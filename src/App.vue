@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen bg-gray-900 text-white">
+  <div class="flex fixed inset-0 bg-gray-900 text-white">
     <!-- Sidebar -->
     <div
       class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900"
@@ -56,7 +56,7 @@
       <!-- Session history panel -->
       <div
         v-if="showHistory"
-        class="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-100"
+        class="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 bg-gray-100"
       >
         <p v-if="sessions.length === 0" class="text-xs text-gray-400">
           No sessions yet.
@@ -81,7 +81,10 @@
       </div>
 
       <!-- Tool result previews -->
-      <div v-else class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-100">
+      <div
+        v-else
+        class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100"
+      >
         <div
           v-for="result in toolResults"
           :key="result.uuid"
