@@ -127,7 +127,7 @@
     </div>
 
     <!-- Canvas -->
-    <div class="flex-1 overflow-auto p-6 text-gray-900">
+    <div class="flex-1 overflow-auto p-6 bg-white text-gray-900">
       <div v-if="selectedResult">
         <component
           :is="getPlugin(selectedResult.toolName)?.viewComponent"
