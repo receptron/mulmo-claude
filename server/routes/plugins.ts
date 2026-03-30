@@ -17,8 +17,12 @@ async function generateInlineImage(prompt: string): Promise<string | null> {
   try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-image-preview",
       contents: [{ text: prompt }],
+      config: {
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: { aspectRatio: "16:9" },
+      },
     });
     const parts = response.candidates?.[0]?.content?.parts ?? [];
     for (const part of parts) {

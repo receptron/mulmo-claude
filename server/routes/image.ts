@@ -5,7 +5,10 @@ import { getSessionImageData } from "../sessions.js";
 const router = Router();
 
 router.post("/generate-image", async (req: Request, res: Response) => {
-  const { prompt, model } = req.body as { prompt: string; model?: string };
+  const { prompt, model } = req.body as {
+    prompt: string;
+    model?: string;
+  };
 
   if (!prompt) {
     res.status(400).json({ success: false, message: "prompt is required" });
@@ -22,11 +25,15 @@ router.post("/generate-image", async (req: Request, res: Response) => {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const modelName = model ?? "gemini-2.5-flash-image";
+    const modelName = model ?? "gemini-3.1-flash-image-preview";
 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [{ text: prompt }],
+      config: {
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: { aspectRatio: "16:9" },
+      },
     });
 
     const parts = response.candidates?.[0]?.content?.parts ?? [];
@@ -87,7 +94,7 @@ router.post("/edit-image", async (req: Request, res: Response) => {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const modelName = "gemini-2.5-flash-image";
+    const modelName = "gemini-3.1-flash-image-preview";
     const base64Data = currentImageData.replace(
       /^data:image\/[^;]+;base64,/,
       "",
