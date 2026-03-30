@@ -29,7 +29,7 @@ This starts both the frontend (Vite) and the backend (Express + Claude Code agen
 
 ### Why do you need a Gemini API key?
 
-MulmoClaude uses Google's **Gemini 2.5 Flash** model for image generation and editing. This powers:
+MulmoClaude uses Google's **Gemini 3.1 Flash Image (nano banana 2)** model for image generation and editing. This powers:
 
 - `generateImage` — creates images from text descriptions
 - `editImage` — transforms or modifies an existing image (e.g. "convert to Ghibli style")
