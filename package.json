@@ -55,11 +55,15 @@
     "concurrently": "^9.2.1",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-sonarjs": "^4.0.2",
+    "globals": "^17.4.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2",
     "vite": "^7.3.1",
     "vue-tsc": "^3.2.5"
   }
