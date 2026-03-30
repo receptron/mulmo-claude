@@ -5,7 +5,7 @@ import path from "path";
 
 export const workspacePath = path.join(os.homedir(), "mulmoclaude");
 
-const SUBDIRS = ["chat", "todos", "calendar", "contacts"];
+const SUBDIRS = ["chat", "todos", "calendar", "contacts", "scheduler"];
 
 export function initWorkspace(): string {
   // Create directory structure if needed

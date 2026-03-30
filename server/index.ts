@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import agentRoutes from "./routes/agent.js";
 import todosRoutes from "./routes/todos.js";
+import schedulerRoutes from "./routes/scheduler.js";
 import sessionsRoutes from "./routes/sessions.js";
 import pluginsRoutes from "./routes/plugins.js";
 import imageRoutes from "./routes/image.js";
@@ -29,6 +30,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
 
 app.use("/api", agentRoutes);
 app.use("/api", todosRoutes);
+app.use("/api", schedulerRoutes);
 app.use("/api", sessionsRoutes);
 app.use("/api", pluginsRoutes);
 app.use("/api", imageRoutes);
