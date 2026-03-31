@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { access, appendFile, mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { Router, Request, Response } from "express";
-import { getRole } from "../../src/config/roles.js";
+import { getRole } from "../roles.js";
 import { runAgent } from "../agent.js";
 import { registerSession, removeSession, pushToSession } from "../sessions.js";
 import { workspacePath } from "../workspace.js";

@@ -18,6 +18,7 @@ import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
 import { TOOL_DEFINITION as OthelloDef } from "@gui-chat-plugin/othello";
 import TodoDef from "../src/plugins/todo/definition.js";
 import SchedulerDef from "../src/plugins/scheduler/definition.js";
+import { toolDefinition as ManageRolesDef } from "../src/plugins/manageRoles/definition.js";
 import type { ToolDefinition } from "gui-chat-protocol";
 
 const SESSION_ID = process.env.SESSION_ID ?? "";
@@ -60,6 +61,7 @@ const TOOL_ENDPOINTS: Record<string, string> = {
   [EditImageDef.name]: "/api/edit-image",
   [Present3DDef.name]: "/api/present3d",
   [OthelloDef.name]: "/api/othello",
+  [ManageRolesDef.name]: "/api/roles/manage",
 };
 
 const ALL_TOOLS: Record<string, ToolDef> = {
@@ -81,6 +83,12 @@ const ALL_TOOLS: Record<string, ToolDef> = {
       OthelloDef,
     ].map((def) => [def.name, fromPackage(def, TOOL_ENDPOINTS[def.name])]),
   ),
+  [ManageRolesDef.name]: {
+    name: ManageRolesDef.name,
+    description: ManageRolesDef.description,
+    inputSchema: ManageRolesDef.inputSchema,
+    endpoint: TOOL_ENDPOINTS[ManageRolesDef.name],
+  },
   switchRole: {
     name: "switchRole",
     description:
@@ -116,6 +124,19 @@ async function handleToolCall(
       body: JSON.stringify({ roleId: args.roleId }),
     });
     return `Switching to ${args.roleId} role`;
+  }
+
+  if (name === "manageRoles") {
+    const res = await fetch(
+      `${BASE_URL}/api/roles/manage?session=${SESSION_ID}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      },
+    );
+    const result = await res.json();
+    return result.message ?? (result.error ? `Error: ${result.error}` : "Done");
   }
 
   const tool = tools.find((t) => t.name === name);

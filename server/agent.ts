@@ -3,7 +3,7 @@ import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { Role } from "../src/config/roles.js";
-import { ROLES } from "../src/config/roles.js";
+import { loadAllRoles } from "./roles.js";
 
 export type AgentEvent =
   | { type: "status"; message: string }
@@ -32,6 +32,7 @@ const MCP_PLUGINS = new Set([
   "editImage",
   "present3D",
   "playOthello",
+  "manageRoles",
 ]);
 
 export async function* runAgent(
@@ -65,7 +66,9 @@ export async function* runAgent(
             SESSION_ID: sessionId,
             PORT: String(port),
             PLUGIN_NAMES: activePlugins.join(","),
-            ROLE_IDS: ROLES.map((r) => r.id).join(","),
+            ROLE_IDS: loadAllRoles()
+              .map((r) => r.id)
+              .join(","),
           },
         },
       },

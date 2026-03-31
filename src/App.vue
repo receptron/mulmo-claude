@@ -191,6 +191,7 @@
 import { ref, computed, onMounted } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import { ROLES } from "./config/roles";
+import type { Role } from "./config/roles";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
@@ -203,10 +204,10 @@ interface SessionSummary {
   preview: string;
 }
 
-const roles = ROLES;
+const roles = ref<Role[]>(ROLES);
 const currentRoleId = ref(ROLES[0].id);
 const currentRole = computed(
-  () => ROLES.find((r) => r.id === currentRoleId.value) ?? ROLES[0],
+  () => roles.value.find((r) => r.id === currentRoleId.value) ?? roles.value[0],
 );
 const chatSessionId = ref(uuidv4());
 
@@ -241,11 +242,11 @@ const showQueries = computed(
 );
 
 function roleIcon(roleId: string): string {
-  return ROLES.find((r) => r.id === roleId)?.icon ?? "star";
+  return roles.value.find((r) => r.id === roleId)?.icon ?? "star";
 }
 
 function roleName(roleId: string): string {
-  return ROLES.find((r) => r.id === roleId)?.name ?? roleId;
+  return roles.value.find((r) => r.id === roleId)?.name ?? roleId;
 }
 
 function formatDate(iso: string): string {
@@ -286,7 +287,7 @@ const GEMINI_PLUGINS = new Set([
   "editHtml",
 ]);
 const needsGemini = (roleId: string) =>
-  (ROLES.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
+  (roles.value.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
     GEMINI_PLUGINS.has(p),
   );
 
@@ -301,6 +302,15 @@ function onRoleChange() {
   statusMessage.value = "";
   chatSessionId.value = uuidv4();
   toolCallHistory.value = [];
+}
+
+async function refreshRoles() {
+  try {
+    const res = await fetch("/api/roles");
+    roles.value = await res.json();
+  } catch {
+    // keep current roles on error
+  }
 }
 
 async function fetchHealth() {
@@ -432,6 +442,8 @@ async function sendMessage(text?: string) {
             currentRoleId.value = data.roleId as string;
             onRoleChange();
           }, 0);
+        } else if (data.type === "roles_updated") {
+          await refreshRoles();
         } else if (data.type === "text") {
           toolResults.value.push(
             makeTextResult(data.message as string, "assistant"),
@@ -459,5 +471,6 @@ async function sendMessage(text?: string) {
 onMounted(() => {
   fetchHealth();
   fetchSessions();
+  refreshRoles();
 });
 </script>

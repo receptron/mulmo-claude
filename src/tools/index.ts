@@ -19,11 +19,13 @@ import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
 import schedulerPlugin from "../plugins/scheduler/index";
+import manageRolesPlugin from "../plugins/manageRoles/index";
 
 const plugins: Record<string, ToolPlugin> = {
   "text-response": TextResponsePlugin.plugin as unknown as ToolPlugin,
   manageTodoList: todoPlugin as unknown as ToolPlugin,
   manageScheduler: schedulerPlugin as unknown as ToolPlugin,
+  manageRoles: manageRolesPlugin as unknown as ToolPlugin,
   presentDocument: MarkdownPlugin.plugin as unknown as ToolPlugin,
   presentSpreadsheet: SpreadsheetPlugin.plugin as unknown as ToolPlugin,
   createMindMap: MindMapPlugin.plugin as unknown as ToolPlugin,
