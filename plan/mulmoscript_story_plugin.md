@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a `presentMulmoScript` local plugin that lets Claude generate a story or presentation in [MulmoScript](../../mulmo/src/types/schema.ts) format and present it visually to the user as an interactive storyboard in the canvas.
+Add a `presentMulmoScript` local plugin that lets Claude generate a story or presentation in [MulmoScript](https://github.com/receptron/mulmocast-cli/blob/main/src/types/schema.ts) format and present it visually to the user as an interactive storyboard in the canvas.
 
 ---
 
@@ -304,6 +304,6 @@ Edits to existing files:
 - **TTS provider is `"gemini"`, not `"google"`** — the `"google"` TTS provider is the older Cloud TTS; `"gemini"` is the Gemini-native TTS (model `gemini-2.5-flash-preview-tts`, voice `"Kore"`). This distinction must be clear in the tool description to avoid Claude using the wrong key.
 - **No schema validation on the server** beyond presence checks — trust Claude to produce valid JSON. Zod validation can be added later.
 - **Workspace sub-directory `stories/`** keeps MulmoScript files discoverable and separate from todos/calendar/etc.
-- **`currentMulmoScriptVersion`** in the schema is `"0.5"` — the `$mulmocast.version` field should be hardcoded to this in the tool description so Claude always gets it right.
+- **`currentMulmoScriptVersion`** in the schema is `"1.1"` — the `$mulmocast.version` field should be hardcoded to this in the tool description so Claude always gets it right.
 - All three Google capabilities share `GEMINI_API_KEY` — only one env var is needed.
 - The saved `.json` files are ready to pass directly to the `mulmo` CLI for rendering into video.

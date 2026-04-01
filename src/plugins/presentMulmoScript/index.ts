@@ -12,17 +12,25 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const res = await fetch("/api/mulmo-script", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args),
-    });
-    const result = await res.json();
-    return {
-      ...result,
-      toolName: TOOL_NAME,
-      uuid: crypto.randomUUID(),
-    };
+    try {
+      const res = await fetch("/api/mulmo-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      });
+      const result = await res.json();
+      return {
+        ...result,
+        toolName: TOOL_NAME,
+        uuid: crypto.randomUUID(),
+      };
+    } catch (error) {
+      return {
+        toolName: TOOL_NAME,
+        uuid: crypto.randomUUID(),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   },
 
   isEnabled: () => true,

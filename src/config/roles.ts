@@ -22,7 +22,7 @@ export const ROLES: Role[] = [
     queries: [
       "Show my todo list",
       "Add 'Add GEMINI_API_KEY in .env file' to the todo list",
-      "Remove completed items froom the todo list",
+      "Remove completed items from the todo list",
       "Show me the scheduler",
     ],
   },

@@ -23,9 +23,8 @@ Always use Google providers. Required structure:
       }
     }
   },
-  "imageParams": { "provider": "google", "model": "gemini-2.5-flash-image" },
-  "movieParams": { "provider": "google", "model": "veo-2.0-generate-001" },
-  "textSlideParams": { "cssStyles": "body { background-color: white; }" },
+  "imageParams": { "provider": "google", "model": "gemini-3.1-flash-image" },
+  "movieParams": { "provider": "google", "model": "veo-3.1-generate" },
   "beats": [
     {
       "speaker": "Presenter",
