@@ -1,11 +1,15 @@
-export interface Role {
-  id: string;
-  name: string;
-  icon: string;
-  prompt: string;
-  availablePlugins: string[];
-  queries?: string[];
-}
+import { z } from "zod";
+
+export const RoleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: z.string(),
+  prompt: z.string(),
+  availablePlugins: z.array(z.string()),
+  queries: z.array(z.string()).optional(),
+});
+
+export type Role = z.infer<typeof RoleSchema>;
 
 export const ROLES: Role[] = [
   {
@@ -251,15 +255,16 @@ export const ROLES: Role[] = [
       "You are a creative storyteller and presentation designer.\n\n" +
       "When asked to create a story, presentation, explainer, or educational video:\n" +
       "1. Decide on the number of beats (typically 4–8)\n" +
-      "2. Choose appropriate image types per beat (markdown for text-heavy slides, textSlide for title/bullet slides, imagePrompt to describe a generated image, mermaid for diagrams)\n" +
+      "2. Choose the visual for each beat: use imagePrompt/moviePrompt (top-level string fields) for AI-generated visuals, or image.type for structured layouts (textSlide, markdown, mermaid)\n" +
       "3. Write clear narration text for each beat (this becomes the voiceover)\n" +
       "4. Assemble the complete mulmoScript JSON following the template below exactly\n" +
       "5. Call presentMulmoScript with the assembled script\n\n" +
       "Always use Google providers as shown in the template. Keep beat texts conversational and engaging.\n\n" +
+      "IMPORTANT: imagePrompt and moviePrompt are plain string fields on the beat, NOT nested inside an image object.\n\n" +
       "## MulmoScript Template\n\n" +
       "```json\n" +
       "{\n" +
-      '  "$mulmocast": { "version": "0.5" },\n' +
+      '  "$mulmocast": { "version": "1.1" },\n' +
       '  "title": "The Life of a Star",\n' +
       '  "description": "A short educational explainer about stellar evolution",\n' +
       '  "lang": "en",\n' +
@@ -278,10 +283,7 @@ export const ROLES: Role[] = [
       "    {\n" +
       '      "speaker": "Presenter",\n' +
       '      "text": "Every star you see in the night sky began its life inside a vast cloud of gas and dust called a nebula.",\n' +
-      '      "image": {\n' +
-      '        "type": "imagePrompt",\n' +
-      '        "prompt": "A vast colorful nebula in deep space, swirling clouds of purple and gold gas, stars forming within"\n' +
-      "      }\n" +
+      '      "imagePrompt": "A vast colorful nebula in deep space, swirling clouds of purple and gold gas, stars forming within"\n' +
       "    },\n" +
       "    {\n" +
       '      "speaker": "Presenter",\n' +
@@ -305,10 +307,7 @@ export const ROLES: Role[] = [
       "    {\n" +
       '      "speaker": "Presenter",\n' +
       '      "text": "When a massive star finally exhausts its fuel, it collapses in an instant and explodes as a supernova.",\n' +
-      '      "image": {\n' +
-      '        "type": "imagePrompt",\n' +
-      '        "prompt": "A dramatic supernova explosion in space, shockwave of light and energy expanding outward, remnant nebula forming"\n' +
-      "      }\n" +
+      '      "imagePrompt": "A dramatic supernova explosion in space, shockwave of light and energy expanding outward, remnant nebula forming"\n' +
       "    },\n" +
       "    {\n" +
       '      "speaker": "Presenter",\n' +
@@ -329,6 +328,21 @@ export const ROLES: Role[] = [
       "Create a 5-slide intro to quantum computing",
       "Make a short story about a robot who learns to paint",
       "Build a presentation explaining the water cycle to kids",
+    ],
+  },
+  {
+    id: "musician",
+    name: "Musician",
+    icon: "music_note",
+    prompt:
+      "You are a music assistant. Help users explore, compose, and display sheet music. " +
+      "When asked to show or play a piece, generate MusicXML and call showMusic. " +
+      "You can compose simple melodies, explain music theory, and present well-known pieces in MusicXML format.",
+    availablePlugins: ["showMusic", "switchRole"],
+    queries: [
+      "Play a C major scale",
+      "Show me Twinkle Twinkle Little Star",
+      "Compose a short melody in G major",
     ],
   },
   {

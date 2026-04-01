@@ -40,7 +40,7 @@ const plugins: Record<string, ToolPlugin> = {
   editImage: EditImagePlugin.plugin as unknown as ToolPlugin,
   browse: BrowsePlugin.plugin as unknown as ToolPlugin,
   camera: CameraPlugin.plugin as unknown as ToolPlugin,
-  music: MusicPlugin.plugin as unknown as ToolPlugin,
+  showMusic: MusicPlugin.plugin as unknown as ToolPlugin,
   playOthello: OthelloPlugin.plugin as unknown as ToolPlugin,
   piano: PianoPlugin.plugin as unknown as ToolPlugin,
   present3D: Present3DPlugin.plugin as unknown as ToolPlugin,

@@ -23,7 +23,7 @@ A minimal valid script that the LLM should produce:
 
 ```json
 {
-  "$mulmocast": { "version": "0.5" },
+  "$mulmocast": { "version": "1.1" },
   "title": "Story title",
   "lang": "en",
   "speechParams": {
@@ -191,7 +191,7 @@ Always use Google providers as shown in the template. Keep beat texts conversati
 
 \`\`\`json
 {
-  "$mulmocast": { "version": "0.5" },
+  "$mulmocast": { "version": "1.1" },
   "title": "The Life of a Star",
   "description": "A short educational explainer about stellar evolution",
   "lang": "en",

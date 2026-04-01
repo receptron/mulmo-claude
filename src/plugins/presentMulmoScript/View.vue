@@ -60,20 +60,27 @@
 
         <!-- Beat body -->
         <div class="px-4 py-3 space-y-2">
-          <!-- Image content preview -->
-          <div v-if="beat.image" class="text-sm text-gray-700">
-            <template
-              v-if="beat.image.type === 'textSlide' && beat.image.slide"
-            >
-              <div class="font-semibold">{{ beat.image.slide.title }}</div>
+          <!-- textSlide: show rendered image if available, else slide text + spinner -->
+          <template v-if="beat.image?.type === 'textSlide'">
+            <div v-if="renderedImages[index]" class="rounded overflow-hidden">
+              <img
+                :src="renderedImages[index]"
+                class="w-full object-contain"
+                :alt="`Beat ${index + 1}`"
+              />
+            </div>
+            <div v-else class="text-sm text-gray-700">
+              <div class="font-semibold">
+                {{ beat.image.slide?.title }}
+              </div>
               <div
-                v-if="beat.image.slide.subtitle"
+                v-if="beat.image.slide?.subtitle"
                 class="text-gray-500 text-xs"
               >
                 {{ beat.image.slide.subtitle }}
               </div>
               <ul
-                v-if="beat.image.slide.bullets?.length"
+                v-if="beat.image.slide?.bullets?.length"
                 class="mt-1 space-y-0.5"
               >
                 <li
@@ -84,9 +91,48 @@
                   <span class="text-gray-400">•</span>{{ b }}
                 </li>
               </ul>
-            </template>
+            </div>
+            <!-- Render status -->
+            <div class="flex items-center gap-1.5 text-xs">
+              <template v-if="renderState[index] === 'rendering'">
+                <svg
+                  class="animate-spin w-3 h-3 text-green-500 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  />
+                </svg>
+                <span class="text-green-600">Rendering…</span>
+              </template>
+              <template v-else-if="renderState[index] === 'done'">
+                <span class="text-green-500">✓</span>
+                <span class="text-gray-400">Image ready</span>
+              </template>
+              <template v-else-if="renderState[index] === 'error'">
+                <span class="text-red-400">✕</span>
+                <span class="text-red-400">{{ renderErrors[index] }}</span>
+              </template>
+            </div>
+          </template>
 
-            <template v-else-if="beat.image.type === 'markdown'">
+          <!-- Other image types -->
+          <div
+            v-else-if="beat.image && beat.image.type !== 'textSlide'"
+            class="text-sm text-gray-700"
+          >
+            <template v-if="beat.image.type === 'markdown'">
               <div
                 class="text-xs font-mono text-gray-600 bg-gray-50 rounded p-2 line-clamp-4 whitespace-pre-wrap"
               >
@@ -144,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, reactive } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { MulmoScriptData } from "./index";
 
@@ -180,6 +226,40 @@ const script = computed<MulmoScript>(
 );
 const filePath = computed(() => data.value?.filePath ?? "");
 const beats = computed<Beat[]>(() => script.value.beats ?? []);
+
+// Per-beat render state
+type RenderState = "idle" | "rendering" | "done" | "error";
+const renderState = reactive<Record<number, RenderState>>({});
+const renderedImages = reactive<Record<number, string>>({});
+const renderErrors = reactive<Record<number, string>>({});
+
+async function renderBeat(index: number) {
+  renderState[index] = "rendering";
+  try {
+    const res = await fetch("/api/mulmo-script/render-beat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath: filePath.value, beatIndex: index }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      throw new Error(json.error ?? "Render failed");
+    }
+    renderedImages[index] = json.image;
+    renderState[index] = "done";
+  } catch (err) {
+    renderErrors[index] = err instanceof Error ? err.message : String(err);
+    renderState[index] = "error";
+  }
+}
+
+onMounted(() => {
+  beats.value.forEach((beat, index) => {
+    if (beat.image?.type === "textSlide") {
+      renderBeat(index);
+    }
+  });
+});
 
 const TYPE_BADGE: Record<string, string> = {
   markdown: "bg-blue-100 text-blue-700",

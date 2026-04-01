@@ -12,7 +12,8 @@
     "server": "tsx server/index.ts",
     "lint": "eslint src server",
     "format": "prettier --write '{src,server}/**/*.{ts,json,yaml,vue}'",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "tsx --test ./test/*/test_*.ts"
   },
   "dependencies": {
     "@google/genai": "^1.47.0",
@@ -40,9 +41,11 @@
     "express": "^5.2.1",
     "gui-chat-protocol": "^0.0.4",
     "material-icons": "^1.13.14",
+    "mulmocast": "file:../mulmo",
     "uuid": "^13.0.0",
     "vue": "^3.5.29",
-    "vue-router": "^5.0.3"
+    "vue-router": "^5.0.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

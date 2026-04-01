@@ -34,4 +34,5 @@ jobs:
     - run: yarn install
     - run: yarn run typecheck
     - run: yarn run lint
+    - run: yarn test
 

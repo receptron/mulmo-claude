@@ -6,6 +6,7 @@ import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "@gui-chat-plugin/canvas";
 import { executePresent3D } from "@gui-chat-plugin/present3d";
 import { executeOthello } from "@gui-chat-plugin/othello";
+import { showMusic } from "@gui-chat-plugin/music";
 import { GoogleGenAI } from "@google/genai";
 
 const router = Router();
@@ -132,6 +133,16 @@ router.post("/present3d", async (req: Request, res: Response) => {
 router.post("/othello", async (req: Request, res: Response) => {
   try {
     const result = await executeOthello(null as never, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: String(err) });
+  }
+});
+
+// showMusic — sheet music display
+router.post("/music", async (req: Request, res: Response) => {
+  try {
+    const result = await showMusic(null as never, req.body);
     res.json(result);
   } catch (err) {
     res.status(500).json({ message: String(err) });

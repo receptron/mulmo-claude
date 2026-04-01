@@ -10,7 +10,7 @@ const toolDefinition: ToolDefinition = {
 Always use Google providers. Required structure:
 
 {
-  "$mulmocast": { "version": "0.5" },
+  "$mulmocast": { "version": "1.1" },
   "title": "The Life of a Star",
   "description": "A short educational explainer about stellar evolution",
   "lang": "en",
@@ -29,7 +29,7 @@ Always use Google providers. Required structure:
     {
       "speaker": "Presenter",
       "text": "Narration spoken aloud for this beat.",
-      "image": { "type": "imagePrompt", "prompt": "Detailed image description" }
+      "imagePrompt": "Detailed description — AI generates the image"
     },
     {
       "speaker": "Presenter",
@@ -40,17 +40,24 @@ Always use Google providers. Required structure:
       "speaker": "Presenter",
       "text": "Markdown beat.",
       "image": { "type": "markdown", "markdown": "## Heading\\n\\nBody text here." }
+    },
+    {
+      "speaker": "Presenter",
+      "text": "AI video beat.",
+      "moviePrompt": "Detailed description — AI generates the video clip"
     }
   ]
 }
 
-Beat image types:
-- "markdown"    → markdown field (string)
-- "textSlide"   → slide: { title, subtitle?, bullets? }
-- "imagePrompt" → prompt field (string) — AI generates image
-- "moviePrompt" → prompt field (string) — AI generates video clip
-- "mermaid"     → title + code field
-- "chart"       → title + chartData field`,
+Beat visual options (choose one per beat):
+- "imagePrompt": "..."  → top-level string field — AI generates an image from the prompt
+- "moviePrompt": "..."  → top-level string field — AI generates a video clip from the prompt
+- "image": { "type": "textSlide", "slide": { "title", "subtitle"?, "bullets"? } }
+- "image": { "type": "markdown", "markdown": "..." }
+- "image": { "type": "mermaid", "title": "...", "code": { "kind": "text", "text": "..." } }
+- "image": { "type": "chart", "title": "...", "chartData": { ... } }
+
+IMPORTANT: "imagePrompt" and "moviePrompt" are plain string fields on the beat, NOT nested under "image".`,
   parameters: {
     type: "object",
     properties: {

@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { BUILTIN_ROLES, type Role } from "../src/config/roles.js";
+import { BUILTIN_ROLES, RoleSchema, type Role } from "../src/config/roles.js";
 
 const rolesDir = path.join(os.homedir(), "mulmoclaude", "roles");
 
@@ -21,7 +21,7 @@ export function loadCustomRoles(): Role[] {
     .flatMap((f) => {
       try {
         const raw = fs.readFileSync(path.join(rolesDir, f), "utf-8");
-        return [withSwitchRole(JSON.parse(raw) as Role)];
+        return [withSwitchRole(RoleSchema.parse(JSON.parse(raw)))];
       } catch {
         return [];
       }
