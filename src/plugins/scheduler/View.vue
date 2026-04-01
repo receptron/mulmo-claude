@@ -92,6 +92,82 @@
       </div>
     </div>
 
+    <!-- iCal sources -->
+    <details class="border-t border-gray-200 bg-gray-50 shrink-0">
+      <summary
+        class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+        @click="onIcalToggle"
+      >
+        iCal Sources
+        <span v-if="icalSources.length > 0" class="text-xs text-gray-400"
+          >({{ icalSources.length }})</span
+        >
+      </summary>
+      <div class="p-3 space-y-3">
+        <!-- Source list -->
+        <div
+          v-for="source in icalSources"
+          :key="source.id"
+          class="flex items-center gap-2 text-sm"
+        >
+          <span class="flex-1 min-w-0 truncate text-gray-700">{{
+            source.name
+          }}</span>
+          <button
+            class="text-gray-400 hover:text-red-500 text-xs shrink-0"
+            :disabled="icalLoading"
+            @click="removeIcalSource(source.id)"
+          >
+            ✕
+          </button>
+        </div>
+        <p v-if="icalSources.length === 0" class="text-xs text-gray-400">
+          No iCal sources configured.
+        </p>
+
+        <!-- Add source form -->
+        <div class="flex flex-col gap-2">
+          <input
+            v-model="newIcalName"
+            type="text"
+            placeholder="Calendar name"
+            class="w-full px-2 py-1.5 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+          />
+          <input
+            v-model="newIcalUrl"
+            type="url"
+            placeholder="iCal URL (https://...)"
+            class="w-full px-2 py-1.5 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+          />
+          <div class="flex gap-2">
+            <button
+              :disabled="
+                !newIcalName.trim() || !newIcalUrl.trim() || icalLoading
+              "
+              class="px-3 py-1.5 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+              @click="addIcalSource"
+            >
+              Add
+            </button>
+            <button
+              :disabled="icalSources.length === 0 || icalLoading"
+              class="px-3 py-1.5 text-xs rounded bg-green-500 text-white hover:bg-green-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+              @click="syncIcal"
+            >
+              {{ icalLoading ? "Syncing..." : "Sync All" }}
+            </button>
+          </div>
+        </div>
+        <p
+          v-if="icalMessage"
+          class="text-xs"
+          :class="icalError ? 'text-red-500' : 'text-green-600'"
+        >
+          {{ icalMessage }}
+        </p>
+      </div>
+    </details>
+
     <!-- JSON source editor -->
     <details class="border-t border-gray-200 bg-gray-50 shrink-0">
       <summary
@@ -245,6 +321,105 @@ async function applyItemEdit() {
     title: parsed.title,
     props: parsed.props,
   });
+}
+
+// ── iCal source management ──────────────────────────────────────────────────
+
+interface IcalSource {
+  id: string;
+  name: string;
+  url: string;
+}
+
+const icalSources = ref<IcalSource[]>([]);
+const newIcalName = ref("");
+const newIcalUrl = ref("");
+const icalLoading = ref(false);
+const icalMessage = ref("");
+const icalError = ref(false);
+
+async function callIcalApi(body: Record<string, unknown>) {
+  const response = await fetch("/api/ical", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return await response.json();
+}
+
+async function fetchIcalSources() {
+  const result = await callIcalApi({ action: "list_sources" });
+  icalSources.value = result.data?.sources ?? [];
+}
+
+function onIcalToggle() {
+  // Fetch sources when opening the panel (click fires before <details> toggles)
+  fetchIcalSources();
+}
+
+async function addIcalSource() {
+  icalMessage.value = "";
+  icalError.value = false;
+  icalLoading.value = true;
+  try {
+    const result = await callIcalApi({
+      action: "add_source",
+      name: newIcalName.value.trim(),
+      url: newIcalUrl.value.trim(),
+    });
+    icalSources.value = result.data?.sources ?? icalSources.value;
+    icalMessage.value = result.message ?? "Source added";
+    newIcalName.value = "";
+    newIcalUrl.value = "";
+  } catch (e) {
+    icalError.value = true;
+    icalMessage.value = e instanceof Error ? e.message : "Failed to add source";
+  } finally {
+    icalLoading.value = false;
+  }
+}
+
+async function removeIcalSource(sourceId: string) {
+  icalMessage.value = "";
+  icalError.value = false;
+  icalLoading.value = true;
+  try {
+    const result = await callIcalApi({ action: "remove_source", sourceId });
+    icalSources.value = result.data?.sources ?? [];
+    icalMessage.value = result.message ?? "Source removed";
+    // Refresh scheduler items since imported events were removed
+    await callApi({ action: "show" });
+  } catch (e) {
+    icalError.value = true;
+    icalMessage.value =
+      e instanceof Error ? e.message : "Failed to remove source";
+  } finally {
+    icalLoading.value = false;
+  }
+}
+
+async function syncIcal() {
+  icalMessage.value = "";
+  icalError.value = false;
+  icalLoading.value = true;
+  try {
+    const result = await callIcalApi({ action: "sync" });
+    icalMessage.value = result.message ?? "Sync complete";
+    icalError.value = (result.jsonData?.errors ?? 0) > 0;
+    // Update the scheduler view with merged items
+    if (result.data?.items) {
+      emit("updateResult", {
+        ...props.selectedResult,
+        data: { items: result.data.items },
+        uuid: props.selectedResult.uuid,
+      });
+    }
+  } catch (e) {
+    icalError.value = true;
+    icalMessage.value = e instanceof Error ? e.message : "Sync failed";
+  } finally {
+    icalLoading.value = false;
+  }
 }
 
 // ── JSON source editor ───────────────────────────────────────────────────────
