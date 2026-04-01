@@ -31,93 +31,99 @@
     </div>
 
     <!-- Beat list -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-3">
+    <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
       <div
         v-for="(beat, index) in beats"
         :key="index"
         class="rounded-lg border border-gray-200 overflow-hidden"
       >
-        <!-- Beat header -->
-        <div
-          class="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200"
-        >
-          <span class="text-xs font-mono text-gray-400 w-5 text-right shrink-0">
-            {{ index + 1 }}
-          </span>
-          <span
-            class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
-            :class="badgeClass(beat.image?.type)"
-          >
-            {{ beat.image?.type || "no image" }}
-          </span>
-          <span class="text-xs text-gray-500 shrink-0">{{
-            beat.speaker || "Presenter"
-          }}</span>
-          <span v-if="beat.id" class="text-xs text-gray-400 font-mono ml-auto"
-            >#{{ beat.id }}</span
-          >
-        </div>
-
         <!-- Beat body: thumbnail + narration side by side -->
-        <div class="px-4 py-3">
-          <div class="flex gap-3 items-start">
-            <!-- Thumbnail -->
+        <div class="flex gap-3 items-stretch">
+          <!-- Thumbnail -->
+          <div class="shrink-0 w-[45%] overflow-hidden bg-gray-50">
+            <img
+              v-if="renderedImages[index]"
+              :src="renderedImages[index]"
+              class="w-full object-contain"
+              :alt="`Beat ${index + 1}`"
+            />
             <div
-              class="shrink-0 w-[50%] rounded overflow-hidden border border-gray-200 bg-gray-50"
+              v-else
+              class="w-full aspect-video flex flex-col items-center justify-center gap-1 p-2"
             >
-              <img
-                v-if="renderedImages[index]"
-                :src="renderedImages[index]"
-                class="w-full object-contain"
-                :alt="`Beat ${index + 1}`"
-              />
-              <div
-                v-else
-                class="w-full aspect-video flex flex-col items-center justify-center gap-1 p-2"
-              >
-                <template v-if="renderState[index] === 'rendering'">
-                  <svg
-                    class="animate-spin w-4 h-4 text-green-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    />
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8H4z"
-                    />
-                  </svg>
-                  <span class="text-xs text-green-500">Rendering…</span>
-                </template>
-                <template v-else-if="renderState[index] === 'error'">
-                  <span class="text-xs text-red-400 text-center">{{
-                    renderErrors[index]
-                  }}</span>
-                </template>
-                <template v-else>
-                  <span class="text-xs text-gray-300">{{
-                    beat.image?.type ?? "—"
-                  }}</span>
-                </template>
-              </div>
-            </div>
-
-            <!-- Narration text -->
-            <div
-              v-if="beat.text"
-              class="flex-1 min-w-0 text-sm text-gray-800 leading-relaxed"
-            >
-              {{ beat.text }}
+              <template v-if="renderState[index] === 'rendering'">
+                <svg
+                  class="animate-spin w-4 h-4 text-green-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  />
+                </svg>
+                <span class="text-xs text-green-500">Rendering…</span>
+              </template>
+              <template v-else-if="renderState[index] === 'error'">
+                <span class="text-xs text-red-400 text-center">{{
+                  renderErrors[index]
+                }}</span>
+              </template>
+              <template v-else>
+                <span class="text-xs text-gray-300">{{
+                  beat.image?.type ?? "—"
+                }}</span>
+              </template>
             </div>
           </div>
+
+          <!-- Narration text -->
+          <div
+            v-if="beat.text"
+            class="flex flex-col flex-1 min-w-0 px-2 py-1.5"
+          >
+            <span class="text-sm text-gray-800 leading-relaxed">{{
+              beat.text
+            }}</span>
+            <div class="flex justify-end mt-auto pt-1">
+              <button
+                class="text-gray-400 hover:text-gray-600"
+                :title="sourceOpen[index] ? 'Hide source' : 'Show source'"
+                @click="sourceOpen[index] = !sourceOpen[index]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Source view -->
+        <div v-if="sourceOpen[index]" class="border-t border-gray-100">
+          <pre
+            class="text-xs text-gray-600 bg-gray-50 p-2 overflow-x-auto whitespace-pre-wrap break-all"
+            >{{ JSON.stringify(beat, null, 2) }}</pre
+          >
         </div>
       </div>
 
@@ -167,6 +173,7 @@ type RenderState = "idle" | "rendering" | "done" | "error";
 const renderState = reactive<Record<number, RenderState>>({});
 const renderedImages = reactive<Record<number, string>>({});
 const renderErrors = reactive<Record<number, string>>({});
+const sourceOpen = reactive<Record<number, boolean>>({});
 
 async function renderBeat(index: number) {
   renderState[index] = "rendering";
@@ -202,20 +209,6 @@ onMounted(() => {
     }
   });
 });
-
-const TYPE_BADGE: Record<string, string> = {
-  markdown: "bg-blue-100 text-blue-700",
-  textSlide: "bg-green-100 text-green-700",
-  imagePrompt: "bg-purple-100 text-purple-700",
-  moviePrompt: "bg-orange-100 text-orange-700",
-  mermaid: "bg-teal-100 text-teal-700",
-  chart: "bg-yellow-100 text-yellow-700",
-  html_tailwind: "bg-pink-100 text-pink-700",
-};
-
-function badgeClass(type?: string): string {
-  return TYPE_BADGE[type ?? ""] ?? "bg-gray-100 text-gray-600";
-}
 
 function downloadJson() {
   const blob = new Blob([JSON.stringify(script.value, null, 2)], {
