@@ -211,6 +211,26 @@ interface SessionEntry {
   result?: ToolResultComplete;
 }
 
+interface TextEntry extends SessionEntry {
+  source: "user" | "assistant";
+  type: "text";
+  message: string;
+}
+
+interface ToolResultEntry extends SessionEntry {
+  source: "tool";
+  type: "tool_result";
+  result: ToolResultComplete;
+}
+
+const isTextEntry = (e: SessionEntry): e is TextEntry =>
+  (e.source === "user" || e.source === "assistant") &&
+  e.type === "text" &&
+  typeof e.message === "string";
+
+const isToolResultEntry = (e: SessionEntry): e is ToolResultEntry =>
+  e.source === "tool" && e.type === "tool_result" && e.result !== undefined;
+
 interface SseToolCall {
   type: "tool_call";
   toolUseId: string;
@@ -415,19 +435,9 @@ async function loadSession(id: string) {
   toolResults.value = [];
   for (const entry of entries) {
     if (entry.type === "session_meta") continue;
-    if (entry.source === "user" && entry.type === "text" && entry.message) {
-      toolResults.value.push(makeTextResult(entry.message, "user"));
-    } else if (
-      entry.source === "assistant" &&
-      entry.type === "text" &&
-      entry.message
-    ) {
-      toolResults.value.push(makeTextResult(entry.message, "assistant"));
-    } else if (
-      entry.source === "tool" &&
-      entry.type === "tool_result" &&
-      entry.result
-    ) {
+    if (isTextEntry(entry)) {
+      toolResults.value.push(makeTextResult(entry.message, entry.source));
+    } else if (isToolResultEntry(entry)) {
       toolResults.value.push(entry.result);
     }
   }
