@@ -59,15 +59,23 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
 }
 
 // presentDocument — fills image placeholders via Gemini if API key is available
-router.post("/present-document", async (req: Request, res: Response) => {
-  const { title, markdown } = req.body as { title: string; markdown: string };
-  const filledMarkdown = await fillImagePlaceholders(markdown);
-  res.json({
-    message: `Document "${title}" is ready.`,
-    title,
-    data: { markdown: filledMarkdown },
-  });
-});
+interface PresentDocumentBody {
+  title: string;
+  markdown: string;
+}
+
+router.post(
+  "/present-document",
+  async (req: Request<object, unknown, PresentDocumentBody>, res: Response) => {
+    const { title, markdown } = req.body;
+    const filledMarkdown = await fillImagePlaceholders(markdown);
+    res.json({
+      message: `Document "${title}" is ready.`,
+      title,
+      data: { markdown: filledMarkdown },
+    });
+  },
+);
 
 // presentSpreadsheet — uses package execute for validation/processing
 router.post("/present-spreadsheet", async (req: Request, res: Response) => {

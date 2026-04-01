@@ -42,115 +42,116 @@ function saveItems(items: ScheduledItem[]): void {
   fs.writeFileSync(file, JSON.stringify(items, null, 2));
 }
 
-router.post("/scheduler", (req: Request, res: Response) => {
-  const {
-    action,
-    title,
-    id,
-    props,
-    items: replaceItems,
-  } = req.body as {
-    action: string;
-    title?: string;
-    id?: string;
-    props?: Record<string, string | number | boolean | null>;
-    items?: ScheduledItem[];
-  };
+interface SchedulerBody {
+  action: string;
+  title?: string;
+  id?: string;
+  props?: Record<string, string | number | boolean | null>;
+  items?: ScheduledItem[];
+}
 
-  let items = loadItems();
-  // eslint-disable-next-line no-useless-assignment
-  let message = "";
-  let jsonData: Record<string, unknown> = {};
+router.post(
+  "/scheduler",
+  (req: Request<object, unknown, SchedulerBody>, res: Response) => {
+    const { action, title, id, props, items: replaceItems } = req.body;
 
-  switch (action) {
-    case "show":
-      message = `Showing ${items.length} scheduled item(s)`;
-      break;
+    let items = loadItems();
+    // eslint-disable-next-line no-useless-assignment
+    let message = "";
+    let jsonData: Record<string, unknown> = {};
 
-    case "add": {
-      if (!title) {
-        res.status(400).json({ error: "title required" });
-        return;
-      }
-      const item: ScheduledItem = {
-        id: `sched_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title,
-        createdAt: Date.now(),
-        props: props ?? {},
-      };
-      items.push(item);
-      items = sortItems(items);
-      saveItems(items);
-      message = `Added: "${title}"`;
-      jsonData = { added: item.id };
-      break;
-    }
+    switch (action) {
+      case "show":
+        message = `Showing ${items.length} scheduled item(s)`;
+        break;
 
-    case "delete": {
-      if (!id) {
-        res.status(400).json({ error: "id required" });
-        return;
-      }
-      const before = items.length;
-      items = items.filter((i) => i.id !== id);
-      saveItems(items);
-      message =
-        items.length < before ? `Deleted item ${id}` : `Item not found: ${id}`;
-      jsonData = { deleted: id };
-      break;
-    }
-
-    case "update": {
-      if (!id) {
-        res.status(400).json({ error: "id required" });
-        return;
-      }
-      const item = items.find((i) => i.id === id);
-      if (item) {
-        if (title !== undefined) item.title = title;
-        if (props !== undefined) {
-          for (const [k, v] of Object.entries(props)) {
-            if (v === null) {
-              delete item.props[k];
-            } else {
-              item.props[k] = v;
-            }
-          }
+      case "add": {
+        if (!title) {
+          res.status(400).json({ error: "title required" });
+          return;
         }
+        const item: ScheduledItem = {
+          id: `sched_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          title,
+          createdAt: Date.now(),
+          props: props ?? {},
+        };
+        items.push(item);
         items = sortItems(items);
         saveItems(items);
-        message = `Updated: "${item.title}"`;
-        jsonData = { updated: id };
-      } else {
-        message = `Item not found: ${id}`;
+        message = `Added: "${title}"`;
+        jsonData = { added: item.id };
+        break;
       }
-      break;
-    }
 
-    case "replace": {
-      if (!Array.isArray(replaceItems)) {
-        res.status(400).json({ error: "items array required" });
+      case "delete": {
+        if (!id) {
+          res.status(400).json({ error: "id required" });
+          return;
+        }
+        const before = items.length;
+        items = items.filter((i) => i.id !== id);
+        saveItems(items);
+        message =
+          items.length < before
+            ? `Deleted item ${id}`
+            : `Item not found: ${id}`;
+        jsonData = { deleted: id };
+        break;
+      }
+
+      case "update": {
+        if (!id) {
+          res.status(400).json({ error: "id required" });
+          return;
+        }
+        const item = items.find((i) => i.id === id);
+        if (item) {
+          if (title !== undefined) item.title = title;
+          if (props !== undefined) {
+            for (const [k, v] of Object.entries(props)) {
+              if (v === null) {
+                delete item.props[k];
+              } else {
+                item.props[k] = v;
+              }
+            }
+          }
+          items = sortItems(items);
+          saveItems(items);
+          message = `Updated: "${item.title}"`;
+          jsonData = { updated: id };
+        } else {
+          message = `Item not found: ${id}`;
+        }
+        break;
+      }
+
+      case "replace": {
+        if (!Array.isArray(replaceItems)) {
+          res.status(400).json({ error: "items array required" });
+          return;
+        }
+        items = sortItems(replaceItems);
+        saveItems(items);
+        message = `Replaced all items (${items.length} total)`;
+        jsonData = { count: items.length };
+        break;
+      }
+
+      default:
+        res.status(400).json({ error: `Unknown action: ${action}` });
         return;
-      }
-      items = sortItems(replaceItems);
-      saveItems(items);
-      message = `Replaced all items (${items.length} total)`;
-      jsonData = { count: items.length };
-      break;
     }
 
-    default:
-      res.status(400).json({ error: `Unknown action: ${action}` });
-      return;
-  }
-
-  res.json({
-    data: { items },
-    message,
-    jsonData,
-    instructions: "Display the updated scheduler to the user.",
-    updating: true,
-  });
-});
+    res.json({
+      data: { items },
+      message,
+      jsonData,
+      instructions: "Display the updated scheduler to the user.",
+      updating: true,
+    });
+  },
+);
 
 export default router;

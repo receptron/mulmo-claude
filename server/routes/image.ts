@@ -4,141 +4,153 @@ import { getSessionImageData } from "../sessions.js";
 
 const router = Router();
 
-router.post("/generate-image", async (req: Request, res: Response) => {
-  const { prompt, model } = req.body as {
-    prompt: string;
-    model?: string;
-  };
+interface GenerateImageBody {
+  prompt: string;
+  model?: string;
+}
 
-  if (!prompt) {
-    res.status(400).json({ success: false, message: "prompt is required" });
-    return;
-  }
+router.post(
+  "/generate-image",
+  async (req: Request<object, unknown, GenerateImageBody>, res: Response) => {
+    const { prompt, model } = req.body;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    res
-      .status(500)
-      .json({ success: false, message: "GEMINI_API_KEY is not set" });
-    return;
-  }
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = model ?? "gemini-3.1-flash-image-preview";
-
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: [{ text: prompt }],
-      config: {
-        responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: { aspectRatio: "16:9" },
-      },
-    });
-
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    let imageData: string | undefined;
-    let message: string | undefined;
-
-    for (const part of parts) {
-      if (part.text) message = part.text;
-      if (part.inlineData?.data) imageData = part.inlineData.data;
+    if (!prompt) {
+      res.status(400).json({ success: false, message: "prompt is required" });
+      return;
     }
 
-    if (imageData) {
-      res.json({
-        message: "image generation succeeded",
-        instructions:
-          "Acknowledge that the image was generated and has been presented to the user.",
-        title: "Generated Image",
-        data: {
-          imageData: `data:image/png;base64,${imageData}`,
-          prompt,
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      res
+        .status(500)
+        .json({ success: false, message: "GEMINI_API_KEY is not set" });
+      return;
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const modelName = model ?? "gemini-3.1-flash-image-preview";
+
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [{ text: prompt }],
+        config: {
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: { aspectRatio: "16:9" },
         },
       });
-    } else {
-      res.json({ message: message ?? "no image data in response" });
+
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+      let imageData: string | undefined;
+      let message: string | undefined;
+
+      for (const part of parts) {
+        if (part.text) message = part.text;
+        if (part.inlineData?.data) imageData = part.inlineData.data;
+      }
+
+      if (imageData) {
+        res.json({
+          message: "image generation succeeded",
+          instructions:
+            "Acknowledge that the image was generated and has been presented to the user.",
+          title: "Generated Image",
+          data: {
+            imageData: `data:image/png;base64,${imageData}`,
+            prompt,
+          },
+        });
+      } else {
+        res.json({ message: message ?? "no image data in response" });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ success: false, message: msg });
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ success: false, message: msg });
-  }
-});
+  },
+);
 
-router.post("/edit-image", async (req: Request, res: Response) => {
-  const { prompt } = req.body as { prompt: string };
-  const session = req.query.session as string | undefined;
+interface EditImageBody {
+  prompt: string;
+}
 
-  if (!prompt) {
-    res.status(400).json({ success: false, message: "prompt is required" });
-    return;
-  }
+router.post(
+  "/edit-image",
+  async (req: Request<object, unknown, EditImageBody>, res: Response) => {
+    const { prompt } = req.body;
+    const session = req.query.session as string | undefined;
 
-  const currentImageData = session ? getSessionImageData(session) : undefined;
-  if (!currentImageData) {
-    res.status(400).json({
-      success: false,
-      message:
-        "No image is selected. Please click an image in the sidebar first, then ask me to edit it.",
-    });
-    return;
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    res
-      .status(500)
-      .json({ success: false, message: "GEMINI_API_KEY is not set" });
-    return;
-  }
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = "gemini-3.1-flash-image-preview";
-    const base64Data = currentImageData.replace(
-      /^data:image\/[^;]+;base64,/,
-      "",
-    );
-
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: [
-        {
-          parts: [
-            { inlineData: { mimeType: "image/png", data: base64Data } },
-            { text: prompt },
-          ],
-        },
-      ],
-    });
-
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    let imageData: string | undefined;
-    let message: string | undefined;
-
-    for (const part of parts) {
-      if (part.text) message = part.text;
-      if (part.inlineData?.data) imageData = part.inlineData.data;
+    if (!prompt) {
+      res.status(400).json({ success: false, message: "prompt is required" });
+      return;
     }
 
-    if (imageData) {
-      res.json({
-        message: "image edit succeeded",
-        instructions:
-          "Acknowledge that the image was edited and has been presented to the user.",
-        title: "Edited Image",
-        data: {
-          imageData: `data:image/png;base64,${imageData}`,
-          prompt,
-        },
+    const currentImageData = session ? getSessionImageData(session) : undefined;
+    if (!currentImageData) {
+      res.status(400).json({
+        success: false,
+        message:
+          "No image is selected. Please click an image in the sidebar first, then ask me to edit it.",
       });
-    } else {
-      res.json({ message: message ?? "no image data in response" });
+      return;
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ success: false, message: msg });
-  }
-});
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      res
+        .status(500)
+        .json({ success: false, message: "GEMINI_API_KEY is not set" });
+      return;
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const modelName = "gemini-3.1-flash-image-preview";
+      const base64Data = currentImageData.replace(
+        /^data:image\/[^;]+;base64,/,
+        "",
+      );
+
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [
+          {
+            parts: [
+              { inlineData: { mimeType: "image/png", data: base64Data } },
+              { text: prompt },
+            ],
+          },
+        ],
+      });
+
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+      let imageData: string | undefined;
+      let message: string | undefined;
+
+      for (const part of parts) {
+        if (part.text) message = part.text;
+        if (part.inlineData?.data) imageData = part.inlineData.data;
+      }
+
+      if (imageData) {
+        res.json({
+          message: "image edit succeeded",
+          instructions:
+            "Acknowledge that the image was edited and has been presented to the user.",
+          title: "Edited Image",
+          data: {
+            imageData: `data:image/png;base64,${imageData}`,
+            prompt,
+          },
+        });
+      } else {
+        res.json({ message: message ?? "no image data in response" });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ success: false, message: msg });
+    }
+  },
+);
 
 export default router;

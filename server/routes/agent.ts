@@ -24,95 +24,110 @@ router.post("/internal/tool-result", async (req: Request, res: Response) => {
 });
 
 // Called by the MCP server to trigger a role switch on the frontend
-router.post("/internal/switch-role", async (req: Request, res: Response) => {
-  const { session } = req.query as { session: string };
-  const { roleId } = req.body as { roleId: string };
-  const pushed = await pushToSession(session, { type: "switch_role", roleId });
-  res.json({ ok: pushed });
-});
+interface SwitchRoleBody {
+  roleId: string;
+}
 
-router.post("/agent", async (req: Request, res: Response) => {
-  const { message, roleId, chatSessionId, selectedImageData } = req.body as {
-    message: string;
-    roleId: string;
-    chatSessionId: string;
-    selectedImageData?: string;
-  };
-
-  if (!message || !roleId || !chatSessionId) {
-    res
-      .status(400)
-      .json({ error: "message, roleId, and chatSessionId are required" });
-    return;
-  }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  const send = (data: unknown) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
-
-  const sessionId = randomUUID();
-  const chatDir = path.join(workspacePath, "chat");
-  await mkdir(chatDir, { recursive: true });
-  const resultsFilePath = path.join(chatDir, `${chatSessionId}.jsonl`);
-
-  // Write metadata only on the first message of this session
-  try {
-    await access(resultsFilePath);
-  } catch {
-    const meta = {
-      type: "session_meta",
+router.post(
+  "/internal/switch-role",
+  async (req: Request<object, unknown, SwitchRoleBody>, res: Response) => {
+    const { session } = req.query as { session: string };
+    const { roleId } = req.body;
+    const pushed = await pushToSession(session, {
+      type: "switch_role",
       roleId,
-      startedAt: new Date().toISOString(),
-    };
-    await writeFile(resultsFilePath, JSON.stringify(meta) + "\n");
-  }
+    });
+    res.json({ ok: pushed });
+  },
+);
 
-  // Append user message for this turn
-  await appendFile(
-    resultsFilePath,
-    JSON.stringify({ source: "user", type: "text", message }) + "\n",
-  );
+interface AgentBody {
+  message: string;
+  roleId: string;
+  chatSessionId: string;
+  selectedImageData?: string;
+}
 
-  registerSession(sessionId, send, resultsFilePath, selectedImageData);
-  const role = getRole(roleId);
-  const claudeSessionId = claudeSessionMap.get(chatSessionId);
+router.post(
+  "/agent",
+  async (req: Request<object, unknown, AgentBody>, res: Response) => {
+    const { message, roleId, chatSessionId, selectedImageData } = req.body;
 
-  try {
-    for await (const event of runAgent(
-      message,
-      role,
-      workspacePath,
-      sessionId,
-      PORT,
-      claudeSessionId,
-    )) {
-      if (event.type === "claude_session_id") {
-        claudeSessionMap.set(chatSessionId, event.id);
-        continue;
-      }
-      send(event);
-      if (event.type === "text") {
-        await appendFile(
-          resultsFilePath,
-          JSON.stringify({
-            source: "assistant",
-            type: "text",
-            message: event.message,
-          }) + "\n",
-        );
-      }
+    if (!message || !roleId || !chatSessionId) {
+      res
+        .status(400)
+        .json({ error: "message, roleId, and chatSessionId are required" });
+      return;
     }
-    send({ type: "status", message: "Done" });
-  } catch (err) {
-    send({ type: "error", message: String(err) });
-  } finally {
-    removeSession(sessionId);
-    res.end();
-  }
-});
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const send = (data: unknown) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const sessionId = randomUUID();
+    const chatDir = path.join(workspacePath, "chat");
+    await mkdir(chatDir, { recursive: true });
+    const resultsFilePath = path.join(chatDir, `${chatSessionId}.jsonl`);
+
+    // Write metadata only on the first message of this session
+    try {
+      await access(resultsFilePath);
+    } catch {
+      const meta = {
+        type: "session_meta",
+        roleId,
+        startedAt: new Date().toISOString(),
+      };
+      await writeFile(resultsFilePath, JSON.stringify(meta) + "\n");
+    }
+
+    // Append user message for this turn
+    await appendFile(
+      resultsFilePath,
+      JSON.stringify({ source: "user", type: "text", message }) + "\n",
+    );
+
+    registerSession(sessionId, send, resultsFilePath, selectedImageData);
+    const role = getRole(roleId);
+    const claudeSessionId = claudeSessionMap.get(chatSessionId);
+
+    try {
+      for await (const event of runAgent(
+        message,
+        role,
+        workspacePath,
+        sessionId,
+        PORT,
+        claudeSessionId,
+      )) {
+        if (event.type === "claude_session_id") {
+          claudeSessionMap.set(chatSessionId, event.id);
+          continue;
+        }
+        send(event);
+        if (event.type === "text") {
+          await appendFile(
+            resultsFilePath,
+            JSON.stringify({
+              source: "assistant",
+              type: "text",
+              message: event.message,
+            }) + "\n",
+          );
+        }
+      }
+      send({ type: "status", message: "Done" });
+    } catch (err) {
+      send({ type: "error", message: String(err) });
+    } finally {
+      removeSession(sessionId);
+      res.end();
+    }
+  },
+);
 
 export default router;
