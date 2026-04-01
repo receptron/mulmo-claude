@@ -159,10 +159,30 @@ async function handleToolCall(
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`Unknown tool: ${name}`);
 
-  const res = await fetch(`${BASE_URL}${tool.endpoint}?session=${SESSION_ID}`, {
+  // Route iCal actions to the dedicated endpoint
+  const ICAL_ACTION_MAP: Record<string, string> = {
+    add_ical_source: "add_source",
+    remove_ical_source: "remove_source",
+    list_ical_sources: "list_sources",
+    sync_ical: "sync",
+  };
+  const icalAction = ICAL_ACTION_MAP[args.action as string];
+  const endpoint =
+    name === "manageScheduler" && icalAction ? "/api/ical" : tool.endpoint;
+  const body =
+    name === "manageScheduler" && icalAction
+      ? {
+          action: icalAction,
+          name: args.name,
+          url: args.icalUrl,
+          sourceId: args.sourceId,
+        }
+      : args;
+
+  const res = await fetch(`${BASE_URL}${endpoint}?session=${SESSION_ID}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
+    body: JSON.stringify(body),
   });
   const result = await res.json();
 

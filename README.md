@@ -46,6 +46,10 @@ Without a Gemini API key, roles that use image generation will be disabled in th
 
 The Gemini API has a free tier that is sufficient for personal use.
 
+## Calendar Import (iCal)
+
+MulmoClaude can import events from Google Calendar, Outlook, and other services that provide iCal URLs. See [docs/ical-setup.md](docs/ical-setup.md) for setup instructions.
+
 ## Workspace
 
 All data is stored as plain files in the workspace directory:

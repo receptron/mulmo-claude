@@ -11,6 +11,7 @@ import pluginsRoutes from "./routes/plugins.js";
 import imageRoutes from "./routes/image.js";
 import htmlRoutes from "./routes/html.js";
 import rolesRoutes from "./routes/roles.js";
+import icalRoutes from "./routes/ical.js";
 import { initWorkspace } from "./workspace.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,6 +38,7 @@ app.use("/api", pluginsRoutes);
 app.use("/api", imageRoutes);
 app.use("/api", htmlRoutes);
 app.use("/api", rolesRoutes);
+app.use("/api", icalRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client")));

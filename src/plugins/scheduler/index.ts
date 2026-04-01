@@ -18,10 +18,30 @@ const schedulerPlugin: ToolPlugin<SchedulerData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const response = await fetch("/api/scheduler", {
+    const typedArgs = args as Record<string, unknown>;
+    const ICAL_ACTION_MAP: Record<string, string> = {
+      add_ical_source: "add_source",
+      remove_ical_source: "remove_source",
+      list_ical_sources: "list_sources",
+      sync_ical: "sync",
+    };
+    const action = typedArgs.action as string;
+    const icalAction = ICAL_ACTION_MAP[action];
+
+    const endpoint = icalAction ? "/api/ical" : "/api/scheduler";
+    const body = icalAction
+      ? {
+          action: icalAction,
+          name: typedArgs.name,
+          url: typedArgs.icalUrl,
+          sourceId: typedArgs.sourceId,
+        }
+      : args;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args),
+      body: JSON.stringify(body),
     });
     const result = await response.json();
     return {

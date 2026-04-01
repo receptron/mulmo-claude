@@ -41,6 +41,7 @@
     "express": "^5.2.1",
     "gui-chat-protocol": "^0.0.4",
     "material-icons": "^1.13.14",
+    "node-ical": "^0.25.6",
     "uuid": "^13.0.0",
     "vue": "^3.5.29",
     "vue-router": "^5.0.3",
