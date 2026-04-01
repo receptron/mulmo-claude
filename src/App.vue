@@ -169,7 +169,7 @@
         @update-result="handleUpdateResult"
       />
       <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
-        <pre class="text-sm text-gray-300 whitespace-pre-wrap">{{
+        <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
           JSON.stringify(selectedResult, null, 2)
         }}</pre>
       </div>
@@ -398,7 +398,12 @@ async function sendMessage(text?: string) {
       }),
     });
 
-    const reader = response.body!.getReader();
+    if (!response.body) {
+      statusMessage.value = "No response body received from server.";
+      return;
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let sseBuffer = "";
 
