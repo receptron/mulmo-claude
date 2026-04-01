@@ -322,12 +322,15 @@ async function fetchHealth() {
   }
 }
 
-async function fetchSessions() {
+async function fetchSessions(): Promise<SessionSummary[]> {
   try {
     const res = await fetch("/api/sessions");
-    sessions.value = await res.json();
+    const data: SessionSummary[] = await res.json();
+    sessions.value = data;
+    return data;
   } catch {
     sessions.value = [];
+    return [];
   }
 }
 
@@ -343,6 +346,7 @@ async function loadSession(id: string) {
   const meta = entries.find((e) => e.type === "session_meta");
   if (meta?.roleId) currentRoleId.value = meta.roleId as string;
   chatSessionId.value = id;
+  localStorage.setItem("lastSessionId", id);
 
   toolResults.value = [];
   for (const entry of entries) {
@@ -378,6 +382,7 @@ async function sendMessage(text?: string) {
   statusMessage.value = "Thinking...";
 
   toolResults.value.push(makeTextResult(message, "user"));
+  localStorage.setItem("lastSessionId", chatSessionId.value);
 
   try {
     const response = await fetch("/api/agent", {
@@ -467,11 +472,18 @@ async function sendMessage(text?: string) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchHealth();
-  fetchSessions();
   refreshRoles();
   window.addEventListener("roles-updated", refreshRoles);
+
+  const allSessions = await fetchSessions();
+  const lastSessionId = localStorage.getItem("lastSessionId");
+  const targetSession =
+    allSessions.find((s) => s.id === lastSessionId) ?? allSessions[0];
+  if (targetSession) {
+    await loadSession(targetSession.id);
+  }
 });
 
 onUnmounted(() => {
