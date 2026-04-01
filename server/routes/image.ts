@@ -78,7 +78,8 @@ router.post(
   "/edit-image",
   async (req: Request<object, unknown, EditImageBody>, res: Response) => {
     const { prompt } = req.body;
-    const session = req.query.session as string | undefined;
+    const session =
+      typeof req.query.session === "string" ? req.query.session : undefined;
 
     if (!prompt) {
       res.status(400).json({ success: false, message: "prompt is required" });

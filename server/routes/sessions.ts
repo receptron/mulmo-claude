@@ -3,6 +3,24 @@ import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../workspace.js";
 
+interface SessionMeta {
+  type?: string;
+  roleId: string;
+  startedAt: string;
+}
+
+interface SessionEntry {
+  source?: string;
+  message?: string;
+}
+
+interface SessionSummary {
+  id: string;
+  roleId: string;
+  startedAt: string;
+  preview: string;
+}
+
 const router = Router();
 
 router.get("/sessions", async (_req: Request, res: Response) => {
@@ -16,34 +34,29 @@ router.get("/sessions", async (_req: Request, res: Response) => {
           try {
             const content = await readFile(path.join(chatDir, file), "utf-8");
             const lines = content.split("\n").filter(Boolean);
-            const meta = JSON.parse(lines[0]);
-            const firstUserLine = lines
+            const meta: SessionMeta = JSON.parse(lines[0]);
+            const firstUserLine: SessionEntry | undefined = lines
               .slice(1)
-              .map((l) => {
+              .map((l): SessionEntry | null => {
                 try {
                   return JSON.parse(l);
                 } catch {
                   return null;
                 }
               })
-              .find((e) => e?.source === "user");
+              .find((e): e is SessionEntry => e?.source === "user");
             return {
               id,
-              roleId: meta.roleId as string,
-              startedAt: meta.startedAt as string,
-              preview: (firstUserLine?.message as string) ?? "",
+              roleId: meta.roleId,
+              startedAt: meta.startedAt,
+              preview: firstUserLine?.message ?? "",
             };
           } catch {
             return null;
           }
         }),
       )
-    ).filter(Boolean) as {
-      id: string;
-      roleId: string;
-      startedAt: string;
-      preview: string;
-    }[];
+    ).filter((s): s is SessionSummary => s !== null);
 
     sessions.sort(
       (a, b) =>

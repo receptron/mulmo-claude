@@ -16,8 +16,8 @@ router.get("/roles", (_req: Request, res: Response) => {
 });
 
 router.post("/roles/manage", async (req: Request, res: Response) => {
-  const { session } = req.query as { session: string };
-  const result = await executeManageRoles(req.body, session ?? "");
+  const session = String(req.query.session ?? "");
+  const result = await executeManageRoles(req.body, session);
   res.json(result);
 });
 
@@ -27,15 +27,24 @@ function notifyRolesUpdated(sessionId: string): void {
   pushToSession(sessionId, { type: "roles_updated" }).catch(() => {});
 }
 
+interface ManageRolesInput {
+  action: string;
+  role?: {
+    id: string;
+    name: string;
+    icon: string;
+    prompt: string;
+    availablePlugins: string[];
+    queries?: string[];
+  };
+  roleId?: string;
+}
+
 export async function executeManageRoles(
-  input: Record<string, unknown>,
+  input: ManageRolesInput,
   sessionId: string,
 ): Promise<Record<string, unknown>> {
-  const { action, role, roleId } = input as {
-    action: string;
-    role?: Record<string, unknown>;
-    roleId?: string;
-  };
+  const { action, role, roleId } = input;
 
   if (action === "list") {
     const customRoles = loadCustomRoles();
@@ -72,8 +81,8 @@ export async function executeManageRoles(
       success: false,
       error: "role definition required for create/update",
     };
-  const roleId2 = role.id as string;
-  if (!roleId2) return { success: false, error: "role.id is required" };
+  if (!role.id) return { success: false, error: "role.id is required" };
+  const roleId2 = role.id;
 
   if (BUILTIN_IDS.has(roleId2) && action === "create") {
     return {
@@ -83,7 +92,7 @@ export async function executeManageRoles(
   }
 
   // Strip switchRole before saving — it is injected at load time by server/roles.ts
-  const pluginsToSave = (role.availablePlugins as string[] | undefined) ?? [];
+  const pluginsToSave = role.availablePlugins ?? [];
   const roleToSave = {
     ...role,
     availablePlugins: pluginsToSave.filter((p) => p !== "switchRole"),
@@ -97,7 +106,7 @@ export async function executeManageRoles(
   notifyRolesUpdated(sessionId);
   return {
     success: true,
-    message: `Role '${role.name as string}' ${action}d successfully.`,
+    message: `Role '${role.name}' ${action}d successfully.`,
     roles: loadAllRoles(),
   };
 }

@@ -1,10 +1,10 @@
 import type {
   ToolPlugin as BaseToolPlugin,
   InputHandler,
-  ToolContext,
-  ToolResultComplete,
   ToolContextApp,
+  ToolDefinition,
 } from "gui-chat-protocol/vue";
+import type { Component } from "vue";
 
 /**
  * Extended app context with file system access for workspace-aware plugins
@@ -24,12 +24,13 @@ export type ToolPlugin<
   A extends object = object,
 > = BaseToolPlugin<T, J, A, InputHandler, Record<string, unknown>>;
 
-export type ToolExecuteFn = (
-  context: ToolContext,
-  name: string,
-  args: Record<string, unknown>,
-) => Promise<ToolResultComplete>;
-
-export type GetToolPluginFn = (
-  name: string,
-) => ToolPlugin<unknown, unknown, object> | null;
+/**
+ * View-only plugin entry for the frontend registry.
+ * Only the properties actually used on the client side are required.
+ * This avoids contravariance issues with execute's args type parameter.
+ */
+export interface PluginEntry {
+  toolDefinition: ToolDefinition;
+  viewComponent?: Component;
+  previewComponent?: Component;
+}

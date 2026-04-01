@@ -224,7 +224,8 @@ router.post(
 );
 
 router.get("/mulmo-script/download-movie", (req: Request, res: Response) => {
-  const { moviePath } = req.query as { moviePath?: string };
+  const moviePath =
+    typeof req.query.moviePath === "string" ? req.query.moviePath : undefined;
 
   if (!moviePath) {
     res.status(400).json({ error: "moviePath is required" });

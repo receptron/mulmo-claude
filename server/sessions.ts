@@ -8,6 +8,17 @@ interface Session {
   selectedImageData?: string;
 }
 
+interface ToolResultEvent {
+  type: "tool_result";
+  result: unknown;
+}
+
+const isToolResultEvent = (data: unknown): data is ToolResultEvent =>
+  typeof data === "object" &&
+  data !== null &&
+  "type" in data &&
+  data.type === "tool_result";
+
 const sessions = new Map<string, Session>();
 
 export function registerSession(
@@ -34,12 +45,8 @@ export async function pushToSession(
   const session = sessions.get(id);
   if (!session) return false;
   session.send(data);
-  if (
-    data &&
-    typeof data === "object" &&
-    (data as Record<string, unknown>).type === "tool_result"
-  ) {
-    const result = (data as Record<string, unknown>).result;
+  if (isToolResultEvent(data)) {
+    const { result } = data;
     await appendFile(
       session.resultsFilePath,
       JSON.stringify({ source: "tool", type: "tool_result", result }) + "\n",

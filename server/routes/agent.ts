@@ -15,7 +15,7 @@ const claudeSessionMap = new Map<string, string>();
 
 // Called by the MCP server to push a ToolResult into the active SSE stream
 router.post("/internal/tool-result", async (req: Request, res: Response) => {
-  const { session } = req.query as { session: string };
+  const session = String(req.query.session ?? "");
   const pushed = await pushToSession(session, {
     type: "tool_result",
     result: req.body,
@@ -31,7 +31,7 @@ interface SwitchRoleBody {
 router.post(
   "/internal/switch-role",
   async (req: Request<object, unknown, SwitchRoleBody>, res: Response) => {
-    const { session } = req.query as { session: string };
+    const session = String(req.query.session ?? "");
     const { roleId } = req.body;
     const pushed = await pushToSession(session, {
       type: "switch_role",

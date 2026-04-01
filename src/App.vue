@@ -203,6 +203,60 @@ interface SessionSummary {
   preview: string;
 }
 
+interface SessionEntry {
+  type?: string;
+  source?: string;
+  roleId?: string;
+  message?: string;
+  result?: ToolResultComplete;
+}
+
+interface SseToolCall {
+  type: "tool_call";
+  toolUseId: string;
+  toolName: string;
+  args: unknown;
+}
+
+interface SseToolCallResult {
+  type: "tool_call_result";
+  toolUseId: string;
+  content: string;
+}
+
+interface SseStatus {
+  type: "status";
+  message: string;
+}
+
+interface SseSwitchRole {
+  type: "switch_role";
+  roleId: string;
+}
+
+interface SseText {
+  type: "text";
+  message: string;
+}
+
+interface SseToolResult {
+  type: "tool_result";
+  result: ToolResultComplete;
+}
+
+interface SseRolesUpdated {
+  type: "roles_updated";
+}
+
+type SseEvent =
+  | SseToolCall
+  | SseToolCallResult
+  | SseStatus
+  | SseSwitchRole
+  | SseText
+  | SseToolResult
+  | SseRolesUpdated;
+
 const roles = ref<Role[]>(ROLES);
 const currentRoleId = ref(ROLES[0].id);
 const currentRole = computed(
@@ -257,6 +311,16 @@ function formatDate(iso: string): string {
   );
 }
 
+function extractImageData(
+  result: ToolResultComplete | undefined,
+): string | undefined {
+  const data = result?.data;
+  if (typeof data === "object" && data !== null && "imageData" in data) {
+    return typeof data.imageData === "string" ? data.imageData : undefined;
+  }
+  return undefined;
+}
+
 function makeTextResult(
   text: string,
   role: "user" | "assistant",
@@ -267,7 +331,7 @@ function makeTextResult(
     message: text,
     title: role === "user" ? "You" : "Assistant",
     data: { text, role, transportKind: "text-rest" },
-  } as ToolResultComplete;
+  };
 }
 
 function handleUpdateResult(updatedResult: ToolResultComplete) {
@@ -341,24 +405,30 @@ async function toggleHistory() {
 
 async function loadSession(id: string) {
   const res = await fetch(`/api/sessions/${id}`);
-  const entries: Record<string, unknown>[] = await res.json();
+  const entries: SessionEntry[] = await res.json();
 
   const meta = entries.find((e) => e.type === "session_meta");
-  if (meta?.roleId) currentRoleId.value = meta.roleId as string;
+  if (meta?.roleId) currentRoleId.value = meta.roleId;
   chatSessionId.value = id;
   localStorage.setItem("lastSessionId", id);
 
   toolResults.value = [];
   for (const entry of entries) {
     if (entry.type === "session_meta") continue;
-    if (entry.source === "user" && entry.type === "text") {
-      toolResults.value.push(makeTextResult(entry.message as string, "user"));
-    } else if (entry.source === "assistant" && entry.type === "text") {
-      toolResults.value.push(
-        makeTextResult(entry.message as string, "assistant"),
-      );
-    } else if (entry.source === "tool" && entry.type === "tool_result") {
-      toolResults.value.push(entry.result as ToolResultComplete);
+    if (entry.source === "user" && entry.type === "text" && entry.message) {
+      toolResults.value.push(makeTextResult(entry.message, "user"));
+    } else if (
+      entry.source === "assistant" &&
+      entry.type === "text" &&
+      entry.message
+    ) {
+      toolResults.value.push(makeTextResult(entry.message, "assistant"));
+    } else if (
+      entry.source === "tool" &&
+      entry.type === "tool_result" &&
+      entry.result
+    ) {
+      toolResults.value.push(entry.result);
     }
   }
 
@@ -392,9 +462,7 @@ async function sendMessage(text?: string) {
         message,
         roleId: currentRoleId.value,
         chatSessionId: chatSessionId.value,
-        selectedImageData:
-          (selectedResult.value?.data as Record<string, unknown> | undefined)
-            ?.imageData ?? undefined,
+        selectedImageData: extractImageData(selectedResult.value ?? undefined),
       }),
     });
 
@@ -417,7 +485,7 @@ async function sendMessage(text?: string) {
 
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
-        let data: Record<string, unknown>;
+        let data: SseEvent;
         try {
           data = JSON.parse(line.slice(6));
         } catch {
@@ -426,8 +494,8 @@ async function sendMessage(text?: string) {
 
         if (data.type === "tool_call") {
           toolCallHistory.value.push({
-            toolUseId: data.toolUseId as string,
-            toolName: data.toolName as string,
+            toolUseId: data.toolUseId,
+            toolName: data.toolName,
             args: data.args,
             timestamp: Date.now(),
           });
@@ -438,27 +506,25 @@ async function sendMessage(text?: string) {
             .reverse()
             .find(
               (c) =>
-                c.toolUseId === (data.toolUseId as string) &&
+                c.toolUseId === data.toolUseId &&
                 c.result === undefined &&
                 c.error === undefined,
             );
-          if (entry) entry.result = data.content as string;
+          if (entry) entry.result = data.content;
           rightSidebarRef.value?.scrollToBottom();
         } else if (data.type === "status") {
-          statusMessage.value = data.message as string;
+          statusMessage.value = data.message;
         } else if (data.type === "switch_role") {
           setTimeout(() => {
-            currentRoleId.value = data.roleId as string;
+            currentRoleId.value = data.roleId;
             onRoleChange();
           }, 0);
         } else if (data.type === "roles_updated") {
           await refreshRoles();
         } else if (data.type === "text") {
-          toolResults.value.push(
-            makeTextResult(data.message as string, "assistant"),
-          );
+          toolResults.value.push(makeTextResult(data.message, "assistant"));
         } else if (data.type === "tool_result") {
-          const result: ToolResultComplete = data.result as ToolResultComplete;
+          const { result } = data;
           const existing = toolResults.value.findIndex(
             (r) => r.uuid === result.uuid,
           );

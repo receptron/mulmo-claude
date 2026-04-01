@@ -1,5 +1,6 @@
 import type { ToolPlugin } from "../../tools/types";
-import { toolDefinition, TOOL_NAME } from "./definition";
+import toolDefinition from "./definition";
+import { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 
@@ -17,7 +18,7 @@ export interface ManageRolesData {
 }
 
 const manageRolesPlugin: ToolPlugin = {
-  toolDefinition: toolDefinition as unknown as ToolPlugin["toolDefinition"],
+  toolDefinition,
   async execute(_context, args) {
     const res = await fetch("/api/roles/manage", {
       method: "POST",

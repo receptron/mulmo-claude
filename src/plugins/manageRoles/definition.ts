@@ -1,11 +1,14 @@
+import type { ToolDefinition } from "gui-chat-protocol";
+
 export const TOOL_NAME = "manageRoles";
 
-export const toolDefinition = {
+const toolDefinition: ToolDefinition = {
+  type: "function",
   name: TOOL_NAME,
   description:
     "Create, update, or delete a custom user role stored in ~/mulmoclaude/roles/. After success, the frontend role list refreshes automatically.",
-  inputSchema: {
-    type: "object" as const,
+  parameters: {
+    type: "object",
     properties: {
       action: {
         type: "string",
@@ -34,3 +37,5 @@ export const toolDefinition = {
     required: ["action"],
   },
 };
+
+export default toolDefinition;
