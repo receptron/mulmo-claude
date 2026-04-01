@@ -76,10 +76,14 @@ router.get("/sessions/:id", async (req: Request, res: Response) => {
                 entry.result?.data?.filePath
               ) {
                 try {
-                  const scriptPath = path.join(
+                  const storiesDir = path.resolve(workspacePath, "stories");
+                  const scriptPath = path.resolve(
                     workspacePath,
                     entry.result.data.filePath,
                   );
+                  if (!scriptPath.startsWith(storiesDir + path.sep)) {
+                    return entry;
+                  }
                   const scriptJson = await readFile(scriptPath, "utf-8");
                   return {
                     ...entry,

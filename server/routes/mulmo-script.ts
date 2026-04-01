@@ -80,7 +80,12 @@ router.post(
       return;
     }
 
-    const absoluteFilePath = path.join(workspacePath, filePath);
+    const storiesDir = path.resolve(workspacePath, "stories");
+    const absoluteFilePath = path.resolve(workspacePath, filePath);
+    if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
+      res.status(400).json({ error: "Invalid filePath" });
+      return;
+    }
     if (!fs.existsSync(absoluteFilePath)) {
       res.status(404).json({ error: `File not found: ${filePath}` });
       return;
@@ -112,7 +117,12 @@ router.post(
       return;
     }
 
-    const absoluteFilePath = path.join(workspacePath, filePath);
+    const storiesDir = path.resolve(workspacePath, "stories");
+    const absoluteFilePath = path.resolve(workspacePath, filePath);
+    if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
+      res.status(400).json({ error: "Invalid filePath" });
+      return;
+    }
     if (!fs.existsSync(absoluteFilePath)) {
       res.status(404).json({ error: `File not found: ${filePath}` });
       return;
