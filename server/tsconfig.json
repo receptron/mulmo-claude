@@ -2,19 +2,22 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "allowJs": true,
     "sourceMap": true,
     "outDir": "../dist/server",
-    "rootDir": "./",
+    "rootDir": "..",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["**/*.ts"],
+  "include": [
+    "**/*.ts",
+    "../src/config/roles.ts",
+    "../src/plugins/*/definition.ts"
+  ],
   "exclude": ["node_modules", "../dist"]
 }
