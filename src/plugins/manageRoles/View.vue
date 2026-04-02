@@ -219,9 +219,15 @@ function selectRole(role: CustomRole) {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
+interface ManageResult {
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
 async function callManage(
   body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<ManageResult> {
   try {
     const res = await fetch("/api/roles/manage", {
       method: "POST",
@@ -271,7 +277,7 @@ async function saveEdit(id: string) {
     selectedId.value = null;
     await refreshList();
   } else {
-    saveError.value = (result.error as string) ?? "Save failed";
+    saveError.value = result.error ?? "Save failed";
   }
   saving.value = false;
 }
@@ -284,7 +290,7 @@ async function deleteRole(id: string) {
     selectedId.value = null;
     await refreshList();
   } else {
-    saveError.value = (result.error as string) ?? "Delete failed";
+    saveError.value = result.error ?? "Delete failed";
   }
   saving.value = false;
 }
