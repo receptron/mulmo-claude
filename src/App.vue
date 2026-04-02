@@ -90,6 +90,7 @@
       <!-- Tool result previews -->
       <div
         v-else
+        ref="chatListRef"
         class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100"
       >
         <div
@@ -107,6 +108,27 @@
             :result="result"
           />
           <span v-else>{{ result.title || result.toolName }}</span>
+        </div>
+
+        <!-- Thinking indicator -->
+        <div v-if="isRunning" class="px-2 py-1 text-sm">
+          <div class="flex items-center gap-2 text-gray-500">
+            <span class="text-xs">{{ statusMessage }}</span>
+            <span class="flex gap-1">
+              <span
+                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
+                style="animation-delay: 0ms"
+              />
+              <span
+                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
+                style="animation-delay: 150ms"
+              />
+              <span
+                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
+                style="animation-delay: 300ms"
+              />
+            </span>
+          </div>
         </div>
       </div>
 
@@ -131,15 +153,19 @@
         :class="{ 'border-t-0': showQueries }"
       >
         <div class="flex gap-2">
-          <input
+          <textarea
             v-model="userInput"
-            type="text"
             placeholder="Type a task..."
-            class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            rows="2"
+            class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
             :disabled="
               isRunning || (!geminiAvailable && needsGemini(currentRoleId))
             "
-            @keydown.enter="$event.isComposing || sendMessage()"
+            @keydown.enter="
+              !$event.isComposing && !$event.shiftKey
+                ? (sendMessage(), $event.preventDefault())
+                : undefined
+            "
           />
           <button
             class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -151,9 +177,6 @@
             <span class="material-icons text-base">send</span>
           </button>
         </div>
-        <p v-if="statusMessage" class="mt-2 text-xs text-gray-500">
-          {{ statusMessage }}
-        </p>
       </div>
     </div>
 
@@ -188,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import { ROLES, type Role } from "./config/roles";
 import { getPlugin } from "./tools";
@@ -293,6 +316,21 @@ const selectedResultUuid = ref<string | null>(null);
 const showHistory = ref(false);
 const sessions = ref<SessionSummary[]>([]);
 const geminiAvailable = ref(true);
+
+const chatListRef = ref<HTMLDivElement | null>(null);
+
+function scrollChatToBottom() {
+  nextTick(() => {
+    if (chatListRef.value) {
+      chatListRef.value.scrollTop = chatListRef.value.scrollHeight;
+    }
+  });
+}
+
+watch(() => toolResults.value.length, scrollChatToBottom);
+watch(isRunning, (running) => {
+  if (running) scrollChatToBottom();
+});
 
 const showRightSidebar = ref(
   localStorage.getItem("right_sidebar_visible") === "true",
