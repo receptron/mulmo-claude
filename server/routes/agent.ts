@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { access, appendFile, mkdir, writeFile } from "fs/promises";
+import { access, appendFile, mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Router, Request, Response } from "express";
 import { getRole } from "../roles.js";
@@ -93,7 +93,9 @@ router.post(
 
     registerSession(sessionId, send, resultsFilePath, selectedImageData);
     const role = getRole(roleId);
-    const claudeSessionId = claudeSessionMap.get(chatSessionId);
+    const claudeSessionId =
+      claudeSessionMap.get(chatSessionId) ??
+      (await readClaudeSessionId(resultsFilePath));
 
     try {
       for await (const event of runAgent(
@@ -106,6 +108,10 @@ router.post(
       )) {
         if (event.type === "claude_session_id") {
           claudeSessionMap.set(chatSessionId, event.id);
+          await appendFile(
+            resultsFilePath,
+            JSON.stringify({ type: "claude_session_id", id: event.id }) + "\n",
+          );
           continue;
         }
         send(event);
@@ -129,5 +135,25 @@ router.post(
     }
   },
 );
+
+async function readClaudeSessionId(
+  filePath: string,
+): Promise<string | undefined> {
+  try {
+    const content = await readFile(filePath, "utf-8");
+    const lines = content.split("\n").filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i]);
+        if (entry.type === "claude_session_id" && entry.id) return entry.id;
+      } catch {
+        // skip malformed lines
+      }
+    }
+  } catch {
+    // file doesn't exist yet
+  }
+  return undefined;
+}
 
 export default router;
