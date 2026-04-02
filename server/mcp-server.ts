@@ -37,6 +37,9 @@ interface JsonRpcMessage {
   params?: ToolCallParams;
 }
 
+const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage =>
+  typeof v === "object" && v !== null && !Array.isArray(v) && "method" in v;
+
 const SESSION_ID = process.env.SESSION_ID ?? "";
 const PORT = process.env.PORT ?? "3001";
 const PLUGIN_NAMES = (process.env.PLUGIN_NAMES ?? "")
@@ -206,12 +209,13 @@ process.stdin.on("data", (chunk: Buffer) => {
 
   for (const line of lines) {
     if (!line.trim()) continue;
-    let msg: JsonRpcMessage;
+    let msg: unknown;
     try {
       msg = JSON.parse(line);
     } catch {
       continue;
     }
+    if (!isJsonRpcMessage(msg)) continue;
 
     const { id, method, params } = msg;
 
@@ -238,9 +242,19 @@ process.stdin.on("data", (chunk: Buffer) => {
         },
       });
     } else if (method === "tools/call") {
-      const name = params?.name ?? "";
-      const toolArgs = params?.arguments ?? {};
-      handleToolCall(name, toolArgs)
+      if (!params?.name) {
+        respond({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message: "Invalid params: tools/call requires params.name",
+          },
+        });
+        continue;
+      }
+      const toolArgs = params.arguments ?? {};
+      handleToolCall(params.name, toolArgs)
         .then((text) => {
           respond({
             jsonrpc: "2.0",
