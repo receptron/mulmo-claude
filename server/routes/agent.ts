@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { access, appendFile, mkdir, writeFile } from "fs/promises";
+import { access, appendFile, mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Router, Request, Response } from "express";
 import { getRole } from "../roles.js";
@@ -72,17 +72,16 @@ router.post(
     const chatDir = path.join(workspacePath, "chat");
     await mkdir(chatDir, { recursive: true });
     const resultsFilePath = path.join(chatDir, `${chatSessionId}.jsonl`);
+    const metaFilePath = path.join(chatDir, `${chatSessionId}.json`);
 
     // Write metadata only on the first message of this session
     try {
-      await access(resultsFilePath);
+      await access(metaFilePath);
     } catch {
-      const meta = {
-        type: "session_meta",
-        roleId,
-        startedAt: new Date().toISOString(),
-      };
-      await writeFile(resultsFilePath, JSON.stringify(meta) + "\n");
+      await writeFile(
+        metaFilePath,
+        JSON.stringify({ roleId, startedAt: new Date().toISOString() }),
+      );
     }
 
     // Append user message for this turn
@@ -93,7 +92,9 @@ router.post(
 
     registerSession(sessionId, send, resultsFilePath, selectedImageData);
     const role = getRole(roleId);
-    const claudeSessionId = claudeSessionMap.get(chatSessionId);
+    const claudeSessionId =
+      claudeSessionMap.get(chatSessionId) ??
+      (await readClaudeSessionId(metaFilePath, resultsFilePath));
 
     try {
       for await (const event of runAgent(
@@ -106,6 +107,7 @@ router.post(
       )) {
         if (event.type === "claude_session_id") {
           claudeSessionMap.set(chatSessionId, event.id);
+          await updateClaudeSessionId(metaFilePath, event.id);
           continue;
         }
         send(event);
@@ -129,5 +131,47 @@ router.post(
     }
   },
 );
+
+async function readClaudeSessionId(
+  metaFilePath: string,
+  jsonlFilePath: string,
+): Promise<string | undefined> {
+  // Try new-style .json metadata file first
+  try {
+    const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
+    if (meta.claudeSessionId) return meta.claudeSessionId;
+  } catch {
+    // fall through to legacy scan
+  }
+  // Legacy: scan .jsonl for inline claude_session_id entries
+  try {
+    const lines = (await readFile(jsonlFilePath, "utf-8"))
+      .split("\n")
+      .filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i]);
+        if (entry.type === "claude_session_id" && entry.id) return entry.id;
+      } catch {
+        // skip malformed lines
+      }
+    }
+  } catch {
+    // file doesn't exist yet
+  }
+  return undefined;
+}
+
+async function updateClaudeSessionId(
+  metaFilePath: string,
+  claudeSessionId: string,
+): Promise<void> {
+  try {
+    const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
+    await writeFile(metaFilePath, JSON.stringify({ ...meta, claudeSessionId }));
+  } catch {
+    // ignore if meta file is missing
+  }
+}
 
 export default router;

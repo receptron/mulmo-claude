@@ -3,10 +3,32 @@ import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../workspace.js";
 
-interface SessionMeta {
-  type?: string;
-  roleId: string;
-  startedAt: string;
+async function readSessionMeta(
+  chatDir: string,
+  id: string,
+): Promise<{ roleId: string; startedAt: string } | null> {
+  // Try new-style .json file first
+  try {
+    const meta = JSON.parse(
+      await readFile(path.join(chatDir, `${id}.json`), "utf-8"),
+    );
+    if (meta.roleId && meta.startedAt) return meta;
+  } catch {
+    // fall through
+  }
+  // Legacy: read first line of .jsonl
+  try {
+    const first = (await readFile(path.join(chatDir, `${id}.jsonl`), "utf-8"))
+      .split("\n")
+      .find(Boolean);
+    if (first) {
+      const meta = JSON.parse(first);
+      if (meta.roleId && meta.startedAt) return meta;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 interface SessionEntry {
@@ -32,11 +54,12 @@ router.get("/sessions", async (_req: Request, res: Response) => {
         files.map(async (file) => {
           const id = file.replace(".jsonl", "");
           try {
+            const meta = await readSessionMeta(chatDir, id);
+            if (!meta) return null;
             const content = await readFile(path.join(chatDir, file), "utf-8");
-            const lines = content.split("\n").filter(Boolean);
-            const meta: SessionMeta = JSON.parse(lines[0]);
-            const firstUserLine: SessionEntry | undefined = lines
-              .slice(1)
+            const firstUserLine: SessionEntry | undefined = content
+              .split("\n")
+              .filter(Boolean)
               .map((l): SessionEntry | null => {
                 try {
                   return JSON.parse(l);
@@ -69,9 +92,11 @@ router.get("/sessions", async (_req: Request, res: Response) => {
 });
 
 router.get("/sessions/:id", async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const filePath = path.join(workspacePath, "chat", `${id}.jsonl`);
+  const id = String(req.params.id);
+  const chatDir = path.join(workspacePath, "chat");
+  const filePath = path.join(chatDir, `${id}.jsonl`);
   try {
+    const meta = await readSessionMeta(chatDir, id);
     const content = await readFile(filePath, "utf-8");
     const entries = (
       await Promise.all(
@@ -81,6 +106,12 @@ router.get("/sessions/:id", async (req: Request, res: Response) => {
           .map(async (line) => {
             try {
               const entry = JSON.parse(line);
+              // Skip legacy metadata entries now stored in .json
+              if (
+                entry.type === "session_meta" ||
+                entry.type === "claude_session_id"
+              )
+                return null;
               // For presentMulmoScript results, re-read the script from disk
               if (
                 entry.source === "tool" &&
@@ -119,7 +150,11 @@ router.get("/sessions/:id", async (req: Request, res: Response) => {
           }),
       )
     ).filter(Boolean);
-    res.json(entries);
+    // Prepend metadata as session_meta entry for the frontend
+    const result = meta
+      ? [{ type: "session_meta", ...meta }, ...entries]
+      : entries;
+    res.json(result);
   } catch {
     res.status(404).json({ error: "Session not found" });
   }
