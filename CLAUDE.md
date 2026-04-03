@@ -115,6 +115,68 @@ Local plugins import Vue components, so their `toolDefinition` must live in a **
 
 > The key in `src/tools/index.ts` must exactly match the tool's `name` field (i.e. `TOOL_NAME` from the package, or `toolDefinition.name` for local plugins). This is what the frontend uses to look up the view component when rendering a tool result.
 
+## Express Route Type Safety
+
+MUST use Express generics to type route handlers — NEVER use `as` casts on `req.body`, `req.params`, or `req.query`.
+
+### Request typing
+
+`Request<Params, ResBody, ReqBody>` — always specify all three type parameters:
+
+```typescript
+// GOOD — fully typed request
+interface MyBody { action: string; text?: string }
+interface MyParams { id: string }
+
+router.post("/items/:id", (req: Request<MyParams, unknown, MyBody>, res: Response) => {
+  const { id } = req.params;    // string — typed
+  const { action } = req.body;  // MyBody — typed
+});
+
+// BAD — untyped, requires casts
+router.post("/items/:id", (req: Request, res: Response) => {
+  const { action } = req.body as { action: string }; // avoid
+});
+```
+
+### Response typing
+
+Use `Response<T>` when the response shape is consistent:
+
+```typescript
+interface ErrorResponse { error: string }
+interface TodoResponse { message: string; data: { items: TodoItem[] } }
+
+router.post("/todos", (req: Request<object, unknown, TodoBody>, res: Response<TodoResponse | ErrorResponse>) => {
+  // res.json() is now type-checked
+});
+```
+
+### Query parameters
+
+NEVER cast `req.query` — use type narrowing:
+
+```typescript
+// GOOD
+const session = String(req.query.session ?? "");
+const moviePath = typeof req.query.moviePath === "string" ? req.query.moviePath : undefined;
+
+// BAD
+const { session } = req.query as { session: string };
+```
+
+### JSON.parse results
+
+Use type annotation instead of `as` cast:
+
+```typescript
+// GOOD
+const data: MyType = JSON.parse(raw);
+
+// BAD
+const data = JSON.parse(raw) as MyType;
+```
+
 ## Tech Stack
 
 - **Frontend**: Vue 3 + Tailwind CSS v4
