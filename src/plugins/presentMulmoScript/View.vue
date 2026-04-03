@@ -95,7 +95,7 @@
         <!-- Beat body: thumbnail + narration side by side -->
         <div class="flex gap-3 items-stretch">
           <!-- Thumbnail -->
-          <div class="shrink-0 w-[45%] overflow-hidden bg-gray-50">
+          <div class="relative shrink-0 w-[45%] overflow-hidden bg-gray-50">
             <img
               v-if="renderedImages[index]"
               :src="renderedImages[index]"
@@ -144,6 +144,18 @@
                 }}</span>
               </template>
             </div>
+            <!-- Generate button for imagePrompt beats -->
+            <button
+              v-if="
+                effectiveBeat(index).imagePrompt &&
+                !renderedImages[index] &&
+                renderState[index] !== 'rendering'
+              "
+              class="absolute top-1.5 right-1.5 px-2 py-0.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50"
+              @click="renderBeat(index)"
+            >
+              Generate
+            </button>
           </div>
 
           <!-- Narration text -->
