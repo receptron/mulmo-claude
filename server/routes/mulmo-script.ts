@@ -49,6 +49,13 @@ interface UpdateBeatBody {
   beat: MulmoBeat;
 }
 
+type ErrorResponse = { error: string };
+
+type BeatImageResponse = { image: string | null } | ErrorResponse;
+type BeatAudioResponse = { audio: string | null } | ErrorResponse;
+type MovieStatusResponse = { moviePath: string | null } | ErrorResponse;
+type GenerateBeatAudioResponse = { audio: string } | ErrorResponse;
+
 router.post(
   "/mulmo-script",
   (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
@@ -116,64 +123,67 @@ router.post(
   },
 );
 
-router.get("/mulmo-script/beat-image", async (req: Request, res: Response) => {
-  const filePath =
-    typeof req.query.filePath === "string" ? req.query.filePath : undefined;
-  const beatIndex =
-    typeof req.query.beatIndex === "string"
-      ? parseInt(req.query.beatIndex, 10)
-      : undefined;
+router.get(
+  "/mulmo-script/beat-image",
+  async (req: Request, res: Response<BeatImageResponse>) => {
+    const filePath =
+      typeof req.query.filePath === "string" ? req.query.filePath : undefined;
+    const beatIndex =
+      typeof req.query.beatIndex === "string"
+        ? parseInt(req.query.beatIndex, 10)
+        : undefined;
 
-  if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
-    res.status(400).json({ error: "filePath and beatIndex are required" });
-    return;
-  }
-
-  const storiesDir = path.resolve(workspacePath, "stories");
-  const absoluteFilePath = path.resolve(workspacePath, filePath);
-  if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
-    res.status(400).json({ error: "Invalid filePath" });
-    return;
-  }
-  if (!fs.existsSync(absoluteFilePath)) {
-    res.status(404).json({ error: `File not found: ${filePath}` });
-    return;
-  }
-
-  try {
-    setGraphAILogger(false);
-
-    const files = getFileObject({
-      file: absoluteFilePath,
-      basedir: path.dirname(absoluteFilePath),
-      grouped: true,
-    });
-
-    const context = await initializeContextFromFiles(files, true);
-    if (!context) {
-      res.status(500).json({ error: "Failed to initialize mulmo context" });
+    if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
+      res.status(400).json({ error: "filePath and beatIndex are required" });
       return;
     }
 
-    const { imagePath } = getBeatPngImagePath(context, beatIndex);
-
-    if (!fs.existsSync(imagePath)) {
-      res.json({ image: null });
+    const storiesDir = path.resolve(workspacePath, "stories");
+    const absoluteFilePath = path.resolve(workspacePath, filePath);
+    if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
+      res.status(400).json({ error: "Invalid filePath" });
+      return;
+    }
+    if (!fs.existsSync(absoluteFilePath)) {
+      res.status(404).json({ error: `File not found: ${filePath}` });
       return;
     }
 
-    const imageData = fs.readFileSync(imagePath);
-    const base64 = imageData.toString("base64");
-    res.json({ image: `data:image/png;base64,${base64}` });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+    try {
+      setGraphAILogger(false);
+
+      const files = getFileObject({
+        file: absoluteFilePath,
+        basedir: path.dirname(absoluteFilePath),
+        grouped: true,
+      });
+
+      const context = await initializeContextFromFiles(files, true);
+      if (!context) {
+        res.status(500).json({ error: "Failed to initialize mulmo context" });
+        return;
+      }
+
+      const { imagePath } = getBeatPngImagePath(context, beatIndex);
+
+      if (!fs.existsSync(imagePath)) {
+        res.json({ image: null });
+        return;
+      }
+
+      const imageData = fs.readFileSync(imagePath);
+      const base64 = imageData.toString("base64");
+      res.json({ image: `data:image/png;base64,${base64}` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 router.get(
   "/mulmo-script/movie-status",
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response<MovieStatusResponse>) => {
     const filePath =
       typeof req.query.filePath === "string" ? req.query.filePath : undefined;
 
@@ -256,49 +266,52 @@ async function buildContext(absoluteFilePath: string, force = false) {
   return initializeContextFromFiles(files, true, force);
 }
 
-router.get("/mulmo-script/beat-audio", async (req: Request, res: Response) => {
-  const filePath =
-    typeof req.query.filePath === "string" ? req.query.filePath : undefined;
-  const beatIndex =
-    typeof req.query.beatIndex === "string"
-      ? parseInt(req.query.beatIndex, 10)
-      : undefined;
+router.get(
+  "/mulmo-script/beat-audio",
+  async (req: Request, res: Response<BeatAudioResponse>) => {
+    const filePath =
+      typeof req.query.filePath === "string" ? req.query.filePath : undefined;
+    const beatIndex =
+      typeof req.query.beatIndex === "string"
+        ? parseInt(req.query.beatIndex, 10)
+        : undefined;
 
-  if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
-    res.status(400).json({ error: "filePath and beatIndex are required" });
-    return;
-  }
-
-  const absoluteFilePath = resolveStoryPath(filePath, res);
-  if (!absoluteFilePath) return;
-
-  try {
-    const context = await buildContext(absoluteFilePath);
-    if (!context) {
-      res.json({ audio: null });
+    if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
+      res.status(400).json({ error: "filePath and beatIndex are required" });
       return;
     }
 
-    const beat = context.studio.script.beats[beatIndex];
-    const audioPath = getBeatAudioPathOrUrl(
-      beat.text ?? "",
-      context,
-      beat,
-      context.lang,
-    );
-    if (!audioPath || !fs.existsSync(audioPath)) {
-      res.json({ audio: null });
-      return;
-    }
+    const absoluteFilePath = resolveStoryPath(filePath, res);
+    if (!absoluteFilePath) return;
 
-    const audioData = fs.readFileSync(audioPath);
-    const base64 = audioData.toString("base64");
-    res.json({ audio: `data:audio/mpeg;base64,${base64}` });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+    try {
+      const context = await buildContext(absoluteFilePath);
+      if (!context) {
+        res.json({ audio: null });
+        return;
+      }
+
+      const beat = context.studio.script.beats[beatIndex];
+      const audioPath = getBeatAudioPathOrUrl(
+        beat.text ?? "",
+        context,
+        beat,
+        context.lang,
+      );
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        res.json({ audio: null });
+        return;
+      }
+
+      const audioData = fs.readFileSync(audioPath);
+      const base64 = audioData.toString("base64");
+      res.json({ audio: `data:audio/mpeg;base64,${base64}` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 router.post(
   "/mulmo-script/generate-beat-audio",
@@ -308,7 +321,7 @@ router.post(
       object,
       { filePath: string; beatIndex: number; force?: boolean }
     >,
-    res: Response,
+    res: Response<GenerateBeatAudioResponse>,
   ) => {
     const { filePath, beatIndex, force } = req.body;
 
@@ -329,8 +342,7 @@ router.post(
 
       await generateBeatAudio(beatIndex, context, {
         settings: process.env as Record<string, string>,
-        langs: [],
-      });
+      } as Parameters<typeof generateBeatAudio>[2]);
 
       const beat = context.studio.script.beats[beatIndex];
       const audioPath =
