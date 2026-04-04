@@ -116,7 +116,11 @@
           <!-- Character thumbnail -->
           <div
             class="relative w-36 h-36 rounded-lg border overflow-hidden bg-gray-50 flex items-center justify-center transition-colors"
-            :class="charDragOver[key] ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
+            :class="
+              charDragOver[key]
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-gray-200'
+            "
             @dragover="onCharDragOver($event, key)"
             @dragleave="onCharDragLeave(key)"
             @drop="onCharDrop($event, key)"
@@ -189,7 +193,8 @@
               <span
                 v-if="movieGenerating || anyBeatRendering"
                 class="inline-block animate-spin"
-              >↺</span>
+                >↺</span
+              >
               <span v-else>↺</span>
             </button>
             <!-- Generate button -->
@@ -325,7 +330,9 @@
               <span class="text-xs text-blue-500 font-medium">Drop</span>
             </div>
             <div
-              v-else-if="!renderedImages[index] && renderState[index] !== 'rendering'"
+              v-else-if="
+                !renderedImages[index] && renderState[index] !== 'rendering'
+              "
               class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
             >
               or drop image
@@ -850,7 +857,11 @@ async function onBeatDrop(event: DragEvent, index: number) {
     const res = await fetch("/api/mulmo-script/upload-beat-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, beatIndex: index, imageData }),
+      body: JSON.stringify({
+        filePath: filePath.value,
+        beatIndex: index,
+        imageData,
+      }),
     });
     const json = await res.json();
     if (!res.ok || json.error) throw new Error(json.error ?? "Upload failed");
