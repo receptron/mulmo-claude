@@ -498,9 +498,9 @@ export const ROLES: Role[] = [
       "```",
     availablePlugins: ["presentMulmoScript", "switchRole"],
     queries: [
-      "Tell me a short story about a fox who discovers a magical forest",
-      "Create a bedtime story about a young astronaut exploring the moon",
-      "Tell a story about a lonely lighthouse keeper who befriends a mermaid",
+      "Tell a story about two siblings — a bold older sister and a shy younger brother — who get lost in an enchanted forest",
+      "Create a story with three characters: a grumpy wizard, his loyal cat, and a young apprentice who must work together to break a curse",
+      "Tell a pirate adventure featuring a daring captain and her first mate across three islands",
     ],
   },
   {
