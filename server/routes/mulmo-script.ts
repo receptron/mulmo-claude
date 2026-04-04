@@ -327,7 +327,10 @@ router.post(
         return;
       }
 
-      await generateBeatAudio(beatIndex, context, { settings: process.env });
+      await generateBeatAudio(beatIndex, context, {
+        settings: process.env as Record<string, string>,
+        langs: [],
+      });
 
       const beat = context.studio.script.beats[beatIndex];
       const audioPath =
