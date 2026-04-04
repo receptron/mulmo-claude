@@ -20,7 +20,7 @@ interface OkResponse {
 
 router.post(
   "/internal/tool-result",
-  async (req: Request, res: Response<OkResponse>) => {
+  async (req: Request<object, unknown, unknown>, res: Response<OkResponse>) => {
     const session = String(req.query.session ?? "");
     const pushed = await pushToSession(session, {
       type: "tool_result",

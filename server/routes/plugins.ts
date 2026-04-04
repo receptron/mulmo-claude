@@ -68,9 +68,18 @@ interface PresentDocumentBody {
   markdown: string;
 }
 
+interface PresentDocumentResponse {
+  message: string;
+  title: string;
+  data: { markdown: string };
+}
+
 router.post(
   "/present-document",
-  async (req: Request<object, unknown, PresentDocumentBody>, res: Response) => {
+  async (
+    req: Request<object, unknown, PresentDocumentBody>,
+    res: Response<PresentDocumentResponse>,
+  ) => {
     const { title, markdown } = req.body;
     const filledMarkdown = await fillImagePlaceholders(markdown);
     res.json({
