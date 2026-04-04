@@ -246,7 +246,13 @@
         <!-- Beat body: thumbnail + narration side by side -->
         <div class="flex gap-3 items-stretch">
           <!-- Thumbnail -->
-          <div class="relative shrink-0 w-[45%] overflow-hidden bg-gray-50">
+          <div
+            class="relative shrink-0 w-[45%] overflow-hidden bg-gray-50 transition-colors"
+            :class="beatDragOver[index] ? 'bg-blue-50' : ''"
+            @dragover="onBeatDragOver($event, index)"
+            @dragleave="onBeatDragLeave(index)"
+            @drop="onBeatDrop($event, index)"
+          >
             <img
               v-if="renderedImages[index]"
               :src="renderedImages[index]"
@@ -310,6 +316,19 @@
                   beat.image?.type ?? "—"
                 }}</span>
               </template>
+            </div>
+            <!-- Beat drop hint / overlay -->
+            <div
+              v-if="beatDragOver[index]"
+              class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none"
+            >
+              <span class="text-xs text-blue-500 font-medium">Drop</span>
+            </div>
+            <div
+              v-else-if="!renderedImages[index] && renderState[index] !== 'rendering'"
+              class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
+            >
+              or drop image
             </div>
             <!-- Generate button for imagePrompt beats -->
             <button
@@ -577,6 +596,7 @@ const charRenderState = reactive<Record<string, CharRenderState>>({});
 const charImages = reactive<Record<string, string>>({});
 const charErrors = reactive<Record<string, string>>({});
 const charDragOver = reactive<Record<string, boolean>>({});
+const beatDragOver = reactive<Record<number, boolean>>({});
 
 const anyBeatRendering = computed(() =>
   Object.values(renderState).some((s) => s === "rendering"),
@@ -801,6 +821,47 @@ function playAudio(index: number) {
   audio.play();
 }
 
+function onBeatDragOver(event: DragEvent, index: number) {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  beatDragOver[index] = true;
+}
+
+function onBeatDragLeave(index: number) {
+  beatDragOver[index] = false;
+}
+
+async function onBeatDrop(event: DragEvent, index: number) {
+  event.preventDefault();
+  beatDragOver[index] = false;
+  const file = event.dataTransfer?.files[0];
+  if (!file || !file.type.startsWith("image/")) return;
+
+  renderState[index] = "rendering";
+  delete renderErrors[index];
+  try {
+    const imageData = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch("/api/mulmo-script/upload-beat-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath: filePath.value, beatIndex: index, imageData }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error ?? "Upload failed");
+    renderedImages[index] = json.image;
+    renderState[index] = "done";
+  } catch (err) {
+    renderErrors[index] = err instanceof Error ? err.message : String(err);
+    renderState[index] = "error";
+  }
+}
+
 function onCharDragOver(event: DragEvent, key: string) {
   if (!event.dataTransfer?.types.includes("Files")) return;
   event.preventDefault();
@@ -916,6 +977,7 @@ async function initializeScript() {
   Object.keys(charRenderState).forEach((k) => delete charRenderState[k]);
   Object.keys(charImages).forEach((k) => delete charImages[k]);
   Object.keys(charErrors).forEach((k) => delete charErrors[k]);
+  Object.keys(beatDragOver).forEach((k) => delete beatDragOver[+k]);
   moviePath.value = null;
   scriptSourceOpen.value = false;
 

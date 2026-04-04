@@ -46,6 +46,12 @@ interface RenderBeatBody {
   force?: boolean;
 }
 
+interface UploadBeatImageBody {
+  filePath: string;
+  beatIndex: number;
+  imageData: string; // base64 data URI
+}
+
 interface UpdateBeatBody {
   filePath: string;
   beatIndex: number;
@@ -508,6 +514,44 @@ router.get(
         res.json({ image: null });
         return;
       }
+
+      res.json({ image: fileToDataUri(imagePath, "image/png") });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  },
+);
+
+router.post(
+  "/mulmo-script/upload-beat-image",
+  async (
+    req: Request<object, BeatImageResponse, UploadBeatImageBody>,
+    res: Response<BeatImageResponse>,
+  ) => {
+    const { filePath, beatIndex, imageData } = req.body;
+
+    if (!filePath || beatIndex === undefined || !imageData) {
+      res
+        .status(400)
+        .json({ error: "filePath, beatIndex, and imageData are required" });
+      return;
+    }
+
+    const absoluteFilePath = resolveStoryPath(filePath, res);
+    if (!absoluteFilePath) return;
+
+    try {
+      const context = await buildContext(absoluteFilePath);
+      if (!context) {
+        res.status(500).json({ error: "Failed to initialize mulmo context" });
+        return;
+      }
+
+      const { imagePath } = getBeatPngImagePath(context, beatIndex);
+      fs.mkdirSync(path.dirname(imagePath), { recursive: true });
+
+      const base64 = imageData.replace(/^data:image\/\w+;base64,/, "");
+      fs.writeFileSync(imagePath, Buffer.from(base64, "base64"));
 
       res.json({ image: fileToDataUri(imagePath, "image/png") });
     } catch (err) {
