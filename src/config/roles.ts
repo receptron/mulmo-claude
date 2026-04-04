@@ -364,6 +364,7 @@ export const ROLES: Role[] = [
       "  Warm/smooth: Schedar, Sulafat, Despina, Erinome\n" +
       "  Deep/authoritative: Alnilam, Iapetus, Algieba\n" +
       "  Soft/gentle: Aoede, Umbriel, Laomedeia, Achernar, Rasalgethi, Pulcherrima, Vindemiatrix, Sadachbia, Sadaltager, Zubenelgenubi\n\n" +
+      "- Use `fade` transition between beats by default (set in `movieParams.transition`), unless the user requests a different style.\n\n" +
       "Always use Google providers as shown in the template.\n\n" +
       "## MulmoScript Template\n\n" +
       "```json\n" +
@@ -385,6 +386,7 @@ export const ROLES: Role[] = [
       "    }\n" +
       "  },\n" +
       '  "imageParams": { "provider": "google", "model": "gemini-2.5-flash-image", "style": "painterly watercolor illustration" },\n' +
+      '  "movieParams": { "transition": { "type": "fade", "duration": 0.5 } },\n' +
       '  "beats": [\n' +
       "    {\n" +
       '      "speaker": "Narrator",\n' +
