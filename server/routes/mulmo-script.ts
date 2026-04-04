@@ -21,6 +21,7 @@ import {
 import type { MulmoBeat } from "@mulmocast/types";
 
 const router = Router();
+const storiesDir = path.resolve(workspacePath, "stories");
 
 function slugify(title: string): string {
   return (
@@ -75,7 +76,6 @@ router.post(
       return;
     }
 
-    const storiesDir = path.join(workspacePath, "stories");
     fs.mkdirSync(storiesDir, { recursive: true });
 
     const title = script.title || "untitled";
@@ -105,7 +105,6 @@ router.post(
       return;
     }
 
-    const storiesDir = path.resolve(workspacePath, "stories");
     const absoluteFilePath = path.resolve(workspacePath, filePath);
     if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
       res.status(400).json({ error: "Invalid filePath" });
@@ -147,7 +146,6 @@ router.get(
       return;
     }
 
-    const storiesDir = path.resolve(workspacePath, "stories");
     const absoluteFilePath = path.resolve(workspacePath, filePath);
     if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
       res.status(400).json({ error: "Invalid filePath" });
@@ -203,7 +201,6 @@ router.get(
       return;
     }
 
-    const storiesDir = path.resolve(workspacePath, "stories");
     const absoluteFilePath = path.resolve(workspacePath, filePath);
     if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
       res.status(400).json({ error: "Invalid filePath" });
@@ -253,7 +250,6 @@ router.get(
 
 // Helper: resolve and validate a stories filePath, returns absoluteFilePath or null
 function resolveStoryPath(filePath: string, res: Response): string | null {
-  const storiesDir = path.resolve(workspacePath, "stories");
   const absoluteFilePath = path.resolve(workspacePath, filePath);
   if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
     res.status(400).json({ error: "Invalid filePath" });
@@ -392,7 +388,6 @@ router.post(
       return;
     }
 
-    const storiesDir = path.resolve(workspacePath, "stories");
     const absoluteFilePath = path.resolve(workspacePath, filePath);
     if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
       res.status(400).json({ error: "Invalid filePath" });
@@ -452,7 +447,6 @@ router.post(
       return;
     }
 
-    const storiesDir = path.resolve(workspacePath, "stories");
     const absoluteFilePath = path.resolve(workspacePath, filePath);
     if (!absoluteFilePath.startsWith(storiesDir + path.sep)) {
       res.status(400).json({ error: "Invalid filePath" });
@@ -551,7 +545,6 @@ router.get("/mulmo-script/download-movie", (req: Request, res: Response) => {
     return;
   }
 
-  const storiesDir = path.resolve(workspacePath, "stories");
   const absolutePath = path.resolve(workspacePath, moviePath);
   if (!absolutePath.startsWith(storiesDir + path.sep)) {
     res.status(400).json({ error: "Invalid moviePath" });
