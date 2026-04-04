@@ -99,6 +99,7 @@
           class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
           :disabled="
             movieGenerating ||
+            anyBeatRendering ||
             characterKeys.every((k) => charRenderState[k] === 'rendering')
           "
           @click="generateAllCharacters"
@@ -110,11 +111,11 @@
         <div
           v-for="key in characterKeys"
           :key="key"
-          class="flex flex-col items-center gap-1 w-24"
+          class="flex flex-col items-center gap-1 w-36"
         >
           <!-- Character thumbnail -->
           <div
-            class="relative w-24 h-24 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center"
+            class="relative w-36 h-36 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center"
           >
             <img
               v-if="charImages[key]"
@@ -158,20 +159,56 @@
             <!-- Regenerate button -->
             <button
               v-if="charImages[key] && charRenderState[key] !== 'rendering'"
-              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border border-gray-400 text-gray-600 bg-white hover:bg-gray-50"
+              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
+              :class="
+                movieGenerating || anyBeatRendering
+                  ? 'border-yellow-400 text-yellow-500 cursor-not-allowed'
+                  : 'border-gray-400 text-gray-600 hover:bg-gray-50'
+              "
+              :disabled="movieGenerating || anyBeatRendering"
               @click.stop="renderCharacter(key, true)"
             >
-              ↺
+              <span
+                v-if="movieGenerating || anyBeatRendering"
+                class="inline-block animate-spin"
+              >↺</span>
+              <span v-else>↺</span>
             </button>
             <!-- Generate button -->
             <button
               v-else-if="
                 !charImages[key] && charRenderState[key] !== 'rendering'
               "
-              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50"
+              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
+              :class="
+                movieGenerating || anyBeatRendering
+                  ? 'border-yellow-400 text-yellow-500 cursor-not-allowed'
+                  : 'border-blue-400 text-blue-600 hover:bg-blue-50'
+              "
+              :disabled="movieGenerating || anyBeatRendering"
               @click.stop="renderCharacter(key, false)"
             >
-              Gen
+              <svg
+                v-if="movieGenerating || anyBeatRendering"
+                class="animate-spin w-3 h-3"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z"
+                />
+              </svg>
+              <span v-else>Gen</span>
             </button>
           </div>
           <span class="text-xs text-gray-600 text-center truncate w-full">{{
@@ -521,6 +558,10 @@ type CharRenderState = "idle" | "rendering" | "done" | "error";
 const charRenderState = reactive<Record<string, CharRenderState>>({});
 const charImages = reactive<Record<string, string>>({});
 const charErrors = reactive<Record<string, string>>({});
+
+const anyBeatRendering = computed(() =>
+  Object.values(renderState).some((s) => s === "rendering"),
+);
 
 const characterKeys = computed(() => {
   const imgs = script.value.imageParams?.images ?? {};
