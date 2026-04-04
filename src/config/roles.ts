@@ -437,8 +437,7 @@ export const ROLES: Role[] = [
       "  Warm/smooth: Schedar, Sulafat, Despina, Erinome\n" +
       "  Deep/authoritative: Alnilam, Iapetus, Algieba\n" +
       "  Soft/gentle: Aoede, Umbriel, Laomedeia, Achernar, Rasalgethi, Pulcherrima, Vindemiatrix, Sadachbia, Sadaltager, Zubenelgenubi\n\n" +
-      "- Use `fade` transition between beats by default (set in `movieParams.transition`), unless the user requests a different style.\n" +
-      "- Add `moviePrompt` to beats ONLY if the user explicitly requests animated video. When included, write a concise motion-focused prompt describing how the scene should move.\n\n" +
+      "- Use `fade` transition between beats by default (set in `movieParams.transition`), unless the user requests a different style.\n\n" +
       "Always use Google providers as shown in the template.\n\n" +
       "## MulmoScript Template\n\n" +
       "```json\n" +
@@ -501,7 +500,7 @@ export const ROLES: Role[] = [
     queries: [
       "Tell a story about two siblings — a bold older sister and a shy younger brother — who get lost in an enchanted forest",
       "Create a story with three characters: a grumpy wizard, his loyal cat, and a young apprentice who must work together to break a curse",
-      "Tell a pirate adventure featuring a daring captain and her first mate across three islands — animate every beat",
+      "Tell a pirate adventure featuring a daring captain and her first mate across three islands",
     ],
   },
   {
