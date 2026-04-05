@@ -29,6 +29,20 @@
         </button>
       </div>
       <div class="ml-4 shrink-0 flex gap-2">
+        <!-- Download PDF -->
+        <button
+          class="px-3 py-1.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          :disabled="pdfDownloading"
+          @click="downloadPdf"
+        >
+          {{ pdfDownloading ? "…" : "↓ PDF" }}
+        </button>
+        <span
+          v-if="pdfError"
+          class="text-xs text-red-500 self-center"
+          :title="pdfError"
+          >⚠ PDF failed</span
+        >
         <!-- Generate / Download Movie -->
         <a
           v-if="moviePath"
@@ -596,6 +610,8 @@ const lightbox = ref<{
   index: number;
   isCharacter?: boolean;
 } | null>(null);
+const pdfDownloading = ref(false);
+const pdfError = ref<string | null>(null);
 
 // Character (imageParams.images) state
 type CharRenderState = "idle" | "rendering" | "done" | "error";
@@ -663,6 +679,59 @@ const scriptSourceText = computed(() => JSON.stringify(script.value, null, 2));
 
 function toggleScriptSource() {
   scriptSourceOpen.value = !scriptSourceOpen.value;
+}
+
+function buildStoryboardMarkdown(): string {
+  const s = script.value;
+  const lines: string[] = [];
+  lines.push(`# ${s.title ?? "Untitled Script"}`);
+  if (s.description) lines.push(`\n${s.description}`);
+  if (s.lang) lines.push(`\n**Language:** ${s.lang}`);
+  lines.push("");
+
+  beats.value.forEach((beat, i) => {
+    lines.push(`## Beat ${i + 1}${beat.id ? ` — ${beat.id}` : ""}`);
+    if (beat.speaker) lines.push(`**Speaker:** ${beat.speaker}`);
+    if (beat.text) lines.push(`\n${beat.text}`);
+    if (beat.imagePrompt) lines.push(`\n*Image:* ${beat.imagePrompt}`);
+    else if (beat.image) lines.push(`\n*Image:* ${JSON.stringify(beat.image)}`);
+    lines.push("");
+  });
+
+  return lines.join("\n");
+}
+
+async function downloadPdf() {
+  pdfError.value = null;
+  pdfDownloading.value = true;
+  const markdown = buildStoryboardMarkdown();
+  const filename = `${script.value.title ?? "storyboard"}.pdf`;
+  let response: Response;
+  try {
+    response = await fetch("/api/pdf/markdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markdown, filename }),
+    });
+  } catch (err) {
+    pdfError.value = err instanceof Error ? err.message : String(err);
+    pdfDownloading.value = false;
+    return;
+  }
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    pdfError.value = `PDF error ${response.status}: ${text}`;
+    pdfDownloading.value = false;
+    return;
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  pdfDownloading.value = false;
 }
 
 function effectiveBeat(index: number): Beat {

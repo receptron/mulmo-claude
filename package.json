@@ -47,6 +47,7 @@
     "marked": "^17.0.6",
     "material-icons": "^1.13.14",
     "mulmocast": "^2.6.6",
+    "puppeteer": "^24.40.0",
     "uuid": "^13.0.0",
     "vue": "^3.5.32",
     "vue-router": "^5.0.3",

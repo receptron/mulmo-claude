@@ -13,6 +13,7 @@ import htmlRoutes from "./routes/html.js";
 import rolesRoutes from "./routes/roles.js";
 import mulmoScriptRoutes from "./routes/mulmo-script.js";
 import wikiRoutes from "./routes/wiki.js";
+import pdfRoutes from "./routes/pdf.js";
 import { initWorkspace } from "./workspace.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +42,7 @@ app.use("/api", htmlRoutes);
 app.use("/api", rolesRoutes);
 app.use("/api", mulmoScriptRoutes);
 app.use("/api", wikiRoutes);
+app.use("/api", pdfRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client")));
