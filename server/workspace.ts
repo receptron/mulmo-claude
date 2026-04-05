@@ -39,7 +39,10 @@ export function initWorkspace(): string {
   const helpsDestDir = path.join(workspacePath, "helps");
   fs.mkdirSync(helpsDestDir, { recursive: true });
   for (const file of fs.readdirSync(TEMPLATES_DIR)) {
-    fs.copyFileSync(path.join(TEMPLATES_DIR, file), path.join(helpsDestDir, file));
+    fs.copyFileSync(
+      path.join(TEMPLATES_DIR, file),
+      path.join(helpsDestDir, file),
+    );
   }
 
   // Git init if not already a repo

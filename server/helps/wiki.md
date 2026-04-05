@@ -1,8 +1,44 @@
 # Wiki
 
-The wiki is a personal knowledge base that Claude builds and maintains as interconnected Markdown files in the workspace. It is available in the **Wiki** role.
+The wiki is a personal knowledge base that Claude builds and maintains as interconnected Markdown files in the workspace. It is available in the **General** role.
 
 The idea originated from [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+
+## The Core Idea
+
+Most people's experience with LLMs and documents resembles RAG: upload files, retrieve relevant chunks at query time, generate answers. The LLM rediscovers knowledge from scratch on every question — there is no accumulation.
+
+The wiki is different. Instead of retrieving from raw documents at query time, Claude **incrementally builds and maintains a persistent wiki** — a structured, interlinked collection of Markdown files. When you add a new source, Claude doesn't just index it. It reads it, extracts key information, and integrates it into the existing wiki: updating entity pages, revising topic summaries, noting contradictions, strengthening synthesis.
+
+**The wiki is a persistent, compounding artifact.** Cross-references are already there. Contradictions are flagged. The synthesis reflects everything you've read. The wiki grows richer with every source and every question.
+
+You never write the wiki yourself — Claude writes and maintains all of it. You curate sources, explore, and ask questions. Claude does the summarizing, cross-referencing, filing, and bookkeeping.
+
+## What You Can Do With It
+
+- **Research**: go deep on a topic over weeks or months — reading papers, articles, reports, building a comprehensive wiki with an evolving thesis.
+- **Reading a book**: file each chapter as you go, building pages for characters, themes, plot threads, and connections.
+- **Personal knowledge**: track goals, health, self-improvement — file journal entries, articles, podcast notes, and build a structured picture over time.
+- **Business**: feed Slack threads, meeting transcripts, project documents into a wiki that stays current because Claude does the maintenance.
+
+## Your Role vs. Claude's Role
+
+**Your job**: curate sources, direct the analysis, ask good questions, think about what it all means.
+
+**Claude's job**: summarizing, cross-referencing, filing, updating pages, maintaining consistency, bookkeeping — everything that makes humans abandon wikis because the maintenance burden grows too fast.
+
+## Three Operations
+
+### Ingest
+Drop a source (article, URL, text) and ask Claude to process it.
+
+Claude will: read the source, identify key entities and concepts, create or update 5–15 wiki pages, add cross-references, append a log entry, and refresh the index. Show the updated index in the canvas when done.
+
+### Query
+Ask any question. Claude searches `wiki/index.md` for relevant pages, reads them, and synthesizes a grounded answer with citations. Good answers can be filed back into the wiki as new pages — a comparison you asked for, an analysis, a connection you discovered — so they don't disappear into chat history.
+
+### Lint
+Ask Claude to health-check the wiki. It scans for contradictions, stale claims, orphan pages, missing cross-references, and concepts that deserve their own page, then fixes issues automatically.
 
 ## Folder Layout
 
@@ -10,7 +46,7 @@ The idea originated from [Andrej Karpathy's LLM Wiki pattern](https://gist.githu
 wiki/
   index.md          ← catalog of all pages (title, one-line summary, last updated)
   log.md            ← append-only chronological activity log
-  summary.md        ← optional compact key-topics list (loaded into every session)
+  summary.md        ← compact key-topics list (loaded into every session as ambient context)
   SCHEMA.md         ← conventions for page format, index updates, and log entries
   pages/
     <topic>.md      ← one page per entity, concept, or theme
@@ -46,32 +82,6 @@ Brief summary paragraph...
 ```
 
 Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyphen-separated (e.g. `transformer-architecture.md`).
-
-## Three Operations
-
-### Ingest
-Process a new source and propagate knowledge across the wiki.
-
-1. Save the raw source to `wiki/sources/<slug>.md`
-2. Identify which existing pages need updating
-3. Create new pages for new entities or concepts
-4. Update existing pages with new facts and cross-references
-5. Append an entry to `wiki/log.md`
-6. Refresh `wiki/index.md`
-
-### Query
-Answer a question using the wiki as the knowledge base.
-
-1. Search `wiki/index.md` for relevant page titles
-2. Read the relevant pages
-3. Synthesize a grounded answer with citations
-4. File back any new insight as a new or updated page
-
-### Lint
-Periodic health check to keep the wiki coherent.
-
-1. Scan all pages for contradictions, stale claims, orphan pages, and broken cross-references
-2. Present a report and optionally auto-fix minor issues
 
 ## Canvas Tool
 
