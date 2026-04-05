@@ -15,7 +15,21 @@
         </button>
         <h2 class="text-lg font-semibold text-gray-800">{{ title }}</h2>
       </div>
-      <div class="flex gap-1">
+      <div class="flex gap-1 items-center">
+        <button
+          v-if="action === 'page' && content"
+          class="text-gray-400 hover:text-gray-700 mr-1 disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Download as PDF"
+          :disabled="isDownloading"
+          @click="downloadPdf"
+        >
+          <span
+            v-if="isDownloading"
+            class="material-icons text-base animate-spin"
+            >autorenew</span
+          >
+          <span v-else class="material-icons text-base">download</span>
+        </button>
         <button
           class="px-3 py-1 text-xs rounded-full border transition-colors"
           :class="
@@ -165,6 +179,45 @@ function navigate(newAction: string) {
 
 function navigatePage(pageName: string) {
   callApi({ action: "page", pageName });
+}
+
+const isDownloading = ref(false);
+
+async function downloadPdf() {
+  isDownloading.value = true;
+  navError.value = null;
+  let response: Response;
+  try {
+    response = await fetch("/api/wiki/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.value, html: renderedContent.value }),
+    });
+  } catch (err) {
+    navError.value = err instanceof Error ? err.message : String(err);
+    isDownloading.value = false;
+    return;
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    navError.value = `PDF generation failed (${response.status}): ${text}`;
+    isDownloading.value = false;
+    return;
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const slug = title.value
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+  a.href = url;
+  a.download = `${slug}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+  isDownloading.value = false;
 }
 
 function handleContentClick(e: MouseEvent) {

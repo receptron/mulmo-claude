@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import puppeteer from "puppeteer";
 import { workspacePath } from "../workspace.js";
 
 const router = Router();
@@ -287,6 +288,82 @@ router.post(
 
       default:
         res.status(400).json({ error: `Unknown action: ${action}` });
+    }
+  },
+);
+
+interface WikiPdfBody {
+  title: string;
+  html: string;
+}
+
+router.post(
+  "/wiki/pdf",
+  async (
+    req: Request<object, unknown, WikiPdfBody>,
+    res: Response,
+  ): Promise<void> => {
+    const { title, html } = req.body;
+    if (!html) {
+      res.status(400).json({ error: "html is required" });
+      return;
+    }
+
+    const page_html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title ?? "Wiki Page"}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap');
+    body { font-family: 'Noto Sans JP', Georgia, serif; max-width: 720px; margin: 40px auto; padding: 0 24px; color: #111; line-height: 1.7; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; }
+    h2 { font-size: 1.3rem; font-weight: 600; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 1.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.2rem; }
+    p { margin-bottom: 0.8rem; }
+    code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; }
+    pre { background: #f3f4f6; padding: 12px; border-radius: 4px; overflow-x: auto; }
+    pre code { background: none; padding: 0; }
+    blockquote { border-left: 3px solid #ccc; padding-left: 1rem; color: #555; margin: 0.8rem 0; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 0.8rem; font-size: 0.9em; }
+    th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+    th { background: #f9fafb; font-weight: 600; }
+    ul { margin-left: 1.5rem; margin-bottom: 0.8rem; list-style-type: disc; }
+    ol { margin-left: 1.5rem; margin-bottom: 0.8rem; list-style-type: decimal; }
+    a { color: #2563eb; }
+  </style>
+</head>
+<body>${html}</body>
+</html>`;
+
+    let browser;
+    try {
+      browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+      const page = await browser.newPage();
+      await page.setContent(page_html, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        margin: { top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" },
+        printBackground: true,
+      });
+      const slug = (title ?? "wiki-page")
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${slug}.pdf"`,
+      );
+      res.send(Buffer.from(pdfBuffer));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: `PDF generation failed: ${message}` });
+    } finally {
+      await browser?.close();
     }
   },
 );
