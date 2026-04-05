@@ -5,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = path.join(__dirname, "templates");
+const TEMPLATES_DIR = path.join(__dirname, "helps");
 
 export const workspacePath = path.join(os.homedir(), "mulmoclaude");
 
@@ -35,10 +35,11 @@ export function initWorkspace(): string {
     );
   }
 
-  // Create about.md if it doesn't exist
-  const aboutFile = path.join(workspacePath, "about.md");
-  if (!fs.existsSync(aboutFile)) {
-    fs.copyFileSync(path.join(TEMPLATES_DIR, "about.md"), aboutFile);
+  // Always sync all files from server/helps/ into workspace/helps/
+  const helpsDestDir = path.join(workspacePath, "helps");
+  fs.mkdirSync(helpsDestDir, { recursive: true });
+  for (const file of fs.readdirSync(TEMPLATES_DIR)) {
+    fs.copyFileSync(path.join(TEMPLATES_DIR, file), path.join(helpsDestDir, file));
   }
 
   // Git init if not already a repo

@@ -35,6 +35,6 @@ MulmoClaude is a text and task-driven AI agent app with rich visual output. It u
   calendar/    ← calendar events
   contacts/    ← address book
   wiki/        ← personal knowledge wiki
-  about.md     ← this file; what MulmoClaude is
+  helps/index.md ← this file; what MulmoClaude is
   memory.md    ← distilled facts loaded into every session
 ```
