@@ -45,13 +45,16 @@ function wrapHtml(body: string, css: string): string {
 </html>`;
 }
 
-async function renderPdf(fullHtml: string): Promise<Buffer> {
+async function renderPdf(
+  fullHtml: string,
+  format: "Letter" | "A4" = "Letter",
+): Promise<Buffer> {
   const browser = await puppeteer.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.setContent(fullHtml, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({
-      format: "A4",
+      format,
       margin: { top: "16mm", bottom: "16mm", left: "16mm", right: "16mm" },
       printBackground: true,
     });
@@ -74,12 +77,13 @@ function sendPdf(res: Response, buffer: Buffer, filename: string): void {
 interface PdfMarkdownBody {
   markdown: string;
   filename?: string;
+  format?: "Letter" | "A4";
 }
 
 router.post(
   "/pdf/markdown",
   async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
-    const { markdown, filename = "document.pdf" } = req.body;
+    const { markdown, filename = "document.pdf", format = "Letter" } = req.body;
 
     if (!markdown) {
       res.status(400).json({ error: "markdown is required" });
@@ -91,7 +95,7 @@ router.post(
         `[pdf] markdown: filename="${filename}" length=${markdown.length}`,
       );
       const html = await marked.parse(markdown);
-      const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS));
+      const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
       sendPdf(res, buffer, filename);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
