@@ -10,7 +10,6 @@ import CanvasPlugin from "@gui-chat-plugin/canvas/vue";
 import GenerateHtmlPlugin from "@gui-chat-plugin/generate-html/vue";
 import EditHtmlPlugin from "@gui-chat-plugin/edit-html/vue";
 import EditImagePlugin from "@gui-chat-plugin/edit-image/vue";
-import BrowsePlugin from "@gui-chat-plugin/browse/vue";
 import CameraPlugin from "@gui-chat-plugin/camera/vue";
 import MusicPlugin from "@gui-chat-plugin/music/vue";
 import OthelloPlugin from "@gui-chat-plugin/othello/vue";
@@ -20,6 +19,7 @@ import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
 import schedulerPlugin from "../plugins/scheduler/index";
 import manageRolesPlugin from "../plugins/manageRoles/index";
+import wikiPlugin from "../plugins/wiki/index";
 import presentMulmoScriptPlugin from "../plugins/presentMulmoScript/index";
 
 const plugins: Record<string, PluginEntry> = {
@@ -27,6 +27,7 @@ const plugins: Record<string, PluginEntry> = {
   manageTodoList: todoPlugin,
   manageScheduler: schedulerPlugin,
   manageRoles: manageRolesPlugin,
+  manageWiki: wikiPlugin,
   presentMulmoScript: presentMulmoScriptPlugin,
   presentDocument: MarkdownPlugin.plugin,
   presentSpreadsheet: SpreadsheetPlugin.plugin,
@@ -38,7 +39,6 @@ const plugins: Record<string, PluginEntry> = {
   generateHtml: GenerateHtmlPlugin.plugin,
   editHtml: EditHtmlPlugin.plugin,
   editImage: EditImagePlugin.plugin,
-  browse: BrowsePlugin.plugin,
   camera: CameraPlugin.plugin,
   showMusic: MusicPlugin.plugin,
   playOthello: OthelloPlugin.plugin,

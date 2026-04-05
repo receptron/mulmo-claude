@@ -21,6 +21,7 @@ import TodoDef from "../src/plugins/todo/definition.js";
 import SchedulerDef from "../src/plugins/scheduler/definition.js";
 import PresentMulmoScriptDef from "../src/plugins/presentMulmoScript/definition.js";
 import ManageRolesDef from "../src/plugins/manageRoles/definition.js";
+import WikiDef from "../src/plugins/wiki/definition.js";
 import type { ToolDefinition } from "gui-chat-protocol";
 
 type JsonRpcId = string | number | null;
@@ -83,6 +84,7 @@ const TOOL_ENDPOINTS: Record<string, string> = {
   [MusicDef.name]: "/api/music",
   [ManageRolesDef.name]: "/api/roles/manage",
   [PresentMulmoScriptDef.name]: "/api/mulmo-script",
+  [WikiDef.name]: "/api/wiki",
 };
 
 const ALL_TOOLS: Record<string, ToolDef> = {
@@ -105,6 +107,7 @@ const ALL_TOOLS: Record<string, ToolDef> = {
       OthelloDef,
       MusicDef,
       ManageRolesDef,
+      WikiDef,
     ].map((def) => [def.name, fromPackage(def, TOOL_ENDPOINTS[def.name])]),
   ),
   switchRole: {

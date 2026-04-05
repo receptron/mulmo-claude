@@ -1406,17 +1406,6 @@
     magic-string-ast "^1.0.2"
     unplugin-utils "^0.3.0"
 
-"@vue/compiler-core@3.5.31":
-  version "3.5.31"
-  resolved "https://registry.yarnpkg.com/@vue/compiler-core/-/compiler-core-3.5.31.tgz#db20d99eb3e8e9ce3c008b8cc79bdb7dab3dfe61"
-  integrity sha512-k/ueL14aNIEy5Onf0OVzR8kiqF/WThgLdFhxwa4e/KF/0qe38IwIdofoSWBTvvxQOesaz6riAFAUaYjoF9fLLQ==
-  dependencies:
-    "@babel/parser" "^7.29.2"
-    "@vue/shared" "3.5.31"
-    entities "^7.0.1"
-    estree-walker "^2.0.2"
-    source-map-js "^1.2.1"
-
 "@vue/compiler-core@3.5.32":
   version "3.5.32"
   resolved "https://registry.yarnpkg.com/@vue/compiler-core/-/compiler-core-3.5.32.tgz#5115ca099b04fedd8f623f93b522d914c376cbeb"
@@ -1427,14 +1416,6 @@
     entities "^7.0.1"
     estree-walker "^2.0.2"
     source-map-js "^1.2.1"
-
-"@vue/compiler-dom@3.5.31":
-  version "3.5.31"
-  resolved "https://registry.yarnpkg.com/@vue/compiler-dom/-/compiler-dom-3.5.31.tgz#7d4b5688a8daef1513ee18f566ea129bded36ff7"
-  integrity sha512-BMY/ozS/xxjYqRFL+tKdRpATJYDTTgWSo0+AJvJNg4ig+Hgb0dOsHPXvloHQ5hmlivUqw1Yt2pPIqp4e0v1GUw==
-  dependencies:
-    "@vue/compiler-core" "3.5.31"
-    "@vue/shared" "3.5.31"
 
 "@vue/compiler-dom@3.5.32", "@vue/compiler-dom@^3.5.0":
   version "3.5.32"
@@ -1458,14 +1439,6 @@
     magic-string "^0.30.21"
     postcss "^8.5.8"
     source-map-js "^1.2.1"
-
-"@vue/compiler-ssr@3.5.31":
-  version "3.5.31"
-  resolved "https://registry.yarnpkg.com/@vue/compiler-ssr/-/compiler-ssr-3.5.31.tgz#bc68bb14cedab04ff5230460badfca983de5391b"
-  integrity sha512-h0xIMxrt/LHOvJKMri+vdYT92BrK3HFLtDqq9Pr/lVVfE4IyKZKvWf0vJFW10Yr6nX02OR4MkJwI0c1HDa1hog==
-  dependencies:
-    "@vue/compiler-dom" "3.5.31"
-    "@vue/shared" "3.5.31"
 
 "@vue/compiler-ssr@3.5.32":
   version "3.5.32"
@@ -1542,11 +1515,6 @@
   dependencies:
     "@vue/compiler-ssr" "3.5.32"
     "@vue/shared" "3.5.32"
-
-"@vue/shared@3.5.31":
-  version "3.5.31"
-  resolved "https://registry.yarnpkg.com/@vue/shared/-/shared-3.5.31.tgz#83276e1d450fea7d20dd15c3bbafbea5aada122d"
-  integrity sha512-nBxuiuS9Lj5bPkPbWogPUnjxxWpkRniX7e5UBQDWl6Fsf4roq9wwV+cR7ezQ4zXswNvPIlsdj1slcLB7XCsRAw==
 
 "@vue/shared@3.5.32", "@vue/shared@^3.5.0":
   version "3.5.32"
@@ -4505,6 +4473,11 @@ marked@^17.0.1, marked@^17.0.5:
   version "17.0.5"
   resolved "https://registry.yarnpkg.com/marked/-/marked-17.0.5.tgz#8fc6878a439463a007b05d346d2ad50a87ec3f0e"
   integrity sha512-6hLvc0/JEbRjRgzI6wnT2P1XuM1/RrrDEX0kPt0N7jGm1133g6X7DlxFasUIx+72aKAr904GTxhSLDrd5DIlZg==
+
+marked@^17.0.6:
+  version "17.0.6"
+  resolved "https://registry.yarnpkg.com/marked/-/marked-17.0.6.tgz#2a97586a272d3be5880f198e020b74ad27cf86ba"
+  integrity sha512-gB0gkNafnonOw0obSTEGZTT86IuhILt2Wfx0mWH/1Au83kybTayroZ/V6nS25mN7u8ASy+5fMhgB3XPNrOZdmA==
 
 material-icons@^1.13.14:
   version "1.13.14"

@@ -18,10 +18,13 @@ See `plan/mulmo_claude.md` for the full design plan.
 - **Lint**: `yarn lint`
 - **Format**: `yarn format`
 - **Typecheck**: `yarn typecheck`
+- **Build**: `yarn build`
 
-**IMPORTANT**: After modifying any source code, always run `yarn format`, `yarn lint`, and `yarn typecheck` before considering the task done.
+**IMPORTANT**: After modifying any source code, always run `yarn format`, `yarn lint`, `yarn typecheck`, and `yarn build` before considering the task done.
 
-**IMPORTANT**: Do NOT run build commands (`npm run build`, `npm run preview`) as they create unnecessary build artifacts.
+**IMPORTANT**: Always write error handling for all `fetch` calls. Handle both network errors (try/catch around `fetch`) and HTTP errors (`!response.ok`). Surface errors to the user in the UI where appropriate.
+
+**IMPORTANT**: Do NOT run `npm run preview` as it serves unnecessary build artifacts.
 
 ## Architecture
 

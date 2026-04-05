@@ -129,6 +129,18 @@
               />
             </span>
           </div>
+          <div v-if="pendingCalls.length > 0" class="mt-1 space-y-0.5">
+            <div
+              v-for="call in pendingCalls"
+              :key="call.toolUseId"
+              class="flex items-center gap-1.5 text-xs text-gray-400"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full bg-blue-300 shrink-0 animate-pulse"
+              />
+              <span class="font-mono truncate">{{ call.toolName }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -348,6 +360,37 @@ const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
 const availableTools = computed(() => currentRole.value.availablePlugins);
 
+const PENDING_MIN_MS = 500;
+const displayTick = ref(0);
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+
+watch(isRunning, (running) => {
+  if (running) {
+    tickInterval = setInterval(() => {
+      displayTick.value++;
+    }, 50);
+  } else {
+    if (tickInterval !== null) {
+      clearInterval(tickInterval);
+      tickInterval = null;
+      // One final tick so the computed clears after the minimum duration
+      setTimeout(() => {
+        displayTick.value++;
+      }, PENDING_MIN_MS);
+    }
+  }
+});
+
+const pendingCalls = computed(() => {
+  void displayTick.value; // reactive dependency on tick
+  const now = Date.now();
+  return toolCallHistory.value.filter(
+    (c) =>
+      (c.result === undefined && c.error === undefined) ||
+      now < c.timestamp + PENDING_MIN_MS,
+  );
+});
+
 const toolDescriptions = computed(() => {
   const map: Record<string, string> = {};
   for (const name of currentRole.value.availablePlugins) {
@@ -445,7 +488,12 @@ function onRoleChange() {
 async function refreshRoles() {
   try {
     const res = await fetch("/api/roles");
-    roles.value = await res.json();
+    const customRoles: Role[] = await res.json();
+    const customIds = new Set(customRoles.map((r) => r.id));
+    roles.value = [
+      ...ROLES.filter((r) => !customIds.has(r.id)),
+      ...customRoles,
+    ];
   } catch {
     // keep current roles on error
   }
@@ -624,5 +672,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("roles-updated", refreshRoles);
+  if (tickInterval !== null) clearInterval(tickInterval);
 });
 </script>

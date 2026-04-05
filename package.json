@@ -44,6 +44,7 @@
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "gui-chat-protocol": "^0.0.4",
+    "marked": "^17.0.6",
     "material-icons": "^1.13.14",
     "mulmocast": "^2.6.6",
     "uuid": "^13.0.0",

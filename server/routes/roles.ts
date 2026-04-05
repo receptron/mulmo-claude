@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { loadAllRoles, loadCustomRoles } from "../roles.js";
+import { loadCustomRoles } from "../roles.js";
 import { BUILTIN_ROLES, type Role } from "../../src/config/roles.js";
 import { pushToSession } from "../sessions.js";
 
@@ -12,7 +12,7 @@ const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((r) => r.id));
 const router = Router();
 
 router.get("/roles", (_req: Request, res: Response<Role[]>) => {
-  res.json(loadAllRoles());
+  res.json(loadCustomRoles());
 });
 
 router.post(
@@ -74,7 +74,7 @@ export async function executeManageRoles(
     return {
       success: true,
       message: `Role '${id}' deleted.`,
-      roles: loadAllRoles(),
+      roles: loadCustomRoles(),
     };
   }
 
@@ -110,6 +110,6 @@ export async function executeManageRoles(
   return {
     success: true,
     message: `Role '${role.name}' ${action}d successfully.`,
-    roles: loadAllRoles(),
+    roles: loadCustomRoles(),
   };
 }
