@@ -38,10 +38,11 @@
       </div>
 
       <!-- Role selector -->
-      <div class="p-4 border-b border-gray-200">
+      <div class="p-4 border-b border-gray-200 flex items-center gap-2">
+        <span class="text-sm text-gray-500 shrink-0">Role</span>
         <select
           v-model="currentRoleId"
-          class="w-full bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900"
+          class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900"
           @change="onRoleChange"
         >
           <option v-for="role in roles" :key="role.id" :value="role.id">
