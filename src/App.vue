@@ -566,6 +566,7 @@ async function sendMessage(text?: string) {
   statusMessage.value = "Thinking...";
 
   toolResults.value.push(makeTextResult(message, "user"));
+  const runStartIndex = toolResults.value.length;
   localStorage.setItem("lastSessionId", chatSessionId.value);
 
   try {
@@ -636,7 +637,14 @@ async function sendMessage(text?: string) {
         } else if (data.type === "roles_updated") {
           await refreshRoles();
         } else if (data.type === "text") {
-          toolResults.value.push(makeTextResult(data.message, "assistant"));
+          const textResult = makeTextResult(data.message, "assistant");
+          toolResults.value.push(textResult);
+          const hasPluginResult = toolResults.value
+            .slice(runStartIndex)
+            .some((r) => r.toolName !== "text-response");
+          if (!hasPluginResult) {
+            selectedResultUuid.value = textResult.uuid;
+          }
         } else if (data.type === "tool_result") {
           const { result } = data;
           const existing = toolResults.value.findIndex(
