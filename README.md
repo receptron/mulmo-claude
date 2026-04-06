@@ -1,6 +1,6 @@
 # MulmoClaude
 
-Experience GUI-chat! You chat with Claude Code, and it responds not just with text but with interactive visual tools — documents, spreadsheets, mind maps, images, forms, 3D scenes, piano, and more.
+Experience GUI-chat with long-term memory! You chat with Claude Code, and it responds not just with text but with interactive visual tools — documents, spreadsheets, mind maps, images, forms, 3D scenes, piano, and more. A built-in personal wiki gives Claude persistent, structured knowledge that grows with every conversation.
 
 ## Installation
 
@@ -46,6 +46,51 @@ Without a Gemini API key, roles that use image generation will be disabled in th
 
 The Gemini API has a free tier that is sufficient for personal use.
 
+## Roles
+
+Each role gives Claude a different persona, tool palette, and focus area:
+
+| Role | What it does |
+|---|---|
+| **General** | All-purpose assistant — todos, scheduler, wiki, documents, mind maps |
+| **Office** | Documents, spreadsheets, forms, presentations, data dashboards |
+| **Guide & Planner** | Travel guides, recipe books, trip planners with rich visual output |
+| **Artist** | Image generation, image editing, generative art with p5.js |
+| **Game** | Play Othello, or build browser games with Phaser/Three.js |
+| **Tutor** | Adaptive teaching — evaluates your level before explaining anything |
+| **Storyteller** | Interactive illustrated stories with images and HTML scenes |
+| **Musician** | Compose and play music in the browser |
+| **Role Manager** | Create and edit custom roles |
+
+Switching roles resets Claude's context and swaps in only the tools that role needs — keeping responses fast and focused.
+
+## Wiki — Long-Term Memory for Claude Code
+
+MulmoClaude includes a **personal knowledge base** inspired by [Andrej Karpathy's LLM Knowledge Bases idea](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). It gives Claude Code genuine long-term memory — not just a short `memory.md`, but a growing, interconnected wiki that Claude builds and maintains itself.
+
+The **General** role has wiki support built in. Try:
+
+- `"Ingest this article: <URL>"` — Claude fetches the page, extracts key knowledge, creates or updates wiki pages, and logs the activity
+- `"What does my wiki say about transformers?"` — Claude searches the index, reads relevant pages, and synthesizes a grounded answer
+- `"Lint my wiki"` — health check for orphan pages, broken links, and missing index entries
+- `"Show me the wiki index"` — renders the full page catalog in the canvas
+
+### How it works
+
+The wiki lives entirely as plain markdown files in your workspace:
+
+```
+workspace/wiki/
+  index.md          ← catalog of all pages (title, description, last updated)
+  log.md            ← append-only activity log
+  pages/<slug>.md   ← one page per entity, concept, or theme
+  sources/<slug>.md ← raw ingested sources
+```
+
+Claude uses its built-in file tools (`read`, `write`, `glob`, `grep`) to navigate and maintain the wiki — no special database or indexing required. Cross-references use `[[wiki link]]` syntax, which the canvas UI renders as clickable navigation.
+
+Over time the wiki grows into a personal knowledge base that any role can consult, making Claude progressively more useful the more you use it.
+
 ## Workspace
 
 All data is stored as plain files in the workspace directory:
@@ -55,5 +100,6 @@ All data is stored as plain files in the workspace directory:
   chat/        ← conversation history (one .jsonl per session)
   todos/        ← todo items
   memory.md     ← persistent facts Claude always has in context
+  wiki/         ← personal knowledge base (see above)
   ...
 ```
