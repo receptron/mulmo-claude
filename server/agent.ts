@@ -112,15 +112,23 @@ export async function* runAgent(
   sessionId: string,
   port: number,
   claudeSessionId?: string,
+  pluginPrompts?: Record<string, string>,
 ): AsyncGenerator<AgentEvent> {
   const memoryContext = buildMemoryContext(workspacePath);
   const wikiContext = buildWikiContext(workspacePath);
+
+  const pluginPromptSections = Object.entries(pluginPrompts ?? {})
+    .map(([name, prompt]) => `### ${name}\n\n${prompt}`);
+
   const systemPrompt = [
     role.prompt,
     `Workspace directory: ${workspacePath}`,
     `Today's date: ${new Date().toISOString().split("T")[0]}`,
     memoryContext,
     ...(wikiContext ? [wikiContext] : []),
+    ...(pluginPromptSections.length
+      ? [`## Plugin Instructions\n\n${pluginPromptSections.join("\n\n")}`]
+      : []),
   ].join("\n\n");
 
   const activePlugins = role.availablePlugins.filter((p) => MCP_PLUGINS.has(p));

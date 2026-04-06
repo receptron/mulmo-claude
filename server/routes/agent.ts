@@ -56,6 +56,7 @@ interface AgentBody {
   roleId: string;
   chatSessionId: string;
   selectedImageData?: string;
+  pluginPrompts?: Record<string, string>;
 }
 
 interface ErrorResponse {
@@ -68,7 +69,7 @@ router.post(
     req: Request<object, unknown, AgentBody>,
     res: Response<ErrorResponse>,
   ) => {
-    const { message, roleId, chatSessionId, selectedImageData } = req.body;
+    const { message, roleId, chatSessionId, selectedImageData, pluginPrompts } = req.body;
 
     if (!message || !roleId || !chatSessionId) {
       res
@@ -121,6 +122,7 @@ router.post(
         sessionId,
         PORT,
         claudeSessionId,
+        pluginPrompts,
       )) {
         if (event.type === "claude_session_id") {
           claudeSessionMap.set(chatSessionId, event.id);

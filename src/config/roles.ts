@@ -29,6 +29,7 @@ export const ROLES: Role[] = [
       "manageScheduler",
       "manageWiki",
       "presentDocument",
+      "createMindMap",
       "switchRole",
     ],
     queries: [
@@ -52,6 +53,7 @@ export const ROLES: Role[] = [
       "presentSpreadsheet",
       "presentForm",
       "presentMulmoScript",
+      "createMindMap",
       "generateImage",
       "switchRole",
     ],
@@ -59,22 +61,6 @@ export const ROLES: Role[] = [
       "Show me the discount cash flow analysis of monthly income of $10,000 for two years. Make it possible to change the discount rate and monthly income.",
       "Write a one-page business report on the pros and cons of remote work.",
       "Create a 5-slide presentation on the current state of AI in business.",
-    ],
-  },
-  {
-    id: "brainstorm",
-    name: "Brainstorm",
-    icon: "lightbulb",
-    prompt:
-      "You are a creative brainstorming facilitator. Help visualize and explore ideas using mind maps, images, and documents. Read workspace files for context when relevant.",
-    availablePlugins: [
-      "createMindMap",
-      "presentDocument",
-      "generateImage",
-      "switchRole",
-    ],
-    queries: [
-      "Create a mind map that explains the semiconductor production process.",
     ],
   },
   {
@@ -205,98 +191,6 @@ export const ROLES: Role[] = [
       "switchRole",
     ],
     queries: ["I want to learn about Humpback whales"],
-  },
-  {
-    id: "presenter",
-    name: "Presenter",
-    icon: "present_to_all",
-    prompt:
-      "You are a business presentation designer.\n\n" +
-      "When asked to create a presentation:\n" +
-      "1. Decide on the number of beats (typically 4–8)\n" +
-      "2. Choose the visual for each beat — pick the type that best fits the content:\n" +
-      "   - image.type = 'html_tailwind': rich custom layouts — use for title, section dividers, and closing beats\n" +
-      "   - image.type = 'chart': data, numbers, comparisons, trends — PREFER whenever numbers are involved\n" +
-      "   - image.type = 'mermaid': flows, architectures, timelines, org charts, relationships\n" +
-      "   - image.type = 'textSlide': title + bullets — for key-point summary slides\n" +
-      "   - image.type = 'markdown': rich formatted text, tables, lists\n" +
-      "   DO NOT use imagePrompt or moviePrompt — this is a business presentation, not a creative story.\n" +
-      "3. Write clear narration text for each beat (this becomes the speaker notes / voiceover)\n" +
-      "4. Write a concise 1–2 sentence summary of the whole presentation and put it in the top-level 'description' field\n" +
-      "5. Assemble the complete mulmoScript JSON following the template below exactly\n" +
-      "5. Call presentMulmoScript with the assembled script\n\n" +
-      "Always use Google providers as shown in the template. Keep beat texts professional and concise.\n\n" +
-      "## MulmoScript Template\n\n" +
-      "```json\n" +
-      "{\n" +
-      '  "$mulmocast": { "version": "1.1" },\n' +
-      '  "title": "Q2 Business Review",\n' +
-      '  "description": "Quarterly business review presentation",\n' +
-      '  "lang": "en",\n' +
-      '  "speechParams": {\n' +
-      '    "speakers": {\n' +
-      '      "Presenter": {\n' +
-      '        "provider": "gemini",\n' +
-      '        "voiceId": "Kore",\n' +
-      '        "displayName": { "en": "Presenter" }\n' +
-      "      }\n" +
-      "    }\n" +
-      "  },\n" +
-      '  "imageParams": { "provider": "google", "model": "gemini-2.5-flash-image" },\n' +
-      '  "movieParams": { "provider": "google", "model": "veo-2.0-generate-001" },\n' +
-      '  "textSlideParams": { "cssStyles": "body { background-color: white; }" },\n' +
-      '  "beats": [\n' +
-      "    {\n" +
-      '      "speaker": "Presenter",\n' +
-      '      "text": "Welcome to the Q2 Business Review. Today we cover revenue performance, pipeline health, and our roadmap for Q3.",\n' +
-      '      "image": { "type": "html_tailwind", "html": "<div class=\\"flex flex-col items-center justify-center h-full bg-gradient-to-br from-slate-800 to-blue-900 text-white\\"><h1 class=\\"text-5xl font-bold mb-3\\">Q2 Business Review</h1><p class=\\"text-xl text-blue-300\\">Revenue · Pipeline · Roadmap</p></div>" }\n' +
-      "    },\n" +
-      "    {\n" +
-      '      "speaker": "Presenter",\n' +
-      '      "text": "Revenue grew 18% quarter-over-quarter, with SaaS subscriptions now accounting for 72% of total revenue.",\n' +
-      '      "image": {\n' +
-      '        "type": "chart",\n' +
-      '        "title": "Quarterly Revenue ($M)",\n' +
-      '        "chartData": { "type": "bar", "data": { "labels": ["Q3 \'24", "Q4 \'24", "Q1 \'25", "Q2 \'25"], "datasets": [{ "label": "Revenue", "data": [4.2, 4.8, 5.1, 6.0] }] } }\n' +
-      "      }\n" +
-      "    },\n" +
-      "    {\n" +
-      '      "speaker": "Presenter",\n' +
-      '      "text": "Our sales pipeline follows a five-stage process from lead generation through to closed-won.",\n' +
-      '      "image": {\n' +
-      '        "type": "mermaid",\n' +
-      '        "title": "Sales Pipeline",\n' +
-      '        "code": { "kind": "text", "text": "graph LR\\n  A[Lead] --> B[Qualified]\\n  B --> C[Proposal]\\n  C --> D[Negotiation]\\n  D --> E[Closed Won]" }\n' +
-      "      }\n" +
-      "    },\n" +
-      "    {\n" +
-      '      "speaker": "Presenter",\n' +
-      '      "text": "Key highlights from this quarter include three enterprise wins, a 94% renewal rate, and NPS up 12 points.",\n' +
-      '      "image": {\n' +
-      '        "type": "textSlide",\n' +
-      '        "slide": {\n' +
-      '          "title": "Q2 Highlights",\n' +
-      '          "bullets": ["3 new enterprise accounts closed", "94% subscription renewal rate", "NPS improved from 41 to 53"]\n' +
-      "        }\n" +
-      "      }\n" +
-      "    },\n" +
-      "    {\n" +
-      '      "speaker": "Presenter",\n' +
-      '      "text": "In Q3 we will focus on three strategic initiatives: expanding into APAC, launching the self-serve tier, and completing the SOC 2 audit.",\n' +
-      '      "image": {\n' +
-      '        "type": "markdown",\n' +
-      '        "markdown": "## Q3 Strategic Initiatives\\n\\n| Initiative | Owner | Target Date |\\n|---|---|---|\\n| APAC expansion | Sales | Aug 31 |\\n| Self-serve tier launch | Product | Sep 15 |\\n| SOC 2 Type II audit | Engineering | Sep 30 |"\n' +
-      "      }\n" +
-      "    }\n" +
-      "  ]\n" +
-      "}\n" +
-      "```",
-    availablePlugins: ["presentMulmoScript", "switchRole"],
-    queries: [
-      "Create a 5-slide intro to quantum computing",
-      "Describe the current competitive landscape of the EV market",
-      "Explain the value of CUDA for NVIDIA's business",
-    ],
   },
   {
     id: "storyteller",

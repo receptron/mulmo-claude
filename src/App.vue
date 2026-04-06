@@ -578,6 +578,11 @@ async function sendMessage(text?: string) {
         roleId: currentRoleId.value,
         chatSessionId: chatSessionId.value,
         selectedImageData: extractImageData(selectedResult.value ?? undefined),
+        pluginPrompts: Object.fromEntries(
+          currentRole.value.availablePlugins
+            .map((name) => [name, getPlugin(name)?.systemPrompt])
+            .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+        ),
       }),
     });
 
