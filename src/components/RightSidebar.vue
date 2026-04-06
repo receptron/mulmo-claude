@@ -6,6 +6,7 @@
       <div class="bg-white border-b border-gray-200">
         <button
           class="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50"
+          title="Toggle system prompt"
           @click="showSystemPrompt = !showSystemPrompt"
         >
           <span
@@ -36,6 +37,7 @@
           <div v-for="tool in availableTools" :key="tool" class="text-xs">
             <button
               class="flex items-center gap-1 w-full text-left"
+              title="Toggle tool description"
               @click="toggleTool(tool)"
             >
               <span

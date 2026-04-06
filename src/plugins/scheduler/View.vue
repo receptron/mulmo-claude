@@ -51,6 +51,7 @@
           </div>
           <button
             class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 mt-0.5 shrink-0"
+            title="Delete item"
             @click.stop="remove(item)"
           >
             ✕
@@ -67,6 +68,7 @@
         <span>Edit item</span>
         <button
           class="text-blue-400 hover:text-blue-600 text-xs"
+          title="Close editor"
           @click="selectedId = null"
         >
           ✕
