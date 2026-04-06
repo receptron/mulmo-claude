@@ -37,7 +37,10 @@
               {{ role.availablePlugins.join(", ") }}
             </div>
           </div>
-          <span class="material-icons text-gray-400 text-sm">
+          <span
+            class="material-icons text-gray-400 text-sm"
+            :title="selectedId === role.id ? 'Collapse' : 'Expand'"
+          >
             {{ selectedId === role.id ? "expand_less" : "expand_more" }}
           </span>
         </div>
