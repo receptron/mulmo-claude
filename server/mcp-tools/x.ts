@@ -149,6 +149,12 @@ export const searchX = {
           type: "number",
           description: "Number of results to return (10–100). Defaults to 10.",
         },
+        sort_order: {
+          type: "string",
+          enum: ["recency", "relevancy"],
+          description:
+            "'recency' = latest tweets first (default). 'relevancy' = most relevant (Top) first.",
+        },
       },
       required: ["query"],
     },
@@ -169,9 +175,12 @@ export const searchX = {
 
     let data: XApiResponse;
     try {
+      const sortOrder =
+        args.sort_order === "relevancy" ? "relevancy" : "recency";
       const params = new URLSearchParams({
         query,
         max_results: String(maxResults),
+        sort_order: sortOrder,
       });
       params.append("tweet.fields", "created_at,author_id,public_metrics");
       params.append("expansions", "author_id");
