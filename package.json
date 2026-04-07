@@ -18,6 +18,9 @@
     "build": "vite build && tsc -p server/tsconfig.json --noEmit",
     "test": "tsx --test ./test/*/test_*.ts"
   },
+  "resolutions": {
+    "tar": "7.5.11"
+  },
   "dependencies": {
     "@google/genai": "^1.47.0",
     "@gui-chat-plugin/browse": "^0.1.1",
@@ -26,7 +29,7 @@
     "@gui-chat-plugin/edit-image": "^0.3.0",
     "@gui-chat-plugin/markdown": "0.1.0",
     "@gui-chat-plugin/mindmap": "^0.3.1",
-    "@gui-chat-plugin/music": "^0.0.3",
+    "@gui-chat-plugin/music": "^1.0.0",
     "@gui-chat-plugin/othello": "^0.2.2",
     "@gui-chat-plugin/piano": "github:receptron/GUIChatPluginPiano",
     "@gui-chat-plugin/present3d": "^0.0.3",
@@ -39,7 +42,7 @@
     "@mulmochat-plugin/quiz": "0.3.3",
     "@mulmochat-plugin/ui-image": "^0.3.0",
     "cors": "^2.8.6",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.4.1",
     "express": "^5.2.1",
     "gui-chat-protocol": "^0.0.4",
     "marked": "^17.0.6",
@@ -71,7 +74,7 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.3",
+    "vite": "^8.0.5",
     "vue-tsc": "^3.2.5"
   }
 }
