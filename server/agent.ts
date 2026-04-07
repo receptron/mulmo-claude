@@ -151,10 +151,9 @@ export async function* runAgent(
 
   // Write temp MCP config if there are plugins to expose
   const mcpConfigPath = join(tmpdir(), `mulmoclaude-mcp-${sessionId}.json`);
-  let hasMcp = false;
+  const hasMcp = activePlugins.length > 0;
 
-  if (activePlugins.length > 0) {
-    hasMcp = true;
+  if (hasMcp) {
     const mcpConfig = {
       mcpServers: {
         mulmoclaude: {
