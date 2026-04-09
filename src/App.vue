@@ -28,6 +28,72 @@
           >
             <span class="material-icons">history</span>
           </button>
+          <div class="relative">
+            <button
+              ref="lockButtonRef"
+              :class="
+                sandboxEnabled
+                  ? 'text-green-500 hover:text-green-700'
+                  : 'text-orange-400 hover:text-orange-600'
+              "
+              :title="
+                sandboxEnabled
+                  ? 'Sandbox enabled (Docker)'
+                  : 'No sandbox (Docker not found)'
+              "
+              @click="showLockPopup = !showLockPopup"
+            >
+              <span class="material-icons">{{
+                sandboxEnabled ? "lock" : "lock_open"
+              }}</span>
+            </button>
+            <div
+              v-if="showLockPopup"
+              ref="lockPopupRef"
+              class="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs"
+            >
+              <p
+                class="mb-2"
+                :class="sandboxEnabled ? 'text-green-800' : 'text-orange-700'"
+              >
+                <template v-if="sandboxEnabled">
+                  <span class="material-icons text-xs align-middle mr-1"
+                    >lock</span
+                  >
+                  <strong>Sandbox enabled:</strong> Docker is running.
+                  Filesystem access is isolated.
+                </template>
+                <template v-else>
+                  <span class="material-icons text-xs align-middle mr-1"
+                    >warning</span
+                  >
+                  <strong>No sandbox:</strong> Claude can access all files on
+                  your machine. Install
+                  <a
+                    href="https://www.docker.com/products/docker-desktop/"
+                    target="_blank"
+                    class="underline"
+                    >Docker Desktop</a
+                  >
+                  to enable filesystem isolation.
+                </template>
+              </p>
+              <p class="text-gray-400 mb-1">Test sandbox isolation:</p>
+              <div class="flex flex-col gap-1">
+                <button
+                  v-for="q in sandboxTestQueries"
+                  :key="q"
+                  class="text-left rounded px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                  @click="
+                    showLockPopup = false;
+                    sendMessage(q);
+                  "
+                >
+                  {{ q }}
+                </button>
+              </div>
+            </div>
+          </div>
           <button
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showRightSidebar }"
@@ -81,35 +147,6 @@
             {{ role.name }}
           </option>
         </select>
-      </div>
-
-      <!-- Sandbox warning -->
-      <div
-        v-if="!sandboxEnabled && !sandboxWarningDismissed"
-        class="mx-4 mb-2 rounded border border-orange-400 bg-orange-50 p-3 text-xs text-orange-700"
-      >
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <span class="material-icons text-xs align-middle mr-1"
-              >warning</span
-            >
-            <strong>No sandbox:</strong> Claude can access all files on your
-            machine. Install
-            <a
-              href="https://www.docker.com/products/docker-desktop/"
-              target="_blank"
-              class="underline"
-              >Docker Desktop</a
-            >
-            to enable filesystem isolation.
-          </div>
-          <button
-            class="shrink-0 text-orange-400 hover:text-orange-700"
-            @click="sandboxWarningDismissed = true"
-          >
-            <span class="material-icons text-sm">close</span>
-          </button>
-        </div>
       </div>
 
       <!-- Gemini API key warning -->
@@ -417,13 +454,21 @@ const showHistory = ref(false);
 const sessions = ref<SessionSummary[]>([]);
 const geminiAvailable = ref(true);
 const sandboxEnabled = ref(true);
-const sandboxWarningDismissed = ref(false);
+const showLockPopup = ref(false);
+
+const sandboxTestQueries = [
+  "Run `whoami` and show the result",
+  "Run `hostname` and show the result",
+  "Try to list files in ~/Library",
+];
 
 const chatListRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const historyButtonRef = ref<HTMLButtonElement | null>(null);
 const historyPopupRef = ref<HTMLDivElement | null>(null);
+const lockButtonRef = ref<HTMLButtonElement | null>(null);
+const lockPopupRef = ref<HTMLDivElement | null>(null);
 const headerRef = ref<HTMLDivElement | null>(null);
 
 function scrollChatToBottom() {
@@ -898,6 +943,16 @@ function handleClickOutsideHistory(e: MouseEvent) {
   }
 }
 
+function handleClickOutsideLock(e: MouseEvent) {
+  if (!showLockPopup.value) return;
+  const target = e.target as Node;
+  const insideButton = lockButtonRef.value?.contains(target) ?? false;
+  const insidePopup = lockPopupRef.value?.contains(target) ?? false;
+  if (!insideButton && !insidePopup) {
+    showLockPopup.value = false;
+  }
+}
+
 onMounted(async () => {
   fetchHealth();
   fetchMcpToolsStatus();
@@ -905,6 +960,7 @@ onMounted(async () => {
   window.addEventListener("roles-updated", refreshRoles);
   window.addEventListener("keydown", handleKeyNavigation);
   window.addEventListener("mousedown", handleClickOutsideHistory);
+  window.addEventListener("mousedown", handleClickOutsideLock);
   window.addEventListener("keydown", handleViewModeShortcut);
 
   const allSessions = await fetchSessions();
@@ -920,6 +976,7 @@ onUnmounted(() => {
   window.removeEventListener("roles-updated", refreshRoles);
   window.removeEventListener("keydown", handleKeyNavigation);
   window.removeEventListener("mousedown", handleClickOutsideHistory);
+  window.removeEventListener("mousedown", handleClickOutsideLock);
   window.removeEventListener("keydown", handleViewModeShortcut);
   if (tickInterval !== null) clearInterval(tickInterval);
 });
