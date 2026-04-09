@@ -62,6 +62,8 @@ export const ROLES: Role[] = [
       "createMindMap",
       "generateImage",
       "presentHtml",
+      "readXPost",
+      "searchX",
       "switchRole",
     ],
     queries: [
