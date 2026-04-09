@@ -39,7 +39,7 @@
         >⚠ PDF failed</span
       >
     </div>
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 overflow-hidden" @click.capture="openLinksInNewTab">
       <OriginalView
         :selected-result="selectedResult"
         @update-result="(r) => emit('updateResult', r as ToolResultComplete)"
@@ -62,6 +62,15 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 const isAssistant = computed(
   () => (props.selectedResult.data?.role ?? "assistant") === "assistant",
 );
+
+function openLinksInNewTab(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (anchor && anchor.href) {
+    event.preventDefault();
+    window.open(anchor.href, "_blank", "noopener,noreferrer");
+  }
+}
 
 const pdfDownloading = ref(false);
 const pdfError = ref<string | null>(null);
