@@ -5,7 +5,7 @@
       class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900"
     >
       <div
-        class="p-4 border-b border-gray-200 flex items-center justify-between"
+        class="p-4 border-b border-gray-200 flex items-center justify-between relative"
       >
         <div>
           <h1 class="text-lg font-semibold">MulmoClaude</h1>
@@ -19,6 +19,7 @@
             <span class="material-icons">add_circle_outline</span>
           </button>
           <button
+            ref="historyButtonRef"
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showHistory }"
             @click="toggleHistory"
@@ -34,6 +35,34 @@
           >
             <span class="material-icons">build</span>
           </button>
+        </div>
+        <!-- History popup -->
+        <div
+          v-if="showHistory"
+          class="absolute left-0 right-0 top-full mt-0 bg-white border-b border-x border-gray-200 shadow-lg z-50"
+        >
+          <div class="max-h-80 overflow-y-auto p-2 space-y-1">
+            <p v-if="sessions.length === 0" class="text-xs text-gray-400 p-2">
+              No sessions yet.
+            </p>
+            <div
+              v-for="session in sessions"
+              :key="session.id"
+              class="cursor-pointer rounded border border-gray-200 p-2 text-sm hover:bg-gray-50 transition-colors"
+              @click="loadSession(session.id)"
+            >
+              <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                <span class="material-icons text-xs">{{
+                  roleIcon(session.roleId)
+                }}</span>
+                <span>{{ roleName(session.roleId) }}</span>
+                <span class="ml-auto">{{ formatDate(session.startedAt) }}</span>
+              </div>
+              <p class="text-gray-700 truncate">
+                {{ session.preview || "(no messages)" }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -90,36 +119,8 @@
         Add it to <code class="font-mono">.env</code> and restart the app.
       </div>
 
-      <!-- Session history panel -->
-      <div
-        v-if="showHistory"
-        class="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 bg-gray-100"
-      >
-        <p v-if="sessions.length === 0" class="text-xs text-gray-400">
-          No sessions yet.
-        </p>
-        <div
-          v-for="session in sessions"
-          :key="session.id"
-          class="cursor-pointer rounded border border-gray-300 p-2 text-sm hover:opacity-75 transition-opacity"
-          @click="loadSession(session.id)"
-        >
-          <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
-            <span class="material-icons text-xs">{{
-              roleIcon(session.roleId)
-            }}</span>
-            <span>{{ roleName(session.roleId) }}</span>
-            <span class="ml-auto">{{ formatDate(session.startedAt) }}</span>
-          </div>
-          <p class="text-gray-700 truncate">
-            {{ session.preview || "(no messages)" }}
-          </p>
-        </div>
-      </div>
-
       <!-- Tool result previews -->
       <div
-        v-else
         ref="chatListRef"
         class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100 outline-none"
         tabindex="0"
@@ -376,6 +377,7 @@ const sandboxWarningDismissed = ref(false);
 const chatListRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const historyButtonRef = ref<HTMLButtonElement | null>(null);
 
 function scrollChatToBottom() {
   nextTick(() => {
@@ -796,12 +798,24 @@ async function sendMessage(text?: string) {
   }
 }
 
+function handleClickOutsideHistory(e: MouseEvent) {
+  if (!showHistory.value) return;
+  const target = e.target as Node;
+  if (
+    historyButtonRef.value &&
+    !historyButtonRef.value.closest("div")!.contains(target)
+  ) {
+    showHistory.value = false;
+  }
+}
+
 onMounted(async () => {
   fetchHealth();
   fetchMcpToolsStatus();
   refreshRoles();
   window.addEventListener("roles-updated", refreshRoles);
   window.addEventListener("keydown", handleKeyNavigation);
+  window.addEventListener("mousedown", handleClickOutsideHistory);
 
   const allSessions = await fetchSessions();
   const lastSessionId = localStorage.getItem("lastSessionId");
@@ -815,6 +829,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("roles-updated", refreshRoles);
   window.removeEventListener("keydown", handleKeyNavigation);
+  window.removeEventListener("mousedown", handleClickOutsideHistory);
   if (tickInterval !== null) clearInterval(tickInterval);
 });
 </script>

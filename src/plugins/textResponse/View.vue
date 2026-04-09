@@ -67,7 +67,8 @@ const isAssistant = computed(
 );
 
 function openLinksInNewTab(event: MouseEvent) {
-  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey)
+    return;
   const target = event.target as HTMLElement;
   const anchor = target.closest("a");
   if (!anchor) return;
