@@ -1,0 +1,59 @@
+<template>
+  <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+    <button
+      v-for="mode in MODES"
+      :key="mode.key"
+      class="px-2.5 py-1 flex items-center gap-1"
+      :class="
+        modelValue === mode.key
+          ? 'bg-blue-500 text-white'
+          : 'bg-white text-gray-600 hover:bg-gray-50'
+      "
+      :title="mode.title"
+      @click="emit('update:modelValue', mode.key)"
+    >
+      <span class="material-icons text-sm">{{ mode.icon }}</span>
+      <span>{{ mode.label }}</span>
+    </button>
+  </div>
+</template>
+
+<script setup lang="ts">
+export type CanvasViewMode = "single" | "stack" | "files";
+
+interface ModeOption {
+  key: CanvasViewMode;
+  icon: string;
+  label: string;
+  title: string;
+}
+
+defineProps<{
+  modelValue: CanvasViewMode;
+}>();
+
+const emit = defineEmits<{
+  "update:modelValue": [mode: CanvasViewMode];
+}>();
+
+const MODES: ModeOption[] = [
+  {
+    key: "single",
+    icon: "view_agenda",
+    label: "Single",
+    title: "Single result (⌘1)",
+  },
+  {
+    key: "stack",
+    icon: "view_stream",
+    label: "Stack",
+    title: "All results stacked (⌘2)",
+  },
+  {
+    key: "files",
+    icon: "folder",
+    label: "Files",
+    title: "Workspace files (⌘3)",
+  },
+];
+</script>

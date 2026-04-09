@@ -227,28 +227,58 @@
 
     <!-- Canvas -->
     <div
-      ref="canvasRef"
-      class="flex-1 overflow-hidden bg-white text-gray-900 min-w-0 outline-none"
-      tabindex="0"
-      @mousedown="activePane = 'main'"
-      @keydown="handleCanvasKeydown"
+      class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden"
     >
-      <component
-        v-if="
-          selectedResult && getPlugin(selectedResult.toolName)?.viewComponent
-        "
-        :is="getPlugin(selectedResult.toolName)?.viewComponent"
-        :selected-result="selectedResult"
-        :send-text-message="sendMessage"
-        @update-result="handleUpdateResult"
-      />
-      <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
-        <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
-          JSON.stringify(selectedResult, null, 2)
-        }}</pre>
+      <div
+        class="flex items-center justify-end px-3 py-2 border-b border-gray-100 shrink-0"
+      >
+        <CanvasViewToggle
+          :model-value="canvasViewMode"
+          @update:model-value="setCanvasViewMode"
+        />
       </div>
-      <div v-else class="flex items-center justify-center h-full text-gray-600">
-        <p>Start a conversation</p>
+      <div
+        ref="canvasRef"
+        class="flex-1 overflow-hidden outline-none min-h-0"
+        tabindex="0"
+        @mousedown="activePane = 'main'"
+        @keydown="handleCanvasKeydown"
+      >
+        <!-- Single mode -->
+        <template v-if="canvasViewMode === 'single'">
+          <component
+            v-if="
+              selectedResult &&
+              getPlugin(selectedResult.toolName)?.viewComponent
+            "
+            :is="getPlugin(selectedResult.toolName)?.viewComponent"
+            :selected-result="selectedResult"
+            :send-text-message="sendMessage"
+            @update-result="handleUpdateResult"
+          />
+          <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
+            <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
+              JSON.stringify(selectedResult, null, 2)
+            }}</pre>
+          </div>
+          <div
+            v-else
+            class="flex items-center justify-center h-full text-gray-600"
+          >
+            <p>Start a conversation</p>
+          </div>
+        </template>
+        <!-- Stack mode -->
+        <StackView
+          v-else-if="canvasViewMode === 'stack'"
+          :tool-results="toolResults"
+          :selected-result-uuid="selectedResultUuid"
+          :send-text-message="sendMessage"
+          @select="(uuid) => (selectedResultUuid = uuid)"
+          @update-result="handleUpdateResult"
+        />
+        <!-- Files mode -->
+        <FilesView v-else :refresh-token="filesRefreshToken" />
       </div>
     </div>
     <!-- Right sidebar: tool call history -->
@@ -271,6 +301,11 @@ import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
 import type { ToolCallHistoryItem } from "./components/RightSidebar.vue";
+import CanvasViewToggle, {
+  type CanvasViewMode,
+} from "./components/CanvasViewToggle.vue";
+import StackView from "./components/StackView.vue";
+import FilesView from "./components/FilesView.vue";
 
 interface SessionSummary {
   id: string;
@@ -397,6 +432,30 @@ watch(isRunning, (running) => {
 const showRightSidebar = ref(
   localStorage.getItem("right_sidebar_visible") === "true",
 );
+
+const VIEW_MODE_STORAGE_KEY = "canvas_view_mode";
+function loadStoredViewMode(): CanvasViewMode {
+  const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+  if (stored === "single" || stored === "stack" || stored === "files") {
+    return stored;
+  }
+  return "single";
+}
+const canvasViewMode = ref<CanvasViewMode>(loadStoredViewMode());
+const filesRefreshToken = ref(0);
+
+function setCanvasViewMode(mode: CanvasViewMode): void {
+  canvasViewMode.value = mode;
+  localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+}
+
+// Refresh the file tree after each agent run completes, so newly written
+// files appear without a manual reload.
+watch(isRunning, (running, prev) => {
+  if (prev && !running) {
+    filesRefreshToken.value++;
+  }
+});
 const toolCallHistory = ref<ToolCallHistoryItem[]>([]);
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
@@ -491,6 +550,21 @@ function handleCanvasKeydown(e: KeyboardEvent) {
   e.preventDefault();
   const delta = e.key === "ArrowDown" ? SCROLL_AMOUNT : -SCROLL_AMOUNT;
   scrollable.scrollBy({ top: delta, behavior: "smooth" });
+}
+
+function handleViewModeShortcut(e: KeyboardEvent) {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.altKey || e.shiftKey) return;
+  if (e.key === "1") {
+    setCanvasViewMode("single");
+    e.preventDefault();
+  } else if (e.key === "2") {
+    setCanvasViewMode("stack");
+    e.preventDefault();
+  } else if (e.key === "3") {
+    setCanvasViewMode("files");
+    e.preventDefault();
+  }
 }
 
 function handleKeyNavigation(e: KeyboardEvent) {
@@ -802,6 +876,7 @@ onMounted(async () => {
   refreshRoles();
   window.addEventListener("roles-updated", refreshRoles);
   window.addEventListener("keydown", handleKeyNavigation);
+  window.addEventListener("keydown", handleViewModeShortcut);
 
   const allSessions = await fetchSessions();
   const lastSessionId = localStorage.getItem("lastSessionId");
@@ -815,6 +890,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("roles-updated", refreshRoles);
   window.removeEventListener("keydown", handleKeyNavigation);
+  window.removeEventListener("keydown", handleViewModeShortcut);
   if (tickInterval !== null) clearInterval(tickInterval);
 });
 </script>

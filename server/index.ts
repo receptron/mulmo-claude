@@ -15,6 +15,7 @@ import rolesRoutes from "./routes/roles.js";
 import mulmoScriptRoutes from "./routes/mulmo-script.js";
 import wikiRoutes from "./routes/wiki.js";
 import pdfRoutes from "./routes/pdf.js";
+import filesRoutes from "./routes/files.js";
 import {
   mcpToolsRouter,
   mcpTools,
@@ -56,6 +57,7 @@ app.use("/api", rolesRoutes);
 app.use("/api", mulmoScriptRoutes);
 app.use("/api", wikiRoutes);
 app.use("/api", pdfRoutes);
+app.use("/api", filesRoutes);
 app.use("/api/mcp-tools", mcpToolsRouter);
 
 if (process.env.NODE_ENV === "production") {
