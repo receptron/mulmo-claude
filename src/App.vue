@@ -2,9 +2,10 @@
   <div class="flex fixed inset-0 bg-gray-900 text-white">
     <!-- Sidebar -->
     <div
-      class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900"
+      class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
     >
       <div
+        ref="headerRef"
         class="p-4 border-b border-gray-200 flex items-center justify-between"
       >
         <div>
@@ -19,6 +20,7 @@
             <span class="material-icons">add_circle_outline</span>
           </button>
           <button
+            ref="historyButtonRef"
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showHistory }"
             @click="toggleHistory"
@@ -34,6 +36,36 @@
           >
             <span class="material-icons">build</span>
           </button>
+        </div>
+      </div>
+      <!-- History popup -->
+      <div
+        v-if="showHistory"
+        ref="historyPopupRef"
+        class="absolute left-0 right-0 bottom-0 bg-white border-b border-gray-200 shadow-lg z-50 overflow-y-auto"
+        :style="{ top: headerRef ? headerRef.offsetHeight + 'px' : '4rem' }"
+      >
+        <div class="p-2 space-y-1">
+          <p v-if="sessions.length === 0" class="text-xs text-gray-400 p-2">
+            No sessions yet.
+          </p>
+          <div
+            v-for="session in sessions"
+            :key="session.id"
+            class="cursor-pointer rounded border border-gray-200 p-2 text-sm hover:bg-gray-50 transition-colors"
+            @click="loadSession(session.id)"
+          >
+            <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
+              <span class="material-icons text-xs">{{
+                roleIcon(session.roleId)
+              }}</span>
+              <span>{{ roleName(session.roleId) }}</span>
+              <span class="ml-auto">{{ formatDate(session.startedAt) }}</span>
+            </div>
+            <p class="text-gray-700 truncate">
+              {{ session.preview || "(no messages)" }}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -90,36 +122,8 @@
         Add it to <code class="font-mono">.env</code> and restart the app.
       </div>
 
-      <!-- Session history panel -->
-      <div
-        v-if="showHistory"
-        class="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 bg-gray-100"
-      >
-        <p v-if="sessions.length === 0" class="text-xs text-gray-400">
-          No sessions yet.
-        </p>
-        <div
-          v-for="session in sessions"
-          :key="session.id"
-          class="cursor-pointer rounded border border-gray-300 p-2 text-sm hover:opacity-75 transition-opacity"
-          @click="loadSession(session.id)"
-        >
-          <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
-            <span class="material-icons text-xs">{{
-              roleIcon(session.roleId)
-            }}</span>
-            <span>{{ roleName(session.roleId) }}</span>
-            <span class="ml-auto">{{ formatDate(session.startedAt) }}</span>
-          </div>
-          <p class="text-gray-700 truncate">
-            {{ session.preview || "(no messages)" }}
-          </p>
-        </div>
-      </div>
-
       <!-- Tool result previews -->
       <div
-        v-else
         ref="chatListRef"
         class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100 outline-none"
         tabindex="0"
@@ -179,8 +183,15 @@
       <!-- Sample queries -->
       <div
         v-if="showQueries"
-        class="px-4 pt-3 flex flex-wrap gap-2 border-t border-gray-200"
+        class="px-4 pt-3 pb-1 flex flex-wrap gap-2 border-t border-gray-200 relative"
       >
+        <button
+          class="absolute top-1 right-1 text-gray-300 hover:text-gray-500"
+          title="Hide suggestions"
+          @click="queriesHidden = true"
+        >
+          <span class="material-icons text-sm">close</span>
+        </button>
         <button
           v-for="query in currentRole.queries"
           :key="query"
@@ -411,6 +422,9 @@ const sandboxWarningDismissed = ref(false);
 const chatListRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const historyButtonRef = ref<HTMLButtonElement | null>(null);
+const historyPopupRef = ref<HTMLDivElement | null>(null);
+const headerRef = ref<HTMLDivElement | null>(null);
 
 function scrollChatToBottom() {
   nextTick(() => {
@@ -589,11 +603,14 @@ function handleKeyNavigation(e: KeyboardEvent) {
   selectedResultUuid.value = results[nextIndex].uuid;
 }
 
+const queriesHidden = ref(false);
+
 const showQueries = computed(
   () =>
     !!currentRole.value.queries?.length &&
     !isRunning.value &&
-    toolResults.value.length < 4,
+    !queriesHidden.value &&
+    toolResults.value.length === 0,
 );
 
 function roleIcon(roleId: string): string {
@@ -662,6 +679,7 @@ function onRoleChange() {
   statusMessage.value = "";
   chatSessionId.value = uuidv4();
   toolCallHistory.value = [];
+  queriesHidden.value = false;
 }
 
 async function refreshRoles() {
@@ -870,12 +888,23 @@ async function sendMessage(text?: string) {
   }
 }
 
+function handleClickOutsideHistory(e: MouseEvent) {
+  if (!showHistory.value) return;
+  const target = e.target as Node;
+  const insideButton = historyButtonRef.value?.contains(target) ?? false;
+  const insidePopup = historyPopupRef.value?.contains(target) ?? false;
+  if (!insideButton && !insidePopup) {
+    showHistory.value = false;
+  }
+}
+
 onMounted(async () => {
   fetchHealth();
   fetchMcpToolsStatus();
   refreshRoles();
   window.addEventListener("roles-updated", refreshRoles);
   window.addEventListener("keydown", handleKeyNavigation);
+  window.addEventListener("mousedown", handleClickOutsideHistory);
   window.addEventListener("keydown", handleViewModeShortcut);
 
   const allSessions = await fetchSessions();
@@ -890,6 +919,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("roles-updated", refreshRoles);
   window.removeEventListener("keydown", handleKeyNavigation);
+  window.removeEventListener("mousedown", handleClickOutsideHistory);
   window.removeEventListener("keydown", handleViewModeShortcut);
   if (tickInterval !== null) clearInterval(tickInterval);
 });
