@@ -309,7 +309,18 @@ router.get(
     const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
     res.setHeader("Content-Type", mime);
     res.setHeader("Content-Length", String(stat.size));
-    fs.createReadStream(absPath).pipe(res);
+    const stream = fs.createReadStream(absPath);
+    // If the read stream errors mid-flight (file deleted, disk error,
+    // permissions changed), surface a clean failure to the client
+    // instead of leaving the connection hanging.
+    stream.on("error", (err) => {
+      if (res.headersSent) {
+        res.destroy(err);
+        return;
+      }
+      res.status(500).json({ error: `Failed to read file: ${err.message}` });
+    });
+    stream.pipe(res);
   },
 );
 
