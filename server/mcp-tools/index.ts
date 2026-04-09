@@ -35,6 +35,7 @@ mcpToolsRouter.get("/", (_req: Request, res: Response) => {
       name: t.definition.name,
       enabled: isMcpToolEnabled(t),
       requiredEnv: t.requiredEnv ?? [],
+      prompt: t.prompt,
     })),
   );
 });

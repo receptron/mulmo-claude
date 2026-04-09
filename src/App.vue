@@ -459,7 +459,14 @@ watch(isRunning, (running, prev) => {
 const toolCallHistory = ref<ToolCallHistoryItem[]>([]);
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
-const availableTools = computed(() => currentRole.value.availablePlugins);
+const disabledMcpTools = ref(new Set<string>());
+const mcpToolDescriptions = ref<Record<string, string>>({});
+
+const availableTools = computed(() =>
+  currentRole.value.availablePlugins.filter(
+    (p) => !disabledMcpTools.value.has(p),
+  ),
+);
 
 const PENDING_MIN_MS = 500;
 const displayTick = ref(0);
@@ -495,7 +502,9 @@ const pendingCalls = computed(() => {
 const toolDescriptions = computed(() => {
   const map: Record<string, string> = {};
   for (const name of currentRole.value.availablePlugins) {
-    const desc = getPlugin(name)?.toolDefinition.description;
+    const desc =
+      getPlugin(name)?.toolDefinition.description ??
+      mcpToolDescriptions.value[name];
     if (desc) map[name] = desc;
   }
   return map;
@@ -681,6 +690,23 @@ async function fetchHealth() {
   }
 }
 
+async function fetchMcpToolsStatus() {
+  try {
+    const res = await fetch("/api/mcp-tools");
+    if (!res.ok) return;
+    const tools: { name: string; enabled: boolean; prompt?: string }[] =
+      await res.json();
+    disabledMcpTools.value = new Set(
+      tools.filter((t) => !t.enabled).map((t) => t.name),
+    );
+    mcpToolDescriptions.value = Object.fromEntries(
+      tools.filter((t) => t.prompt).map((t) => [t.name, t.prompt as string]),
+    );
+  } catch {
+    // ignore — all tools remain visible if the fetch fails
+  }
+}
+
 async function fetchSessions(): Promise<SessionSummary[]> {
   try {
     const res = await fetch("/api/sessions");
@@ -846,6 +872,7 @@ async function sendMessage(text?: string) {
 
 onMounted(async () => {
   fetchHealth();
+  fetchMcpToolsStatus();
   refreshRoles();
   window.addEventListener("roles-updated", refreshRoles);
   window.addEventListener("keydown", handleKeyNavigation);

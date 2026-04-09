@@ -78,12 +78,29 @@ export interface SystemPromptParams {
   pluginPrompts?: Record<string, string>;
 }
 
+function buildInlinedHelpFiles(
+  rolePrompt: string,
+  workspacePath: string,
+): string[] {
+  const matches = rolePrompt.match(/helps\/[\w.-]+\.md/g) ?? [];
+  const unique = [...new Set(matches)];
+  return unique
+    .map((rel) => {
+      const fullPath = join(workspacePath, rel);
+      if (!existsSync(fullPath)) return null;
+      const content = readFileSync(fullPath, "utf-8").trim();
+      return content ? `### ${rel}\n\n${content}` : null;
+    })
+    .filter((s): s is string => s !== null);
+}
+
 export function buildSystemPrompt(params: SystemPromptParams): string {
   const { role, workspacePath, pluginPrompts } = params;
 
   const memoryContext = buildMemoryContext(workspacePath);
   const wikiContext = buildWikiContext(workspacePath);
   const pluginSections = buildPluginPromptSections(role, pluginPrompts);
+  const helpSections = buildInlinedHelpFiles(role.prompt, workspacePath);
 
   return [
     role.prompt,
@@ -91,6 +108,9 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     `Today's date: ${new Date().toISOString().split("T")[0]}`,
     memoryContext,
     ...(wikiContext ? [wikiContext] : []),
+    ...(helpSections.length
+      ? [`## Reference Files\n\n${helpSections.join("\n\n")}`]
+      : []),
     ...(pluginSections.length
       ? [`## Plugin Instructions\n\n${pluginSections.join("\n\n")}`]
       : []),

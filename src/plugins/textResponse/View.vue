@@ -5,7 +5,7 @@
       class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0"
     >
       <button
-        class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 w-16 flex items-center justify-center gap-1"
+        class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center gap-1"
         :disabled="pdfDownloading"
         @click="downloadPdf"
       >
@@ -29,8 +29,11 @@
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span v-else>↓ PDF</span>
-        <span v-if="pdfDownloading">PDF</span>
+        <template v-if="!pdfDownloading">
+          <span class="material-icons text-sm leading-none">download</span>
+          <span>PDF</span>
+        </template>
+        <span v-else>PDF</span>
       </button>
       <span
         v-if="pdfError"
@@ -39,7 +42,7 @@
         >⚠ PDF failed</span
       >
     </div>
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 overflow-hidden" @click.capture="openLinksInNewTab">
       <OriginalView
         :selected-result="selectedResult"
         @update-result="(r) => emit('updateResult', r as ToolResultComplete)"
@@ -62,6 +65,19 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 const isAssistant = computed(
   () => (props.selectedResult.data?.role ?? "assistant") === "assistant",
 );
+
+function openLinksInNewTab(event: MouseEvent) {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey)
+    return;
+  const target = event.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const url = anchor.href;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+  if (new URL(url).origin === window.location.origin) return;
+  event.preventDefault();
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
 const pdfDownloading = ref(false);
 const pdfError = ref<string | null>(null);

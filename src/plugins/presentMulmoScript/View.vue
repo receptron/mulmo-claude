@@ -29,29 +29,25 @@
         </button>
       </div>
       <div class="ml-4 shrink-0 flex gap-2">
-        <!-- Generate / Download Movie -->
+        <!-- Download Movie -->
         <a
-          v-if="moviePath"
+          v-if="moviePath && !movieGenerating"
           :href="`/api/mulmo-script/download-movie?moviePath=${encodeURIComponent(moviePath)}`"
           download
-          class="px-3 py-1.5 text-xs rounded border border-green-400 text-green-600 hover:bg-green-50"
+          class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
         >
-          Download Movie
+          <span class="material-icons text-sm leading-none">download</span>
+          <span>Movie</span>
         </a>
+        <!-- Generate / Regenerate Movie -->
         <button
-          v-else
-          class="px-3 py-1.5 text-xs rounded border flex items-center gap-1.5"
-          :class="
-            movieGenerating
-              ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-          "
+          class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center gap-1"
           :disabled="movieGenerating"
           @click="generateMovie"
         >
           <svg
             v-if="movieGenerating"
-            class="animate-spin w-3 h-3"
+            class="animate-spin w-3 h-3 shrink-0"
             viewBox="0 0 24 24"
             fill="none"
           >
@@ -69,7 +65,11 @@
               d="M4 12a8 8 0 018-8v8H4z"
             />
           </svg>
-          {{ movieGenerating ? "Generating…" : "Generate Movie" }}
+          <span v-if="movieGenerating">Generating…</span>
+          <template v-else>
+            <span class="material-icons text-sm leading-none">refresh</span>
+            <span>Movie</span>
+          </template>
         </button>
       </div>
     </div>
