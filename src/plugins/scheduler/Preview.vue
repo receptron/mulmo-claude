@@ -22,6 +22,7 @@
 import { computed } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
+import { PREVIEW_ITEM_COUNT } from "../../config/ui";
 
 const props = defineProps<{ result: ToolResultComplete<SchedulerData> }>();
 
@@ -49,6 +50,10 @@ const upcomingItems = computed(() => {
   return [...withDate, ...noDate];
 });
 
-const preview = computed(() => upcomingItems.value.slice(0, 3));
-const more = computed(() => Math.max(0, upcomingItems.value.length - 3));
+const preview = computed(() =>
+  upcomingItems.value.slice(0, PREVIEW_ITEM_COUNT),
+);
+const more = computed(() =>
+  Math.max(0, upcomingItems.value.length - PREVIEW_ITEM_COUNT),
+);
 </script>

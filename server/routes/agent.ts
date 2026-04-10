@@ -6,9 +6,10 @@ import { getRole } from "../roles.js";
 import { runAgent } from "../agent.js";
 import { registerSession, removeSession, pushToSession } from "../sessions.js";
 import { workspacePath } from "../workspace.js";
+import { DEFAULT_SERVER_PORT } from "../config/settings.js";
 
 const router = Router();
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || DEFAULT_SERVER_PORT;
 
 // Maps app-level chatSessionId → Claude CLI internal session ID for multi-turn dialog
 const claudeSessionMap = new Map<string, string>();

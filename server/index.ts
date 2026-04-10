@@ -25,6 +25,7 @@ import { initWorkspace } from "./workspace.js";
 import fs from "fs";
 import os from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./docker.js";
+import { DEFAULT_SERVER_PORT } from "./config/settings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +35,7 @@ initWorkspace();
 let sandboxEnabled = false;
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || DEFAULT_SERVER_PORT;
 
 app.disable("x-powered-by");
 app.use(cors());

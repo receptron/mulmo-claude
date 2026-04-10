@@ -1,3 +1,8 @@
+import {
+  X_SEARCH_MIN_RESULTS,
+  X_SEARCH_MAX_RESULTS,
+} from "../config/settings.js";
+
 const X_API_BASE = "https://api.twitter.com/2";
 const TWEET_FIELDS =
   "tweet.fields=created_at,author_id,public_metrics,entities";
@@ -169,8 +174,11 @@ export const searchX = {
     if (!query) return "A search query is required.";
 
     const maxResults = Math.min(
-      100,
-      Math.max(10, Number(args.max_results ?? 10)),
+      X_SEARCH_MAX_RESULTS,
+      Math.max(
+        X_SEARCH_MIN_RESULTS,
+        Number(args.max_results ?? X_SEARCH_MIN_RESULTS),
+      ),
     );
 
     let data: XApiResponse;

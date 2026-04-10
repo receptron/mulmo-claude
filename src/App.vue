@@ -491,6 +491,11 @@ import { useClickOutside } from "./composables/useClickOutside";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
+import {
+  MAX_VISIBLE_SESSION_TABS,
+  ERROR_BODY_PREVIEW_MAX_CHARS,
+  LS_RIGHT_SIDEBAR_VISIBLE,
+} from "./config/ui";
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
@@ -567,7 +572,7 @@ watch(isRunning, (running) => {
 });
 
 const showRightSidebar = ref(
-  localStorage.getItem("right_sidebar_visible") === "true",
+  localStorage.getItem(LS_RIGHT_SIDEBAR_VISIBLE) === "true",
 );
 
 const {
@@ -621,7 +626,9 @@ const mergedSessions = computed((): SessionSummary[] => {
   );
 });
 
-const tabSessions = computed(() => mergedSessions.value.slice(0, 6));
+const tabSessions = computed(() =>
+  mergedSessions.value.slice(0, MAX_VISIBLE_SESSION_TABS),
+);
 
 function tabColor(session: SessionSummary): string {
   const live = sessionMap.get(session.id);
@@ -745,7 +752,10 @@ const needsGemini = (roleId: string) =>
 
 function toggleRightSidebar() {
   showRightSidebar.value = !showRightSidebar.value;
-  localStorage.setItem("right_sidebar_visible", String(showRightSidebar.value));
+  localStorage.setItem(
+    LS_RIGHT_SIDEBAR_VISIBLE,
+    String(showRightSidebar.value),
+  );
 }
 
 function createNewSession(roleId?: string): ActiveSession {
@@ -922,7 +932,7 @@ async function sendMessage(text?: string) {
       );
       pushErrorMessage(
         session,
-        `Server error ${response.status}: ${errBody.slice(0, 200)}`,
+        `Server error ${response.status}: ${errBody.slice(0, ERROR_BODY_PREVIEW_MAX_CHARS)}`,
       );
       return;
     }

@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../workspace.js";
 import { getGeminiClient, isGeminiAvailable } from "../utils/gemini.js";
+import { HTML_TITLE_TRUNCATE_LENGTH } from "../config/settings.js";
 
 const router = Router();
 const HTML_FILE = () => path.join(workspacePath, "html", "current.html");
@@ -65,7 +66,7 @@ router.post(
         message: "HTML generation succeeded",
         instructions:
           "Acknowledge that the HTML was generated and has been presented to the user.",
-        title: prompt.slice(0, 50),
+        title: prompt.slice(0, HTML_TITLE_TRUNCATE_LENGTH),
         data: { html, type: "tailwind" },
       });
     } catch (err) {
@@ -109,7 +110,7 @@ router.post(
         message: "HTML editing succeeded",
         instructions:
           "Acknowledge that the HTML was modified and has been presented to the user.",
-        title: prompt.slice(0, 50),
+        title: prompt.slice(0, HTML_TITLE_TRUNCATE_LENGTH),
         data: { html, type: "tailwind" },
         updating: true,
       });

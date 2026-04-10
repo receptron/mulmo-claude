@@ -20,6 +20,7 @@
 import { computed } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData } from "./index";
+import { PREVIEW_ITEM_COUNT } from "../../config/ui";
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 
@@ -27,6 +28,8 @@ const items = computed(() => props.result.data?.items ?? []);
 const completedCount = computed(
   () => items.value.filter((i) => i.completed).length,
 );
-const preview = computed(() => items.value.slice(0, 3));
-const more = computed(() => Math.max(0, items.value.length - 3));
+const preview = computed(() => items.value.slice(0, PREVIEW_ITEM_COUNT));
+const more = computed(() =>
+  Math.max(0, items.value.length - PREVIEW_ITEM_COUNT),
+);
 </script>
