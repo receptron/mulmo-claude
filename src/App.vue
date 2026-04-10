@@ -944,6 +944,14 @@ function toggleRightSidebar() {
 }
 
 function createNewSession(roleId?: string): ActiveSession {
+  // Remove the latest session if it's empty (no messages exchanged)
+  const latest = [...sessionMap.values()].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  )[0];
+  if (latest && latest.toolResults.length === 0) {
+    sessionMap.delete(latest.id);
+  }
+
   const id = uuidv4();
   const rId = roleId ?? currentRoleId.value;
   const session: ActiveSession = {
