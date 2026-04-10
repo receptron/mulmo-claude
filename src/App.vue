@@ -14,19 +14,31 @@
         <div class="flex gap-2">
           <button
             class="text-gray-400 hover:text-gray-700"
-            @click="onRoleChange"
+            @click="createNewSession()"
             title="New session"
           >
             <span class="material-icons">add_circle_outline</span>
           </button>
           <button
             ref="historyButtonRef"
-            class="text-gray-400 hover:text-gray-700"
+            class="relative text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showHistory }"
             @click="toggleHistory"
             title="Session history"
           >
             <span class="material-icons">history</span>
+            <!-- Active sessions badge -->
+            <span
+              v-if="activeSessionCount > 0"
+              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              >{{ activeSessionCount }}</span
+            >
+            <!-- Unread replies badge -->
+            <span
+              v-if="unreadCount > 0"
+              class="absolute -bottom-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              >{{ unreadCount }}</span
+            >
           </button>
           <div class="relative">
             <button
@@ -112,13 +124,25 @@
         :style="{ top: headerRef ? headerRef.offsetHeight + 'px' : '4rem' }"
       >
         <div class="p-2 space-y-1">
-          <p v-if="sessions.length === 0" class="text-xs text-gray-400 p-2">
+          <p
+            v-if="mergedSessions.length === 0"
+            class="text-xs text-gray-400 p-2"
+          >
             No sessions yet.
           </p>
           <div
-            v-for="session in sessions"
+            v-for="session in mergedSessions"
             :key="session.id"
-            class="cursor-pointer rounded border border-gray-200 p-2 text-sm hover:bg-gray-50 transition-colors"
+            class="cursor-pointer rounded border p-2 text-sm transition-colors"
+            :class="
+              sessionMap.get(session.id)?.isRunning
+                ? 'border-green-400 bg-green-50 hover:bg-green-100'
+                : sessionMap.get(session.id)?.hasUnread
+                  ? 'border-red-400 bg-red-50 hover:bg-red-100'
+                  : session.id === currentSessionId
+                    ? 'border-blue-400 bg-blue-50 hover:bg-blue-100'
+                    : 'border-gray-200 hover:bg-gray-50'
+            "
             @click="loadSession(session.id)"
           >
             <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
@@ -126,9 +150,36 @@
                 roleIcon(session.roleId)
               }}</span>
               <span>{{ roleName(session.roleId) }}</span>
-              <span class="ml-auto">{{ formatDate(session.startedAt) }}</span>
+              <span class="ml-auto flex items-center gap-1.5">
+                <span
+                  v-if="sessionMap.get(session.id)?.isRunning"
+                  class="flex items-center gap-0.5 text-green-600 font-medium"
+                >
+                  <span
+                    class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"
+                  />
+                  Running
+                </span>
+                <span
+                  v-else-if="sessionMap.get(session.id)?.hasUnread"
+                  class="flex items-center gap-0.5 text-red-600 font-medium"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  Unread
+                </span>
+                <span v-else>{{ formatDate(session.startedAt) }}</span>
+              </span>
             </div>
-            <p class="text-gray-700 truncate">
+            <p
+              class="truncate"
+              :class="
+                sessionMap.get(session.id)?.isRunning
+                  ? 'text-green-800'
+                  : sessionMap.get(session.id)?.hasUnread
+                    ? 'text-red-800 font-medium'
+                    : 'text-gray-700'
+              "
+            >
               {{ session.preview || "(no messages)" }}
             </p>
           </div>
@@ -342,7 +393,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  reactive,
+  markRaw,
+} from "vue";
 import { v4 as uuidv4 } from "uuid";
 import { ROLES, type Role } from "./config/roles";
 import { getPlugin } from "./tools";
@@ -436,18 +496,53 @@ type SseEvent =
   | SseToolResult
   | SseRolesUpdated;
 
+interface ActiveSession {
+  id: string;
+  roleId: string;
+  toolResults: ToolResultComplete[];
+  isRunning: boolean;
+  statusMessage: string;
+  toolCallHistory: ToolCallHistoryItem[];
+  selectedResultUuid: string | null;
+  hasUnread: boolean;
+  abortController: AbortController;
+  startedAt: string;
+}
+
+// --- Per-session state ---
+const sessionMap = reactive(new Map<string, ActiveSession>());
+const currentSessionId = ref("");
+
+const activeSession = computed(() => sessionMap.get(currentSessionId.value));
+
+const toolResults = computed(() => activeSession.value?.toolResults ?? []);
+const isRunning = computed(() => activeSession.value?.isRunning ?? false);
+const statusMessage = computed(() => activeSession.value?.statusMessage ?? "");
+const toolCallHistory = computed(
+  () => activeSession.value?.toolCallHistory ?? [],
+);
+const selectedResultUuid = computed({
+  get: () => activeSession.value?.selectedResultUuid ?? null,
+  set: (val: string | null) => {
+    if (activeSession.value) activeSession.value.selectedResultUuid = val;
+  },
+});
+
+const activeSessionCount = computed(
+  () => [...sessionMap.values()].filter((s) => s.isRunning).length,
+);
+const unreadCount = computed(
+  () => [...sessionMap.values()].filter((s) => s.hasUnread).length,
+);
+
+// --- Global state ---
 const roles = ref<Role[]>(ROLES);
 const currentRoleId = ref(ROLES[0].id);
 const currentRole = computed(
   () => roles.value.find((r) => r.id === currentRoleId.value) ?? roles.value[0],
 );
-const chatSessionId = ref(uuidv4());
 
 const userInput = ref("");
-const isRunning = ref(false);
-const statusMessage = ref("");
-const toolResults = ref<ToolResultComplete[]>([]);
-const selectedResultUuid = ref<string | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
 
 const showHistory = ref(false);
@@ -515,7 +610,6 @@ watch(isRunning, (running, prev) => {
     filesRefreshToken.value++;
   }
 });
-const toolCallHistory = ref<ToolCallHistoryItem[]>([]);
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
 const disabledMcpTools = ref(new Set<string>());
@@ -573,6 +667,26 @@ const selectedResult = computed(
   () =>
     toolResults.value.find((r) => r.uuid === selectedResultUuid.value) ?? null,
 );
+
+// Merged list for history pane: live sessions first, then server-only sessions
+const mergedSessions = computed((): SessionSummary[] => {
+  const liveIds = new Set(sessionMap.keys());
+  const liveSummaries: SessionSummary[] = [...sessionMap.values()].map((s) => {
+    const firstUserMsg = s.toolResults.find(
+      (r) =>
+        r.toolName === "text-response" &&
+        (r.data as { role?: string } | null)?.role === "user",
+    );
+    return {
+      id: s.id,
+      roleId: s.roleId,
+      startedAt: s.startedAt,
+      preview: firstUserMsg?.message ?? "",
+    };
+  });
+  const serverOnly = sessions.value.filter((s) => !liveIds.has(s.id));
+  return [...liveSummaries, ...serverOnly];
+});
 
 const SCROLL_AMOUNT = 60;
 
@@ -699,11 +813,11 @@ function makeTextResult(
 }
 
 function handleUpdateResult(updatedResult: ToolResultComplete) {
-  const index = toolResults.value.findIndex(
-    (r) => r.uuid === updatedResult.uuid,
-  );
+  const results = activeSession.value?.toolResults;
+  if (!results) return;
+  const index = results.findIndex((r) => r.uuid === updatedResult.uuid);
   if (index !== -1) {
-    Object.assign(toolResults.value[index], updatedResult);
+    Object.assign(results[index], updatedResult);
   }
 }
 
@@ -718,13 +832,30 @@ function toggleRightSidebar() {
   localStorage.setItem("right_sidebar_visible", String(showRightSidebar.value));
 }
 
-function onRoleChange() {
-  toolResults.value = [];
-  selectedResultUuid.value = null;
-  statusMessage.value = "";
-  chatSessionId.value = uuidv4();
-  toolCallHistory.value = [];
+function createNewSession(roleId?: string): ActiveSession {
+  const id = uuidv4();
+  const rId = roleId ?? currentRoleId.value;
+  const session: ActiveSession = {
+    id,
+    roleId: rId,
+    toolResults: [],
+    isRunning: false,
+    statusMessage: "",
+    toolCallHistory: [],
+    selectedResultUuid: null,
+    hasUnread: false,
+    abortController: markRaw(new AbortController()),
+    startedAt: new Date().toISOString(),
+  };
+  sessionMap.set(id, session);
+  currentSessionId.value = id;
+  currentRoleId.value = rId;
   queriesHidden.value = false;
+  return sessionMap.get(id)!;
+}
+
+function onRoleChange() {
+  createNewSession(currentRoleId.value);
 }
 
 async function refreshRoles() {
@@ -788,31 +919,54 @@ async function toggleHistory() {
 }
 
 async function loadSession(id: string) {
+  // Already live in memory — just switch to it
+  const live = sessionMap.get(id);
+  if (live) {
+    live.hasUnread = false;
+    currentSessionId.value = id;
+    currentRoleId.value = live.roleId;
+    showHistory.value = false;
+    return;
+  }
+
+  // Load from server
   const res = await fetch(`/api/sessions/${id}`);
+  if (!res.ok) return;
   const entries: SessionEntry[] = await res.json();
 
   const meta = entries.find((e) => e.type === "session_meta");
-  if (meta?.roleId) currentRoleId.value = meta.roleId;
-  chatSessionId.value = id;
-  toolResults.value = [];
+  const roleId = meta?.roleId ?? currentRoleId.value;
+
+  const toolResultsList: ToolResultComplete[] = [];
   for (const entry of entries) {
     if (entry.type === "session_meta") continue;
     if (isTextEntry(entry)) {
-      toolResults.value.push(makeTextResult(entry.message, entry.source));
+      toolResultsList.push(makeTextResult(entry.message, entry.source));
     } else if (isToolResultEntry(entry)) {
-      toolResults.value.push(entry.result);
+      toolResultsList.push(entry.result);
     }
   }
 
-  // Select last non-text result, or last result
-  const lastTool = [...toolResults.value]
+  const lastTool = [...toolResultsList]
     .reverse()
     .find((r) => r.toolName !== "text-response");
-  selectedResultUuid.value =
-    lastTool?.uuid ??
-    toolResults.value[toolResults.value.length - 1]?.uuid ??
-    null;
+  const resolvedSelectedUuid =
+    lastTool?.uuid ?? toolResultsList[toolResultsList.length - 1]?.uuid ?? null;
 
+  sessionMap.set(id, {
+    id,
+    roleId,
+    toolResults: toolResultsList,
+    isRunning: false,
+    statusMessage: "",
+    toolCallHistory: [],
+    selectedResultUuid: resolvedSelectedUuid,
+    hasUnread: false,
+    abortController: markRaw(new AbortController()),
+    startedAt: new Date().toISOString(),
+  });
+  currentSessionId.value = id;
+  currentRoleId.value = roleId;
   showHistory.value = false;
 }
 
@@ -820,11 +974,24 @@ async function sendMessage(text?: string) {
   const message = typeof text === "string" ? text : userInput.value.trim();
   if (!message || isRunning.value) return;
   userInput.value = "";
-  isRunning.value = true;
-  statusMessage.value = "Thinking...";
 
-  toolResults.value.push(makeTextResult(message, "user"));
-  const runStartIndex = toolResults.value.length;
+  // Capture the session this message belongs to
+  const session = sessionMap.get(currentSessionId.value);
+  if (!session) return;
+
+  session.isRunning = true;
+  session.statusMessage = "Thinking...";
+  session.toolResults.push(makeTextResult(message, "user"));
+  const runStartIndex = session.toolResults.length;
+
+  // Fresh AbortController for this run
+  session.abortController = markRaw(new AbortController());
+
+  const sessionRole =
+    roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
+  const selectedRes =
+    session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
+    undefined;
 
   try {
     const response = await fetch("/api/agent", {
@@ -832,11 +999,11 @@ async function sendMessage(text?: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        roleId: currentRoleId.value,
-        chatSessionId: chatSessionId.value,
-        selectedImageData: extractImageData(selectedResult.value ?? undefined),
+        roleId: session.roleId,
+        chatSessionId: session.id,
+        selectedImageData: extractImageData(selectedRes),
         pluginPrompts: Object.fromEntries(
-          currentRole.value.availablePlugins
+          sessionRole.availablePlugins
             .map((name) => [name, getPlugin(name)?.systemPrompt])
             .filter(
               (entry): entry is [string, string] =>
@@ -844,10 +1011,11 @@ async function sendMessage(text?: string) {
             ),
         ),
       }),
+      signal: session.abortController.signal,
     });
 
     if (!response.body) {
-      statusMessage.value = "No response body received from server.";
+      session.statusMessage = "No response body received from server.";
       return;
     }
 
@@ -873,7 +1041,7 @@ async function sendMessage(text?: string) {
         }
 
         if (data.type === "tool_call") {
-          toolCallHistory.value.push({
+          session.toolCallHistory.push({
             toolUseId: data.toolUseId,
             toolName: data.toolName,
             args: data.args,
@@ -881,7 +1049,7 @@ async function sendMessage(text?: string) {
           });
           rightSidebarRef.value?.scrollToBottom();
         } else if (data.type === "tool_call_result") {
-          const entry = toolCallHistory.value
+          const entry = session.toolCallHistory
             .slice()
             .reverse()
             .find(
@@ -893,7 +1061,7 @@ async function sendMessage(text?: string) {
           if (entry) entry.result = data.content;
           rightSidebarRef.value?.scrollToBottom();
         } else if (data.type === "status") {
-          statusMessage.value = data.message;
+          session.statusMessage = data.message;
         } else if (data.type === "switch_role") {
           setTimeout(() => {
             currentRoleId.value = data.roleId;
@@ -903,30 +1071,38 @@ async function sendMessage(text?: string) {
           await refreshRoles();
         } else if (data.type === "text") {
           const textResult = makeTextResult(data.message, "assistant");
-          toolResults.value.push(textResult);
-          const hasPluginResult = toolResults.value
+          session.toolResults.push(textResult);
+          const hasPluginResult = session.toolResults
             .slice(runStartIndex)
             .some((r) => r.toolName !== "text-response");
           if (!hasPluginResult) {
-            selectedResultUuid.value = textResult.uuid;
+            session.selectedResultUuid = textResult.uuid;
           }
         } else if (data.type === "tool_result") {
           const { result } = data;
-          const existing = toolResults.value.findIndex(
+          const existing = session.toolResults.findIndex(
             (r) => r.uuid === result.uuid,
           );
           if (existing >= 0) {
-            toolResults.value[existing] = result;
+            session.toolResults[existing] = result;
           } else {
-            toolResults.value.push(result);
-            selectedResultUuid.value = result.uuid;
+            session.toolResults.push(result);
+            session.selectedResultUuid = result.uuid;
           }
         }
       }
     }
+  } catch (e) {
+    if (!(e instanceof DOMException && e.name === "AbortError")) {
+      session.statusMessage = "Connection error.";
+    }
   } finally {
-    isRunning.value = false;
-    statusMessage.value = "";
+    session.isRunning = false;
+    session.statusMessage = "";
+    // Mark as unread if the user has switched away from this session
+    if (currentSessionId.value !== session.id) {
+      session.hasUnread = true;
+    }
   }
 }
 
@@ -951,6 +1127,7 @@ function handleClickOutsideLock(e: MouseEvent) {
 }
 
 onMounted(async () => {
+  createNewSession();
   fetchHealth();
   fetchMcpToolsStatus();
   refreshRoles();
