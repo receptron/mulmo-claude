@@ -459,117 +459,38 @@ import {
   markRaw,
 } from "vue";
 import { v4 as uuidv4 } from "uuid";
-import { ROLES, type Role } from "./config/roles";
 import { SYSTEM_PROMPT } from "./config/system-prompt";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
-import type { ToolCallHistoryItem } from "./components/RightSidebar.vue";
-import CanvasViewToggle, {
-  type CanvasViewMode,
-} from "./components/CanvasViewToggle.vue";
+import type { ToolCallHistoryItem } from "./types/toolCallHistory";
+import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
-
-interface SessionSummary {
-  id: string;
-  roleId: string;
-  startedAt: string;
-  preview: string;
-}
-
-interface SessionEntry {
-  type?: string;
-  source?: string;
-  roleId?: string;
-  message?: string;
-  result?: ToolResultComplete;
-}
-
-interface TextEntry extends SessionEntry {
-  source: "user" | "assistant";
-  type: "text";
-  message: string;
-}
-
-interface ToolResultEntry extends SessionEntry {
-  source: "tool";
-  type: "tool_result";
-  result: ToolResultComplete;
-}
-
-const isTextEntry = (e: SessionEntry): e is TextEntry =>
-  (e.source === "user" || e.source === "assistant") &&
-  e.type === "text" &&
-  typeof e.message === "string";
-
-const isToolResultEntry = (e: SessionEntry): e is ToolResultEntry =>
-  e.source === "tool" && e.type === "tool_result" && e.result !== undefined;
-
-interface SseToolCall {
-  type: "tool_call";
-  toolUseId: string;
-  toolName: string;
-  args: unknown;
-}
-
-interface SseToolCallResult {
-  type: "tool_call_result";
-  toolUseId: string;
-  content: string;
-}
-
-interface SseStatus {
-  type: "status";
-  message: string;
-}
-
-interface SseSwitchRole {
-  type: "switch_role";
-  roleId: string;
-}
-
-interface SseText {
-  type: "text";
-  message: string;
-}
-
-interface SseToolResult {
-  type: "tool_result";
-  result: ToolResultComplete;
-}
-
-interface SseRolesUpdated {
-  type: "roles_updated";
-}
-
-interface SseError {
-  type: "error";
-  message: string;
-}
-
-type SseEvent =
-  | SseToolCall
-  | SseToolCallResult
-  | SseStatus
-  | SseSwitchRole
-  | SseText
-  | SseToolResult
-  | SseRolesUpdated
-  | SseError;
-
-interface ActiveSession {
-  id: string;
-  roleId: string;
-  toolResults: ToolResultComplete[];
-  isRunning: boolean;
-  statusMessage: string;
-  toolCallHistory: ToolCallHistoryItem[];
-  selectedResultUuid: string | null;
-  hasUnread: boolean;
-  abortController: AbortController;
-  startedAt: string;
-}
+import type { SseEvent } from "./types/sse";
+import {
+  type SessionSummary,
+  type SessionEntry,
+  type ActiveSession,
+  isTextEntry,
+  isToolResultEntry,
+} from "./types/session";
+import {
+  isUserTextResponse,
+  extractImageData,
+  makeTextResult,
+} from "./utils/tools/result";
+import {
+  roleIcon as roleIconLookup,
+  roleName as roleNameLookup,
+} from "./utils/role/icon";
+import { formatDate } from "./utils/format/date";
+import { findScrollableChild } from "./utils/dom/scrollable";
+import { usePendingCalls } from "./composables/usePendingCalls";
+import { useClickOutside } from "./composables/useClickOutside";
+import { useCanvasViewMode } from "./composables/useCanvasViewMode";
+import { useMcpTools } from "./composables/useMcpTools";
+import { useRoles } from "./composables/useRoles";
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
@@ -598,11 +519,7 @@ const unreadCount = computed(
 );
 
 // --- Global state ---
-const roles = ref<Role[]>(ROLES);
-const currentRoleId = ref(ROLES[0].id);
-const currentRole = computed(
-  () => roles.value.find((r) => r.id === currentRoleId.value) ?? roles.value[0],
-);
+const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
 const userInput = ref("");
 const activePane = ref<"sidebar" | "main">("sidebar");
@@ -653,80 +570,28 @@ const showRightSidebar = ref(
   localStorage.getItem("right_sidebar_visible") === "true",
 );
 
-const VIEW_MODE_STORAGE_KEY = "canvas_view_mode";
-function loadStoredViewMode(): CanvasViewMode {
-  const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-  if (stored === "single" || stored === "stack" || stored === "files") {
-    return stored;
-  }
-  return "single";
-}
-const canvasViewMode = ref<CanvasViewMode>(loadStoredViewMode());
-const filesRefreshToken = ref(0);
-
-function setCanvasViewMode(mode: CanvasViewMode): void {
-  canvasViewMode.value = mode;
-  localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
-}
-
-// Refresh the file tree after each agent run completes, so newly written
-// files appear without a manual reload.
-watch(isRunning, (running, prev) => {
-  if (prev && !running) {
-    filesRefreshToken.value++;
-  }
-});
+const {
+  canvasViewMode,
+  setCanvasViewMode,
+  filesRefreshToken,
+  handleViewModeShortcut,
+} = useCanvasViewMode({ isRunning });
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
-const disabledMcpTools = ref(new Set<string>());
-const mcpToolDescriptions = ref<Record<string, string>>({});
-
-const availableTools = computed(() =>
-  currentRole.value.availablePlugins.filter(
-    (p) => !disabledMcpTools.value.has(p),
-  ),
-);
-
-const PENDING_MIN_MS = 500;
-const displayTick = ref(0);
-let tickInterval: ReturnType<typeof setInterval> | null = null;
-
-watch(isRunning, (running) => {
-  if (running) {
-    tickInterval = setInterval(() => {
-      displayTick.value++;
-    }, 50);
-  } else {
-    if (tickInterval !== null) {
-      clearInterval(tickInterval);
-      tickInterval = null;
-      // One final tick so the computed clears after the minimum duration
-      setTimeout(() => {
-        displayTick.value++;
-      }, PENDING_MIN_MS);
-    }
-  }
+const {
+  disabledMcpTools,
+  mcpToolDescriptions,
+  availableTools,
+  toolDescriptions,
+  fetchMcpToolsStatus,
+} = useMcpTools({
+  currentRole,
+  getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
 });
 
-const pendingCalls = computed(() => {
-  void displayTick.value; // reactive dependency on tick
-  const now = Date.now();
-  return toolCallHistory.value.filter(
-    (c) =>
-      (c.result === undefined && c.error === undefined) ||
-      now < c.timestamp + PENDING_MIN_MS,
-  );
-});
-
-const toolDescriptions = computed(() => {
-  const map: Record<string, string> = {};
-  for (const name of currentRole.value.availablePlugins) {
-    const desc =
-      getPlugin(name)?.toolDefinition.description ??
-      mcpToolDescriptions.value[name];
-    if (desc) map[name] = desc;
-  }
-  return map;
+const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
+  isRunning,
+  toolCallHistory,
 });
 
 const selectedResult = computed(
@@ -737,14 +602,6 @@ const selectedResult = computed(
 // Type-guard for the user-side branch of a text-response result. Used
 // to surface the first user message as a preview for live sessions
 // that haven't been persisted to disk yet.
-function isUserTextResponse(r: ToolResultComplete): boolean {
-  if (r.toolName !== "text-response") return false;
-  const data = r.data;
-  if (typeof data !== "object" || data === null) return false;
-  if (!("role" in data)) return false;
-  return data.role === "user";
-}
-
 // Merged list for the history pane: live sessions in `sessionMap`
 // merged with server-only sessions, sorted newest-first by startedAt.
 const mergedSessions = computed((): SessionSummary[] => {
@@ -783,25 +640,6 @@ watch(currentSessionId, (id) => {
 
 const SCROLL_AMOUNT = 60;
 
-function findScrollableChild(container: HTMLElement): HTMLElement | null {
-  const children = container.querySelectorAll("*");
-  for (const el of children) {
-    const html = el as HTMLElement;
-    if (html.scrollHeight > html.clientHeight) {
-      const style = getComputedStyle(html);
-      if (
-        style.overflowY === "auto" ||
-        style.overflowY === "scroll" ||
-        style.overflow === "auto" ||
-        style.overflow === "scroll"
-      ) {
-        return html;
-      }
-    }
-  }
-  return null;
-}
-
 function handleCanvasKeydown(e: KeyboardEvent) {
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
   if (
@@ -816,21 +654,6 @@ function handleCanvasKeydown(e: KeyboardEvent) {
   e.preventDefault();
   const delta = e.key === "ArrowDown" ? SCROLL_AMOUNT : -SCROLL_AMOUNT;
   scrollable.scrollBy({ top: delta, behavior: "smooth" });
-}
-
-function handleViewModeShortcut(e: KeyboardEvent) {
-  if (!(e.metaKey || e.ctrlKey)) return;
-  if (e.altKey || e.shiftKey) return;
-  if (e.key === "1") {
-    setCanvasViewMode("single");
-    e.preventDefault();
-  } else if (e.key === "2") {
-    setCanvasViewMode("stack");
-    e.preventDefault();
-  } else if (e.key === "3") {
-    setCanvasViewMode("files");
-    e.preventDefault();
-  }
 }
 
 function handleKeyNavigation(e: KeyboardEvent) {
@@ -865,47 +688,15 @@ const showQueries = computed(
     toolResults.value.length === 0,
 );
 
+// Local wrappers that thread the reactive `roles.value` into the
+// pure helpers in src/utils/role.ts. Template bindings keep the
+// short names `roleIcon(id)` / `roleName(id)`.
 function roleIcon(roleId: string): string {
-  const icon = roles.value.find((r) => r.id === roleId)?.icon ?? "star";
-  // Material Icon names are lowercase letters and underscores only.
-  // Fall back to a generic icon if an emoji or other value was stored.
-  return /^[a-z_]+$/.test(icon) ? icon : "smart_toy";
+  return roleIconLookup(roles.value, roleId);
 }
 
 function roleName(roleId: string): string {
-  return roles.value.find((r) => r.id === roleId)?.name ?? roleId;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
-    " " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
-}
-
-function extractImageData(
-  result: ToolResultComplete | undefined,
-): string | undefined {
-  const data = result?.data;
-  if (typeof data === "object" && data !== null && "imageData" in data) {
-    return typeof data.imageData === "string" ? data.imageData : undefined;
-  }
-  return undefined;
-}
-
-function makeTextResult(
-  text: string,
-  role: "user" | "assistant",
-): ToolResultComplete {
-  return {
-    uuid: uuidv4(),
-    toolName: "text-response",
-    message: text,
-    title: role === "user" ? "You" : "Assistant",
-    data: { text, role, transportKind: "text-rest" },
-  };
+  return roleNameLookup(roles.value, roleId);
 }
 
 // Surface a server-side or transport-level error as a card in the
@@ -991,20 +782,6 @@ function onRoleChange() {
   createNewSession(currentRoleId.value);
 }
 
-async function refreshRoles() {
-  try {
-    const res = await fetch("/api/roles");
-    const customRoles: Role[] = await res.json();
-    const customIds = new Set(customRoles.map((r) => r.id));
-    roles.value = [
-      ...ROLES.filter((r) => !customIds.has(r.id)),
-      ...customRoles,
-    ];
-  } catch {
-    // keep current roles on error
-  }
-}
-
 async function fetchHealth() {
   try {
     const res = await fetch("/api/health");
@@ -1014,23 +791,6 @@ async function fetchHealth() {
     sandboxEnabled.value = !!data.sandboxEnabled;
   } catch {
     geminiAvailable.value = false;
-  }
-}
-
-async function fetchMcpToolsStatus() {
-  try {
-    const res = await fetch("/api/mcp-tools");
-    if (!res.ok) return;
-    const tools: { name: string; enabled: boolean; prompt?: string }[] =
-      await res.json();
-    disabledMcpTools.value = new Set(
-      tools.filter((t) => !t.enabled).map((t) => t.name),
-    );
-    mcpToolDescriptions.value = Object.fromEntries(
-      tools.filter((t) => t.prompt).map((t) => [t.name, t.prompt as string]),
-    );
-  } catch {
-    // ignore — all tools remain visible if the fetch fails
   }
 }
 
@@ -1267,35 +1027,21 @@ async function sendMessage(text?: string) {
   }
 }
 
-function handleClickOutsideHistory(e: MouseEvent) {
-  if (!showHistory.value) return;
-  const target = e.target as Node;
-  const insideButton = historyButtonRef.value?.contains(target) ?? false;
-  const insidePopup = historyPopupRef.value?.contains(target) ?? false;
-  if (!insideButton && !insidePopup) {
-    showHistory.value = false;
-  }
-}
-
-function handleClickOutsideLock(e: MouseEvent) {
-  if (!showLockPopup.value) return;
-  const target = e.target as Node;
-  const insideButton = lockButtonRef.value?.contains(target) ?? false;
-  const insidePopup = lockPopupRef.value?.contains(target) ?? false;
-  if (!insideButton && !insidePopup) {
-    showLockPopup.value = false;
-  }
-}
-
-function handleClickOutsideRoleDropdown(e: MouseEvent) {
-  if (!showRoleDropdown.value) return;
-  const target = e.target as Node;
-  const insideButton = roleButtonRef.value?.contains(target) ?? false;
-  const insideDropdown = roleDropdownRef.value?.contains(target) ?? false;
-  if (!insideButton && !insideDropdown) {
-    showRoleDropdown.value = false;
-  }
-}
+const { handler: handleClickOutsideHistory } = useClickOutside({
+  isOpen: showHistory,
+  buttonRef: historyButtonRef,
+  popupRef: historyPopupRef,
+});
+const { handler: handleClickOutsideLock } = useClickOutside({
+  isOpen: showLockPopup,
+  buttonRef: lockButtonRef,
+  popupRef: lockPopupRef,
+});
+const { handler: handleClickOutsideRoleDropdown } = useClickOutside({
+  isOpen: showRoleDropdown,
+  buttonRef: roleButtonRef,
+  popupRef: roleDropdownRef,
+});
 
 onMounted(async () => {
   // Listeners first so the UI responds to interactions even if the
@@ -1324,6 +1070,6 @@ onUnmounted(() => {
   window.removeEventListener("mousedown", handleClickOutsideLock);
   window.removeEventListener("mousedown", handleClickOutsideRoleDropdown);
   window.removeEventListener("keydown", handleViewModeShortcut);
-  if (tickInterval !== null) clearInterval(tickInterval);
+  teardownPendingCalls();
 });
 </script>

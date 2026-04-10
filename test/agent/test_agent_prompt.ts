@@ -37,7 +37,7 @@ describe("buildMemoryContext", () => {
     const result = buildMemoryContext(workspace);
     assert.ok(result.includes("User prefers dark mode"));
     assert.ok(result.includes("## Memory"));
-    assert.ok(result.includes("<reference type=\"memory\">"));
+    assert.ok(result.includes('<reference type="memory">'));
   });
 
   it("includes helps hint even without memory.md", () => {
@@ -80,7 +80,7 @@ describe("buildWikiContext", () => {
     const result = buildWikiContext(workspace);
     assert.ok(result !== null);
     assert.ok(result.includes("Key topics: AI, cooking"));
-    assert.ok(result.includes("<reference type=\"wiki-summary\">"));
+    assert.ok(result.includes('<reference type="wiki-summary">'));
   });
 
   it("includes schema hint when SCHEMA.md exists", () => {
@@ -98,7 +98,7 @@ describe("buildWikiContext", () => {
     writeFileSync(join(workspace, "wiki", "summary.md"), "  ");
     const result = buildWikiContext(workspace);
     assert.ok(result !== null);
-    assert.ok(!result.includes("<reference type=\"wiki-summary\">"));
+    assert.ok(!result.includes('<reference type="wiki-summary">'));
     assert.ok(result.includes("wiki/index.md"));
     assert.ok(result.includes("wiki/pages/"));
   });

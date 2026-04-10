@@ -196,8 +196,8 @@ import {
   tokenizeJsonl,
   prettyJson,
   JSON_TOKEN_CLASS,
-} from "../utils/jsonSyntax";
-import { extractFrontmatter } from "../utils/frontmatter";
+} from "../utils/format/jsonSyntax";
+import { extractFrontmatter } from "../utils/format/frontmatter";
 
 const STORAGE_KEY = "files_selected_path";
 const MD_RAW_STORAGE_KEY = "files_md_raw_mode";

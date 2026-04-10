@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-export type CanvasViewMode = "single" | "stack" | "files";
+import type { CanvasViewMode } from "../utils/canvas/viewMode";
 
 interface ModeOption {
   key: CanvasViewMode;

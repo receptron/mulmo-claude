@@ -112,15 +112,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
-
-export interface ToolCallHistoryItem {
-  toolUseId: string;
-  toolName: string;
-  args: unknown;
-  timestamp: number;
-  result?: string;
-  error?: string;
-}
+import type { ToolCallHistoryItem } from "../types/toolCallHistory";
 
 defineProps<{
   toolCallHistory: ToolCallHistoryItem[];
