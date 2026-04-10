@@ -347,15 +347,15 @@ const items = computed(() => props.selectedResult.data?.items ?? []);
 type ViewMode = "list" | "week" | "month";
 
 const VIEW_MODES: { key: ViewMode; label: string; icon: string }[] = [
-  { key: "list", label: "List", icon: "view_list" },
-  { key: "week", label: "Week", icon: "view_week" },
   { key: "month", label: "Month", icon: "calendar_month" },
+  { key: "week", label: "Week", icon: "view_week" },
+  { key: "list", label: "List", icon: "view_list" },
 ];
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_MONTH_ITEMS = 3;
 
-const viewMode = ref<ViewMode>("list");
+const viewMode = ref<ViewMode>("month");
 const currentDate = ref(new Date());
 
 // ── Calendar utilities ─────────────────────────────────────────────────────

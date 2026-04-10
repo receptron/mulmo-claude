@@ -35,13 +35,13 @@
           result.toolName
         }}</span>
       </button>
-      <!-- text-response: render the message directly so the card sizes
-           naturally to its text content -->
-      <div
-        v-if="isTextResponse(result)"
-        class="px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap break-words"
-      >
-        {{ messageText(result) }}
+      <!-- text-response: render the message as Markdown via the
+           underlying plugin View. The .stack-text-response class below
+           collapses the plugin's own card chrome (outer p-6, inner
+           rounded/border/shadow box, role header) so only the stack
+           card's own border shows. -->
+      <div v-if="isTextResponse(result)" class="stack-text-response">
+        <TextResponseOriginalView :selected-result="result" />
       </div>
       <!-- Document-like plugins: let the content flow at its natural
            height by overriding the plugin's internal h-full / overflow
@@ -87,6 +87,8 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { getPlugin } from "../tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import { View as TextResponseOriginalView } from "@gui-chat-plugin/text-response/vue";
+import type { TextResponseData } from "@gui-chat-plugin/text-response";
 
 // Most plugin viewComponents use h-full internally, so a defined parent
 // height is required for them to render. text-response and the
@@ -175,22 +177,14 @@ function resizeOneIframe(iframe: HTMLIFrameElement): void {
   }
 }
 
-function isTextResponse(result: ToolResultComplete): boolean {
-  return result.toolName === "text-response";
-}
-
-function messageText(result: ToolResultComplete): string {
-  if (typeof result.message === "string") return result.message;
+function isTextResponse(
+  result: ToolResultComplete,
+): result is ToolResultComplete<TextResponseData> {
+  if (result.toolName !== "text-response") return false;
   const data = result.data;
-  if (
-    typeof data === "object" &&
-    data !== null &&
-    "text" in data &&
-    typeof (data as { text: unknown }).text === "string"
-  ) {
-    return (data as { text: string }).text;
-  }
-  return "";
+  if (typeof data !== "object" || data === null) return false;
+  if (!("text" in data)) return false;
+  return typeof data.text === "string";
 }
 
 function iconFor(toolName: string): string {
@@ -348,5 +342,28 @@ onUnmounted(() => {
 }
 .stack-natural :deep(.flex-1) {
   flex: 0 0 auto !important;
+}
+
+/* Collapse the nested chrome that @gui-chat-plugin/text-response
+   draws around its Markdown output so it reads like plain content
+   inside our stack card instead of creating a second border/shadow
+   "card" inside ours. */
+.stack-text-response :deep(.text-response-content-wrapper > .p-6) {
+  padding: 0.5rem 0.75rem;
+}
+.stack-text-response :deep(.text-response-container .max-w-3xl) {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+.stack-text-response :deep(.text-response-container .mb-2) {
+  display: none; /* redundant role header — stack card header shows it already */
+}
+.stack-text-response :deep(.text-response-container .shadow-sm) {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 </style>

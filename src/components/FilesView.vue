@@ -53,9 +53,14 @@
         </div>
         <template v-else-if="content">
           <template v-if="content.kind === 'text'">
+            <!-- Scheduler items.json: render with the scheduler plugin's
+                 calendar/list view by synthesizing a fake tool result. -->
+            <div v-if="schedulerResult" class="h-full">
+              <SchedulerView :selected-result="schedulerResult" />
+            </div>
             <!-- Markdown rendered: frontmatter panel + body -->
             <div
-              v-if="isMarkdown && !mdRawMode"
+              v-else-if="isMarkdown && !mdRawMode"
               class="h-full flex flex-col overflow-auto"
             >
               <div
@@ -182,8 +187,10 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import FileTree, { type TreeNode } from "./FileTree.vue";
 import TextResponseView from "../plugins/textResponse/View.vue";
+import SchedulerView from "../plugins/scheduler/View.vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
+import type { SchedulerData, ScheduledItem } from "../plugins/scheduler/index";
 import {
   tokenizeJson,
   tokenizeJsonl,
@@ -257,6 +264,42 @@ const jsonlLines = computed(() => {
   if (!content.value || content.value.kind !== "text") return [];
   return tokenizeJsonl(content.value.content);
 });
+
+function isScheduledItem(x: unknown): x is ScheduledItem {
+  if (typeof x !== "object" || x === null) return false;
+  if (!("id" in x) || typeof x.id !== "string") return false;
+  if (!("title" in x) || typeof x.title !== "string") return false;
+  return true;
+}
+
+function isScheduledItemArray(x: unknown): x is ScheduledItem[] {
+  return Array.isArray(x) && x.every(isScheduledItem);
+}
+
+// When the user opens scheduler/items.json, render it with the
+// scheduler plugin's calendar view instead of as a JSON blob. We
+// synthesize a fake ToolResultComplete<SchedulerData> so the View
+// component receives the same shape it normally gets in chat mode.
+const schedulerResult = computed(
+  (): ToolResultComplete<SchedulerData> | null => {
+    if (selectedPath.value !== "scheduler/items.json") return null;
+    if (!content.value || content.value.kind !== "text") return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content.value.content);
+    } catch {
+      return null;
+    }
+    if (!isScheduledItemArray(parsed)) return null;
+    return {
+      uuid: "files-scheduler-preview",
+      toolName: "manageScheduler",
+      message: "scheduler/items.json",
+      title: "Scheduler",
+      data: { items: parsed },
+    };
+  },
+);
 
 const mdFrontmatter = computed(() => {
   if (!content.value || content.value.kind !== "text") return null;

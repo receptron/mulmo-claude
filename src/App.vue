@@ -538,6 +538,11 @@ interface SseRolesUpdated {
   type: "roles_updated";
 }
 
+interface SseError {
+  type: "error";
+  message: string;
+}
+
 type SseEvent =
   | SseToolCall
   | SseToolCallResult
@@ -545,7 +550,8 @@ type SseEvent =
   | SseSwitchRole
   | SseText
   | SseToolResult
-  | SseRolesUpdated;
+  | SseRolesUpdated
+  | SseError;
 
 interface ActiveSession {
   id: string;
@@ -896,6 +902,23 @@ function makeTextResult(
   };
 }
 
+// Surface a server-side or transport-level error as a card in the
+// session's chat so the user actually sees it. The status-message
+// channel can't be used because `finally` clears it the moment the
+// run ends.
+function pushErrorMessage(session: ActiveSession, message: string): void {
+  const text = `[Error] ${message}`;
+  const errorResult: ToolResultComplete = {
+    uuid: uuidv4(),
+    toolName: "text-response",
+    message: text,
+    title: "Error",
+    data: { text, role: "assistant", transportKind: "text-rest" },
+  };
+  session.toolResults.push(errorResult);
+  session.selectedResultUuid = errorResult.uuid;
+}
+
 function handleUpdateResult(updatedResult: ToolResultComplete) {
   const results = activeSession.value?.toolResults;
   if (!results) return;
@@ -1102,8 +1125,22 @@ async function sendMessage(text?: string) {
       signal: session.abortController.signal,
     });
 
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      console.error(
+        "[agent] HTTP error:",
+        response.status,
+        response.statusText,
+        errBody,
+      );
+      pushErrorMessage(
+        session,
+        `Server error ${response.status}: ${errBody.slice(0, 200)}`,
+      );
+      return;
+    }
     if (!response.body) {
-      session.statusMessage = "No response body received from server.";
+      pushErrorMessage(session, "No response body received from server.");
       return;
     }
 
@@ -1177,12 +1214,19 @@ async function sendMessage(text?: string) {
             session.toolResults.push(result);
             session.selectedResultUuid = result.uuid;
           }
+        } else if (data.type === "error") {
+          console.error("[agent] error event:", data.message);
+          pushErrorMessage(session, data.message);
         }
       }
     }
   } catch (e) {
     if (!(e instanceof DOMException && e.name === "AbortError")) {
-      session.statusMessage = "Connection error.";
+      console.error("[agent] fetch error:", e);
+      pushErrorMessage(
+        session,
+        e instanceof Error ? e.message : "Connection error.",
+      );
     }
   } finally {
     session.isRunning = false;
