@@ -478,6 +478,17 @@ import {
   isTextEntry,
   isToolResultEntry,
 } from "./types/session";
+import {
+  isUserTextResponse,
+  extractImageData,
+  makeTextResult,
+} from "./utils/toolResult";
+import {
+  roleIcon as roleIconLookup,
+  roleName as roleNameLookup,
+} from "./utils/role";
+import { formatDate } from "./utils/format";
+import { findScrollableChild } from "./utils/dom";
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
@@ -645,14 +656,6 @@ const selectedResult = computed(
 // Type-guard for the user-side branch of a text-response result. Used
 // to surface the first user message as a preview for live sessions
 // that haven't been persisted to disk yet.
-function isUserTextResponse(r: ToolResultComplete): boolean {
-  if (r.toolName !== "text-response") return false;
-  const data = r.data;
-  if (typeof data !== "object" || data === null) return false;
-  if (!("role" in data)) return false;
-  return data.role === "user";
-}
-
 // Merged list for the history pane: live sessions in `sessionMap`
 // merged with server-only sessions, sorted newest-first by startedAt.
 const mergedSessions = computed((): SessionSummary[] => {
@@ -690,25 +693,6 @@ watch(currentSessionId, (id) => {
 });
 
 const SCROLL_AMOUNT = 60;
-
-function findScrollableChild(container: HTMLElement): HTMLElement | null {
-  const children = container.querySelectorAll("*");
-  for (const el of children) {
-    const html = el as HTMLElement;
-    if (html.scrollHeight > html.clientHeight) {
-      const style = getComputedStyle(html);
-      if (
-        style.overflowY === "auto" ||
-        style.overflowY === "scroll" ||
-        style.overflow === "auto" ||
-        style.overflow === "scroll"
-      ) {
-        return html;
-      }
-    }
-  }
-  return null;
-}
 
 function handleCanvasKeydown(e: KeyboardEvent) {
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
@@ -773,47 +757,15 @@ const showQueries = computed(
     toolResults.value.length === 0,
 );
 
+// Local wrappers that thread the reactive `roles.value` into the
+// pure helpers in src/utils/role.ts. Template bindings keep the
+// short names `roleIcon(id)` / `roleName(id)`.
 function roleIcon(roleId: string): string {
-  const icon = roles.value.find((r) => r.id === roleId)?.icon ?? "star";
-  // Material Icon names are lowercase letters and underscores only.
-  // Fall back to a generic icon if an emoji or other value was stored.
-  return /^[a-z_]+$/.test(icon) ? icon : "smart_toy";
+  return roleIconLookup(roles.value, roleId);
 }
 
 function roleName(roleId: string): string {
-  return roles.value.find((r) => r.id === roleId)?.name ?? roleId;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
-    " " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
-}
-
-function extractImageData(
-  result: ToolResultComplete | undefined,
-): string | undefined {
-  const data = result?.data;
-  if (typeof data === "object" && data !== null && "imageData" in data) {
-    return typeof data.imageData === "string" ? data.imageData : undefined;
-  }
-  return undefined;
-}
-
-function makeTextResult(
-  text: string,
-  role: "user" | "assistant",
-): ToolResultComplete {
-  return {
-    uuid: uuidv4(),
-    toolName: "text-response",
-    message: text,
-    title: role === "user" ? "You" : "Assistant",
-    data: { text, role, transportKind: "text-rest" },
-  };
+  return roleNameLookup(roles.value, roleId);
 }
 
 // Surface a server-side or transport-level error as a card in the
