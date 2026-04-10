@@ -28,6 +28,7 @@ export const ROLES: Role[] = [
       "manageTodoList",
       "manageScheduler",
       "manageWiki",
+      "searchChatHistory",
       "presentDocument",
       "createMindMap",
       "presentHtml",
@@ -62,6 +63,7 @@ export const ROLES: Role[] = [
       "createMindMap",
       "generateImage",
       "presentHtml",
+      "searchChatHistory",
       "readXPost",
       "searchX",
       "switchRole",
@@ -111,6 +113,7 @@ export const ROLES: Role[] = [
       "presentForm",
       "presentDocument",
       "generateImage",
+      "searchChatHistory",
       "switchRole",
     ],
     queries: [
@@ -135,6 +138,7 @@ export const ROLES: Role[] = [
       "openCanvas",
       "present3D",
       "presentHtml",
+      "searchChatHistory",
       "switchRole",
     ],
     queries: [
@@ -155,7 +159,12 @@ export const ROLES: Role[] = [
       "- **2D games**: Phaser 3 (via CDN: https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js) — great for platformers, arcade games, tile-based games, and sprite animation. Scale the game to fill the full window using Phaser's Scale Manager (mode: Phaser.Scale.RESIZE).\n" +
       "- **3D games**: Three.js (via CDN: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js) — great for 3D environments, first-person views, and 3D physics scenes. Always make the renderer fill the full viewport and handle window resize.\n\n" +
       "Always produce a complete, self-contained HTML page with all logic inline.",
-    availablePlugins: ["playOthello", "presentHtml", "switchRole"],
+    availablePlugins: [
+      "playOthello",
+      "presentHtml",
+      "searchChatHistory",
+      "switchRole",
+    ],
     queries: [
       "Let's play Othello. I'll go first.",
       "Let's play Othello. You'll go first",
@@ -174,6 +183,7 @@ export const ROLES: Role[] = [
       "presentDocument",
       "presentForm",
       "generateImage",
+      "searchChatHistory",
       "switchRole",
     ],
     queries: ["I want to learn about Humpback whales"],
@@ -241,7 +251,7 @@ export const ROLES: Role[] = [
       "  ]\n" +
       "}\n" +
       "```",
-    availablePlugins: ["presentMulmoScript", "switchRole"],
+    availablePlugins: ["presentMulmoScript", "searchChatHistory", "switchRole"],
     queries: [
       "Tell me a short story about a fox who discovers a magical forest",
       "Create a bedtime story about a young astronaut exploring the moon",
@@ -337,7 +347,7 @@ export const ROLES: Role[] = [
       "  ]\n" +
       "}\n" +
       "```",
-    availablePlugins: ["presentMulmoScript", "switchRole"],
+    availablePlugins: ["presentMulmoScript", "searchChatHistory", "switchRole"],
     queries: [
       "Tell a story about two siblings — a bold older sister and a shy younger brother — who get lost in an enchanted forest. Use a Studio Ghibli anime style.",
       "Create a story with three characters: a grumpy wizard, his loyal cat, and a young apprentice who must work together to break a curse. Use a dark fantasy oil painting style.",
@@ -352,7 +362,7 @@ export const ROLES: Role[] = [
       "You are a music assistant. Help users explore, compose, and display sheet music. " +
       "When asked to show or play a piece, generate MusicXML and call showMusic. " +
       "You can compose simple melodies, explain music theory, and present well-known pieces in MusicXML format.",
-    availablePlugins: ["showMusic", "switchRole"],
+    availablePlugins: ["showMusic", "searchChatHistory", "switchRole"],
     queries: [
       "Play a C major scale",
       "Show me Twinkle Twinkle Little Star",
@@ -368,7 +378,7 @@ export const ROLES: Role[] = [
       "When asked to list or show roles, call manageRoles with action='list' to display them in the canvas. " +
       "When creating a role, ask the user for the role name, purpose, and any specific instructions, then choose appropriate plugins from the available set and write a clear system prompt. " +
       "Always call manageRoles with action='list' after creating, updating, or deleting a role so the user can see the updated list.",
-    availablePlugins: ["manageRoles", "switchRole"],
+    availablePlugins: ["manageRoles", "searchChatHistory", "switchRole"],
     queries: ["Show my custom roles", "Create a new role for me"],
   },
 ];

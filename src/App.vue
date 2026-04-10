@@ -1198,6 +1198,13 @@ function handleClickOutsideLock(e: MouseEvent) {
   }
 }
 
+// Triggered by the searchChatHistory result View when the user clicks
+// a row to load that past session.
+function handleLoadSessionEvent(e: Event) {
+  const detail = (e as CustomEvent<{ id?: string }>).detail;
+  if (detail?.id) loadSession(detail.id);
+}
+
 onMounted(async () => {
   // Listeners first so the UI responds to interactions even if the
   // async fetches below take a moment.
@@ -1206,6 +1213,7 @@ onMounted(async () => {
   window.addEventListener("mousedown", handleClickOutsideHistory);
   window.addEventListener("mousedown", handleClickOutsideLock);
   window.addEventListener("keydown", handleViewModeShortcut);
+  window.addEventListener("mulmo:load-session", handleLoadSessionEvent);
   // Fire-and-forget side fetches.
   fetchHealth();
   fetchMcpToolsStatus();
@@ -1222,6 +1230,7 @@ onUnmounted(() => {
   window.removeEventListener("mousedown", handleClickOutsideHistory);
   window.removeEventListener("mousedown", handleClickOutsideLock);
   window.removeEventListener("keydown", handleViewModeShortcut);
+  window.removeEventListener("mulmo:load-session", handleLoadSessionEvent);
   if (tickInterval !== null) clearInterval(tickInterval);
 });
 </script>

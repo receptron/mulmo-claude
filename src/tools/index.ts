@@ -20,6 +20,7 @@ import manageRolesPlugin from "../plugins/manageRoles/index";
 import wikiPlugin from "../plugins/wiki/index";
 import presentMulmoScriptPlugin from "../plugins/presentMulmoScript/index";
 import presentHtmlPlugin from "../plugins/presentHtml/index";
+import searchChatHistoryPlugin from "../plugins/searchChatHistory/index";
 
 const plugins: Record<string, PluginEntry> = {
   "text-response": {
@@ -30,6 +31,7 @@ const plugins: Record<string, PluginEntry> = {
   manageScheduler: schedulerPlugin,
   manageRoles: manageRolesPlugin,
   manageWiki: wikiPlugin,
+  searchChatHistory: searchChatHistoryPlugin,
   presentMulmoScript: presentMulmoScriptPlugin,
   presentDocument: MarkdownPlugin.plugin,
   presentSpreadsheet: SpreadsheetPlugin.plugin,

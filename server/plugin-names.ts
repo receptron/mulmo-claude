@@ -10,6 +10,7 @@ import PresentMulmoScriptDef from "../src/plugins/presentMulmoScript/definition.
 import ManageRolesDef from "../src/plugins/manageRoles/definition.js";
 import WikiDef from "../src/plugins/wiki/definition.js";
 import PresentHtmlDef from "../src/plugins/presentHtml/definition.js";
+import SearchChatHistoryDef from "../src/plugins/searchChatHistory/definition.js";
 import { TOOL_DEFINITION as MarkdownDef } from "@gui-chat-plugin/markdown";
 import { TOOL_DEFINITION as SpreadsheetDef } from "@gui-chat-plugin/spreadsheet";
 import { TOOL_DEFINITION as MindMapDef } from "@gui-chat-plugin/mindmap";
@@ -41,6 +42,7 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [ManageRolesDef.name]: "/api/roles/manage",
   [PresentMulmoScriptDef.name]: "/api/mulmo-script",
   [WikiDef.name]: "/api/wiki",
+  [SearchChatHistoryDef.name]: "/api/chat-history/search",
 };
 
 /** All ToolDefinition objects for package and local plugins. */
@@ -62,6 +64,7 @@ export const PLUGIN_DEFS = [
   MusicDef,
   ManageRolesDef,
   WikiDef,
+  SearchChatHistoryDef,
 ];
 
 /**
