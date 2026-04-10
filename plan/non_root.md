@@ -67,9 +67,9 @@ Root can read/write anything it encounters, so Claude never hits unexpected perm
 ### Non-Root UX (Proposed)
 
 **Pro: Consistent workspace path**
-Mount the workspace at its real host path instead of `/workspace`:
+Mount the workspace at `/home/node/mulmoclaude` (i.e. `~/mulmoclaude` for the `node` user):
 ```ts
-`${toDockerPath(workspacePath)}:${toDockerPath(workspacePath)}`
+`${toDockerPath(workspacePath)}:/home/node/mulmoclaude`,
 ```
 Claude always sees `~/mulmoclaude` regardless of sandbox state. File references, memory, and session context are portable between sandboxed and non-sandboxed runs.
 
@@ -100,7 +100,7 @@ Must change `/root/.claude` → `/home/node/.claude` (or wherever the non-root h
 | Container escape impact | Full host root compromise | Host user-level access only |
 | Linux capabilities | All (unrestricted) | Can drop to near-zero |
 | Workspace file ownership | Owned by root on host (Linux); host user on macOS via virtiofs | Owned by host user with UID mapping (Linux); no change on macOS |
-| Workspace path | `/workspace` in container, `~/mulmoclaude` on host — inconsistent | `~/mulmoclaude` everywhere — consistent |
+| Workspace path | `/workspace` in container, `~/mulmoclaude` on host — inconsistent | `/home/node/mulmoclaude` = `~/mulmoclaude` in container — consistent |
 | `.claude` mount | `/root/.claude` — works trivially | `/home/node/.claude` — requires Dockerfile change |
 | UID mismatch on macOS | Not applicable | Partially mitigated by Docker Desktop's virtiofs |
 | Setup complexity | None | Requires `--user $(id -u):$(id -g)` at runtime |
@@ -110,23 +110,22 @@ Must change `/root/.claude` → `/home/node/.claude` (or wherever the non-root h
 
 ## Recommended Implementation
 
-1. **`Dockerfile.sandbox`** — add `USER node` (UID 1000, already exists in `node:22-slim`). Ensure `/workspace` dir is pre-created with correct ownership:
+1. **`Dockerfile.sandbox`** — add `USER node` and set `WORKDIR` to `~/mulmoclaude` for the `node` user. Dockerfiles do not expand `~`, so use the explicit path:
    ```dockerfile
    FROM node:22-slim
    RUN npm install -g @anthropic-ai/claude-code tsx
-   RUN mkdir -p /workspace && chown node:node /workspace
    USER node
-   WORKDIR /workspace
+   WORKDIR /home/node/mulmoclaude
    ```
 
 2. **`server/agent.ts`** — three changes:
-   - Mount the workspace at its real path instead of `/workspace`:
+   - Mount the workspace at `/home/node/mulmoclaude` instead of `/workspace`:
      ```ts
-     `${toDockerPath(workspacePath)}:${toDockerPath(workspacePath)}`,
+     `${toDockerPath(workspacePath)}:/home/node/mulmoclaude`,
      ```
-   - Update the MCP config arg path (currently hardcoded to `/workspace/...`) to use the real path:
+   - Update the MCP config arg path (currently hardcoded to `/workspace/...`):
      ```ts
-     mcpConfigArgPath = join(mcpConfigDir, `mcp-${sessionId}.json`); // same as host path
+     mcpConfigArgPath = `/home/node/mulmoclaude/.mulmoclaude/mcp-${sessionId}.json`;
      ```
    - Change the `.claude` mount target and add `--user` flag:
      ```ts
@@ -139,6 +138,16 @@ Must change `/root/.claude` → `/home/node/.claude` (or wherever the non-root h
    ```ts
    "--cap-drop", "ALL",
    ```
+
+### Container Mount Layout
+
+| Container path | Source | Access |
+|---|---|---|
+| `/app/node_modules` | `projectRoot/node_modules` | ro |
+| `/app/server` | `projectRoot/server` | ro |
+| `/app/src` | `projectRoot/src` | ro |
+| `/home/node/mulmoclaude` | `workspacePath` | rw |
+| `/home/node/.claude` | `~/.claude` | ro |
 
 4. **Rebuild the sandbox image** — since `Dockerfile.sandbox` changes, `ensureSandboxImage()` will not detect the stale image automatically. Users need to `docker rmi mulmoclaude-sandbox` to force a rebuild, or the build step should check image labels/digests.
 
