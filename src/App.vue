@@ -617,6 +617,7 @@ const sandboxTestQueries = [
   "Run `whoami` and show the result",
   "Run `hostname` and show the result",
   "Try to list files in ~/Library",
+  "Read helps/sandbox.md and explain how the sandbox works",
 ];
 
 const chatListRef = ref<HTMLDivElement | null>(null);
