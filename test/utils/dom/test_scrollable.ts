@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { findScrollableChild } from "../../../src/utils/dom/scrollable.js";
 
@@ -13,6 +13,19 @@ interface MockElement {
   overflow?: string;
 }
 
+// Saved before the first stub so each test's afterEach can put the
+// real implementation (or undefined) back. Without this the stub
+// would leak into any subsequent test file run in the same process.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let originalGetComputedStyle: any =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).getComputedStyle;
+
+afterEach(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).getComputedStyle = originalGetComputedStyle;
+});
+
 function fakeContainer(children: MockElement[]): HTMLElement {
   const elements = children.map(
     (c) =>
@@ -24,7 +37,8 @@ function fakeContainer(children: MockElement[]): HTMLElement {
   );
 
   // Stub getComputedStyle on globalThis so the function under test
-  // sees the overflow we configured per fake child.
+  // sees the overflow we configured per fake child. The afterEach
+  // hook above restores the original implementation.
   const styles = new Map<unknown, { overflow: string; overflowY: string }>();
   children.forEach((c, i) => {
     styles.set(elements[i], {

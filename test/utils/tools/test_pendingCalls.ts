@@ -4,7 +4,7 @@ import {
   isCallStillPending,
   PENDING_MIN_MS,
 } from "../../../src/utils/tools/pendingCalls.js";
-import type { ToolCallHistoryItem } from "../../../src/components/RightSidebar.vue";
+import type { ToolCallHistoryItem } from "../../../src/types/toolCallHistory";
 
 function call(over: Partial<ToolCallHistoryItem>): ToolCallHistoryItem {
   return {

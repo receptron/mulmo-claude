@@ -2,7 +2,7 @@
 // returned by the server's session routes.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { ToolCallHistoryItem } from "../components/RightSidebar.vue";
+import type { ToolCallHistoryItem } from "./toolCallHistory";
 
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
 // are populated by the chat indexer (PR #94) when present.

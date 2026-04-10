@@ -6,7 +6,7 @@
 // so the computed clears the lingering rows.
 
 import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
-import type { ToolCallHistoryItem } from "../components/RightSidebar.vue";
+import type { ToolCallHistoryItem } from "../types/toolCallHistory";
 import {
   isCallStillPending,
   PENDING_MIN_MS,
@@ -22,6 +22,9 @@ interface UsePendingCallsOptions {
 export function usePendingCalls(opts: UsePendingCallsOptions) {
   const displayTick = ref(0);
   let tickInterval: ReturnType<typeof setInterval> | null = null;
+  // Tracked so teardown can cancel the lingering "final tick" and we
+  // never mutate displayTick after the composable's owner unmounts.
+  let delayedTickTimeout: ReturnType<typeof setTimeout> | null = null;
 
   watch(opts.isRunning, (running) => {
     if (running) {
@@ -32,9 +35,12 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
       clearInterval(tickInterval);
       tickInterval = null;
       // One final tick so the computed clears after the minimum
-      // duration has elapsed.
-      setTimeout(() => {
+      // duration has elapsed. Cancel any previous pending one first
+      // so back-to-back start/stop runs do not stack timeouts.
+      if (delayedTickTimeout !== null) clearTimeout(delayedTickTimeout);
+      delayedTickTimeout = setTimeout(() => {
         displayTick.value++;
+        delayedTickTimeout = null;
       }, PENDING_MIN_MS);
     }
   });
@@ -56,6 +62,10 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
     if (tickInterval !== null) {
       clearInterval(tickInterval);
       tickInterval = null;
+    }
+    if (delayedTickTimeout !== null) {
+      clearTimeout(delayedTickTimeout);
+      delayedTickTimeout = null;
     }
   }
 

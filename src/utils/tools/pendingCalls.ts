@@ -3,7 +3,7 @@
 // Vue reactive scope. The composable in src/composables/usePendingCalls
 // pairs this with the timing / interval bookkeeping.
 
-import type { ToolCallHistoryItem } from "../../components/RightSidebar.vue";
+import type { ToolCallHistoryItem } from "../../types/toolCallHistory";
 
 // A freshly-resolved call is held visible for this many milliseconds
 // after its result lands, so the spinner / loading row does not flash

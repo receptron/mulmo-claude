@@ -463,7 +463,7 @@ import { SYSTEM_PROMPT } from "./config/system-prompt";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
-import type { ToolCallHistoryItem } from "./components/RightSidebar.vue";
+import type { ToolCallHistoryItem } from "./types/toolCallHistory";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
