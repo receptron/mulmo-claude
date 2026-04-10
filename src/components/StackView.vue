@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onUnmounted } from "vue";
+import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { getPlugin } from "../tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
@@ -92,6 +92,11 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 // height is required for them to render. text-response and the
 // "stack-natural" plugins below are special-cased.
 const PLUGIN_HEIGHT = "min(60vh, 560px)";
+
+// How long to ignore scroll-spy after a programmatic scroll (sidebar
+// click, auto-scroll on new result). Keeps the spy from emitting a
+// stale uuid while the scroll is still settling.
+const SCROLL_SPY_SUPPRESS_MS = 150;
 
 // Plugins that look better flowing at natural height in stack view
 // rather than being clipped to PLUGIN_HEIGHT with an inner scrollbar.
@@ -193,15 +198,82 @@ function iconFor(toolName: string): string {
   return "extension";
 }
 
+// Scroll-spy state: as the user scrolls the stack container we emit
+// a `select` for whichever card currently occupies the top, so the
+// sidebar selection always tracks what's on screen.
+//
+// Two flags coordinate the feedback loop:
+//   - `suppressScrollSync` is set while the component programmatically
+//     scrolls (sidebar click → scrollIntoView, auto-scroll on new
+//     result) so the spy doesn't fire on its own scroll.
+//   - `selectionFromScrollSpy` is set right before the spy emits a
+//     `select`, so the watch on `selectedResultUuid` knows the change
+//     came from the user scrolling and skips the scrollIntoView (which
+//     would otherwise jerk the view to the start of the next card).
+let suppressScrollSync = false;
+let suppressScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+let scrollSpyRafId: number | null = null;
+let selectionFromScrollSpy = false;
+
+function beginSuppressScrollSync(): void {
+  suppressScrollSync = true;
+  if (suppressScrollTimeout !== null) clearTimeout(suppressScrollTimeout);
+  suppressScrollTimeout = setTimeout(() => {
+    suppressScrollSync = false;
+    suppressScrollTimeout = null;
+  }, SCROLL_SPY_SUPPRESS_MS);
+}
+
+// Walk items in order and return the last one whose top edge is at or
+// above the container's visible top. Iterating in DOM order lets us
+// break early once an item is below the line.
+function computeActiveUuidFromScroll(): string | null {
+  if (!containerRef.value) return null;
+  const containerTop = containerRef.value.getBoundingClientRect().top;
+  let activeUuid: string | null = null;
+  for (const result of props.toolResults) {
+    const el = itemRefs.get(result.uuid);
+    if (!el) continue;
+    if (el.getBoundingClientRect().top <= containerTop) {
+      activeUuid = result.uuid;
+    } else {
+      break;
+    }
+  }
+  return activeUuid;
+}
+
+function onContainerScroll(): void {
+  if (suppressScrollSync) return;
+  if (scrollSpyRafId !== null) return;
+  scrollSpyRafId = requestAnimationFrame(() => {
+    scrollSpyRafId = null;
+    if (suppressScrollSync) return;
+    const activeUuid = computeActiveUuidFromScroll();
+    if (activeUuid && activeUuid !== props.selectedResultUuid) {
+      selectionFromScrollSpy = true;
+      emit("select", activeUuid);
+    }
+  });
+}
+
+// Scroll the selected card to the top whenever the external selection
+// changes (sidebar click, initial load). Skip the scroll when the
+// change was initiated by the spy itself — the viewport is already in
+// the right place, and scrolling again would jerk to the next card.
 watch(
   () => props.selectedResultUuid,
   (uuid) => {
     if (!uuid) return;
+    if (selectionFromScrollSpy) {
+      selectionFromScrollSpy = false;
+      return;
+    }
     nextTick(() => {
       const el = itemRefs.get(uuid);
-      if (el) {
-        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
+      if (!el) return;
+      beginSuppressScrollSync();
+      el.scrollIntoView({ block: "start", behavior: "auto" });
     });
   },
 );
@@ -211,6 +283,7 @@ watch(
   () => {
     nextTick(() => {
       if (containerRef.value) {
+        beginSuppressScrollSync();
         containerRef.value.scrollTop = containerRef.value.scrollHeight;
       }
       // New items may have brought in more iframes to size.
@@ -221,7 +294,25 @@ watch(
   },
 );
 
+onMounted(() => {
+  containerRef.value?.addEventListener("scroll", onContainerScroll, {
+    passive: true,
+  });
+  // Align the initial scroll position with the externally selected
+  // item so the sidebar and stack start in sync on mount.
+  nextTick(() => {
+    if (!props.selectedResultUuid) return;
+    const el = itemRefs.get(props.selectedResultUuid);
+    if (!el) return;
+    beginSuppressScrollSync();
+    el.scrollIntoView({ block: "start", behavior: "auto" });
+  });
+});
+
 onUnmounted(() => {
+  containerRef.value?.removeEventListener("scroll", onContainerScroll);
+  if (scrollSpyRafId !== null) cancelAnimationFrame(scrollSpyRafId);
+  if (suppressScrollTimeout !== null) clearTimeout(suppressScrollTimeout);
   naturalWrapperRefs.clear();
 });
 </script>
