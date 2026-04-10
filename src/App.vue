@@ -470,106 +470,14 @@ import CanvasViewToggle, {
 } from "./components/CanvasViewToggle.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
-
-interface SessionSummary {
-  id: string;
-  roleId: string;
-  startedAt: string;
-  preview: string;
-}
-
-interface SessionEntry {
-  type?: string;
-  source?: string;
-  roleId?: string;
-  message?: string;
-  result?: ToolResultComplete;
-}
-
-interface TextEntry extends SessionEntry {
-  source: "user" | "assistant";
-  type: "text";
-  message: string;
-}
-
-interface ToolResultEntry extends SessionEntry {
-  source: "tool";
-  type: "tool_result";
-  result: ToolResultComplete;
-}
-
-const isTextEntry = (e: SessionEntry): e is TextEntry =>
-  (e.source === "user" || e.source === "assistant") &&
-  e.type === "text" &&
-  typeof e.message === "string";
-
-const isToolResultEntry = (e: SessionEntry): e is ToolResultEntry =>
-  e.source === "tool" && e.type === "tool_result" && e.result !== undefined;
-
-interface SseToolCall {
-  type: "tool_call";
-  toolUseId: string;
-  toolName: string;
-  args: unknown;
-}
-
-interface SseToolCallResult {
-  type: "tool_call_result";
-  toolUseId: string;
-  content: string;
-}
-
-interface SseStatus {
-  type: "status";
-  message: string;
-}
-
-interface SseSwitchRole {
-  type: "switch_role";
-  roleId: string;
-}
-
-interface SseText {
-  type: "text";
-  message: string;
-}
-
-interface SseToolResult {
-  type: "tool_result";
-  result: ToolResultComplete;
-}
-
-interface SseRolesUpdated {
-  type: "roles_updated";
-}
-
-interface SseError {
-  type: "error";
-  message: string;
-}
-
-type SseEvent =
-  | SseToolCall
-  | SseToolCallResult
-  | SseStatus
-  | SseSwitchRole
-  | SseText
-  | SseToolResult
-  | SseRolesUpdated
-  | SseError;
-
-interface ActiveSession {
-  id: string;
-  roleId: string;
-  toolResults: ToolResultComplete[];
-  isRunning: boolean;
-  statusMessage: string;
-  toolCallHistory: ToolCallHistoryItem[];
-  selectedResultUuid: string | null;
-  hasUnread: boolean;
-  abortController: AbortController;
-  startedAt: string;
-}
+import type { SseEvent } from "./types/sse";
+import {
+  type SessionSummary,
+  type SessionEntry,
+  type ActiveSession,
+  isTextEntry,
+  isToolResultEntry,
+} from "./types/session";
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
