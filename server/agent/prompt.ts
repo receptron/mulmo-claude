@@ -76,6 +76,7 @@ export interface SystemPromptParams {
   role: Role;
   workspacePath: string;
   pluginPrompts?: Record<string, string>;
+  systemPrompt?: string;
 }
 
 function buildInlinedHelpFiles(
@@ -95,7 +96,7 @@ function buildInlinedHelpFiles(
 }
 
 export function buildSystemPrompt(params: SystemPromptParams): string {
-  const { role, workspacePath, pluginPrompts } = params;
+  const { role, workspacePath, pluginPrompts, systemPrompt } = params;
 
   const memoryContext = buildMemoryContext(workspacePath);
   const wikiContext = buildWikiContext(workspacePath);
@@ -103,6 +104,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
   const helpSections = buildInlinedHelpFiles(role.prompt, workspacePath);
 
   return [
+    ...(systemPrompt ? [systemPrompt] : []),
     role.prompt,
     `Workspace directory: ${workspacePath}`,
     `Today's date: ${new Date().toISOString().split("T")[0]}`,

@@ -460,6 +460,7 @@ import {
 } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import { ROLES, type Role } from "./config/roles";
+import { SYSTEM_PROMPT } from "./config/system-prompt";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
@@ -616,6 +617,7 @@ const sandboxTestQueries = [
   "Run `whoami` and show the result",
   "Run `hostname` and show the result",
   "Try to list files in ~/Library",
+  "Read helps/sandbox.md and explain how the sandbox works",
 ];
 
 const chatListRef = ref<HTMLDivElement | null>(null);
@@ -1137,6 +1139,7 @@ async function sendMessage(text?: string) {
         roleId: session.roleId,
         chatSessionId: session.id,
         selectedImageData: extractImageData(selectedRes),
+        systemPrompt: SYSTEM_PROMPT,
         pluginPrompts: Object.fromEntries(
           sessionRole.availablePlugins
             .map((name) => [name, getPlugin(name)?.systemPrompt])

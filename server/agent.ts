@@ -25,16 +25,18 @@ export async function* runAgent(
   port: number,
   claudeSessionId?: string,
   pluginPrompts?: Record<string, string>,
+  systemPrompt?: string,
 ): AsyncGenerator<AgentEvent> {
   const activePlugins = getActivePlugins(role);
   const hasMcp = activePlugins.length > 0;
   const useDocker = await isDockerAvailable();
 
   const containerWorkspacePath = "/home/node/mulmoclaude";
-  const systemPrompt = buildSystemPrompt({
+  const fullSystemPrompt = buildSystemPrompt({
     role,
     workspacePath: useDocker ? containerWorkspacePath : workspacePath,
     pluginPrompts,
+    systemPrompt,
   });
 
   // Compute MCP config paths — host path for writing/cleanup,
@@ -63,7 +65,7 @@ export async function* runAgent(
   }
 
   const args = buildCliArgs({
-    systemPrompt,
+    systemPrompt: fullSystemPrompt,
     activePlugins,
     claudeSessionId,
     message,
