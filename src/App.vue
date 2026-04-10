@@ -794,8 +794,6 @@ async function loadSession(id: string) {
   const meta = entries.find((e) => e.type === "session_meta");
   if (meta?.roleId) currentRoleId.value = meta.roleId;
   chatSessionId.value = id;
-  localStorage.setItem("lastSessionId", id);
-
   toolResults.value = [];
   for (const entry of entries) {
     if (entry.type === "session_meta") continue;
@@ -827,7 +825,6 @@ async function sendMessage(text?: string) {
 
   toolResults.value.push(makeTextResult(message, "user"));
   const runStartIndex = toolResults.value.length;
-  localStorage.setItem("lastSessionId", chatSessionId.value);
 
   try {
     const response = await fetch("/api/agent", {
@@ -962,14 +959,6 @@ onMounted(async () => {
   window.addEventListener("mousedown", handleClickOutsideHistory);
   window.addEventListener("mousedown", handleClickOutsideLock);
   window.addEventListener("keydown", handleViewModeShortcut);
-
-  const allSessions = await fetchSessions();
-  const lastSessionId = localStorage.getItem("lastSessionId");
-  const targetSession =
-    allSessions.find((s) => s.id === lastSessionId) ?? allSessions[0];
-  if (targetSession) {
-    await loadSession(targetSession.id);
-  }
 });
 
 onUnmounted(() => {
