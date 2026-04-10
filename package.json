@@ -25,7 +25,7 @@
     "tar": "7.5.13"
   },
   "dependencies": {
-    "@google/genai": "^1.47.0",
+    "@google/genai": "^1.49.0",
     "@gui-chat-plugin/browse": "^0.1.1",
     "@gui-chat-plugin/camera": "^0.3.0",
     "@gui-chat-plugin/canvas": "0.3.4",
@@ -62,7 +62,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.5.2",
+    "@types/node": "^25.6.0",
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "concurrently": "^9.2.1",
@@ -72,7 +72,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-sonarjs": "^4.0.2",
     "globals": "^17.4.0",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.2",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
