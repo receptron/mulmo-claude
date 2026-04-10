@@ -23,11 +23,13 @@ import {
 } from "./mcp-tools/index.js";
 import { initWorkspace } from "./workspace.js";
 import { isDockerAvailable, ensureSandboxImage } from "./docker.js";
+import { startChatIndexer } from "./chat-index/scheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 initWorkspace();
+startChatIndexer();
 
 let sandboxEnabled = false;
 
