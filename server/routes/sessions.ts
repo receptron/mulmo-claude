@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../workspace.js";
+import { readManifest } from "../chat-index/indexer.js";
+import type { ChatIndexEntry } from "../chat-index/types.js";
 
 async function readSessionMeta(
   chatDir: string,
@@ -41,6 +43,11 @@ interface SessionSummary {
   roleId: string;
   startedAt: string;
   preview: string;
+  // Set when the chat indexer has summarised this session, so the
+  // frontend can show a richer second-line description in the
+  // history pane.
+  summary?: string;
+  keywords?: string[];
 }
 
 const router = Router();
@@ -49,6 +56,13 @@ router.get(
   "/sessions",
   async (_req: Request, res: Response<SessionSummary[]>) => {
     const chatDir = path.join(workspacePath, "chat");
+    // Load the chat index manifest once and look up entries by id.
+    // Sessions that haven't been indexed yet fall back to the legacy
+    // first-user-message preview.
+    const manifest = await readManifest();
+    const indexById = new Map<string, ChatIndexEntry>(
+      manifest.entries.map((e) => [e.id, e]),
+    );
     try {
       const files = (await readdir(chatDir)).filter((f) =>
         f.endsWith(".jsonl"),
@@ -60,6 +74,7 @@ router.get(
             try {
               const meta = await readSessionMeta(chatDir, id);
               if (!meta) return null;
+              const indexEntry = indexById.get(id);
               const content = await readFile(path.join(chatDir, file), "utf-8");
               const firstUserLine: SessionEntry | undefined = content
                 .split("\n")
@@ -76,7 +91,13 @@ router.get(
                 id,
                 roleId: meta.roleId,
                 startedAt: meta.startedAt,
-                preview: firstUserLine?.message ?? "",
+                preview: indexEntry?.title ?? firstUserLine?.message ?? "",
+                ...(indexEntry?.summary !== undefined && {
+                  summary: indexEntry.summary,
+                }),
+                ...(indexEntry?.keywords !== undefined && {
+                  keywords: indexEntry.keywords,
+                }),
               };
             } catch {
               return null;

@@ -182,6 +182,12 @@
             >
               {{ session.preview || "(no messages)" }}
             </p>
+            <p
+              v-if="session.summary"
+              class="text-xs text-gray-500 truncate mt-0.5"
+            >
+              {{ session.summary }}
+            </p>
           </div>
         </div>
       </div>
@@ -420,6 +426,10 @@ interface SessionSummary {
   roleId: string;
   startedAt: string;
   preview: string;
+  // Populated by the chat indexer (server-side). Shown as a smaller
+  // second line in the history popup when present.
+  summary?: string;
+  keywords?: string[];
 }
 
 interface SessionEntry {
