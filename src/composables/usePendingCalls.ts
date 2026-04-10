@@ -26,24 +26,35 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
   // never mutate displayTick after the composable's owner unmounts.
   let delayedTickTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  watch(opts.isRunning, (running) => {
-    if (running) {
-      tickInterval = setInterval(() => {
-        displayTick.value++;
-      }, 50);
-    } else if (tickInterval !== null) {
-      clearInterval(tickInterval);
-      tickInterval = null;
-      // One final tick so the computed clears after the minimum
-      // duration has elapsed. Cancel any previous pending one first
-      // so back-to-back start/stop runs do not stack timeouts.
-      if (delayedTickTimeout !== null) clearTimeout(delayedTickTimeout);
-      delayedTickTimeout = setTimeout(() => {
-        displayTick.value++;
-        delayedTickTimeout = null;
-      }, PENDING_MIN_MS);
-    }
-  });
+  watch(
+    opts.isRunning,
+    (running) => {
+      if (running) {
+        // Guard against double-start: if the watcher fires twice with
+        // running=true (e.g. immediate + a synchronous flip), don't
+        // stack a second interval.
+        if (tickInterval !== null) return;
+        tickInterval = setInterval(() => {
+          displayTick.value++;
+        }, 50);
+      } else if (tickInterval !== null) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+        // One final tick so the computed clears after the minimum
+        // duration has elapsed. Cancel any previous pending one first
+        // so back-to-back start/stop runs do not stack timeouts.
+        if (delayedTickTimeout !== null) clearTimeout(delayedTickTimeout);
+        delayedTickTimeout = setTimeout(() => {
+          displayTick.value++;
+          delayedTickTimeout = null;
+        }, PENDING_MIN_MS);
+      }
+    },
+    // immediate so a composable created while a run is already in
+    // flight (e.g. mounted mid-stream) starts ticking right away
+    // instead of waiting for the next isRunning flip.
+    { immediate: true },
+  );
 
   const pendingCalls = computed(() => {
     // Read displayTick to register the computed as a reactive

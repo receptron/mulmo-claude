@@ -2,7 +2,7 @@
 // owns the reactive ref, persists to localStorage, hooks the
 // "refresh files tree after each agent run" side effect, and
 // exposes the Cmd/Ctrl+1/2/3 keydown handler. The pure parsing
-// helpers live in src/utils/canvasViewMode.ts so the rules are
+// helpers live in src/utils/canvas/viewMode.ts so the rules are
 // unit-testable.
 
 import { ref, watch, type ComputedRef, type Ref } from "vue";

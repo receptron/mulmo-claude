@@ -43,10 +43,34 @@ describe("roleIcon", () => {
 
   it("accepts only lowercase letters and underscores as valid icons", () => {
     const r: Role[] = [
-      { id: "a", name: "", icon: "valid_name", prompt: "", availablePlugins: [] },
-      { id: "b", name: "", icon: "Has_Caps", prompt: "", availablePlugins: [] },
-      { id: "c", name: "", icon: "with-dash", prompt: "", availablePlugins: [] },
-      { id: "d", name: "", icon: "123", prompt: "", availablePlugins: [] },
+      {
+        id: "a",
+        name: "",
+        icon: "valid_name",
+        prompt: "",
+        availablePlugins: [],
+      },
+      {
+        id: "b",
+        name: "",
+        icon: "Has_Caps",
+        prompt: "",
+        availablePlugins: [],
+      },
+      {
+        id: "c",
+        name: "",
+        icon: "with-dash",
+        prompt: "",
+        availablePlugins: [],
+      },
+      {
+        id: "d",
+        name: "",
+        icon: "123",
+        prompt: "",
+        availablePlugins: [],
+      },
     ];
     assert.equal(roleIcon(r, "a"), "valid_name");
     assert.equal(roleIcon(r, "b"), "smart_toy");

@@ -14,11 +14,18 @@ describe("formatDate", () => {
     assert.match(out, /\d/);
   });
 
-  it("returns 'Invalid Date' for an unparseable input but does not throw", () => {
-    // Locale-aware formatting of an invalid date returns the literal
-    // 'Invalid Date' on every platform tested. The important thing is
-    // that the function does not throw.
+  it("does not throw for an unparseable input", () => {
+    // Locale-aware formatting of an invalid Date never throws — it
+    // returns a placeholder string ("Invalid Date" / "Invalid Date
+    // Invalid Date" depending on locale). We only assert the safety
+    // contract: the function must not bubble an exception up to the
+    // UI render path.
     assert.doesNotThrow(() => formatDate("not a date"));
+    // And it returns a non-empty placeholder string of some kind.
+    const out = formatDate("not a date");
+    assert.equal(typeof out, "string");
+    assert.ok(out.length > 0);
+    assert.match(out, /Invalid Date/);
   });
 
   it("differs across days at the same time", () => {

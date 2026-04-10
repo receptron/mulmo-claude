@@ -31,7 +31,7 @@ describe("isClickOutside", () => {
   const buttonWithChild = fakeEl("button", [buttonChild]);
   const popupWithChild = fakeEl("popup", [popupChild]);
 
-  it("returns true when target is null", () => {
+  it("returns false when target is null", () => {
     assert.equal(isClickOutside(null, button, popup), false);
   });
 

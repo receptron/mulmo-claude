@@ -69,7 +69,10 @@ describe("extractImageData", () => {
   });
 
   it("returns undefined when imageData is missing", () => {
-    assert.equal(extractImageData(makeResult({ data: { foo: "bar" } })), undefined);
+    assert.equal(
+      extractImageData(makeResult({ data: { foo: "bar" } })),
+      undefined,
+    );
   });
 
   it("returns undefined when imageData is not a string", () => {

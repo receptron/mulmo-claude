@@ -23,10 +23,18 @@ export function useRoles(): {
   async function refreshRoles(): Promise<void> {
     try {
       const res = await fetch("/api/roles");
+      if (!res.ok) {
+        throw new Error(
+          `GET /api/roles failed: ${res.status} ${res.statusText}`,
+        );
+      }
       const customRoles: Role[] = await res.json();
       roles.value = mergeRoles(ROLES, customRoles);
-    } catch {
-      // keep current roles on error
+    } catch (err) {
+      // Keep the current role list on failure — losing custom roles
+      // is preferable to crashing the UI on a transient API hiccup.
+      // eslint-disable-next-line no-console
+      console.warn("[useRoles] refreshRoles failed:", err);
     }
   }
 

@@ -17,7 +17,7 @@ interface MockElement {
 // real implementation (or undefined) back. Without this the stub
 // would leak into any subsequent test file run in the same process.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let originalGetComputedStyle: any =
+const originalGetComputedStyle: any =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).getComputedStyle;
 
@@ -26,7 +26,7 @@ afterEach(() => {
   (globalThis as any).getComputedStyle = originalGetComputedStyle;
 });
 
-function fakeContainer(children: MockElement[]): HTMLElement {
+function fakeContainer(children: MockElement[]) {
   const elements = children.map(
     (c) =>
       ({
