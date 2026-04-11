@@ -138,7 +138,6 @@ export async function readState(workspaceRoot: string): Promise<JournalState> {
     // Corrupted JSON or any other read error — fall back to defaults
     // and log a warning. Better to rebuild from scratch than to
     // crash the journal module.
-    // eslint-disable-next-line no-console
     console.warn(`[journal] state file unreadable, using defaults:`, err);
     return defaultState();
   }

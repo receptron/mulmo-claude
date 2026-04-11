@@ -1,4 +1,4 @@
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer, WebSocket, type RawData } from "ws";
 import http from "http";
 
 export interface IPubSub {
@@ -11,13 +11,13 @@ export function createPubSub(server: http.Server): IPubSub {
   const wss = new WebSocketServer({ server, path: "/ws/pubsub" });
   const subscriptions = new Map<WebSocket, Set<string>>();
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws: WebSocket) => {
     subscriptions.set(ws, new Set());
 
-    ws.on("message", (raw) => {
+    ws.on("message", (raw: RawData) => {
       try {
         const msg: { action?: string; channel?: string } = JSON.parse(
-          String(raw),
+          raw.toString(),
         );
         if (!msg.channel || typeof msg.channel !== "string") return;
         const channels = subscriptions.get(ws)!;

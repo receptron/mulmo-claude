@@ -3,6 +3,52 @@ import { join } from "path";
 import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "../mcp-tools/index.js";
 
+// Prepend a pointer to the auto-generated workspace journal to the
+// first-turn user message of a new session. The pointer tells the
+// LLM where to find past daily/topic summaries so it can Read them
+// opportunistically if the user's question would benefit from
+// historical context.
+//
+// Deliberately NOT in the system prompt because the journal grows
+// over time (new topic and daily files accrete) and bloating every
+// session's baseline context is wasteful. Memory.md and the wiki
+// hint live in the system prompt because they're ambient facts;
+// the journal is history and opt-in.
+//
+// The caller is responsible for deciding whether it's the first
+// turn (i.e. no `claudeSessionId` yet). On follow-up turns the
+// pointer is already present in Claude's resumed context.
+//
+// Returns the original message unchanged if the workspace has no
+// journal yet (`summaries/_index.md` missing). This keeps the
+// helper a no-op on fresh workspaces and doesn't disturb any
+// existing behaviour.
+export function prependJournalPointer(
+  message: string,
+  workspacePath: string,
+): string {
+  const indexPath = join(workspacePath, "summaries", "_index.md");
+  if (!existsSync(indexPath)) return message;
+
+  const pointer = [
+    "<journal-context>",
+    "This workspace maintains an auto-generated journal of past",
+    "sessions under `summaries/`:",
+    "- `summaries/_index.md` — browseable index of topics and recent days",
+    "- `summaries/topics/<slug>.md` — long-running topic notes",
+    "- `summaries/daily/YYYY/MM/DD.md` — per-day summaries",
+    "",
+    "If the user's question may benefit from prior context, read",
+    "`summaries/_index.md` first with the Read tool, then drill into",
+    "relevant topic or daily files. Skip this when the question is",
+    "self-contained.",
+    "</journal-context>",
+    "",
+    message,
+  ].join("\n");
+  return pointer;
+}
+
 export function buildMemoryContext(workspacePath: string): string {
   const memoryPath = join(workspacePath, "memory.md");
   const parts: string[] = [];

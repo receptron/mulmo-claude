@@ -7,10 +7,25 @@
     <div
       v-for="item in preview"
       :key="item.id"
-      class="text-xs truncate"
+      class="text-xs truncate flex items-center gap-1"
       :class="item.completed ? 'line-through text-gray-400' : 'text-gray-600'"
     >
-      {{ item.completed ? "✓" : "○" }} {{ item.text }}
+      <span class="shrink-0">{{ item.completed ? "✓" : "○" }}</span>
+      <span class="truncate">{{ item.text }}</span>
+      <template v-if="(item.labels?.length ?? 0) > 0">
+        <span
+          v-for="label in (item.labels ?? []).slice(0, 2)"
+          :key="label"
+          class="px-1 rounded-full text-[9px] font-medium shrink-0"
+          :class="colorForLabel(label)"
+          >{{ label }}</span
+        >
+        <span
+          v-if="(item.labels?.length ?? 0) > 2"
+          class="text-[9px] text-gray-400 shrink-0"
+          >+{{ (item.labels?.length ?? 0) - 2 }}</span
+        >
+      </template>
     </div>
     <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
   </div>
@@ -21,6 +36,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { colorForLabel } from "./labels";
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 

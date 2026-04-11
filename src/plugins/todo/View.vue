@@ -9,6 +9,36 @@
       >
     </div>
 
+    <!-- Filter bar: only shown when at least one label is in use. -->
+    <div
+      v-if="labelInventory.length > 0"
+      class="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-gray-100 bg-gray-50"
+    >
+      <span class="text-xs text-gray-500 mr-1">Filter:</span>
+      <button
+        v-for="entry in labelInventory"
+        :key="entry.label"
+        class="px-2 py-0.5 rounded-full text-xs font-medium transition-all"
+        :class="
+          activeFilters.has(entry.label.toLowerCase())
+            ? 'ring-2 ring-blue-400 ' + colorForLabel(entry.label)
+            : colorForLabel(entry.label) + ' opacity-70 hover:opacity-100'
+        "
+        @click="toggleFilter(entry.label)"
+      >
+        {{ entry.label }}
+        <span class="opacity-60">{{ entry.count }}</span>
+      </button>
+      <button
+        v-if="activeFilters.size > 0"
+        class="ml-auto text-xs text-gray-500 hover:text-gray-700"
+        title="Clear all filters"
+        @click="clearFilters"
+      >
+        Clear ✕
+      </button>
+    </div>
+
     <div
       v-if="items.length === 0"
       class="flex-1 flex items-center justify-center text-gray-400"
@@ -16,9 +46,16 @@
       No todo items yet
     </div>
 
+    <div
+      v-else-if="filteredItems.length === 0"
+      class="flex-1 flex items-center justify-center text-gray-400 text-sm"
+    >
+      No items match the active filter
+    </div>
+
     <ul v-else class="flex-1 overflow-y-auto p-4 space-y-2">
       <li
-        v-for="item in items"
+        v-for="item in filteredItems"
         :key="item.id"
         class="rounded-lg border"
         :class="selectedId === item.id ? 'border-blue-400' : 'border-gray-200'"
@@ -37,13 +74,24 @@
             @change="toggle(item)"
           />
           <div class="flex-1 min-w-0">
-            <span
-              class="text-sm"
-              :class="
-                item.completed ? 'line-through text-gray-400' : 'text-gray-800'
-              "
-              >{{ item.text }}</span
-            >
+            <div class="flex items-center gap-2 flex-wrap">
+              <span
+                class="text-sm"
+                :class="
+                  item.completed
+                    ? 'line-through text-gray-400'
+                    : 'text-gray-800'
+                "
+                >{{ item.text }}</span
+              >
+              <span
+                v-for="label in item.labels ?? []"
+                :key="label"
+                class="px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0"
+                :class="colorForLabel(label)"
+                >{{ label }}</span
+              >
+            </div>
             <div v-if="item.note" class="text-xs text-gray-400 mt-0.5">
               {{ item.note }}
             </div>
@@ -109,6 +157,12 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import {
+  colorForLabel,
+  filterByLabels,
+  listLabelsWithCount,
+  subtractLabels,
+} from "./labels";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TodoData>;
@@ -145,6 +199,35 @@ const completedCount = computed(
 );
 const hasCompleted = computed(() => items.value.some((i) => i.completed));
 
+// ── Label filter state ──────────────────────────────────────────────────────
+// Filters are local to this View instance — intentional, so that
+// switching sessions or reopening a tool result doesn't drag state
+// across contexts. Active filters are stored lowercased to match
+// `filterByLabels`' case-insensitive semantics.
+
+const activeFilters = ref<Set<string>>(new Set());
+
+const labelInventory = computed(() => listLabelsWithCount(items.value));
+
+const filteredItems = computed(() =>
+  filterByLabels(items.value, [...activeFilters.value]),
+);
+
+function toggleFilter(label: string): void {
+  const key = label.toLowerCase();
+  const next = new Set(activeFilters.value);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  activeFilters.value = next;
+}
+
+function clearFilters(): void {
+  activeFilters.value = new Set();
+}
+
 // ── YAML helpers ─────────────────────────────────────────────────────────────
 
 function yamlStringValue(v: string): string {
@@ -161,10 +244,49 @@ function yamlStringValue(v: string): string {
 }
 
 function serializeYaml(item: TodoItem): string {
+  const labels = item.labels ?? [];
+  const labelsLine =
+    labels.length > 0
+      ? `labels: [${labels.map(yamlStringValue).join(", ")}]`
+      : "labels: []";
   return [
     `text: ${yamlStringValue(item.text)}`,
     `note: ${item.note ? yamlStringValue(item.note) : ""}`,
+    labelsLine,
   ].join("\n");
+}
+
+// Parse a YAML flow sequence `[a, "b", c]` into an array of strings.
+// Handles quoted and unquoted entries. Whitespace-only input → empty.
+function parseFlowSequence(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "[]") return [];
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return [];
+  const inner = trimmed.slice(1, -1);
+  // Split on commas that are NOT inside double quotes. Cheap scan;
+  // fine for our label use case where items don't contain commas
+  // (stored labels are normalised strings without commas).
+  const result: string[] = [];
+  let buffer = "";
+  let inQuotes = false;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch === '"' && inner[i - 1] !== "\\") {
+      inQuotes = !inQuotes;
+      buffer += ch;
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      const piece = parseYamlValue(buffer.trim());
+      if (piece) result.push(piece);
+      buffer = "";
+      continue;
+    }
+    buffer += ch;
+  }
+  const last = parseYamlValue(buffer.trim());
+  if (last) result.push(last);
+  return result;
 }
 
 function parseYamlValue(raw: string): string {
@@ -177,7 +299,9 @@ function parseYamlValue(raw: string): string {
   return raw;
 }
 
-function parseYaml(text: string): { text: string; note: string } | null {
+function parseYaml(
+  text: string,
+): { text: string; note: string; labels: string[] } | null {
   const result: Record<string, string> = {};
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
@@ -189,18 +313,31 @@ function parseYaml(text: string): { text: string; note: string } | null {
       if (colonEnd !== -1) result[line.slice(0, colonEnd).trim()] = "";
       continue;
     }
-    result[line.slice(0, colonIdx).trim()] = parseYamlValue(
-      line.slice(colonIdx + 2).trim(),
-    );
+    // `labels:` is a flow sequence (`[a, b]`) — parse it as a list
+    // instead of running it through `parseYamlValue` which strips
+    // brackets as if they were quotes.
+    const key = line.slice(0, colonIdx).trim();
+    const raw = line.slice(colonIdx + 2).trim();
+    if (key === "labels") {
+      result[key] = raw;
+      continue;
+    }
+    result[key] = parseYamlValue(raw);
   }
   if (typeof result["text"] !== "string" || !result["text"]) return null;
-  return { text: result["text"], note: result["note"] ?? "" };
+  const labels = parseFlowSequence(result["labels"] ?? "[]");
+  return {
+    text: result["text"],
+    note: result["note"] ?? "",
+    labels,
+  };
 }
 
 // ── Item selection & YAML edit ────────────────────────────────────────────────
 
 const selectedId = ref<string | null>(null);
 const selectedOriginalText = ref<string>("");
+const selectedOriginalLabels = ref<string[]>([]);
 const yamlText = ref("");
 const yamlError = ref("");
 
@@ -211,6 +348,7 @@ function selectItem(item: TodoItem) {
   }
   selectedId.value = item.id;
   selectedOriginalText.value = item.text;
+  selectedOriginalLabels.value = [...(item.labels ?? [])];
   yamlText.value = serializeYaml(item);
   yamlError.value = "";
 }
@@ -221,6 +359,7 @@ watch(items, () => {
     if (item) {
       yamlText.value = serializeYaml(item);
       selectedOriginalText.value = item.text;
+      selectedOriginalLabels.value = [...(item.labels ?? [])];
     } else {
       selectedId.value = null;
     }
@@ -234,13 +373,38 @@ async function applyItemEdit() {
     yamlError.value = "Could not parse YAML — 'text' field is required";
     return;
   }
+  // 1. text / note go through `update` (label-agnostic on the server).
   const ok = await callApi({
     action: "update",
     text: selectedOriginalText.value,
     newText: parsed.text,
     note: parsed.note,
   });
-  if (ok) selectedId.value = null;
+  if (!ok) return;
+  // 2. labels are diffed against the prior state and applied as
+  //    `add_label` / `remove_label` calls. `update` deliberately
+  //    does not touch labels — this keeps each LLM action
+  //    single-purpose and matches the add_label/remove_label
+  //    semantics the LLM uses.
+  const originalLabels = selectedOriginalLabels.value;
+  const removed = subtractLabels(originalLabels, parsed.labels);
+  const added = subtractLabels(parsed.labels, originalLabels);
+  // Use the already-renamed `parsed.text` to match the updated item.
+  if (removed.length > 0) {
+    await callApi({
+      action: "remove_label",
+      text: parsed.text,
+      labels: removed,
+    });
+  }
+  if (added.length > 0) {
+    await callApi({
+      action: "add_label",
+      text: parsed.text,
+      labels: added,
+    });
+  }
+  selectedId.value = null;
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────

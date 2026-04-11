@@ -71,11 +71,9 @@ export async function maybeRunJournal(
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) {
       disabled = true;
-      // eslint-disable-next-line no-console
       console.warn(err.message);
       return;
     }
-    // eslint-disable-next-line no-console
     console.warn("[journal] unexpected failure, continuing:", err);
   } finally {
     running = false;
@@ -97,14 +95,12 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
   const optimize = opts.force === true || isOptimizationDue(state, now);
   if (!daily && !optimize) return;
   if (opts.force === true) {
-    // eslint-disable-next-line no-console
     console.log("[journal] force-run: skipping interval gates");
   }
 
   let nextState = state;
 
   if (daily) {
-    // eslint-disable-next-line no-console
     console.log("[journal] running daily pass");
     const { nextState: afterDaily, result } = await runDailyPass(nextState, {
       workspaceRoot,
@@ -124,14 +120,12 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
       result.skipped.length > 0
         ? ` (${result.skipped.length} days skipped, will retry)`
         : "";
-    // eslint-disable-next-line no-console
     console.log(
       `[journal] daily pass done: ${result.sessionsIngested.length} sessions, ${result.daysTouched.length} days, ${result.topicsCreated.length} topics created, ${result.topicsUpdated.length} updated${skipSuffix}`,
     );
   }
 
   if (optimize) {
-    // eslint-disable-next-line no-console
     console.log("[journal] running optimization pass");
     const { nextState: afterOpt, result } = await runOptimizationPass(
       nextState,
@@ -151,12 +145,10 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
       }),
     };
     if (result.skipped) {
-      // eslint-disable-next-line no-console
       console.log(
         `[journal] optimization pass skipped: ${result.skippedReason}`,
       );
     } else {
-      // eslint-disable-next-line no-console
       console.log(
         `[journal] optimization pass done: ${result.mergedSlugs.length} merged, ${result.archivedSlugs.length} archived`,
       );

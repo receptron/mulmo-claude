@@ -33,7 +33,6 @@ export function useRoles(): {
     } catch (err) {
       // Keep the current role list on failure — losing custom roles
       // is preferable to crashing the UI on a transient API hiccup.
-      // eslint-disable-next-line no-console
       console.warn("[useRoles] refreshRoles failed:", err);
     }
   }

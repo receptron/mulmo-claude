@@ -7,6 +7,7 @@ export interface TodoItem {
   id: string;
   text: string;
   note?: string;
+  labels?: string[];
   completed: boolean;
   createdAt: number;
 }

@@ -108,7 +108,6 @@ export async function runDailyPass(
       }
     } catch (err) {
       // Malformed jsonl — skip this session, don't crash the pass.
-      // eslint-disable-next-line no-console
       console.warn(`[journal] failed to load session ${sessionId}:`, err);
     }
   }
@@ -171,7 +170,7 @@ export async function runDailyPass(
         // Propagate so the outer runner can disable the feature.
         throw err;
       }
-      // eslint-disable-next-line no-console
+
       console.warn(
         `[journal] summarize failed for ${date}, skipping day:`,
         err,
@@ -182,7 +181,6 @@ export async function runDailyPass(
 
     const parsed = extractJsonObject(rawOutput);
     if (!isDailyArchivistOutput(parsed)) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[journal] archivist returned unusable JSON for ${date}, skipping`,
       );
@@ -276,7 +274,6 @@ export async function runDailyPass(
       // A write failure is not fatal for the pass itself — we've
       // already written the day's markdown — but we want it loud
       // in the logs so a broken filesystem doesn't hide.
-      // eslint-disable-next-line no-console
       console.warn(`[journal] failed to persist state after ${date}:`, err);
     }
   }

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import path from "path";
+import { randomBytes } from "crypto";
 import { workspacePath } from "../workspace.js";
 import { loadJsonFile, saveJsonFile } from "../utils/file.js";
 
@@ -85,7 +86,7 @@ router.post(
           return;
         }
         const item: ScheduledItem = {
-          id: `sched_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          id: `sched_${Date.now()}_${randomBytes(3).toString("hex")}`,
           title,
           createdAt: Date.now(),
           props: props ?? {},

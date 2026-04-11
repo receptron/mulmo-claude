@@ -69,7 +69,6 @@ export async function runOptimizationPass(
     );
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) throw err;
-    // eslint-disable-next-line no-console
     console.warn(`[journal] optimization summarize failed:`, err);
     result.skipped = true;
     result.skippedReason = "summarize failed";
@@ -78,7 +77,6 @@ export async function runOptimizationPass(
 
   const parsed = extractJsonObject(raw);
   if (!isOptimizationOutput(parsed)) {
-    // eslint-disable-next-line no-console
     console.warn(`[journal] optimizer returned unusable JSON, skipping`);
     result.skipped = true;
     result.skippedReason = "unusable optimizer JSON";
@@ -180,7 +178,6 @@ async function moveToArchive(
     // never a real file) or the rename hit an unexpected IO error.
     // Log and return false — the caller leaves state untouched for
     // this slug so the in-memory knownTopics stays accurate.
-    // eslint-disable-next-line no-console
     console.warn(`[journal] could not archive ${slug}:`, err);
     return false;
   }
