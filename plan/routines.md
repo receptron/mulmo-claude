@@ -23,7 +23,6 @@ Routines sit on top of the Task Manager. Each routine is a persistent record sto
 ### Non-Goals
 1. Complex scheduling (weekly, cron) — only `daily` and `interval` for now, matching the Task Manager.
 2. Output routing (email, notification, etc.) — output goes to a chat session file in `workspace/chat/`.
-3. Editing routines in a UI — users can view/edit `tasks.json` directly or via FilesView.
 
 ---
 
@@ -131,9 +130,18 @@ Removes from `tasks.json` and calls `removeTask()` on the Task Manager.
 When the Task Manager fires a routine's task:
 
 ```ts
-async function executeRoutine(routine: Routine): Promise<void> {
+async function executeRoutine(routine: Routine, pubsub: IPubSub): Promise<void> {
   const role = getRole(routine.roleId);
   const sessionId = uuidv4();
+
+  // Notify the client that a new session has started
+  pubsub.publish("sessions", {
+    event: "session.started",
+    sessionId,
+    routineId: routine.id,
+    routineName: routine.name,
+    roleId: routine.roleId,
+  });
 
   for await (const event of runAgent(
     routine.prompt,
@@ -142,18 +150,82 @@ async function executeRoutine(routine: Routine): Promise<void> {
     sessionId,
     PORT,
   )) {
-    // Events are written to workspace/chat/{sessionId}.jsonl
-    // by the agent infrastructure automatically.
-    // We just need to drain the generator.
+    // Agent events (text, tool_result, status, etc.) are forwarded to the client
+    // so the UI updates in real time, just like a user-initiated session.
+    pubsub.publish("sessions", { event: "agent.event", sessionId, data: event });
   }
+
+  // Notify the client that the session is complete
+  pubsub.publish("sessions", {
+    event: "session.completed",
+    sessionId,
+    routineId: routine.id,
+  });
 }
 ```
 
-The output ends up in `workspace/chat/` as a normal chat session. Users can review routine results alongside regular conversations.
+A routine creates a real chat session — the same as if the user had typed the prompt. The conversation is recorded in `workspace/chat/{sessionId}.jsonl` and the session metadata in `workspace/chat/{sessionId}.json`, exactly like any other session.
+
+The client subscribes to the `"sessions"` pub/sub channel. When a routine fires:
+1. `session.started` — the session list updates to show a new active session (with the routine name and role).
+2. `agent.event` — streamed events update the conversation in real time. If the user switches to this session, they see it progressing live.
+3. `session.completed` — the session is marked as finished.
+
+This means the user can open the app, see a routine's session appear in the sidebar, click on it, and watch it work — or review the results later. There is no distinction in the UI between a user-initiated session and a routine-initiated session.
 
 ---
 
-## 7) File/Module Plan
+## 7) UI — Routines Tab
+
+The Routines view is a fourth tab in the canvas area's `CanvasViewToggle`, alongside Single, Stack, and Files.
+
+### CanvasViewToggle changes
+
+Add a new mode to `CanvasViewMode`:
+```ts
+export type CanvasViewMode = "single" | "stack" | "files" | "routines";
+```
+
+New button in the toggle bar:
+- Icon: `schedule` (Material Icons)
+- Label: "Routines"
+- Shortcut: `Cmd/Ctrl + 4`
+
+### RoutinesView component
+
+`src/components/RoutinesView.vue` — rendered when `canvasViewMode === "routines"`.
+
+**Layout:**
+- Top: "Add Routine" button
+- Below: list of all routines as cards
+
+**Each routine card shows:**
+- Name
+- Role (icon + name)
+- Prompt (truncated)
+- Schedule (e.g., "Daily at 4:00 AM PT" or "Every 4 hours")
+- Enabled toggle switch
+- Edit / Delete buttons
+
+**Add / Edit form (inline or modal):**
+- Name (text input)
+- Role (dropdown — populated from available roles)
+- Prompt (textarea)
+- Schedule type (daily / interval toggle)
+  - Daily: time picker + timezone selector
+  - Interval: number input + unit selector (minutes / hours)
+- Enabled checkbox
+
+**Actions:**
+- Toggle enabled → `PUT /api/routines/:id` with `{ enabled: !current }`
+- Delete → `DELETE /api/routines/:id` with confirmation
+- Save (create/edit) → `POST /api/routines` or `PUT /api/routines/:id`
+
+All actions call the REST API; the routines list is refreshed after each mutation.
+
+---
+
+## 8) File/Module Plan
 
 ```text
 server/
@@ -162,6 +234,13 @@ server/
     types.ts                // Routine interface
   routes/
     routines.ts             // REST endpoints
+
+src/
+  components/
+    RoutinesView.vue        // Routines tab content
+  utils/
+    canvas/
+      viewMode.ts           // add "routines" to CanvasViewMode
 
 workspace/
   tasks/
@@ -172,7 +251,7 @@ The `tasks` subdirectory needs to be added to `SUBDIRS` in `server/workspace.ts`
 
 ---
 
-## 8) Required Changes to Task Manager
+## 9) Required Changes to Task Manager
 
 The current Task Manager works as-is for Routines. No changes to its API or scheduling logic are needed.
 
@@ -185,7 +264,7 @@ Option B requires no Task Manager changes. Prefer Option B for now.
 
 ---
 
-## 9) Timezone Handling
+## 10) Timezone Handling
 
 Users specify times in local time (e.g., "4am Pacific"). The Routines API converts to UTC before storing in `tasks.json`. The Task Manager only deals with UTC.
 
@@ -195,6 +274,6 @@ The original user-specified time and timezone could optionally be stored as meta
 
 ---
 
-## 10) Decision Summary
+## 11) Decision Summary
 
 Routines is a thin persistence and LLM-invocation layer on top of the Task Manager. It owns `tasks.json` for storage, converts user schedules to UTC, and registers tasks whose `run()` calls `runAgent()`. The Task Manager is unchanged — it just sees normal task definitions. Output goes to `workspace/chat/` as regular sessions.
