@@ -8,7 +8,7 @@
 // at a `mkdtempSync` directory without touching the real
 // ~/mulmoclaude.
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import {
   defaultSummarize,
@@ -16,6 +16,7 @@ import {
   type SummarizeFn,
 } from "./summarizer.js";
 import {
+  chatDirFor,
   indexDirFor,
   indexEntryPathFor,
   manifestPathFor,
@@ -37,6 +38,11 @@ export interface IndexerDeps {
   summarize?: SummarizeFn;
   now?: () => number;
   minIntervalMs?: number;
+  // Bypass the `isFresh` freshness throttle. Used by the
+  // backfill helper and the debug trigger endpoint so a manual
+  // "rebuild everything" run doesn't silently skip entries that
+  // happen to be within the 15-minute window.
+  force?: boolean;
 }
 
 // --- manifest I/O ---------------------------------------------------
@@ -169,6 +175,19 @@ async function readSessionMeta(
   }
 }
 
+// List every session id that has a .jsonl file in the workspace
+// chat dir. Used by the backfill helper.
+export async function listSessionIds(workspaceRoot: string): Promise<string[]> {
+  try {
+    const files = await readdir(chatDirFor(workspaceRoot));
+    return files
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => f.slice(0, -".jsonl".length));
+  } catch {
+    return [];
+  }
+}
+
 // --- the core indexSession call ------------------------------------
 
 // Index (or re-index) a single session. Returns the entry on
@@ -184,8 +203,9 @@ export async function indexSession(
   const summarize = deps.summarize ?? defaultSummarize;
   const now = (deps.now ?? Date.now)();
   const minInterval = deps.minIntervalMs ?? MIN_INDEX_INTERVAL_MS;
+  const force = deps.force === true;
 
-  if (await isFresh(workspaceRoot, sessionId, now, minInterval)) {
+  if (!force && (await isFresh(workspaceRoot, sessionId, now, minInterval))) {
     return null;
   }
 

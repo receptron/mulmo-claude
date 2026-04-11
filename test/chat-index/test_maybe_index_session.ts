@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   maybeIndexSession,
+  backfillAllSessions,
   __resetForTests,
 } from "../../server/chat-index/index.js";
 import { indexEntryPathFor } from "../../server/chat-index/paths.js";
@@ -219,5 +220,127 @@ describe("maybeIndexSession — unexpected error swallowing", () => {
       deps: { summarize: stub.fn, now: () => 0 },
     });
     assert.equal(stub.calls, 1);
+  });
+});
+
+describe("maybeIndexSession — force option", () => {
+  it("bypasses the activeSessionIds guard when force is true", async () => {
+    seedSession("live-force");
+    const stub = stubSummarize();
+
+    await maybeIndexSession({
+      sessionId: "live-force",
+      activeSessionIds: new Set(["live-force"]),
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+      force: true,
+    });
+
+    assert.equal(stub.calls, 1);
+  });
+
+  it("bypasses the freshness throttle when force is true", async () => {
+    seedSession("fresh-force");
+    const stub = stubSummarize();
+
+    // Seed a fresh entry.
+    await maybeIndexSession({
+      sessionId: "fresh-force",
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+    });
+    assert.equal(stub.calls, 1);
+
+    // Normal second call: skipped by freshness.
+    await maybeIndexSession({
+      sessionId: "fresh-force",
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 500 },
+    });
+    assert.equal(stub.calls, 1);
+
+    // Forced second call: re-indexes.
+    await maybeIndexSession({
+      sessionId: "fresh-force",
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 500 },
+      force: true,
+    });
+    assert.equal(stub.calls, 2);
+  });
+});
+
+describe("backfillAllSessions", () => {
+  it("indexes every session jsonl in the workspace", async () => {
+    seedSession("bf-1");
+    seedSession("bf-2");
+    seedSession("bf-3");
+    const stub = stubSummarize();
+
+    const result = await backfillAllSessions({
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+    });
+
+    assert.equal(result.total, 3);
+    assert.equal(result.indexed, 3);
+    assert.equal(result.skipped, 0);
+    assert.equal(stub.calls, 3);
+  });
+
+  it("returns an empty result when there are no session jsonls", async () => {
+    const stub = stubSummarize();
+    const result = await backfillAllSessions({
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+    });
+    assert.equal(result.total, 0);
+    assert.equal(result.indexed, 0);
+    assert.equal(result.skipped, 0);
+    assert.equal(stub.calls, 0);
+  });
+
+  it("skips sessions that throw and keeps processing the rest", async () => {
+    seedSession("ok-1");
+    seedSession("boom");
+    seedSession("ok-2");
+    let callCount = 0;
+    const mixedSummarize = async (): Promise<SummaryResult> => {
+      callCount++;
+      if (callCount === 2) throw new Error("boom on second call");
+      return { title: "t", summary: "s", keywords: [] };
+    };
+
+    const result = await backfillAllSessions({
+      workspaceRoot: workspace,
+      deps: { summarize: mixedSummarize, now: () => 0 },
+    });
+
+    assert.equal(result.total, 3);
+    assert.equal(result.indexed, 2);
+    assert.equal(result.skipped, 1);
+  });
+
+  it("re-indexes sessions even when they are already fresh (force)", async () => {
+    seedSession("warm-1");
+    const stub = stubSummarize();
+
+    // First pass seeds the entry.
+    await maybeIndexSession({
+      sessionId: "warm-1",
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+    });
+    assert.equal(stub.calls, 1);
+
+    // Second pass via backfill with the same now() — a normal
+    // maybeIndexSession call would be skipped by freshness, but
+    // backfill sets force: true.
+    const result = await backfillAllSessions({
+      workspaceRoot: workspace,
+      deps: { summarize: stub.fn, now: () => 0 },
+    });
+    assert.equal(result.indexed, 1);
+    assert.equal(stub.calls, 2);
   });
 });
