@@ -3,7 +3,7 @@
     <button
       v-if="node.type === 'dir'"
       class="w-full flex items-center gap-1 px-2 py-1 text-left text-sm hover:bg-gray-100 rounded"
-      @click="expanded = !expanded"
+      @click="toggle(node.path)"
     >
       <span class="material-icons text-sm text-gray-400 shrink-0">{{
         expanded ? "folder_open" : "folder"
@@ -47,7 +47,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
+import { useExpandedDirs } from "../composables/useExpandedDirs";
 
 export interface TreeNode {
   name: string;
@@ -68,10 +69,12 @@ const emit = defineEmits<{
   select: [path: string];
 }>();
 
-// Only the root node defaults to expanded; nested directories start
-// collapsed so opening Files mode doesn't render the entire workspace
-// tree at once.
-const expanded = ref(props.node.path === "");
+// Expand/collapse state lives in a module-level singleton so every
+// recursive FileTree instance shares it, and survives remounts (e.g.
+// the agent-run refresh that bumps filesRefreshToken in FilesView).
+// Default on first run: only the workspace root ("") is expanded.
+const { isExpanded, toggle } = useExpandedDirs();
+const expanded = computed(() => isExpanded(props.node.path));
 
 const isRecent = computed(() => props.recentPaths.has(props.node.path));
 </script>
