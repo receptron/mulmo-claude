@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   buildIndexMarkdown,
   DEFAULT_MAX_RECENT_DAYS,
+  renderArchiveSection,
+  renderRecentDaysSection,
+  renderTopicsSection,
   type IndexInputs,
 } from "../../server/journal/indexFile.js";
 
@@ -121,5 +124,75 @@ describe("buildIndexMarkdown", () => {
       baseInput({ days: [{ date: "2026-04-11" }] }),
     );
     assert.match(out, /\[2026-04-11\]\(daily\/2026\/04\/11\.md\)/);
+  });
+});
+
+describe("renderTopicsSection", () => {
+  it("returns the heading + empty placeholder for an empty list", () => {
+    const lines = renderTopicsSection([]);
+    assert.deepEqual(lines, ["## Topics", "", "_No topics yet._"]);
+  });
+
+  it("renders one row per topic, newest-first", () => {
+    const lines = renderTopicsSection([
+      { slug: "old", lastUpdatedIso: "2026-01-01T00:00:00Z" },
+      { slug: "new", lastUpdatedIso: "2026-04-01T00:00:00Z" },
+    ]);
+    assert.equal(lines[0], "## Topics");
+    assert.match(lines[2] ?? "", /\[new\]/);
+    assert.match(lines[3] ?? "", /\[old\]/);
+  });
+
+  it("uses the title when present", () => {
+    const lines = renderTopicsSection([{ slug: "v", title: "Video Gen" }]);
+    assert.match(lines.join("\n"), /\[Video Gen\]/);
+  });
+});
+
+describe("renderRecentDaysSection", () => {
+  it("returns the heading + empty placeholder for an empty list", () => {
+    const lines = renderRecentDaysSection([], 14);
+    assert.deepEqual(lines, ["## Recent days", "", "_No daily entries yet._"]);
+  });
+
+  it("returns at most maxRecent rows + a collapsed-count footer", () => {
+    const days = Array.from({ length: 5 }, (_, i) => ({
+      date: `2026-01-0${i + 1}`,
+    }));
+    const lines = renderRecentDaysSection(days, 3);
+    const rows = lines.filter((l) => l.startsWith("- ["));
+    assert.equal(rows.length, 3);
+    assert.ok(lines.some((l) => /…and 2 earlier days\./.test(l)));
+  });
+
+  it("uses singular 'day' when exactly one is collapsed", () => {
+    const days = Array.from({ length: 4 }, (_, i) => ({
+      date: `2026-01-0${i + 1}`,
+    }));
+    const lines = renderRecentDaysSection(days, 3);
+    assert.ok(lines.some((l) => /…and 1 earlier day\./.test(l)));
+  });
+
+  it("omits the collapsed-count footer when nothing is collapsed", () => {
+    const days = [{ date: "2026-04-11" }];
+    const lines = renderRecentDaysSection(days, 14);
+    assert.ok(!lines.some((l) => /earlier day/.test(l)));
+  });
+});
+
+describe("renderArchiveSection", () => {
+  it("returns the heading + empty placeholder when count is 0", () => {
+    const lines = renderArchiveSection(0);
+    assert.deepEqual(lines, ["## Archive", "", "_No archived topics._"]);
+  });
+
+  it("uses the singular noun when count is 1", () => {
+    const lines = renderArchiveSection(1);
+    assert.match(lines[2] ?? "", /1 archived topic\b/);
+  });
+
+  it("uses the plural noun when count > 1", () => {
+    const lines = renderArchiveSection(7);
+    assert.match(lines[2] ?? "", /7 archived topics\b/);
   });
 });

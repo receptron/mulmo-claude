@@ -34,61 +34,73 @@ export const DEFAULT_MAX_RECENT_DAYS = 14;
 
 export function buildIndexMarkdown(input: IndexInputs): string {
   const maxRecent = input.maxRecentDays ?? DEFAULT_MAX_RECENT_DAYS;
-  const lines: string[] = [];
-  lines.push("# Workspace Journal");
-  lines.push("");
-  lines.push(`*Last updated: ${input.builtAtIso}*`);
-  lines.push("");
+  return [
+    "# Workspace Journal",
+    "",
+    `*Last updated: ${input.builtAtIso}*`,
+    "",
+    ...renderTopicsSection(input.topics),
+    "",
+    ...renderRecentDaysSection(input.days, maxRecent),
+    "",
+    ...renderArchiveSection(input.archivedTopicCount),
+    "",
+  ].join("\n");
+}
 
-  lines.push("## Topics");
-  lines.push("");
-  if (input.topics.length === 0) {
+export function renderTopicsSection(
+  topics: readonly IndexTopicEntry[],
+): string[] {
+  const lines: string[] = ["## Topics", ""];
+  if (topics.length === 0) {
     lines.push("_No topics yet._");
-  } else {
-    // Newest-first by last update (topics with no timestamp sort
-    // last, ordered alphabetically among themselves for stability).
-    const sorted = [...input.topics].sort(compareTopicsNewestFirst);
-    for (const t of sorted) {
-      lines.push(renderTopicRow(t));
-    }
+    return lines;
   }
-  lines.push("");
+  // Newest-first by last update (topics with no timestamp sort
+  // last, ordered alphabetically among themselves for stability).
+  const sorted = [...topics].sort(compareTopicsNewestFirst);
+  for (const t of sorted) {
+    lines.push(renderTopicRow(t));
+  }
+  return lines;
+}
 
-  lines.push("## Recent days");
-  lines.push("");
-  if (input.days.length === 0) {
+export function renderRecentDaysSection(
+  days: readonly IndexDailyEntry[],
+  maxRecent: number,
+): string[] {
+  const lines: string[] = ["## Recent days", ""];
+  if (days.length === 0) {
     lines.push("_No daily entries yet._");
-  } else {
-    // Newest-first by date string (YYYY-MM-DD sorts lexically).
-    const sorted = [...input.days].sort((a, b) =>
-      a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-    );
-    const head = sorted.slice(0, maxRecent);
-    for (const d of head) {
-      lines.push(renderDailyRow(d));
-    }
-    const rest = sorted.length - head.length;
-    if (rest > 0) {
-      lines.push("");
-      lines.push(`_…and ${rest} earlier day${rest === 1 ? "" : "s"}._`);
-    }
+    return lines;
   }
-  lines.push("");
+  // Newest-first by date string (YYYY-MM-DD sorts lexically).
+  const sorted = [...days].sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
+  );
+  const head = sorted.slice(0, maxRecent);
+  for (const d of head) {
+    lines.push(renderDailyRow(d));
+  }
+  const rest = sorted.length - head.length;
+  if (rest > 0) {
+    lines.push("");
+    lines.push(`_…and ${rest} earlier day${rest === 1 ? "" : "s"}._`);
+  }
+  return lines;
+}
 
-  lines.push("## Archive");
-  lines.push("");
-  if (input.archivedTopicCount === 0) {
+export function renderArchiveSection(archivedTopicCount: number): string[] {
+  const lines: string[] = ["## Archive", ""];
+  if (archivedTopicCount === 0) {
     lines.push("_No archived topics._");
-  } else {
-    const noun =
-      input.archivedTopicCount === 1 ? "archived topic" : "archived topics";
-    lines.push(
-      `- [Archived topics](archive/topics/) — ${input.archivedTopicCount} ${noun}`,
-    );
+    return lines;
   }
-  lines.push("");
-
-  return lines.join("\n");
+  const noun = archivedTopicCount === 1 ? "archived topic" : "archived topics";
+  lines.push(
+    `- [Archived topics](archive/topics/) — ${archivedTopicCount} ${noun}`,
+  );
+  return lines;
 }
 
 function compareTopicsNewestFirst(

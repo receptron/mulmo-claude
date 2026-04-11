@@ -1,8 +1,11 @@
 import { Router, Request, Response } from "express";
 import path from "path";
-import { randomBytes } from "crypto";
 import { workspacePath } from "../workspace.js";
 import { loadJsonFile, saveJsonFile } from "../utils/file.js";
+import {
+  dispatchScheduler,
+  type SchedulerActionInput,
+} from "./schedulerHandlers.js";
 
 const router = Router();
 
@@ -19,18 +22,6 @@ function loadItems(): ScheduledItem[] {
   return loadJsonFile<ScheduledItem[]>(schedulerFile(), []);
 }
 
-function sortItems(items: ScheduledItem[]): ScheduledItem[] {
-  return [...items].sort((a, b) => {
-    const aDate = typeof a.props.date === "string" ? a.props.date : null;
-    const bDate = typeof b.props.date === "string" ? b.props.date : null;
-    const aTime = typeof a.props.time === "string" ? a.props.time : "00:00";
-    const bTime = typeof b.props.time === "string" ? b.props.time : "00:00";
-    const aKey = aDate ? `0_${aDate}_${aTime}` : `1_${a.createdAt}`;
-    const bKey = bDate ? `0_${bDate}_${bTime}` : `1_${b.createdAt}`;
-    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
-  });
-}
-
 function saveItems(items: ScheduledItem[]): void {
   saveJsonFile(schedulerFile(), items);
 }
@@ -42,12 +33,8 @@ router.get(
   },
 );
 
-interface SchedulerBody {
+interface SchedulerBody extends SchedulerActionInput {
   action: string;
-  title?: string;
-  id?: string;
-  props?: Record<string, string | number | boolean | null>;
-  items?: ScheduledItem[];
 }
 
 interface ErrorResponse {
@@ -68,101 +55,26 @@ router.post(
     req: Request<object, unknown, SchedulerBody>,
     res: Response<SchedulerResponse | ErrorResponse>,
   ) => {
-    const { action, title, id, props, items: replaceItems } = req.body;
+    const { action, ...input } = req.body;
+    const items = loadItems();
 
-    let items = loadItems();
-    // eslint-disable-next-line no-useless-assignment
-    let message = "";
-    let jsonData: Record<string, unknown> = {};
+    const result = dispatchScheduler(action, items, input);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
 
-    switch (action) {
-      case "show":
-        message = `Showing ${items.length} scheduled item(s)`;
-        break;
-
-      case "add": {
-        if (!title) {
-          res.status(400).json({ error: "title required" });
-          return;
-        }
-        const item: ScheduledItem = {
-          id: `sched_${Date.now()}_${randomBytes(3).toString("hex")}`,
-          title,
-          createdAt: Date.now(),
-          props: props ?? {},
-        };
-        items.push(item);
-        items = sortItems(items);
-        saveItems(items);
-        message = `Added: "${title}"`;
-        jsonData = { added: item.id };
-        break;
-      }
-
-      case "delete": {
-        if (!id) {
-          res.status(400).json({ error: "id required" });
-          return;
-        }
-        const before = items.length;
-        items = items.filter((i) => i.id !== id);
-        saveItems(items);
-        message =
-          items.length < before
-            ? `Deleted item ${id}`
-            : `Item not found: ${id}`;
-        jsonData = { deleted: id };
-        break;
-      }
-
-      case "update": {
-        if (!id) {
-          res.status(400).json({ error: "id required" });
-          return;
-        }
-        const item = items.find((i) => i.id === id);
-        if (item) {
-          if (title !== undefined) item.title = title;
-          if (props !== undefined) {
-            for (const [k, v] of Object.entries(props)) {
-              if (v === null) {
-                delete item.props[k];
-              } else {
-                item.props[k] = v;
-              }
-            }
-          }
-          items = sortItems(items);
-          saveItems(items);
-          message = `Updated: "${item.title}"`;
-          jsonData = { updated: id };
-        } else {
-          message = `Item not found: ${id}`;
-        }
-        break;
-      }
-
-      case "replace": {
-        if (!Array.isArray(replaceItems)) {
-          res.status(400).json({ error: "items array required" });
-          return;
-        }
-        items = sortItems(replaceItems);
-        saveItems(items);
-        message = `Replaced all items (${items.length} total)`;
-        jsonData = { count: items.length };
-        break;
-      }
-
-      default:
-        res.status(400).json({ error: `Unknown action: ${action}` });
-        return;
+    // Persist whenever the action mutated state. "show" returns the
+    // same array reference unchanged, so this no-ops in that case
+    // (saveItems is idempotent for equal content anyway).
+    if (action !== "show") {
+      saveItems(result.items);
     }
 
     res.json({
-      data: { items },
-      message,
-      jsonData,
+      data: { items: result.items },
+      message: result.message,
+      jsonData: result.jsonData,
       instructions: "Display the updated scheduler to the user.",
       updating: true,
     });

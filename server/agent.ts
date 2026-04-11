@@ -1,22 +1,86 @@
-import { spawn } from "child_process";
+import { spawn, type ChildProcessByStdio } from "child_process";
 import { mkdir, writeFile, unlink } from "fs/promises";
-import { homedir, tmpdir } from "os";
-import { join } from "path";
+import { dirname } from "path";
+import type { Readable } from "stream";
 import { isDockerAvailable } from "./docker.js";
 import { refreshCredentials } from "./credentials.js";
 import type { Role } from "../src/config/roles.js";
 import { loadAllRoles } from "./roles.js";
 import { buildSystemPrompt } from "./agent/prompt.js";
 import {
-  getActivePlugins,
-  buildMcpConfig,
+  CONTAINER_WORKSPACE_PATH,
   buildCliArgs,
+  buildDockerSpawnArgs,
+  buildMcpConfig,
+  getActivePlugins,
+  resolveMcpConfigPaths,
 } from "./agent/config.js";
 import {
   parseStreamEvent,
   type AgentEvent,
   type RawStreamEvent,
 } from "./agent/stream.js";
+
+type ClaudeProc = ChildProcessByStdio<null, Readable, Readable>;
+
+function spawnClaude(
+  useDocker: boolean,
+  workspacePath: string,
+  cliArgs: string[],
+): ClaudeProc {
+  if (!useDocker) {
+    return spawn("claude", cliArgs, {
+      cwd: workspacePath,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
+  const dockerArgs = buildDockerSpawnArgs({
+    workspacePath,
+    cliArgs,
+    uid: process.getuid?.() ?? 1000,
+    gid: process.getgid?.() ?? 1000,
+    platform: process.platform,
+  });
+  return spawn("docker", dockerArgs, { stdio: ["ignore", "pipe", "pipe"] });
+}
+
+async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
+  let stderrOutput = "";
+  proc.stderr.on("data", (chunk: Buffer) => {
+    stderrOutput += chunk.toString();
+  });
+
+  let buffer = "";
+  for await (const chunk of proc.stdout) {
+    buffer += (chunk as Buffer).toString();
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let event: RawStreamEvent;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      for (const agentEvent of parseStreamEvent(event)) {
+        yield agentEvent;
+      }
+    }
+  }
+
+  const exitCode = await new Promise<number>((resolve) =>
+    proc.on("close", resolve),
+  );
+
+  if (exitCode !== 0) {
+    yield {
+      type: "error",
+      message: stderrOutput || `claude exited with code ${exitCode}`,
+    };
+  }
+}
 
 export async function* runAgent(
   message: string,
@@ -38,26 +102,20 @@ export async function* runAgent(
     await refreshCredentials();
   }
 
-  const containerWorkspacePath = "/home/node/mulmoclaude";
   const fullSystemPrompt = buildSystemPrompt({
     role,
-    workspacePath: useDocker ? containerWorkspacePath : workspacePath,
+    workspacePath: useDocker ? CONTAINER_WORKSPACE_PATH : workspacePath,
     pluginPrompts,
     systemPrompt,
   });
 
-  // Compute MCP config paths — host path for writing/cleanup,
-  // arg path for what gets passed to the claude CLI (container path if docker).
-  let mcpConfigHostPath: string;
-  let mcpConfigArgPath: string;
+  const mcpPaths = resolveMcpConfigPaths({
+    workspacePath,
+    sessionId,
+    useDocker,
+  });
   if (useDocker) {
-    const mcpConfigDir = join(workspacePath, ".mulmoclaude");
-    await mkdir(mcpConfigDir, { recursive: true });
-    mcpConfigHostPath = join(mcpConfigDir, `mcp-${sessionId}.json`);
-    mcpConfigArgPath = `/home/node/mulmoclaude/.mulmoclaude/mcp-${sessionId}.json`;
-  } else {
-    mcpConfigHostPath = join(tmpdir(), `mulmoclaude-mcp-${sessionId}.json`);
-    mcpConfigArgPath = mcpConfigHostPath;
+    await mkdir(dirname(mcpPaths.hostPath), { recursive: true });
   }
 
   if (hasMcp) {
@@ -68,100 +126,23 @@ export async function* runAgent(
       roleIds: loadAllRoles().map((r) => r.id),
       useDocker,
     });
-    await writeFile(mcpConfigHostPath, JSON.stringify(mcpConfig, null, 2));
+    await writeFile(mcpPaths.hostPath, JSON.stringify(mcpConfig, null, 2));
   }
 
-  const args = buildCliArgs({
+  const cliArgs = buildCliArgs({
     systemPrompt: fullSystemPrompt,
     activePlugins,
     claudeSessionId,
     message,
-    mcpConfigPath: hasMcp ? mcpConfigArgPath : undefined,
+    mcpConfigPath: hasMcp ? mcpPaths.argPath : undefined,
   });
 
-  const toDockerPath = (p: string) => p.replace(/\\/g, "/");
-  const extraHosts: string[] =
-    process.platform === "linux"
-      ? ["--add-host", "host.docker.internal:host-gateway"]
-      : [];
-
-  const uid = process.getuid?.() ?? 1000;
-  const gid = process.getgid?.() ?? 1000;
-  const projectRoot = process.cwd();
-  const proc = useDocker
-    ? spawn(
-        "docker",
-        [
-          "run",
-          "--rm",
-          "--cap-drop",
-          "ALL",
-          "--user",
-          `${uid}:${gid}`,
-          "-e",
-          "HOME=/home/node",
-          "-v",
-          `${toDockerPath(projectRoot)}/node_modules:/app/node_modules:ro`,
-          "-v",
-          `${toDockerPath(projectRoot)}/server:/app/server:ro`,
-          "-v",
-          `${toDockerPath(projectRoot)}/src:/app/src:ro`,
-          "-v",
-          `${toDockerPath(workspacePath)}:/home/node/mulmoclaude`,
-          "-v",
-          `${toDockerPath(homedir())}/.claude:/home/node/.claude`,
-          "-v",
-          `${toDockerPath(homedir())}/.claude.json:/home/node/.claude.json`,
-          ...extraHosts,
-          "mulmoclaude-sandbox",
-          "claude",
-          ...args,
-        ],
-        { stdio: ["ignore", "pipe", "pipe"] },
-      )
-    : spawn("claude", args, {
-        cwd: workspacePath,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+  const proc = spawnClaude(useDocker, workspacePath, cliArgs);
 
   try {
-    let stderrOutput = "";
-    proc.stderr.on("data", (chunk: Buffer) => {
-      stderrOutput += chunk.toString();
-    });
-
-    let buffer = "";
-    for await (const chunk of proc.stdout) {
-      buffer += chunk.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        let event: RawStreamEvent;
-        try {
-          event = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        for (const agentEvent of parseStreamEvent(event)) {
-          yield agentEvent;
-        }
-      }
-    }
-
-    const exitCode = await new Promise<number>((resolve) =>
-      proc.on("close", resolve),
-    );
-
-    if (exitCode !== 0) {
-      yield {
-        type: "error",
-        message: stderrOutput || `claude exited with code ${exitCode}`,
-      };
-    }
+    yield* readAgentEvents(proc);
   } finally {
     if (!proc.killed) proc.kill();
-    if (hasMcp) unlink(mcpConfigHostPath).catch(() => {});
+    if (hasMcp) unlink(mcpPaths.hostPath).catch(() => {});
   }
 }
