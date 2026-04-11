@@ -21,7 +21,7 @@ Routines sit on top of the Task Manager. Each routine is a persistent record sto
 4. **Registerable by user or LLM** — via REST API or tool call.
 
 ### Non-Goals
-1. Complex scheduling (weekly, cron) — only `daily` and `interval` for now, matching the Task Manager.
+1. Cron expressions — use typed schedule variants instead.
 2. Output routing (email, notification, etc.) — output goes to a chat session file in `workspace/chat/`.
 
 ---
@@ -29,16 +29,37 @@ Routines sit on top of the Task Manager. Each routine is a persistent record sto
 ## 3) Data Model
 
 ```ts
+// Routine-level schedule types — richer than TaskSchedule.
+// The routines layer translates these down to TaskSchedule for the task manager.
+type RoutineSchedule =
+  | { type: "daily"; time: string }                          // "HH:MM" in UTC
+  | { type: "interval"; intervalMs: number }
+  | { type: "weekly"; daysOfWeek: number[]; time: string }   // daysOfWeek: 0=Sun..6=Sat, time: "HH:MM" UTC
+  | { type: "once"; at: string };                            // ISO 8601 timestamp
+
 interface Routine {
   id: string;                    // unique, stable across restarts (e.g., UUID)
   name: string;                  // human-readable label
   roleId: string;                // which role to invoke (e.g., "office", "general")
   prompt: string;                // the message sent to the agent
-  schedule: TaskSchedule;        // reuses TaskSchedule from task-manager
+  schedule: RoutineSchedule;
   enabled: boolean;              // can be toggled without deleting
   createdAt: string;             // ISO timestamp
 }
 ```
+
+### Mapping to TaskSchedule
+
+The task manager only understands `interval` and `daily`. The routines layer handles the translation:
+
+| RoutineSchedule | TaskSchedule | Notes |
+|---|---|---|
+| `daily` | `daily` | Pass through as-is |
+| `interval` | `interval` | Pass through as-is |
+| `weekly` | `daily` | Register as daily; the `run()` callback checks `now.getUTCDay()` against `daysOfWeek` and skips non-matching days |
+| `once` | `interval: 60_000` | Register with 1-minute interval; the `run()` callback checks if `now >= at`, fires once, then calls `removeTask()` to self-unregister |
+
+This keeps the task manager simple while supporting richer schedules at the routines layer.
 
 ### `tasks.json` format
 
@@ -53,12 +74,30 @@ interface Routine {
       "schedule": { "type": "daily", "time": "11:00" },
       "enabled": true,
       "createdAt": "2026-04-11T00:00:00Z"
+    },
+    {
+      "id": "d4e5f6",
+      "name": "One-time reminder",
+      "roleId": "general",
+      "prompt": "Remind me about the design review meeting.",
+      "schedule": { "type": "once", "at": "2026-04-15T21:00:00Z" },
+      "enabled": true,
+      "createdAt": "2026-04-11T00:00:00Z"
+    },
+    {
+      "id": "g7h8i9",
+      "name": "MWF evening digest",
+      "roleId": "office",
+      "prompt": "Summarize today's activity.",
+      "schedule": { "type": "weekly", "daysOfWeek": [1, 3, 5], "time": "18:00" },
+      "enabled": true,
+      "createdAt": "2026-04-11T00:00:00Z"
     }
   ]
 }
 ```
 
-Note: `schedule.time` for daily is in UTC. The API layer converts user-specified local time (e.g., "4am Pacific") to UTC before storing.
+Note: `schedule.time` for daily/weekly is in UTC. The API layer converts user-specified local time (e.g., "4am Pacific") to UTC before storing.
 
 ---
 
@@ -146,9 +185,11 @@ Expose routines as an MCP tool so the LLM can create, list, and delete routines 
       name: { type: "string" },
       roleId: { type: "string" },
       prompt: { type: "string" },
-      scheduleType: { type: "string", enum: ["daily", "interval"] },
-      time: { type: "string", description: "HH:MM in UTC (for daily)" },
+      scheduleType: { type: "string", enum: ["daily", "interval", "weekly", "once"] },
+      time: { type: "string", description: "HH:MM in UTC (for daily/weekly)" },
       intervalMs: { type: "number", description: "Milliseconds (for interval)" },
+      daysOfWeek: { type: "array", items: { type: "number" }, description: "0=Sun..6=Sat (for weekly)" },
+      at: { type: "string", description: "ISO 8601 timestamp (for once)" },
       // For "delete":
       id: { type: "string" },
     },
@@ -299,9 +340,11 @@ New button in the toggle bar:
 - Name (text input)
 - Role (dropdown — populated from available roles)
 - Prompt (textarea)
-- Schedule type (daily / interval toggle)
+- Schedule type (daily / interval / weekly / once)
   - Daily: time picker + timezone selector
   - Interval: number input + unit selector (minutes / hours)
+  - Weekly: day-of-week checkboxes + time picker + timezone selector
+  - Once: date-time picker + timezone selector
 - Enabled checkbox
 
 **Actions:**
