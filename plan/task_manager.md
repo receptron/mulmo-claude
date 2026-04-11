@@ -31,10 +31,8 @@ Create a **simple task scheduling service** (Task Manager) built around a single
 1. Cron expressions or cron library dependency.
 2. Retry or backoff logic.
 3. Concurrency limits or overlap policies.
-4. Sequential/ordered execution.
+4. Task dependency or ordered execution.
 5. Distributed coordination across server instances.
-6. Persistence of schedule definitions (clients own this).
-7. Task dependency/ordering.
 
 ---
 
@@ -66,12 +64,6 @@ Every tick (1 minute or 1 second):
 **Interval** (`every`): Run every N milliseconds. A task is due when `now - lastStartedAt >= intervalMs`.
 
 **Time-of-day** (`daily`): Run once per day at a specific `HH:MM` (24h format, in configured timezone). A task is due when the current time matches the target hour/minute and it hasn't already run today.
-
-### Persistence Boundary
-
-- Task Manager runtime state is process-local and ephemeral.
-- Task schedule intent must be persisted by clients in their own storage.
-- On server startup, each client loads its persisted records and re-registers tasks before `start()`.
 
 ---
 
@@ -135,7 +127,6 @@ interface ITaskManager {
 interface TaskManagerOptions {
   tickMs?: number;               // default: 60_000 (1 minute); set to 1_000 for debug
   now?: () => Date;              // injectable clock; default: () => new Date()
-  logger?: TaskLogger;           // optional structured logger
 }
 
 function createTaskManager(options?: TaskManagerOptions): ITaskManager;
@@ -227,7 +218,7 @@ function isDue(task: TaskEntry, now: Date): boolean {
 
 ### Startup
 1. Construct `TaskManager` with options.
-2. Each client loads persisted schedule intent and registers tasks.
+2. Register tasks.
 3. Call `start()` — begins the tick timer.
 
 ### Shutdown
@@ -248,30 +239,39 @@ function isDue(task: TaskEntry, now: Date): boolean {
 
 ## 9) Observability
 
-### Logging
-Events (all optional, via injected logger):
-- `task.registered` — task added to registry
-- `task.removed` — task removed from registry
+Log events via `console.log` with `[task-manager]` prefix:
 - `task.started` — task execution began
 - `task.succeeded` — task execution completed
 - `task.failed` — task execution threw
 
-### Runtime Introspection
-Optional endpoint for debugging:
-- `GET /api/admin/tasks` — returns `listStates()`.
-- `POST /api/admin/tasks/:id/run` — manual trigger via `runNow()`.
-
 ---
 
-## 10) Validation Rules
+## 10) Debug Mode
 
-At registration time:
-- `id` must be non-empty and unique.
-- `schedule.intervalMs` must be > 0 (for interval type).
-- `schedule.time` must match `HH:MM` format (for daily type).
-- `run` must be a function.
+### Activation
 
-On validation failure: throw immediately.
+Pass `--debug-tasks` as a command line argument to the server:
+
+```bash
+tsx server/index.ts --debug-tasks
+```
+
+Or in package.json:
+```json
+"dev:server:debug": "tsx server/index.ts --debug-tasks"
+```
+
+### Behavior
+
+When `--debug-tasks` is active:
+1. Tick interval is **1 second** instead of 60 seconds.
+2. A built-in **counter test task** is registered automatically:
+   - ID: `debug.counter`
+   - Schedule: `{ type: "interval", intervalMs: 1_000 }` (every 1 second)
+   - Maintains an internal counter, increments on each run, logs `[task-manager] debug.counter: N` to the console.
+   - After 10 runs, unregisters itself via `removeTask("debug.counter")`.
+
+This provides an immediate smoke test of the full lifecycle: register → tick → execute → self-unregister.
 
 ---
 
@@ -288,11 +288,17 @@ That's it — the entire implementation fits in two files.
 
 Bootstrap integration in `server/index.ts`:
 ```ts
+const debugTasks = process.argv.includes("--debug-tasks");
+
 const taskManager = createTaskManager({
-  tickMs: process.env.DEBUG_TASKS ? 1_000 : 60_000,
+  tickMs: debugTasks ? 1_000 : 60_000,
 });
 
 // clients register tasks here...
+
+if (debugTasks) {
+  registerDebugTasks(taskManager);
+}
 
 taskManager.start();
 
@@ -316,8 +322,13 @@ taskManager.stop();
 2. Multiple tasks with different schedules firing independently.
 3. Error in one task does not block others.
 
+### Smoke Test
+Run `tsx server/index.ts --debug-tasks` and observe 10 counter log lines followed by self-unregistration. No other infrastructure needed.
+
 ---
 
 ## 13) Decision Summary
 
-This design replaces the previous cron-based architecture with a single `setInterval` tick loop. Every tick checks which tasks are due and fires them asynchronously. No cron library, no retry, no concurrency control, no overlap policies — just a registry, a timer, and fire-and-forget execution. The entire implementation fits in ~150 lines across two files.
+The Task Manager is built around a single `setInterval` tick loop. Every tick checks which tasks are due and fires them asynchronously. No cron library, no retry, no concurrency control, no overlap policies — just a registry, a timer, and fire-and-forget execution. The entire implementation fits in ~150 lines across two files.
+
+A `--debug-tasks` CLI flag switches to 1-second ticks and registers a self-removing counter task for instant smoke testing.
