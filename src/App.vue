@@ -166,7 +166,7 @@
                 >
                   Unread
                 </span>
-                <span v-else>{{ formatDate(session.startedAt) }}</span>
+                <span v-else>{{ formatDate(session.updatedAt) }}</span>
               </span>
             </div>
             <p
