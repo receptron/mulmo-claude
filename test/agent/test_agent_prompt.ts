@@ -7,6 +7,7 @@ import {
   buildMemoryContext,
   buildWikiContext,
   buildSystemPrompt,
+  prependJournalPointer,
 } from "../../server/agent/prompt.js";
 import type { Role } from "../../src/config/roles.js";
 
@@ -163,5 +164,75 @@ describe("buildSystemPrompt", () => {
     const role = makeRole();
     const result = buildSystemPrompt({ role, workspacePath: workspace });
     assert.ok(!result.includes("## Plugin Instructions"));
+  });
+});
+
+describe("prependJournalPointer", () => {
+  function writeJournalIndex(): void {
+    mkdirSync(join(workspace, "summaries"), { recursive: true });
+    writeFileSync(
+      join(workspace, "summaries", "_index.md"),
+      "# Workspace Journal\n\n- refactoring\n- video-generation\n",
+    );
+  }
+
+  it("returns the original message unchanged when _index.md is absent", () => {
+    const result = prependJournalPointer("hello world", workspace);
+    assert.equal(result, "hello world");
+  });
+
+  it("prepends a journal-context block when _index.md exists", () => {
+    writeJournalIndex();
+    const result = prependJournalPointer("hello world", workspace);
+    assert.ok(result.includes("<journal-context>"));
+    assert.ok(result.includes("</journal-context>"));
+    assert.notEqual(result, "hello world");
+  });
+
+  it("mentions all three path types in the pointer", () => {
+    writeJournalIndex();
+    const result = prependJournalPointer("anything", workspace);
+    assert.ok(result.includes("summaries/_index.md"));
+    assert.ok(result.includes("summaries/topics/"));
+    assert.ok(result.includes("summaries/daily/"));
+  });
+
+  it("preserves the original user message verbatim at the end", () => {
+    writeJournalIndex();
+    const message = "What did I do last week with the video plugin?";
+    const result = prependJournalPointer(message, workspace);
+    assert.ok(
+      result.endsWith(`\n${message}`),
+      "decorated message should end with the original message on its own line",
+    );
+  });
+
+  it("preserves a trailing newline in the original message", () => {
+    writeJournalIndex();
+    const message = "What did I do last week with the video plugin?\n";
+    const result = prependJournalPointer(message, workspace);
+    assert.ok(
+      result.endsWith(`\n${message}`),
+      "decorated message should preserve a trailing newline in the original message",
+    );
+  });
+
+  it("handles an empty message without crashing", () => {
+    writeJournalIndex();
+    const result = prependJournalPointer("", workspace);
+    assert.ok(result.includes("<journal-context>"));
+    assert.ok(result.endsWith("\n"));
+  });
+
+  it("explicitly permits skipping when the question is self-contained", () => {
+    // The pointer wording is load-bearing for the feature — it
+    // tells the LLM that opt-out is allowed. Pin this so accidental
+    // rewording doesn't turn the pointer into a mandatory Read.
+    writeJournalIndex();
+    const result = prependJournalPointer("hi", workspace);
+    assert.ok(
+      result.toLowerCase().includes("skip"),
+      "pointer should tell the model it can skip when not needed",
+    );
   });
 });

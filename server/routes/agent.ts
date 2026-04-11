@@ -4,6 +4,7 @@ import path from "path";
 import { Router, Request, Response } from "express";
 import { getRole } from "../roles.js";
 import { runAgent } from "../agent.js";
+import { prependJournalPointer } from "../agent/prompt.js";
 import {
   registerSession,
   removeSession,
@@ -128,9 +129,20 @@ router.post(
       claudeSessionMap.get(chatSessionId) ??
       (await readClaudeSessionId(metaFilePath, resultsFilePath));
 
+    // First-turn only: prepend a pointer to the workspace journal so
+    // the LLM knows where to find historical context if the user's
+    // question benefits from it. On resumed turns the pointer is
+    // already in Claude's context from the first turn and does not
+    // need to be re-sent. The original `message` has already been
+    // appended to the jsonl above, so the user-facing chat log stays
+    // clean — only the version handed to Claude CLI is decorated.
+    const decoratedMessage = claudeSessionId
+      ? message
+      : prependJournalPointer(message, workspacePath);
+
     try {
       for await (const event of runAgent(
-        message,
+        decoratedMessage,
         role,
         workspacePath,
         sessionId,
