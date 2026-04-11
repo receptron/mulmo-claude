@@ -127,7 +127,7 @@ async function handleToolCall(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             toolName: "manageRoles",
-            uuid: `${SESSION_ID}-manageRoles`,
+            uuid: crypto.randomUUID(),
             ...result,
           }),
         },
@@ -168,7 +168,7 @@ async function handleToolCall(
   // Push visual ToolResult to the frontend via the session
   const toolResult = {
     toolName: name,
-    uuid: `${SESSION_ID}-${name}`,
+    uuid: crypto.randomUUID(),
     ...result,
   };
   await fetch(`${BASE_URL}/api/internal/tool-result?session=${SESSION_ID}`, {
