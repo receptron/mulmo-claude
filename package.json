@@ -29,7 +29,6 @@
     "@gui-chat-plugin/browse": "^0.1.1",
     "@gui-chat-plugin/camera": "^0.3.0",
     "@gui-chat-plugin/canvas": "0.3.4",
-    "@gui-chat-plugin/edit-image": "^0.3.0",
     "@gui-chat-plugin/mindmap": "^0.3.1",
     "@gui-chat-plugin/music": "^1.0.0",
     "@gui-chat-plugin/othello": "^0.2.2",

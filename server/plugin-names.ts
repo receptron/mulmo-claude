@@ -17,7 +17,7 @@ import { TOOL_DEFINITION as GenerateImageDef } from "@mulmochat-plugin/generate-
 import { TOOL_DEFINITION as QuizDef } from "@mulmochat-plugin/quiz";
 import { TOOL_DEFINITION as FormDef } from "@mulmochat-plugin/form";
 import { TOOL_DEFINITION as CanvasDef } from "@gui-chat-plugin/canvas";
-import { TOOL_DEFINITION as EditImageDef } from "@gui-chat-plugin/edit-image";
+import EditImageDef from "../src/plugins/editImage/definition.js";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
 import { TOOL_DEFINITION as MusicDef } from "@gui-chat-plugin/music";
 

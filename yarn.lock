@@ -471,13 +471,6 @@
   dependencies:
     vue-drawing-canvas "^1.0.14"
 
-"@gui-chat-plugin/edit-image@^0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/edit-image/-/edit-image-0.3.0.tgz#89045471e0cab9536b8652fc29604c24008e5053"
-  integrity sha512-/8ckzhqpOYAasMnHHcpaGwEIUf/78Em3TxAKHuIeDVIN3IBcdleMoIVmMv3/Nlj0eASTGs3/vid69+Z+JH5OgA==
-  dependencies:
-    gui-chat-protocol "^0.0.3"
-
 "@gui-chat-plugin/mindmap@^0.3.1":
   version "0.3.1"
   resolved "https://registry.yarnpkg.com/@gui-chat-plugin/mindmap/-/mindmap-0.3.1.tgz#68bf59e93f4e8940cc1062deab7eb38a3c5b3b3a"
