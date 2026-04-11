@@ -174,6 +174,28 @@ describe("indexSession — freshness throttle", () => {
     assert.equal(stub.calls.length, 2);
   });
 
+  it("force: true bypasses the freshness throttle", async () => {
+    seedSession("sess-force");
+    const stub = makeStubSummarize();
+
+    // Seed a fresh entry at t=0.
+    await indexSession(workspace, "sess-force", {
+      summarize: stub.fn,
+      now: () => 0,
+    });
+    assert.equal(stub.calls.length, 1);
+
+    // Second call 1 second later — normally skipped, but
+    // force: true re-indexes anyway.
+    const refreshed = await indexSession(workspace, "sess-force", {
+      summarize: stub.fn,
+      now: () => 1000,
+      force: true,
+    });
+    assert.ok(refreshed !== null);
+    assert.equal(stub.calls.length, 2);
+  });
+
   it("respects a custom minIntervalMs", async () => {
     seedSession("sess-D");
     const stub = makeStubSummarize();

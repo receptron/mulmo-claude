@@ -57,7 +57,25 @@ No `setInterval`. No `server/index.ts` registration. No `CHAT_INDEX_REFRESH_HOUR
 
 ## Backfill
 
-Legacy sessions (created before this feature lands) will be indexed lazily as the user revisits and continues them. For an immediate one-shot backfill, users can run the server with an env var (out of scope for this PR — add later if the lazy backfill turns out to be too slow in practice). The sidebar gracefully falls back to the first-user-message preview for any session without an index entry.
+Legacy sessions (created before this feature lands) are indexed lazily as the user revisits and continues them. The sidebar gracefully falls back to the first-user-message preview for any session without an index entry.
+
+For an immediate one-shot backfill over every existing session — useful the first time the feature is rolled out, or for debugging the indexer itself — there are two manual triggers:
+
+**Startup switch** (mirrors the journal's `JOURNAL_FORCE_RUN_ON_STARTUP=1`):
+
+```bash
+CHAT_INDEX_FORCE_RUN_ON_STARTUP=1 yarn dev
+```
+
+The server boots, walks every `chat/*.jsonl`, spawns claude for each, and logs each indexed session. The `force: true` flag propagated through the indexer bypasses both the freshness throttle and the `activeSessionIds` guard.
+
+**Runtime endpoint** (no restart required):
+
+```bash
+curl -X POST http://localhost:3000/api/chat-index/rebuild
+```
+
+`POST /api/chat-index/rebuild` calls `backfillAllSessions()` and returns `{ total, indexed, skipped }`. Server logs each indexed session as it goes so progress is visible in the terminal.
 
 ## File layout (proposed)
 

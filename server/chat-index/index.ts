@@ -15,7 +15,7 @@
 
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
-import { indexSession, type IndexerDeps } from "./indexer.js";
+import { indexSession, listSessionIds, type IndexerDeps } from "./indexer.js";
 
 // Per-session lock. Indexing different sessions in parallel is
 // fine; indexing the same session twice concurrently would just
@@ -31,9 +31,18 @@ export interface MaybeIndexSessionOptions {
   sessionId: string;
   // Skip indexing if the session is still being appended to by a
   // concurrent /api/agent request — the jsonl may be mid-write.
+  // Ignored when `force` is true so manual rebuild runs can
+  // re-index even a live session (accepting that the transcript
+  // may be slightly out of date).
   activeSessionIds?: ReadonlySet<string>;
   workspaceRoot?: string;
   deps?: IndexerDeps;
+  // Bypass the activeSessionIds guard and the isFresh throttle
+  // for this call. The per-session lock and the `disabled`
+  // sentinel are still respected — forcing doesn't help if the
+  // claude CLI is missing or the same session is already in
+  // flight.
+  force?: boolean;
 }
 
 // Fire-and-forget entry point. Errors are swallowed here; a
@@ -44,15 +53,23 @@ export async function maybeIndexSession(
   if (disabled) return;
 
   const { sessionId } = opts;
-  if (opts.activeSessionIds?.has(sessionId)) return;
+  const force = opts.force === true;
+  if (!force && opts.activeSessionIds?.has(sessionId)) return;
   if (running.has(sessionId)) return;
+
+  // Thread `force` through the indexer via IndexerDeps so the
+  // freshness throttle is also bypassed on forced runs.
+  const effectiveDeps: IndexerDeps = {
+    ...(opts.deps ?? {}),
+    ...(force ? { force: true } : {}),
+  };
 
   running.add(sessionId);
   try {
     await indexSession(
       opts.workspaceRoot ?? defaultWorkspacePath,
       sessionId,
-      opts.deps,
+      effectiveDeps,
     );
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) {
@@ -66,6 +83,67 @@ export async function maybeIndexSession(
   } finally {
     running.delete(sessionId);
   }
+}
+
+// Debug helper: index every session jsonl under workspace/chat/
+// sequentially with `force: true`. Used by the manual rebuild
+// endpoint and the CHAT_INDEX_FORCE_RUN_ON_STARTUP switch so the
+// user can populate titles for existing sessions without waiting
+// for each one to be revisited.
+//
+// Returns counts for logging. Errors on individual sessions do
+// not stop the walk — the failure is logged and processing
+// continues.
+export interface BackfillResult {
+  total: number;
+  indexed: number;
+  skipped: number;
+}
+
+export async function backfillAllSessions(
+  opts: {
+    workspaceRoot?: string;
+    deps?: IndexerDeps;
+  } = {},
+): Promise<BackfillResult> {
+  const workspaceRoot = opts.workspaceRoot ?? defaultWorkspacePath;
+  const ids = await listSessionIds(workspaceRoot);
+  const result: BackfillResult = {
+    total: ids.length,
+    indexed: 0,
+    skipped: 0,
+  };
+  for (const sessionId of ids) {
+    if (disabled) {
+      result.skipped++;
+      continue;
+    }
+    try {
+      const entry = await indexSession(workspaceRoot, sessionId, {
+        ...(opts.deps ?? {}),
+        force: true,
+      });
+      if (entry) {
+        result.indexed++;
+        // eslint-disable-next-line no-console
+        console.log(`[chat-index] indexed ${sessionId}: ${entry.title}`);
+      } else {
+        result.skipped++;
+      }
+    } catch (err) {
+      if (err instanceof ClaudeCliNotFoundError) {
+        disabled = true;
+        // eslint-disable-next-line no-console
+        console.warn(err.message);
+        result.skipped++;
+        continue;
+      }
+      result.skipped++;
+      // eslint-disable-next-line no-console
+      console.warn(`[chat-index] failed to index ${sessionId}:`, err);
+    }
+  }
+  return result;
 }
 
 // Internal hook: tests need to reset the module-level `disabled`
