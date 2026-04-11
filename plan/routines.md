@@ -125,7 +125,49 @@ Removes from `tasks.json` and calls `removeTask()` on the Task Manager.
 
 ---
 
-## 6) LLM Execution
+## 6) MCP Tool — manageRoutines
+
+Expose routines as an MCP tool so the LLM can create, list, and delete routines during a conversation. For example, the user says "remind me to check OpenAI news every morning at 9am" and the LLM calls this tool directly.
+
+### Tool Definition
+
+```ts
+{
+  name: "manageRoutines",
+  description: "Create, list, or delete scheduled routines that run automatically.",
+  input_schema: {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        enum: ["create", "list", "delete"],
+      },
+      // For "create":
+      name: { type: "string" },
+      roleId: { type: "string" },
+      prompt: { type: "string" },
+      scheduleType: { type: "string", enum: ["daily", "interval"] },
+      time: { type: "string", description: "HH:MM in UTC (for daily)" },
+      intervalMs: { type: "number", description: "Milliseconds (for interval)" },
+      // For "delete":
+      id: { type: "string" },
+    },
+    required: ["action"],
+  },
+}
+```
+
+### Behavior
+
+- **create** — calls `POST /api/routines` internally. Returns the created routine.
+- **list** — calls `GET /api/routines`. Returns all routines.
+- **delete** — calls `DELETE /api/routines/:id`. Returns confirmation.
+
+The tool calls the same REST endpoints as the UI, so behavior is identical. The tool should be added to roles that need scheduling capability (e.g., "general", "office").
+
+---
+
+## 7) LLM Execution (when a routine fires)
 
 When the Task Manager fires a routine's task:
 
@@ -175,7 +217,76 @@ This means the user can open the app, see a routine's session appear in the side
 
 ---
 
-## 7) UI — Routines Tab
+## 8) Execution History
+
+Each routine execution is recorded in `{workspace}/tasks/history.json` so users can see past runs and jump to the corresponding chat session.
+
+### Data Model
+
+```ts
+interface RoutineExecution {
+  routineId: string;             // which routine ran
+  routineName: string;           // snapshot of the name at execution time
+  sessionId: string;             // the chat session created by this run
+  roleId: string;
+  startedAt: string;             // ISO timestamp
+  finishedAt: string;            // ISO timestamp
+  status: "success" | "error";
+  error?: string;                // error message if status is "error"
+}
+```
+
+### `history.json` format
+
+```json
+{
+  "executions": [
+    {
+      "routineId": "a1b2c3",
+      "routineName": "Daily OpenAI summary",
+      "sessionId": "d4e5f6-...",
+      "roleId": "office",
+      "startedAt": "2026-04-11T11:00:01Z",
+      "finishedAt": "2026-04-11T11:02:34Z",
+      "status": "success"
+    }
+  ]
+}
+```
+
+The array is append-only. Newest entries are appended to the end. A reasonable cap (e.g., keep the last 500 entries) prevents unbounded growth.
+
+### Recording
+
+In `executeRoutine()`, record the execution after the agent finishes:
+
+```ts
+const startedAt = new Date().toISOString();
+// ... run agent ...
+const finishedAt = new Date().toISOString();
+
+appendExecution({
+  routineId: routine.id,
+  routineName: routine.name,
+  sessionId,
+  roleId: routine.roleId,
+  startedAt,
+  finishedAt,
+  status: error ? "error" : "success",
+  error: error ? String(error) : undefined,
+});
+```
+
+### Server API
+
+```ts
+// GET /api/routines/history              — list all executions (newest first)
+// GET /api/routines/history?routineId=X  — filter by routine
+```
+
+---
+
+## 9) UI — Routines Tab
 
 The Routines view is a fourth tab in the canvas area's `CanvasViewToggle`, alongside Single, Stack, and Files.
 
@@ -206,6 +317,7 @@ New button in the toggle bar:
 - Schedule (e.g., "Daily at 4:00 AM PT" or "Every 4 hours")
 - Enabled toggle switch
 - Edit / Delete buttons
+- Expandable **execution history** — recent runs with timestamp, status (success/error), and a "View" link that switches to the chat session
 
 **Add / Edit form (inline or modal):**
 - Name (text input)
@@ -225,7 +337,7 @@ All actions call the REST API; the routines list is refreshed after each mutatio
 
 ---
 
-## 8) File/Module Plan
+## 10) File/Module Plan
 
 ```text
 server/
@@ -236,6 +348,10 @@ server/
     routines.ts             // REST endpoints
 
 src/
+  plugins/
+    manageRoutines/         // MCP tool for LLM to create/list/delete routines
+      definition.ts
+      index.ts
   components/
     RoutinesView.vue        // Routines tab content
   utils/
@@ -245,13 +361,16 @@ src/
 workspace/
   tasks/
     tasks.json              // persisted routines
+    history.json            // execution history
 ```
+
+Follow the standard local plugin registration path (see CLAUDE.md "Adding a local plugin").
 
 The `tasks` subdirectory needs to be added to `SUBDIRS` in `server/workspace.ts`.
 
 ---
 
-## 9) Required Changes to Task Manager
+## 11) Required Changes to Task Manager
 
 The current Task Manager works as-is for Routines. No changes to its API or scheduling logic are needed.
 
@@ -264,7 +383,7 @@ Option B requires no Task Manager changes. Prefer Option B for now.
 
 ---
 
-## 10) Timezone Handling
+## 12) Timezone Handling
 
 Users specify times in local time (e.g., "4am Pacific"). The Routines API converts to UTC before storing in `tasks.json`. The Task Manager only deals with UTC.
 
@@ -274,6 +393,6 @@ The original user-specified time and timezone could optionally be stored as meta
 
 ---
 
-## 11) Decision Summary
+## 13) Decision Summary
 
 Routines is a thin persistence and LLM-invocation layer on top of the Task Manager. It owns `tasks.json` for storage, converts user schedules to UTC, and registers tasks whose `run()` calls `runAgent()`. The Task Manager is unchanged — it just sees normal task definitions. Output goes to `workspace/chat/` as regular sessions.
