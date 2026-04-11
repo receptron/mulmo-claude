@@ -38,7 +38,7 @@ import {
   type SessionFileMeta,
 } from "./diff.js";
 import { rewriteWorkspaceLinks } from "./linkRewrite.js";
-import type { JournalState } from "./state.js";
+import { writeState, type JournalState } from "./state.js";
 
 // --- Constants ------------------------------------------------------
 
@@ -116,10 +116,37 @@ export async function runDailyPass(
   // Read existing topic summaries once (shared across all day calls).
   const existingTopics = await readAllTopics(workspaceRoot);
 
+  // Pre-compute: per-session, the set of days it contributes to.
+  // We decrement this set as days succeed so we can mark a session
+  // "fully processed" the moment its LAST day is written, and
+  // persist that incrementally — a mid-run crash then only costs
+  // the days written after the last checkpoint, not the whole pass.
+  const sessionToDays = new Map<string, Set<string>>();
+  for (const [date, bucket] of dayBuckets) {
+    for (const excerpt of bucket) {
+      let set = sessionToDays.get(excerpt.sessionId);
+      if (!set) {
+        set = new Set<string>();
+        sessionToDays.set(excerpt.sessionId, set);
+      }
+      set.add(date);
+    }
+  }
+
+  // `nextState` is mutated through the day loop and persisted after
+  // each successful day via writeState (atomic tmp+rename). We do
+  // NOT bump lastDailyRunAt here — that's the outer runner's job
+  // after the whole pass (including optimization) finishes, so
+  // partial progress doesn't look like a complete pass.
+  const newTopicsSeen = new Set<string>(state.knownTopics);
+  let nextState: JournalState = {
+    ...state,
+    knownTopics: [...newTopicsSeen].sort(),
+  };
+
   // Process days in chronological order so topic state accumulates
   // naturally: an earlier day's update is visible to the next day.
   const orderedDays = [...dayBuckets.keys()].sort();
-  const newTopicsSeen = new Set<string>(state.knownTopics);
 
   for (const date of orderedDays) {
     const excerpts = dayBuckets.get(date) ?? [];
@@ -212,30 +239,47 @@ export async function runDailyPass(
         else existingTopics[idx] = snapshot;
       }
     }
-  }
 
-  // Only mark a dirty session as processed if none of the days it
-  // contributed to were skipped. A session whose day we failed to
-  // summarize must stay "dirty" so the next pass retries it —
-  // otherwise a transient LLM failure would permanently hide those
-  // events from the journal.
-  const skippedSessionIds = new Set<string>();
-  for (const skip of result.skipped) {
-    const bucket = dayBuckets.get(skip.date);
-    if (!bucket) continue;
-    for (const excerpt of bucket) skippedSessionIds.add(excerpt.sessionId);
+    // Per-day incremental state update. Sessions whose pending day
+    // set just became empty are now fully processed and get their
+    // record written. Sessions still carrying pending days stay
+    // dirty so the next pass retries them if the loop is interrupted.
+    const justCompleted: SessionFileMeta[] = [];
+    for (const excerpt of excerpts) {
+      const pending = sessionToDays.get(excerpt.sessionId);
+      if (!pending) continue;
+      pending.delete(date);
+      if (pending.size === 0) {
+        sessionToDays.delete(excerpt.sessionId);
+        const meta = dirtyMetaById.get(excerpt.sessionId);
+        if (meta) justCompleted.push(meta);
+      }
+    }
+    if (justCompleted.length > 0) {
+      result.sessionsIngested.push(...justCompleted.map((m) => m.id));
+    }
+    nextState = {
+      ...nextState,
+      processedSessions: applyProcessed(
+        nextState.processedSessions,
+        justCompleted,
+      ),
+      knownTopics: [...newTopicsSeen].sort(),
+    };
+    // Persist after every day. The atomic tmp+rename inside
+    // writeState means a crash mid-write can't corrupt state.json,
+    // and everything up to and including `date` is safely
+    // committed: the next run picks up exactly from the next day.
+    try {
+      await writeState(workspaceRoot, nextState);
+    } catch (err) {
+      // A write failure is not fatal for the pass itself — we've
+      // already written the day's markdown — but we want it loud
+      // in the logs so a broken filesystem doesn't hide.
+      // eslint-disable-next-line no-console
+      console.warn(`[journal] failed to persist state after ${date}:`, err);
+    }
   }
-  const justProcessed: SessionFileMeta[] = dirty
-    .filter((id) => !skippedSessionIds.has(id))
-    .map((id) => dirtyMetaById.get(id))
-    .filter((m): m is SessionFileMeta => m !== undefined);
-  result.sessionsIngested = justProcessed.map((m) => m.id);
-
-  const nextState: JournalState = {
-    ...state,
-    processedSessions: applyProcessed(state.processedSessions, justProcessed),
-    knownTopics: [...newTopicsSeen].sort(),
-  };
 
   return { nextState, result };
 }
