@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { access, appendFile, mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { getRole, loadAllRoles } from "./roles.js";
@@ -94,7 +93,7 @@ async function readChatState(chatId: string): Promise<TelegramChatState> {
   const statePath = getStatePath(chatId);
   try {
     const raw = await readFile(statePath, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<TelegramChatState>;
+    const parsed: Partial<TelegramChatState> = JSON.parse(raw);
     if (
       parsed.chatId &&
       parsed.sessionId &&
@@ -103,10 +102,13 @@ async function readChatState(chatId: string): Promise<TelegramChatState> {
       parsed.updatedAt
     ) {
       return {
-        ...parsed,
         chatId: String(parsed.chatId),
+        sessionId: parsed.sessionId,
         roleId: getRole(parsed.roleId).id,
-      } as TelegramChatState;
+        claudeSessionId: parsed.claudeSessionId,
+        startedAt: parsed.startedAt,
+        updatedAt: parsed.updatedAt,
+      };
     }
   } catch {
     // fall through to create default state
@@ -179,13 +181,20 @@ async function telegramApi<T>(
   const token = getBotToken();
   if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
 
-  const response = await fetch(`${TELEGRAM_API_ORIGIN}/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload ? JSON.stringify(payload) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${TELEGRAM_API_ORIGIN}/bot${token}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+  } catch (err) {
+    throw new Error(
+      `Telegram API ${method} network error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
-  const data = (await response.json()) as TelegramApiResponse<T>;
+  const data: TelegramApiResponse<T> = await response.json();
   if (!response.ok || !data.ok) {
     throw new Error(data.description || `Telegram API ${method} failed`);
   }
@@ -364,7 +373,7 @@ async function handleAgentMessage(
     text,
     getRole(state.roleId),
     workspacePath,
-    randomUUID(),
+    state.sessionId,
     port,
     state.claudeSessionId,
   )) {
@@ -486,7 +495,9 @@ export async function startTelegramBot(port: number): Promise<void> {
 
       for (const update of updates) {
         offset = update.update_id + 1;
-        await handleUpdate(update, port);
+        handleUpdate(update, port).catch((error) => {
+          console.error("Telegram update handling failed:", error);
+        });
       }
     } catch (error) {
       console.error("Telegram polling failed:", error);

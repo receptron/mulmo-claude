@@ -179,7 +179,11 @@ MulmoClaude can also be controlled from Telegram through a bot. The Telegram bot
    ```bash
    TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
    ```
-4. Restart the server with `yarn dev`
+4. Optional: set the default role for new Telegram chats (defaults to `general`)
+   ```bash
+   TELEGRAM_DEFAULT_ROLE_ID=general
+   ```
+5. Restart the server with `yarn dev`
 
 When `TELEGRAM_BOT_TOKEN` is present, the Express server starts a Telegram long-polling loop automatically.
 
