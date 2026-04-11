@@ -16,9 +16,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
 const props = defineProps<{ result: ToolResultComplete<WikiData> }>();
 
@@ -26,30 +27,34 @@ const action = ref(props.result.data?.action ?? "index");
 const title = ref(props.result.data?.title ?? "Wiki");
 const pageEntries = ref<WikiPageEntry[]>(props.result.data?.pageEntries ?? []);
 
+const { refresh } = useFreshPluginData<WikiData>({
+  endpoint: () => "/api/wiki",
+  extract: (json) => (json as { data?: WikiData }).data ?? null,
+  apply: (data) => {
+    // Bug fix (CodeRabbit V1 #6): /api/wiki (no slug) always
+    // returns the index payload. The Preview component is reused
+    // for page / log / lint_report previews as well, so blindly
+    // overwriting action/title/pageEntries would clobber non-index
+    // previews with "Wiki Index" the moment the fetch resolves.
+    // Only apply when this preview is currently showing the index.
+    if (action.value !== "index") return;
+    title.value = data.title ?? "Wiki";
+    pageEntries.value = data.pageEntries ?? [];
+  },
+});
+
 watch(
-  () => props.result.data,
-  (newData) => {
-    if (newData) {
-      action.value = newData.action ?? "index";
-      title.value = newData.title ?? "Wiki";
-      pageEntries.value = newData.pageEntries ?? [];
+  () => props.result.uuid,
+  () => {
+    const d = props.result.data;
+    if (d) {
+      action.value = d.action ?? "index";
+      title.value = d.title ?? "Wiki";
+      pageEntries.value = d.pageEntries ?? [];
     }
+    void refresh();
   },
 );
-
-onMounted(async () => {
-  try {
-    const res = await fetch("/api/wiki");
-    if (res.ok) {
-      const json: { data: WikiData } = await res.json();
-      action.value = json.data?.action ?? "index";
-      title.value = json.data?.title ?? "Wiki";
-      pageEntries.value = json.data?.pageEntries ?? [];
-    }
-  } catch {
-    // Fall back to prop data
-  }
-});
 
 const label = computed(() => {
   if (action.value === "index")

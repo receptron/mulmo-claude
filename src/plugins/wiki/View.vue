@@ -133,11 +133,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<WikiData>;
@@ -152,47 +153,34 @@ const pageEntries = ref<WikiPageEntry[]>(
   props.selectedResult.data?.pageEntries ?? [],
 );
 
-let fetchAbort: AbortController | null = null;
-
-async function fetchWiki() {
-  fetchAbort?.abort();
-  const controller = new AbortController();
-  fetchAbort = controller;
-  try {
-    const currentAction = action.value;
+const { refresh } = useFreshPluginData<WikiData>({
+  // Slug-aware: when the view is currently showing a specific page,
+  // fetch that page by slug; otherwise fetch the index.
+  endpoint: () => {
     const slug =
-      currentAction === "page"
-        ? props.selectedResult.data?.pageName
-        : undefined;
-    const url = slug
-      ? `/api/wiki?slug=${encodeURIComponent(slug)}`
-      : "/api/wiki";
-    const res = await fetch(url, { signal: controller.signal });
-    if (controller.signal.aborted) return;
-    if (res.ok) {
-      const json: { data: WikiData } = await res.json();
-      action.value = json.data?.action ?? "index";
-      title.value = json.data?.title ?? "Wiki";
-      content.value = json.data?.content ?? "";
-      pageEntries.value = json.data?.pageEntries ?? [];
-    }
-  } catch {
-    // Fall back to prop data
-  }
-}
-
-onMounted(fetchWiki);
+      action.value === "page" ? props.selectedResult.data?.pageName : undefined;
+    return slug ? `/api/wiki?slug=${encodeURIComponent(slug)}` : "/api/wiki";
+  },
+  extract: (json) => (json as { data?: WikiData }).data ?? null,
+  apply: (data) => {
+    action.value = data.action ?? "index";
+    title.value = data.title ?? "Wiki";
+    content.value = data.content ?? "";
+    pageEntries.value = data.pageEntries ?? [];
+  },
+});
 
 watch(
-  () => props.selectedResult.data,
-  (newData) => {
-    if (newData) {
-      action.value = newData.action ?? "index";
-      title.value = newData.title ?? "Wiki";
-      content.value = newData.content ?? "";
-      pageEntries.value = newData.pageEntries ?? [];
-      fetchWiki();
+  () => props.selectedResult.uuid,
+  () => {
+    const d = props.selectedResult.data;
+    if (d) {
+      action.value = d.action ?? "index";
+      title.value = d.title ?? "Wiki";
+      content.value = d.content ?? "";
+      pageEntries.value = d.pageEntries ?? [];
     }
+    void refresh();
   },
 );
 

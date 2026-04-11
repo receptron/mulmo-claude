@@ -19,32 +19,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
 const props = defineProps<{ result: ToolResultComplete<SchedulerData> }>();
 
 const items = ref<ScheduledItem[]>(props.result.data?.items ?? []);
 
+const { refresh } = useFreshPluginData<ScheduledItem[]>({
+  endpoint: () => "/api/scheduler",
+  extract: (json) => {
+    const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
+    return Array.isArray(v) ? v : null;
+  },
+  apply: (data) => {
+    items.value = data;
+  },
+});
+
 watch(
-  () => props.result.data?.items,
-  (newItems) => {
-    if (newItems) items.value = newItems;
+  () => props.result.uuid,
+  () => {
+    items.value = props.result.data?.items ?? [];
+    void refresh();
   },
 );
-
-onMounted(async () => {
-  try {
-    const res = await fetch("/api/scheduler");
-    if (res.ok) {
-      const json: { data: { items: ScheduledItem[] } } = await res.json();
-      items.value = json.data?.items ?? [];
-    }
-  } catch {
-    // Fall back to prop data
-  }
-});
 
 const today = new Date().toISOString().slice(0, 10);
 

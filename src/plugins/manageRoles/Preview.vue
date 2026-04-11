@@ -24,29 +24,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageRolesData, CustomRole } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
 const props = defineProps<{ result: ToolResultComplete<ManageRolesData> }>();
 const customRoles = ref<CustomRole[]>(props.result.data?.customRoles ?? []);
 
+const { refresh } = useFreshPluginData<CustomRole[]>({
+  endpoint: () => "/api/roles",
+  extract: (json) => (Array.isArray(json) ? (json as CustomRole[]) : null),
+  apply: (data) => {
+    customRoles.value = data;
+  },
+});
+
 watch(
-  () => props.result.data?.customRoles,
-  (newRoles) => {
-    if (newRoles) customRoles.value = newRoles;
+  () => props.result.uuid,
+  () => {
+    customRoles.value = props.result.data?.customRoles ?? [];
+    void refresh();
   },
 );
-
-onMounted(async () => {
-  try {
-    const res = await fetch("/api/roles");
-    if (res.ok) {
-      const roles: CustomRole[] = await res.json();
-      customRoles.value = roles;
-    }
-  } catch {
-    // Fall back to prop data
-  }
-});
 </script>

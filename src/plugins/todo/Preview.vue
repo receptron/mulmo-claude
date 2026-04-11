@@ -32,33 +32,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { colorForLabel } from "./labels";
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 
 const items = ref<TodoItem[]>(props.result.data?.items ?? []);
 
+const { refresh } = useFreshPluginData<TodoItem[]>({
+  endpoint: () => "/api/todos",
+  extract: (json) => {
+    const v = (json as { data?: { items?: TodoItem[] } }).data?.items;
+    return Array.isArray(v) ? v : null;
+  },
+  apply: (data) => {
+    items.value = data;
+  },
+});
+
 watch(
-  () => props.result.data?.items,
-  (newItems) => {
-    if (newItems) items.value = newItems;
+  () => props.result.uuid,
+  () => {
+    items.value = props.result.data?.items ?? [];
+    void refresh();
   },
 );
-
-onMounted(async () => {
-  try {
-    const res = await fetch("/api/todos");
-    if (res.ok) {
-      const json: { data: { items: TodoItem[] } } = await res.json();
-      items.value = json.data?.items ?? [];
-    }
-  } catch {
-    // Fall back to prop data
-  }
-});
 const completedCount = computed(
   () => items.value.filter((i) => i.completed).length,
 );

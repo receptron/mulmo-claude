@@ -179,7 +179,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { CustomRole, ManageRolesData } from "./index";
 import { getAllPluginNames } from "../../tools/index";
@@ -219,17 +220,25 @@ const customRoles = ref<CustomRole[]>(
   props.selectedResult.data?.customRoles ?? [],
 );
 
-onMounted(async () => {
-  try {
-    const res = await fetch("/api/roles");
-    if (res.ok) {
-      const roles: CustomRole[] = await res.json();
-      customRoles.value = roles;
-    }
-  } catch {
-    // Fall back to prop data
-  }
+const { refresh: refreshCustomRoles } = useFreshPluginData<CustomRole[]>({
+  endpoint: () => "/api/roles",
+  extract: (json) => (Array.isArray(json) ? (json as CustomRole[]) : null),
+  apply: (data) => {
+    customRoles.value = data;
+  },
 });
+
+// Sync with parent prop changes when the tool result is swapped
+// (e.g. moving between sessions). Previously this component was
+// missing a watch entirely, so it never picked up prop changes
+// after mount — closing CodeRabbit V1 #2/#4/#7's coverage gap.
+watch(
+  () => props.selectedResult.uuid,
+  () => {
+    customRoles.value = props.selectedResult.data?.customRoles ?? [];
+    void refreshCustomRoles();
+  },
+);
 
 // ── Selection & edit form ─────────────────────────────────────────────────────
 

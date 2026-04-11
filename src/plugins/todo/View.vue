@@ -153,9 +153,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import {
   colorForLabel,
   filterByLabels,
@@ -170,33 +171,27 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
 const items = ref<TodoItem[]>(props.selectedResult.data?.items ?? []);
 
-let fetchAbort: AbortController | null = null;
+const { refresh } = useFreshPluginData<TodoItem[]>({
+  endpoint: () => "/api/todos",
+  extract: (json) => {
+    const v = (json as { data?: { items?: TodoItem[] } }).data?.items;
+    return Array.isArray(v) ? v : null;
+  },
+  apply: (data) => {
+    items.value = data;
+  },
+});
 
-async function fetchItems() {
-  fetchAbort?.abort();
-  const controller = new AbortController();
-  fetchAbort = controller;
-  try {
-    const res = await fetch("/api/todos", { signal: controller.signal });
-    if (controller.signal.aborted) return;
-    if (res.ok) {
-      const json: { data: { items: TodoItem[] } } = await res.json();
-      items.value = json.data?.items ?? [];
-    }
-  } catch {
-    // Fall back to prop data (already set)
-  }
-}
-
-onMounted(fetchItems);
-
+// Re-fetch when the caller swaps in a different tool result.
+// Watch the uuid (not data?.items) so the trigger fires even when
+// the old and new results both have `undefined` items — e.g.
+// toggling between two empty results — per CodeRabbit V2's
+// "watch key miss" finding.
 watch(
-  () => props.selectedResult.data?.items,
-  (newItems) => {
-    if (newItems) {
-      items.value = newItems;
-      fetchItems();
-    }
+  () => props.selectedResult.uuid,
+  () => {
+    items.value = props.selectedResult.data?.items ?? [];
+    void refresh();
   },
 );
 const completedCount = computed(

@@ -331,9 +331,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
+import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<SchedulerData>;
@@ -342,33 +343,22 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
 const items = ref<ScheduledItem[]>(props.selectedResult.data?.items ?? []);
 
-let fetchAbort: AbortController | null = null;
-
-async function fetchItems() {
-  fetchAbort?.abort();
-  const controller = new AbortController();
-  fetchAbort = controller;
-  try {
-    const res = await fetch("/api/scheduler", { signal: controller.signal });
-    if (controller.signal.aborted) return;
-    if (res.ok) {
-      const json: { data: { items: ScheduledItem[] } } = await res.json();
-      items.value = json.data?.items ?? [];
-    }
-  } catch {
-    // Fall back to prop data
-  }
-}
-
-onMounted(fetchItems);
+const { refresh } = useFreshPluginData<ScheduledItem[]>({
+  endpoint: () => "/api/scheduler",
+  extract: (json) => {
+    const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
+    return Array.isArray(v) ? v : null;
+  },
+  apply: (data) => {
+    items.value = data;
+  },
+});
 
 watch(
-  () => props.selectedResult.data?.items,
-  (newItems) => {
-    if (newItems) {
-      items.value = newItems;
-      fetchItems();
-    }
+  () => props.selectedResult.uuid,
+  () => {
+    items.value = props.selectedResult.data?.items ?? [];
+    void refresh();
   },
 );
 
