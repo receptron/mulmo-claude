@@ -3,6 +3,7 @@ import { mkdir, writeFile, unlink } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join } from "path";
 import { isDockerAvailable } from "./docker.js";
+import { refreshCredentials } from "./credentials.js";
 import type { Role } from "../src/config/roles.js";
 import { loadAllRoles } from "./roles.js";
 import { buildSystemPrompt } from "./agent/prompt.js";
@@ -30,6 +31,12 @@ export async function* runAgent(
   const activePlugins = getActivePlugins(role);
   const hasMcp = activePlugins.length > 0;
   const useDocker = await isDockerAvailable();
+
+  // On macOS sandbox, always refresh credentials from Keychain before each
+  // agent run so that expired OAuth tokens are replaced transparently.
+  if (useDocker && process.platform === "darwin") {
+    await refreshCredentials();
+  }
 
   const containerWorkspacePath = "/home/node/mulmoclaude";
   const fullSystemPrompt = buildSystemPrompt({

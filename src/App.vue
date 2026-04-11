@@ -9,7 +9,9 @@
         class="p-4 border-b border-gray-200 flex items-center justify-between"
       >
         <div>
-          <h1 class="text-lg font-semibold">MulmoClaude</h1>
+          <h1 class="text-lg font-semibold" :style="debugTitleStyle">
+            MulmoClaude
+          </h1>
         </div>
         <div class="flex gap-2">
           <button
@@ -505,6 +507,23 @@ import { useClickOutside } from "./composables/useClickOutside";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
+import { usePubSub } from "./composables/usePubSub";
+
+// --- Debug beat (pub/sub) ---
+const debugBeatColor = ref<string | null>(null);
+const debugTitleStyle = computed(() =>
+  debugBeatColor.value ? { color: debugBeatColor.value } : {},
+);
+
+const { subscribe: pubsubSubscribe } = usePubSub();
+pubsubSubscribe("debug.beat", (data) => {
+  const msg = data as { count: number; last?: boolean };
+  if (msg.last) {
+    debugBeatColor.value = null;
+  } else {
+    debugBeatColor.value = msg.count % 2 === 0 ? "#3b82f6" : "#ef4444";
+  }
+});
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
