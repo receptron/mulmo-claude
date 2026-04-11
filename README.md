@@ -163,3 +163,32 @@ All data is stored as plain files in the workspace directory:
   wiki/         ← personal knowledge base (see above)
   ...
 ```
+
+## Optional: Telegram Bot
+
+MulmoClaude can also be controlled from Telegram through a bot. The Telegram bot reuses the same server-side Claude session flow as the web UI and stores one conversation state per Telegram chat.
+
+### Setup
+
+1. Create a bot with [@BotFather](https://t.me/BotFather)
+2. Copy the bot token into `.env`
+   ```bash
+   TELEGRAM_BOT_TOKEN=123456:your_bot_token
+   ```
+3. Optional: restrict access to specific Telegram chats
+   ```bash
+   TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
+   ```
+4. Restart the server with `yarn dev`
+
+When `TELEGRAM_BOT_TOKEN` is present, the Express server starts a Telegram long-polling loop automatically.
+
+### Telegram Commands
+
+- `/start` — create a fresh Telegram session
+- `/help` — show bot help
+- `/roles` — list available MulmoClaude roles
+- `/role <id>` — switch role and reset the session
+- `/reset` — reset the current conversation
+
+Plain text messages are forwarded to MulmoClaude and the text response is sent back to Telegram. Visual plugin outputs remain available in the browser UI, so Telegram is best for text-first interaction.

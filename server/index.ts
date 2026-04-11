@@ -25,6 +25,7 @@ import { initWorkspace } from "./workspace.js";
 import fs from "fs";
 import os from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./docker.js";
+import { startTelegramBot } from "./telegram.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -160,5 +161,8 @@ function isPortFree(port: number): Promise<boolean> {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
+    startTelegramBot(PORT).catch((error) => {
+      console.error("Failed to start Telegram bot:", error);
+    });
   });
 })();
