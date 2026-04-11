@@ -11,7 +11,7 @@ import ManageRolesDef from "../src/plugins/manageRoles/definition.js";
 import WikiDef from "../src/plugins/wiki/definition.js";
 import PresentHtmlDef from "../src/plugins/presentHtml/definition.js";
 import MarkdownDef from "../src/plugins/markdown/definition.js";
-import { TOOL_DEFINITION as SpreadsheetDef } from "@gui-chat-plugin/spreadsheet";
+import SpreadsheetDef from "../src/plugins/spreadsheet/definition.js";
 import { TOOL_DEFINITION as MindMapDef } from "@gui-chat-plugin/mindmap";
 import { TOOL_DEFINITION as GenerateImageDef } from "@mulmochat-plugin/generate-image";
 import { TOOL_DEFINITION as QuizDef } from "@mulmochat-plugin/quiz";

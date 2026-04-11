@@ -2,7 +2,7 @@ import type { PluginEntry } from "./types";
 import TextResponsePlugin from "@gui-chat-plugin/text-response/vue";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import markdownPlugin from "../plugins/markdown/index";
-import SpreadsheetPlugin from "@gui-chat-plugin/spreadsheet/vue";
+import spreadsheetPlugin from "../plugins/spreadsheet/index";
 import MindMapPlugin from "@gui-chat-plugin/mindmap/vue";
 import GenerateImagePlugin from "@mulmochat-plugin/generate-image/vue";
 import QuizPlugin from "@mulmochat-plugin/quiz/vue";
@@ -31,7 +31,7 @@ const plugins: Record<string, PluginEntry> = {
   manageWiki: wikiPlugin,
   presentMulmoScript: presentMulmoScriptPlugin,
   presentDocument: markdownPlugin,
-  presentSpreadsheet: SpreadsheetPlugin.plugin,
+  presentSpreadsheet: spreadsheetPlugin,
   createMindMap: MindMapPlugin.plugin,
   generateImage: GenerateImagePlugin.plugin,
   putQuestions: QuizPlugin.plugin,

@@ -11,7 +11,7 @@ export default [
     files: ["{src,test}/**/*.{js,ts,yaml,yml}", "assets/html/js/**/*.js"],
   },
   {
-    ignores: ["lib"],
+    ignores: ["lib", "src/plugins/spreadsheet/engine"],
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,

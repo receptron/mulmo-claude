@@ -33,7 +33,6 @@
     "@gui-chat-plugin/othello": "^0.2.2",
     "@gui-chat-plugin/piano": "github:receptron/GUIChatPluginPiano",
     "@gui-chat-plugin/present3d": "^0.0.3",
-    "@gui-chat-plugin/spreadsheet": "0.2.2",
     "@gui-chat-plugin/text-response": "0.1.2",
     "@gui-chat-plugin/weather": "^0.0.2",
     "@mulmocast/types": "^2.6.6",
@@ -53,6 +52,7 @@
     "vue": "^3.5.32",
     "vue-drawing-canvas": "^1.0.14",
     "vue-router": "^5.0.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.3.6"
   },
   "devDependencies": {

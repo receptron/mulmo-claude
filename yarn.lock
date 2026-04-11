@@ -505,13 +505,6 @@
     three-bvh-csg "^0.0.17"
     three-mesh-bvh "^0.9.7"
 
-"@gui-chat-plugin/spreadsheet@0.2.2":
-  version "0.2.2"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/spreadsheet/-/spreadsheet-0.2.2.tgz#7ef519002edfc183b8bc0874c2d876a7e2a8e0a9"
-  integrity sha512-saoGHsGqdrp8EN+6RF6b5emK6K0oTf9mzqmtsY3IBIGDkKPjq+/EOymTMOApwSS1U13pGpX7clnINcRsyA/9Fg==
-  dependencies:
-    xlsx "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
-
 "@gui-chat-plugin/text-response@0.1.2":
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/@gui-chat-plugin/text-response/-/text-response-0.1.2.tgz#ebb4376a04a4ff944a1268d00b8e2835aefe6015"

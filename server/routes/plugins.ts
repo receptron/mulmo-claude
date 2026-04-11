@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { executeMindMap } from "@gui-chat-plugin/mindmap";
-import { executeSpreadsheet } from "@gui-chat-plugin/spreadsheet";
+import { executeSpreadsheet } from "../../src/plugins/spreadsheet/definition.js";
 import { executeQuiz } from "@mulmochat-plugin/quiz";
 import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "../../src/plugins/canvas/definition.js";
@@ -94,7 +94,7 @@ router.post(
   "/present-spreadsheet",
   async (_req: Request, res: Response<PluginErrorResponse>) => {
     try {
-      const result = await executeSpreadsheet(null as never, _req.body);
+      const result = await executeSpreadsheet(_req.body);
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: String(err) });
