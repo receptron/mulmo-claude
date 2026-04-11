@@ -16,15 +16,40 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { WikiData } from "./index";
+import type { WikiData, WikiPageEntry } from "./index";
 
 const props = defineProps<{ result: ToolResultComplete<WikiData> }>();
 
-const action = computed(() => props.result.data?.action ?? "index");
-const title = computed(() => props.result.data?.title ?? "Wiki");
-const pageEntries = computed(() => props.result.data?.pageEntries ?? []);
+const action = ref(props.result.data?.action ?? "index");
+const title = ref(props.result.data?.title ?? "Wiki");
+const pageEntries = ref<WikiPageEntry[]>(props.result.data?.pageEntries ?? []);
+
+watch(
+  () => props.result.data,
+  (newData) => {
+    if (newData) {
+      action.value = newData.action ?? "index";
+      title.value = newData.title ?? "Wiki";
+      pageEntries.value = newData.pageEntries ?? [];
+    }
+  },
+);
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/wiki");
+    if (res.ok) {
+      const json: { data: WikiData } = await res.json();
+      action.value = json.data?.action ?? "index";
+      title.value = json.data?.title ?? "Wiki";
+      pageEntries.value = json.data?.pageEntries ?? [];
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 
 const label = computed(() => {
   if (action.value === "index")

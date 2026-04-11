@@ -215,9 +215,21 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
-const customRoles = computed(
-  () => props.selectedResult.data?.customRoles ?? [],
+const customRoles = ref<CustomRole[]>(
+  props.selectedResult.data?.customRoles ?? [],
 );
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/roles");
+    if (res.ok) {
+      const roles: CustomRole[] = await res.json();
+      customRoles.value = roles;
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 
 // ── Selection & edit form ─────────────────────────────────────────────────────
 
@@ -288,6 +300,8 @@ async function callManage(
 async function refreshList() {
   const result = await callManage({ action: "list" });
   if (result.success) {
+    const data = result as { data?: { customRoles?: CustomRole[] } };
+    customRoles.value = data.data?.customRoles ?? [];
     emit("updateResult", {
       ...props.selectedResult,
       ...result,

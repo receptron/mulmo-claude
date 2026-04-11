@@ -331,7 +331,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 
@@ -340,7 +340,19 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
-const items = computed(() => props.selectedResult.data?.items ?? []);
+const items = ref<ScheduledItem[]>(props.selectedResult.data?.items ?? []);
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/scheduler");
+    if (res.ok) {
+      const json: { data: { items: ScheduledItem[] } } = await res.json();
+      items.value = json.data?.items ?? [];
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 
 // ── View mode ──────────────────────────────────────────────────────────────
 
@@ -565,21 +577,18 @@ function selectItem(item: ScheduledItem) {
   yamlError.value = "";
 }
 
-watch(
-  () => props.selectedResult.data,
-  () => {
-    if (selectedId.value) {
-      const item = items.value.find((i) => i.id === selectedId.value);
-      if (item) {
-        yamlText.value = serializeYaml(item);
-      } else {
-        selectedId.value = null;
-      }
+watch(items, () => {
+  if (selectedId.value) {
+    const item = items.value.find((i) => i.id === selectedId.value);
+    if (item) {
+      yamlText.value = serializeYaml(item);
+    } else {
+      selectedId.value = null;
     }
-    editorText.value = toJson(items.value);
-    parseError.value = "";
-  },
-);
+  }
+  editorText.value = toJson(items.value);
+  parseError.value = "";
+});
 
 async function applyItemEdit() {
   yamlError.value = "";
@@ -594,6 +603,7 @@ async function applyItemEdit() {
     title: parsed.title,
     props: parsed.props,
   });
+  selectedId.value = null;
 }
 
 // ── JSON source editor ───────────────────────────────────────────────────────
@@ -607,17 +617,23 @@ const parseError = ref("");
 const isModified = computed(() => editorText.value !== toJson(items.value));
 
 async function callApi(body: Record<string, unknown>) {
-  const response = await fetch("/api/scheduler", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const result = await response.json();
-  emit("updateResult", {
-    ...props.selectedResult,
-    ...result,
-    uuid: props.selectedResult.uuid,
-  });
+  try {
+    const response = await fetch("/api/scheduler", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) return;
+    const result = await response.json();
+    items.value = result.data?.items ?? [];
+    emit("updateResult", {
+      ...props.selectedResult,
+      ...result,
+      uuid: props.selectedResult.uuid,
+    });
+  } catch {
+    // Network error — keep current state
+  }
 }
 
 function remove(item: ScheduledItem) {

@@ -34,6 +34,13 @@ function saveItems(items: ScheduledItem[]): void {
   saveJsonFile(schedulerFile(), items);
 }
 
+router.get(
+  "/scheduler",
+  (_req: Request, res: Response<{ data: { items: ScheduledItem[] } }>) => {
+    res.json({ data: { items: loadItems() } });
+  },
+);
+
 interface SchedulerBody {
   action: string;
   title?: string;

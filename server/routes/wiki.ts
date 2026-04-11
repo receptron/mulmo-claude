@@ -113,6 +113,46 @@ function resolvePagePath(pageName: string): string | null {
   return match ? path.join(dir, match) : null;
 }
 
+router.get(
+  "/wiki",
+  (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
+    const slug =
+      typeof req.query.slug === "string" ? req.query.slug : undefined;
+    if (slug) {
+      const filePath = resolvePagePath(slug);
+      const content = filePath ? readFileOrEmpty(filePath) : "";
+      const resolvedTitle = filePath ? path.basename(filePath, ".md") : slug;
+      res.json({
+        data: {
+          action: "page",
+          title: resolvedTitle,
+          content,
+          pageName: resolvedTitle,
+          error: content ? undefined : `Page not found: ${slug}`,
+        },
+        message: content
+          ? `Showing page: ${resolvedTitle}`
+          : `Page not found: ${slug}`,
+        title: resolvedTitle,
+        instructions: "The wiki page is now displayed on the canvas.",
+        updating: true,
+      });
+    } else {
+      const content = readFileOrEmpty(indexFile());
+      const pageEntries = parseIndexEntries(content);
+      res.json({
+        data: { action: "index", title: "Wiki Index", content, pageEntries },
+        message: content
+          ? `Wiki index — ${pageEntries.length} page(s)`
+          : "Wiki index is empty.",
+        title: "Wiki Index",
+        instructions: "The wiki index is now displayed on the canvas.",
+        updating: true,
+      });
+    }
+  },
+);
+
 interface WikiBody {
   action: string;
   pageName?: string;

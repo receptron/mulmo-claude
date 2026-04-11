@@ -23,6 +23,13 @@ function saveTodos(items: TodoItem[]): void {
   saveJsonFile(todosFile(), items);
 }
 
+router.get(
+  "/todos",
+  (_req: Request, res: Response<{ data: { items: TodoItem[] } }>) => {
+    res.json({ data: { items: loadTodos() } });
+  },
+);
+
 interface TodoBody {
   action: string;
   text?: string;

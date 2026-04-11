@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
@@ -145,12 +145,35 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
-const action = computed(() => props.selectedResult.data?.action ?? "index");
-const title = computed(() => props.selectedResult.data?.title ?? "Wiki");
-const content = computed(() => props.selectedResult.data?.content ?? "");
-const pageEntries = computed(
-  (): WikiPageEntry[] => props.selectedResult.data?.pageEntries ?? [],
+const action = ref(props.selectedResult.data?.action ?? "index");
+const title = ref(props.selectedResult.data?.title ?? "Wiki");
+const content = ref(props.selectedResult.data?.content ?? "");
+const pageEntries = ref<WikiPageEntry[]>(
+  props.selectedResult.data?.pageEntries ?? [],
 );
+
+onMounted(async () => {
+  try {
+    const currentAction = action.value;
+    const slug =
+      currentAction === "page"
+        ? props.selectedResult.data?.pageName
+        : undefined;
+    const url = slug
+      ? `/api/wiki?slug=${encodeURIComponent(slug)}`
+      : "/api/wiki";
+    const res = await fetch(url);
+    if (res.ok) {
+      const json: { data: WikiData } = await res.json();
+      action.value = json.data?.action ?? "index";
+      title.value = json.data?.title ?? "Wiki";
+      content.value = json.data?.content ?? "";
+      pageEntries.value = json.data?.pageEntries ?? [];
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 
 const renderedContent = computed(() => {
   if (!content.value) return "";
@@ -187,6 +210,10 @@ async function callApi(body: Record<string, unknown>) {
   }
 
   const result = await response.json();
+  action.value = result.data?.action ?? "index";
+  title.value = result.data?.title ?? "Wiki";
+  content.value = result.data?.content ?? "";
+  pageEntries.value = result.data?.pageEntries ?? [];
   emit("updateResult", {
     ...props.selectedResult,
     ...result,

@@ -17,13 +17,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { TodoData } from "./index";
+import type { TodoData, TodoItem } from "./index";
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 
-const items = computed(() => props.result.data?.items ?? []);
+const items = ref<TodoItem[]>(props.result.data?.items ?? []);
+
+watch(
+  () => props.result.data?.items,
+  (newItems) => {
+    if (newItems) items.value = newItems;
+  },
+);
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/todos");
+    if (res.ok) {
+      const json: { data: { items: TodoItem[] } } = await res.json();
+      items.value = json.data?.items ?? [];
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 const completedCount = computed(
   () => items.value.filter((i) => i.completed).length,
 );

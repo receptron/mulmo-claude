@@ -19,13 +19,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 
 const props = defineProps<{ result: ToolResultComplete<SchedulerData> }>();
 
-const items = computed(() => props.result.data?.items ?? []);
+const items = ref<ScheduledItem[]>(props.result.data?.items ?? []);
+
+watch(
+  () => props.result.data?.items,
+  (newItems) => {
+    if (newItems) items.value = newItems;
+  },
+);
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/scheduler");
+    if (res.ok) {
+      const json: { data: { items: ScheduledItem[] } } = await res.json();
+      items.value = json.data?.items ?? [];
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 
 const today = new Date().toISOString().slice(0, 10);
 

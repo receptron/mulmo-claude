@@ -24,10 +24,29 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, watch, onMounted } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { ManageRolesData } from "./index";
+import type { ManageRolesData, CustomRole } from "./index";
 
 const props = defineProps<{ result: ToolResultComplete<ManageRolesData> }>();
-const customRoles = computed(() => props.result.data?.customRoles ?? []);
+const customRoles = ref<CustomRole[]>(props.result.data?.customRoles ?? []);
+
+watch(
+  () => props.result.data?.customRoles,
+  (newRoles) => {
+    if (newRoles) customRoles.value = newRoles;
+  },
+);
+
+onMounted(async () => {
+  try {
+    const res = await fetch("/api/roles");
+    if (res.ok) {
+      const roles: CustomRole[] = await res.json();
+      customRoles.value = roles;
+    }
+  } catch {
+    // Fall back to prop data
+  }
+});
 </script>
