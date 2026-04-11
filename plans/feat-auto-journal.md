@@ -14,10 +14,11 @@ A top-level `summaries/_index.md` ties both together for quick navigation.
 The system is **fully automatic**:
 
 - No user action required to trigger summarisation
-- Runs at a configurable interval (default 24h for daily/topic updates, 7d for optimization)
+- Runs at a configurable interval (default 1h for daily/topic updates, 7d for optimization)
 - Remembers what it has already processed and only touches new/changed sessions
 - Self-organising: topic taxonomy is discovered by the LLM from session content, not hand-configured
 - Self-optimising: a periodic pass merges near-duplicate topics and archives stale ones
+- Uses the user's `claude` CLI subprocess (not the Claude Agent SDK), so summarisation draws from the user's Claude subscription quota rather than API tokens
 
 ## Non-goals
 
@@ -60,7 +61,7 @@ interface JournalState {
   lastOptimizationRunAt: string | null;
   // Intervals between passes. Stored in state so the user can edit
   // them without rebuilding; defaults applied if absent.
-  dailyIntervalHours: number;           // default 24
+  dailyIntervalHours: number;           // default 1
   optimizationIntervalDays: number;     // default 7
   // Sessions whose jsonl has already been ingested, with the last
   // mtime we saw, so we can detect appended events on resumed sessions.
@@ -104,9 +105,47 @@ Why not trigger on startup?
 6. **Rebuild `_index.md`** from current filesystem state (no LLM needed — pure filesystem walk + sort)
 7. **Update `_state.json`**: bump `lastDailyRunAt`, update `processedSessions` mtimes, append any newly-created topic slugs to `knownTopics`
 
-### LLM prompt shape
+### LLM invocation — `claude` CLI subprocess
 
-The archivist is a single `query()` call to the Claude Agent SDK (no MCP plugins, no tools — pure text in, structured text out). System prompt:
+Rather than calling the Claude Agent SDK (which bills through the API key and burns tokens per-run), the archivist shells out to the user's **`claude` CLI binary**. That routes through the user's Claude subscription quota instead, which is effectively free for this kind of background batch work.
+
+```ts
+// Simplified shape. Real code adds timeouts and stderr handling.
+import { spawn } from "node:child_process";
+
+async function runClaudeCli(systemPrompt: string, userPrompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("claude", ["-p", "--output-format", "text"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d.toString()));
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`claude exited ${code}: ${stderr}`));
+    });
+    // Send the full archivist prompt via stdin so we don't hit
+    // shell argv length limits for large day excerpts.
+    child.stdin.write(`${systemPrompt}\n\n---\n\n${userPrompt}`);
+    child.stdin.end();
+  });
+}
+```
+
+Constraints and caveats the wrapper must handle:
+
+- **Timeout** — spawn gets a 5-minute wall-clock timeout per invocation. On timeout, kill the child and fail the day (next pass retries).
+- **`claude` not on PATH** — on `ENOENT`, log a clear one-liner and disable the journal for the current server lifetime (do not keep retrying on every session-end).
+- **Not authenticated / quota exhausted** — surfaces as a non-zero exit with a stderr message; log it and skip the day, retry next pass.
+- **stdin piping** — the archivist prompt can include thousands of lines of jsonl excerpts; passing via argv would blow past OS arg limits. Always use stdin.
+- **Structured output** — ask the prompt to emit a JSON code fence; parse with a tolerant extractor (`/```json\n([\s\S]*?)\n```/`) and fall back to scanning for the first `{` ... balanced `}` if the fence is missing.
+
+### Prompt shape
+
+The archivist runs with no MCP plugins, no tools — pure text in, structured text out. System prompt:
 
 > You are the journal archivist for this MulmoClaude workspace. Your job is to distill raw session logs into two artifacts:
 > (1) a daily summary capturing what happened on the given date, and
@@ -119,7 +158,7 @@ The archivist is a single `query()` call to the Claude Agent SDK (no MCP plugins
 >
 > Match the language of the source session (Japanese stays Japanese, English stays English). Be terse — no filler.
 
-Response is parsed as JSON; on parse failure, skip the day and log the error (don't crash the journal).
+Response is parsed as JSON; on parse failure, skip the day and log the error (don't crash the journal). All subprocess failure modes (ENOENT, timeout, non-zero exit, auth error) are caught inside `archivist.ts` and converted into logged warnings — the journal module never throws into the agent route's `finally` block.
 
 ## Optimization pass — `runOptimizationPass()`
 
@@ -188,7 +227,7 @@ All non-LLM logic is extracted into pure functions and lives in files designed t
 - `state.ts` — `defaultState()`, parse/validate round-trip, `isDailyDue(state, now)`, `isOptimizationDue(state, now)`
 - `indexFile.ts` — `buildIndexMarkdown(dirListing, lastUpdatedIso)` pure string builder
 
-The LLM wrapper `archivist.ts` takes an injected `summarize: (prompt) => Promise<string>` so tests can pass a fake. The default exports a real Claude Agent SDK call.
+The LLM wrapper `archivist.ts` takes an injected `summarize: (systemPrompt, userPrompt) => Promise<string>` so tests can pass a fake. The default exports `runClaudeCli` which shells out to the `claude` binary. Tests never spawn a subprocess; they supply a deterministic fake that returns canned JSON.
 
 Test files:
 ```
@@ -203,7 +242,8 @@ At minimum each file covers: happy path, empty case, boundary case (interval exa
 
 ## Risks & mitigations
 
-- **Token cost** — default interval is 24h so worst case is 1 LLM call per day per active workspace. Grouping by day in a single call keeps the ceiling at O(days_touched), not O(sessions). Mitigation: configurable interval in `_state.json`; user can raise it to 72h or lower to 6h.
+- **Token cost** — mitigated by routing through the `claude` CLI (subscription quota) instead of the API SDK. Default interval is 1h so a heavily-used workspace triggers ~24 passes per day worst case, but each pass only invokes the CLI if sessions have actually changed since the last run. Grouping by day keeps the per-pass cost at O(days_touched), not O(sessions). User can raise `dailyIntervalHours` in `_state.json` if they want even less chatter.
+- **`claude` CLI dependency** — the feature silently disables itself (with a single warning log) if the `claude` binary isn't installed or authenticated. Existing MulmoClaude functionality is unaffected.
 - **Concurrent runs** — two sessions ending simultaneously could race. Mitigation: in-process module-level lock flag (`running: boolean`). Good enough for single-user single-instance MulmoClaude.
 - **Partial writes on crash** — write `_state.json` atomically (write to `_state.json.tmp`, rename). Per-topic/per-day file writes are idempotent because the dirty-session detection re-ingests on next run until `_state.json` is persisted.
 - **Runaway topic creation** — LLM invents a new topic for every session. Mitigation: system prompt instructs "prefer existing topics; create new only when no existing topic fits". Optimization pass merges duplicates as a safety net.
@@ -213,23 +253,19 @@ At minimum each file covers: happy path, empty case, boundary case (interval exa
 
 ## Implementation order
 
-**Phase 1 — Daily + topic passes + index + hook (this PR):**
+**All in this PR** — Phase 1 (daily + topic) and Phase 2 (optimization) ship together:
 
 1. `server/journal/paths.ts` + tests
 2. `server/journal/state.ts` + tests (including atomic write)
 3. `server/journal/diff.ts` + tests
 4. `server/journal/indexFile.ts` + tests
-5. `server/journal/archivist.ts` — LLM wrapper with injectable `summarize`
-6. `server/journal/dailyPass.ts` — ties the above together
-7. `server/journal/index.ts` — `maybeRunJournal()` entry with lock
-8. `server/routes/agent.ts` — call `maybeRunJournal()` in `finally` block (fire-and-forget)
-9. Run format / lint / typecheck / build / test
-10. Manual smoke: trigger a session, verify `summaries/` gets written on the next session-end after the 24h default (or lower the interval in `_state.json` first for testing)
-
-**Phase 2 — Optimization pass (separate PR):**
-
-11. `server/journal/optimizationPass.ts` + tests for classification logic
-12. Chain from `maybeRunJournal` after the daily pass
+5. `server/journal/archivist.ts` — `claude` CLI subprocess wrapper with injectable `summarize`
+6. `server/journal/dailyPass.ts` — ties the above together for daily + topic updates
+7. `server/journal/optimizationPass.ts` + tests for classification logic
+8. `server/journal/index.ts` — `maybeRunJournal()` entry with lock, chains daily then optimization
+9. `server/routes/agent.ts` — call `maybeRunJournal()` in `finally` block (fire-and-forget)
+10. Run format / lint / typecheck / build / test
+11. Manual smoke: lower `dailyIntervalHours` to near-zero in `_state.json`, trigger a session, verify `summaries/` gets written
 
 ## Deferred / not in scope
 
@@ -252,8 +288,9 @@ At minimum each file covers: happy path, empty case, boundary case (interval exa
 - Corrupt `summaries/_state.json` (invalid JSON), verify the pass falls back to defaults and logs an error
 - Two concurrent session-end events: verify only one pass actually runs (lock holds)
 
-**LLM integration (manual, requires API key):**
+**LLM integration (manual, requires `claude` CLI installed and authenticated):**
 - Run one real pass, eyeball the resulting `daily/*.md` and `topics/*.md` for quality
 - Confirm language preservation (Japanese session → Japanese summary)
+- Confirm the feature silently no-ops (with one warning log) if `claude` is missing from PATH
 
 No new golden tests — the LLM output is non-deterministic and not golden-testable. Non-LLM logic is covered by unit tests.
