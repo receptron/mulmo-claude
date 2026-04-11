@@ -92,23 +92,24 @@ Note: `app.listen()` returns an `http.Server`, so no change to the existing serv
 A Vue composable:
 
 ```ts
+type Unsubscribe = () => void;
+
 function usePubSub(): {
-  subscribe: (channel: string, callback: (data: unknown) => void) => void;
-  unsubscribe: (channel: string) => void;
+  subscribe: (channel: string, callback: (data: unknown) => void) => Unsubscribe;
 };
 ```
 
 ### Usage
 
 ```ts
-const { subscribe, unsubscribe } = usePubSub();
+const { subscribe } = usePubSub();
 
-subscribe("tasks", (data) => {
+const unsub = subscribe("tasks", (data) => {
   console.log("task event:", data);
 });
 
-// later
-unsubscribe("tasks");
+// later — removes only this callback, not other subscribers on the same channel
+unsub();
 ```
 
 ### Connection Lifecycle
@@ -172,16 +173,23 @@ const listeners = new Map<string, Set<(data: unknown) => void>>();
 
 function ensureConnection() { /* connect, handle reconnect, re-subscribe */ }
 
-function subscribe(channel: string, callback: (data: unknown) => void) {
+function subscribe(channel: string, callback: (data: unknown) => void): () => void {
   if (!listeners.has(channel)) listeners.set(channel, new Set());
   listeners.get(channel)!.add(callback);
   ensureConnection();
   ws?.send(JSON.stringify({ action: "subscribe", channel }));
-}
 
-function unsubscribe(channel: string) {
-  listeners.delete(channel);
-  ws?.send(JSON.stringify({ action: "unsubscribe", channel }));
+  // Return disposer that removes only this callback
+  return () => {
+    const cbs = listeners.get(channel);
+    if (!cbs) return;
+    cbs.delete(callback);
+    // Unsubscribe from server only when no callbacks remain for this channel
+    if (cbs.size === 0) {
+      listeners.delete(channel);
+      ws?.send(JSON.stringify({ action: "unsubscribe", channel }));
+    }
+  };
 }
 
 // On message: parse JSON, look up channel in listeners, call all callbacks.

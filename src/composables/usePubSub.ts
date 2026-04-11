@@ -4,6 +4,7 @@ interface PubSubMessage {
 }
 
 type Callback = (data: unknown) => void;
+type Unsubscribe = () => void;
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -67,41 +68,38 @@ function connect() {
 }
 
 export function usePubSub() {
-  function subscribe(channel: string, callback: Callback) {
+  function subscribe(channel: string, callback: Callback): Unsubscribe {
     if (!listeners.has(channel)) listeners.set(channel, new Set());
     listeners.get(channel)!.add(callback);
     connect();
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ action: "subscribe", channel }));
     }
-  }
 
-  function unsubscribe(channel: string, callback?: Callback) {
-    const cbs = listeners.get(channel);
-    if (!cbs) return;
-
-    if (callback) {
+    return () => {
+      const cbs = listeners.get(channel);
+      if (!cbs) return;
       cbs.delete(callback);
-      if (cbs.size > 0) return;
-    }
-
-    listeners.delete(channel);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ action: "unsubscribe", channel }));
-    }
-
-    // Close connection if no listeners remain
-    if (listeners.size === 0) {
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
+      if (cbs.size === 0) {
+        listeners.delete(channel);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ action: "unsubscribe", channel }));
+        }
       }
-      if (ws) {
-        ws.close();
-        ws = null;
+
+      // Close connection if no listeners remain
+      if (listeners.size === 0) {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
       }
-    }
+    };
   }
 
-  return { subscribe, unsubscribe };
+  return { subscribe };
 }
