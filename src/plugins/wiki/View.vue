@@ -137,6 +137,7 @@ import { computed, ref } from "vue";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
+import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<WikiData>;
@@ -237,11 +238,20 @@ async function downloadPdf() {
 }
 
 function handleContentClick(e: MouseEvent) {
+  // 1. Internal wiki links: `[[Page Name]]` was rewritten to a
+  //    `<span class="wiki-link">` during markdown pre-processing,
+  //    so it doesn't overlap with regular `<a>` handling.
   const target = e.target as HTMLElement;
   const link = target.closest(".wiki-link") as HTMLElement | null;
   if (link?.dataset.page) {
     navigatePage(link.dataset.page);
+    return;
   }
+  // 2. External http(s) links in the rendered markdown body: open
+  //    in a new tab so clicking them doesn't navigate the whole
+  //    SPA away from MulmoClaude. Same-origin and non-http links
+  //    (mailto:, tel:, anchors) fall through to the browser default.
+  handleExternalLinkClick(e);
 }
 </script>
 
