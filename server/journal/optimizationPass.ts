@@ -40,6 +40,87 @@ export interface OptimizationPassResult {
   skippedReason?: string;
 }
 
+// Pure planner: turns the optimizer's raw merge instructions into a
+// concrete list of slug-level operations. Empty merges (where every
+// source resolves to the merge target itself) are dropped, and slugs
+// are normalized via slugify so the I/O layer never has to.
+export interface MergePlanItem {
+  intoSlug: string;
+  fromSlugs: string[];
+  newContent: string;
+}
+
+export interface RawMerge {
+  into: string;
+  from: string[];
+  newContent: string;
+}
+
+export function planMerges(merges: readonly RawMerge[]): MergePlanItem[] {
+  const plans: MergePlanItem[] = [];
+  for (const merge of merges) {
+    const intoSlug = slugify(merge.into);
+    const fromSlugs = merge.from.map(slugify).filter((s) => s !== intoSlug);
+    if (fromSlugs.length === 0) continue;
+    plans.push({ intoSlug, fromSlugs, newContent: merge.newContent });
+  }
+  return plans;
+}
+
+// Pure transform: returns the next JournalState with any slug in
+// `removed` filtered out of knownTopics.
+export function applyRemovedTopics(
+  state: JournalState,
+  removed: ReadonlySet<string>,
+): JournalState {
+  return {
+    ...state,
+    knownTopics: state.knownTopics.filter((t) => !removed.has(t)),
+  };
+}
+
+async function executeMergePlans(
+  workspaceRoot: string,
+  plans: MergePlanItem[],
+  removed: Set<string>,
+  mergedSlugs: string[],
+): Promise<void> {
+  for (const plan of plans) {
+    await fsp.mkdir(path.dirname(topicPathFor(workspaceRoot, plan.intoSlug)), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      topicPathFor(workspaceRoot, plan.intoSlug),
+      plan.newContent,
+      "utf-8",
+    );
+    for (const src of plan.fromSlugs) {
+      // Only record the merge as successful if the source file
+      // actually moved. If moveToArchive fails (missing file, IO
+      // error) we leave the source out of the removed set so the
+      // in-memory knownTopics state stays accurate.
+      if (!(await moveToArchive(workspaceRoot, src))) continue;
+      removed.add(src);
+      mergedSlugs.push(src);
+    }
+  }
+}
+
+async function executeArchives(
+  workspaceRoot: string,
+  rawSlugs: readonly string[],
+  removed: Set<string>,
+  archivedSlugs: string[],
+): Promise<void> {
+  for (const raw of rawSlugs) {
+    const slug = slugify(raw);
+    if (removed.has(slug)) continue;
+    if (!(await moveToArchive(workspaceRoot, slug))) continue;
+    removed.add(slug);
+    archivedSlugs.push(slug);
+  }
+}
+
 export async function runOptimizationPass(
   state: JournalState,
   deps: OptimizationPassDeps,
@@ -85,52 +166,22 @@ export async function runOptimizationPass(
 
   const removed = new Set<string>();
 
-  // Apply merges first. If multiple merges reference the same slug,
-  // the later merge wins — shouldn't happen in practice but
-  // deterministic if it does.
-  for (const merge of parsed.merges) {
-    const intoSlug = slugify(merge.into);
-    const fromSlugs = merge.from.map(slugify).filter((s) => s !== intoSlug);
-    if (fromSlugs.length === 0) continue;
+  // Apply merges first, then archives (which skip slugs already
+  // removed by a merge).
+  await executeMergePlans(
+    workspaceRoot,
+    planMerges(parsed.merges),
+    removed,
+    result.mergedSlugs,
+  );
+  await executeArchives(
+    workspaceRoot,
+    parsed.archives,
+    removed,
+    result.archivedSlugs,
+  );
 
-    await fsp.mkdir(path.dirname(topicPathFor(workspaceRoot, intoSlug)), {
-      recursive: true,
-    });
-    await fsp.writeFile(
-      topicPathFor(workspaceRoot, intoSlug),
-      merge.newContent,
-      "utf-8",
-    );
-
-    for (const src of fromSlugs) {
-      // Only record the merge as successful if the source file
-      // actually moved. If moveToArchive fails (missing file, IO
-      // error) we leave the source out of the removed set so the
-      // in-memory knownTopics state stays accurate.
-      const moved = await moveToArchive(workspaceRoot, src);
-      if (!moved) continue;
-      removed.add(src);
-      result.mergedSlugs.push(src);
-    }
-  }
-
-  // Apply archives (skip any already removed by a merge).
-  for (const rawSlug of parsed.archives) {
-    const slug = slugify(rawSlug);
-    if (removed.has(slug)) continue;
-    const moved = await moveToArchive(workspaceRoot, slug);
-    if (!moved) continue;
-    removed.add(slug);
-    result.archivedSlugs.push(slug);
-  }
-
-  const nextKnownTopics = state.knownTopics.filter((t) => !removed.has(t));
-  const nextState: JournalState = {
-    ...state,
-    knownTopics: nextKnownTopics,
-  };
-
-  return { nextState, result };
+  return { nextState: applyRemovedTopics(state, removed), result };
 }
 
 async function loadTopicHeads(

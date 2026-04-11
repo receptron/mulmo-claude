@@ -95,68 +95,63 @@ function isPortFree(port: number): Promise<boolean> {
   });
 }
 
-(async () => {
-  const portFree = await isPortFree(PORT);
-  if (!portFree) {
+async function ensureCredentialsAvailable(): Promise<void> {
+  const credentialsPath = path.join(
+    os.homedir(),
+    ".claude",
+    ".credentials.json",
+  );
+  if (fs.existsSync(credentialsPath)) return;
+
+  if (process.platform === "darwin") {
+    const { refreshCredentials } = await import("./credentials.js");
+    const ok = await refreshCredentials();
+    if (ok) return;
     console.error(
-      `[error] Port ${PORT} is already in use. Stop the other process and try again.`,
+      "[sandbox] Failed to export credentials from macOS Keychain.",
     );
+    console.error("[sandbox] Run `npm run sandbox:login` manually.");
     process.exit(1);
   }
+  console.error(
+    "[sandbox] Missing credentials file: ~/.claude/.credentials.json",
+  );
+  console.error(
+    "[sandbox] Run `claude auth login` to authenticate Claude Code.",
+  );
+  process.exit(1);
+}
 
+async function setupSandbox(): Promise<boolean> {
   if (process.env.DISABLE_SANDBOX === "1") {
     console.log(
       "[sandbox] DISABLE_SANDBOX=1 — running unrestricted (debug mode)",
     );
-  } else {
-    try {
-      sandboxEnabled = await isDockerAvailable();
-      if (sandboxEnabled) {
-        const credentialsPath = path.join(
-          os.homedir(),
-          ".claude",
-          ".credentials.json",
-        );
-        if (!fs.existsSync(credentialsPath)) {
-          if (process.platform === "darwin") {
-            const { refreshCredentials } = await import("./credentials.js");
-            const ok = await refreshCredentials();
-            if (!ok) {
-              console.error(
-                "[sandbox] Failed to export credentials from macOS Keychain.",
-              );
-              console.error("[sandbox] Run `npm run sandbox:login` manually.");
-              process.exit(1);
-            }
-          } else {
-            console.error(
-              "[sandbox] Missing credentials file: ~/.claude/.credentials.json",
-            );
-            console.error(
-              "[sandbox] Run `claude auth login` to authenticate Claude Code.",
-            );
-            process.exit(1);
-          }
-        }
-        console.log(
-          "[sandbox] Docker available — building sandbox image if needed",
-        );
-        await ensureSandboxImage();
-        console.log("[sandbox] Sandbox ready");
-      } else {
-        console.log(
-          "[sandbox] Docker not found — claude will run unrestricted",
-        );
-      }
-    } catch (err) {
-      console.error(
-        "[sandbox] Failed to set up sandbox, running unrestricted:",
-        err,
-      );
-      sandboxEnabled = false;
-    }
+    return false;
   }
+  try {
+    const dockerAvailable = await isDockerAvailable();
+    if (!dockerAvailable) {
+      console.log("[sandbox] Docker not found — claude will run unrestricted");
+      return false;
+    }
+    await ensureCredentialsAvailable();
+    console.log(
+      "[sandbox] Docker available — building sandbox image if needed",
+    );
+    await ensureSandboxImage();
+    console.log("[sandbox] Sandbox ready");
+    return true;
+  } catch (err) {
+    console.error(
+      "[sandbox] Failed to set up sandbox, running unrestricted:",
+      err,
+    );
+    return false;
+  }
+}
 
+function logMcpStatus(): void {
   const enabledMcpTools = mcpTools.filter(isMcpToolEnabled);
   const disabledMcpTools = mcpTools.filter((t) => !isMcpToolEnabled(t));
   if (enabledMcpTools.length > 0) {
@@ -173,53 +168,73 @@ function isPortFree(port: number): Promise<boolean> {
       .join(", ");
     console.log(`[mcp] Unavailable (missing env): ${names}`);
   }
+}
+
+function maybeForceJournalRun(): void {
+  // Debug switch: set JOURNAL_FORCE_RUN_ON_STARTUP=1 to run a full
+  // journal pass immediately without waiting for a session end or
+  // the hourly interval. Fire-and-forget — journal errors never
+  // propagate out of maybeRunJournal.
+  if (process.env.JOURNAL_FORCE_RUN_ON_STARTUP !== "1") return;
+  console.log("[journal] JOURNAL_FORCE_RUN_ON_STARTUP=1 — running now");
+  maybeRunJournal({ force: true }).catch((err) => {
+    console.warn("[journal] forced startup run failed:", err);
+  });
+}
+
+function maybeForceChatIndexBackfill(): void {
+  // Companion switch for the chat indexer: force-rebuild every
+  // session's title summary on startup. Useful the first time the
+  // feature is rolled out over an existing workspace, or when
+  // debugging the indexer itself.
+  if (process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP !== "1") return;
+  console.log("[chat-index] CHAT_INDEX_FORCE_RUN_ON_STARTUP=1 — running now");
+  backfillAllSessions()
+    .then((result) => {
+      console.log(
+        `[chat-index] startup backfill complete: ${result.indexed}/${result.total} indexed, ${result.skipped} skipped`,
+      );
+    })
+    .catch((err) => {
+      console.warn("[chat-index] forced startup backfill failed:", err);
+    });
+}
+
+function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
+  console.log(`Server running on port ${PORT}`);
+
+  // --- Pub/Sub ---
+  const pubsub = createPubSub(httpServer);
+
+  // --- Task Manager ---
+  const taskManager = createTaskManager({
+    tickMs: debugMode ? 1_000 : 60_000,
+  });
+
+  if (debugMode) {
+    registerDebugTasks(taskManager, pubsub);
+  }
+
+  taskManager.start();
+
+  maybeForceJournalRun();
+  maybeForceChatIndexBackfill();
+}
+
+(async () => {
+  const portFree = await isPortFree(PORT);
+  if (!portFree) {
+    console.error(
+      `[error] Port ${PORT} is already in use. Stop the other process and try again.`,
+    );
+    process.exit(1);
+  }
+
+  sandboxEnabled = await setupSandbox();
+  logMcpStatus();
 
   const httpServer = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-
-    // --- Pub/Sub ---
-    const pubsub = createPubSub(httpServer);
-
-    // --- Task Manager ---
-    const taskManager = createTaskManager({
-      tickMs: debugMode ? 1_000 : 60_000,
-    });
-
-    if (debugMode) {
-      registerDebugTasks(taskManager, pubsub);
-    }
-
-    taskManager.start();
-
-    // Debug switch: set JOURNAL_FORCE_RUN_ON_STARTUP=1 to run a full
-    // journal pass immediately without waiting for a session end or
-    // the hourly interval. Fire-and-forget — journal errors never
-    // propagate out of maybeRunJournal.
-    if (process.env.JOURNAL_FORCE_RUN_ON_STARTUP === "1") {
-      console.log("[journal] JOURNAL_FORCE_RUN_ON_STARTUP=1 — running now");
-      maybeRunJournal({ force: true }).catch((err) => {
-        console.warn("[journal] forced startup run failed:", err);
-      });
-    }
-
-    // Companion switch for the chat indexer: force-rebuild every
-    // session's title summary on startup. Useful the first time
-    // the feature is rolled out over an existing workspace, or
-    // when debugging the indexer itself.
-    if (process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP === "1") {
-      console.log(
-        "[chat-index] CHAT_INDEX_FORCE_RUN_ON_STARTUP=1 — running now",
-      );
-      backfillAllSessions()
-        .then((result) => {
-          console.log(
-            `[chat-index] startup backfill complete: ${result.indexed}/${result.total} indexed, ${result.skipped} skipped`,
-          );
-        })
-        .catch((err) => {
-          console.warn("[chat-index] forced startup backfill failed:", err);
-        });
-    }
+    startRuntimeServices(httpServer);
   });
 })();
 

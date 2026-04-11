@@ -1,7 +1,10 @@
 import { join } from "path";
+import { homedir, tmpdir } from "os";
 import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "../mcp-tools/index.js";
 import { MCP_PLUGIN_NAMES } from "../plugin-names.js";
+
+export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 
 const BASE_ALLOWED_TOOLS = [
   "Bash",
@@ -118,4 +121,103 @@ export function buildCliArgs(params: CliArgsParams): string[] {
   }
 
   return args;
+}
+
+export interface McpConfigPaths {
+  // Where the file is actually written on the host filesystem.
+  hostPath: string;
+  // What gets passed to claude --mcp-config (container path under
+  // docker, identical to hostPath when running natively).
+  argPath: string;
+}
+
+export function resolveMcpConfigPaths(opts: {
+  workspacePath: string;
+  sessionId: string;
+  useDocker: boolean;
+}): McpConfigPaths {
+  if (opts.useDocker) {
+    const hostPath = join(
+      opts.workspacePath,
+      ".mulmoclaude",
+      `mcp-${opts.sessionId}.json`,
+    );
+    const argPath = `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/mcp-${opts.sessionId}.json`;
+    return { hostPath, argPath };
+  }
+  const hostPath = join(tmpdir(), `mulmoclaude-mcp-${opts.sessionId}.json`);
+  return { hostPath, argPath: hostPath };
+}
+
+// Mirror NodeJS.Platform — re-declared so the file doesn't need a
+// `NodeJS` global reference, which the no-undef rule doesn't see in
+// type-only positions.
+export type Platform =
+  | "aix"
+  | "android"
+  | "darwin"
+  | "freebsd"
+  | "haiku"
+  | "linux"
+  | "openbsd"
+  | "sunos"
+  | "win32"
+  | "cygwin"
+  | "netbsd";
+
+export interface DockerSpawnArgsParams {
+  workspacePath: string;
+  cliArgs: string[];
+  uid: number;
+  gid: number;
+  platform: Platform;
+  projectRoot?: string;
+  homeDir?: string;
+}
+
+// Pure helper that returns the full `docker run ... claude <args>`
+// argv array. Extracted from runAgent so the long flag list can be
+// inspected and tested without spawning a real subprocess.
+export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
+  const {
+    workspacePath,
+    cliArgs,
+    uid,
+    gid,
+    platform,
+    projectRoot = process.cwd(),
+    homeDir = homedir(),
+  } = params;
+  const toDockerPath = (p: string): string => p.replace(/\\/g, "/");
+  const extraHosts: string[] =
+    platform === "linux"
+      ? ["--add-host", "host.docker.internal:host-gateway"]
+      : [];
+
+  return [
+    "run",
+    "--rm",
+    "--cap-drop",
+    "ALL",
+    "--user",
+    `${uid}:${gid}`,
+    "-e",
+    "HOME=/home/node",
+    "-v",
+    `${toDockerPath(projectRoot)}/node_modules:/app/node_modules:ro`,
+    "-v",
+    `${toDockerPath(projectRoot)}/server:/app/server:ro`,
+    "-v",
+    `${toDockerPath(projectRoot)}/src:/app/src:ro`,
+    "-v",
+    `${toDockerPath(workspacePath)}:${CONTAINER_WORKSPACE_PATH}`,
+    "-v",
+    `${toDockerPath(homeDir)}/.claude:/home/node/.claude`,
+    "-v",
+    `${toDockerPath(homeDir)}/.claude.json:/home/node/.claude.json`,
+    ...extraHosts,
+    "mulmoclaude-sandbox",
+    "claude",
+    ...cliArgs,
+  ];
 }

@@ -206,37 +206,42 @@ async function walkTopics(workspaceRoot: string): Promise<IndexTopicEntry[]> {
   return out;
 }
 
+// Returns the entries of `dir`, or [] if `dir` is missing / unreadable.
+// Centralizes the "missing parent directory is fine" idiom that the
+// daily-files walker leans on.
+async function safeReaddir(dir: string): Promise<string[]> {
+  try {
+    return await fsp.readdir(dir);
+  } catch {
+    return [];
+  }
+}
+
+const YEAR_PATTERN = /^\d{4}$/;
+const MONTH_PATTERN = /^\d{2}$/;
+const DAY_FILE_PATTERN = /^(\d{2})\.md$/;
+
+// Pure: returns the two-digit day if `name` matches `DD.md`, else null.
+export function parseDailyFilename(name: string): string | null {
+  const match = DAY_FILE_PATTERN.exec(name);
+  return match ? (match[1] ?? null) : null;
+}
+
 async function walkDailyFiles(
   workspaceRoot: string,
 ): Promise<IndexDailyEntry[]> {
   const root = path.join(summariesRoot(workspaceRoot), DAILY_DIR);
   const out: IndexDailyEntry[] = [];
-  let years: string[];
-  try {
-    years = await fsp.readdir(root);
-  } catch {
-    return [];
-  }
+  const years = (await safeReaddir(root)).filter((y) => YEAR_PATTERN.test(y));
   for (const y of years) {
-    if (!/^\d{4}$/.test(y)) continue;
-    let months: string[];
-    try {
-      months = await fsp.readdir(path.join(root, y));
-    } catch {
-      continue;
-    }
+    const months = (await safeReaddir(path.join(root, y))).filter((m) =>
+      MONTH_PATTERN.test(m),
+    );
     for (const m of months) {
-      if (!/^\d{2}$/.test(m)) continue;
-      let days: string[];
-      try {
-        days = await fsp.readdir(path.join(root, y, m));
-      } catch {
-        continue;
-      }
-      for (const d of days) {
-        const match = d.match(/^(\d{2})\.md$/);
-        if (!match) continue;
-        out.push({ date: `${y}-${m}-${match[1]}` });
+      const dayFiles = await safeReaddir(path.join(root, y, m));
+      for (const d of dayFiles) {
+        const day = parseDailyFilename(d);
+        if (day) out.push({ date: `${y}-${m}-${day}` });
       }
     }
   }
