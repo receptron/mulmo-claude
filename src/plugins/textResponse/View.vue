@@ -56,6 +56,7 @@ import { computed, ref } from "vue";
 import { View as OriginalView } from "@gui-chat-plugin/text-response/vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
+import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TextResponseData>;
@@ -66,17 +67,13 @@ const isAssistant = computed(
   () => (props.selectedResult.data?.role ?? "assistant") === "assistant",
 );
 
-function openLinksInNewTab(event: MouseEvent) {
-  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey)
-    return;
-  const target = event.target as HTMLElement;
-  const anchor = target.closest("a");
-  if (!anchor) return;
-  const url = anchor.href;
-  if (!url.startsWith("http://") && !url.startsWith("https://")) return;
-  if (new URL(url).origin === window.location.origin) return;
-  event.preventDefault();
-  window.open(url, "_blank", "noopener,noreferrer");
+// The shared helper returns a boolean indicating whether it
+// consumed the click. In this component we don't have any other
+// click behaviour to cascade to, so the return value is ignored —
+// but we keep the helper call because it does the `event.preventDefault()`
+// and `window.open()` internally.
+function openLinksInNewTab(event: MouseEvent): void {
+  handleExternalLinkClick(event);
 }
 
 const pdfDownloading = ref(false);

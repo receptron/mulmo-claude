@@ -39,8 +39,18 @@
            underlying plugin View. The .stack-text-response class below
            collapses the plugin's own card chrome (outer p-6, inner
            rounded/border/shadow box, role header) so only the stack
-           card's own border shows. -->
-      <div v-if="isTextResponse(result)" class="stack-text-response">
+           card's own border shows.
+
+           We render the upstream OriginalView directly rather than our
+           local TextResponseView wrapper, so we lose the wrapper's
+           "open external links in a new tab" click handler. Attach
+           the same handler here via @click.capture so cross-origin
+           links in assistant Markdown don't navigate the SPA away. -->
+      <div
+        v-if="isTextResponse(result)"
+        class="stack-text-response"
+        @click.capture="handleExternalLinkClick"
+      >
         <TextResponseOriginalView :selected-result="result" />
       </div>
       <!-- Document-like plugins: let the content flow at its natural
@@ -88,6 +98,7 @@ import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { getPlugin } from "../tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { View as TextResponseOriginalView } from "@gui-chat-plugin/text-response/vue";
+import { handleExternalLinkClick } from "../utils/dom/externalLink";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
 
 // Most plugin viewComponents use h-full internally, so a defined parent

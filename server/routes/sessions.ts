@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, stat } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../workspace.js";
 
@@ -40,6 +40,10 @@ interface SessionSummary {
   id: string;
   roleId: string;
   startedAt: string;
+  // ISO timestamp of the jsonl file's most recent mtime — i.e. the
+  // last time the session had an event appended. Clients sort the
+  // sidebar history list by this so active sessions float to the top.
+  updatedAt: string;
   preview: string;
 }
 
@@ -60,7 +64,14 @@ router.get(
             try {
               const meta = await readSessionMeta(chatDir, id);
               if (!meta) return null;
-              const content = await readFile(path.join(chatDir, file), "utf-8");
+              const fullPath = path.join(chatDir, file);
+              // Fetch file content and stat in parallel — content
+              // for the first-user-message preview, stat for the
+              // "last appended" mtime that drives client sort.
+              const [content, fileStat] = await Promise.all([
+                readFile(fullPath, "utf-8"),
+                stat(fullPath),
+              ]);
               const firstUserLine: SessionEntry | undefined = content
                 .split("\n")
                 .filter(Boolean)
@@ -76,6 +87,7 @@ router.get(
                 id,
                 roleId: meta.roleId,
                 startedAt: meta.startedAt,
+                updatedAt: new Date(fileStat.mtimeMs).toISOString(),
                 preview: firstUserLine?.message ?? "",
               };
             } catch {
@@ -85,10 +97,17 @@ router.get(
         )
       ).filter((s): s is SessionSummary => s !== null);
 
-      sessions.sort(
-        (a, b) =>
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-      );
+      // Sort by most-recently-updated first. Falls back to
+      // startedAt if two sessions share the same mtime (e.g. a
+      // file-system with second-granularity timestamps).
+      sessions.sort((a, b) => {
+        const byUpdated =
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        if (byUpdated !== 0) return byUpdated;
+        return (
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+        );
+      });
       res.json(sessions);
     } catch {
       res.json([]);

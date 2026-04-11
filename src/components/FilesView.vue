@@ -91,7 +91,10 @@
                   }}</span>
                 </div>
               </div>
-              <div class="flex-1 min-h-0">
+              <div
+                class="flex-1 min-h-0"
+                @click.capture="handleMarkdownLinkClick"
+              >
                 <TextResponseView
                   :selected-result="
                     markdownResult(
@@ -198,6 +201,11 @@ import {
   JSON_TOKEN_CLASS,
 } from "../utils/format/jsonSyntax";
 import { extractFrontmatter } from "../utils/format/frontmatter";
+import {
+  isExternalHref,
+  resolveWorkspaceLink,
+  extractSessionIdFromPath,
+} from "../utils/path/relativeLink";
 
 const STORAGE_KEY = "files_selected_path";
 const MD_RAW_STORAGE_KEY = "files_md_raw_mode";
@@ -223,6 +231,13 @@ type FileContent = TextContent | MetaContent;
 
 const props = defineProps<{
   refreshToken?: number;
+}>();
+
+const emit = defineEmits<{
+  // Emitted when the user clicks a markdown link whose target is
+  // a chat session jsonl; App.vue should load that session into
+  // the active chat view rather than opening the raw jsonl.
+  loadSession: [sessionId: string];
 }>();
 
 const tree = ref<TreeNode | null>(null);
@@ -406,6 +421,44 @@ function selectFile(filePath: string): void {
   selectedPath.value = filePath;
   localStorage.setItem(STORAGE_KEY, filePath);
   loadContent(filePath);
+}
+
+// When the user clicks an <a> inside a rendered markdown body, check
+// if it's a workspace-internal relative/absolute link. If so, resolve
+// it against the current file and navigate inside FilesView instead
+// of letting the browser follow the (meaningless) relative href.
+//
+// Uses click.capture so we intercept before TextResponseView's own
+// handler (which only knows about absolute URLs) sees the event.
+function handleMarkdownLinkClick(event: MouseEvent): void {
+  if (event.button !== 0) return;
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href");
+  if (!href) return;
+  // External URLs and mailto/tel: let TextResponseView's existing
+  // handler open them in a new tab.
+  if (isExternalHref(href)) return;
+  // Anchor-only (#section): let the browser handle in-page scroll.
+  if (href.startsWith("#")) return;
+  if (!selectedPath.value) return;
+  const resolved = resolveWorkspaceLink(selectedPath.value, href);
+  if (!resolved) return;
+  event.preventDefault();
+  event.stopPropagation();
+  // Chat session link: hand off to App.vue so the sidebar chat
+  // switches to that session instead of opening the raw jsonl
+  // as a file. Direct clicks in the file tree still open the
+  // jsonl in raw view — only markdown link clicks route here.
+  const sessionId = extractSessionIdFromPath(resolved);
+  if (sessionId !== null) {
+    emit("loadSession", sessionId);
+    return;
+  }
+  selectFile(resolved);
 }
 
 watch(

@@ -6,10 +6,18 @@ import type { ToolCallHistoryItem } from "./toolCallHistory";
 
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
 // are populated by the chat indexer (PR #94) when present.
+//
+// `updatedAt` is the most recent activity timestamp — taken from the
+// jsonl file's mtime on the server side and bumped whenever the
+// client appends a message in-memory. Used for the "most recently
+// touched" sort order in the session history sidebar (users expect
+// active sessions to float to the top, not to stay pinned in
+// creation order).
 export interface SessionSummary {
   id: string;
   roleId: string;
   startedAt: string;
+  updatedAt: string;
   preview: string;
   summary?: string;
   keywords?: string[];
@@ -59,4 +67,8 @@ export interface ActiveSession {
   hasUnread: boolean;
   abortController: AbortController;
   startedAt: string;
+  // Bumped whenever the user sends a new message in this session.
+  // Used by `mergedSessions` to sort the sidebar history list by
+  // "most recently touched" rather than "created first".
+  updatedAt: string;
 }
