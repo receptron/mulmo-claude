@@ -62,15 +62,15 @@ MulmoClaude uses Claude Code as its AI backend, which has access to tools includ
 4. **Linux**: follow the [Linux install guide](https://docs.docker.com/desktop/install/linux/)
 5. Wait for Docker Desktop to finish starting — the whale icon in the menu bar / system tray should turn steady (not animated)
 6. Restart MulmoClaude — it will detect Docker and build the sandbox image on first run (one-time, takes about a minute)
-7. Authenticate Claude Code inside the sandbox (one-time):
+7. Export your Claude Code credentials for the sandbox:
    ```bash
-   yarn sandbox:login
+   npm run sandbox:login
    ```
-   This opens a browser for the standard Claude Code OAuth flow. Your credentials are saved in `~/.claude` and persist across all future runs — you won't need to do this again.
+   This extracts your OAuth token from macOS Keychain and writes it to `~/.claude/.credentials.json`, which the Docker container reads via bind mount. Re-run this command whenever you get a 401 authentication error (tokens expire every few hours).
 
 If Docker is not installed, the app shows a warning banner and continues to work without sandboxing.
 
-> **Why a separate login?** On macOS and Windows, Claude Code stores OAuth tokens in the system keychain. The Docker container (a Linux environment) cannot access the host keychain, so a one-time login inside the container is required. The credentials are stored as files in `~/.claude`, which is mounted into the container on every run.
+> **Why is this needed?** On macOS, Claude Code stores and refreshes OAuth tokens in the system Keychain. The Docker container (a Linux environment) cannot access the Keychain, so it reads credentials from `~/.claude/.credentials.json` instead. The `sandbox:login` script bridges the gap by copying the current token from Keychain to that file. Running `claude auth login` inside the Docker container does not work on macOS because the OAuth callback requires a local HTTP server that is unreachable from the host browser due to Docker Desktop's VM-based networking.
 
 > **Debug mode**: To run without the sandbox even when Docker is installed, set `DISABLE_SANDBOX=1` before starting the server.
 

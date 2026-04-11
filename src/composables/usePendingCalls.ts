@@ -10,6 +10,7 @@ import type { ToolCallHistoryItem } from "../types/toolCallHistory";
 import {
   isCallStillPending,
   PENDING_MIN_MS,
+  PENDING_TICK_INTERVAL_MS,
 } from "../utils/tools/pendingCalls";
 
 interface UsePendingCallsOptions {
@@ -36,7 +37,7 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
         if (tickInterval !== null) return;
         tickInterval = setInterval(() => {
           displayTick.value++;
-        }, 50);
+        }, PENDING_TICK_INTERVAL_MS);
       } else if (tickInterval !== null) {
         clearInterval(tickInterval);
         tickInterval = null;

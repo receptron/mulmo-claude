@@ -22,7 +22,10 @@ import {
   isMcpToolEnabled,
 } from "./mcp-tools/index.js";
 import { initWorkspace } from "./workspace.js";
+import fs from "fs";
+import os from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./docker.js";
+import { DEFAULT_SERVER_PORT } from "./config/settings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +35,7 @@ initWorkspace();
 let sandboxEnabled = false;
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || DEFAULT_SERVER_PORT;
 
 app.disable("x-powered-by");
 app.use(cors());
@@ -100,6 +103,26 @@ function isPortFree(port: number): Promise<boolean> {
     try {
       sandboxEnabled = await isDockerAvailable();
       if (sandboxEnabled) {
+        const credentialsPath = path.join(
+          os.homedir(),
+          ".claude",
+          ".credentials.json",
+        );
+        if (!fs.existsSync(credentialsPath)) {
+          console.error(
+            "[sandbox] Missing credentials file: ~/.claude/.credentials.json",
+          );
+          if (process.platform === "darwin") {
+            console.error(
+              "[sandbox] Run `npm run sandbox:login` to export credentials from Keychain.",
+            );
+          } else {
+            console.error(
+              "[sandbox] Run `claude auth login` to authenticate Claude Code.",
+            );
+          }
+          process.exit(1);
+        }
         console.log(
           "[sandbox] Docker available — building sandbox image if needed",
         );

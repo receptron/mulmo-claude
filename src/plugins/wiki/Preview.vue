@@ -19,6 +19,7 @@
 import { computed } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData } from "./index";
+import { PREVIEW_ITEM_COUNT } from "../../config/ui";
 
 const props = defineProps<{ result: ToolResultComplete<WikiData> }>();
 
@@ -34,6 +35,10 @@ const label = computed(() => {
   return `Wiki: ${title.value}`;
 });
 
-const previewEntries = computed(() => pageEntries.value.slice(0, 3));
-const more = computed(() => Math.max(0, pageEntries.value.length - 3));
+const previewEntries = computed(() =>
+  pageEntries.value.slice(0, PREVIEW_ITEM_COUNT),
+);
+const more = computed(() =>
+  Math.max(0, pageEntries.value.length - PREVIEW_ITEM_COUNT),
+);
 </script>
