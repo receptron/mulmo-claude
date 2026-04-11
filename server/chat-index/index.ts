@@ -74,11 +74,9 @@ export async function maybeIndexSession(
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) {
       disabled = true;
-      // eslint-disable-next-line no-console
       console.warn(err.message);
       return;
     }
-    // eslint-disable-next-line no-console
     console.warn("[chat-index] unexpected failure, continuing:", err);
   } finally {
     running.delete(sessionId);
@@ -125,7 +123,6 @@ export async function backfillAllSessions(
       });
       if (entry) {
         result.indexed++;
-        // eslint-disable-next-line no-console
         console.log(`[chat-index] indexed ${sessionId}: ${entry.title}`);
       } else {
         result.skipped++;
@@ -133,13 +130,11 @@ export async function backfillAllSessions(
     } catch (err) {
       if (err instanceof ClaudeCliNotFoundError) {
         disabled = true;
-        // eslint-disable-next-line no-console
         console.warn(err.message);
         result.skipped++;
         continue;
       }
       result.skipped++;
-      // eslint-disable-next-line no-console
       console.warn(`[chat-index] failed to index ${sessionId}:`, err);
     }
   }

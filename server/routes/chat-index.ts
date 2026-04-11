@@ -31,16 +31,13 @@ router.post(
     res: Response<RebuildResponse | RebuildErrorResponse>,
   ) => {
     try {
-      // eslint-disable-next-line no-console
       console.log("[chat-index] manual rebuild triggered");
       const result = await backfillAllSessions();
-      // eslint-disable-next-line no-console
       console.log(
         `[chat-index] rebuild complete: ${result.indexed}/${result.total} indexed, ${result.skipped} skipped`,
       );
       res.json(result);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn("[chat-index] rebuild failed:", err);
       res.status(500).json({
         error: err instanceof Error ? err.message : "unknown error",

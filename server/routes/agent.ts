@@ -195,7 +195,6 @@ router.post(
         sessionId,
         activeSessionIds: getActiveSessionIds(),
       }).catch((err) => {
-        // eslint-disable-next-line no-console
         console.warn("[chat-index] unexpected error in background:", err);
       });
     }
