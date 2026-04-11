@@ -37,6 +37,7 @@ Create a **generic task scheduling service** (Task Manager) that lets feature se
 3. Exactly-once semantics across crashes.
 4. A user-facing UI for editing cron expressions.
 5. Persisting schedule definitions inside the Task Manager itself.
+6. Task dependency/ordering (e.g., "run B after A completes").
 
 ---
 
@@ -109,9 +110,11 @@ export interface TaskDefinition {
   enabled?: boolean;           // default: true
 
   overlapPolicy?: OverlapPolicy; // default: "skip"
+  maxConcurrentRuns?: number;    // only meaningful with "parallel"; default: 5
   timeoutMs?: number;            // hard execution timeout
   maxRetries?: number;           // default: 0
   retryBackoffMs?: number;       // base backoff
+  maxRetryBackoffMs?: number;    // cap for exponential backoff; default: 60_000
   jitterMs?: number;             // optional random delay before run
 
   tags?: string[];               // grouping/filtering
@@ -166,6 +169,7 @@ export interface TaskRunContext {
 interface ITaskManager {
   registerTask(def: TaskDefinition): void;
   registerTasks(defs: TaskDefinition[]): void;
+  removeTask(taskId: string): void;   // stop schedule + remove from registry
 
   startAll(): Promise<void>;     // bind cron schedules
   stopAll(): Promise<void>;      // stop schedules + wait/abort running
@@ -188,7 +192,7 @@ For restart safety, each service is responsible for loading its own persisted sc
 
 ```ts
 // startup/bootstrap pseudocode
-const taskManager = createTaskManager({ logger, now: () => new Date() });
+const taskManager = createTaskManager({ logger, now: () => new Date(), shutdownTimeoutMs: 30_000 });
 
 const reminderSchedules = await reminderScheduleRepo.loadAll(); // persisted by reminder domain
 taskManager.registerTasks(createReminderTasks(deps, reminderSchedules));
@@ -200,6 +204,10 @@ taskManager.registerTasks(createSyncTasks(deps)); // static schedule example
 
 await taskManager.startAll();
 ```
+
+### Removing Tasks
+
+`removeTask(taskId)` stops the cron schedule and removes the task from the registry. If the task is currently running, it is aborted via its `AbortController`. Calling `removeTask` on a non-existent ID is a no-op (idempotent).
 
 ### Optional Upsert API for Dynamic Clients
 
@@ -223,11 +231,13 @@ upsertTask(def: TaskDefinition): void;
    - If already running, new trigger is skipped and logged.
 
 2. **queue_one**
-   - If running, keep a single queued flag.
-   - When run finishes, execute once more immediately.
+   - If running, keep a single queued flag. Additional triggers while queued are dropped.
+   - When the current run finishes, execute one more time immediately using the current time (not the original trigger time).
+   - If the current run errors, the queued run still fires (errors don't consume the queued slot).
 
 3. **parallel**
-   - Allow concurrent runs (bounded by optional global guard in future).
+   - Allow concurrent runs up to `maxConcurrentRuns` (default: 5).
+   - If the limit is reached, additional triggers are skipped and logged.
 
 ### 6.2 Timeout
 
@@ -238,8 +248,9 @@ upsertTask(def: TaskDefinition): void;
 ### 6.3 Retry
 
 - Retries occur within same trigger execution chain.
-- Delay formula (v1): `retryBackoffMs * 2^(attempt-1)` (cap can be added later).
+- Delay formula: `min(retryBackoffMs * 2^(attempt-1), maxRetryBackoffMs)` where `maxRetryBackoffMs` defaults to 60 seconds.
 - Retries emit structured events for observability.
+- Note: if the process crashes during a retry backoff delay, the remaining retries are lost. This is acceptable given the non-goal of crash resilience; clients that need stronger guarantees should persist retry state in their own storage.
 
 ### 6.4 Jitter
 
@@ -251,7 +262,7 @@ upsertTask(def: TaskDefinition): void;
 ## 7) Startup, Shutdown, and Lifecycle
 
 ## Startup
-1. Construct `TaskManager` with logger + clock.
+1. Construct `TaskManager` with logger + clock + `shutdownTimeoutMs` (default: 30 000).
 2. Each client loads persisted schedule intent from its own store.
 3. Register all tasks before serving traffic.
 4. Validate task IDs and cron expressions.
@@ -261,7 +272,7 @@ upsertTask(def: TaskDefinition): void;
 ## Shutdown
 1. Stop creating new scheduled triggers.
 2. For running tasks:
-   - wait up to graceful timeout,
+   - wait up to `shutdownTimeoutMs` (default: 30 000),
    - then abort via `AbortController`.
 3. Emit final shutdown summary log.
 
