@@ -68,6 +68,7 @@ describe("buildDailyUserPrompt", () => {
               { source: "user", type: "text", content: "hello" },
               { source: "assistant", type: "text", content: "world" },
             ],
+            artifactPaths: [],
           },
         ],
       }),
@@ -75,6 +76,44 @@ describe("buildDailyUserPrompt", () => {
     assert.match(out, /### session sess-abc \(role: default\)/);
     assert.match(out, /\[user\/text\] hello/);
     assert.match(out, /\[assistant\/text\] world/);
+  });
+
+  it("shows '(none)' for an empty artifact set", () => {
+    const out = buildDailyUserPrompt(baseInput());
+    assert.match(out, /ARTIFACTS REFERENCED:\n\(none\)/);
+  });
+
+  it("aggregates artifact paths across sessions and sorts them", () => {
+    const out = buildDailyUserPrompt(
+      baseInput({
+        sessionExcerpts: [
+          {
+            sessionId: "s1",
+            roleId: "r",
+            events: [],
+            artifactPaths: ["stories/b.json", "wiki/pages/a.md"],
+          },
+          {
+            sessionId: "s2",
+            roleId: "r",
+            events: [],
+            artifactPaths: ["stories/b.json", "HTMLs/x.html"],
+          },
+        ],
+      }),
+    );
+    // All three paths appear, sorted, each only once.
+    const artifactsSection = out.slice(out.indexOf("ARTIFACTS REFERENCED:"));
+    const htmlIdx = artifactsSection.indexOf("- HTMLs/x.html");
+    const storiesIdx = artifactsSection.indexOf("- stories/b.json");
+    const wikiIdx = artifactsSection.indexOf("- wiki/pages/a.md");
+    assert.ok(htmlIdx !== -1, "HTMLs path should appear");
+    assert.ok(storiesIdx !== -1, "stories path should appear");
+    assert.ok(wikiIdx !== -1, "wiki path should appear");
+    assert.ok(htmlIdx < storiesIdx && storiesIdx < wikiIdx, "sorted ascending");
+    // Dedup check: stories/b.json should only appear once.
+    const matches = artifactsSection.match(/- stories\/b\.json/g);
+    assert.equal(matches?.length, 1);
   });
 });
 

@@ -126,6 +126,11 @@ export interface SessionExcerpt {
   sessionId: string;
   roleId: string;
   events: SessionEventExcerpt[];
+  // Workspace-relative file paths produced by the session's tool
+  // calls (e.g. "stories/foo.json", "HTMLs/bar.html",
+  // "wiki/pages/baz.md"). Surfaced so the archivist can emit
+  // navigable markdown links to them in the summaries.
+  artifactPaths: string[];
 }
 
 export interface ExistingTopicSnapshot {
@@ -186,6 +191,15 @@ TOPIC UPDATE RULES
 - Use \`rewrite\` sparingly — only when the existing topic has become incoherent and needs a full replacement.
 - If a session has no clear topical hook, emit zero topic updates rather than forcing one.
 
+ARTIFACT LINKS
+- The prompt may list "ARTIFACTS REFERENCED" — workspace-relative paths produced by the day's sessions (e.g. \`stories/foo.json\`, \`wiki/pages/bar.md\`, \`HTMLs/baz.html\`).
+- When your summary mentions one of those artifacts, embed a markdown link to it using a **workspace-absolute path** beginning with a single forward slash.
+  - Correct:   \`[wiki page on X](/wiki/pages/x.md)\`
+  - Wrong:     \`[wiki page](wiki/pages/x.md)\` (missing leading slash)
+  - Wrong:     \`[wiki page](/home/user/.../x.md)\` (filesystem absolute)
+- The post-processor converts these to true relative paths before writing the file to disk, so don't do the relative-path math yourself.
+- Only link to artifacts listed in "ARTIFACTS REFERENCED". Don't invent paths.
+
 LANGUAGE
 - Match the language of the source sessions. Always.`;
 
@@ -210,6 +224,23 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   } else {
     for (const t of input.existingTopicSummaries) {
       parts.push(`- ${t.slug}`);
+    }
+  }
+  parts.push("");
+
+  // Union of all workspace-relative artifact paths the day's
+  // sessions produced, deduped and sorted. Given to the archivist
+  // so it can link to them from the summary text.
+  const allArtifacts = new Set<string>();
+  for (const s of input.sessionExcerpts) {
+    for (const p of s.artifactPaths) allArtifacts.add(p);
+  }
+  parts.push("ARTIFACTS REFERENCED:");
+  if (allArtifacts.size === 0) {
+    parts.push("(none)");
+  } else {
+    for (const p of [...allArtifacts].sort()) {
+      parts.push(`- ${p}`);
     }
   }
   parts.push("");

@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { entryToExcerpt } from "../../server/journal/dailyPass.js";
+import {
+  entryToExcerpt,
+  extractArtifactPaths,
+  parseEntry,
+} from "../../server/journal/dailyPass.js";
 
 describe("entryToExcerpt", () => {
   it("converts a text entry", () => {
@@ -87,5 +91,137 @@ describe("entryToExcerpt", () => {
     const out = entryToExcerpt({ message: "hi", type: "text" });
     assert.ok(out);
     assert.equal(out!.source, "unknown");
+  });
+});
+
+describe("extractArtifactPaths", () => {
+  it("returns [] for text entries", () => {
+    assert.deepEqual(
+      extractArtifactPaths({ source: "user", type: "text", message: "hi" }),
+      [],
+    );
+  });
+
+  it("extracts data.filePath from a tool_result", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "presentMulmoScript",
+        data: { filePath: "stories/foo.json" },
+      },
+    });
+    assert.deepEqual(paths, ["stories/foo.json"]);
+  });
+
+  it("synthesises a wiki page path from manageWiki + pageName", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "manageWiki",
+        data: { action: "view", pageName: "refactoring" },
+      },
+    });
+    assert.deepEqual(paths, ["wiki/pages/refactoring.md"]);
+  });
+
+  it("extracts from presentHtml via data.filePath", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "presentHtml",
+        data: { filePath: "HTMLs/report.html" },
+      },
+    });
+    assert.deepEqual(paths, ["HTMLs/report.html"]);
+  });
+
+  it("rejects absolute paths in filePath", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "presentHtml",
+        data: { filePath: "/etc/passwd" },
+      },
+    });
+    assert.deepEqual(paths, []);
+  });
+
+  it("rejects parent-escape paths in filePath", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "presentHtml",
+        data: { filePath: "../../etc/passwd" },
+      },
+    });
+    assert.deepEqual(paths, []);
+  });
+
+  it("rejects scheme-looking paths in filePath", () => {
+    const paths = extractArtifactPaths({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "foo",
+        data: { filePath: "https://example.com/x" },
+      },
+    });
+    assert.deepEqual(paths, []);
+  });
+
+  it("returns [] when data is missing", () => {
+    assert.deepEqual(
+      extractArtifactPaths({
+        source: "tool",
+        type: "tool_result",
+        result: { toolName: "presentHtml" },
+      }),
+      [],
+    );
+  });
+
+  it("returns [] for non-tool_result entries", () => {
+    assert.deepEqual(
+      extractArtifactPaths({
+        type: "other",
+        result: { data: { filePath: "x" } },
+      }),
+      [],
+    );
+  });
+});
+
+describe("parseEntry", () => {
+  it("returns excerpt plus artifactPaths for a tool_result", () => {
+    const parsed = parseEntry({
+      source: "tool",
+      type: "tool_result",
+      result: {
+        toolName: "presentMulmoScript",
+        title: "story about a cat",
+        data: { filePath: "stories/cat.json" },
+      },
+    });
+    assert.ok(parsed);
+    assert.match(
+      parsed!.excerpt.content,
+      /presentMulmoScript: story about a cat/,
+    );
+    assert.deepEqual(parsed!.artifactPaths, ["stories/cat.json"]);
+  });
+
+  it("returns empty artifactPaths for a text entry", () => {
+    const parsed = parseEntry({ source: "user", type: "text", message: "hi" });
+    assert.ok(parsed);
+    assert.deepEqual(parsed!.artifactPaths, []);
+  });
+
+  it("returns null for entries that don't produce an excerpt", () => {
+    assert.equal(parseEntry({ source: "x", type: "mystery" }), null);
   });
 });

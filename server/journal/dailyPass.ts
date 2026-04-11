@@ -37,6 +37,7 @@ import {
   applyProcessed,
   type SessionFileMeta,
 } from "./diff.js";
+import { rewriteWorkspaceLinks } from "./linkRewrite.js";
 import type { JournalState } from "./state.js";
 
 // --- Constants ------------------------------------------------------
@@ -162,12 +163,26 @@ export async function runDailyPass(
       continue;
     }
 
-    await writeDailySummary(workspaceRoot, date, parsed.dailySummaryMarkdown);
+    // Rewrite any /workspace-absolute links in the archivist's output
+    // into true-relative links from the daily summary's location
+    // before writing to disk. Same treatment below for topic files.
+    const [yearPart, monthPart, dayPart] = date.split("-");
+    const dailyFileWsPath = `summaries/daily/${yearPart}/${monthPart}/${dayPart}.md`;
+    const dailyContent = rewriteWorkspaceLinks(
+      dailyFileWsPath,
+      parsed.dailySummaryMarkdown,
+    );
+    await writeDailySummary(workspaceRoot, date, dailyContent);
     result.daysTouched.push(date);
 
     for (const update of parsed.topicUpdates) {
       const canonicalSlug = slugify(update.slug);
       const exists = existingTopics.some((t) => t.slug === canonicalSlug);
+      const topicFileWsPath = path.posix.join(
+        "summaries",
+        "topics",
+        `${canonicalSlug}.md`,
+      );
       const normalized: TopicUpdate = {
         slug: canonicalSlug,
         // Guard: if the archivist asked to "append" to a slug that
@@ -175,7 +190,7 @@ export async function runDailyPass(
         // handling that removes a whole class of LLM mistakes.
         action:
           !exists && update.action === "append" ? "create" : update.action,
-        content: update.content,
+        content: rewriteWorkspaceLinks(topicFileWsPath, update.content),
       };
       const outcome = await applyTopicUpdate(workspaceRoot, normalized);
       if (outcome === "created") result.topicsCreated.push(canonicalSlug);
@@ -273,17 +288,20 @@ async function loadSessionExcerptsByDate(
     if (entry.type === "session_meta" || entry.type === "claude_session_id") {
       continue;
     }
-    const excerpt = entryToExcerpt(entry);
-    if (!excerpt) continue;
+    const parsed = parseEntry(entry);
+    if (!parsed) continue;
     count++;
 
     const date = fallbackDate;
     let bucket = buckets.get(date);
     if (!bucket) {
-      bucket = { sessionId, roleId, events: [] };
+      bucket = { sessionId, roleId, events: [], artifactPaths: [] };
       buckets.set(date, bucket);
     }
-    bucket.events.push(excerpt);
+    bucket.events.push(parsed.excerpt);
+    for (const p of parsed.artifactPaths) {
+      if (!bucket.artifactPaths.includes(p)) bucket.artifactPaths.push(p);
+    }
   }
   return buckets;
 }
@@ -298,8 +316,27 @@ async function readRoleId(metaPath: string): Promise<string> {
   return "unknown";
 }
 
-// Convert one jsonl entry into a flat excerpt the archivist can read.
+// Convert one jsonl entry into a flat excerpt the archivist can read,
+// plus any workspace-relative artifact paths the entry references.
 // Exported so tests can exercise it with fabricated entries.
+export interface ParsedEntry {
+  excerpt: SessionEventExcerpt;
+  // 0+ workspace-relative artifact paths referenced by this entry.
+  // Used to build the ARTIFACTS REFERENCED prompt section.
+  artifactPaths: string[];
+}
+
+export function parseEntry(entry: Record<string, unknown>): ParsedEntry | null {
+  const excerpt = entryToExcerpt(entry);
+  if (!excerpt) return null;
+  return {
+    excerpt,
+    artifactPaths: extractArtifactPaths(entry),
+  };
+}
+
+// Legacy single-purpose form used by the existing unit tests.
+// Prefer `parseEntry` for code that also wants artifact paths.
 export function entryToExcerpt(
   entry: Record<string, unknown>,
 ): SessionEventExcerpt | null {
@@ -329,6 +366,49 @@ export function entryToExcerpt(
     };
   }
   return null;
+}
+
+// Pull workspace-relative artifact paths out of a jsonl entry. The
+// extraction is tool-aware: different plugins stash file paths in
+// different places inside their tool_result data. Exported for
+// tests.
+export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
+  if (entry.type !== "tool_result") return [];
+  const result = entry.result;
+  if (typeof result !== "object" || result === null) return [];
+  const r = result as Record<string, unknown>;
+  const data = r.data;
+  if (typeof data !== "object" || data === null) return [];
+  const d = data as Record<string, unknown>;
+  const paths: string[] = [];
+
+  // Direct `filePath: string` — presentMulmoScript, presentHtml.
+  if (typeof d.filePath === "string" && d.filePath.length > 0) {
+    paths.push(d.filePath);
+  }
+
+  // Wiki uses `pageName: string` and stores the page at
+  // `wiki/pages/<pageName>.md`. The plugin itself doesn't surface
+  // the full path in the result, so we synthesise it from the
+  // convention established in server/routes/wiki.ts.
+  if (r.toolName === "manageWiki" && typeof d.pageName === "string") {
+    paths.push(`wiki/pages/${d.pageName}.md`);
+  }
+
+  // Paths must be workspace-relative (not absolute, no escape).
+  // Drop anything suspicious rather than link to it.
+  return paths.filter(isSafeWorkspacePath);
+}
+
+// Defensive: refuse absolute paths, parent-escapes, or scheme-like
+// strings. Protects against a malformed tool result wedging a
+// filesystem-absolute path into the archivist prompt.
+function isSafeWorkspacePath(p: string): boolean {
+  if (!p) return false;
+  if (p.startsWith("/")) return false;
+  if (p.startsWith("..")) return false;
+  if (p.includes("://")) return false;
+  return true;
 }
 
 function truncate(s: string, max: number): string {
