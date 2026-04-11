@@ -38,6 +38,12 @@ export function removeSession(id: string): void {
   sessions.delete(id);
 }
 
+// Snapshot of currently-live session ids. The journal module uses
+// this to skip ingesting jsonl files that are still being written.
+export function getActiveSessionIds(): Set<string> {
+  return new Set(sessions.keys());
+}
+
 export async function pushToSession(
   id: string,
   data: unknown,

@@ -4,8 +4,14 @@ import path from "path";
 import { Router, Request, Response } from "express";
 import { getRole } from "../roles.js";
 import { runAgent } from "../agent.js";
-import { registerSession, removeSession, pushToSession } from "../sessions.js";
+import {
+  registerSession,
+  removeSession,
+  pushToSession,
+  getActiveSessionIds,
+} from "../sessions.js";
 import { workspacePath } from "../workspace.js";
+import { maybeRunJournal } from "../journal/index.js";
 
 const router = Router();
 const PORT = Number(process.env.PORT) || 3001;
@@ -156,6 +162,18 @@ router.post(
     } finally {
       removeSession(sessionId);
       res.end();
+      // Fire-and-forget: the journal module decides whether the
+      // interval has elapsed and is self-locking. We pass the
+      // active-session set so the pass skips any jsonl file still
+      // being written by a concurrent request.
+      maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(
+        (err) => {
+          // Should not actually happen — maybeRunJournal swallows
+          // its own errors — but belt-and-suspenders.
+          // eslint-disable-next-line no-console
+          console.warn("[journal] unexpected error in background:", err);
+        },
+      );
     }
   },
 );

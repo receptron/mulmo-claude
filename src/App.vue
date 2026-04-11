@@ -323,33 +323,43 @@
         </div>
       </div>
 
-      <!-- Sample queries -->
-      <div
-        v-if="showQueries"
-        class="px-4 pt-3 pb-1 flex flex-wrap gap-2 border-t border-gray-200 relative"
-      >
-        <button
-          class="absolute top-1 right-1 text-gray-300 hover:text-gray-500"
-          title="Hide suggestions"
-          @click="queriesHidden = true"
+      <!-- Sample queries (expandable pane) -->
+      <div v-if="showQueries" class="border-t border-gray-200">
+        <div
+          v-if="queriesExpanded"
+          ref="queriesListRef"
+          class="px-4 pt-2 max-h-64 overflow-y-auto flex flex-col gap-1"
         >
-          <span class="material-icons text-sm">close</span>
-        </button>
+          <button
+            v-for="query in currentRole.queries"
+            :key="query"
+            class="text-left text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded px-3 py-1.5 border border-gray-300 transition-colors"
+            @click="onQueryClick($event, query)"
+          >
+            {{ query }}
+          </button>
+          <p class="text-center text-[10px] text-gray-400 py-0.5">
+            click to send · shift+click to edit
+          </p>
+        </div>
         <button
-          v-for="query in currentRole.queries"
-          :key="query"
-          class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full px-3 py-1 border border-gray-300 transition-colors"
-          @click="sendMessage(query)"
+          class="w-full flex items-center justify-between px-4 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          @click="queriesExpanded = !queriesExpanded"
         >
-          {{ query }}
+          <span class="flex items-center gap-1">
+            <span class="material-icons text-sm">lightbulb</span>
+            Suggestions
+          </span>
+          <span
+            class="material-icons text-sm transition-transform"
+            :class="{ 'rotate-180': !queriesExpanded }"
+            >expand_less</span
+          >
         </button>
       </div>
 
       <!-- Text input -->
-      <div
-        class="p-4 border-t border-gray-200"
-        :class="{ 'border-t-0': showQueries }"
-      >
+      <div class="p-4 border-t border-gray-200">
         <div class="flex gap-2">
           <textarea
             ref="textareaRef"
@@ -432,7 +442,11 @@
           @update-result="handleUpdateResult"
         />
         <!-- Files mode -->
-        <FilesView v-else :refresh-token="filesRefreshToken" />
+        <FilesView
+          v-else
+          :refresh-token="filesRefreshToken"
+          @load-session="onFilesViewLoadSession"
+        />
       </div>
     </div>
     <!-- Right sidebar: tool call history -->
@@ -678,15 +692,30 @@ function handleKeyNavigation(e: KeyboardEvent) {
   selectedResultUuid.value = results[nextIndex].uuid;
 }
 
-const queriesHidden = ref(false);
+const queriesExpanded = ref(false);
+const queriesListRef = ref<HTMLDivElement | null>(null);
 
-const showQueries = computed(
-  () =>
-    !!currentRole.value.queries?.length &&
-    !isRunning.value &&
-    !queriesHidden.value &&
-    toolResults.value.length === 0,
-);
+watch(queriesExpanded, (expanded) => {
+  if (expanded) {
+    nextTick(() => {
+      if (queriesListRef.value) {
+        queriesListRef.value.scrollTop = queriesListRef.value.scrollHeight;
+      }
+    });
+  }
+});
+
+const showQueries = computed(() => !!currentRole.value.queries?.length);
+
+function onQueryClick(e: MouseEvent, query: string) {
+  queriesExpanded.value = false;
+  if (e.shiftKey) {
+    userInput.value = query;
+    nextTick(() => textareaRef.value?.focus());
+  } else {
+    sendMessage(query);
+  }
+}
 
 // Local wrappers that thread the reactive `roles.value` into the
 // pure helpers in src/utils/role.ts. Template bindings keep the
@@ -737,6 +766,18 @@ function onSidebarItemClick(uuid: string) {
   }
 }
 
+// Bridge from FilesView: a user clicked a markdown link to a chat
+// session (e.g. "[session abc](../../chat/abc-123.jsonl)" inside
+// a journal summary). Switch the active session AND pop the canvas
+// out of files mode, otherwise they'd still be staring at the file
+// tree after the session loaded.
+function onFilesViewLoadSession(sessionId: string): void {
+  loadSession(sessionId);
+  if (canvasViewMode.value === "files") {
+    setCanvasViewMode("single");
+  }
+}
+
 const GEMINI_PLUGINS = new Set(["generateImage", "presentDocument"]);
 const needsGemini = (roleId: string) =>
   (roles.value.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
@@ -774,7 +815,7 @@ function createNewSession(roleId?: string): ActiveSession {
   sessionMap.set(id, session);
   currentSessionId.value = id;
   currentRoleId.value = rId;
-  queriesHidden.value = false;
+  queriesExpanded.value = false;
   return sessionMap.get(id)!;
 }
 

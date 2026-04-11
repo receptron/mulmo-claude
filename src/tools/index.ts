@@ -10,7 +10,6 @@ import FormPlugin from "@mulmochat-plugin/form/vue";
 import CanvasPlugin from "@gui-chat-plugin/canvas/vue";
 import EditImagePlugin from "@gui-chat-plugin/edit-image/vue";
 import MusicPlugin from "@gui-chat-plugin/music/vue";
-import OthelloPlugin from "@gui-chat-plugin/othello/vue";
 import PianoPlugin from "@gui-chat-plugin/piano/vue";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
@@ -41,7 +40,6 @@ const plugins: Record<string, PluginEntry> = {
   presentHtml: presentHtmlPlugin,
   editImage: EditImagePlugin.plugin,
   showMusic: MusicPlugin.plugin,
-  playOthello: OthelloPlugin.plugin,
   piano: PianoPlugin.plugin,
   present3D: Present3DPlugin.plugin,
   weather: WeatherPlugin.plugin,

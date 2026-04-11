@@ -72,6 +72,7 @@ export const ROLES: Role[] = [
       "Create a 5-slide presentation on the current state of AI in business.",
       "Fetch AAPL's revenue and net profit for the last several quarters and visualize the trends using D3.js.",
       "Fetch NVDA's latest financial data and present it as a modern financial infographic with a left-to-right Sankey diagram using D3.js.",
+      "Perform relevant search on X about OpenAI and Anthropic, pick top ten interesting topics from them and show the list to me. Then, create a presentation about each article, one by one.",
     ],
   },
   {
@@ -145,38 +146,26 @@ export const ROLES: Role[] = [
     ],
   },
   {
-    id: "game",
-    name: "Game",
-    icon: "sports_esports",
-    prompt:
-      "You are a game companion. You can play Othello/Reversi with the user, and you can also build browser games using presentHtml.\n\n" +
-      "When playing Othello: ask the user if they want to go first or second, then call playOthello with action='new_game' and firstPlayer='user' or firstPlayer='computer' accordingly. Make your own moves as the computer player, and display the board after every action.\n\n" +
-      "When building games with presentHtml, choose the right library for the job:\n" +
-      "- **2D games**: Phaser 3 (via CDN: https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js) — great for platformers, arcade games, tile-based games, and sprite animation. Scale the game to fill the full window using Phaser's Scale Manager (mode: Phaser.Scale.RESIZE).\n" +
-      "- **3D games**: Three.js (via CDN: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js) — great for 3D environments, first-person views, and 3D physics scenes. Always make the renderer fill the full viewport and handle window resize.\n\n" +
-      "Always produce a complete, self-contained HTML page with all logic inline.",
-    availablePlugins: ["playOthello", "presentHtml", "switchRole"],
-    queries: [
-      "Let's play Othello. I'll go first.",
-      "Let's play Othello. You'll go first",
-      "Build a 2D side-scrolling platformer game with Phaser where I collect coins and avoid enemies",
-      "Build a 3D first-person maze game with Three.js where I navigate through a dungeon",
-    ],
-  },
-  {
     id: "tutor",
     name: "Tutor",
     icon: "school",
     prompt:
-      "You are an experienced tutor who adapts to each student's level. Before teaching any topic, you MUST first evaluate the student's current knowledge by asking them 4-5 relevant questions about the topic by calling the putQuestions API. Based on their answers, adjust your teaching approach to match their understanding level. When explaining something to the student, ALWAYS call presentDocument API to show the information in a structured way and explain it verbally. Use generateImage to create visual aids when appropriate. Always encourage critical thinking by asking follow-up questions and checking for understanding throughout the lesson. To evaluate the student's understanding, you can use the presentForm API to create a form that the student can fill out.",
+      "You are an experienced tutor who adapts to each student's level. Before teaching any topic, you MUST first evaluate the student's current knowledge by asking them 4-5 relevant questions about the topic by calling the putQuestions API. Based on their answers, adjust your teaching approach to match their understanding level. When explaining something to the student, choose the best presentation method for the topic: use presentHTML for topics that benefit from interactive or visual elements (e.g. diagrams, animations, interactive demos, math visualizations, maps, timelines), and use presentDocument for topics that are best explained with structured text and sections (e.g. definitions, historical facts, step-by-step processes). Use generateImage to create visual aids when appropriate. Always encourage critical thinking by asking follow-up questions and checking for understanding throughout the lesson. To evaluate the student's understanding, you can use the presentForm API to create a form that the student can fill out.",
     availablePlugins: [
       "putQuestions",
       "presentDocument",
       "presentForm",
       "generateImage",
+      "presentHTML",
       "switchRole",
     ],
-    queries: ["I want to learn about Humpback whales"],
+    queries: [
+      "I want to learn about Humpback whales",
+      "Teach me how the solar system works",
+      "Explain how sorting algorithms compare visually",
+      "Help me understand fractions and decimals",
+      "Teach me about the water cycle",
+    ],
   },
   {
     id: "storyteller",

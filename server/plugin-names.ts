@@ -19,7 +19,6 @@ import { TOOL_DEFINITION as FormDef } from "@mulmochat-plugin/form";
 import { TOOL_DEFINITION as CanvasDef } from "@gui-chat-plugin/canvas";
 import { TOOL_DEFINITION as EditImageDef } from "@gui-chat-plugin/edit-image";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
-import { TOOL_DEFINITION as OthelloDef } from "@gui-chat-plugin/othello";
 import { TOOL_DEFINITION as MusicDef } from "@gui-chat-plugin/music";
 
 /** Maps plugin tool name → REST API endpoint. */
@@ -36,7 +35,6 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [PresentHtmlDef.name]: "/api/present-html",
   [EditImageDef.name]: "/api/edit-image",
   [Present3DDef.name]: "/api/present3d",
-  [OthelloDef.name]: "/api/othello",
   [MusicDef.name]: "/api/music",
   [ManageRolesDef.name]: "/api/roles/manage",
   [PresentMulmoScriptDef.name]: "/api/mulmo-script",
@@ -58,7 +56,6 @@ export const PLUGIN_DEFS = [
   PresentHtmlDef,
   EditImageDef,
   Present3DDef,
-  OthelloDef,
   MusicDef,
   ManageRolesDef,
   WikiDef,

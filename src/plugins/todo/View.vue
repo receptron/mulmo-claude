@@ -20,40 +20,77 @@
       <li
         v-for="item in items"
         :key="item.id"
-        class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer group"
-        :class="
-          selectedId === item.id
-            ? 'border-blue-400 bg-blue-50'
-            : 'border-gray-200 hover:bg-gray-50'
-        "
-        @click="selectItem(item)"
+        class="rounded-lg border"
+        :class="selectedId === item.id ? 'border-blue-400' : 'border-gray-200'"
       >
-        <input
-          type="checkbox"
-          :checked="item.completed"
-          class="cursor-pointer shrink-0"
-          @click.stop
-          @change="toggle(item)"
-        />
-        <div class="flex-1 min-w-0">
-          <span
-            class="text-sm"
-            :class="
-              item.completed ? 'line-through text-gray-400' : 'text-gray-800'
-            "
-            >{{ item.text }}</span
+        <!-- Item row -->
+        <div
+          class="flex items-center gap-3 p-3 cursor-pointer group hover:bg-gray-50 rounded-lg"
+          :class="selectedId === item.id ? 'rounded-b-none' : ''"
+          @click="selectItem(item)"
+        >
+          <input
+            type="checkbox"
+            :checked="item.completed"
+            class="cursor-pointer shrink-0"
+            @click.stop
+            @change="toggle(item)"
+          />
+          <div class="flex-1 min-w-0">
+            <span
+              class="text-sm"
+              :class="
+                item.completed ? 'line-through text-gray-400' : 'text-gray-800'
+              "
+              >{{ item.text }}</span
+            >
+            <div v-if="item.note" class="text-xs text-gray-400 mt-0.5">
+              {{ item.note }}
+            </div>
+          </div>
+          <button
+            class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 shrink-0"
+            title="Delete item"
+            @click.stop="remove(item)"
           >
-          <div v-if="item.note" class="text-xs text-gray-400 mt-0.5">
-            {{ item.note }}
+            ✕
+          </button>
+          <span
+            class="material-icons text-gray-400 text-sm"
+            :title="selectedId === item.id ? 'Collapse' : 'Expand'"
+          >
+            {{ selectedId === item.id ? "expand_less" : "expand_more" }}
+          </span>
+        </div>
+
+        <!-- Inline editor -->
+        <div
+          v-if="selectedId === item.id"
+          class="border-t border-blue-100 bg-blue-50 p-4 space-y-3 rounded-b-lg"
+        >
+          <textarea
+            v-model="yamlText"
+            class="w-full h-24 p-3 font-mono text-xs bg-white border border-blue-300 rounded resize-y focus:outline-none focus:border-blue-500"
+            spellcheck="false"
+          />
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+              @click="applyItemEdit"
+            >
+              Update
+            </button>
+            <button
+              class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+              @click="selectedId = null"
+            >
+              Cancel
+            </button>
+            <span v-if="yamlError" class="text-xs text-red-500">{{
+              yamlError
+            }}</span>
           </div>
         </div>
-        <button
-          class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 shrink-0"
-          title="Delete item"
-          @click.stop="remove(item)"
-        >
-          ✕
-        </button>
       </li>
     </ul>
 
@@ -64,40 +101,6 @@
     >
       Clear completed
     </button>
-
-    <!-- Item YAML editor -->
-    <div v-if="selectedId" class="border-t border-blue-200 bg-blue-50 shrink-0">
-      <div
-        class="flex items-center justify-between px-4 py-2 text-sm font-medium text-blue-700"
-      >
-        <span>Edit item</span>
-        <button
-          class="text-blue-400 hover:text-blue-600 text-xs"
-          title="Close editor"
-          @click="selectedId = null"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="px-3 pb-3">
-        <textarea
-          v-model="yamlText"
-          class="w-full h-24 p-3 font-mono text-xs bg-white border border-blue-300 rounded resize-y focus:outline-none focus:border-blue-500"
-          spellcheck="false"
-        />
-        <div class="flex items-center gap-2 mt-2">
-          <button
-            class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-            @click="applyItemEdit"
-          >
-            Update
-          </button>
-          <span v-if="yamlError" class="text-xs text-red-500">{{
-            yamlError
-          }}</span>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -215,6 +218,7 @@ async function applyItemEdit() {
     newText: parsed.text,
     note: parsed.note,
   });
+  selectedId.value = null;
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────

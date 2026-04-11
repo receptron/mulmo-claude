@@ -26,6 +26,7 @@ import fs from "fs";
 import os from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./docker.js";
 import { startTelegramBot } from "./telegram.js";
+import { maybeRunJournal } from "./journal/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,5 +165,15 @@ function isPortFree(port: number): Promise<boolean> {
     startTelegramBot(PORT).catch((error) => {
       console.error("Failed to start Telegram bot:", error);
     });
+    // Debug switch: set JOURNAL_FORCE_RUN_ON_STARTUP=1 to run a full
+    // journal pass immediately without waiting for a session end or
+    // the hourly interval. Fire-and-forget — journal errors never
+    // propagate out of maybeRunJournal.
+    if (process.env.JOURNAL_FORCE_RUN_ON_STARTUP === "1") {
+      console.log("[journal] JOURNAL_FORCE_RUN_ON_STARTUP=1 — running now");
+      maybeRunJournal({ force: true }).catch((err) => {
+        console.warn("[journal] forced startup run failed:", err);
+      });
+    }
   });
 })();

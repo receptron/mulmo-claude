@@ -60,6 +60,7 @@
                 v-model="editForm.name"
                 type="text"
                 class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+                @keydown.enter="saveEdit(role.id)"
               />
             </div>
             <div class="w-32">
@@ -151,7 +152,7 @@
                 :disabled="saving"
                 @click="saveEdit(role.id)"
               >
-                {{ saving ? "Saving…" : "Save" }}
+                {{ saving ? "Updating…" : "Update" }}
               </button>
               <button
                 class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"

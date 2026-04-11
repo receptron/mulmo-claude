@@ -5,7 +5,6 @@ import { executeQuiz } from "@mulmochat-plugin/quiz";
 import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "@gui-chat-plugin/canvas";
 import { executePresent3D } from "@gui-chat-plugin/present3d";
-import { executeOthello } from "@gui-chat-plugin/othello";
 import { showMusic } from "@gui-chat-plugin/music";
 import { getGeminiClient, isGeminiAvailable } from "../utils/gemini.js";
 
@@ -161,19 +160,6 @@ router.post(
   async (_req: Request, res: Response<PluginErrorResponse>) => {
     try {
       const result = await executePresent3D(null as never, _req.body);
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({ message: String(err) });
-    }
-  },
-);
-
-// playOthello — Othello/Reversi game
-router.post(
-  "/othello",
-  async (_req: Request, res: Response<PluginErrorResponse>) => {
-    try {
-      const result = await executeOthello(null as never, _req.body);
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: String(err) });

@@ -242,7 +242,7 @@
     </div>
 
     <!-- Beat list -->
-    <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+    <div ref="beatListEl" class="flex-1 overflow-y-auto p-2 space-y-1.5">
       <div
         v-for="(beat, index) in beats"
         :key="index"
@@ -590,6 +590,7 @@ const audioErrors = reactive<Record<number, string>>({});
 const playingAudio = ref<{ index: number; audio: HTMLAudioElement } | null>(
   null,
 );
+const beatListEl = ref<HTMLElement | null>(null);
 const lightbox = ref<{
   src: string;
   text?: string;
@@ -974,6 +975,8 @@ async function generateAllCharacters() {
 }
 
 async function initializeScript() {
+  // Reset scroll position so new results start at the top
+  if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
   Object.keys(renderState).forEach((k) => delete renderState[+k]);
   Object.keys(renderedImages).forEach((k) => delete renderedImages[+k]);
