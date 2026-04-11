@@ -116,7 +116,7 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
 const items = ref<TodoItem[]>(props.selectedResult.data?.items ?? []);
 
-onMounted(async () => {
+async function fetchItems() {
   try {
     const res = await fetch("/api/todos");
     if (res.ok) {
@@ -126,7 +126,18 @@ onMounted(async () => {
   } catch {
     // Fall back to prop data (already set)
   }
-});
+}
+
+onMounted(fetchItems);
+
+watch(
+  () => props.selectedResult.data?.items,
+  (newItems) => {
+    if (newItems) {
+      items.value = newItems;
+    }
+  },
+);
 const completedCount = computed(
   () => items.value.filter((i) => i.completed).length,
 );
@@ -221,25 +232,25 @@ async function applyItemEdit() {
     yamlError.value = "Could not parse YAML — 'text' field is required";
     return;
   }
-  await callApi({
+  const ok = await callApi({
     action: "update",
     text: selectedOriginalText.value,
     newText: parsed.text,
     note: parsed.note,
   });
-  selectedId.value = null;
+  if (ok) selectedId.value = null;
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
-async function callApi(body: Record<string, unknown>) {
+async function callApi(body: Record<string, unknown>): Promise<boolean> {
   try {
     const response = await fetch("/api/todos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!response.ok) return;
+    if (!response.ok) return false;
     const result = await response.json();
     items.value = result.data?.items ?? [];
     emit("updateResult", {
@@ -247,8 +258,9 @@ async function callApi(body: Record<string, unknown>) {
       ...result,
       uuid: props.selectedResult.uuid,
     });
+    return true;
   } catch {
-    // Network error — keep current state
+    return false;
   }
 }
 

@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
@@ -150,6 +150,18 @@ const title = ref(props.selectedResult.data?.title ?? "Wiki");
 const content = ref(props.selectedResult.data?.content ?? "");
 const pageEntries = ref<WikiPageEntry[]>(
   props.selectedResult.data?.pageEntries ?? [],
+);
+
+watch(
+  () => props.selectedResult.data,
+  (newData) => {
+    if (newData) {
+      action.value = newData.action ?? "index";
+      title.value = newData.title ?? "Wiki";
+      content.value = newData.content ?? "";
+      pageEntries.value = newData.pageEntries ?? [];
+    }
+  },
 );
 
 onMounted(async () => {
