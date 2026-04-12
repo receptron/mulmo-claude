@@ -126,8 +126,8 @@
     <div
       v-else
       class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content"
-      v-html="renderedContent"
       @click="handleContentClick"
+      v-html="renderedContent"
     />
   </div>
 </template>

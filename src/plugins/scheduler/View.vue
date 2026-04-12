@@ -336,6 +336,8 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 
+type YamlScalar = string | number | boolean | null;
+
 const props = defineProps<{
   selectedResult: ToolResultComplete<SchedulerData>;
 }>();
@@ -510,7 +512,7 @@ function goNext() {
 function yamlStringValue(v: string): string {
   const needsQuotes =
     v === "" ||
-    /[:#\[\]{},&*?|<>=!%@`]/.test(v) ||
+    /[:#[\]{},&*?|<>=!%@`]/.test(v) ||
     /^\s|\s$/.test(v) ||
     /^(true|false|null|~)$/i.test(v) ||
     /^\d/.test(v);
@@ -533,7 +535,7 @@ function serializeYaml(item: ScheduledItem): string {
   return lines.join("\n");
 }
 
-function parseYamlValue(raw: string): string | number | boolean | null {
+function parseYamlValue(raw: string): YamlScalar {
   if (raw === "null" || raw === "~") return null;
   if (raw === "true") return true;
   if (raw === "false") return false;

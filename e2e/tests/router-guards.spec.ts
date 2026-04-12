@@ -11,11 +11,20 @@ test.describe("URL injection defence", () => {
     // The catch-all redirect sends it to /chat.
     await page.goto("/chat/<script>alert(1)</script>");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    // URL must resolve to a valid /chat path — no script tags in decoded pathname
+    const pathname = decodeURIComponent(new URL(page.url()).pathname);
+    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
+    expect(pathname).not.toContain("<script>");
   });
 
   test("path traversal → app renders normally", async ({ page }) => {
     await page.goto("/chat/..%2F..%2Fetc%2Fpasswd");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    // URL must resolve to a valid /chat path, not a traversed location
+    const pathname = new URL(page.url()).pathname;
+    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
   });
 
   test("extremely long path segment → app renders normally", async ({
@@ -29,7 +38,8 @@ test.describe("URL injection defence", () => {
   test("unknown route → redirected to /chat, app loads", async ({ page }) => {
     await page.goto("/admin/secret");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    expect(page.url()).toContain("/chat");
+    const pathname = new URL(page.url()).pathname;
+    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
   });
 
   test("special chars in path → app does not crash", async ({ page }) => {

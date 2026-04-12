@@ -1,6 +1,9 @@
 import { Router, Request, Response } from "express";
 import { executeMindMap } from "@gui-chat-plugin/mindmap";
-import { executeSpreadsheet } from "../../src/plugins/spreadsheet/definition.js";
+import {
+  executeSpreadsheet,
+  type SpreadsheetArgs,
+} from "../../src/plugins/spreadsheet/definition.js";
 import { executeQuiz } from "@mulmochat-plugin/quiz";
 import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "../../src/plugins/canvas/definition.js";
@@ -17,6 +20,11 @@ import {
   overwriteMarkdown,
   isMarkdownPath,
 } from "../utils/markdown-store.js";
+import {
+  saveSpreadsheet,
+  overwriteSpreadsheet,
+  isSpreadsheetPath,
+} from "../utils/spreadsheet-store.js";
 
 const router = Router();
 
@@ -34,10 +42,11 @@ interface PluginErrorResponse {
 // default and each plugin's execute function does its own runtime
 // validation — matching the behavior of the inline handlers this
 // replaces.
-function wrapPluginExecute<TResult>(
-  execute: (req: Request) => Promise<TResult>,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function wrapPluginExecute<TBody = any, TResult = unknown>(
+  execute: (req: Request<object, unknown, TBody>) => Promise<TResult>,
 ): (
-  req: Request,
+  req: Request<object, unknown, TBody>,
   res: Response<TResult | PluginErrorResponse>,
 ) => Promise<void> {
   return async (req, res) => {
@@ -158,10 +167,55 @@ router.put(
 // path — so we satisfy the type signature with a never cast rather
 // than fabricating a fake context.
 
-// presentSpreadsheet — uses package execute for validation/processing
+// presentSpreadsheet — validate, then save sheets to disk
 router.post(
   "/present-spreadsheet",
-  wrapPluginExecute((req) => executeSpreadsheet(req.body)),
+  wrapPluginExecute<SpreadsheetArgs, unknown>(async (req) => {
+    const result = await executeSpreadsheet(req.body);
+    if (!Array.isArray(result.data.sheets)) {
+      throw new Error("Expected sheets array from executeSpreadsheet");
+    }
+    const sheetsPath = await saveSpreadsheet(result.data.sheets);
+    return { ...result, data: { ...result.data, sheets: sheetsPath } };
+  }),
+);
+
+// Update spreadsheet file on disk (user edits in View)
+interface UpdateSpreadsheetBody {
+  sheets: unknown[];
+}
+
+interface UpdateSpreadsheetResponse {
+  path: string;
+}
+
+interface UpdateSpreadsheetError {
+  error: string;
+}
+
+router.put(
+  "/spreadsheets/:filename",
+  async (
+    req: Request<{ filename: string }, unknown, UpdateSpreadsheetBody>,
+    res: Response<UpdateSpreadsheetResponse | UpdateSpreadsheetError>,
+  ) => {
+    const relativePath = `spreadsheets/${req.params.filename}`;
+    const { sheets } = req.body;
+    if (!Array.isArray(sheets)) {
+      res.status(400).json({ error: "sheets must be an array" });
+      return;
+    }
+    if (!isSpreadsheetPath(relativePath)) {
+      res.status(400).json({ error: "invalid spreadsheet path" });
+      return;
+    }
+    try {
+      await overwriteSpreadsheet(relativePath, sheets);
+      res.json({ path: relativePath });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  },
 );
 
 // createMindMap — uses package execute for node layout computation

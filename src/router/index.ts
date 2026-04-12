@@ -1,23 +1,22 @@
-// Phase 0: minimal vue-router setup.
+// Vue-router setup (history mode — clean URLs without #).
 //
-// Hash mode so no server-side rewrite rules are needed. The only
-// route is /chat/:sessionId? which captures the session the user was
-// looking at. Everything else (view mode, file path, result uuid,
+// The route is /chat/:sessionId? which captures the session the user
+// was looking at. Everything else (view mode, file path, result uuid,
 // role) lives in query parameters and will be wired in later phases.
 //
 // The "/" → "/chat" redirect ensures a fresh browser tab always lands
 // on the chat view with the default (new) session, matching the
 // current pre-router behaviour.
 //
-// Phase 0 does NOT add <router-view> to App.vue — the existing
-// rendering is completely untouched. The router just manages the URL
-// and makes `useRoute()` available for later phases to start reading
-// params/query. The route components are no-op stubs.
+// History mode requires the server to serve index.html for any path
+// that doesn't match an API route or static file. In production the
+// Express catch-all `app.get("*", ...)` in server/index.ts already
+// does this. In dev, Vite's default SPA fallback handles it.
 
 import { defineComponent, h } from "vue";
 import {
   createRouter,
-  createWebHashHistory,
+  createWebHistory,
   type RouteRecordRaw,
 } from "vue-router";
 
@@ -48,7 +47,7 @@ const routes: RouteRecordRaw[] = [
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes,
 });
 

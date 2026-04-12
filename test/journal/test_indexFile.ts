@@ -196,3 +196,63 @@ describe("renderArchiveSection", () => {
     assert.match(lines[2] ?? "", /7 archived topics\b/);
   });
 });
+
+describe("topic sort order (compareTopicsNewestFirst)", () => {
+  const BASE: IndexInputs = {
+    topics: [],
+    days: [],
+    archivedTopicCount: 0,
+    builtAtIso: "2026-04-12T00:00:00Z",
+  };
+
+  it("sorts topics newest first", () => {
+    const md = buildIndexMarkdown({
+      ...BASE,
+      topics: [
+        { slug: "old", title: "Old", lastUpdatedIso: "2026-01-01T00:00:00Z" },
+        { slug: "new", title: "New", lastUpdatedIso: "2026-04-12T00:00:00Z" },
+      ],
+    });
+    const newIdx = md.indexOf("New");
+    const oldIdx = md.indexOf("Old");
+    assert.ok(newIdx < oldIdx, "New should come before Old");
+  });
+
+  it("topics without timestamps sort after those with timestamps", () => {
+    const md = buildIndexMarkdown({
+      ...BASE,
+      topics: [
+        { slug: "no-time", title: "No Time" },
+        {
+          slug: "has-time",
+          title: "Has Time",
+          lastUpdatedIso: "2026-04-12T00:00:00Z",
+        },
+      ],
+    });
+    const hasIdx = md.indexOf("Has Time");
+    const noIdx = md.indexOf("No Time");
+    assert.ok(hasIdx < noIdx, "Has Time should come before No Time");
+  });
+
+  it("same timestamp → sorted by slug for determinism", () => {
+    const md = buildIndexMarkdown({
+      ...BASE,
+      topics: [
+        {
+          slug: "zebra",
+          title: "Zebra",
+          lastUpdatedIso: "2026-04-12T00:00:00Z",
+        },
+        {
+          slug: "alpha",
+          title: "Alpha",
+          lastUpdatedIso: "2026-04-12T00:00:00Z",
+        },
+      ],
+    });
+    const alphaIdx = md.indexOf("Alpha");
+    const zebraIdx = md.indexOf("Zebra");
+    assert.ok(alphaIdx < zebraIdx, "Alpha should come before Zebra");
+  });
+});

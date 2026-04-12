@@ -8,13 +8,13 @@
               <button
                 v-for="size in [2, 5, 10, 20]"
                 :key="size"
-                @click="brushSize = size"
                 :class="[
                   'w-8 h-8 rounded border-2 transition-colors',
                   brushSize === size
                     ? 'border-blue-500 bg-blue-100'
                     : 'border-gray-300 bg-white hover:bg-gray-50',
                 ]"
+                @click="brushSize = size"
               >
                 <div
                   :class="'bg-gray-800 rounded-full mx-auto'"
@@ -38,23 +38,23 @@
 
         <div class="flex items-center gap-1">
           <button
-            @click="undo"
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
             title="Undo"
+            @click="undo"
           >
             <span class="material-icons text-sm">undo</span>
           </button>
           <button
-            @click="redo"
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
             title="Redo"
+            @click="redo"
           >
             <span class="material-icons text-sm">redo</span>
           </button>
           <button
-            @click="clear"
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50"
             title="Clear"
+            @click="clear"
           >
             <span class="material-icons text-sm">delete</span>
           </button>
@@ -74,13 +74,13 @@
         :line-join="'round'"
         :fill-shape="false"
         :eraser="false"
-        :lineWidth="brushSize"
+        :line-width="brushSize"
         :color="brushColor"
         :background-color="'#FFFFFF'"
         :background-image="undefined"
         :watermark="undefined"
         :initial-image="initialStrokes"
-        saveAs="png"
+        save-as="png"
         :styles="{
           border: '1px solid #ddd',
           borderRadius: '8px',
@@ -94,8 +94,8 @@
         <button
           v-for="style in artStyles"
           :key="style.id"
-          @click="applyStyle(style)"
           class="px-3 py-1.5 text-xs rounded-full border border-gray-300 bg-white hover:bg-blue-50 hover:border-blue-400 transition-colors"
+          @click="applyStyle(style)"
         >
           {{ style.label }}
         </button>

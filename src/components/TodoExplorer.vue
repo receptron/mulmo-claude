@@ -11,6 +11,7 @@
         >
         <input
           v-model="search"
+          data-testid="todo-search"
           type="text"
           placeholder="Search..."
           class="px-2 py-1 text-xs border border-gray-200 rounded w-44 focus:outline-none focus:border-blue-400"
@@ -19,6 +20,7 @@
       <div class="flex items-center gap-2">
         <!-- Add button -->
         <button
+          data-testid="todo-add-btn"
           class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600"
           @click="addOpen = true"
         >
@@ -27,6 +29,7 @@
         <!-- Add column button (kanban only) -->
         <button
           v-if="viewMode === 'kanban'"
+          data-testid="todo-column-add-btn"
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
         >
@@ -45,6 +48,7 @@
                 ? 'bg-blue-500 text-white'
                 : 'bg-white text-gray-600 hover:bg-gray-50'
             "
+            :data-testid="`todo-view-${mode.key}`"
             :title="mode.label"
             @click="setViewMode(mode.key)"
           >

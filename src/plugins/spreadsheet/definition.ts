@@ -13,7 +13,7 @@ export interface SpreadsheetSheet {
 }
 
 export interface SpreadsheetToolData {
-  sheets: SpreadsheetSheet[];
+  sheets: SpreadsheetSheet[] | string;
 }
 
 export interface SpreadsheetArgs {

@@ -233,7 +233,7 @@ function clearFilters(): void {
 function yamlStringValue(v: string): string {
   const needsQuotes =
     v === "" ||
-    /[:#\[\]{},&*?|<>=!%@`]/.test(v) ||
+    /[:#[\]{},&*?|<>=!%@`]/.test(v) ||
     /^\s|\s$/.test(v) ||
     /^(true|false|null|~)$/i.test(v) ||
     /^\d/.test(v);

@@ -117,9 +117,9 @@
                 "
               >
                 <input
+                  v-model="editForm.selectedPlugins"
                   type="checkbox"
                   :value="plugin.name"
-                  v-model="editForm.selectedPlugins"
                   :disabled="!plugin.enabled"
                   class="cursor-pointer disabled:cursor-not-allowed"
                 />
@@ -179,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { CustomRole, ManageRolesData } from "./index";

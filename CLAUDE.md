@@ -14,6 +14,10 @@ See `plan/mulmo_claude.md` for the full design plan.
 
 - **Dev server**: `npm run dev` (runs both client and server concurrently)
 - **Lint**: `yarn lint` / **Format**: `yarn format` / **Typecheck**: `yarn typecheck` / **Build**: `yarn build`
+- **Unit tests**: `yarn test` (node:test, server handlers + utils)
+- **E2E tests**: `yarn test:e2e` (Playwright, browser UI tests — no backend needed)
+- **E2E single file**: `yarn test:e2e -- tests/smoke.spec.ts`
+- **E2E headed**: `yarn test:e2e -- --headed` (opens browser for debugging)
 
 **IMPORTANT**: After modifying any source code, always run `yarn format`, `yarn lint`, `yarn typecheck`, and `yarn build` before considering the task done.
 
@@ -41,7 +45,7 @@ SSE from `POST /api/agent`: `{ type: "status" | "tool_result" | "error", ... }`.
 
 Set via `WORKSPACE_PATH` env var (defaults to `cwd()`). All data lives as plain Markdown + YAML frontmatter files:
 
-```
+```text
 workspace/
   chat/           ← session ToolResults (one .jsonl per session)
   chat/index/     ← per-session title/summary cache (chat indexer)
@@ -51,6 +55,27 @@ workspace/
   summaries/      ← journal output (daily/ + topics/ + archive/)
   memory.md       ← distilled facts always loaded as context
 ```
+
+### Routing (vue-router, history mode)
+
+URL-based navigation via `vue-router` (history mode — clean paths, no `#`). The router manages session, view mode, and (in future phases) file path, result UUID, and role in the URL.
+
+**URL scheme** (see #108 for full plan):
+
+```text
+/                                          → /chat redirect
+/chat                                      → new session, single view
+/chat/:sessionId                           → existing session, single view
+/chat/:sessionId?view=stack                → stack view
+/chat/:sessionId?view=files                → files view
+/chat/:sessionId?view=files&path=wiki/foo  → files view + file selected (future)
+```
+
+**Key pattern — ref + bidirectional sync**: `router.push` is async, so state that must be readable synchronously (e.g. `currentSessionId`, `canvasViewMode`) is kept as a plain `ref`. The ref is the source of truth for reads; `router.push`/`router.replace` keeps the URL in sync. A `watch` on route params/query handles external URL changes (back/forward button, typed URL).
+
+**Navigation guards** (`src/router/guards.ts`): `beforeEach` validates all URL params (sessionId format, view whitelist) and strips invalid values via `router.replace`.
+
+**`navigateToSession`** in `App.vue` uses `buildViewQuery()` (from `useCanvasViewMode`) instead of raw `route.query` for the view param — this avoids a stale-query race when `setCanvasViewMode` and `navigateToSession` are called in the same synchronous block.
 
 ## Key Files
 
@@ -64,6 +89,9 @@ workspace/
 | `server/csrfGuard.ts` | CSRF origin-check middleware |
 | `src/config/roles.ts` | Role definitions |
 | `src/tools/index.ts` | Plugin registry |
+| `src/router/index.ts` | Vue-router setup (history mode, route definitions) |
+| `src/router/guards.ts` | Navigation guards (param validation + sanitize) |
+| `src/composables/useCanvasViewMode.ts` | View mode state — URL sync via router, localStorage fallback |
 | `src/App.vue` | Main UI — sidebar + canvas + role switcher |
 
 ## Plugin Development
@@ -112,7 +140,17 @@ The repo runs several PRs in flight at once. Code that sprawls across large func
 
 - Extract pure logic into exported helpers so unit tests can exercise them without a harness. Examples: `parseRange` / `classify` / `isSensitivePath` in `server/routes/files.ts`, `normalizeTopicAction` / `computeJustCompletedSessions` in `server/journal/dailyPass.ts`.
 - Prefer discriminated-union return types (`{ kind: "skipped", reason } | { kind: "processed", ... }`) over null / thrown errors for multi-outcome helpers.
-- Honour the `sonarjs/cognitive-complexity` threshold (warn at >15). Split rather than suppress.
+- Honour the `sonarjs/cognitive-complexity` threshold (**error at >15** in `.ts` / `.js`; temporarily **warn** in `.vue` until pre-existing violations like `App.vue#sendMessage` at 47 and `spreadsheet/View.vue` at 163 are refactored). Split rather than suppress.
+
+### Linting covers .vue files
+
+`eslint-plugin-vue` + `vue-eslint-parser` are enabled (`eslint.config.mjs`). The `.vue` override block at the end of the config:
+
+- demotes `vue/multi-word-component-names` to off — the `View` / `Preview` component names are the MulmoClaude plugin convention
+- demotes `sonarjs/cognitive-complexity`, `sonarjs/slow-regex`, and `vue/no-v-html` to **warn** because pre-existing violations would otherwise block CI
+- keeps `vue/attributes-order` / `vue/attribute-hyphenation` as warn (auto-fixable)
+
+Each warn-level rule is a follow-up target — when all violations in `.vue` are fixed, re-raise to `error` in the override block. The goal is parity with `.ts` files.
 
 ### DRY: eliminate duplication aggressively
 
@@ -127,6 +165,8 @@ Key shared helpers in this repo:
 | `statSafe` / `readDirSafe` | `server/utils/fs.ts` |
 | `dispatchResponse(res, result)` | `server/routes/dispatchResponse.ts` |
 | `useFreshPluginData(opts)` | `src/composables/useFreshPluginData.ts` |
+| `useCanvasViewMode(opts)` | `src/composables/useCanvasViewMode.ts` |
+| `applyViewToQuery(query, mode)` | `src/composables/useCanvasViewMode.ts` |
 
 Periodically audit for duplication (`sonarjs/no-duplicate-string` warnings, `jscpd`). Batch low-risk extractions into a single refactor PR (as #145 did).
 
@@ -140,7 +180,7 @@ Periodically audit for duplication (`sonarjs/no-duplicate-string` warnings, `jsc
 
 Looking at a directory name should predict what's inside:
 
-```
+```text
 server/
   agent/          ← agent-loop (config, prompt, stream)
   chat-index/     ← per-session summarizer + manifest
@@ -153,18 +193,50 @@ src/
   components/     ← shared Vue components
   composables/    ← Vue 3 composables
   config/         ← static config (roles, system prompts)
+  router/         ← vue-router setup + navigation guards
   plugins/<name>/ ← one dir per plugin (definition, index, View, Preview)
   tools/          ← plugin registry + types
   types/          ← shared type definitions
   utils/          ← grouped by concern (dom/, format/, path/, role/)
 
 test/             ← mirrors source layout 1:1
+e2e/              ← Playwright E2E tests + fixtures
 plans/            ← one file per feature/refactor/fix
 ```
 
 - Group by *what files are about*, not file kind. `src/plugins/wiki/` keeps def/index/View/Preview together.
 - Mirror source layout in `test/`. `server/journal/dailyPass.ts` → `test/journal/test_dailyPass.ts`.
 - Prefer a new named directory over dropping files into the closest pre-existing bucket.
+
+## E2E Testing (Playwright)
+
+Browser-based tests in `e2e/`. No backend server required — all `/api/*` calls are intercepted with `page.route()` and served from fixtures.
+
+### Structure
+
+```text
+e2e/
+  playwright.config.ts    ← Chromium-only, auto-starts vite dev client
+  fixtures/
+    api.ts                ← mockAllApis(page) — shared API mock helper
+    sessions.ts           ← session data fixtures
+  tests/
+    smoke.spec.ts         ← app loads, input works
+    router-guards.spec.ts ← URL injection defence
+```
+
+### Writing tests
+
+1. Call `await mockAllApis(page)` before `page.goto()` — it intercepts all API routes
+2. Use `data-testid` attributes for element selection (change-resistant)
+3. Use URL assertions for router behaviour (`expect(page.url()).toContain(...)`)
+4. Override specific API responses per test by adding a `page.route()` AFTER `mockAllApis` (Playwright checks last-registered first)
+
+### Gotchas
+
+- **Route order is reversed**: Playwright checks routes last-registered-first. Register catch-all FIRST, specific routes AFTER.
+- **URL predicate functions > globs**: `**/api/roles` doesn't reliably match `http://host/api/roles`. Use `(url) => url.pathname === "/api/roles"` instead.
+- **Hash vs history mode**: Tests that assert URL query params behave differently between hash mode (`/#/chat?view=x`) and history mode (`/chat?view=x`). Write tests against the rendered UI state rather than raw URL strings when possible.
 
 ## Tech Stack
 
@@ -173,4 +245,5 @@ plans/            ← one file per feature/refactor/fix
 - **Plugin protocol**: `gui-chat-protocol`
 - **Server**: Express.js (SSE streaming)
 - **Storage**: Local file system (plain Markdown files)
+- **E2E Testing**: Playwright (Chromium)
 - **Language**: TypeScript throughout

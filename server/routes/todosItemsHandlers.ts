@@ -134,50 +134,41 @@ export interface CreateInput {
   labels?: string[];
 }
 
-export function handleCreate(
-  items: TodoItem[],
-  columns: StatusColumn[],
+// Resolve the status field from input, validating against known
+// columns. Returns the resolved column id or an error result.
+type ResolveStatusResult =
+  | { kind: "ok"; status: string }
+  | { kind: "error"; status: number; error: string };
+
+function resolveStatus(
   input: CreateInput,
-): ItemsActionResult {
-  if (!input.text || input.text.trim().length === 0) {
-    return { kind: "error", status: 400, error: "text required" };
-  }
-  // Resolve status. An explicit but unknown status is a 400, not a
-  // silent fallback to the default — silently rewriting the user's
-  // intent has bitten us before with sibling MCP routes.
-  const validStatusIds = new Set(columns.map((c) => c.id));
-  let status: string;
+  columns: StatusColumn[],
+): ResolveStatusResult {
   if (input.status === undefined || input.status === "") {
-    status = defaultStatusId(columns);
-  } else if (validStatusIds.has(input.status)) {
-    status = input.status;
-  } else {
-    return {
-      kind: "error",
-      status: 400,
-      error: `unknown status: ${input.status}`,
-    };
+    return { kind: "ok", status: defaultStatusId(columns) };
   }
-  const isDone = status === doneColumnId(columns);
-  const item: TodoItem = {
-    id: makeId(),
-    text: input.text.trim(),
-    completed: isDone,
-    createdAt: Date.now(),
-    status,
-    order: nextOrder(items, status),
+  const validStatusIds = new Set(columns.map((c) => c.id));
+  if (validStatusIds.has(input.status)) {
+    return { kind: "ok", status: input.status };
+  }
+  return {
+    kind: "error",
+    status: 400,
+    error: `unknown status: ${input.status}`,
   };
-  if (input.note !== undefined && input.note !== "") item.note = input.note;
-  const normalizedLabels = mergeLabels([], input.labels ?? []);
-  if (normalizedLabels.length > 0) item.labels = normalizedLabels;
-  if (input.priority !== undefined) {
-    if (input.priority === "") {
-      // explicit clear — leave undefined
-    } else if (isPriority(input.priority)) {
-      item.priority = input.priority;
-    } else {
+}
+
+// Apply optional priority + dueDate to an item, returning an error
+// result on validation failure.
+function applyOptionalFields(
+  item: TodoItem,
+  input: CreateInput,
+): ItemsActionResult | null {
+  if (input.priority !== undefined && input.priority !== "") {
+    if (!isPriority(input.priority)) {
       return { kind: "error", status: 400, error: "invalid priority" };
     }
+    item.priority = input.priority;
   }
   if (input.dueDate !== undefined && input.dueDate !== "") {
     if (!isDueDate(input.dueDate)) {
@@ -189,6 +180,36 @@ export function handleCreate(
     }
     item.dueDate = input.dueDate;
   }
+  return null;
+}
+
+export function handleCreate(
+  items: TodoItem[],
+  columns: StatusColumn[],
+  input: CreateInput,
+): ItemsActionResult {
+  if (!input.text || input.text.trim().length === 0) {
+    return { kind: "error", status: 400, error: "text required" };
+  }
+  const resolved = resolveStatus(input, columns);
+  if (resolved.kind === "error") return resolved;
+
+  const status = resolved.status;
+  const item: TodoItem = {
+    id: makeId(),
+    text: input.text.trim(),
+    completed: status === doneColumnId(columns),
+    createdAt: Date.now(),
+    status,
+    order: nextOrder(items, status),
+  };
+  if (input.note !== undefined && input.note !== "") item.note = input.note;
+  const normalizedLabels = mergeLabels([], input.labels ?? []);
+  if (normalizedLabels.length > 0) item.labels = normalizedLabels;
+
+  const fieldError = applyOptionalFields(item, input);
+  if (fieldError) return fieldError;
+
   return { kind: "success", items: [...items, item], item };
 }
 

@@ -367,6 +367,20 @@ export function extractJsonObject(raw: string): unknown | null {
     }
   }
   // 2. First balanced `{...}` block
+  const balanced = findBalancedBraceBlock(raw);
+  if (balanced === null) return null;
+  try {
+    return JSON.parse(balanced);
+  } catch {
+    return null;
+  }
+}
+
+// Scan `raw` for the first balanced `{ ... }` block, handling string
+// literals and escape sequences so nested braces inside JSON strings
+// don't trip the depth counter. Returns the raw substring (including
+// the outer braces) or null if no balanced block is found.
+export function findBalancedBraceBlock(raw: string): string | null {
   const start = raw.indexOf("{");
   if (start === -1) return null;
   let depth = 0;
@@ -388,16 +402,7 @@ export function extractJsonObject(raw: string): unknown | null {
     }
     if (inString) continue;
     if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(raw.slice(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
-    }
+    if (ch === "}" && --depth === 0) return raw.slice(start, i + 1);
   }
   return null;
 }

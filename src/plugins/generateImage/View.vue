@@ -1,5 +1,5 @@
 <template>
-  <ImageView v-if="imageResult" :selectedResult="imageResult" />
+  <ImageView v-if="imageResult" :selected-result="imageResult" />
 </template>
 
 <script setup lang="ts">

@@ -8,6 +8,12 @@ export interface MarkdownToolData {
   filenameHint?: string;
 }
 
+/** True when the `markdown` field is a workspace-relative file path
+ *  (stored under markdowns/*.md) rather than inline content. */
+export function isFilePath(value: string): boolean {
+  return value.startsWith("markdowns/") && value.endsWith(".md");
+}
+
 const toolDefinition: ToolDefinition = {
   type: "function",
   name: TOOL_NAME,

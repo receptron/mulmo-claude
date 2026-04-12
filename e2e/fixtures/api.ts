@@ -53,10 +53,13 @@ export async function mockAllApis(
 
   // Catch-all FIRST (checked last by Playwright)
   await page.route(urlStartsWith("/api/"), (route: Route) => {
-    console.warn(
-      `[mock] unhandled: ${route.request().method()} ${route.request().url()}`,
-    );
-    return route.fulfill({ json: {} });
+    const method = route.request().method();
+    const url = route.request().url();
+    console.warn(`[mock] unhandled: ${method} ${url}`);
+    return route.fulfill({
+      status: 501,
+      json: { error: "Unhandled mocked API route", method, url },
+    });
   });
 
   // Specific routes AFTER (checked first by Playwright)

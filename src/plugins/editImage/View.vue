@@ -1,7 +1,7 @@
 <template>
   <ImageView
     v-if="selectedResult"
-    :selectedResult="selectedResult"
+    :selected-result="selectedResult"
     alt="Edited image"
     prompt-label="Edit prompt"
   />

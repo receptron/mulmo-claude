@@ -18,13 +18,22 @@
             </h1>
             <div class="button-group">
               <button
-                @click="downloadMarkdown"
                 class="download-btn download-btn-green"
+                :disabled="pdfDownloading"
+                @click="downloadPdf"
               >
-                <span class="material-icons">download</span>
-                MD
+                <span class="material-icons">{{
+                  pdfDownloading ? "hourglass_empty" : "download"
+                }}</span>
+                PDF
               </button>
             </div>
+            <span
+              v-if="pdfError"
+              class="text-xs text-red-500 self-center ml-2"
+              :title="pdfError"
+              >⚠ PDF failed</span
+            >
           </div>
           <div
             class="markdown-content prose prose-slate max-w-none"
@@ -41,9 +50,9 @@
           spellcheck="false"
         ></textarea>
         <button
-          @click="applyMarkdown"
           class="apply-btn"
           :disabled="!hasChanges || saving"
+          @click="applyMarkdown"
         >
           {{ saving ? "Saving..." : "Apply Changes" }}
         </button>
@@ -56,8 +65,9 @@
 import { computed, ref, watch, nextTick } from "vue";
 import { marked } from "marked";
 import type { ToolResult } from "gui-chat-protocol";
-import type { MarkdownToolData } from "./definition";
+import { isFilePath, type MarkdownToolData } from "./definition";
 import { resolveImageSrc } from "../../utils/image/resolve";
+import { usePdfDownload } from "../../composables/usePdfDownload";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -72,10 +82,6 @@ const saving = ref(false);
 // The actual markdown content (fetched from server or inline)
 const markdownContent = ref("");
 const editableMarkdown = ref("");
-
-function isFilePath(value: string): boolean {
-  return value.startsWith("markdowns/") && value.endsWith(".md");
-}
 
 async function fetchMarkdownContent(): Promise<void> {
   const raw = props.selectedResult.data?.markdown;
@@ -154,25 +160,22 @@ watch(
   },
 );
 
-const downloadMarkdown = () => {
-  if (!markdownContent.value) return;
+const {
+  pdfDownloading,
+  pdfError,
+  downloadPdf: rawDownloadPdf,
+} = usePdfDownload();
 
-  const blob = new Blob([markdownContent.value], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
+async function downloadPdf() {
+  if (!markdownContent.value) return;
   const hint = props.selectedResult.data?.filenameHint;
-  const filename = hint
-    ? `${hint.replace(/[/\\:*?"<>|]/g, "_")}.md`
+  const title = hint
+    ? hint.replace(/[/\\:*?"<>|]/g, "_")
     : props.selectedResult.title
-      ? `${props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_")}.md`
-      : "document.md";
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
+      ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_")
+      : "document";
+  await rawDownloadPdf(markdownContent.value, `${title}.pdf`);
+}
 
 async function applyMarkdown() {
   const raw = props.selectedResult.data?.markdown;
@@ -274,6 +277,11 @@ watch(
 
 .download-btn .material-icons {
   font-size: 1.2em;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .markdown-content :deep(h1) {

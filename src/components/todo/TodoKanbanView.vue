@@ -10,7 +10,10 @@
       @end="onColumnDragEnd"
     >
       <template #item="{ element: col }: { element: StatusColumn }">
-        <div class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg">
+        <div
+          :data-testid="`todo-column-${col.id}`"
+          class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg"
+        >
           <!-- Column header. The whole header is the drag handle —
              clicking the menu button still works because the menu
              button has its own @click handler that doesn't kick off
@@ -91,6 +94,7 @@
           >
             <template #item="{ element }: { element: TodoItem }">
               <div
+                :data-testid="`todo-card-${element.id}`"
                 class="bg-white border border-l-4 border-gray-200 rounded shadow-sm p-2 cursor-grab hover:shadow active:cursor-grabbing"
                 :class="
                   element.priority
@@ -289,8 +293,8 @@ function startRename(col: StatusColumn): void {
   renamingId.value = col.id;
   renameDraft.value = col.label;
   void nextTick(() => {
-    const ref = renameInput.value;
-    const el = Array.isArray(ref) ? ref[0] : ref;
+    const inputRef = renameInput.value;
+    const el = Array.isArray(inputRef) ? inputRef[0] : inputRef;
     el?.focus();
     el?.select();
   });

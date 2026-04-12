@@ -4,37 +4,18 @@
       v-if="isAssistant"
       class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0"
     >
-      <button
-        class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center gap-1"
-        :disabled="pdfDownloading"
-        @click="downloadPdf"
-      >
-        <svg
-          v-if="pdfDownloading"
-          class="animate-spin w-3 h-3 shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
+      <div class="button-group">
+        <button
+          class="download-btn download-btn-green"
+          :disabled="pdfDownloading"
+          @click="downloadPdf"
         >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v8H4z"
-          />
-        </svg>
-        <template v-if="!pdfDownloading">
-          <span class="material-icons text-sm leading-none">download</span>
-          <span>PDF</span>
-        </template>
-        <span v-else>PDF</span>
-      </button>
+          <span class="material-icons">{{
+            pdfDownloading ? "hourglass_empty" : "download"
+          }}</span>
+          PDF
+        </button>
+      </div>
       <span
         v-if="pdfError"
         class="text-xs text-red-500 self-center ml-2"
@@ -52,11 +33,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { View as OriginalView } from "@gui-chat-plugin/text-response/vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { usePdfDownload } from "../../composables/usePdfDownload";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TextResponseData>;
@@ -76,39 +58,47 @@ function openLinksInNewTab(event: MouseEvent): void {
   handleExternalLinkClick(event);
 }
 
-const pdfDownloading = ref(false);
-const pdfError = ref<string | null>(null);
+const {
+  pdfDownloading,
+  pdfError,
+  downloadPdf: rawDownloadPdf,
+} = usePdfDownload();
 
 async function downloadPdf() {
-  pdfError.value = null;
-  pdfDownloading.value = true;
   const text = props.selectedResult.data?.text ?? "";
   const filename = `${props.selectedResult.title ?? "response"}.pdf`;
-  let response: Response;
-  try {
-    response = await fetch("/api/pdf/markdown", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: text, filename }),
-    });
-  } catch (err) {
-    pdfError.value = err instanceof Error ? err.message : String(err);
-    pdfDownloading.value = false;
-    return;
-  }
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    pdfError.value = `PDF error ${response.status}: ${errText}`;
-    pdfDownloading.value = false;
-    return;
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  pdfDownloading.value = false;
+  await rawDownloadPdf(text, filename);
 }
 </script>
+
+<style scoped>
+.button-group {
+  display: flex;
+  gap: 0.5em;
+}
+
+.download-btn {
+  padding: 0.5em 1em;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.download-btn-green {
+  background-color: #4caf50;
+}
+
+.download-btn .material-icons {
+  font-size: 1.2em;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>

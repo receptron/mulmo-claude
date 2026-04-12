@@ -103,25 +103,35 @@ export function renderArchiveSection(archivedTopicCount: number): string[] {
   return lines;
 }
 
+// Parse an ISO timestamp into a numeric sort key. Invalid or missing
+// timestamps get -Infinity so they sort to the bottom (oldest).
+function topicSortKey(entry: IndexTopicEntry): number {
+  if (!entry.lastUpdatedIso) return -Infinity;
+  const ms = Date.parse(entry.lastUpdatedIso);
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
+
+function compareBySlug(a: IndexTopicEntry, b: IndexTopicEntry): number {
+  if (a.slug < b.slug) return -1;
+  if (a.slug > b.slug) return 1;
+  return 0;
+}
+
 function compareTopicsNewestFirst(
   a: IndexTopicEntry,
   b: IndexTopicEntry,
 ): number {
-  const at = a.lastUpdatedIso ? Date.parse(a.lastUpdatedIso) : NaN;
-  const bt = b.lastUpdatedIso ? Date.parse(b.lastUpdatedIso) : NaN;
-  const aValid = !Number.isNaN(at);
-  const bValid = !Number.isNaN(bt);
-  if (aValid && bValid) {
-    // Tie-break on slug when timestamps are identical so the index
-    // output is deterministic across repeated rebuilds. Without this,
-    // equal-mtime topics fall back to input order, which depends on
-    // readdir ordering and varies by filesystem.
-    if (bt !== at) return bt - at;
-    return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
-  }
-  if (aValid) return -1;
-  if (bValid) return 1;
-  return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
+  const ak = topicSortKey(a);
+  const bk = topicSortKey(b);
+  // Both valid timestamps → compare numerically.
+  // One or both invalid (-Infinity) → valid wins; if both invalid,
+  // fall through to the slug tie-breaker.
+  const aValid = Number.isFinite(ak);
+  const bValid = Number.isFinite(bk);
+  if (aValid && bValid && bk !== ak) return bk - ak;
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  // Tie-break on slug for determinism.
+  return compareBySlug(a, b);
 }
 
 function renderTopicRow(t: IndexTopicEntry): string {

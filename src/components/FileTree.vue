@@ -3,6 +3,7 @@
     <button
       v-if="node.type === 'dir'"
       class="w-full flex items-center gap-1 px-2 py-1 text-left text-sm hover:bg-gray-100 rounded"
+      :data-testid="`file-tree-dir-${node.name || 'root'}`"
       @click="toggle(node.path)"
     >
       <span class="material-icons text-sm text-gray-400 shrink-0">{{
@@ -20,6 +21,7 @@
           ? 'bg-blue-100 text-blue-700'
           : 'text-gray-700 hover:bg-gray-100'
       "
+      :data-testid="`file-tree-file-${node.name}`"
       :title="node.path"
       @click="emit('select', node.path)"
     >

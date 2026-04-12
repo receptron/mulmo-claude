@@ -218,6 +218,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import FileTree, { type TreeNode } from "./FileTree.vue";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import SchedulerView from "../plugins/scheduler/View.vue";
@@ -239,9 +240,21 @@ import {
   extractSessionIdFromPath,
 } from "../utils/path/relativeLink";
 
-const STORAGE_KEY = "files_selected_path";
 const MD_RAW_STORAGE_KEY = "files_md_raw_mode";
 const RECENT_THRESHOLD_MS = 60 * 1000;
+
+const route = useRoute();
+const router = useRouter();
+
+// Validate a file path from the URL: reject traversal attempts and
+// obviously invalid values. We don't check existence here — a 404 is
+// handled gracefully by the content loader.
+function isValidFilePath(p: unknown): p is string {
+  if (typeof p !== "string" || p.length === 0) return false;
+  if (p.includes("..")) return false;
+  if (p.startsWith("/")) return false;
+  return true;
+}
 
 interface TextContent {
   kind: "text";
@@ -274,7 +287,16 @@ const emit = defineEmits<{
 
 const tree = ref<TreeNode | null>(null);
 const treeError = ref<string | null>(null);
-const selectedPath = ref<string | null>(null);
+
+// Seed selectedPath from URL query ?path=, falling back to
+// localStorage. Same bidirectional-sync pattern as sessionId
+// and canvasViewMode: ref is the source of truth for reads,
+// router.push keeps the URL in sync, watcher handles external
+// URL changes (back/forward).
+const urlPath = route.query.path;
+const selectedPath = ref<string | null>(
+  isValidFilePath(urlPath) ? urlPath : null,
+);
 
 const content = ref<FileContent | null>(null);
 const contentLoading = ref(false);
@@ -490,8 +512,16 @@ async function loadContent(filePath: string): Promise<void> {
 
 function selectFile(filePath: string): void {
   selectedPath.value = filePath;
-  localStorage.setItem(STORAGE_KEY, filePath);
   loadContent(filePath);
+  // Push file path into the URL so it's bookmarkable / back-navigable.
+  const { path: __path, ...restQuery } = route.query;
+  router
+    .push({ query: { ...restQuery, path: filePath } })
+    .catch((err: unknown) => {
+      if (!isNavigationFailure(err)) {
+        console.error("[selectFile] navigation failed:", err);
+      }
+    });
 }
 
 // When the user clicks an <a> inside a rendered markdown body, check
@@ -532,6 +562,24 @@ function handleMarkdownLinkClick(event: MouseEvent): void {
   selectFile(resolved);
 }
 
+// External URL changes (back/forward) → update selectedPath.
+watch(
+  () => route.query.path,
+  (newPath) => {
+    if (!isValidFilePath(newPath)) {
+      if (selectedPath.value !== null) {
+        selectedPath.value = null;
+        content.value = null;
+      }
+      return;
+    }
+    if (newPath !== selectedPath.value) {
+      selectedPath.value = newPath;
+      loadContent(newPath);
+    }
+  },
+);
+
 watch(
   () => props.refreshToken,
   () => {
@@ -542,8 +590,11 @@ watch(
 
 onMounted(async () => {
   await loadTree();
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) selectFile(saved);
+  // If the URL already has a ?path=, load that file. Otherwise
+  // leave file-unselected (the "Select a file" placeholder shows).
+  if (selectedPath.value) {
+    loadContent(selectedPath.value);
+  }
 });
 
 onUnmounted(() => {
