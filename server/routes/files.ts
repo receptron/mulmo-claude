@@ -11,6 +11,56 @@ const MAX_PREVIEW_BYTES = 1024 * 1024; // 1 MB — text content embedded in JSON
 const MAX_RAW_BYTES = 50 * 1024 * 1024; // 50 MB — cap for binary streaming
 const HIDDEN_DIRS = new Set([".git"]);
 
+// Files whose basename exactly matches one of these is refused by
+// every file-API endpoint. Used to keep workspace secrets
+// (credentials, API keys, SSH / TLS private keys) off the HTTP
+// surface. Compared against `path.basename(...).toLowerCase()`.
+const SENSITIVE_BASENAMES = new Set([
+  "credentials.json",
+  // Claude Code credentials file written by server/credentials.ts.
+  ".npmrc",
+  ".htpasswd",
+  "id_rsa",
+  "id_ecdsa",
+  "id_ed25519",
+  "id_dsa",
+]);
+
+// File extensions whose contents are almost always secret. Compared
+// against `path.extname(...).toLowerCase()`. Note: `.env` is matched
+// separately below because `path.extname(".env")` returns "" —
+// dotfiles with no second extension don't carry an extname.
+const SENSITIVE_EXTENSIONS = new Set([".pem", ".key", ".crt"]);
+
+// Decide whether `relPath` names a file whose contents should NEVER
+// be served by the file API. Applied in three places:
+//
+// 1. `resolveSafe` returns null for sensitive paths so every
+//    endpoint (content, raw, anything future) rejects them with a
+//    generic 400.
+// 2. `buildTree` filters them out of `/files/tree`, so the file
+//    explorer never lists them in the first place.
+// 3. The `.env` blocklist below is what keeps `/files/content`
+//    from leaking credentials on a matching-name lookup.
+//
+// Exported so `test/routes/test_filesRoute.ts` can pin the matching
+// rules down table-driven — regressions here silently reopen a
+// credential-exfil surface.
+export function isSensitivePath(relPath: string): boolean {
+  const base = path.basename(relPath).toLowerCase();
+  if (SENSITIVE_BASENAMES.has(base)) return true;
+  // `.env` and every `.env.<something>` variant
+  // (`.env.local`, `.env.production`, ...). The startsWith check
+  // is scoped to `.env` to avoid false-positives on names like
+  // `.environment-notes` — we only match `.env` exact or
+  // `.env.<suffix>`.
+  if (base === ".env") return true;
+  if (base.startsWith(".env.")) return true;
+  const ext = path.extname(base);
+  if (SENSITIVE_EXTENSIONS.has(ext)) return true;
+  return false;
+}
+
 const TEXT_EXTENSIONS = new Set([
   ".md",
   ".markdown",
@@ -30,7 +80,11 @@ const TEXT_EXTENSIONS = new Set([
   ".css",
   ".csv",
   ".log",
-  ".env",
+  // `.env` intentionally removed — see `isSensitivePath` below.
+  // It used to be here, making `/files/content?path=.env` return
+  // the workspace credentials as JSON text over an open CORS
+  // endpoint. The file API now refuses sensitive paths outright;
+  // this set is kept for genuine plain-text previews only.
   ".gitignore",
   ".sh",
   ".py",
@@ -150,6 +204,10 @@ function resolveSafe(relPath: string): string | null {
       if (HIDDEN_DIRS.has(seg)) return null;
     }
   }
+  // Reject workspace-sensitive filenames outright. `isSensitivePath`
+  // matches on the basename so it catches `.env`, `id_rsa`, and
+  // friends regardless of which directory they sit in.
+  if (isSensitivePath(resolved)) return null;
   return resolved;
 }
 
@@ -249,6 +307,11 @@ function buildTree(absPath: string, relPath: string): TreeNode {
   const children: TreeNode[] = [];
   for (const entry of entries) {
     if (HIDDEN_DIRS.has(entry.name)) continue;
+    // Hide sensitive files (`.env`, `id_rsa`, `*.pem`, etc.) from
+    // the tree so they don't even show up in the file explorer
+    // for the user to click on. `resolveSafe` would refuse them
+    // too, but keeping them out of the listing is cleaner.
+    if (!entry.isDirectory() && isSensitivePath(entry.name)) continue;
     if (entry.isSymbolicLink()) continue; // avoid escaping the workspace
     const childAbs = path.join(absPath, entry.name);
     const childRel = relPath ? path.join(relPath, entry.name) : entry.name;

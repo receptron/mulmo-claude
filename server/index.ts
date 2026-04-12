@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-import cors from "cors";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -46,7 +45,17 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
 app.disable("x-powered-by");
-app.use(cors());
+// No `cors()` middleware. The Vite dev proxy forwards `/api/*`
+// from :5173 to :3001 server-side, and in production Express
+// serves the built client from the same origin, so every
+// legitimate request is same-origin and doesn't need CORS
+// headers at all. Dropping the middleware means a page at
+// `http://evil.example` can still send a request to
+// `localhost:3001` but the browser refuses to expose the
+// response to the calling script (no
+// `Access-Control-Allow-Origin` header). See
+// plans/fix-server-lockdown-cors-localhost.md for the threat
+// model.
 app.use(express.json({ limit: "50mb" }));
 
 app.get("/api/health", (_req: Request, res: Response) => {
@@ -91,7 +100,10 @@ function isPortFree(port: number): Promise<boolean> {
     server.once("listening", () => {
       server.close(() => resolve(true));
     });
-    server.listen(port, "0.0.0.0");
+    // Probe the same interface we'll actually bind to so a port
+    // held by a different process on a different interface doesn't
+    // give us a false "free" reading.
+    server.listen(port, "127.0.0.1");
   });
 }
 
@@ -233,7 +245,12 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   sandboxEnabled = await setupSandbox();
   logMcpStatus();
 
-  const httpServer = app.listen(PORT, "0.0.0.0", () => {
+  // Bind to localhost-only. Using `0.0.0.0` would expose the dev
+  // server to the entire LAN (anyone on the same Wi-Fi could reach
+  // `http://<laptop-ip>:3001/api/*`), which combined with the
+  // workspace file API is a credential-theft risk. Personal dev
+  // tool — localhost is the right default.
+  const httpServer = app.listen(PORT, "127.0.0.1", () => {
     startRuntimeServices(httpServer);
   });
 })();
