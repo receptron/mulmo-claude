@@ -31,6 +31,8 @@ const displayTitle = computed(() => {
 });
 
 const sheetCount = computed(() => {
-  return props.result.data?.sheets?.length || 0;
+  const sheets = props.result.data?.sheets;
+  if (!sheets || typeof sheets === "string") return 0;
+  return sheets.length;
 });
 </script>

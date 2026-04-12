@@ -1,9 +1,16 @@
 <template>
   <div class="spreadsheet-container">
+    <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
+      <div class="text-gray-500">Loading spreadsheet...</div>
+    </div>
     <div
-      v-if="
-        !selectedResult.data?.sheets || selectedResult.data.sheets.length === 0
-      "
+      v-else-if="errorMessage"
+      class="min-h-full p-8 flex items-center justify-center"
+    >
+      <div class="error">{{ errorMessage }}</div>
+    </div>
+    <div
+      v-else-if="!resolvedSheets || resolvedSheets.length === 0"
       class="min-h-full p-8 flex items-center justify-center"
     >
       <div class="text-gray-500">No spreadsheet data available</div>
@@ -24,9 +31,9 @@
           </div>
 
           <!-- Sheet tabs (if multiple sheets) -->
-          <div v-if="selectedResult.data.sheets.length > 1" class="sheet-tabs">
+          <div v-if="resolvedSheets.length > 1" class="sheet-tabs">
             <button
-              v-for="(sheet, index) in selectedResult.data.sheets"
+              v-for="(sheet, index) in resolvedSheets"
               :key="index"
               @click="activeSheetIndex = index"
               :class="['sheet-tab', { active: activeSheetIndex === index }]"
@@ -123,7 +130,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import * as XLSX from "xlsx";
 import type { ToolResult } from "gui-chat-protocol";
-import type { SpreadsheetToolData } from "./definition";
+import type { SpreadsheetToolData, SpreadsheetSheet } from "./definition";
 import { SpreadsheetEngine, columnToIndex, indexToColumn } from "./engine";
 
 // Import all spreadsheet functions to populate the function registry
@@ -184,10 +191,90 @@ const emit = defineEmits<{
 // Create spreadsheet engine instance
 const engine = new SpreadsheetEngine();
 
+const loading = ref(false);
+const errorMessage = ref("");
+const resolvedSheets = ref<SpreadsheetSheet[]>([]);
+
+function isFilePath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("spreadsheets/") &&
+    value.endsWith(".json")
+  );
+}
+
+async function fetchSheets(): Promise<void> {
+  const raw = props.selectedResult.data?.sheets;
+  if (!raw) {
+    resolvedSheets.value = [];
+    return;
+  }
+  if (isFilePath(raw)) {
+    loading.value = true;
+    errorMessage.value = "";
+    try {
+      const res = await fetch(
+        `/api/files/content?path=${encodeURIComponent(raw)}`,
+      );
+      if (!res.ok) {
+        errorMessage.value = `Failed to load spreadsheet: ${res.statusText}`;
+        resolvedSheets.value = [];
+        return;
+      }
+      const json: { content?: string } = await res.json();
+      resolvedSheets.value = json.content ? JSON.parse(json.content) : [];
+    } catch (err) {
+      errorMessage.value = `Failed to load spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
+      resolvedSheets.value = [];
+    } finally {
+      loading.value = false;
+    }
+  } else {
+    // Legacy inline data
+    resolvedSheets.value = raw as SpreadsheetSheet[];
+  }
+}
+
+// Fetch on mount and sync editableData
+fetchSheets().then(() => {
+  editableData.value = JSON.stringify(resolvedSheets.value || [], null, 2);
+});
+
+/** Persist edited sheets to disk when file-backed, and emit updateResult. */
+async function persistSheets(sheets: SpreadsheetSheet[]): Promise<void> {
+  const raw = props.selectedResult.data?.sheets;
+  if (isFilePath(raw)) {
+    const filename = raw.replace(/^spreadsheets\//, "");
+    try {
+      const res = await fetch(`/api/spreadsheets/${filename}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sheets }),
+      });
+      if (!res.ok) {
+        errorMessage.value = `Failed to save spreadsheet: ${res.statusText}`;
+        return;
+      }
+    } catch (err) {
+      errorMessage.value = `Failed to save spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
+      return;
+    }
+  }
+
+  resolvedSheets.value = sheets;
+
+  const updatedResult: ToolResult<SpreadsheetToolData> = {
+    ...props.selectedResult,
+    data: {
+      ...props.selectedResult.data,
+      sheets: isFilePath(raw) ? raw : sheets,
+    },
+  };
+  emit("updateResult", updatedResult);
+}
+
 const activeSheetIndex = ref(0);
-const editableData = ref(
-  JSON.stringify(props.selectedResult.data?.sheets || [], null, 2),
-);
+const editableData = ref(JSON.stringify(resolvedSheets.value || [], null, 2));
 const editorTextarea = ref<HTMLTextAreaElement | null>(null);
 const editorDetails = ref<HTMLDetailsElement | null>(null);
 const tableContainer = ref<HTMLDivElement | null>(null);
@@ -207,11 +294,7 @@ const referencedCells = ref<Array<{ row: number; col: number }>>([]);
 // Check if spreadsheet data has been modified
 const hasChanges = computed(() => {
   try {
-    const currentData = JSON.stringify(
-      props.selectedResult.data?.sheets || [],
-      null,
-      2,
-    );
+    const currentData = JSON.stringify(resolvedSheets.value || [], null, 2);
     return editableData.value !== currentData;
   } catch {
     return false;
@@ -228,7 +311,7 @@ const calculateFormulas = (
   sheetName?: string,
 ): Array<Array<any>> => {
   // If we have a sheet name, we need to find all sheets for cross-sheet references
-  const allSheets = props.selectedResult.data?.sheets;
+  const allSheets = resolvedSheets.value;
 
   // Create a SheetData object for the engine
   const sheet = {
@@ -246,14 +329,11 @@ const calculateFormulas = (
 
 // Render the active sheet as HTML table
 const renderedHtml = computed(() => {
-  if (
-    !props.selectedResult.data?.sheets ||
-    props.selectedResult.data.sheets.length === 0
-  ) {
+  if (!resolvedSheets.value || resolvedSheets.value.length === 0) {
     return "";
   }
 
-  const sheet = props.selectedResult.data.sheets[activeSheetIndex.value];
+  const sheet = resolvedSheets.value[activeSheetIndex.value];
   if (!sheet || !sheet.data) {
     return "";
   }
@@ -280,13 +360,13 @@ const renderedHtml = computed(() => {
 
 // Download as Excel file
 const downloadExcel = () => {
-  if (!props.selectedResult?.data?.sheets) return;
+  if (!resolvedSheets.value || resolvedSheets.value.length === 0) return;
 
   try {
     const workbook = XLSX.utils.book_new();
 
     // Add all sheets to workbook
-    props.selectedResult.data.sheets.forEach((sheet) => {
+    resolvedSheets.value.forEach((sheet) => {
       const worksheet = XLSX.utils.aoa_to_sheet(sheet.data);
       XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
     });
@@ -520,16 +600,8 @@ function saveMiniEditor() {
     // Update editableData
     editableData.value = JSON.stringify(sheets, null, 2);
 
-    // Apply changes immediately
-    const updatedResult: ToolResult<SpreadsheetToolData> = {
-      ...props.selectedResult,
-      data: {
-        ...props.selectedResult.data,
-        sheets: sheets,
-      },
-    };
-
-    emit("updateResult", updatedResult);
+    // Persist to disk (if file-backed) and emit update
+    persistSheets(sheets);
 
     // Update referenced cells if the saved cell contains a formula
     if (typeof newCellValue.v === "string" && newCellValue.v.startsWith("=")) {
@@ -691,7 +763,7 @@ function handleTableClick(event: MouseEvent) {
   }
 }
 
-function applyChanges() {
+async function applyChanges() {
   try {
     // Parse the edited JSON
     const parsedSheets = JSON.parse(editableData.value);
@@ -701,16 +773,8 @@ function applyChanges() {
       throw new Error("Data must be an array of sheets");
     }
 
-    // Update the result with new spreadsheet data
-    const updatedResult: ToolResult<SpreadsheetToolData> = {
-      ...props.selectedResult,
-      data: {
-        ...props.selectedResult.data,
-        sheets: parsedSheets,
-      },
-    };
-
-    emit("updateResult", updatedResult);
+    // Persist to disk (if file-backed) and emit update
+    await persistSheets(parsedSheets);
 
     // Reset to first sheet after update
     activeSheetIndex.value = 0;
@@ -724,16 +788,18 @@ function applyChanges() {
 // Watch for external changes to selectedResult
 watch(
   () => props.selectedResult.data?.sheets,
-  (newSheets) => {
-    editableData.value = JSON.stringify(newSheets || [], null, 2);
-    // Reset to first sheet when result changes
-    activeSheetIndex.value = 0;
+  () => {
+    fetchSheets().then(() => {
+      editableData.value = JSON.stringify(resolvedSheets.value || [], null, 2);
+      // Reset to first sheet when result changes
+      activeSheetIndex.value = 0;
+    });
   },
 );
 
 // Reset active sheet if it's out of bounds
 watch(
-  () => props.selectedResult.data?.sheets?.length,
+  () => resolvedSheets.value?.length,
   (length) => {
     if (length && activeSheetIndex.value >= length) {
       activeSheetIndex.value = 0;

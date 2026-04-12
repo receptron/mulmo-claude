@@ -22,6 +22,7 @@ const SUBDIRS = [
   "stories",
   "images",
   "markdowns",
+  "spreadsheets",
 ];
 
 export function initWorkspace(): string {
