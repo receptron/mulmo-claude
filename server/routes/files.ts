@@ -190,6 +190,33 @@ export function parseRange(header: string, size: number): ByteRange | null {
   return { start, end };
 }
 
+// Security headers applied to every `/files/raw` response. Exported
+// so a regression test can pin the exact strings down — a silent
+// regression here reopens a real XSS surface (see plans/
+// fix-files-raw-csp-sandbox.md for the full threat model).
+//
+// `sandbox` (no allow-flags) creates an opaque origin for the
+// response. Even if an SVG / HTML / PDF with embedded JavaScript
+// gets loaded as a top-level document or inside an iframe, its
+// scripts can't access the localhost:3001 origin's cookies,
+// session storage, or hit the `/api/*` endpoints. Frames rendering
+// the response become sandboxed too — PDFs still work because
+// they don't rely on same-origin access to the parent.
+//
+// `nosniff` stops Chrome / Firefox from re-guessing Content-Type
+// on files the server declared but the browser might want to
+// re-interpret as HTML.
+export const RAW_SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  "Content-Security-Policy": "sandbox",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function applyRawSecurityHeaders(res: Response): void {
+  for (const [name, value] of Object.entries(RAW_SECURITY_HEADERS)) {
+    res.setHeader(name, value);
+  }
+}
+
 // If the read stream errors mid-flight (file deleted, disk error,
 // permissions changed), surface a clean failure to the client instead
 // of leaving the connection hanging.
@@ -408,6 +435,11 @@ router.get(
     const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Content-Type", mime);
+    // Sandbox the response so an `.svg` / `.html` / `.pdf` with
+    // embedded JavaScript can't escape into the localhost:3001
+    // origin via direct navigation or <iframe>. See
+    // plans/fix-files-raw-csp-sandbox.md for the threat model.
+    applyRawSecurityHeaders(res);
 
     // Range support is required for `<video>` playback (Safari refuses
     // to play media without 206 responses) and for seek-past-buffered

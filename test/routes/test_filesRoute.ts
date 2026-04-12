@@ -11,7 +11,11 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseRange, classify } from "../../server/routes/files.js";
+import {
+  parseRange,
+  classify,
+  RAW_SECURITY_HEADERS,
+} from "../../server/routes/files.js";
 
 describe("parseRange — happy path", () => {
   it("parses a basic start-end range", () => {
@@ -246,5 +250,38 @@ describe("classify", () => {
   it("handles paths with directories", () => {
     assert.equal(classify("/path/to/song.mp3"), "audio");
     assert.equal(classify("dir\\windows\\file.png"), "image");
+  });
+});
+
+describe("RAW_SECURITY_HEADERS", () => {
+  // These tests don't exercise Express — supertest isn't in the
+  // dependency tree — but they pin the exact header strings down.
+  // Silently dropping the CSP header would reopen the SVG / HTML /
+  // PDF-with-JS XSS surface documented in
+  // plans/fix-files-raw-csp-sandbox.md.
+
+  it("sets Content-Security-Policy to `sandbox` (no allow flags)", () => {
+    // The bare `sandbox` directive is the strictest setting — it
+    // creates an opaque origin, blocks scripts, forms, and
+    // same-origin access. If a future edit weakens this to
+    // `sandbox allow-scripts` or similar, this assertion fires.
+    assert.equal(RAW_SECURITY_HEADERS["Content-Security-Policy"], "sandbox");
+  });
+
+  it("sets X-Content-Type-Options to nosniff", () => {
+    assert.equal(RAW_SECURITY_HEADERS["X-Content-Type-Options"], "nosniff");
+  });
+
+  it("does not set any allow-listing header that would defeat sandbox", () => {
+    // Guardrails: if someone adds a future header that opens the
+    // sandbox back up, this catches it early.
+    assert.equal(
+      RAW_SECURITY_HEADERS["Access-Control-Allow-Origin"],
+      undefined,
+    );
+    assert.equal(
+      RAW_SECURITY_HEADERS["Cross-Origin-Resource-Policy"],
+      undefined,
+    );
   });
 });
