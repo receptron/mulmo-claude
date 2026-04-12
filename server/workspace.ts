@@ -20,6 +20,7 @@ const SUBDIRS = [
   "scheduler",
   "roles",
   "stories",
+  "images",
 ];
 
 export function initWorkspace(): string {

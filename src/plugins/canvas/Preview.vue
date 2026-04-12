@@ -2,7 +2,7 @@
   <div class="min-h-24 flex items-center justify-center">
     <img
       v-if="result.data?.imageData"
-      :src="result.data.imageData"
+      :src="resolvedSrc"
       class="max-w-full h-auto rounded"
       alt="Canvas drawing"
     />
@@ -11,10 +11,18 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData } from "./definition";
+import { resolveImageSrc } from "../../utils/image/resolve";
 
-defineProps<{
+const props = defineProps<{
   result: ToolResult<ImageToolData>;
 }>();
+
+const resolvedSrc = computed(() =>
+  props.result.data?.imageData
+    ? resolveImageSrc(props.result.data.imageData)
+    : "",
+);
 </script>

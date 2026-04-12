@@ -5,7 +5,7 @@
         <img
           :src="resolvedSrc"
           class="max-w-full max-h-full object-contain rounded"
-          alt="Edited image"
+          alt="Current generated image"
         />
       </div>
       <div
@@ -13,7 +13,7 @@
         class="mt-4 p-3 bg-gray-100 rounded-lg max-w-full flex-shrink-0"
       >
         <p class="text-sm text-gray-700">
-          <span class="font-medium">Edit prompt:</span>
+          <span class="font-medium">Prompt:</span>
           {{ selectedResult.data.prompt }}
         </p>
       </div>
@@ -23,8 +23,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ToolResult } from "gui-chat-protocol";
-import type { ImageToolData } from "./definition";
+import type { ToolResult, ImageToolData } from "./types";
 import { resolveImageSrc } from "../../utils/image/resolve";
 
 const props = defineProps<{

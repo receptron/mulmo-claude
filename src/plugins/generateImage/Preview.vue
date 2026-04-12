@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ImagePreview } from "@mulmochat-plugin/ui-image";
+import { ImagePreview } from "../ui-image";
 import type { ToolResult } from "gui-chat-protocol";
 import type { ImageToolData } from "./definition";
 

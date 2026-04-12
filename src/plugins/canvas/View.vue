@@ -153,6 +153,16 @@ const canvasWidth = ref(800);
 const canvasHeight = ref(600);
 const canvasRenderKey = ref(0);
 
+// Track the server-side image path for this canvas instance.
+// Initialized from existing result data (if reopening a saved canvas).
+const imagePath = ref(
+  props.selectedResult?.data?.imageData &&
+    !props.selectedResult.data.imageData.startsWith("data:")
+    ? props.selectedResult.data.imageData
+    : "",
+);
+let uploadInFlight = false;
+
 const restoreDrawingState = () => {
   if (props.selectedResult?.viewState?.drawingState) {
     const state = props.selectedResult.viewState
@@ -213,34 +223,64 @@ const handleDrawingEnd = () => {
   saveDrawingState();
 };
 
+const uploadImage = async (dataUri: string): Promise<string> => {
+  if (imagePath.value) {
+    // Overwrite existing file
+    const filename = imagePath.value.replace(/^images\//, "");
+    const res = await fetch(`/api/images/${filename}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData: dataUri }),
+    });
+    if (!res.ok) throw new Error(`PUT failed: ${res.statusText}`);
+    const json: { path: string } = await res.json();
+    return json.path;
+  } else {
+    // Create new file
+    const res = await fetch("/api/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData: dataUri }),
+    });
+    if (!res.ok) throw new Error(`POST failed: ${res.statusText}`);
+    const json: { path: string } = await res.json();
+    return json.path;
+  }
+};
+
 const saveDrawingState = async () => {
-  if (canvasRef.value && props.selectedResult) {
-    try {
-      const imageData = await canvasRef.value.save();
-      const strokes = canvasRef.value.getAllStrokes();
-      const drawingState = {
-        strokes,
-        brushSize: brushSize.value,
-        brushColor: brushColor.value,
-        canvasWidth: canvasWidth.value,
-        canvasHeight: canvasHeight.value,
-      };
+  if (!canvasRef.value || !props.selectedResult || uploadInFlight) return;
+  uploadInFlight = true;
+  try {
+    const imageDataUri: string = await canvasRef.value.save();
+    const strokes = canvasRef.value.getAllStrokes();
+    const drawingState = {
+      strokes,
+      brushSize: brushSize.value,
+      brushColor: brushColor.value,
+      canvasWidth: canvasWidth.value,
+      canvasHeight: canvasHeight.value,
+    };
 
-      const updatedResult: ToolResult<ImageToolData> = {
-        ...props.selectedResult,
-        data: {
-          prompt: props.selectedResult.data?.prompt || "",
-          imageData: imageData,
-        },
-        viewState: {
-          drawingState,
-        },
-      };
+    const path = await uploadImage(imageDataUri);
+    imagePath.value = path;
 
-      emit("updateResult", updatedResult);
-    } catch (error) {
-      console.error("Failed to save drawing state:", error);
-    }
+    const updatedResult: ToolResult<ImageToolData> = {
+      ...props.selectedResult,
+      data: {
+        prompt: props.selectedResult.data?.prompt || "",
+        imageData: path,
+      },
+      viewState: {
+        drawingState,
+      },
+    };
+
+    emit("updateResult", updatedResult);
+  } catch (error) {
+    console.error("Failed to save drawing state:", error);
+  } finally {
+    uploadInFlight = false;
   }
 };
 

@@ -5,6 +5,13 @@ import {
   generateGeminiImageFromPrompt,
 } from "../utils/gemini.js";
 import { errorMessage } from "../utils/errors.js";
+import {
+  saveImage,
+  overwriteImage,
+  loadImageBase64,
+  stripDataUri,
+  isImagePath,
+} from "../utils/image-store.js";
 
 const router = Router();
 
@@ -46,13 +53,14 @@ router.post(
         model,
       );
       if (imageData) {
+        const imagePath = await saveImage(imageData);
         res.json({
           message: "image generation succeeded",
           instructions:
             "Acknowledge that the image was generated and has been presented to the user.",
           title: "Generated Image",
           data: {
-            imageData: `data:image/png;base64,${imageData}`,
+            imageData: imagePath,
             prompt,
           },
         });
@@ -95,10 +103,10 @@ router.post(
     }
 
     try {
-      const base64Data = currentImageData.replace(
-        /^data:image\/[^;]+;base64,/,
-        "",
-      );
+      // Resolve input image to raw base64 — supports both file paths and legacy data URIs
+      const base64Data = isImagePath(currentImageData)
+        ? await loadImageBase64(currentImageData)
+        : stripDataUri(currentImageData);
       // /edit-image deliberately omits `config` (no aspectRatio) so
       // Gemini preserves the input image's dimensions.
       const { imageData, message } = await generateGeminiImageContent([
@@ -110,13 +118,14 @@ router.post(
         },
       ]);
       if (imageData) {
+        const imagePath = await saveImage(imageData);
         res.json({
           message: "image edit succeeded",
           instructions:
             "Acknowledge that the image was edited and has been presented to the user.",
           title: "Edited Image",
           data: {
-            imageData: `data:image/png;base64,${imageData}`,
+            imageData: imagePath,
             prompt,
           },
         });
@@ -125,6 +134,67 @@ router.post(
       }
     } catch (err) {
       res.status(500).json({ success: false, message: errorMessage(err) });
+    }
+  },
+);
+
+// Canvas image storage — POST creates a new file, PUT overwrites existing
+
+interface CanvasImageBody {
+  imageData: string;
+}
+
+interface CanvasImageResponse {
+  path: string;
+}
+
+interface CanvasImageError {
+  error: string;
+}
+
+router.post(
+  "/images",
+  async (
+    req: Request<object, unknown, CanvasImageBody>,
+    res: Response<CanvasImageResponse | CanvasImageError>,
+  ) => {
+    const { imageData } = req.body;
+    if (!imageData) {
+      res.status(400).json({ error: "imageData is required" });
+      return;
+    }
+    try {
+      const base64 = stripDataUri(imageData);
+      const imagePath = await saveImage(base64);
+      res.json({ path: imagePath });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  },
+);
+
+router.put(
+  "/images/:filename",
+  async (
+    req: Request<{ filename: string }, unknown, CanvasImageBody>,
+    res: Response<CanvasImageResponse | CanvasImageError>,
+  ) => {
+    const relativePath = `images/${req.params.filename}`;
+    const { imageData } = req.body;
+    if (!imageData || !relativePath) {
+      res.status(400).json({ error: "imageData and path are required" });
+      return;
+    }
+    if (!isImagePath(relativePath)) {
+      res.status(400).json({ error: "invalid image path" });
+      return;
+    }
+    try {
+      const base64 = stripDataUri(imageData);
+      await overwriteImage(relativePath, base64);
+      res.json({ path: relativePath });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
     }
   },
 );

@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { ImageView } from "@mulmochat-plugin/ui-image";
+import { ImageView } from "../ui-image";
 import type { ToolResult } from "gui-chat-protocol";
 import type { ImageToolData } from "./definition";
 import { TOOL_NAME } from "./definition";
