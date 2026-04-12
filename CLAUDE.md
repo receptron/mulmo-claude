@@ -232,6 +232,17 @@ e2e/
 3. Use URL assertions for router behaviour (`expect(page.url()).toContain(...)`)
 4. Override specific API responses per test by adding a `page.route()` AFTER `mockAllApis` (Playwright checks last-registered first)
 
+### When to add E2E coverage
+
+**Whenever a `.vue` component is modified**, consider whether the change needs a new E2E test. Unit tests cover the extracted pure helpers; E2E tests are the regression safety-net for the Vue component's wiring (template bindings, event handlers, reactive state flow, router integration). Concrete triggers:
+
+- Touching `src/App.vue` — almost always add / extend a scenario in `e2e/tests/chat-flow.spec.ts` (the refactor flow).
+- Touching a plugin's `View.vue` / `Preview.vue` — add or extend the plugin-specific spec (e.g. `file-explorer.spec.ts`, `image-plugins.spec.ts`).
+- Adding a new route or changing guard logic — `router-navigation.spec.ts` / `router-guards.spec.ts`.
+- Changing SSE event handling, session loading, or sidebar session merging — `chat-flow.spec.ts` already exercises these; add a case if a new event type / selection rule / merge path is introduced.
+
+Skip if the change is purely cosmetic (Tailwind class tweaks, copy fixes, emoji swaps) with no behavioural path touched.
+
 ### Gotchas
 
 - **Route order is reversed**: Playwright checks routes last-registered-first. Register catch-all FIRST, specific routes AFTER.
