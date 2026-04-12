@@ -4,12 +4,33 @@ import { workspacePath } from "../workspace.js";
 import { loadJsonFile, saveJsonFile } from "../utils/file.js";
 import { dispatchTodos, type TodosActionInput } from "./todosHandlers.js";
 import {
+  type StatusColumn,
+  DEFAULT_COLUMNS,
+  handleAddColumn,
+  handleDeleteColumn,
+  handlePatchColumn,
+  handleReorderColumns,
+  normalizeColumns,
+} from "./todosColumnsHandlers.js";
+import {
+  handleCreate,
+  handleDeleteItem,
+  handleMove,
+  handlePatch,
+  migrateItems,
+  type CreateInput,
+  type MoveInput,
+  type PatchInput,
+} from "./todosItemsHandlers.js";
+import {
   respondWithDispatchResult,
   type DispatchSuccessResponse,
   type DispatchErrorResponse,
 } from "./dispatchResponse.js";
 
 const router = Router();
+
+export type TodoPriority = "low" | "medium" | "high" | "urgent";
 
 export interface TodoItem {
   id: string;
@@ -18,24 +39,67 @@ export interface TodoItem {
   labels?: string[];
   completed: boolean;
   createdAt: number;
+  // ── Added for the file-explorer kanban view ──
+  // status: id of a column from columns.json. Optional on the wire so
+  // legacy items load cleanly; migrateTodos() backfills it on read.
+  status?: string;
+  priority?: TodoPriority;
+  dueDate?: string; // ISO YYYY-MM-DD
+  order?: number; // sort key within the same status column
 }
 
-const todosFile = () => path.join(workspacePath, "todos", "todos.json");
+const todosFile = (): string => path.join(workspacePath, "todos", "todos.json");
+const columnsFile = (): string =>
+  path.join(workspacePath, "todos", "columns.json");
 
+function loadColumns(): StatusColumn[] {
+  return normalizeColumns(
+    loadJsonFile<unknown>(columnsFile(), DEFAULT_COLUMNS),
+  );
+}
+
+function saveColumns(columns: StatusColumn[]): void {
+  saveJsonFile(columnsFile(), columns);
+}
+
+// Reads todos.json and migrates the result so callers always see a
+// fully-populated TodoItem (status / order backfilled). Migration is
+// done on every read; we only persist the migrated form when an
+// action mutates state, which keeps the on-disk format unchanged
+// for users who never touch the kanban view.
 function loadTodos(): TodoItem[] {
-  return loadJsonFile<TodoItem[]>(todosFile(), []);
+  const raw = loadJsonFile<TodoItem[]>(todosFile(), []);
+  const columns = loadColumns();
+  return migrateItems(raw, columns);
 }
 
 function saveTodos(items: TodoItem[]): void {
   saveJsonFile(todosFile(), items);
 }
 
-router.get(
-  "/todos",
-  (_req: Request, res: Response<{ data: { items: TodoItem[] } }>) => {
-    res.json({ data: { items: loadTodos() } });
-  },
-);
+// ── GET /api/todos ───────────────────────────────────────────────
+//
+// Returns the migrated items + the current status columns. The
+// columns field is new; existing chat-side consumers only read
+// `data.items` so adding a sibling key is non-breaking.
+
+interface TodosListResponse {
+  data: { items: TodoItem[]; columns: StatusColumn[] };
+}
+
+router.get("/todos", (_req: Request, res: Response<TodosListResponse>) => {
+  res.json({ data: { items: loadTodos(), columns: loadColumns() } });
+});
+
+// ── POST /api/todos (legacy MCP action route) ────────────────────
+//
+// Uses the shared dispatcher response plumbing introduced in #145.
+// The legacy MCP `manageTodoList` tool is the only consumer of this
+// route — the file-explorer TodoExplorer calls the new id-based REST
+// routes below instead — so the response shape stays the simple
+// `{ data: { items } }` form. Columns aren't included here on purpose:
+// the chat-side View.vue only reads `data.items`, and the explorer
+// loads columns via GET /api/todos.
 
 interface TodoBody extends TodosActionInput {
   action: string;
@@ -59,6 +123,212 @@ router.post(
       instructions: "Display the updated todo list to the user.",
       persist: saveTodos,
     });
+  },
+);
+
+// ── New REST routes for the file-explorer todo view ──────────────
+//
+// These are id-based and used exclusively by the web UI. They live
+// alongside the legacy MCP action route so the LLM-facing contract
+// stays unchanged.
+
+interface ItemResponse {
+  data: { items: TodoItem[]; columns: StatusColumn[] };
+  item?: TodoItem;
+}
+
+interface ItemIdParams {
+  id: string;
+}
+
+interface ColumnIdParams {
+  id: string;
+}
+
+// POST /api/todos/items — create a new todo
+router.post(
+  "/todos/items",
+  (
+    req: Request<object, unknown, CreateInput>,
+    res: Response<ItemResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const columns = loadColumns();
+    const result = handleCreate(items, columns, req.body);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveTodos(result.items);
+    res.json({
+      data: { items: result.items, columns },
+      ...(result.item && { item: result.item }),
+    });
+  },
+);
+
+// PATCH /api/todos/items/:id — partial update
+router.patch(
+  "/todos/items/:id",
+  (
+    req: Request<ItemIdParams, unknown, PatchInput>,
+    res: Response<ItemResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const columns = loadColumns();
+    const result = handlePatch(items, columns, req.params.id, req.body);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveTodos(result.items);
+    res.json({
+      data: { items: result.items, columns },
+      ...(result.item && { item: result.item }),
+    });
+  },
+);
+
+// POST /api/todos/items/:id/move — drag & drop persistence
+router.post(
+  "/todos/items/:id/move",
+  (
+    req: Request<ItemIdParams, unknown, MoveInput>,
+    res: Response<ItemResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const columns = loadColumns();
+    const result = handleMove(items, columns, req.params.id, req.body);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveTodos(result.items);
+    res.json({
+      data: { items: result.items, columns },
+      ...(result.item && { item: result.item }),
+    });
+  },
+);
+
+// DELETE /api/todos/items/:id
+router.delete(
+  "/todos/items/:id",
+  (
+    req: Request<ItemIdParams>,
+    res: Response<ItemResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const columns = loadColumns();
+    const result = handleDeleteItem(items, req.params.id);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveTodos(result.items);
+    res.json({ data: { items: result.items, columns } });
+  },
+);
+
+// ── Columns ──────────────────────────────────────────────────────
+
+interface ColumnsResponse {
+  data: { items: TodoItem[]; columns: StatusColumn[] };
+}
+
+interface AddColumnBody {
+  label?: string;
+  isDone?: boolean;
+}
+
+interface PatchColumnBody {
+  label?: string;
+  isDone?: boolean;
+}
+
+interface ReorderColumnsBody {
+  ids?: string[];
+}
+
+router.get(
+  "/todos/columns",
+  (_req: Request, res: Response<ColumnsResponse>) => {
+    res.json({ data: { items: loadTodos(), columns: loadColumns() } });
+  },
+);
+
+router.post(
+  "/todos/columns",
+  (
+    req: Request<object, unknown, AddColumnBody>,
+    res: Response<ColumnsResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const result = handleAddColumn(loadColumns(), items, req.body);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveColumns(result.columns);
+    if (result.items) saveTodos(result.items);
+    res.json({ data: { items: loadTodos(), columns: result.columns } });
+  },
+);
+
+router.patch(
+  "/todos/columns/:id",
+  (
+    req: Request<ColumnIdParams, unknown, PatchColumnBody>,
+    res: Response<ColumnsResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const result = handlePatchColumn(
+      loadColumns(),
+      req.params.id,
+      req.body,
+      items,
+    );
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveColumns(result.columns);
+    if (result.items) saveTodos(result.items);
+    res.json({ data: { items: loadTodos(), columns: result.columns } });
+  },
+);
+
+router.delete(
+  "/todos/columns/:id",
+  (
+    req: Request<ColumnIdParams>,
+    res: Response<ColumnsResponse | DispatchErrorResponse>,
+  ) => {
+    const items = loadTodos();
+    const result = handleDeleteColumn(loadColumns(), req.params.id, items);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveColumns(result.columns);
+    if (result.items) saveTodos(result.items);
+    res.json({ data: { items: loadTodos(), columns: result.columns } });
+  },
+);
+
+router.put(
+  "/todos/columns/order",
+  (
+    req: Request<object, unknown, ReorderColumnsBody>,
+    res: Response<ColumnsResponse | DispatchErrorResponse>,
+  ) => {
+    const result = handleReorderColumns(loadColumns(), req.body.ids ?? []);
+    if (result.kind === "error") {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    saveColumns(result.columns);
+    res.json({ data: { items: loadTodos(), columns: result.columns } });
   },
 );
 

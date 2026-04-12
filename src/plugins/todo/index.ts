@@ -3,6 +3,8 @@ import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
 
+export type TodoPriority = "low" | "medium" | "high" | "urgent";
+
 export interface TodoItem {
   id: string;
   text: string;
@@ -10,10 +12,22 @@ export interface TodoItem {
   labels?: string[];
   completed: boolean;
   createdAt: number;
+  // ── Added for the file-explorer kanban view ──
+  status?: string;
+  priority?: TodoPriority;
+  dueDate?: string;
+  order?: number;
+}
+
+export interface StatusColumn {
+  id: string;
+  label: string;
+  isDone?: boolean;
 }
 
 export interface TodoData {
   items: TodoItem[];
+  columns?: StatusColumn[];
 }
 
 const todoPlugin: ToolPlugin<TodoData> = {

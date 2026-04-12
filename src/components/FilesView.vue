@@ -58,6 +58,10 @@
             <div v-if="schedulerResult" class="h-full">
               <SchedulerView :selected-result="schedulerResult" />
             </div>
+            <!-- Todos todos.json: full kanban / table / list explorer. -->
+            <div v-else-if="todoExplorerResult" class="h-full">
+              <TodoExplorer :selected-result="todoExplorerResult" />
+            </div>
             <!-- Markdown rendered: frontmatter panel + body -->
             <div
               v-else-if="isMarkdown && !mdRawMode"
@@ -217,9 +221,11 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import FileTree, { type TreeNode } from "./FileTree.vue";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import SchedulerView from "../plugins/scheduler/View.vue";
+import TodoExplorer from "./TodoExplorer.vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
 import type { SchedulerData, ScheduledItem } from "../plugins/scheduler/index";
+import type { StatusColumn, TodoData, TodoItem } from "../plugins/todo/index";
 import {
   tokenizeJson,
   tokenizeJsonl,
@@ -341,6 +347,45 @@ const schedulerResult = computed(
     };
   },
 );
+
+// Same idea as schedulerResult: when the user opens todos/todos.json
+// we render it as a full TodoExplorer (kanban / table / list) instead
+// of a raw JSON blob. The TodoExplorer fetches its own state from
+// /api/todos so the data we synthesize here is just a starter — the
+// columns array might be empty until the first refresh lands.
+function isTodoItem(x: unknown): x is TodoItem {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  if (typeof o["id"] !== "string" || typeof o["text"] !== "string")
+    return false;
+  if (typeof o["completed"] !== "boolean") return false;
+  if (typeof o["createdAt"] !== "number") return false;
+  return true;
+}
+
+function isTodoItemArray(x: unknown): x is TodoItem[] {
+  return Array.isArray(x) && x.every(isTodoItem);
+}
+
+const todoExplorerResult = computed((): ToolResultComplete<TodoData> | null => {
+  if (selectedPath.value !== "todos/todos.json") return null;
+  if (!content.value || content.value.kind !== "text") return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content.value.content);
+  } catch {
+    return null;
+  }
+  const items: TodoItem[] = isTodoItemArray(parsed) ? parsed : [];
+  const columns: StatusColumn[] = [];
+  return {
+    uuid: "files-todo-preview",
+    toolName: "manageTodoList",
+    message: "todos/todos.json",
+    title: "Todo",
+    data: { items, columns },
+  };
+});
 
 const mdFrontmatter = computed(() => {
   if (!content.value || content.value.kind !== "text") return null;
