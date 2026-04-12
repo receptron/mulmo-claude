@@ -108,9 +108,17 @@ interface FileContentMeta {
 
 type FileContentResponse = FileContentText | FileContentMeta;
 
-type ContentKind = "text" | "image" | "pdf" | "audio" | "video" | "binary";
+export type ContentKind =
+  | "text"
+  | "image"
+  | "pdf"
+  | "audio"
+  | "video"
+  | "binary";
 
-function classify(filename: string): ContentKind {
+// Exported for unit tests. Classification is purely extension-based
+// and case-insensitive (via `path.extname(...).toLowerCase()`).
+export function classify(filename: string): ContentKind {
   const ext = path.extname(filename).toLowerCase();
   if (TEXT_EXTENSIONS.has(ext)) return "text";
   if (IMAGE_EXTENSIONS.has(ext)) return "image";
@@ -155,7 +163,7 @@ function resolveSafe(relPath: string): string | null {
   return resolvedReal;
 }
 
-interface ByteRange {
+export interface ByteRange {
   start: number;
   end: number;
 }
@@ -165,8 +173,18 @@ interface ByteRange {
 // so the caller can respond 416. We deliberately reject multi-range
 // requests (`bytes=0-99,200-299`) since browsers don't issue them for
 // media playback and supporting them would complicate the response.
-function parseRange(header: string, size: number): ByteRange | null {
-  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+//
+// Exported for unit tests — this is the most security-sensitive piece
+// of the file-serving surface, so it's covered exhaustively in
+// `test/routes/test_filesRoute.ts`.
+export function parseRange(header: string, size: number): ByteRange | null {
+  // RFC 7233 §2.1: "A Range request on a representation whose current
+  // length is 0 cannot be satisfied". We also need this guard at the
+  // top because the naive suffix-range math below produces `end = -1`
+  // for zero-byte files, which then crashes `fs.createReadStream`
+  // with `ERR_OUT_OF_RANGE`.
+  if (size <= 0) return null;
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(header.trim());
   if (!match) return null;
   const [, startStr, endStr] = match;
   if (startStr === "" && endStr === "") return null;
@@ -396,6 +414,11 @@ router.get(
     if (rangeHeader) {
       const range = parseRange(rangeHeader, stat.size);
       if (!range) {
+        // The media MIME was set above so the 206 success path
+        // doesn't have to repeat it, but on a 416 we want JSON so
+        // `res.json` doesn't lie about the body's content-type. Set
+        // the Content-Range per RFC 7233 §4.4 before sending.
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.setHeader("Content-Range", `bytes */${stat.size}`);
         res.status(416).json({ error: "Range not satisfiable" });
         return;
