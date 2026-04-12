@@ -221,8 +221,28 @@ async function fetchSheets(): Promise<void> {
         resolvedSheets.value = [];
         return;
       }
-      const json: { content?: string } = await res.json();
-      resolvedSheets.value = json.content ? JSON.parse(json.content) : [];
+      const json: { kind?: string; content?: string; message?: string } =
+        await res.json();
+      // The /files/content endpoint returns { kind: "text" | "too-large"
+      // | "binary" | ... }. Only "text" carries a content field; other
+      // kinds indicate the file can't be rendered as a spreadsheet.
+      if (json.kind && json.kind !== "text") {
+        errorMessage.value =
+          json.message ?? `Cannot load spreadsheet: ${json.kind}`;
+        resolvedSheets.value = [];
+        return;
+      }
+      if (typeof json.content !== "string") {
+        errorMessage.value = "Spreadsheet file has no content";
+        resolvedSheets.value = [];
+        return;
+      }
+      try {
+        resolvedSheets.value = JSON.parse(json.content);
+      } catch (parseErr) {
+        errorMessage.value = `Spreadsheet JSON is malformed: ${parseErr instanceof Error ? parseErr.message : "parse error"}`;
+        resolvedSheets.value = [];
+      }
     } catch (err) {
       errorMessage.value = `Failed to load spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
       resolvedSheets.value = [];

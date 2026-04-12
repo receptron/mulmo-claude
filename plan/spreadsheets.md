@@ -14,7 +14,7 @@ Store spreadsheet data as JSON files in `{workspace}/spreadsheets/` and replace 
 
 The `data.sheets` field in `SpreadsheetToolData` changes from an inline array to a workspace-relative path string:
 
-```
+```text
 spreadsheets/{uuid}.json
 ```
 
@@ -22,7 +22,7 @@ The frontend detects whether `data.sheets` is a string (file path) or array (leg
 
 ### Storage layout
 
-```
+```text
 ~/mulmoclaude/
   spreadsheets/
     a1b2c3d4e5f6g7h8.json

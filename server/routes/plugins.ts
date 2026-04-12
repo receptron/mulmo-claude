@@ -201,8 +201,8 @@ router.put(
   ) => {
     const relativePath = `spreadsheets/${req.params.filename}`;
     const { sheets } = req.body;
-    if (!sheets) {
-      res.status(400).json({ error: "sheets is required" });
+    if (!Array.isArray(sheets)) {
+      res.status(400).json({ error: "sheets must be an array" });
       return;
     }
     if (!isSpreadsheetPath(relativePath)) {

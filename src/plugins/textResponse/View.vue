@@ -33,11 +33,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { View as OriginalView } from "@gui-chat-plugin/text-response/vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { usePdfDownload } from "../../composables/usePdfDownload";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TextResponseData>;
@@ -57,40 +58,16 @@ function openLinksInNewTab(event: MouseEvent): void {
   handleExternalLinkClick(event);
 }
 
-const pdfDownloading = ref(false);
-const pdfError = ref<string | null>(null);
+const {
+  pdfDownloading,
+  pdfError,
+  downloadPdf: rawDownloadPdf,
+} = usePdfDownload();
 
 async function downloadPdf() {
-  pdfError.value = null;
-  pdfDownloading.value = true;
   const text = props.selectedResult.data?.text ?? "";
   const filename = `${props.selectedResult.title ?? "response"}.pdf`;
-  let response: Response;
-  try {
-    response = await fetch("/api/pdf/markdown", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: text, filename }),
-    });
-  } catch (err) {
-    pdfError.value = err instanceof Error ? err.message : String(err);
-    pdfDownloading.value = false;
-    return;
-  }
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    pdfError.value = `PDF error ${response.status}: ${errText}`;
-    pdfDownloading.value = false;
-    return;
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  pdfDownloading.value = false;
+  await rawDownloadPdf(text, filename);
 }
 </script>
 

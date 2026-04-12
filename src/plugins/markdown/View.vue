@@ -65,8 +65,9 @@
 import { computed, ref, watch, nextTick } from "vue";
 import { marked } from "marked";
 import type { ToolResult } from "gui-chat-protocol";
-import type { MarkdownToolData } from "./definition";
+import { isFilePath, type MarkdownToolData } from "./definition";
 import { resolveImageSrc } from "../../utils/image/resolve";
+import { usePdfDownload } from "../../composables/usePdfDownload";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -81,10 +82,6 @@ const saving = ref(false);
 // The actual markdown content (fetched from server or inline)
 const markdownContent = ref("");
 const editableMarkdown = ref("");
-
-function isFilePath(value: string): boolean {
-  return value.startsWith("markdowns/") && value.endsWith(".md");
-}
 
 async function fetchMarkdownContent(): Promise<void> {
   const raw = props.selectedResult.data?.markdown;
@@ -163,46 +160,21 @@ watch(
   },
 );
 
-const pdfDownloading = ref(false);
-const pdfError = ref<string | null>(null);
+const {
+  pdfDownloading,
+  pdfError,
+  downloadPdf: rawDownloadPdf,
+} = usePdfDownload();
 
 async function downloadPdf() {
   if (!markdownContent.value) return;
-  pdfError.value = null;
-  pdfDownloading.value = true;
   const hint = props.selectedResult.data?.filenameHint;
   const title = hint
     ? hint.replace(/[/\\:*?"<>|]/g, "_")
     : props.selectedResult.title
       ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_")
       : "document";
-  const filename = `${title}.pdf`;
-  let response: Response;
-  try {
-    response = await fetch("/api/pdf/markdown", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: markdownContent.value, filename }),
-    });
-  } catch (err) {
-    pdfError.value = err instanceof Error ? err.message : String(err);
-    pdfDownloading.value = false;
-    return;
-  }
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    pdfError.value = `PDF error ${response.status}: ${errText}`;
-    pdfDownloading.value = false;
-    return;
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  pdfDownloading.value = false;
+  await rawDownloadPdf(markdownContent.value, `${title}.pdf`);
 }
 
 async function applyMarkdown() {

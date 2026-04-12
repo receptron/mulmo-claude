@@ -5,6 +5,7 @@ import { marked } from "marked";
 import puppeteer from "puppeteer";
 import { errorMessage } from "../utils/errors.js";
 import { workspacePath } from "../workspace.js";
+import { resolveWithinRoot } from "../utils/fs.js";
 
 const router = Router();
 
@@ -48,20 +49,45 @@ const MIME_BY_EXT: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+// Realpath of the workspace, resolved once at module load. Used to
+// validate that image paths resolved relative to markdowns/ stay
+// inside the workspace after symlink resolution.
+const workspaceReal = fs.realpathSync(workspacePath);
+
 /**
  * Inline local images as base64 data URIs so Puppeteer can render them.
  * Markdown files live in workspace/markdowns/ and reference images as
  * "../images/xyz.png" → workspace/images/xyz.png.
+ *
+ * Paths are validated against the workspace root via resolveWithinRoot
+ * so an attacker-controlled <img src="../../../etc/passwd"> can't read
+ * files outside the workspace.
  */
 function inlineImages(html: string): string {
-  const baseDir = path.join(workspacePath, "markdowns");
+  const baseDir = path.join(workspaceReal, "markdowns");
   return html.replace(
     /(<img\s[^>]*src=")([^"]+)(")/g,
     (_match, before: string, src: string, after: string) => {
       if (src.startsWith("data:") || src.startsWith("http")) {
         return _match;
       }
-      const abs = path.resolve(baseDir, src);
+      // Resolve the image path relative to markdowns/ but require the
+      // final realpath to stay inside the workspace root. markdowns/
+      // references like "../images/foo.png" are common so we can't
+      // restrict to markdowns/ itself.
+      const unsafeAbs = path.resolve(baseDir, src);
+      // Make unsafeAbs relative to the workspace for the
+      // resolveWithinRoot check (it expects a relative path).
+      const relToWorkspace = path.relative(workspaceReal, unsafeAbs);
+      if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
+        console.warn(`[pdf] image path escapes workspace: ${src}`);
+        return _match;
+      }
+      const abs = resolveWithinRoot(workspaceReal, relToWorkspace);
+      if (!abs) {
+        console.warn(`[pdf] image path rejected by safe-resolve: ${src}`);
+        return _match;
+      }
       try {
         const buf = fs.readFileSync(abs);
         const ext = path.extname(abs).toLowerCase();

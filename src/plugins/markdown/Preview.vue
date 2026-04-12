@@ -15,15 +15,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { ToolResult } from "gui-chat-protocol";
-import type { MarkdownToolData } from "./definition";
+import { isFilePath, type MarkdownToolData } from "./definition";
 
 const props = defineProps<{
   result: ToolResult<MarkdownToolData>;
 }>();
-
-function isFilePath(value: string): boolean {
-  return value.startsWith("markdowns/") && value.endsWith(".md");
-}
 
 const fetchedContent = ref("");
 
