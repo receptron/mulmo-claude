@@ -11,6 +11,12 @@ import {
   isGeminiAvailable,
 } from "../utils/gemini.js";
 import { errorMessage } from "../utils/errors.js";
+import { saveImage } from "../utils/image-store.js";
+import {
+  saveMarkdown,
+  overwriteMarkdown,
+  isMarkdownPath,
+} from "../utils/markdown-store.js";
 
 const router = Router();
 
@@ -46,11 +52,11 @@ function wrapPluginExecute<TResult>(
 
 const IMAGE_PLACEHOLDER = /!\[([^\]]+)\]\(\/?__too_be_replaced_image_path__\)/g;
 
-async function generateInlineImage(prompt: string): Promise<string | null> {
+async function generateImageFile(prompt: string): Promise<string | null> {
   if (!isGeminiAvailable()) return null;
   try {
     const { imageData } = await generateGeminiImageFromPrompt(prompt);
-    if (imageData) return `data:image/png;base64,${imageData}`;
+    if (imageData) return saveImage(imageData);
   } catch {
     // leave placeholder if generation fails
   }
@@ -66,13 +72,13 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
     matches.map(async (m) => ({
       full: m[0],
       prompt: m[1],
-      url: await generateInlineImage(m[1]),
+      url: await generateImageFile(m[1]),
     })),
   );
 
   let filled = markdown;
   for (const { full, prompt, url } of results) {
-    if (url) filled = filled.replace(full, `![${prompt}](${url})`);
+    if (url) filled = filled.replace(full, `![${prompt}](../${url})`);
   }
   return filled;
 }
@@ -98,11 +104,50 @@ router.post(
   ) => {
     const { title, markdown, filenameHint } = req.body;
     const filledMarkdown = await fillImagePlaceholders(markdown);
+    const markdownPath = await saveMarkdown(filledMarkdown);
     res.json({
       message: `Document "${title}" is ready.`,
       title,
-      data: { markdown: filledMarkdown, filenameHint },
+      data: { markdown: markdownPath, filenameHint },
     });
+  },
+);
+
+// Update markdown file on disk (user edits in View)
+interface UpdateMarkdownBody {
+  markdown: string;
+}
+
+interface UpdateMarkdownResponse {
+  path: string;
+}
+
+interface UpdateMarkdownError {
+  error: string;
+}
+
+router.put(
+  "/markdowns/:filename",
+  async (
+    req: Request<{ filename: string }, unknown, UpdateMarkdownBody>,
+    res: Response<UpdateMarkdownResponse | UpdateMarkdownError>,
+  ) => {
+    const relativePath = `markdowns/${req.params.filename}`;
+    const { markdown } = req.body;
+    if (!markdown) {
+      res.status(400).json({ error: "markdown is required" });
+      return;
+    }
+    if (!isMarkdownPath(relativePath)) {
+      res.status(400).json({ error: "invalid markdown path" });
+      return;
+    }
+    try {
+      await overwriteMarkdown(relativePath, markdown);
+      res.json({ path: relativePath });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
   },
 );
 

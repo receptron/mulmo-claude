@@ -1,7 +1,10 @@
 <template>
   <div class="markdown-container">
+    <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
+      <div class="text-gray-500">Loading document...</div>
+    </div>
     <div
-      v-if="!selectedResult.data?.markdown"
+      v-else-if="!markdownContent"
       class="min-h-full p-8 flex items-center justify-center"
     >
       <div class="text-gray-500">No markdown content available</div>
@@ -40,9 +43,9 @@
         <button
           @click="applyMarkdown"
           class="apply-btn"
-          :disabled="!hasChanges"
+          :disabled="!hasChanges || saving"
         >
-          Apply Changes
+          {{ saving ? "Saving..." : "Apply Changes" }}
         </button>
       </details>
     </template>
@@ -54,6 +57,7 @@ import { computed, ref, watch, nextTick } from "vue";
 import { marked } from "marked";
 import type { ToolResult } from "gui-chat-protocol";
 import type { MarkdownToolData } from "./definition";
+import { resolveImageSrc } from "../../utils/image/resolve";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -63,19 +67,75 @@ const emit = defineEmits<{
   updateResult: [result: ToolResult<MarkdownToolData>];
 }>();
 
-const editableMarkdown = ref(props.selectedResult.data?.markdown || "");
+const loading = ref(false);
+const saving = ref(false);
+// The actual markdown content (fetched from server or inline)
+const markdownContent = ref("");
+const editableMarkdown = ref("");
 
-// Check if markdown has been modified
+function isFilePath(value: string): boolean {
+  return value.startsWith("markdowns/") && value.endsWith(".md");
+}
+
+async function fetchMarkdownContent(): Promise<void> {
+  const raw = props.selectedResult.data?.markdown;
+  if (!raw) {
+    markdownContent.value = "";
+    editableMarkdown.value = "";
+    return;
+  }
+  if (isFilePath(raw)) {
+    loading.value = true;
+    try {
+      const res = await fetch(
+        `/api/files/content?path=${encodeURIComponent(raw)}`,
+      );
+      if (!res.ok) {
+        console.error("Failed to fetch markdown:", res.statusText);
+        markdownContent.value = "";
+        editableMarkdown.value = "";
+        return;
+      }
+      const json: { content?: string } = await res.json();
+      markdownContent.value = json.content ?? "";
+    } catch (err) {
+      console.error("Failed to fetch markdown:", err);
+      markdownContent.value = "";
+    } finally {
+      loading.value = false;
+    }
+  } else {
+    // Legacy inline content
+    markdownContent.value = raw;
+  }
+  editableMarkdown.value = markdownContent.value;
+}
+
+// Fetch on mount
+fetchMarkdownContent();
+
 const hasChanges = computed(() => {
-  return editableMarkdown.value !== props.selectedResult.data?.markdown;
+  return editableMarkdown.value !== markdownContent.value;
 });
 
+// Resolve image paths in rendered HTML so workspace-relative paths become URLs.
+// Markdown files use "../images/xyz.png" (relative from markdowns/ dir);
+// strip the "../" prefix to get the workspace-relative path for resolveImageSrc.
+function resolveImagesInHtml(html: string): string {
+  return html.replace(
+    /(<img\s[^>]*src=")([^"]+)(")/g,
+    (_match, before: string, src: string, after: string) => {
+      if (src.startsWith("data:") || src.startsWith("http")) return _match;
+      const normalized = src.replace(/^\.\.\//, "");
+      return `${before}${resolveImageSrc(normalized)}${after}`;
+    },
+  );
+}
+
 const renderedHtml = computed(() => {
-  if (!props.selectedResult.data?.markdown) {
-    console.error("No markdown data in result:", props.selectedResult);
-    return "";
-  }
-  return marked(props.selectedResult.data.markdown);
+  if (!markdownContent.value) return "";
+  const html = marked(markdownContent.value) as string;
+  return resolveImagesInHtml(html);
 });
 
 // Watch for scroll requests from viewState
@@ -83,8 +143,6 @@ watch(
   () => props.selectedResult?.viewState?.scrollToAnchor as string | undefined,
   (anchorId) => {
     if (!anchorId) return;
-
-    // Use nextTick to ensure the DOM is updated
     nextTick(() => {
       const element = document.getElementById(anchorId);
       if (element) {
@@ -97,11 +155,9 @@ watch(
 );
 
 const downloadMarkdown = () => {
-  if (!props.selectedResult?.data?.markdown) return;
+  if (!markdownContent.value) return;
 
-  const blob = new Blob([props.selectedResult.data.markdown], {
-    type: "text/markdown",
-  });
+  const blob = new Blob([markdownContent.value], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -118,26 +174,52 @@ const downloadMarkdown = () => {
   URL.revokeObjectURL(url);
 };
 
-function applyMarkdown() {
-  // Update the result with new markdown content
+async function applyMarkdown() {
+  const raw = props.selectedResult.data?.markdown;
+  if (!raw) return;
+
+  // If file-based, save to server
+  if (isFilePath(raw)) {
+    saving.value = true;
+    try {
+      const filename = raw.replace(/^markdowns\//, "");
+      const res = await fetch(`/api/markdowns/${filename}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markdown: editableMarkdown.value }),
+      });
+      if (!res.ok) {
+        console.error("Failed to save markdown:", res.statusText);
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to save markdown:", err);
+      return;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  // Update local state
+  markdownContent.value = editableMarkdown.value;
+
+  // Emit update to parent (clears pdfPath since content changed)
   const updatedResult: ToolResult<MarkdownToolData> = {
     ...props.selectedResult,
     data: {
       ...props.selectedResult.data,
-      markdown: editableMarkdown.value,
-      // Reset pdfPath since markdown has changed
+      markdown: isFilePath(raw) ? raw : editableMarkdown.value,
       pdfPath: undefined,
     },
   };
-
   emit("updateResult", updatedResult);
 }
 
 // Watch for external changes to selectedResult (when user clicks different result)
 watch(
   () => props.selectedResult.data?.markdown,
-  (newMarkdown) => {
-    editableMarkdown.value = newMarkdown || "";
+  () => {
+    fetchMarkdownContent();
   },
 );
 </script>

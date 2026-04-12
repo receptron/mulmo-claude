@@ -21,6 +21,7 @@ const SUBDIRS = [
   "roles",
   "stories",
   "images",
+  "markdowns",
 ];
 
 export function initWorkspace(): string {
