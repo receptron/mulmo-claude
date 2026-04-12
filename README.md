@@ -153,8 +153,30 @@ All data is stored as plain files in the workspace directory:
 ```
 ~/mulmoclaude/
   chat/        ← conversation history (one .jsonl per session)
-  todos/        ← todo items
+  todos/        ← todo items (todos.json) and kanban columns (columns.json)
   memory.md     ← persistent facts Claude always has in context
   wiki/         ← personal knowledge base (see above)
   ...
 ```
+
+### Todo explorer
+
+Selecting `todos/todos.json` in the file explorer opens a full **Todo
+Explorer** with three view modes:
+
+- **Kanban** — GitHub Projects-style columns. Drag cards between
+  columns to change status. Each column has a menu to rename, mark as
+  done, or delete. New columns can be added from the toolbar.
+- **Table** — sortable table with status / priority / labels / due
+  date / created columns. Click a row to inline-edit.
+- **List** — flat checklist with the same inline editor.
+
+Status columns are stored in `todos/columns.json` and default to
+`Backlog / Todo / In Progress / Done`. Each todo carries optional
+`status`, `priority` (low / medium / high / urgent), and `dueDate`
+fields in addition to the original text / note / labels / completed
+fields.
+
+The chat-side `manageTodoList` MCP tool keeps its existing behaviour
+unchanged — it can read and edit text / note / labels / completed
+todos, and the explorer's extra fields are preserved across MCP edits.
