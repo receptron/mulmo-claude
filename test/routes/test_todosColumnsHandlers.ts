@@ -90,14 +90,14 @@ describe("doneColumnId / defaultStatusId", () => {
 
 describe("handleAddColumn", () => {
   it("rejects empty label", () => {
-    const result = handleAddColumn(cols(), { label: "  " });
+    const result = handleAddColumn(cols(), [], { label: "  " });
     assert.equal(result.kind, "error");
     if (result.kind !== "error") return;
     assert.equal(result.status, 400);
   });
 
   it("appends a slugified column", () => {
-    const result = handleAddColumn(cols(), { label: "In Review!" });
+    const result = handleAddColumn(cols(), [], { label: "In Review!" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.equal(result.columns.length, 5);
@@ -110,14 +110,14 @@ describe("handleAddColumn", () => {
       ...cols(),
       { id: "review", label: "Review" } as StatusColumn,
     ];
-    const result = handleAddColumn(start, { label: "Review" });
+    const result = handleAddColumn(start, [], { label: "Review" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.equal(result.columns[result.columns.length - 1]?.id, "review_2");
   });
 
   it("demotes existing done columns when isDone is true", () => {
-    const result = handleAddColumn(cols(), {
+    const result = handleAddColumn(cols(), [], {
       label: "Archived",
       isDone: true,
     });
@@ -125,6 +125,36 @@ describe("handleAddColumn", () => {
     if (result.kind !== "success") return;
     const doneIds = result.columns.filter((c) => c.isDone).map((c) => c.id);
     assert.deepEqual(doneIds, ["archived"]);
+  });
+
+  it("resyncs `completed` on items in the old done column when adding a new isDone column", () => {
+    // Items in the original "done" column carry completed=true. When
+    // a brand-new column is promoted to be the done column, the old
+    // ones should flip back to completed=false because their column
+    // is no longer the done column.
+    const items = [
+      makeItem({ id: "a", status: "done", completed: true }),
+      makeItem({ id: "b", status: "todo", completed: false }),
+    ];
+    const result = handleAddColumn(cols(), items, {
+      label: "Archived",
+      isDone: true,
+    });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const a = result.items?.find((i) => i.id === "a");
+    const b = result.items?.find((i) => i.id === "b");
+    assert.equal(a?.completed, false);
+    assert.equal(b?.completed, false);
+  });
+
+  it("does not resync items when adding a non-done column", () => {
+    const items = [makeItem({ id: "a", status: "done", completed: true })];
+    const result = handleAddColumn(cols(), items, { label: "Review" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    // No items field on the result because nothing changed.
+    assert.equal(result.items, undefined);
   });
 });
 
@@ -150,7 +180,7 @@ describe("handlePatchColumn", () => {
     assert.equal(result.status, 404);
   });
 
-  it("promoting a column to done demotes the prior done column and syncs items", () => {
+  it("promoting a column to done demotes the prior done column and syncs items in BOTH directions", () => {
     const items = [
       makeItem({ id: "a", status: "in_progress", completed: false }),
       makeItem({ id: "b", status: "done", completed: true }),
@@ -167,10 +197,13 @@ describe("handlePatchColumn", () => {
     const done = result.columns.find((c) => c.id === "done");
     assert.equal(inProgress?.isDone, true);
     assert.equal(done?.isDone, undefined);
+    // "a" is now in the new done column → completed should be true.
     assert.equal(result.items?.find((i) => i.id === "a")?.completed, true);
-    // Item "b" was in the now-non-done column; we don't unilaterally
-    // un-complete it (it kept its completed flag from before).
-    assert.equal(result.items?.find((i) => i.id === "b")?.completed, true);
+    // "b" stayed in the old (now non-done) "done" column → completed
+    // should flip to false. Symmetrical: column-level intent is
+    // explicit user action so we sync both ends, unlike the legacy
+    // MCP `check` action which only flips the boolean.
+    assert.equal(result.items?.find((i) => i.id === "b")?.completed, false);
   });
 
   it("refuses to demote the only done column", () => {
@@ -213,6 +246,31 @@ describe("handleDeleteColumn", () => {
     // "a" was in backlog → moves to first non-done column (now "todo")
     assert.equal(result.items?.find((i) => i.id === "a")?.status, "todo");
     assert.equal(result.items?.find((i) => i.id === "a")?.completed, false);
+  });
+
+  it("rebuilds the refuge column's order so merged items don't collide", () => {
+    // Both source and destination columns happen to have items at
+    // orders 1000/2000. Naively merging would leave duplicate orders
+    // in the destination, breaking the kanban sort. The handler
+    // should re-stripe the refuge column.
+    const items = [
+      makeItem({ id: "a", status: "backlog", order: 1000 }),
+      makeItem({ id: "b", status: "backlog", order: 2000 }),
+      makeItem({ id: "c", status: "todo", order: 1000 }),
+      makeItem({ id: "d", status: "todo", order: 2000 }),
+    ];
+    const result = handleDeleteColumn(cols(), "backlog", items);
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    // All four items now live in "todo" with unique, contiguous orders.
+    const todoItems = result
+      .items!.filter((i) => i.status === "todo")
+      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    const orders = todoItems.map((i) => i.order);
+    // No duplicates.
+    assert.equal(new Set(orders).size, 4);
+    // Stripe is 1000, 2000, 3000, 4000.
+    assert.deepEqual(orders, [1000, 2000, 3000, 4000]);
   });
 
   it("removing the done column promotes a new done column and marks orphans complete", () => {

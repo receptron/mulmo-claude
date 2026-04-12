@@ -271,7 +271,8 @@ router.post(
     req: Request<object, unknown, AddColumnBody>,
     res: Response<ColumnsResponse | ErrorResponse>,
   ) => {
-    const result = handleAddColumn(loadColumns(), req.body);
+    const items = loadTodos();
+    const result = handleAddColumn(loadColumns(), items, req.body);
     if (result.kind === "error") {
       res.status(result.status).json({ error: result.error });
       return;

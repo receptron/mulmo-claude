@@ -58,7 +58,7 @@ interface TodoItem {
   text: string;
   note?: string;
   labels?: string[];
-  completed: boolean;        // 後方互換のため残す（status === doneColumnId と同期）
+  completed: boolean;        // status とは独立に扱う（後述）
   createdAt: number;
   // ── new ──
   status?: string;           // ステータス column の id（未設定時は最初の non-done column）
@@ -67,6 +67,16 @@ interface TodoItem {
   order?: number;            // 同一ステータス内の並び順（小さいほど上）
 }
 ```
+
+> **`completed` と `status` の関係**: 当初は読み込みのたびに `status === doneColumnId` から `completed` を再同期する設計でしたが、これだとレガシー MCP `check` action（`completed=true` を立てるだけで status は触らない）が次の GET で revert されてしまうため廃止。
+>
+> 現在は **storage 層では完全に独立** に扱い、両者を同期するのは以下の **明示的なユーザ操作** のみ:
+> - REST `PATCH /api/todos/items/:id` で `status` を変えると `completed` も sync
+> - REST `PATCH` で `completed` を flip すると status を done 列 / default 開いた列に移動
+> - REST `POST /api/todos/items/:id/move` で done 列に入った item は `completed=true`
+> - 列の add (`isDone:true`) / patch (`isDone:true`) / delete (done 列を消す) は影響範囲の item を `resyncDoneMembership` で sync
+>
+> migration on read（`migrateItems`）は status の **backfill** はするが completed の **resync は一切しない**。
 
 ### ステータスカラム (`workspace/todos/columns.json` — 新規)
 
@@ -213,7 +223,7 @@ Scheduler パターンを踏襲。`todos/todos.json` を選択した時に、`to
   - priority（左ボーダー or アイコン: low=灰 / medium=青 / high=橙 / urgent=赤）
   - dueDate（バッジ。期限切れは赤、当日はオレンジ）
   - クリックで詳細パネル展開（既存 View.vue の YAML editor を再利用 or 新ダイアログ）
-- drag 終了時に `move` action を `/api/todos` に POST して永続化。失敗時は state を rollback。
+- drag 終了時に `POST /api/todos/items/:id/move` を呼んで永続化。失敗時は state を rollback。
 
 #### `src/components/todo/TodoTableView.vue` (新規)
 

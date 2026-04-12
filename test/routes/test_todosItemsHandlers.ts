@@ -121,8 +121,11 @@ describe("migrateItems", () => {
     assert.equal(result.find((i) => i.id === "b")?.order, 7);
   });
 
-  it("backfills order even when some items in a column have it", () => {
-    // Mixed group: at least one missing order → entire column gets re-ordered.
+  it("preserves existing orders and appends missing-order items at the end", () => {
+    // Mixed group: items with order keep their values; items without
+    // get assigned values strictly greater than the existing max so
+    // they sort to the bottom in createdAt order. This avoids
+    // clobbering hand-managed orders just because one item lacks one.
     const items: TodoItem[] = [
       {
         id: "a",
@@ -139,10 +142,20 @@ describe("migrateItems", () => {
         createdAt: 200,
         status: "todo",
       },
+      {
+        id: "c",
+        text: "z",
+        completed: false,
+        createdAt: 50,
+        status: "todo",
+      },
     ];
     const result = migrateItems(items, cols());
-    assert.equal(result.find((i) => i.id === "a")?.order, 1000);
-    assert.equal(result.find((i) => i.id === "b")?.order, 2000);
+    assert.equal(result.find((i) => i.id === "a")?.order, 5);
+    // c is missing order; createdAt 50 < b's 200 → c gets the smaller
+    // appended slot. Existing max in column = 5, so c=1005, b=2005.
+    assert.equal(result.find((i) => i.id === "c")?.order, 1005);
+    assert.equal(result.find((i) => i.id === "b")?.order, 2005);
   });
 });
 
@@ -166,6 +179,20 @@ describe("handleCreate", () => {
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.equal(result.item?.completed, true);
+  });
+
+  it("rejects an explicitly-unknown status with 400 (no silent fallback)", () => {
+    const result = handleCreate([], cols(), { text: "x", status: "ghost" });
+    assert.equal(result.kind, "error");
+    if (result.kind !== "error") return;
+    assert.equal(result.status, 400);
+  });
+
+  it("falls back to default status when status is undefined", () => {
+    const result = handleCreate([], cols(), { text: "x" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.status, "backlog");
   });
 
   it("rejects invalid priority", () => {

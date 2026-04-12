@@ -73,9 +73,12 @@ export function migrateItems(
     return { ...it, status };
   });
 
-  // Second pass: backfill order per column. Sort by createdAt within
-  // each column, then assign 1000 / 2000 / 3000 ... so drag-drop has
-  // room to insert between any two existing items.
+  // Second pass: backfill order per column. Items that already have
+  // an order keep it untouched — only items missing order get one
+  // assigned, and they go after the column's current max so they
+  // sort to the bottom in createdAt order. This preserves any
+  // hand-managed ordering even when a column is a mix of legacy
+  // and kanban-aware items.
   const byStatus = new Map<string, TodoItem[]>();
   for (const it of withStatus) {
     const key = it.status ?? openId;
@@ -84,13 +87,15 @@ export function migrateItems(
   }
   const orderById = new Map<string, number>();
   for (const [, group] of byStatus) {
-    // If every item already has an order, leave them alone — they
-    // were saved by a kanban-aware client and we shouldn't trample
-    // their hand-set ordering.
-    const allHaveOrder = group.every((it) => typeof it.order === "number");
-    if (allHaveOrder) continue;
-    const sorted = [...group].sort((a, b) => a.createdAt - b.createdAt);
-    sorted.forEach((it, i) => orderById.set(it.id, (i + 1) * ORDER_STEP));
+    const missing = group.filter((it) => typeof it.order !== "number");
+    if (missing.length === 0) continue;
+    const existingMax = group
+      .filter((it) => typeof it.order === "number")
+      .reduce((acc, it) => Math.max(acc, it.order!), 0);
+    const sorted = [...missing].sort((a, b) => a.createdAt - b.createdAt);
+    sorted.forEach((it, i) => {
+      orderById.set(it.id, existingMax + (i + 1) * ORDER_STEP);
+    });
   }
   return withStatus.map((it): TodoItem => {
     const next = orderById.get(it.id);
@@ -137,11 +142,22 @@ export function handleCreate(
   if (!input.text || input.text.trim().length === 0) {
     return { kind: "error", status: 400, error: "text required" };
   }
+  // Resolve status. An explicit but unknown status is a 400, not a
+  // silent fallback to the default — silently rewriting the user's
+  // intent has bitten us before with sibling MCP routes.
   const validStatusIds = new Set(columns.map((c) => c.id));
-  const status =
-    input.status && validStatusIds.has(input.status)
-      ? input.status
-      : defaultStatusId(columns);
+  let status: string;
+  if (input.status === undefined || input.status === "") {
+    status = defaultStatusId(columns);
+  } else if (validStatusIds.has(input.status)) {
+    status = input.status;
+  } else {
+    return {
+      kind: "error",
+      status: 400,
+      error: `unknown status: ${input.status}`,
+    };
+  }
   const isDone = status === doneColumnId(columns);
   const item: TodoItem = {
     id: makeId(),

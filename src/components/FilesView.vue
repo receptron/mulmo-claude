@@ -330,7 +330,11 @@ const schedulerResult = computed(
 function isTodoItem(x: unknown): x is TodoItem {
   if (typeof x !== "object" || x === null) return false;
   const o = x as Record<string, unknown>;
-  return typeof o["id"] === "string" && typeof o["text"] === "string";
+  if (typeof o["id"] !== "string" || typeof o["text"] !== "string")
+    return false;
+  if (typeof o["completed"] !== "boolean") return false;
+  if (typeof o["createdAt"] !== "number") return false;
+  return true;
 }
 
 function isTodoItemArray(x: unknown): x is TodoItem[] {

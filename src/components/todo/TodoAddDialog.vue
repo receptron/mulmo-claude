@@ -5,9 +5,17 @@
   >
     <div
       class="bg-white rounded-lg shadow-xl w-96 max-w-[90vw] p-5 space-y-3"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="todo-add-dialog-title"
       @click.stop
     >
-      <h3 class="text-base font-semibold text-gray-800">Add Todo</h3>
+      <h3
+        id="todo-add-dialog-title"
+        class="text-base font-semibold text-gray-800"
+      >
+        Add Todo
+      </h3>
       <label class="block text-xs text-gray-600">
         Text
         <input
@@ -88,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import type { StatusColumn } from "../../plugins/todo/index";
 import { PRIORITIES, PRIORITY_LABELS } from "../../plugins/todo/priority";
 import type { CreateItemInput } from "../../plugins/todo/composables/useTodos";
@@ -112,8 +120,21 @@ const labelsText = ref("");
 
 const textInput = ref<HTMLInputElement | null>(null);
 
+// Escape closes the dialog. Bound at the document level rather than
+// on the modal div so it works no matter where focus is — Vue's
+// `@keydown.esc` only fires when the modal owns focus, which it
+// loses as soon as the user tabs into one of the form inputs.
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") emit("cancel");
+}
+
 onMounted(() => {
   textInput.value?.focus();
+  document.addEventListener("keydown", onKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
 });
 
 function submit(): void {

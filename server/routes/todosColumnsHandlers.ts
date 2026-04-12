@@ -149,6 +149,52 @@ export function defaultStatusId(columns: StatusColumn[]): string {
   return open ? open.id : doneColumnId(columns);
 }
 
+// Reconcile each item's `completed` boolean with the new done-column
+// id. Items in the new done column are completed=true, items
+// elsewhere are completed=false. Returns [updatedItems, changed]
+// where `changed` says whether any item was actually rewritten —
+// callers use that to decide whether to persist items along with
+// the column change.
+//
+// This is the *only* place that mass-mutates `completed` based on
+// status. The migration on read deliberately does NOT do this any
+// more (so the legacy MCP `check` action's plain boolean flips keep
+// working). Column operations are explicit user intent so it's safe
+// to sync at that point.
+export function resyncDoneMembership(
+  items: TodoItem[],
+  newDoneId: string,
+): { items: TodoItem[]; changed: boolean } {
+  let changed = false;
+  const next = items.map((it): TodoItem => {
+    const shouldBeDone = it.status === newDoneId;
+    if (it.completed === shouldBeDone) return it;
+    changed = true;
+    return { ...it, completed: shouldBeDone };
+  });
+  return { items: next, changed };
+}
+
+// Re-stripe order values for every item in `columnId`. Items already
+// sorted by their existing `order` get reassigned to 1000, 2000, ...
+// so two columns being merged together (handleDeleteColumn's refuge
+// case) end up with unique, contiguous orders rather than colliding
+// 1000s from each side.
+function rebuildColumnOrder(items: TodoItem[], columnId: string): TodoItem[] {
+  const inColumn = items
+    .filter((it) => it.status === columnId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const newOrders = new Map<string, number>();
+  inColumn.forEach((it, i) => newOrders.set(it.id, (i + 1) * ORDER_STEP));
+  return items.map((it): TodoItem => {
+    const o = newOrders.get(it.id);
+    if (o === undefined) return it;
+    return { ...it, order: o };
+  });
+}
+
+const ORDER_STEP = 1000;
+
 // ── Action handlers ───────────────────────────────────────────────
 
 export interface AddColumnInput {
@@ -158,6 +204,7 @@ export interface AddColumnInput {
 
 export function handleAddColumn(
   columns: StatusColumn[],
+  items: TodoItem[],
   input: AddColumnInput,
 ): ColumnsActionResult {
   if (!input.label || input.label.trim().length === 0) {
@@ -167,12 +214,20 @@ export function handleAddColumn(
   const id = uniqueId(baseId, new Set(columns.map((c) => c.id)));
   const col: StatusColumn = { id, label: input.label.trim() };
   if (input.isDone === true) col.isDone = true;
-  // If the new column is flagged done, demote any existing done columns
-  // (only one is allowed at a time).
-  const next = input.isDone
-    ? [...columns.map((c) => ({ ...c, isDone: false })), col]
-    : [...columns, col];
-  return { kind: "success", columns: next };
+  // If the new column is flagged done, demote any existing done
+  // columns (only one is allowed at a time) and resync items so the
+  // old done column's items are no longer marked completed. The new
+  // column itself is empty so there's nothing on its side to sync.
+  if (input.isDone === true) {
+    const nextColumns = [...columns.map((c) => ({ ...c, isDone: false })), col];
+    const { items: nextItems, changed } = resyncDoneMembership(items, id);
+    return {
+      kind: "success",
+      columns: nextColumns,
+      ...(changed ? { items: nextItems } : {}),
+    };
+  }
+  return { kind: "success", columns: [...columns, col] };
 }
 
 export interface PatchColumnInput {
@@ -204,11 +259,13 @@ export function handlePatchColumn(
     nextColumns = nextColumns.map((c) =>
       c.id === id ? { ...c, isDone: true } : { id: c.id, label: c.label },
     );
-    // Sync `completed` for items in the new done column.
-    nextItems = items.map((it) =>
-      it.status === id ? { ...it, completed: true } : it,
-    );
-    itemsChanged = true;
+    // Resync `completed` across all items: the new done column's
+    // items become true, the old done column's items become false.
+    // Doing this with the helper rather than a one-sided pass means
+    // both ends of the swap stay consistent.
+    const synced = resyncDoneMembership(items, id);
+    nextItems = synced.items;
+    itemsChanged = synced.changed;
   } else if (input.isDone === false && target.isDone) {
     // Refuse to demote the only done column — there must always be one.
     return {
@@ -253,13 +310,31 @@ export function handleDeleteColumn(
   // deleted column was done; otherwise to the new default open column.
   const refugeId = target.isDone ? newDoneId : defaultStatusId(nextColumns);
   let itemsChanged = false;
-  const nextItems = items.map((it) => {
+  let nextItems = items.map((it): TodoItem => {
     if (it.status !== id) return it;
     itemsChanged = true;
-    const updated: TodoItem = { ...it, status: refugeId };
-    if (refugeId === newDoneId) updated.completed = true;
-    return updated;
+    return { ...it, status: refugeId };
   });
+  if (itemsChanged) {
+    // The refuge column might have already had items in it; the ones
+    // we just merged in came with their original order values from
+    // the deleted column, which can collide with the refuge's
+    // existing orders. Re-stripe the whole refuge column to 1000,
+    // 2000, ... so the kanban sort stays unique and stable.
+    nextItems = rebuildColumnOrder(nextItems, refugeId);
+  }
+  // Resync the done flag across the result. Necessary in two
+  // scenarios: (a) we deleted the done column, so the new last column
+  // is now done and its existing items should flip to completed=true;
+  // (b) we deleted any other column whose items happened to be the
+  // refuge target — already handled by the migration above, but
+  // running the helper unconditionally keeps the rest of the items
+  // consistent too.
+  if (target.isDone) {
+    const synced = resyncDoneMembership(nextItems, newDoneId);
+    nextItems = synced.items;
+    itemsChanged = itemsChanged || synced.changed;
+  }
   return {
     kind: "success",
     columns: nextColumns,

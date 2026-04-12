@@ -159,8 +159,19 @@
       class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center"
       @click="addColumnOpen = false"
     >
-      <div class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3" @click.stop>
-        <h3 class="text-base font-semibold text-gray-800">Add Column</h3>
+      <div
+        class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="todo-add-column-title"
+        @click.stop
+      >
+        <h3
+          id="todo-add-column-title"
+          class="text-base font-semibold text-gray-800"
+        >
+          Add Column
+        </h3>
         <label class="block text-xs text-gray-600">
           Label
           <input
@@ -191,7 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "../plugins/todo/index";
 import {
@@ -343,6 +354,18 @@ async function commitNewColumn(): Promise<void> {
     newColumnLabel.value = "";
   }
 }
+
+// Escape closes the inline add-column dialog. The Add and Edit
+// dialogs handle their own Escape via document listeners; this one
+// is owned by the explorer template directly so it lives here.
+function onExplorerKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Escape") return;
+  if (addColumnOpen.value) {
+    addColumnOpen.value = false;
+  }
+}
+onMounted(() => document.addEventListener("keydown", onExplorerKeydown));
+onUnmounted(() => document.removeEventListener("keydown", onExplorerKeydown));
 
 // ── Item handlers ──────────────────────────────────────────────
 

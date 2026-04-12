@@ -49,7 +49,15 @@ export const PRIORITIES: readonly TodoPriority[] = [
 ];
 
 export function isPriority(v: unknown): v is TodoPriority {
-  return typeof v === "string" && (v as TodoPriority) in PRIORITY_ORDER;
+  // Use hasOwnProperty rather than the `in` operator: `in` walks the
+  // prototype chain, so `"toString" in PRIORITY_ORDER` would return
+  // true and incorrectly narrow `"toString"` to TodoPriority. We use
+  // the .call form (rather than Object.hasOwn) because the project's
+  // client tsconfig targets ES2021, and Object.hasOwn is ES2022.
+  return (
+    typeof v === "string" &&
+    Object.prototype.hasOwnProperty.call(PRIORITY_ORDER, v)
+  );
 }
 
 // ── due date helpers ─────────────────────────────────────────────

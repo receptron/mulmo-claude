@@ -118,7 +118,7 @@ export function useTodos(
   const columns = ref<StatusColumn[]>(initialColumns);
   const error = ref<string | null>(null);
 
-  const { refresh } = useFreshPluginData<{
+  const { refresh: rawRefresh } = useFreshPluginData<{
     items: TodoItem[];
     columns: StatusColumn[];
   }>({
@@ -134,6 +134,17 @@ export function useTodos(
       if (nextColumns.length > 0) columns.value = nextColumns;
     },
   });
+
+  // useFreshPluginData swallows fetch errors silently — its refresh
+  // returns false on failure but never updates anything callers can
+  // observe. Wrap it so the initial GET / manual reloads surface
+  // through the same `error` ref the rest of the composable uses.
+  async function refresh(): Promise<boolean> {
+    error.value = null;
+    const ok = await rawRefresh();
+    if (!ok) error.value = "Failed to load todos";
+    return ok;
+  }
 
   // Use Parameters<typeof fetch> rather than the global RequestInit
   // type so this file doesn't depend on the DOM lib being in the
