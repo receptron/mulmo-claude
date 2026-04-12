@@ -14,7 +14,7 @@
         <button
           class="text-gray-400 hover:text-red-500 text-xs px-2 py-0.5"
           title="Delete this item"
-          @click="confirmDelete"
+          @click="emit('delete', item.id)"
         >
           Delete
         </button>
@@ -34,7 +34,7 @@ import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 import TodoEditPanel from "./TodoEditPanel.vue";
 
-const props = defineProps<{
+defineProps<{
   item: TodoItem;
   columns: StatusColumn[];
 }>();
@@ -44,12 +44,7 @@ const emit = defineEmits<{
   cancel: [];
   delete: [id: string];
 }>();
-
-function confirmDelete(): void {
-  // Same UX as the column delete: native confirm because deletion is
-  // reversible (the next save would re-create) but worth a beat.
-  const ok = window.confirm(`Delete "${props.item.text}"?`);
-  if (!ok) return;
-  emit("delete", props.item.id);
-}
+// The parent (TodoExplorer) gates deletion behind a single confirm
+// helper, so this dialog just emits the delete intent and lets the
+// caller decide whether to actually remove the item.
 </script>

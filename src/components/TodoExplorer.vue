@@ -112,6 +112,7 @@
           @rename-column="onRenameColumn"
           @delete-column="onDeleteColumn"
           @mark-done="onMarkDone"
+          @reorder-columns="onReorderColumns"
         />
         <TodoTableView
           v-else-if="viewMode === 'table'"
@@ -241,6 +242,7 @@ const {
   addColumn,
   patchColumn,
   deleteColumn,
+  reorderColumns,
 } = useTodos(
   props.selectedResult.data?.items ?? [],
   props.selectedResult.data?.columns ?? [],
@@ -348,8 +350,21 @@ function onPatchItem(id: string, input: PatchItemInput): void {
   void patchItem(id, input);
 }
 
-function onDeleteItem(id: string): void {
+// Single confirm gate for every item deletion path: row "✕" buttons
+// in list/table, the kanban edit dialog's delete button, anything
+// else that wants to remove an item. Centralised so we never
+// accidentally bypass the confirm in a future caller.
+function confirmAndDelete(id: string): boolean {
+  const item = items.value.find((i) => i.id === id);
+  if (!item) return false;
+  const ok = window.confirm(`Delete "${item.text}"?`);
+  if (!ok) return false;
   void deleteItem(id);
+  return true;
+}
+
+function onDeleteItem(id: string): void {
+  confirmAndDelete(id);
 }
 
 function onToggleComplete(item: TodoItem): void {
@@ -378,8 +393,10 @@ async function onEditDialogSave(input: PatchItemInput): Promise<void> {
 }
 
 function onEditDialogDelete(id: string): void {
-  void deleteItem(id);
-  editingItem.value = null;
+  // Funnel through the same confirm gate as the inline ✕ buttons.
+  // The dialog only closes if the user confirmed; if they cancelled
+  // the confirm, the dialog stays open so they can keep editing.
+  if (confirmAndDelete(id)) editingItem.value = null;
 }
 
 // ── Column handlers ────────────────────────────────────────────
@@ -404,5 +421,9 @@ function onDeleteColumn(id: string): void {
 
 function onMarkDone(id: string): void {
   void patchColumn(id, { isDone: true });
+}
+
+function onReorderColumns(ids: string[]): void {
+  void reorderColumns(ids);
 }
 </script>
