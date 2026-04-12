@@ -516,6 +516,12 @@ import {
 } from "./utils/role/icon";
 import { formatDate } from "./utils/format/date";
 import { findScrollableChild } from "./utils/dom/scrollable";
+import { buildAgentRequestBody } from "./utils/agent/request";
+import { parseSSEChunk } from "./utils/agent/sse";
+import {
+  findPendingToolCall,
+  shouldSelectAssistantText,
+} from "./utils/agent/toolCalls";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
@@ -1097,15 +1103,13 @@ async function loadSession(id: string) {
   showHistory.value = false;
 }
 
-async function sendMessage(text?: string) {
-  const message = typeof text === "string" ? text : userInput.value.trim();
-  if (!message || isRunning.value) return;
-  userInput.value = "";
-
-  // Capture the session this message belongs to
-  const session = sessionMap.get(currentSessionId.value);
-  if (!session) return;
-
+// Seed the session state for a fresh user turn. Not pure (mutates
+// session), but isolated so sendMessage doesn't have the init
+// pattern inline. Returns `runStartIndex` — the index into
+// toolResults at which this run's outputs start, used later to
+// decide whether a trailing text response becomes the selected
+// canvas result.
+function beginUserTurn(session: ActiveSession, message: string): number {
   session.isRunning = true;
   session.statusMessage = "Thinking...";
   // Bump updatedAt so the session floats to the top of the
@@ -1114,142 +1118,207 @@ async function sendMessage(text?: string) {
   // on the next fetchSessions() after the run ends.
   session.updatedAt = new Date().toISOString();
   session.toolResults.push(makeTextResult(message, "user"));
-  const runStartIndex = session.toolResults.length;
-
   // Fresh AbortController for this run
   session.abortController = markRaw(new AbortController());
+  return session.toolResults.length;
+}
 
+// HTTP-level error check. Posts a user-visible error and returns
+// false so the caller can early-return. Separate function so the
+// branch count in sendMessage stays low.
+async function checkAgentResponseOk(
+  session: ActiveSession,
+  response: Response,
+): Promise<boolean> {
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
+    console.error(
+      "[agent] HTTP error:",
+      response.status,
+      response.statusText,
+      errBody,
+    );
+    pushErrorMessage(
+      session,
+      `Server error ${response.status}: ${errBody.slice(0, 200)}`,
+    );
+    return false;
+  }
+  if (!response.body) {
+    pushErrorMessage(session, "No response body received from server.");
+    return false;
+  }
+  return true;
+}
+
+// Dispatch a single SSE event from the agent stream against an
+// active session. Hoisted out of sendMessage so its 8-way switch
+// counts toward its own cognitive-complexity budget rather than
+// ballooning sendMessage's score. Reactive refs / callbacks that
+// live in the setup scope are passed via `ctx` — this keeps the
+// handler a regular named function with a clear signature.
+interface AgentEventContext {
+  session: ActiveSession;
+  runStartIndex: number;
+  setCurrentRoleId: (roleId: string) => void;
+  onRoleChange: () => void;
+  refreshRoles: () => Promise<void>;
+  scrollSidebarToBottom: () => void;
+}
+
+async function applyAgentEvent(
+  event: SseEvent,
+  ctx: AgentEventContext,
+): Promise<void> {
+  const { session, runStartIndex } = ctx;
+  switch (event.type) {
+    case "tool_call":
+      session.toolCallHistory.push({
+        toolUseId: event.toolUseId,
+        toolName: event.toolName,
+        args: event.args,
+        timestamp: Date.now(),
+      });
+      ctx.scrollSidebarToBottom();
+      return;
+    case "tool_call_result": {
+      const entry = findPendingToolCall(
+        session.toolCallHistory,
+        event.toolUseId,
+      );
+      if (entry) entry.result = event.content;
+      ctx.scrollSidebarToBottom();
+      return;
+    }
+    case "status":
+      session.statusMessage = event.message;
+      return;
+    case "switch_role":
+      setTimeout(() => {
+        ctx.setCurrentRoleId(event.roleId);
+        ctx.onRoleChange();
+      }, 0);
+      return;
+    case "roles_updated":
+      await ctx.refreshRoles();
+      return;
+    case "text": {
+      const textResult = makeTextResult(event.message, "assistant");
+      session.toolResults.push(textResult);
+      if (shouldSelectAssistantText(session.toolResults, runStartIndex)) {
+        session.selectedResultUuid = textResult.uuid;
+      }
+      return;
+    }
+    case "tool_result": {
+      const { result } = event;
+      const existing = session.toolResults.findIndex(
+        (r) => r.uuid === result.uuid,
+      );
+      if (existing >= 0) {
+        session.toolResults[existing] = result;
+      } else {
+        session.toolResults.push(result);
+        session.selectedResultUuid = result.uuid;
+      }
+      return;
+    }
+    case "error":
+      console.error("[agent] error event:", event.message);
+      pushErrorMessage(session, event.message);
+      return;
+  }
+}
+
+// Read the SSE stream from `/api/agent` to completion, dispatching
+// every event into the given context. Extracted so sendMessage's
+// own cognitive complexity stays under the threshold — the
+// while-loop + nested for-loop + chunk decoding contributes ~5 to
+// the parent's score when inlined.
+async function streamAgentEvents(
+  body: ReadableStream<Uint8Array>,
+  ctx: AgentEventContext,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let sseBuffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    const parsed = parseSSEChunk(sseBuffer, chunk);
+    sseBuffer = parsed.remaining;
+    for (const event of parsed.events) {
+      await applyAgentEvent(event, ctx);
+    }
+  }
+}
+
+// Translate an error caught from the agent fetch + stream loop
+// into the user-visible sidebar. Aborts are intentional (the user
+// switched sessions or hit stop) and get swallowed silently;
+// everything else surfaces as a pushErrorMessage entry. Extracted
+// so sendMessage's catch block is a single call.
+function reportAgentError(session: ActiveSession, e: unknown): void {
+  if (e instanceof DOMException && e.name === "AbortError") return;
+  console.error("[agent] fetch error:", e);
+  pushErrorMessage(
+    session,
+    e instanceof Error ? e.message : "Connection error.",
+  );
+}
+
+async function sendMessage(text?: string) {
+  const message = typeof text === "string" ? text : userInput.value.trim();
+  if (!message || isRunning.value) return;
+  userInput.value = "";
+
+  const session = sessionMap.get(currentSessionId.value);
+  if (!session) return;
+
+  const runStartIndex = beginUserTurn(session, message);
   const sessionRole =
     roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
   const selectedRes =
     session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
     undefined;
 
+  // Context for the SSE event dispatcher. Callbacks wrap reactive
+  // refs + Vue setup-scope functions so `applyAgentEvent` stays a
+  // regular named function with its own cognitive-complexity
+  // budget (the 8-way switch would otherwise pile onto sendMessage).
+  const eventCtx: AgentEventContext = {
+    session,
+    runStartIndex,
+    setCurrentRoleId: (roleId) => {
+      currentRoleId.value = roleId;
+    },
+    onRoleChange,
+    refreshRoles,
+    scrollSidebarToBottom: () => rightSidebarRef.value?.scrollToBottom(),
+  };
+
   try {
     const response = await fetch("/api/agent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message,
-        roleId: session.roleId,
-        chatSessionId: session.id,
-        selectedImageData: extractImageData(selectedRes),
-        systemPrompt: SYSTEM_PROMPT,
-        pluginPrompts: Object.fromEntries(
-          sessionRole.availablePlugins
-            .map((name) => [name, getPlugin(name)?.systemPrompt])
-            .filter(
-              (entry): entry is [string, string] =>
-                typeof entry[1] === "string",
-            ),
-        ),
-      }),
+      body: JSON.stringify(
+        buildAgentRequestBody({
+          message,
+          role: sessionRole,
+          chatSessionId: session.id,
+          systemPrompt: SYSTEM_PROMPT,
+          selectedImageData: extractImageData(selectedRes),
+          getPluginSystemPrompt: (name) => getPlugin(name)?.systemPrompt,
+        }),
+      ),
       signal: session.abortController.signal,
     });
 
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      console.error(
-        "[agent] HTTP error:",
-        response.status,
-        response.statusText,
-        errBody,
-      );
-      pushErrorMessage(
-        session,
-        `Server error ${response.status}: ${errBody.slice(0, 200)}`,
-      );
-      return;
-    }
-    if (!response.body) {
-      pushErrorMessage(session, "No response body received from server.");
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let sseBuffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      sseBuffer += decoder.decode(value, { stream: true });
-      const lines = sseBuffer.split("\n");
-      sseBuffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        let data: SseEvent;
-        try {
-          data = JSON.parse(line.slice(6));
-        } catch {
-          continue;
-        }
-
-        if (data.type === "tool_call") {
-          session.toolCallHistory.push({
-            toolUseId: data.toolUseId,
-            toolName: data.toolName,
-            args: data.args,
-            timestamp: Date.now(),
-          });
-          rightSidebarRef.value?.scrollToBottom();
-        } else if (data.type === "tool_call_result") {
-          const entry = session.toolCallHistory
-            .slice()
-            .reverse()
-            .find(
-              (c) =>
-                c.toolUseId === data.toolUseId &&
-                c.result === undefined &&
-                c.error === undefined,
-            );
-          if (entry) entry.result = data.content;
-          rightSidebarRef.value?.scrollToBottom();
-        } else if (data.type === "status") {
-          session.statusMessage = data.message;
-        } else if (data.type === "switch_role") {
-          setTimeout(() => {
-            currentRoleId.value = data.roleId;
-            onRoleChange();
-          }, 0);
-        } else if (data.type === "roles_updated") {
-          await refreshRoles();
-        } else if (data.type === "text") {
-          const textResult = makeTextResult(data.message, "assistant");
-          session.toolResults.push(textResult);
-          const hasPluginResult = session.toolResults
-            .slice(runStartIndex)
-            .some((r) => r.toolName !== "text-response");
-          if (!hasPluginResult) {
-            session.selectedResultUuid = textResult.uuid;
-          }
-        } else if (data.type === "tool_result") {
-          const { result } = data;
-          const existing = session.toolResults.findIndex(
-            (r) => r.uuid === result.uuid,
-          );
-          if (existing >= 0) {
-            session.toolResults[existing] = result;
-          } else {
-            session.toolResults.push(result);
-            session.selectedResultUuid = result.uuid;
-          }
-        } else if (data.type === "error") {
-          console.error("[agent] error event:", data.message);
-          pushErrorMessage(session, data.message);
-        }
-      }
-    }
+    if (!(await checkAgentResponseOk(session, response))) return;
+    await streamAgentEvents(response.body!, eventCtx);
   } catch (e) {
-    if (!(e instanceof DOMException && e.name === "AbortError")) {
-      console.error("[agent] fetch error:", e);
-      pushErrorMessage(
-        session,
-        e instanceof Error ? e.message : "Connection error.",
-      );
-    }
+    reportAgentError(session, e);
   } finally {
     session.isRunning = false;
     session.statusMessage = "";
