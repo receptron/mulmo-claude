@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full flex flex-col bg-white">
-    <div class="flex-shrink-0 p-4 border-b bg-gray-50">
+    <div class="flex-shrink-0 px-4 py-2 border-b border-gray-100 bg-gray-50">
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
@@ -42,21 +42,21 @@
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
             title="Undo"
           >
-            ↩
+            <span class="material-icons text-sm">undo</span>
           </button>
           <button
             @click="redo"
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
             title="Redo"
           >
-            ↪
+            <span class="material-icons text-sm">redo</span>
           </button>
           <button
             @click="clear"
             class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50"
             title="Clear"
           >
-            🗑
+            <span class="material-icons text-sm">delete</span>
           </button>
         </div>
       </div>
@@ -89,6 +89,17 @@
         @mouseup="handleDrawingEnd"
         @touchend="handleDrawingEnd"
       />
+      <div class="flex items-center gap-2 flex-wrap mt-3">
+        <span class="text-xs text-gray-500 mr-1">Style:</span>
+        <button
+          v-for="style in artStyles"
+          :key="style.id"
+          @click="applyStyle(style)"
+          class="px-3 py-1.5 text-xs rounded-full border border-gray-300 bg-white hover:bg-blue-50 hover:border-blue-400 transition-colors"
+        >
+          {{ style.label }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -101,11 +112,36 @@ import type { ImageToolData, CanvasDrawingState } from "./definition";
 
 const props = defineProps<{
   selectedResult: ToolResult<ImageToolData> | null;
+  sendTextMessage?: (text: string) => void;
 }>();
 
 const emit = defineEmits<{
   updateResult: [result: ToolResult<ImageToolData>];
 }>();
+
+const artStyles = [
+  { id: "ghibli", label: "Ghibli" },
+  { id: "ukiyoe", label: "Ukiyoe" },
+  { id: "sumie", label: "Sumi-e" },
+  { id: "picasso", label: "Picasso" },
+  { id: "gogh", label: "Van Gogh" },
+  { id: "photo", label: "Photo-realistic" },
+  { id: "watercolor", label: "Watercolor" },
+  { id: "popart", label: "Pop Art" },
+  { id: "american", label: "American Comic" },
+  { id: "cyberpunk", label: "Cyberpunk" },
+  { id: "pencilsketch", label: "Pencil Sketch" },
+  { id: "pixelart", label: "Pixel Art" },
+];
+
+const applyStyle = async (style: { id: string; label: string }) => {
+  await saveDrawingState();
+  if (props.sendTextMessage) {
+    props.sendTextMessage(
+      `Turn my drawing on the canvas into a ${style.label} style image.`,
+    );
+  }
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const canvasRef = ref<any>(null);
@@ -233,7 +269,8 @@ const updateCanvasSize = () => {
   if (canvasContainer) {
     const containerRect = canvasContainer.getBoundingClientRect();
 
-    const newWidth = Math.floor(containerRect.width);
+    const padding = 32; // p-4 = 16px each side
+    const newWidth = Math.floor(containerRect.width - padding);
     const newHeight = Math.floor((newWidth * 9) / 16);
 
     // Only update if the size actually changed to avoid unnecessary re-renders
