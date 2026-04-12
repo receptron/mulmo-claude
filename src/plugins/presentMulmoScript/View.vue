@@ -536,6 +536,13 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { MulmoScriptData } from "./index";
 import { mulmoBeatSchema } from "@mulmocast/types";
+import {
+  extractErrorMessage,
+  getMissingCharacterKeys,
+  parseSSEEventLine,
+  shouldAutoRenderBeat,
+  validateBeatJSON,
+} from "./helpers";
 
 interface Beat {
   speaker?: string;
@@ -677,12 +684,7 @@ function toggleSource(index: number) {
 }
 
 function isValidBeat(index: number): boolean {
-  try {
-    const parsed = JSON.parse(sourceText[index] ?? "");
-    return mulmoBeatSchema.safeParse(parsed).success;
-  } catch {
-    return false;
-  }
+  return validateBeatJSON(sourceText[index] ?? "", mulmoBeatSchema);
 }
 
 async function updateBeat(index: number) {
@@ -717,7 +719,7 @@ async function renderBeat(index: number) {
     renderState[index] = "done";
     refreshMissingCharacterImages();
   } catch (err) {
-    renderErrors[index] = err instanceof Error ? err.message : String(err);
+    renderErrors[index] = extractErrorMessage(err);
     renderState[index] = "error";
   }
 }
@@ -740,7 +742,7 @@ async function regenerateBeat(index: number) {
     renderedImages[index] = json.image;
     renderState[index] = "done";
   } catch (err) {
-    renderErrors[index] = err instanceof Error ? err.message : String(err);
+    renderErrors[index] = extractErrorMessage(err);
     renderState[index] = "error";
   }
 }
@@ -794,7 +796,7 @@ async function generateAudio(index: number) {
     beatAudios[index] = json.audio;
     audioState[index] = "done";
   } catch (err) {
-    audioErrors[index] = err instanceof Error ? err.message : String(err);
+    audioErrors[index] = extractErrorMessage(err);
     audioState[index] = "error";
   }
 }
@@ -942,9 +944,11 @@ async function loadExistingCharacterImage(key: string) {
 }
 
 function refreshMissingCharacterImages() {
-  characterKeys.value
-    .filter((k) => !charImages[k] && charRenderState[k] !== "rendering")
-    .forEach((k) => loadExistingCharacterImage(k));
+  getMissingCharacterKeys(
+    characterKeys.value,
+    charImages,
+    charRenderState,
+  ).forEach((k) => loadExistingCharacterImage(k));
 }
 
 async function renderCharacter(key: string, force: boolean) {
@@ -961,7 +965,7 @@ async function renderCharacter(key: string, force: boolean) {
     charImages[key] = json.image;
     charRenderState[key] = "done";
   } catch (err) {
-    charErrors[key] = err instanceof Error ? err.message : String(err);
+    charErrors[key] = extractErrorMessage(err);
     charRenderState[key] = "error";
   }
 }
@@ -1000,14 +1004,10 @@ async function initializeScript() {
     "chart",
     "mermaid",
     "html_tailwind",
-  ];
+  ] as const;
   const hasCharacters = characterKeys.value.length > 0;
   beats.value.forEach((beat, index) => {
-    if (
-      !hasCharacters &&
-      beat.image?.type &&
-      AUTO_RENDER_TYPES.includes(beat.image.type)
-    ) {
+    if (shouldAutoRenderBeat(beat, hasCharacters, AUTO_RENDER_TYPES)) {
       renderBeat(index);
     } else if (beat.imagePrompt) {
       loadExistingBeatImage(index);
@@ -1053,8 +1053,8 @@ async function generateMovie() {
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
       for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const event = JSON.parse(line.slice(6));
+        const event = parseSSEEventLine(line);
+        if (!event) continue;
         if (event.type === "beat_image_done") {
           loadExistingBeatImage(event.beatIndex);
           refreshMissingCharacterImages();
@@ -1068,7 +1068,7 @@ async function generateMovie() {
       }
     }
   } catch (err) {
-    alert(err instanceof Error ? err.message : String(err));
+    alert(extractErrorMessage(err));
   } finally {
     movieGenerating.value = false;
   }

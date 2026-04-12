@@ -13,6 +13,9 @@ export * from "./formatter";
 export * from "./evaluator";
 export * from "./calculator";
 export * from "./formulaRefs";
+export * from "./cellBuilder";
+export * from "./responseDecoder";
+export * from "./jsonCellLocator";
 
 // Export function registry
 export * from "./registry";

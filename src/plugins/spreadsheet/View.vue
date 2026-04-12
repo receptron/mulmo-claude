@@ -135,9 +135,13 @@ import {
   SpreadsheetEngine,
   indexToColumn,
   extractCellReferences,
+  buildCellFromInput,
+  decodeSpreadsheetResponse,
+  findCellJsonPosition,
   type SpreadsheetCell,
   type CellValue,
 } from "./engine";
+import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
 
 // Import all spreadsheet functions to populate the function registry
 import "./engine/functions";
@@ -214,59 +218,47 @@ function isFilePath(value: unknown): value is string {
 
 async function fetchSheets(): Promise<void> {
   const raw = props.selectedResult.data?.sheets;
+  // Clear any stale error from a previous result BEFORE the early
+  // returns, otherwise switching from a failed file-backed load to
+  // a new inline-data result leaves the error panel on screen.
+  errorMessage.value = "";
   if (!raw) {
     resolvedSheets.value = [];
     return;
   }
-  if (isFilePath(raw)) {
-    loading.value = true;
-    errorMessage.value = "";
-    try {
-      const res = await fetch(
-        `/api/files/content?path=${encodeURIComponent(raw)}`,
-      );
-      if (!res.ok) {
-        errorMessage.value = `Failed to load spreadsheet: ${res.statusText}`;
-        resolvedSheets.value = [];
-        return;
-      }
-      const json: { kind?: string; content?: string; message?: string } =
-        await res.json();
-      // The /files/content endpoint returns { kind: "text" | "too-large"
-      // | "binary" | ... }. Only "text" carries a content field; other
-      // kinds indicate the file can't be rendered as a spreadsheet.
-      if (json.kind && json.kind !== "text") {
-        errorMessage.value =
-          json.message ?? `Cannot load spreadsheet: ${json.kind}`;
-        resolvedSheets.value = [];
-        return;
-      }
-      if (typeof json.content !== "string") {
-        errorMessage.value = "Spreadsheet file has no content";
-        resolvedSheets.value = [];
-        return;
-      }
-      try {
-        const parsed: unknown = JSON.parse(json.content);
-        if (!Array.isArray(parsed)) {
-          errorMessage.value = "Spreadsheet content is not an array of sheets";
-          resolvedSheets.value = [];
-        } else {
-          resolvedSheets.value = parsed as SpreadsheetSheet[];
-        }
-      } catch (parseErr) {
-        errorMessage.value = `Spreadsheet JSON is malformed: ${parseErr instanceof Error ? parseErr.message : "parse error"}`;
-        resolvedSheets.value = [];
-      }
-    } catch (err) {
-      errorMessage.value = `Failed to load spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
-      resolvedSheets.value = [];
-    } finally {
-      loading.value = false;
-    }
-  } else {
+  if (!isFilePath(raw)) {
     // Legacy inline data
     resolvedSheets.value = raw as SpreadsheetSheet[];
+    return;
+  }
+  loading.value = true;
+  try {
+    const res = await fetch(
+      `/api/files/content?path=${encodeURIComponent(raw)}`,
+    );
+    if (!res.ok) {
+      errorMessage.value = `Failed to load spreadsheet: ${res.statusText}`;
+      resolvedSheets.value = [];
+      return;
+    }
+    // The /files/content endpoint returns { kind, content?, message? }.
+    // Delegate the shape/validation decision to decodeSpreadsheetResponse
+    // so the async wrapper stays simple.
+    const body: unknown = await res.json();
+    const result = decodeSpreadsheetResponse(
+      (body as { kind?: string; content?: string; message?: string }) ?? {},
+    );
+    if (result.kind === "error") {
+      errorMessage.value = result.message;
+      resolvedSheets.value = [];
+    } else {
+      resolvedSheets.value = result.sheets as SpreadsheetSheet[];
+    }
+  } catch (err) {
+    errorMessage.value = `Failed to load spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
+    resolvedSheets.value = [];
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -531,40 +523,14 @@ function saveMiniEditor() {
       normalizedData[row] = [];
     }
 
-    // Build the new cell value based on type (new format: {v, f})
-
-    let newCellValue: SpreadsheetCell;
-    if (miniEditorType.value === "string") {
-      // String type - create simple cell with string value
-      newCellValue = {
-        v: String(miniEditorValue.value),
-      };
-    } else {
-      // object type (Formula or Number)
-      const input = miniEditorFormula.value?.trim() || "";
-
-      // Detect if it's a formula by checking for:
-      // 1. Function names or expressions starting with operators (-, +, etc.)
-      // 2. Cell references with operators (A1+B1, etc.)
-      // 3. Arithmetic expressions with operators (6/100, 5*2, etc.)
-      const isFormula =
-        /^[-+]?\s*[A-Z]+\s*\(/i.test(input) || // Any function call, optionally preceded by +/- operator
-        /[A-Z]+\d+\s*[+\-*/^]/.test(input) ||
-        /\d+\s*[+\-*/^]\s*\d+/.test(input);
-
-      newCellValue = { v: "" };
-      if (isFormula) {
-        // Store formula with "=" prefix
-        newCellValue.v = "=" + input;
-      } else if (input !== "") {
-        const numValue = parseFloat(input);
-        newCellValue.v = isNaN(numValue) ? input : numValue;
-      }
-      // Add format if provided
-      if (miniEditorFormat.value) {
-        newCellValue.f = miniEditorFormat.value;
-      }
-    }
+    // Build the new cell value (delegates formula/number detection
+    // and format attachment to the pure helper).
+    const newCellValue: SpreadsheetCell = buildCellFromInput({
+      type: miniEditorType.value,
+      value: miniEditorValue.value,
+      formula: miniEditorFormula.value,
+      format: miniEditorFormat.value,
+    });
 
     // Update the cell in normalized data
     normalizedData[row][col] = newCellValue;
@@ -616,125 +582,43 @@ function handleTableClick(event: MouseEvent) {
     return;
   }
 
-  // If editor is open, try to find and select this cell in the editor
-  if (editorTextarea.value) {
-    try {
-      const sheets = JSON.parse(editableData.value);
-      const currentSheet = sheets[activeSheetIndex.value];
-
-      if (!currentSheet || !currentSheet.data) {
-        return;
-      }
-
-      // Normalize the data in case it's malformed
-      const normalizedData = normalizeSheetData(currentSheet.data);
-
-      if (
-        normalizedData[rowIndex] &&
-        normalizedData[rowIndex][colIndex] !== undefined
-      ) {
-        const cellValue = normalizedData[rowIndex][colIndex];
-        const cellStr = JSON.stringify(cellValue);
-
-        // Find the sheet's data section in the editor
-        const sheetStartMarker = `"name": "${currentSheet.name}"`;
-        const dataStartMarker = `"data": [`;
-
-        let searchPos = editableData.value.indexOf(sheetStartMarker);
-        if (searchPos >= 0) {
-          searchPos = editableData.value.indexOf(dataStartMarker, searchPos);
-          if (searchPos >= 0) {
-            // Now navigate through the formatted JSON to find the target row and cell
-            let currentRow = -1;
-            let pos = searchPos + dataStartMarker.length;
-
-            // Find the target row by counting opening brackets
-            while (pos < editableData.value.length && currentRow < rowIndex) {
-              const char = editableData.value[pos];
-              if (char === "[") {
-                currentRow++;
-                if (currentRow === rowIndex) {
-                  // Found our target row - now find the colIndex-th cell
-                  let currentCol = 0;
-                  let cellStart = -1;
-                  let inString = false;
-                  let inObject = 0;
-                  let bracketDepth = 0;
-
-                  for (let i = pos; i < editableData.value.length; i++) {
-                    const c = editableData.value[i];
-                    const prevChar = i > 0 ? editableData.value[i - 1] : "";
-
-                    // Track string boundaries
-                    if (c === '"' && prevChar !== "\\") {
-                      inString = !inString;
-                    }
-
-                    if (!inString) {
-                      // Track bracket depth to know when we exit this row
-                      if (c === "[") bracketDepth++;
-                      if (c === "]") {
-                        bracketDepth--;
-                        if (bracketDepth === 0) break; // End of row
-                      }
-
-                      // Track object depth
-                      if (c === "{") inObject++;
-                      if (c === "}") inObject--;
-
-                      // Count cells by top-level commas
-                      if (c === "," && inObject === 0 && bracketDepth === 1) {
-                        currentCol++;
-                      }
-                    }
-
-                    // Find the start of our target cell
-                    if (currentCol === colIndex && cellStart === -1) {
-                      // Skip whitespace and opening bracket/comma
-                      if (
-                        c !== " " &&
-                        c !== "\n" &&
-                        c !== "\t" &&
-                        c !== "[" &&
-                        c !== ","
-                      ) {
-                        cellStart = i;
-                        break;
-                      }
-                    }
-                  }
-
-                  if (cellStart >= 0) {
-                    editorTextarea.value.focus();
-                    editorTextarea.value.setSelectionRange(
-                      cellStart,
-                      cellStart + cellStr.length,
-                    );
-
-                    // Scroll the textarea to make the selection visible
-                    const textBeforeSelection = editableData.value.substring(
-                      0,
-                      cellStart,
-                    );
-                    const lineNumber = textBeforeSelection.split("\n").length;
-                    const lineHeight = 22;
-                    const textarea = editorTextarea.value;
-                    textarea.scrollTop = Math.max(
-                      0,
-                      lineNumber * lineHeight - textarea.clientHeight / 2,
-                    );
-                  }
-                  break;
-                }
-              }
-              pos++;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Failed to select cell in editor:", error);
+  // If editor is open, try to find and select this cell in the editor.
+  if (!editorTextarea.value) return;
+  try {
+    const sheets = JSON.parse(editableData.value);
+    const currentSheet = sheets[activeSheetIndex.value];
+    if (!currentSheet || !currentSheet.data) return;
+    const normalizedData = normalizeSheetData(currentSheet.data);
+    if (
+      !normalizedData[rowIndex] ||
+      normalizedData[rowIndex][colIndex] === undefined
+    ) {
+      return;
     }
+    const cellStr = JSON.stringify(normalizedData[rowIndex][colIndex]);
+    const cellStart = findCellJsonPosition(
+      editableData.value,
+      currentSheet.name,
+      rowIndex,
+      colIndex,
+    );
+    if (cellStart < 0) return;
+    editorTextarea.value.focus();
+    editorTextarea.value.setSelectionRange(
+      cellStart,
+      cellStart + cellStr.length,
+    );
+    // Scroll the textarea to make the selection visible.
+    const textBeforeSelection = editableData.value.substring(0, cellStart);
+    const lineNumber = textBeforeSelection.split("\n").length;
+    const lineHeight = 22;
+    const textarea = editorTextarea.value;
+    textarea.scrollTop = Math.max(
+      0,
+      lineNumber * lineHeight - textarea.clientHeight / 2,
+    );
+  } catch (error) {
+    console.error("Failed to select cell in editor:", error);
   }
 }
 
@@ -782,51 +666,20 @@ watch(
   },
 );
 
-// Highlight selected cell and referenced cells when mini editor is open
+// Highlight selected cell and referenced cells when mini editor is
+// open. The per-step DOM work lives in cellHighlights.ts so this
+// callback stays trivial and the complexity lands on the helpers,
+// each of which is linear.
 watch(
   [miniEditorOpen, miniEditorCell, referencedCells, renderedHtml],
   () => {
-    // Remove previous highlights
-    const prevEditingCell =
-      tableContainer.value?.querySelector(".cell-editing");
-    if (prevEditingCell) {
-      prevEditingCell.classList.remove("cell-editing");
-    }
-
-    const prevReferencedCells =
-      tableContainer.value?.querySelectorAll(".cell-referenced");
-    if (prevReferencedCells) {
-      prevReferencedCells.forEach((cell) =>
-        cell.classList.remove("cell-referenced"),
-      );
-    }
-
-    if (miniEditorOpen.value && tableContainer.value) {
-      const table = tableContainer.value.querySelector("#spreadsheet-table");
-      if (table) {
-        // Highlight the selected cell
-        if (miniEditorCell.value) {
-          const row = table.querySelectorAll("tr")[miniEditorCell.value.row];
-          if (row) {
-            const cell = row.querySelectorAll("td")[miniEditorCell.value.col];
-            if (cell) {
-              cell.classList.add("cell-editing");
-            }
-          }
-        }
-
-        // Highlight referenced cells
-        for (const cellRef of referencedCells.value) {
-          const row = table.querySelectorAll("tr")[cellRef.row];
-          if (row) {
-            const cell = row.querySelectorAll("td")[cellRef.col];
-            if (cell) {
-              cell.classList.add("cell-referenced");
-            }
-          }
-        }
-      }
-    }
+    clearCellHighlights(tableContainer.value);
+    if (!miniEditorOpen.value) return;
+    applyCellHighlights(
+      tableContainer.value,
+      miniEditorCell.value,
+      referencedCells.value,
+    );
   },
   { flush: "post" },
 );
