@@ -539,8 +539,8 @@ import { mulmoBeatSchema } from "@mulmocast/types";
 import {
   extractErrorMessage,
   getMissingCharacterKeys,
-  parseSSEEventLine,
   shouldAutoRenderBeat,
+  streamMovieEvents,
   validateBeatJSON,
 } from "./helpers";
 
@@ -1041,32 +1041,16 @@ async function generateMovie() {
       body: JSON.stringify({ filePath: filePath.value }),
     });
     if (!res.ok || !res.body) throw new Error("Generation failed");
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const event = parseSSEEventLine(line);
-        if (!event) continue;
-        if (event.type === "beat_image_done") {
-          loadExistingBeatImage(event.beatIndex);
-          refreshMissingCharacterImages();
-        } else if (event.type === "beat_audio_done") {
-          loadExistingBeatAudio(event.beatIndex);
-        } else if (event.type === "done") {
-          moviePath.value = event.moviePath;
-        } else if (event.type === "error") {
-          throw new Error(event.message);
-        }
-      }
-    }
+    await streamMovieEvents(res.body, {
+      onBeatImageDone: (beatIndex) => {
+        loadExistingBeatImage(beatIndex);
+        refreshMissingCharacterImages();
+      },
+      onBeatAudioDone: (beatIndex) => loadExistingBeatAudio(beatIndex),
+      onDone: (path) => {
+        moviePath.value = path;
+      },
+    });
   } catch (err) {
     alert(extractErrorMessage(err));
   } finally {

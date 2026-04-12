@@ -117,12 +117,6 @@ export default [
       // (`src/plugins/<name>/View.vue`). The Vue-recommended rule
       // against single-word names fights that on purpose.
       "vue/multi-word-component-names": "off",
-      // Pre-existing `.vue` files carry cognitive-complexity
-      // violations (notably `App.vue#sendMessage` at 47 and
-      // `spreadsheet/View.vue` at 163). Demoted to warn so CI
-      // isn't blocked — follow-up PRs should refactor each and
-      // re-raise to error. See CLAUDE.md's Functions section.
-      "sonarjs/cognitive-complexity": "warn",
       // Pre-existing slow-regex hits in `.vue` files; demote to
       // warn for the same reason. Each case needs a targeted
       // regex rewrite in a follow-up.

@@ -1,11 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyMovieEvent,
   extractErrorMessage,
   getMissingCharacterKeys,
   parseSSEEventLine,
   shouldAutoRenderBeat,
+  streamMovieEvents,
   validateBeatJSON,
+  type MovieEventHandlers,
   type SafeParseSchema,
 } from "../../../src/plugins/presentMulmoScript/helpers.js";
 
@@ -201,5 +204,193 @@ describe("extractErrorMessage", () => {
 
   it("coerces an object", () => {
     assert.equal(extractErrorMessage({ foo: "bar" }), "[object Object]");
+  });
+});
+
+// --- applyMovieEvent ---------------------------------------------
+
+// Tiny spy factory — records which handler fired and with what
+// argument. Keeps each test a single assertion rather than 3+
+// checks per case.
+interface HandlerSpy {
+  handlers: MovieEventHandlers;
+  calls: Array<
+    | { name: "onBeatImageDone"; beatIndex: number }
+    | { name: "onBeatAudioDone"; beatIndex: number }
+    | { name: "onDone"; moviePath: string }
+  >;
+}
+
+function makeSpy(): HandlerSpy {
+  const spy: HandlerSpy = {
+    calls: [],
+    handlers: {
+      onBeatImageDone(beatIndex) {
+        spy.calls.push({ name: "onBeatImageDone", beatIndex });
+      },
+      onBeatAudioDone(beatIndex) {
+        spy.calls.push({ name: "onBeatAudioDone", beatIndex });
+      },
+      onDone(moviePath) {
+        spy.calls.push({ name: "onDone", moviePath });
+      },
+    },
+  };
+  return spy;
+}
+
+describe("applyMovieEvent", () => {
+  it("routes beat_image_done to onBeatImageDone with the beat index", () => {
+    const spy = makeSpy();
+    applyMovieEvent({ type: "beat_image_done", beatIndex: 3 }, spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onBeatImageDone", beatIndex: 3 }]);
+  });
+
+  it("routes beat_audio_done to onBeatAudioDone", () => {
+    const spy = makeSpy();
+    applyMovieEvent({ type: "beat_audio_done", beatIndex: 7 }, spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onBeatAudioDone", beatIndex: 7 }]);
+  });
+
+  it("routes done to onDone with the movie path", () => {
+    const spy = makeSpy();
+    applyMovieEvent(
+      { type: "done", moviePath: "movies/final.mp4" },
+      spy.handlers,
+    );
+    assert.deepEqual(spy.calls, [
+      { name: "onDone", moviePath: "movies/final.mp4" },
+    ]);
+  });
+
+  it("throws on error events with the server-provided message", () => {
+    const spy = makeSpy();
+    assert.throws(
+      () =>
+        applyMovieEvent(
+          { type: "error", message: "ffmpeg boom" },
+          spy.handlers,
+        ),
+      /ffmpeg boom/,
+    );
+    // No handler called for the error path.
+    assert.equal(spy.calls.length, 0);
+  });
+
+  it("silently ignores unknown events (forward-compat for new server types)", () => {
+    const spy = makeSpy();
+    applyMovieEvent({ type: "unknown" }, spy.handlers);
+    assert.equal(spy.calls.length, 0);
+  });
+
+  it("handles beatIndex 0 correctly (falsy boundary)", () => {
+    // Guard against a `if (beatIndex)` regression — index 0 is a
+    // legitimate first beat and must reach the handler.
+    const spy = makeSpy();
+    applyMovieEvent({ type: "beat_image_done", beatIndex: 0 }, spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onBeatImageDone", beatIndex: 0 }]);
+  });
+
+  it("does not stop on repeated events — the caller decides idempotency", () => {
+    const spy = makeSpy();
+    applyMovieEvent({ type: "done", moviePath: "a" }, spy.handlers);
+    applyMovieEvent({ type: "done", moviePath: "b" }, spy.handlers);
+    assert.deepEqual(spy.calls, [
+      { name: "onDone", moviePath: "a" },
+      { name: "onDone", moviePath: "b" },
+    ]);
+  });
+});
+
+// --- streamMovieEvents ------------------------------------------
+
+// Build a ReadableStream<Uint8Array> from an array of string chunks
+// — the caller's byte stream boundary is what exercises the
+// internal buffer-remainder handling.
+function streamFromChunks(
+  chunks: readonly string[],
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let i = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i >= chunks.length) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(chunks[i]));
+      i++;
+    },
+  });
+}
+
+describe("streamMovieEvents", () => {
+  it("parses every newline-terminated event in a single-chunk body", async () => {
+    const chunks = [
+      `data: ${JSON.stringify({ type: "beat_image_done", beatIndex: 1 })}\n` +
+        `data: ${JSON.stringify({ type: "beat_audio_done", beatIndex: 2 })}\n` +
+        `data: ${JSON.stringify({ type: "done", moviePath: "x.mp4" })}\n`,
+    ];
+    const spy = makeSpy();
+    await streamMovieEvents(streamFromChunks(chunks), spy.handlers);
+    assert.deepEqual(spy.calls, [
+      { name: "onBeatImageDone", beatIndex: 1 },
+      { name: "onBeatAudioDone", beatIndex: 2 },
+      { name: "onDone", moviePath: "x.mp4" },
+    ]);
+  });
+
+  it("reassembles an event split across two chunks", async () => {
+    // The JSON body is sliced mid-way so the first chunk ends in
+    // the middle of a `data:` line. `streamMovieEvents` must
+    // buffer the partial line and complete it on the next read.
+    const payload = `data: ${JSON.stringify({
+      type: "done",
+      moviePath: "boundary.mp4",
+    })}\n`;
+    const mid = Math.floor(payload.length / 2);
+    const spy = makeSpy();
+    await streamMovieEvents(
+      streamFromChunks([payload.slice(0, mid), payload.slice(mid)]),
+      spy.handlers,
+    );
+    assert.deepEqual(spy.calls, [
+      { name: "onDone", moviePath: "boundary.mp4" },
+    ]);
+  });
+
+  it("skips comment / blank / malformed lines", async () => {
+    const chunks = [
+      ":keepalive\n" +
+        "\n" +
+        "not a data line\n" +
+        "data: { not json\n" +
+        `data: ${JSON.stringify({ type: "done", moviePath: "ok.mp4" })}\n`,
+    ];
+    const spy = makeSpy();
+    await streamMovieEvents(streamFromChunks(chunks), spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onDone", moviePath: "ok.mp4" }]);
+  });
+
+  it("propagates error events by throwing (caller's try/catch)", async () => {
+    const chunks = [
+      `data: ${JSON.stringify({ type: "beat_image_done", beatIndex: 0 })}\n` +
+        `data: ${JSON.stringify({ type: "error", message: "server exploded" })}\n` +
+        // This last line should never be reached.
+        `data: ${JSON.stringify({ type: "done", moviePath: "unreachable" })}\n`,
+    ];
+    const spy = makeSpy();
+    await assert.rejects(
+      () => streamMovieEvents(streamFromChunks(chunks), spy.handlers),
+      /server exploded/,
+    );
+    // Only the first (pre-error) event was dispatched.
+    assert.deepEqual(spy.calls, [{ name: "onBeatImageDone", beatIndex: 0 }]);
+  });
+
+  it("returns cleanly when the stream closes with no events", async () => {
+    const spy = makeSpy();
+    await streamMovieEvents(streamFromChunks([]), spy.handlers);
+    assert.equal(spy.calls.length, 0);
   });
 });

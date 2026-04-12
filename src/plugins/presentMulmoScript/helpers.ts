@@ -100,3 +100,77 @@ export function validateBeatJSON(
 export function extractErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
+
+/**
+ * Callback set for `applyMovieEvent` / `streamMovieEvents`. Each
+ * handler is scoped to one event shape; the dispatcher routes to
+ * the right one based on the discriminated union's `type` field.
+ * Keeping this as named handlers (rather than one big switch in
+ * the caller) lets `generateMovie` stay under the
+ * sonarjs/cognitive-complexity threshold.
+ */
+export interface MovieEventHandlers {
+  onBeatImageDone(beatIndex: number): void;
+  onBeatAudioDone(beatIndex: number): void;
+  onDone(moviePath: string): void;
+}
+
+/**
+ * Dispatch a single already-parsed SSE event from the movie
+ * generation stream to the matching handler. `"error"` events
+ * throw so the caller's try/catch can surface the message the
+ * same way a network failure would. `"unknown"` events are
+ * silently ignored — the server occasionally introduces new
+ * event types before the client catches up, and we don't want
+ * those to tear down an otherwise-healthy stream.
+ */
+export function applyMovieEvent(
+  event: SSEEvent,
+  handlers: MovieEventHandlers,
+): void {
+  switch (event.type) {
+    case "beat_image_done":
+      handlers.onBeatImageDone(event.beatIndex);
+      return;
+    case "beat_audio_done":
+      handlers.onBeatAudioDone(event.beatIndex);
+      return;
+    case "done":
+      handlers.onDone(event.moviePath);
+      return;
+    case "error":
+      throw new Error(event.message);
+    case "unknown":
+      return;
+  }
+}
+
+/**
+ * Read the SSE stream body from the movie-generation endpoint
+ * and dispatch every parsed event into the given handlers.
+ * Returns when the server closes the stream; throws through any
+ * `"error"` event or unhandled read error. Kept here (rather
+ * than inline in `generateMovie`) so the reader + decoder +
+ * line-buffer state machine is a single named unit instead of a
+ * pyramid of `while` / `for` / `if` inside a Vue component.
+ */
+export async function streamMovieEvents(
+  body: ReadableStream<Uint8Array>,
+  handlers: MovieEventHandlers,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parseSSEEventLine(line);
+      if (!event) continue;
+      applyMovieEvent(event, handlers);
+    }
+  }
+}
