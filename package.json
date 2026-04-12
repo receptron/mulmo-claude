@@ -18,7 +18,7 @@
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
     "build:client": "vite build",
     "build": "vite build && tsc -p server/tsconfig.json --noEmit",
-    "test": "tsx --test ./test/*/test_*.ts ./test/*/*/test_*.ts",
+    "test": "tsx --test ./test/*/test_*.ts ./test/*/*/test_*.ts ./test/*/*/*/test_*.ts",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:coverage": "tsx --test --experimental-test-coverage ./test/*/test_*.ts ./test/*/*/test_*.ts",
     "sandbox:remove": "docker rmi mulmoclaude-sandbox",

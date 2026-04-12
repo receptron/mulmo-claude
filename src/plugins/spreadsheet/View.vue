@@ -126,8 +126,8 @@ import type { ToolResult } from "gui-chat-protocol";
 import type { SpreadsheetToolData } from "./definition";
 import {
   SpreadsheetEngine,
-  columnToIndex,
   indexToColumn,
+  extractCellReferences,
   type SpreadsheetCell,
   type CellValue,
 } from "./engine";
@@ -227,8 +227,7 @@ const hasChanges = computed(() => {
   }
 });
 
-// Helper functions using the spreadsheet engine utilities
-const colToIndex = columnToIndex;
+// Short alias used in the template column header.
 const indexToCol = indexToColumn;
 
 // Calculate formulas in the data using the spreadsheet engine
@@ -320,78 +319,11 @@ function handleDataEdit() {
   // User needs to click "Apply Changes" button
 }
 
-// Extract cell references from a formula string
-function extractCellReferences(
-  formula: string,
-): Array<{ row: number; col: number }> {
-  const references: Array<{ row: number; col: number }> = [];
-
-  // Remove the "=" prefix if present
-  const cleanFormula = formula.startsWith("=") ? formula.substring(1) : formula;
-
-  // First, extract range references (e.g., A1:B10, $A$1:$B$10)
-  const rangeRegex = /\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+/g;
-  const rangeMatches = cleanFormula.match(rangeRegex);
-
-  if (rangeMatches) {
-    for (const range of rangeMatches) {
-      // Remove $ symbols for absolute references
-      const cleanRange = range.replace(/\$/g, "");
-      const rangeMatch = cleanRange.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-
-      if (rangeMatch) {
-        const startCol = colToIndex(rangeMatch[1]);
-        const startRow = parseInt(rangeMatch[2]) - 1;
-        const endCol = colToIndex(rangeMatch[3]);
-        const endRow = parseInt(rangeMatch[4]) - 1;
-
-        // Add all cells in the range
-        for (let row = startRow; row <= endRow; row++) {
-          for (let col = startCol; col <= endCol; col++) {
-            if (
-              !references.some(
-                (cellRef) => cellRef.row === row && cellRef.col === col,
-              )
-            ) {
-              references.push({ row, col });
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Remove ranges from formula before extracting individual cell references
-  const formulaWithoutRanges = cleanFormula.replace(rangeRegex, "");
-
-  // Then, extract individual cell references (e.g., A1, $B$2, B2)
-  const cellRefRegex = /\$?[A-Z]+\$?\d+/g;
-  const cellMatches = formulaWithoutRanges.match(cellRefRegex);
-
-  if (cellMatches) {
-    for (const match of cellMatches) {
-      // Remove $ symbols for absolute references
-      const cleanRef = match.replace(/\$/g, "");
-      const cellMatch = cleanRef.match(/^([A-Z]+)(\d+)$/);
-
-      if (cellMatch) {
-        const col = colToIndex(cellMatch[1]);
-        const row = parseInt(cellMatch[2]) - 1; // Convert to 0-based
-
-        // Add to references if not already present
-        if (
-          !references.some(
-            (cellRef) => cellRef.row === row && cellRef.col === col,
-          )
-        ) {
-          references.push({ row, col });
-        }
-      }
-    }
-  }
-
-  return references;
-}
+// `extractCellReferences` now lives in `./engine/formulaRefs.ts`
+// (imported at the top of this file). Extracted to bring this
+// file's cognitive complexity back under the sonarjs threshold
+// and to make the formula-reference scanner unit-testable.
+// See `test/plugins/spreadsheet/engine/test_formulaRefs.ts`.
 
 function openMiniEditor(rowIndex: number, colIndex: number) {
   try {

@@ -12,6 +12,7 @@ export * from "./parser";
 export * from "./formatter";
 export * from "./evaluator";
 export * from "./calculator";
+export * from "./formulaRefs";
 
 // Export function registry
 export * from "./registry";
