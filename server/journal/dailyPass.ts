@@ -266,6 +266,10 @@ async function writeDailySummaryForDate(
 // Apply every topic update the archivist asked for, keeping the
 // in-memory `existingTopics` snapshot in sync so the next day in
 // this same pass sees fresh content. Mutates `existingTopics`.
+//
+// Per-update failures (EACCES, EIO, etc. surfaced by appendOrCreate)
+// are logged and skipped so a single broken topic file doesn't kill
+// the whole pass after days of progress have already been committed.
 async function processTopicUpdatesForDay(
   workspaceRoot: string,
   updates: readonly TopicUpdate[],
@@ -275,10 +279,21 @@ async function processTopicUpdatesForDay(
   const updated: string[] = [];
   for (const update of updates) {
     const normalized = normalizeTopicAction(update, existingTopics);
-    const outcome = await applyTopicUpdate(workspaceRoot, normalized);
-    if (outcome === "created") created.push(normalized.slug);
-    else if (outcome === "updated") updated.push(normalized.slug);
-    await refreshTopicSnapshot(workspaceRoot, normalized.slug, existingTopics);
+    try {
+      const outcome = await applyTopicUpdate(workspaceRoot, normalized);
+      if (outcome === "created") created.push(normalized.slug);
+      else if (outcome === "updated") updated.push(normalized.slug);
+      await refreshTopicSnapshot(
+        workspaceRoot,
+        normalized.slug,
+        existingTopics,
+      );
+    } catch (err) {
+      console.warn(
+        `[journal] failed to apply topic update for ${normalized.slug}:`,
+        err,
+      );
+    }
   }
   return { created, updated };
 }
@@ -740,7 +755,9 @@ async function writeDailySummary(
 // Distinguishes a true missing file (ENOENT) from other read errors
 // (permission denied, I/O failure) — without this, a transient EACCES
 // on an existing topic would silently overwrite it.
-async function appendOrCreate(
+//
+// Exported for unit testing in test/journal/test_appendOrCreate.ts.
+export async function appendOrCreate(
   filePath: string,
   content: string,
 ): Promise<"created" | "updated"> {

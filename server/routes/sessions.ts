@@ -188,6 +188,9 @@ router.get(
                   try {
                     // Realpath-based traversal check defeats symlink
                     // escapes — see resolveWithinRoot in utils/fs.ts.
+                    // Resolve the stories dir's realpath so the
+                    // boundary check works even when stories/ itself
+                    // is a legitimate symlink to another disk.
                     const storiesDir = path.resolve(workspacePath, "stories");
                     let storiesReal: string;
                     try {
@@ -196,19 +199,15 @@ router.get(
                       return entry;
                     }
                     const scriptRelPath: string = entry.result.data.filePath;
-                    const candidate = path.resolve(
-                      workspacePath,
-                      scriptRelPath,
-                    );
-                    if (
-                      candidate !== storiesReal &&
-                      !candidate.startsWith(storiesReal + path.sep)
-                    ) {
-                      return entry;
-                    }
+                    if (path.isAbsolute(scriptRelPath)) return entry;
+                    // Strip optional "stories/" prefix so the
+                    // remainder is relative to storiesReal.
+                    const relFromStories = scriptRelPath.startsWith("stories/")
+                      ? scriptRelPath.slice("stories/".length)
+                      : scriptRelPath;
                     const scriptPath = resolveWithinRoot(
                       storiesReal,
-                      path.relative(storiesReal, candidate),
+                      relFromStories,
                     );
                     if (!scriptPath) return entry;
                     const scriptJson = await readFile(scriptPath, "utf-8");

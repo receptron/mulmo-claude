@@ -28,13 +28,6 @@ import { errorMessage } from "../utils/errors.js";
 const router = Router();
 const storiesDir = path.resolve(workspacePath, "stories");
 
-// Realpath of the workspace, computed once at module load. Needed
-// because the stories realpath check below has to compare against a
-// candidate path built from the same realpath form — otherwise on
-// macOS where /tmp → /private/tmp, a workspace under /tmp would have
-// every legitimate request rejected.
-const workspaceReal = fs.realpathSync(workspacePath);
-
 // Lazily realpath the stories dir on first use. We can't realpath at
 // module load because the directory may not exist yet (it's created
 // on demand by /mulmo-script POST). The cache is invalidated never —
@@ -242,32 +235,46 @@ function fileToDataUri(filePath: string, mimeType: string): string {
 // symlink-based escapes. The previous implementation used a plain
 // `path.resolve` + `startsWith` check, which a malicious symlink
 // under stories/ could bypass.
+//
+// Callers pass workspace-relative paths like "stories/foo.json" or
+// "stories/__movies__/bar.mp4". We strip the leading "stories/"
+// segment and resolve the remainder against the realpath of the
+// stories directory itself — this works whether stories/ is a
+// regular directory or a legitimate symlink to another location
+// (e.g. workspace/stories → /ext/stories on a different disk).
 function resolveStoryPath(filePath: string, res: Response): string | null {
   const storiesReal = ensureStoriesReal();
   if (!storiesReal) {
     res.status(500).json({ error: "stories directory not available" });
     return null;
   }
-  // Syntactic stories/ membership check first, on the unresolved
-  // candidate path. Distinguishes "outside stories" (400) from
-  // "missing file" (404) and short-circuits before we hit realpath.
-  // Builds the candidate from the workspace's realpath so the
-  // comparison against storiesReal (also realpath'd) is symmetric.
-  const candidate = path.resolve(workspaceReal, filePath);
-  if (
-    candidate !== storiesReal &&
-    !candidate.startsWith(storiesReal + path.sep)
-  ) {
+  // Reject absolute paths and parent traversal at the syntactic
+  // level — defense in depth on top of the realpath check below.
+  if (path.isAbsolute(filePath)) {
     res.status(400).json({ error: "Invalid filePath" });
     return null;
   }
-  // realpath check — defeats symlink escapes (stories/foo → /etc/passwd).
-  const resolved = resolveWithinRoot(
-    storiesReal,
-    path.relative(storiesReal, candidate),
-  );
+  // Strip the optional "stories/" prefix so the remainder is a path
+  // relative to storiesReal. Accepts both "stories/foo.json" (the
+  // canonical caller convention) and bare "foo.json".
+  const STORIES_PREFIX = "stories" + path.sep;
+  const relFromStories =
+    filePath === "stories"
+      ? ""
+      : filePath.startsWith(STORIES_PREFIX) || filePath.startsWith("stories/")
+        ? filePath.slice("stories/".length)
+        : filePath;
+  // resolveWithinRoot enforces both the realpath boundary AND
+  // existence; ENOENT and traversal both produce null. Distinguish
+  // them via a follow-up existsSync so 404 vs 400 stays accurate.
+  const resolved = resolveWithinRoot(storiesReal, relFromStories);
   if (!resolved) {
-    res.status(404).json({ error: `File not found: ${filePath}` });
+    const candidate = path.resolve(storiesReal, relFromStories);
+    if (!fs.existsSync(candidate)) {
+      res.status(404).json({ error: `File not found: ${filePath}` });
+    } else {
+      res.status(400).json({ error: "Invalid filePath" });
+    }
     return null;
   }
   return resolved;
