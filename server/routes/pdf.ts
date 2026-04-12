@@ -1,7 +1,10 @@
+import fs from "fs";
+import path from "path";
 import { Router, Request, Response } from "express";
 import { marked } from "marked";
 import puppeteer from "puppeteer";
 import { errorMessage } from "../utils/errors.js";
+import { workspacePath } from "../workspace.js";
 
 const router = Router();
 
@@ -34,6 +37,42 @@ const MARKDOWN_CSS = `
   strong { font-weight: 600; }
   a { color: #2563eb; }
 `;
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+};
+
+/**
+ * Inline local images as base64 data URIs so Puppeteer can render them.
+ * Markdown files live in workspace/markdowns/ and reference images as
+ * "../images/xyz.png" → workspace/images/xyz.png.
+ */
+function inlineImages(html: string): string {
+  const baseDir = path.join(workspacePath, "markdowns");
+  return html.replace(
+    /(<img\s[^>]*src=")([^"]+)(")/g,
+    (_match, before: string, src: string, after: string) => {
+      if (src.startsWith("data:") || src.startsWith("http")) {
+        return _match;
+      }
+      const abs = path.resolve(baseDir, src);
+      try {
+        const buf = fs.readFileSync(abs);
+        const ext = path.extname(abs).toLowerCase();
+        const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+        return `${before}data:${mime};base64,${buf.toString("base64")}${after}`;
+      } catch {
+        console.warn(`[pdf] could not read image: ${abs}`);
+        return _match;
+      }
+    },
+  );
+}
 
 function wrapHtml(body: string, css: string): string {
   return `<!DOCTYPE html>
@@ -95,7 +134,7 @@ router.post(
       console.log(
         `[pdf] markdown: filename="${filename}" length=${markdown.length}`,
       );
-      const html = await marked.parse(markdown);
+      const html = inlineImages(await marked.parse(markdown));
       const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
       sendPdf(res, buffer, filename);
     } catch (err) {

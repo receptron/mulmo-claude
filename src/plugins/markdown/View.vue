@@ -24,7 +24,23 @@
                 <span class="material-icons">download</span>
                 MD
               </button>
+              <button
+                class="download-btn download-btn-green"
+                :disabled="pdfDownloading"
+                @click="downloadPdf"
+              >
+                <span class="material-icons">{{
+                  pdfDownloading ? "hourglass_empty" : "download"
+                }}</span>
+                PDF
+              </button>
             </div>
+            <span
+              v-if="pdfError"
+              class="text-xs text-red-500 self-center ml-2"
+              :title="pdfError"
+              >⚠ PDF failed</span
+            >
           </div>
           <div
             class="markdown-content prose prose-slate max-w-none"
@@ -154,6 +170,48 @@ watch(
   },
 );
 
+const pdfDownloading = ref(false);
+const pdfError = ref<string | null>(null);
+
+async function downloadPdf() {
+  if (!markdownContent.value) return;
+  pdfError.value = null;
+  pdfDownloading.value = true;
+  const hint = props.selectedResult.data?.filenameHint;
+  const title = hint
+    ? hint.replace(/[/\\:*?"<>|]/g, "_")
+    : props.selectedResult.title
+      ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_")
+      : "document";
+  const filename = `${title}.pdf`;
+  let response: Response;
+  try {
+    response = await fetch("/api/pdf/markdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markdown: markdownContent.value, filename }),
+    });
+  } catch (err) {
+    pdfError.value = err instanceof Error ? err.message : String(err);
+    pdfDownloading.value = false;
+    return;
+  }
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    pdfError.value = `PDF error ${response.status}: ${errText}`;
+    pdfDownloading.value = false;
+    return;
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  pdfDownloading.value = false;
+}
+
 const downloadMarkdown = () => {
   if (!markdownContent.value) return;
 
@@ -274,6 +332,11 @@ watch(
 
 .download-btn .material-icons {
   font-size: 1.2em;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .markdown-content :deep(h1) {

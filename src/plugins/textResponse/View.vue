@@ -4,37 +4,18 @@
       v-if="isAssistant"
       class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0"
     >
-      <button
-        class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center gap-1"
-        :disabled="pdfDownloading"
-        @click="downloadPdf"
-      >
-        <svg
-          v-if="pdfDownloading"
-          class="animate-spin w-3 h-3 shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
+      <div class="button-group">
+        <button
+          class="download-btn download-btn-green"
+          :disabled="pdfDownloading"
+          @click="downloadPdf"
         >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v8H4z"
-          />
-        </svg>
-        <template v-if="!pdfDownloading">
-          <span class="material-icons text-sm leading-none">download</span>
-          <span>PDF</span>
-        </template>
-        <span v-else>PDF</span>
-      </button>
+          <span class="material-icons">{{
+            pdfDownloading ? "hourglass_empty" : "download"
+          }}</span>
+          PDF
+        </button>
+      </div>
       <span
         v-if="pdfError"
         class="text-xs text-red-500 self-center ml-2"
@@ -112,3 +93,35 @@ async function downloadPdf() {
   pdfDownloading.value = false;
 }
 </script>
+
+<style scoped>
+.button-group {
+  display: flex;
+  gap: 0.5em;
+}
+
+.download-btn {
+  padding: 0.5em 1em;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.download-btn-green {
+  background-color: #4caf50;
+}
+
+.download-btn .material-icons {
+  font-size: 1.2em;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
