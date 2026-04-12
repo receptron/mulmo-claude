@@ -43,10 +43,19 @@ export function installGuards(router: Router): void {
     // ── view mode whitelist ──────────────────────────────────────
     const view = to.query.view;
     if (typeof view === "string" && !VALID_VIEW_MODES.has(view)) {
-      // Strip the bad value and fall through to the default (single).
       const cleaned = { ...to.query };
       delete cleaned.view;
       return { ...to, query: cleaned, replace: true };
+    }
+
+    // ── file path traversal check ────────────────────────────────
+    const filePath = to.query.path;
+    if (typeof filePath === "string") {
+      if (filePath.includes("..") || filePath.startsWith("/")) {
+        const cleaned = { ...to.query };
+        delete cleaned.path;
+        return { ...to, query: cleaned, replace: true };
+      }
     }
   });
 }
