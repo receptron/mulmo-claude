@@ -378,9 +378,7 @@
             placeholder="Type a task..."
             rows="2"
             class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
-            :disabled="
-              isRunning || (!geminiAvailable && needsGemini(currentRoleId))
-            "
+            :disabled="isRunning"
             @keydown.enter="
               !$event.isComposing && !$event.shiftKey
                 ? (sendMessage(), $event.preventDefault())
@@ -389,9 +387,7 @@
           />
           <button
             class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="
-              isRunning || (!geminiAvailable && needsGemini(currentRoleId))
-            "
+            :disabled="isRunning"
             @click="sendMessage()"
           >
             <span class="material-icons text-base">send</span>
