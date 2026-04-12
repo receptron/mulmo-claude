@@ -69,7 +69,9 @@ export default [
       "sonarjs/no-unused-vars": "warn",
       "sonarjs/no-nested-conditional": "off",
       "sonarjs/cognitive-complexity": "error",
-      "sonarjs/no-os-command-from-path": "warn",
+      // MulmoClaude is a local desktop app — spawning claude/docker/git
+      // via PATH is normal operation, not a server-side injection risk.
+      "sonarjs/no-os-command-from-path": "off",
       "sonarjs/cors": "off",
       "sonarjs/pseudo-random": "warn",
     },
