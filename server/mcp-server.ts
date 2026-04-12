@@ -102,22 +102,46 @@ function respond(msg: unknown): void {
 // `path` is the absolute server path (e.g. /api/internal/tool-result)
 // — the session query string is appended automatically.
 //
-// Network errors (DNS failure, connection refused, etc.) are wrapped
-// in a descriptive Error so the outer catch in handleToolCall reports
-// them as the failed tool call instead of a bare TypeError. HTTP
-// status checking (`!res.ok`) is left to call sites that need it,
-// since several callers fire-and-forget for the result push.
-async function postJson(path: string, body: unknown): Promise<Response> {
+// Both network errors and HTTP failures (4xx/5xx) are converted into
+// a descriptive Error by default, so the outer catch in handleToolCall
+// reports them as the failed tool call instead of a silent success.
+// Pass `allowHttpError: true` for callers that want to inspect the
+// response themselves (e.g. /api/mcp-tools/* which has its own
+// status-aware result handling).
+interface PostJsonOpts {
+  allowHttpError?: boolean;
+}
+
+async function postJson(
+  path: string,
+  body: unknown,
+  opts: PostJsonOpts = {},
+): Promise<Response> {
+  // SESSION_ID comes from the parent process env so it's effectively
+  // trusted, but encode it anyway — defense in depth against future
+  // callers passing unexpected characters (`&`, `#`, newlines, etc.).
+  // The path arg is used as-is because all current call sites pass
+  // hardcoded literals.
+  let res: Response;
   try {
-    return await fetch(`${BASE_URL}${path}?session=${SESSION_ID}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    res = await fetch(
+      `${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`Network error calling ${path}: ${message}`);
   }
+  if (!opts.allowHttpError && !res.ok) {
+    const text = await res.text().catch(() => "");
+    const detail = text ? `: ${text.slice(0, 500)}` : "";
+    throw new Error(`HTTP ${res.status} calling ${path}${detail}`);
+  }
+  return res;
 }
 
 async function handleToolCall(
@@ -145,10 +169,14 @@ async function handleToolCall(
     return result.message ?? (result.error ? `Error: ${result.error}` : "Done");
   }
 
-  // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly (no frontend push)
+  // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly
+  // (no frontend push). Opt out of postJson's HTTP error throw because
+  // we want to surface the JSON error body to the caller as a string.
   const mcpTool = mcpTools.find((t) => t.definition.name === name);
   if (mcpTool) {
-    const res = await postJson(`/api/mcp-tools/${name}`, args);
+    const res = await postJson(`/api/mcp-tools/${name}`, args, {
+      allowHttpError: true,
+    });
     const json = await res.json();
     if (!res.ok) return `Error: ${json.error ?? res.status}`;
     return typeof json.result === "string"

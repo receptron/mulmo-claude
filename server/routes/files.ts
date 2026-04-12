@@ -246,14 +246,20 @@ interface PathQuery {
 }
 
 // Shared validation preamble for /files/content and /files/raw. Both
-// endpoints need to: read `path` from the query, run it through
-// resolveSafe, stat it, and confirm it's a regular file. On any
-// failure this writes the appropriate 4xx response and returns null;
-// the caller bails out.
+// endpoints need to: read `path` from the query, validate it's
+// inside the workspace (with symlink hardening), stat it, and
+// confirm it's a regular file. On any failure this writes the
+// appropriate 4xx response and returns null; the caller bails out.
 //
 // `T` lets each caller's Response type stay precise — both endpoints
 // have different success-shape unions and we just need ErrorResponse
 // to be one of the alternatives.
+//
+// Order matters: stat the syntactic candidate first so a missing
+// file gets a 404, then run the realpath-hardened resolveSafe check
+// for symlink escapes (which would return 400). Doing them in this
+// order keeps 404 reachable for the common "file not found" case
+// instead of conflating it with traversal attempts.
 function resolveAndStatFile<T>(
   req: Request<object, unknown, unknown, PathQuery>,
   res: Response<T | ErrorResponse>,
@@ -263,18 +269,35 @@ function resolveAndStatFile<T>(
     res.status(400).json({ error: "path required" });
     return null;
   }
-  const absPath = resolveSafe(relPath);
-  if (!absPath) {
-    res.status(400).json({ error: "Path outside workspace" });
-    return null;
-  }
-  const stat = statSafe(absPath);
+  // Syntactic candidate (no symlink resolution yet).
+  const candidate = path.resolve(workspaceReal, path.normalize(relPath));
+  const stat = statSafe(candidate);
   if (!stat) {
-    res.status(404).json({ error: "File not found" });
+    // Distinguish "missing file under workspace" (404) from "path
+    // syntactically outside workspace" (400). We check the
+    // syntactic relative form, NOT realpath, because the file
+    // doesn't exist so realpath would throw anyway.
+    const relativeFromWorkspace = path.relative(workspaceReal, candidate);
+    const escapesSyntactically =
+      relativeFromWorkspace === ".." ||
+      relativeFromWorkspace.startsWith(`..${path.sep}`);
+    if (escapesSyntactically) {
+      res.status(400).json({ error: "Path outside workspace" });
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
     return null;
   }
   if (!stat.isFile()) {
     res.status(400).json({ error: "Not a file" });
+    return null;
+  }
+  // File exists — run the realpath-hardened check to defeat
+  // symlink-escape attempts (e.g. workspace/secret → /etc/passwd).
+  // resolveSafe also rejects paths that traverse a hidden dir.
+  const absPath = resolveSafe(relPath);
+  if (!absPath) {
+    res.status(400).json({ error: "Path outside workspace" });
     return null;
   }
   return { relPath, absPath, stat };
