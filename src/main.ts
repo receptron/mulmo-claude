@@ -1,5 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
+import router from "./router/index";
+import { installGuards } from "./router/guards";
 import "./index.css";
 import "material-icons/iconfont/material-icons.css";
 
@@ -11,4 +13,8 @@ import.meta.glob(
   { eager: true },
 );
 
-createApp(App).mount("#app");
+installGuards(router);
+
+const app = createApp(App);
+app.use(router);
+app.mount("#app");
