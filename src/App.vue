@@ -649,16 +649,34 @@ const selectedResult = computed(
 // `updatedAt` (most recently touched floats to the top). `updatedAt`
 // is bumped in `sendMessage` for live sessions and taken from the
 // jsonl file mtime for server-only sessions.
+//
+// When a session exists on the server side (the indexer has produced
+// a title / summary / keywords for it), we prefer those fields over
+// the live-session fallback: a live session that was loaded from a
+// pre-indexed jsonl should keep showing the AI-generated title in
+// the sidebar, not regress to the raw first user message. Without
+// this merge, opening an indexed session immediately clobbered its
+// sidebar row with the first-user-message preview.
 const mergedSessions = computed((): SessionSummary[] => {
   const liveIds = new Set(sessionMap.keys());
+  const serverById = new Map<string, SessionSummary>(
+    sessions.value.map((s) => [s.id, s]),
+  );
   const liveSummaries: SessionSummary[] = [...sessionMap.values()].map((s) => {
     const firstUserMsg = s.toolResults.find(isUserTextResponse);
+    const serverEntry = serverById.get(s.id);
     return {
       id: s.id,
       roleId: s.roleId,
       startedAt: s.startedAt,
       updatedAt: s.updatedAt,
-      preview: firstUserMsg?.message ?? "",
+      preview: serverEntry?.preview || (firstUserMsg?.message ?? ""),
+      ...(serverEntry?.summary !== undefined && {
+        summary: serverEntry.summary,
+      }),
+      ...(serverEntry?.keywords !== undefined && {
+        keywords: serverEntry.keywords,
+      }),
     };
   });
   const serverOnly = sessions.value.filter((s) => !liveIds.has(s.id));
