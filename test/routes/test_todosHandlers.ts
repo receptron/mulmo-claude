@@ -513,3 +513,71 @@ describe("dispatchTodos", () => {
     assert.equal(dispatchTodos("list_labels", items, {}).kind, "success");
   });
 });
+
+// Regression: the kanban view stores extra fields (status / priority /
+// dueDate / order) on TodoItem. The MCP `update` handler must keep
+// those fields when changing text / note, otherwise an LLM editing a
+// label-only field would silently strip the kanban metadata.
+describe("kanban field preservation", () => {
+  it("handleUpdate preserves status / priority / dueDate / order", () => {
+    const item = makeTodo({
+      id: "a",
+      text: "Old",
+      status: "in_progress",
+      priority: "high",
+      dueDate: "2026-04-20",
+      order: 2500,
+    });
+    const result = handleUpdate([item], { text: "old", newText: "New" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const updated = result.items[0];
+    assert.equal(updated?.text, "New");
+    assert.equal(updated?.status, "in_progress");
+    assert.equal(updated?.priority, "high");
+    assert.equal(updated?.dueDate, "2026-04-20");
+    assert.equal(updated?.order, 2500);
+  });
+
+  it("handleCheck preserves status / priority / dueDate / order", () => {
+    const item = makeTodo({
+      id: "a",
+      text: "x",
+      completed: false,
+      status: "in_progress",
+      priority: "urgent",
+      dueDate: "2026-05-01",
+      order: 4500,
+    });
+    const result = handleCheck([item], { text: "x" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const updated = result.items[0];
+    assert.equal(updated?.completed, true);
+    assert.equal(updated?.status, "in_progress");
+    assert.equal(updated?.priority, "urgent");
+    assert.equal(updated?.dueDate, "2026-05-01");
+    assert.equal(updated?.order, 4500);
+  });
+
+  it("handleAddLabel preserves status / priority / dueDate / order", () => {
+    const item = makeTodo({
+      id: "a",
+      text: "x",
+      labels: ["work"],
+      status: "todo",
+      priority: "medium",
+      dueDate: "2026-06-01",
+      order: 1500,
+    });
+    const result = handleAddLabel([item], { text: "x", labels: ["urgent"] });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const updated = result.items[0];
+    assert.deepEqual(updated?.labels, ["work", "urgent"]);
+    assert.equal(updated?.status, "todo");
+    assert.equal(updated?.priority, "medium");
+    assert.equal(updated?.dueDate, "2026-06-01");
+    assert.equal(updated?.order, 1500);
+  });
+});

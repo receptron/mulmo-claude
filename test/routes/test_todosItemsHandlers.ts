@@ -1,0 +1,362 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import {
+  handleCreate,
+  handleDeleteItem,
+  handleMove,
+  handlePatch,
+  migrateItems,
+} from "../../server/routes/todosItemsHandlers.js";
+import { DEFAULT_COLUMNS } from "../../server/routes/todosColumnsHandlers.js";
+import type { TodoItem } from "../../server/routes/todos.js";
+
+function cols() {
+  return DEFAULT_COLUMNS.map((c) => ({ ...c }));
+}
+
+function makeItem(overrides: Partial<TodoItem> = {}): TodoItem {
+  return {
+    id: "todo_test_1",
+    text: "Default item",
+    completed: false,
+    createdAt: 1_000_000,
+    status: "todo",
+    order: 1000,
+    ...overrides,
+  };
+}
+
+describe("migrateItems", () => {
+  it("backfills status and order on legacy items", () => {
+    const legacy: TodoItem[] = [
+      {
+        id: "a",
+        text: "Done item",
+        completed: true,
+        createdAt: 100,
+      },
+      {
+        id: "b",
+        text: "Open item",
+        completed: false,
+        createdAt: 200,
+      },
+    ];
+    const result = migrateItems(legacy, cols());
+    const a = result.find((i) => i.id === "a");
+    const b = result.find((i) => i.id === "b");
+    assert.equal(a?.status, "done");
+    assert.equal(a?.completed, true);
+    assert.equal(b?.status, "backlog");
+    assert.equal(b?.completed, false);
+    assert.equal(typeof a?.order, "number");
+    assert.equal(typeof b?.order, "number");
+  });
+
+  it("reassigns items pointing at unknown columns", () => {
+    const items: TodoItem[] = [
+      {
+        id: "a",
+        text: "x",
+        completed: false,
+        createdAt: 100,
+        status: "ghost-column",
+        order: 500,
+      },
+    ];
+    const result = migrateItems(items, cols());
+    assert.equal(result[0]?.status, "backlog");
+  });
+
+  it("syncs completed to done column membership", () => {
+    const items: TodoItem[] = [
+      {
+        id: "a",
+        text: "x",
+        completed: false, // out-of-sync; status says done
+        createdAt: 100,
+        status: "done",
+        order: 1000,
+      },
+      {
+        id: "b",
+        text: "y",
+        completed: true, // out-of-sync; status says todo
+        createdAt: 200,
+        status: "todo",
+        order: 1000,
+      },
+    ];
+    const result = migrateItems(items, cols());
+    assert.equal(result.find((i) => i.id === "a")?.completed, true);
+    assert.equal(result.find((i) => i.id === "b")?.completed, false);
+  });
+
+  it("preserves existing order values when every item in a column has one", () => {
+    const items: TodoItem[] = [
+      {
+        id: "a",
+        text: "x",
+        completed: false,
+        createdAt: 100,
+        status: "todo",
+        order: 5,
+      },
+      {
+        id: "b",
+        text: "y",
+        completed: false,
+        createdAt: 200,
+        status: "todo",
+        order: 7,
+      },
+    ];
+    const result = migrateItems(items, cols());
+    assert.equal(result.find((i) => i.id === "a")?.order, 5);
+    assert.equal(result.find((i) => i.id === "b")?.order, 7);
+  });
+
+  it("backfills order even when some items in a column have it", () => {
+    // Mixed group: at least one missing order → entire column gets re-ordered.
+    const items: TodoItem[] = [
+      {
+        id: "a",
+        text: "x",
+        completed: false,
+        createdAt: 100,
+        status: "todo",
+        order: 5,
+      },
+      {
+        id: "b",
+        text: "y",
+        completed: false,
+        createdAt: 200,
+        status: "todo",
+      },
+    ];
+    const result = migrateItems(items, cols());
+    assert.equal(result.find((i) => i.id === "a")?.order, 1000);
+    assert.equal(result.find((i) => i.id === "b")?.order, 2000);
+  });
+});
+
+describe("handleCreate", () => {
+  it("rejects empty text", () => {
+    const result = handleCreate([], cols(), { text: "  " });
+    assert.equal(result.kind, "error");
+  });
+
+  it("creates with default status when none specified", () => {
+    const result = handleCreate([], cols(), { text: "New" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.status, "backlog");
+    assert.equal(result.item?.completed, false);
+    assert.equal(result.item?.order, 1000);
+  });
+
+  it("creates in done column → completed true", () => {
+    const result = handleCreate([], cols(), { text: "Did it", status: "done" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.completed, true);
+  });
+
+  it("rejects invalid priority", () => {
+    const result = handleCreate([], cols(), { text: "x", priority: "huge" });
+    assert.equal(result.kind, "error");
+  });
+
+  it("rejects malformed dueDate", () => {
+    const result = handleCreate([], cols(), {
+      text: "x",
+      dueDate: "next tuesday",
+    });
+    assert.equal(result.kind, "error");
+  });
+
+  it("normalises labels", () => {
+    const result = handleCreate([], cols(), {
+      text: "x",
+      labels: ["  Work ", "WORK", "Urgent"],
+    });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.deepEqual(result.item?.labels, ["Work", "Urgent"]);
+  });
+
+  it("places new items at the end of their column", () => {
+    const items = [
+      makeItem({ id: "a", status: "todo", order: 1000 }),
+      makeItem({ id: "b", status: "todo", order: 2500 }),
+    ];
+    const result = handleCreate(items, cols(), { text: "z", status: "todo" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.order, 3500);
+  });
+});
+
+describe("handlePatch", () => {
+  it("returns 404 for unknown id", () => {
+    const result = handlePatch([], cols(), "ghost", { text: "x" });
+    assert.equal(result.kind, "error");
+    if (result.kind !== "error") return;
+    assert.equal(result.status, 404);
+  });
+
+  it("rejects empty text", () => {
+    const items = [makeItem({ id: "a" })];
+    const result = handlePatch(items, cols(), "a", { text: "  " });
+    assert.equal(result.kind, "error");
+  });
+
+  it("clears note when set to empty string", () => {
+    const items = [makeItem({ id: "a", note: "old" })];
+    const result = handlePatch(items, cols(), "a", { note: "" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.note, undefined);
+  });
+
+  it("changes status and resyncs completed", () => {
+    const items = [makeItem({ id: "a", status: "todo", completed: false })];
+    const result = handlePatch(items, cols(), "a", { status: "done" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.status, "done");
+    assert.equal(result.item?.completed, true);
+  });
+
+  it("rejects unknown status", () => {
+    const items = [makeItem({ id: "a" })];
+    const result = handlePatch(items, cols(), "a", { status: "ghost" });
+    assert.equal(result.kind, "error");
+  });
+
+  it("toggling completed=true moves the item into the done column", () => {
+    const items = [makeItem({ id: "a", status: "todo", completed: false })];
+    const result = handlePatch(items, cols(), "a", { completed: true });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.completed, true);
+    assert.equal(result.item?.status, "done");
+  });
+
+  it("toggling completed=false moves the item to the default open column", () => {
+    const items = [makeItem({ id: "a", status: "done", completed: true })];
+    const result = handlePatch(items, cols(), "a", { completed: false });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.completed, false);
+    assert.equal(result.item?.status, "backlog");
+  });
+
+  it("rejects invalid priority", () => {
+    const items = [makeItem({ id: "a" })];
+    const result = handlePatch(items, cols(), "a", { priority: "huge" });
+    assert.equal(result.kind, "error");
+  });
+
+  it("clears priority when set to null", () => {
+    const items = [makeItem({ id: "a", priority: "high" })];
+    const result = handlePatch(items, cols(), "a", { priority: null });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.priority, undefined);
+  });
+
+  it("clears dueDate when set to empty string", () => {
+    const items = [makeItem({ id: "a", dueDate: "2026-01-01" })];
+    const result = handlePatch(items, cols(), "a", { dueDate: "" });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.dueDate, undefined);
+  });
+});
+
+describe("handleMove", () => {
+  it("returns 404 for unknown id", () => {
+    const result = handleMove([], cols(), "ghost", { position: 0 });
+    assert.equal(result.kind, "error");
+  });
+
+  it("moves an item across columns and updates completed", () => {
+    const items = [
+      makeItem({ id: "a", status: "todo", order: 1000, completed: false }),
+    ];
+    const result = handleMove(items, cols(), "a", {
+      status: "done",
+      position: 0,
+    });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.item?.status, "done");
+    assert.equal(result.item?.completed, true);
+  });
+
+  it("reorders within a single column", () => {
+    const items = [
+      makeItem({ id: "a", status: "todo", order: 1000 }),
+      makeItem({ id: "b", status: "todo", order: 2000 }),
+      makeItem({ id: "c", status: "todo", order: 3000 }),
+    ];
+    // Move "a" to the end of the todo column.
+    const result = handleMove(items, cols(), "a", {
+      status: "todo",
+      position: 2,
+    });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const todoItems = result.items
+      .filter((i) => i.status === "todo")
+      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    assert.deepEqual(
+      todoItems.map((i) => i.id),
+      ["b", "c", "a"],
+    );
+  });
+
+  it("clamps a position past the end", () => {
+    const items = [
+      makeItem({ id: "a", status: "todo", order: 1000 }),
+      makeItem({ id: "b", status: "todo", order: 2000 }),
+    ];
+    const result = handleMove(items, cols(), "a", {
+      status: "todo",
+      position: 999,
+    });
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    const todoItems = result.items
+      .filter((i) => i.status === "todo")
+      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    assert.deepEqual(
+      todoItems.map((i) => i.id),
+      ["b", "a"],
+    );
+  });
+
+  it("rejects unknown status", () => {
+    const items = [makeItem({ id: "a" })];
+    const result = handleMove(items, cols(), "a", { status: "ghost" });
+    assert.equal(result.kind, "error");
+  });
+});
+
+describe("handleDeleteItem", () => {
+  it("returns 404 for unknown id", () => {
+    const result = handleDeleteItem([], "ghost");
+    assert.equal(result.kind, "error");
+  });
+
+  it("removes the matching item", () => {
+    const items = [makeItem({ id: "a" }), makeItem({ id: "b" })];
+    const result = handleDeleteItem(items, "a");
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0]?.id, "b");
+  });
+});
