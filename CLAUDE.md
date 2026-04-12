@@ -14,6 +14,10 @@ See `plan/mulmo_claude.md` for the full design plan.
 
 - **Dev server**: `npm run dev` (runs both client and server concurrently)
 - **Lint**: `yarn lint` / **Format**: `yarn format` / **Typecheck**: `yarn typecheck` / **Build**: `yarn build`
+- **Unit tests**: `yarn test` (node:test, server handlers + utils)
+- **E2E tests**: `yarn test:e2e` (Playwright, browser UI tests — no backend needed)
+- **E2E single file**: `yarn test:e2e -- tests/smoke.spec.ts`
+- **E2E headed**: `yarn test:e2e -- --headed` (opens browser for debugging)
 
 **IMPORTANT**: After modifying any source code, always run `yarn format`, `yarn lint`, `yarn typecheck`, and `yarn build` before considering the task done.
 
@@ -159,12 +163,43 @@ src/
   utils/          ← grouped by concern (dom/, format/, path/, role/)
 
 test/             ← mirrors source layout 1:1
+e2e/              ← Playwright E2E tests + fixtures
 plans/            ← one file per feature/refactor/fix
 ```
 
 - Group by *what files are about*, not file kind. `src/plugins/wiki/` keeps def/index/View/Preview together.
 - Mirror source layout in `test/`. `server/journal/dailyPass.ts` → `test/journal/test_dailyPass.ts`.
 - Prefer a new named directory over dropping files into the closest pre-existing bucket.
+
+## E2E Testing (Playwright)
+
+Browser-based tests in `e2e/`. No backend server required — all `/api/*` calls are intercepted with `page.route()` and served from fixtures.
+
+### Structure
+
+```
+e2e/
+  playwright.config.ts    ← Chromium-only, auto-starts vite dev client
+  fixtures/
+    api.ts                ← mockAllApis(page) — shared API mock helper
+    sessions.ts           ← session data fixtures
+  tests/
+    smoke.spec.ts         ← app loads, input works
+    router-guards.spec.ts ← URL injection defence
+```
+
+### Writing tests
+
+1. Call `await mockAllApis(page)` before `page.goto()` — it intercepts all API routes
+2. Use `data-testid` attributes for element selection (change-resistant)
+3. Use URL assertions for router behaviour (`expect(page.url()).toContain(...)`)
+4. Override specific API responses per test by adding a `page.route()` AFTER `mockAllApis` (Playwright checks last-registered first)
+
+### Gotchas
+
+- **Route order is reversed**: Playwright checks routes last-registered-first. Register catch-all FIRST, specific routes AFTER.
+- **URL predicate functions > globs**: `**/api/roles` doesn't reliably match `http://host/api/roles`. Use `(url) => url.pathname === "/api/roles"` instead.
+- **Hash vs history mode**: Tests that assert URL query params behave differently between hash mode (`/#/chat?view=x`) and history mode (`/chat?view=x`). Write tests against the rendered UI state rather than raw URL strings when possible.
 
 ## Tech Stack
 
@@ -173,4 +208,5 @@ plans/            ← one file per feature/refactor/fix
 - **Plugin protocol**: `gui-chat-protocol`
 - **Server**: Express.js (SSE streaming)
 - **Storage**: Local file system (plain Markdown files)
+- **E2E Testing**: Playwright (Chromium)
 - **Language**: TypeScript throughout
