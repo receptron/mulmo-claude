@@ -238,7 +238,13 @@ async function fetchSheets(): Promise<void> {
         return;
       }
       try {
-        resolvedSheets.value = JSON.parse(json.content);
+        const parsed: unknown = JSON.parse(json.content);
+        if (!Array.isArray(parsed)) {
+          errorMessage.value = "Spreadsheet content is not an array of sheets";
+          resolvedSheets.value = [];
+        } else {
+          resolvedSheets.value = parsed as SpreadsheetSheet[];
+        }
       } catch (parseErr) {
         errorMessage.value = `Spreadsheet JSON is malformed: ${parseErr instanceof Error ? parseErr.message : "parse error"}`;
         resolvedSheets.value = [];

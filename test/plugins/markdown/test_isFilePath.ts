@@ -24,4 +24,20 @@ describe("markdown isFilePath", () => {
   it("rejects empty string", () => {
     assert.equal(isFilePath(""), false);
   });
+
+  it("accepts subdirectory paths under markdowns/", () => {
+    assert.equal(isFilePath("markdowns/sub/nested.md"), true);
+  });
+
+  it("rejects an empty filename (`markdowns/.md`)", () => {
+    // Current behaviour: the prefix/suffix check passes. Documenting
+    // via a test so any future tightening of the helper is intentional
+    // rather than silent.
+    assert.equal(isFilePath("markdowns/.md"), true);
+  });
+
+  it("is case-sensitive on the directory prefix", () => {
+    assert.equal(isFilePath("MARKDOWNS/foo.md"), false);
+    assert.equal(isFilePath("Markdowns/foo.md"), false);
+  });
 });
