@@ -42,21 +42,32 @@
         </div>
       </div>
 
-      <details class="markdown-source">
-        <summary>Edit Markdown Source</summary>
-        <textarea
-          v-model="editableMarkdown"
-          class="markdown-editor"
-          spellcheck="false"
-        ></textarea>
+      <div class="bottom-bar-wrapper">
+        <details class="markdown-source">
+          <summary>Edit Markdown Source</summary>
+          <textarea
+            v-model="editableMarkdown"
+            class="markdown-editor"
+            spellcheck="false"
+          ></textarea>
+          <button
+            class="apply-btn"
+            :disabled="!hasChanges || saving"
+            @click="applyMarkdown"
+          >
+            {{ saving ? "Saving..." : "Apply Changes" }}
+          </button>
+        </details>
         <button
-          class="apply-btn"
-          :disabled="!hasChanges || saving"
-          @click="applyMarkdown"
+          class="copy-btn"
+          :title="copied ? 'Copied!' : 'Copy'"
+          @click="copyText"
         >
-          {{ saving ? "Saving..." : "Apply Changes" }}
+          <span class="material-icons">{{
+            copied ? "check" : "content_copy"
+          }}</span>
         </button>
-      </details>
+      </div>
     </template>
   </div>
 </template>
@@ -159,6 +170,20 @@ watch(
     });
   },
 );
+
+const copied = ref(false);
+
+async function copyText() {
+  try {
+    await navigator.clipboard.writeText(markdownContent.value);
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2000);
+  } catch {
+    // clipboard API may be blocked in some contexts
+  }
+}
 
 const {
   pdfDownloading,
@@ -324,6 +349,31 @@ watch(
   font-weight: bold;
   margin-top: 1em;
   margin-bottom: 0.5em;
+}
+
+.bottom-bar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.copy-btn {
+  position: absolute;
+  bottom: 0.3rem;
+  right: 0.65rem;
+  padding: 0.4rem;
+  background: none;
+  border: none;
+  color: #333;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.copy-btn:hover {
+  color: #000;
+}
+
+.copy-btn .material-icons {
+  font-size: 1.15rem;
 }
 
 .markdown-source {

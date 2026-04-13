@@ -23,17 +23,29 @@
         >⚠ PDF failed</span
       >
     </div>
-    <div class="flex-1 overflow-hidden" @click.capture="openLinksInNewTab">
+    <div
+      class="flex-1 overflow-hidden relative"
+      @click.capture="openLinksInNewTab"
+    >
       <OriginalView
         :selected-result="selectedResult"
         @update-result="(r) => emit('updateResult', r as ToolResultComplete)"
       />
+      <button
+        class="copy-btn"
+        :title="copied ? 'Copied!' : 'Copy'"
+        @click="copyText"
+      >
+        <span class="material-icons">{{
+          copied ? "check" : "content_copy"
+        }}</span>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { View as OriginalView } from "@gui-chat-plugin/text-response/vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
@@ -63,6 +75,21 @@ const {
   pdfError,
   downloadPdf: rawDownloadPdf,
 } = usePdfDownload();
+
+const copied = ref(false);
+
+async function copyText() {
+  const text = props.selectedResult.data?.text ?? "";
+  try {
+    await navigator.clipboard.writeText(text);
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2000);
+  } catch {
+    // Fallback: clipboard API may be blocked in some contexts
+  }
+}
 
 async function downloadPdf() {
   const text = props.selectedResult.data?.text ?? "";
@@ -100,5 +127,25 @@ async function downloadPdf() {
 .download-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.copy-btn {
+  position: absolute;
+  bottom: 0.3rem;
+  right: 0.65rem;
+  padding: 0.4rem;
+  background: none;
+  border: none;
+  color: #333;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.copy-btn:hover {
+  color: #000;
+}
+
+.copy-btn .material-icons {
+  font-size: 1.15rem;
 }
 </style>
