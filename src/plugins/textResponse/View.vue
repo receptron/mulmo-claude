@@ -24,14 +24,17 @@
       >
     </div>
     <div
+      ref="contentWrapper"
       class="flex-1 overflow-hidden relative"
       @click.capture="openLinksInNewTab"
     >
       <OriginalView
+        :key="viewKey"
         :selected-result="selectedResult"
-        @update-result="(r) => emit('updateResult', r as ToolResultComplete)"
+        @update-result="onApply"
       />
       <button
+        v-show="!editing"
         class="copy-btn"
         :title="copied ? 'Copied!' : 'Copy'"
         @click="copyText"
@@ -40,12 +43,15 @@
           copied ? "check" : "content_copy"
         }}</span>
       </button>
+      <button v-show="editing" class="cancel-btn" @click="cancelEdit">
+        Cancel
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { View as OriginalView } from "@gui-chat-plugin/text-response/vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
@@ -75,6 +81,43 @@ const {
   pdfError,
   downloadPdf: rawDownloadPdf,
 } = usePdfDownload();
+
+const contentWrapper = ref<HTMLElement>();
+const editing = ref(false);
+const viewKey = ref(0);
+
+function attachToggleListener() {
+  const details = contentWrapper.value?.querySelector("details");
+  details?.addEventListener("toggle", onDetailsToggle);
+}
+
+function onDetailsToggle(e: Event) {
+  const open = (e.target as HTMLDetailsElement).open;
+  editing.value = open;
+  if (!open) {
+    // Re-mount OriginalView to discard textarea edits
+    viewKey.value++;
+    nextTick(attachToggleListener);
+  }
+}
+
+onMounted(attachToggleListener);
+
+onBeforeUnmount(() => {
+  const details = contentWrapper.value?.querySelector("details");
+  details?.removeEventListener("toggle", onDetailsToggle);
+});
+
+function cancelEdit() {
+  const details = contentWrapper.value?.querySelector("details");
+  if (details) details.open = false;
+}
+
+function onApply(r: unknown) {
+  emit("updateResult", r as ToolResultComplete);
+  const details = contentWrapper.value?.querySelector("details");
+  if (details) details.open = false;
+}
 
 const copied = ref(false);
 
@@ -147,5 +190,24 @@ async function downloadPdf() {
 
 .copy-btn .material-icons {
   font-size: 1.15rem;
+}
+
+.cancel-btn {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.65rem;
+  padding: 0.5rem 1rem;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  z-index: 1;
+}
+
+.cancel-btn:hover {
+  background: #d0d0d0;
 }
 </style>

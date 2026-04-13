@@ -43,22 +43,30 @@
       </div>
 
       <div class="bottom-bar-wrapper">
-        <details class="markdown-source">
+        <details
+          ref="sourceDetails"
+          class="markdown-source"
+          @toggle="onDetailsToggle"
+        >
           <summary>Edit Markdown Source</summary>
           <textarea
             v-model="editableMarkdown"
             class="markdown-editor"
             spellcheck="false"
           ></textarea>
-          <button
-            class="apply-btn"
-            :disabled="!hasChanges || saving"
-            @click="applyMarkdown"
-          >
-            {{ saving ? "Saving..." : "Apply Changes" }}
-          </button>
+          <div class="editor-actions">
+            <button
+              class="apply-btn"
+              :disabled="!hasChanges || saving"
+              @click="applyMarkdown"
+            >
+              {{ saving ? "Saving..." : "Apply Changes" }}
+            </button>
+            <button class="cancel-btn" @click="cancelEdit">Cancel</button>
+          </div>
         </details>
         <button
+          v-show="!editing"
           class="copy-btn"
           :title="copied ? 'Copied!' : 'Copy'"
           @click="copyText"
@@ -171,7 +179,19 @@ watch(
   },
 );
 
+const sourceDetails = ref<HTMLDetailsElement>();
+const editing = ref(false);
 const copied = ref(false);
+
+function onDetailsToggle(e: Event) {
+  const open = (e.target as HTMLDetailsElement).open;
+  editing.value = open;
+  if (!open) editableMarkdown.value = markdownContent.value;
+}
+
+function cancelEdit() {
+  if (sourceDetails.value) sourceDetails.value.open = false;
+}
 
 async function copyText() {
   try {
@@ -241,6 +261,9 @@ async function applyMarkdown() {
     },
   };
   emit("updateResult", updatedResult);
+
+  // Close the edit panel
+  if (sourceDetails.value) sourceDetails.value.open = false;
 }
 
 // Watch for external changes to selectedResult (when user clicks different result)
@@ -453,5 +476,26 @@ watch(
 
 .apply-btn:disabled:hover {
   background: #cccccc;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cancel-btn {
+  padding: 0.5rem 1rem;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+
+.cancel-btn:hover {
+  background: #d0d0d0;
 }
 </style>
