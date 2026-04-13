@@ -159,62 +159,16 @@
       </div>
 
       <!-- Tool result previews -->
-      <div
-        ref="chatListRef"
-        class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100 outline-none"
-        tabindex="0"
-        @mousedown="activePane = 'sidebar'"
-      >
-        <div
-          v-for="result in sidebarResults"
-          :key="result.uuid"
-          class="cursor-pointer rounded border border-gray-300 p-2 text-sm text-gray-900 hover:opacity-75 transition-opacity"
-          :class="
-            result.uuid === selectedResultUuid ? 'ring-2 ring-blue-500' : ''
-          "
-          @click="onSidebarItemClick(result.uuid)"
-        >
-          <component
-            :is="getPlugin(result.toolName)?.previewComponent"
-            v-if="getPlugin(result.toolName)?.previewComponent"
-            :result="result"
-          />
-          <span v-else>{{ result.title || result.toolName }}</span>
-        </div>
-
-        <!-- Thinking indicator -->
-        <div v-if="isRunning" class="px-2 py-1 text-sm">
-          <div class="flex items-center gap-2 text-gray-500">
-            <span class="text-xs">{{ statusMessage }}</span>
-            <span class="flex gap-1">
-              <span
-                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
-                style="animation-delay: 0ms"
-              />
-              <span
-                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
-                style="animation-delay: 150ms"
-              />
-              <span
-                class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
-                style="animation-delay: 300ms"
-              />
-            </span>
-          </div>
-          <div v-if="pendingCalls.length > 0" class="mt-1 space-y-0.5">
-            <div
-              v-for="call in pendingCalls"
-              :key="call.toolUseId"
-              class="flex items-center gap-1.5 text-xs text-gray-400"
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full bg-blue-300 shrink-0 animate-pulse"
-              />
-              <span class="font-mono truncate">{{ call.toolName }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ToolResultsPanel
+        ref="toolResultsPanelRef"
+        :results="sidebarResults"
+        :selected-uuid="selectedResultUuid"
+        :is-running="isRunning"
+        :status-message="statusMessage"
+        :pending-calls="pendingCalls"
+        @select="onSidebarItemClick"
+        @activate="activePane = 'sidebar'"
+      />
 
       <!-- Sample queries (expandable pane) -->
       <div v-if="showQueries" class="border-t border-gray-200">
@@ -369,6 +323,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
 import LockStatusPopup from "./components/LockStatusPopup.vue";
+import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
@@ -591,7 +546,8 @@ const { sessions, showHistory, fetchSessions, toggleHistory } =
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 const showLockPopup = ref(false);
 
-const chatListRef = ref<HTMLDivElement | null>(null);
+const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
+const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const historyButtonRef = ref<HTMLButtonElement | null>(null);
