@@ -48,72 +48,13 @@
               >{{ unreadCount }}</span
             >
           </button>
-          <div class="relative">
-            <button
-              ref="lockButtonRef"
-              :class="
-                sandboxEnabled
-                  ? 'text-green-500 hover:text-green-700'
-                  : 'text-amber-400 hover:text-amber-500'
-              "
-              :title="
-                sandboxEnabled
-                  ? 'Sandbox enabled (Docker)'
-                  : 'No sandbox (Docker not found)'
-              "
-              @click="showLockPopup = !showLockPopup"
-            >
-              <span class="material-icons">{{
-                sandboxEnabled ? "lock" : "lock_open"
-              }}</span>
-            </button>
-            <div
-              v-if="showLockPopup"
-              ref="lockPopupRef"
-              class="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs"
-            >
-              <p
-                class="mb-2"
-                :class="sandboxEnabled ? 'text-green-800' : 'text-amber-500'"
-              >
-                <template v-if="sandboxEnabled">
-                  <span class="material-icons text-xs align-middle mr-1"
-                    >lock</span
-                  >
-                  <strong>Sandbox enabled:</strong> Docker is running.
-                  Filesystem access is isolated.
-                </template>
-                <template v-else>
-                  <span class="material-icons text-xs align-middle mr-1"
-                    >warning</span
-                  >
-                  <strong>No sandbox:</strong> Claude can access all files on
-                  your machine. Install
-                  <a
-                    href="https://www.docker.com/products/docker-desktop/"
-                    target="_blank"
-                    class="underline"
-                    >Docker Desktop</a
-                  >
-                  to enable filesystem isolation.
-                </template>
-              </p>
-              <p class="text-gray-400 mb-1">Test sandbox isolation:</p>
-              <div class="flex flex-col gap-1">
-                <button
-                  v-for="q in sandboxTestQueries"
-                  :key="q"
-                  class="text-left rounded px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-                  @click="
-                    showLockPopup = false;
-                    sendMessage(q);
-                  "
-                >
-                  {{ q }}
-                </button>
-              </div>
-            </div>
-          </div>
+          <LockStatusPopup
+            ref="lockPopupRef"
+            :sandbox-enabled="sandboxEnabled"
+            :open="showLockPopup"
+            @update:open="showLockPopup = $event"
+            @test-query="sendMessage"
+          />
           <button
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showRightSidebar }"
@@ -427,6 +368,7 @@ import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
+import LockStatusPopup from "./components/LockStatusPopup.vue";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
@@ -649,13 +591,6 @@ const { sessions, showHistory, fetchSessions, toggleHistory } =
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 const showLockPopup = ref(false);
 
-const sandboxTestQueries = [
-  "Run `whoami` and show the result",
-  "Run `hostname` and show the result",
-  "Try to list files in ~/Library",
-  "Read helps/sandbox.md and explain how the sandbox works",
-];
-
 const chatListRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
@@ -664,8 +599,14 @@ const historyButtonRef = ref<HTMLButtonElement | null>(null);
 // needs the actual popup DOM element (not the component instance).
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
-const lockButtonRef = ref<HTMLButtonElement | null>(null);
-const lockPopupRef = ref<HTMLDivElement | null>(null);
+// Lock popup exposes its button + popup DOM via defineExpose so the
+// click-outside guard has both references without poking the template.
+const lockPopupRef = ref<{
+  button: HTMLButtonElement | null;
+  popup: HTMLDivElement | null;
+} | null>(null);
+const lockButtonRef = computed(() => lockPopupRef.value?.button ?? null);
+const lockPopupElRef = computed(() => lockPopupRef.value?.popup ?? null);
 const headerRef = ref<HTMLDivElement | null>(null);
 const roleButtonRef = ref<HTMLButtonElement | null>(null);
 const roleDropdownRef = ref<HTMLDivElement | null>(null);
@@ -1224,7 +1165,7 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
 const { handler: handleClickOutsideLock } = useClickOutside({
   isOpen: showLockPopup,
   buttonRef: lockButtonRef,
-  popupRef: lockPopupRef,
+  popupRef: lockPopupElRef,
 });
 const { handler: handleClickOutsideRoleDropdown } = useClickOutside({
   isOpen: showRoleDropdown,
