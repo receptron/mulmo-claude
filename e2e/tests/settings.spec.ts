@@ -72,9 +72,7 @@ async function mockConfigApi(
 // modal already populated when they start typing).
 async function openSettingsModal(page: Page): Promise<void> {
   await page.locator('[data-testid="settings-btn"]').click();
-  await expect(
-    page.locator('[data-testid="settings-modal"]'),
-  ).toBeVisible();
+  await expect(page.locator('[data-testid="settings-modal"]')).toBeVisible();
   await page.waitForLoadState("networkidle");
 }
 
@@ -126,9 +124,9 @@ test.describe("Settings modal", () => {
     await page.goto("/chat");
 
     await openSettingsModal(page);
-    await page.locator('[data-testid="settings-tools-textarea"]').fill(
-      "mcp__claude_ai_Gmail\nrm -rf /",
-    );
+    await page
+      .locator('[data-testid="settings-tools-textarea"]')
+      .fill("mcp__claude_ai_Gmail\nrm -rf /");
     await expect(page.getByText(/look non-standard/)).toBeVisible();
   });
 
@@ -192,9 +190,9 @@ test.describe("Settings MCP tab — HTTP servers (Phase 2a)", () => {
       .fill("https://gmail.mcp.claude.com/mcp");
     await page.locator('[data-testid="mcp-draft-add"]').click();
 
-    await expect(
-      page.locator('[data-testid="mcp-draft-error"]'),
-    ).toContainText(/lowercase/);
+    await expect(page.locator('[data-testid="mcp-draft-error"]')).toContainText(
+      /lowercase/,
+    );
   });
 
   test("rejects a non-http URL", async ({ page }) => {
@@ -208,18 +206,16 @@ test.describe("Settings MCP tab — HTTP servers (Phase 2a)", () => {
     await page.locator('[data-testid="mcp-draft-url"]').fill("ftp://x/mcp");
     await page.locator('[data-testid="mcp-draft-add"]').click();
 
-    await expect(
-      page.locator('[data-testid="mcp-draft-error"]'),
-    ).toContainText(/http/);
+    await expect(page.locator('[data-testid="mcp-draft-error"]')).toContainText(
+      /http/,
+    );
   });
 
   test("rejects a duplicate id", async ({ page }) => {
     await mockConfigApi(page, {
       settings: { extraAllowedTools: [] },
       mcp: {
-        servers: [
-          { id: "gmail", spec: { type: "http", url: "https://x" } },
-        ],
+        servers: [{ id: "gmail", spec: { type: "http", url: "https://x" } }],
       },
     });
     await page.goto("/chat");
@@ -227,13 +223,11 @@ test.describe("Settings MCP tab — HTTP servers (Phase 2a)", () => {
     await page.locator('[data-testid="settings-tab-mcp"]').click();
     await page.locator('[data-testid="mcp-add-btn"]').click();
     await page.locator('[data-testid="mcp-draft-id"]').fill("gmail");
-    await page
-      .locator('[data-testid="mcp-draft-url"]')
-      .fill("https://y/mcp");
+    await page.locator('[data-testid="mcp-draft-url"]').fill("https://y/mcp");
     await page.locator('[data-testid="mcp-draft-add"]').click();
-    await expect(
-      page.locator('[data-testid="mcp-draft-error"]'),
-    ).toContainText(/already exists/);
+    await expect(page.locator('[data-testid="mcp-draft-error"]')).toContainText(
+      /already exists/,
+    );
   });
 
   test("removes an existing server", async ({ page }) => {
@@ -267,14 +261,10 @@ test.describe("Settings MCP tab — stdio + Docker warnings (Phase 2b)", () => {
     await page.locator('[data-testid="mcp-add-btn"]').click();
     await page.locator('[data-testid="mcp-draft-id"]').fill("files");
     await page.locator('[data-testid="mcp-draft-type-stdio"]').check();
-    await page.locator('[data-testid="mcp-draft-command"]').selectOption(
-      "npx",
-    );
+    await page.locator('[data-testid="mcp-draft-command"]').selectOption("npx");
     await page
       .locator('[data-testid="mcp-draft-args"]')
-      .fill(
-        "-y\n@modelcontextprotocol/server-filesystem\n/workspace/docs",
-      );
+      .fill("-y\n@modelcontextprotocol/server-filesystem\n/workspace/docs");
     await page.locator('[data-testid="mcp-draft-add"]').click();
 
     await expect(
