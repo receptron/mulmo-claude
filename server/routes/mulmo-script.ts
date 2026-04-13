@@ -20,6 +20,7 @@ import {
   removeSessionProgressCallback,
   type MulmoScript,
 } from "mulmocast";
+import { mulmoScriptSchema } from "@mulmocast/types";
 import type { MulmoBeat, MulmoImagePromptMedia } from "@mulmocast/types";
 import { slugify } from "../utils/slug.js";
 import { resolveWithinRoot } from "../utils/fs.js";
@@ -154,6 +155,12 @@ router.post(
 
     if (!filePath || !updatedScript) {
       res.status(400).json({ error: "filePath and script are required" });
+      return;
+    }
+
+    const result = mulmoScriptSchema.safeParse(updatedScript);
+    if (!result.success) {
+      res.status(400).json({ error: "Invalid MulmoScript schema" });
       return;
     }
 
