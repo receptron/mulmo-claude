@@ -43,15 +43,16 @@ SSE from `POST /api/agent`: `{ type: "status" | "tool_result" | "error", ... }`.
 
 ### Workspace
 
-Set via `WORKSPACE_PATH` env var (defaults to `cwd()`). All data lives as plain Markdown + YAML frontmatter files:
+Hard-coded to `~/mulmoclaude/` (see `server/workspace.ts:11`). There is **no `WORKSPACE_PATH` env override**; changing the location requires a code edit or a symlink. Full directory layout is documented in [`docs/developer.md`](docs/developer.md#workspace-layout-mulmoclaude); the short version:
 
 ```text
-workspace/
+~/mulmoclaude/
   chat/           ← session ToolResults (one .jsonl per session)
   chat/index/     ← per-session title/summary cache (chat indexer)
   todos/          ← todo items
   calendar/       ← calendar events
   wiki/           ← wiki pages + assets
+  configs/        ← web Settings UI (settings.json, mcp.json)
   summaries/      ← journal output (daily/ + topics/ + archive/)
   memory.md       ← distilled facts always loaded as context
 ```
