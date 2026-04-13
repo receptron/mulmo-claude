@@ -112,9 +112,7 @@ test.describe("spreadsheet — rendering", () => {
   });
 
   test("legacy inline sheets render without a fetch", async ({ page }) => {
-    const sheets = [
-      { name: "Inline", data: [[{ v: "Legacy" }, { v: 1 }]] },
-    ];
+    const sheets = [{ name: "Inline", data: [[{ v: "Legacy" }, { v: 1 }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.getByText("Legacy").first()).toBeVisible({
@@ -132,7 +130,9 @@ test.describe("spreadsheet — rendering", () => {
     const item = page.getByText("Q1 Revenue").first();
     await expect(item).toBeVisible({ timeout: 5000 });
     await item.click();
-    await expect(page.locator("h1.title", { hasText: "Q1 Revenue" })).toBeVisible({
+    await expect(
+      page.locator("h1.title", { hasText: "Q1 Revenue" }),
+    ).toBeVisible({
       timeout: 5000,
     });
   });
@@ -151,9 +151,7 @@ test.describe("spreadsheet — multi-sheet", () => {
   test("sheet tabs appear only when there is more than one sheet", async ({
     page,
   }) => {
-    const sheets = [
-      { name: "Single", data: [[{ v: "only" }]] },
-    ];
+    const sheets = [{ name: "Single", data: [[{ v: "only" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     // No tab row when single sheet
@@ -190,10 +188,7 @@ test.describe("spreadsheet — formula & format", () => {
     const sheets = [
       {
         name: "Sheet1",
-        data: [
-          [{ v: 10 }, { v: 20 }, { v: 30 }],
-          [{ v: "=SUM(A1:C1)" }],
-        ],
+        data: [[{ v: 10 }, { v: 20 }, { v: 30 }], [{ v: "=SUM(A1:C1)" }]],
       },
     ];
     await setupSpreadsheetSession(page, { sheets });
@@ -285,7 +280,9 @@ test.describe("spreadsheet — mini editor", () => {
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.locator(".radio-option", { hasText: "String" })).toBeVisible();
+    await expect(
+      page.locator(".radio-option", { hasText: "String" }),
+    ).toBeVisible();
     await expect(
       page.locator(".radio-option", { hasText: "Formula" }),
     ).toBeVisible();
@@ -303,7 +300,9 @@ test.describe("spreadsheet — mini editor", () => {
     await expect(page.locator(".mini-editor-panel")).toHaveCount(0);
   });
 
-  test("formula mode shows a second input for format code", async ({ page }) => {
+  test("formula mode shows a second input for format code", async ({
+    page,
+  }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "hi" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -314,7 +313,9 @@ test.describe("spreadsheet — mini editor", () => {
     // Switch to Formula mode
     await page.locator(".radio-option", { hasText: "Formula" }).click();
     // Two inputs: value/formula + format
-    await expect(page.locator('input[placeholder^="Value or Formula"]')).toBeVisible();
+    await expect(
+      page.locator('input[placeholder^="Value or Formula"]'),
+    ).toBeVisible();
     await expect(page.locator('input[placeholder^="Format"]')).toBeVisible();
   });
 });
@@ -326,8 +327,9 @@ test.describe("spreadsheet — source editor", () => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
-    await expect(page.locator("summary", { hasText: "Edit Spreadsheet Data" }))
-      .toBeVisible({ timeout: 5000 });
+    await expect(
+      page.locator("summary", { hasText: "Edit Spreadsheet Data" }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test("Apply Changes button is disabled when textarea matches state", async ({
@@ -470,9 +472,9 @@ test.describe("spreadsheet — edge cases", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     // Accept either case; the engine may normalize.
-    await expect(page.locator("td", { hasText: /true/i }).first()).toBeVisible(
-      { timeout: 5000 },
-    );
+    await expect(page.locator("td", { hasText: /true/i }).first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("many rows render without crash", async ({ page }) => {

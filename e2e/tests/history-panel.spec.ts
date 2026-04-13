@@ -8,7 +8,7 @@
 // AI-title preference): this file focuses on the button+popup UX
 // extracted into useSessionHistory + SessionHistoryPanel.
 
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 import { SESSION_A, SESSION_B } from "../fixtures/sessions";
 
@@ -28,9 +28,7 @@ test.describe("history panel (useSessionHistory)", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Panel is closed initially — session items should not be in DOM.
-    await expect(
-      page.getByTestId(`session-item-${SESSION_A.id}`),
-    ).toBeHidden();
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeHidden();
 
     await page.getByTestId("history-btn").click();
 

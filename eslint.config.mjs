@@ -91,6 +91,32 @@ export default [
     },
   },
   {
+    // Test & E2E override. Tests legitimately use things that the
+    // sonarjs rule set flags as insecure in production code:
+    // /tmp directories for fixtures, chmod bits in fs-permission
+    // tests, http://localhost in CSRF / CORS tests. And Playwright
+    // specs need the full browser global set. Narrow the override
+    // to just those categories so no-shadow / cognitive-complexity /
+    // no-unused-vars / no-floating-promises etc. stay at `error`
+    // across the whole repo — those *do* catch real bugs in tests.
+    files: ["test/**/*.{ts,js}", "e2e/**/*.{ts,js}"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      "sonarjs/publicly-writable-directories": "off",
+      "sonarjs/file-permissions": "off",
+      "sonarjs/no-clear-text-protocols": "off",
+      // Playwright / jsdom-style specs commonly use `any`-ish casts
+      // against DOM types to build minimal mocks. Keep
+      // `no-explicit-any` at `error` in production code; demote to
+      // warn inside tests.
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+  {
     // Vue SFC override — must come AFTER the main rules block so
     // our per-rule overrides actually take effect (flat config's
     // last-match-wins semantics). `vue-eslint-parser` is needed so

@@ -97,7 +97,7 @@ describe("maybeAppendWikiBacklinks (driver)", () => {
 
     let writeCalls = 0;
     const deps: Partial<WikiBacklinksDeps> = {
-      writeFile: async (_p: string, _c: string) => {
+      writeFile: async (__p: string, __c: string) => {
         writeCalls++;
       },
     };

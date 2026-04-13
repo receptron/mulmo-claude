@@ -33,11 +33,9 @@ test.describe("health check (useHealth)", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     const lockBtn = page.getByTestId("sandbox-lock-button");
-    await expect(lockBtn).toHaveAttribute(
-      "title",
-      "Sandbox enabled (Docker)",
-      { timeout: 3000 },
-    );
+    await expect(lockBtn).toHaveAttribute("title", "Sandbox enabled (Docker)", {
+      timeout: 3000,
+    });
   });
 
   test("sandboxEnabled=false → lock button shows 'No sandbox' tooltip", async ({

@@ -49,7 +49,6 @@ export function createFileSink(
     deps.onError ??
     ((err: unknown) => {
       // Fallback — never throw back into the caller.
-      // eslint-disable-next-line no-console
       console.error("[logger] file sink error:", err);
     });
 

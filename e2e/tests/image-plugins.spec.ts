@@ -114,9 +114,7 @@ test.describe("image plugin rendering", () => {
     await expect(brokenImages).toHaveCount(0);
   });
 
-  test("legacy data URI image renders as an actual <img>", async ({
-    page,
-  }) => {
+  test("legacy data URI image renders as an actual <img>", async ({ page }) => {
     await page.goto("/chat/img-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.waitForTimeout(1000);

@@ -185,7 +185,9 @@ test.describe("Todo Explorer", () => {
     await page.locator('[data-testid="todo-add-btn"]').click();
     await expect(page.getByText("Add Todo")).toBeVisible();
     // The dialog should have a text input and status select
-    await expect(page.locator('input[placeholder="What needs doing?"]')).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="What needs doing?"]'),
+    ).toBeVisible();
   });
 
   test("Escape closes the add dialog", async ({ page }) => {

@@ -1,6 +1,7 @@
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "fs/promises";
+import { randomBytes } from "crypto";
 import os from "os";
 import path from "path";
 import {
@@ -70,9 +71,11 @@ describe("recordToolEvent", () => {
   // leak between cases.
   let h: Harness;
   beforeEach(async () => {
+    // Crypto-grade random keeps sonarjs/pseudo-random happy;
+    // uniqueness only matters so each case gets its own jsonl dir.
     const subdir = path.join(
       workspaceRoot,
-      `case-${Math.random().toString(36).slice(2, 8)}`,
+      `case-${randomBytes(4).toString("hex")}`,
     );
     h = await makeHarness(subdir);
   });

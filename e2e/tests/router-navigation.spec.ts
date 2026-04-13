@@ -35,9 +35,7 @@ test.describe("session navigation via URL", () => {
     await page.waitForURL(/\/chat\//);
 
     await openHistoryWithSessions(page);
-    await page
-      .locator(`[data-testid="session-item-${SESSION_A.id}"]`)
-      .click();
+    await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).click();
 
     await page.waitForURL(new RegExp(SESSION_A.id));
     expect(page.url()).toContain(SESSION_A.id);
@@ -49,16 +47,12 @@ test.describe("session navigation via URL", () => {
 
     // Navigate to session A
     await openHistoryWithSessions(page);
-    await page
-      .locator(`[data-testid="session-item-${SESSION_A.id}"]`)
-      .click();
+    await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).click();
     await page.waitForURL(new RegExp(SESSION_A.id));
 
     // Navigate to session B
     await openHistoryWithSessions(page);
-    await page
-      .locator(`[data-testid="session-item-${SESSION_B.id}"]`)
-      .click();
+    await page.locator(`[data-testid="session-item-${SESSION_B.id}"]`).click();
     await page.waitForURL(new RegExp(SESSION_B.id));
 
     // Back → session A
@@ -74,15 +68,11 @@ test.describe("session navigation via URL", () => {
     await page.waitForURL(/\/chat\//);
 
     await openHistoryWithSessions(page);
-    await page
-      .locator(`[data-testid="session-item-${SESSION_A.id}"]`)
-      .click();
+    await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).click();
     await page.waitForURL(new RegExp(SESSION_A.id));
 
     await openHistoryWithSessions(page);
-    await page
-      .locator(`[data-testid="session-item-${SESSION_B.id}"]`)
-      .click();
+    await page.locator(`[data-testid="session-item-${SESSION_B.id}"]`).click();
     await page.waitForURL(new RegExp(SESSION_B.id));
 
     // Back → session A

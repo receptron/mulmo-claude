@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
-import { TODO_ITEMS, TODO_COLUMNS, type TodoFixture } from "../fixtures/todos";
+import { TODO_ITEMS, TODO_COLUMNS } from "../fixtures/todos";
 
 // Mirror of server/utils/slug.ts for deterministic id generation in
 // the mock. Keeping this inline avoids a Vite/server import boundary;
@@ -11,7 +11,14 @@ function mockSlugifyColumnId(label: string): string {
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "_");
-  slug = slug.replace(/^_+|_+$/g, "");
+  // Trim leading/trailing underscores by character walk — avoids the
+  // `^_+|_+$` alternation that sonarjs/slow-regex flags for
+  // potential backtracking.
+  let start = 0;
+  while (start < slug.length && slug[start] === "_") start++;
+  let end = slug.length;
+  while (end > start && slug[end - 1] === "_") end--;
+  slug = slug.slice(start, end);
   // eslint-disable-next-line no-control-regex
   const hasNonAscii = /[^\x00-\x7F]/.test(label);
   if (!hasNonAscii) return slug.length > 0 ? slug : "column";
@@ -28,7 +35,7 @@ async function setupTodoMocks(page: Page) {
 
   // Mutable state for column operations.
   let columns = [...TODO_COLUMNS];
-  let items = [...TODO_ITEMS];
+  const items = [...TODO_ITEMS];
 
   const buildResponse = () => ({ data: { items, columns } });
 
@@ -138,9 +145,7 @@ test.describe("Todo column management", () => {
     });
 
     // Click the first column's menu button (more_horiz icon)
-    const firstColumn = page.locator(
-      '[data-testid="todo-column-backlog"]',
-    );
+    const firstColumn = page.locator('[data-testid="todo-column-backlog"]');
     await firstColumn.locator("text=more_horiz").click();
     await expect(page.getByText("Rename")).toBeVisible();
     await expect(page.getByText("Delete column")).toBeVisible();

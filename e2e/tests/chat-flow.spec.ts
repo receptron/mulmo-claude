@@ -102,9 +102,7 @@ test.describe("session selection", () => {
     });
   });
 
-  test("history panel shows session previews", async ({
-    page,
-  }) => {
+  test("history panel shows session previews", async ({ page }) => {
     await page.goto("/");
 
     // Open history panel.
@@ -140,7 +138,9 @@ test.describe("sending a chat message", () => {
     await page.getByTestId("user-input").fill("ping");
     await page.getByTestId("send-btn").click();
 
-    await expect(page.locator("text=Pong from the server").first()).toBeVisible();
+    await expect(
+      page.locator("text=Pong from the server").first(),
+    ).toBeVisible();
     // The user's own message should also be in the list.
     await expect(page.locator("text=ping").first()).toBeVisible();
   });
