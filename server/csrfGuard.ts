@@ -17,6 +17,7 @@
 // Full design + threat model: plans/fix-server-csrf-origin-check.md
 
 import type { Request, Response, NextFunction } from "express";
+import { log } from "./logger/index.js";
 
 const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -74,5 +75,14 @@ export function requireSameOrigin(
     next();
     return;
   }
+  // Security-relevant event: an upstream caller just hit us from
+  // off-localhost with a state-changing method. Log it at warn so
+  // operators see it in both the console and the rotating file
+  // log even if the attack is otherwise silent on the wire.
+  log.warn("csrf", "rejected cross-origin request", {
+    origin,
+    method: req.method,
+    path: req.path,
+  });
   res.status(403).json({ error: "Forbidden: cross-origin request rejected" });
 }
