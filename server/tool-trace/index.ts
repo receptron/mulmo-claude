@@ -85,6 +85,85 @@ async function handleToolCall(
     ts: now.toISOString(),
   };
   await appendRecord(deps, record);
+  logToolCall(event);
+}
+
+// Emit an info-level log when a tool fires. WebSearch and WebFetch
+// get a little extra context (the query / URL) because those are the
+// two tools whose progress users most often want to watch in real
+// time.
+function logToolCall(event: ToolCallEvent): void {
+  if (event.toolName === "WebSearch") {
+    const query = extractQuery(event.args);
+    log.info("tool-trace", "web_search starting", {
+      toolUseId: event.toolUseId,
+      query: query ?? "<missing>",
+    });
+    return;
+  }
+  if (event.toolName === "WebFetch") {
+    const url = extractUrl(event.args);
+    log.info("tool-trace", "web_fetch starting", {
+      toolUseId: event.toolUseId,
+      url: url ?? "<missing>",
+    });
+    return;
+  }
+  log.debug("tool-trace", "tool_call", {
+    toolUseId: event.toolUseId,
+    toolName: event.toolName,
+  });
+}
+
+function extractUrl(args: unknown): string | null {
+  if (!args || typeof args !== "object") return null;
+  const record = args as Record<string, unknown>;
+  const raw = record.url;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+// Emit progress on the result side. For WebSearch we specifically
+// log the saved `contentRef` so operators can follow the breadcrumb
+// from the server log straight to the on-disk search file.
+function logToolCallResult(
+  toolName: string,
+  event: ToolCallResultEvent,
+  classification:
+    | { kind: "pointer"; contentRef: string }
+    | { kind: "inline"; content: string; truncated: boolean },
+  searchContentRef: string | undefined,
+): void {
+  if (toolName === "WebSearch" && searchContentRef) {
+    log.info("tool-trace", "web_search saved", {
+      toolUseId: event.toolUseId,
+      contentRef: searchContentRef,
+      bodyLen: event.content.length,
+    });
+    return;
+  }
+  if (toolName === "WebSearch") {
+    // Save failed earlier → we already emitted a warn; record
+    // inline-fallback landing at info so the pair stays matched.
+    log.info("tool-trace", "web_search inlined (save failed)", {
+      toolUseId: event.toolUseId,
+      bodyLen: event.content.length,
+    });
+    return;
+  }
+  if (classification.kind === "pointer") {
+    log.debug("tool-trace", "tool_call_result pointer", {
+      toolUseId: event.toolUseId,
+      toolName,
+      contentRef: classification.contentRef,
+    });
+    return;
+  }
+  log.debug("tool-trace", "tool_call_result inline", {
+    toolUseId: event.toolUseId,
+    toolName,
+    bodyLen: event.content.length,
+    truncated: classification.truncated,
+  });
 }
 
 async function handleToolCallResult(
@@ -129,6 +208,7 @@ async function handleToolCallResult(
           truncated: classification.truncated,
         };
   await appendRecord(deps, record);
+  logToolCallResult(toolName, event, classification, searchContentRef);
 
   // Release the cache entry once consumed so long-lived sessions
   // don't accumulate stale tool_use ids.
