@@ -139,6 +139,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { renderWikiLinks } from "./helpers";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<WikiData>;
@@ -186,12 +187,7 @@ watch(
 
 const renderedContent = computed(() => {
   if (!content.value) return "";
-  // Replace [[wiki links]] with styled spans before parsing
-  const withLinks = content.value.replace(
-    /\[\[([^\]]+)\]\]/g,
-    '<span class="wiki-link" data-page="$1">$1</span>',
-  );
-  return marked.parse(withLinks) as string;
+  return marked.parse(renderWikiLinks(content.value)) as string;
 });
 
 const navError = ref<string | null>(null);

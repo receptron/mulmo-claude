@@ -39,6 +39,16 @@ function buildLiveSummary(
     ...(serverEntry?.keywords !== undefined && {
       keywords: serverEntry.keywords,
     }),
+    // Carry live state from the server entry (authoritative source).
+    ...(serverEntry?.isRunning !== undefined && {
+      isRunning: serverEntry.isRunning,
+    }),
+    ...(serverEntry?.hasUnread !== undefined && {
+      hasUnread: serverEntry.hasUnread,
+    }),
+    ...(serverEntry?.statusMessage !== undefined && {
+      statusMessage: serverEntry.statusMessage,
+    }),
   };
 }
 

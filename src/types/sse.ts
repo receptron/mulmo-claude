@@ -46,6 +46,11 @@ export interface SseError {
   message: string;
 }
 
+/** Sent on the session channel when the agent run finishes. */
+export interface SseSessionFinished {
+  type: "session_finished";
+}
+
 export type SseEvent =
   | SseToolCall
   | SseToolCallResult
@@ -54,4 +59,5 @@ export type SseEvent =
   | SseText
   | SseToolResult
   | SseRolesUpdated
-  | SseError;
+  | SseError
+  | SseSessionFinished;

@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { access, appendFile, mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Router, Request, Response } from "express";
@@ -6,11 +5,14 @@ import { getRole } from "../roles.js";
 import { runAgent } from "../agent.js";
 import { prependJournalPointer } from "../agent/prompt.js";
 import {
-  registerSession,
-  removeSession,
-  pushToSession,
+  getOrCreateSession,
+  beginRun,
+  endRun,
+  cancelRun,
+  pushSessionEvent,
+  pushToolResult,
   getActiveSessionIds,
-} from "../sessions.js";
+} from "../session-store/index.js";
 import { workspacePath } from "../workspace.js";
 import { maybeRunJournal } from "../journal/index.js";
 import { maybeIndexSession } from "../chat-index/index.js";
@@ -19,23 +21,20 @@ import { log } from "../logger/index.js";
 const router = Router();
 const PORT = Number(process.env.PORT) || 3001;
 
-// Maps app-level chatSessionId → Claude CLI internal session ID for multi-turn dialog
-const claudeSessionMap = new Map<string, string>();
-
-// Called by the MCP server to push a ToolResult into the active SSE stream
+// Called by the MCP server to push a ToolResult into the active session.
 interface OkResponse {
   ok: boolean;
 }
 
 router.post(
   "/internal/tool-result",
-  async (req: Request<object, unknown, unknown>, res: Response<OkResponse>) => {
-    const session = String(req.query.session ?? "");
-    const pushed = await pushToSession(session, {
-      type: "tool_result",
-      result: req.body,
-    });
-    res.json({ ok: pushed });
+  async (
+    req: Request<object, unknown, Record<string, unknown>>,
+    res: Response<OkResponse>,
+  ) => {
+    const chatSessionId = String(req.query.session ?? "");
+    const outcome = await pushToolResult(chatSessionId, req.body);
+    res.json({ ok: outcome.kind === "processed" });
   },
 );
 
@@ -50,13 +49,30 @@ router.post(
     req: Request<object, unknown, SwitchRoleBody>,
     res: Response<OkResponse>,
   ) => {
-    const session = String(req.query.session ?? "");
-    const { roleId } = req.body;
-    const pushed = await pushToSession(session, {
+    const chatSessionId = String(req.query.session ?? "");
+    pushSessionEvent(chatSessionId, {
       type: "switch_role",
-      roleId,
+      roleId: req.body.roleId,
     });
-    res.json({ ok: pushed });
+    res.json({ ok: true });
+  },
+);
+
+// Cancel a running agent session by killing the Claude CLI process.
+interface CancelBody {
+  chatSessionId: string;
+}
+
+router.post(
+  "/agent/cancel",
+  (req: Request<object, unknown, CancelBody>, res: Response<OkResponse>) => {
+    const { chatSessionId } = req.body;
+    if (!chatSessionId) {
+      res.json({ ok: false });
+      return;
+    }
+    const ok = cancelRun(chatSessionId);
+    res.json({ ok });
   },
 );
 
@@ -73,11 +89,15 @@ interface ErrorResponse {
   error: string;
 }
 
+interface AcceptedResponse {
+  chatSessionId: string;
+}
+
 router.post(
   "/agent",
   async (
     req: Request<object, unknown, AgentBody>,
-    res: Response<ErrorResponse>,
+    res: Response<ErrorResponse | AcceptedResponse>,
   ) => {
     const {
       message,
@@ -95,28 +115,32 @@ router.post(
       return;
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
-    const send = (data: unknown) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    const sessionId = randomUUID();
     const chatDir = path.join(workspacePath, "chat");
     await mkdir(chatDir, { recursive: true });
     const resultsFilePath = path.join(chatDir, `${chatSessionId}.jsonl`);
     const metaFilePath = path.join(chatDir, `${chatSessionId}.json`);
 
-    // Write metadata only on the first message of this session
+    // Write or update metadata. On the first message we create the file
+    // with firstUserMessage so GET /api/sessions never needs to read the
+    // jsonl content. On subsequent turns we backfill firstUserMessage if
+    // missing (migrates pre-existing sessions).
+    let isFirstTurn = false;
     try {
       await access(metaFilePath);
     } catch {
+      isFirstTurn = true;
+    }
+    if (isFirstTurn) {
       await writeFile(
         metaFilePath,
-        JSON.stringify({ roleId, startedAt: new Date().toISOString() }),
+        JSON.stringify({
+          roleId,
+          startedAt: new Date().toISOString(),
+          firstUserMessage: message,
+        }),
       );
+    } else {
+      await backfillFirstUserMessage(metaFilePath, message);
     }
 
     // Append user message for this turn
@@ -125,118 +149,164 @@ router.post(
       JSON.stringify({ source: "user", type: "text", message }) + "\n",
     );
 
-    registerSession(sessionId, send, resultsFilePath, selectedImageData);
+    const now = new Date().toISOString();
+    getOrCreateSession(chatSessionId, {
+      roleId,
+      resultsFilePath,
+      selectedImageData,
+      startedAt: now,
+      updatedAt: now,
+    });
+
+    // Register abort callback and mark running. If the session is
+    // already running, reject with 409 Conflict.
+    const abortController = new AbortController();
+    const started = beginRun(chatSessionId, () => abortController.abort());
+    if (!started) {
+      res.status(409).json({ error: "Session is already running" });
+      return;
+    }
+
+    // Fire-and-forget: return 202 immediately, run agent in background.
+    // Events are published to the `session.<chatSessionId>` pub/sub
+    // channel — clients subscribe via WebSocket.
+    res.status(202).json({ chatSessionId });
+
     const role = getRole(roleId);
-    const claudeSessionId =
-      claudeSessionMap.get(chatSessionId) ??
-      (await readClaudeSessionId(metaFilePath, resultsFilePath));
+    const claudeSessionId = await readClaudeSessionId(
+      metaFilePath,
+      resultsFilePath,
+    );
 
     const requestStartedAt = Date.now();
     log.info("agent", "request received", {
-      sessionId,
       chatSessionId,
       roleId,
       messageLen: message.length,
       resumed: Boolean(claudeSessionId),
     });
 
-    // First-turn only: prepend a pointer to the workspace journal so
-    // the LLM knows where to find historical context if the user's
-    // question benefits from it. On resumed turns the pointer is
-    // already in Claude's context from the first turn and does not
-    // need to be re-sent. The original `message` has already been
-    // appended to the jsonl above, so the user-facing chat log stays
-    // clean — only the version handed to Claude CLI is decorated.
     const decoratedMessage = claudeSessionId
       ? message
       : prependJournalPointer(message, workspacePath);
 
-    try {
-      for await (const event of runAgent(
-        decoratedMessage,
-        role,
-        workspacePath,
-        sessionId,
-        PORT,
-        claudeSessionId,
-        pluginPrompts,
-        systemPrompt,
-      )) {
-        if (event.type === "claude_session_id") {
-          claudeSessionMap.set(chatSessionId, event.id);
-          await updateClaudeSessionId(metaFilePath, event.id);
-          continue;
-        }
-        send(event);
-        if (event.type === "text") {
-          await appendFile(
-            resultsFilePath,
-            JSON.stringify({
-              source: "assistant",
-              type: "text",
-              message: event.message,
-            }) + "\n",
-          );
-        }
-      }
-      send({ type: "status", message: "Done" });
-      log.info("agent", "request completed", {
-        sessionId,
-        chatSessionId,
-        durationMs: Date.now() - requestStartedAt,
-      });
-    } catch (err) {
-      log.error("agent", "request failed", {
-        sessionId,
-        chatSessionId,
-        error: String(err),
-      });
-      send({ type: "error", message: String(err) });
-    } finally {
-      removeSession(sessionId);
-      res.end();
-      // Fire-and-forget: the journal module decides whether the
-      // interval has elapsed and is self-locking. We pass the
-      // active-session set so the pass skips any jsonl file still
-      // being written by a concurrent request.
-      maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(
-        (err) => {
-          // Should not actually happen — maybeRunJournal swallows
-          // its own errors — but belt-and-suspenders.
-          log.warn("journal", "unexpected error in background", {
-            error: String(err),
-          });
-        },
-      );
-      // Same fire-and-forget pattern as the journal above. The
-      // chat indexer is self-gated by `indexedAt` freshness, holds
-      // a per-session lock, and skips sessions still in the live
-      // registry — so back-to-back turns on the same conversation
-      // don't spam the CLI.
-      maybeIndexSession({
-        sessionId,
-        activeSessionIds: getActiveSessionIds(),
-      }).catch((err) => {
-        log.warn("chat-index", "unexpected error in background", {
-          error: String(err),
-        });
-      });
-    }
+    runAgentInBackground({
+      decoratedMessage,
+      role,
+      chatSessionId,
+      claudeSessionId,
+      pluginPrompts,
+      systemPrompt,
+      abortSignal: abortController.signal,
+      resultsFilePath,
+      metaFilePath,
+      requestStartedAt,
+    });
   },
 );
+
+// Runs the agent loop as a detached async task. Events are published
+// to the session's pub/sub channel. When the loop ends, `endRun` is
+// called to mark the session as finished and publish `session_finished`.
+interface BackgroundRunParams {
+  decoratedMessage: string;
+  role: ReturnType<typeof getRole>;
+  chatSessionId: string;
+  claudeSessionId: string | undefined;
+  pluginPrompts: Record<string, string> | undefined;
+  systemPrompt: string | undefined;
+  abortSignal: AbortSignal;
+  resultsFilePath: string;
+  metaFilePath: string;
+  requestStartedAt: number;
+}
+
+async function runAgentInBackground(
+  params: BackgroundRunParams,
+): Promise<void> {
+  const {
+    decoratedMessage,
+    role,
+    chatSessionId,
+    claudeSessionId,
+    pluginPrompts,
+    systemPrompt,
+    abortSignal,
+    resultsFilePath,
+    metaFilePath,
+    requestStartedAt,
+  } = params;
+
+  try {
+    for await (const event of runAgent(
+      decoratedMessage,
+      role,
+      workspacePath,
+      chatSessionId,
+      PORT,
+      claudeSessionId,
+      pluginPrompts,
+      systemPrompt,
+      abortSignal,
+    )) {
+      if (event.type === "claude_session_id") {
+        await updateClaudeSessionId(metaFilePath, event.id);
+        continue;
+      }
+      pushSessionEvent(chatSessionId, event as Record<string, unknown>);
+
+      if (event.type === "text") {
+        await appendFile(
+          resultsFilePath,
+          JSON.stringify({
+            source: "assistant",
+            type: "text",
+            message: event.message,
+          }) + "\n",
+        );
+      }
+    }
+    log.info("agent", "request completed", {
+      chatSessionId,
+      durationMs: Date.now() - requestStartedAt,
+    });
+  } catch (err) {
+    log.error("agent", "request failed", {
+      chatSessionId,
+      error: String(err),
+    });
+    pushSessionEvent(chatSessionId, { type: "error", message: String(err) });
+  } finally {
+    endRun(chatSessionId);
+    // Fire-and-forget: journal + chat-index post-processing
+    maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(
+      (err) => {
+        log.warn("journal", "unexpected error in background", {
+          error: String(err),
+        });
+      },
+    );
+    maybeIndexSession({
+      sessionId: chatSessionId,
+      activeSessionIds: getActiveSessionIds(),
+    }).catch((err) => {
+      log.warn("chat-index", "unexpected error in background", {
+        error: String(err),
+      });
+    });
+  }
+}
 
 async function readClaudeSessionId(
   metaFilePath: string,
   jsonlFilePath: string,
 ): Promise<string | undefined> {
-  // Try new-style .json metadata file first
   try {
     const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
     if (meta.claudeSessionId) return meta.claudeSessionId;
   } catch {
     // fall through to legacy scan
   }
-  // Legacy: scan .jsonl for inline claude_session_id entries
   try {
     const lines = (await readFile(jsonlFilePath, "utf-8"))
       .split("\n")
@@ -253,6 +323,24 @@ async function readClaudeSessionId(
     // file doesn't exist yet
   }
   return undefined;
+}
+
+/** Add firstUserMessage to an existing meta file if it's missing (migration). */
+async function backfillFirstUserMessage(
+  metaFilePath: string,
+  message: string,
+): Promise<void> {
+  try {
+    const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
+    if (!meta.firstUserMessage) {
+      await writeFile(
+        metaFilePath,
+        JSON.stringify({ ...meta, firstUserMessage: message }),
+      );
+    }
+  } catch {
+    // ignore — meta file may not exist
+  }
 }
 
 async function updateClaudeSessionId(

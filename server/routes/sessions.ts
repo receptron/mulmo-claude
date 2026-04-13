@@ -6,11 +6,18 @@ import { workspacePath } from "../workspace.js";
 import { readManifest } from "../chat-index/indexer.js";
 import { resolveWithinRoot } from "../utils/fs.js";
 import type { ChatIndexEntry } from "../chat-index/types.js";
+import { markRead, getSession } from "../session-store/index.js";
+
+interface SessionMeta {
+  roleId: string;
+  startedAt: string;
+  firstUserMessage?: string;
+}
 
 async function readSessionMeta(
   chatDir: string,
   id: string,
-): Promise<{ roleId: string; startedAt: string } | null> {
+): Promise<SessionMeta | null> {
   // Try new-style .json file first
   try {
     const meta = JSON.parse(
@@ -35,11 +42,6 @@ async function readSessionMeta(
   return null;
 }
 
-interface SessionEntry {
-  source?: string;
-  message?: string;
-}
-
 interface SessionSummary {
   id: string;
   roleId: string;
@@ -54,22 +56,29 @@ interface SessionSummary {
   // under the preview in the history popup. See #123.
   summary?: string;
   keywords?: string[];
+  // Live state from the in-memory session store. Absent when the
+  // session has no active entry in the store (i.e. idle / historical).
+  isRunning?: boolean;
+  hasUnread?: boolean;
+  statusMessage?: string;
 }
 
 const router = Router();
+
+// Sessions older than this are excluded from the listing. Set
+// SESSIONS_LIST_WINDOW_DAYS to override (0 = no cutoff).
+const WINDOW_MS =
+  (Number(process.env.SESSIONS_LIST_WINDOW_DAYS) || 90) * 86_400_000;
 
 router.get(
   "/sessions",
   async (_req: Request, res: Response<SessionSummary[]>) => {
     const chatDir = path.join(workspacePath, "chat");
-    // Load the chat-index manifest once per request so each
-    // session lookup is a cheap Map.get rather than a file read.
-    // Sessions without an index entry fall back to the legacy
-    // first-user-message preview below.
     const manifest = await readManifest(workspacePath);
     const indexById = new Map<string, ChatIndexEntry>(
       manifest.entries.map((e) => [e.id, e]),
     );
+    const cutoff = WINDOW_MS > 0 ? Date.now() - WINDOW_MS : 0;
     try {
       const files = (await readdir(chatDir)).filter((f) =>
         f.endsWith(".jsonl"),
@@ -79,44 +88,34 @@ router.get(
           files.map(async (file) => {
             const id = file.replace(".jsonl", "");
             try {
+              // stat only — no readFile on .jsonl content
+              const fileStat = await stat(path.join(chatDir, file));
+              if (cutoff > 0 && fileStat.mtimeMs < cutoff) return null;
+
               const meta = await readSessionMeta(chatDir, id);
               if (!meta) return null;
-              const fullPath = path.join(chatDir, file);
-              // Fetch file content and stat in parallel — content
-              // for the first-user-message preview, stat for the
-              // "last appended" mtime that drives client sort.
-              const [content, fileStat] = await Promise.all([
-                readFile(fullPath, "utf-8"),
-                stat(fullPath),
-              ]);
-              const firstUserLine: SessionEntry | undefined = content
-                .split("\n")
-                .filter(Boolean)
-                .map((l): SessionEntry | null => {
-                  try {
-                    return JSON.parse(l);
-                  } catch {
-                    return null;
-                  }
-                })
-                .find((e): e is SessionEntry => e?.source === "user");
+
               const indexEntry = indexById.get(id);
-              // Prefer the AI-generated title when available,
-              // fall back to the raw first user message otherwise.
-              // `summary` and `keywords` are spread conditionally
-              // to respect the server tsconfig's
-              // exactOptionalPropertyTypes.
+              // Prefer AI title → meta.firstUserMessage → empty
+              const preview = indexEntry?.title ?? meta.firstUserMessage ?? "";
+
+              const live = getSession(id);
               return {
                 id,
                 roleId: meta.roleId,
                 startedAt: meta.startedAt,
                 updatedAt: new Date(fileStat.mtimeMs).toISOString(),
-                preview: indexEntry?.title ?? firstUserLine?.message ?? "",
+                preview,
                 ...(indexEntry?.summary !== undefined && {
                   summary: indexEntry.summary,
                 }),
                 ...(indexEntry?.keywords !== undefined && {
                   keywords: indexEntry.keywords,
+                }),
+                ...(live && {
+                  isRunning: live.isRunning,
+                  hasUnread: live.hasUnread,
+                  statusMessage: live.statusMessage,
                 }),
               };
             } catch {
@@ -126,9 +125,6 @@ router.get(
         )
       ).filter((s): s is SessionSummary => s !== null);
 
-      // Sort by most-recently-updated first. Falls back to
-      // startedAt if two sessions share the same mtime (e.g. a
-      // file-system with second-granularity timestamps).
       sessions.sort((a, b) => {
         const byUpdated =
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -240,6 +236,15 @@ router.get(
     } catch {
       res.status(404).json({ error: "Session not found" });
     }
+  },
+);
+
+// Mark a session as read (clears the hasUnread flag in the session store).
+router.post(
+  "/sessions/:id/mark-read",
+  (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
+    const ok = markRead(req.params.id);
+    res.json({ ok });
   },
 );
 

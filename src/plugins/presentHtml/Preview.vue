@@ -13,17 +13,15 @@
 import { computed } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
+import { stripHtmlToPreview } from "./helpers";
+
+const HINT_MAX_LENGTH = 60;
 
 const props = defineProps<{ result: ToolResultComplete<PresentHtmlData> }>();
 
 const data = computed(() => props.result.data);
 const title = computed(() => data.value?.title ?? "HTML Page");
-const hint = computed(() => {
-  const raw = data.value?.html ?? "";
-  const stripped = raw
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return stripped.slice(0, 60);
-});
+const hint = computed(() =>
+  stripHtmlToPreview(data.value?.html ?? "", HINT_MAX_LENGTH),
+);
 </script>

@@ -94,6 +94,19 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
   }
 }
 
+export interface RunAgentOptions {
+  message: string;
+  role: Role;
+  workspacePath: string;
+  sessionId: string;
+  port: number;
+  claudeSessionId?: string;
+  pluginPrompts?: Record<string, string>;
+  systemPrompt?: string;
+  /** When aborted, the spawned Claude CLI process is killed. */
+  abortSignal?: AbortSignal;
+}
+
 export async function* runAgent(
   message: string,
   role: Role,
@@ -103,6 +116,7 @@ export async function* runAgent(
   claudeSessionId?: string,
   pluginPrompts?: Record<string, string>,
   systemPrompt?: string,
+  abortSignal?: AbortSignal,
 ): AsyncGenerator<AgentEvent> {
   const activePlugins = getActivePlugins(role);
   const hasMcp = activePlugins.length > 0;
@@ -132,7 +146,7 @@ export async function* runAgent(
 
   if (hasMcp) {
     const mcpConfig = buildMcpConfig({
-      sessionId,
+      chatSessionId: sessionId,
       port,
       activePlugins,
       roleIds: loadAllRoles().map((r) => r.id),
@@ -162,9 +176,16 @@ export async function* runAgent(
   });
   const proc = spawnClaude(useDocker, workspacePath, cliArgs);
 
+  // If an abort signal is provided, kill the process when it fires.
+  const onAbort = () => {
+    if (!proc.killed) proc.kill();
+  };
+  abortSignal?.addEventListener("abort", onAbort, { once: true });
+
   try {
     yield* readAgentEvents(proc);
   } finally {
+    abortSignal?.removeEventListener("abort", onAbort);
     if (!proc.killed) proc.kill();
     if (hasMcp) unlink(mcpPaths.hostPath).catch(() => {});
   }

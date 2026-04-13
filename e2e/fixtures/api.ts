@@ -83,7 +83,13 @@ export async function mockAllApis(
       url.pathname.startsWith("/api/sessions/") &&
       url.pathname !== "/api/sessions",
     (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      const method = route.request().method();
+      // POST /api/sessions/:id/mark-read
+      if (method === "POST") {
+        return route.fulfill({ json: { ok: true } });
+      }
+      // GET /api/sessions/:id
+      if (method !== "GET") return route.fallback();
       const id = route.request().url().split("/api/sessions/").pop() ?? "";
       const match = sessions.find((s) => s.id === id);
       if (match) {
@@ -113,5 +119,21 @@ export async function mockAllApis(
     route.fulfill({
       json: { name: "", path: "", type: "dir", children: [] },
     }),
+  );
+
+  // Default agent mock — returns 202 (fire-and-forget). Tests that
+  // need to deliver events should register their own route + WS mock
+  // AFTER calling mockAllApis.
+  await page.route(urlEndsWith("/api/agent"), (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    return route.fulfill({
+      status: 202,
+      json: { chatSessionId: "mock-session" },
+    });
+  });
+
+  // Agent cancel endpoint
+  await page.route(urlEndsWith("/api/agent/cancel"), (route) =>
+    route.fulfill({ json: { ok: true } }),
   );
 }

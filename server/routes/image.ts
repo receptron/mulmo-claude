@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getSessionImageData } from "../sessions.js";
+import { getSessionImageData } from "../session-store/index.js";
 import {
   generateGeminiImageContent,
   generateGeminiImageFromPrompt,

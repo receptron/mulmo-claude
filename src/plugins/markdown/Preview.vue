@@ -16,6 +16,7 @@
 import { computed, ref, watch } from "vue";
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
+import { extractFirstH1 } from "../../utils/markdown/extractFirstH1";
 
 const props = defineProps<{
   result: ToolResult<MarkdownToolData>;
@@ -53,10 +54,8 @@ const displayTitle = computed(() => {
   }
   const md = resolvedMarkdown.value;
   if (md) {
-    const match = md.match(/^#\s+(.+)$/m);
-    if (match) {
-      return match[1];
-    }
+    const h1 = extractFirstH1(md);
+    if (h1) return h1;
   }
   return "Markdown Document";
 });

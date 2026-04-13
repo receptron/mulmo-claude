@@ -70,7 +70,6 @@
         v-if="showHistory"
         ref="historyPanelRef"
         :sessions="mergedSessions"
-        :session-map="sessionMap"
         :current-session-id="currentSessionId"
         :roles="roles"
         :top-offset="headerRef?.offsetHeight"
@@ -137,7 +136,7 @@
               class="material-icons text-base"
               :class="[
                 tabColor(tabSessions[i - 1]),
-                sessionMap.get(tabSessions[i - 1].id)?.isRunning
+                tabSessions[i - 1].isRunning
                   ? 'animate-spin [animation-duration:3s]'
                   : '',
               ]"
@@ -307,15 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  nextTick,
-  onMounted,
-  reactive,
-  markRaw,
-} from "vue";
+import { ref, computed, watch, nextTick, onMounted, reactive } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import { SYSTEM_PROMPT } from "./config/system-prompt";
 import { getPlugin } from "./tools";
@@ -340,7 +331,6 @@ import {
 } from "./utils/role/icon";
 import { findScrollableChild } from "./utils/dom/scrollable";
 import { buildAgentRequestBody } from "./utils/agent/request";
-import { parseSSEChunk } from "./utils/agent/sse";
 import {
   findPendingToolCall,
   shouldSelectAssistantText,
@@ -380,12 +370,58 @@ pubsubSubscribe("debug.beat", (data) => {
   }
 });
 
+// --- Sessions channel (pub/sub) ---
+// Subscribe to the global `sessions` channel. The server publishes a
+// bare notification (no data) whenever any session's state changes.
+// The client refetches the session list via REST — the server is the
+// single source of truth for isRunning, hasUnread, etc.
+pubsubSubscribe("sessions", () => {
+  refreshSessionStates();
+});
+
+async function refreshSessionStates(): Promise<void> {
+  const summaries = await fetchSessions();
+  for (const s of summaries) {
+    const live = sessionMap.get(s.id);
+    if (!live) continue;
+    // Missing fields mean the server has no live entry — reset to defaults.
+    live.isRunning = s.isRunning ?? false;
+    live.statusMessage = s.statusMessage ?? "";
+    const unread = s.hasUnread ?? false;
+    // Don't mark the currently viewed session as unread
+    if (!(unread && s.id === currentSessionId.value)) {
+      live.hasUnread = unread;
+    }
+  }
+}
+
+async function markSessionRead(id: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `/api/sessions/${encodeURIComponent(id)}/mark-read`,
+      { method: "POST" },
+    );
+    if (!res.ok) {
+      // Server didn't clear the flag — refetch to restore truth.
+      await refreshSessionStates();
+    }
+  } catch {
+    await refreshSessionStates();
+  }
+}
+
 // --- Routing ---
 const route = useRoute();
 const router = useRouter();
 
 // --- Per-session state ---
 const sessionMap = reactive(new Map<string, ActiveSession>());
+
+// Tracks active pub/sub subscriptions per session. The unsubscribe
+// function is stored so we can clean up when the session is removed
+// from memory. Sessions that are running always have an active
+// subscription so events arrive via WebSocket.
+const sessionSubscriptions = new Map<string, () => void>();
 
 // currentSessionId is a plain ref so that synchronous writes (e.g.
 // inside createNewSession, which is called right before sendMessage
@@ -508,8 +544,22 @@ const sidebarResults = computed(() => {
   });
 });
 
-const isRunning = computed(() => activeSession.value?.isRunning ?? false);
-const statusMessage = computed(() => activeSession.value?.statusMessage ?? "");
+// Read running/status from the server session list (single source of
+// truth). Falls back to sessionMap for the brief window before the
+// first fetchSessions completes.
+const currentSummary = computed(() =>
+  sessions.value.find((s) => s.id === currentSessionId.value),
+);
+const isRunning = computed(
+  () =>
+    currentSummary.value?.isRunning ?? activeSession.value?.isRunning ?? false,
+);
+const statusMessage = computed(
+  () =>
+    currentSummary.value?.statusMessage ??
+    activeSession.value?.statusMessage ??
+    "",
+);
 const toolCallHistory = computed(
   () => activeSession.value?.toolCallHistory ?? [],
 );
@@ -529,10 +579,10 @@ const selectedResultUuid = computed({
 });
 
 const activeSessionCount = computed(
-  () => [...sessionMap.values()].filter((s) => s.isRunning).length,
+  () => sessions.value.filter((s) => s.isRunning).length,
 );
 const unreadCount = computed(
-  () => [...sessionMap.values()].filter((s) => s.hasUnread).length,
+  () => sessions.value.filter((s) => s.hasUnread).length,
 );
 
 // --- Global state ---
@@ -634,18 +684,29 @@ const mergedSessions = computed((): SessionSummary[] =>
 const tabSessions = computed(() => mergedSessions.value.slice(0, 6));
 
 function tabColor(session: SessionSummary): string {
-  const live = sessionMap.get(session.id);
-  if (live?.isRunning) return "text-yellow-400";
-  if (live?.hasUnread) return "text-gray-900";
+  if (session.isRunning) return "text-yellow-400";
+  if (session.hasUnread) return "text-gray-900";
   return "text-gray-400";
 }
 
-// Centralised hasUnread reset: whenever the user switches to a session
-// (either by clicking it in history, by creating a new one, or by
-// loading one from the server), clear that session's unread flag.
+// Centralised session-switch handler: clear unread flag and subscribe
+// to the session's pub/sub channel if it's running (so a second tab
+// or a tab that navigated to an in-progress session receives events).
 watch(currentSessionId, (id) => {
   const session = sessionMap.get(id);
-  if (session) session.hasUnread = false;
+  if (session?.isRunning) {
+    ensureSessionSubscription(session, session.toolResults.length);
+  }
+  // Clear unread in both sessionMap and sessions list (for badge count),
+  // then tell the server so other tabs see it too.
+  const summary = sessions.value.find((s) => s.id === id);
+  const wasUnread =
+    (session && session.hasUnread) || (summary && summary.hasUnread);
+  if (wasUnread) {
+    if (session) session.hasUnread = false;
+    if (summary) summary.hasUnread = false;
+    markSessionRead(id);
+  }
 });
 
 const SCROLL_AMOUNT = 60;
@@ -813,7 +874,6 @@ function createNewSession(roleId?: string): ActiveSession {
     toolCallHistory: [],
     selectedResultUuid: null,
     hasUnread: false,
-    abortController: markRaw(new AbortController()),
     startedAt: now,
     updatedAt: now,
   };
@@ -861,6 +921,7 @@ async function loadSession(id: string) {
   const urlResult =
     typeof route.query.result === "string" ? route.query.result : null;
   const resolvedSelectedUuid = resolveSelectedUuid(toolResultsList, urlResult);
+  // Use server summary for live state (isRunning, etc.) and timestamps
   const serverSummary = sessions.value.find((s) => s.id === id);
   const { startedAt, updatedAt } = resolveSessionTimestamps(
     serverSummary,
@@ -871,12 +932,11 @@ async function loadSession(id: string) {
     id,
     roleId,
     toolResults: toolResultsList,
-    isRunning: false,
-    statusMessage: "",
+    isRunning: serverSummary?.isRunning ?? false,
+    statusMessage: serverSummary?.statusMessage ?? "",
     toolCallHistory: [],
     selectedResultUuid: resolvedSelectedUuid,
     hasUnread: false,
-    abortController: markRaw(new AbortController()),
     startedAt,
     updatedAt,
   });
@@ -892,53 +952,74 @@ async function loadSession(id: string) {
 // decide whether a trailing text response becomes the selected
 // canvas result.
 function beginUserTurn(session: ActiveSession, message: string): number {
-  session.isRunning = true;
-  session.statusMessage = "Thinking...";
-  // Bump updatedAt so the session floats to the top of the
-  // "most recently touched" sort in the sidebar as soon as the
-  // user submits a message. The server's jsonl mtime will match
-  // on the next fetchSessions() after the run ends.
+  // Append the user's message so it renders immediately. State like
+  // isRunning / statusMessage is NOT set here — it comes from the
+  // server via the `sessions` channel notification → refetch cycle,
+  // keeping all clients (including the initiator) in sync.
   session.updatedAt = new Date().toISOString();
   session.toolResults.push(makeTextResult(message, "user"));
-  // Fresh AbortController for this run
-  session.abortController = markRaw(new AbortController());
   return session.toolResults.length;
 }
 
-// HTTP-level error check. Posts a user-visible error and returns
-// false so the caller can early-return. Separate function so the
-// branch count in sendMessage stays low.
-async function checkAgentResponseOk(
+// Subscribe to a session's pub/sub channel so events from the server
+// (tool_call, text, tool_result, session_finished, etc.) arrive via
+// WebSocket and are dispatched into the session's reactive state.
+// Returns the unsubscribe function. Idempotent — if a subscription
+// already exists for this session, it's reused.
+function ensureSessionSubscription(
   session: ActiveSession,
-  response: Response,
-): Promise<boolean> {
-  if (!response.ok) {
-    const errBody = await response.text().catch(() => "");
-    console.error(
-      "[agent] HTTP error:",
-      response.status,
-      response.statusText,
-      errBody,
-    );
-    pushErrorMessage(
-      session,
-      `Server error ${response.status}: ${errBody.slice(0, 200)}`,
-    );
-    return false;
-  }
-  if (!response.body) {
-    pushErrorMessage(session, "No response body received from server.");
-    return false;
-  }
-  return true;
+  runStartIndex: number,
+): void {
+  if (sessionSubscriptions.has(session.id)) return;
+
+  const ctx: AgentEventContext = {
+    session,
+    runStartIndex,
+    setCurrentRoleId: (roleId) => {
+      currentRoleId.value = roleId;
+    },
+    onRoleChange,
+    refreshRoles,
+    scrollSidebarToBottom: () => rightSidebarRef.value?.scrollToBottom(),
+  };
+
+  const channel = `session.${session.id}`;
+  const unsub = pubsubSubscribe(channel, (data) => {
+    const event = data as SseEvent;
+    if (!event || typeof event !== "object") return;
+
+    // session_finished signals end-of-run — clean up subscription.
+    // If the user is viewing this session, tell the server to clear
+    // hasUnread. State updates (isRunning, hasUnread) arrive via the
+    // `sessions` channel notification → refetch cycle.
+    if (event.type === "session_finished") {
+      if (currentSessionId.value === session.id) {
+        markSessionRead(session.id);
+      }
+      unsubscribeSession(session.id);
+      return;
+    }
+
+    applyAgentEvent(event, ctx);
+  });
+
+  sessionSubscriptions.set(session.id, unsub);
 }
 
-// Dispatch a single SSE event from the agent stream against an
-// active session. Hoisted out of sendMessage so its 8-way switch
-// counts toward its own cognitive-complexity budget rather than
-// ballooning sendMessage's score. Reactive refs / callbacks that
-// live in the setup scope are passed via `ctx` — this keeps the
-// handler a regular named function with a clear signature.
+function unsubscribeSession(chatSessionId: string): void {
+  const unsub = sessionSubscriptions.get(chatSessionId);
+  if (unsub) {
+    unsub();
+    sessionSubscriptions.delete(chatSessionId);
+  }
+}
+
+// Dispatch a single event from the agent pub/sub channel against an
+// active session. Hoisted so its switch counts toward its own
+// cognitive-complexity budget rather than ballooning the caller's
+// score. Reactive refs / callbacks that live in the setup scope are
+// passed via `ctx` — this keeps the handler a regular named function
+// with a clear signature.
 interface AgentEventContext {
   session: ActiveSession;
   runStartIndex: number;
@@ -1009,45 +1090,10 @@ async function applyAgentEvent(
       console.error("[agent] error event:", event.message);
       pushErrorMessage(session, event.message);
       return;
+    case "session_finished":
+      // Handled in the subscription callback — no-op here.
+      return;
   }
-}
-
-// Read the SSE stream from `/api/agent` to completion, dispatching
-// every event into the given context. Extracted so sendMessage's
-// own cognitive complexity stays under the threshold — the
-// while-loop + nested for-loop + chunk decoding contributes ~5 to
-// the parent's score when inlined.
-async function streamAgentEvents(
-  body: ReadableStream<Uint8Array>,
-  ctx: AgentEventContext,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let sseBuffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    const parsed = parseSSEChunk(sseBuffer, chunk);
-    sseBuffer = parsed.remaining;
-    for (const event of parsed.events) {
-      await applyAgentEvent(event, ctx);
-    }
-  }
-}
-
-// Translate an error caught from the agent fetch + stream loop
-// into the user-visible sidebar. Aborts are intentional (the user
-// switched sessions or hit stop) and get swallowed silently;
-// everything else surfaces as a pushErrorMessage entry. Extracted
-// so sendMessage's catch block is a single call.
-function reportAgentError(session: ActiveSession, e: unknown): void {
-  if (e instanceof DOMException && e.name === "AbortError") return;
-  console.error("[agent] fetch error:", e);
-  pushErrorMessage(
-    session,
-    e instanceof Error ? e.message : "Connection error.",
-  );
 }
 
 async function sendMessage(text?: string) {
@@ -1065,20 +1111,10 @@ async function sendMessage(text?: string) {
     session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
     undefined;
 
-  // Context for the SSE event dispatcher. Callbacks wrap reactive
-  // refs + Vue setup-scope functions so `applyAgentEvent` stays a
-  // regular named function with its own cognitive-complexity
-  // budget (the 8-way switch would otherwise pile onto sendMessage).
-  const eventCtx: AgentEventContext = {
-    session,
-    runStartIndex,
-    setCurrentRoleId: (roleId) => {
-      currentRoleId.value = roleId;
-    },
-    onRoleChange,
-    refreshRoles,
-    scrollSidebarToBottom: () => rightSidebarRef.value?.scrollToBottom(),
-  };
+  // Subscribe to the session's pub/sub channel BEFORE posting so we
+  // don't miss events. The subscription callback dispatches each
+  // event into the session's reactive state via applyAgentEvent.
+  ensureSessionSubscription(session, runStartIndex);
 
   try {
     const response = await fetch("/api/agent", {
@@ -1094,22 +1130,23 @@ async function sendMessage(text?: string) {
           getPluginSystemPrompt: (name) => getPlugin(name)?.systemPrompt,
         }),
       ),
-      signal: session.abortController.signal,
     });
 
-    if (!(await checkAgentResponseOk(session, response))) return;
-    await streamAgentEvents(response.body!, eventCtx);
-  } catch (e) {
-    reportAgentError(session, e);
-  } finally {
-    session.isRunning = false;
-    session.statusMessage = "";
-    // Mark as unread if the user has switched away from this session
-    if (currentSessionId.value !== session.id) {
-      session.hasUnread = true;
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      pushErrorMessage(
+        session,
+        `Server error ${response.status}: ${errBody.slice(0, 200)}`,
+      );
+      unsubscribeSession(session.id);
     }
-    // Refresh server session list so tabs stay up to date
-    fetchSessions();
+  } catch (e) {
+    console.error("[agent] fetch error:", e);
+    pushErrorMessage(
+      session,
+      e instanceof Error ? e.message : "Connection error.",
+    );
+    unsubscribeSession(session.id);
   }
 }
 

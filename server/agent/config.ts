@@ -27,7 +27,10 @@ export function getActivePlugins(role: Role): string[] {
 }
 
 export interface McpConfigParams {
-  sessionId: string;
+  /** Stable chat session ID (not the per-run UUID). Used as SESSION_ID
+   *  env var so the MCP server's /internal/* callbacks address the
+   *  session store by chatSessionId. */
+  chatSessionId: string;
   port: number;
   activePlugins: string[];
   roleIds: string[];
@@ -35,7 +38,13 @@ export interface McpConfigParams {
 }
 
 export function buildMcpConfig(params: McpConfigParams): object {
-  const { sessionId, port, activePlugins, roleIds, useDocker = false } = params;
+  const {
+    chatSessionId,
+    port,
+    activePlugins,
+    roleIds,
+    useDocker = false,
+  } = params;
   const projectRoot = process.cwd();
   const command = useDocker
     ? "tsx"
@@ -63,7 +72,7 @@ export function buildMcpConfig(params: McpConfigParams): object {
         command,
         args: [mcpServerPath],
         env: {
-          SESSION_ID: sessionId,
+          SESSION_ID: chatSessionId,
           PORT: String(port),
           PLUGIN_NAMES: activePlugins.join(","),
           ROLE_IDS: roleIds.join(","),

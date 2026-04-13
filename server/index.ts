@@ -31,6 +31,7 @@ import { createPubSub } from "./pub-sub/index.js";
 import { createTaskManager } from "./task-manager/index.js";
 import type { ITaskManager } from "./task-manager/index.js";
 import type { IPubSub } from "./pub-sub/index.js";
+import { initSessionStore } from "./session-store/index.js";
 import { requireSameOrigin } from "./csrfGuard.js";
 import { log } from "./logger/index.js";
 
@@ -228,6 +229,9 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
 
   // --- Pub/Sub ---
   const pubsub = createPubSub(httpServer);
+
+  // --- Session Store ---
+  initSessionStore(pubsub);
 
   // --- Task Manager ---
   const taskManager = createTaskManager({

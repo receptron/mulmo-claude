@@ -14,7 +14,7 @@ import {
 describe("buildMcpConfig", () => {
   it("returns correct structure", () => {
     const config = buildMcpConfig({
-      sessionId: "s1",
+      chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList", "presentDocument"],
       roleIds: ["assistant", "cook"],
@@ -37,7 +37,7 @@ describe("buildMcpConfig", () => {
 
   it("handles empty plugins and roles", () => {
     const config = buildMcpConfig({
-      sessionId: "s2",
+      chatSessionId: "s2",
       port: 4000,
       activePlugins: [],
       roleIds: [],

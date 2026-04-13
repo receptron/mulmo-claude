@@ -117,10 +117,6 @@ export default [
       // (`src/plugins/<name>/View.vue`). The Vue-recommended rule
       // against single-word names fights that on purpose.
       "vue/multi-word-component-names": "off",
-      // Pre-existing slow-regex hits in `.vue` files; demote to
-      // warn for the same reason. Each case needs a targeted
-      // regex rewrite in a follow-up.
-      "sonarjs/slow-regex": "warn",
       // `wiki/View.vue` uses `v-html` intentionally to render
       // sanitised markdown. Warn so the justified usage doesn't
       // block CI — audit per-use at review time.

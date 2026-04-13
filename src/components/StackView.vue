@@ -117,6 +117,7 @@ const STACK_NATURAL_TOOLS = new Set<string>([
   "presentHtml",
   "presentDocument",
   "presentSpreadsheet",
+  "manageWiki",
 ]);
 
 function isStackNatural(toolName: string): boolean {

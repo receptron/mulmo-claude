@@ -35,7 +35,10 @@ import {
   ClaudeCliNotFoundError,
   type Summarize,
 } from "./archivist.js";
+import { extractFirstH1 } from "../../src/utils/markdown/extractFirstH1.js";
 import { log } from "../logger/index.js";
+
+export { extractFirstH1 };
 
 // Module-level lock. A boolean is enough for the single-process
 // single-user MulmoClaude server; if two sessions finish at the
@@ -260,21 +263,4 @@ async function countArchivedTopics(workspaceRoot: string): Promise<number> {
   } catch {
     return 0;
   }
-}
-
-// Extract the first `# Heading` line from a markdown body. Returns
-// null if there isn't one. Used for topic row labels.
-//
-// Implemented without a regex to satisfy sonarjs/slow-regex — a
-// prefix check is just as readable for this small grammar and has
-// zero backtracking risk.
-export function extractFirstH1(markdown: string): string | null {
-  for (const line of markdown.split("\n")) {
-    // H1 requires "#" followed by a space, which also naturally
-    // excludes H2 ("## ") and H3 ("### ") etc.
-    if (!line.startsWith("# ")) continue;
-    const text = line.slice(2).trim();
-    if (text.length > 0) return text;
-  }
-  return null;
 }
