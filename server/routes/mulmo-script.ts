@@ -297,10 +297,30 @@ interface WithStoryContextDeps {
 //
 // Accepts a `deps` param so unit tests can inject fakes without the
 // full mulmocast stack.
+export interface WithStoryContextOptions {
+  force?: boolean;
+  /**
+   * Handler-specific tag included in the helper's failure log so
+   * dashboards can distinguish which route is failing (e.g.
+   * `"generate-beat-audio"`). Falls back to a generic
+   * `"handler failed"` entry when omitted.
+   */
+  operation?: string;
+  /**
+   * Soft-fail override for `buildContext` returning undefined. Some
+   * endpoints (e.g. `GET /beat-audio`) historically returned a
+   * 200 `{ audio: null }` in that case so the frontend can silently
+   * retry. If provided, this callback writes the fallback response
+   * instead of the default 500 `{ error: "Failed to initialize
+   * mulmo context" }`.
+   */
+  onContextMissing?: (res: Response) => void;
+}
+
 export async function withStoryContext(
   res: Response,
   filePath: string,
-  options: { force?: boolean },
+  options: WithStoryContextOptions,
   handler: (ctx: {
     absoluteFilePath: string;
     context: StoryContext;
@@ -314,7 +334,11 @@ export async function withStoryContext(
   try {
     const context = await build(absoluteFilePath, options.force ?? false);
     if (!context) {
-      res.status(500).json({ error: "Failed to initialize mulmo context" });
+      if (options.onContextMissing) {
+        options.onContextMissing(res);
+      } else {
+        res.status(500).json({ error: "Failed to initialize mulmo context" });
+      }
       return;
     }
     await handler({ absoluteFilePath, context });
@@ -324,6 +348,7 @@ export async function withStoryContext(
     // Consistent with the chat-index / wiki-backlinks / journal
     // fire-and-forget error pattern.
     log.warn("mulmo-script", "handler failed", {
+      ...(options.operation ? { operation: options.operation } : {}),
       filePath,
       error: errorMessage(err),
     });
@@ -352,20 +377,32 @@ router.get(
       return;
     }
 
-    await withStoryContext(res, filePath, {}, async ({ context }) => {
-      const beat = context.studio.script.beats[beatIndex];
-      const audioPath = getBeatAudioPathOrUrl(
-        beat.text ?? "",
-        context,
-        beat,
-        context.lang,
-      );
-      if (!audioPath || !fs.existsSync(audioPath)) {
-        res.json({ audio: null });
-        return;
-      }
-      res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
-    });
+    // GET /beat-audio is a probe — the frontend polls it expecting a
+    // 200 with `{ audio: null }` when nothing has been generated yet.
+    // Override the helper's default 500-on-context-missing so the
+    // soft-fail contract is preserved.
+    await withStoryContext(
+      res,
+      filePath,
+      {
+        operation: "beat-audio",
+        onContextMissing: (r) => r.json({ audio: null }),
+      },
+      async ({ context }) => {
+        const beat = context.studio.script.beats[beatIndex];
+        const audioPath = getBeatAudioPathOrUrl(
+          beat.text ?? "",
+          context,
+          beat,
+          context.lang,
+        );
+        if (!audioPath || !fs.existsSync(audioPath)) {
+          res.json({ audio: null });
+          return;
+        }
+        res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
+      },
+    );
   },
 );
 
@@ -386,37 +423,45 @@ router.post(
       return;
     }
 
-    await withStoryContext(res, filePath, { force }, async ({ context }) => {
-      // Thrown errors bubble up to withStoryContext which logs +
-      // returns 500. No inner try/catch needed.
-      await generateBeatAudio(beatIndex, context, {
-        settings: process.env as Record<string, string>,
-      } as Parameters<typeof generateBeatAudio>[2]);
+    await withStoryContext(
+      res,
+      filePath,
+      { force, operation: "generate-beat-audio" },
+      async ({ context }) => {
+        // Thrown errors bubble up to withStoryContext which logs +
+        // returns 500. No inner try/catch needed.
+        await generateBeatAudio(beatIndex, context, {
+          settings: process.env as Record<string, string>,
+        } as Parameters<typeof generateBeatAudio>[2]);
 
-      const beat = context.studio.script.beats[beatIndex];
-      const audioPath =
-        context.studio.beats[beatIndex]?.audioFile ??
-        getBeatAudioPathOrUrl(beat.text ?? "", context, beat, context.lang);
+        const beat = context.studio.script.beats[beatIndex];
+        const audioPath =
+          context.studio.beats[beatIndex]?.audioFile ??
+          getBeatAudioPathOrUrl(beat.text ?? "", context, beat, context.lang);
 
-      if (!audioPath || !fs.existsSync(audioPath)) {
-        // Logic-flow failure (not an exception) — emit a targeted log
-        // with the diagnostic payload before responding. The helper's
-        // catch-all log.warn wouldn't fire for this non-throw path.
-        // Don't write raw `beat.text` into persistent logs — it's
-        // free-form user content and can contain sensitive data.
-        log.error("generate-beat-audio", "audio was not generated", {
-          beatIndex,
-          audioPath,
-          exists: audioPath ? fs.existsSync(audioPath) : false,
-          beatTextLength: typeof beat?.text === "string" ? beat.text.length : 0,
-          audioFilePresent: Boolean(context.studio.beats[beatIndex]?.audioFile),
-        });
-        res.status(500).json({ error: "Audio was not generated" });
-        return;
-      }
+        if (!audioPath || !fs.existsSync(audioPath)) {
+          // Logic-flow failure (not an exception) — emit a targeted log
+          // with the diagnostic payload before responding. The helper's
+          // catch-all log.warn wouldn't fire for this non-throw path.
+          // Don't write raw `beat.text` into persistent logs — it's
+          // free-form user content and can contain sensitive data.
+          log.error("generate-beat-audio", "audio was not generated", {
+            beatIndex,
+            audioPath,
+            exists: audioPath ? fs.existsSync(audioPath) : false,
+            beatTextLength:
+              typeof beat?.text === "string" ? beat.text.length : 0,
+            audioFilePresent: Boolean(
+              context.studio.beats[beatIndex]?.audioFile,
+            ),
+          });
+          res.status(500).json({ error: "Audio was not generated" });
+          return;
+        }
 
-      res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
-    });
+        res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
+      },
+    );
   },
 );
 

@@ -91,6 +91,34 @@ describe("withStoryContext — buildContext returns null", () => {
       error: "Failed to initialize mulmo context",
     });
   });
+
+  it("uses onContextMissing override to emit a soft-fail payload", async () => {
+    // Some endpoints (e.g. GET /beat-audio) historically return a
+    // 200 `{ audio: null }` when the workspace context can't be
+    // initialised yet, so the frontend can silently retry. The
+    // override must bypass the default 500.
+    const res = makeRes();
+    let handlerCalled = false;
+    await withStoryContext(
+      res as unknown as Response,
+      "stories/x.json",
+      {
+        onContextMissing: (r) =>
+          (r as unknown as RecordedResponse).json({ audio: null }),
+      },
+      async () => {
+        handlerCalled = true;
+      },
+      {
+        resolveStoryPath: () => "/abs/stories/x.json",
+        buildContext: async () => undefined,
+      },
+    );
+    assert.equal(handlerCalled, false);
+    // Status untouched (still 200 default) + soft-fail body written.
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { audio: null });
+  });
 });
 
 describe("withStoryContext — handler throws", () => {
