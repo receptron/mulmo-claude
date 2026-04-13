@@ -14,6 +14,7 @@ import {
 import { workspacePath } from "../workspace.js";
 import { maybeRunJournal } from "../journal/index.js";
 import { maybeIndexSession } from "../chat-index/index.js";
+import { maybeAppendWikiBacklinks } from "../wiki-backlinks/index.js";
 import { log } from "../logger/index.js";
 
 const router = Router();
@@ -218,6 +219,18 @@ router.post(
         activeSessionIds: getActiveSessionIds(),
       }).catch((err) => {
         log.warn("chat-index", "unexpected error in background", {
+          error: String(err),
+        });
+      });
+      // Same fire-and-forget pattern. Walks wiki/pages/ for files
+      // modified during this turn and appends a backlink to the
+      // originating chat session so the user can jump back from a
+      // wiki page to the conversation that created it. See #109.
+      maybeAppendWikiBacklinks({
+        chatSessionId,
+        turnStartedAt: requestStartedAt,
+      }).catch((err) => {
+        log.warn("wiki-backlinks", "unexpected error in background", {
           error: String(err),
         });
       });
