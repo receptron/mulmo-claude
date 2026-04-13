@@ -14,12 +14,16 @@ The codebase already had a WebSocket pub/sub system (`server/pub-sub/index.ts` +
 
 ## Design
 
+### Pub/sub is event-only, REST is for state
+
+The pub/sub layer (`IPubSub`) has a single method: `publish(channel, data)`. It is a pure broadcast pipe — no snapshots, no per-client delivery, no subscribe hooks. Clients that need current state (e.g. a new tab joining mid-run) fetch it via REST (`GET /api/sessions`, `GET /api/sessions/:id`) and then subscribe to the pub/sub channel for live updates going forward.
+
 ### Two pub/sub channels
 
 | Channel | Purpose | Events |
 |---|---|---|
-| `session.<chatSessionId>` | Per-session event stream | `tool_call`, `tool_call_result`, `status`, `text`, `tool_result`, `switch_role`, `roles_updated`, `error`, **`snapshot`** (on subscribe), **`session_finished`** |
-| `sessions` | Global session list changes | `session_state_changed { chatSessionId, isRunning, hasUnread, statusMessage, updatedAt }`, `session_removed`, `sessions_snapshot` (on subscribe) |
+| `session.<chatSessionId>` | Per-session event stream | `tool_call`, `tool_call_result`, `status`, `text`, `tool_result`, `switch_role`, `roles_updated`, `error`, **`session_finished`** |
+| `sessions` | Global session list changes | `session_state_changed { chatSessionId, isRunning, hasUnread, statusMessage, updatedAt }`, `session_removed` |
 
 ### Server-side session state — `server/session-store/`
 
@@ -55,10 +59,6 @@ interface ServerSession {
 
 The agent loop publishes each event to `session.<chatSessionId>`. On completion, `endRun()` sets `isRunning = false`, `hasUnread = true`, publishes `session_finished` + `session_state_changed`.
 
-### Late joiners — snapshot on subscribe
-
-`onSubscribe(prefix, handler)` hook on pub/sub. When a client subscribes to `session.<id>`, the server sends a `snapshot` message (just to that client) with the current `ServerSession` state. For the `sessions` channel, on subscribe the server sends a `sessions_snapshot` with all in-memory session states.
-
 ### Cancellation
 
 `POST /api/agent/cancel { chatSessionId }` — calls `session.abortRun()` which aborts the `AbortController` passed to `runAgent()`, killing the CLI process. The agent loop's `finally` block fires normally, calling `endRun()`.
@@ -84,22 +84,22 @@ The MCP server receives `chatSessionId` (stable across turns) as `SESSION_ID` en
 
 | File | Purpose |
 |---|---|
-| `server/session-store/index.ts` | `ServerSession` type, Map store, init/get/update/remove/snapshot, pub/sub integration, idle eviction |
+| `server/session-store/index.ts` | `ServerSession` type, Map store, init/get/update/remove, pub/sub integration, idle eviction |
 
 ### Modified files
 
 | File | Change |
 |---|---|
-| `server/pub-sub/index.ts` | Added `onSubscribe(prefix, handler)` hook + `sendToClient(ws, channel, data)` for targeted delivery |
+| `server/pub-sub/index.ts` | Unchanged interface — still just `publish()`. Removed snapshot/subscribe hook complexity. |
 | `server/routes/agent.ts` | Fire-and-forget 202, background agent loop via `runAgentInBackground()`, `POST /api/agent/cancel` endpoint |
 | `server/agent/config.ts` | `buildMcpConfig` takes `chatSessionId` (not per-run `sessionId`) as `SESSION_ID` env var |
 | `server/agent.ts` | Added `abortSignal` param to `runAgent()` for cancellation |
-| `server/index.ts` | Wires `initSessionStore(pubsub)`, registers `onSubscribe` handlers for session snapshots |
+| `server/index.ts` | Wires `initSessionStore(pubsub)` |
 | `server/routes/sessions.ts` | Added `POST /sessions/:id/mark-read` endpoint |
 | `server/routes/roles.ts` | Uses `pushSessionEvent` from session store |
 | `server/routes/image.ts` | Uses `getSessionImageData` from session store |
 | `src/App.vue` | Subscribes to `session.<id>` channel for events, `sessions` channel for sidebar state, `mark-read` on session switch + session finish |
-| `src/composables/usePubSub.ts` | Added `subscribeWithSnapshot()` convenience |
+| `src/composables/usePubSub.ts` | No new API — clients use `subscribe()` only |
 | `src/types/sse.ts` | Added `SseSessionFinished` event type |
 | `e2e/fixtures/api.ts` | Mocks for 202 agent response, mark-read, cancel |
 | `e2e/tests/chat-flow.spec.ts` | Rewrote SSE tests to use WebSocket pub/sub mocks via `page.routeWebSocket` |
@@ -118,7 +118,7 @@ The MCP server receives `chatSessionId` (stable across turns) as `SESSION_ID` en
 
 1. **Single client**: send a message, verify tool calls appear in sidebar, final text appears in canvas, status message updates, `isRunning` badge shows/hides
 2. **Two tabs**: open same session in two tabs, send message from one, verify both tabs see progress and results
-3. **Late joiner**: start agent run, open a second tab mid-run, verify snapshot delivers current state + live events continue
+3. **Late joiner**: start agent run, open a second tab — fetch current state via REST, then subscribe to pub/sub for live events going forward
 4. **Unread**: start a run, switch to another session before it finishes, verify unread badge appears. Switch back, verify it clears. Open a second tab — verify badge state is consistent. Verify the currently viewed session does NOT flash unread when it finishes.
 5. **Cancel**: start a long-running agent, hit cancel, verify process stops and `session_finished` is published
 6. **Tests**: `yarn test` (1099 unit tests), `yarn test:e2e` (112 Playwright tests including pub/sub mocks)
