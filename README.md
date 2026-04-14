@@ -98,6 +98,68 @@ Each role gives Claude a different persona, tool palette, and focus area:
 
 Switching roles resets Claude's context and swaps in only the tools that role needs — keeping responses fast and focused.
 
+## Skills — Run Your Claude Code Skills from MulmoClaude
+
+MulmoClaude can list and launch the **Claude Code skills** you already have. A skill is any folder under `~/.claude/skills/<name>/` containing a `SKILL.md` file with a YAML frontmatter `description` and a markdown body of instructions. See the [Claude Code Skills docs](https://docs.claude.com/en/docs/claude-code/skills) for details on authoring skills.
+
+### How to use
+
+1. Open MulmoClaude and stay in one of the skill-enabled roles: **General**, **Office**, or **Tutor**.
+2. Ask Claude to show your skills — e.g. *"show my skills"* or *"list skills"*.
+3. Claude invokes the `manageSkills` tool, and a split-pane **Skills** view opens in the canvas:
+   - **Left**: every skill discovered on your machine, with its description and scope badge (`USER` / `PROJECT`).
+   - **Right**: the full `SKILL.md` content of the selected skill.
+4. Click **Run** on a skill. MulmoClaude sends `/<skill-name>` to Claude as a regular chat message; Claude Code's slash-command machinery resolves it against `~/.claude/skills/` and executes the skill's instructions inline in the same chat session.
+
+No extra typing, no copy-pasting SKILL.md bodies — the Run button is a one-click wrapper around `/skill-name`.
+
+### Skill discovery — two scopes
+
+| Scope       | Location                                | Semantics                                                                                 |
+| ----------- | --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **User**    | `~/.claude/skills/<name>/SKILL.md`      | Personal skills, shared across every project you open with the Claude CLI.                |
+| **Project** | `~/mulmoclaude/.claude/skills/<name>/`  | MulmoClaude-workspace-scoped skills. Project scope **wins** if a name collides with user. |
+
+Both scopes are read-only in phase 0 — edits happen on the file system. A future release will let MulmoClaude itself create / edit project-scope skills.
+
+### Docker sandbox vs non-Docker
+
+MulmoClaude's default **Docker sandbox mode** isolates Claude Code in a container for safety (see [Security](#security)). Skill behaviour differs between the two modes:
+
+| Mode                                 | User skills (`~/.claude/skills/`) | Project skills (`~/mulmoclaude/.claude/skills/`) | Built-in CLI skills (`/simplify`, `/update-config`, …) |
+| ------------------------------------ | --------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| **Non-Docker** (`DISABLE_SANDBOX=1`) | ✅ All work                       | ✅                                               | ✅                                                     |
+| **Docker sandbox** (default)         | ⚠️ See caveats below              | ✅ Mounted via workspace volume                  | ✅                                                     |
+
+**Docker caveats — why user skills sometimes don't work in the sandbox:**
+
+- **Symlinked `~/.claude/skills/`** — if your `~/.claude/skills` (or any sub-entry) is a symlink pointing outside `~/.claude/` (for example `~/.claude/skills → ~/ss/dotfiles/claude/skills`), the symlink's target is not present inside the container. The link appears as **dangling**, and Claude Code falls back to only the built-in skills.
+- **Older Claude CLI inside the sandbox image** — `Dockerfile.sandbox` pins the CLI version at image build time. If that version is behind your host CLI (e.g. 2.1.96 in the image vs 2.1.105 on the host), user-skill discovery may behave differently.
+
+**Workarounds for skill-rich setups that don't play nicely with the sandbox:**
+
+1. **Disable the sandbox for this session**:
+
+   ```bash
+   DISABLE_SANDBOX=1 yarn dev
+   ```
+
+   The Claude CLI runs with your real `~/.claude/` and everything resolves natively. Use this when you trust the prompts you're about to send — sandbox is still the recommended default for untrusted / exploratory work.
+
+2. **Move skills into project scope** — copy the specific skills you want into `~/mulmoclaude/.claude/skills/` (this path is mounted as the workspace volume inside the sandbox, so no symlink drama). Great for skills that are specific to your MulmoClaude workflow anyway.
+
+3. **Flatten symlinks** — if you maintain your skill library via symlinks (e.g. in a dotfiles repo), replacing the top-level `~/.claude/skills` symlink with the real directory is the simplest fix.
+
+### What the skill actually receives
+
+When you press **Run**, MulmoClaude sends a plain user turn containing the slash-command string:
+
+```text
+/my-skill-name
+```
+
+That is the entire payload — MulmoClaude does **not** inline the `SKILL.md` body or extra context. The body is what Claude Code reads when the CLI resolves the slash command on its end. This keeps the chat input small and makes long skills (multi-kilobyte `SKILL.md`) safe to run without blowing up the prompt context.
+
 ## Wiki — Long-Term Memory for Claude Code
 
 MulmoClaude includes a **personal knowledge base** inspired by [Andrej Karpathy's LLM Knowledge Bases idea](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). It gives Claude Code genuine long-term memory — not just a short `memory.md`, but a growing, interconnected wiki that Claude builds and maintains itself.
