@@ -157,9 +157,9 @@ Three independent Node processes cooperate at runtime:
 
 ## Workspace layout (`~/mulmoclaude/`)
 
-`initWorkspace()` creates / refreshes this on every server start (`server/workspace.ts`). Everything is plain files committed to a private git repo:
+`initWorkspace()` creates / refreshes this on every server start (`server/workspace.ts`). Everything is plain files tracked in a private git repo:
 
-```
+```text
 ~/mulmoclaude/
   chat/               session ToolResults (.jsonl per session)
   chat/index/         per-session title/summary cache
@@ -229,7 +229,7 @@ When to add E2E coverage is documented in [CLAUDE.md](../CLAUDE.md#when-to-add-e
 
 Two jobs gate every PR:
 
-- **`lint_test`** — matrix: Node 22.x & 24.x × {ubuntu, windows, macos}. Runs `typecheck`, `typecheck:server`, `lint`, `build`, `test:coverage`.
+- **`lint_test`** — matrix: Node 22.x & 24.x × {ubuntu, windows, macOS}. Runs `typecheck`, `typecheck:server`, `lint`, `build`, `test:coverage`.
 - **`e2e`** — Ubuntu / Node 22.x. Runs `playwright install chromium` then `test:e2e`. Failed runs upload `test-results/` as an artifact for 7 days.
 
 Cross-platform compatibility is a hard requirement — use `node:path` joins, `node:url` for file URL conversions, no shell-specific syntax in scripts.
