@@ -40,6 +40,8 @@ import {
 } from "./diff.js";
 import { rewriteWorkspaceLinks } from "./linkRewrite.js";
 import { writeState, type JournalState } from "./state.js";
+import { appendEntries, parseMemory, renderMemory } from "./memory.js";
+import type { MemoryEntry } from "./archivist.js";
 import { readTextOrNull } from "../utils/fs.js";
 import { log } from "../logger/index.js";
 
@@ -188,11 +190,14 @@ async function processOneDay(
   summarize: Summarize,
 ): Promise<DayOutcome> {
   const existingDaily = await readTextOrNull(dailyPathFor(workspaceRoot, date));
+  const memoryPath = path.join(workspaceRoot, "memory.md");
+  const existingMemory = (await readTextOrNull(memoryPath)) ?? "";
   const input: DailyArchivistInput = {
     date,
     existingDailySummary: existingDaily,
     existingTopicSummaries: existingTopics,
     sessionExcerpts: excerpts,
+    existingMemory,
   };
 
   const rawOutput = await callSummarizeForDay(date, input, summarize);
@@ -219,6 +224,8 @@ async function processOneDay(
     parsed.topicUpdates,
     existingTopics,
   );
+
+  await applyMemoryEntries(memoryPath, existingMemory, parsed.memoryEntries);
 
   return {
     kind: "processed",
@@ -813,4 +820,24 @@ async function applyTopicUpdate(
   }
   // append
   return appendOrCreate(p, update.content);
+}
+
+// Apply distilled memory entries from the archivist back into
+// `~/mulmoclaude/memory.md`. Skips the write entirely when the LLM
+// emits no entries (the common case) so the file's mtime doesn't
+// churn on quiet days. The parse → append → render path keeps any
+// preamble or user-added content outside the four known sections
+// intact.
+async function applyMemoryEntries(
+  memoryPath: string,
+  existingMemory: string,
+  entries: readonly MemoryEntry[],
+): Promise<void> {
+  if (entries.length === 0) return;
+  const parsed = parseMemory(existingMemory);
+  const updated = appendEntries(parsed, entries);
+  const rendered = renderMemory(updated);
+  if (rendered === existingMemory) return;
+  await fsp.writeFile(memoryPath, rendered, "utf-8");
+  log.info("journal", "memory.md updated", { entries: entries.length });
 }

@@ -369,6 +369,7 @@ describe("parseArchivistOutput", () => {
     topicUpdates: [
       { slug: "refactoring", action: "append", content: "more progress" },
     ],
+    memoryEntries: [],
   };
 
   it("returns the parsed output for a well-formed JSON fence", () => {

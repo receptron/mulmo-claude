@@ -18,6 +18,7 @@ describe("buildDailyUserPrompt", () => {
     existingDailySummary: null,
     existingTopicSummaries: [],
     sessionExcerpts: [],
+    existingMemory: "",
     ...over,
   });
 
@@ -115,6 +116,22 @@ describe("buildDailyUserPrompt", () => {
     const matches = artifactsSection.match(/- stories\/b\.json/g);
     assert.equal(matches?.length, 1);
   });
+
+  it("shows '(empty)' for the EXISTING MEMORY block when memory.md is blank", () => {
+    const out = buildDailyUserPrompt(baseInput());
+    assert.match(out, /EXISTING MEMORY .*:\n\(empty\)/s);
+  });
+
+  it("includes existingMemory verbatim when provided", () => {
+    const out = buildDailyUserPrompt(
+      baseInput({
+        existingMemory: "## User\n\n- macOS + Docker\n- OSS maintainer\n",
+      }),
+    );
+    assert.match(out, /EXISTING MEMORY/);
+    assert.match(out, /- macOS \+ Docker/);
+    assert.match(out, /- OSS maintainer/);
+  });
 });
 
 describe("buildOptimizationUserPrompt", () => {
@@ -179,7 +196,11 @@ describe("extractJsonObject", () => {
 describe("isDailyArchivistOutput", () => {
   it("accepts a valid minimal output", () => {
     assert.equal(
-      isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: [] }),
+      isDailyArchivistOutput({
+        dailySummaryMarkdown: "x",
+        topicUpdates: [],
+        memoryEntries: [],
+      }),
       true,
     );
   });
@@ -192,17 +213,68 @@ describe("isDailyArchivistOutput", () => {
         { slug: "b", action: "append", content: "..." },
         { slug: "c", action: "rewrite", content: "..." },
       ],
+      memoryEntries: [],
     };
     assert.equal(isDailyArchivistOutput(out), true);
   });
 
+  it("accepts memory entries of each valid type", () => {
+    const out = {
+      dailySummaryMarkdown: "x",
+      topicUpdates: [],
+      memoryEntries: [
+        { type: "user", body: "macOS" },
+        { type: "feedback", body: "Prefer yarn" },
+        { type: "project", body: "phase 1 in flight" },
+        { type: "reference", body: "Linear INGEST tracks bugs" },
+      ],
+    };
+    assert.equal(isDailyArchivistOutput(out), true);
+  });
+
+  it("rejects missing memoryEntries field", () => {
+    assert.equal(
+      isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: [] }),
+      false,
+    );
+  });
+
+  it("rejects memory entries with an unknown type", () => {
+    assert.equal(
+      isDailyArchivistOutput({
+        dailySummaryMarkdown: "x",
+        topicUpdates: [],
+        memoryEntries: [{ type: "todo", body: "x" }],
+      }),
+      false,
+    );
+  });
+
+  it("rejects memory entries with a non-string body", () => {
+    assert.equal(
+      isDailyArchivistOutput({
+        dailySummaryMarkdown: "x",
+        topicUpdates: [],
+        memoryEntries: [{ type: "user", body: 42 }],
+      }),
+      false,
+    );
+  });
+
   it("rejects missing dailySummaryMarkdown", () => {
-    assert.equal(isDailyArchivistOutput({ topicUpdates: [] }), false);
+    assert.equal(
+      isDailyArchivistOutput({ topicUpdates: [], memoryEntries: [] }),
+      false,
+    );
   });
 
   it("rejects non-array topicUpdates", () => {
     assert.equal(
-      isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: {} }),
+      isDailyArchivistOutput({
+        dailySummaryMarkdown: "x",
+        topicUpdates: {},
+        memoryEntries: [],
+      }),
       false,
     );
   });
@@ -212,6 +284,7 @@ describe("isDailyArchivistOutput", () => {
       isDailyArchivistOutput({
         dailySummaryMarkdown: "x",
         topicUpdates: [{ slug: "a", action: "delete", content: "" }],
+        memoryEntries: [],
       }),
       false,
     );

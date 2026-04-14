@@ -161,6 +161,11 @@ export interface DailyArchivistInput {
   existingDailySummary: string | null;
   existingTopicSummaries: ExistingTopicSnapshot[];
   sessionExcerpts: SessionExcerpt[];
+  /** Current `~/mulmoclaude/memory.md` content. Passed to the LLM
+   *  so it can dedup against existing user-level facts before
+   *  emitting new memoryEntries. May be empty when the file is the
+   *  workspace stub. */
+  existingMemory: string;
 }
 
 export type TopicUpdateAction = "create" | "append" | "rewrite";
@@ -171,9 +176,23 @@ export interface TopicUpdate {
   content: string;
 }
 
+export type MemoryEntryType = "user" | "feedback" | "project" | "reference";
+
+export interface MemoryEntry {
+  type: MemoryEntryType;
+  /** One short bullet (1-3 sentences). Rendered as `- <body>` under
+   *  the matching `## User` / `## Feedback` / `## Project` /
+   *  `## Reference` section in memory.md. */
+  body: string;
+}
+
 export interface DailyArchivistOutput {
   dailySummaryMarkdown: string;
   topicUpdates: TopicUpdate[];
+  /** User-level facts to remember across sessions. Empty array when
+   *  the day produced nothing worth distilling — that's the common
+   *  case and not an error. */
+  memoryEntries: MemoryEntry[];
 }
 
 // System prompt for the daily pass. Written long-form because the
@@ -181,7 +200,8 @@ export interface DailyArchivistOutput {
 // than with a terse instruction.
 export const DAILY_SYSTEM_PROMPT = `You are the journal archivist for a personal MulmoClaude workspace.
 Your job: given raw session excerpts for a single day, produce
-(1) a daily summary and (2) updates to long-running topic notes.
+(1) a daily summary, (2) updates to long-running topic notes, and
+(3) user-level memory entries to remember across sessions.
 
 OUTPUT FORMAT
 You must emit a single JSON object wrapped in a \`\`\`json code fence.
@@ -190,9 +210,12 @@ Schema:
   "dailySummaryMarkdown": "...",
   "topicUpdates": [
     { "slug": "kebab-case-slug", "action": "create" | "append" | "rewrite", "content": "..." }
+  ],
+  "memoryEntries": [
+    { "type": "user" | "feedback" | "project" | "reference", "body": "..." }
   ]
 }
-No prose outside the fence. No extra keys.
+No prose outside the fence. No extra keys. \`memoryEntries\` MUST be present — emit \`[]\` when nothing is worth distilling, which is the common case.
 
 DAILY SUMMARY RULES
 - Write in the same language as the source sessions. Japanese stays Japanese. English stays English.
@@ -224,8 +247,34 @@ SESSION LINKS
 - The file viewer recognises this pattern and switches the sidebar chat to that session when the link is clicked, so the reader can pick up where the session left off.
 - You do not have to link every session you mention, but linking at least the first reference per session is helpful.
 
+MEMORY ENTRIES
+- These end up in \`memory.md\`, which is **inlined into every Claude system prompt** for this workspace. Be selective: only entries with cross-session value belong here. Topical knowledge belongs in topics; what-happened-today belongs in the daily summary; this is for things future-you needs to know about the user up front.
+- Four types, each with its own discipline:
+  - **user**: Who the user is, their environment, role, expertise, ongoing context. Examples: "macOS + Docker Desktop environment", "Primary repos: receptron/mulmoclaude", "OSS maintainer".
+  - **feedback**: Corrections / preferences the user has expressed (do this; don't do that). Examples: "Prefer yarn over npm", "PR descriptions in Japanese", "Don't blindly accept all CodeRabbit suggestions — triage each one".
+  - **project**: Current work / status / deadlines / decisions in flight. Examples: "skills phase 1 in PR #234", "v0.1.0 tagged 2026-04-14".
+  - **reference**: External systems / paths / dashboards / docs the user mentioned. Examples: "Linear project INGEST tracks pipeline bugs", "Skill repo at ~/ss/dotfiles/claude/skills/ (symlink)".
+- Skip these (do NOT emit a memory entry):
+  - Facts already present in the EXISTING MEMORY block (the user passed it to you for dedup).
+  - One-off chitchat, debugging output, throwaway code samples.
+  - Topical / domain knowledge — that goes in topicUpdates.
+  - "What happened today" — that's in dailySummaryMarkdown.
+- Each \`body\` is one short bullet (1-3 sentences max). Write in the user's language. No leading dash or bullet character — just the body text.
+
 LANGUAGE
 - Match the language of the source sessions. Always.`;
+
+// Render the EXISTING MEMORY section of the user prompt. Empty input
+// becomes a single `(empty)` line; non-empty memory is wrapped in a
+// fenced markdown block for the LLM. Extracted to keep
+// buildDailyUserPrompt under the cognitive-complexity threshold.
+function formatExistingMemoryBlock(existingMemory: string): string[] {
+  const header = "EXISTING MEMORY (do not re-emit facts already covered here):";
+  if (existingMemory.trim().length === 0) {
+    return [header, "(empty)"];
+  }
+  return [header, "```md", existingMemory.trimEnd(), "```"];
+}
 
 // Build the user-side prompt for one day's worth of content.
 // Pure string construction — safe to unit test if we ever want to.
@@ -267,6 +316,9 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
       parts.push(`- ${p}`);
     }
   }
+  parts.push("");
+
+  parts.push(...formatExistingMemoryBlock(input.existingMemory));
   parts.push("");
 
   parts.push("SESSION EXCERPTS:");
@@ -437,7 +489,9 @@ export function isDailyArchivistOutput(
   const v = value as Record<string, unknown>;
   if (typeof v.dailySummaryMarkdown !== "string") return false;
   if (!Array.isArray(v.topicUpdates)) return false;
-  return v.topicUpdates.every(isTopicUpdate);
+  if (!v.topicUpdates.every(isTopicUpdate)) return false;
+  if (!Array.isArray(v.memoryEntries)) return false;
+  return v.memoryEntries.every(isMemoryEntry);
 }
 
 function isTopicUpdate(value: unknown): value is TopicUpdate {
@@ -447,6 +501,18 @@ function isTopicUpdate(value: unknown): value is TopicUpdate {
   if (typeof v.content !== "string") return false;
   return (
     v.action === "create" || v.action === "append" || v.action === "rewrite"
+  );
+}
+
+function isMemoryEntry(value: unknown): value is MemoryEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.body !== "string") return false;
+  return (
+    v.type === "user" ||
+    v.type === "feedback" ||
+    v.type === "project" ||
+    v.type === "reference"
   );
 }
 
