@@ -78,7 +78,7 @@ function renewTokenViaPty(): Promise<boolean> {
 
 #### Updated `refreshCredentials()` flow
 
-```
+```text
 1. Read credentials JSON from Keychain (existing logic)
 2. If empty → return false
 3. Parse and check expiresAt → if NOT expired, write to file and return true (fast path)

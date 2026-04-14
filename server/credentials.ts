@@ -103,10 +103,15 @@ async function renewTokenViaPty(): Promise<boolean> {
       finish(false);
     }, PTY_TIMEOUT_MS);
 
+    // Match "hi" as a whole token so unrelated output containing those
+    // bytes (e.g. ANSI sequences, words like "This" or "high") can't
+    // false-positive the echo detection.
+    const ECHO_RE = /\bhi\b/;
+
     proc.onData((data: string) => {
       buffer += data;
 
-      if (!responded && buffer.includes("hi")) {
+      if (!responded && ECHO_RE.test(buffer)) {
         // Claude echoed our "hi" — now wait for the actual response
         responded = true;
         return;
@@ -177,6 +182,16 @@ export async function refreshCredentials(): Promise<boolean> {
         log.error(
           "credentials",
           "No credentials in Keychain after renewal — unexpected",
+        );
+        return false;
+      }
+      // Guard against writing a still-expired token as "fresh": the PTY
+      // echo check is a proxy for "Claude responded", not proof that the
+      // Keychain entry was actually refreshed.
+      if (isTokenExpired(credentials)) {
+        log.error(
+          "credentials",
+          "Token still expired after renewal — Keychain was not refreshed",
         );
         return false;
       }
