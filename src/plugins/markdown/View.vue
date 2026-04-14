@@ -85,7 +85,7 @@ import { computed, ref, watch, nextTick } from "vue";
 import { marked } from "marked";
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
-import { resolveImageSrc } from "../../utils/image/resolve";
+import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 
 const props = defineProps<{
@@ -143,24 +143,14 @@ const hasChanges = computed(() => {
   return editableMarkdown.value !== markdownContent.value;
 });
 
-// Resolve image paths in rendered HTML so workspace-relative paths become URLs.
-// Markdown files use "../images/xyz.png" (relative from markdowns/ dir);
-// strip the "../" prefix to get the workspace-relative path for resolveImageSrc.
-function resolveImagesInHtml(html: string): string {
-  return html.replace(
-    /(<img\s[^>]*src=")([^"]+)(")/g,
-    (_match, before: string, src: string, after: string) => {
-      if (src.startsWith("data:") || src.startsWith("http")) return _match;
-      const normalized = src.replace(/^\.\.\//, "");
-      return `${before}${resolveImageSrc(normalized)}${after}`;
-    },
-  );
-}
-
+// Rewrite workspace-relative image refs `![alt](../images/foo.png)`
+// to `/api/files/raw?path=...` via the shared helper BEFORE marked
+// runs. Keeps the image-resolving rules in one place (shared with
+// wiki/View and FilesView's markdown preview).
 const renderedHtml = computed(() => {
   if (!markdownContent.value) return "";
-  const html = marked(markdownContent.value) as string;
-  return resolveImagesInHtml(html);
+  const withImages = rewriteMarkdownImageRefs(markdownContent.value);
+  return marked(withImages) as string;
 });
 
 // Watch for scroll requests from viewState
