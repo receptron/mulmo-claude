@@ -91,6 +91,7 @@
 
         <div v-else-if="activeTab === 'mcp'" class="space-y-3">
           <SettingsMcpTab
+            ref="mcpTabRef"
             :servers="mcpServers"
             :docker-mode="dockerMode"
             @add="addMcpServer"
@@ -151,6 +152,11 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
   saved: [];
 }>();
+
+// Typed ref to the SettingsMcpTab so save() can flush a pending draft
+// before PUTing (eliminates the "user typed but forgot the inner Add
+// button" footgun). Null when the MCP tab isn't the active one.
+const mcpTabRef = ref<{ flushDraft: () => boolean } | null>(null);
 
 const activeTab = ref<"tools" | "mcp">("tools");
 const toolsText = ref("");
@@ -225,6 +231,15 @@ async function save(): Promise<void> {
   // guard the function body too so any programmatic caller can't
   // submit a half-loaded form.
   if (loading.value) return;
+  // Auto-commit any half-entered draft on the MCP tab. If the draft
+  // is invalid the tab sets its own inline error — abort the save so
+  // the user can fix it.
+  if (mcpTabRef.value && !mcpTabRef.value.flushDraft()) {
+    statusError.value = true;
+    statusMessage.value =
+      "Finish or cancel the pending MCP server entry first.";
+    return;
+  }
   saving.value = true;
   statusMessage.value = "";
   statusError.value = false;

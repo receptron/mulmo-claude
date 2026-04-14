@@ -269,8 +269,85 @@ function cancelAdd(): void {
 
 const ID_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 
+// Derive an id from user input when the Name field is left blank.
+// Covers the common shapes: a scoped npm package in stdio args
+// (`@modelcontextprotocol/server-everything` → `everything`), or a
+// hostname for an HTTP url (`mcp.deepwiki.com` → `deepwiki`).
+function suggestIdFromDraft(d: DraftState): string {
+  if (d.type === "http") {
+    return suggestIdFromUrl(d.url.trim());
+  }
+  const args = d.argsText
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return suggestIdFromStdioArgs(args);
+}
+
+function suggestIdFromUrl(rawUrl: string): string {
+  try {
+    const host = new URL(rawUrl).hostname;
+    const parts = host.split(".").filter((p) => p.length > 0);
+    // Drop generic subdomain / TLD noise so `mcp.deepwiki.com` → `deepwiki`.
+    const filtered = parts.filter(
+      (p, i) =>
+        !(i === 0 && (p === "mcp" || p === "www" || p === "api")) &&
+        !(i === parts.length - 1 && /^[a-z]{2,4}$/.test(p)),
+    );
+    const candidate = filtered[0] ?? parts[0] ?? "";
+    return slugifyToId(candidate);
+  } catch {
+    return "";
+  }
+}
+
+function suggestIdFromStdioArgs(args: string[]): string {
+  // First arg that isn't a flag is typically the package/script name.
+  const payload = args.find((a) => !a.startsWith("-"));
+  if (!payload) return "";
+  // For scoped packages / paths, keep only the last segment.
+  const lastSegment = payload.split("/").pop() ?? payload;
+  // Strip common MCP naming prefixes so `server-everything` → `everything`.
+  const stripped = lastSegment
+    .replace(/^(mcp-server-|server-|mcp-)/, "")
+    .replace(/\.(?:[jt]s|mjs|cjs)$/, "");
+  return slugifyToId(stripped);
+}
+
+function slugifyToId(raw: string): string {
+  let slug = raw.toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  // Strip leading/trailing hyphens with explicit while-loops so the
+  // regex engine can't be lured into catastrophic backtracking on a
+  // crafted input.
+  while (slug.startsWith("-")) slug = slug.slice(1);
+  while (slug.endsWith("-")) slug = slug.slice(0, -1);
+  slug = slug.slice(0, 64);
+  // Must start with a lowercase letter.
+  if (!/^[a-z]/.test(slug)) return "";
+  return slug;
+}
+
+function ensureUniqueId(base: string): string {
+  if (!base) return "";
+  if (!props.servers.some((s) => s.id === base)) return base;
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = `${base}-${i}`;
+    if (!props.servers.some((s) => s.id === candidate)) return candidate;
+  }
+  return "";
+}
+
 function commitAdd(): void {
-  const id = draft.value.id.trim();
+  let id = draft.value.id.trim();
+  if (!id) {
+    const suggested = ensureUniqueId(suggestIdFromDraft(draft.value));
+    if (!suggested) {
+      draftError.value =
+        "Please provide a Name, or enter a URL / args we can derive one from.";
+      return;
+    }
+    id = suggested;
+  }
   if (!ID_RE.test(id)) {
     draftError.value =
       "Name must start with a lowercase letter and contain only [a-z0-9_-].";
@@ -302,7 +379,30 @@ function commitAdd(): void {
   }
   emit("add", { id, spec });
   adding.value = false;
+  draftError.value = "";
 }
+
+// Called by the parent right before Save. If the draft form is open
+// and has any input, commit it (auto-generating a Name if blank). If
+// the draft is empty, silently close the form. Returns false only
+// when validation fails so the parent can surface an error and abort
+// the save — this is what spares users the pre-PR footgun of clicking
+// Save without first clicking the inner Add button.
+function flushDraft(): boolean {
+  if (!adding.value) return true;
+  const hasInput =
+    draft.value.id.trim().length > 0 ||
+    (draft.value.type === "http" && draft.value.url.trim().length > 0) ||
+    (draft.value.type === "stdio" && draft.value.argsText.trim().length > 0);
+  if (!hasInput) {
+    cancelAdd();
+    return true;
+  }
+  commitAdd();
+  return !adding.value;
+}
+
+defineExpose({ flushDraft });
 
 function onToggleEnabled(index: number, event: Event): void {
   const target = event.target as HTMLInputElement;
