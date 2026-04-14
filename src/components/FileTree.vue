@@ -4,7 +4,7 @@
       v-if="node.type === 'dir'"
       class="w-full flex items-center gap-1 px-2 py-1 text-left text-sm hover:bg-gray-100 rounded"
       :data-testid="`file-tree-dir-${node.name || 'root'}`"
-      @click="toggle(node.path)"
+      @click="onToggle"
     >
       <span class="material-icons text-sm text-gray-400 shrink-0">{{
         expanded ? "folder_open" : "folder"
@@ -35,21 +35,29 @@
         title="Recently changed"
       />
     </button>
-    <div v-if="node.type === 'dir' && expanded && node.children" class="pl-4">
+    <div v-if="node.type === 'dir' && expanded" class="pl-4">
+      <!-- Loading state: children not in the cache yet. Rendered
+           once per dir so a slow network shows where the wait is,
+           not as a global overlay. -->
+      <div v-if="loadingChildren" class="px-2 py-1 text-xs text-gray-400">
+        Loading...
+      </div>
       <FileTree
-        v-for="child in node.children"
+        v-for="child in loadedChildren"
         :key="child.path"
         :node="child"
         :selected-path="selectedPath"
         :recent-paths="recentPaths"
+        :children-by-path="childrenByPath"
         @select="(p) => emit('select', p)"
+        @load-children="(p) => emit('loadChildren', p)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
 
 export interface TreeNode {
@@ -65,10 +73,16 @@ const props = defineProps<{
   node: TreeNode;
   selectedPath: string | null;
   recentPaths: Set<string>;
+  // Lazy-expand cache managed by the parent (FilesView). `undefined`
+  // entry (not in the map) = not loaded yet → we emit `loadChildren`
+  // so the parent kicks off the fetch. `null` = load in flight →
+  // show spinner. Array = loaded.
+  childrenByPath: Map<string, TreeNode[] | null>;
 }>();
 
 const emit = defineEmits<{
   select: [path: string];
+  loadChildren: [path: string];
 }>();
 
 // Expand/collapse state lives in a module-level singleton so every
@@ -77,6 +91,42 @@ const emit = defineEmits<{
 // Default on first run: only the workspace root ("") is expanded.
 const { isExpanded, toggle } = useExpandedDirs();
 const expanded = computed(() => isExpanded(props.node.path));
+
+const cached = computed(() => props.childrenByPath.get(props.node.path));
+// `cached === null` = load in flight. `undefined` = never requested.
+// Array = loaded.
+const loadingChildren = computed(() => cached.value === null);
+const loadedChildren = computed(() =>
+  Array.isArray(cached.value) ? cached.value : [],
+);
+
+// Kick off a fetch if the dir is expanded but its children haven't
+// been requested yet. Covers two scenarios:
+//   1. User just toggled open → onToggle already emits, but watching
+//      here makes the flow idempotent when the parent re-mounts the
+//      component with expand state restored from localStorage.
+//   2. Deep link: FilesView calls `expand(ancestor)` before children
+//      arrive; this watcher catches that case too.
+watch(
+  [expanded, cached],
+  ([isOpen, current]) => {
+    if (!isOpen) return;
+    if (props.node.type !== "dir") return;
+    if (current !== undefined) return;
+    emit("loadChildren", props.node.path);
+  },
+  { immediate: true },
+);
+
+function onToggle(): void {
+  toggle(props.node.path);
+  // When newly-opened, request children if cache miss. The watcher
+  // above covers the reactive path but we also fire here so the
+  // request is visibly tied to the click for network inspection.
+  if (!isExpanded(props.node.path)) return;
+  if (cached.value !== undefined) return;
+  emit("loadChildren", props.node.path);
+}
 
 const isRecent = computed(() => props.recentPaths.has(props.node.path));
 </script>

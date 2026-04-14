@@ -41,6 +41,8 @@ watch(expandedDirs, (val) => {
 export function useExpandedDirs(): {
   isExpanded: (path: string) => boolean;
   toggle: (path: string) => void;
+  expand: (path: string) => void;
+  expandedPaths: () => string[];
 } {
   function isExpanded(path: string): boolean {
     return expandedDirs.value.has(path);
@@ -53,5 +55,16 @@ export function useExpandedDirs(): {
     else next.add(path);
     expandedDirs.value = next;
   }
-  return { isExpanded, toggle };
+  // Idempotently mark a path as expanded (used by deep-link auto-
+  // expand where we want to reveal ancestors without toggling).
+  function expand(path: string): void {
+    if (expandedDirs.value.has(path)) return;
+    const next = new Set(expandedDirs.value);
+    next.add(path);
+    expandedDirs.value = next;
+  }
+  function expandedPaths(): string[] {
+    return Array.from(expandedDirs.value);
+  }
+  return { isExpanded, toggle, expand, expandedPaths };
 }

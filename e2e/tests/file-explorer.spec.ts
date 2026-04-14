@@ -1,46 +1,66 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
-// Override the files/tree mock with a small fixture tree.
+// Override the lazy-expand endpoint with a small fixture tree. Each
+// directory returns its immediate children only — recursion is
+// emulated by the client via subsequent fetches on expand.
 async function mockFileTree(page: Page) {
   await page.route(
-    (url) => url.pathname === "/api/files/tree",
-    (route) =>
-      route.fulfill({
-        json: {
-          name: "",
-          path: "",
-          type: "dir",
-          children: [
-            {
-              name: "wiki",
-              path: "wiki",
-              type: "dir",
-              children: [
-                {
-                  name: "hello.md",
-                  path: "wiki/hello.md",
-                  type: "file",
-                  size: 42,
-                },
-              ],
-            },
-            {
-              name: "todos",
-              path: "todos",
-              type: "dir",
-              children: [
-                {
-                  name: "todos.json",
-                  path: "todos/todos.json",
-                  type: "file",
-                  size: 100,
-                },
-              ],
-            },
-          ],
-        },
-      }),
+    (url) => url.pathname === "/api/files/dir",
+    (route) => {
+      const path =
+        new URL(route.request().url()).searchParams.get("path") ?? "";
+      if (path === "") {
+        return route.fulfill({
+          json: {
+            name: "",
+            path: "",
+            type: "dir",
+            children: [
+              { name: "wiki", path: "wiki", type: "dir" },
+              { name: "todos", path: "todos", type: "dir" },
+            ],
+          },
+        });
+      }
+      if (path === "wiki") {
+        return route.fulfill({
+          json: {
+            name: "wiki",
+            path: "wiki",
+            type: "dir",
+            children: [
+              {
+                name: "hello.md",
+                path: "wiki/hello.md",
+                type: "file",
+                size: 42,
+              },
+            ],
+          },
+        });
+      }
+      if (path === "todos") {
+        return route.fulfill({
+          json: {
+            name: "todos",
+            path: "todos",
+            type: "dir",
+            children: [
+              {
+                name: "todos.json",
+                path: "todos/todos.json",
+                type: "file",
+                size: 100,
+              },
+            ],
+          },
+        });
+      }
+      return route.fulfill({
+        json: { name: path, path, type: "dir", children: [] },
+      });
+    },
   );
 
   // Mock file content for wiki/hello.md
@@ -68,13 +88,23 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("file explorer path in URL", () => {
   test("selecting a file puts ?path= in the URL", async ({ page }) => {
-    // Navigate to files view
     await page.goto("/chat?view=files");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
-    // Expand the wiki dir and click hello.md
-    // FileTree dirs start collapsed; click to expand
+    // Wait for the root dir's shallow listing to land — with lazy
+    // expand (#200 phase 2), the tree only renders children after
+    // `/api/files/dir?path=` resolves.
+    await expect(
+      page.locator('[data-testid="file-tree-dir-wiki"]'),
+    ).toBeVisible();
+
+    // Expand the wiki dir and click hello.md. FileTree dirs start
+    // collapsed; click toggles expand + triggers a lazy-fetch of
+    // wiki's children (resolved by the mockFileTree dispatcher).
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
+    await expect(
+      page.locator('[data-testid="file-tree-file-hello.md"]'),
+    ).toBeVisible();
     await page.locator('[data-testid="file-tree-file-hello.md"]').click();
 
     // URL should now contain ?path=wiki/hello.md

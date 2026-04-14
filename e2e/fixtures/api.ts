@@ -121,6 +121,15 @@ export async function mockAllApis(
     }),
   );
 
+  // Lazy-expand endpoint (Phase 2 of #200). Returns an empty dir by
+  // default; specific tests override with their own fixtures (see
+  // e2e/tests/file-explorer.spec.ts).
+  await page.route(urlEndsWith("/api/files/dir"), (route) =>
+    route.fulfill({
+      json: { name: "", path: "", type: "dir", children: [] },
+    }),
+  );
+
   // Default Settings response. Per-test specs (e.g. settings.spec.ts)
   // can override with a later page.route() which wins due to
   // Playwright's reverse-order matching.
