@@ -191,8 +191,10 @@ const renderedContent = computed(() => {
   // Rewrite workspace-relative image refs (`![alt](images/foo.png)`)
   // to `/api/files/raw?path=...` BEFORE marked parses them — without
   // this, the browser tries to fetch against the SPA route URL
-  // (/chat/…/images/foo.png) and 404s.
-  const withImages = rewriteMarkdownImageRefs(content.value);
+  // (/chat/…/images/foo.png) and 404s. basePath = wiki/pages for
+  // individual pages so `../images/foo.png` resolves correctly.
+  const basePath = action.value === "page" ? "wiki/pages" : "wiki";
+  const withImages = rewriteMarkdownImageRefs(content.value, basePath);
   return marked.parse(renderWikiLinks(withImages)) as string;
 });
 

@@ -9,18 +9,18 @@ import { resolveImageSrc } from "./resolve";
 // pass, the src becomes `/api/files/raw?path=images/foo.png` which
 // the workspace file server serves.
 //
-// Kept as a pure string→string transform so it can be applied
-// uniformly wherever we render user/LLM-authored markdown outside
-// the markdown plugin proper:
+// Callers that know the markdown file's directory (`basePath`) get
+// correct resolution for `./` and `../` relative refs. Callers that
+// omit `basePath` only resolve refs that are already workspace-rooted
+// (no leading `./` or `../`); relative-with-traversal refs without
+// context would be ambiguous, so they pass through untouched rather
+// than silently pointing at the wrong file.
+//
+// Used by:
 //
 //   - `src/plugins/wiki/View.vue`
 //   - `src/components/FilesView.vue` (when previewing a .md file)
-//   - potential future renderers
-//
-// The markdown plugin (`src/plugins/markdown/View.vue`) has its own
-// post-`marked` HTML rewriter; both approaches reach the same end
-// state, but pre-marked is less brittle for places where we don't
-// own the rendering pipeline (TextResponseView).
+//   - `src/plugins/markdown/View.vue` (via post-`marked` HTML rewriter)
 
 // Match `![alt](url)`. Single character class per span, no
 // overlapping backtracking surface (linear-time matching).
@@ -34,29 +34,60 @@ function shouldSkip(url: string): boolean {
   return false;
 }
 
-function normalizeRelative(url: string): string {
-  // Strip leading `./` / `../` segments. Markdown authored from
-  // different workspace subdirs typically uses `../images/foo.png`
-  // relative to the file's own directory; our API resolves from the
-  // workspace root so the relative prefix is always noise.
-  let out = url;
-  while (out.startsWith("./")) out = out.slice(2);
-  while (out.startsWith("../")) out = out.slice(3);
-  return out;
+/**
+ * Resolve `url` relative to `basePath` using posix segment arithmetic.
+ * Returns the resolved workspace-relative path, or `null` if the URL
+ * escapes the workspace root (more `..` than `basePath` depth).
+ *
+ * Pure string operation — does not touch the filesystem or use Node's
+ * `path` module (this file runs in the browser).
+ */
+function resolveWorkspacePath(basePath: string, url: string): string | null {
+  // Absolute-within-workspace (e.g. "/images/foo.png") — reset base.
+  const isAbsolute = url.startsWith("/");
+  const baseSegs = isAbsolute
+    ? []
+    : basePath.split("/").filter((s) => s !== "" && s !== ".");
+  const segs = [...baseSegs];
+
+  const urlSegs = (isAbsolute ? url.slice(1) : url).split("/");
+  for (const seg of urlSegs) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (segs.length === 0) return null;
+      segs.pop();
+      continue;
+    }
+    segs.push(seg);
+  }
+  if (segs.length === 0) return null;
+  return segs.join("/");
 }
 
 /**
  * Rewrite `![alt](path)` image refs in markdown text so workspace-
- * relative paths render through `/api/files/raw`. Absolute URLs,
- * data URIs, and existing API paths pass through untouched.
+ * relative paths render through `/api/files/raw`.
  *
- * Pure — safe to call on any markdown string.
+ * @param markdown Markdown source text.
+ * @param basePath The workspace-relative directory of the markdown
+ *   file (e.g. `"wiki/pages"` for `wiki/pages/foo.md`). Omit or pass
+ *   `""` when resolving refs against the workspace root.
+ *
+ * Absolute URLs, data URIs, and existing API paths pass through
+ * untouched. Refs that would escape the workspace root (more `..`
+ * than `basePath` depth) also pass through untouched — they would
+ * 404 regardless, and passing through lets the user see the broken
+ * ref instead of silently re-pointing it.
  */
-export function rewriteMarkdownImageRefs(markdown: string): string {
+export function rewriteMarkdownImageRefs(
+  markdown: string,
+  basePath: string = "",
+): string {
   return markdown.replace(IMAGE_REF_RE, (match, alt: string, url: string) => {
     const trimmedUrl = url.trim();
     if (trimmedUrl === "" || shouldSkip(trimmedUrl)) return match;
-    const resolved = resolveImageSrc(normalizeRelative(trimmedUrl));
-    return `![${alt}](${resolved})`;
+    const resolved = resolveWorkspacePath(basePath, trimmedUrl);
+    if (resolved === null) return match;
+    return `![${alt}](${resolveImageSrc(resolved)})`;
   });
 }

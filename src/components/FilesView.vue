@@ -458,8 +458,12 @@ function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   // Rewrite `![alt](path)` refs BEFORE handing the markdown to
   // TextResponseView (which we don't own — it's a package component)
   // so workspace-relative image paths resolve via /api/files/raw
-  // instead of 404-ing against the SPA page URL.
-  const rewritten = rewriteMarkdownImageRefs(text);
+  // instead of 404-ing against the SPA page URL. basePath is the
+  // directory of the current file so `../` refs resolve correctly.
+  const current = selectedPath.value ?? "";
+  const slash = current.lastIndexOf("/");
+  const basePath = slash >= 0 ? current.slice(0, slash) : "";
+  const rewritten = rewriteMarkdownImageRefs(text, basePath);
   return {
     uuid: "files-preview",
     toolName: "text-response",
