@@ -112,7 +112,27 @@ wired into the test assertions. Spot-checking is usually enough.
 
 See [`docs/logging.md`](logging.md) for the full logger reference.
 
-## 6. Cross-browser / responsive (beyond Chromium)
+## 6. Editor save-failure UX (markdown + presentMulmoScript)
+
+**Why manual**: an E2E that mocks `PUT /api/markdowns/:file` or
+`POST /api/mulmo-script/update-beat` with a 500 proved flaky when run
+alongside the rest of the presentMulmoScript suite — the mocked
+request was occasionally unobserved even though the test passed in
+isolation. The fix is exercised by the same flow in production; the
+manual smoke below is enough to catch a regression.
+
+### What to check
+
+| Surface | Flow |
+|---|---|
+| **markdown plugin edit** | Open a markdown tool result → "Edit Markdown Source" → change text → disconnect network (devtools) → click "Apply Changes". Editor stays open, a red "Save failed: …" box appears, editor content unchanged. Reconnect + retry succeeds. |
+| **presentMulmoScript beat edit** | Open a MulmoScript tool result → "Show source" on a beat → change JSON → disconnect network → click "Update". Editor stays open, red "Save failed: …" inline message near Update, JSON unchanged. Reconnect + retry succeeds. |
+
+**Server contract is already covered**: the render-beat 500-path E2E
+exercises the same `{ error }` response shape — only the *editor UI
+wiring* on save failure needs manual verification.
+
+## 7. Cross-browser / responsive (beyond Chromium)
 
 **Why manual**: E2E runs only Chromium (see `e2e/playwright.config.ts`).
 

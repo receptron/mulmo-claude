@@ -64,6 +64,9 @@
             </button>
             <button class="cancel-btn" @click="cancelEdit">Cancel</button>
           </div>
+          <p v-if="saveError" class="save-error" role="alert">
+            ⚠ {{ saveError }}
+          </p>
         </details>
         <button
           v-show="!editing"
@@ -98,6 +101,9 @@ const emit = defineEmits<{
 
 const loading = ref(false);
 const saving = ref(false);
+// Human-readable message shown next to the Save button when a PUT
+// fails. null while the editor is idle or the last save succeeded.
+const saveError = ref<string | null>(null);
 // The actual markdown content (fetched from server or inline)
 const markdownContent = ref("");
 const editableMarkdown = ref("");
@@ -186,7 +192,10 @@ const copied = ref(false);
 function onDetailsToggle(e: Event) {
   const open = (e.target as HTMLDetailsElement).open;
   editing.value = open;
-  if (!open) editableMarkdown.value = markdownContent.value;
+  if (!open) {
+    editableMarkdown.value = markdownContent.value;
+    saveError.value = null;
+  }
 }
 
 function cancelEdit() {
@@ -226,6 +235,8 @@ async function applyMarkdown() {
   const raw = props.selectedResult.data?.markdown;
   if (!raw) return;
 
+  saveError.value = null;
+
   // If file-based, save to server
   if (isFilePath(raw)) {
     saving.value = true;
@@ -237,11 +248,11 @@ async function applyMarkdown() {
         body: JSON.stringify({ markdown: editableMarkdown.value }),
       });
       if (!res.ok) {
-        console.error("Failed to save markdown:", res.statusText);
+        saveError.value = `Save failed: ${res.status} ${res.statusText}`;
         return;
       }
     } catch (err) {
-      console.error("Failed to save markdown:", err);
+      saveError.value = `Save failed: ${err instanceof Error ? err.message : String(err)}`;
       return;
     } finally {
       saving.value = false;
@@ -481,6 +492,16 @@ watch(
 .editor-actions {
   display: flex;
   justify-content: space-between;
+}
+
+.save-error {
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.6rem;
+  background: #fdecea;
+  color: #b71c1c;
+  border: 1px solid #f5c2c7;
+  border-radius: 4px;
+  font-size: 0.85rem;
 }
 
 .cancel-btn {
