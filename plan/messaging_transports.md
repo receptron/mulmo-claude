@@ -69,6 +69,9 @@ export interface TransportContext {
   /** Task manager for registering polling tasks */
   taskManager: ITaskManager;
 
+  /** Express router for registering webhook endpoints */
+  router: express.Router;
+
   /** Server port for internal API calls (if needed) */
   port: number;
 }
@@ -290,7 +293,7 @@ The `TELEGRAM_ALLOWED_CHAT_IDS` env var restricts which Telegram chats can inter
 
 ---
 
-## 5) Future Transports (sketched)
+## 5) Other Transports (sketched)
 
 ### Slack
 
@@ -298,13 +301,33 @@ The `TELEGRAM_ALLOWED_CHAT_IDS` env var restricts which Telegram chats can inter
 - **Ingress**: Webhook endpoint (`POST /api/transports/slack/events`) or Socket Mode
 - **Mapping**: Slack channel/thread ID -> MulmoClaude session
 - **Task**: If using Socket Mode, register a reconnect-on-failure task; if webhooks, no polling needed
+- **Constraint**: Slack requires a 3-second ACK for webhook events; long agent runs need a deferred response pattern (ACK immediately, post reply later via `chat.postMessage`)
 
 ### Twitter/X
 
 - **Auth**: OAuth 2.0 app credentials + user token
 - **Ingress**: Polling DMs via task manager interval, or Account Activity API webhooks
 - **Mapping**: DM conversation ID -> MulmoClaude session
-- **Constraint**: 280-char limit for replies — `splitMessage()` with smaller chunk size
+- **Constraint**: 280-char limit for public replies — `splitMessage()` with smaller chunk size. DMs allow up to 10,000 chars. Rate limits are strict (app-level + user-level)
+
+### LINE
+
+- **Auth**: `LINE_CHANNEL_ACCESS_TOKEN` + `LINE_CHANNEL_SECRET`
+- **Ingress**: Webhook endpoint (`POST /api/transports/line/webhook`). LINE pushes events; no polling needed
+- **Mapping**: LINE user ID or group/room ID -> MulmoClaude session
+- **Signature verification**: Every webhook request must be verified using HMAC-SHA256 with the channel secret — reject unverified requests
+- **Reply vs Push**: LINE distinguishes "reply" (free, must use a `replyToken` within 1 minute of the event) and "push" (costs message quota, can be sent anytime). For agent responses that may take longer than ~30s, use push messages as a fallback
+- **Constraint**: 5,000-char limit per text message bubble; max 5 bubbles per reply. Long responses need `splitMessage()` with LINE-specific limits
+
+### WhatsApp (via Cloud API)
+
+- **Auth**: `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_VERIFY_TOKEN` (for webhook verification)
+- **Ingress**: Webhook endpoint (`POST /api/transports/whatsapp/webhook`) + GET verification endpoint. Meta sends events via webhook; no polling needed
+- **Mapping**: WhatsApp phone number -> MulmoClaude session
+- **Webhook verification**: Meta sends a GET with `hub.mode`, `hub.verify_token`, `hub.challenge` — must echo the challenge back if token matches
+- **24-hour messaging window**: WhatsApp only allows free-form replies within 24 hours of the user's last message. After that, only pre-approved template messages can be sent. The transport should track the last user message timestamp and warn if the window is closing
+- **Constraint**: 4,096-char limit per text message. Must mark incoming messages as "read" via the API to show blue ticks
+- **Note**: Requires a Meta Business account and app review for production use; development mode works with up to 5 phone numbers
 
 ---
 
@@ -340,6 +363,11 @@ process.on("SIGTERM", async () => {
 # TELEGRAM_DEFAULT_ROLE_ID=general
 # SLACK_BOT_TOKEN=xoxb-...
 # SLACK_SIGNING_SECRET=...
+# LINE_CHANNEL_ACCESS_TOKEN=...
+# LINE_CHANNEL_SECRET=...
+# WHATSAPP_PHONE_NUMBER_ID=...
+# WHATSAPP_ACCESS_TOKEN=...
+# WHATSAPP_VERIFY_TOKEN=my_secret_verify_token
 ```
 
 ---
@@ -360,6 +388,18 @@ server/transports/
     types.ts            ← Telegram-specific types
   slack/                ← (future)
   twitter/              ← (future)
+  line/                 ← (future)
+  whatsapp/             ← (future)
+```
+
+Webhook routes (for platforms that push events):
+
+```
+server/routes/transports.ts   ← Express router mounting webhook endpoints
+  POST /api/transports/line/webhook
+  POST /api/transports/whatsapp/webhook
+  GET  /api/transports/whatsapp/webhook   ← Meta verification
+  POST /api/transports/slack/events       ← (if using webhooks)
 ```
 
 Workspace storage:
@@ -369,6 +409,8 @@ Workspace storage:
   telegram/chats/       ← Per-chat state JSON files
   slack/chats/          ← (future)
   twitter/chats/        ← (future)
+  line/chats/           ← (future)
+  whatsapp/chats/       ← (future)
 ```
 
 ---
@@ -391,19 +433,47 @@ Workspace storage:
 1. Create `server/transports/slack/` using the same foundation
 2. Add webhook route or Socket Mode support
 
-### Phase 2: Twitter/X
+### Phase 2: LINE
+1. Create `server/transports/line/` — webhook-based, no polling
+2. Add `POST /api/transports/line/webhook` route with HMAC-SHA256 signature verification
+3. Implement reply-token-first strategy with push-message fallback for slow responses
+
+### Phase 3: WhatsApp
+1. Create `server/transports/whatsapp/` — webhook-based, no polling
+2. Add webhook routes (GET for verification, POST for events)
+3. Implement 24-hour window tracking in chat state
+4. Handle message read receipts
+
+### Phase 4: Twitter/X
 1. Create `server/transports/twitter/` using the same foundation
 2. Handle OAuth flow + DM polling
 
 ---
 
-## 9) Key Design Decisions
+## 9) Ingress Patterns: Polling vs Webhook
+
+The five platforms split into two ingress patterns. The `MessagingTransport` interface supports both via `TransportContext`:
+
+| Pattern | Platforms | Mechanism |
+|---|---|---|
+| **Polling** | Telegram, Twitter/X | Register an interval task via `ctx.taskManager` |
+| **Webhook** | LINE, WhatsApp, Slack | Register an Express route via `ctx.router` |
+
+**Polling transports** call the platform API on a timer. The task manager handles scheduling, error logging, and shutdown. Simple, no public URL needed — works behind NAT.
+
+**Webhook transports** receive HTTP pushes from the platform. They register routes under `/api/transports/{name}/` during `init()`. Each platform has its own signature verification (HMAC-SHA256 for LINE, SHA-256 for Slack, Meta's verify-token handshake for WhatsApp) — this is **not** shared, since each scheme differs. Webhooks require the server to be publicly reachable (ngrok for development, reverse proxy for production).
+
+Both patterns converge at `relayMessage()` — once an incoming message is parsed and the transport chat state is loaded, the same relay function handles agent invocation and response collection.
+
+---
+
+## 10) Key Design Decisions
 
 | Decision | Rationale |
 |---|---|
 | Use `startChat()` not `runAgent()` | Gets session persistence, JSONL, journal, chat-index for free |
 | Task manager for polling | Proper lifecycle management, no infinite loops, graceful shutdown |
-| Transport-agnostic relay | Telegram, Slack, Twitter all use the same relay function |
+| Transport-agnostic relay | Telegram, Slack, LINE, WhatsApp, Twitter all use the same relay function |
 | Workspace storage for chat state | Consistent with MulmoClaude's "workspace is the database" philosophy |
 | `resolveWithinRoot()` for all paths | Prevents path traversal from external chat IDs |
 | Shared command handler | `/start`, `/help`, `/roles` work identically across all transports |
