@@ -19,17 +19,8 @@ const toolDefinition: ToolDefinition = {
   name: TOOL_NAME,
   description: "Display a document in markdown format.",
   prompt:
-    `Use the ${TOOL_NAME} tool to create structured documents with text and embedded images. This tool is ideal for:\n` +
-    '- Guides, tutorials, and how-to content ("create a guide about...", "explain how to...")\n' +
-    "- Educational content (lessons, explanations, timelines, concept visualizations)\n" +
-    "- Reports and presentations (business reports, data analysis, infographics)\n" +
-    "- Articles and blog posts with illustrations\n" +
-    "- Documentation with diagrams or screenshots\n" +
-    "- Recipes with step-by-step photos\n" +
-    "- Travel guides with location images\n" +
-    "- Product presentations or lookbooks\n" +
-    "- Any content that combines written information with supporting visuals\n\n" +
-    `IMPORTANT: Use this tool instead of just generating standalone images when the user wants informational or educational content with visuals. This creates a cohesive document with formatted text (markdown) AND images embedded at appropriate locations. For example, if asked to "create a guide about photosynthesis with a diagram", use ${TOOL_NAME} to create a full guide with explanatory text and the diagram embedded, rather than just generating the diagram image alone.\n\n` +
+    `Use the ${TOOL_NAME} tool when the user asks for a document that combines text with embedded images — guides, reports, tutorials, articles, or any structured content with visuals. ` +
+    `Prefer this over standalone image generation when the user wants informational content with supporting visuals.\n\n` +
     "Format embedded images as: ![Detailed image prompt](__too_be_replaced_image_path__)",
   parameters: {
     type: "object",
