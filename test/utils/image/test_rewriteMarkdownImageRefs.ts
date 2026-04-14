@@ -121,3 +121,82 @@ describe("rewriteMarkdownImageRefs — with basePath", () => {
     assert.equal(rewriteMarkdownImageRefs(src, "wiki/pages"), src);
   });
 });
+
+describe("rewriteMarkdownImageRefs — code blocks and special chars", () => {
+  it("leaves image-ref syntax inside a fenced code block untouched", () => {
+    const src = [
+      "Before",
+      "",
+      "```",
+      "![example](images/foo.png)",
+      "```",
+      "",
+      "After ![real](images/bar.png)",
+    ].join("\n");
+    const out = rewriteMarkdownImageRefs(src);
+    // The one inside the code block stays literal.
+    assert.ok(out.includes("![example](images/foo.png)"));
+    // The one outside gets rewritten.
+    assert.ok(out.includes("path=images%2Fbar.png"));
+  });
+
+  it("leaves image-ref syntax inside an inline code span untouched", () => {
+    const src =
+      "Use `![example](images/foo.png)` in a doc; ![real](images/bar.png) renders.";
+    const out = rewriteMarkdownImageRefs(src);
+    assert.ok(out.includes("`![example](images/foo.png)`"));
+    assert.ok(out.includes("path=images%2Fbar.png"));
+  });
+
+  it("leaves image-ref syntax inside a ~~~ fenced block untouched", () => {
+    const src = "~~~\n![example](images/foo.png)\n~~~\n![real](x.png)";
+    const out = rewriteMarkdownImageRefs(src);
+    assert.ok(out.includes("![example](images/foo.png)"));
+    assert.ok(out.includes("path=x.png"));
+  });
+
+  it("correctly rewrites an image URL that contains `)` inside the path (Wikipedia-style)", () => {
+    // The old regex stopped at the first `)` and truncated the href
+    // to `wiki/Foo_(bar`. marked's lexer parses balanced parens
+    // correctly, so the full `Foo_(bar).png` lands in the href.
+    // encodeURIComponent preserves `(` and `)` as literal chars (they
+    // are in its "unreserved mark" set) — the resulting URL round-
+    // trips through marked because balanced parens stay balanced.
+    const src = "![wikilink](wiki/Foo_(bar).png)";
+    const out = rewriteMarkdownImageRefs(src);
+    assert.equal(out, "![wikilink](/api/files/raw?path=wiki%2FFoo_(bar).png)");
+  });
+
+  it("passes through https URLs with balanced parens untouched", () => {
+    const src = "![w](https://en.wikipedia.org/wiki/Foo_(bar))";
+    assert.equal(rewriteMarkdownImageRefs(src), src);
+  });
+
+  it("preserves markdown title when rewriting", () => {
+    const out = rewriteMarkdownImageRefs(
+      '![alt](images/foo.png "a title")',
+      "",
+    );
+    assert.equal(out, '![alt](/api/files/raw?path=images%2Ffoo.png "a title")');
+  });
+
+  it("rewrites multiple refs across paragraphs, lists, and blockquotes", () => {
+    const src = [
+      "# Page",
+      "",
+      "- one ![a](images/a.png)",
+      "- two ![b](images/b.png)",
+      "",
+      "> quoted ![c](images/c.png)",
+      "",
+      "```",
+      "![skipme](images/skip.png)",
+      "```",
+    ].join("\n");
+    const out = rewriteMarkdownImageRefs(src);
+    assert.ok(out.includes("path=images%2Fa.png"));
+    assert.ok(out.includes("path=images%2Fb.png"));
+    assert.ok(out.includes("path=images%2Fc.png"));
+    assert.ok(out.includes("![skipme](images/skip.png)"));
+  });
+});
