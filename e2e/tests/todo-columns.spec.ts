@@ -1,126 +1,40 @@
-import { createHash } from "crypto";
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
-import { TODO_ITEMS, TODO_COLUMNS } from "../fixtures/todos";
+import {
+  mockSlugifyColumnId,
+  setupMutableTodoMocks,
+} from "../fixtures/todos-mutable";
 
-// Mirror of server/utils/slug.ts for deterministic id generation in
-// the mock. Keeping this inline avoids a Vite/server import boundary;
-// the unit tests cover correctness of the real implementation.
-function mockSlugifyColumnId(label: string): string {
-  let slug = label
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "_");
-  // Trim leading/trailing underscores by character walk — avoids the
-  // `^_+|_+$` alternation that sonarjs/slow-regex flags for
-  // potential backtracking.
-  let start = 0;
-  while (start < slug.length && slug[start] === "_") start++;
-  let end = slug.length;
-  while (end > start && slug[end - 1] === "_") end--;
-  slug = slug.slice(start, end);
-  // eslint-disable-next-line no-control-regex
-  const hasNonAscii = /[^\x00-\x7F]/.test(label);
-  if (!hasNonAscii) return slug.length > 0 ? slug : "column";
-  const hash = createHash("sha256")
-    .update(label.trim(), "utf-8")
-    .digest("base64url")
-    .slice(0, 16);
-  if (slug.length >= 3) return `${slug}_${hash}`;
-  return hash;
-}
-
-async function setupTodoMocks(page: Page) {
+async function setupTodoMocks(page: Page): Promise<void> {
   await mockAllApis(page);
-
-  // Mutable state for column operations.
-  let columns = [...TODO_COLUMNS];
-  const items = [...TODO_ITEMS];
-
-  const buildResponse = () => ({ data: { items, columns } });
-
-  await page.route(
-    (url) => url.pathname === "/api/todos",
-    (route) => route.fulfill({ json: buildResponse() }),
-  );
-
-  // Column operations — return updated state.
-  await page.route(
-    (url) => url.pathname.startsWith("/api/todos/columns"),
-    (route) => {
-      const method = route.request().method();
+  await setupMutableTodoMocks(page, {
+    dispatchColumn(method, id, body, state) {
       if (method === "POST") {
-        const body = route.request().postDataJSON() ?? {};
-        const label: string =
+        const label =
           typeof body.label === "string" && body.label.length > 0
             ? body.label
             : "New Column";
         const baseId = mockSlugifyColumnId(label);
-        const existing = new Set(columns.map((c) => c.id));
-        let id = baseId;
+        const existing = new Set(state.columns.map((c) => c.id));
+        let newId = baseId;
         let n = 2;
-        while (existing.has(id)) id = `${baseId}_${n++}`;
-        columns = [...columns, { id, label }];
-      } else if (method === "DELETE") {
-        const id = route.request().url().split("/api/todos/columns/").pop();
-        columns = columns.filter((c) => c.id !== id);
-      } else if (method === "PATCH") {
-        const id = route.request().url().split("/api/todos/columns/").pop();
-        columns = columns.map((c) =>
-          c.id === id ? { ...c, label: "Renamed" } : c,
-        );
+        while (existing.has(newId)) newId = `${baseId}_${n++}`;
+        return {
+          columns: [...state.columns, { id: newId, label }],
+        };
       }
-      return route.fulfill({ json: buildResponse() });
+      if (method === "DELETE" && id) {
+        return { columns: state.columns.filter((c) => c.id !== id) };
+      }
+      if (method === "PATCH" && id) {
+        return {
+          columns: state.columns.map((c) =>
+            c.id === id ? { ...c, label: "Renamed" } : c,
+          ),
+        };
+      }
     },
-  );
-
-  await page.route(
-    (url) => url.pathname.startsWith("/api/todos/items"),
-    (route) => route.fulfill({ json: buildResponse() }),
-  );
-
-  await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === "todos/todos.json",
-    (route) =>
-      route.fulfill({
-        json: {
-          kind: "text",
-          path: "todos/todos.json",
-          content: JSON.stringify(items),
-          size: 500,
-          modifiedMs: Date.now(),
-        },
-      }),
-  );
-
-  await page.route(
-    (url) => url.pathname === "/api/files/tree",
-    (route) =>
-      route.fulfill({
-        json: {
-          name: "",
-          path: "",
-          type: "dir",
-          children: [
-            {
-              name: "todos",
-              path: "todos",
-              type: "dir",
-              children: [
-                {
-                  name: "todos.json",
-                  path: "todos/todos.json",
-                  type: "file",
-                  size: 500,
-                },
-              ],
-            },
-          ],
-        },
-      }),
-  );
+  });
 }
 
 test.describe("Todo column management", () => {

@@ -23,7 +23,8 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
-import { TODO_COLUMNS, TODO_ITEMS, type TodoFixture } from "../fixtures/todos";
+import { setupMutableTodoMocks } from "../fixtures/todos-mutable";
+import type { TodoFixture } from "../fixtures/todos";
 
 let itemIdCounter = 0;
 function nextItemId(): string {
@@ -32,9 +33,9 @@ function nextItemId(): string {
 }
 
 // Pure mutations — each returns the next `items` array (or the
-// same reference if no change). Kept outside the route handler so
-// the dispatcher stays tiny + the handlers are individually
-// testable if we ever want to.
+// same reference if no change). Kept outside the dispatcher so the
+// handlers stay tiny + are individually testable if we ever want
+// to.
 function applyCreate(
   items: TodoFixture[],
   body: Record<string, unknown>,
@@ -87,109 +88,27 @@ function applyMove(
   );
 }
 
-// Per-test harness. Each `test` gets its own `items` / `columns`
-// closure so state can't leak between cases.
-async function setupMutableTodoMocks(page: Page): Promise<void> {
+async function setupItemsCrudMocks(page: Page): Promise<void> {
   await mockAllApis(page);
-
-  // Deep clone so no test mutates the shared fixture.
-  let items: TodoFixture[] = TODO_ITEMS.map((i) => ({ ...i }));
-  const columns = TODO_COLUMNS.map((c) => ({ ...c }));
-  const buildResponse = () => ({ data: { items, columns } });
-
-  // /api/todos — plain GET
-  await page.route(
-    (url) => url.pathname === "/api/todos",
-    (route) => route.fulfill({ json: buildResponse() }),
-  );
-
-  // /api/todos/items/* — covers POST (create), PATCH (update),
-  // DELETE (remove), POST /:id/move (drag + toggle-complete).
-  await page.route(
-    (url) => url.pathname.startsWith("/api/todos/items"),
-    (route) => {
-      const method = route.request().method();
-      const urlObj = new URL(route.request().url());
-      const itemsPath = urlObj.pathname.replace(/^\/api\/todos\/items\/?/, "");
-      const [idSegment, tail] = itemsPath.split("/");
-      const body = (route.request().postDataJSON() ?? {}) as Record<
-        string,
-        unknown
-      >;
-
+  await setupMutableTodoMocks(page, {
+    dispatchItem(method, path, body, state) {
+      const [idSegment, tail] = path.split("/");
       if (method === "POST" && idSegment === "") {
-        const { items: next, item } = applyCreate(items, body);
-        items = next;
-        return route.fulfill({ json: { ...buildResponse(), item } });
+        const { items, item } = applyCreate(state.items, body);
+        return { items, extra: { item } };
       }
       if (method === "PATCH" && idSegment) {
-        const { items: next, item } = applyPatch(items, idSegment, body);
-        items = next;
-        return route.fulfill({
-          json: item ? { ...buildResponse(), item } : buildResponse(),
-        });
+        const { items, item } = applyPatch(state.items, idSegment, body);
+        return { items, extra: item ? { item } : undefined };
       }
       if (method === "POST" && tail === "move" && idSegment) {
-        items = applyMove(items, idSegment, body);
-        return route.fulfill({ json: buildResponse() });
+        return { items: applyMove(state.items, idSegment, body) };
       }
       if (method === "DELETE" && idSegment) {
-        items = items.filter((it) => it.id !== idSegment);
-        return route.fulfill({ json: buildResponse() });
+        return { items: state.items.filter((it) => it.id !== idSegment) };
       }
-      return route.fulfill({ json: buildResponse() });
     },
-  );
-
-  // /api/todos/columns/* — tests here don't exercise column mutation,
-  // but the route must exist for the explorer to hydrate.
-  await page.route(
-    (url) => url.pathname.startsWith("/api/todos/columns"),
-    (route) => route.fulfill({ json: buildResponse() }),
-  );
-
-  // File explorer wiring — same shape as todo-columns.spec.ts.
-  await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === "todos/todos.json",
-    (route) =>
-      route.fulfill({
-        json: {
-          kind: "text",
-          path: "todos/todos.json",
-          content: JSON.stringify(items),
-          size: 500,
-          modifiedMs: Date.now(),
-        },
-      }),
-  );
-  await page.route(
-    (url) => url.pathname === "/api/files/tree",
-    (route) =>
-      route.fulfill({
-        json: {
-          name: "",
-          path: "",
-          type: "dir",
-          children: [
-            {
-              name: "todos",
-              path: "todos",
-              type: "dir",
-              children: [
-                {
-                  name: "todos.json",
-                  path: "todos/todos.json",
-                  type: "file",
-                  size: 500,
-                },
-              ],
-            },
-          ],
-        },
-      }),
-  );
+  });
 }
 
 async function openTodoExplorer(page: Page): Promise<void> {
@@ -203,7 +122,7 @@ async function openTodoExplorer(page: Page): Promise<void> {
 
 test.describe("Todo items CRUD (mutable-state)", () => {
   test.beforeEach(async ({ page }) => {
-    await setupMutableTodoMocks(page);
+    await setupItemsCrudMocks(page);
     await openTodoExplorer(page);
   });
 
