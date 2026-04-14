@@ -212,4 +212,10 @@ test.describe("presentMulmoScript plugin", () => {
     // string in the placeholder slot.
     await expect(page.getByText("Image was not generated")).toBeVisible();
   });
+
+  // E2E for the update-beat save-failure UX is covered manually —
+  // see docs/manual-testing.md. It kept flaking when run in the full
+  // suite (the Update button fetch was occasionally never seen by the
+  // per-test mock even though it passed in isolation), so the check
+  // lives in manual testing rather than gating CI.
 });
