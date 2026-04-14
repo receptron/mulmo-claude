@@ -8,7 +8,7 @@
 // Eliminates the sync `readdirSync` + linear `find()` in the old
 // `resolvePagePath` — see #201.
 
-import fsp from "node:fs/promises";
+import { readDirSafeAsync, statSafeAsync } from "../../utils/fs.js";
 
 export interface PageIndex {
   mtimeMs: number;
@@ -25,7 +25,7 @@ let cache: PageIndex | null = null;
  * Safe to call concurrently — racing builds produce the same result.
  */
 export async function getPageIndex(pagesDir: string): Promise<PageIndex> {
-  const stat = await fsp.stat(pagesDir).catch(() => null);
+  const stat = await statSafeAsync(pagesDir);
   if (!stat) {
     // Dir doesn't exist yet (never ingested). Return empty but
     // don't cache a stale-forever value — the next call will
@@ -35,9 +35,11 @@ export async function getPageIndex(pagesDir: string): Promise<PageIndex> {
   if (cache && cache.mtimeMs >= stat.mtimeMs) {
     return cache;
   }
-  const entries = await fsp.readdir(pagesDir).catch(() => []);
+  const entries = await readDirSafeAsync(pagesDir);
   const slugs = new Map<string, string>();
-  for (const name of entries) {
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
     if (!name.endsWith(".md")) continue;
     slugs.set(name.slice(0, -".md".length), name);
   }
