@@ -23,6 +23,24 @@ import { createArgsCache, recordToolEvent } from "../tool-trace/index.js";
 const router = Router();
 const PORT = Number(process.env.PORT) || 3001;
 
+// Short, safe preview of tool args for logs. Full payload may contain
+// base64 images or large blobs, so we cap it. The goal is to make a
+// line like `mcp__deepwiki__read_wiki_contents` grep-able in logs
+// alongside its args shape, not to record the full input.
+const TOOL_ARGS_LOG_PREVIEW_MAX = 200;
+function previewJson(value: unknown): string {
+  let serialised: string;
+  try {
+    serialised = JSON.stringify(value);
+  } catch {
+    return "[unserialisable]";
+  }
+  if (serialised === undefined) return "";
+  return serialised.length > TOOL_ARGS_LOG_PREVIEW_MAX
+    ? `${serialised.slice(0, TOOL_ARGS_LOG_PREVIEW_MAX)}…`
+    : serialised;
+}
+
 // Called by the MCP server to push a ToolResult into the active session.
 interface OkResponse {
   ok: boolean;
@@ -273,6 +291,25 @@ async function runAgentInBackground(
             message: event.message,
           }) + "\n",
         );
+      }
+      if (event.type === "tool_call") {
+        log.info("agent-tool", "call", {
+          chatSessionId,
+          toolName: event.toolName,
+          toolUseId: event.toolUseId,
+          argsPreview: previewJson(event.args),
+        });
+      }
+      if (event.type === "tool_call_result") {
+        // Look up the toolName from the cache *before* recordToolEvent
+        // runs (it deletes the cache entry on result).
+        const cached = toolArgsCache.get(event.toolUseId);
+        log.info("agent-tool", "result", {
+          chatSessionId,
+          toolName: cached?.toolName,
+          toolUseId: event.toolUseId,
+          contentBytes: event.content.length,
+        });
       }
       if (event.type === "tool_call" || event.type === "tool_call_result") {
         // Fire-and-forget: tool-trace persistence failures must not
