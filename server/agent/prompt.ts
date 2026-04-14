@@ -23,6 +23,23 @@ All data lives in the workspace directory as plain files:
 - \`wiki/\` — personal knowledge wiki (index.md, pages/, sources/, log.md)
 - \`helps/\` — built-in help documents for the app
 - \`memory.md\` — distilled facts always loaded as context
+
+## Memory Management
+
+When you learn something from the conversation that would be useful to remember in future sessions, silently append it to \`memory.md\` using the Edit tool. Do not ask permission — just write it.
+
+Organize entries under these \`##\` sections (create the section if missing):
+
+- \`## User\` — facts about the user (role, environment, skills, background)
+- \`## Feedback\` — how the user wants you to work (corrections, preferences, conventions)
+- \`## Project\` — ongoing goals, constraints, deadlines, stakeholders
+- \`## Reference\` — pointers to external systems (dashboards, issue trackers, docs)
+
+Write when: the fact is durable (still true next week), not derivable from code or git history, and not already covered by an existing entry.
+
+Skip when: it is ephemeral task state, sensitive (credentials, \`~/.ssh\`, tokens), a duplicate, or something the user explicitly asked you to forget.
+
+Keep entries as short bullet lines. Prefer updating an existing bullet over adding a near-duplicate. Bias toward fewer high-signal entries rather than exhaustive logging.
 `;
 
 // Prepend a pointer to the auto-generated workspace journal to the
