@@ -36,7 +36,18 @@ async function mockConfigApi(
   await page.route(
     (url) => url.pathname === "/api/config",
     (route) => {
-      if (route.request().method() === "GET") {
+      const method = route.request().method();
+      if (method === "GET") {
+        return route.fulfill({ json: state });
+      }
+      if (method === "PUT") {
+        // Atomic endpoint: payload is { settings, mcp } together.
+        const body = route.request().postDataJSON() as {
+          settings: Settings;
+          mcp: { servers: McpEntry[] };
+        };
+        state.settings = body.settings;
+        state.mcp = { servers: body.mcp.servers };
         return route.fulfill({ json: state });
       }
       return route.fallback();
