@@ -25,6 +25,10 @@ import { slugify } from "../utils/slug.js";
 import { resolveWithinRoot } from "../utils/fs.js";
 import { errorMessage } from "../utils/errors.js";
 import { log } from "../logger/index.js";
+import {
+  validateUpdateBeatBody,
+  validateUpdateScriptBody,
+} from "./mulmoScriptValidate.js";
 
 const router = Router();
 const storiesDir = path.resolve(workspacePath, "stories");
@@ -60,12 +64,6 @@ interface UploadBeatImageBody {
   filePath: string;
   beatIndex: number;
   imageData: string; // base64 data URI
-}
-
-interface UpdateBeatBody {
-  filePath: string;
-  beatIndex: number;
-  beat: MulmoBeat;
 }
 
 type ErrorResponse = { error: string };
@@ -113,15 +111,13 @@ router.post(
 
 router.post(
   "/mulmo-script/update-beat",
-  (req: Request<object, object, UpdateBeatBody>, res: Response) => {
-    const { filePath, beatIndex, beat } = req.body;
-
-    if (!filePath || beatIndex === undefined || !beat) {
-      res
-        .status(400)
-        .json({ error: "filePath, beatIndex, and beat are required" });
+  (req: Request<object, object, unknown>, res: Response) => {
+    const validation = validateUpdateBeatBody(req.body);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.error });
       return;
     }
+    const { filePath, beatIndex, beat } = validation.value;
 
     const absoluteFilePath = resolveStoryPath(filePath, res);
     if (!absoluteFilePath) return;
@@ -135,27 +131,22 @@ router.post(
       return;
     }
 
-    script.beats[beatIndex] = beat;
+    script.beats[beatIndex] = beat as MulmoBeat;
     fs.writeFileSync(absoluteFilePath, JSON.stringify(script, null, 2));
 
     res.json({ ok: true });
   },
 );
 
-interface UpdateScriptBody {
-  filePath: string;
-  script: MulmoScript;
-}
-
 router.post(
   "/mulmo-script/update-script",
-  (req: Request<object, object, UpdateScriptBody>, res: Response) => {
-    const { filePath, script: updatedScript } = req.body;
-
-    if (!filePath || !updatedScript) {
-      res.status(400).json({ error: "filePath and script are required" });
+  (req: Request<object, object, unknown>, res: Response) => {
+    const validation = validateUpdateScriptBody(req.body);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.error });
       return;
     }
+    const { filePath, script: updatedScript } = validation.value;
 
     const absoluteFilePath = resolveStoryPath(filePath, res);
     if (!absoluteFilePath) return;
