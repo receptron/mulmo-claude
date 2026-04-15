@@ -23,6 +23,15 @@ See `plan/mulmo_claude.md` for the full design plan.
 
 **IMPORTANT**: Always write error handling for all `fetch` calls. Handle both network errors (try/catch) and HTTP errors (`!response.ok`). Surface errors to the user in the UI where appropriate.
 
+## GitHub posts (gh pr comment / gh issue comment / PR body)
+
+**NEVER escape backticks with backslash** when writing the body for `gh pr comment`, `gh issue comment`, `gh pr create --body`, `gh issue create --body`, or any other GitHub-rendering surface.
+
+- ✅ Correct: write ` ``` ` for fenced code blocks and `` ` `` for inline code, literally. Inside a bash heredoc (`<<'EOF'` with single quotes), backticks pass through unchanged.
+- ❌ Wrong: `\`\`\`` or `\``. These render as literal `\`\`\`` / `\`` on GitHub — backslash is visible, and markdown treats it as escaped so there's no code block at all.
+
+This happens repeatedly. If you're tempted to write `\`` inside a gh body, stop and check: the single-quoted heredoc (`<<'EOF' ... EOF`) doesn't interpret backticks, so they need zero escaping. Only escape if the heredoc is unquoted (`<<EOF`) — and the right fix there is to quote the heredoc, not add backslashes.
+
 ## Architecture
 
 ### LLM Core

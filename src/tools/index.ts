@@ -17,6 +17,7 @@ import todoPlugin from "../plugins/todo/index";
 import schedulerPlugin from "../plugins/scheduler/index";
 import manageRolesPlugin from "../plugins/manageRoles/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
+import manageSourcePlugin from "../plugins/manageSource/index";
 import wikiPlugin from "../plugins/wiki/index";
 import presentMulmoScriptPlugin from "../plugins/presentMulmoScript/index";
 import presentHtmlPlugin from "../plugins/presentHtml/index";
@@ -31,6 +32,7 @@ const plugins: Record<string, PluginEntry> = {
   manageScheduler: schedulerPlugin,
   manageRoles: manageRolesPlugin,
   manageSkills: manageSkillsPlugin,
+  manageSource: manageSourcePlugin,
   manageWiki: wikiPlugin,
   presentMulmoScript: presentMulmoScriptPlugin,
   presentDocument: markdownPlugin,

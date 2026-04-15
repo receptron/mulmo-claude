@@ -1,0 +1,265 @@
+// Top-level pipeline entry point.
+//
+// `runSourcesPipeline({ workspaceRoot, scheduleType, ... })`
+// threads every phase in order:
+//
+//   1. Load sources from the registry
+//   2. Read per-source state from `_state/<slug>.json`
+//   3. Plan: filter by schedule + backoff
+//   4. Fetch: per-source, parallel, failure-isolated
+//   5. Dedup across sources (first occurrence wins)
+//   6. Summarize via claude CLI (skipped for 0 items)
+//   7. Write daily markdown + JSON block
+//   8. Append every item to its per-source monthly archive
+//   9. Persist updated per-source state back to disk
+//
+// Design follows #188 decisions: per-source try/catch (Q8),
+// cross-source dedup only at summary step (Q3), local timezone
+// (Q6), parallel across hosts (Q7 — enforced deeper by
+// HostRateLimiter inside fetchPolite).
+//
+// Fully DI-threaded: `getFetcher`, `summarizeFn`, `now` are all
+// parameters, and workspaceRoot is explicit. Tests can drive
+// the whole pipeline end-to-end against a mkdtempSync workspace
+// with stub fetchers and a fake summarize.
+
+// Side-effect import: registers every production fetcher so
+// `registryGetFetcher(kind)` below resolves. Without this the
+// pipeline would run, report `no-fetcher` for every source, and
+// write an empty daily file.
+import "../fetchers/registerAll.js";
+
+import { existsSync } from "fs";
+import { listSources } from "../registry.js";
+import { readManyStates, writeManyStates } from "../sourceState.js";
+import { dailyNewsPath } from "../paths.js";
+import {
+  getFetcher as registryGetFetcher,
+  type FetcherDeps,
+  type SourceFetcher,
+} from "../fetchers/index.js";
+import type {
+  FetcherKind,
+  Source,
+  SourceItem,
+  SourceState,
+  SourceSchedule,
+} from "../types.js";
+import { planEligibleSources } from "./plan.js";
+import { runFetchPhase, computeNextState, type FetchOutcome } from "./fetch.js";
+import { dedupAcrossSources, type DedupStats } from "./dedup.js";
+import { makeDefaultSummarize, type SummarizeFn } from "./summarize.js";
+import { writeDailyFile, appendItemsToArchives } from "./write.js";
+
+export interface RunPipelineInput {
+  workspaceRoot: string;
+  scheduleType: SourceSchedule;
+  // Shared across all fetchers in the run (rate limiter, robots
+  // provider, fetch impl, timeout — assembled by the caller).
+  fetcherDeps: FetcherDeps;
+  // Pipeline-run clock. Production passes `() => Date.now()`.
+  // Tests pass a fixed millis so isoDate / backoff math is
+  // deterministic.
+  nowMs: () => number;
+  // Injection hooks.
+  getFetcher?: (kind: FetcherKind) => SourceFetcher | null;
+  summarizeFn?: SummarizeFn;
+  // For test instrumentation; ignored in production.
+  onProgress?: (phase: string) => void;
+}
+
+export interface RunPipelineResult {
+  // Sources considered in this run.
+  plannedCount: number;
+  // Raw fetch outcomes (success / error / no-fetcher). In
+  // original plan order.
+  outcomes: FetchOutcome[];
+  // Items emitted after cross-source dedup, ready for
+  // summarization + archive append.
+  items: SourceItem[];
+  dedup: DedupStats;
+  // Absolute path of the daily markdown file written.
+  dailyPath: string;
+  archiveWrittenPaths: string[];
+  // Non-fatal errors from the archive append step.
+  archiveErrors: string[];
+  // Per-source post-run states, already persisted to disk.
+  nextStates: SourceState[];
+  // Local ISO date used for the daily header / filename.
+  isoDate: string;
+}
+
+// Convert a wall-clock millis value to YYYY-MM-DD in LOCAL
+// time, matching the #188 Q6 decision ("Local time, like the
+// journal"). The journal's `toIsoDate` in paths.ts uses the
+// same algorithm — duplicated here to avoid a cross-module
+// import that would pull journal code into the sources module.
+export function toLocalIsoDate(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Convert a wall-clock millis value to the LOCAL year-month
+// key (YYYY-MM) used as the archive fallback for items without
+// a parseable publishedAt.
+export function toLocalYearMonth(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+export async function runSourcesPipeline(
+  input: RunPipelineInput,
+): Promise<RunPipelineResult> {
+  const {
+    workspaceRoot,
+    scheduleType,
+    fetcherDeps,
+    nowMs,
+    getFetcher = registryGetFetcher,
+    onProgress = () => {},
+  } = input;
+
+  const startMs = nowMs();
+  const isoDate = toLocalIsoDate(startMs);
+  const fallbackMonth = toLocalYearMonth(startMs);
+  const summarizeFn = input.summarizeFn ?? makeDefaultSummarize(isoDate);
+
+  // --- 1. Load registry + state --------------------------------------
+  onProgress("load");
+  const allSources = await listSources(workspaceRoot);
+  const statesBySlug = await readManyStates(
+    workspaceRoot,
+    allSources.map((s) => s.slug),
+  );
+
+  // --- 2. Plan ------------------------------------------------------
+  onProgress("plan");
+  const eligible = planEligibleSources({
+    sources: allSources,
+    statesBySlug,
+    scheduleType,
+    nowMs: startMs,
+  });
+  if (eligible.length === 0) {
+    // Write an empty-day daily file so it's clear the pipeline
+    // ran. Archive append is a no-op. State untouched.
+    //
+    // But: if a previous pass today already produced a non-empty
+    // brief, don't clobber it. A same-day rerun with nothing due
+    // (all sources still in backoff / on "weekly" schedule) would
+    // otherwise wipe the morning's brief when re-triggered in the
+    // afternoon.
+    onProgress("write-empty");
+    const existingPath = dailyNewsPath(workspaceRoot, isoDate);
+    const dailyPath = existsSync(existingPath)
+      ? existingPath
+      : await writeDailyFile(workspaceRoot, isoDate, await summarizeFn([]), []);
+    return {
+      plannedCount: 0,
+      outcomes: [],
+      items: [],
+      dedup: {
+        uniqueCount: 0,
+        duplicateCount: 0,
+        duplicateSlugsById: new Map(),
+      },
+      dailyPath,
+      archiveWrittenPaths: [],
+      archiveErrors: [],
+      nextStates: [],
+      isoDate,
+    };
+  }
+
+  // --- 3. Fetch -----------------------------------------------------
+  onProgress("fetch");
+  const { outcomes } = await runFetchPhase({
+    sources: eligible,
+    statesBySlug,
+    deps: fetcherDeps,
+    getFetcher,
+  });
+
+  // --- 4. Dedup -----------------------------------------------------
+  onProgress("dedup");
+  const rawItems = flattenItems(outcomes);
+  const dedup = dedupAcrossSources(rawItems);
+
+  // --- 5. Summarize + write ----------------------------------------
+  onProgress("summarize");
+  const markdown = await summarizeFn(dedup.items);
+
+  onProgress("write");
+  const dailyPath = await writeDailyFile(
+    workspaceRoot,
+    isoDate,
+    markdown,
+    dedup.items,
+  );
+  const archiveResult = await appendItemsToArchives(
+    workspaceRoot,
+    dedup.items,
+    fallbackMonth,
+  );
+
+  // --- 6. Persist state ---------------------------------------------
+  onProgress("persist");
+  const nextStates = buildNextStates(eligible, statesBySlug, outcomes, nowMs());
+  await writeManyStates(workspaceRoot, nextStates);
+
+  onProgress("done");
+  return {
+    plannedCount: eligible.length,
+    outcomes,
+    items: dedup.items,
+    dedup: dedup.stats,
+    dailyPath,
+    archiveWrittenPaths: archiveResult.writtenPaths,
+    archiveErrors: archiveResult.errors,
+    nextStates,
+    isoDate,
+  };
+}
+
+// Flatten successful-outcome items into a single list for
+// dedup. Keeps the original source ordering (planned sort
+// order) so dedup preserves deterministic precedence.
+function flattenItems(outcomes: readonly FetchOutcome[]): SourceItem[] {
+  const out: SourceItem[] = [];
+  for (const outcome of outcomes) {
+    if (outcome.kind !== "success") continue;
+    for (const item of outcome.items) out.push(item);
+  }
+  return out;
+}
+
+function buildNextStates(
+  eligible: readonly Source[],
+  statesBySlug: ReadonlyMap<string, SourceState>,
+  outcomes: readonly FetchOutcome[],
+  nowMs: number,
+): SourceState[] {
+  const outcomeBySlug = new Map<string, FetchOutcome>();
+  for (const outcome of outcomes) {
+    outcomeBySlug.set(outcome.sourceSlug, outcome);
+  }
+  const nextStates: SourceState[] = [];
+  for (const source of eligible) {
+    const prev = statesBySlug.get(source.slug) ?? {
+      slug: source.slug,
+      lastFetchedAt: null,
+      cursor: {},
+      consecutiveFailures: 0,
+      nextAttemptAt: null,
+    };
+    const outcome = outcomeBySlug.get(source.slug);
+    if (!outcome) continue; // unreachable in practice; defensive
+    nextStates.push(computeNextState(prev, outcome, nowMs));
+  }
+  return nextStates;
+}

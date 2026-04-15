@@ -9,6 +9,7 @@ import SchedulerDef from "../src/plugins/scheduler/definition.js";
 import PresentMulmoScriptDef from "../src/plugins/presentMulmoScript/definition.js";
 import ManageRolesDef from "../src/plugins/manageRoles/definition.js";
 import ManageSkillsDef from "../src/plugins/manageSkills/definition.js";
+import ManageSourceDef from "../src/plugins/manageSource/definition.js";
 import WikiDef from "../src/plugins/wiki/definition.js";
 import PresentHtmlDef from "../src/plugins/presentHtml/definition.js";
 import PresentChartDef from "../src/plugins/chart/definition.js";
@@ -41,6 +42,7 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [MusicDef.name]: "/api/music",
   [ManageRolesDef.name]: "/api/roles/manage",
   [ManageSkillsDef.name]: "/api/skills",
+  [ManageSourceDef.name]: "/api/sources/manage",
   [PresentMulmoScriptDef.name]: "/api/mulmo-script",
   [WikiDef.name]: "/api/wiki",
 };
@@ -64,6 +66,7 @@ export const PLUGIN_DEFS = [
   MusicDef,
   ManageRolesDef,
   ManageSkillsDef,
+  ManageSourceDef,
   WikiDef,
 ];
 
