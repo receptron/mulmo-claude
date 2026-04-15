@@ -160,6 +160,34 @@ When you press **Run**, MulmoClaude sends a plain user turn containing the slash
 
 That is the entire payload — MulmoClaude does **not** inline the `SKILL.md` body or extra context. The body is what Claude Code reads when the CLI resolves the slash command on its end. This keeps the chat input small and makes long skills (multi-kilobyte `SKILL.md`) safe to run without blowing up the prompt context.
 
+### Save a conversation as a new skill
+
+After a productive chat, you can ask MulmoClaude to capture the workflow:
+
+```text
+"この会話を fix-ci という skill にして"
+"save this as a skill called publish-flow"
+"skill 化して"   ← Claude picks a slug for you
+```
+
+Claude reads the current chat transcript, distills the steps you took, and writes a new `SKILL.md` to `~/mulmoclaude/.claude/skills/<slug>/`. The skill appears in the Skills view immediately and is invokable via `/<slug>` in any future session.
+
+Notes on saving:
+
+- **Project scope only** — saves go to `~/mulmoclaude/.claude/skills/`, never to `~/.claude/skills/`. The user scope stays read-only from MulmoClaude.
+- **No overwrite** — if a skill with the same name already exists (in either scope), the save fails and Claude will ask you for a different name.
+- **Slug rules** — lowercase letters, digits, and hyphens; 1–64 chars; no leading / trailing or consecutive hyphens. Claude picks one automatically; if you want a specific name, mention it in the request.
+
+### Delete a saved skill
+
+Project-scope skills get a **Delete** button next to the Run button in the Skills view (user-scope skills are read-only — no Delete button shown). Confirming the dialog removes `~/mulmoclaude/.claude/skills/<slug>/SKILL.md`. If you also dropped extra files in that folder by hand, they're left in place; only the SKILL.md is removed.
+
+You can also ask Claude to delete by name:
+
+```text
+"delete the fix-ci skill"
+```
+
 ## Wiki — Long-Term Memory for Claude Code
 
 MulmoClaude includes a **personal knowledge base** inspired by [Andrej Karpathy's LLM Knowledge Bases idea](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). It gives Claude Code genuine long-term memory — not just a short `memory.md`, but a growing, interconnected wiki that Claude builds and maintains itself.

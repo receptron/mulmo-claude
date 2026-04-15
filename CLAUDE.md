@@ -134,6 +134,30 @@ router.post("/items/:id", (req: Request, res: Response) => { const x = req.body 
 - NEVER cast `req.query` — use `typeof req.query.x === "string" ? req.query.x : undefined`
 - Use type annotation (`const data: MyType = JSON.parse(raw)`) instead of `as` cast
 
+## Cross-platform considerations
+
+CI runs the matrix `{ubuntu, windows, macOS} × {Node 22, Node 24}` (see `docs/developer.md`). Server / shared code MUST run on all three. Patches that build hardcoded POSIX paths or rely on `/tmp` semantics break Windows CI immediately and are the most common cause of red builds.
+
+### Paths
+
+- MUST build paths with `node:path` (`path.join`, `path.resolve`, `path.dirname`) — NEVER concatenate with literal `/` or `\\`.
+- In **tests**, expected values MUST also go through `path.join()`. Do NOT hardcode `"/tmp/ws/.claude/skills"`-style strings — Windows produces `"\\tmp\\ws\\..."` and the assertion fails. Compose roots with `path.join(path.sep, "tmp", "ws")` or `os.tmpdir()`.
+- For URL ↔ path conversions, use `node:url`'s `fileURLToPath` / `pathToFileURL`. NEVER manipulate `file://` strings directly.
+- Workspace-relative path **comparisons** (e.g. checking that a resolved path stays under a root) MUST use `path.relative()` or `path.resolve()` then a separator-aware `startsWith` — string-prefix checks like `p.startsWith(root + "/")` are wrong on Windows.
+
+### Filesystem semantics
+
+- **Atomic writes**: place the tmp file alongside the final destination (`${finalPath}.${randomUUID()}.tmp`), not in `os.tmpdir()`. `os.tmpdir()` may live on a different filesystem (Docker volumes, separate `/tmp` mounts), and `rename()` across filesystems fails with `EXDEV`. The same-directory pattern is the only reliable atomic-rename idiom in Node.
+- **Case sensitivity**: macOS / Windows are case-insensitive by default; Linux is case-sensitive. Treat `Foo.md` and `foo.md` as the same file when matching, never as distinct entries.
+- **Symlinks**: behavior differs across platforms (Windows requires admin for some symlink types). Don't depend on symlink presence in tests; if you must test it, gate with `if (process.platform === "win32") test.skip(...)`.
+- **Permissions**: `chmod(0o000)` is a no-op on Windows. Tests that simulate "unreadable file" need `if (process.platform === "win32") return;` early-return guards.
+- **Line endings**: writes that round-trip through git on a Windows checkout may pick up CRLF — use `"\n"` explicitly when comparing string output, and parse with `replace(/\r\n/g, "\n")` if reading user-edited files.
+- **Shell scripts in npm scripts**: NEVER use shell-specific syntax (`rm -rf`, `cp`, glob expansions in single quotes). Use `rimraf`, `shx`, or a Node script. Globs in package.json scripts should be unquoted (`prettier --write src/**/*.ts`, not `'src/**/*.ts'`).
+
+### Why this section keeps mattering
+
+Cross-platform path bugs land disproportionately often (multiple PRs in the last few weeks: `#224`, `#234`). The pattern is always the same: code works locally on macOS, ships, then Windows CI explodes on `\` vs `/`. Read this section once before writing any new fs / path code and the regressions go away.
+
 ## Code Organization
 
 The repo runs several PRs in flight at once. Code that sprawls across large functions or monolithic files creates expensive merge conflicts. Keep units small so parallel PRs touch different blocks.

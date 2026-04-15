@@ -33,6 +33,7 @@ let routeMod: RouteModule;
 type Handler = (req: Request, res: Response) => void;
 let getHandler: Handler;
 let putSettingsHandler: Handler;
+let putConfigHandler: Handler;
 
 interface StackFrame {
   route?: {
@@ -51,11 +52,14 @@ function extractRouteHandler(
   method: "get" | "put",
 ): Handler {
   const router = mod.default as unknown as RouterInternals;
-  const frame = router.stack.find((f) => f.route?.path === routePath);
-  if (!frame?.route) throw new Error(`route ${routePath} not registered`);
-  const layer = frame.route.stack.find((s) => s.method === method);
-  if (!layer) throw new Error(`method ${method} not found on ${routePath}`);
-  return layer.handle;
+  // Each router.get/put() registers its own stack frame, so find the
+  // frame matching BOTH path and method rather than the first path hit.
+  for (const frame of router.stack) {
+    if (frame.route?.path !== routePath) continue;
+    const layer = frame.route.stack.find((s) => s.method === method);
+    if (layer) return layer.handle;
+  }
+  throw new Error(`route ${method.toUpperCase()} ${routePath} not registered`);
 }
 
 function mockRes() {
@@ -90,6 +94,7 @@ before(async () => {
   routeMod = await import("../../server/routes/config.js");
   getHandler = extractRouteHandler(routeMod, "/config", "get");
   putSettingsHandler = extractRouteHandler(routeMod, "/config/settings", "put");
+  putConfigHandler = extractRouteHandler(routeMod, "/config", "put");
 });
 
 after(async () => {
@@ -177,5 +182,68 @@ describe("PUT /config/settings", () => {
     );
     assert.equal(state.status, 200);
     assert.deepEqual(configMod.loadSettings().extraAllowedTools, ["new"]);
+  });
+});
+
+describe("PUT /config (atomic)", () => {
+  beforeEach(() => {
+    fs.rmSync(configMod.configsDir(), { recursive: true, force: true });
+  });
+
+  it("persists settings and mcp together in a single call", () => {
+    const body = {
+      settings: { extraAllowedTools: ["alpha"] },
+      mcp: {
+        servers: [
+          {
+            id: "gh",
+            spec: { type: "http", url: "https://example.com", enabled: true },
+          },
+        ],
+      },
+    };
+    const { state, res } = mockRes();
+    putConfigHandler({ body } as Request, res);
+    assert.equal(state.status, 200);
+    assert.deepEqual(
+      (state.body as { settings: { extraAllowedTools: string[] } }).settings
+        .extraAllowedTools,
+      ["alpha"],
+    );
+    assert.deepEqual(configMod.loadSettings().extraAllowedTools, ["alpha"]);
+  });
+
+  it("rejects when settings shape is invalid", () => {
+    const body = {
+      settings: { extraAllowedTools: "not-an-array" },
+      mcp: { servers: [] },
+    };
+    const { state, res } = mockRes();
+    putConfigHandler({ body } as Request, res);
+    assert.equal(state.status, 400);
+  });
+
+  it("rejects when mcp shape is invalid", () => {
+    const body = {
+      settings: { extraAllowedTools: [] },
+      mcp: { servers: "nope" },
+    };
+    const { state, res } = mockRes();
+    putConfigHandler({ body } as Request, res);
+    assert.equal(state.status, 400);
+  });
+
+  it("does not persist settings when mcp payload fails validation", () => {
+    configMod.saveSettings({ extraAllowedTools: ["before"] });
+    const body = {
+      settings: { extraAllowedTools: ["after"] },
+      // Missing required fields → fromMcpEntries throws
+      mcp: { servers: [{ id: "x", spec: { type: "bogus" } }] },
+    };
+    const { state, res } = mockRes();
+    putConfigHandler({ body } as Request, res);
+    assert.equal(state.status, 400);
+    // Validation happens before any write — previous state unchanged
+    assert.deepEqual(configMod.loadSettings().extraAllowedTools, ["before"]);
   });
 });

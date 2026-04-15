@@ -4,16 +4,11 @@
 // skills with the same name (mirrors settings precedence in #197).
 
 import { readdir, readFile, stat } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { log } from "../logger/index.js";
 import { parseSkillFrontmatter } from "./parser.js";
+import { SKILL_FILE, USER_SKILLS_DIR, projectSkillsDir } from "./paths.js";
 import type { Skill, SkillSource } from "./types.js";
-
-const SKILL_FILE = "SKILL.md";
-export const USER_SKILLS_DIR = join(homedir(), ".claude", "skills");
-export const projectSkillsDir = (workspaceRoot: string): string =>
-  join(workspaceRoot, ".claude", "skills");
 
 // One directory entry → a parsed Skill, or null when the entry is
 // not a valid skill (no SKILL.md, malformed frontmatter, I/O error).

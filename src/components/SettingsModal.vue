@@ -244,24 +244,19 @@ async function save(): Promise<void> {
   statusMessage.value = "";
   statusError.value = false;
   try {
-    const settingsResponse = await fetch("/api/config/settings", {
+    // Single atomic endpoint — avoids the partial-save state where
+    // extraAllowedTools is persisted but MCP config write fails.
+    const response = await fetch("/api/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraAllowedTools: parsedToolNames.value }),
+      body: JSON.stringify({
+        settings: { extraAllowedTools: parsedToolNames.value },
+        mcp: { servers: mcpServers.value },
+      }),
     });
-    if (!settingsResponse.ok) {
-      const text = await settingsResponse.text();
-      throw new Error(text || `HTTP ${settingsResponse.status}`);
-    }
-
-    const mcpResponse = await fetch("/api/config/mcp", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ servers: mcpServers.value }),
-    });
-    if (!mcpResponse.ok) {
-      const text = await mcpResponse.text();
-      throw new Error(text || `HTTP ${mcpResponse.status}`);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
     }
 
     emit("saved");

@@ -16,7 +16,7 @@ const toolDefinition: ToolDefinition = {
   name: TOOL_NAME,
   description:
     "Generate an image based on the prompt and display it on the screen. Be descriptive and specify the concrete details of the images in the prompt. Each call generates one image.",
-  prompt: `When you are talking about places, objects, people, movies, books and other things, you MUST use the ${TOOL_NAME} API to draw pictures to make the conversation more engaging.`,
+  prompt: `When the user asks you to generate, draw, or create an image, use the ${TOOL_NAME} API. You may also offer to generate an image when a visual would clearly enhance the conversation, but do not generate images unsolicited during casual discussion.`,
   parameters: {
     type: "object",
     properties: {

@@ -1,4 +1,77 @@
 FROM node:22-slim
+
+# Sandbox tool set (see #162). Grouped into layers by purpose so the
+# rationale is obvious from the diff:
+#
+# 1. Core CLI — read local git history, fetch over HTTP, pipeline JSON,
+#    run Makefile-driven workspaces, handle archives, query SQLite.
+#    `ca-certificates` is needed because `node:22-slim` ships without
+#    a trust store. `ripgrep` backs Claude's grep tool.
+# 2. Data analysis + plotting — Python with pandas/numpy/matplotlib
+#    and `requests` for API fetches. Graphviz for structural diagrams.
+#    ImageMagick for raster ops. Covers the "investment / data / chart"
+#    and "visualize this workflow" use cases in the issue.
+# 3. Document + media conversion — pandoc bridges Markdown ↔ PDF/DOCX/
+#    HTML/EPUB for report output. ffmpeg covers audio/video transcode
+#    and probing. poppler-utils extracts text / images from PDFs.
+# 4. Small extras — `tree` for directory listing, `bc` for arbitrary-
+#    precision arithmetic, `less` for pagers.
+#
+# Deferred on purpose:
+#
+# - `@mermaid-js/mermaid-cli` — pulls in headless Chromium (~300MB).
+#   Revisit as a separate layer if diagram generation becomes common.
+# - `texlive-*` — ~150MB+ for marginal PDF quality gains over pandoc's
+#   default LaTeX-free path; add when a user actually needs math/
+#   journal-style typesetting.
+# - `gh` CLI + auth mount — tracked in #162 Phase 4, needs a code
+#   change in `server/agent/config.ts` to mount `~/.config/gh:ro`.
+#
+# Runtime `pip install` is intentionally NOT wired up. Everything the
+# agent might need for data work is preinstalled at build time so
+# supply-chain risk stays out of the sandbox.
+
+# Layer 1: core CLI
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
+      curl \
+      jq \
+      make \
+      ca-certificates \
+      sqlite3 \
+      zip \
+      unzip \
+      ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 2: data analysis + plotting
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 \
+      python3-pip \
+      graphviz \
+      imagemagick \
+    && rm -rf /var/lib/apt/lists/* \
+ && pip3 install --no-cache-dir --break-system-packages \
+      pandas \
+      numpy \
+      matplotlib \
+      requests
+
+# Layer 3: document + media conversion
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      pandoc \
+      ffmpeg \
+      poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 4: small extras
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      tree \
+      bc \
+      less \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN npm install -g @anthropic-ai/claude-code tsx
+
 USER node
 WORKDIR /home/node/mulmoclaude

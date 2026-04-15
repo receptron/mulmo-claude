@@ -47,6 +47,71 @@ router.get("/config", (_req: Request, res: Response<ConfigResponse>) => {
   res.json(buildFullResponse());
 });
 
+// Atomic save for both settings and MCP. Validates both payloads first
+// (no writes happen until every input is known-good), then writes
+// settings and captures the previous state so a subsequent saveMcpConfig
+// failure can roll back. This is the endpoint the Settings modal should
+// use; the per-section PUTs below remain for targeted updates.
+interface PutConfigBody {
+  settings: AppSettings;
+  mcp: { servers: McpServerEntry[] };
+}
+
+function isPutConfigBody(value: unknown): value is PutConfigBody {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  return isAppSettings(c.settings) && isMcpPutBody(c.mcp);
+}
+
+router.put(
+  "/config",
+  (
+    req: Request<unknown, unknown, PutConfigBody>,
+    res: Response<ConfigResponse | ConfigErrorResponse>,
+  ) => {
+    const body = req.body;
+    if (!isPutConfigBody(body)) {
+      res.status(400).json({ error: "Invalid config payload" });
+      return;
+    }
+    let mcpCfg;
+    try {
+      mcpCfg = fromMcpEntries(body.mcp.servers);
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "invalid mcp entries",
+      });
+      return;
+    }
+    // Snapshot previous settings so we can roll back if the second
+    // write fails — a cross-file atomic write isn't possible, but
+    // rollback keeps the pair consistent from the user's perspective.
+    const previousSettings = loadSettings();
+    try {
+      saveSettings(body.settings);
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : "saveSettings failed",
+      });
+      return;
+    }
+    try {
+      saveMcpConfig(mcpCfg);
+    } catch (err) {
+      try {
+        saveSettings(previousSettings);
+      } catch {
+        // If rollback fails too, surface the original mcp error.
+      }
+      res.status(500).json({
+        error: err instanceof Error ? err.message : "saveMcpConfig failed",
+      });
+      return;
+    }
+    res.json(buildFullResponse());
+  },
+);
+
 router.put(
   "/config/settings",
   (

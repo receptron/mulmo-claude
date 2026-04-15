@@ -45,6 +45,7 @@ See [Wiki](helps/wiki.md) for details on how it works.
 - [Wiki](helps/wiki.md) — how the personal knowledge wiki works, its folder layout, page format, and operations
 - [MulmoScript](helps/mulmoscript.md) — format reference for authoring multimedia stories: beats, image types, speech, audio, and a minimal example
 - [Business Presentation Template](helps/business.md) — MulmoScript template and rules for business presentations in the Office role
+- [Spreadsheet](helps/spreadsheet.md) — cell format, formulas, date handling, and format codes for the presentSpreadsheet plugin
 - [Sandbox](helps/sandbox.md) — how the Docker sandbox isolates the agent, what it can access, and how to disable it
 
 ## Workspace Layout

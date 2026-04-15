@@ -186,3 +186,169 @@ test.describe("manageSkills plugin", () => {
     expect(dispatched).toBe("/ci_enable");
   });
 });
+
+// ---- Delete (phase 1) ----------------------------------------------
+
+async function setupSkillsWithProjectScope(page: Page) {
+  await mockAllApis(page, {
+    sessions: [
+      {
+        id: "skills-session",
+        title: "Skills Session",
+        roleId: "general",
+        startedAt: "2026-04-14T10:00:00Z",
+        updatedAt: "2026-04-14T10:05:00Z",
+      },
+    ],
+  });
+
+  await page.route(
+    (url) =>
+      url.pathname.startsWith("/api/sessions/") &&
+      url.pathname !== "/api/sessions",
+    (route) => {
+      return route.fulfill({
+        json: [
+          {
+            type: "session_meta",
+            roleId: "general",
+            sessionId: "skills-session",
+          },
+          { type: "text", source: "user", message: "Show my skills" },
+          {
+            type: "tool_result",
+            source: "tool",
+            result: {
+              uuid: "skills-result-1",
+              toolName: "manageSkills",
+              title: "Skills",
+              message: "Found 2 skills.",
+              data: {
+                skills: [
+                  {
+                    name: "user-only",
+                    description: "Read-only user skill",
+                    source: "user",
+                  },
+                  {
+                    name: "my-project-skill",
+                    description: "Captured from a chat",
+                    source: "project",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      });
+    },
+  );
+
+  await page.route(
+    (url) =>
+      url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
+    (route: Route) => {
+      const method = route.request().method();
+      const name =
+        decodeURIComponent(
+          route.request().url().split("/api/skills/").pop() ?? "",
+        ).split("?")[0] ?? "";
+      if (method === "DELETE") {
+        // Stubbed delete response — phase 1 server returns
+        // { deleted: true, name } on success.
+        return route.fulfill({ json: { deleted: true, name } });
+      }
+      const sources: Record<string, "user" | "project"> = {
+        "user-only": "user",
+        "my-project-skill": "project",
+      };
+      const source = sources[name];
+      if (!source) {
+        return route.fulfill({
+          status: 404,
+          json: { error: `skill not found: ${name}` },
+        });
+      }
+      return route.fulfill({
+        json: {
+          skill: {
+            name,
+            description:
+              source === "user"
+                ? "Read-only user skill"
+                : "Captured from a chat",
+            body: `## ${name}\n\nbody`,
+            source,
+            path: `/fake/${name}/SKILL.md`,
+          },
+        },
+      });
+    },
+  );
+}
+
+test.describe("manageSkills plugin — delete (phase 1)", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupSkillsWithProjectScope(page);
+  });
+
+  test("Delete button is hidden for user-scope skills", async ({ page }) => {
+    await page.goto("/chat/skills-session?result=skills-result-1");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    // First skill (user-only) is auto-selected on mount; Delete
+    // button should not appear.
+    await page.getByTestId("skill-item-user-only").click();
+    await expect(page.locator("pre")).toContainText("## user-only");
+    await expect(page.getByTestId("skill-delete-btn")).toHaveCount(0);
+  });
+
+  test("Delete button is visible for project-scope skills", async ({
+    page,
+  }) => {
+    await page.goto("/chat/skills-session?result=skills-result-1");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await page.getByTestId("skill-item-my-project-skill").click();
+    await expect(page.locator("pre")).toContainText("## my-project-skill");
+    await expect(page.getByTestId("skill-delete-btn")).toBeVisible();
+  });
+
+  test("clicking Delete fires DELETE /api/skills/:name and removes the row", async ({
+    page,
+  }) => {
+    // Auto-accept the native confirm() dialog the View shows.
+    page.on("dialog", (d) => d.accept());
+
+    let deletedName: string | null = null;
+    await page.route(
+      (url) =>
+        url.pathname.startsWith("/api/skills/") &&
+        url.pathname !== "/api/skills",
+      (route: Route) => {
+        if (route.request().method() === "DELETE") {
+          const name =
+            decodeURIComponent(
+              route.request().url().split("/api/skills/").pop() ?? "",
+            ).split("?")[0] ?? "";
+          deletedName = name;
+          return route.fulfill({ json: { deleted: true, name } });
+        }
+        return route.fallback();
+      },
+    );
+
+    await page.goto("/chat/skills-session?result=skills-result-1");
+    await page.getByTestId("skill-item-my-project-skill").click();
+    await expect(page.getByTestId("skill-delete-btn")).toBeVisible();
+
+    await page.getByTestId("skill-delete-btn").click();
+
+    // The DELETE call landed with the right name.
+    await expect.poll(() => deletedName).toBe("my-project-skill");
+
+    // Row is removed from the left list — only the user skill remains.
+    await expect(page.getByTestId("skill-item-my-project-skill")).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
+  });
+});

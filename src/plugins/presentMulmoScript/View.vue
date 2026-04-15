@@ -706,7 +706,17 @@ const editing = ref(false);
 const editableSource = ref("");
 const copied = ref(false);
 
-const scriptSourceText = computed(() => JSON.stringify(script.value, null, 2));
+// Beats may be edited in-place via `updateBeat()` and rendered through
+// `effectiveBeat()`, so the Copy / source-view text must read the merged
+// shape — otherwise the clipboard returns the original prop snapshot
+// until the full result is reloaded.
+const effectiveScript = computed<MulmoScript>(() => ({
+  ...script.value,
+  beats: beats.value.map((beat, i) => localOverrides[i] ?? beat),
+}));
+const scriptSourceText = computed(() =>
+  JSON.stringify(effectiveScript.value, null, 2),
+);
 const loadedSource = ref("");
 const sourceChanged = computed(
   () => editableSource.value !== loadedSource.value,

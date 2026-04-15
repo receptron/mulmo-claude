@@ -59,15 +59,28 @@
                 {{ selected.description }}
               </p>
             </div>
-            <button
-              class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 shrink-0 flex items-center gap-1"
-              :disabled="detailLoading || !detail"
-              data-testid="skill-run-btn"
-              @click="runSkill"
-            >
-              <span class="material-icons text-base">play_arrow</span>
-              Run
-            </button>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                v-if="detail && detail.source === 'project'"
+                class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
+                :disabled="detailLoading || deleting"
+                data-testid="skill-delete-btn"
+                @click="deleteSkill"
+                title="Delete this project-scope skill"
+              >
+                <span class="material-icons text-base">delete</span>
+                Delete
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center gap-1"
+                :disabled="detailLoading || !detail"
+                data-testid="skill-run-btn"
+                @click="runSkill"
+              >
+                <span class="material-icons text-base">play_arrow</span>
+                Run
+              </button>
+            </div>
           </div>
           <div v-if="detailLoading" class="text-sm text-gray-400 italic">
             Loading…
@@ -103,13 +116,15 @@ const props = defineProps<{
   selectedResult: ToolResultComplete<ManageSkillsData>;
 }>();
 
-const skills = computed<SkillSummary[]>(
-  () => props.selectedResult.data?.skills ?? [],
-);
+// Local mutable copy of the skill list so the Delete button can
+// remove rows without waiting for a fresh tool_result push.
+// Re-seeded whenever the underlying tool result changes.
+const skills = ref<SkillSummary[]>(props.selectedResult.data?.skills ?? []);
 const selectedName = ref<string | null>(skills.value[0]?.name ?? null);
 const detail = ref<SkillDetail | null>(null);
 const detailLoading = ref(false);
 const detailError = ref<string | null>(null);
+const deleting = ref(false);
 
 const selected = computed(
   () => skills.value.find((s) => s.name === selectedName.value) ?? null,
@@ -120,6 +135,7 @@ const selected = computed(
 watch(
   () => props.selectedResult.uuid,
   () => {
+    skills.value = props.selectedResult.data?.skills ?? [];
     selectedName.value = skills.value[0]?.name ?? null;
   },
 );
@@ -166,5 +182,43 @@ function runSkill(): void {
       detail: { message: `/${selectedName.value}` },
     }),
   );
+}
+
+// Delete is project-scope only — see saveProjectSkill / deleteProjectSkill
+// in server/skills/writer.ts. The button is hidden in the template
+// when source !== "project". A native confirm() is enough for phase 1
+// since the action is reversible by re-saving via the conversation.
+async function deleteSkill(): Promise<void> {
+  if (!detail.value || detail.value.source !== "project") return;
+  const name = detail.value.name;
+  if (
+    !window.confirm(
+      `Delete skill "${name}"? This removes ~/mulmoclaude/.claude/skills/${name}/SKILL.md.`,
+    )
+  ) {
+    return;
+  }
+  deleting.value = true;
+  try {
+    const res = await fetch(`/api/skills/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      detailError.value = body.error ?? `Failed to delete: ${res.statusText}`;
+      return;
+    }
+    // Remove from the local list, advance selection, clear detail.
+    const idx = skills.value.findIndex((s) => s.name === name);
+    if (idx >= 0) {
+      skills.value.splice(idx, 1);
+    }
+    selectedName.value = skills.value[0]?.name ?? null;
+    detail.value = null;
+  } catch (err) {
+    detailError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    deleting.value = false;
+  }
 }
 </script>
