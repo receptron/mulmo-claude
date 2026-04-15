@@ -206,10 +206,41 @@ export function getActiveSessionIds(): Set<string> {
   return ids;
 }
 
+// ── In-process session event listeners ────────────────────────
+
+type SessionEventListener = (event: Record<string, unknown>) => void;
+const sessionListeners = new Map<string, Set<SessionEventListener>>();
+
+/**
+ * Subscribe to session events in-process (no WebSocket needed).
+ * Returns an unsubscribe function.
+ */
+export function onSessionEvent(
+  chatSessionId: string,
+  listener: SessionEventListener,
+): () => void {
+  let listeners = sessionListeners.get(chatSessionId);
+  if (!listeners) {
+    listeners = new Set();
+    sessionListeners.set(chatSessionId, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners!.delete(listener);
+    if (listeners!.size === 0) sessionListeners.delete(chatSessionId);
+  };
+}
+
 // ── Internal helpers ───────────────────────────────────────────
 
 function publishToSessionChannel(chatSessionId: string, data: unknown): void {
   pubsub?.publish(`session.${chatSessionId}`, data);
+  const listeners = sessionListeners.get(chatSessionId);
+  if (listeners) {
+    for (const listener of listeners) {
+      listener(data as Record<string, unknown>);
+    }
+  }
 }
 
 /** Notify all clients that session state has changed — refetch via REST. */
