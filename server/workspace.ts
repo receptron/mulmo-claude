@@ -29,7 +29,7 @@ const SUBDIRS = [
   "charts",
   // Web-configurable settings (app-wide) and user-defined MCP servers
   // live under this dir so future import/export can ship them as a
-  // unit. See plans/feat-web-settings-ui.md.
+  // unit. See plans/done/feat-web-settings-ui.md.
   "configs",
 ];
 

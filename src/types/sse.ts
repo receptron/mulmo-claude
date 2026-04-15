@@ -30,6 +30,7 @@ export interface SseSwitchRole {
 export interface SseText {
   type: "text";
   message: string;
+  source?: "user" | "assistant";
 }
 
 export interface SseToolResult {

@@ -245,29 +245,40 @@ function buildInlinedHelpFiles(
     .filter((s): s is string => s !== null);
 }
 
+// Wrap a list of sub-entries under a single markdown heading, or
+// return null when the list is empty so the caller can skip the
+// whole section. Used for "## Reference Files" / "## Plugin
+// Instructions" style blocks. Exported so unit tests can exercise
+// the pure formatter without spinning up the whole prompt builder.
+export function headingSection(
+  heading: string,
+  items: string[],
+): string | null {
+  if (items.length === 0) return null;
+  return `## ${heading}\n\n${items.join("\n\n")}`;
+}
+
 export function buildSystemPrompt(params: SystemPromptParams): string {
   const { role, workspacePath, useDocker } = params;
 
-  const memoryContext = buildMemoryContext(workspacePath);
-  const wikiContext = buildWikiContext(workspacePath);
-  const sourcesContext = buildSourcesContext(workspacePath);
-  const pluginSections = buildPluginPromptSections(role);
-  const helpSections = buildInlinedHelpFiles(role.prompt, workspacePath);
-
-  return [
+  // Every section builder returns either its content or null. The
+  // orchestrator just filters out nulls and joins — no per-section
+  // `...(cond ? [x] : [])` ceremony at the bottom.
+  const sections: Array<string | null> = [
     SYSTEM_PROMPT,
     role.prompt,
     `Workspace directory: ${workspacePath}`,
     `Today's date: ${new Date().toISOString().split("T")[0]}`,
-    memoryContext,
-    ...(useDocker ? [SANDBOX_TOOLS_HINT] : []),
-    ...(wikiContext ? [wikiContext] : []),
-    ...(sourcesContext ? [sourcesContext] : []),
-    ...(helpSections.length
-      ? [`## Reference Files\n\n${helpSections.join("\n\n")}`]
-      : []),
-    ...(pluginSections.length
-      ? [`## Plugin Instructions\n\n${pluginSections.join("\n\n")}`]
-      : []),
-  ].join("\n\n");
+    buildMemoryContext(workspacePath),
+    useDocker ? SANDBOX_TOOLS_HINT : null,
+    buildWikiContext(workspacePath),
+    buildSourcesContext(workspacePath),
+    headingSection(
+      "Reference Files",
+      buildInlinedHelpFiles(role.prompt, workspacePath),
+    ),
+    headingSection("Plugin Instructions", buildPluginPromptSections(role)),
+  ];
+
+  return sections.filter((s): s is string => s !== null).join("\n\n");
 }

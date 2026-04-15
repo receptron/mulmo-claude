@@ -4,7 +4,7 @@
 // inlined with truncation. No filesystem access — callers do I/O
 // separately and feed the result here.
 //
-// See plans/feat-tool-trace-persistence.md for the design rationale.
+// See plans/done/feat-tool-trace-persistence.md for the design rationale.
 
 export type Classification =
   | { kind: "pointer"; contentRef: string }

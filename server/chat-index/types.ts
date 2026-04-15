@@ -1,7 +1,7 @@
 // On-disk shapes for the per-session chat summaries cached under
 // workspace/chat/index/. These power the title + summary shown for
 // past sessions in the sidebar history pane. The full design lives
-// in plans/feat-session-index-titles.md.
+// in plans/done/feat-session-index-titles.md.
 
 export interface SummaryResult {
   // <= 60 chars in the source language

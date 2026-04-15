@@ -271,7 +271,7 @@ describe("RAW_SECURITY_HEADERS", () => {
   // dependency tree — but they pin the exact header strings down.
   // Silently dropping the CSP header would reopen the SVG / HTML /
   // PDF-with-JS XSS surface documented in
-  // plans/fix-files-raw-csp-sandbox.md.
+  // plans/done/fix-files-raw-csp-sandbox.md.
 
   it("sets Content-Security-Policy to `sandbox` (no allow flags)", () => {
     // The bare `sandbox` directive is the strictest setting — it

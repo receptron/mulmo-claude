@@ -15,6 +15,7 @@ import {
 } from "../utils/gemini.js";
 import { errorMessage } from "../utils/errors.js";
 import { badRequest, serverError } from "../utils/httpError.js";
+import { log } from "../logger/index.js";
 import { saveImage } from "../utils/image-store.js";
 import {
   saveMarkdown,
@@ -67,28 +68,67 @@ async function generateImageFile(prompt: string): Promise<string | null> {
   try {
     const { imageData } = await generateGeminiImageFromPrompt(prompt);
     if (imageData) return saveImage(imageData);
-  } catch {
-    // leave placeholder if generation fails
+    log.warn("present-document", "Gemini returned no image data for prompt", {
+      promptPreview: prompt.slice(0, 80),
+    });
+  } catch (err) {
+    // Surface the failure so missing-image symptoms in the canvas
+    // are debuggable from the server log instead of vanishing.
+    log.warn("present-document", "Gemini image generation failed", {
+      error: errorMessage(err),
+      promptPreview: prompt.slice(0, 80),
+    });
   }
   return null;
 }
 
 async function fillImagePlaceholders(markdown: string): Promise<string> {
-  if (!isGeminiAvailable()) return markdown;
   const matches = [...markdown.matchAll(IMAGE_PLACEHOLDER)];
   if (matches.length === 0) return markdown;
+  // Only attempt generation when Gemini is wired up; otherwise the
+  // placeholder still gets stripped below so we don't leak a broken
+  // <img src="...__too_be_replaced_image_path__"> into the rendered
+  // document.
+  const geminiOk = isGeminiAvailable();
+  if (!geminiOk) {
+    log.warn(
+      "present-document",
+      "GEMINI_API_KEY not set — image placeholders will render as text markers",
+      { placeholderCount: matches.length },
+    );
+  }
 
   const results = await Promise.all(
     matches.map(async (m) => ({
       full: m[0],
       prompt: m[1],
-      url: await generateImageFile(m[1]),
+      url: geminiOk ? await generateImageFile(m[1]) : null,
     })),
   );
 
+  // Surface a single tally line so the operator can see the
+  // success rate even when most calls go through. The per-call
+  // error already lands at warn from generateImageFile's catch.
+  if (geminiOk) {
+    const failed = results.filter((r) => !r.url).length;
+    if (failed > 0) {
+      log.warn("present-document", "image generation had failures", {
+        failed,
+        total: results.length,
+      });
+    }
+  }
+
   let filled = markdown;
   for (const { full, prompt, url } of results) {
-    if (url) filled = filled.replace(full, `![${prompt}](../${url})`);
+    // On success → real image. On failure / no key → italic text
+    // marker so the alt prompt still surfaces but no broken image
+    // 404s through the View. The user can re-render later once
+    // GEMINI_API_KEY is set.
+    filled = filled.replace(
+      full,
+      url ? `![${prompt}](../${url})` : `*🖼️ Image: ${prompt}*`,
+    );
   }
   return filled;
 }

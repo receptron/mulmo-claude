@@ -226,11 +226,10 @@
             rows="2"
             class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
             :disabled="isRunning"
-            @keydown.enter="
-              !$event.isComposing && !$event.shiftKey
-                ? (sendMessage(), $event.preventDefault())
-                : undefined
-            "
+            @compositionstart="onCompositionStart"
+            @compositionend="onCompositionEnd"
+            @keydown="onTextareaKeydown"
+            @blur="onTextareaBlur"
           />
           <button
             data-testid="send-btn"
@@ -610,6 +609,45 @@ const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 const userInput = ref("");
 const activePane = ref<"sidebar" | "main">("sidebar");
 
+// IME composition tracking. Safari fires `compositionend` BEFORE the
+// confirming Enter's `keydown`, so `event.isComposing` is already
+// false on that keydown — the inline `!isComposing` guard let the
+// message send on IME confirmation. Chrome / Firefox fire
+// `compositionend` AFTER the keydown and keep `isComposing` true,
+// so they handle confirmation correctly on their own.
+//
+// We use a tight time window after `compositionend` (30ms) to suppress
+// only the immediately-following keydown — short enough that Safari's
+// synchronous race fits, long enough that human reaction time on a
+// follow-up Enter (>=100ms) never falls inside.
+let isImeComposing = false;
+let lastCompositionEndAt = 0;
+const SAFARI_IME_RACE_WINDOW_MS = 30;
+function onCompositionStart() {
+  isImeComposing = true;
+}
+function onCompositionEnd() {
+  isImeComposing = false;
+  lastCompositionEndAt = performance.now();
+}
+function onTextareaBlur() {
+  isImeComposing = false;
+  lastCompositionEndAt = 0;
+}
+function onTextareaKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter" || event.shiftKey) return;
+  if (event.isComposing || isImeComposing) {
+    event.preventDefault();
+    return;
+  }
+  if (performance.now() - lastCompositionEndAt < SAFARI_IME_RACE_WINDOW_MS) {
+    event.preventDefault();
+    return;
+  }
+  event.preventDefault();
+  sendMessage();
+}
+
 const { sessions, showHistory, fetchSessions, toggleHistory } =
   useSessionHistory();
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
@@ -709,14 +747,27 @@ function tabColor(session: SessionSummary): string {
   return "text-gray-400";
 }
 
-// Centralised session-switch handler: clear unread flag and subscribe
-// to the session's pub/sub channel if it's running (so a second tab
-// or a tab that navigated to an in-progress session receives events).
+// Centralised session-switch handler: subscribe to the current session's
+// pub/sub channel so we receive real-time events even if the session is
+// idle (another tab may start a run). Unsubscribe from idle sessions
+// when switching away (running sessions keep their subscription so they
+// continue receiving events — session_finished will clean them up).
+let previousSessionId: string | null = null;
 watch(currentSessionId, (id) => {
   const session = sessionMap.get(id);
-  if (session?.isRunning) {
+  // Subscribe to the new session's channel
+  if (session) {
     ensureSessionSubscription(session, session.toolResults.length);
   }
+  // Unsubscribe from the previous session if it's not running
+  if (previousSessionId && previousSessionId !== id) {
+    const prevSession = sessionMap.get(previousSessionId);
+    if (prevSession && !prevSession.isRunning) {
+      unsubscribeSession(previousSessionId);
+    }
+  }
+  previousSessionId = id;
+
   // Clear unread in both sessionMap and sessions list (for badge count),
   // then tell the server so other tabs see it too.
   const summary = sessions.value.find((s) => s.id === id);
@@ -986,7 +1037,7 @@ async function loadSession(id: string) {
     new Date().toISOString(),
   );
 
-  sessionMap.set(id, {
+  const newSession: ActiveSession = {
     id,
     roleId,
     toolResults: toolResultsList,
@@ -997,7 +1048,18 @@ async function loadSession(id: string) {
     hasUnread: false,
     startedAt,
     updatedAt,
-  });
+  };
+  sessionMap.set(id, newSession);
+  // Subscribe immediately — the watch(currentSessionId) may have
+  // already fired before the session was in sessionMap (e.g. when
+  // opened via URL), so it couldn't subscribe at that point.
+  // Use sessionMap.get() to obtain the reactive proxy — passing the
+  // raw object would bypass Vue's reactivity tracking.
+  const reactiveSession = sessionMap.get(id)!;
+  ensureSessionSubscription(
+    reactiveSession,
+    reactiveSession.toolResults.length,
+  );
   navigateToSession(id, replaced);
   currentRoleId.value = roleId;
   showHistory.value = false;
@@ -1046,15 +1108,17 @@ function ensureSessionSubscription(
     const event = data as SseEvent;
     if (!event || typeof event !== "object") return;
 
-    // session_finished signals end-of-run — clean up subscription.
-    // If the user is viewing this session, tell the server to clear
-    // hasUnread. State updates (isRunning, hasUnread) arrive via the
-    // `sessions` channel notification → refetch cycle.
+    // session_finished signals end-of-run. If the user is viewing
+    // this session, clear unread and keep the subscription alive so
+    // we receive events if another tab starts a new run. Only
+    // unsubscribe sessions the user is NOT currently viewing — the
+    // watch(currentSessionId) handler cleans up when switching away.
     if (event.type === "session_finished") {
       if (currentSessionId.value === session.id) {
         markSessionRead(session.id);
+      } else {
+        unsubscribeSession(session.id);
       }
-      unsubscribeSession(session.id);
       return;
     }
 
@@ -1124,6 +1188,24 @@ async function applyAgentEvent(
       await ctx.refreshRoles();
       return;
     case "text": {
+      const source = event.source ?? "assistant";
+      if (source === "user") {
+        // The tab that sent the message already added it locally via
+        // beginUserTurn. Deduplicate: skip if the last text-response
+        // is a user message with identical text.
+        const last = session.toolResults[session.toolResults.length - 1];
+        const lastData = last?.data as
+          | { role?: string; text?: string }
+          | undefined;
+        if (
+          last?.toolName === "text-response" &&
+          lastData?.role === "user" &&
+          lastData?.text === event.message
+        )
+          return;
+        session.toolResults.push(makeTextResult(event.message, "user"));
+        return;
+      }
       const textResult = makeTextResult(event.message, "assistant");
       session.toolResults.push(textResult);
       if (shouldSelectAssistantText(session.toolResults, runStartIndex)) {

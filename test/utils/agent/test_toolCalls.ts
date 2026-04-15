@@ -1,7 +1,7 @@
 // Unit tests for the pure helpers extracted from
 // `src/App.vue#sendMessage` around tool-call-history management
 // and text-result selection heuristics. See
-// plans/refactor-vue-cognitive-complexity.md and issue #175.
+// plans/done/refactor-vue-cognitive-complexity.md and issue #175.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

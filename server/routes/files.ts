@@ -641,7 +641,7 @@ router.get(
     // Sandbox the response so an `.svg` / `.html` / `.pdf` with
     // embedded JavaScript can't escape into the localhost:3001
     // origin via direct navigation or <iframe>. See
-    // plans/fix-files-raw-csp-sandbox.md for the threat model.
+    // plans/done/fix-files-raw-csp-sandbox.md for the threat model.
     applyRawSecurityHeaders(res);
 
     // Range support is required for `<video>` playback (Safari refuses

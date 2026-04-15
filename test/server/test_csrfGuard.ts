@@ -4,7 +4,7 @@
 // cross-origin CSRF attacks that survive the CORS lockdown in
 // #148.
 //
-// Full design: plans/fix-server-csrf-origin-check.md
+// Full design: plans/done/fix-server-csrf-origin-check.md
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

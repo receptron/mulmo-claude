@@ -1,6 +1,6 @@
 // Unit tests for `mergeSessionLists` + `compareSessionsByRecency`.
 // Extracted from `src/App.vue`'s `mergedSessions` computed — see
-// plans/refactor-vue-cognitive-complexity.md and issue #175.
+// plans/done/refactor-vue-cognitive-complexity.md and issue #175.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

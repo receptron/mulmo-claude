@@ -7,6 +7,7 @@ import {
   buildMemoryContext,
   buildWikiContext,
   buildSystemPrompt,
+  headingSection,
   prependJournalPointer,
 } from "../../server/agent/prompt.js";
 import type { Role } from "../../src/config/roles.js";
@@ -30,6 +31,37 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
+});
+
+describe("headingSection", () => {
+  it("wraps items under a ## heading joined by blank lines", () => {
+    const out = headingSection("Plugin Instructions", [
+      "### a\n\nbody a",
+      "### b\n\nbody b",
+    ]);
+    assert.equal(
+      out,
+      "## Plugin Instructions\n\n### a\n\nbody a\n\n### b\n\nbody b",
+    );
+  });
+
+  it("returns null when the list is empty so callers can skip the section", () => {
+    assert.equal(headingSection("Whatever", []), null);
+  });
+
+  it("keeps a single item verbatim under the heading", () => {
+    const out = headingSection("Reference Files", [
+      "### helps/index.md\n\ncontent",
+    ]);
+    assert.equal(out, "## Reference Files\n\n### helps/index.md\n\ncontent");
+  });
+
+  it("preserves embedded blank lines inside items", () => {
+    // Items can contain their own paragraph breaks; join should use
+    // exactly \n\n between items and not touch the item text.
+    const out = headingSection("Section", ["line1\n\nline2", "line3"]);
+    assert.equal(out, "## Section\n\nline1\n\nline2\n\nline3");
+  });
 });
 
 describe("buildMemoryContext", () => {

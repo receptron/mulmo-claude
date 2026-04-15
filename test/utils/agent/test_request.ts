@@ -1,5 +1,5 @@
 // Unit tests for the pure request-body builder extracted from
-// `src/App.vue#sendMessage`. See plans/refactor-vue-cognitive-complexity.md
+// `src/App.vue#sendMessage`. See plans/done/refactor-vue-cognitive-complexity.md
 // and issue #175.
 
 import { describe, it } from "node:test";

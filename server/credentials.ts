@@ -99,7 +99,10 @@ async function renewTokenViaPty(): Promise<boolean> {
     };
 
     const timeout = setTimeout(() => {
-      log.error("credentials", "Token renewal timed out after 30s");
+      log.error(
+        "credentials",
+        `Token renewal timed out after ${PTY_TIMEOUT_MS / 1000}s`,
+      );
       finish(false);
     }, PTY_TIMEOUT_MS);
 
@@ -108,17 +111,39 @@ async function renewTokenViaPty(): Promise<boolean> {
     // false-positive the echo detection.
     const ECHO_RE = /\bhi\b/;
 
+    // After the echo, only treat output as a successful renewal when
+    // it looks like a real Claude response — a conversational opener
+    // (Hello / Hi / I'm / …) AND a non-trivial amount of text. Error
+    // chunks ("Please log in", "Invalid credentials", network blips)
+    // don't match both conditions, so they fall through to the
+    // 30-second timeout and we treat the renewal as failed. A final
+    // safety net: `refreshCredentials()` re-reads the Keychain and
+    // calls `isTokenExpired()` before writing, so even a false
+    // positive here can't persist a stale token.
+    const RESPONSE_PATTERN_RE = /\b(Hello|Hi|I['’]m|I can|How can)\b/i;
+    const MIN_RESPONSE_CHARS = 20;
+    let echoEndIdx = -1;
+
     proc.onData((data: string) => {
       buffer += data;
 
-      if (!responded && ECHO_RE.test(buffer)) {
-        // Claude echoed our "hi" — now wait for the actual response
-        responded = true;
+      if (!responded) {
+        const m = ECHO_RE.exec(buffer);
+        if (m) {
+          // Claude echoed our "hi" — remember where the response
+          // window starts so the success check looks only at bytes
+          // that arrived AFTER the echo.
+          responded = true;
+          echoEndIdx = m.index + m[0].length;
+        }
         return;
       }
 
-      if (responded) {
-        // Got something after "hi" — credentials renewed
+      const response = buffer.slice(echoEndIdx);
+      if (
+        response.length >= MIN_RESPONSE_CHARS &&
+        RESPONSE_PATTERN_RE.test(response)
+      ) {
         finish(true);
       }
     });
