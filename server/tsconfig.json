@@ -17,7 +17,8 @@
   "include": [
     "**/*.ts",
     "../src/config/roles.ts",
-    "../src/plugins/*/definition.ts"
+    "../src/plugins/*/definition.ts",
+    "../bridges/**/*.ts"
   ],
   "exclude": ["node_modules", "../dist"]
 }
