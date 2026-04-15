@@ -12,6 +12,15 @@
         </span>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          :disabled="adding || busy === 'rebuild'"
+          data-testid="sources-add-btn"
+          @click="startAdd"
+        >
+          <span class="material-icons text-sm align-middle">add</span>
+          Add
+        </button>
+        <button
+          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="busy === 'rebuild'"
           data-testid="sources-rebuild-btn"
           @click="rebuild"
@@ -19,6 +28,72 @@
           <span class="material-icons text-sm align-middle">refresh</span>
           {{ busy === "rebuild" ? "Rebuilding…" : "Rebuild now" }}
         </button>
+      </div>
+    </div>
+
+    <div
+      v-if="adding"
+      class="px-4 py-3 border-b border-blue-200 bg-blue-50/50 shrink-0 space-y-2"
+      data-testid="sources-add-form"
+    >
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="text-xs text-gray-700">
+          Type
+          <select
+            v-model="draft.kind"
+            class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5"
+            data-testid="sources-draft-kind"
+            @change="onKindChange"
+          >
+            <option value="rss">RSS</option>
+            <option value="github-releases">GitHub releases</option>
+            <option value="github-issues">GitHub issues</option>
+            <option value="arxiv">arXiv</option>
+          </select>
+        </label>
+        <input
+          v-model="draft.primary"
+          class="flex-1 min-w-[12rem] text-xs border border-gray-300 rounded px-2 py-1 font-mono"
+          :placeholder="primaryPlaceholder"
+          data-testid="sources-draft-primary"
+          @keydown.enter="commitAdd"
+        />
+        <input
+          v-model="draft.title"
+          class="w-40 text-xs border border-gray-300 rounded px-2 py-1"
+          placeholder="Title (optional)"
+          data-testid="sources-draft-title"
+          @keydown.enter="commitAdd"
+        />
+      </div>
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-gray-500">
+          {{ primaryHint }}
+        </span>
+        <div class="flex gap-2">
+          <button
+            class="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+            data-testid="sources-draft-cancel"
+            @click="cancelAdd"
+          >
+            Cancel
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+            :disabled="busy === 'add' || !draft.primary.trim()"
+            data-testid="sources-draft-add"
+            @click="commitAdd"
+          >
+            {{ busy === "add" ? "Adding…" : "Add + Rebuild" }}
+          </button>
+        </div>
+      </div>
+      <div
+        v-if="draftError"
+        class="text-xs text-red-600"
+        data-testid="sources-draft-error"
+      >
+        {{ draftError }}
       </div>
     </div>
 
@@ -41,8 +116,8 @@
         class="flex items-center justify-center h-full p-6 text-center text-sm text-gray-500 italic"
         data-testid="sources-empty"
       >
-        No sources registered yet. Ask Claude to register one — e.g. “register
-        the Hacker News RSS feed”.
+        No sources registered yet. Click <strong>+ Add</strong> above, or ask
+        Claude to register one.
       </div>
       <ul v-else class="divide-y divide-gray-100 border-b border-gray-100">
         <li
@@ -175,9 +250,193 @@ const localSources = ref<Source[] | null>(null);
 const lastRebuild = ref<RebuildSummary | null>(null);
 const actionMessage = ref("");
 const actionError = ref(false);
-// Tracks the current button-driven request: either a slug (Remove) or
-// the literal "rebuild". Used to disable/relabel the matching button.
+// Tracks the current button-driven request: "rebuild", "add", or a
+// slug (Remove). Used to disable/relabel the matching button.
 const busy = ref<string | null>(null);
+
+// --- Add source form state ---------------------------------------------
+
+type DraftKind = "rss" | "github-releases" | "github-issues" | "arxiv";
+interface DraftState {
+  kind: DraftKind;
+  primary: string; // Feed URL / repo URL / repo slug / arxiv query
+  title: string;
+}
+
+const adding = ref(false);
+const draft = ref<DraftState>(emptyDraft());
+const draftError = ref("");
+
+function emptyDraft(): DraftState {
+  return { kind: "rss", primary: "", title: "" };
+}
+
+function startAdd(): void {
+  draft.value = emptyDraft();
+  draftError.value = "";
+  adding.value = true;
+}
+
+function cancelAdd(): void {
+  adding.value = false;
+  draftError.value = "";
+}
+
+function onKindChange(): void {
+  draftError.value = "";
+}
+
+const primaryPlaceholder = computed(() => {
+  switch (draft.value.kind) {
+    case "rss":
+      return "https://news.ycombinator.com/rss";
+    case "github-releases":
+    case "github-issues":
+      return "https://github.com/owner/repo  (or owner/repo)";
+    case "arxiv":
+      return "cat:cs.CL";
+  }
+  return "";
+});
+
+const primaryHint = computed(() => {
+  switch (draft.value.kind) {
+    case "rss":
+      return "Feed URL (RSS 2.0 / Atom / RDF)";
+    case "github-releases":
+      return "GitHub repo URL or owner/repo — fetches releases";
+    case "github-issues":
+      return "GitHub repo URL or owner/repo — fetches issues";
+    case "arxiv":
+      return "arXiv search query (e.g. cat:cs.CL or au:hinton)";
+  }
+  return "";
+});
+
+// Extract owner/repo from either a full github.com URL or a bare
+// "owner/repo" string. Returns null when the input doesn't look
+// like a recognisable GitHub repo.
+function parseRepoSlug(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const urlMatch = trimmed.match(
+    /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+)/i,
+  );
+  if (urlMatch) return `${urlMatch[1]}/${urlMatch[2].replace(/\.git$/, "")}`;
+  if (/^[^/\s]+\/[^/\s]+$/.test(trimmed)) return trimmed.replace(/\.git$/, "");
+  return null;
+}
+
+// Build the /api/sources body from the draft. Returns an error
+// string when the input is invalid for the chosen kind.
+interface RegisterPayload {
+  title: string;
+  url: string;
+  fetcherKind: DraftKind;
+  fetcherParams: Record<string, string>;
+}
+
+function buildRegisterPayload(d: DraftState): RegisterPayload | string {
+  const primary = d.primary.trim();
+  const title = d.title.trim();
+  if (!primary) return "Please fill in the URL / query field.";
+  switch (d.kind) {
+    case "rss": {
+      if (!/^https?:\/\//i.test(primary)) {
+        return "RSS feed URL must start with http:// or https://";
+      }
+      return {
+        title: title || new URL(primary).hostname,
+        url: primary,
+        fetcherKind: "rss",
+        fetcherParams: { rss_url: primary },
+      };
+    }
+    case "github-releases":
+    case "github-issues": {
+      const slug = parseRepoSlug(primary);
+      if (!slug) {
+        return "Enter a GitHub repo URL (https://github.com/owner/repo) or owner/repo.";
+      }
+      return {
+        title: title || slug,
+        url: `https://github.com/${slug}`,
+        fetcherKind: d.kind,
+        fetcherParams: { github_repo: slug },
+      };
+    }
+    case "arxiv": {
+      const query = primary;
+      return {
+        title: title || `arXiv: ${query}`,
+        url: `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(query)}`,
+        fetcherKind: "arxiv",
+        fetcherParams: { arxiv_query: query },
+      };
+    }
+  }
+  return "Unsupported fetcher kind.";
+}
+
+async function commitAdd(): Promise<void> {
+  const payload = buildRegisterPayload(draft.value);
+  if (typeof payload === "string") {
+    draftError.value = payload;
+    return;
+  }
+  draftError.value = "";
+  busy.value = "add";
+  try {
+    const res = await fetch("/api/sources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      draftError.value = body?.error ?? `HTTP ${res.status}`;
+      return;
+    }
+    flash(`Registered. Fetching new items…`);
+    adding.value = false;
+    await refreshList();
+    // C: auto-rebuild so the user sees items without an extra click.
+    busy.value = "rebuild";
+    await rebuildInline();
+  } catch (err) {
+    draftError.value =
+      err instanceof Error ? err.message : "Failed to register source";
+  } finally {
+    busy.value = null;
+  }
+}
+
+// Rebuild step extracted so commitAdd can chain it without recursing
+// into rebuild()'s own busy-state machine.
+async function rebuildInline(): Promise<void> {
+  try {
+    const res = await fetch("/api/sources/rebuild", { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(body?.error ?? `HTTP ${res.status}`);
+    }
+    const summary = (await res.json()) as RebuildSummary;
+    lastRebuild.value = summary;
+    flash(
+      `Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`,
+    );
+    await loadBrief(summary.isoDate);
+  } catch (err) {
+    flash(
+      `Register succeeded but rebuild failed: ${err instanceof Error ? err.message : String(err)}`,
+      true,
+    );
+  }
+}
 
 const sources = computed<Source[]>(() => {
   if (localSources.value !== null) return localSources.value;
