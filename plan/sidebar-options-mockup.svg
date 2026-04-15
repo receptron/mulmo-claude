@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 980" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">
+  <style>
+    .panel { fill: #ffffff; stroke: #cbd5e0; stroke-width: 1.5; }
+    .bar   { fill: #f7fafc; stroke: #e2e8f0; }
+    .sidebar-bg { fill: #fafafa; stroke: #e5e7eb; }
+    .canvas-bg  { fill: #ffffff; stroke: #e5e7eb; }
+    .chip { fill: #f8fafc; stroke: #cbd5e0; rx: 4; }
+    .chip-active { fill: #dbeafe; stroke: #60a5fa; rx: 4; }
+    .btn { fill: #eef2ff; stroke: #c7d2fe; rx: 4; }
+    .btn-active { fill: #4f46e5; stroke: #4338ca; rx: 4; }
+    .tab { fill: #f1f5f9; stroke: #cbd5e0; rx: 4 4 0 0; }
+    .tab-active { fill: #ffffff; stroke: #4338ca; stroke-width: 2; rx: 4 4 0 0; }
+    .msg-user { fill: #dbeafe; stroke: #93c5fd; rx: 6; }
+    .msg-agent { fill: #f3f4f6; stroke: #d1d5db; rx: 6; }
+    .input-bar { fill: #ffffff; stroke: #4f46e5; stroke-width: 2; rx: 8; }
+    .label-bold { font-weight: 600; fill: #1e293b; }
+    .label     { fill: #334155; }
+    .label-sub { fill: #64748b; font-size: 10px; }
+    .label-note { fill: #2563eb; font-size: 10px; font-style: italic; }
+    .badge-pro { fill: #ecfdf5; stroke: #86efac; rx: 3; }
+    .badge-con { fill: #fef2f2; stroke: #fecaca; rx: 3; }
+    .splitter  { fill: #cbd5e0; stroke: #94a3b8; }
+    .divider { stroke: #e2e8f0; stroke-width: 1; }
+  </style>
+
+  <!-- Title -->
+  <text x="760" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">Sidebar layout options — keeping session history AND current-session result navigation</text>
+  <text x="760" y="52" text-anchor="middle" font-size="13" fill="#475569">Single view stays · stack view stays · files view stays · question is how to access them all without re-opening popups every time</text>
+
+  <!-- Common toolbar legend at top -->
+  <g transform="translate(40, 70)">
+    <text x="0" y="14" class="label-bold" font-size="13">Toolbar (all panels) :</text>
+    <rect x="160" y="0" width="28" height="20" class="btn"/>
+    <text x="174" y="14" text-anchor="middle" font-size="10">📋</text>
+    <text x="174" y="32" text-anchor="middle" class="label-sub">stack</text>
+    <rect x="200" y="0" width="28" height="20" class="btn"/>
+    <text x="214" y="14" text-anchor="middle" font-size="10">🔍</text>
+    <text x="214" y="32" text-anchor="middle" class="label-sub">single</text>
+    <rect x="240" y="0" width="28" height="20" class="btn"/>
+    <text x="254" y="14" text-anchor="middle" font-size="10">📁</text>
+    <text x="254" y="32" text-anchor="middle" class="label-sub">files</text>
+    <text x="290" y="14" class="label-sub">view-mode toggle survives unchanged</text>
+    <text x="290" y="32" class="label-sub">single view = focused detail of one selected tool result</text>
+  </g>
+
+  <!-- ============ Panel α: TABBED SIDEBAR ============ -->
+  <g transform="translate(20, 130)">
+    <rect class="panel" x="0" y="0" width="480" height="820" rx="8"/>
+    <rect class="badge-pro" x="12" y="12" width="170" height="22" />
+    <text x="97" y="27" text-anchor="middle" font-weight="700" font-size="11" fill="#065f46">Option α — Tabbed sidebar</text>
+
+    <!-- top bar slim -->
+    <rect class="bar" x="16" y="46" width="448" height="34"/>
+    <text x="28" y="68" class="label-bold">MulmoClaude</text>
+    <text x="140" y="68" class="label-sub">Role: General ▼</text>
+    <rect x="280" y="52" width="22" height="22" class="btn"/>
+    <text x="291" y="68" text-anchor="middle" font-size="10">📋</text>
+    <rect x="306" y="52" width="22" height="22" class="btn-active"/>
+    <text x="317" y="68" text-anchor="middle" font-size="10" fill="#fff">🔍</text>
+    <rect x="332" y="52" width="22" height="22" class="btn"/>
+    <text x="343" y="68" text-anchor="middle" font-size="10">📁</text>
+    <text x="368" y="68" class="label-sub">⚙ 🔧</text>
+
+    <!-- left sidebar with tabs -->
+    <g>
+      <!-- tab strip -->
+      <rect class="tab" x="16" y="86" width="92" height="26"/>
+      <text x="62" y="103" text-anchor="middle" class="label">📚 History</text>
+      <rect class="tab-active" x="108" y="86" width="92" height="26"/>
+      <text x="154" y="103" text-anchor="middle" class="label-bold">📋 Results (4)</text>
+
+      <!-- active tab body: current session results -->
+      <rect class="sidebar-bg" x="16" y="112" width="184" height="630"/>
+      <text x="24" y="132" class="label-bold" font-size="11">Q3 budget draft</text>
+      <text x="24" y="144" class="label-sub">started 14:00 · current</text>
+
+      <rect x="24" y="152" width="168" height="42" class="chip-active"/>
+      <text x="32" y="170" class="label">📊 Q3 spreadsheet</text>
+      <text x="32" y="184" class="label-sub">14:02 · click to focus →</text>
+
+      <rect x="24" y="200" width="168" height="42" class="chip"/>
+      <text x="32" y="218" class="label">📈 Marketing chart</text>
+      <text x="32" y="232" class="label-sub">14:05</text>
+
+      <rect x="24" y="248" width="168" height="42" class="chip"/>
+      <text x="32" y="266" class="label">📝 Finance review wiki</text>
+      <text x="32" y="280" class="label-sub">14:05</text>
+
+      <rect x="24" y="296" width="168" height="42" class="chip"/>
+      <text x="32" y="314" class="label">📋 Action items todo</text>
+      <text x="32" y="328" class="label-sub">14:08</text>
+
+      <text x="24" y="358" class="label-sub">— sample queries —</text>
+      <rect x="24" y="366" width="168" height="20" class="btn"/>
+      <text x="32" y="380" class="label-sub">"summarize this thread"</text>
+      <rect x="24" y="390" width="168" height="20" class="btn"/>
+      <text x="32" y="404" class="label-sub">"add to wiki"</text>
+    </g>
+
+    <!-- chat input at sidebar bottom -->
+    <rect x="24" y="754" width="168" height="44" class="input-bar"/>
+    <text x="32" y="772" class="label">Type a message…</text>
+    <text x="32" y="786" class="label-sub">[ Enter to send ]</text>
+
+    <!-- canvas: single view selected result -->
+    <rect class="canvas-bg" x="216" y="86" width="248" height="712"/>
+    <text x="226" y="106" class="label-bold">📊 Q3 spreadsheet (single view)</text>
+    <text x="226" y="120" class="label-sub">selected from sidebar →</text>
+
+    <rect x="226" y="130" width="232" height="280" class="chip" />
+    <text x="342" y="270" text-anchor="middle" class="label-sub">Spreadsheet plugin View.vue</text>
+    <text x="342" y="284" text-anchor="middle" class="label-sub">(rendered full-canvas)</text>
+
+    <text x="226" y="436" class="label-sub">Click "📋 stack" in toolbar = same data, scrolling thread mode</text>
+
+    <!-- annotations -->
+    <text x="24" y="820" class="label-note">✓ Familiar tab pattern · sessions list 1 click away · current-session results visible by default</text>
+    <rect x="24" y="826" width="148" height="14" class="badge-con"/>
+    <text x="98" y="838" text-anchor="middle" class="label-note" fill="#991b1b">✗ Can't see both at once</text>
+    <rect x="180" y="826" width="160" height="14" class="badge-pro"/>
+    <text x="260" y="838" text-anchor="middle" class="label-note" fill="#065f46">✓ Minimal layout change from today</text>
+  </g>
+
+  <!-- ============ Panel β: SPLIT SIDEBAR ============ -->
+  <g transform="translate(520, 130)">
+    <rect class="panel" x="0" y="0" width="480" height="820" rx="8"/>
+    <rect class="badge-pro" x="12" y="12" width="180" height="22" />
+    <text x="102" y="27" text-anchor="middle" font-weight="700" font-size="11" fill="#065f46">Option β — Split sidebar</text>
+
+    <!-- top bar -->
+    <rect class="bar" x="16" y="46" width="448" height="34"/>
+    <text x="28" y="68" class="label-bold">MulmoClaude</text>
+    <text x="140" y="68" class="label-sub">Role: General ▼</text>
+    <rect x="280" y="52" width="22" height="22" class="btn"/>
+    <text x="291" y="68" text-anchor="middle" font-size="10">📋</text>
+    <rect x="306" y="52" width="22" height="22" class="btn-active"/>
+    <text x="317" y="68" text-anchor="middle" font-size="10" fill="#fff">🔍</text>
+    <rect x="332" y="52" width="22" height="22" class="btn"/>
+    <text x="343" y="68" text-anchor="middle" font-size="10">📁</text>
+    <text x="368" y="68" class="label-sub">⚙ 🔧</text>
+
+    <!-- left sidebar: split top/bottom -->
+    <!-- TOP: sessions list (compact) -->
+    <rect class="sidebar-bg" x="16" y="86" width="184" height="240"/>
+    <text x="24" y="106" class="label-bold" font-size="11">📚 Sessions</text>
+    <text x="178" y="106" text-anchor="end" class="label-sub">▾ collapse</text>
+
+    <rect x="24" y="116" width="168" height="28" class="chip-active"/>
+    <text x="32" y="134" class="label" font-size="11">📝 Q3 budget draft · current</text>
+
+    <rect x="24" y="148" width="168" height="24" class="chip"/>
+    <text x="32" y="164" class="label-sub">📅 Today's wrap · 2h</text>
+
+    <rect x="24" y="176" width="168" height="24" class="chip"/>
+    <text x="32" y="192" class="label-sub">🎨 Logo ideas · 2d</text>
+
+    <rect x="24" y="204" width="168" height="24" class="chip"/>
+    <text x="32" y="220" class="label-sub">🔎 AI trends · 3d</text>
+
+    <rect x="24" y="232" width="168" height="24" class="chip"/>
+    <text x="32" y="248" class="label-sub">📒 Meeting notes · 5d</text>
+
+    <text x="24" y="276" class="label-sub">+ 24 more sessions</text>
+    <rect x="24" y="284" width="168" height="22" class="btn"/>
+    <text x="32" y="298" class="label-sub">🔍 search history…</text>
+
+    <!-- splitter -->
+    <rect class="splitter" x="16" y="326" width="184" height="6"/>
+    <text x="108" y="343" text-anchor="middle" class="label-sub">drag to resize ↕</text>
+
+    <!-- BOTTOM: current session results -->
+    <rect class="sidebar-bg" x="16" y="350" width="184" height="392"/>
+    <text x="24" y="370" class="label-bold" font-size="11">📋 Results in this session (4)</text>
+
+    <rect x="24" y="380" width="168" height="36" class="chip-active"/>
+    <text x="32" y="396" class="label">📊 Q3 spreadsheet</text>
+    <text x="32" y="408" class="label-sub">14:02</text>
+
+    <rect x="24" y="422" width="168" height="36" class="chip"/>
+    <text x="32" y="438" class="label">📈 Marketing chart</text>
+    <text x="32" y="450" class="label-sub">14:05</text>
+
+    <rect x="24" y="464" width="168" height="36" class="chip"/>
+    <text x="32" y="480" class="label">📝 Finance review</text>
+    <text x="32" y="492" class="label-sub">14:05</text>
+
+    <rect x="24" y="506" width="168" height="36" class="chip"/>
+    <text x="32" y="522" class="label">📋 Action items</text>
+    <text x="32" y="534" class="label-sub">14:08</text>
+
+    <!-- chat input -->
+    <rect x="24" y="754" width="168" height="44" class="input-bar"/>
+    <text x="32" y="772" class="label">Type a message…</text>
+    <text x="32" y="786" class="label-sub">[ Enter to send ]</text>
+
+    <!-- canvas: single view -->
+    <rect class="canvas-bg" x="216" y="86" width="248" height="712"/>
+    <text x="226" y="106" class="label-bold">📊 Q3 spreadsheet (single view)</text>
+    <rect x="226" y="120" width="232" height="280" class="chip" />
+    <text x="342" y="260" text-anchor="middle" class="label-sub">full Spreadsheet plugin View</text>
+
+    <text x="226" y="430" class="label-sub">Both lists visible · click row in either to navigate</text>
+    <text x="226" y="446" class="label-sub">Sessions row click → load that session (replaces results below)</text>
+    <text x="226" y="462" class="label-sub">Results row click → focus that tool result in canvas</text>
+
+    <!-- annotations -->
+    <text x="24" y="820" class="label-note">✓ Both lists visible at once · matches IDE conventions (file tree + search results)</text>
+    <rect x="24" y="826" width="180" height="14" class="badge-con"/>
+    <text x="114" y="838" text-anchor="middle" class="label-note" fill="#991b1b">✗ Both lists compete for vertical space</text>
+    <rect x="212" y="826" width="180" height="14" class="badge-pro"/>
+    <text x="302" y="838" text-anchor="middle" class="label-note" fill="#065f46">✓ Splitter lets user prioritize either</text>
+  </g>
+
+  <!-- ============ Panel γ: TWO SIDEBARS ============ -->
+  <g transform="translate(1020, 130)">
+    <rect class="panel" x="0" y="0" width="480" height="820" rx="8"/>
+    <rect class="badge-pro" x="12" y="12" width="172" height="22" />
+    <text x="98" y="27" text-anchor="middle" font-weight="700" font-size="11" fill="#065f46">Option γ — Two sidebars</text>
+
+    <!-- top bar -->
+    <rect class="bar" x="16" y="46" width="448" height="34"/>
+    <text x="28" y="68" class="label-bold">MulmoClaude</text>
+    <text x="140" y="68" class="label-sub">Role: General ▼</text>
+    <rect x="280" y="52" width="22" height="22" class="btn"/>
+    <text x="291" y="68" text-anchor="middle" font-size="10">📋</text>
+    <rect x="306" y="52" width="22" height="22" class="btn-active"/>
+    <text x="317" y="68" text-anchor="middle" font-size="10" fill="#fff">🔍</text>
+    <rect x="332" y="52" width="22" height="22" class="btn"/>
+    <text x="343" y="68" text-anchor="middle" font-size="10">📁</text>
+    <text x="368" y="68" class="label-sub">⚙ 🔧</text>
+
+    <!-- left sidebar: sessions only -->
+    <rect class="sidebar-bg" x="16" y="86" width="116" height="712"/>
+    <text x="24" y="106" class="label-bold" font-size="11">📚 Sessions</text>
+
+    <rect x="22" y="116" width="104" height="38" class="chip-active"/>
+    <text x="28" y="132" class="label" font-size="10">📝 Q3 budget</text>
+    <text x="28" y="146" class="label-sub">current</text>
+
+    <rect x="22" y="158" width="104" height="34" class="chip"/>
+    <text x="28" y="174" class="label-sub">📅 Today wrap</text>
+
+    <rect x="22" y="196" width="104" height="34" class="chip"/>
+    <text x="28" y="212" class="label-sub">🎨 Logo ideas</text>
+
+    <rect x="22" y="234" width="104" height="34" class="chip"/>
+    <text x="28" y="250" class="label-sub">🔎 AI trends</text>
+
+    <rect x="22" y="272" width="104" height="34" class="chip"/>
+    <text x="28" y="288" class="label-sub">📒 Notes</text>
+
+    <text x="24" y="316" class="label-sub">+ 24 more</text>
+
+    <!-- canvas in middle -->
+    <rect class="canvas-bg" x="148" y="86" width="200" height="640"/>
+    <text x="158" y="106" class="label-bold">Q3 spreadsheet (single view)</text>
+    <rect x="158" y="120" width="180" height="280" class="chip" />
+    <text x="248" y="260" text-anchor="middle" class="label-sub">full Spreadsheet plugin View</text>
+
+    <text x="158" y="430" class="label-sub">Click any chip on right →</text>
+    <text x="158" y="444" class="label-sub">canvas swaps to that result</text>
+
+    <!-- chat input under canvas -->
+    <rect x="158" y="744" width="180" height="44" class="input-bar"/>
+    <text x="166" y="762" class="label">Continue conversation…</text>
+    <text x="166" y="776" class="label-sub">[ Enter to send ]</text>
+
+    <!-- right sidebar: current session results -->
+    <rect class="sidebar-bg" x="364" y="86" width="100" height="712"/>
+    <text x="372" y="106" class="label-bold" font-size="11">📋 Results</text>
+    <text x="458" y="106" text-anchor="end" class="label-sub">4</text>
+
+    <rect x="370" y="116" width="88" height="46" class="chip-active"/>
+    <text x="376" y="132" class="label" font-size="10">📊 Q3 spread</text>
+    <text x="376" y="146" class="label-sub">14:02</text>
+    <text x="376" y="158" class="label-sub" fill="#1d4ed8">▶ shown</text>
+
+    <rect x="370" y="166" width="88" height="46" class="chip"/>
+    <text x="376" y="182" class="label" font-size="10">📈 Marketing</text>
+    <text x="376" y="196" class="label-sub">14:05</text>
+
+    <rect x="370" y="216" width="88" height="46" class="chip"/>
+    <text x="376" y="232" class="label" font-size="10">📝 Finance</text>
+    <text x="376" y="246" class="label-sub">14:05</text>
+
+    <rect x="370" y="266" width="88" height="46" class="chip"/>
+    <text x="376" y="282" class="label" font-size="10">📋 Actions</text>
+    <text x="376" y="296" class="label-sub">14:08</text>
+
+    <text x="372" y="334" class="label-sub">— tool trace —</text>
+    <text x="372" y="348" class="label-sub">read /todos</text>
+    <text x="372" y="362" class="label-sub">write Q3.json</text>
+    <text x="372" y="376" class="label-sub">render chart</text>
+
+    <!-- annotations -->
+    <text x="24" y="820" class="label-note">✓ Both fully visible without splitter · canvas centered between scopes</text>
+    <rect x="24" y="826" width="170" height="14" class="badge-con"/>
+    <text x="109" y="838" text-anchor="middle" class="label-note" fill="#991b1b">✗ Eats more horizontal space</text>
+    <rect x="202" y="826" width="218" height="14" class="badge-pro"/>
+    <text x="311" y="838" text-anchor="middle" class="label-note" fill="#065f46">✓ Right sidebar can absorb tool-trace too</text>
+  </g>
+</svg>
