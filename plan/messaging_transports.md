@@ -259,9 +259,52 @@ Each child process receives:
 
 If a child process crashes, the bridge manager logs the error and optionally restarts it (configurable).
 
-### 4.5 What a Bridge Looks Like
+### 4.5 CLI Bridge — The Reference Implementation
 
-A bridge is a simple, self-contained program. Here's the Telegram bridge as an example:
+The simplest possible bridge: reads from stdin, posts to the Chat Service API, prints the reply. No API keys, no platform dependencies, no network setup. It validates the entire Chat Service API end-to-end.
+
+```ts
+// bridges/cli/index.ts
+
+import * as readline from "readline";
+
+const API_URL = process.env.MULMOCLAUDE_API_URL ?? "http://localhost:3001";
+const TRANSPORT_ID = "cli";
+const CHAT_ID = "terminal";
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+function prompt() {
+  rl.question("You: ", async (text) => {
+    if (!text.trim()) return prompt();
+
+    const res = await fetch(`${API_URL}/api/chat/${TRANSPORT_ID}/${CHAT_ID}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text.trim() }),
+    });
+    const { reply } = await res.json();
+
+    console.log(`\nAssistant: ${reply}\n`);
+    prompt();
+  });
+}
+
+console.log("MulmoClaude CLI bridge. Type /help for commands, Ctrl+C to exit.\n");
+prompt();
+```
+
+That's the entire bridge. ~20 lines of logic. It exercises every server-side feature — session creation, command handling, agent invocation, response collection — without any platform complexity. Run it with:
+
+```bash
+node ./bridges/cli/index.js
+```
+
+Start the server in one terminal (`yarn dev`), then run the CLI bridge in another (`yarn cli`).
+
+### 4.6 What a Platform Bridge Looks Like
+
+Platform bridges follow the same pattern with platform-specific I/O. Here's Telegram:
 
 ```ts
 // bridges/telegram/index.ts
@@ -280,10 +323,8 @@ async function poll() {
     const text = update.message.text?.trim();
     if (!text) continue;
 
-    // Send typing indicator
     await telegramSendTyping(BOT_TOKEN, chatId);
 
-    // Call MulmoClaude — this is the ONLY server interaction
     const res = await fetch(`${API_URL}/api/chat/${TRANSPORT_ID}/${chatId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -291,20 +332,26 @@ async function poll() {
     });
     const { reply } = await res.json();
 
-    // Send reply back to Telegram
     await telegramSendMessage(BOT_TOKEN, chatId, reply);
   }
 }
 
-// Poll loop
 setInterval(poll, 5000);
 ```
 
-That's the entire bridge. ~30 lines of actual logic. It knows nothing about sessions, roles, commands, or MulmoClaude internals. The access control (`TELEGRAM_ALLOWED_CHAT_IDS`) can live in the bridge (filter before calling the API) or on the server (reject unknown chat IDs) — bridge-side is simpler since it avoids unnecessary API calls.
+~30 lines of logic. The only difference from the CLI bridge is the I/O: poll Telegram instead of readline, sendMessage instead of console.log. The server interaction is identical — one POST, one reply. Access control (`TELEGRAM_ALLOWED_CHAT_IDS`) lives in the bridge to avoid unnecessary API calls.
 
 ---
 
 ## 5) Platform-Specific Bridge Notes
+
+### CLI (reference implementation)
+
+- **Ingress**: stdin (readline)
+- **Bridge complexity**: Trivial — ~20 lines, zero dependencies
+- **Purpose**: Validates the Chat Service API without any platform setup. Also useful as a template for new bridges
+- **Chat ID**: Fixed to `"terminal"` — single session, single user
+- **Not auto-spawned** — run manually via `yarn cli` in a second terminal. Not managed by the bridge manager since it's an interactive tool, not a daemon
 
 ### Telegram
 
@@ -380,6 +427,8 @@ No `server/transports/` directory. No platform-specific code in the server at al
 
 ```
 bridges/
+  cli/
+    index.ts            ← Reference implementation: readline → API → console
   telegram/
     index.ts            ← Poll loop + Telegram API calls
     api.ts              ← Telegram Bot API wrappers
@@ -440,38 +489,42 @@ bridges/
 
 ## 8) Implementation Phases
 
-### Phase 0: Chat Service API + Telegram Bridge
+### Phase 0: Chat Service API + CLI Bridge
 1. Create `server/chat-service/chat-state.ts` — state store with `resolveWithinRoot()`
 2. Create `server/chat-service/commands.ts` — server-side `/reset`, `/help`, `/roles`, `/role`, `/status`
 3. Create `server/chat-service/index.ts` — `POST /api/chat/:transportId/:externalChatId`, `POST /api/chat/:transportId/connect`, `GET /api/chat/transports`
-4. Create `server/bridge-manager.ts` — child process spawning based on env vars, restart on crash, graceful shutdown
-5. Create `bridges/telegram/` — polling bridge (~50 lines of logic)
-6. Wire into `server/index.ts` — mount chat-service routes, call `startBridges()` after server listen
-7. Add `.env.example` entries
-8. Update `README.md` with setup instructions
-9. Unit tests: `test/chat-service/test_chat-state.ts`, `test/chat-service/test_commands.ts`
-10. Integration test: mock Telegram API, verify round-trip through Chat Service API
+4. Create `bridges/cli/index.ts` — reference implementation (~20 lines)
+5. Wire into `server/index.ts` — mount chat-service routes
+6. Unit tests: `test/chat-service/test_chat-state.ts`, `test/chat-service/test_commands.ts`
+7. Manual end-to-end test: run server, run CLI bridge, verify conversation round-trip, verify session appears in Web UI sidebar, verify `/reset` and `/role` commands
 
-### Phase 0.5: Web UI Connect Support
+### Phase 1: Bridge Manager + Telegram Bridge
+1. Create `server/bridge-manager.ts` — child process spawning based on env vars, restart on crash, graceful shutdown
+2. Create `bridges/telegram/` — polling bridge (~30 lines of logic)
+3. Wire bridge manager into `server/index.ts` — call `startBridges()` after server listen
+4. Add `.env.example` entries
+5. Update `README.md` with setup instructions
+
+### Phase 1.5: Web UI Connect Support
 1. Add "Connect to {transport}" action in session header/context menu (calls `POST /api/chat/:transportId/connect`)
 2. Show transport badge on sidebar sessions whose IDs start with a transport prefix
 3. Use `GET /api/chat/transports` to determine which transports are available
 
-### Phase 1: LINE Bridge
+### Phase 2: LINE Bridge
 1. Create `bridges/line/` — webhook HTTP server + LINE API
 2. Add `LINE_*` env vars to bridge manager config
 3. Document ngrok setup for development
 
-### Phase 2: Slack Bridge
+### Phase 3: Slack Bridge
 1. Create `bridges/slack/` — Socket Mode (no public URL needed)
 2. Handle Slack's deferred response pattern (ACK immediately, reply later)
 
-### Phase 3: WhatsApp Bridge
+### Phase 4: WhatsApp Bridge
 1. Create `bridges/whatsapp/` — webhook HTTP server + Meta Cloud API
 2. Handle webhook verification handshake
 3. Document Meta Business account setup
 
-### Phase 4: Twitter/X Bridge
+### Phase 5: Twitter/X Bridge
 1. Create `bridges/twitter/` — DM polling + Twitter API
 2. Handle OAuth flow
 
@@ -484,6 +537,7 @@ bridges/
 | Out-of-process bridges | True failure isolation, independent versioning, zero platform code in server |
 | Server owns all state | Bridges are stateless dumb pipes — simplest possible bridge, no state sync issues |
 | Bridges don't see session IDs | Maximum decoupling — server handles all session logic internally |
+| CLI bridge as reference implementation | Validates the entire API with zero platform dependencies; also serves as a template for new bridges |
 | Chat Service API over HTTP | Bridges are just HTTP clients — language-agnostic, testable with curl |
 | Child process spawning | User still just runs `yarn dev` — bridge lifecycle is managed automatically |
 | 1 chat = 1 active session pointer | Messaging apps have one thread; the pointer resolves the multi-session mismatch cleanly |
