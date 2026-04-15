@@ -4,9 +4,11 @@
 // clients can subscribe to the same session channel and receive
 // identical events.
 
-import { appendFile } from "fs/promises";
+import { appendFile, readFile, writeFile } from "fs/promises";
+import path from "path";
 import type { IPubSub } from "../pub-sub/index.js";
 import { log } from "../logger/index.js";
+import { workspacePath } from "../workspace.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -63,6 +65,7 @@ export function getOrCreateSession(
     selectedImageData?: string;
     startedAt: string;
     updatedAt: string;
+    hasUnread?: boolean;
   },
 ): ServerSession {
   const existing = store.get(chatSessionId);
@@ -75,7 +78,7 @@ export function getOrCreateSession(
     chatSessionId,
     roleId: opts.roleId,
     isRunning: false,
-    hasUnread: false,
+    hasUnread: opts.hasUnread ?? false,
     statusMessage: "",
     toolCallHistory: [],
     resultsFilePath: opts.resultsFilePath,
@@ -117,6 +120,7 @@ export function endRun(chatSessionId: string): void {
   session.statusMessage = "";
   session.abortRun = undefined;
   session.updatedAt = new Date().toISOString();
+  persistHasUnread(chatSessionId, true);
   publishToSessionChannel(chatSessionId, { type: "session_finished" });
   notifySessionsChanged();
 }
@@ -132,9 +136,15 @@ export function cancelRun(chatSessionId: string): boolean {
 /** Clear the unread flag (called when a client views the session). */
 export function markRead(chatSessionId: string): boolean {
   const session = store.get(chatSessionId);
-  if (!session) return false;
+  if (!session) {
+    // No in-memory session — still persist to disk so the flag is
+    // cleared for the next server restart / session listing.
+    persistHasUnread(chatSessionId, false);
+    return false;
+  }
   if (!session.hasUnread) return true;
   session.hasUnread = false;
+  persistHasUnread(chatSessionId, false);
   notifySessionsChanged();
   return true;
 }
@@ -232,6 +242,22 @@ export function onSessionEvent(
 }
 
 // ── Internal helpers ───────────────────────────────────────────
+
+function persistHasUnread(chatSessionId: string, hasUnread: boolean): void {
+  const metaFilePath = path.join(
+    workspacePath,
+    "chat",
+    `${chatSessionId}.json`,
+  );
+  readFile(metaFilePath, "utf-8")
+    .then((raw) => {
+      const meta = JSON.parse(raw);
+      return writeFile(metaFilePath, JSON.stringify({ ...meta, hasUnread }));
+    })
+    .catch(() => {
+      // Meta file missing or malformed — nothing to persist into.
+    });
+}
 
 function publishToSessionChannel(chatSessionId: string, data: unknown): void {
   pubsub?.publish(`session.${chatSessionId}`, data);

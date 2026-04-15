@@ -154,6 +154,18 @@ export async function startChat(
     await backfillFirstUserMessage(metaFilePath, message);
   }
 
+  // Read persisted hasUnread so the in-memory store starts with the
+  // correct value (survives server restarts).
+  let persistedHasUnread: boolean | undefined;
+  if (!isFirstTurn) {
+    try {
+      const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
+      persistedHasUnread = meta.hasUnread === true;
+    } catch {
+      // ignore — meta file may be missing or malformed
+    }
+  }
+
   // Append user message for this turn
   await appendFile(
     resultsFilePath,
@@ -167,6 +179,7 @@ export async function startChat(
     selectedImageData,
     startedAt: now,
     updatedAt: now,
+    hasUnread: persistedHasUnread,
   });
 
   // Register abort callback and mark running. If the session is

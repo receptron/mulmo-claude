@@ -12,6 +12,7 @@ interface SessionMeta {
   roleId: string;
   startedAt: string;
   firstUserMessage?: string;
+  hasUnread?: boolean;
 }
 
 async function readSessionMeta(
@@ -103,24 +104,23 @@ router.get(
               const preview = indexEntry?.title ?? meta.firstUserMessage ?? "";
 
               const live = getSession(id);
-              return {
+              const summary: SessionSummary = {
                 id,
                 roleId: meta.roleId,
                 startedAt: meta.startedAt,
                 updatedAt: new Date(fileStat.mtimeMs).toISOString(),
                 preview,
-                ...(indexEntry?.summary !== undefined && {
-                  summary: indexEntry.summary,
-                }),
-                ...(indexEntry?.keywords !== undefined && {
-                  keywords: indexEntry.keywords,
-                }),
-                ...(live && {
-                  isRunning: live.isRunning,
-                  hasUnread: live.hasUnread,
-                  statusMessage: live.statusMessage,
-                }),
+                hasUnread: live?.hasUnread ?? meta.hasUnread ?? false,
               };
+              if (indexEntry?.summary !== undefined)
+                summary.summary = indexEntry.summary;
+              if (indexEntry?.keywords !== undefined)
+                summary.keywords = indexEntry.keywords;
+              if (live) {
+                summary.isRunning = live.isRunning;
+                summary.statusMessage = live.statusMessage;
+              }
+              return summary;
             } catch {
               return null;
             }
