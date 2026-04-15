@@ -131,16 +131,56 @@ export async function startChat(
   const resultsFilePath = path.join(chatDir, `${chatSessionId}.jsonl`);
   const metaFilePath = path.join(chatDir, `${chatSessionId}.json`);
 
-  // Write or update metadata. On the first message we create the file
-  // with firstUserMessage so GET /api/sessions never needs to read the
-  // jsonl content. On subsequent turns we backfill firstUserMessage if
-  // missing (migrates pre-existing sessions).
+  // Check whether this is a brand-new session up front so we can both
+  // (a) decide whether to read persisted hasUnread (skipped for first
+  // turn — nothing on disk yet) and (b) pick meta-write vs backfill
+  // after beginRun succeeds.
   let isFirstTurn = false;
   try {
     await access(metaFilePath);
   } catch {
     isFirstTurn = true;
   }
+
+  // Read persisted hasUnread so the in-memory store starts with the
+  // correct value (survives server restarts). Must happen before
+  // getOrCreateSession; for the first turn the meta file doesn't
+  // exist yet so the value stays undefined.
+  let persistedHasUnread: boolean | undefined;
+  if (!isFirstTurn) {
+    try {
+      const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
+      persistedHasUnread = meta.hasUnread === true;
+    } catch {
+      // ignore — meta file may be missing or malformed
+    }
+  }
+
+  const now = new Date().toISOString();
+  getOrCreateSession(chatSessionId, {
+    roleId,
+    resultsFilePath,
+    selectedImageData,
+    startedAt: now,
+    updatedAt: now,
+    hasUnread: persistedHasUnread,
+  });
+
+  // Register abort callback and mark running FIRST. If the session
+  // is already running, reject with 409 before we persist anything.
+  // Writing the user message to jsonl or broadcasting it before this
+  // check leaves an orphan message on disk + in every viewing tab
+  // when the run is rejected — see #281.
+  const abortController = new AbortController();
+  const started = beginRun(chatSessionId, () => abortController.abort());
+  if (!started) {
+    return { kind: "error", error: "Session is already running", status: 409 };
+  }
+
+  // Run is committed. Now persist the user message so callers (and
+  // other tabs) see the turn. Metadata first — it powers the sidebar
+  // title cache; the append follows so the jsonl is always a
+  // superset of what metadata advertised.
   if (isFirstTurn) {
     await writeFile(
       metaFilePath,
@@ -154,50 +194,20 @@ export async function startChat(
     await backfillFirstUserMessage(metaFilePath, message);
   }
 
-  // Read persisted hasUnread so the in-memory store starts with the
-  // correct value (survives server restarts).
-  let persistedHasUnread: boolean | undefined;
-  if (!isFirstTurn) {
-    try {
-      const meta = JSON.parse(await readFile(metaFilePath, "utf-8"));
-      persistedHasUnread = meta.hasUnread === true;
-    } catch {
-      // ignore — meta file may be missing or malformed
-    }
-  }
-
   // Append user message for this turn
   await appendFile(
     resultsFilePath,
     JSON.stringify({ source: "user", type: "text", message }) + "\n",
   );
 
-  const now = new Date().toISOString();
-  getOrCreateSession(chatSessionId, {
-    roleId,
-    resultsFilePath,
-    selectedImageData,
-    startedAt: now,
-    updatedAt: now,
-    hasUnread: persistedHasUnread,
-  });
-
   // Broadcast the user message so other tabs viewing this session
-  // see the input in real time. Must come after getOrCreateSession
-  // so the session exists in the store.
+  // see the input in real time. Runs AFTER beginRun so a 409 never
+  // produces a phantom user message in other clients.
   pushSessionEvent(chatSessionId, {
     type: "text",
     source: "user",
     message,
   });
-
-  // Register abort callback and mark running. If the session is
-  // already running, reject with 409 Conflict.
-  const abortController = new AbortController();
-  const started = beginRun(chatSessionId, () => abortController.abort());
-  if (!started) {
-    return { kind: "error", error: "Session is already running", status: 409 };
-  }
 
   const role = getRole(roleId);
   const claudeSessionId = await readClaudeSessionId(
