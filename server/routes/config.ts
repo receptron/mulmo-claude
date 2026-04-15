@@ -8,6 +8,7 @@ import {
   saveSettings,
   toMcpEntries,
   type AppSettings,
+  type McpConfigFile,
   type McpServerEntry,
 } from "../config.js";
 
@@ -22,6 +23,8 @@ export interface ConfigResponse {
 export interface ConfigErrorResponse {
   error: string;
 }
+
+type ConfigRes = Response<ConfigResponse | ConfigErrorResponse>;
 
 function buildFullResponse(): ConfigResponse {
   return {
@@ -39,6 +42,52 @@ function isMcpPutBody(value: unknown): value is { servers: McpServerEntry[] } {
   return c.servers.every(
     (e) => typeof e === "object" && e !== null && "id" in e && "spec" in e,
   );
+}
+
+// Uniform error responder: prefer the exception's message (useful to
+// the client) and fall back to a static label. Used for every failure
+// path in this router to keep the JSON shape consistent.
+function sendError(
+  res: ConfigRes,
+  status: number,
+  err: unknown,
+  fallback: string,
+): void {
+  res.status(status).json({
+    error: err instanceof Error ? err.message : fallback,
+  });
+}
+
+// Parse an MCP payload through `fromMcpEntries` (which does the full
+// shape validation and throws on anything malformed). On failure,
+// respond 400 and return null so the caller can early-return.
+function parseMcpPayloadOrFail(
+  res: ConfigRes,
+  servers: McpServerEntry[],
+): McpConfigFile | null {
+  try {
+    return fromMcpEntries(servers);
+  } catch (err) {
+    sendError(res, 400, err, "invalid mcp entries");
+    return null;
+  }
+}
+
+// Run a filesystem save. On failure, respond 500 with the error's
+// message and return false so the caller can early-return. Returns
+// true on success.
+function runSaveOrFail(
+  res: ConfigRes,
+  save: () => void,
+  fallback: string,
+): boolean {
+  try {
+    save();
+    return true;
+  } catch (err) {
+    sendError(res, 500, err, fallback);
+    return false;
+  }
 }
 
 const router = Router();
@@ -65,47 +114,38 @@ function isPutConfigBody(value: unknown): value is PutConfigBody {
 
 router.put(
   "/config",
-  (
-    req: Request<unknown, unknown, PutConfigBody>,
-    res: Response<ConfigResponse | ConfigErrorResponse>,
-  ) => {
+  (req: Request<unknown, unknown, PutConfigBody>, res: ConfigRes) => {
     const body = req.body;
     if (!isPutConfigBody(body)) {
       res.status(400).json({ error: "Invalid config payload" });
       return;
     }
-    let mcpCfg;
-    try {
-      mcpCfg = fromMcpEntries(body.mcp.servers);
-    } catch (err) {
-      res.status(400).json({
-        error: err instanceof Error ? err.message : "invalid mcp entries",
-      });
-      return;
-    }
+    const mcpCfg = parseMcpPayloadOrFail(res, body.mcp.servers);
+    if (!mcpCfg) return;
+
     // Snapshot previous settings so we can roll back if the second
     // write fails — a cross-file atomic write isn't possible, but
     // rollback keeps the pair consistent from the user's perspective.
     const previousSettings = loadSettings();
-    try {
-      saveSettings(body.settings);
-    } catch (err) {
-      res.status(500).json({
-        error: err instanceof Error ? err.message : "saveSettings failed",
-      });
+    if (
+      !runSaveOrFail(
+        res,
+        () => saveSettings(body.settings),
+        "saveSettings failed",
+      )
+    ) {
       return;
     }
-    try {
-      saveMcpConfig(mcpCfg);
-    } catch (err) {
+    if (
+      !runSaveOrFail(res, () => saveMcpConfig(mcpCfg), "saveMcpConfig failed")
+    ) {
+      // Best-effort rollback; if it fails too, the original mcp error
+      // is already on the wire.
       try {
         saveSettings(previousSettings);
       } catch {
-        // If rollback fails too, surface the original mcp error.
+        /* swallow — original error already sent */
       }
-      res.status(500).json({
-        error: err instanceof Error ? err.message : "saveMcpConfig failed",
-      });
       return;
     }
     res.json(buildFullResponse());
@@ -114,21 +154,13 @@ router.put(
 
 router.put(
   "/config/settings",
-  (
-    req: Request<unknown, unknown, AppSettings>,
-    res: Response<ConfigResponse | ConfigErrorResponse>,
-  ) => {
+  (req: Request<unknown, unknown, AppSettings>, res: ConfigRes) => {
     const body = req.body;
     if (!isAppSettings(body)) {
       res.status(400).json({ error: "Invalid AppSettings payload" });
       return;
     }
-    try {
-      saveSettings(body);
-    } catch (err) {
-      res.status(500).json({
-        error: err instanceof Error ? err.message : "saveSettings failed",
-      });
+    if (!runSaveOrFail(res, () => saveSettings(body), "saveSettings failed")) {
       return;
     }
     res.json(buildFullResponse());
@@ -139,7 +171,7 @@ router.put(
   "/config/mcp",
   (
     req: Request<unknown, unknown, { servers: McpServerEntry[] }>,
-    res: Response<ConfigResponse | ConfigErrorResponse>,
+    res: ConfigRes,
   ) => {
     const body = req.body;
     if (!isMcpPutBody(body)) {
@@ -148,21 +180,9 @@ router.put(
     }
     // fromMcpEntries rejects malformed client input (400). saveMcpConfig
     // can fail for server-side reasons like disk/permission errors (500).
-    let cfg;
-    try {
-      cfg = fromMcpEntries(body.servers);
-    } catch (err) {
-      res.status(400).json({
-        error: err instanceof Error ? err.message : "invalid mcp entries",
-      });
-      return;
-    }
-    try {
-      saveMcpConfig(cfg);
-    } catch (err) {
-      res.status(500).json({
-        error: err instanceof Error ? err.message : "saveMcpConfig failed",
-      });
+    const cfg = parseMcpPayloadOrFail(res, body.servers);
+    if (!cfg) return;
+    if (!runSaveOrFail(res, () => saveMcpConfig(cfg), "saveMcpConfig failed")) {
       return;
     }
     res.json(buildFullResponse());
