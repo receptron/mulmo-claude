@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  extractSlugFromBulletHref,
   findBrokenLinksInPage,
   findMissingFiles,
   findOrphanPages,
@@ -34,6 +35,42 @@ describe("wikiSlugify", () => {
 
   it("handles empty input", () => {
     assert.equal(wikiSlugify(""), "");
+  });
+});
+
+describe("extractSlugFromBulletHref", () => {
+  it("extracts slug from pages/<slug>.md", () => {
+    assert.equal(
+      extractSlugFromBulletHref("pages/sakura-internet.md"),
+      "sakura-internet",
+    );
+  });
+
+  it("handles leading ./ and deeper prefixes", () => {
+    assert.equal(extractSlugFromBulletHref("./pages/foo.md"), "foo");
+    assert.equal(extractSlugFromBulletHref("wiki/pages/foo.md"), "foo");
+  });
+
+  it("accepts a bare <slug>.md without the pages prefix", () => {
+    assert.equal(extractSlugFromBulletHref("foo.md"), "foo");
+  });
+
+  it("accepts just <slug> with no .md extension", () => {
+    assert.equal(extractSlugFromBulletHref("foo"), "foo");
+  });
+
+  it("strips surrounding whitespace", () => {
+    assert.equal(extractSlugFromBulletHref("  pages/foo.md  "), "foo");
+  });
+
+  it("returns empty for absolute URLs (caller should fall back)", () => {
+    assert.equal(extractSlugFromBulletHref("https://example.com/foo"), "");
+    assert.equal(extractSlugFromBulletHref("http://x/foo.md"), "");
+  });
+
+  it("returns empty for an empty input", () => {
+    assert.equal(extractSlugFromBulletHref(""), "");
+    assert.equal(extractSlugFromBulletHref("   "), "");
   });
 });
 
@@ -74,6 +111,45 @@ describe("parseIndexEntries", () => {
       slug: "video-generation",
       description: "about video",
     });
+  });
+
+  it("derives slug from href for non-ASCII titles", () => {
+    // Regression for the Japanese-wiki case: before, the slug was
+    // `wikiSlugify(title)` which stripped every non-ASCII character
+    // and returned "", breaking in-canvas navigation. The slug must
+    // now come from the href segment.
+    const md =
+      "- [さくらインターネット](pages/sakura-internet.md) — クラウド事業者";
+    const entries = parseIndexEntries(md);
+    assert.deepEqual(entries[0], {
+      title: "さくらインターネット",
+      slug: "sakura-internet",
+      description: "クラウド事業者",
+    });
+  });
+
+  it("derives slug from a bare filename href", () => {
+    // Some historical index.md files used `[Title](slug.md)` without
+    // the `pages/` prefix. Still valid — use the filename as slug.
+    const md = "- [Video Generation](video-generation.md) — about video";
+    const entries = parseIndexEntries(md);
+    assert.equal(entries[0]?.slug, "video-generation");
+  });
+
+  it("derives slug from a plain filename with no extension", () => {
+    const md = "- [Video Generation](video-generation) — about video";
+    const entries = parseIndexEntries(md);
+    assert.equal(entries[0]?.slug, "video-generation");
+  });
+
+  it("falls back to slugifying the title when the href is an external URL", () => {
+    // External URLs have no wiki-page slug, so the old title-derived
+    // slug is the only reasonable choice. For non-ASCII titles this
+    // still produces "" — but that's fine: such a row isn't a
+    // real wiki page entry in the first place.
+    const md = "- [Video Generation](https://example.com/xyz) — about video";
+    const entries = parseIndexEntries(md);
+    assert.equal(entries[0]?.slug, "video-generation");
   });
 
   it("parses bullet wiki links", () => {

@@ -30,14 +30,17 @@ You never write the wiki yourself — Claude writes and maintains all of it. You
 ## Three Operations
 
 ### Ingest
+
 Drop a source (article, URL, text) and ask Claude to process it.
 
 Claude will: read the source, identify key entities and concepts, create or update 5–15 wiki pages, add cross-references, append a log entry, and refresh the index. Show the updated index in the canvas when done.
 
 ### Query
+
 Ask any question. Claude searches `wiki/index.md` for relevant pages, reads them, and synthesizes a grounded answer with citations. Good answers can be filed back into the wiki as new pages — a comparison you asked for, an analysis, a connection you discovered — so they don't disappear into chat history.
 
 ### Lint
+
 Ask Claude to health-check the wiki. It scans for contradictions, stale claims, orphan pages, missing cross-references, and concepts that deserve their own page, then fixes issues automatically.
 
 ## Folder Layout
@@ -83,6 +86,32 @@ Brief summary paragraph...
 
 Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyphen-separated (e.g. `transformer-architecture.md`).
 
+## `index.md` Format
+
+`wiki/index.md` is the catalog — one bullet per page using standard markdown link syntax with the slug embedded in the href. This format works both in-app (the canvas parses it) and in any plain markdown viewer (GitHub, VS Code preview, etc.).
+
+```markdown
+# Wiki Index
+
+## ページ一覧
+
+- [Transformer Architecture](pages/transformer-architecture.md) — machine-learning, architecture, attention (2026-04-05)
+- [さくらインターネット](pages/sakura-internet.md) — クラウド, 日本企業, データセンター (2026-04-06)
+- [ECharts DataZoom](pages/echarts-datazoom.md) — ECharts, データ可視化 (2026-04-13)
+
+## タグ一覧
+
+- **AI**: [Transformer Architecture](pages/transformer-architecture.md), [さくらインターネット](pages/sakura-internet.md)
+- **日本企業**: [さくらインターネット](pages/sakura-internet.md)
+```
+
+Key rules:
+
+- Always write bullet items as `[Title](pages/<slug>.md) — description (YYYY-MM-DD)` — **no** `[[slug]]` wiki-link form, and **no** markdown tables. The canvas parser extracts the slug from the href so non-ASCII titles (日本語, etc.) keep a navigable slug.
+- Slugs are lowercase ASCII, hyphen-separated. They match the page filename one-to-one (`pages/sakura-internet.md` → slug `sakura-internet`).
+- Group by category if useful, then include a "タグ一覧" / "Tags" section with the same `[Title](pages/<slug>.md)` link form so every mention is clickable.
+- Keep the index in sync with `pages/` — when you add a page, add a row; when you rename a file, update every link that points at it.
+
 ## Canvas Tool
 
 Use the `manageWiki` tool to display wiki content in the canvas:
@@ -94,9 +123,9 @@ Use the `manageWiki` tool to display wiki content in the canvas:
 
 ## Relationship to `memory.md`
 
-| | `memory.md` | `wiki/` |
-|---|---|---|
-| Scope | Brief distilled facts, always in context | Deep structured knowledge, loaded on demand |
-| Growth | Intentionally small | Grows unboundedly |
+|        | `memory.md`                              | `wiki/`                                     |
+| ------ | ---------------------------------------- | ------------------------------------------- |
+| Scope  | Brief distilled facts, always in context | Deep structured knowledge, loaded on demand |
+| Growth | Intentionally small                      | Grows unboundedly                           |
 
 Over time, Claude can distill key insights from the wiki back into `memory.md` as compact ambient context for all roles.

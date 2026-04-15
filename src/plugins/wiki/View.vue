@@ -113,7 +113,7 @@
         v-for="entry in pageEntries"
         :key="entry.slug"
         class="rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
-        @click="navigatePage(entry.title)"
+        @click="navigatePage(entry.slug || entry.title)"
       >
         <div class="font-medium text-sm text-gray-800">{{ entry.title }}</div>
         <div v-if="entry.description" class="text-xs text-gray-500 mt-0.5">

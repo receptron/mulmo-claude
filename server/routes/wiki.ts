@@ -37,7 +37,12 @@ export function wikiSlugify(text: string): string {
 }
 
 const TABLE_SEPARATOR_PATTERN = /^\|[\s|:-]+\|$/;
-const BULLET_LINK_PATTERN = /^[-*]\s+\[([^\]]+)\]\([^)]*\)(?:\s*[—–-]\s*(.*))?/;
+// Capture the href (group 2) alongside the title (group 1) so we can
+// derive the slug from the file name instead of re-slugifying the
+// title. This matters for non-ASCII titles like "さくらインターネット"
+// where `wikiSlugify` returns "" and the slug would otherwise be lost.
+const BULLET_LINK_PATTERN =
+  /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
 const BULLET_WIKI_LINK_PATTERN = /^[-*]\s+\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?/;
 
 // Each parser returns the entry it produced (if any). The parent
@@ -55,12 +60,32 @@ function parseTableRow(trimmed: string): WikiPageEntry | null {
   return { title, slug, description: desc };
 }
 
+// Extract the slug segment from a bullet link's href. Accepts the
+// canonical `pages/<slug>.md`, a bare `<slug>.md`, or just `<slug>`
+// — the three forms produced by different historical writers of
+// index.md. Returns "" for hrefs that don't look like a wiki page
+// reference (e.g. `https://example.com`) so the caller can fall
+// back to title-based slugification.
+export function extractSlugFromBulletHref(rawHref: string): string {
+  const href = rawHref.trim();
+  if (!href) return "";
+  if (/^[a-z]+:\/\//i.test(href)) return "";
+  const lastSegment = href.split("/").pop() ?? href;
+  return lastSegment.replace(/\.md$/i, "");
+}
+
 function parseBulletLinkRow(trimmed: string): WikiPageEntry | null {
   const m = BULLET_LINK_PATTERN.exec(trimmed);
   if (!m) return null;
   const title = m[1].trim();
-  const desc = m[2]?.trim() ?? "";
-  return { title, slug: wikiSlugify(title), description: desc };
+  const href = m[2] ?? "";
+  const desc = m[3]?.trim() ?? "";
+  // Prefer the slug embedded in the href so non-ASCII titles keep
+  // a navigable slug. Fall back to slugifying the title only when
+  // the href has no recognisable slug (rare — usually means the
+  // author put an external URL here).
+  const slug = extractSlugFromBulletHref(href) || wikiSlugify(title);
+  return { title, slug, description: desc };
 }
 
 function parseBulletWikiLinkRow(trimmed: string): WikiPageEntry | null {
