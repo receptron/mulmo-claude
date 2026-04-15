@@ -118,7 +118,7 @@ export function saveSettings(settings: AppSettings): void {
 //   { "mcpServers": { "<id>": <McpServerSpec> } }
 //
 // A server is either HTTP (remote, always Docker-safe) or stdio
-// (local command). See plans/feat-web-settings-ui.md for Phase 2a /
+// (local command). See plans/done/feat-web-settings-ui.md for Phase 2a /
 // 2b scope notes.
 
 export interface McpHttpSpec {

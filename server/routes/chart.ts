@@ -7,7 +7,7 @@ import { errorMessage } from "../utils/errors.js";
 
 const router = Router();
 
-// See plans/feat-chart-plugin.md for the full design. The LLM sends an
+// See plans/done/feat-chart-plugin.md for the full design. The LLM sends an
 // ECharts option object per chart; we persist the whole document to
 // <workspace>/charts/<slug>-<timestamp>.chart.json so it can be
 // browsed in the files explorer and (eventually) wikified.

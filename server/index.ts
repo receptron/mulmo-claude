@@ -62,14 +62,14 @@ app.disable("x-powered-by");
 // `localhost:3001` but the browser refuses to expose the
 // response to the calling script (no
 // `Access-Control-Allow-Origin` header). See
-// plans/fix-server-lockdown-cors-localhost.md for the threat
+// plans/done/fix-server-lockdown-cors-localhost.md for the threat
 // model.
 app.use(express.json({ limit: "50mb" }));
 // CSRF guard: reject state-changing requests that arrive with a
 // non-localhost Origin header. Allows missing Origin (server-to-
 // server / CLI callers) because the listener is already bound to
 // localhost (#148); if that ever changes, tighten this middleware
-// too. See plans/fix-server-csrf-origin-check.md.
+// too. See plans/done/fix-server-csrf-origin-check.md.
 app.use(requireSameOrigin);
 
 app.get("/api/health", (_req: Request, res: Response) => {
