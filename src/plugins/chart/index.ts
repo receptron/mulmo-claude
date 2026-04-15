@@ -1,7 +1,9 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
+import { apiPost } from "../../utils/api";
 
 export interface ChartEntry {
   title?: string;
@@ -24,39 +26,22 @@ const presentChartPlugin: ToolPlugin<PresentChartData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    try {
-      const res = await fetch("/api/present-chart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
-      });
-      if (!res.ok) {
-        // Server responds with { error: string }; fall back to
-        // statusText if the body is missing or malformed.
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-          message?: string;
-        } | null;
-        const message = body?.error ?? body?.message ?? res.statusText;
-        return {
-          toolName: TOOL_NAME,
-          uuid: crypto.randomUUID(),
-          error: message,
-        };
-      }
-      const result = await res.json();
-      return {
-        ...result,
-        toolName: TOOL_NAME,
-        uuid: crypto.randomUUID(),
-      };
-    } catch (error) {
+    const result = await apiPost<ToolResult<PresentChartData>>(
+      "/api/present-chart",
+      args,
+    );
+    if (!result.ok) {
       return {
         toolName: TOOL_NAME,
         uuid: crypto.randomUUID(),
-        error: error instanceof Error ? error.message : String(error),
+        message: result.error,
       };
     }
+    return {
+      ...result.data,
+      toolName: TOOL_NAME,
+      uuid: crypto.randomUUID(),
+    };
   },
 
   isEnabled: () => true,

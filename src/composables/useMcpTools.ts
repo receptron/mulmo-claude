@@ -11,6 +11,7 @@ import {
   toolDescriptionsFor,
   type ToolDefinitionMetadata,
 } from "../utils/tools/mcp";
+import { apiGet } from "../utils/api";
 
 interface UseMcpToolsOptions {
   currentRole: ComputedRef<Role>;
@@ -40,20 +41,19 @@ export function useMcpTools(opts: UseMcpToolsOptions) {
   );
 
   async function fetchMcpToolsStatus(): Promise<void> {
-    try {
-      const res = await fetch("/api/mcp-tools");
-      if (!res.ok) return;
-      const tools: { name: string; enabled: boolean; prompt?: string }[] =
-        await res.json();
-      disabledMcpTools.value = new Set(
-        tools.filter((t) => !t.enabled).map((t) => t.name),
+    const result =
+      await apiGet<{ name: string; enabled: boolean; prompt?: string }[]>(
+        "/api/mcp-tools",
       );
-      mcpToolDescriptions.value = Object.fromEntries(
-        tools.filter((t) => t.prompt).map((t) => [t.name, t.prompt as string]),
-      );
-    } catch {
-      // ignore — all tools remain visible if the fetch fails
-    }
+    // ignore failures — all tools remain visible if the fetch fails
+    if (!result.ok) return;
+    const tools = result.data;
+    disabledMcpTools.value = new Set(
+      tools.filter((t) => !t.enabled).map((t) => t.name),
+    );
+    mcpToolDescriptions.value = Object.fromEntries(
+      tools.filter((t) => t.prompt).map((t) => [t.name, t.prompt as string]),
+    );
   }
 
   return {

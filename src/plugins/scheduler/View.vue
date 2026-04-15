@@ -335,6 +335,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { apiPost } from "../../utils/api";
 
 type YamlScalar = string | number | boolean | null;
 
@@ -627,24 +628,19 @@ const parseError = ref("");
 const isModified = computed(() => editorText.value !== toJson(items.value));
 
 async function callApi(body: Record<string, unknown>): Promise<boolean> {
-  try {
-    const response = await fetch("/api/scheduler", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) return false;
-    const result = await response.json();
-    items.value = result.data?.items ?? [];
-    emit("updateResult", {
-      ...props.selectedResult,
-      ...result,
-      uuid: props.selectedResult.uuid,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const response = await apiPost<{ data?: { items?: ScheduledItem[] } }>(
+    "/api/scheduler",
+    body,
+  );
+  if (!response.ok) return false;
+  const result = response.data;
+  items.value = result.data?.items ?? [];
+  emit("updateResult", {
+    ...props.selectedResult,
+    ...result,
+    uuid: props.selectedResult.uuid,
+  });
+  return true;
 }
 
 function remove(item: ScheduledItem) {

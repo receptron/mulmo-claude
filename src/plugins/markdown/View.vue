@@ -90,6 +90,7 @@ import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { resolveImageSrc } from "../../utils/image/resolve";
 import { usePdfDownload } from "../../composables/usePdfDownload";
+import { apiGet, apiPut } from "../../utils/api";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -117,24 +118,18 @@ async function fetchMarkdownContent(): Promise<void> {
   }
   if (isFilePath(raw)) {
     loading.value = true;
-    try {
-      const res = await fetch(
-        `/api/files/content?path=${encodeURIComponent(raw)}`,
-      );
-      if (!res.ok) {
-        console.error("Failed to fetch markdown:", res.statusText);
-        markdownContent.value = "";
-        editableMarkdown.value = "";
-        return;
-      }
-      const json: { content?: string } = await res.json();
-      markdownContent.value = json.content ?? "";
-    } catch (err) {
-      console.error("Failed to fetch markdown:", err);
+    const result = await apiGet<{ content?: string }>("/api/files/content", {
+      path: raw,
+    });
+    if (!result.ok) {
+      console.error("Failed to fetch markdown:", result.error);
       markdownContent.value = "";
-    } finally {
+      editableMarkdown.value = "";
       loading.value = false;
+      return;
     }
+    markdownContent.value = result.data.content ?? "";
+    loading.value = false;
   } else {
     // Legacy inline content
     markdownContent.value = raw;
@@ -240,22 +235,14 @@ async function applyMarkdown() {
   // If file-based, save to server
   if (isFilePath(raw)) {
     saving.value = true;
-    try {
-      const filename = raw.replace(/^markdowns\//, "");
-      const res = await fetch(`/api/markdowns/${filename}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: editableMarkdown.value }),
-      });
-      if (!res.ok) {
-        saveError.value = `Save failed: ${res.status} ${res.statusText}`;
-        return;
-      }
-    } catch (err) {
-      saveError.value = `Save failed: ${err instanceof Error ? err.message : String(err)}`;
+    const filename = raw.replace(/^markdowns\//, "");
+    const result = await apiPut<unknown>(`/api/markdowns/${filename}`, {
+      markdown: editableMarkdown.value,
+    });
+    saving.value = false;
+    if (!result.ok) {
+      saveError.value = `Save failed: ${result.error}`;
       return;
-    } finally {
-      saving.value = false;
     }
   }
 

@@ -237,6 +237,7 @@ import FileTree, { type TreeNode } from "./FileTree.vue";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
+import { apiGet } from "../utils/api";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
@@ -528,26 +529,24 @@ async function loadDirChildren(path: string): Promise<void> {
   next.set(path, null);
   childrenByPath.value = next;
 
-  try {
-    const url = `/api/files/dir?path=${encodeURIComponent(path)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`dir: ${res.status}`);
-    const node: TreeNode = await res.json();
-    const updated = new Map(childrenByPath.value);
-    updated.set(path, node.children ?? []);
-    childrenByPath.value = updated;
-    // Also expose the root dir's own metadata (name / path /
-    // modifiedMs) for the FileTree header — only relevant for the
-    // workspace root, which the tree renders as "(workspace)".
-    if (path === "") rootNode.value = { ...node, children: [] };
-  } catch (err) {
+  const result = await apiGet<TreeNode>("/api/files/dir", { path });
+  if (!result.ok) {
     // Drop the `null` marker so the user can retry (e.g. via the
     // refresh-token watcher). Keep the error visible too.
     const rollback = new Map(childrenByPath.value);
     rollback.delete(path);
     childrenByPath.value = rollback;
-    treeError.value = err instanceof Error ? err.message : String(err);
+    treeError.value = result.error || `dir: ${result.status}`;
+    return;
   }
+  const node = result.data;
+  const updated = new Map(childrenByPath.value);
+  updated.set(path, node.children ?? []);
+  childrenByPath.value = updated;
+  // Also expose the root dir's own metadata (name / path /
+  // modifiedMs) for the FileTree header — only relevant for the
+  // workspace root, which the tree renders as "(workspace)".
+  if (path === "") rootNode.value = { ...node, children: [] };
 }
 
 // Walk each ancestor of a file path and expand + load it. Used on
@@ -589,28 +588,23 @@ async function loadContent(filePath: string): Promise<void> {
   contentLoading.value = true;
   contentError.value = null;
   content.value = null;
-  try {
-    const res = await fetch(
-      `/api/files/content?path=${encodeURIComponent(filePath)}`,
-      { signal: controller.signal },
-    );
+  const result = await apiGet<FileContent>(
+    "/api/files/content",
+    { path: filePath },
+    { signal: controller.signal },
+  );
+  if (controller.signal.aborted) return;
+  if (!result.ok) {
+    // AbortController cancellations come back as network errors
+    // (status 0); swallow them just like the old try/catch did.
     if (controller.signal.aborted) return;
-    if (!res.ok) {
-      const errBody: { error?: string } = await res.json().catch(() => ({}));
-      throw new Error(errBody.error ?? `HTTP ${res.status}`);
-    }
-    const body: FileContent = await res.json();
-    if (controller.signal.aborted) return;
-    content.value = body;
-  } catch (err) {
-    if (controller.signal.aborted) return;
-    if (err instanceof DOMException && err.name === "AbortError") return;
-    contentError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    if (contentAbort === controller) {
-      contentLoading.value = false;
-      contentAbort = null;
-    }
+    contentError.value = result.error;
+  } else {
+    content.value = result.data;
+  }
+  if (contentAbort === controller) {
+    contentLoading.value = false;
+    contentAbort = null;
   }
 }
 

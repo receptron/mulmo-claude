@@ -372,6 +372,7 @@ import { useQueriesPanel } from "./composables/useQueriesPanel";
 import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
+import { apiGet, apiPost, apiFetchRaw } from "./utils/api";
 
 // --- Debug beat (pub/sub) ---
 const debugBeatColor = ref<string | null>(null);
@@ -415,36 +416,15 @@ async function refreshSessionStates(): Promise<void> {
 }
 
 async function markSessionRead(id: string): Promise<void> {
-  try {
-    const res = await fetch(
-      `/api/sessions/${encodeURIComponent(id)}/mark-read`,
-      { method: "POST" },
-    );
-    // The server returns `{ ok: boolean }` — a 200 with `ok: false`
-    // means the endpoint was reached but the flag wasn't actually
-    // cleared (e.g. session not found). Treat that the same as a
-    // transport failure and refetch so the sidebar doesn't go stale.
-    let appLevelOk = true;
-    if (res.ok) {
-      try {
-        const body: unknown = await res.json();
-        if (
-          body !== null &&
-          typeof body === "object" &&
-          (body as { ok?: unknown }).ok === false
-        ) {
-          appLevelOk = false;
-        }
-      } catch {
-        // Body wasn't JSON — treat as failure.
-        appLevelOk = false;
-      }
-    }
-    if (!res.ok || !appLevelOk) {
-      // Server didn't clear the flag — refetch to restore truth.
-      await refreshSessionStates();
-    }
-  } catch {
+  const result = await apiPost<{ ok: boolean }>(
+    `/api/sessions/${encodeURIComponent(id)}/mark-read`,
+  );
+  // The server returns `{ ok: boolean }` — a 200 with `ok: false`
+  // means the endpoint was reached but the flag wasn't actually
+  // cleared (e.g. session not found). Treat that the same as a
+  // transport failure and refetch so the sidebar doesn't go stale.
+  if (!result.ok || result.data.ok === false) {
+    // Server didn't clear the flag — refetch to restore truth.
     await refreshSessionStates();
   }
 }
@@ -937,41 +917,33 @@ function onRoleChange() {
 // replace / augment it in the normal way.
 async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
   if (session.roleId !== "sourceManager") return;
-  try {
-    const res = await fetch("/api/sources");
-    if (!res.ok) {
-      if (session.toolResults.length === 0) {
-        pushErrorMessage(
-          session,
-          `Could not preload sources (HTTP ${res.status}). Ask Claude to list them, or check the server log.`,
-        );
-      }
-      return;
-    }
-    const body = (await res.json()) as { sources?: unknown[] };
-    const result: ToolResultComplete = {
-      uuid: uuidv4(),
-      toolName: "manageSource",
-      message: "Loaded source registry.",
-      title: "Information sources",
-      data: { sources: body.sources ?? [] },
-    };
-    // Skip if the user has already produced their own result in the
-    // meantime (fast typer + slow fetch race).
-    if (session.toolResults.length > 0) return;
-    session.toolResults.push(result);
-    session.selectedResultUuid = result.uuid;
-  } catch (err) {
+  const response = await apiGet<{ sources?: unknown[] }>("/api/sources");
+  if (!response.ok) {
     // Non-fatal: the Add / Rebuild buttons remain reachable via
     // chat as soon as the user sends any message. Still surface
     // a visible hint so the blank canvas isn't a mystery.
     if (session.toolResults.length === 0) {
+      const detail =
+        response.status === 0 ? response.error : `HTTP ${response.status}`;
       pushErrorMessage(
         session,
-        `Could not preload sources: ${err instanceof Error ? err.message : String(err)}`,
+        `Could not preload sources (${detail}). Ask Claude to list them, or check the server log.`,
       );
     }
+    return;
   }
+  const result: ToolResultComplete = {
+    uuid: uuidv4(),
+    toolName: "manageSource",
+    message: "Loaded source registry.",
+    title: "Information sources",
+    data: { sources: response.data.sources ?? [] },
+  };
+  // Skip if the user has already produced their own result in the
+  // meantime (fast typer + slow fetch race).
+  if (session.toolResults.length > 0) return;
+  session.toolResults.push(result);
+  session.selectedResultUuid = result.uuid;
 }
 
 async function loadSession(id: string) {
@@ -997,9 +969,9 @@ async function loadSession(id: string) {
   }
 
   // Load from server
-  const res = await fetch(`/api/sessions/${id}`);
-  if (!res.ok) return;
-  const entries: SessionEntry[] = await res.json();
+  const response = await apiGet<SessionEntry[]>(`/api/sessions/${id}`);
+  if (!response.ok) return;
+  const entries = response.data;
 
   const meta = entries.find((e) => e.type === "session_meta");
   const roleId = meta?.roleId ?? currentRoleId.value;
@@ -1203,9 +1175,8 @@ async function sendMessage(text?: string) {
   ensureSessionSubscription(session, runStartIndex);
 
   try {
-    const response = await fetch("/api/agent", {
+    const response = await apiFetchRaw("/api/agent", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
         buildAgentRequestBody({
           message,
@@ -1214,6 +1185,7 @@ async function sendMessage(text?: string) {
           selectedImageData: extractImageData(selectedRes),
         }),
       ),
+      headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {

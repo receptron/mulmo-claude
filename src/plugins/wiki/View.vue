@@ -141,6 +141,7 @@ import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { renderWikiLinks } from "./helpers";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
+import { apiPost, apiFetchRaw } from "../../utils/api";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<WikiData>;
@@ -204,25 +205,22 @@ const pdfError = ref<string | null>(null);
 
 async function callApi(body: Record<string, unknown>) {
   navError.value = null;
-  let response: Response;
-  try {
-    response = await fetch("/api/wiki", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch (err) {
-    navError.value = err instanceof Error ? err.message : String(err);
-    return;
-  }
-
+  const response = await apiPost<{
+    data?: {
+      action?: string;
+      title?: string;
+      content?: string;
+      pageEntries?: WikiPageEntry[];
+    };
+  }>("/api/wiki", body);
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    navError.value = `Wiki API error ${response.status}: ${text}`;
+    navError.value =
+      response.status === 0
+        ? response.error
+        : `Wiki API error ${response.status}: ${response.error}`;
     return;
   }
-
-  const result = await response.json();
+  const result = response.data;
   action.value = result.data?.action ?? "index";
   title.value = result.data?.title ?? "Wiki";
   content.value = result.data?.content ?? "";
@@ -248,13 +246,13 @@ async function downloadPdf() {
   pdfDownloading.value = true;
   let response: Response;
   try {
-    response = await fetch("/api/pdf/markdown", {
+    response = await apiFetchRaw("/api/pdf/markdown", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         markdown: content.value,
         filename: `${title.value}.pdf`,
       }),
+      headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     pdfError.value = err instanceof Error ? err.message : String(err);

@@ -1,40 +1,31 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import toolDefinition, { TOOL_NAME } from "./definition";
 import type { ImageToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
+import { apiPost } from "../../utils/api";
 
 const editImagePlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    try {
-      const res = await fetch("/api/edit-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: res.statusText }));
-        return {
-          toolName: TOOL_NAME,
-          uuid: crypto.randomUUID(),
-          error: (err as { message?: string }).message ?? res.statusText,
-        };
-      }
-      const result = await res.json();
-      return {
-        ...result,
-        toolName: TOOL_NAME,
-        uuid: crypto.randomUUID(),
-      };
-    } catch (error) {
+    const result = await apiPost<ToolResult<ImageToolData>>(
+      "/api/edit-image",
+      args,
+    );
+    if (!result.ok) {
       return {
         toolName: TOOL_NAME,
         uuid: crypto.randomUUID(),
-        error: error instanceof Error ? error.message : String(error),
+        message: result.error,
       };
     }
+    return {
+      ...result.data,
+      toolName: TOOL_NAME,
+      uuid: crypto.randomUUID(),
+    };
   },
 
   isEnabled: () => true,

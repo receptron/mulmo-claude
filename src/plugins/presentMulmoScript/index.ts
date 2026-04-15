@@ -1,8 +1,10 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import type { MulmoScript } from "mulmocast";
 import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
+import { apiPost } from "../../utils/api";
 
 export interface MulmoScriptData {
   script: MulmoScript;
@@ -13,25 +15,22 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    try {
-      const res = await fetch("/api/mulmo-script", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
-      });
-      const result = await res.json();
-      return {
-        ...result,
-        toolName: TOOL_NAME,
-        uuid: crypto.randomUUID(),
-      };
-    } catch (error) {
+    const result = await apiPost<ToolResult<MulmoScriptData>>(
+      "/api/mulmo-script",
+      args,
+    );
+    if (!result.ok) {
       return {
         toolName: TOOL_NAME,
         uuid: crypto.randomUUID(),
-        error: error instanceof Error ? error.message : String(error),
+        message: result.error,
       };
     }
+    return {
+      ...result.data,
+      toolName: TOOL_NAME,
+      uuid: crypto.randomUUID(),
+    };
   },
 
   isEnabled: () => true,
@@ -41,4 +40,3 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
 };
 
 export default presentMulmoScriptPlugin;
-export { TOOL_NAME };

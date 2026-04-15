@@ -1,7 +1,9 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
+import { apiPost } from "../../utils/api";
 
 export interface ScheduledItem {
   id: string;
@@ -18,16 +20,21 @@ const schedulerPlugin: ToolPlugin<SchedulerData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const response = await fetch("/api/scheduler", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args),
-    });
-    const result = await response.json();
+    const result = await apiPost<ToolResult<SchedulerData>>(
+      "/api/scheduler",
+      args,
+    );
+    if (!result.ok) {
+      return {
+        toolName: "manageScheduler",
+        uuid: crypto.randomUUID(),
+        message: result.error,
+      };
+    }
     return {
-      ...result,
+      ...result.data,
       toolName: "manageScheduler",
-      uuid: result.uuid ?? crypto.randomUUID(),
+      uuid: result.data.uuid ?? crypto.randomUUID(),
     };
   },
 

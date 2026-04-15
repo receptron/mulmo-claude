@@ -104,6 +104,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSkillsData, SkillSummary } from "./index";
 import { useAppApi } from "../../composables/useAppApi";
+import { apiGet, apiDelete } from "../../utils/api";
 
 interface SkillDetail {
   name: string;
@@ -152,21 +153,16 @@ watch(
     }
     detailLoading.value = true;
     detailError.value = null;
-    try {
-      const res = await fetch(`/api/skills/${encodeURIComponent(name)}`);
-      if (!res.ok) {
-        detailError.value = `Failed to load skill: ${res.statusText}`;
-        detail.value = null;
-        return;
-      }
-      const body: { skill: SkillDetail } = await res.json();
-      detail.value = body.skill;
-    } catch (err) {
-      detailError.value = err instanceof Error ? err.message : String(err);
+    const response = await apiGet<{ skill: SkillDetail }>(
+      `/api/skills/${encodeURIComponent(name)}`,
+    );
+    if (!response.ok) {
+      detailError.value = `Failed to load skill: ${response.error}`;
       detail.value = null;
-    } finally {
-      detailLoading.value = false;
+    } else {
+      detail.value = response.data.skill;
     }
+    detailLoading.value = false;
   },
   { immediate: true },
 );
@@ -197,26 +193,20 @@ async function deleteSkill(): Promise<void> {
     return;
   }
   deleting.value = true;
-  try {
-    const res = await fetch(`/api/skills/${encodeURIComponent(name)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      detailError.value = body.error ?? `Failed to delete: ${res.statusText}`;
-      return;
-    }
-    // Remove from the local list, advance selection, clear detail.
-    const idx = skills.value.findIndex((s) => s.name === name);
-    if (idx >= 0) {
-      skills.value.splice(idx, 1);
-    }
-    selectedName.value = skills.value[0]?.name ?? null;
-    detail.value = null;
-  } catch (err) {
-    detailError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    deleting.value = false;
+  const result = await apiDelete<unknown>(
+    `/api/skills/${encodeURIComponent(name)}`,
+  );
+  deleting.value = false;
+  if (!result.ok) {
+    detailError.value = result.error || "Failed to delete";
+    return;
   }
+  // Remove from the local list, advance selection, clear detail.
+  const idx = skills.value.findIndex((s) => s.name === name);
+  if (idx >= 0) {
+    skills.value.splice(idx, 1);
+  }
+  selectedName.value = skills.value[0]?.name ?? null;
+  detail.value = null;
 }
 </script>

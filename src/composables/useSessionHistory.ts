@@ -8,6 +8,7 @@
 
 import { ref, type Ref } from "vue";
 import type { SessionSummary } from "../types/session";
+import { apiGet } from "../utils/api";
 
 export function useSessionHistory(): {
   sessions: Ref<SessionSummary[]>;
@@ -19,15 +20,13 @@ export function useSessionHistory(): {
   const showHistory = ref(false);
 
   async function fetchSessions(): Promise<SessionSummary[]> {
-    try {
-      const res = await fetch("/api/sessions");
-      const data: SessionSummary[] = await res.json();
-      sessions.value = data;
-      return data;
-    } catch {
+    const result = await apiGet<SessionSummary[]>("/api/sessions");
+    if (!result.ok) {
       sessions.value = [];
       return [];
     }
+    sessions.value = result.data;
+    return result.data;
   }
 
   async function toggleHistory(): Promise<void> {

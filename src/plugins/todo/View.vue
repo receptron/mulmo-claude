@@ -157,6 +157,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { apiPost } from "../../utils/api";
 import {
   colorForLabel,
   filterByLabels,
@@ -410,24 +411,19 @@ async function applyItemEdit() {
 // ── API ───────────────────────────────────────────────────────────────────────
 
 async function callApi(body: Record<string, unknown>): Promise<boolean> {
-  try {
-    const response = await fetch("/api/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) return false;
-    const result = await response.json();
-    items.value = result.data?.items ?? [];
-    emit("updateResult", {
-      ...props.selectedResult,
-      ...result,
-      uuid: props.selectedResult.uuid,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const response = await apiPost<{ data?: { items?: TodoItem[] } }>(
+    "/api/todos",
+    body,
+  );
+  if (!response.ok) return false;
+  const result = response.data;
+  items.value = result.data?.items ?? [];
+  emit("updateResult", {
+    ...props.selectedResult,
+    ...result,
+    uuid: props.selectedResult.uuid,
+  });
+  return true;
 }
 
 function toggle(item: TodoItem) {

@@ -271,6 +271,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSourceData, RebuildSummary, Source } from "./index";
+import { apiGet, apiPost, apiDelete } from "../../utils/api";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<ManageSourceData>;
@@ -428,31 +429,19 @@ async function commitAdd(): Promise<void> {
   }
   draftError.value = "";
   busy.value = "add";
-  try {
-    const res = await fetch("/api/sources", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      draftError.value = body?.error ?? `HTTP ${res.status}`;
-      return;
-    }
-    flash(`Registered. Fetching new items…`);
-    adding.value = false;
-    await refreshList();
-    // C: auto-rebuild so the user sees items without an extra click.
-    busy.value = "rebuild";
-    await rebuildInline();
-  } catch (err) {
-    draftError.value =
-      err instanceof Error ? err.message : "Failed to register source";
-  } finally {
+  const response = await apiPost<unknown>("/api/sources", payload);
+  if (!response.ok) {
+    draftError.value = response.error || "Failed to register source";
     busy.value = null;
+    return;
   }
+  flash(`Registered. Fetching new items…`);
+  adding.value = false;
+  await refreshList();
+  // C: auto-rebuild so the user sees items without an extra click.
+  busy.value = "rebuild";
+  await rebuildInline();
+  busy.value = null;
 }
 
 // --- Starter-pack presets ----------------------------------------------
@@ -542,33 +531,19 @@ async function installPreset(preset: Preset): Promise<void> {
   }
   const failures: string[] = [];
   for (const entry of toRegister) {
-    try {
-      const res = await fetch("/api/sources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: entry.slug,
-          title: entry.title,
-          url: entry.url,
-          fetcherKind: entry.fetcherKind,
-          fetcherParams: entry.fetcherParams,
-          // Presets know their categories — skip the classifier
-          // CLI call so the first brief is ready sooner.
-          categories: entry.categories,
-          skipClassify: true,
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        const reason = body?.error ?? `HTTP ${res.status}`;
-        failures.push(`${entry.slug}: ${reason}`);
-      }
-    } catch (err) {
-      failures.push(
-        `${entry.slug}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    const response = await apiPost<unknown>("/api/sources", {
+      slug: entry.slug,
+      title: entry.title,
+      url: entry.url,
+      fetcherKind: entry.fetcherKind,
+      fetcherParams: entry.fetcherParams,
+      // Presets know their categories — skip the classifier
+      // CLI call so the first brief is ready sooner.
+      categories: entry.categories,
+      skipClassify: true,
+    });
+    if (!response.ok) {
+      failures.push(`${entry.slug}: ${response.error}`);
     }
   }
   if (failures.length > 0) {
@@ -589,26 +564,17 @@ async function installPreset(preset: Preset): Promise<void> {
 // Rebuild step extracted so commitAdd can chain it without recursing
 // into rebuild()'s own busy-state machine.
 async function rebuildInline(): Promise<void> {
-  try {
-    const res = await fetch("/api/sources/rebuild", { method: "POST" });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      throw new Error(body?.error ?? `HTTP ${res.status}`);
-    }
-    const summary = (await res.json()) as RebuildSummary;
-    lastRebuild.value = summary;
-    flash(
-      `Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`,
-    );
-    await loadBrief(summary.isoDate);
-  } catch (err) {
-    flash(
-      `Register succeeded but rebuild failed: ${err instanceof Error ? err.message : String(err)}`,
-      true,
-    );
+  const response = await apiPost<RebuildSummary>("/api/sources/rebuild");
+  if (!response.ok) {
+    flash(`Register succeeded but rebuild failed: ${response.error}`, true);
+    return;
   }
+  const summary = response.data;
+  lastRebuild.value = summary;
+  flash(
+    `Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`,
+  );
+  await loadBrief(summary.isoDate);
 }
 
 const sources = computed<Source[]>(() => {
@@ -688,68 +654,44 @@ function flash(message: string, isError = false): void {
 }
 
 async function refreshList(): Promise<void> {
-  try {
-    const res = await fetch("/api/sources");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = (await res.json()) as { sources: Source[] };
-    localSources.value = body.sources;
-  } catch (err) {
-    flash(
-      `Failed to refresh sources: ${err instanceof Error ? err.message : String(err)}`,
-      true,
-    );
+  const response = await apiGet<{ sources: Source[] }>("/api/sources");
+  if (!response.ok) {
+    flash(`Failed to refresh sources: ${response.error}`, true);
+    return;
   }
+  localSources.value = response.data.sources;
 }
 
 async function remove(slug: string): Promise<void> {
   if (!confirm(`Remove source "${slug}"?`)) return;
   busy.value = slug;
-  try {
-    const res = await fetch(`/api/sources/${encodeURIComponent(slug)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      throw new Error(body?.error ?? `HTTP ${res.status}`);
-    }
-    flash(`Removed "${slug}".`);
-    await refreshList();
-  } catch (err) {
-    flash(
-      `Remove failed: ${err instanceof Error ? err.message : String(err)}`,
-      true,
-    );
-  } finally {
-    busy.value = null;
+  const response = await apiDelete<unknown>(
+    `/api/sources/${encodeURIComponent(slug)}`,
+  );
+  busy.value = null;
+  if (!response.ok) {
+    flash(`Remove failed: ${response.error}`, true);
+    return;
   }
+  flash(`Removed "${slug}".`);
+  await refreshList();
 }
 
 async function rebuild(): Promise<void> {
   busy.value = "rebuild";
-  try {
-    const res = await fetch("/api/sources/rebuild", { method: "POST" });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      throw new Error(body?.error ?? `HTTP ${res.status}`);
-    }
-    const summary = (await res.json()) as RebuildSummary;
-    lastRebuild.value = summary;
-    flash(
-      `Rebuild complete: ${summary.itemCount} items from ${summary.plannedCount} sources.`,
-    );
-    await Promise.all([refreshList(), loadBrief(summary.isoDate)]);
-  } catch (err) {
-    flash(
-      `Rebuild failed: ${err instanceof Error ? err.message : String(err)}`,
-      true,
-    );
-  } finally {
+  const response = await apiPost<RebuildSummary>("/api/sources/rebuild");
+  if (!response.ok) {
+    flash(`Rebuild failed: ${response.error}`, true);
     busy.value = null;
+    return;
   }
+  const summary = response.data;
+  lastRebuild.value = summary;
+  flash(
+    `Rebuild complete: ${summary.itemCount} items from ${summary.plannedCount} sources.`,
+  );
+  await Promise.all([refreshList(), loadBrief(summary.isoDate)]);
+  busy.value = null;
 }
 
 // --- today's brief -------------------------------------------------------
@@ -792,33 +734,27 @@ async function loadBrief(isoDate: string): Promise<void> {
   briefDate.value = isoDate;
   const relPath = dailyPathFor(isoDate);
   briefFilePath.value = relPath;
-  try {
-    const res = await fetch(
-      `/api/files/content?path=${encodeURIComponent(relPath)}`,
-    );
-    if (token !== briefLoadToken) return;
-    if (!res.ok) {
-      if (res.status === 404) {
-        briefMarkdown.value = "";
-        briefError.value =
-          "No brief written for this date yet. Click Rebuild now.";
-        return;
-      }
-      throw new Error(`HTTP ${res.status}`);
+  const response = await apiGet<{ content?: string; kind?: string }>(
+    "/api/files/content",
+    { path: relPath },
+  );
+  if (token !== briefLoadToken) return;
+  if (!response.ok) {
+    if (response.status === 404) {
+      briefMarkdown.value = "";
+      briefError.value =
+        "No brief written for this date yet. Click Rebuild now.";
+    } else {
+      briefError.value = response.error || "Failed to load brief";
     }
-    const body = (await res.json()) as { content?: string; kind?: string };
-    if (token !== briefLoadToken) return;
-    briefMarkdown.value = body.content ?? "";
-    if (!briefMarkdown.value.trim()) {
-      briefError.value = "Today's brief is empty.";
-    }
-  } catch (err) {
-    if (token !== briefLoadToken) return;
-    briefError.value =
-      err instanceof Error ? err.message : "Failed to load brief";
-  } finally {
-    if (token === briefLoadToken) briefLoading.value = false;
+    briefLoading.value = false;
+    return;
   }
+  briefMarkdown.value = response.data.content ?? "";
+  if (!briefMarkdown.value.trim()) {
+    briefError.value = "Today's brief is empty.";
+  }
+  briefLoading.value = false;
 }
 
 // The daily file ends with a trailing ```json block that carries

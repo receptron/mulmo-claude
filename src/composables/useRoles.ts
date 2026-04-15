@@ -6,6 +6,7 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { ROLES, type Role } from "../config/roles";
 import { mergeRoles } from "../utils/role/merge";
+import { apiGet } from "../utils/api";
 
 export function useRoles(): {
   roles: Ref<Role[]>;
@@ -21,20 +22,16 @@ export function useRoles(): {
   );
 
   async function refreshRoles(): Promise<void> {
-    try {
-      const res = await fetch("/api/roles");
-      if (!res.ok) {
-        throw new Error(
-          `GET /api/roles failed: ${res.status} ${res.statusText}`,
-        );
-      }
-      const customRoles: Role[] = await res.json();
-      roles.value = mergeRoles(ROLES, customRoles);
-    } catch (err) {
+    const result = await apiGet<Role[]>("/api/roles");
+    if (!result.ok) {
       // Keep the current role list on failure — losing custom roles
       // is preferable to crashing the UI on a transient API hiccup.
-      console.warn("[useRoles] refreshRoles failed:", err);
+      console.warn(
+        `[useRoles] refreshRoles failed: ${result.status} ${result.error}`,
+      );
+      return;
     }
+    roles.value = mergeRoles(ROLES, result.data);
   }
 
   return { roles, currentRoleId, currentRole, refreshRoles };

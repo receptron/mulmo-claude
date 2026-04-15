@@ -145,6 +145,8 @@ import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
 
 // Import all spreadsheet functions to populate the function registry
 import "./engine/functions";
+import { apiGet, apiPut } from "../../utils/api";
+import type { FilesContentResponseLike } from "./engine/responseDecoder";
 
 /**
  * Normalize malformed data structures
@@ -232,34 +234,27 @@ async function fetchSheets(): Promise<void> {
     return;
   }
   loading.value = true;
-  try {
-    const res = await fetch(
-      `/api/files/content?path=${encodeURIComponent(raw)}`,
-    );
-    if (!res.ok) {
-      errorMessage.value = `Failed to load spreadsheet: ${res.statusText}`;
-      resolvedSheets.value = [];
-      return;
-    }
-    // The /files/content endpoint returns { kind, content?, message? }.
-    // Delegate the shape/validation decision to decodeSpreadsheetResponse
-    // so the async wrapper stays simple.
-    const body: unknown = await res.json();
-    const result = decodeSpreadsheetResponse(
-      (body as { kind?: string; content?: string; message?: string }) ?? {},
-    );
-    if (result.kind === "error") {
-      errorMessage.value = result.message;
-      resolvedSheets.value = [];
-    } else {
-      resolvedSheets.value = result.sheets as SpreadsheetSheet[];
-    }
-  } catch (err) {
-    errorMessage.value = `Failed to load spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
+  const response = await apiGet<FilesContentResponseLike>(
+    "/api/files/content",
+    { path: raw },
+  );
+  if (!response.ok) {
+    errorMessage.value = `Failed to load spreadsheet: ${response.error}`;
     resolvedSheets.value = [];
-  } finally {
     loading.value = false;
+    return;
   }
+  // The /files/content endpoint returns { kind, content?, message? }.
+  // Delegate the shape/validation decision to decodeSpreadsheetResponse
+  // so the async wrapper stays simple.
+  const result = decodeSpreadsheetResponse(response.data);
+  if (result.kind === "error") {
+    errorMessage.value = result.message;
+    resolvedSheets.value = [];
+  } else {
+    resolvedSheets.value = result.sheets as SpreadsheetSheet[];
+  }
+  loading.value = false;
 }
 
 // Fetch on mount and sync editableData
@@ -272,18 +267,11 @@ async function persistSheets(sheets: SpreadsheetSheet[]): Promise<void> {
   const raw = props.selectedResult.data?.sheets;
   if (isFilePath(raw)) {
     const filename = raw.replace(/^spreadsheets\//, "");
-    try {
-      const res = await fetch(`/api/spreadsheets/${filename}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sheets }),
-      });
-      if (!res.ok) {
-        errorMessage.value = `Failed to save spreadsheet: ${res.statusText}`;
-        return;
-      }
-    } catch (err) {
-      errorMessage.value = `Failed to save spreadsheet: ${err instanceof Error ? err.message : "Network error"}`;
+    const result = await apiPut<unknown>(`/api/spreadsheets/${filename}`, {
+      sheets,
+    });
+    if (!result.ok) {
+      errorMessage.value = `Failed to save spreadsheet: ${result.error}`;
       return;
     }
   }

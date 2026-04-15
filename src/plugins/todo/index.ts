@@ -1,7 +1,9 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
+import { apiPost } from "../../utils/api";
 
 export type TodoPriority = "low" | "medium" | "high" | "urgent";
 
@@ -34,16 +36,18 @@ const todoPlugin: ToolPlugin<TodoData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const response = await fetch("/api/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args),
-    });
-    const result = await response.json();
+    const result = await apiPost<ToolResult<TodoData>>("/api/todos", args);
+    if (!result.ok) {
+      return {
+        toolName: "manageTodoList",
+        uuid: crypto.randomUUID(),
+        message: result.error,
+      };
+    }
     return {
-      ...result,
+      ...result.data,
       toolName: "manageTodoList",
-      uuid: result.uuid ?? crypto.randomUUID(),
+      uuid: result.data.uuid ?? crypto.randomUUID(),
     };
   },
 

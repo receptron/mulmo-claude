@@ -574,6 +574,7 @@ import {
   streamMovieEvents,
   validateBeatJSON,
 } from "./helpers";
+import { apiGet, apiPost, apiFetchRaw } from "../../utils/api";
 
 interface Beat {
   speaker?: string;
@@ -736,17 +737,14 @@ async function onSourceToggle(open: boolean) {
     let text = scriptSourceText.value;
     // Read the current file from disk so beat-level edits are reflected
     if (filePath.value) {
-      try {
-        const res = await fetch(
-          `/api/files/content?path=${encodeURIComponent(filePath.value)}`,
-        );
-        if (res.ok) {
-          const json: { content?: string } = await res.json();
-          if (json.content) text = json.content;
-        }
-      } catch {
-        // fall through to in-memory script
+      const response = await apiGet<{ content?: string }>(
+        "/api/files/content",
+        { path: filePath.value },
+      );
+      if (response.ok && response.data.content) {
+        text = response.data.content;
       }
+      // fall through to in-memory script on failure
     }
     editableSource.value = text;
     loadedSource.value = text;
@@ -761,17 +759,16 @@ async function applySource() {
   let parsed: MulmoScript;
   try {
     parsed = JSON.parse(editableSource.value);
-    const res = await fetch("/api/mulmo-script/update-script", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, script: parsed }),
-    });
-    if (!res.ok) {
-      const json = await res.json();
-      throw new Error(json.error ?? "Update failed");
-    }
   } catch (err) {
     alert(extractErrorMessage(err));
+    return;
+  }
+  const response = await apiPost<unknown>("/api/mulmo-script/update-script", {
+    filePath: filePath.value,
+    script: parsed,
+  });
+  if (!response.ok) {
+    alert(response.error || "Update failed");
     return;
   }
 
@@ -830,26 +827,15 @@ async function updateBeat(index: number) {
 
   delete beatSaveErrors[index];
   beatSaving[index] = true;
-  try {
-    const res = await fetch("/api/mulmo-script/update-beat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filePath: filePath.value,
-        beatIndex: index,
-        beat,
-      }),
-    });
-    if (!res.ok) {
-      beatSaveErrors[index] = `Save failed: ${res.status} ${res.statusText}`;
-      return;
-    }
-  } catch (err) {
-    beatSaveErrors[index] =
-      `Save failed: ${err instanceof Error ? err.message : String(err)}`;
+  const response = await apiPost<unknown>("/api/mulmo-script/update-beat", {
+    filePath: filePath.value,
+    beatIndex: index,
+    beat,
+  });
+  delete beatSaving[index];
+  if (!response.ok) {
+    beatSaveErrors[index] = `Save failed: ${response.error}`;
     return;
-  } finally {
-    delete beatSaving[index];
   }
 
   localOverrides[index] = beat;
@@ -863,100 +849,89 @@ async function updateBeat(index: number) {
 
 async function renderBeat(index: number) {
   renderState[index] = "rendering";
-  try {
-    const res = await fetch("/api/mulmo-script/render-beat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, beatIndex: index }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error) {
-      throw new Error(json.error ?? "Render failed");
-    }
-    renderedImages[index] = json.image;
-    renderState[index] = "done";
-    refreshMissingCharacterImages();
-  } catch (err) {
-    renderErrors[index] = extractErrorMessage(err);
+  const response = await apiPost<{ image?: string; error?: string }>(
+    "/api/mulmo-script/render-beat",
+    { filePath: filePath.value, beatIndex: index },
+  );
+  if (!response.ok) {
+    renderErrors[index] = response.error || "Render failed";
     renderState[index] = "error";
+    return;
   }
+  if (response.data.error) {
+    renderErrors[index] = response.data.error;
+    renderState[index] = "error";
+    return;
+  }
+  renderedImages[index] = response.data.image ?? "";
+  renderState[index] = "done";
+  refreshMissingCharacterImages();
 }
 
 async function regenerateBeat(index: number) {
   delete renderedImages[index];
   renderState[index] = "rendering";
-  try {
-    const res = await fetch("/api/mulmo-script/render-beat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filePath: filePath.value,
-        beatIndex: index,
-        force: true,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error ?? "Render failed");
-    renderedImages[index] = json.image;
-    renderState[index] = "done";
-  } catch (err) {
-    renderErrors[index] = extractErrorMessage(err);
+  const response = await apiPost<{ image?: string; error?: string }>(
+    "/api/mulmo-script/render-beat",
+    { filePath: filePath.value, beatIndex: index, force: true },
+  );
+  if (!response.ok) {
+    renderErrors[index] = response.error || "Render failed";
     renderState[index] = "error";
+    return;
   }
+  if (response.data.error) {
+    renderErrors[index] = response.data.error;
+    renderState[index] = "error";
+    return;
+  }
+  renderedImages[index] = response.data.image ?? "";
+  renderState[index] = "done";
 }
 
 async function loadExistingBeatImage(index: number) {
-  try {
-    const params = new URLSearchParams({
-      filePath: filePath.value,
-      beatIndex: String(index),
-    });
-    const res = await fetch(`/api/mulmo-script/beat-image?${params}`);
-    const json = await res.json();
-    if (json.image) {
-      renderedImages[index] = json.image;
-      renderState[index] = "done";
-    }
-  } catch {
-    // silently ignore — image simply hasn't been generated yet
+  const response = await apiGet<{ image?: string }>(
+    "/api/mulmo-script/beat-image",
+    { filePath: filePath.value, beatIndex: String(index) },
+  );
+  // silently ignore errors — image simply hasn't been generated yet
+  if (response.ok && response.data.image) {
+    renderedImages[index] = response.data.image;
+    renderState[index] = "done";
   }
 }
 
 async function loadExistingBeatAudio(index: number) {
-  try {
-    const params = new URLSearchParams({
-      filePath: filePath.value,
-      beatIndex: String(index),
-    });
-    const res = await fetch(`/api/mulmo-script/beat-audio?${params}`);
-    const json = await res.json();
-    if (json.audio) {
-      beatAudios[index] = json.audio;
-      audioState[index] = "done";
-    }
-  } catch {
-    // silently ignore
+  const response = await apiGet<{ audio?: string }>(
+    "/api/mulmo-script/beat-audio",
+    { filePath: filePath.value, beatIndex: String(index) },
+  );
+  // silently ignore errors
+  if (response.ok && response.data.audio) {
+    beatAudios[index] = response.data.audio;
+    audioState[index] = "done";
   }
 }
 
 async function generateAudio(index: number) {
   audioState[index] = "generating";
   delete audioErrors[index];
-  try {
-    const res = await fetch("/api/mulmo-script/generate-beat-audio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, beatIndex: index }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error)
-      throw new Error(json.error ?? "Audio generation failed");
-    beatAudios[index] = json.audio;
-    audioState[index] = "done";
-  } catch (err) {
-    audioErrors[index] = extractErrorMessage(err);
+  const response = await apiPost<{ audio?: string; error?: string }>(
+    "/api/mulmo-script/generate-beat-audio",
+    { filePath: filePath.value, beatIndex: index },
+  );
+  if (!response.ok) {
+    audioErrors[index] = response.error || "Audio generation failed";
     audioState[index] = "error";
+    return;
   }
+  if (response.data.error) {
+    audioErrors[index] = response.data.error;
+    audioState[index] = "error";
+    return;
+  }
+  beatAudios[index] = response.data.audio ?? "";
+  audioState[index] = "done";
 }
 
 function playAudio(index: number) {
@@ -1006,31 +981,35 @@ async function onBeatDrop(event: DragEvent, index: number) {
 
   renderState[index] = "rendering";
   delete renderErrors[index];
+  let imageData: string;
   try {
-    const imageData = await new Promise<string>((resolve, reject) => {
+    imageData = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-
-    const res = await fetch("/api/mulmo-script/upload-beat-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filePath: filePath.value,
-        beatIndex: index,
-        imageData,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error ?? "Upload failed");
-    renderedImages[index] = json.image;
-    renderState[index] = "done";
   } catch (err) {
     renderErrors[index] = err instanceof Error ? err.message : String(err);
     renderState[index] = "error";
+    return;
   }
+  const response = await apiPost<{ image?: string; error?: string }>(
+    "/api/mulmo-script/upload-beat-image",
+    { filePath: filePath.value, beatIndex: index, imageData },
+  );
+  if (!response.ok) {
+    renderErrors[index] = response.error || "Upload failed";
+    renderState[index] = "error";
+    return;
+  }
+  if (response.data.error) {
+    renderErrors[index] = response.data.error;
+    renderState[index] = "error";
+    return;
+  }
+  renderedImages[index] = response.data.image ?? "";
+  renderState[index] = "done";
 }
 
 function onCharDragOver(event: DragEvent, key: string) {
@@ -1051,27 +1030,35 @@ async function onCharDrop(event: DragEvent, key: string) {
 
   charRenderState[key] = "rendering";
   delete charErrors[key];
+  let imageData: string;
   try {
-    const imageData = await new Promise<string>((resolve, reject) => {
+    imageData = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-
-    const res = await fetch("/api/mulmo-script/upload-character-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, key, imageData }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error ?? "Upload failed");
-    charImages[key] = json.image;
-    charRenderState[key] = "done";
   } catch (err) {
     charErrors[key] = err instanceof Error ? err.message : String(err);
     charRenderState[key] = "error";
+    return;
   }
+  const response = await apiPost<{ image?: string; error?: string }>(
+    "/api/mulmo-script/upload-character-image",
+    { filePath: filePath.value, key, imageData },
+  );
+  if (!response.ok) {
+    charErrors[key] = response.error || "Upload failed";
+    charRenderState[key] = "error";
+    return;
+  }
+  if (response.data.error) {
+    charErrors[key] = response.data.error;
+    charRenderState[key] = "error";
+    return;
+  }
+  charImages[key] = response.data.image ?? "";
+  charRenderState[key] = "done";
 }
 
 function openCharacterLightbox(key: string) {
@@ -1088,16 +1075,14 @@ function openCharacterLightbox(key: string) {
 }
 
 async function loadExistingCharacterImage(key: string) {
-  try {
-    const params = new URLSearchParams({ filePath: filePath.value, key });
-    const res = await fetch(`/api/mulmo-script/character-image?${params}`);
-    const json = await res.json();
-    if (json.image) {
-      charImages[key] = json.image;
-      charRenderState[key] = "done";
-    }
-  } catch {
-    // silently ignore
+  const response = await apiGet<{ image?: string }>(
+    "/api/mulmo-script/character-image",
+    { filePath: filePath.value, key },
+  );
+  // silently ignore errors
+  if (response.ok && response.data.image) {
+    charImages[key] = response.data.image;
+    charRenderState[key] = "done";
   }
 }
 
@@ -1112,20 +1097,22 @@ function refreshMissingCharacterImages() {
 async function renderCharacter(key: string, force: boolean) {
   charRenderState[key] = "rendering";
   delete charErrors[key];
-  try {
-    const res = await fetch("/api/mulmo-script/render-character", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: filePath.value, key, force }),
-    });
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error ?? "Render failed");
-    charImages[key] = json.image;
-    charRenderState[key] = "done";
-  } catch (err) {
-    charErrors[key] = extractErrorMessage(err);
+  const response = await apiPost<{ image?: string; error?: string }>(
+    "/api/mulmo-script/render-character",
+    { filePath: filePath.value, key, force },
+  );
+  if (!response.ok) {
+    charErrors[key] = response.error || "Render failed";
     charRenderState[key] = "error";
+    return;
   }
+  if (response.data.error) {
+    charErrors[key] = response.data.error;
+    charRenderState[key] = "error";
+    return;
+  }
+  charImages[key] = response.data.image ?? "";
+  charRenderState[key] = "done";
 }
 
 async function generateAllCharacters() {
@@ -1178,14 +1165,14 @@ async function initializeScript() {
   characterKeys.value.forEach((key) => loadExistingCharacterImage(key));
 
   if (filePath.value) {
-    try {
-      const params = new URLSearchParams({ filePath: filePath.value });
-      const res = await fetch(`/api/mulmo-script/movie-status?${params}`);
-      const json = await res.json();
-      if (json.moviePath) moviePath.value = json.moviePath;
-    } catch {
-      // ignore
+    const response = await apiGet<{ moviePath?: string }>(
+      "/api/mulmo-script/movie-status",
+      { filePath: filePath.value },
+    );
+    if (response.ok && response.data.moviePath) {
+      moviePath.value = response.data.moviePath;
     }
+    // ignore errors
   }
 }
 
@@ -1195,10 +1182,10 @@ watch(() => props.selectedResult, initializeScript);
 async function generateMovie() {
   movieGenerating.value = true;
   try {
-    const res = await fetch("/api/mulmo-script/generate-movie", {
+    const res = await apiFetchRaw("/api/mulmo-script/generate-movie", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filePath: filePath.value }),
+      headers: { "Content-Type": "application/json" },
     });
     if (!res.ok || !res.body) throw new Error("Generation failed");
     await streamMovieEvents(res.body, {

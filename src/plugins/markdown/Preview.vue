@@ -17,6 +17,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { extractFirstH1 } from "../../utils/markdown/extractFirstH1";
+import { apiGet } from "../../utils/api";
 
 const props = defineProps<{
   result: ToolResult<MarkdownToolData>;
@@ -30,19 +31,14 @@ async function fetchContent(): Promise<void> {
     fetchedContent.value = "";
     return;
   }
-  try {
-    const res = await fetch(
-      `/api/files/content?path=${encodeURIComponent(raw)}`,
-    );
-    if (!res.ok) {
-      fetchedContent.value = "";
-      return;
-    }
-    const json: { content?: string } = await res.json();
-    fetchedContent.value = json.content ?? "";
-  } catch {
+  const result = await apiGet<{ content?: string }>("/api/files/content", {
+    path: raw,
+  });
+  if (!result.ok) {
     fetchedContent.value = "";
+    return;
   }
+  fetchedContent.value = result.data.content ?? "";
 }
 
 fetchContent();

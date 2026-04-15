@@ -109,6 +109,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
 import VueDrawingCanvas from "vue-drawing-canvas";
 import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData, CanvasDrawingState } from "./definition";
+import { apiPost, apiPut } from "../../utils/api";
 
 const props = defineProps<{
   selectedResult: ToolResult<ImageToolData> | null;
@@ -269,24 +270,19 @@ const saveDrawingState = async (): Promise<boolean> => {
     const savedPath = boundImagePath
       ? await (async () => {
           const filename = boundImagePath.replace(/^images\//, "");
-          const res = await fetch(`/api/images/${filename}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageData: imageDataUri }),
-          });
-          if (!res.ok) throw new Error(`PUT failed: ${res.statusText}`);
-          const json: { path: string } = await res.json();
-          return json.path;
+          const result = await apiPut<{ path: string }>(
+            `/api/images/${filename}`,
+            { imageData: imageDataUri },
+          );
+          if (!result.ok) throw new Error(`PUT failed: ${result.error}`);
+          return result.data.path;
         })()
       : await (async () => {
-          const res = await fetch("/api/images", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageData: imageDataUri }),
+          const result = await apiPost<{ path: string }>("/api/images", {
+            imageData: imageDataUri,
           });
-          if (!res.ok) throw new Error(`POST failed: ${res.statusText}`);
-          const json: { path: string } = await res.json();
-          return json.path;
+          if (!result.ok) throw new Error(`POST failed: ${result.error}`);
+          return result.data.path;
         })();
 
     imagePath.value = savedPath;

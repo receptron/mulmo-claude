@@ -1,7 +1,9 @@
 import type { ToolPlugin } from "../../tools/types";
+import type { ToolResult } from "gui-chat-protocol";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
+import { apiPost } from "../../utils/api";
 
 export interface WikiPageEntry {
   title: string;
@@ -21,28 +23,18 @@ const wikiPlugin: ToolPlugin<WikiData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    let response: Response;
-    try {
-      response = await fetch("/api/wiki", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`Wiki request failed: ${message}`);
+    const result = await apiPost<ToolResult<WikiData>>("/api/wiki", args);
+    if (!result.ok) {
+      throw new Error(
+        result.status === 0
+          ? `Wiki request failed: ${result.error}`
+          : `Wiki API error ${result.status}: ${result.error}`,
+      );
     }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`Wiki API error ${response.status}: ${text}`);
-    }
-
-    const result = await response.json();
     return {
-      ...result,
+      ...result.data,
       toolName: "manageWiki",
-      uuid: result.uuid ?? crypto.randomUUID(),
+      uuid: result.data.uuid ?? crypto.randomUUID(),
     };
   },
 

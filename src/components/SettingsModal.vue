@@ -141,6 +141,7 @@
 import { computed, ref, watch } from "vue";
 import SettingsMcpTab from "./SettingsMcpTab.vue";
 import type { McpServerEntry } from "./SettingsMcpTab.vue";
+import { apiGet, apiPut } from "../utils/api";
 
 interface Props {
   open: boolean;
@@ -203,27 +204,22 @@ async function loadConfig(): Promise<void> {
   loading.value = true;
   loadError.value = "";
   statusMessage.value = "";
-  try {
-    const response = await fetch("/api/config");
-    // A newer open() has already started another load — drop this one.
-    if (token !== loadToken) return;
-    if (!response.ok) {
-      loadError.value = `Failed to load settings (HTTP ${response.status})`;
-      return;
-    }
-    const data: {
-      settings: { extraAllowedTools: string[] };
-      mcp?: { servers: McpServerEntry[] };
-    } = await response.json();
-    if (token !== loadToken) return;
-    toolsText.value = data.settings.extraAllowedTools.join("\n");
-    mcpServers.value = data.mcp?.servers ?? [];
-  } catch (err) {
-    if (token !== loadToken) return;
-    loadError.value = err instanceof Error ? err.message : "Network error";
-  } finally {
-    if (token === loadToken) loading.value = false;
+  const response = await apiGet<{
+    settings: { extraAllowedTools: string[] };
+    mcp?: { servers: McpServerEntry[] };
+  }>("/api/config");
+  // A newer open() has already started another load — drop this one.
+  if (token !== loadToken) return;
+  if (!response.ok) {
+    loadError.value =
+      response.status === 0
+        ? response.error || "Network error"
+        : `Failed to load settings (HTTP ${response.status})`;
+  } else {
+    toolsText.value = response.data.settings.extraAllowedTools.join("\n");
+    mcpServers.value = response.data.mcp?.servers ?? [];
   }
+  if (token === loadToken) loading.value = false;
 }
 
 async function save(): Promise<void> {
@@ -243,32 +239,22 @@ async function save(): Promise<void> {
   saving.value = true;
   statusMessage.value = "";
   statusError.value = false;
-  try {
-    // Single atomic endpoint — avoids the partial-save state where
-    // extraAllowedTools is persisted but MCP config write fails.
-    const response = await fetch("/api/config", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: { extraAllowedTools: parsedToolNames.value },
-        mcp: { servers: mcpServers.value },
-      }),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-
+  // Single atomic endpoint — avoids the partial-save state where
+  // extraAllowedTools is persisted but MCP config write fails.
+  const response = await apiPut<unknown>("/api/config", {
+    settings: { extraAllowedTools: parsedToolNames.value },
+    mcp: { servers: mcpServers.value },
+  });
+  if (!response.ok) {
+    statusError.value = true;
+    statusMessage.value = response.error || "Save failed";
+  } else {
     emit("saved");
     // Close on success. Changes take effect on the next message, so
     // the user has no reason to stay in the modal after a good save.
     close();
-  } catch (err) {
-    statusError.value = true;
-    statusMessage.value = err instanceof Error ? err.message : "Save failed";
-  } finally {
-    saving.value = false;
   }
+  saving.value = false;
 }
 
 function close(): void {

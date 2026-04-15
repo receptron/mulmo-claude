@@ -185,6 +185,7 @@ import { useAppApi } from "../../composables/useAppApi";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { CustomRole, ManageRolesData } from "./index";
 import { getAllPluginNames } from "../../tools/index";
+import { apiGet, apiPost } from "../../utils/api";
 
 interface PluginEntry {
   name: string;
@@ -201,15 +202,11 @@ const guiPlugins: PluginEntry[] = getAllPluginNames()
 const availablePlugins = ref<PluginEntry[]>(guiPlugins);
 
 onMounted(async () => {
-  try {
-    const res = await fetch("/api/mcp-tools");
-    if (res.ok) {
-      const mcpTools: PluginEntry[] = await res.json();
-      availablePlugins.value = [...guiPlugins, ...mcpTools];
-    }
-  } catch {
-    // silently fall back to GUI plugins only
+  const result = await apiGet<PluginEntry[]>("/api/mcp-tools");
+  if (result.ok) {
+    availablePlugins.value = [...guiPlugins, ...result.data];
   }
+  // silently fall back to GUI plugins only on failure
 });
 
 const props = defineProps<{
@@ -292,21 +289,17 @@ interface ManageResult {
 async function callManage(
   body: Record<string, unknown>,
 ): Promise<ManageResult> {
-  try {
-    const res = await fetch("/api/roles/manage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok)
-      return { success: false, error: `Server error: ${res.status}` };
-    return res.json();
-  } catch (e) {
+  const result = await apiPost<ManageResult>("/api/roles/manage", body);
+  if (!result.ok) {
     return {
       success: false,
-      error: e instanceof Error ? e.message : "Network error",
+      error:
+        result.status === 0
+          ? result.error || "Network error"
+          : `Server error: ${result.status}`,
     };
   }
+  return result.data;
 }
 
 async function refreshList() {

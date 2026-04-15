@@ -8,6 +8,7 @@
 // doesn't momentarily flash "sandbox disabled" on a transient error.
 
 import { ref, type Ref } from "vue";
+import { apiGet } from "../utils/api";
 
 interface HealthResponse {
   geminiAvailable?: unknown;
@@ -23,15 +24,13 @@ export function useHealth(): {
   const sandboxEnabled = ref(true);
 
   async function fetchHealth(): Promise<void> {
-    try {
-      const res = await fetch("/api/health");
-      if (!res.ok) throw new Error("health check failed");
-      const data: HealthResponse = await res.json();
-      geminiAvailable.value = !!data.geminiAvailable;
-      sandboxEnabled.value = !!data.sandboxEnabled;
-    } catch {
+    const result = await apiGet<HealthResponse>("/api/health");
+    if (!result.ok) {
       geminiAvailable.value = false;
+      return;
     }
+    geminiAvailable.value = !!result.data.geminiAvailable;
+    sandboxEnabled.value = !!result.data.sandboxEnabled;
   }
 
   return { geminiAvailable, sandboxEnabled, fetchHealth };

@@ -29,6 +29,7 @@
 // to re-fetch when switching between tool results).
 
 import { onMounted, onUnmounted } from "vue";
+import { apiGet } from "../utils/api";
 
 export interface UseFreshPluginDataOptions<T> {
   endpoint: () => string;
@@ -56,23 +57,15 @@ export async function refreshOnce<T>(
   opts: UseFreshPluginDataOptions<T>,
   signal: AbortSignal,
 ): Promise<boolean> {
-  try {
-    const res = await fetch(opts.endpoint(), { signal });
-    if (signal.aborted) return false;
-    if (!res.ok) return false;
-    const json: unknown = await res.json();
-    if (signal.aborted) return false;
-    const extracted = opts.extract(json);
-    if (extracted === null) return false;
-    opts.apply(extracted);
-    return true;
-  } catch {
-    // AbortError and any other fetch / parse error all land here.
-    // The caller still has the prop-initialised state as a
-    // fallback, so a failed refresh is a silent no-op — consistent
-    // with how the original duplicated implementations handled it.
-    return false;
-  }
+  const result = await apiGet<unknown>(opts.endpoint(), undefined, { signal });
+  // AbortError / network error / non-OK HTTP / malformed JSON all land
+  // as { ok: false }. The caller still has prop-initialised state as a
+  // fallback, so a failed refresh is a silent no-op.
+  if (signal.aborted || !result.ok) return false;
+  const extracted = opts.extract(result.data);
+  if (extracted === null) return false;
+  opts.apply(extracted);
+  return true;
 }
 
 export function useFreshPluginData<T>(
