@@ -90,6 +90,7 @@ import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { usePdfDownload } from "../../composables/usePdfDownload";
+import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -184,7 +185,7 @@ watch(
 
 const sourceDetails = ref<HTMLDetailsElement>();
 const editing = ref(false);
-const copied = ref(false);
+const { copied, copy } = useClipboardCopy();
 
 function onDetailsToggle(e: Event) {
   const open = (e.target as HTMLDetailsElement).open;
@@ -200,15 +201,7 @@ function cancelEdit() {
 }
 
 async function copyText() {
-  try {
-    await navigator.clipboard.writeText(markdownContent.value);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch {
-    // clipboard API may be blocked in some contexts
-  }
+  await copy(markdownContent.value);
 }
 
 const {

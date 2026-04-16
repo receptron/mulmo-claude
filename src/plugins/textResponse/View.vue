@@ -57,6 +57,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "@gui-chat-plugin/text-response";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { usePdfDownload } from "../../composables/usePdfDownload";
+import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TextResponseData>;
@@ -119,19 +120,10 @@ function onApply(r: unknown) {
   if (details) details.open = false;
 }
 
-const copied = ref(false);
+const { copied, copy } = useClipboardCopy();
 
 async function copyText() {
-  const text = props.selectedResult.data?.text ?? "";
-  try {
-    await navigator.clipboard.writeText(text);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch {
-    // Fallback: clipboard API may be blocked in some contexts
-  }
+  await copy(props.selectedResult.data?.text ?? "");
 }
 
 async function downloadPdf() {

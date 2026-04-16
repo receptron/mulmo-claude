@@ -574,6 +574,7 @@ import {
   streamMovieEvents,
   validateBeatJSON,
 } from "./helpers";
+import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
 interface Beat {
   speaker?: string;
@@ -704,7 +705,7 @@ function lightboxMove(delta: number) {
 const sourceDetails = ref<HTMLDetailsElement>();
 const editing = ref(false);
 const editableSource = ref("");
-const copied = ref(false);
+const { copied, copy } = useClipboardCopy();
 
 // Beats may be edited in-place via `updateBeat()` and rendered through
 // `effectiveBeat()`, so the Copy / source-view text must read the merged
@@ -790,15 +791,7 @@ async function applySource() {
 }
 
 async function copyText() {
-  try {
-    await navigator.clipboard.writeText(scriptSourceText.value);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch {
-    // clipboard API may be blocked in some contexts
-  }
+  await copy(scriptSourceText.value);
 }
 
 function effectiveBeat(index: number): Beat {
