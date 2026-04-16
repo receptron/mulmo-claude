@@ -16,45 +16,81 @@ function urlEndsWith(suffix: string): (url: URL) => boolean {
 }
 
 // Mock the `/api/agent` POST to return 202 (fire-and-forget) and
-// send the given events to the client via the WebSocket pub/sub
-// channel. The events are delivered when the client subscribes to
-// the `session.<id>` channel.
+// stream the given events through the pub/sub channel the client
+// subscribes to.
+//
+// PR #311 replaced the raw WebSocket with socket.io, so the mock
+// speaks engine.io + socket.io wire protocol rather than plain
+// JSON framing. Cheat sheet:
+//   engine.io packets (single char): 0=open, 2=ping, 3=pong,
+//                                    4=message, 5=upgrade, 6=noop
+//   socket.io packets (when wrapped in eio 4=message):
+//                                    0=connect, 1=disconnect, 2=event
+// So `40` = connect-to-default-namespace, `42["name", arg]` = event
+// emit. We only need open/ping/connect/event handling here.
 async function mockAgentWithPubSub(
   page: Page,
   events: readonly unknown[],
 ): Promise<void> {
-  // Intercept WebSocket and deliver events when client subscribes
-  // to a session channel.
   await page.routeWebSocket(
-    (url) => url.pathname === "/ws/pubsub",
+    (url) => url.pathname.startsWith("/ws/pubsub"),
     (ws) => {
+      // Send the engine.io OPEN packet immediately so the socket.io
+      // client can transition from "connecting" to "connected" and
+      // start emitting `subscribe` events. Values are placeholders —
+      // the client only inspects `sid` and the timing fields.
+      ws.send(
+        "0" +
+          JSON.stringify({
+            sid: "mock-sid",
+            upgrades: [],
+            pingInterval: 25000,
+            pingTimeout: 20000,
+            maxPayload: 1_000_000,
+          }),
+      );
+
       ws.onMessage((msg) => {
-        try {
-          const parsed = JSON.parse(String(msg));
-          if (
-            parsed.action === "subscribe" &&
-            typeof parsed.channel === "string" &&
-            parsed.channel.startsWith("session.")
-          ) {
-            const channel = parsed.channel;
-            // Deliver mock events with a small delay so the client
-            // has time to process the subscription.
-            setTimeout(() => {
-              for (const event of events) {
-                ws.send(JSON.stringify({ channel, data: event }));
-              }
-              // Signal end of run
-              ws.send(
-                JSON.stringify({
-                  channel,
-                  data: { type: "session_finished" },
-                }),
-              );
-            }, 50);
-          }
-        } catch {
-          // ignore non-JSON messages
+        const text = String(msg);
+        if (text === "2") {
+          ws.send("3");
+          return;
         }
+        // Client CONNECT to default namespace.
+        if (text === "40") {
+          ws.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
+          return;
+        }
+        // Event: `42["subscribe", "session.…"]`.
+        if (!text.startsWith("42")) return;
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(text.slice(2));
+        } catch {
+          return;
+        }
+        if (!Array.isArray(parsed)) return;
+        const [name, arg] = parsed as [string, unknown];
+        if (
+          name !== "subscribe" ||
+          typeof arg !== "string" ||
+          !arg.startsWith("session.")
+        ) {
+          return;
+        }
+        const channel = arg;
+        setTimeout(() => {
+          for (const event of events) {
+            ws.send("42" + JSON.stringify(["data", { channel, data: event }]));
+          }
+          ws.send(
+            "42" +
+              JSON.stringify([
+                "data",
+                { channel, data: { type: "session_finished" } },
+              ]),
+          );
+        }, 50);
       });
     },
   );
