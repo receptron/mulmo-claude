@@ -346,9 +346,12 @@ process.on("SIGTERM", () => {
   // Generate the bearer token before `app.listen` so the first
   // request cannot race an uninitialised `getCurrentToken()`. The
   // middleware defensively handles the null case anyway (401).
-  await generateAndWriteToken();
+  // `env.authTokenOverride` (#316) pins the token across restarts
+  // when set; otherwise a fresh random one is written.
+  await generateAndWriteToken(undefined, env.authTokenOverride);
   log.info("auth", "bearer token written", {
     path: WORKSPACE_PATHS.sessionToken,
+    source: env.authTokenOverride ? "env" : "random",
   });
 
   sandboxEnabled = await setupSandbox();

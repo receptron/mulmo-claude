@@ -201,6 +201,8 @@ Every HTTP call to `/api/*` requires `Authorization: Bearer <token>`. Layered on
 
 **Dev-mode escape hatch**: setting `MULMOCLAUDE_AUTH_TOKEN=…` before `yarn dev:client` makes the Vite plugin use that value instead of reading the file. Used by `e2e/playwright.config.ts` to inject a predictable token in E2E; also handy for debugging without a running server. Production (Express serving built HTML) never reads env — the in-memory token from `generateAndWriteToken()` is the sole source.
 
+**Server-side pinning (#316)**: setting `MULMOCLAUDE_AUTH_TOKEN=…` before `yarn dev` (or any process that starts Express) makes `generateAndWriteToken()` use that value verbatim instead of generating a fresh random token. The same var is already honoured by the Vite dev plugin and the CLI bridge, so pinning it once in a shared shell / `.env` / docker-compose file keeps the token consistent across a server restart — long-running bridges no longer need a relaunch every time the dev server bounces. A warning logs if the override is shorter than 32 chars; no other validation. Use random-per-startup (the default) for casual dev and the env override only when the restart pain outweighs the leak surface (CI, docker, multi-bridge setups).
+
 **Current scope** (#272 Phase 1+2): Vue client, Express middleware, and the CLI bridge (`yarn cli`). The bridge reads the same `.session-token` file (or `MULMOCLAUDE_AUTH_TOKEN` env var) on startup and attaches the header to its `fetch` calls.
 
 **Files**

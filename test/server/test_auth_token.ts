@@ -64,6 +64,41 @@ describe("generateAndWriteToken", () => {
   });
 });
 
+describe("generateAndWriteToken — env override (#316)", () => {
+  it("uses the override verbatim when non-empty", async () => {
+    const override = "pinned-token-1234567890abcdef1234567890abcdef12";
+    const token = await generateAndWriteToken(tokenPath, override);
+    assert.equal(token, override);
+    assert.equal(getCurrentToken(), override);
+    assert.equal(fs.readFileSync(tokenPath, "utf-8"), override);
+  });
+
+  it("does not rotate — repeated calls with the same override return it each time", async () => {
+    const override = "stable-token-abcdefabcdefabcdefabcdefabcdef";
+    const first = await generateAndWriteToken(tokenPath, override);
+    const second = await generateAndWriteToken(tokenPath, override);
+    assert.equal(first, override);
+    assert.equal(second, override);
+  });
+
+  it("treats empty string as no override (falls back to random)", async () => {
+    const token = await generateAndWriteToken(tokenPath, "");
+    assert.match(token, /^[0-9a-f]{64}$/);
+    assert.notEqual(token, "");
+  });
+
+  it("treats undefined as no override (falls back to random)", async () => {
+    const token = await generateAndWriteToken(tokenPath, undefined);
+    assert.match(token, /^[0-9a-f]{64}$/);
+  });
+
+  it("accepts a short override but still uses it (warning is logged, not an error)", async () => {
+    const token = await generateAndWriteToken(tokenPath, "short");
+    assert.equal(token, "short");
+    assert.equal(getCurrentToken(), "short");
+  });
+});
+
 describe("deleteTokenFile", () => {
   it("removes the token file", async () => {
     await generateAndWriteToken(tokenPath);

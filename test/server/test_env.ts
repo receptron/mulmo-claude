@@ -14,6 +14,7 @@ interface EnvSnapshot {
     disableSandbox: boolean;
     geminiApiKey: string | undefined;
     xBearerToken: string | undefined;
+    authTokenOverride: string | undefined;
     sessionsListWindowDays: number;
     journalForceRunOnStartup: boolean;
     chatIndexForceRunOnStartup: boolean;
@@ -40,6 +41,7 @@ const ENV_KEYS = [
   "DISABLE_SANDBOX",
   "GEMINI_API_KEY",
   "X_BEARER_TOKEN",
+  "MULMOCLAUDE_AUTH_TOKEN",
   "SESSIONS_LIST_WINDOW_DAYS",
   "JOURNAL_FORCE_RUN_ON_STARTUP",
   "CHAT_INDEX_FORCE_RUN_ON_STARTUP",
@@ -74,6 +76,7 @@ describe("env defaults", () => {
     assert.equal(env.disableSandbox, false);
     assert.equal(env.geminiApiKey, undefined);
     assert.equal(env.xBearerToken, undefined);
+    assert.equal(env.authTokenOverride, undefined);
     assert.equal(env.sessionsListWindowDays, 90);
     assert.equal(env.journalForceRunOnStartup, false);
     assert.equal(env.chatIndexForceRunOnStartup, false);
@@ -142,6 +145,12 @@ describe("env coercion", () => {
     process.env.SESSIONS_LIST_WINDOW_DAYS = "30";
     const { env } = await loadEnvFresh();
     assert.equal(env.sessionsListWindowDays, 30);
+  });
+
+  it("MULMOCLAUDE_AUTH_TOKEN is passed through verbatim when set", async () => {
+    process.env.MULMOCLAUDE_AUTH_TOKEN = "pinned-value";
+    const { env } = await loadEnvFresh();
+    assert.equal(env.authTokenOverride, "pinned-value");
   });
 });
 
