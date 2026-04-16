@@ -9,11 +9,24 @@ describe("RoleSchema", () => {
       name: "Test Role",
       icon: "star",
       prompt: "You are a test assistant.",
-      availablePlugins: ["pluginA", "pluginB"],
+      availablePlugins: ["manageTodoList", "generateImage"],
       queries: ["hello"],
     };
     const result = RoleSchema.parse(valid);
     assert.deepStrictEqual(result, valid);
+  });
+
+  it("rejects a role whose availablePlugins includes an unknown tool", () => {
+    const invalid = {
+      id: "test",
+      name: "Test",
+      icon: "star",
+      prompt: "prompt",
+      // `presentHTML` is the historical typo of `presentHtml`; the
+      // enum-backed schema catches it at the boundary.
+      availablePlugins: ["presentHTML"],
+    };
+    assert.throws(() => RoleSchema.parse(invalid));
   });
 
   it("accepts a valid role without optional queries", () => {

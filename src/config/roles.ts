@@ -1,11 +1,23 @@
 import { z } from "zod";
+import { ALL_TOOL_NAMES, type ToolName } from "./toolNames";
+
+// `availablePlugins` accepts every literal listed in `TOOL_NAMES`.
+// Runtime: validate with a literal-union z.enum so a typo or an
+// unknown tool name (e.g. from a future user-defined role loaded off
+// disk) rejects at boundary instead of silently dropping at runtime.
+// Compile time: roles.ts static definitions below get typed as
+// `ToolName[]` via RoleSchema's zod inference, so `presentHTML` vs
+// `presentHtml` kind of typos are caught immediately.
+const toolNameEnum = z.enum(
+  ALL_TOOL_NAMES as readonly [ToolName, ...ToolName[]],
+);
 
 export const RoleSchema = z.object({
   id: z.string(),
   name: z.string(),
   icon: z.string(),
   prompt: z.string(),
-  availablePlugins: z.array(z.string()),
+  availablePlugins: z.array(toolNameEnum),
   queries: z.array(z.string()).optional(),
 });
 
@@ -161,7 +173,7 @@ export const ROLES: Role[] = [
       "presentDocument",
       "presentForm",
       "generateImage",
-      "presentHTML",
+      "presentHtml",
       "presentChart",
       "manageSkills",
       "switchRole",
