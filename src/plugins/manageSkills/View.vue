@@ -88,11 +88,16 @@
           <div v-else-if="detailError" class="text-sm text-red-600">
             {{ detailError }}
           </div>
-          <pre
-            v-else-if="detail"
-            class="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded border border-gray-200"
-            >{{ detail.body || "(empty body)" }}</pre
-          >
+          <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify -->
+          <div
+            v-else-if="detail && renderedBody"
+            class="markdown-content text-gray-700"
+            data-testid="skill-body-rendered"
+            v-html="renderedBody"
+          ></div>
+          <p v-else-if="detail" class="text-sm text-gray-400 italic">
+            (empty body)
+          </p>
         </div>
       </div>
     </div>
@@ -101,6 +106,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSkillsData, SkillSummary } from "./index";
 import { useAppApi } from "../../composables/useAppApi";
@@ -132,6 +139,12 @@ const deleting = ref(false);
 const selected = computed(
   () => skills.value.find((s) => s.name === selectedName.value) ?? null,
 );
+
+const renderedBody = computed(() => {
+  const body = detail.value?.body;
+  if (!body) return "";
+  return DOMPurify.sanitize(marked(body) as string);
+});
 
 // Reset the selection when the tool result is replaced (e.g. the
 // user opens a newer `manageSkills` invocation from the sidebar).
