@@ -57,10 +57,8 @@ describe("useSessionHistory — error surfacing (#280)", () => {
 
     assert.equal(sessions.value.length, 1, "sessions preserved on failure");
     assert.equal(result.length, 1);
-    assert.ok(
-      historyError.value && historyError.value.length > 0,
-      "historyError populated",
-    );
+    assert.equal(typeof historyError.value, "string");
+    assert.ok((historyError.value ?? "").length > 0, "historyError populated");
   });
 
   it("clears historyError on the next successful fetch", async () => {

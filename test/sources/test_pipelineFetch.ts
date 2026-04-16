@@ -147,9 +147,12 @@ describe("runFetchPhase — success path", () => {
   });
 
   it("supplies a default state when none is present", async () => {
-    let sawState: SourceState | null = null;
+    // See test_classifier.ts — array capture avoids the TS narrowing
+    // bug where a `let` reassigned inside an async callback becomes
+    // `never` at the outer scope.
+    const captured: SourceState[] = [];
     const fetcher = fakeFetcher("rss", async (_source, state) => {
-      sawState = state;
+      captured.push(state);
       return { items: [], cursor: {} };
     });
     await runFetchPhase({
@@ -158,10 +161,10 @@ describe("runFetchPhase — success path", () => {
       deps: makeDeps(),
       getFetcher: makeGetFetcher([fetcher]),
     });
-    assert.ok(sawState);
-    assert.equal(sawState!.slug, "fresh");
-    assert.deepEqual(sawState!.cursor, {});
-    assert.equal(sawState!.consecutiveFailures, 0);
+    assert.equal(captured.length, 1);
+    assert.equal(captured[0].slug, "fresh");
+    assert.deepEqual(captured[0].cursor, {});
+    assert.equal(captured[0].consecutiveFailures, 0);
   });
 });
 

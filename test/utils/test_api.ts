@@ -82,7 +82,7 @@ describe("apiCall — happy path", () => {
   it("PUT forwards the method", async () => {
     nextResponse = jsonResponse(200, {});
     await apiPut("/api/thing", { x: 1 });
-    assert.equal(calls[0].init.method, "PUT");
+    assert.equal(calls[0].init?.method, "PUT");
   });
 
   it("DELETE accepts an optional body", async () => {

@@ -438,7 +438,7 @@ describe("userServerAllowedToolNames", () => {
 describe("buildMcpConfig — user servers", () => {
   it("merges user-defined servers alongside mulmoclaude", () => {
     const cfg = buildMcpConfig({
-      sessionId: "s1",
+      chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList"],
       roleIds: ["assistant"],
@@ -456,7 +456,7 @@ describe("buildMcpConfig — user servers", () => {
 
   it("refuses to let a user server override the reserved 'mulmoclaude' id", () => {
     const cfg = buildMcpConfig({
-      sessionId: "s1",
+      chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList"],
       roleIds: ["assistant"],

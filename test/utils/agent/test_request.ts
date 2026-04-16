@@ -22,7 +22,7 @@ describe("buildAgentRequestBody — happy path", () => {
   it("assembles every field in the shape the server expects", () => {
     const role = makeRole({
       id: "coder",
-      availablePlugins: ["todo", "wiki"],
+      availablePlugins: ["manageTodoList", "manageWiki"],
     });
     const body = buildAgentRequestBody({
       message: "hello",

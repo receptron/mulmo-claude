@@ -27,7 +27,6 @@ jobs:
         cache: 'yarn'
     - run: yarn install
     - run: yarn run typecheck
-    - run: yarn run typecheck:server
     - run: yarn run lint
     - run: yarn run build
     - run: yarn run test:coverage

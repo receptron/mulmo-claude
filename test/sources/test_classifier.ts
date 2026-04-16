@@ -235,9 +235,12 @@ describe("parseClassifyOutput", () => {
 
 describe("classifySource — injection wrapper", () => {
   it("passes the input through to the injected ClassifyFn", async () => {
-    let received: ClassifyInput | null = null;
+    // Capture inputs via an array — TS can't track a scalar `let`
+    // reassigned inside an async callback (narrows to `never` after
+    // the declaration), but an array reference is stable.
+    const captured: ClassifyInput[] = [];
     const classify: ClassifyFn = async (input) => {
-      received = input;
+      captured.push(input);
       return {
         categories: ["ai"],
         rationale: "fake",
@@ -251,9 +254,9 @@ describe("classifySource — injection wrapper", () => {
       },
       classify,
     );
-    assert.ok(received);
-    assert.equal(received!.title, "Test");
-    assert.deepEqual(received!.sampleTitles, ["a", "b"]);
+    assert.equal(captured.length, 1);
+    assert.equal(captured[0].title, "Test");
+    assert.deepEqual(captured[0].sampleTitles, ["a", "b"]);
     assert.deepEqual(out.categories, ["ai"]);
   });
 

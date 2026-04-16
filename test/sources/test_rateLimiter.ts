@@ -67,7 +67,7 @@ describe("HostRateLimiter — basic behaviour", () => {
 describe("HostRateLimiter — serialization per host", () => {
   it("serializes concurrent calls to the same host", async () => {
     const { deps } = controllableClock();
-    const lim = new HostRateLimiter(deps, ...[].slice()); // eslint noise
+    const lim = new HostRateLimiter(deps);
     // The semaphore-like invariant: if two run() calls are issued
     // back-to-back on the same host, the second task must not
     // start until the first has completed.

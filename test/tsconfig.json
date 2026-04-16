@@ -1,0 +1,30 @@
+{
+  // Dedicated type-check config for `test/**`. Adds `test/` to the
+  // type-check coverage that was otherwise gated only by ESLint + the
+  // runtime tsx loader (which skips type checking entirely).
+  //
+  // Not used to BUILD the tests — `tsx --test` still runs them. This
+  // config exists solely so `yarn typecheck:test` can flag type drift
+  // (e.g. a renamed server-side type that test files haven't caught up
+  // with) before it reaches CI.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    // Tests import Vue composables that touch `.vue` files
+    // transitively — skipping lib check is enough to let those
+    // references type-check without pulling in the full Vue
+    // compiler.
+    "jsx": "preserve"
+  },
+  "include": ["**/*.ts", "../src/**/*.ts", "../server/**/*.ts", "../bridges/**/*.ts"],
+  "exclude": ["../node_modules", "../dist"]
+}

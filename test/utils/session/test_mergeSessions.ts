@@ -24,7 +24,6 @@ function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
     toolCallHistory: [],
     selectedResultUuid: null,
     hasUnread: false,
-    abortController: new AbortController(),
     startedAt: "2026-04-10T10:00:00.000Z",
     updatedAt: "2026-04-10T10:05:00.000Z",
     ...overrides,

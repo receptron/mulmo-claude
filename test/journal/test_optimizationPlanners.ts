@@ -66,10 +66,13 @@ describe("planMerges", () => {
 describe("applyRemovedTopics", () => {
   function makeState(over: Partial<JournalState> = {}): JournalState {
     return {
+      version: 1,
       knownTopics: [],
-      lastDailyRunAt: undefined,
-      lastOptimizationRunAt: undefined,
-      processedSessions: [],
+      lastDailyRunAt: null,
+      lastOptimizationRunAt: null,
+      dailyIntervalHours: 1,
+      optimizationIntervalDays: 7,
+      processedSessions: {},
       ...over,
     };
   }
@@ -102,11 +105,11 @@ describe("applyRemovedTopics", () => {
     const state = makeState({
       knownTopics: ["a"],
       lastDailyRunAt: "2026-04-11T00:00:00Z",
-      processedSessions: ["sess1"],
+      processedSessions: { sess1: { lastMtimeMs: 1 } },
     });
     const next = applyRemovedTopics(state, new Set(["a"]));
     assert.equal(next.lastDailyRunAt, "2026-04-11T00:00:00Z");
-    assert.deepEqual(next.processedSessions, ["sess1"]);
+    assert.deepEqual(next.processedSessions, { sess1: { lastMtimeMs: 1 } });
   });
 
   it("does not mutate the input state", () => {

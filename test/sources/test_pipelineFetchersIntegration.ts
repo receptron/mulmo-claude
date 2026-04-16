@@ -54,7 +54,7 @@ afterEach(() => {
 // Test-only summarizer: just lists every item title as a bullet.
 // Extracted so the sonarjs/no-nested-template-literals rule stays
 // happy (inline template-literal + .map().join() → nested).
-async function stubSummarize(items: SourceItem[]): Promise<string> {
+async function stubSummarize(items: readonly SourceItem[]): Promise<string> {
   const lines = items.map((i) => `- ${i.title}`).join("\n");
   return `# brief\n\n${lines}\n`;
 }
@@ -72,7 +72,6 @@ function controllableClock(): RateLimiterDeps {
 
 function makeSource(over: Partial<Source> & Pick<Source, "slug">): Source {
   return {
-    slug: over.slug,
     title: "",
     url: "",
     fetcherKind: "rss",
