@@ -108,7 +108,12 @@ async function processOneFile(
       WORKSPACE_DIRS.chat,
       `${sessionId}.jsonl`,
     );
-    const linkHref = path.relative(path.dirname(fullPath), chatFileAbs);
+    // Markdown link targets are URL-ish and must use forward slashes
+    // even on Windows, where `path.relative` returns backslashes.
+    const linkHref = path
+      .relative(path.dirname(fullPath), chatFileAbs)
+      .split(path.sep)
+      .join("/");
     const updated = updateSessionBacklinks(content, sessionId, linkHref);
     if (updated === content) return;
 
