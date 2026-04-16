@@ -401,7 +401,31 @@ export const ROLES: Role[] = [
 
 export const BUILTIN_ROLES = ROLES;
 
-export const DEFAULT_ROLE_ID = "general";
+// String-literal constants for every built-in role id. Use these
+// instead of inline `"general"` / `"sourceManager"` etc. so that
+// renaming a role id is one place to change and `BuiltInRoleId`
+// catches typos at compile time.
+//
+// Test `test/config/test_roles.ts` asserts these keys/values stay in
+// sync with `ROLES[].id` — adding a new role to ROLES without
+// updating this map fails the test.
+export const BUILTIN_ROLE_IDS = {
+  general: "general",
+  office: "office",
+  guide: "guide",
+  artist: "artist",
+  tutor: "tutor",
+  storyteller: "storyteller",
+  storytellerPlus: "storytellerPlus",
+  musician: "musician",
+  roleManager: "roleManager",
+  sourceManager: "sourceManager",
+} as const;
+
+export type BuiltInRoleId =
+  (typeof BUILTIN_ROLE_IDS)[keyof typeof BUILTIN_ROLE_IDS];
+
+export const DEFAULT_ROLE_ID: BuiltInRoleId = BUILTIN_ROLE_IDS.general;
 
 export function getRole(id: string): Role {
   return ROLES.find((r) => r.id === id) ?? ROLES[0];

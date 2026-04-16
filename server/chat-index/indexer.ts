@@ -24,6 +24,7 @@ import {
   sessionMetaPathFor,
 } from "./paths.js";
 import type { ChatIndexEntry, ChatIndexManifest } from "./types.js";
+import { DEFAULT_ROLE_ID } from "../../src/config/roles.js";
 
 // Freshness throttle: a session whose existing index entry is
 // newer than this is skipped. The 15-minute window is a compromise
@@ -219,7 +220,7 @@ export async function indexSession(
 
   const entry: ChatIndexEntry = {
     id: sessionId,
-    roleId: meta.roleId ?? "general",
+    roleId: meta.roleId ?? DEFAULT_ROLE_ID,
     startedAt: meta.startedAt ?? new Date(now).toISOString(),
     indexedAt: new Date(now).toISOString(),
     title: summary.title,

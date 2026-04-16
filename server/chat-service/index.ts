@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { log } from "../logger/index.js";
 import { getRole } from "../roles.js";
+import { DEFAULT_ROLE_ID } from "../../src/config/roles.js";
 import { startChat } from "../routes/agent.js";
 import { onSessionEvent } from "../session-store/index.js";
 import {
@@ -61,7 +62,7 @@ router.post(
     // Load or create chat state
     let chatState = await getChatState(transportId, externalChatId);
     if (!chatState) {
-      const defaultRole = getRole("general");
+      const defaultRole = getRole(DEFAULT_ROLE_ID);
       chatState = await resetChatState(
         transportId,
         externalChatId,

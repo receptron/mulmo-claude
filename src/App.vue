@@ -363,6 +363,7 @@ import { useClickOutside } from "./composables/useClickOutside";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
+import { BUILTIN_ROLE_IDS } from "./config/roles";
 import { usePubSub } from "./composables/usePubSub";
 import { useHealth } from "./composables/useHealth";
 import { useSessionHistory } from "./composables/useSessionHistory";
@@ -987,7 +988,7 @@ function onRoleChange() {
 // (never persisted server-side) — any subsequent LLM tool call will
 // replace / augment it in the normal way.
 async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
-  if (session.roleId !== "sourceManager") return;
+  if (session.roleId !== BUILTIN_ROLE_IDS.sourceManager) return;
   try {
     const res = await fetch("/api/sources");
     if (!res.ok) {

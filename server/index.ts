@@ -14,6 +14,7 @@ import imageRoutes from "./routes/image.js";
 import presentHtmlRoutes from "./routes/presentHtml.js";
 import chartRoutes from "./routes/chart.js";
 import rolesRoutes from "./routes/roles.js";
+import { DEFAULT_ROLE_ID } from "../src/config/roles.js";
 import mulmoScriptRoutes from "./routes/mulmo-script.js";
 import wikiRoutes from "./routes/wiki.js";
 import pdfRoutes from "./routes/pdf.js";
@@ -303,7 +304,7 @@ function registerDebugTasks(taskManager: ITaskManager, pubsub: IPubSub) {
       log.info("debug", "starting auto-chat", { chatSessionId });
       const result = await startChat({
         message: "Tell me about this app, MulmoClaude.",
-        roleId: "general",
+        roleId: DEFAULT_ROLE_ID,
         chatSessionId,
       });
       log.info("debug", "auto-chat result", { kind: result.kind });
