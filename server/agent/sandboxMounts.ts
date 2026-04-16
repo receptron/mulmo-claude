@@ -1,0 +1,260 @@
+// Host-credential mounts for the Docker sandbox (#259).
+//
+// Two independent opt-in mechanisms, composable:
+//
+//   SANDBOX_SSH_AGENT_FORWARD=1
+//     Bind-mounts $SSH_AUTH_SOCK into the container and sets
+//     SSH_AUTH_SOCK to the container path. Private keys stay on the
+//     host — the agent on the host signs on behalf of the container.
+//
+//   SANDBOX_MOUNT_CONFIGS=gh,gitconfig
+//     CSV of allowlisted config mounts. Each name resolves to a fixed
+//     host path via the server-side ALLOWED_CONFIG_MOUNTS map; users
+//     cannot pass arbitrary paths.
+//
+// See docs/sandbox-credentials.md for the user-facing contract.
+
+import path from "node:path";
+import fs from "node:fs";
+import { homedir } from "node:os";
+import { log } from "../logger/index.js";
+
+// ── Config-mount allowlist ──────────────────────────────────────────
+
+export interface SandboxMountSpec {
+  /** The short name users type in SANDBOX_MOUNT_CONFIGS. */
+  name: string;
+  /** Absolute path on the host. Resolved from `$HOME` at lookup. */
+  hostPath: string;
+  /** Absolute path inside the container (must match where the tool looks). */
+  containerPath: string;
+  /** Whether the host path is expected to be a file or a directory. */
+  kind: "file" | "dir";
+  /** Short human description — shown in docs and in startup logs. */
+  description: string;
+}
+
+/**
+ * Build the allowlist. Parameterized on `home` so tests can inject a
+ * temp directory without touching the real filesystem.
+ *
+ * To add a new tool:
+ * 1. Append a row here with the host path the tool reads on startup
+ *    and the container path it should find the same file at.
+ * 2. Add a row in docs/sandbox-credentials.md.
+ * 3. That's it — no env var changes, no parser changes.
+ */
+export function buildAllowedConfigMounts(
+  home: string = homedir(),
+): Record<string, SandboxMountSpec> {
+  return {
+    gh: {
+      name: "gh",
+      hostPath: path.join(home, ".config", "gh"),
+      containerPath: "/home/node/.config/gh",
+      kind: "dir",
+      description: "GitHub CLI auth token + hosts config",
+    },
+    gitconfig: {
+      name: "gitconfig",
+      hostPath: path.join(home, ".gitconfig"),
+      containerPath: "/home/node/.gitconfig",
+      kind: "file",
+      description: "Git user identity (name, email, signing key)",
+    },
+  };
+}
+
+// ── Name parsing / validation ──────────────────────────────────────
+
+export interface ParsedMountList {
+  /** Names that resolved to a spec. Order preserved. */
+  resolved: SandboxMountSpec[];
+  /** Names the user requested that aren't in the allowlist. */
+  unknown: string[];
+  /** Names whose host path does not exist — silently skipped. */
+  missing: SandboxMountSpec[];
+}
+
+/**
+ * Parse a CSV list of mount names, resolve against the allowlist,
+ * check that each host path exists. The three output buckets let the
+ * caller decide what to error on (unknown) vs warn on (missing).
+ */
+export function resolveMountNames(
+  names: readonly string[],
+  allowed: Record<string, SandboxMountSpec> = buildAllowedConfigMounts(),
+): ParsedMountList {
+  const resolved: SandboxMountSpec[] = [];
+  const unknown: string[] = [];
+  const missing: SandboxMountSpec[] = [];
+
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const spec = allowed[name];
+    if (!spec) {
+      unknown.push(name);
+      continue;
+    }
+    if (!hostPathExists(spec)) {
+      missing.push(spec);
+      continue;
+    }
+    resolved.push(spec);
+  }
+  return { resolved, unknown, missing };
+}
+
+function hostPathExists(spec: SandboxMountSpec): boolean {
+  try {
+    const stat = fs.statSync(spec.hostPath);
+    return spec.kind === "dir" ? stat.isDirectory() : stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+// ── Docker arg generation ──────────────────────────────────────────
+
+/**
+ * Return the `-v ...` argument pairs for the given resolved mounts.
+ * Always read-only. The caller splices these into the full docker
+ * argv in `buildDockerSpawnArgs`.
+ */
+export function configMountArgs(
+  resolved: readonly SandboxMountSpec[],
+): string[] {
+  const args: string[] = [];
+  for (const spec of resolved) {
+    args.push("-v", `${toDockerPath(spec.hostPath)}:${spec.containerPath}:ro`);
+  }
+  return args;
+}
+
+// ── SSH agent forward ──────────────────────────────────────────────
+
+/** Absolute container path the agent socket is bound to. */
+export const SSH_AGENT_CONTAINER_SOCK = "/ssh-agent";
+
+export interface SshAgentForwardResult {
+  args: string[];
+  /** When null, forward was requested but not possible; caller decides
+   *  whether to log once (we always log in the production driver). */
+  skippedReason: string | null;
+}
+
+/**
+ * Return the docker argv fragment that forwards the host SSH agent
+ * into the container. The agent socket is bind-mounted and
+ * `SSH_AUTH_SOCK` is re-pointed so ssh / git pick it up.
+ *
+ * Skipped (empty args + reason) when:
+ * - the flag is off
+ * - $SSH_AUTH_SOCK isn't set (no agent running on host)
+ * - the socket path doesn't exist on the host
+ */
+export function sshAgentForwardArgs(
+  enabled: boolean,
+  sshAuthSock: string | undefined,
+): SshAgentForwardResult {
+  if (!enabled) return { args: [], skippedReason: null };
+  if (!sshAuthSock || sshAuthSock.length === 0) {
+    return {
+      args: [],
+      skippedReason: "SSH_AUTH_SOCK not set on host",
+    };
+  }
+  if (!fs.existsSync(sshAuthSock)) {
+    return {
+      args: [],
+      skippedReason: `SSH_AUTH_SOCK=${sshAuthSock} not found on host`,
+    };
+  }
+  return {
+    args: [
+      "-v",
+      `${toDockerPath(sshAuthSock)}:${SSH_AGENT_CONTAINER_SOCK}`,
+      "-e",
+      `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
+    ],
+    skippedReason: null,
+  };
+}
+
+// ── Top-level resolver used by buildDockerSpawnArgs ────────────────
+
+export interface ResolvedSandboxAuth {
+  /** docker argv additions: a list of `-v` / `-e` tokens. */
+  args: string[];
+  /** Descriptions the caller can log once to show what got mounted. */
+  appliedDescriptions: string[];
+}
+
+export interface ResolveSandboxAuthParams {
+  sshAgentForward: boolean;
+  configMountNames: readonly string[];
+  sshAuthSock?: string | undefined;
+  home?: string;
+}
+
+/**
+ * Combine the two mechanisms. Emits a `log.warn` for unknown names
+ * (configuration error the user should fix), a `log.info` for missing
+ * paths (expected when a user hasn't set up the tool), and a
+ * `log.info` line listing what actually got mounted so the startup
+ * log shows the sandbox's effective auth posture.
+ */
+export function resolveSandboxAuth(
+  params: ResolveSandboxAuthParams,
+): ResolvedSandboxAuth {
+  const home = params.home ?? homedir();
+  const allowed = buildAllowedConfigMounts(home);
+  const parsed = resolveMountNames(params.configMountNames, allowed);
+
+  if (parsed.unknown.length > 0) {
+    log.warn("sandbox", "unknown SANDBOX_MOUNT_CONFIGS entries ignored", {
+      unknown: parsed.unknown,
+      allowed: Object.keys(allowed),
+    });
+  }
+  for (const spec of parsed.missing) {
+    log.info("sandbox", "config mount skipped (host path missing)", {
+      name: spec.name,
+      hostPath: spec.hostPath,
+    });
+  }
+
+  const sshResult = sshAgentForwardArgs(
+    params.sshAgentForward,
+    params.sshAuthSock,
+  );
+  if (sshResult.skippedReason !== null) {
+    log.warn("sandbox", "SSH agent forward requested but skipped", {
+      reason: sshResult.skippedReason,
+    });
+  }
+
+  const args = [...configMountArgs(parsed.resolved), ...sshResult.args];
+  const appliedDescriptions = [
+    ...parsed.resolved.map((s) => `${s.name} (${s.description})`),
+    ...(sshResult.args.length > 0 ? ["ssh-agent forward"] : []),
+  ];
+
+  if (appliedDescriptions.length > 0) {
+    log.info("sandbox", "host credentials attached to container", {
+      mounts: appliedDescriptions,
+    });
+  }
+
+  return { args, appliedDescriptions };
+}
+
+// ── Utilities ──────────────────────────────────────────────────────
+
+// Docker accepts POSIX-style paths even on Windows when using
+// Docker Desktop, and the rest of the codebase already uses this
+// helper in buildDockerSpawnArgs.
+function toDockerPath(p: string): string {
+  return p.replace(/\\/g, "/");
+}

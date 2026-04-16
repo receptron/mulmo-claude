@@ -62,6 +62,10 @@ export const env = Object.freeze({
 
   // Sandbox / Docker
   disableSandbox: asFlag(process.env.DISABLE_SANDBOX),
+  // Host-credential opt-ins for the Docker sandbox (#259). Both off
+  // by default. See docs/sandbox-credentials.md for the contract.
+  sandboxSshAgentForward: asFlag(process.env.SANDBOX_SSH_AGENT_FORWARD),
+  sandboxMountConfigs: asCsv(process.env.SANDBOX_MOUNT_CONFIGS),
 
   // API credentials (undefined when not configured)
   geminiApiKey: process.env.GEMINI_API_KEY,

@@ -26,6 +26,8 @@ import {
 } from "./agent/stream.js";
 import { log } from "./logger/index.js";
 import { EVENT_TYPES } from "../src/types/events.js";
+import { env } from "./env.js";
+import { resolveSandboxAuth } from "./agent/sandboxMounts.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -40,12 +42,18 @@ function spawnClaude(
       stdio: ["pipe", "pipe", "pipe"],
     });
   }
+  const sandboxAuth = resolveSandboxAuth({
+    sshAgentForward: env.sandboxSshAgentForward,
+    configMountNames: env.sandboxMountConfigs,
+    sshAuthSock: process.env.SSH_AUTH_SOCK,
+  });
   const dockerArgs = buildDockerSpawnArgs({
     workspacePath,
     cliArgs,
     uid: process.getuid?.() ?? 1000,
     gid: process.getgid?.() ?? 1000,
     platform: process.platform,
+    sandboxAuthArgs: sandboxAuth.args,
   });
   return spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
 }

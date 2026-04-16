@@ -25,6 +25,15 @@ The container runs with `--cap-drop ALL` and as the host user's UID/GID, so it h
 
 Set the environment variable `DISABLE_SANDBOX=1` to always run the agent directly on the host, even when Docker is available.
 
+## Host Credentials (opt-in)
+
+The sandbox is credential-free by default. Two opt-in flags let you expose the minimum needed for `git` / `gh` to authenticate without leaking private keys into the container:
+
+- `SANDBOX_SSH_AGENT_FORWARD=1` — forwards the host's SSH agent socket (private keys stay on the host).
+- `SANDBOX_MOUNT_CONFIGS=gh,gitconfig` — allowlisted read-only config mounts.
+
+Full contract, what's deliberately excluded, and troubleshooting: [`docs/sandbox-credentials.md`](../../docs/sandbox-credentials.md).
+
 ## First-Time Setup (macOS)
 
 On macOS, the Docker container uses a separate credential store from the host. Before using the sandbox for the first time (and whenever the credential expires), run:

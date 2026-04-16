@@ -271,6 +271,23 @@ describe("buildDockerSpawnArgs", () => {
     const args = buildDockerSpawnArgs(baseParams());
     assert.ok(args.includes("mulmoclaude-sandbox"));
   });
+
+  it("splices sandboxAuthArgs in before the image name (#259)", () => {
+    const args = buildDockerSpawnArgs({
+      ...baseParams(),
+      sandboxAuthArgs: ["-v", "/host/.config/gh:/home/node/.config/gh:ro"],
+    });
+    const authIdx = args.indexOf("/host/.config/gh:/home/node/.config/gh:ro");
+    const imageIdx = args.indexOf("mulmoclaude-sandbox");
+    assert.ok(authIdx >= 0, "expected sandboxAuthArgs to be present");
+    assert.ok(authIdx < imageIdx, "auth mounts must land before image name");
+  });
+
+  it("defaults to no sandbox auth args when omitted", () => {
+    const args = buildDockerSpawnArgs(baseParams());
+    assert.ok(!args.some((a) => a.includes(".config/gh")));
+    assert.ok(!args.some((a) => a.includes("SSH_AUTH_SOCK")));
+  });
 });
 
 describe("rewriteLocalhostForDocker", () => {

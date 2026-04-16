@@ -342,6 +342,9 @@ export interface DockerSpawnArgsParams {
   platform: Platform;
   projectRoot?: string;
   homeDir?: string;
+  /** Extra `-v` / `-e` tokens for opt-in host credentials (#259).
+   *  Built by `resolveSandboxAuth` in `sandboxMounts.ts`. Default []. */
+  sandboxAuthArgs?: readonly string[];
 }
 
 // Pure helper that returns the full `docker run ... claude <args>`
@@ -356,6 +359,7 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     platform,
     projectRoot = process.cwd(),
     homeDir = homedir(),
+    sandboxAuthArgs = [],
   } = params;
   const toDockerPath = (p: string): string => p.replace(/\\/g, "/");
   const extraHosts: string[] =
@@ -388,6 +392,7 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     `${toDockerPath(homeDir)}/.claude:/home/node/.claude`,
     "-v",
     `${toDockerPath(homeDir)}/.claude.json:/home/node/.claude.json`,
+    ...sandboxAuthArgs,
     ...extraHosts,
     "mulmoclaude-sandbox",
     "claude",

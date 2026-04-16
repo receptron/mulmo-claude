@@ -61,6 +61,8 @@ All env vars are **optional unless flagged "required"**. The server reads them a
 | `PORT` | `3001` | Express listen port (`server/index.ts:47`). |
 | `NODE_ENV` | unset / `production` | When `production`, Express serves the built client from `dist/client` and falls back to `index.html` for SPA history-mode routing. Auto-set by tooling — you rarely set this manually. |
 | `DISABLE_SANDBOX` | unset | Set to `1` to bypass the Docker sandbox even when Docker is available. The agent runs `claude` directly on the host. Useful for debugging without container rebuild overhead (`server/docker.ts:49`, `server/index.ts:147`). |
+| `SANDBOX_SSH_AGENT_FORWARD` | unset | Set to `1` to forward the host's `$SSH_AUTH_SOCK` into the sandbox. Private keys stay on the host; the agent signs on the container's behalf. Full contract: [docs/sandbox-credentials.md](sandbox-credentials.md). |
+| `SANDBOX_MOUNT_CONFIGS` | unset | CSV of allowlisted config mounts (currently `gh`, `gitconfig`). Each entry resolves to a fixed host→container path pair defined in `server/agent/sandboxMounts.ts`; unknown names are logged and ignored. |
 | `SESSIONS_LIST_WINDOW_DAYS` | `90` | Caps how far back the sidebar looks when listing chat sessions (`server/routes/sessions.ts`). Set to `0` to disable the cutoff entirely. Introduced in PR #203 to keep `GET /api/sessions` cheap on long-lived workspaces; anything older is still on disk, just hidden from the list. |
 
 ### Debug startup hooks
