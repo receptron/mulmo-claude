@@ -13,6 +13,7 @@
     "server": "tsx server/index.ts",
     "server:debug": "tsx server/index.ts --debug",
     "cli": "tsx bridges/cli/index.ts",
+    "telegram": "tsx bridges/telegram/index.ts",
     "lint": "eslint src server test e2e bridges",
     "format": "prettier --write '{src,server,test,e2e,bridges}/**/*.{ts,json,yaml,vue}'",
     "typecheck": "vue-tsc --noEmit",
