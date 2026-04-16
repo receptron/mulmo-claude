@@ -22,6 +22,7 @@ import filesRoutes from "./routes/files.js";
 import configRoutes from "./routes/config.js";
 import skillsRoutes from "./routes/skills.js";
 import chatServiceRoutes from "./chat-service/index.js";
+import { attachChatSocket } from "./chat-service/socket.js";
 import { serverError } from "./utils/httpError.js";
 import {
   mcpToolsRouter,
@@ -249,6 +250,9 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
 
   // --- Pub/Sub ---
   const pubsub = createPubSub(httpServer);
+
+  // --- Chat socket (Phase A of #268) ---
+  attachChatSocket(httpServer);
 
   // --- Session Store ---
   initSessionStore(pubsub);

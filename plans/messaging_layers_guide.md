@@ -63,10 +63,12 @@ and talk to MulmoClaude via HTTP, just like the Web UI does.
 │   Speaks one platform's protocol, and ONLY that protocol.  │
 │   Stateless — knows nothing about sessions or roles.       │
 └─────────────┬──────────────────────────────────────────────┘
-              │ HTTP: POST /api/chat/{transportId}/{externalChatId}
+              │ socket.io /ws/chat  (or legacy HTTP /api/chat/...)
 ┌─────────────▼──────────────────────────────────────────────┐
 │ Layer 3: Chat Service API + state (server-side)            │
-│   server/chat-service/index.ts    ← HTTP endpoints         │
+│   server/chat-service/socket.ts   ← socket.io transport    │
+│   server/chat-service/index.ts    ← legacy HTTP endpoints  │
+│   server/chat-service/relay.ts    ← shared flow            │
 │   server/chat-service/chat-state.ts  ← session pointer     │
 │   server/chat-service/commands.ts    ← /reset, /role, etc. │
 │   Receives raw text, manages sessions, invokes the agent.  │
@@ -120,6 +122,13 @@ above this layer is under our control.
 ### Layer 2 — Bridge processes
 
 Per-platform code running as **separate child processes** of MulmoClaude.
+The wire protocol is **socket.io** on `/ws/chat` (see issue #268 /
+`plans/feat-chat-socketio.md`). The legacy HTTP endpoint
+`POST /api/chat/{transportId}/{externalChatId}` is kept for backwards
+compatibility and will be deprecated in Phase D. New bridges should use
+socket.io; the protocol is otherwise identical (transportId at handshake,
+message payload with externalChatId + text, ack returns the reply).
+
 Each bridge is a small, self-contained program:
 
 ```
