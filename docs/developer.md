@@ -183,6 +183,24 @@ The `configs/` dir is the home for the [web Settings UI](../README.md#configurin
 
 ---
 
+## Centralized constants (`as const` modules)
+
+Cross-module string literals (endpoint paths, tool names, role IDs, etc.) are defined once and imported everywhere. A typo in an import key fails typecheck; a typo in a raw string literal silently produces a runtime 404 or broken channel.
+
+| Constant | Module | Consumers |
+|---|---|---|
+| `API_ROUTES` | `src/config/apiRoutes.ts` | Server route files (`router.post(API_ROUTES.todos.items, ...)`), frontend fetch calls (`fetch(API_ROUTES.todos.items)`), MCP bridge `postJson` calls |
+| `EVENT_TYPES` / `EventType` | `src/types/events.ts` | SSE stream emitters, pub-sub session events, chat jsonl parsers, `AgentEvent` union discriminators |
+| `WORKSPACE_PATHS` / `WORKSPACE_DIRS` | `server/workspace-paths.ts` | Every server module that reads or writes workspace files |
+| `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` | Role definitions (`availablePlugins`), plugin registry, session-store tool matching |
+| `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` | Anywhere a built-in role ID appears outside the role definition itself |
+| `PUBSUB_CHANNELS` / `sessionChannel()` | `src/config/pubsubChannels.ts` | Pub-sub publish/subscribe sites in session-store and task-manager |
+| `EVENT_TYPES` / `EventType` | `src/types/events.ts` | SSE event type discriminants in agent loop, session store, and frontend dispatch |
+
+**Convention**: add new entries to the appropriate module before writing the first consumer. Keep the `as const` assertion so TypeScript infers literal types, not `string`.
+
+---
+
 ## Docker sandbox (`Dockerfile.sandbox`)
 
 Minimal image: `node:22-slim` + `@anthropic-ai/claude-code` + `tsx`. Built lazily on first Docker-mode run; rebuilt when `Dockerfile.sandbox` changes (image SHA pinned in code). `yarn sandbox:remove` forces a rebuild.
