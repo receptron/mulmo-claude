@@ -5,7 +5,7 @@
       data-testid="sandbox-lock-button"
       :class="
         sandboxEnabled
-          ? 'text-green-500 hover:text-green-700'
+          ? 'text-gray-400 hover:text-gray-700'
           : 'text-amber-400 hover:text-amber-500'
       "
       :title="

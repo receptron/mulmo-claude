@@ -209,7 +209,7 @@ test.describe("creating a new session", () => {
 
     // URL should change to a new session ID (not SESSION_A.id).
     await expect(page).not.toHaveURL(new RegExp(SESSION_A.id));
-    // Input should be focusable on the new session.
-    await expect(page.getByTestId("user-input")).toBeVisible();
+    // Input should be focused on the new session (see #300).
+    await expect(page.getByTestId("user-input")).toBeFocused();
   });
 });

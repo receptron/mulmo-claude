@@ -19,14 +19,6 @@
         </div>
         <div class="flex gap-2">
           <button
-            class="text-gray-400 hover:text-gray-700"
-            data-testid="new-session-btn"
-            title="New session"
-            @click="createNewSession()"
-          >
-            <span class="material-icons">add_circle_outline</span>
-          </button>
-          <button
             ref="historyButtonRef"
             data-testid="history-btn"
             class="relative text-gray-400 hover:text-gray-700"
@@ -127,7 +119,16 @@
       </div>
 
       <!-- Session tab bar -->
-      <div class="px-2 py-1 border-b border-gray-200 flex gap-1">
+      <div class="px-2 py-1 border-b border-gray-200 flex gap-1 items-center">
+        <button
+          class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+          data-testid="new-session-btn"
+          title="New session"
+          aria-label="New session"
+          @click="createNewSession()"
+        >
+          <span class="material-icons text-sm">add</span>
+        </button>
         <template v-for="i in 6" :key="i">
           <button
             v-if="tabSessions[i - 1]"
@@ -1110,6 +1111,7 @@ function createNewSession(roleId?: string): ActiveSession {
   navigateToSession(id, true);
   currentRoleId.value = rId;
   queriesExpanded.value = false;
+  nextTick(() => textareaRef.value?.focus());
   return sessionMap.get(id)!;
 }
 
