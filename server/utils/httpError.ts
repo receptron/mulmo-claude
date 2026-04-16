@@ -39,6 +39,11 @@ export function badRequest(res: Response, error: string): Response {
   return sendError(res, 400, error);
 }
 
+/** 401 Unauthorized — missing or invalid credentials. */
+export function unauthorized(res: Response, error: string): Response {
+  return sendError(res, 401, error);
+}
+
 /** 403 Forbidden — auth present but not authorised for the resource. */
 export function forbidden(res: Response, error: string): Response {
   return sendError(res, 403, error);

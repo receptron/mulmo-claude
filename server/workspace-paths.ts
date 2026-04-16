@@ -58,6 +58,13 @@ export const WORKSPACE_DIRS = {
 // File names at the workspace root (not under a subdirectory).
 export const WORKSPACE_FILES = {
   memory: "memory.md",
+  // Bearer auth token (#272). Written at server startup, mode 0600, read
+  // by the Vite plugin (dev) / Express HTML serve (prod) to inject into
+  // the `<meta name="mulmoclaude-auth">` tag, and by CLI bridges
+  // (Phase 2) to pick up Authorization headers. Deleted on graceful
+  // shutdown; stale files after a crash are harmless since the next
+  // startup regenerates and the in-memory token is the only one checked.
+  sessionToken: ".session-token",
 } as const;
 
 // Absolute paths, built once at module load from `workspacePath`.
@@ -86,6 +93,7 @@ export const WORKSPACE_PATHS = {
   html: path.join(workspacePath, WORKSPACE_DIRS.html),
   transports: path.join(workspacePath, WORKSPACE_DIRS.transports),
   memory: path.join(workspacePath, WORKSPACE_FILES.memory),
+  sessionToken: path.join(workspacePath, WORKSPACE_FILES.sessionToken),
 } as const;
 
 export type WorkspaceDirKey = keyof typeof WORKSPACE_DIRS;

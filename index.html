@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Bearer auth token (#272). The placeholder string is rewritten
+      per-request:
+        - dev:  Vite plugin `mulmoclaudeAuthTokenPlugin` in vite.config.ts
+                reads `<workspace>/.session-token` and substitutes.
+        - prod: Express handler in `server/index.ts` substitutes when
+                serving the built client/index.html.
+      Vue bootstrap (src/main.ts) reads the content attribute and calls
+      setAuthToken() so every apiFetch attaches an Authorization header.
+    -->
+    <meta name="mulmoclaude-auth" content="__MULMOCLAUDE_AUTH_TOKEN__" />
     <title>MulmoClaude</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   </head>

@@ -45,9 +45,17 @@ import type { ITaskManager } from "./task-manager/index.js";
 import type { IPubSub } from "./pub-sub/index.js";
 import { initSessionStore } from "./session-store/index.js";
 import { requireSameOrigin } from "./csrfGuard.js";
+import { bearerAuth } from "./auth/bearerAuth.js";
+import {
+  deleteTokenFile,
+  generateAndWriteToken,
+  getCurrentToken,
+} from "./auth/token.js";
 import { log } from "./logger/index.js";
 import { startChat } from "./routes/agent.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
+
+const HTML_TOKEN_PLACEHOLDER = "__MULMOCLAUDE_AUTH_TOKEN__";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +88,14 @@ app.use(express.json({ limit: "50mb" }));
 // localhost (#148); if that ever changes, tighten this middleware
 // too. See plans/done/fix-server-csrf-origin-check.md.
 app.use(requireSameOrigin);
+
+// Bearer token auth: every `/api/*` request must carry
+// `Authorization: Bearer <token>` matching the per-startup token.
+// Layered *on top of* CSRF guard so we catch both cross-origin
+// browser attacks (origin check) and local sibling processes that
+// bypass browser CORS (bearer check). See #272 and
+// plans/feat-bearer-token-auth.md.
+app.use("/api", bearerAuth);
 
 app.get(API_ROUTES.health, (_req: Request, res: Response) => {
   res.json({
@@ -124,9 +140,25 @@ app.use(
 app.use(mcpToolsRouter);
 
 if (env.isProduction) {
-  app.use(express.static(path.join(__dirname, "../client")));
+  // `{ index: false }` so express.static doesn't intercept `GET /`
+  // with the built index.html. We need our own handler that reads
+  // the file and substitutes the bearer token placeholder on each
+  // request — see the `app.get("*")` fallback below.
+  app.use(express.static(path.join(__dirname, "../client"), { index: false }));
+  const indexHtmlPath = path.join(__dirname, "../client/index.html");
   app.get("*", (_req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, "../client/index.html"));
+    let html: string;
+    try {
+      html = fs.readFileSync(indexHtmlPath, "utf-8");
+    } catch (err) {
+      log.error("server", "failed to read index.html", { error: String(err) });
+      serverError(res, "Internal Server Error");
+      return;
+    }
+    const token = getCurrentToken() ?? "";
+    html = html.replace(HTML_TOKEN_PLACEHOLDER, token);
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
   });
 }
 
@@ -281,6 +313,26 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   maybeForceChatIndexBackfill();
 }
 
+// Graceful shutdown: best-effort cleanup of the auth token file so
+// other readers (Vite plugin, future bridges) don't latch onto a
+// dead token. Crashes that skip this are harmless — see
+// plans/feat-bearer-token-auth.md; the next startup overwrites and
+// the stale file's token no longer matches the live in-memory one.
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  log.info("server", "shutting down", { signal });
+  await deleteTokenFile();
+  process.exit(0);
+}
+process.on("SIGINT", () => {
+  gracefulShutdown("SIGINT").catch(() => process.exit(1));
+});
+process.on("SIGTERM", () => {
+  gracefulShutdown("SIGTERM").catch(() => process.exit(1));
+});
+
 (async () => {
   const portFree = await isPortFree(PORT);
   if (!portFree) {
@@ -290,6 +342,14 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
     );
     process.exit(1);
   }
+
+  // Generate the bearer token before `app.listen` so the first
+  // request cannot race an uninitialised `getCurrentToken()`. The
+  // middleware defensively handles the null case anyway (401).
+  await generateAndWriteToken();
+  log.info("auth", "bearer token written", {
+    path: WORKSPACE_PATHS.sessionToken,
+  });
 
   sandboxEnabled = await setupSandbox();
   logMcpStatus();

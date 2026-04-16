@@ -14,5 +14,10 @@ export default defineConfig({
     port: 5173,
     reuseExistingServer: true,
     timeout: 15_000,
+    // Inject a fixed bearer token into the dev HTML so tests can
+    // assert the auth flow end-to-end without touching the real
+    // user's `~/mulmoclaude/.session-token`. See
+    // vite.config.ts#readDevToken and #272 Phase 1 plan.
+    env: { MULMOCLAUDE_AUTH_TOKEN: "e2e-test-token" },
   },
 });

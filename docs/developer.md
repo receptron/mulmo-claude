@@ -175,11 +175,40 @@ Three independent Node processes cooperate at runtime:
   configs/            settings.json, mcp.json (web Settings UI)
   helps/              synced from server/helps/ at every boot
   memory.md           always-loaded agent context
+  .session-token      bearer auth token (mode 0600, see Auth below)
   .git/               auto-init'd repo
   .mulmoclaude/       internal: per-session MCP config files
 ```
 
 The `configs/` dir is the home for the [web Settings UI](../README.md#configuring-additional-tools-web-settings) — `settings.json` carries `extraAllowedTools`, `mcp.json` follows Claude CLI's `--mcp-config` format so you can copy it between machines.
+
+---
+
+## Auth (bearer token on `/api/*`)
+
+Every HTTP call to `/api/*` requires `Authorization: Bearer <token>`. Layered on top of the CSRF origin check (`server/csrfGuard.ts`): **both** must pass. The origin check stops cross-origin browser attacks; the bearer check stops sibling processes on the same machine that bypass browser CORS entirely.
+
+**Token lifecycle**
+
+| Event | What happens |
+|---|---|
+| Server start | `generateAndWriteToken()` writes a fresh 32-byte hex token to `<workspace>/.session-token` (mode 0600) |
+| Vue page load / reload / new tab | Vite plugin (dev) / Express handler (prod) reads the file and substitutes `<meta name="mulmoclaude-auth" content="…">` into index.html |
+| Vue bootstrap (`src/main.ts`) | Reads the meta tag, calls `setAuthToken()` so every `apiFetch` attaches the header |
+| HMR | No file I/O — token stays in Vue memory, SPA never reloads |
+| `SIGINT` / `SIGTERM` | Best-effort `unlink` of `.session-token` |
+| Crash / `kill -9` | File may linger — harmless, next startup generates a new token and the stale value no longer matches |
+
+**Dev-mode escape hatch**: setting `MULMOCLAUDE_AUTH_TOKEN=…` before `yarn dev:client` makes the Vite plugin use that value instead of reading the file. Used by `e2e/playwright.config.ts` to inject a predictable token in E2E; also handy for debugging without a running server. Production (Express serving built HTML) never reads env — the in-memory token from `generateAndWriteToken()` is the sole source.
+
+**Current scope** (#272 Phase 1+2): Vue client, Express middleware, and the CLI bridge (`yarn cli`). The bridge reads the same `.session-token` file (or `MULMOCLAUDE_AUTH_TOKEN` env var) on startup and attaches the header to its `fetch` calls.
+
+**Files**
+- `server/auth/token.ts` — generate / write / unlink
+- `server/auth/bearerAuth.ts` — Express middleware
+- `src/utils/api.ts` — `setAuthToken()` + header injection (no call site changes needed; `apiFetch` auto-attaches)
+- `vite.config.ts` — `mulmoclaudeAuthTokenPlugin` for dev HTML substitution
+- `bridges/cli/token.ts` — bridge-side resolver (env var → file)
 
 ---
 
