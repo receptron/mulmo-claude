@@ -38,7 +38,13 @@ describe("useSessionHistory — error surfacing (#280)", () => {
     // Prime the list with a successful fetch.
     stubFetch(async () =>
       mockJsonResponse(200, [
-        { id: "s1", roleId: "general", startedAt: "", updatedAt: "", preview: "" },
+        {
+          id: "s1",
+          roleId: "general",
+          startedAt: "",
+          updatedAt: "",
+          preview: "",
+        },
       ]),
     );
     await fetchSessions();
@@ -46,9 +52,7 @@ describe("useSessionHistory — error surfacing (#280)", () => {
     assert.equal(historyError.value, null);
 
     // Simulate a 500 — the existing list must survive.
-    stubFetch(async () =>
-      mockJsonResponse(500, { error: "server exploded" }),
-    );
+    stubFetch(async () => mockJsonResponse(500, { error: "server exploded" }));
     const result = await fetchSessions();
 
     assert.equal(sessions.value.length, 1, "sessions preserved on failure");
@@ -78,8 +82,20 @@ describe("useSessionHistory — error surfacing (#280)", () => {
 
     stubFetch(async () =>
       mockJsonResponse(200, [
-        { id: "a", roleId: "general", startedAt: "", updatedAt: "", preview: "" },
-        { id: "b", roleId: "general", startedAt: "", updatedAt: "", preview: "" },
+        {
+          id: "a",
+          roleId: "general",
+          startedAt: "",
+          updatedAt: "",
+          preview: "",
+        },
+        {
+          id: "b",
+          roleId: "general",
+          startedAt: "",
+          updatedAt: "",
+          preview: "",
+        },
       ]),
     );
     const first = await fetchSessions();

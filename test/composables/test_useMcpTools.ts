@@ -71,7 +71,8 @@ describe("useMcpTools — error surfacing (#280)", () => {
     await fetchMcpToolsStatus();
 
     assert.ok(
-      mcpToolsError.value && /Unexpected response shape/.test(mcpToolsError.value),
+      mcpToolsError.value &&
+        /Unexpected response shape/.test(mcpToolsError.value),
       "shape-error populated",
     );
   });
