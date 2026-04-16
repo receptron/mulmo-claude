@@ -9,7 +9,7 @@ import {
   resolveWithinRoot,
 } from "../utils/fs.js";
 import { errorMessage } from "../utils/errors.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

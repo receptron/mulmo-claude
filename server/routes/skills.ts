@@ -18,7 +18,7 @@ import {
 } from "../skills/index.js";
 import type { Skill, SkillSummary } from "../skills/index.js";
 import { workspacePath } from "../workspace.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { log } from "../logger/index.js";
 
 const router = Router();

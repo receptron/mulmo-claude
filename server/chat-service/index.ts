@@ -11,7 +11,7 @@ import {
   connectSession,
 } from "./chat-state.js";
 import { handleCommand } from "./commands.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { readXPost, searchX } from "./x.js";
 import { errorMessage } from "../utils/errors.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 export interface McpTool {
   definition: {

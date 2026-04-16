@@ -4,7 +4,7 @@ import path from "path";
 import { WORKSPACE_PATHS } from "../workspace-paths.js";
 import { getGeminiClient, isGeminiAvailable } from "../utils/gemini.js";
 import { errorMessage } from "../utils/errors.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 const HTML_FILE = () => path.join(WORKSPACE_PATHS.html, "current.html");

@@ -5,7 +5,7 @@ import os from "os";
 import { loadCustomRoles } from "../roles.js";
 import { BUILTIN_ROLES, type Role } from "../../src/config/roles.js";
 import { pushSessionEvent } from "../session-store/index.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const rolesDir = path.join(os.homedir(), "mulmoclaude", "roles");
 const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((r) => r.id));

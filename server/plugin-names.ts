@@ -23,7 +23,7 @@ import CanvasDef from "../src/plugins/canvas/definition.js";
 import EditImageDef from "../src/plugins/editImage/definition.js";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
 import { TOOL_DEFINITION as MusicDef } from "@gui-chat-plugin/music";
-import { API_ROUTES } from "../src/api-routes.js";
+import { API_ROUTES } from "../src/config/apiRoutes.js";
 
 /** Maps plugin tool name → REST API endpoint. */
 export const TOOL_ENDPOINTS: Record<string, string> = {

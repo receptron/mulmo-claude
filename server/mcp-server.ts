@@ -7,7 +7,7 @@
 import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
-import { API_ROUTES } from "../src/api-routes.js";
+import { API_ROUTES } from "../src/config/apiRoutes.js";
 
 type JsonRpcId = string | number | null;
 

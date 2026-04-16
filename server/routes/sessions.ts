@@ -8,7 +8,7 @@ import { readManifest } from "../chat-index/indexer.js";
 import { resolveWithinRoot } from "../utils/fs.js";
 import type { ChatIndexEntry } from "../chat-index/types.js";
 import { markRead, getSession } from "../session-store/index.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 interface SessionMeta {
   roleId: string;

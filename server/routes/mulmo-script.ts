@@ -29,7 +29,7 @@ import {
   validateUpdateBeatBody,
   validateUpdateScriptBody,
 } from "./mulmoScriptValidate.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 const storiesDir = path.resolve(workspacePath, "stories");

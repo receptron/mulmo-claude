@@ -40,7 +40,7 @@ import { initSessionStore } from "./session-store/index.js";
 import { requireSameOrigin } from "./csrfGuard.js";
 import { log } from "./logger/index.js";
 import { startChat } from "./routes/agent.js";
-import { API_ROUTES } from "../src/api-routes.js";
+import { API_ROUTES } from "../src/config/apiRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,7 +83,7 @@ app.get(API_ROUTES.health, (_req: Request, res: Response) => {
 });
 
 // Routers register FULL `/api/...` paths internally (see
-// `src/api-routes.ts`), so they mount at root. The previous
+// `src/config/apiRoutes.ts`), so they mount at root. The previous
 // `app.use("/api", ...)` prefix was dropped when #289 part 1 moved
 // the `/api` literal into each `router.post(API_ROUTES.…)` call.
 app.use(agentRoutes);

@@ -40,7 +40,7 @@ import {
   type FetcherParams,
 } from "../sources/types.js";
 import { normalizeCategories, type CategorySlug } from "../sources/taxonomy.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

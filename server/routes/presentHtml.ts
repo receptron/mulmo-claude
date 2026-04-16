@@ -4,7 +4,7 @@ import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../workspace-paths.js";
 import { slugify } from "../utils/slug.js";
 import { errorMessage } from "../utils/errors.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

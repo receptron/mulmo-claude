@@ -11,7 +11,7 @@ import {
   type McpConfigFile,
   type McpServerEntry,
 } from "../config.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 // Public surface of /api/config. GET returns the full config tree so
 // the client can render every section in one request. PUT surfaces are

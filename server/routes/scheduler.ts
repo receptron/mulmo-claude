@@ -11,7 +11,7 @@ import {
   type DispatchSuccessResponse,
   type DispatchErrorResponse,
 } from "./dispatchResponse.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

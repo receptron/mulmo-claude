@@ -1,4 +1,4 @@
-# refactor: centralize `/api/*` endpoint paths into `src/api-routes.ts` (issue #289, part 1)
+# refactor: centralize `/api/*` endpoint paths into `src/config/apiRoutes.ts` (issue #289, part 1)
 
 ## Context
 
@@ -15,7 +15,7 @@ Currently:
 
 **Server only.** The issue lists "frontend + backend" migration as the end state, but the Vue side conflicts with in-flight PR #279 (`refactor/consolidate-api-fetch`), so:
 
-1. Add `src/api-routes.ts` as the shared source of truth with every `/api/...` path the server exposes.
+1. Add `src/config/apiRoutes.ts` as the shared source of truth with every `/api/...` path the server exposes.
 2. Migrate all 77+1 server route registrations (router files + `server/index.ts` health check + mcp-tools) to reference the constants.
 3. Leave `fetch("/api/...")` calls in `src/**/*.vue` / `src/**/*.ts` untouched. Follow-up PR after #279 merges.
 
@@ -87,7 +87,7 @@ Previously `app.use("/api/mcp-tools", mcpToolsRouter)` with internal `router.get
 
 ## Checklist
 
-- [ ] `src/api-routes.ts` created
+- [ ] `src/config/apiRoutes.ts` created
 - [ ] `server/index.ts` mount prefix removed + health check uses const
 - [ ] 19 router files migrated (+ mcp-tools)
 - [ ] `yarn format && yarn lint && yarn typecheck && yarn build`

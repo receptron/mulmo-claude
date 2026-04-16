@@ -4,7 +4,7 @@ import fsp from "node:fs/promises";
 import path from "path";
 import { WORKSPACE_PATHS } from "../workspace-paths.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

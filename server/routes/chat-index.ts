@@ -12,7 +12,7 @@
 import { Router, Request, Response } from "express";
 import { backfillAllSessions } from "../chat-index/index.js";
 import { log } from "../logger/index.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 interface RebuildResponse {
   total: number;

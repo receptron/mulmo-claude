@@ -7,7 +7,7 @@ import { errorMessage } from "../utils/errors.js";
 import { workspacePath } from "../workspace.js";
 import { resolveWithinRoot } from "../utils/fs.js";
 import { log } from "../logger/index.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 

@@ -21,7 +21,7 @@ import { maybeAppendWikiBacklinks } from "../wiki-backlinks/index.js";
 import { log } from "../logger/index.js";
 import { logBackgroundError } from "../utils/logBackgroundError.js";
 import { createArgsCache, recordToolEvent } from "../tool-trace/index.js";
-import { API_ROUTES } from "../../src/api-routes.js";
+import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
 const router = Router();
 const PORT = Number(process.env.PORT) || 3001;
