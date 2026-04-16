@@ -4,6 +4,7 @@ import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "../mcp-tools/index.js";
 import { MCP_PLUGIN_NAMES } from "../plugin-names.js";
 import type { McpServerSpec } from "../config.js";
+import { getCurrentToken } from "../auth/token.js";
 
 export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 
@@ -146,6 +147,13 @@ function buildMulmoclaudeServer(params: {
       }
     : {};
 
+  // Bearer token for MCP subprocess to call /api/* back to this server
+  // (#272). The MCP bridge also has a file-read fallback from
+  // <workspace>/.session-token, but env is faster and works in Docker
+  // where the token file may not be bind-mounted.
+  const token = getCurrentToken();
+  const authEnv = token ? { MULMOCLAUDE_AUTH_TOKEN: token } : {};
+
   return {
     command,
     args: [mcpServerPath],
@@ -154,6 +162,7 @@ function buildMulmoclaudeServer(params: {
       PORT: String(port),
       PLUGIN_NAMES: activePlugins.join(","),
       ROLE_IDS: roleIds.join(","),
+      ...authEnv,
       ...dockerEnv,
     },
   };

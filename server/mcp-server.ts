@@ -4,12 +4,14 @@
  * back to the active frontend SSE stream via the session registry.
  */
 
+import fs from "node:fs";
 import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
 import { errorMessage } from "./utils/errors.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { env } from "./env.js";
+import { WORKSPACE_PATHS } from "./workspace-paths.js";
 
 type JsonRpcId = string | number | null;
 
@@ -34,6 +36,24 @@ const PLUGIN_NAMES = env.mcpPluginNames;
 const ROLE_IDS = env.mcpRoleIds;
 const MCP_HOST = env.mcpHost;
 const BASE_URL = `http://${MCP_HOST}:${PORT}`;
+
+// Bearer token for /api/* calls back to the parent server (#272).
+// The parent writes it to <workspace>/.session-token at startup; we
+// read once at module load — the token is immutable for the server's
+// lifetime. Same resolution order as bridges/cli/token.ts.
+function readSessionToken(): string {
+  const fromEnv = process.env.MULMOCLAUDE_AUTH_TOKEN;
+  if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv;
+  try {
+    return fs.readFileSync(WORKSPACE_PATHS.sessionToken, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+const SESSION_TOKEN = readSessionToken();
+const AUTH_HEADER: Record<string, string> = SESSION_TOKEN
+  ? { Authorization: `Bearer ${SESSION_TOKEN}` }
+  : {};
 
 interface ToolDef {
   name: string;
@@ -129,7 +149,7 @@ async function postJson(
       `${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...AUTH_HEADER },
         body: JSON.stringify(body),
       },
     );
@@ -163,7 +183,7 @@ async function fetchSkillsList(): Promise<{ name: string }[]> {
   const url = `${BASE_URL}/api/skills?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await fetch(url, { headers: AUTH_HEADER });
   } catch (err) {
     throw new Error(`Network error calling /api/skills: ${errorMessage(err)}`);
   }
@@ -230,7 +250,10 @@ async function handleManageSkillsDelete(
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${url}`, { method: "DELETE" });
+    res = await fetch(`${BASE_URL}${url}`, {
+      method: "DELETE",
+      headers: AUTH_HEADER,
+    });
   } catch (err) {
     throw new Error(
       `Network error calling DELETE ${url}: ${errorMessage(err)}`,
