@@ -243,7 +243,7 @@ import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { TextResponseData } from "@gui-chat-plugin/text-response";
+import type { TextResponseData } from "../plugins/textResponse/types";
 import type { SchedulerData, ScheduledItem } from "../plugins/scheduler/index";
 import type { StatusColumn, TodoData, TodoItem } from "../plugins/todo/index";
 import {

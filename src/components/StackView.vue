@@ -97,9 +97,9 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { getPlugin } from "../tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import { View as TextResponseOriginalView } from "@gui-chat-plugin/text-response/vue";
+import { View as TextResponseOriginalView } from "../plugins/textResponse/index";
 import { handleExternalLinkClick } from "../utils/dom/externalLink";
-import type { TextResponseData } from "@gui-chat-plugin/text-response";
+import type { TextResponseData } from "../plugins/textResponse/types";
 
 // Most plugin viewComponents use h-full internally, so a defined parent
 // height is required for them to render. text-response and the
@@ -360,10 +360,9 @@ onUnmounted(() => {
   flex: 0 0 auto !important;
 }
 
-/* Collapse the nested chrome that @gui-chat-plugin/text-response
-   draws around its Markdown output so it reads like plain content
-   inside our stack card instead of creating a second border/shadow
-   "card" inside ours. */
+/* Collapse the nested chrome that text-response draws around its
+   Markdown output so it reads like plain content inside our stack card
+   instead of creating a second border/shadow "card" inside ours. */
 .stack-text-response :deep(.text-response-content-wrapper > .p-6) {
   padding: 0.5rem 0.75rem;
 }

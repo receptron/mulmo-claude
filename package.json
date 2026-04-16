@@ -37,7 +37,6 @@
     "@gui-chat-plugin/othello": "^0.2.2",
     "@gui-chat-plugin/piano": "github:receptron/GUIChatPluginPiano",
     "@gui-chat-plugin/present3d": "^0.0.3",
-    "@gui-chat-plugin/text-response": "0.1.2",
     "@gui-chat-plugin/weather": "^0.0.2",
     "@mulmocast/types": "^2.6.7",
     "@mulmochat-plugin/form": "0.3.2",

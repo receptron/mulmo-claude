@@ -1,6 +1,5 @@
 import type { PluginEntry } from "./types";
-import TextResponsePlugin from "@gui-chat-plugin/text-response/vue";
-import TextResponseView from "../plugins/textResponse/View.vue";
+import textResponsePlugin from "../plugins/textResponse/index";
 import markdownPlugin from "../plugins/markdown/index";
 import spreadsheetPlugin from "../plugins/spreadsheet/index";
 import MindMapPlugin from "@gui-chat-plugin/mindmap/vue";
@@ -23,10 +22,7 @@ import presentHtmlPlugin from "../plugins/presentHtml/index";
 import presentChartPlugin from "../plugins/chart/index";
 
 const plugins: Record<string, PluginEntry> = {
-  "text-response": {
-    ...TextResponsePlugin.plugin,
-    viewComponent: TextResponseView,
-  },
+  "text-response": textResponsePlugin.plugin,
   manageTodoList: todoPlugin,
   manageScheduler: schedulerPlugin,
   manageRoles: manageRolesPlugin,
