@@ -353,21 +353,6 @@ export const ROLES: Role[] = [
     ],
   },
   {
-    id: "musician",
-    name: "Musician",
-    icon: "music_note",
-    prompt:
-      "You are a music assistant. Help users explore, compose, and display sheet music. " +
-      "When asked to show or play a piece, generate MusicXML and call showMusic. " +
-      "You can compose simple melodies, explain music theory, and present well-known pieces in MusicXML format.",
-    availablePlugins: ["showMusic", "switchRole"],
-    queries: [
-      "Play a C major scale",
-      "Show me Twinkle Twinkle Little Star",
-      "Compose a short melody in G major",
-    ],
-  },
-  {
     id: "roleManager",
     name: "Role Manager",
     icon: "manage_accounts",
@@ -429,7 +414,6 @@ export const BUILTIN_ROLE_IDS = {
   tutor: "tutor",
   storyteller: "storyteller",
   storytellerPlus: "storytellerPlus",
-  musician: "musician",
   roleManager: "roleManager",
   sourceManager: "sourceManager",
 } as const;

@@ -34,7 +34,6 @@
     "@gui-chat-plugin/browse": "^0.1.1",
     "@gui-chat-plugin/camera": "^0.3.0",
     "@gui-chat-plugin/mindmap": "^0.3.1",
-    "@gui-chat-plugin/music": "^1.0.0",
     "@gui-chat-plugin/othello": "^0.2.2",
     "@gui-chat-plugin/piano": "github:receptron/GUIChatPluginPiano",
     "@gui-chat-plugin/present3d": "^0.0.3",

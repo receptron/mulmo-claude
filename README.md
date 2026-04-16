@@ -93,7 +93,6 @@ Each role gives Claude a different persona, tool palette, and focus area:
 | **Game**            | Play Othello, or build browser games with Phaser/Three.js            |
 | **Tutor**           | Adaptive teaching — evaluates your level before explaining anything  |
 | **Storyteller**     | Interactive illustrated stories with images and HTML scenes          |
-| **Musician**        | Compose and play music in the browser                                |
 | **Role Manager**    | Create and edit custom roles                                         |
 
 Switching roles resets Claude's context and swaps in only the tools that role needs — keeping responses fast and focused.

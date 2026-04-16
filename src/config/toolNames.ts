@@ -46,7 +46,6 @@ export const TOOL_NAMES = {
 
   // Interactive / media
   putQuestions: "putQuestions",
-  showMusic: "showMusic",
   piano: "piano",
   weather: "weather",
 

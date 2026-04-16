@@ -15,7 +15,6 @@ Under the hood it uses the Claude Code Agent SDK as its LLM core. Claude has ful
 - **Tutor** — Assesses your knowledge level, then teaches any topic with structured documents and visuals.
 - **Storyteller** — Crafts illustrated narrative stories as a MulmoScript storyboard.
 - **Storyteller Plus** — Like Storyteller, with consistent character images across beats.
-- **Musician** — Generates and displays sheet music in MusicXML format.
 - **Game** — Play Othello/Reversi.
 - **Role Manager** — Create, edit, and delete custom roles.
 - *(Additional roles may be defined by the user in the workspace.)*
@@ -28,7 +27,6 @@ Under the hood it uses the Claude Code Agent SDK as its LLM core. Claude has ful
 - Create interactive mind maps
 - Generate and edit HTML pages / 3D scenes
 - Present MulmoScript multimedia stories
-- Show music visualizations
 - Manage a personal knowledge wiki
 - Switch between roles mid-conversation
 - Ask clarifying questions via interactive forms

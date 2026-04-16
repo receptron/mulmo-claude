@@ -22,7 +22,6 @@ import { TOOL_DEFINITION as FormDef } from "@mulmochat-plugin/form";
 import CanvasDef from "../src/plugins/canvas/definition.js";
 import EditImageDef from "../src/plugins/editImage/definition.js";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
-import { TOOL_DEFINITION as MusicDef } from "@gui-chat-plugin/music";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
 
 /** Maps plugin tool name → REST API endpoint. */
@@ -40,7 +39,6 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [PresentChartDef.name]: API_ROUTES.chart.present,
   [EditImageDef.name]: API_ROUTES.image.edit,
   [Present3DDef.name]: API_ROUTES.plugins.present3d,
-  [MusicDef.name]: API_ROUTES.plugins.music,
   [ManageRolesDef.name]: API_ROUTES.roles.manage,
   [ManageSkillsDef.name]: API_ROUTES.skills.create,
   [ManageSourceDef.name]: API_ROUTES.sources.manage,
@@ -64,7 +62,6 @@ export const PLUGIN_DEFS = [
   PresentChartDef,
   EditImageDef,
   Present3DDef,
-  MusicDef,
   ManageRolesDef,
   ManageSkillsDef,
   ManageSourceDef,

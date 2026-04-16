@@ -8,7 +8,6 @@ import { executeQuiz } from "@mulmochat-plugin/quiz";
 import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "../../src/plugins/canvas/definition.js";
 import { executePresent3D } from "@gui-chat-plugin/present3d";
-import { showMusic } from "@gui-chat-plugin/music";
 import {
   generateGeminiImageFromPrompt,
   isGeminiAvailable,
@@ -287,12 +286,6 @@ router.post(
 router.post(
   API_ROUTES.plugins.present3d,
   wrapPluginExecute((req) => executePresent3D(null as never, req.body)),
-);
-
-// showMusic — sheet music display
-router.post(
-  API_ROUTES.plugins.music,
-  wrapPluginExecute((req) => showMusic(null as never, req.body)),
 );
 
 export default router;

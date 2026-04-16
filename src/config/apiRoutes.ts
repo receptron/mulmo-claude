@@ -109,7 +109,6 @@ export const API_ROUTES = {
     form: "/api/form",
     canvas: "/api/canvas",
     present3d: "/api/present3d",
-    music: "/api/music",
   },
 
   roles: {
