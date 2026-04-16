@@ -65,7 +65,7 @@ describe("writeFileAtomic", () => {
     assert.ok(fs.existsSync(p));
   });
 
-  it("uses `${path}.tmp` by default and cleans it up on success", async () => {
+  it("uses a .tmp suffix by default and cleans it up on success", async () => {
     const p = path.join(tmpDir, "out.txt");
     await writeFileAtomic(p, "hello");
     assert.ok(!fs.existsSync(`${p}.tmp`), "tmp file should not remain");
@@ -93,18 +93,10 @@ describe("writeFileAtomic", () => {
 
   it("leaves the existing target untouched if the tmp write fails", async () => {
     const p = path.join(tmpDir, "out.txt");
-    // Pre-existing file with known contents.
     fs.writeFileSync(p, "ORIGINAL");
-    // Force a failure by making the parent directory read-only would
-    // be brittle across platforms. Instead simulate by passing a
-    // giant mode bit that's invalid — but node accepts that. Use a
-    // path-outside-existing-dir-after-mkdir trick instead: write to
-    // a path whose tmp parent we first delete between mkdir and
-    // writeFile — complex. Simplest test: assert happy-path
-    // overwrite works (partial-failure handling is covered by the
-    // unlink-on-throw contract in the code, verified visually).
-    await writeFileAtomic(p, "NEW");
-    assert.equal(fs.readFileSync(p, "utf-8"), "NEW");
+    fs.mkdirSync(`${p}.tmp`);
+    await assert.rejects(writeFileAtomic(p, "NEW"));
+    assert.equal(fs.readFileSync(p, "utf-8"), "ORIGINAL");
   });
 
   it("overwrites an existing file atomically", async () => {
