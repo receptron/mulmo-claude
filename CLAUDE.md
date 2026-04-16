@@ -151,6 +151,7 @@ String literals that form cross-module contracts (endpoint paths, event types, t
 | What | Source of truth | Pattern |
 |---|---|---|
 | API endpoint paths | `src/config/apiRoutes.ts` → `API_ROUTES` | `router.post(API_ROUTES.todos.items, ...)` / `fetch(API_ROUTES.todos.items)` |
+| SSE / event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `{ type: EVENT_TYPES.toolResult, ... }` — also used in `AgentEvent` union |
 | Workspace directories | `server/workspace-paths.ts` → `WORKSPACE_PATHS` | `path.join(WORKSPACE_PATHS.wiki, "pages")` |
 | Tool names | `src/config/toolNames.ts` → `TOOL_NAMES` / `ToolName` | `availablePlugins: [TOOL_NAMES.manageTodoList, ...]` |
 | Built-in role IDs | `src/config/roles.ts` → `BUILTIN_ROLE_IDS` | `if (roleId === BUILTIN_ROLE_IDS.general)` |
@@ -212,6 +213,7 @@ Key shared helpers in this repo:
 | Helper | Location |
 |---|---|
 | `API_ROUTES` | `src/config/apiRoutes.ts` |
+| `EVENT_TYPES` / `EventType` | `src/types/events.ts` |
 | `WORKSPACE_PATHS` / `WORKSPACE_DIRS` | `server/workspace-paths.ts` |
 | `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` |
 | `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` |
