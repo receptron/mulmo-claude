@@ -1,5 +1,15 @@
 # Messaging Transport Layer — Design Document
 
+> **Contract decisions (resolved in #273)**
+>
+> - **URL namespace**: `/api/transports/:transportId/chats/:externalChatId[/connect]` — dedicated `transports` prefix, separate from the Web UI's `/api/sessions`. `GET /api/transports` lists registered transports.
+> - **State field**: `chatSessionId` (matches `startChat()`'s parameter; renamed from the earlier draft's `sessionId`).
+> - **`startChat()` shape**: `{ kind: "started", chatSessionId } | { kind: "error", error, status? }`. Post-processing (journal / chat-index / wiki-backlinks) runs in `runAgentInBackground()`'s `finally`, not inline.
+> - **SSE event payload**: text chunks arrive as `event.message`.
+> - **`/role <id>`**: creates a new session with the new role (context reset). Matches the Web UI's role-switch semantics.
+> - **Poll cadence**: each transport drives its own `setInterval(poll, …)`. The server-side task-manager is not used (its tick is 60 s and its purpose is workspace maintenance, not I/O polls).
+> - **Session ID naming**: see the dedicated subsection in §4.2.
+
 ## 1) User Experience — Remote Access to MulmoClaude
 
 ### The Problem We're Solving
@@ -87,7 +97,7 @@ The web UI already communicates with MulmoClaude via HTTP (`POST /api/agent`) an
 
 ### Overview
 
-```
+```text
 MulmoClaude server (single process)
   ├─ Express (existing Web UI API)
   ├─ Chat Service API (new — thin layer over startChat + chat-state)
@@ -105,32 +115,38 @@ The bridges are **completely separate processes**. They share no memory, no impo
 
 The API that bridges call. Two endpoints handle the core flow:
 
-```
-POST /api/chat/:transportId/:externalChatId
+```text
+POST /api/transports/:transportId/chats/:externalChatId
   Body: { text: string }
   Response: { reply: string }
 
   The server:
-  1. Looks up the active session for this transport+chatId
+  1. Looks up the active session for this transport+externalChatId
   2. If none exists, creates a new session (e.g. "telegram-123-1713100000")
   3. Checks if text is a command (/reset, /role, /roles, /help, /status)
      - If command: executes it, returns the result as reply
   4. If not a command: calls startChat() with the active session
-  5. Subscribes to pub/sub, collects text events
-  6. Returns the full agent reply as response
+  5. Subscribes to pub/sub, collects text events (event.message)
+  6. Returns the concatenated text reply as response
+
+  Note: `startChat()` kicks off the agent run and returns immediately
+  ({ kind: "started", chatSessionId }) — the post-processing pipeline
+  (journal, chat-index, wiki-backlinks) runs as fire-and-forget from
+  runAgentInBackground()'s finally block, NOT inline here.
 ```
 
-```
-POST /api/chat/:transportId/connect
+```text
+POST /api/transports/:transportId/chats/:externalChatId/connect
   Body: { chatSessionId: string }
   Response: { ok: true }
 
-  Reassigns the active session pointer for a transport.
-  Called from the Web UI's "Connect to Telegram" action.
+  Reassigns the active session pointer for this transport+externalChatId
+  to an existing MulmoClaude session. Called from the Web UI's
+  "Connect to Telegram" action.
 ```
 
-```
-GET /api/chat/transports
+```text
+GET /api/transports
   Response: { transports: [{ id: "telegram", enabled: true }, ...] }
 
   Lists registered transports and their status.
@@ -143,7 +159,7 @@ GET /api/chat/transports
 
 The server manages all chat state. One JSON file per external chat, stored in the workspace:
 
-```
+```text
 ~/mulmoclaude/transports/
   telegram/
     chats/{chatId}.json
@@ -160,8 +176,8 @@ export interface TransportChatState {
   /** External platform's chat/channel/DM ID */
   externalChatId: string;
 
-  /** Active MulmoClaude session ID */
-  sessionId: string;
+  /** Active MulmoClaude session ID (matches startChat's chatSessionId param) */
+  chatSessionId: string;
 
   /** Active role ID */
   roleId: string;
@@ -179,10 +195,22 @@ Operations:
 - `get(transportId, externalChatId)` — read state, return null if not found
 - `set(transportId, state)` — write state
 - `reset(transportId, externalChatId, roleId?)` — create a fresh session, move the pointer. Old session stays in sidebar
-- `connect(transportId, chatSessionId)` — point this transport at an existing session
+- `connect(transportId, externalChatId, chatSessionId)` — point this transport+externalChatId at an existing session
 - Path safety via `resolveWithinRoot()` for all file operations
 
-**Session ID format**: `{transportId}-{externalChatId}-{timestamp}` (e.g. `telegram-123-1713100000`).
+### Session ID naming rules
+
+`chatSessionId` is used both as a filename segment (`chat/<chatSessionId>.jsonl`) and as a URL path segment, so it has to be filesystem-safe **and** URL-safe. `externalChatId` comes from the platform (Telegram numeric, Slack channel name, Discord snowflake, …) and its character set varies, so we sanitize before composing.
+
+Rules for `chatSessionId`:
+
+- **Format**: `{transportId}-{sanitizedExternalChatId}-{timestampMs}` — e.g. `telegram-123-1713100000`.
+- **Character set**: `[A-Za-z0-9._-]+`. Anything outside this set is replaced with `_` during sanitization. This matches the regex the chat-state store already enforces via `isSafeId()`.
+- **Length**: ≤ 200 characters. Enforced by `isSafeId()`. If a platform returns something unreasonably long (a Slack workspace ID plus channel ID plus thread ts), truncate before sanitization and append a short hash so collisions stay rare.
+- **Stability**: the sanitized `chatSessionId` is written into the jsonl filename and the sidebar URL. Once issued for a turn, it never changes. `/reset` and `/role` create a **new** `chatSessionId`; they don't rename the old one.
+- **Origin visibility**: keeping `transportId` as the first segment lets readers see at a glance where a session came from when scanning the sidebar or the chat/ directory.
+
+`externalChatId` itself is stored verbatim in the state JSON (not sanitized) so the mapping back to the platform is lossless. Only the composition into `chatSessionId` goes through sanitization.
 
 ### 4.3 Command Handling (server-side)
 
@@ -190,13 +218,15 @@ The server parses and executes commands before they reach the agent. The bridge 
 
 | Command | Action |
 |---|---|
-| `/reset` | Create a fresh session, make it active |
+| `/reset` | Create a fresh session with the current role, make it active. Old session stays in the sidebar. |
 | `/help` | Return list of available commands |
 | `/roles` | Return list of available roles |
-| `/role <id>` | Switch role and create a new session |
+| `/role <id>` | Switch role **and** create a new session with that role. Conversation context is reset — treat it as "/reset with a different role". |
 | `/status` | Return current role and last activity |
 
 Since command handling is server-side, every platform gets the same behavior with zero bridge code.
+
+**Why `/role` resets the session instead of editing the existing one**: role defines the system prompt, available plugins, and the context-reset-on-switch semantics the Web UI already uses (see `src/config/roles.ts`). Keeping messaging-transport role changes consistent with the Web UI means history is scoped to one role per session, avoiding "half of this transcript is general-mode, half is artist-mode" confusion. If a user wants continuity, they can `/role general` to reset, send "continue from where we left off" — the new session can reference the old one via the normal conversation tools.
 
 ### 4.4 Bridge Process Management
 
@@ -278,11 +308,14 @@ function prompt() {
   rl.question("You: ", async (text) => {
     if (!text.trim()) return prompt();
 
-    const res = await fetch(`${API_URL}/api/chat/${TRANSPORT_ID}/${CHAT_ID}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.trim() }),
-    });
+    const res = await fetch(
+      `${API_URL}/api/transports/${TRANSPORT_ID}/chats/${CHAT_ID}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      },
+    );
     const { reply } = await res.json();
 
     console.log(`\nAssistant: ${reply}\n`);
@@ -325,17 +358,25 @@ async function poll() {
 
     await telegramSendTyping(BOT_TOKEN, chatId);
 
-    const res = await fetch(`${API_URL}/api/chat/${TRANSPORT_ID}/${chatId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
+    const res = await fetch(
+      `${API_URL}/api/transports/${TRANSPORT_ID}/chats/${chatId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      },
+    );
     const { reply } = await res.json();
 
     await telegramSendMessage(BOT_TOKEN, chatId, reply);
   }
 }
 
+// Polling cadence is a per-transport concern, so we drive it with a
+// plain setInterval inside the bridge process rather than registering
+// a task with the server-side task-manager (whose default tick is 60s
+// and whose purpose is cron-like workspace maintenance, not
+// sub-minute I/O loops).
 setInterval(poll, 5000);
 ```
 
@@ -392,7 +433,7 @@ setInterval(poll, 5000);
 
 Some platforms (LINE, WhatsApp, Slack in webhook mode) push events to an HTTP endpoint. These bridges run their own small HTTP server:
 
-```
+```text
 Internet
   │
   ├─ LINE webhook ──────► line-bridge (port 3002) ──► MulmoClaude API (port 3001)
@@ -412,7 +453,7 @@ Internet
 
 ### Server-Side Files
 
-```
+```text
 server/
   chat-service/
     index.ts            ← Chat Service API routes
@@ -425,7 +466,7 @@ No `server/transports/` directory. No platform-specific code in the server at al
 
 ### Bridge Files (separate from server)
 
-```
+```text
 bridges/
   cli/
     index.ts            ← Reference implementation: readline → API → console
@@ -445,7 +486,7 @@ bridges/
 
 ### Workspace Storage
 
-```
+```text
 ~/mulmoclaude/transports/
   telegram/chats/       ← Per-chat state JSON files (managed by server)
   line/chats/
@@ -492,7 +533,7 @@ bridges/
 ### Phase 0: Chat Service API + CLI Bridge
 1. Create `server/chat-service/chat-state.ts` — state store with `resolveWithinRoot()`
 2. Create `server/chat-service/commands.ts` — server-side `/reset`, `/help`, `/roles`, `/role`, `/status`
-3. Create `server/chat-service/index.ts` — `POST /api/chat/:transportId/:externalChatId`, `POST /api/chat/:transportId/connect`, `GET /api/chat/transports`
+3. Create `server/chat-service/index.ts` — `POST /api/transports/:transportId/chats/:externalChatId`, `POST /api/transports/:transportId/chats/:externalChatId/connect`, `GET /api/transports`
 4. Create `bridges/cli/index.ts` — reference implementation (~20 lines)
 5. Wire into `server/index.ts` — mount chat-service routes
 6. Unit tests: `test/chat-service/test_chat-state.ts`, `test/chat-service/test_commands.ts`
@@ -506,9 +547,9 @@ bridges/
 5. Update `README.md` with setup instructions
 
 ### Phase 1.5: Web UI Connect Support
-1. Add "Connect to {transport}" action in session header/context menu (calls `POST /api/chat/:transportId/connect`)
+1. Add "Connect to {transport}" action in session header/context menu (calls `POST /api/transports/:transportId/chats/:externalChatId/connect`)
 2. Show transport badge on sidebar sessions whose IDs start with a transport prefix
-3. Use `GET /api/chat/transports` to determine which transports are available
+3. Use `GET /api/transports` to determine which transports are available
 
 ### Phase 2: LINE Bridge
 1. Create `bridges/line/` — webhook HTTP server + LINE API

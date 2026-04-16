@@ -5,6 +5,9 @@ plan doc is terse and assumes you already understand the architecture. This
 guide explains the layer structure from the ground up so a newcomer can read
 the plan and contribute to it.
 
+> **Contract decisions (resolved in #273)** — see the plan doc for the authoritative list. Short version:
+> URL prefix `/api/transports/…`; state field `chatSessionId`; `startChat()` returns `{ kind: "started" | "error", … }` and kicks post-processing from `runAgentInBackground()`'s `finally`; text chunks arrive as `event.message`; `/role` resets; transport polling uses `setInterval`, not the task-manager.
+
 ---
 
 ## Why have layers at all?
@@ -48,7 +51,7 @@ and talk to MulmoClaude via HTTP, just like the Web UI does.
 
 ## The five layers at a glance
 
-```
+```text
 ┌────────────────────────────────────────────────────────────┐
 │ Layer 1: External platforms                                │
 │   Telegram / LINE / WhatsApp / Slack / Twitter             │
@@ -63,7 +66,7 @@ and talk to MulmoClaude via HTTP, just like the Web UI does.
 │   Speaks one platform's protocol, and ONLY that protocol.  │
 │   Stateless — knows nothing about sessions or roles.       │
 └─────────────┬──────────────────────────────────────────────┘
-              │ HTTP: POST /api/chat/{transportId}/{externalChatId}
+              │ HTTP: POST /api/transports/{transportId}/chats/{externalChatId}
 ┌─────────────▼──────────────────────────────────────────────┐
 │ Layer 3: Chat Service API + state (server-side)            │
 │   server/chat-service/index.ts    ← HTTP endpoints         │
@@ -75,9 +78,10 @@ and talk to MulmoClaude via HTTP, just like the Web UI does.
 ┌─────────────▼──────────────────────────────────────────────┐
 │ Layer 4: MulmoClaude core (already exists, not modified)   │
 │   startChat() — session creation, jsonl persistence,       │
-│                 background agent launch, post-processing   │
+│                 background agent launch                    │
+│                 (post-processing runs in finally, detached)│
 │   runAgent() — Claude CLI subprocess orchestration         │
-│   session-store — in-memory sessionId → state              │
+│   session-store — in-memory chatSessionId → state          │
 │   pub/sub — session event distribution                     │
 └─────────────┬──────────────────────────────────────────────┘
               │ subprocess calls
@@ -122,7 +126,7 @@ above this layer is under our control.
 Per-platform code running as **separate child processes** of MulmoClaude.
 Each bridge is a small, self-contained program:
 
-```
+```text
 bridges/telegram/
   index.ts   ← Poll loop: getUpdates → POST to Chat Service API → sendMessage
   api.ts     ← Telegram API wrappers (sendMessage, getUpdates, sendTyping)
@@ -131,7 +135,7 @@ bridges/telegram/
 **A bridge's entire job:**
 
 1. **Inbound**: receive a message from the platform → extract chat ID
-   and text → `POST /api/chat/{transportId}/{chatId}` with `{ text }`
+   and text → `POST /api/transports/{transportId}/chats/{externalChatId}` with `{ text }`
 2. **Outbound**: receive the response → send it back via the platform's
    API
 
@@ -165,7 +169,7 @@ async function poll() {
     await telegramSendTyping(BOT_TOKEN, chatId);
 
     const res = await fetch(
-      `${API_URL}/api/chat/${TRANSPORT_ID}/${chatId}`,
+      `${API_URL}/api/transports/${TRANSPORT_ID}/chats/${chatId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,6 +182,10 @@ async function poll() {
   }
 }
 
+// Polling cadence is a per-transport concern, driven by a plain
+// setInterval inside the bridge process. We don't register this with
+// the server-side task-manager because that's for cron-like workspace
+// maintenance (default tick 60s) and would miss sub-minute polls.
 setInterval(poll, 5000);
 ```
 
@@ -188,7 +196,7 @@ unaffected.
 ### Layer 3 — Chat Service API + state (server-side)
 
 This is the brain. When a bridge sends
-`POST /api/chat/telegram/123 { text: "hello" }`, Layer 3:
+`POST /api/transports/telegram/chats/123 { text: "hello" }`, Layer 3:
 
 1. Looks up chat state for `telegram/123` on disk
 2. If no state exists, creates a new session `telegram-123-{timestamp}`
@@ -210,7 +218,7 @@ persisted as a JSON file:
 // ~/mulmoclaude/transports/telegram/chats/123.json
 {
   "externalChatId": "123",
-  "sessionId": "telegram-123-1713100000",
+  "chatSessionId": "telegram-123-1713100000",
   "roleId": "general",
   "claudeSessionId": "xyz-789",
   "startedAt": "2026-04-14T12:00:00Z",
@@ -218,16 +226,18 @@ persisted as a JSON file:
 }
 ```
 
+The field name `chatSessionId` matches the `startChat()` parameter name, so the value can be forwarded without renaming.
+
 The state store API:
 
 - `get(transportId, externalChatId)` — load or return null
 - `set(transportId, state)` — persist (atomic write)
 - `reset(transportId, externalChatId, roleId?)` — create a fresh
-  session (new ID), move the pointer. The old session is **not deleted**
-  — it stays in the sidebar for reference
-- `connect(transportId, chatSessionId)` — point this transport at an
-  existing MulmoClaude session (called from the Web UI's "Connect to
-  Telegram" action)
+  session (new `chatSessionId`), move the pointer. The old session is
+  **not deleted** — it stays in the sidebar for reference
+- `connect(transportId, externalChatId, chatSessionId)` — point this
+  transport+externalChatId at an existing MulmoClaude session (called
+  from the Web UI's "Connect to Telegram" action)
 
 **Session ID format**: `{transportId}-{externalChatId}-{timestamp}`
 (e.g. `telegram-123-1713100000`). This makes the origin visible in the
@@ -250,10 +260,25 @@ if (command) {
   if (result.nextState) await chatStateStore.set(transportId, result.nextState);
   return res.json({ reply: result.reply });
 }
-// Not a command — fall through to startChat()
+
+// Not a command — relay through startChat(). Contract:
+//   StartChatParams = { message, roleId, chatSessionId, selectedImageData? }
+//   StartChatResult = { kind: "started", chatSessionId } | { kind: "error", error, status? }
+const result = await startChat({
+  message: text,
+  roleId: chatState.roleId,
+  chatSessionId: chatState.chatSessionId,
+});
+if (result.kind === "error") {
+  return res.status(result.status ?? 500).json({ reply: `Error: ${result.error}` });
+}
+// Agent is running in the background — subscribe to the session
+// channel, concatenate `event.message` chunks, and return the full
+// text on session_finished.
 ```
 
 Available commands: `/reset`, `/help`, `/roles`, `/role <id>`, `/status`.
+`/role <id>` follows the same "new session on switch" rule as the Web UI (see `src/config/roles.ts`): switching role resets conversation context.
 
 #### 3c. Session model — one pointer per chat
 
@@ -264,11 +289,11 @@ these two worlds?
 **Each messaging chat has exactly one "active session pointer"**, managed
 entirely by the server. The bridge never sees session IDs.
 
-```
+```text
 Telegram chat 123
   ┌──────────────────────────────────────────┐
   │ active session pointer:                  │
-  │   sessionId = "telegram-123-1713100000"  │───► jsonl, sidebar, etc.
+  │   chatSessionId = "telegram-123-1713100000"  │───► jsonl, sidebar, etc.
   │                                          │
   │ Previous sessions:                       │
   │   (still in sidebar,                     │
@@ -290,8 +315,8 @@ Telegram chat 123
 
 - Any messaging session appears in the sidebar like a normal session.
   The user can open it and continue the conversation from the browser
-- "Connect to Telegram" (calls `POST /api/chat/telegram/connect`) →
-  reassigns the pointer to the currently-open browser session
+- "Connect to Telegram" (calls `POST /api/transports/telegram/chats/{externalChatId}/connect`) →
+  reassigns the pointer for that chat to the currently-open browser session
 
 **Why the server owns this, not the bridge:** the `/connect` flow
 originates from the Web UI and needs to update the pointer. If the
@@ -306,23 +331,30 @@ We don't touch this layer in the messaging work — we just use it.
 
 `startChat()` is the public entry point:
 
-```
-startChat()
-  ├─ Validate session / create if new
+```text
+startChat()          // returns { kind: "started", chatSessionId } immediately
+  ├─ Validate params ({ message, roleId, chatSessionId, selectedImageData? })
+  ├─ Write / backfill the meta file with firstUserMessage
   ├─ Append user message to jsonl
   ├─ Register in session-store (so the sidebar can see it)
-  ├─ Mark session as running
-  ├─ Launch runAgentInBackground()
-  │    └─ runAgent()
-  │         ├─ spawn claude CLI subprocess
-  │         ├─ emit text events to pub/sub as tokens stream in
-  │         ├─ emit tool_result events when plugins execute
-  │         └─ emit done event on completion
-  └─ After completion:
-      ├─ Trigger journal daily-pass update
-      ├─ Trigger chat-index summary
-      └─ Trigger wiki-backlinks sweep
+  ├─ beginRun() — mark session running (409 if already running)
+  └─ runAgentInBackground()   // detached; errors surface via pub/sub
+       ├─ runAgent()
+       │    ├─ spawn claude CLI subprocess
+       │    ├─ emit text events (event.message) to pub/sub as tokens arrive
+       │    ├─ emit tool_call / tool_call_result events as plugins run
+       │    └─ emit tool_result + session_finished on completion
+       └─ finally:            // fire-and-forget, NOT awaited by startChat
+            ├─ endRun() + publish session_finished
+            ├─ maybeRunJournal()       ← journal daily-pass
+            ├─ maybeIndexSession()     ← chat-index title/summary
+            └─ maybeAppendWikiBacklinks()  ← wiki backlinks sweep
 ```
+
+The post-processing step (journal / chat-index / wiki-backlinks) runs
+in `runAgentInBackground()`'s `finally` block as detached promises —
+callers of `startChat()` do **not** await the pipeline, and a failure
+in any of those hooks is logged but never propagates up.
 
 The Web UI uses this same entry point — the only difference is how the
 caller subscribes to the resulting events (WebSocket in the browser,
@@ -349,7 +381,7 @@ exists — Layer 3's Chat Service API covers everything.
 
 Sending a text message from your phone triggers this sequence:
 
-```
+```text
 [Phone — Telegram app]
   │  User types "What's the weather today?"
   ▼
@@ -359,19 +391,20 @@ Sending a text message from your phone triggers this sequence:
 [Layer 2: telegram bridge process]
   │  Poll fires, calls getUpdates
   │  Gets {chatId: 123, text: "What's the weather today?"}
-  │  POST http://localhost:3001/api/chat/telegram/123
+  │  POST http://localhost:3001/api/transports/telegram/chats/123
   │       body: { text: "What's the weather today?" }
   ▼
 [Layer 3: Chat Service API]
   │  Loads ~/mulmoclaude/transports/telegram/chats/123.json
-  │  → sessionId = "telegram-123-1713100000", role = "general"
+  │  → chatSessionId = "telegram-123-1713100000", role = "general"
   │  Text doesn't start with "/" → not a command
   │  Calls startChat({ chatSessionId: "telegram-123-...", message: "...", roleId: "general" })
+  │  → returns { kind: "started", chatSessionId } immediately; agent runs in background
   ▼
 [Layer 4: startChat]
   │  Appends user message to the session jsonl
-  │  Marks session running in session-store
-  │  Spawns runAgentInBackground()
+  │  Marks session running in session-store (beginRun)
+  │  Spawns runAgentInBackground() and returns { kind: "started" }
   ▼
 [Layer 5: Claude CLI subprocess]
   │  Receives prompt, decides to call the web_search plugin
@@ -379,13 +412,18 @@ Sending a text message from your phone triggers this sequence:
   │  Claude drafts a reply and emits text chunks
   ▼
 [Layer 4: pub/sub]
-  │  Each text chunk publishes to the "session:telegram-123-..." channel
-  │  Final done event on completion
+  │  Each text event (event.message) publishes to the
+  │  "session.telegram-123-..." channel; tool_call / tool_call_result
+  │  events publish too. A session_finished event fires when the
+  │  runAgent generator drains.
   ▼
 [Layer 3: Chat Service API]
-  │  In-process subscriber collects chunks into fullReply = "Sunny with some clouds"
-  │  Done event triggers finalize
+  │  In-process subscriber concatenates `event.message` chunks into
+  │  fullReply = "Sunny with some clouds"
+  │  session_finished resolves the pending request promise
   │  Returns HTTP response: { reply: "Sunny with some clouds" }
+  │  (journal / chat-index / wiki-backlinks run separately in
+  │   runAgentInBackground's finally, not awaited here)
   ▼
 [Layer 2: telegram bridge process]
   │  Calls telegramSendMessage(chatId: 123, text: "Sunny…")
@@ -410,17 +448,17 @@ endpoint.
 One detail that trips up new contributors: MulmoClaude carries **two**
 session IDs, and they live at different layers with different lifetimes.
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │ Layer 3 chat-state (~/mulmoclaude/transports/…) │
 │   externalChatId: "123"                         │
-│   sessionId: "telegram-123-…"     ──┐            │
+│   chatSessionId: "telegram-123-…" ──┐            │
 │   claudeSessionId: "xyz-789" ──┐  │             │
 └──────────────────────────────┼──┼──────────────┘
                                │  │
 ┌──────────────────────────────┼──▼──────────────┐
 │ Layer 4 session-store + jsonl   │               │
-│   sessionId "telegram-123-…"    │               │
+│   chatSessionId "telegram-123-…"│               │
 │   Persistent — lives as long    │               │
 │   as the jsonl file exists.     │               │
 │   Shared between the bridge     │               │
@@ -436,8 +474,8 @@ session IDs, and they live at different layers with different lifetimes.
 └─────────────────────────────────────────────────┘
 ```
 
-- **`sessionId`** is the MulmoClaude identity of the conversation. It
-  owns the jsonl file, appears in the sidebar, and persists forever
+- **`chatSessionId`** is the MulmoClaude identity of the conversation.
+  It owns the jsonl file, appears in the sidebar, and persists forever
   unless explicitly deleted.
 - **`claudeSessionId`** is the Claude CLI's identifier for resuming
   its own in-memory conversation state. It's optional — if we pass
@@ -446,7 +484,7 @@ session IDs, and they live at different layers with different lifetimes.
 
 When `claudeSessionId` becomes stale (CLI restarted between messages,
 process crashed, TTL elapsed), the CLI returns `"No conversation found
-with session ID: xyz-789"`. The `sessionId` is still intact — we just
+with session ID: xyz-789"`. The `chatSessionId` is still intact — we just
 need to drop the stale claudeSessionId and let the CLI start a new
 conversation. This recovery logic lives in Layer 3's Chat Service API
 so every transport benefits automatically.
@@ -544,10 +582,10 @@ HTTP overhead is negligible compared to the agent execution time.
 5. **Layer 4 is untouched.** Bridges invoke the agent via the Chat
    Service API, which calls `startChat()` internally — the same entry
    point the Web UI uses.
-6. **Two session IDs, two layers.** `sessionId` = persistent, lives in
+6. **Two session IDs, two layers.** `chatSessionId` = persistent, lives in
    Layer 4's jsonl. `claudeSessionId` = volatile, lives in Layer 5's CLI
    process. Recovery when the volatile one dies belongs in Layer 3.
    Bridges never see either ID.
 7. **Adding a new platform = writing a bridge.** No server changes.
    The bridge just needs to speak the platform's protocol and POST
-   text to `/api/chat/{transportId}/{externalChatId}`.
+   text to `/api/transports/{transportId}/chats/{externalChatId}`.

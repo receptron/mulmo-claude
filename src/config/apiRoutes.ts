@@ -39,10 +39,15 @@ export const API_ROUTES = {
   },
 
   chatService: {
-    // POST /api/chat/:transportId/:externalChatId           — send a message
-    // POST /api/chat/:transportId/:externalChatId/connect   — set active session
-    message: "/api/chat/:transportId/:externalChatId",
-    connect: "/api/chat/:transportId/:externalChatId/connect",
+    // POST /api/transports/:transportId/chats/:externalChatId           — send a message
+    // POST /api/transports/:transportId/chats/:externalChatId/connect   — set active session
+    //
+    // Namespace is deliberately separate from /api/chat/ so the word
+    // "chat" is not overloaded (the Web UI's /api/sessions is the
+    // conversation concept; /api/transports/* is the external-
+    // platform-to-session pointer concept). See plans/messaging_transports.md.
+    message: "/api/transports/:transportId/chats/:externalChatId",
+    connect: "/api/transports/:transportId/chats/:externalChatId/connect",
   },
 
   config: {
