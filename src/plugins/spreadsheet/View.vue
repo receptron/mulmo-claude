@@ -146,6 +146,7 @@ import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
 // Import all spreadsheet functions to populate the function registry
 import "./engine/functions";
 import { apiGet, apiPut } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 import type { FilesContentResponseLike } from "./engine/responseDecoder";
 
 /**
@@ -235,7 +236,7 @@ async function fetchSheets(): Promise<void> {
   }
   loading.value = true;
   const response = await apiGet<FilesContentResponseLike>(
-    "/api/files/content",
+    API_ROUTES.files.content,
     { path: raw },
   );
   if (!response.ok) {
@@ -267,9 +268,12 @@ async function persistSheets(sheets: SpreadsheetSheet[]): Promise<void> {
   const raw = props.selectedResult.data?.sheets;
   if (isFilePath(raw)) {
     const filename = raw.replace(/^spreadsheets\//, "");
-    const result = await apiPut<unknown>(`/api/spreadsheets/${filename}`, {
-      sheets,
-    });
+    const result = await apiPut<unknown>(
+      API_ROUTES.plugins.updateSpreadsheet.replace(":filename", filename),
+      {
+        sheets,
+      },
+    );
     if (!result.ok) {
       errorMessage.value = `Failed to save spreadsheet: ${result.error}`;
       return;

@@ -4,12 +4,24 @@
       <div class="text-gray-500">Loading document...</div>
     </div>
     <div
+      v-else-if="loadError && !markdownContent"
+      class="min-h-full p-8 flex items-center justify-center"
+    >
+      <div class="load-error-banner" role="alert">
+        ⚠ Failed to load document: {{ loadError }}
+      </div>
+    </div>
+    <div
       v-else-if="!markdownContent"
       class="min-h-full p-8 flex items-center justify-center"
     >
       <div class="text-gray-500">No markdown content available</div>
     </div>
     <template v-else>
+      <div v-if="loadError" class="load-error-banner" role="alert">
+        ⚠ Failed to refresh document: {{ loadError }} — showing last
+        successfully loaded content.
+      </div>
       <div class="markdown-content-wrapper">
         <div class="p-4">
           <div class="header-row">
@@ -91,6 +103,7 @@ import { isFilePath, type MarkdownToolData } from "./definition";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { apiGet, apiPut } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
 const props = defineProps<{
@@ -106,11 +119,16 @@ const saving = ref(false);
 // Human-readable message shown next to the Save button when a PUT
 // fails. null while the editor is idle or the last save succeeded.
 const saveError = ref<string | null>(null);
+// Error loading the markdown content from the server. Distinct from an
+// intentionally empty document — we used to wipe `markdownContent` on
+// failure, which made "fetch failed" look like "no content available".
+const loadError = ref<string | null>(null);
 // The actual markdown content (fetched from server or inline)
 const markdownContent = ref("");
 const editableMarkdown = ref("");
 
 async function fetchMarkdownContent(): Promise<void> {
+  loadError.value = null;
   const raw = props.selectedResult.data?.markdown;
   if (!raw) {
     markdownContent.value = "";
@@ -119,13 +137,18 @@ async function fetchMarkdownContent(): Promise<void> {
   }
   if (isFilePath(raw)) {
     loading.value = true;
-    const result = await apiGet<{ content?: string }>("/api/files/content", {
-      path: raw,
-    });
+    const result = await apiGet<{ content?: string }>(
+      API_ROUTES.files.content,
+      {
+        path: raw,
+      },
+    );
     if (!result.ok) {
-      console.error("Failed to fetch markdown:", result.error);
-      markdownContent.value = "";
-      editableMarkdown.value = "";
+      // Preserve any previously-loaded content instead of wiping it —
+      // the user sees the banner AND whatever they were reading, not
+      // a blank canvas. editableMarkdown is left in sync so the editor
+      // (if open) doesn't flip between states.
+      loadError.value = result.error;
       loading.value = false;
       return;
     }
@@ -226,9 +249,12 @@ async function applyMarkdown() {
   if (isFilePath(raw)) {
     saving.value = true;
     const filename = raw.replace(/^markdowns\//, "");
-    const result = await apiPut<unknown>(`/api/markdowns/${filename}`, {
-      markdown: editableMarkdown.value,
-    });
+    const result = await apiPut<unknown>(
+      API_ROUTES.plugins.updateMarkdown.replace(":filename", filename),
+      {
+        markdown: editableMarkdown.value,
+      },
+    );
     saving.value = false;
     if (!result.ok) {
       saveError.value = `Save failed: ${result.error}`;
@@ -479,6 +505,16 @@ watch(
   border: 1px solid #f5c2c7;
   border-radius: 4px;
   font-size: 0.85rem;
+}
+
+.load-error-banner {
+  margin: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #fdecea;
+  color: #b71c1c;
+  border: 1px solid #f5c2c7;
+  border-radius: 4px;
+  font-size: 0.875rem;
 }
 
 .cancel-btn {

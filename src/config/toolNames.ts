@@ -46,7 +46,6 @@ export const TOOL_NAMES = {
 
   // Interactive / media
   putQuestions: "putQuestions",
-  piano: "piano",
   weather: "weather",
 
   // MCP tools (server-side, not GUI plugins — registered in

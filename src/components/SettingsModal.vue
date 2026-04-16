@@ -60,8 +60,13 @@
       </div>
 
       <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4 text-gray-900">
-        <div v-if="loadError" class="text-sm text-red-600">
-          {{ loadError }}
+        <div
+          v-if="loadError"
+          class="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2"
+          role="alert"
+          data-testid="settings-load-error"
+        >
+          ⚠ {{ loadError }}
         </div>
 
         <div v-if="activeTab === 'tools'" class="space-y-3">
@@ -90,6 +95,15 @@
         </div>
 
         <div v-else-if="activeTab === 'mcp'" class="space-y-3">
+          <div
+            v-if="mcpToolsError"
+            class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"
+            role="alert"
+            data-testid="mcp-tools-error"
+          >
+            ⚠ Could not fetch MCP tool status: {{ mcpToolsError }}. Showing all
+            tools regardless of enablement.
+          </div>
           <SettingsMcpTab
             ref="mcpTabRef"
             :servers="mcpServers"
@@ -124,8 +138,13 @@
             Cancel
           </button>
           <button
-            class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300"
-            :disabled="saving || loading"
+            class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            :disabled="saving || loading || !!loadError"
+            :title="
+              loadError
+                ? 'Cannot save until settings load successfully'
+                : undefined
+            "
             data-testid="settings-save-btn"
             @click="save"
           >
@@ -142,13 +161,21 @@ import { computed, ref, watch } from "vue";
 import SettingsMcpTab from "./SettingsMcpTab.vue";
 import type { McpServerEntry } from "./SettingsMcpTab.vue";
 import { apiGet, apiPut } from "../utils/api";
+import { API_ROUTES } from "../config/apiRoutes";
 
 interface Props {
   open: boolean;
   dockerMode?: boolean;
+  // Forwarded from useMcpTools — if non-null, the MCP tab shows a
+  // small warning strip so the user knows "all tools visible" is a
+  // fallback rather than an accurate listing.
+  mcpToolsError?: string | null;
 }
 
-const props = withDefaults(defineProps<Props>(), { dockerMode: false });
+const props = withDefaults(defineProps<Props>(), {
+  dockerMode: false,
+  mcpToolsError: null,
+});
 const emit = defineEmits<{
   "update:open": [value: boolean];
   saved: [];
@@ -207,7 +234,7 @@ async function loadConfig(): Promise<void> {
   const response = await apiGet<{
     settings: { extraAllowedTools: string[] };
     mcp?: { servers: McpServerEntry[] };
-  }>("/api/config");
+  }>(API_ROUTES.config.base);
   // A newer open() has already started another load — drop this one.
   if (token !== loadToken) return;
   if (!response.ok) {
@@ -241,7 +268,7 @@ async function save(): Promise<void> {
   statusError.value = false;
   // Single atomic endpoint — avoids the partial-save state where
   // extraAllowedTools is persisted but MCP config write fails.
-  const response = await apiPut<unknown>("/api/config", {
+  const response = await apiPut<unknown>(API_ROUTES.config.base, {
     settings: { extraAllowedTools: parsedToolNames.value },
     mcp: { servers: mcpServers.value },
   });

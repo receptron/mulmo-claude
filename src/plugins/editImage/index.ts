@@ -5,13 +5,14 @@ import type { ImageToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const editImagePlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<ImageToolData>>(
-      "/api/edit-image",
+      API_ROUTES.image.edit,
       args,
     );
     if (!result.ok) {

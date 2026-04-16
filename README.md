@@ -1,6 +1,6 @@
 # MulmoClaude
 
-Experience GUI-chat with Claude Code — and long-term memory! You chat with Claude Code, and it responds not just with text but with interactive visual tools — documents, spreadsheets, mind maps, images, forms, 3D scenes, piano, and more. A built-in personal wiki gives Claude persistent, structured knowledge that grows with every conversation.
+Experience GUI-chat with Claude Code — and long-term memory! You chat with Claude Code, and it responds not just with text but with interactive visual tools — documents, spreadsheets, mind maps, images, forms, 3D scenes, and more. A built-in personal wiki gives Claude persistent, structured knowledge that grows with every conversation.
 
 > **Hacking on MulmoClaude?** See [`docs/developer.md`](docs/developer.md) for environment variables, scripts, the process map, sandbox layout, and other contributor-facing notes. Logging knobs live in [`docs/logging.md`](docs/logging.md).
 
@@ -90,7 +90,6 @@ Each role gives Claude a different persona, tool palette, and focus area:
 | **Office**          | Documents, spreadsheets, forms, presentations, data dashboards       |
 | **Guide & Planner** | Travel guides, recipe books, trip planners with rich visual output   |
 | **Artist**          | Image generation, image editing, generative art with p5.js           |
-| **Game**            | Play Othello, or build browser games with Phaser/Three.js            |
 | **Tutor**           | Adaptive teaching — evaluates your level before explaining anything  |
 | **Storyteller**     | Interactive illustrated stories with images and HTML scenes          |
 | **Role Manager**    | Create and edit custom roles                                         |

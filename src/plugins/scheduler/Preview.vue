@@ -23,13 +23,14 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const props = defineProps<{ result: ToolResultComplete<SchedulerData> }>();
 
 const items = ref<ScheduledItem[]>(props.result.data?.items ?? []);
 
 const { refresh } = useFreshPluginData<ScheduledItem[]>({
-  endpoint: () => "/api/scheduler",
+  endpoint: () => API_ROUTES.scheduler.base,
   extract: (json) => {
     const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
     return Array.isArray(v) ? v : null;

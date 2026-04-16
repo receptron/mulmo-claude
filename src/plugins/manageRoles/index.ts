@@ -5,6 +5,7 @@ import { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 export interface CustomRole {
   id: string;
@@ -23,7 +24,7 @@ const manageRolesPlugin: ToolPlugin = {
   toolDefinition,
   async execute(_context, args) {
     const result = await apiPost<ToolResult<ManageRolesData>>(
-      "/api/roles/manage",
+      API_ROUTES.roles.manage,
       args,
     );
     if (!result.ok) {

@@ -15,7 +15,6 @@ Under the hood it uses the Claude Code Agent SDK as its LLM core. Claude has ful
 - **Tutor** — Assesses your knowledge level, then teaches any topic with structured documents and visuals.
 - **Storyteller** — Crafts illustrated narrative stories as a MulmoScript storyboard.
 - **Storyteller Plus** — Like Storyteller, with consistent character images across beats.
-- **Game** — Play Othello/Reversi.
 - **Role Manager** — Create, edit, and delete custom roles.
 - *(Additional roles may be defined by the user in the workspace.)*
 
@@ -30,7 +29,7 @@ Under the hood it uses the Claude Code Agent SDK as its LLM core. Claude has ful
 - Manage a personal knowledge wiki
 - Switch between roles mid-conversation
 - Ask clarifying questions via interactive forms
-- Play games (Othello)
+- Play browser games
 
 ## Wiki — Long-Term Memory
 

@@ -5,13 +5,14 @@ import type { MarkdownToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const markdownPlugin: ToolPlugin<MarkdownToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<MarkdownToolData>>(
-      "/api/present-document",
+      API_ROUTES.plugins.presentDocument,
       args,
     );
     if (!result.ok) {

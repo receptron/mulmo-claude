@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Markdown content styles.
-   `@gui-chat-plugin/text-response` wraps rendered Markdown in a
+   The text-response plugin wraps rendered Markdown in a
    `.markdown-content` container with `prose prose-slate` classes, but
    Tailwind Typography isn't installed here so those classes don't do
    anything. Provide a minimal baseline so headings, lists, code blocks

@@ -110,6 +110,7 @@ import VueDrawingCanvas from "vue-drawing-canvas";
 import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData, CanvasDrawingState } from "./definition";
 import { apiPost, apiPut } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const props = defineProps<{
   selectedResult: ToolResult<ImageToolData> | null;
@@ -271,16 +272,19 @@ const saveDrawingState = async (): Promise<boolean> => {
       ? await (async () => {
           const filename = boundImagePath.replace(/^images\//, "");
           const result = await apiPut<{ path: string }>(
-            `/api/images/${filename}`,
+            API_ROUTES.image.update.replace(":filename", filename),
             { imageData: imageDataUri },
           );
           if (!result.ok) throw new Error(`PUT failed: ${result.error}`);
           return result.data.path;
         })()
       : await (async () => {
-          const result = await apiPost<{ path: string }>("/api/images", {
-            imageData: imageDataUri,
-          });
+          const result = await apiPost<{ path: string }>(
+            API_ROUTES.image.upload,
+            {
+              imageData: imageDataUri,
+            },
+          );
           if (!result.ok) throw new Error(`POST failed: ${result.error}`);
           return result.data.path;
         })();

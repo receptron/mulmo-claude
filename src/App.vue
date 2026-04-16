@@ -74,6 +74,7 @@
         :current-session-id="currentSessionId"
         :roles="roles"
         :top-offset="headerRef?.offsetHeight"
+        :error-message="historyError"
         @load-session="loadSession"
       />
 
@@ -319,6 +320,7 @@
     <SettingsModal
       :open="showSettings"
       :docker-mode="sandboxEnabled"
+      :mcp-tools-error="mcpToolsError"
       @update:open="showSettings = $event"
     />
   </div>
@@ -380,6 +382,7 @@ import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import { apiGet, apiPost, apiFetchRaw } from "./utils/api";
+import { API_ROUTES } from "./config/apiRoutes";
 
 // --- Debug beat (pub/sub) ---
 const debugBeatColor = ref<string | null>(null);
@@ -424,7 +427,7 @@ async function refreshSessionStates(): Promise<void> {
 
 async function markSessionRead(id: string): Promise<void> {
   const result = await apiPost<{ ok: boolean }>(
-    `/api/sessions/${encodeURIComponent(id)}/mark-read`,
+    API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)),
   );
   // The server returns `{ ok: boolean }` — a 200 with `ok: false`
   // means the endpoint was reached but the flag wasn't actually
@@ -656,7 +659,7 @@ function onTextareaKeydown(event: KeyboardEvent) {
   sendMessage();
 }
 
-const { sessions, showHistory, fetchSessions, toggleHistory } =
+const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
   useSessionHistory();
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 const showLockPopup = ref(false);
@@ -735,28 +738,28 @@ const LAUNCHER_INVOKE_SPECS: Record<
   }
 > = {
   todos: {
-    endpoint: "/api/todos",
+    endpoint: API_ROUTES.todos.dispatch,
     method: "POST",
     body: { action: "show" },
     toolName: "manageTodoList",
     defaultTitle: "Todos",
   },
   scheduler: {
-    endpoint: "/api/scheduler",
+    endpoint: API_ROUTES.scheduler.base,
     method: "POST",
     body: { action: "show" },
     toolName: "manageScheduler",
     defaultTitle: "Schedule",
   },
   skills: {
-    endpoint: "/api/skills",
+    endpoint: API_ROUTES.skills.list,
     method: "GET",
     toolName: "manageSkills",
     defaultTitle: "Skills",
     wrapData: (json) => ({ skills: json.skills ?? [] }),
   },
   wiki: {
-    endpoint: "/api/wiki",
+    endpoint: API_ROUTES.wiki.base,
     method: "POST",
     body: { action: "index" },
     toolName: "manageWiki",
@@ -843,10 +846,11 @@ async function onPluginNavigate(target: PluginLauncherTarget): Promise<void> {
   }
 }
 
-const { availableTools, toolDescriptions, fetchMcpToolsStatus } = useMcpTools({
-  currentRole,
-  getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
-});
+const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } =
+  useMcpTools({
+    currentRole,
+    getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
+  });
 
 const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
   isRunning,
@@ -1108,7 +1112,9 @@ function onRoleChange() {
 // replace / augment it in the normal way.
 async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
   if (session.roleId !== BUILTIN_ROLE_IDS.sourceManager) return;
-  const response = await apiGet<{ sources?: unknown[] }>("/api/sources");
+  const response = await apiGet<{ sources?: unknown[] }>(
+    API_ROUTES.sources.list,
+  );
   if (!response.ok) {
     // Non-fatal: the Add / Rebuild buttons remain reachable via
     // chat as soon as the user sends any message. Still surface
@@ -1160,7 +1166,9 @@ async function loadSession(id: string) {
   }
 
   // Load from server
-  const response = await apiGet<SessionEntry[]>(`/api/sessions/${id}`);
+  const response = await apiGet<SessionEntry[]>(
+    API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(id)),
+  );
   if (!response.ok) return;
   const entries = response.data;
 
@@ -1397,7 +1405,7 @@ async function sendMessage(text?: string) {
   ensureSessionSubscription(session, runStartIndex);
 
   try {
-    const response = await apiFetchRaw("/api/agent", {
+    const response = await apiFetchRaw(API_ROUTES.agent.run, {
       method: "POST",
       body: JSON.stringify(
         buildAgentRequestBody({

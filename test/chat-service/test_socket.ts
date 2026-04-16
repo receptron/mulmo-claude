@@ -12,6 +12,14 @@ import type {
   RelayParams,
   RelayResult,
 } from "../../server/chat-service/relay.ts";
+import type { Logger } from "../../server/chat-service/types.ts";
+
+const silentLogger: Logger = {
+  error: () => {},
+  warn: () => {},
+  info: () => {},
+  debug: () => {},
+};
 
 interface Harness {
   httpServer: http.Server;
@@ -32,6 +40,7 @@ async function startHarness(): Promise<Harness> {
       relayCalls.push(params);
       return nextResult;
     },
+    logger: silentLogger,
   });
 
   await new Promise<void>((resolve) =>

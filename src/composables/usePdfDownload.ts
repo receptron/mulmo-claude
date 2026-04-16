@@ -9,6 +9,7 @@
 // below the download button.
 
 import { ref, type Ref } from "vue";
+import { API_ROUTES } from "../config/apiRoutes";
 import { apiFetchRaw } from "../utils/api";
 import { errorMessage } from "../utils/errors";
 
@@ -32,7 +33,7 @@ export function usePdfDownload(): UsePdfDownloadHandle {
     try {
       // PDF endpoint returns a binary blob, not JSON — use the raw
       // Response escape hatch so we can call `.blob()` ourselves.
-      const response = await apiFetchRaw("/api/pdf/markdown", {
+      const response = await apiFetchRaw(API_ROUTES.pdf.markdown, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markdown, filename }),

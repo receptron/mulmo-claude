@@ -5,6 +5,7 @@ import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 export interface MulmoScriptData {
   script: MulmoScript;
@@ -16,7 +17,7 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<MulmoScriptData>>(
-      "/api/mulmo-script",
+      API_ROUTES.mulmoScript.save,
       args,
     );
     if (!result.ok) {

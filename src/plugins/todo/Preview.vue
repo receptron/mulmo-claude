@@ -36,6 +36,7 @@ import { computed, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { API_ROUTES } from "../../config/apiRoutes";
 import { colorForLabel } from "./labels";
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
@@ -43,7 +44,7 @@ const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 const items = ref<TodoItem[]>(props.result.data?.items ?? []);
 
 const { refresh } = useFreshPluginData<TodoItem[]>({
-  endpoint: () => "/api/todos",
+  endpoint: () => API_ROUTES.todos.list,
   extract: (json) => {
     const v = (json as { data?: { items?: TodoItem[] } }).data?.items;
     return Array.isArray(v) ? v : null;

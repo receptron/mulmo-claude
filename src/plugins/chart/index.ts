@@ -4,6 +4,7 @@ import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 export interface ChartEntry {
   title?: string;
@@ -27,7 +28,7 @@ const presentChartPlugin: ToolPlugin<PresentChartData> = {
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<PresentChartData>>(
-      "/api/present-chart",
+      API_ROUTES.chart.present,
       args,
     );
     if (!result.ok) {

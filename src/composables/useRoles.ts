@@ -4,6 +4,7 @@
 // independently.
 
 import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { API_ROUTES } from "../config/apiRoutes";
 import { ROLES, type Role } from "../config/roles";
 import { mergeRoles } from "../utils/role/merge";
 import { apiGet } from "../utils/api";
@@ -22,7 +23,7 @@ export function useRoles(): {
   );
 
   async function refreshRoles(): Promise<void> {
-    const result = await apiGet<Role[]>("/api/roles");
+    const result = await apiGet<Role[]>(API_ROUTES.roles.list);
     if (!result.ok) {
       // Keep the current role list on failure — losing custom roles
       // is preferable to crashing the UI on a transient API hiccup.

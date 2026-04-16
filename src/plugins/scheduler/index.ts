@@ -4,6 +4,7 @@ import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 export interface ScheduledItem {
   id: string;
@@ -21,7 +22,7 @@ const schedulerPlugin: ToolPlugin<SchedulerData> = {
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<SchedulerData>>(
-      "/api/scheduler",
+      API_ROUTES.scheduler.base,
       args,
     );
     if (!result.ok) {

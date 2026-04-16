@@ -4,6 +4,7 @@ import View from "./View.vue";
 import Preview from "./Preview.vue";
 import toolDefinition from "./definition";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 export interface WikiPageEntry {
   title: string;
@@ -23,7 +24,10 @@ const wikiPlugin: ToolPlugin<WikiData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<WikiData>>("/api/wiki", args);
+    const result = await apiPost<ToolResult<WikiData>>(
+      API_ROUTES.wiki.base,
+      args,
+    );
     if (!result.ok) {
       // Return an error ToolResult instead of throwing so execute()
       // stays symmetric with every other plugin in this repo. Callers

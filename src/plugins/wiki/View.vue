@@ -142,6 +142,7 @@ import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { renderWikiLinks } from "./helpers";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { apiPost, apiFetchRaw } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
 
 const props = defineProps<{
@@ -163,7 +164,9 @@ const { refresh } = useFreshPluginData<WikiData>({
   endpoint: () => {
     const slug =
       action.value === "page" ? props.selectedResult.data?.pageName : undefined;
-    return slug ? `/api/wiki?slug=${encodeURIComponent(slug)}` : "/api/wiki";
+    return slug
+      ? `${API_ROUTES.wiki.base}?slug=${encodeURIComponent(slug)}`
+      : API_ROUTES.wiki.base;
   },
   extract: (json) => (json as { data?: WikiData }).data ?? null,
   apply: (data) => {
@@ -213,7 +216,7 @@ async function callApi(body: Record<string, unknown>) {
       content?: string;
       pageEntries?: WikiPageEntry[];
     };
-  }>("/api/wiki", body);
+  }>(API_ROUTES.wiki.base, body);
   if (!response.ok) {
     navError.value =
       response.status === 0
@@ -247,7 +250,7 @@ async function downloadPdf() {
   pdfDownloading.value = true;
   let response: Response;
   try {
-    response = await apiFetchRaw("/api/pdf/markdown", {
+    response = await apiFetchRaw(API_ROUTES.pdf.markdown, {
       method: "POST",
       body: JSON.stringify({
         markdown: content.value,

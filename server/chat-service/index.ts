@@ -1,11 +1,27 @@
+// @package-contract — see ./types.ts
+//
+// Factory for the transport chat bridge. `createChatService(deps)`
+// returns both an Express `Router` (HTTP transport, mounted via
+// `app.use`) and an `attachSocket(httpServer)` helper (socket.io
+// transport, see #268 Phase A). All host-app dependencies arrive
+// through `deps`; the module has no direct imports from
+// `../routes/…`, `../roles.js`, `../session-store/…`, or `../logger/…`
+// so it can be lifted into a standalone npm package without
+// internal edits. See #269 / #305 for the packaging rationale.
+
+import type http from "http";
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { connectSession } from "./chat-state.js";
-import { relayMessage } from "./relay.js";
-import { badRequest, notFound } from "../utils/httpError.js";
+import type { Server as SocketServer } from "socket.io";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
+import { createChatStateStore } from "./chat-state.js";
+import { createCommandHandler } from "./commands.js";
+import { createRelay } from "./relay.js";
+import type { RelayFn } from "./relay.js";
+import { attachChatSocket } from "./socket.js";
+import type { ChatServiceDeps } from "./types.js";
 
-const router = Router();
+// ── Types ────────────────────────────────────────────────────
 
 interface ChatRequestBody {
   text: string;
@@ -25,69 +41,112 @@ interface ConnectRequestParams {
   externalChatId: string;
 }
 
-// ── POST /api/chat/:transportId/:externalChatId ──────────────
-//
-// The HTTP bridge transport. Kept alongside the socket.io
-// transport (see `attachChatSocket`) until Phase D deprecates it.
+export interface ChatService {
+  router: Router;
+  /** Relay used by the HTTP router. Exposed so external transports
+   *  (tests, alternate wire protocols) can share the same flow. */
+  relay: RelayFn;
+  /** Mount socket.io at `/ws/chat` on an existing HTTP server. */
+  attachSocket(httpServer: http.Server): SocketServer;
+}
 
-router.post(
-  API_ROUTES.chatService.message,
-  async (
-    req: Request<ChatRequestParams, unknown, ChatRequestBody>,
-    res: Response,
-  ) => {
-    const { transportId, externalChatId } = req.params;
-    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+// Inlined (not imported from `../utils/httpError.js`) so the module
+// has no outbound dependency on the host app's utility modules.
+const badRequest = (res: Response, error: string) =>
+  res.status(400).json({ error });
+const notFound = (res: Response, error: string) =>
+  res.status(404).json({ error });
 
-    if (!text) {
-      badRequest(res, "text is required");
-      return;
-    }
+// ── Factory ──────────────────────────────────────────────────
 
-    const result = await relayMessage({ transportId, externalChatId, text });
+export function createChatService(deps: ChatServiceDeps): ChatService {
+  const { startChat, onSessionEvent, loadAllRoles, getRole, defaultRoleId } =
+    deps;
+  const logger = deps.logger;
+  const store = createChatStateStore({
+    transportsDir: deps.transportsDir,
+    logger,
+  });
+  const handleCommand = createCommandHandler({
+    loadAllRoles,
+    getRole,
+    resetChatState: store.resetChatState,
+  });
+  const relay = createRelay({
+    store,
+    handleCommand,
+    startChat,
+    onSessionEvent,
+    getRole,
+    defaultRoleId,
+    logger,
+  });
 
-    if (result.kind === "ok") {
-      res.json({ reply: result.reply });
-      return;
-    }
+  const router = Router();
 
-    res.status(result.status).json({ reply: result.message });
-  },
-);
+  // POST /api/chat/:transportId/:externalChatId — send text, get a reply.
+  router.post(
+    API_ROUTES.chatService.message,
+    async (
+      req: Request<ChatRequestParams, unknown, ChatRequestBody>,
+      res: Response,
+    ) => {
+      const { transportId, externalChatId } = req.params;
+      const text =
+        typeof req.body?.text === "string" ? req.body.text.trim() : "";
 
-// ── POST /api/chat/:transportId/:externalChatId/connect ──────
-//
-// Reassign the active session pointer for a transport chat.
+      if (!text) {
+        badRequest(res, "text is required");
+        return;
+      }
 
-router.post(
-  API_ROUTES.chatService.connect,
-  async (
-    req: Request<ConnectRequestParams, unknown, ConnectRequestBody>,
-    res: Response,
-  ) => {
-    const { transportId, externalChatId } = req.params;
-    const chatSessionId =
-      typeof req.body?.chatSessionId === "string"
-        ? req.body.chatSessionId.trim()
-        : "";
+      const result = await relay({ transportId, externalChatId, text });
 
-    if (!chatSessionId) {
-      badRequest(res, "chatSessionId is required");
-      return;
-    }
+      if (result.kind === "ok") {
+        res.json({ reply: result.reply });
+        return;
+      }
+      res.status(result.status).json({ reply: result.message });
+    },
+  );
 
-    const updated = await connectSession(
-      transportId,
-      externalChatId,
-      chatSessionId,
-    );
-    if (!updated) {
-      notFound(res, "No chat state found for this transport");
-      return;
-    }
+  // POST /api/chat/:transportId/:externalChatId/connect — reassign
+  // the active session pointer for a transport chat.
+  router.post(
+    API_ROUTES.chatService.connect,
+    async (
+      req: Request<ConnectRequestParams, unknown, ConnectRequestBody>,
+      res: Response,
+    ) => {
+      const { transportId, externalChatId } = req.params;
+      const chatSessionId =
+        typeof req.body?.chatSessionId === "string"
+          ? req.body.chatSessionId.trim()
+          : "";
 
-    res.json({ ok: true });
-  },
-);
+      if (!chatSessionId) {
+        badRequest(res, "chatSessionId is required");
+        return;
+      }
 
-export default router;
+      const updated = await store.connectSession(
+        transportId,
+        externalChatId,
+        chatSessionId,
+      );
+      if (!updated) {
+        notFound(res, "No chat state found for this transport");
+        return;
+      }
+
+      res.json({ ok: true });
+    },
+  );
+
+  return {
+    router,
+    relay,
+    attachSocket: (httpServer) =>
+      attachChatSocket(httpServer, { relay, logger }),
+  };
+}

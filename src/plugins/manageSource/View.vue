@@ -272,6 +272,7 @@ import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSourceData, RebuildSummary, Source } from "./index";
 import { apiGet, apiPost, apiDelete } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<ManageSourceData>;
@@ -429,7 +430,7 @@ async function commitAdd(): Promise<void> {
   }
   draftError.value = "";
   busy.value = "add";
-  const response = await apiPost<unknown>("/api/sources", payload);
+  const response = await apiPost<unknown>(API_ROUTES.sources.create, payload);
   if (!response.ok) {
     draftError.value = response.error || "Failed to register source";
     busy.value = null;
@@ -531,7 +532,7 @@ async function installPreset(preset: Preset): Promise<void> {
   }
   const failures: string[] = [];
   for (const entry of toRegister) {
-    const response = await apiPost<unknown>("/api/sources", {
+    const response = await apiPost<unknown>(API_ROUTES.sources.create, {
       slug: entry.slug,
       title: entry.title,
       url: entry.url,
@@ -564,7 +565,7 @@ async function installPreset(preset: Preset): Promise<void> {
 // Rebuild step extracted so commitAdd can chain it without recursing
 // into rebuild()'s own busy-state machine.
 async function rebuildInline(): Promise<void> {
-  const response = await apiPost<RebuildSummary>("/api/sources/rebuild");
+  const response = await apiPost<RebuildSummary>(API_ROUTES.sources.rebuild);
   if (!response.ok) {
     flash(`Register succeeded but rebuild failed: ${response.error}`, true);
     return;
@@ -654,7 +655,7 @@ function flash(message: string, isError = false): void {
 }
 
 async function refreshList(): Promise<void> {
-  const response = await apiGet<{ sources: Source[] }>("/api/sources");
+  const response = await apiGet<{ sources: Source[] }>(API_ROUTES.sources.list);
   if (!response.ok) {
     flash(`Failed to refresh sources: ${response.error}`, true);
     return;
@@ -666,7 +667,7 @@ async function remove(slug: string): Promise<void> {
   if (!confirm(`Remove source "${slug}"?`)) return;
   busy.value = slug;
   const response = await apiDelete<unknown>(
-    `/api/sources/${encodeURIComponent(slug)}`,
+    API_ROUTES.sources.remove.replace(":slug", encodeURIComponent(slug)),
   );
   busy.value = null;
   if (!response.ok) {
@@ -679,7 +680,7 @@ async function remove(slug: string): Promise<void> {
 
 async function rebuild(): Promise<void> {
   busy.value = "rebuild";
-  const response = await apiPost<RebuildSummary>("/api/sources/rebuild");
+  const response = await apiPost<RebuildSummary>(API_ROUTES.sources.rebuild);
   if (!response.ok) {
     flash(`Rebuild failed: ${response.error}`, true);
     busy.value = null;
@@ -735,7 +736,7 @@ async function loadBrief(isoDate: string): Promise<void> {
   const relPath = dailyPathFor(isoDate);
   briefFilePath.value = relPath;
   const response = await apiGet<{ content?: string; kind?: string }>(
-    "/api/files/content",
+    API_ROUTES.files.content,
     { path: relPath },
   );
   if (token !== briefLoadToken) return;

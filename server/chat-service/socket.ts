@@ -1,33 +1,35 @@
-import type http from "http";
-import { Server as SocketServer } from "socket.io";
-import type { Socket } from "socket.io";
-import { log } from "../logger/index.js";
-import { relayMessage as defaultRelayMessage } from "./relay.js";
-import type { RelayParams, RelayResult } from "./relay.js";
-
-export type RelayFn = (params: RelayParams) => Promise<RelayResult>;
-
-export interface AttachChatSocketOptions {
-  /** Injectable relay — tests stub this to avoid spinning up Claude. */
-  relay?: RelayFn;
-}
-
-// ── Chat socket (Phase A of issue #268) ──────────────────────
+// @package-contract — see ./types.ts
 //
-// Bidirectional WebSocket transport for messaging bridges. Sits
-// next to `/ws/pubsub` (frontend state sub) on the same HTTP
-// server; path is `/ws/chat`. Client emits `message` with an
-// ack callback, server dispatches through the shared
-// `relayMessage` helper and invokes the ack with the reply.
+// Socket.io transport for the bridge chat flow (Phase A of #268).
+// Sits next to the HTTP router at `/ws/chat`. DI-pure — it takes a
+// `RelayFn` and a `Logger` through the factory so the package has
+// no direct imports from the host app.
+//
+// Client contract:
+//   handshake.auth: { transportId: string }
+//   emit("message", { externalChatId, text }, ack)
+//     ack receives either { ok: true, reply } or
+//     { ok: false, error, status? }
 //
 // Future phases:
-//   B — server→bridge push via `socket.to(room).emit("push", …)`
-//   C — streaming text chunks via `reply.chunk`
+//   B — server→bridge push via rooms (#263)
+//   C — streaming text chunks via reply.chunk
 //   D — HTTP endpoint deprecation
 //
 // See plans/feat-chat-socketio.md and plans/messaging_layers_guide.md.
 
+import type http from "http";
+import { Server as SocketServer } from "socket.io";
+import type { Socket } from "socket.io";
+import type { RelayFn } from "./relay.js";
+import type { Logger } from "./types.js";
+
 export const CHAT_SOCKET_PATH = "/ws/chat";
+
+export interface ChatSocketDeps {
+  relay: RelayFn;
+  logger: Logger;
+}
 
 interface HandshakeAuth {
   transportId?: unknown;
@@ -43,16 +45,20 @@ type MessageAck =
   | { ok: true; reply: string }
   | { ok: false; error: string; status?: number };
 
+type ParsedMessage =
+  | { ok: true; externalChatId: string; text: string }
+  | { ok: false; error: string };
+
 export function attachChatSocket(
   server: http.Server,
-  options: AttachChatSocketOptions = {},
+  deps: ChatSocketDeps,
 ): SocketServer {
-  const relay = options.relay ?? defaultRelayMessage;
+  const { relay, logger } = deps;
+
   const io = new SocketServer(server, {
     path: CHAT_SOCKET_PATH,
-    // Same CORS stance as the rest of the app: browser SOP + CSRF
-    // guard on HTTP paths, localhost-only bind. Socket.io defaults
-    // to same-origin, which is what we want.
+    // Same CORS stance as the rest of the host: browser SOP +
+    // localhost-only bind. Socket.io defaults to same-origin.
   });
 
   io.use((socket, next) => {
@@ -67,13 +73,13 @@ export function attachChatSocket(
 
   io.on("connection", (socket: Socket) => {
     const transportId: string = socket.data.transportId;
-    log.info("chat-service", "socket connected", {
+    logger.info("chat-service", "socket connected", {
       socketId: socket.id,
       transportId,
     });
 
     socket.on("disconnect", (reason: string) => {
-      log.info("chat-service", "socket disconnected", {
+      logger.info("chat-service", "socket disconnected", {
         socketId: socket.id,
         transportId,
         reason,
@@ -84,7 +90,7 @@ export function attachChatSocket(
       "message",
       async (payload: MessagePayload, ack?: (reply: MessageAck) => void) => {
         if (typeof ack !== "function") {
-          log.warn("chat-service", "socket message missing ack", {
+          logger.warn("chat-service", "socket message missing ack", {
             socketId: socket.id,
             transportId,
           });
@@ -122,10 +128,6 @@ function extractTransportId(auth: unknown): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
-
-type ParsedMessage =
-  | { ok: true; externalChatId: string; text: string }
-  | { ok: false; error: string };
 
 function parseMessagePayload(payload: MessagePayload): ParsedMessage {
   if (!payload || typeof payload !== "object") {

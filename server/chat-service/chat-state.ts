@@ -1,7 +1,14 @@
+// @package-contract — see ./types.ts
+//
+// Persists per-transport chat state (which session a given
+// external chat id currently points at, which role, timestamps).
+// Kept DI-pure so the module can be extracted as a standalone npm
+// package: the transports directory path and logger arrive via the
+// factory, never through a direct `../workspace-paths.js` import.
+
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { WORKSPACE_PATHS } from "../workspace-paths.js";
-import { log } from "../logger/index.js";
+import type { Logger } from "./types.js";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -14,109 +21,132 @@ export interface TransportChatState {
   updatedAt: string;
 }
 
-// ── Path helpers ─────────────────────────────────────────────
+export interface ChatStateStore {
+  getChatState(
+    transportId: string,
+    externalChatId: string,
+  ): Promise<TransportChatState | null>;
+  setChatState(transportId: string, state: TransportChatState): Promise<void>;
+  resetChatState(
+    transportId: string,
+    externalChatId: string,
+    roleId: string,
+  ): Promise<TransportChatState>;
+  connectSession(
+    transportId: string,
+    externalChatId: string,
+    chatSessionId: string,
+  ): Promise<TransportChatState | null>;
+  generateSessionId(transportId: string, externalChatId: string): string;
+}
 
-/**
- * Validate that an external ID is safe for use in file paths.
- * Only allows alphanumeric, hyphens, underscores, and dots.
- */
+// ── Path / id helpers ────────────────────────────────────────
+
+// Allow alphanumeric, hyphen, underscore, dot. Rejects empty
+// strings and anything >200 chars so we never let a transport id
+// escape the transports directory via path traversal.
 function isSafeId(id: string): boolean {
   return /^[\w.-]+$/.test(id) && id.length > 0 && id.length <= 200;
 }
 
-function getTransportDir(transportId: string): string {
-  return path.join(WORKSPACE_PATHS.transports, transportId, "chats");
-}
+// ── Factory ──────────────────────────────────────────────────
 
-function getStatePath(transportId: string, externalChatId: string): string {
-  return path.join(getTransportDir(transportId), `${externalChatId}.json`);
-}
+export function createChatStateStore(opts: {
+  transportsDir: string;
+  logger: Logger;
+}): ChatStateStore {
+  const { transportsDir, logger } = opts;
 
-// ── Session ID generation ────────────────────────────────────
+  const transportDir = (transportId: string) =>
+    path.join(transportsDir, transportId, "chats");
 
-export function generateSessionId(
-  transportId: string,
-  externalChatId: string,
-): string {
-  return `${transportId}-${externalChatId}-${Date.now()}`;
-}
+  const statePath = (transportId: string, externalChatId: string) =>
+    path.join(transportDir(transportId), `${externalChatId}.json`);
 
-// ── CRUD operations ──────────────────────────────────────────
+  const generateSessionId = (
+    transportId: string,
+    externalChatId: string,
+  ): string => `${transportId}-${externalChatId}-${Date.now()}`;
 
-export async function getChatState(
-  transportId: string,
-  externalChatId: string,
-): Promise<TransportChatState | null> {
-  if (!isSafeId(transportId) || !isSafeId(externalChatId)) return null;
+  const getChatState = async (
+    transportId: string,
+    externalChatId: string,
+  ): Promise<TransportChatState | null> => {
+    if (!isSafeId(transportId) || !isSafeId(externalChatId)) return null;
+    try {
+      const raw = await readFile(
+        statePath(transportId, externalChatId),
+        "utf-8",
+      );
+      const parsed: TransportChatState = JSON.parse(raw);
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
 
-  try {
-    const raw = await readFile(
-      getStatePath(transportId, externalChatId),
-      "utf-8",
+  const setChatState = async (
+    transportId: string,
+    state: TransportChatState,
+  ): Promise<void> => {
+    if (!isSafeId(transportId) || !isSafeId(state.externalChatId)) {
+      throw new Error("Invalid transport or chat ID");
+    }
+    await mkdir(transportDir(transportId), { recursive: true });
+    await writeFile(
+      statePath(transportId, state.externalChatId),
+      JSON.stringify(state, null, 2),
     );
-    const parsed: TransportChatState = JSON.parse(raw);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-export async function setChatState(
-  transportId: string,
-  state: TransportChatState,
-): Promise<void> {
-  if (!isSafeId(transportId) || !isSafeId(state.externalChatId)) {
-    throw new Error("Invalid transport or chat ID");
-  }
-
-  const dir = getTransportDir(transportId);
-  await mkdir(dir, { recursive: true });
-  await writeFile(
-    getStatePath(transportId, state.externalChatId),
-    JSON.stringify(state, null, 2),
-  );
-}
-
-export async function resetChatState(
-  transportId: string,
-  externalChatId: string,
-  roleId: string,
-): Promise<TransportChatState> {
-  const now = new Date().toISOString();
-  const state: TransportChatState = {
-    externalChatId,
-    sessionId: generateSessionId(transportId, externalChatId),
-    roleId,
-    startedAt: now,
-    updatedAt: now,
   };
-  await setChatState(transportId, state);
-  log.info("chat-state", "reset", {
-    transportId,
-    externalChatId,
-    sessionId: state.sessionId,
-  });
-  return state;
-}
 
-export async function connectSession(
-  transportId: string,
-  externalChatId: string,
-  chatSessionId: string,
-): Promise<TransportChatState | null> {
-  const existing = await getChatState(transportId, externalChatId);
-  if (!existing) return null;
-
-  const updated: TransportChatState = {
-    ...existing,
-    sessionId: chatSessionId,
-    updatedAt: new Date().toISOString(),
+  const resetChatState = async (
+    transportId: string,
+    externalChatId: string,
+    roleId: string,
+  ): Promise<TransportChatState> => {
+    const now = new Date().toISOString();
+    const state: TransportChatState = {
+      externalChatId,
+      sessionId: generateSessionId(transportId, externalChatId),
+      roleId,
+      startedAt: now,
+      updatedAt: now,
+    };
+    await setChatState(transportId, state);
+    logger.info("chat-state", "reset", {
+      transportId,
+      externalChatId,
+      sessionId: state.sessionId,
+    });
+    return state;
   };
-  await setChatState(transportId, updated);
-  log.info("chat-state", "connected", {
-    transportId,
-    externalChatId,
-    sessionId: chatSessionId,
-  });
-  return updated;
+
+  const connectSession = async (
+    transportId: string,
+    externalChatId: string,
+    chatSessionId: string,
+  ): Promise<TransportChatState | null> => {
+    const existing = await getChatState(transportId, externalChatId);
+    if (!existing) return null;
+    const updated: TransportChatState = {
+      ...existing,
+      sessionId: chatSessionId,
+      updatedAt: new Date().toISOString(),
+    };
+    await setChatState(transportId, updated);
+    logger.info("chat-state", "connected", {
+      transportId,
+      externalChatId,
+      sessionId: chatSessionId,
+    });
+    return updated;
+  };
+
+  return {
+    getChatState,
+    setChatState,
+    resetChatState,
+    connectSession,
+    generateSessionId,
+  };
 }

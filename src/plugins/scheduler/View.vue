@@ -1,5 +1,15 @@
 <template>
   <div class="h-full bg-white flex flex-col">
+    <!-- API error banner — surfaces POST /api/scheduler failures so a
+         delete/add/replace that silently no-ops becomes diagnosable. -->
+    <div
+      v-if="apiError"
+      class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700"
+      role="alert"
+      data-testid="scheduler-api-error"
+    >
+      ⚠ Failed to update scheduler: {{ apiError }}
+    </div>
     <!-- Header -->
     <div
       class="flex items-center justify-between px-6 py-3 border-b border-gray-100"
@@ -336,6 +346,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 type YamlScalar = string | number | boolean | null;
 
@@ -347,7 +358,7 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 const items = ref<ScheduledItem[]>(props.selectedResult.data?.items ?? []);
 
 const { refresh } = useFreshPluginData<ScheduledItem[]>({
-  endpoint: () => "/api/scheduler",
+  endpoint: () => API_ROUTES.scheduler.base,
   extract: (json) => {
     const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
     return Array.isArray(v) ? v : null;
@@ -625,14 +636,21 @@ function toJson(its: ScheduledItem[]) {
 
 const editorText = ref(toJson(items.value));
 const parseError = ref("");
+// Last POST /api/scheduler failure. Cleared on the next successful call
+// so the banner disappears as soon as things recover.
+const apiError = ref<string | null>(null);
 const isModified = computed(() => editorText.value !== toJson(items.value));
 
 async function callApi(body: Record<string, unknown>): Promise<boolean> {
   const response = await apiPost<{ data?: { items?: ScheduledItem[] } }>(
-    "/api/scheduler",
+    API_ROUTES.scheduler.base,
     body,
   );
-  if (!response.ok) return false;
+  if (!response.ok) {
+    apiError.value = response.error;
+    return false;
+  }
+  apiError.value = null;
   const result = response.data;
   items.value = result.data?.items ?? [];
   emit("updateResult", {

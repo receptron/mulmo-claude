@@ -5,13 +5,14 @@ import type { ImageToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const canvasPlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<ImageToolData>>(
-      "/api/canvas",
+      API_ROUTES.plugins.canvas,
       args,
     );
     if (!result.ok) {

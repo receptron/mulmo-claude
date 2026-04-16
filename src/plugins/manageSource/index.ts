@@ -4,6 +4,7 @@ import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 // Mirrors server/sources/types.ts#Source. Re-declared here so the
 // frontend doesn't have to import a server package.
@@ -42,7 +43,7 @@ const manageSourcePlugin: ToolPlugin<ManageSourceData> = {
   toolDefinition,
   async execute(_context, args) {
     const result = await apiPost<ToolResult<ManageSourceData>>(
-      "/api/sources/manage",
+      API_ROUTES.sources.manage,
       args,
     );
     if (!result.ok) {

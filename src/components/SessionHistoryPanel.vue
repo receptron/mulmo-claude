@@ -5,6 +5,15 @@
     :style="{ top: topOffset != null ? topOffset + 'px' : '4rem' }"
   >
     <div class="p-2 space-y-1">
+      <div
+        v-if="errorMessage"
+        class="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 mb-1"
+        role="alert"
+        data-testid="session-history-error"
+      >
+        ⚠ Failed to refresh: {{ errorMessage }}
+        <span v-if="sessions.length > 0"> — showing last known list.</span>
+      </div>
       <p v-if="sessions.length === 0" class="text-xs text-gray-400 p-2">
         No sessions yet.
       </p>
@@ -65,6 +74,8 @@ const props = defineProps<{
   currentSessionId: string;
   roles: Role[];
   topOffset?: number;
+  // Latest fetch error from useSessionHistory, or null when healthy.
+  errorMessage?: string | null;
 }>();
 
 const emit = defineEmits<{

@@ -105,6 +105,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSkillsData, SkillSummary } from "./index";
 import { useAppApi } from "../../composables/useAppApi";
 import { apiGet, apiDelete } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 interface SkillDetail {
   name: string;
@@ -158,7 +159,7 @@ watch(
     detailLoading.value = true;
     detailError.value = null;
     const response = await apiGet<{ skill: SkillDetail }>(
-      `/api/skills/${encodeURIComponent(name)}`,
+      API_ROUTES.skills.detail.replace(":name", encodeURIComponent(name)),
     );
     if (selectedName.value !== name) {
       // Selection changed while this request was in flight — drop it.
@@ -202,7 +203,7 @@ async function deleteSkill(): Promise<void> {
   }
   deleting.value = true;
   const result = await apiDelete<unknown>(
-    `/api/skills/${encodeURIComponent(name)}`,
+    API_ROUTES.skills.remove.replace(":name", encodeURIComponent(name)),
   );
   deleting.value = false;
   if (!result.ok) {

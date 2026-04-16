@@ -5,13 +5,14 @@ import type { SpreadsheetToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const spreadsheetPlugin: ToolPlugin<SpreadsheetToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<SpreadsheetToolData>>(
-      "/api/present-spreadsheet",
+      API_ROUTES.plugins.presentSpreadsheet,
       args,
     );
     if (!result.ok) {

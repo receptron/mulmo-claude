@@ -18,6 +18,7 @@ import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { extractFirstH1 } from "../../utils/markdown/extractFirstH1";
 import { apiGet } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 const props = defineProps<{
   result: ToolResult<MarkdownToolData>;
@@ -31,7 +32,7 @@ async function fetchContent(): Promise<void> {
     fetchedContent.value = "";
     return;
   }
-  const result = await apiGet<{ content?: string }>("/api/files/content", {
+  const result = await apiGet<{ content?: string }>(API_ROUTES.files.content, {
     path: raw,
   });
   if (!result.ok) {

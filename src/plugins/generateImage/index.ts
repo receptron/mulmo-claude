@@ -5,6 +5,7 @@ import type { ImageToolData } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 
 function createUploadedImageResult(
   imageData: string,
@@ -24,7 +25,7 @@ const generateImagePlugin: ToolPlugin<ImageToolData> = {
 
   async execute(_context, args) {
     const result = await apiPost<ToolResult<ImageToolData>>(
-      "/api/generate-image",
+      API_ROUTES.image.generate,
       args,
     );
     if (!result.ok) {

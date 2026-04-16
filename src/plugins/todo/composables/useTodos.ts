@@ -9,6 +9,7 @@
 // action route is intentionally NOT used by the explorer.
 
 import { ref, type Ref } from "vue";
+import { API_ROUTES } from "../../../config/apiRoutes";
 import { useFreshPluginData } from "../../../composables/useFreshPluginData";
 import { errorMessage } from "../../../utils/errors";
 import type { StatusColumn, TodoItem } from "../index";
@@ -123,7 +124,7 @@ export function useTodos(
     items: TodoItem[];
     columns: StatusColumn[];
   }>({
-    endpoint: () => "/api/todos",
+    endpoint: () => API_ROUTES.todos.list,
     extract: (json) => {
       const i = extractItems(json);
       const c = extractColumns(json);
@@ -195,30 +196,34 @@ export function useTodos(
     columns,
     error,
     refresh,
-    createItem: (input) => call("/api/todos/items", jsonInit("POST", input)),
+    createItem: (input) =>
+      call(API_ROUTES.todos.items, jsonInit("POST", input)),
     patchItem: (id, input) =>
       call(
-        `/api/todos/items/${encodeURIComponent(id)}`,
+        API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)),
         jsonInit("PATCH", input),
       ),
     moveItem: (id, input) =>
       call(
-        `/api/todos/items/${encodeURIComponent(id)}/move`,
+        API_ROUTES.todos.itemMove.replace(":id", encodeURIComponent(id)),
         jsonInit("POST", input),
       ),
     deleteItem: (id) =>
-      call(`/api/todos/items/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    addColumn: (input) => call("/api/todos/columns", jsonInit("POST", input)),
+      call(API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)), {
+        method: "DELETE",
+      }),
+    addColumn: (input) =>
+      call(API_ROUTES.todos.columns, jsonInit("POST", input)),
     patchColumn: (id, input) =>
       call(
-        `/api/todos/columns/${encodeURIComponent(id)}`,
+        API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)),
         jsonInit("PATCH", input),
       ),
     deleteColumn: (id) =>
-      call(`/api/todos/columns/${encodeURIComponent(id)}`, {
+      call(API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)), {
         method: "DELETE",
       }),
     reorderColumns: (ids) =>
-      call("/api/todos/columns/order", jsonInit("PUT", { ids })),
+      call(API_ROUTES.todos.columnsOrder, jsonInit("PUT", { ids })),
   };
 }

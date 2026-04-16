@@ -238,11 +238,12 @@ import { useExpandedDirs } from "../composables/useExpandedDirs";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
 import { apiGet } from "../utils/api";
+import { API_ROUTES } from "../config/apiRoutes";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type { TextResponseData } from "@gui-chat-plugin/text-response";
+import type { TextResponseData } from "../plugins/textResponse/types";
 import type { SchedulerData, ScheduledItem } from "../plugins/scheduler/index";
 import type { StatusColumn, TodoData, TodoItem } from "../plugins/todo/index";
 import {
@@ -497,7 +498,7 @@ const recentPaths = computed(() => {
 });
 
 function rawUrl(filePath: string): string {
-  return `/api/files/raw?path=${encodeURIComponent(filePath)}`;
+  return `${API_ROUTES.files.raw}?path=${encodeURIComponent(filePath)}`;
 }
 
 function formatBytes(bytes: number): string {
@@ -529,7 +530,7 @@ async function loadDirChildren(path: string): Promise<void> {
   next.set(path, null);
   childrenByPath.value = next;
 
-  const result = await apiGet<TreeNode>("/api/files/dir", { path });
+  const result = await apiGet<TreeNode>(API_ROUTES.files.dir, { path });
   if (!result.ok) {
     // Drop the `null` marker so the user can retry (e.g. via the
     // refresh-token watcher). Keep the error visible too.
@@ -589,7 +590,7 @@ async function loadContent(filePath: string): Promise<void> {
   contentError.value = null;
   content.value = null;
   const result = await apiGet<FileContent>(
-    "/api/files/content",
+    API_ROUTES.files.content,
     { path: filePath },
     { signal: controller.signal },
   );

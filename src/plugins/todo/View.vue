@@ -1,5 +1,15 @@
 <template>
   <div class="h-full bg-white flex flex-col">
+    <!-- API error banner — surfaces POST /api/todos failures so a
+         silent add/remove/toggle becomes diagnosable. -->
+    <div
+      v-if="todoApiError"
+      class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700"
+      role="alert"
+      data-testid="todo-api-error"
+    >
+      ⚠ Failed to update todos: {{ todoApiError }}
+    </div>
     <div
       class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
     >
@@ -158,6 +168,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { apiPost } from "../../utils/api";
+import { API_ROUTES } from "../../config/apiRoutes";
 import {
   colorForLabel,
   filterByLabels,
@@ -173,7 +184,7 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 const items = ref<TodoItem[]>(props.selectedResult.data?.items ?? []);
 
 const { refresh } = useFreshPluginData<TodoItem[]>({
-  endpoint: () => "/api/todos",
+  endpoint: () => API_ROUTES.todos.list,
   extract: (json) => {
     const v = (json as { data?: { items?: TodoItem[] } }).data?.items;
     return Array.isArray(v) ? v : null;
@@ -410,12 +421,20 @@ async function applyItemEdit() {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
+// Last POST /api/todos failure. Cleared on the next successful call so
+// the banner disappears as soon as things recover.
+const todoApiError = ref<string | null>(null);
+
 async function callApi(body: Record<string, unknown>): Promise<boolean> {
   const response = await apiPost<{ data?: { items?: TodoItem[] } }>(
-    "/api/todos",
+    API_ROUTES.todos.dispatch,
     body,
   );
-  if (!response.ok) return false;
+  if (!response.ok) {
+    todoApiError.value = response.error;
+    return false;
+  }
+  todoApiError.value = null;
   const result = response.data;
   items.value = result.data?.items ?? [];
   emit("updateResult", {
