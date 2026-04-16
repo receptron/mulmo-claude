@@ -42,6 +42,7 @@ import { rewriteWorkspaceLinks } from "./linkRewrite.js";
 import { writeState, type JournalState } from "./state.js";
 import { readTextOrNull } from "../utils/fs.js";
 import { log } from "../logger/index.js";
+import { EVENT_TYPES } from "../../src/types/events.js";
 
 // --- Constants ------------------------------------------------------
 
@@ -578,7 +579,10 @@ function parseJsonlLine(line: string): Record<string, unknown> | null {
 }
 
 function isMetadataEntry(entry: Record<string, unknown>): boolean {
-  return entry.type === "session_meta" || entry.type === "claude_session_id";
+  return (
+    entry.type === EVENT_TYPES.sessionMeta ||
+    entry.type === EVENT_TYPES.claudeSessionId
+  );
 }
 
 // Collect parsed events into per-date buckets using `fallbackDate`
@@ -644,7 +648,7 @@ export function entryToExcerpt(
   const type = typeof entry.type === "string" ? entry.type : "unknown";
 
   // text entries: {source, type: "text", message}
-  if (type === "text" && typeof entry.message === "string") {
+  if (type === EVENT_TYPES.text && typeof entry.message === "string") {
     return {
       source,
       type,
@@ -656,7 +660,7 @@ export function entryToExcerpt(
   // to avoid a NullPointerException-style crash when accessing
   // r.toolName below.
   if (
-    type === "tool_result" &&
+    type === EVENT_TYPES.toolResult &&
     typeof entry.result === "object" &&
     entry.result !== null
   ) {

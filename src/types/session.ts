@@ -2,6 +2,7 @@
 // returned by the server's session routes.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import { EVENT_TYPES } from "./events";
 import type { ToolCallHistoryItem } from "./toolCallHistory";
 
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
@@ -40,23 +41,25 @@ export interface SessionEntry {
 
 export interface TextEntry extends SessionEntry {
   source: "user" | "assistant";
-  type: "text";
+  type: typeof EVENT_TYPES.text;
   message: string;
 }
 
 export interface ToolResultEntry extends SessionEntry {
   source: "tool";
-  type: "tool_result";
+  type: typeof EVENT_TYPES.toolResult;
   result: ToolResultComplete;
 }
 
 export const isTextEntry = (e: SessionEntry): e is TextEntry =>
   (e.source === "user" || e.source === "assistant") &&
-  e.type === "text" &&
+  e.type === EVENT_TYPES.text &&
   typeof e.message === "string";
 
 export const isToolResultEntry = (e: SessionEntry): e is ToolResultEntry =>
-  e.source === "tool" && e.type === "tool_result" && e.result !== undefined;
+  e.source === "tool" &&
+  e.type === EVENT_TYPES.toolResult &&
+  e.result !== undefined;
 
 // In-memory session held in `sessionMap`. PR #88 introduced this so
 // multiple chats can run concurrently — `id` matches the `chatSessionId`

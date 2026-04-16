@@ -13,6 +13,7 @@
 // inject their own SummarizeFn via `IndexerDeps.summarize`.
 
 import { spawn } from "node:child_process";
+import { EVENT_TYPES } from "../../src/types/events.js";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
@@ -85,7 +86,7 @@ export function extractText(jsonlContent: string): string {
     const source = entry.source;
     if (
       (source === "user" || source === "assistant") &&
-      entry.type === "text" &&
+      entry.type === EVENT_TYPES.text &&
       typeof entry.message === "string"
     ) {
       parts.push(`[${source}] ${trimMessage(entry.message)}`);

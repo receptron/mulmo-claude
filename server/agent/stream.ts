@@ -1,12 +1,23 @@
+import { EVENT_TYPES } from "../../src/types/events.js";
+
 export type AgentEvent =
-  | { type: "status"; message: string }
-  | { type: "text"; message: string }
-  | { type: "tool_result"; result: unknown }
-  | { type: "switch_role"; roleId: string }
-  | { type: "error"; message: string }
-  | { type: "tool_call"; toolUseId: string; toolName: string; args: unknown }
-  | { type: "tool_call_result"; toolUseId: string; content: string }
-  | { type: "claude_session_id"; id: string };
+  | { type: typeof EVENT_TYPES.status; message: string }
+  | { type: typeof EVENT_TYPES.text; message: string }
+  | { type: typeof EVENT_TYPES.toolResult; result: unknown }
+  | { type: typeof EVENT_TYPES.switchRole; roleId: string }
+  | { type: typeof EVENT_TYPES.error; message: string }
+  | {
+      type: typeof EVENT_TYPES.toolCall;
+      toolUseId: string;
+      toolName: string;
+      args: unknown;
+    }
+  | {
+      type: typeof EVENT_TYPES.toolCallResult;
+      toolUseId: string;
+      content: string;
+    }
+  | { type: typeof EVENT_TYPES.claudeSessionId; id: string };
 
 export interface ClaudeContentBlock {
   type: string;
@@ -36,7 +47,7 @@ export interface RawStreamEvent {
 export function blockToEvent(block: ClaudeContentBlock): AgentEvent | null {
   if (block.type === "tool_use" && block.id && block.name) {
     return {
-      type: "tool_call",
+      type: EVENT_TYPES.toolCall,
       toolUseId: block.id,
       toolName: block.name,
       args: block.input,
@@ -51,7 +62,7 @@ export function blockToEvent(block: ClaudeContentBlock): AgentEvent | null {
           ? ""
           : JSON.stringify(raw);
     return {
-      type: "tool_call_result",
+      type: EVENT_TYPES.toolCallResult,
       toolUseId: block.tool_use_id,
       content,
     };
@@ -61,9 +72,14 @@ export function blockToEvent(block: ClaudeContentBlock): AgentEvent | null {
 
 export function parseStreamEvent(event: RawStreamEvent): AgentEvent[] {
   if (event.type === "result" && event.result) {
-    const events: AgentEvent[] = [{ type: "text", message: event.result }];
+    const events: AgentEvent[] = [
+      { type: EVENT_TYPES.text, message: event.result },
+    ];
     if (event.session_id) {
-      events.push({ type: "claude_session_id", id: event.session_id });
+      events.push({
+        type: EVENT_TYPES.claudeSessionId,
+        id: event.session_id,
+      });
     }
     return events;
   }
@@ -78,7 +94,10 @@ export function parseStreamEvent(event: RawStreamEvent): AgentEvent[] {
     : [];
 
   if (event.type === "assistant") {
-    return [{ type: "status", message: "Thinking..." }, ...blockEvents];
+    return [
+      { type: EVENT_TYPES.status, message: "Thinking..." },
+      ...blockEvents,
+    ];
   }
   return blockEvents;
 }

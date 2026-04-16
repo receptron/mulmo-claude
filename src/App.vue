@@ -341,6 +341,7 @@ import {
   type SessionEntry,
   type ActiveSession,
 } from "./types/session";
+import { EVENT_TYPES } from "./types/events";
 import { extractImageData, makeTextResult } from "./utils/tools/result";
 import {
   roleIcon as roleIconLookup,
@@ -1054,7 +1055,7 @@ async function loadSession(id: string) {
   if (!res.ok) return;
   const entries: SessionEntry[] = await res.json();
 
-  const meta = entries.find((e) => e.type === "session_meta");
+  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
   const roleId = meta?.roleId ?? currentRoleId.value;
   const toolResultsList = parseSessionEntries(entries);
   const urlResult =
@@ -1143,7 +1144,7 @@ function ensureSessionSubscription(
     // we receive events if another tab starts a new run. Only
     // unsubscribe sessions the user is NOT currently viewing — the
     // watch(currentSessionId) handler cleans up when switching away.
-    if (event.type === "session_finished") {
+    if (event.type === EVENT_TYPES.sessionFinished) {
       if (currentSessionId.value === session.id) {
         markSessionRead(session.id);
       } else {
@@ -1187,7 +1188,7 @@ async function applyAgentEvent(
 ): Promise<void> {
   const { session, runStartIndex } = ctx;
   switch (event.type) {
-    case "tool_call":
+    case EVENT_TYPES.toolCall:
       session.toolCallHistory.push({
         toolUseId: event.toolUseId,
         toolName: event.toolName,
@@ -1196,7 +1197,7 @@ async function applyAgentEvent(
       });
       ctx.scrollSidebarToBottom();
       return;
-    case "tool_call_result": {
+    case EVENT_TYPES.toolCallResult: {
       const entry = findPendingToolCall(
         session.toolCallHistory,
         event.toolUseId,
@@ -1205,19 +1206,19 @@ async function applyAgentEvent(
       ctx.scrollSidebarToBottom();
       return;
     }
-    case "status":
+    case EVENT_TYPES.status:
       session.statusMessage = event.message;
       return;
-    case "switch_role":
+    case EVENT_TYPES.switchRole:
       setTimeout(() => {
         ctx.setCurrentRoleId(event.roleId);
         ctx.onRoleChange();
       }, 0);
       return;
-    case "roles_updated":
+    case EVENT_TYPES.rolesUpdated:
       await ctx.refreshRoles();
       return;
-    case "text": {
+    case EVENT_TYPES.text: {
       const source = event.source ?? "assistant";
       if (source === "user") {
         // The tab that sent the message already added it locally via
@@ -1243,7 +1244,7 @@ async function applyAgentEvent(
       }
       return;
     }
-    case "tool_result": {
+    case EVENT_TYPES.toolResult: {
       const { result } = event;
       const existing = session.toolResults.findIndex(
         (r) => r.uuid === result.uuid,
@@ -1256,11 +1257,11 @@ async function applyAgentEvent(
       }
       return;
     }
-    case "error":
+    case EVENT_TYPES.error:
       console.error("[agent] error event:", event.message);
       pushErrorMessage(session, event.message);
       return;
-    case "session_finished":
+    case EVENT_TYPES.sessionFinished:
       // Handled in the subscription callback — no-op here.
       return;
   }

@@ -7,16 +7,17 @@ import { appendFile } from "node:fs/promises";
 import { log } from "../logger/index.js";
 import { WEB_SEARCH_TOOL_NAME, classifyToolResult } from "./classify.js";
 import { writeSearchResult } from "./writeSearch.js";
+import { EVENT_TYPES } from "../../src/types/events.js";
 
 export interface ToolCallEvent {
-  type: "tool_call";
+  type: typeof EVENT_TYPES.toolCall;
   toolUseId: string;
   toolName: string;
   args: unknown;
 }
 
 export interface ToolCallResultEvent {
-  type: "tool_call_result";
+  type: typeof EVENT_TYPES.toolCallResult;
   toolUseId: string;
   content: string;
 }
@@ -53,7 +54,7 @@ export async function recordToolEvent(
   deps: RecordToolEventDeps,
 ): Promise<void> {
   try {
-    if (event.type === "tool_call") {
+    if (event.type === EVENT_TYPES.toolCall) {
       await handleToolCall(event, deps);
       return;
     }
@@ -78,7 +79,7 @@ async function handleToolCall(
   const now = (deps.now ?? (() => new Date()))();
   const record = {
     source: "tool",
-    type: "tool_call",
+    type: EVENT_TYPES.toolCall,
     toolUseId: event.toolUseId,
     toolName: event.toolName,
     args: event.args,
@@ -194,7 +195,7 @@ async function handleToolCallResult(
 
   const base = {
     source: "tool",
-    type: "tool_call_result",
+    type: EVENT_TYPES.toolCallResult,
     toolUseId: event.toolUseId,
     toolName,
     ts: now.toISOString(),

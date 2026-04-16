@@ -12,6 +12,7 @@ import {
   type SessionEntry,
   type SessionSummary,
 } from "../../types/session";
+import { EVENT_TYPES } from "../../types/events";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 // Walk the server's session entries and produce the flat
@@ -24,7 +25,7 @@ export function parseSessionEntries(
 ): ToolResultComplete[] {
   const out: ToolResultComplete[] = [];
   for (const entry of entries) {
-    if (entry.type === "session_meta") continue;
+    if (entry.type === EVENT_TYPES.sessionMeta) continue;
     if (isTextEntry(entry)) {
       out.push(makeTextResult(entry.message, entry.source));
     } else if (isToolResultEntry(entry)) {

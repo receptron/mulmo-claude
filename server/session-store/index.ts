@@ -13,6 +13,7 @@ import {
 } from "../../src/config/pubsubChannels.js";
 import { log } from "../logger/index.js";
 import { workspacePath } from "../workspace.js";
+import { EVENT_TYPES } from "../../src/types/events.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -125,7 +126,9 @@ export function endRun(chatSessionId: string): void {
   session.abortRun = undefined;
   session.updatedAt = new Date().toISOString();
   persistHasUnread(chatSessionId, true);
-  publishToSessionChannel(chatSessionId, { type: "session_finished" });
+  publishToSessionChannel(chatSessionId, {
+    type: EVENT_TYPES.sessionFinished,
+  });
   notifySessionsChanged();
 }
 
@@ -165,19 +168,19 @@ export function pushSessionEvent(
 
   const type = event.type as string;
 
-  if (type === "tool_call") {
+  if (type === EVENT_TYPES.toolCall) {
     session.toolCallHistory.push({
       toolUseId: event.toolUseId as string,
       toolName: event.toolName as string,
       args: event.args,
       timestamp: Date.now(),
     });
-  } else if (type === "tool_call_result") {
+  } else if (type === EVENT_TYPES.toolCallResult) {
     const entry = session.toolCallHistory.find(
       (e) => e.toolUseId === event.toolUseId,
     );
     if (entry) entry.result = event.content as string;
-  } else if (type === "status") {
+  } else if (type === EVENT_TYPES.status) {
     session.statusMessage = event.message as string;
     // No notifySessionsChanged() here — status updates are high-frequency
     // and flow to subscribed clients via the session.<id> channel directly.
@@ -200,9 +203,16 @@ export async function pushToolResult(
 
   await appendFile(
     session.resultsFilePath,
-    JSON.stringify({ source: "tool", type: "tool_result", result }) + "\n",
+    JSON.stringify({
+      source: "tool",
+      type: EVENT_TYPES.toolResult,
+      result,
+    }) + "\n",
   );
-  publishToSessionChannel(chatSessionId, { type: "tool_result", result });
+  publishToSessionChannel(chatSessionId, {
+    type: EVENT_TYPES.toolResult,
+    result,
+  });
   return { kind: "processed" };
 }
 

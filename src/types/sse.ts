@@ -3,53 +3,54 @@
 // session's state.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import { EVENT_TYPES } from "./events";
 
 export interface SseToolCall {
-  type: "tool_call";
+  type: typeof EVENT_TYPES.toolCall;
   toolUseId: string;
   toolName: string;
   args: unknown;
 }
 
 export interface SseToolCallResult {
-  type: "tool_call_result";
+  type: typeof EVENT_TYPES.toolCallResult;
   toolUseId: string;
   content: string;
 }
 
 export interface SseStatus {
-  type: "status";
+  type: typeof EVENT_TYPES.status;
   message: string;
 }
 
 export interface SseSwitchRole {
-  type: "switch_role";
+  type: typeof EVENT_TYPES.switchRole;
   roleId: string;
 }
 
 export interface SseText {
-  type: "text";
+  type: typeof EVENT_TYPES.text;
   message: string;
   source?: "user" | "assistant";
 }
 
 export interface SseToolResult {
-  type: "tool_result";
+  type: typeof EVENT_TYPES.toolResult;
   result: ToolResultComplete;
 }
 
 export interface SseRolesUpdated {
-  type: "roles_updated";
+  type: typeof EVENT_TYPES.rolesUpdated;
 }
 
 export interface SseError {
-  type: "error";
+  type: typeof EVENT_TYPES.error;
   message: string;
 }
 
 /** Sent on the session channel when the agent run finishes. */
 export interface SseSessionFinished {
-  type: "session_finished";
+  type: typeof EVENT_TYPES.sessionFinished;
 }
 
 export type SseEvent =

@@ -25,6 +25,7 @@ import {
   type RawStreamEvent,
 } from "./agent/stream.js";
 import { log } from "./logger/index.js";
+import { EVENT_TYPES } from "../src/types/events.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -92,7 +93,7 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
 
   if (exitCode !== 0) {
     yield {
-      type: "error",
+      type: EVENT_TYPES.error,
       message: stderrOutput || `claude exited with code ${exitCode}`,
     };
   }

@@ -22,6 +22,7 @@ import { log } from "../logger/index.js";
 import { logBackgroundError } from "../utils/logBackgroundError.js";
 import { createArgsCache, recordToolEvent } from "../tool-trace/index.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
+import { EVENT_TYPES } from "../../src/types/events.js";
 import { env } from "../env.js";
 
 const router = Router();
@@ -75,7 +76,7 @@ router.post(
   ) => {
     const chatSessionId = String(req.query.session ?? "");
     pushSessionEvent(chatSessionId, {
-      type: "switch_role",
+      type: EVENT_TYPES.switchRole,
       roleId: req.body.roleId,
     });
     res.json({ ok: true });
@@ -200,14 +201,14 @@ export async function startChat(
   // Append user message for this turn
   await appendFile(
     resultsFilePath,
-    JSON.stringify({ source: "user", type: "text", message }) + "\n",
+    JSON.stringify({ source: "user", type: EVENT_TYPES.text, message }) + "\n",
   );
 
   // Broadcast the user message so other tabs viewing this session
   // see the input in real time. Runs AFTER beginRun so a 409 never
   // produces a phantom user message in other clients.
   pushSessionEvent(chatSessionId, {
-    type: "text",
+    type: EVENT_TYPES.text,
     source: "user",
     message,
   });
@@ -317,23 +318,23 @@ async function runAgentInBackground(
       claudeSessionId,
       abortSignal,
     )) {
-      if (event.type === "claude_session_id") {
+      if (event.type === EVENT_TYPES.claudeSessionId) {
         await updateClaudeSessionId(metaFilePath, event.id);
         continue;
       }
       pushSessionEvent(chatSessionId, event as Record<string, unknown>);
 
-      if (event.type === "text") {
+      if (event.type === EVENT_TYPES.text) {
         await appendFile(
           resultsFilePath,
           JSON.stringify({
             source: "assistant",
-            type: "text",
+            type: EVENT_TYPES.text,
             message: event.message,
           }) + "\n",
         );
       }
-      if (event.type === "tool_call") {
+      if (event.type === EVENT_TYPES.toolCall) {
         log.info("agent-tool", "call", {
           chatSessionId,
           toolName: event.toolName,
@@ -341,7 +342,7 @@ async function runAgentInBackground(
           argsPreview: previewJson(event.args),
         });
       }
-      if (event.type === "tool_call_result") {
+      if (event.type === EVENT_TYPES.toolCallResult) {
         // Look up the toolName from the cache *before* recordToolEvent
         // runs (it deletes the cache entry on result).
         const cached = toolArgsCache.get(event.toolUseId);
@@ -352,7 +353,10 @@ async function runAgentInBackground(
           contentBytes: event.content.length,
         });
       }
-      if (event.type === "tool_call" || event.type === "tool_call_result") {
+      if (
+        event.type === EVENT_TYPES.toolCall ||
+        event.type === EVENT_TYPES.toolCallResult
+      ) {
         // Fire-and-forget: tool-trace persistence failures must not
         // block the agent loop. Errors are log.warn'd by
         // recordToolEvent itself.
@@ -373,7 +377,10 @@ async function runAgentInBackground(
       chatSessionId,
       error: String(err),
     });
-    pushSessionEvent(chatSessionId, { type: "error", message: String(err) });
+    pushSessionEvent(chatSessionId, {
+      type: EVENT_TYPES.error,
+      message: String(err),
+    });
   } finally {
     endRun(chatSessionId);
     // Fire-and-forget: journal + chat-index post-processing
@@ -412,7 +419,8 @@ async function readClaudeSessionId(
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
         const entry = JSON.parse(lines[i]);
-        if (entry.type === "claude_session_id" && entry.id) return entry.id;
+        if (entry.type === EVENT_TYPES.claudeSessionId && entry.id)
+          return entry.id;
       } catch {
         // skip malformed lines
       }
