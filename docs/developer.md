@@ -210,7 +210,8 @@ Every HTTP call to `/api/*` requires `Authorization: Bearer <token>`. Layered on
 - `server/auth/bearerAuth.ts` — Express middleware
 - `src/utils/api.ts` — `setAuthToken()` + header injection (no call site changes needed; `apiFetch` auto-attaches)
 - `vite.config.ts` — `mulmoclaudeAuthTokenPlugin` for dev HTML substitution
-- `bridges/cli/token.ts` — bridge-side resolver (env var → file)
+- `bridges/_lib/token.ts` — bridge-side resolver (env var → file)
+- `bridges/_lib/client.ts` — shared socket.io setup for every bridge (see `docs/bridge-protocol.md`)
 
 ---
 

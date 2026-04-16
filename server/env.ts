@@ -69,7 +69,7 @@ export const env = Object.freeze({
 
   // Bearer auth token (#272, #316): if set, the server uses this
   // verbatim instead of generating a fresh random token at startup.
-  // Matches the env var already honoured by `bridges/cli/token.ts`
+  // Matches the env var already honoured by `bridges/_lib/token.ts`
   // and the Vite dev plugin, so pinning on both sides survives a
   // server restart. Undefined / empty → random-per-startup path.
   authTokenOverride: process.env.MULMOCLAUDE_AUTH_TOKEN,

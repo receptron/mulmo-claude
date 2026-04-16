@@ -17,7 +17,7 @@
 // **Env override (#316)**: `MULMOCLAUDE_AUTH_TOKEN` (read via `env.ts`)
 // pins the token across restarts so long-running bridges don't need a
 // relaunch every time the server bounces. The client-side readers
-// (`bridges/cli/token.ts`, Vite plugin) already honour the same var;
+// (`bridges/_lib/token.ts`, Vite plugin) already honour the same var;
 // setting it once on both sides survives restarts.
 
 import { randomBytes } from "crypto";

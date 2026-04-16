@@ -1,4 +1,4 @@
-// Unit tests for the CLI bridge token reader (#272 Phase 2). The
+// Unit tests for the bridge token reader (#272 Phase 2). The
 // helper is tiny but covers the two sources (env var, file) and
 // three "no token" shapes (missing file, empty file, whitespace-
 // only file), so explicit coverage is worth it.
@@ -23,7 +23,7 @@ interface TokenModule {
 let cacheBuster = 0;
 async function loadFresh(): Promise<TokenModule> {
   cacheBuster++;
-  const mod = await import(`../../bridges/cli/token.ts?t=${cacheBuster}`);
+  const mod = await import(`../../bridges/_lib/token.ts?t=${cacheBuster}`);
   return mod as TokenModule;
 }
 
