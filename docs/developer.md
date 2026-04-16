@@ -50,6 +50,9 @@ All env vars are **optional unless flagged "required"**. The server reads them a
 |---|---|---|
 | `GEMINI_API_KEY` | `server/utils/gemini.ts` | Enables Gemini image generation / editing. Without it, image plugins surface a UI warning. The `geminiAvailable` flag in `GET /api/health` mirrors this. |
 | `X_BEARER_TOKEN` | `server/mcp-tools/x.ts` | **Required** to enable `readXPost` / `searchX` MCP tools. Tools are silently disabled if absent. |
+| `TELEGRAM_BOT_TOKEN` | `bridges/telegram/` | **Required** for the Telegram bridge. BotFather token. Treat like a password. See [`message_apps/telegram/`](message_apps/telegram/). |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | `bridges/telegram/` | CSV of integer Telegram chat IDs allowed to message the bot. Empty / unset → deny everyone. A non-integer entry halts startup. |
+| `TELEGRAM_POLL_TIMEOUT_SEC` | `bridges/telegram/` | Long-polling timeout in seconds. Defaults `25` (Telegram's recommended max). |
 
 ### Runtime
 
@@ -113,6 +116,8 @@ You never set these by hand; the server constructs them when spawning Claude ins
 | `yarn dev:client` | Vite client only — useful when you've already started the server elsewhere. |
 | `yarn dev:server` / `yarn server` | Express server only. |
 | `yarn server:debug` | Server with `--debug` flag. |
+| `yarn cli` | CLI bridge — REPL in your terminal that talks to the running server (see [`bridge-protocol.md`](bridge-protocol.md)). |
+| `yarn telegram` | Telegram bridge — operator guide at [`message_apps/telegram/`](message_apps/telegram/) (JP: [`README.ja.md`](message_apps/telegram/README.ja.md) / EN: [`README.md`](message_apps/telegram/README.md)). |
 
 ### Static checks
 
