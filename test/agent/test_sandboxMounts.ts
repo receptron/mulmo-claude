@@ -158,9 +158,13 @@ describe("sshAgentForwardArgs", () => {
     fs.writeFileSync(fake, "");
     const r = sshAgentForwardArgs(true, fake);
     assert.equal(r.skippedReason, null);
+    // Normalise to forward slashes on both sides: the helper converts
+    // backslashes to forward slashes for Docker, so the expected value
+    // has to do the same to stay portable across Windows CI runners.
+    const expectedHostPath = fake.replace(/\\/g, "/");
     assert.deepEqual(r.args, [
       "-v",
-      `${fake}:${SSH_AGENT_CONTAINER_SOCK}`,
+      `${expectedHostPath}:${SSH_AGENT_CONTAINER_SOCK}`,
       "-e",
       `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
     ]);
