@@ -61,4 +61,11 @@ export interface ChatServiceDeps {
   /** Absolute path to the transports workspace dir (one subdir per transportId). */
   transportsDir: string;
   logger: Logger;
+  /**
+   * Returns the current bearer token the socket transport should
+   * accept at handshake, or null if auth isn't bootstrapped yet.
+   * Omit in tests / unauth environments to skip the check. See
+   * `attachChatSocket` in ./socket.ts.
+   */
+  tokenProvider?: () => string | null;
 }
