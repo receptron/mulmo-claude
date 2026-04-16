@@ -122,5 +122,5 @@ Extending the list is a code change, not a user config. This is deliberate — t
 ## Related
 
 - Issue [#259](https://github.com/receptron/mulmoclaude/issues/259) — the design discussion that led to this doc.
-- [server/helps/sandbox.md](../server/helps/sandbox.md) — general sandbox behaviour (what runs where, how to disable it).
+- [server/workspace/helps/sandbox.md](../server/workspace/helps/sandbox.md) — general sandbox behaviour (what runs where, how to disable it).
 - [docs/developer.md](./developer.md) — full list of env vars honoured by the server.

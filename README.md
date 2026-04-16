@@ -74,7 +74,7 @@ If Docker is not installed, the app shows a warning banner and continues to work
 ## Logging
 
 The server writes readable text to the console and full-fidelity JSON
-to rotating daily files under `server/logs/`. Everything is
+to rotating daily files under `server/system/logs/`. Everything is
 configurable via `LOG_LEVEL`, `LOG_*_FORMAT`, `LOG_FILE_DIR`, etc.
 
 See [docs/logging.md](docs/logging.md) for the full reference, format

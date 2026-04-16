@@ -52,7 +52,7 @@ SSE from `POST /api/agent`: `{ type: "status" | "tool_result" | "error", ... }`.
 
 ### Workspace
 
-Hard-coded to `~/mulmoclaude/` (see `server/workspace.ts`). There is **no `WORKSPACE_PATH` env override**; changing the location requires a code edit or a symlink. Post-#284 the layout is grouped into four top-level buckets — full reference in [`docs/developer.md`](docs/developer.md#workspace-layout-mulmoclaude). Short version:
+Hard-coded to `~/mulmoclaude/` (see `server/workspace/workspace.ts`). There is **no `WORKSPACE_PATH` env override**; changing the location requires a code edit or a symlink. Post-#284 the layout is grouped into four top-level buckets — full reference in [`docs/developer.md`](docs/developer.md#workspace-layout-mulmoclaude). Short version:
 
 ```text
 ~/mulmoclaude/
@@ -66,7 +66,7 @@ Hard-coded to `~/mulmoclaude/` (see `server/workspace.ts`). There is **no `WORKS
 
 Pre-#284 workspaces must run `yarn tsx scripts/migrate-workspace-284.ts --execute` (preceded by `--dry-run`) once before the server will start.
 
-**Always reach for constants** (`WORKSPACE_PATHS.<key>` / `WORKSPACE_DIRS.<key>` / `WORKSPACE_FILES.<key>` from `server/workspace-paths.ts`) when composing workspace paths — never hardcode a literal. A rename is one-file edit there; hardcoded literals turn it into a grep-and-edit across the server.
+**Always reach for constants** (`WORKSPACE_PATHS.<key>` / `WORKSPACE_DIRS.<key>` / `WORKSPACE_FILES.<key>` from `server/workspace/paths.ts`) when composing workspace paths — never hardcode a literal. A rename is one-file edit there; hardcoded literals turn it into a grep-and-edit across the server.
 
 ### Routing (vue-router, history mode)
 
@@ -163,7 +163,7 @@ String literals that form cross-module contracts (endpoint paths, event types, t
 |---|---|---|
 | API endpoint paths | `src/config/apiRoutes.ts` → `API_ROUTES` | `router.post(API_ROUTES.todos.items, ...)` / `fetch(API_ROUTES.todos.items)` |
 | SSE / event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `{ type: EVENT_TYPES.toolResult, ... }` — also used in `AgentEvent` union |
-| Workspace directories | `server/workspace-paths.ts` → `WORKSPACE_PATHS` | `path.join(WORKSPACE_PATHS.wiki, "pages")` |
+| Workspace directories | `server/workspace/paths.ts` → `WORKSPACE_PATHS` | `path.join(WORKSPACE_PATHS.wiki, "pages")` |
 | Tool names | `src/config/toolNames.ts` → `TOOL_NAMES` / `ToolName` | `availablePlugins: [TOOL_NAMES.manageTodoList, ...]` |
 | Built-in role IDs | `src/config/roles.ts` → `BUILTIN_ROLE_IDS` | `if (roleId === BUILTIN_ROLE_IDS.general)` |
 | Pub-sub channels | `src/config/pubsubChannels.ts` → `sessionChannel()` | `pubsub.publish(sessionChannel(id), event)` |
@@ -225,7 +225,7 @@ Key shared helpers in this repo:
 |---|---|
 | `API_ROUTES` | `src/config/apiRoutes.ts` |
 | `EVENT_TYPES` / `EventType` | `src/types/events.ts` |
-| `WORKSPACE_PATHS` / `WORKSPACE_DIRS` | `server/workspace-paths.ts` |
+| `WORKSPACE_PATHS` / `WORKSPACE_DIRS` | `server/workspace/paths.ts` |
 | `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` |
 | `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` |
 | `PUBSUB_CHANNELS` / `sessionChannel()` | `src/config/pubsubChannels.ts` |
@@ -361,7 +361,7 @@ See `plans/` entries and past PR descriptions (#193 wiki-backlinks, #195 tool-tr
 
 ## Server Logging
 
-The server uses the structured logger at `server/logger/`. **Never call `console.*` directly outside that module** — import and use `log.{error,warn,info,debug}(prefix, msg, data?)` instead.
+The server uses the structured logger at `server/system/logger/`. **Never call `console.*` directly outside that module** — import and use `log.{error,warn,info,debug}(prefix, msg, data?)` instead.
 
 ```ts
 import { log } from "../logger/index.js";
@@ -372,10 +372,10 @@ log.error("my-module", "operation failed", { error: String(err) });
 
 - `prefix` is lowercase, hyphenated, no brackets (the text formatter adds `[ ]`)
 - Put structured values in the `data` payload, not interpolated into `msg` — the JSON file format depends on it
-- Console default is `info`/`text`; file default is `debug`/`json` rotating daily under `server/logs/`
+- Console default is `info`/`text`; file default is `debug`/`json` rotating daily under `server/system/logs/`
 - Full reference (env vars, formats, rotation, recipes): [`docs/logging.md`](docs/logging.md)
 
-The only remaining `console.*` call is `server/logger/sinks.ts`'s fallback path for when the file sink itself errors.
+The only remaining `console.*` call is `server/system/logger/sinks.ts`'s fallback path for when the file sink itself errors.
 
 ## Tech Stack
 

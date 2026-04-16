@@ -6,7 +6,7 @@ UTC daily", "tick every 5 minutes". One `setInterval`, no cron
 library, no persistence — designed for development-workstation
 lifetimes, not 24/7 infrastructure.
 
-Canonical module: [`server/task-manager/index.ts`](../server/task-manager/index.ts).
+Canonical module: [`server/events/task-manager/index.ts`](../server/events/task-manager/index.ts).
 Design rationale: [`plans/done/task_manager.md`](../plans/done/task_manager.md).
 
 ---
@@ -158,7 +158,7 @@ a clock-tick boundary).
 The scheduler calls `onTick` every `tickMs`. On each tick it walks
 the registry and fires every enabled task whose schedule is "due".
 Due-checking is pure — see `isDue()` in
-[`server/task-manager/index.ts`](../server/task-manager/index.ts).
+[`server/events/task-manager/index.ts`](../server/events/task-manager/index.ts).
 
 - **`interval`**: due when `floor(msSinceMidnightUtc / tickMs) * tickMs`
   is a whole-number multiple of `intervalMs`. Practical effect:
@@ -209,7 +209,7 @@ Relevant code: `server/index.ts#registerDebugTasks`.
 Inject `now` and drive ticks manually — no real timer involved:
 
 ```ts
-import { createTaskManager } from "../../server/task-manager/index.js";
+import { createTaskManager } from "../../server/events/task-manager/index.js";
 
 const state = { t: new Date("2026-04-15T00:00:00Z") };
 const tm = createTaskManager({
