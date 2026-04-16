@@ -104,7 +104,7 @@ function rowClasses(session: SessionSummary): string {
   if (isSessionRunning(session))
     return "border-yellow-400 bg-yellow-50 hover:bg-yellow-100";
   if (isSessionUnread(session))
-    return "border-gray-400 bg-white hover:bg-gray-50";
+    return "border-sky-300 bg-sky-50 hover:bg-sky-100";
   if (session.id === props.currentSessionId)
     return "border-blue-400 bg-blue-50 hover:bg-blue-100";
   return "border-gray-200 hover:bg-gray-50";
