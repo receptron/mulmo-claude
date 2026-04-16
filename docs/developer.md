@@ -194,6 +194,7 @@ Cross-module string literals (endpoint paths, tool names, role IDs, etc.) are de
 | `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` | Role definitions (`availablePlugins`), plugin registry, session-store tool matching |
 | `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` | Anywhere a built-in role ID appears outside the role definition itself |
 | `PUBSUB_CHANNELS` / `sessionChannel()` | `src/config/pubsubChannels.ts` | Pub-sub publish/subscribe sites in session-store and task-manager |
+| `EVENT_TYPES` / `EventType` | `src/types/events.ts` | SSE event type discriminants in agent loop, session store, and frontend dispatch |
 
 **Convention**: add new entries to the appropriate module before writing the first consumer. Keep the `as const` assertion so TypeScript infers literal types, not `string`.
 

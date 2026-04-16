@@ -155,6 +155,7 @@ String literals that form cross-module contracts (endpoint paths, event types, t
 | Tool names | `src/config/toolNames.ts` → `TOOL_NAMES` / `ToolName` | `availablePlugins: [TOOL_NAMES.manageTodoList, ...]` |
 | Built-in role IDs | `src/config/roles.ts` → `BUILTIN_ROLE_IDS` | `if (roleId === BUILTIN_ROLE_IDS.general)` |
 | Pub-sub channels | `src/config/pubsubChannels.ts` → `sessionChannel()` | `pubsub.publish(sessionChannel(id), event)` |
+| SSE event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `event.type === EVENT_TYPES.toolCall` |
 
 **Adding a new endpoint**: add the path to `src/config/apiRoutes.ts` first, then reference `API_ROUTES.<group>.<name>` from both the router file and the frontend `fetch()` call. Routers register the full `/api/...` path directly (no mount prefix in `server/index.ts`).
 
@@ -215,6 +216,7 @@ Key shared helpers in this repo:
 | `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` |
 | `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` |
 | `PUBSUB_CHANNELS` / `sessionChannel()` | `src/config/pubsubChannels.ts` |
+| `EVENT_TYPES` / `EventType` | `src/types/events.ts` |
 | `resolveWithinRoot(root, relPath)` | `server/utils/fs.ts` |
 | `errorMessage(err)` | `server/utils/errors.ts` |
 | `statSafe` / `readDirSafe` | `server/utils/fs.ts` |
