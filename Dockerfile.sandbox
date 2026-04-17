@@ -24,8 +24,8 @@ FROM node:22-slim
 # - `texlive-*` — ~150MB+ for marginal PDF quality gains over pandoc's
 #   default LaTeX-free path; add when a user actually needs math/
 #   journal-style typesetting.
-# - `gh` CLI + auth mount — tracked in #162 Phase 4, needs a code
-#   change in `server/agent/config.ts` to mount `~/.config/gh:ro`.
+# - `gh` CLI — now installed (Layer 1b). Auth via SANDBOX_MOUNT_CONFIGS=gh
+#   which mounts ~/.config/gh:ro into the container (#259).
 #
 # Runtime `pip install` is intentionally NOT wired up. Everything the
 # agent might need for data work is preinstalled at build time so
@@ -43,6 +43,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       zip \
       unzip \
       ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 1b: GitHub CLI (#164). Installed from the official apt repo.
+# Auth is provided at runtime via SANDBOX_MOUNT_CONFIGS=gh which
+# bind-mounts ~/.config/gh:ro (#259). On macOS where the token lives
+# in the system keyring, the server falls back to GH_TOKEN env var.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 2: data analysis + plotting
