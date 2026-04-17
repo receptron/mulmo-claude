@@ -4,11 +4,13 @@ Review ALL staged and unstaged changes against the project's coding standards be
 
 Run `git diff --stat` and `git diff` first, then check every item below against the actual changes. Report violations with file:line references. If everything passes, say "All checks passed — ready to commit."
 
-## 1. DRY — No Duplication
+## 1. DRY — No Duplication & Small Functions
 
 - [ ] No function or 3+ line block is copy-pasted across files. If the same logic appears twice, it MUST be extracted to a shared helper under `server/utils/` or `src/utils/`.
 - [ ] Utility functions are grouped by concern: file ops → `utils/files/`, dates → `utils/date.ts`, strings → `utils/slug.ts`, JSON → `utils/json.ts`, types → `utils/types.ts`, spawn → `utils/spawn.ts`, network → `utils/fetch.ts`, markdown → `utils/markdown.ts`, IDs → `utils/id.ts`, errors → `utils/errors.ts`.
 - [ ] No new `makeId()`, `isRecord()`, `formatSpawnFailure()`, `isValidSlug()`, `extractJsonObject()`, or similar that already exists in `server/utils/`.
+- [ ] **Functions are as small as possible.** Each function does one thing. If a function body exceeds ~20 lines, look for extractable sub-steps. Before writing a new helper, grep the codebase — it may already exist.
+- [ ] **Every new function MUST have a corresponding test.** No exceptions. If it's exported, it has a test file. If it's private but contains non-trivial logic, extract it as a testable exported pure function.
 
 ## 2. Tests
 
@@ -101,8 +103,13 @@ Run `git diff --stat` and `git diff` first, then check every item below against 
 - [ ] No sensitive files staged (`.env`, credentials, API keys).
 - [ ] No unintended files (node_modules, .DS_Store, test-results/).
 
-## 12. Import Style
+## 12. Import Style & Module Boundaries
 
-- [ ] Top-level `import` for always-needed packages — no `await import()` unless conditional.
-- [ ] No unnecessary re-exports.
+- [ ] Top-level `import` only — `await import()` (dynamic import) is **prohibited** unless there is a documented reason (e.g., platform-specific optional dependency that must not be loaded unconditionally). If used, add a comment explaining why.
+- [ ] **No re-exports.** Each module exports its own symbols. NEVER create barrel files or `export { X } from "./other.js"` forwarding. Callers import from the canonical source directly.
 - [ ] Import from the canonical location (e.g., `server/utils/slug.ts` not a re-export in `sources/paths.ts`).
+
+## 13. Lint Suppression
+
+- [ ] **No `eslint-disable-line` or `eslint-disable-next-line`.** If the lint rule fires, fix the code — don't suppress. The only exception is `@typescript-eslint/no-explicit-any` in test mocks where the mock intentionally returns `as any` to satisfy a type constraint that doesn't matter for the test.
+- [ ] No `@ts-ignore` or `@ts-expect-error`.
