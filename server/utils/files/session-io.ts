@@ -111,18 +111,17 @@ export async function readSessionJsonl(
 }
 
 /**
- * Append a single line to the session event log.
+ * Append a single line to the session event log (JSONL format).
  *
- * **Caller provides the trailing `\n`.** This matches the existing
- * convention (`JSON.stringify(obj) + "\n"`) and avoids double-newline
- * if the function also appended one. If `line` is missing its `\n`,
- * the next append will concatenate on the same line — breaking JSONL
- * parsing.
+ * The function **ensures a trailing `\n`** — callers pass the raw
+ * content and don't need to worry about line termination. This
+ * prevents JSONL parse failures from missing newlines.
  */
 export async function appendSessionLine(
   id: string,
   line: string,
   r?: string,
 ): Promise<void> {
-  await appendFile(resolvePath(root(r), `${CHAT}/${id}.jsonl`), line);
+  const normalized = line.endsWith("\n") ? line : `${line}\n`;
+  await appendFile(resolvePath(root(r), `${CHAT}/${id}.jsonl`), normalized);
 }
