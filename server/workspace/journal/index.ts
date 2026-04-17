@@ -10,6 +10,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import {
   readState,
   writeState,
@@ -179,8 +180,7 @@ async function rebuildIndex(workspaceRoot: string): Promise<void> {
     builtAtIso: new Date().toISOString(),
   });
   const p = path.join(summariesRoot(workspaceRoot), INDEX_FILE);
-  await fsp.mkdir(path.dirname(p), { recursive: true });
-  await fsp.writeFile(p, md, "utf-8");
+  await writeFileAtomic(p, md);
 }
 
 async function walkTopics(workspaceRoot: string): Promise<IndexTopicEntry[]> {

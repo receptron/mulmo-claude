@@ -6,6 +6,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import {
   type Summarize,
   type OptimizationTopicSnapshot,
@@ -87,13 +88,9 @@ async function executeMergePlans(
   mergedSlugs: string[],
 ): Promise<void> {
   for (const plan of plans) {
-    await fsp.mkdir(path.dirname(topicPathFor(workspaceRoot, plan.intoSlug)), {
-      recursive: true,
-    });
-    await fsp.writeFile(
+    await writeFileAtomic(
       topicPathFor(workspaceRoot, plan.intoSlug),
       plan.newContent,
-      "utf-8",
     );
     for (const src of plan.fromSlugs) {
       // Only record the merge as successful if the source file

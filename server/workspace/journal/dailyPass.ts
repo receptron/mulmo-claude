@@ -12,6 +12,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import {
   type Summarize,
   type SessionExcerpt,
@@ -765,8 +766,7 @@ async function writeDailySummary(
   content: string,
 ): Promise<void> {
   const p = dailyPathFor(workspaceRoot, date);
-  await fsp.mkdir(path.dirname(p), { recursive: true });
-  await fsp.writeFile(p, content, "utf-8");
+  await writeFileAtomic(p, content);
 }
 
 // If the file doesn't exist, write `content` fresh; otherwise append
@@ -792,16 +792,12 @@ export async function appendOrCreate(
       "code" in err &&
       err.code === "ENOENT"
     ) {
-      await fsp.writeFile(filePath, content, "utf-8");
+      await writeFileAtomic(filePath, content);
       return "created";
     }
     throw err;
   }
-  await fsp.writeFile(
-    filePath,
-    `${existing.trimEnd()}\n\n${content}\n`,
-    "utf-8",
-  );
+  await writeFileAtomic(filePath, `${existing.trimEnd()}\n\n${content}\n`);
   return "updated";
 }
 
@@ -819,7 +815,7 @@ async function applyTopicUpdate(
   }
   if (update.action === "rewrite") {
     const existed = (await readTextOrNull(p)) !== null;
-    await fsp.writeFile(p, update.content, "utf-8");
+    await writeFileAtomic(p, update.content);
     return existed ? "updated" : "created";
   }
   // append
