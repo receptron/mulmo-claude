@@ -85,6 +85,8 @@ interface HandshakeAuth {
 interface MessagePayload {
   externalChatId?: unknown;
   text?: unknown;
+  /** Base64 data URL for vision (optional, #380). */
+  imageDataUrl?: unknown;
 }
 
 type MessageAck =
@@ -92,7 +94,7 @@ type MessageAck =
   | { ok: false; error: string; status?: number };
 
 type ParsedMessage =
-  | { ok: true; externalChatId: string; text: string }
+  | { ok: true; externalChatId: string; text: string; imageDataUrl?: string }
   | { ok: false; error: string };
 
 type HandshakeResult =
@@ -184,6 +186,7 @@ export function attachChatSocket(
           transportId,
           externalChatId: parsed.externalChatId,
           text: parsed.text,
+          imageDataUrl: parsed.imageDataUrl,
         });
 
         if (result.kind === "ok") {
@@ -269,5 +272,9 @@ function parseMessagePayload(payload: MessagePayload): ParsedMessage {
   if (!text) {
     return { ok: false, error: "text is required" };
   }
-  return { ok: true, externalChatId, text };
+  const imageDataUrl =
+    typeof payload.imageDataUrl === "string" && payload.imageDataUrl.length > 0
+      ? payload.imageDataUrl
+      : undefined;
+  return { ok: true, externalChatId, text, imageDataUrl };
 }

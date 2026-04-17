@@ -124,6 +124,11 @@ Payload:
 - `text: string` — non-empty. The user's message, UTF-8. Trim
   leading / trailing whitespace yourself if you care; the server
   trims before dispatching.
+- `imageDataUrl?: string` — optional. Base64 data URL
+  (`data:image/png;base64,…`) for vision input (#380). When
+  present, Claude receives the image as a content block alongside
+  the text. The Telegram bridge populates this by downloading the
+  photo via `getFile` + base64-encoding it.
 
 Ack shape:
 

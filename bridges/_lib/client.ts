@@ -45,7 +45,11 @@ export interface BridgeClientOptions {
 
 export interface BridgeClient {
   /** Send a user turn to MulmoClaude, wait for the assistant reply. */
-  send(externalChatId: string, text: string): Promise<MessageAck>;
+  send(
+    externalChatId: string,
+    text: string,
+    imageDataUrl?: string,
+  ): Promise<MessageAck>;
   /** Subscribe to server → bridge async pushes (Phase B of #268). */
   onPush(handler: (event: PushEvent) => void): void;
   /** Called each time the socket (re-)establishes a connection. */
@@ -91,7 +95,8 @@ export function createBridgeClient(opts: BridgeClientOptions): BridgeClient {
   installDefaultLogging(socket);
 
   return {
-    send: (externalChatId, text) => sendMessage(socket, externalChatId, text),
+    send: (externalChatId, text, imageDataUrl) =>
+      sendMessage(socket, externalChatId, text, imageDataUrl),
     onPush: (handler) => {
       socket.on(CHAT_SOCKET_EVENTS.push, handler);
     },
@@ -112,13 +117,16 @@ function sendMessage(
   socket: Socket,
   externalChatId: string,
   text: string,
+  imageDataUrl?: string,
 ): Promise<MessageAck> {
+  const payload: Record<string, string> = { externalChatId, text };
+  if (imageDataUrl) payload.imageDataUrl = imageDataUrl;
   return new Promise((resolve) => {
     socket
       .timeout(REPLY_TIMEOUT_MS)
       .emit(
         CHAT_SOCKET_EVENTS.message,
-        { externalChatId, text },
+        payload,
         (err: Error | null, ack: MessageAck | undefined) => {
           if (err) {
             resolve({ ok: false, error: `timeout: ${err.message}` });

@@ -16,11 +16,22 @@ export interface TelegramUpdate {
   message?: TelegramMessage;
 }
 
+export interface TelegramPhotoSize {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
 export interface TelegramMessage {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
+  /** Array of photo sizes, largest last. Present when user sends a photo. */
+  photo?: TelegramPhotoSize[];
+  caption?: string;
   date: number;
 }
 
@@ -55,6 +66,8 @@ export interface GetUpdatesOptions {
 export interface TelegramApi {
   getUpdates(opts?: GetUpdatesOptions): Promise<TelegramUpdate[]>;
   sendMessage(chatId: number, text: string): Promise<void>;
+  /** Download a photo by file_id, return as base64 data URL. */
+  downloadPhoto(fileId: string): Promise<string>;
 }
 
 const DEFAULT_BASE = "https://api.telegram.org";
@@ -112,6 +125,49 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
           `sendMessage API error: ${body.description ?? "unknown"}`,
         );
       }
+    },
+
+    async downloadPhoto(fileId) {
+      // Step 1: getFile to get the file_path
+      const getFileRes = await fetchImpl(
+        `${base}/getFile?file_id=${encodeURIComponent(fileId)}`,
+      );
+      if (!getFileRes.ok) {
+        throw new Error(
+          `getFile failed: ${getFileRes.status} ${await safeText(getFileRes)}`,
+        );
+      }
+      const getFileBody = (await getFileRes.json()) as {
+        ok: boolean;
+        description?: string;
+        result?: { file_path?: string };
+      };
+      if (!getFileBody.ok || !getFileBody.result?.file_path) {
+        throw new Error(
+          `getFile API error: ${getFileBody.description ?? "no file_path"}`,
+        );
+      }
+
+      // Step 2: download the file bytes
+      const fileUrl = `${baseUrl}/file/bot${opts.botToken}/${getFileBody.result.file_path}`;
+      const fileRes = await fetchImpl(fileUrl);
+      if (!fileRes.ok) {
+        throw new Error(`file download failed: ${fileRes.status}`);
+      }
+      const buffer = await fileRes.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      // Infer media type from file path extension
+      const ext = getFileBody.result.file_path.split(".").pop()?.toLowerCase();
+      const mediaType =
+        ext === "jpg" || ext === "jpeg"
+          ? "image/jpeg"
+          : ext === "png"
+            ? "image/png"
+            : ext === "webp"
+              ? "image/webp"
+              : "image/jpeg"; // Telegram defaults to JPEG for photos
+      return `data:${mediaType};base64,${base64}`;
     },
   };
 }

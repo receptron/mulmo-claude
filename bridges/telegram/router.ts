@@ -16,6 +16,7 @@ const TELEGRAM_MAX_MESSAGE_CHARS = 4096;
 export type SendToMulmoFn = (
   externalChatId: string,
   text: string,
+  imageDataUrl?: string,
 ) => Promise<MessageAck>;
 
 export interface RouterDeps {
@@ -56,14 +57,27 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
 
   async function handleAllowed(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
-    const text = msg.text ?? "";
-    if (text.trim().length === 0) return;
+    const text = msg.text ?? msg.caption ?? "";
+    const hasPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;
+    if (text.trim().length === 0 && !hasPhoto) return;
     const user = userLabel(msg);
     log.info(
-      `[telegram] accepted chat=${chatId} user=@${user} len=${text.length}`,
+      `[telegram] accepted chat=${chatId} user=@${user} len=${text.length}${hasPhoto ? " +photo" : ""}`,
     );
 
-    const ack = await sendToMulmo(String(chatId), text);
+    // Download the largest photo size if present
+    let imageDataUrl: string | undefined;
+    if (hasPhoto) {
+      const largest = msg.photo![msg.photo!.length - 1];
+      try {
+        imageDataUrl = await api.downloadPhoto(largest.file_id);
+      } catch (err) {
+        log.error(`[telegram] photo download failed: ${String(err)}`);
+      }
+    }
+
+    const messageText = text.trim().length > 0 ? text : "What is this image?";
+    const ack = await sendToMulmo(String(chatId), messageText, imageDataUrl);
     if (ack.ok) {
       await sendChunked(api, chatId, ack.reply ?? "");
     } else {

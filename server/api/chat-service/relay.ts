@@ -18,6 +18,10 @@ export interface RelayParams {
   transportId: string;
   externalChatId: string;
   text: string;
+  /** Base64 data URL (e.g. data:image/png;base64,...). Optional —
+   *  when present the image is passed to Claude CLI as a vision
+   *  content block alongside the text message. */
+  imageDataUrl?: string;
 }
 
 export type RelayResult =
@@ -56,7 +60,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
   return async function relayMessage(
     params: RelayParams,
   ): Promise<RelayResult> {
-    const { transportId, externalChatId, text } = params;
+    const { transportId, externalChatId, text, imageDataUrl } = params;
 
     logger.info("chat-service", "message received", {
       transportId,
@@ -83,6 +87,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
       message: text,
       roleId: chatState.roleId,
       chatSessionId: chatState.sessionId,
+      selectedImageData: imageDataUrl,
     });
 
     if (result.kind === "error") {
