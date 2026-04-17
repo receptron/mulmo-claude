@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc",
     "prepack": "yarn build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts"
   },
   "publishConfig": {
     "main": "./dist/index.js",
