@@ -11,6 +11,7 @@ import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
 import { errorMessage } from "../utils/errors.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
+import { extractFetchError } from "../utils/fetch.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
 
 type JsonRpcId = string | number | null;
@@ -247,9 +248,7 @@ async function handleManageSkillsSave(
     { allowHttpError: true },
   );
   if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-    const detail = errBody.error ?? "HTTP " + res.status;
-    return "Error: " + detail;
+    return "Error: " + (await extractFetchError(res));
   }
   await pushSkillsListResult(`Saved skill "${name}".`);
   return `Saved skill ${name}. Run with /${name}.`;
@@ -276,9 +275,7 @@ async function handleManageSkillsUpdate(
     );
   }
   if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-    const detail = errBody.error ?? "HTTP " + res.status;
-    return "Error: " + detail;
+    return "Error: " + (await extractFetchError(res));
   }
   await pushSkillsListResult(`Updated skill "${name}".`);
   return `Updated skill ${name}. The changes take effect in new sessions.`;
@@ -301,9 +298,7 @@ async function handleManageSkillsDelete(
     );
   }
   if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-    const detail = errBody.error ?? "HTTP " + res.status;
-    return "Error: " + detail;
+    return "Error: " + (await extractFetchError(res));
   }
   await pushSkillsListResult(`Deleted skill "${name}".`);
   return `Deleted skill ${name}.`;

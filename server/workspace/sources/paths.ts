@@ -15,6 +15,7 @@
 // tests can target a `mkdtempSync` directory.
 
 import path from "node:path";
+import { isValidSlug } from "../../utils/slug.js";
 
 export const SOURCES_DIR = "sources";
 export const SOURCE_STATE_DIR = "_state";
@@ -120,10 +121,4 @@ export function archivePath(
 // anything that could surprise the filesystem or the URL parser.
 // Letters, digits, hyphens only. 1-64 chars. No leading / trailing
 // hyphen. No consecutive hyphens.
-export function isValidSlug(slug: string): boolean {
-  if (typeof slug !== "string") return false;
-  if (slug.length === 0 || slug.length > 64) return false;
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) return false;
-  if (slug.includes("--")) return false;
-  return true;
-}
+// isValidSlug moved to server/utils/slug.ts — import from there.

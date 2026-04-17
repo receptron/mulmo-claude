@@ -10,13 +10,13 @@
 // complexity of the route handler under the lint threshold.
 
 import type { TodoItem } from "./todos.js";
-import { randomBytes } from "crypto";
 import {
   filterByLabels,
   listLabelsWithCount,
   mergeLabels,
   subtractLabels,
 } from "../../../src/plugins/todo/labels.js";
+import { makeId } from "../../utils/id.js";
 
 export interface TodosActionInput {
   text?: string;
@@ -39,10 +39,6 @@ export type TodosActionResult =
       message: string;
       jsonData: Record<string, unknown>;
     };
-
-function makeId(): string {
-  return `todo_${Date.now()}_${randomBytes(3).toString("hex")}`;
-}
 
 // Substring match (case-insensitive). Used by delete / update /
 // check / uncheck / add_label / remove_label — all share the same
@@ -91,7 +87,7 @@ export function handleAdd(
   // case-insensitive dedup in one shot.
   const normalizedLabels = mergeLabels([], input.labels ?? []);
   const item: TodoItem = {
-    id: makeId(),
+    id: makeId("todo"),
     text: input.text,
     ...(input.note !== undefined && { note: input.note }),
     ...(normalizedLabels.length > 0 && { labels: normalizedLabels }),

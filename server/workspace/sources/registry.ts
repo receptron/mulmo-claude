@@ -48,7 +48,8 @@ import {
 import { normalizeCategories } from "./taxonomy.js";
 import type { CategorySlug } from "./taxonomy.js";
 import { writeFileAtomic } from "../../utils/files/index.js";
-import { isValidSlug, sourceFilePath, sourcesRoot } from "./paths.js";
+import { sourceFilePath, sourcesRoot } from "./paths.js";
+import { isValidSlug } from "../../utils/slug.js";
 import { log } from "../../system/logger/index.js";
 
 // --- Frontmatter parsing ------------------------------------------------

@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "crypto";
-import { hasNonAscii, hashSlug, slugify } from "../../server/utils/slug.js";
+import {
+  hasNonAscii,
+  hashSlug,
+  isValidSlug,
+  slugify,
+} from "../../server/utils/slug.js";
 
 const HASH_LEN = 16;
 
@@ -109,5 +114,58 @@ describe("slugify (non-ASCII fallback)", () => {
   it("handles emoji-only input", () => {
     const result = slugify("🎉🎊");
     assert.equal(result, expectedHash("🎉🎊"));
+  });
+});
+
+// isValidSlug — consolidated from sources/paths.ts + skills/paths.ts
+describe("isValidSlug", () => {
+  it("accepts lowercase alphanumeric with hyphens", () => {
+    assert.equal(isValidSlug("hn"), true);
+    assert.equal(isValidSlug("hn-front-page"), true);
+    assert.equal(isValidSlug("a"), true);
+    assert.equal(isValidSlug("arxiv-2024"), true);
+    assert.equal(isValidSlug("100"), true);
+  });
+
+  it("rejects empty and too-long strings", () => {
+    assert.equal(isValidSlug(""), false);
+    assert.equal(isValidSlug("a".repeat(65)), false);
+  });
+
+  it("rejects uppercase", () => {
+    assert.equal(isValidSlug("HN"), false);
+    assert.equal(isValidSlug("Hacker-News"), false);
+  });
+
+  it("rejects special characters", () => {
+    assert.equal(isValidSlug("hn_front"), false);
+    assert.equal(isValidSlug("hn.front"), false);
+    assert.equal(isValidSlug("hn/front"), false);
+    assert.equal(isValidSlug("hn front"), false);
+  });
+
+  it("rejects leading/trailing hyphens", () => {
+    assert.equal(isValidSlug("-hn"), false);
+    assert.equal(isValidSlug("hn-"), false);
+    assert.equal(isValidSlug("-"), false);
+  });
+
+  it("rejects consecutive hyphens", () => {
+    assert.equal(isValidSlug("hn--front"), false);
+  });
+
+  it("rejects path-traversal attempts", () => {
+    assert.equal(isValidSlug(".."), false);
+    assert.equal(isValidSlug("../etc/passwd"), false);
+    assert.equal(isValidSlug(".hidden"), false);
+  });
+
+  it("rejects non-string inputs", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assert.equal(isValidSlug(null as any), false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assert.equal(isValidSlug(42 as any), false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assert.equal(isValidSlug(undefined as any), false);
   });
 });

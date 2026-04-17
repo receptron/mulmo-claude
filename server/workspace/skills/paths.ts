@@ -38,10 +38,4 @@ export function projectSkillDir(workspaceRoot: string, slug: string): string {
  * filesystem, the Claude CLI slash-command resolver, or the URL
  * parser. Single source of truth for `save` / `delete` input.
  */
-export function isValidSlug(slug: string): boolean {
-  if (typeof slug !== "string") return false;
-  if (slug.length === 0 || slug.length > 64) return false;
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) return false;
-  if (slug.includes("--")) return false;
-  return true;
-}
+// isValidSlug moved to server/utils/slug.ts — import from there.

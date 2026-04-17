@@ -109,6 +109,5 @@ export async function githubFetchJson(
 // Small type-guard used by the json-shape parsers below. Keeping
 // it here (rather than duplicated per fetcher) so adding a new
 // GitHub endpoint stays boilerplate-free.
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+// Re-export so existing callers that import from this module keep working.
+export { isRecord } from "../../../utils/types.js";

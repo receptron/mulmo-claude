@@ -353,80 +353,10 @@ export function buildOptimizationUserPrompt(input: OptimizationInput): string {
 // to scanning for the first balanced `{ ... }` block. Returns `null`
 // on failure so callers can log-and-skip instead of crash.
 //
-// The fenced-block path is written with indexOf rather than a regex
-// to avoid sonarjs/slow-regex; the balanced-brace path uses a single
-// pass with character-level state tracking.
-export function extractJsonObject(raw: string): unknown | null {
-  // 1. Fenced block — locate with indexOf, no regex backtracking risk.
-  const fencedBody = findFencedJsonBody(raw);
-  if (fencedBody !== null) {
-    try {
-      return JSON.parse(fencedBody);
-    } catch {
-      // fall through to scan
-    }
-  }
-  // 2. First balanced `{...}` block
-  const balanced = findBalancedBraceBlock(raw);
-  if (balanced === null) return null;
-  try {
-    return JSON.parse(balanced);
-  } catch {
-    return null;
-  }
-}
-
-// Scan `raw` for the first balanced `{ ... }` block, handling string
-// literals and escape sequences so nested braces inside JSON strings
-// don't trip the depth counter. Returns the raw substring (including
-// the outer braces) or null if no balanced block is found.
-export function findBalancedBraceBlock(raw: string): string | null {
-  const start = raw.indexOf("{");
-  if (start === -1) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}" && --depth === 0) return raw.slice(start, i + 1);
-  }
-  return null;
-}
-
-// Pull the body out of a ```json ... ``` fenced block using indexOf
-// only — no regex so we don't need to worry about backtracking.
-// Returns null if no complete fence pair is present.
-function findFencedJsonBody(raw: string): string | null {
-  const OPEN = "```json";
-  const CLOSE = "```";
-  const openIdx = raw.indexOf(OPEN);
-  if (openIdx === -1) return null;
-  // Body starts after the first newline following the opener so we
-  // skip any trailing whitespace on the opening line.
-  const afterOpen = openIdx + OPEN.length;
-  const bodyStart = raw.indexOf("\n", afterOpen);
-  if (bodyStart === -1) return null;
-  const closeIdx = raw.indexOf(CLOSE, bodyStart + 1);
-  if (closeIdx === -1) return null;
-  // Strip the newline immediately before the closing fence if
-  // present so JSON.parse doesn't see a trailing blank.
-  const bodyEnd = raw[closeIdx - 1] === "\n" ? closeIdx - 1 : closeIdx;
-  return raw.slice(bodyStart + 1, bodyEnd);
-}
+// JSON extraction helpers moved to server/utils/json.ts.
+// Re-export for backwards compatibility with callers that import
+// from this module (dailyPass.ts, optimizationPass.ts).
+export { extractJsonObject, findBalancedBraceBlock } from "../../utils/json.js";
 
 // Type guards used by callers to validate parsed output. Written as
 // guards rather than `as` casts per project conventions.

@@ -9,8 +9,8 @@ export {
   deleteProjectSkill,
 } from "./writer.js";
 export type { SaveResult, UpdateResult, DeleteResult } from "./writer.js";
+export { isValidSlug } from "../../utils/slug.js";
 export {
-  isValidSlug,
   projectSkillsDir,
   projectSkillPath,
   projectSkillDir,

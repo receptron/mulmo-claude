@@ -10,18 +10,16 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { slugify } from "../../utils/slug.js";
+import { toUtcIsoDate } from "../../utils/date.js";
 import { WORKSPACE_DIRS } from "../paths.js";
 
 export const SEARCHES_DIR = WORKSPACE_DIRS.searches;
 const SEARCH_HASH_LEN = 8;
 const MAX_QUERY_SLUG_CHARS = 40;
 
-export function formatSearchDateDir(ts: Date): string {
-  const y = ts.getUTCFullYear();
-  const m = String(ts.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(ts.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+// Re-export for backwards compatibility with callers that imported
+// from this module. The function is now in utils/date.ts.
+export { toUtcIsoDate as formatSearchDateDir } from "../../utils/date.js";
 
 export function computeSearchHash(
   query: string,
@@ -45,7 +43,7 @@ export interface SearchPathInputs {
 export function computeSearchRelPath(inputs: SearchPathInputs): string {
   const slug = slugify(inputs.query, "search", MAX_QUERY_SLUG_CHARS);
   const hash = computeSearchHash(inputs.query, inputs.sessionId, inputs.ts);
-  const dateDir = formatSearchDateDir(inputs.ts);
+  const dateDir = toUtcIsoDate(inputs.ts);
   return `${SEARCHES_DIR}/${dateDir}/${slug}-${hash}.md`;
 }
 

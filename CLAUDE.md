@@ -236,6 +236,34 @@ The repo runs several PRs in flight at once. Code that sprawls across large func
 - Prefer discriminated-union return types (`{ kind: "skipped", reason } | { kind: "processed", ... }`) over null / thrown errors for multi-outcome helpers.
 - Honour the `sonarjs/cognitive-complexity` threshold (**error at >15** in `.ts` / `.js`; temporarily **warn** in `.vue` until pre-existing violations like `App.vue#sendMessage` at 47 and `spreadsheet/View.vue` at 163 are refactored). Split rather than suppress.
 
+### Utility functions: group by concern under `utils/`
+
+Reusable pure functions MUST be placed under `server/utils/` or `src/utils/` and grouped into files by semantic concern — NOT dumped into a single `utils.ts` / `helpers.ts`. When adding a new utility, find (or create) the file whose name matches the concern:
+
+```text
+server/utils/
+  fs.ts            ← file / path operations (resolveWithinRoot, statSafe, …)
+  errors.ts        ← error message extraction
+  httpError.ts     ← Express response helpers (badRequest, serverError, …)
+  slug.ts          ← string slugification
+  gemini.ts        ← Gemini API wrappers
+
+src/utils/
+  api.ts           ← apiGet / apiPost / apiPut / … (network)
+  errors.ts        ← errorMessage (shared with server)
+  format/          ← date formatting, number formatting
+  session/         ← mergeSessions, sessionEntries (session-specific logic)
+  image/           ← image URL rewriting
+  path/            ← workspace-relative link resolution
+  dom/             ← DOM helpers (scroll, external-link detection)
+  tools/           ← tool-result type guards, pending-call state
+  role/            ← role icon / name resolution
+  files/           ← file-tree expand state
+  agent/           ← agent request building, tool-call helpers
+```
+
+**Rule of thumb**: if a function operates on a specific data type (file, string, array, network response, DOM element), it belongs in the file named for that type. If no file exists yet, create one. NEVER add unrelated functions to an existing file just because it's already imported nearby.
+
 ### Linting covers .vue files
 
 `eslint-plugin-vue` + `vue-eslint-parser` are enabled (`eslint.config.mjs`). The `.vue` override block at the end of the config:

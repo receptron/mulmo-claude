@@ -3,6 +3,8 @@
 // markdown for the index. All filesystem walking happens in the
 // caller; this function is deterministic and easy to snapshot-test.
 
+import { isoDateOnly } from "../../utils/date.js";
+
 export interface IndexTopicEntry {
   // Filesystem slug (matches topics/<slug>.md).
   slug: string;
@@ -137,7 +139,7 @@ function compareTopicsNewestFirst(
 function renderTopicRow(t: IndexTopicEntry): string {
   const label = t.title && t.title.trim().length > 0 ? t.title : t.slug;
   const stamp = t.lastUpdatedIso
-    ? ` — updated ${formatShortDate(t.lastUpdatedIso)}`
+    ? ` — updated ${isoDateOnly(t.lastUpdatedIso)}`
     : "";
   return `- [${label}](topics/${t.slug}.md)${stamp}`;
 }
@@ -145,10 +147,4 @@ function renderTopicRow(t: IndexTopicEntry): string {
 function renderDailyRow(d: IndexDailyEntry): string {
   const [year, month, day] = d.date.split("-");
   return `- [${d.date}](daily/${year}/${month}/${day}.md)`;
-}
-
-// Strip ISO time portion for compactness — "updated 2026-04-11" is
-// plenty; the full timestamp is in _state.json if anyone needs it.
-function formatShortDate(iso: string): string {
-  return iso.slice(0, 10);
 }

@@ -10,7 +10,8 @@
 
 import fsp from "node:fs/promises";
 import { defaultSourceState, type SourceState } from "./types.js";
-import { isValidSlug, sourceStatePath } from "./paths.js";
+import { sourceStatePath } from "./paths.js";
+import { isValidSlug } from "../../utils/slug.js";
 import { errorMessage } from "../../utils/errors.js";
 import { writeJsonAtomic } from "../../utils/files/index.js";
 

@@ -15,6 +15,7 @@
 import { spawn } from "node:child_process";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { readFile } from "node:fs/promises";
+import { formatSpawnFailure } from "../../utils/spawn.js";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
 import { errorMessage } from "../../utils/errors.js";
@@ -150,52 +151,7 @@ export function formatSpawnError(
   stdout: string,
   stderr: string,
 ): string {
-  const structured = extractStructuredError(stdout);
-  if (structured !== null) {
-    return `[chat-index] claude summarize exited ${code}: ${structured}`;
-  }
-  const trimmedStderr = stderr.trim();
-  if (trimmedStderr.length > 0) {
-    return `[chat-index] claude summarize exited ${code}: ${trimmedStderr.slice(0, 500)}`;
-  }
-  const trimmedStdout = stdout.trim();
-  if (trimmedStdout.length > 0) {
-    return `[chat-index] claude summarize exited ${code}: ${trimmedStdout.slice(0, 500)}`;
-  }
-  return `[chat-index] claude summarize exited ${code}: no error output`;
-}
-
-// Attempts to extract a useful error reason from a claude JSON
-// envelope. Returns null when stdout is not parseable JSON or
-// the envelope does not indicate an error.
-function extractStructuredError(stdout: string): string | null {
-  const text = stdout.trim();
-  if (text.length === 0) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
-  if (obj.is_error !== true) return null;
-
-  // Prefer the explicit errors[] list if present.
-  if (Array.isArray(obj.errors) && obj.errors.length > 0) {
-    const joined = obj.errors
-      .filter((e): e is string => typeof e === "string")
-      .join("; ");
-    if (joined.length > 0) return joined;
-  }
-  // Fall back to subtype (e.g. "error_max_budget_usd") with an
-  // optional result string for context.
-  const subtype = typeof obj.subtype === "string" ? obj.subtype : "";
-  const result = typeof obj.result === "string" ? obj.result : "";
-  if (subtype.length > 0 && result.length > 0) return `${subtype}: ${result}`;
-  if (subtype.length > 0) return subtype;
-  if (result.length > 0) return result;
-  return "unknown error (no errors / subtype / result fields)";
+  return formatSpawnFailure("[chat-index]", code, stdout, stderr);
 }
 
 // Runtime-validate an arbitrary value into a SummaryResult. Missing

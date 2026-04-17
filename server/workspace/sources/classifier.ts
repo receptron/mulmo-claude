@@ -20,6 +20,7 @@
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
+import { formatSpawnFailure } from "../../utils/spawn.js";
 import {
   CATEGORY_SLUGS,
   normalizeCategories,
@@ -258,59 +259,16 @@ function spawnClaudeClassify(
         // error_max_budget_usd) to STDOUT in JSON form — same
         // lesson we learned in chat-index/summarizer. Prefer the
         // structured message when we can parse it.
-        reject(new Error(formatSpawnFailure(code, stdout, stderr)));
+        reject(
+          new Error(
+            formatSpawnFailure("[sources/classifier]", code, stdout, stderr),
+          ),
+        );
         return;
       }
       resolve(stdout);
     });
   });
-}
-
-// Mirror of `formatSpawnError` in chat-index/summarizer. Kept
-// local so we don't cross-import between the chat-index and
-// sources modules (they're independent consumers of claude CLI).
-function formatSpawnFailure(
-  code: number | null,
-  stdout: string,
-  stderr: string,
-): string {
-  const structured = extractClaudeErrorMessage(stdout);
-  if (structured) {
-    return `[sources/classifier] claude exited ${code}: ${structured}`;
-  }
-  const trimmedStderr = stderr.trim();
-  if (trimmedStderr.length > 0) {
-    return `[sources/classifier] claude exited ${code}: ${trimmedStderr.slice(0, 500)}`;
-  }
-  const trimmedStdout = stdout.trim();
-  if (trimmedStdout.length > 0) {
-    return `[sources/classifier] claude exited ${code}: ${trimmedStdout.slice(0, 500)}`;
-  }
-  return `[sources/classifier] claude exited ${code}: no error output`;
-}
-
-function extractClaudeErrorMessage(stdout: string): string | null {
-  const text = stdout.trim();
-  if (!text) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
-  if (obj.is_error !== true) return null;
-  if (Array.isArray(obj.errors) && obj.errors.length > 0) {
-    const joined = obj.errors
-      .filter((e): e is string => typeof e === "string")
-      .join("; ");
-    if (joined.length > 0) return joined;
-  }
-  const subtype = typeof obj.subtype === "string" ? obj.subtype : "";
-  const result = typeof obj.result === "string" ? obj.result : "";
-  if (subtype && result) return `${subtype}: ${result}`;
-  return subtype || result || null;
 }
 
 // Production ClassifyFn — spawns the real claude CLI.

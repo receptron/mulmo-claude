@@ -13,6 +13,7 @@
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../../journal/archivist.js";
+import { formatSpawnFailure } from "../../../utils/spawn.js";
 import { errorMessage } from "../../../utils/errors.js";
 import type { SourceItem } from "../types.js";
 
@@ -186,59 +187,16 @@ function spawnClaudeSummarize(
       settled = true;
       clearTimeout(timer);
       if (code !== 0) {
-        reject(new Error(formatSpawnFailure(code, stdout, stderr)));
+        reject(
+          new Error(
+            formatSpawnFailure("[sources/summarize]", code, stdout, stderr),
+          ),
+        );
         return;
       }
       resolve(stdout);
     });
   });
-}
-
-function formatSpawnFailure(
-  code: number | null,
-  stdout: string,
-  stderr: string,
-): string {
-  // Structured error from stdout wins (budget-exhaustion etc.).
-  // See the matching helper in server/chat-index/summarizer.ts
-  // for the "why stdout not stderr" rationale.
-  const structured = extractClaudeErrorMessage(stdout);
-  if (structured) {
-    return `[sources/summarize] claude exited ${code}: ${structured}`;
-  }
-  const trimmedStderr = stderr.trim();
-  if (trimmedStderr.length > 0) {
-    return `[sources/summarize] claude exited ${code}: ${trimmedStderr.slice(0, 500)}`;
-  }
-  const trimmedStdout = stdout.trim();
-  if (trimmedStdout.length > 0) {
-    return `[sources/summarize] claude exited ${code}: ${trimmedStdout.slice(0, 500)}`;
-  }
-  return `[sources/summarize] claude exited ${code}: no error output`;
-}
-
-function extractClaudeErrorMessage(stdout: string): string | null {
-  const text = stdout.trim();
-  if (!text) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
-  if (obj.is_error !== true) return null;
-  if (Array.isArray(obj.errors) && obj.errors.length > 0) {
-    const joined = obj.errors
-      .filter((e): e is string => typeof e === "string")
-      .join("; ");
-    if (joined.length > 0) return joined;
-  }
-  const subtype = typeof obj.subtype === "string" ? obj.subtype : "";
-  const result = typeof obj.result === "string" ? obj.result : "";
-  if (subtype && result) return `${subtype}: ${result}`;
-  return subtype || result || null;
 }
 
 // Build the production SummarizeFn. `isoDate` is captured once

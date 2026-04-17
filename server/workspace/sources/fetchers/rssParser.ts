@@ -8,6 +8,7 @@
 // Pure — no I/O. Unit-testable with fixture strings.
 
 import { XMLParser } from "fast-xml-parser";
+import { isRecord } from "../../../utils/types.js";
 
 export interface ParsedFeedItem {
   // Best-effort stable identity from the feed itself. For RSS
@@ -251,9 +252,7 @@ function classifyAtomLinkCandidate(candidate: unknown): AtomLinkOutcome {
 
 // --- helpers ------------------------------------------------------------
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+// isRecord moved to server/utils/types.ts
 
 // Extract a string from a value that might be:
 //   - a plain string

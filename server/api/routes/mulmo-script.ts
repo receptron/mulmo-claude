@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
+import { stripDataUri } from "../../utils/files/image-store.js";
 import {
   getFileObject,
   initializeContextFromFiles,
@@ -656,7 +657,7 @@ router.post(
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-      const base64 = imageData.replace(/^data:image\/\w+;base64,/, "");
+      const base64 = stripDataUri(imageData);
       fs.writeFileSync(imagePath, Buffer.from(base64, "base64"));
 
       res.json({ image: fileToDataUri(imagePath, "image/png") });
@@ -722,7 +723,7 @@ router.post(
       const imagePath = getReferenceImagePath(context, key, "png");
       fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-      const base64 = imageData.replace(/^data:image\/\w+;base64,/, "");
+      const base64 = stripDataUri(imageData);
       fs.writeFileSync(imagePath, Buffer.from(base64, "base64"));
 
       res.json({ image: fileToDataUri(imagePath, "image/png") });

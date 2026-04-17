@@ -8,7 +8,6 @@ import {
   robotsCachePath,
   dailyNewsPath,
   archivePath,
-  isValidSlug,
 } from "../../server/workspace/sources/paths.js";
 
 const root = path.join("/tmp", "ws");
@@ -85,62 +84,5 @@ describe("path helpers", () => {
   });
 });
 
-describe("isValidSlug", () => {
-  it("accepts simple kebab-case slugs", () => {
-    assert.equal(isValidSlug("hn"), true);
-    assert.equal(isValidSlug("hn-front-page"), true);
-    assert.equal(isValidSlug("anthropic-releases"), true);
-    assert.equal(isValidSlug("a"), true);
-    assert.equal(isValidSlug("arxiv-cs-cl"), true);
-  });
-
-  it("accepts digits", () => {
-    assert.equal(isValidSlug("arxiv-2024"), true);
-    assert.equal(isValidSlug("news3"), true);
-    assert.equal(isValidSlug("100"), true);
-  });
-
-  it("rejects empty / too-long", () => {
-    assert.equal(isValidSlug(""), false);
-    assert.equal(isValidSlug("a".repeat(65)), false);
-  });
-
-  it("rejects uppercase", () => {
-    assert.equal(isValidSlug("HN"), false);
-    assert.equal(isValidSlug("Hacker-News"), false);
-  });
-
-  it("rejects underscores / dots / slashes / spaces", () => {
-    assert.equal(isValidSlug("hn_front"), false);
-    assert.equal(isValidSlug("hn.front"), false);
-    assert.equal(isValidSlug("hn/front"), false);
-    assert.equal(isValidSlug("hn front"), false);
-  });
-
-  it("rejects leading / trailing hyphen", () => {
-    assert.equal(isValidSlug("-hn"), false);
-    assert.equal(isValidSlug("hn-"), false);
-    assert.equal(isValidSlug("-"), false);
-  });
-
-  it("rejects consecutive hyphens", () => {
-    assert.equal(isValidSlug("hn--front"), false);
-  });
-
-  it("rejects path-traversal attempts", () => {
-    // Defense: the slug doubles as a filename, so ".." or "x/y"
-    // would let a caller escape the sources dir. The regex
-    // already rejects these but pin the intent.
-    assert.equal(isValidSlug(".."), false);
-    assert.equal(isValidSlug("../etc/passwd"), false);
-    assert.equal(isValidSlug("foo/../bar"), false);
-    assert.equal(isValidSlug(".hidden"), false);
-  });
-
-  it("rejects non-string", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    assert.equal(isValidSlug(null as any), false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    assert.equal(isValidSlug(42 as any), false);
-  });
-});
+// isValidSlug tests moved to test/utils/test_slug.ts — the function
+// itself was consolidated to server/utils/slug.ts in PR #377.

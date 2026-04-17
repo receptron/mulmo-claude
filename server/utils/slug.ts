@@ -24,6 +24,17 @@ export function hashSlug(
     .slice(0, length);
 }
 
+// Validates a slug: lowercase alphanumeric + hyphens, 1–64 chars,
+// no leading/trailing hyphen, no consecutive hyphens. Previously
+// duplicated in sources/paths.ts and skills/paths.ts.
+export function isValidSlug(slug: string): boolean {
+  if (typeof slug !== "string") return false;
+  if (slug.length === 0 || slug.length > 64) return false;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) return false;
+  if (slug.includes("--")) return false;
+  return true;
+}
+
 export function slugify(
   title: string,
   defaultSlug = "page",

@@ -4,6 +4,7 @@
 
 import path from "node:path";
 import { WORKSPACE_DIRS } from "../paths.js";
+import { isValidIsoDate } from "../../utils/date.js";
 
 // Directory layout under workspace/conversations/summaries/ is an
 // implementation detail of the journal module; keep it centralised
@@ -40,30 +41,6 @@ export function dailyPathFor(workspaceRoot: string, isoDate: string): string {
   );
 }
 
-// Strict YYYY-MM-DD check without a regex (sonarjs/slow-regex). We
-// deliberately don't validate that the date is real (no "2026-02-31"
-// rejection) — that's the LLM's / caller's job; we only make sure
-// the string can be split into 3 numeric components so the
-// downstream path math won't produce garbage.
-function isValidIsoDate(s: string): boolean {
-  if (s.length !== 10) return false;
-  if (s[4] !== "-" || s[7] !== "-") return false;
-  return (
-    isNumeric(s.slice(0, 4)) &&
-    isNumeric(s.slice(5, 7)) &&
-    isNumeric(s.slice(8, 10))
-  );
-}
-
-function isNumeric(s: string): boolean {
-  if (s.length === 0) return false;
-  for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    if (code < 48 || code > 57) return false;
-  }
-  return true;
-}
-
 // summaries/topics/<slug>.md
 export function topicPathFor(workspaceRoot: string, slug: string): string {
   return path.join(summariesRoot(workspaceRoot), TOPICS_DIR, `${slug}.md`);
@@ -83,17 +60,9 @@ export function archivedTopicPathFor(
   );
 }
 
-// Convert a Date (or ms timestamp) to a YYYY-MM-DD string in LOCAL
-// time. We intentionally use the local wall clock: this is a personal
-// workspace, not a distributed system, and "what did I do on 2026-04-11"
-// is a human-timezone question, not a UTC-offset question.
-export function toIsoDate(input: Date | number): string {
-  const d = typeof input === "number" ? new Date(input) : input;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+// Re-export for backwards compatibility — callers that import
+// toIsoDate from journal/paths keep working.
+export { toLocalIsoDate as toIsoDate } from "../../utils/date.js";
 
 // Convert a free-form topic name into a filesystem-safe slug.
 // Rules:

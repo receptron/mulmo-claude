@@ -27,7 +27,7 @@ import {
   defaultHttpFetcherDeps,
   type RobotsProvider,
 } from "../../workspace/sources/httpFetcher.js";
-import { isValidSlug } from "../../workspace/sources/paths.js";
+import { isValidSlug } from "../../utils/slug.js";
 import {
   FETCHER_KINDS,
   SOURCE_SCHEDULES,

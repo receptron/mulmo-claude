@@ -8,7 +8,6 @@
 // and returns a result. The Express route is responsible for loading
 // and saving JSON to disk.
 
-import { randomBytes } from "crypto";
 import type { TodoItem, TodoPriority } from "./todos.js";
 import {
   type StatusColumn,
@@ -16,6 +15,7 @@ import {
   doneColumnId,
 } from "./todosColumnsHandlers.js";
 import { mergeLabels } from "../../../src/plugins/todo/labels.js";
+import { makeId } from "../../utils/id.js";
 
 const ORDER_STEP = 1000;
 const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
@@ -25,12 +25,6 @@ const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
 export type ItemsActionResult =
   | { kind: "error"; status: number; error: string }
   | { kind: "success"; items: TodoItem[]; item?: TodoItem };
-
-// ── id generation ─────────────────────────────────────────────────
-
-function makeId(): string {
-  return `todo_${Date.now()}_${randomBytes(3).toString("hex")}`;
-}
 
 // ── Migration ─────────────────────────────────────────────────────
 
@@ -196,7 +190,7 @@ export function handleCreate(
 
   const status = resolved.status;
   const item: TodoItem = {
-    id: makeId(),
+    id: makeId("todo"),
     text: input.text.trim(),
     completed: status === doneColumnId(columns),
     createdAt: Date.now(),

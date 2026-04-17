@@ -10,7 +10,7 @@
 // threshold.
 
 import type { ScheduledItem } from "./scheduler.js";
-import { randomBytes } from "crypto";
+import { makeId } from "../../utils/id.js";
 
 export interface SchedulerActionInput {
   title?: string;
@@ -40,10 +40,6 @@ export function sortItems(items: ScheduledItem[]): ScheduledItem[] {
   });
 }
 
-function makeId(): string {
-  return `sched_${Date.now()}_${randomBytes(3).toString("hex")}`;
-}
-
 export function handleShow(items: ScheduledItem[]): SchedulerActionResult {
   return {
     kind: "success",
@@ -61,7 +57,7 @@ export function handleAdd(
     return { kind: "error", status: 400, error: "title required" };
   }
   const item: ScheduledItem = {
-    id: makeId(),
+    id: makeId("sched"),
     title: input.title,
     createdAt: Date.now(),
     props: input.props ?? {},

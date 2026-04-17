@@ -13,7 +13,8 @@
 
 import { unlink, rmdir } from "node:fs/promises";
 import { discoverSkills } from "./discovery.js";
-import { isValidSlug, projectSkillDir, projectSkillPath } from "./paths.js";
+import { projectSkillDir, projectSkillPath } from "./paths.js";
+import { isValidSlug } from "../../utils/slug.js";
 import { log } from "../../system/logger/index.js";
 import { writeFileAtomic } from "../../utils/files/index.js";
 
