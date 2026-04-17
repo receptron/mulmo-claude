@@ -223,6 +223,58 @@ test.describe("sending a chat message", () => {
 
     await expect(page.locator("text=final message").first()).toBeVisible();
   });
+
+  test("recovers missed events via re-fetch on session_finished (#350)", async ({
+    page,
+  }) => {
+    // Simulate an event gap: the mock sends ONLY session_finished
+    // (no text events). The client's toolResults stay empty from the
+    // pub/sub stream. But session_finished triggers a re-fetch of
+    // /api/sessions/:id which returns the full transcript — the
+    // "recovered message" should appear via that path.
+    await mockAgentWithPubSub(page, [
+      // Deliberately NO text events — simulates pub/sub loss.
+    ]);
+
+    // Override /api/sessions/:id to return a transcript with the
+    // "recovered" text. Registered AFTER mockAllApis, so it wins
+    // for GET requests whose path starts with /api/sessions/ and
+    // contains the session id (we capture dynamically below).
+    let capturedSessionId: string | null = null;
+    await page.route(
+      (url) =>
+        url.pathname.startsWith("/api/sessions/") &&
+        url.pathname !== "/api/sessions",
+      (route) => {
+        if (route.request().method() !== "GET") return route.fallback();
+        const id = route.request().url().split("/api/sessions/").pop() ?? "";
+        capturedSessionId = id.split("?")[0]; // strip query
+        return route.fulfill({
+          json: [
+            {
+              type: "session_meta",
+              roleId: "general",
+              sessionId: capturedSessionId,
+            },
+            { type: "text", source: "user", message: "trigger" },
+            {
+              type: "text",
+              source: "assistant",
+              message: "recovered message",
+            },
+          ],
+        });
+      },
+    );
+
+    await page.goto("/");
+    await page.getByTestId("user-input").fill("trigger");
+    await page.getByTestId("send-btn").click();
+
+    // "recovered message" was never sent via pub/sub — it should
+    // appear only because session_finished triggered a re-fetch.
+    await expect(page.locator("text=recovered message").first()).toBeVisible();
+  });
 });
 
 // -------- Session creation + tab bar --------

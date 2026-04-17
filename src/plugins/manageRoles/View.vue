@@ -32,7 +32,12 @@
         >
           <span class="material-icons text-gray-500">{{ role.icon }}</span>
           <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm text-gray-800">{{ role.name }}</div>
+            <div class="font-medium text-sm text-gray-800">
+              {{ role.name }}
+              <span class="ml-1 text-xs font-mono text-gray-400"
+                >({{ role.id }})</span
+              >
+            </div>
             <div class="text-xs text-gray-400 truncate">
               {{ role.availablePlugins.join(", ") }}
             </div>

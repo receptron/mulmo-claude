@@ -22,7 +22,7 @@
     <div
       v-if="open"
       ref="popup"
-      class="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs"
+      class="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs"
     >
       <p
         class="mb-2"

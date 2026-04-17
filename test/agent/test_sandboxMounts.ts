@@ -136,31 +136,47 @@ describe("sshAgentForwardArgs", () => {
     assert.deepEqual(r, { args: [], skippedReason: null });
   });
 
-  it("reports SSH_AUTH_SOCK missing", () => {
-    const r = sshAgentForwardArgs(true, undefined);
+  it("uses Docker Desktop magic socket on macOS", () => {
+    const r = sshAgentForwardArgs(true, "/tmp/irrelevant", "darwin");
+    assert.equal(r.skippedReason, null);
+    assert.deepEqual(r.args, [
+      "-v",
+      `/run/host-services/ssh-auth.sock:${SSH_AGENT_CONTAINER_SOCK}`,
+      "-e",
+      `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
+    ]);
+  });
+
+  it("macOS path ignores SSH_AUTH_SOCK value entirely", () => {
+    const r = sshAgentForwardArgs(true, undefined, "darwin");
+    assert.equal(r.skippedReason, null);
+    assert.equal(r.args.length, 4);
+  });
+
+  it("reports SSH_AUTH_SOCK missing on Linux", () => {
+    const r = sshAgentForwardArgs(true, undefined, "linux");
     assert.deepEqual(r.args, []);
     assert.match(r.skippedReason ?? "", /not set/);
   });
 
-  it("reports socket path missing on disk", () => {
-    const r = sshAgentForwardArgs(true, "/tmp/definitely-not-a-real-sock");
+  it("reports socket path missing on disk (Linux)", () => {
+    const r = sshAgentForwardArgs(
+      true,
+      "/tmp/definitely-not-a-real-sock",
+      "linux",
+    );
     assert.deepEqual(r.args, []);
     assert.match(r.skippedReason ?? "", /not found/);
   });
 
-  it("binds socket and sets SSH_AUTH_SOCK when sock exists", () => {
-    // Use an ordinary file as a stand-in for the socket — the helper
-    // only checks existence, not socket-ness.
+  it("binds socket and sets SSH_AUTH_SOCK when sock exists (Linux)", () => {
     const fake = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "sock-")),
       "agent.sock",
     );
     fs.writeFileSync(fake, "");
-    const r = sshAgentForwardArgs(true, fake);
+    const r = sshAgentForwardArgs(true, fake, "linux");
     assert.equal(r.skippedReason, null);
-    // Normalise to forward slashes on both sides: the helper converts
-    // backslashes to forward slashes for Docker, so the expected value
-    // has to do the same to stay portable across Windows CI runners.
     const expectedHostPath = fake.replace(/\\/g, "/");
     assert.deepEqual(r.args, [
       "-v",

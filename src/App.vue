@@ -27,16 +27,18 @@
             @click="toggleHistory"
           >
             <span class="material-icons">history</span>
-            <!-- Active sessions badge -->
+            <!-- Active sessions badge (yellow, left) -->
             <span
               v-if="activeSessionCount > 0"
-              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+              :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
               >{{ activeSessionCount }}</span
             >
-            <!-- Unread replies badge -->
+            <!-- Unread replies badge (red, right) -->
             <span
               v-if="unreadCount > 0"
-              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+              :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
               >{{ unreadCount }}</span
             >
           </button>
@@ -252,7 +254,11 @@
       <div
         class="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0 gap-2"
       >
-        <PluginLauncher @navigate="onPluginNavigate" />
+        <PluginLauncher
+          :active-tool-name="selectedResult?.toolName ?? null"
+          :active-view-mode="canvasViewMode"
+          @navigate="onPluginNavigate"
+        />
         <CanvasViewToggle
           :model-value="canvasViewMode"
           @update:model-value="setCanvasViewMode"
@@ -727,7 +733,7 @@ const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 // returns `{ skills: [...] }` flat, so `wrapData` lifts the payload
 // under `data` before the ToolResult reaches the View.
 const LAUNCHER_INVOKE_SPECS: Record<
-  "todos" | "scheduler" | "skills" | "wiki",
+  "todos" | "scheduler" | "skills" | "wiki" | "roles",
   {
     endpoint: string;
     method: "GET" | "POST";
@@ -766,6 +772,13 @@ const LAUNCHER_INVOKE_SPECS: Record<
     body: { action: "index" },
     toolName: "manageWiki",
     defaultTitle: "Wiki",
+  },
+  roles: {
+    endpoint: API_ROUTES.roles.manage,
+    method: "POST",
+    body: { action: "list" },
+    toolName: "manageRoles",
+    defaultTitle: "Roles",
   },
 };
 
@@ -1215,6 +1228,26 @@ async function loadSession(id: string) {
   showHistory.value = false;
 }
 
+// Re-fetch the transcript from the server and patch any entries the
+// client missed (e.g. due to a pub-sub disconnect during a long
+// Docker build). Called on session_finished so the user sees the
+// full response even if mid-run events were lost. See issue #350.
+async function refreshSessionTranscript(sessionId: string): Promise<void> {
+  const session = sessionMap.get(sessionId);
+  if (!session) return;
+  const response = await apiGet<SessionEntry[]>(
+    API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)),
+  );
+  if (!response.ok) return;
+  const serverResults = parseSessionEntries(response.data);
+  // Only patch if the server knows more than we do — avoids
+  // replacing a richer in-flight state with a stale snapshot when
+  // session_finished races with the last few events.
+  if (serverResults.length > session.toolResults.length) {
+    session.toolResults = serverResults;
+  }
+}
+
 // Seed the session state for a fresh user turn. Not pure (mutates
 // session), but isolated so sendMessage doesn't have the init
 // pattern inline. Returns `runStartIndex` — the index into
@@ -1264,6 +1297,11 @@ function ensureSessionSubscription(
     // unsubscribe sessions the user is NOT currently viewing — the
     // watch(currentSessionId) handler cleans up when switching away.
     if (event.type === EVENT_TYPES.sessionFinished) {
+      // Recover any events lost due to pub-sub disconnects during
+      // long runs (e.g. Docker builds). Fire-and-forget; if the
+      // re-fetch fails the user still has whatever events arrived
+      // via the live stream + can reload manually. See #350.
+      refreshSessionTranscript(session.id);
       if (currentSessionId.value === session.id) {
         markSessionRead(session.id);
       } else {

@@ -306,11 +306,13 @@ router.get(
 );
 
 // Mark a session as read (clears the hasUnread flag in the session store).
+// Awaits persistence so the response only arrives after the disk write
+// completes — prevents the client from refetching stale hasUnread values.
 router.post(
   API_ROUTES.sessions.markRead,
-  (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
-    const ok = markRead(req.params.id);
-    res.json({ ok });
+  async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
+    await markRead(req.params.id);
+    res.json({ ok: true });
   },
 );
 

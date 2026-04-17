@@ -214,10 +214,27 @@ describe("buildDockerSpawnArgs", () => {
     assert.equal(args[idx + 1], "ALL");
   });
 
-  it("passes uid:gid via --user", () => {
+  it("uses --user when SSH agent forward is off (default)", () => {
     const args = buildDockerSpawnArgs({ ...baseParams(), uid: 501, gid: 20 });
     const idx = args.indexOf("--user");
+    assert.ok(idx >= 0);
     assert.equal(args[idx + 1], "501:20");
+    assert.ok(!args.includes("HOST_UID=501"));
+    assert.ok(!args.includes("CHOWN"));
+  });
+
+  it("uses HOST_UID/HOST_GID + cap-adds when SSH agent forward is on", () => {
+    const args = buildDockerSpawnArgs({
+      ...baseParams(),
+      uid: 501,
+      gid: 20,
+      sshAgentForward: true,
+    });
+    assert.equal(args.indexOf("--user"), -1);
+    assert.ok(args.includes("HOST_UID=501"));
+    assert.ok(args.includes("HOST_GID=20"));
+    assert.ok(args.includes("CHOWN"));
+    assert.ok(args.includes("SETUID"));
   });
 
   it("mounts the workspace at the container path", () => {

@@ -16,6 +16,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { log } from "../system/logger/index.js";
 
@@ -144,21 +145,47 @@ export interface SshAgentForwardResult {
   skippedReason: string | null;
 }
 
+// Docker Desktop for Mac exposes the host SSH agent through a
+// well-known magic socket inside the VM. Direct bind-mounting the
+// macOS $SSH_AUTH_SOCK (/private/tmp/…) fails with "operation not
+// supported" because Docker's Linux VM can't mkdir a Unix socket.
+// Using the magic path sidesteps the issue entirely and works on
+// Docker Desktop ≥ 2.3.0 (2020+).
+const DOCKER_DESKTOP_MAC_SSH_SOCK = "/run/host-services/ssh-auth.sock";
+
 /**
  * Return the docker argv fragment that forwards the host SSH agent
- * into the container. The agent socket is bind-mounted and
- * `SSH_AUTH_SOCK` is re-pointed so ssh / git pick it up.
+ * into the container. On macOS + Docker Desktop, the built-in
+ * magic socket is used instead of a raw bind-mount. On Linux, the
+ * host `$SSH_AUTH_SOCK` is bind-mounted directly.
  *
  * Skipped (empty args + reason) when:
  * - the flag is off
- * - $SSH_AUTH_SOCK isn't set (no agent running on host)
- * - the socket path doesn't exist on the host
+ * - $SSH_AUTH_SOCK isn't set (no agent running on host) — on
+ *   non-macOS only; macOS always has the magic socket available
+ *   when Docker Desktop is running, regardless of $SSH_AUTH_SOCK
  */
 export function sshAgentForwardArgs(
   enabled: boolean,
   sshAuthSock: string | undefined,
+  platform: typeof process.platform = process.platform,
 ): SshAgentForwardResult {
   if (!enabled) return { args: [], skippedReason: null };
+
+  // macOS + Docker Desktop: use the magic VM-internal socket.
+  if (platform === "darwin") {
+    return {
+      args: [
+        "-v",
+        `${DOCKER_DESKTOP_MAC_SSH_SOCK}:${SSH_AGENT_CONTAINER_SOCK}`,
+        "-e",
+        `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
+      ],
+      skippedReason: null,
+    };
+  }
+
+  // Linux / other: bind-mount the host socket directly.
   if (!sshAuthSock || sshAuthSock.length === 0) {
     return {
       args: [],
@@ -193,6 +220,11 @@ export interface ResolvedSandboxAuth {
 
 export interface ResolveSandboxAuthParams {
   sshAgentForward: boolean;
+  /** Comma-separated host whitelist for the SSH agent. Default
+   *  "github.com". Passed to the container as
+   *  `SANDBOX_SSH_ALLOWED_HOSTS` and consumed by the entrypoint
+   *  to generate a restrictive `~/.ssh/config`. */
+  sshAllowedHosts?: string;
   configMountNames: readonly string[];
   sshAuthSock?: string | undefined;
   home?: string;
@@ -235,10 +267,37 @@ export function resolveSandboxAuth(
     });
   }
 
-  const args = [...configMountArgs(parsed.resolved), ...sshResult.args];
+  // Pass the allowed-hosts whitelist to the container so the
+  // entrypoint can generate a restrictive ~/.ssh/config. Only
+  // included when SSH agent forward is actually active.
+  const sshAllowedHostsArgs =
+    sshResult.args.length > 0 && params.sshAllowedHosts
+      ? ["-e", `SANDBOX_SSH_ALLOWED_HOSTS=${params.sshAllowedHosts}`]
+      : [];
+
+  // gh CLI keyring fallback (#259 + #164). When the user opted in
+  // to `gh` via SANDBOX_MOUNT_CONFIGS but the file mount succeeded
+  // with a keyring-based token (macOS), the mounted hosts.yml won't
+  // contain the actual token. Detect this and inject GH_TOKEN env
+  // var instead. Only runs when "gh" was explicitly requested.
+  const ghTokenArgs = resolveGhTokenFallback(params.configMountNames, parsed);
+
+  const args = [
+    ...configMountArgs(parsed.resolved),
+    ...sshResult.args,
+    ...sshAllowedHostsArgs,
+    ...ghTokenArgs.args,
+  ];
+  const allowedHostsSuffix =
+    sshResult.args.length > 0 && params.sshAllowedHosts
+      ? ` → hosts: ${params.sshAllowedHosts}`
+      : "";
   const appliedDescriptions = [
     ...parsed.resolved.map((s) => `${s.name} (${s.description})`),
-    ...(sshResult.args.length > 0 ? ["ssh-agent forward"] : []),
+    ...(sshResult.args.length > 0
+      ? [`ssh-agent forward${allowedHostsSuffix}`]
+      : []),
+    ...(ghTokenArgs.args.length > 0 ? ["gh CLI (GH_TOKEN fallback)"] : []),
   ];
 
   if (appliedDescriptions.length > 0) {
@@ -248,6 +307,59 @@ export function resolveSandboxAuth(
   }
 
   return { args, appliedDescriptions };
+}
+
+// ── GitHub CLI token fallback ──────────────────────────────────────
+
+// When the user opted in to `gh` via SANDBOX_MOUNT_CONFIGS, the
+// file mount may not carry a usable token — macOS stores it in the
+// system keyring, not in ~/.config/gh/hosts.yml. In that case we
+// extract the token via `gh auth token` on the host and pass it as
+// GH_TOKEN env var. This only runs when "gh" was explicitly
+// requested (#259 opt-in principle).
+function resolveGhTokenFallback(
+  requestedNames: readonly string[],
+  parsed: ParsedMountList,
+): { args: string[] } {
+  const ghRequested = requestedNames.some((n) => n.trim() === "gh");
+  if (!ghRequested) return { args: [] };
+
+  // If an explicit GH_TOKEN is already in the environment, pass it.
+  if (process.env.GH_TOKEN) {
+    return { args: ["-e", `GH_TOKEN=${process.env.GH_TOKEN}`] };
+  }
+
+  // If the file mount resolved (hosts.yml exists), the token might
+  // be in the file. Check if it's keyring-based by looking for
+  // "oauth_token" in the hosts.yml — if missing, fall back.
+  const ghResolved = parsed.resolved.some((s) => s.name === "gh");
+  const ghMissing = parsed.missing.some((s) => s.name === "gh");
+
+  // gh dir doesn't exist at all → try extracting from keyring
+  // gh dir exists (mounted) → still try, since keyring auth leaves
+  //   the file with no usable token
+  if (ghResolved || ghMissing || !ghResolved) {
+    try {
+      const token = execFileSync("gh", ["auth", "token"], {
+        encoding: "utf-8",
+        timeout: 5_000,
+      }).trim();
+      if (token.length > 0) {
+        log.info(
+          "sandbox",
+          "gh token extracted from host keyring (GH_TOKEN fallback)",
+        );
+        return { args: ["-e", `GH_TOKEN=${token}`] };
+      }
+    } catch {
+      log.info(
+        "sandbox",
+        "gh auth token failed — gh CLI may not work in sandbox",
+      );
+    }
+  }
+
+  return { args: [] };
 }
 
 // ── Utilities ──────────────────────────────────────────────────────

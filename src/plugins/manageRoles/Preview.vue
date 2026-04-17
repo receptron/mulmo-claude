@@ -41,10 +41,20 @@ const { refresh } = useFreshPluginData<CustomRole[]>({
   },
 });
 
+// Watch the data itself — not just uuid — because the View emits
+// updateResult with the same uuid after an in-place edit. A uuid-only
+// watch would miss those updates and the preview would go stale.
+watch(
+  () => props.result.data?.customRoles,
+  (next) => {
+    customRoles.value = next ?? [];
+  },
+  { deep: true },
+);
+
 watch(
   () => props.result.uuid,
   () => {
-    customRoles.value = props.result.data?.customRoles ?? [];
     void refresh();
   },
 );
