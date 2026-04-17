@@ -1,5 +1,5 @@
 {
-  "name": "@mulmobridge/types",
+  "name": "@mulmobridge/protocol",
   "version": "0.1.0",
   "description": "Shared types and constants for the MulmoBridge protocol",
   "type": "module",
@@ -17,5 +17,6 @@
     "prepublishOnly": "yarn build",
     "typecheck": "tsc --noEmit"
   },
-  "license": "AGPL-3.0-only"
+  "license": "MIT",
+  "author": "Receptron Team"
 }

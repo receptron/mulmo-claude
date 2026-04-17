@@ -17,7 +17,7 @@ import {
   CHAT_SOCKET_EVENTS,
   CHAT_SOCKET_PATH,
   type Attachment,
-} from "@mulmobridge/types";
+} from "@mulmobridge/protocol";
 import { readBridgeToken, TOKEN_FILE_PATH } from "./token.js";
 
 // 6 min > the server's REPLY_TIMEOUT_MS (5 min) so the server's
@@ -38,7 +38,7 @@ export interface PushEvent {
   message: string;
 }
 
-// Attachment type imported from @mulmobridge/types above.
+// Attachment type imported from @mulmobridge/protocol above.
 
 export interface BridgeClientOptions {
   /** Required. Identifier for this bridge in the handshake.

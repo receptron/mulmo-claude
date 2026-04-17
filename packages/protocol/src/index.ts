@@ -1,4 +1,4 @@
-// @mulmobridge/types — shared constants and interfaces for the
+// @mulmobridge/protocol — shared constants and interfaces for the
 // MulmoBridge chat protocol.
 //
 // This package defines the wire-level contract between:

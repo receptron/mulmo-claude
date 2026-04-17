@@ -19,7 +19,7 @@
 import type http from "http";
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { CHAT_SERVICE_ROUTES } from "@mulmobridge/types";
+import { CHAT_SERVICE_ROUTES } from "@mulmobridge/protocol";
 import { createChatStateStore } from "./chat-state.js";
 import { createCommandHandler } from "./commands.js";
 import { createRelay } from "./relay.js";
