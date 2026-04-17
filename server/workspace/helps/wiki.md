@@ -37,7 +37,7 @@ Claude will: read the source, identify key entities and concepts, create or upda
 
 ### Query
 
-Ask any question. Claude searches `wiki/index.md` for relevant pages, reads them, and synthesizes a grounded answer with citations. Good answers can be filed back into the wiki as new pages — a comparison you asked for, an analysis, a connection you discovered — so they don't disappear into chat history.
+Ask any question. Claude searches `data/wiki/index.md` for relevant pages, reads them, and synthesizes a grounded answer with citations. Good answers can be filed back into the wiki as new pages — a comparison you asked for, an analysis, a connection you discovered — so they don't disappear into chat history.
 
 ### Lint
 
@@ -46,7 +46,7 @@ Ask Claude to health-check the wiki. It scans for contradictions, stale claims, 
 ## Folder Layout
 
 ```
-wiki/
+data/wiki/
   index.md          ← catalog of all pages (title, one-line summary, last updated)
   log.md            ← append-only chronological activity log
   summary.md        ← compact key-topics list (loaded into every session as ambient context)
@@ -88,7 +88,7 @@ Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyph
 
 ## `index.md` Format
 
-`wiki/index.md` is the catalog — one bullet per page using standard markdown link syntax with the slug embedded in the href. This format works both in-app (the canvas parses it) and in any plain markdown viewer (GitHub, VS Code preview, etc.).
+`data/wiki/index.md` is the catalog — one bullet per page using standard markdown link syntax with the slug embedded in the href. This format works both in-app (the canvas parses it) and in any plain markdown viewer (GitHub, VS Code preview, etc.).
 
 ```markdown
 # Wiki Index
@@ -123,7 +123,7 @@ Use the `manageWiki` tool to display wiki content in the canvas:
 
 ## Relationship to `memory.md`
 
-|        | `memory.md`                              | `wiki/`                                     |
+|        | `memory.md`                              | `data/wiki/`                                |
 | ------ | ---------------------------------------- | ------------------------------------------- |
 | Scope  | Brief distilled facts, always in context | Deep structured knowledge, loaded on demand |
 | Growth | Intentionally small                      | Grows unboundedly                           |

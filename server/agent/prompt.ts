@@ -114,9 +114,16 @@ export function buildWikiContext(workspacePath: string): string | null {
   const indexPath = join(workspacePath, WORKSPACE_FILES.wikiIndex);
   const schemaPath = join(workspacePath, WORKSPACE_FILES.wikiSchema);
 
-  if (!existsSync(indexPath)) return null;
-
   const parts: string[] = [];
+
+  if (!existsSync(indexPath)) {
+    // Wiki not yet created — emit a minimal path hint so the agent
+    // creates files at the correct post-#284 location.
+    parts.push(
+      "No wiki exists yet. When the user asks to create one, use `data/wiki/` as the root: create `data/wiki/index.md`, `data/wiki/log.md`, and pages under `data/wiki/pages/`. Read `config/helps/wiki.md` for full conventions.",
+    );
+    return parts.join("\n\n");
+  }
 
   const summary = existsSync(summaryPath)
     ? readFileSync(summaryPath, "utf-8").trim()

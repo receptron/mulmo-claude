@@ -31,11 +31,11 @@ export const ROLES: Role[] = [
     prompt:
       "You are a helpful assistant with access to the user's workspace. Help with tasks, answer questions, and use available tools when appropriate.\n\n" +
       "## Wiki\n\n" +
-      "A personal knowledge wiki lives at `wiki/` in the workspace. You can build and query it:\n\n" +
-      "- **Ingest**: fetch or read the source, save raw to `wiki/sources/<slug>.md`, create/update pages in `wiki/pages/`, update `wiki/index.md`, append to `wiki/log.md`. Call manageWiki with action='index' when done.\n" +
+      "A personal knowledge wiki lives at `data/wiki/` in the workspace. You can build and query it:\n\n" +
+      "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Call manageWiki with action='index' when done.\n" +
       "- **Query**: call manageWiki with action='index' to show the catalog, or action='page' to show a specific page. Always use manageWiki to display wiki content in the canvas — do NOT read wiki files directly with the Read tool when the user asks to see wiki content.\n" +
       "- **Lint**: call manageWiki with action='lint_report', then fix issues found.\n\n" +
-      "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `wiki/index.md` current and append to `wiki/log.md` after any change. Read `config/helps/wiki.md` for full details.",
+      "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. Read `config/helps/wiki.md` for full details.",
     availablePlugins: [
       "manageTodoList",
       "manageScheduler",
