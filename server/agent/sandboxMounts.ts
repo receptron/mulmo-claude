@@ -16,6 +16,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { log } from "../system/logger/index.js";
 
@@ -274,10 +275,17 @@ export function resolveSandboxAuth(
       ? ["-e", `SANDBOX_SSH_ALLOWED_HOSTS=${params.sshAllowedHosts}`]
       : [];
 
+  // Inject GH_TOKEN so `gh` CLI inside the container can authenticate.
+  // On macOS the host stores the token in the system keyring, which
+  // isn't accessible from inside Docker. Running `gh auth token` on the
+  // host extracts it; we pass it as an env var so no file mount needed.
+  const ghTokenArgs = resolveGhToken();
+
   const args = [
     ...configMountArgs(parsed.resolved),
     ...sshResult.args,
     ...sshAllowedHostsArgs,
+    ...ghTokenArgs.args,
   ];
   const allowedHostsSuffix =
     sshResult.args.length > 0 && params.sshAllowedHosts
@@ -288,6 +296,7 @@ export function resolveSandboxAuth(
     ...(sshResult.args.length > 0
       ? [`ssh-agent forward${allowedHostsSuffix}`]
       : []),
+    ...(ghTokenArgs.args.length > 0 ? ["gh CLI (GH_TOKEN)"] : []),
   ];
 
   if (appliedDescriptions.length > 0) {
@@ -297,6 +306,31 @@ export function resolveSandboxAuth(
   }
 
   return { args, appliedDescriptions };
+}
+
+// ── GitHub CLI token ──────────────────────────────────────────────
+
+// Extract the GH_TOKEN from the host's `gh auth token` command.
+// Falls back gracefully: if `gh` isn't installed on the host, or
+// the user isn't logged in, the container simply won't have GH_TOKEN
+// and `gh` commands inside will fail with a clear auth error.
+function resolveGhToken(): { args: string[] } {
+  // Prefer explicit env var (user override)
+  if (process.env.GH_TOKEN) {
+    return { args: ["-e", `GH_TOKEN=${process.env.GH_TOKEN}`] };
+  }
+  try {
+    const token = execFileSync("gh", ["auth", "token"], {
+      encoding: "utf-8",
+      timeout: 5_000,
+    }).trim();
+    if (token.length > 0) {
+      return { args: ["-e", `GH_TOKEN=${token}`] };
+    }
+  } catch {
+    // gh not installed or not authenticated — skip silently
+  }
+  return { args: [] };
 }
 
 // ── Utilities ──────────────────────────────────────────────────────
