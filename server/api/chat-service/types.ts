@@ -27,11 +27,22 @@ export interface Logger {
   debug(prefix: string, message: string, data?: Record<string, unknown>): void;
 }
 
+/** A file attached to a bridge message. Generic enough for images,
+ *  PDFs, documents, videos, etc. The server decides what to do with
+ *  each based on mimeType — images become vision content blocks,
+ *  unsupported types are ignored with a log. */
+export interface Attachment {
+  mimeType: string;
+  data: string; // base64-encoded
+  filename?: string;
+}
+
 export interface StartChatParams {
   message: string;
   roleId: string;
   chatSessionId: string;
   selectedImageData?: string;
+  attachments?: Attachment[];
 }
 
 export type StartChatResult =

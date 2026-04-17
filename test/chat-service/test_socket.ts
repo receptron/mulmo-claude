@@ -128,11 +128,9 @@ describe("chat-service socket — no auth", () => {
 
     assert.deepEqual(ack, { ok: true, reply: "hello back" });
     assert.equal(harness.relayCalls.length, 1);
-    assert.deepEqual(harness.relayCalls[0], {
-      transportId: "cli",
-      externalChatId: "terminal",
-      text: "hi",
-    });
+    assert.equal(harness.relayCalls[0].transportId, "cli");
+    assert.equal(harness.relayCalls[0].externalChatId, "terminal");
+    assert.equal(harness.relayCalls[0].text, "hi");
 
     client.disconnect();
   });

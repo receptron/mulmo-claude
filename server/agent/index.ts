@@ -19,6 +19,7 @@ import {
   resolveMcpConfigPaths,
   userServerAllowedToolNames,
 } from "./config.js";
+import type { Attachment } from "../api/chat-service/types.js";
 import {
   parseStreamEvent,
   type AgentEvent,
@@ -128,7 +129,7 @@ export async function* runAgent(
   port: number,
   claudeSessionId?: string,
   abortSignal?: AbortSignal,
-  imageDataUrl?: string,
+  attachments?: Attachment[],
 ): AsyncGenerator<AgentEvent> {
   const activePlugins = getActivePlugins(role);
   const useDocker = await isDockerAvailable();
@@ -218,7 +219,7 @@ export async function* runAgent(
   // turns are coming. Writing before attaching the abort handler
   // is fine — if the write fails because the process already died
   // for other reasons, the `readAgentEvents` loop below surfaces it.
-  proc.stdin.write(buildUserMessageLine(message, imageDataUrl));
+  proc.stdin.write(buildUserMessageLine(message, attachments));
   proc.stdin.end();
 
   // If an abort signal is provided, kill the process when it fires.

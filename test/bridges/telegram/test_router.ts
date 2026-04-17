@@ -26,6 +26,9 @@ function stubApi(): TelegramApi & { sent: SentMessage[] } {
     async sendMessage(chatId, text) {
       sent.push({ chatId, text });
     },
+    async downloadPhoto() {
+      return "data:image/jpeg;base64,AAAA";
+    },
   };
 }
 
@@ -128,6 +131,64 @@ describe("router.handleMessage — allowed chat", () => {
     });
     await router.handleMessage(msg(42, "ping"));
     assert.deepEqual(api.sent, [{ chatId: 42, text: "(empty reply)" }]);
+  });
+
+  it("downloads photo and passes attachments when message has photo", async () => {
+    let receivedAttachments: unknown;
+    const sendCapture: SendToMulmoFn = async (_chatId, _text, attachments) => {
+      receivedAttachments = attachments;
+      return { ok: true, reply: "nice pic" };
+    };
+    const photoApi = stubApi();
+    const router = createMessageRouter({
+      api: photoApi,
+      allowlist: createAllowlist([42]),
+      sendToMulmo: sendCapture,
+      log: silentLog,
+    });
+    const photoMsg: TelegramMessage = {
+      message_id: 1,
+      chat: { id: 42, type: "private" },
+      from: { id: 1, is_bot: false, first_name: "A", username: "alice" },
+      date: 0,
+      photo: [
+        { file_id: "small", file_unique_id: "s", width: 90, height: 90 },
+        { file_id: "large", file_unique_id: "l", width: 800, height: 600 },
+      ],
+      caption: "look at this",
+    };
+    await router.handleMessage(photoMsg);
+    assert.ok(Array.isArray(receivedAttachments));
+    const atts = receivedAttachments as Array<{
+      mimeType: string;
+      data: string;
+    }>;
+    assert.equal(atts.length, 1);
+    assert.equal(atts[0].mimeType, "image/jpeg");
+    assert.equal(atts[0].data, "AAAA");
+  });
+
+  it("uses default text when photo has no caption", async () => {
+    let receivedText = "";
+    const sendCapture: SendToMulmoFn = async (_chatId, text) => {
+      receivedText = text;
+      return { ok: true, reply: "ok" };
+    };
+    const captionApi = stubApi();
+    const router = createMessageRouter({
+      api: captionApi,
+      allowlist: createAllowlist([42]),
+      sendToMulmo: sendCapture,
+      log: silentLog,
+    });
+    const photoMsg: TelegramMessage = {
+      message_id: 1,
+      chat: { id: 42, type: "private" },
+      date: 0,
+      photo: [{ file_id: "f", file_unique_id: "u", width: 100, height: 100 }],
+    };
+    await router.handleMessage(photoMsg);
+    assert.equal(receivedText, "What is this image?");
   });
 });
 

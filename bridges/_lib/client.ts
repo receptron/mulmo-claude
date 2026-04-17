@@ -35,6 +35,14 @@ export interface PushEvent {
   message: string;
 }
 
+/** Generic attachment — images, PDFs, documents, etc. The server
+ *  decides what to do with each based on mimeType. */
+export interface Attachment {
+  mimeType: string;
+  data: string; // base64
+  filename?: string;
+}
+
 export interface BridgeClientOptions {
   /** Required. Identifier for this bridge in the handshake.
    *  Matches `handshake.auth.transportId` server-side. */
@@ -45,7 +53,11 @@ export interface BridgeClientOptions {
 
 export interface BridgeClient {
   /** Send a user turn to MulmoClaude, wait for the assistant reply. */
-  send(externalChatId: string, text: string): Promise<MessageAck>;
+  send(
+    externalChatId: string,
+    text: string,
+    attachments?: Attachment[],
+  ): Promise<MessageAck>;
   /** Subscribe to server → bridge async pushes (Phase B of #268). */
   onPush(handler: (event: PushEvent) => void): void;
   /** Called each time the socket (re-)establishes a connection. */
@@ -91,7 +103,8 @@ export function createBridgeClient(opts: BridgeClientOptions): BridgeClient {
   installDefaultLogging(socket);
 
   return {
-    send: (externalChatId, text) => sendMessage(socket, externalChatId, text),
+    send: (externalChatId, text, attachments) =>
+      sendMessage(socket, externalChatId, text, attachments),
     onPush: (handler) => {
       socket.on(CHAT_SOCKET_EVENTS.push, handler);
     },
@@ -112,13 +125,16 @@ function sendMessage(
   socket: Socket,
   externalChatId: string,
   text: string,
+  attachments?: Attachment[],
 ): Promise<MessageAck> {
+  const payload: Record<string, unknown> = { externalChatId, text };
+  if (attachments && attachments.length > 0) payload.attachments = attachments;
   return new Promise((resolve) => {
     socket
       .timeout(REPLY_TIMEOUT_MS)
       .emit(
         CHAT_SOCKET_EVENTS.message,
-        { externalChatId, text },
+        payload,
         (err: Error | null, ack: MessageAck | undefined) => {
           if (err) {
             resolve({ ok: false, error: `timeout: ${err.message}` });

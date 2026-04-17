@@ -32,6 +32,7 @@ import {
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { env } from "../../system/env.js";
+import type { Attachment } from "../chat-service/types.js";
 
 const router = Router();
 const PORT = env.port;
@@ -119,6 +120,7 @@ export interface StartChatParams {
   roleId: string;
   chatSessionId: string;
   selectedImageData?: string;
+  attachments?: Attachment[];
 }
 
 export type StartChatResult =
@@ -128,7 +130,8 @@ export type StartChatResult =
 export async function startChat(
   params: StartChatParams,
 ): Promise<StartChatResult> {
-  const { message, roleId, chatSessionId, selectedImageData } = params;
+  const { message, roleId, chatSessionId, selectedImageData, attachments } =
+    params;
 
   if (!message || !roleId || !chatSessionId) {
     return {
@@ -249,10 +252,33 @@ export async function startChat(
     metaFilePath,
     requestStartedAt,
     toolArgsCache: createArgsCache(),
-    imageDataUrl: selectedImageData,
+    attachments: mergeAttachments(selectedImageData, attachments),
   });
 
   return { kind: "started", chatSessionId };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+/** Convert legacy `selectedImageData` (data URL from the Vue UI) into
+ *  the generic Attachment format, then merge with any explicitly-
+ *  provided attachments from the bridge protocol. Returns undefined
+ *  when there's nothing to attach. */
+function mergeAttachments(
+  selectedImageData: string | undefined,
+  explicit: Attachment[] | undefined,
+): Attachment[] | undefined {
+  const result: Attachment[] = [];
+  if (selectedImageData) {
+    const match = selectedImageData.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      result.push({ mimeType: match[1], data: match[2] });
+    }
+  }
+  if (explicit) {
+    result.push(...explicit);
+  }
+  return result.length > 0 ? result : undefined;
 }
 
 // ── HTTP route ──────────────────────────────────────────────────────
@@ -300,7 +326,7 @@ interface BackgroundRunParams {
   metaFilePath: string;
   requestStartedAt: number;
   toolArgsCache: ReturnType<typeof createArgsCache>;
-  imageDataUrl: string | undefined;
+  attachments: Attachment[] | undefined;
 }
 
 // Per-event side-effect context passed to `handleAgentEvent`.
@@ -382,7 +408,7 @@ async function runAgentInBackground(
     metaFilePath,
     requestStartedAt,
     toolArgsCache,
-    imageDataUrl,
+    attachments,
   } = params;
 
   const eventCtx: EventContext = {
@@ -411,7 +437,7 @@ async function runAgentInBackground(
         PORT,
         currentClaudeSessionId,
         abortSignal,
-        imageDataUrl,
+        attachments,
       )) {
         if (
           failoverAttemptsRemaining > 0 &&

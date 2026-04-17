@@ -99,7 +99,8 @@ async function main(): Promise<void> {
   const router = createMessageRouter({
     api,
     allowlist,
-    sendToMulmo: (chatId, text) => client.send(chatId, text),
+    sendToMulmo: (chatId, text, attachments) =>
+      client.send(chatId, text, attachments),
   });
 
   // Server → Telegram async push (Phase B of #268).

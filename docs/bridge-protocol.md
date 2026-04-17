@@ -124,6 +124,13 @@ Payload:
 - `text: string` — non-empty. The user's message, UTF-8. Trim
   leading / trailing whitespace yourself if you care; the server
   trims before dispatching.
+- `attachments?: Attachment[]` — optional array of file
+  attachments (#382). Each entry has `{ mimeType: string, data:
+  string, filename?: string }` where `data` is base64-encoded
+  content. The server filters by mimeType: `image/*` becomes
+  vision content blocks for Claude; other types are logged and
+  skipped for now. Multiple images are supported (one content
+  block per attachment).
 
 Ack shape:
 

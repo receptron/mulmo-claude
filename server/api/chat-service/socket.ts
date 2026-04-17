@@ -31,7 +31,7 @@ import { Server as SocketServer } from "socket.io";
 import type { Socket } from "socket.io";
 import type { RelayFn } from "./relay.js";
 import type { PushQueue } from "./push-queue.js";
-import type { Logger } from "./types.js";
+import type { Attachment, Logger } from "./types.js";
 
 export const CHAT_SOCKET_PATH = "/ws/chat";
 
@@ -85,6 +85,8 @@ interface HandshakeAuth {
 interface MessagePayload {
   externalChatId?: unknown;
   text?: unknown;
+  /** Array of `{ mimeType, data, filename? }` attachments (#382). */
+  attachments?: unknown;
 }
 
 type MessageAck =
@@ -92,7 +94,12 @@ type MessageAck =
   | { ok: false; error: string; status?: number };
 
 type ParsedMessage =
-  | { ok: true; externalChatId: string; text: string }
+  | {
+      ok: true;
+      externalChatId: string;
+      text: string;
+      attachments?: Attachment[];
+    }
   | { ok: false; error: string };
 
 type HandshakeResult =
@@ -184,6 +191,7 @@ export function attachChatSocket(
           transportId,
           externalChatId: parsed.externalChatId,
           text: parsed.text,
+          attachments: parsed.attachments,
         });
 
         if (result.kind === "ok") {
@@ -269,5 +277,28 @@ function parseMessagePayload(payload: MessagePayload): ParsedMessage {
   if (!text) {
     return { ok: false, error: "text is required" };
   }
-  return { ok: true, externalChatId, text };
+  const attachments = parseAttachments(payload.attachments);
+  return { ok: true, externalChatId, text, attachments };
+}
+
+function parseAttachments(raw: unknown): Attachment[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const valid: Attachment[] = [];
+  for (const item of raw) {
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as Record<string, unknown>).mimeType === "string" &&
+      typeof (item as Record<string, unknown>).data === "string"
+    ) {
+      const entry: Attachment = {
+        mimeType: (item as Record<string, unknown>).mimeType as string,
+        data: (item as Record<string, unknown>).data as string,
+      };
+      const fn = (item as Record<string, unknown>).filename;
+      if (typeof fn === "string" && fn.length > 0) entry.filename = fn;
+      valid.push(entry);
+    }
+  }
+  return valid.length > 0 ? valid : undefined;
 }
