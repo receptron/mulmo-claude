@@ -62,10 +62,21 @@ interface ToolDef {
   endpoint?: string; // absent for tools handled specially (e.g. switchRole)
 }
 
+// Combine `description` (one-liner) and `prompt` (detailed usage
+// instructions) into the MCP tool description so Claude CLI sees
+// both. The MCP protocol only has `description` — there's no
+// `prompt` field — so the prompt content must ride along in the
+// description string. The gui-chat-protocol ToolDefinition carries
+// `prompt` separately because the Vue client uses it for different
+// purposes, but the CLI needs it in-band.
 function fromPackage(def: ToolDefinition, endpoint: string): ToolDef {
+  const parts = [def.description];
+  if (typeof def.prompt === "string" && def.prompt.length > 0) {
+    parts.push(def.prompt);
+  }
   return {
     name: def.name,
-    description: def.description,
+    description: parts.join("\n\n"),
     inputSchema: def.parameters ?? {},
     endpoint,
   };
