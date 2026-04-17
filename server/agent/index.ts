@@ -21,7 +21,7 @@ import {
 } from "./config.js";
 import type { Attachment } from "../api/chat-service/types.js";
 import {
-  parseStreamEvent,
+  createStreamParser,
   type AgentEvent,
   type RawStreamEvent,
 } from "./stream.js";
@@ -75,6 +75,11 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
     }
   });
 
+  // Stateful parser tracks whether text was already streamed via
+  // assistant content blocks so the final `result` event's duplicate
+  // text is suppressed. See createStreamParser() in stream.ts.
+  const parser = createStreamParser();
+
   let buffer = "";
   for await (const chunk of proc.stdout) {
     buffer += (chunk as Buffer).toString();
@@ -89,7 +94,7 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
       } catch {
         continue;
       }
-      for (const agentEvent of parseStreamEvent(event)) {
+      for (const agentEvent of parser.parse(event)) {
         yield agentEvent;
       }
     }

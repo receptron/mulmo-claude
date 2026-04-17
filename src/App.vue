@@ -1473,6 +1473,25 @@ interface AgentEventContext {
   scrollSidebarToBottom: () => void;
 }
 
+// Try to append a text chunk to the last assistant text-response
+// result in the session. Returns true if appended, false if a new
+// result should be created instead. Extracted to keep
+// applyAgentEvent under the cognitive-complexity threshold.
+function appendToLastAssistantText(
+  session: ActiveSession,
+  text: string,
+): boolean {
+  const last = session.toolResults[session.toolResults.length - 1];
+  const lastData = last?.data as { role?: string; text?: string } | undefined;
+  if (last?.toolName !== "text-response" || lastData?.role !== "assistant") {
+    return false;
+  }
+  lastData.text = (lastData.text ?? "") + text;
+  last.message = (last.message ?? "") + text;
+  return true;
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing 15; streaming append adds 1
 async function applyAgentEvent(
   event: SseEvent,
   ctx: AgentEventContext,
@@ -1528,6 +1547,9 @@ async function applyAgentEvent(
         session.toolResults.push(makeTextResult(event.message, "user"));
         return;
       }
+      // Streaming: append to the last assistant text-response if one
+      // exists, rather than creating a new card per chunk.
+      if (appendToLastAssistantText(session, event.message)) return;
       const textResult = makeTextResult(event.message, "assistant");
       session.toolResults.push(textResult);
       if (shouldSelectAssistantText(session.toolResults, runStartIndex)) {
