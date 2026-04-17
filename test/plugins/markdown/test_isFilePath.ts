@@ -40,4 +40,24 @@ describe("markdown isFilePath", () => {
     assert.equal(isFilePath("MARKDOWNS/foo.md"), false);
     assert.equal(isFilePath("Markdowns/foo.md"), false);
   });
+
+  // Post-#284 canonical path (artifacts/documents/) — PR #348 added
+  // dual-prefix support; these tests guard the new path.
+  it("accepts post-#284 canonical path (artifacts/documents/)", () => {
+    assert.equal(isFilePath("artifacts/documents/abc.md"), true);
+  });
+
+  it("accepts nested paths under artifacts/documents/", () => {
+    assert.equal(isFilePath("artifacts/documents/sub/deep.md"), true);
+  });
+
+  it("rejects artifacts/documents/ with non-.md extension", () => {
+    assert.equal(isFilePath("artifacts/documents/foo.txt"), false);
+    assert.equal(isFilePath("artifacts/documents/foo"), false);
+  });
+
+  it("rejects artifacts/ without documents/ subdirectory", () => {
+    assert.equal(isFilePath("artifacts/foo.md"), false);
+    assert.equal(isFilePath("artifacts/spreadsheets/foo.md"), false);
+  });
 });
