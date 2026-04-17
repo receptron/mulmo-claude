@@ -767,6 +767,13 @@ const LAUNCHER_INVOKE_SPECS: Record<
     toolName: "manageWiki",
     defaultTitle: "Wiki",
   },
+  roles: {
+    endpoint: API_ROUTES.roles.manage,
+    method: "POST",
+    body: { action: "list" },
+    toolName: "manageRoles",
+    defaultTitle: "Roles",
+  },
 };
 
 type LauncherInvokeKey = keyof typeof LAUNCHER_INVOKE_SPECS;

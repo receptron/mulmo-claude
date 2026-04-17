@@ -33,7 +33,7 @@ export type PluginLauncherKind =
 
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
-  key: "todos" | "scheduler" | "skills" | "wiki" | "files";
+  key: "todos" | "scheduler" | "skills" | "wiki" | "roles" | "files";
   kind: PluginLauncherKind;
   /** Material-icons glyph. */
   icon: string;
@@ -71,6 +71,13 @@ const TARGETS: PluginLauncherTarget[] = [
     icon: "menu_book",
     label: "Wiki",
     title: "Open wiki",
+  },
+  {
+    key: "roles",
+    kind: "invoke",
+    icon: "manage_accounts",
+    label: "Roles",
+    title: "Open roles",
   },
   {
     key: "files",
