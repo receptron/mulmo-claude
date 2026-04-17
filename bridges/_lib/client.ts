@@ -13,7 +13,11 @@
 // minimal non-Node equivalent.
 
 import { io, type Socket } from "socket.io-client";
-import { CHAT_SOCKET_EVENTS } from "../../server/api/chat-service/socket.js";
+import {
+  CHAT_SOCKET_EVENTS,
+  CHAT_SOCKET_PATH,
+  type Attachment,
+} from "@mulmobridge/types";
 import { readBridgeToken, TOKEN_FILE_PATH } from "./token.js";
 
 // 6 min > the server's REPLY_TIMEOUT_MS (5 min) so the server's
@@ -21,7 +25,6 @@ import { readBridgeToken, TOKEN_FILE_PATH } from "./token.js";
 const REPLY_TIMEOUT_MS = 6 * 60 * 1000;
 
 const DEFAULT_API_URL = "http://localhost:3001";
-const CHAT_SOCKET_PATH = "/ws/chat";
 
 export interface MessageAck {
   ok: boolean;
@@ -35,10 +38,7 @@ export interface PushEvent {
   message: string;
 }
 
-// Attachment type is defined in server/api/chat-service/types.ts.
-// Consumers import it directly from there — no re-export here
-// (CLAUDE.md rule). See also bridges/_lib/mime.ts for MIME helpers.
-import type { Attachment } from "../../server/api/chat-service/types.js";
+// Attachment type imported from @mulmobridge/types above.
 
 export interface BridgeClientOptions {
   /** Required. Identifier for this bridge in the handshake.

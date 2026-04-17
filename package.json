@@ -5,6 +5,7 @@
   "type": "module",
   "author": "snakajima",
   "license": "AGPL-3.0-only",
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "concurrently -n server,client -k \"npm run server\" \"sleep 2 && vite\"",
     "dev:debug": "concurrently -n server,client -k \"npm run server:debug\" \"sleep 2 && vite\"",

@@ -1,0 +1,20 @@
+{
+  "name": "@mulmobridge/types",
+  "version": "0.1.0",
+  "description": "Shared types and constants for the MulmoBridge protocol",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "AGPL-3.0-only"
+}
