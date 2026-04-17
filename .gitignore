@@ -6,5 +6,6 @@ dist
 *~
 server/system/logs/
 server/logs/
-.claude/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 playwright-report/
