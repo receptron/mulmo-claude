@@ -38,8 +38,6 @@ export interface PushEvent {
   message: string;
 }
 
-// Attachment type imported from @mulmobridge/protocol above.
-
 export interface BridgeClientOptions {
   /** Required. Identifier for this bridge in the handshake.
    *  Matches `handshake.auth.transportId` server-side. */
