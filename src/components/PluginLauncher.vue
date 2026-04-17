@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="rootRef"
     class="flex border border-gray-300 rounded overflow-hidden text-xs"
     data-testid="plugin-launcher"
   >
@@ -12,12 +13,14 @@
       @click="emit('navigate', target)"
     >
       <span class="material-icons text-sm">{{ target.icon }}</span>
-      <span>{{ target.label }}</span>
+      <span v-if="!compact">{{ target.label }}</span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from "vue";
+
 // Quick-access toolbar sitting above the canvas. Each button either
 // invokes a plugin locally (no LLM round-trip) and surfaces its
 // native View, or — for "files" — switches the canvas to the
@@ -33,7 +36,7 @@ export type PluginLauncherKind =
 
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
-  key: "todos" | "scheduler" | "skills" | "wiki" | "files";
+  key: "todos" | "scheduler" | "skills" | "wiki" | "roles" | "files";
   kind: PluginLauncherKind;
   /** Material-icons glyph. */
   icon: string;
@@ -73,6 +76,13 @@ const TARGETS: PluginLauncherTarget[] = [
     title: "Open wiki",
   },
   {
+    key: "roles",
+    kind: "invoke",
+    icon: "manage_accounts",
+    label: "Roles",
+    title: "Open roles",
+  },
+  {
     key: "files",
     kind: "files",
     icon: "folder",
@@ -84,4 +94,31 @@ const TARGETS: PluginLauncherTarget[] = [
 const emit = defineEmits<{
   navigate: [target: PluginLauncherTarget];
 }>();
+
+// Compact mode (icons only) kicks in when the toolbar's parent row
+// is narrower than this threshold. Tuned against the six labelled
+// buttons + the canvas-view toggle sharing one row.
+const COMPACT_BREAKPOINT_PX = 640;
+
+const rootRef = ref<HTMLElement | null>(null);
+const compact = ref(false);
+let observer: ResizeObserver | null = null;
+
+onMounted(() => {
+  const parent = rootRef.value?.parentElement;
+  if (!parent) return;
+  const update = (width: number) => {
+    compact.value = width < COMPACT_BREAKPOINT_PX;
+  };
+  update(parent.clientWidth);
+  observer = new ResizeObserver((entries) => {
+    for (const entry of entries) update(entry.contentRect.width);
+  });
+  observer.observe(parent);
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+});
 </script>

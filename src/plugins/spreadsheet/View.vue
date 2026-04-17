@@ -214,7 +214,8 @@ const resolvedSheets = ref<SpreadsheetSheet[]>([]);
 function isFilePath(value: unknown): value is string {
   return (
     typeof value === "string" &&
-    value.startsWith("spreadsheets/") &&
+    (value.startsWith("artifacts/spreadsheets/") ||
+      value.startsWith("spreadsheets/")) &&
     value.endsWith(".json")
   );
 }
@@ -267,7 +268,10 @@ fetchSheets().then(() => {
 async function persistSheets(sheets: SpreadsheetSheet[]): Promise<void> {
   const raw = props.selectedResult.data?.sheets;
   if (isFilePath(raw)) {
-    const filename = raw.replace(/^spreadsheets\//, "");
+    const filename = raw.replace(
+      /^(artifacts\/spreadsheets|spreadsheets)\//,
+      "",
+    );
     const result = await apiPut<unknown>(
       API_ROUTES.plugins.updateSpreadsheet.replace(":filename", filename),
       {

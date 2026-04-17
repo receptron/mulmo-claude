@@ -27,6 +27,7 @@ import {
   isSpreadsheetPath,
 } from "../../utils/spreadsheet-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 
 const router = Router();
 
@@ -182,7 +183,7 @@ router.put(
     req: Request<{ filename: string }, unknown, UpdateMarkdownBody>,
     res: Response<UpdateMarkdownResponse | UpdateMarkdownError>,
   ) => {
-    const relativePath = `markdowns/${req.params.filename}`;
+    const relativePath = `${WORKSPACE_DIRS.markdowns}/${req.params.filename}`;
     const { markdown } = req.body;
     if (!markdown) {
       badRequest(res, "markdown is required");
@@ -240,7 +241,7 @@ router.put(
     req: Request<{ filename: string }, unknown, UpdateSpreadsheetBody>,
     res: Response<UpdateSpreadsheetResponse | UpdateSpreadsheetError>,
   ) => {
-    const relativePath = `spreadsheets/${req.params.filename}`;
+    const relativePath = `${WORKSPACE_DIRS.spreadsheets}/${req.params.filename}`;
     const { sheets } = req.body;
     if (!Array.isArray(sheets)) {
       badRequest(res, "sheets must be an array");

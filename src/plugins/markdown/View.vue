@@ -248,7 +248,7 @@ async function applyMarkdown() {
   // If file-based, save to server
   if (isFilePath(raw)) {
     saving.value = true;
-    const filename = raw.replace(/^markdowns\//, "");
+    const filename = raw.replace(/^(artifacts\/documents|markdowns)\//, "");
     const result = await apiPut<unknown>(
       API_ROUTES.plugins.updateMarkdown.replace(":filename", filename),
       {
