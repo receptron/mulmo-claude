@@ -78,6 +78,8 @@ export const WORKSPACE_DIRS = {
   // prompt hint.
   wikiPages: "data/wiki/pages",
   wikiSources: "data/wiki/sources",
+  // Development — git-cloned repositories (#256).
+  github: "github",
 } as const;
 
 // Well-known individual files. Values are workspace-relative paths.
@@ -138,6 +140,7 @@ export const WORKSPACE_PATHS = {
   htmls: path.join(workspacePath, WORKSPACE_DIRS.htmls),
   html: path.join(workspacePath, WORKSPACE_DIRS.html),
   transports: path.join(workspacePath, WORKSPACE_DIRS.transports),
+  github: path.join(workspacePath, WORKSPACE_DIRS.github),
   // nested subdirs
   wikiPages: path.join(workspacePath, WORKSPACE_DIRS.wikiPages),
   wikiSources: path.join(workspacePath, WORKSPACE_DIRS.wikiSources),
@@ -174,4 +177,5 @@ export const EAGER_WORKSPACE_DIRS: readonly WorkspaceDirKey[] = [
   "spreadsheets",
   "charts",
   "configs",
+  "github",
 ];
