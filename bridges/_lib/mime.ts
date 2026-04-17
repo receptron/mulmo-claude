@@ -42,6 +42,18 @@ export function isImageMime(mimeType: string): boolean {
   return mimeType.startsWith("image/");
 }
 
+/** True when the MIME type is a PDF document Claude can read natively
+ *  via `type: "document"` content blocks. */
+export function isPdfMime(mimeType: string): boolean {
+  return mimeType === "application/pdf";
+}
+
+/** True when the attachment can be sent to Claude as a content block
+ *  (image vision or PDF document). */
+export function isSupportedAttachmentMime(mimeType: string): boolean {
+  return isImageMime(mimeType) || isPdfMime(mimeType);
+}
+
 export interface ParsedDataUrl {
   mimeType: string;
   data: string; // base64

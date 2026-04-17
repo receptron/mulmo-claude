@@ -6,7 +6,11 @@ import { MCP_PLUGIN_NAMES } from "./plugin-names.js";
 import type { McpServerSpec } from "../system/config.js";
 import { getCurrentToken } from "../api/auth/token.js";
 import type { Attachment } from "../api/chat-service/types.js";
-import { isImageMime } from "../../bridges/_lib/mime.js";
+import {
+  isImageMime,
+  isPdfMime,
+  isSupportedAttachmentMime,
+} from "../../bridges/_lib/mime.js";
 
 export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 
@@ -286,36 +290,31 @@ export function buildCliArgs(params: CliArgsParams): string[] {
 /** JSON line to write to the Claude CLI's stdin when running in
  *  stream-json input mode. One line per user turn.
  *
- *  When `attachments` are provided, image/* entries become vision
- *  content blocks and `content` becomes an array. Without
- *  attachments, content is a plain string (smaller, backward-
- *  compatible). Non-image MIME types are currently skipped — a
- *  future phase can map PDF/docx to Claude Files API. */
+ *  Supported attachment types:
+ *  - `image/*` → vision content blocks (`type: "image"`)
+ *  - `application/pdf` → document content blocks (`type: "document"`)
+ *  - Other MIME types (docx, pptx, video, …) → skipped with a
+ *    console hint. A future phase can add conversion pipelines.
+ *
+ *  Without attachments, content is a plain string (smaller,
+ *  backward-compatible). */
 export function buildUserMessageLine(
   message: string,
   attachments?: Attachment[],
 ): string {
   const all = attachments ?? [];
-  const imageAttachments = all.filter((a) => isImageMime(a.mimeType));
-  const skipped = all.length - imageAttachments.length;
+  const supported = all.filter((a) => isSupportedAttachmentMime(a.mimeType));
+  const skipped = all.length - supported.length;
   if (skipped > 0) {
-    // Non-image attachments (PDF, docx, etc.) are not yet supported
-    // by the vision content-block path. Log so operators can see
-    // "I attached a PDF and nothing happened" in the file log.
     const skippedTypes = all
-      .filter((a) => !isImageMime(a.mimeType))
+      .filter((a) => !isSupportedAttachmentMime(a.mimeType))
       .map((a) => a.mimeType);
-    // Using console.error as a lightweight debug hint — the
-    // structured logger isn't imported here (config.ts is import-
-    // light by design). The relay layer logs the full summary.
     console.error(
-      `[agent] skipping ${skipped} non-image attachment(s): ${skippedTypes.join(", ")}`,
+      `[agent] skipping ${skipped} unsupported attachment(s): ${skippedTypes.join(", ")}`,
     );
   }
   const content =
-    imageAttachments.length > 0
-      ? buildContentBlocks(message, imageAttachments)
-      : message;
+    supported.length > 0 ? buildContentBlocks(message, supported) : message;
   return (
     JSON.stringify({
       type: "user",
@@ -326,18 +325,29 @@ export function buildUserMessageLine(
 
 function buildContentBlocks(
   message: string,
-  images: Attachment[],
+  attachments: Attachment[],
 ): Array<Record<string, unknown>> {
   const blocks: Array<Record<string, unknown>> = [];
-  for (const img of images) {
-    blocks.push({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: img.mimeType,
-        data: img.data,
-      },
-    });
+  for (const att of attachments) {
+    if (isImageMime(att.mimeType)) {
+      blocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: att.mimeType,
+          data: att.data,
+        },
+      });
+    } else if (isPdfMime(att.mimeType)) {
+      blocks.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: att.mimeType,
+          data: att.data,
+        },
+      });
+    }
   }
   blocks.push({ type: "text", text: message });
   return blocks;

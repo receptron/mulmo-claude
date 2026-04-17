@@ -223,21 +223,23 @@
       <div
         class="p-4 border-t border-gray-200"
         @dragover.prevent
-        @drop="onDropImage"
+        @drop="onDropFile"
       >
         <div
-          v-if="imageError"
+          v-if="fileError"
           class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5"
-          data-testid="image-error"
+          data-testid="file-error"
         >
-          {{ imageError }}
+          {{ fileError }}
         </div>
-        <ChatImagePreview
-          v-if="pastedImage"
-          :src="pastedImage"
-          @remove="pastedImage = null"
+        <ChatAttachmentPreview
+          v-if="pastedFile"
+          :data-url="pastedFile.dataUrl"
+          :filename="pastedFile.name"
+          :mime="pastedFile.mime"
+          @remove="pastedFile = null"
         />
-        <div class="flex gap-2" :class="{ 'mt-2': pastedImage }">
+        <div class="flex gap-2" :class="{ 'mt-2': pastedFile }">
           <textarea
             ref="textareaRef"
             v-model="userInput"
@@ -252,7 +254,7 @@
             @compositionend="imeEnter.onCompositionEnd"
             @keydown="imeEnter.onKeydown"
             @blur="onInputBlur"
-            @paste="onPasteImage"
+            @paste="onPasteFile"
           />
           <div class="flex flex-col gap-1">
             <button
@@ -436,7 +438,7 @@ import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
-import ChatImagePreview from "./components/ChatImagePreview.vue";
+import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
 import type { SseEvent } from "./types/sse";
 import {
   type SessionSummary,
@@ -714,48 +716,61 @@ const unreadCount = computed(
 const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
 const userInput = ref("");
-const pastedImage = ref<string | null>(null);
-const imageError = ref<string | null>(null);
+const pastedFile = ref<{ dataUrl: string; name: string; mime: string } | null>(
+  null,
+);
+const fileError = ref<string | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB base64 limit
+const MAX_ATTACH_BYTES = 30 * 1024 * 1024; // 30 MB (PDF can be larger than images)
+const ACCEPTED_MIME_PREFIXES = ["image/", "application/pdf"];
 
-function readImageFile(file: File): void {
-  imageError.value = null;
-  if (!file.type.startsWith("image/")) return;
-  if (file.size > MAX_IMAGE_BYTES) {
+function isAcceptedType(mime: string): boolean {
+  return ACCEPTED_MIME_PREFIXES.some(
+    (p) => mime === p || mime.startsWith(p.endsWith("/") ? p : p + "/"),
+  );
+}
+
+function readAttachmentFile(file: File): void {
+  fileError.value = null;
+  if (!isAcceptedType(file.type)) return;
+  if (file.size > MAX_ATTACH_BYTES) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-    imageError.value = `Image too large (${sizeMB} MB). Maximum is 10 MB.`;
+    fileError.value = `File too large (${sizeMB} MB). Maximum is 30 MB.`;
     return;
   }
   const reader = new FileReader();
   reader.onload = () => {
     if (typeof reader.result === "string") {
-      pastedImage.value = reader.result;
+      pastedFile.value = {
+        dataUrl: reader.result,
+        name: file.name,
+        mime: file.type,
+      };
     }
   };
   reader.readAsDataURL(file);
 }
 
-function onPasteImage(e: ClipboardEvent): void {
+function onPasteFile(e: ClipboardEvent): void {
   const items = e.clipboardData?.items;
   if (!items) return;
   for (const item of items) {
-    if (item.type.startsWith("image/")) {
+    if (isAcceptedType(item.type)) {
       const file = item.getAsFile();
       if (file) {
         e.preventDefault();
-        readImageFile(file);
+        readAttachmentFile(file);
         return;
       }
     }
   }
 }
 
-function onDropImage(e: DragEvent): void {
+function onDropFile(e: DragEvent): void {
   e.preventDefault();
   const file = e.dataTransfer?.files[0];
-  if (file) readImageFile(file);
+  if (file) readAttachmentFile(file);
 }
 
 const imeEnter = useImeAwareEnter(() => sendMessage());
@@ -1547,8 +1562,8 @@ async function sendMessage(text?: string) {
   const message = typeof text === "string" ? text : userInput.value.trim();
   if (!message || isRunning.value) return;
   userInput.value = "";
-  const imageSnapshot = pastedImage.value;
-  pastedImage.value = null;
+  const fileSnapshot = pastedFile.value;
+  pastedFile.value = null;
 
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
@@ -1573,7 +1588,8 @@ async function sendMessage(text?: string) {
           message,
           role: sessionRole,
           chatSessionId: session.id,
-          selectedImageData: imageSnapshot ?? extractImageData(selectedRes),
+          selectedImageData:
+            fileSnapshot?.dataUrl ?? extractImageData(selectedRes),
         }),
       ),
       headers: { "Content-Type": "application/json" },

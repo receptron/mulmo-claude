@@ -571,27 +571,39 @@ describe("buildUserMessageLine", () => {
     assert.equal(typeof parsed.message.content, "string");
   });
 
-  it("skips non-image attachments (PDF etc.) for now", () => {
+  it("sends PDF as a document content block", () => {
     const line = buildUserMessageLine("read this", [
       { mimeType: "application/pdf", data: "JVBERi0x" },
     ]);
     const parsed = JSON.parse(line.trimEnd());
-    // No image content blocks → plain string fallback
-    assert.equal(typeof parsed.message.content, "string");
-    assert.equal(parsed.message.content, "read this");
+    const blocks = parsed.message.content;
+    assert.equal(blocks.length, 2);
+    assert.equal(blocks[0].type, "document");
+    assert.equal(blocks[0].source.media_type, "application/pdf");
+    assert.equal(blocks[0].source.data, "JVBERi0x");
+    assert.equal(blocks[1].type, "text");
+    assert.equal(blocks[1].text, "read this");
   });
 
-  it("includes only image attachments when mixed types are present", () => {
+  it("includes image and PDF attachments, skips unsupported types", () => {
     const line = buildUserMessageLine("analyze", [
       { mimeType: "image/jpeg", data: "/9j/4AAQ" },
       { mimeType: "application/pdf", data: "JVBERi0x" },
+      {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        data: "UEs=",
+      },
     ]);
     const parsed = JSON.parse(line.trimEnd());
     const blocks = parsed.message.content;
-    // 1 image + 1 text (PDF skipped)
-    assert.equal(blocks.length, 2);
+    // image + document (PDF) + text; docx skipped
+    assert.equal(blocks.length, 3);
+    assert.equal(blocks[0].type, "image");
     assert.equal(blocks[0].source.media_type, "image/jpeg");
-    assert.equal(blocks[1].type, "text");
+    assert.equal(blocks[1].type, "document");
+    assert.equal(blocks[1].source.media_type, "application/pdf");
+    assert.equal(blocks[2].type, "text");
   });
 });
 
