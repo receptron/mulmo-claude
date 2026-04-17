@@ -27,16 +27,18 @@
             @click="toggleHistory"
           >
             <span class="material-icons">history</span>
-            <!-- Active sessions badge -->
+            <!-- Active sessions badge (yellow, left) -->
             <span
               v-if="activeSessionCount > 0"
-              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+              :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
               >{{ activeSessionCount }}</span
             >
-            <!-- Unread replies badge -->
+            <!-- Unread replies badge (red, right) -->
             <span
               v-if="unreadCount > 0"
-              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+              :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
               >{{ unreadCount }}</span
             >
           </button>
@@ -252,7 +254,11 @@
       <div
         class="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0 gap-2"
       >
-        <PluginLauncher @navigate="onPluginNavigate" />
+        <PluginLauncher
+          :active-tool-name="selectedResult?.toolName ?? null"
+          :active-view-mode="canvasViewMode"
+          @navigate="onPluginNavigate"
+        />
         <CanvasViewToggle
           :model-value="canvasViewMode"
           @update:model-value="setCanvasViewMode"

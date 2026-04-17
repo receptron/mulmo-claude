@@ -311,8 +311,8 @@ router.get(
 router.post(
   API_ROUTES.sessions.markRead,
   async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
-    const ok = await markRead(req.params.id);
-    res.json({ ok });
+    await markRead(req.params.id);
+    res.json({ ok: true });
   },
 );
 
