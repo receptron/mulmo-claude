@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import {
   createSessionMeta,
   backfillFirstUserMessage as backfillMeta,
+  readSessionMetaFull,
   readSessionMeta,
   setClaudeSessionId as setClaudeId,
   clearClaudeSessionId as clearClaudeId,
@@ -152,13 +153,18 @@ export async function startChat(
   ensureChatDir();
   const resultsFilePath = sessionJsonlAbsPath(chatSessionId);
 
-  // Check whether this is a brand-new session and read persisted
-  // hasUnread in one read. readSessionMeta returns null if the meta
-  // file doesn't exist yet (= first turn).
-  const existingMeta = await readSessionMeta(chatSessionId);
-  const isFirstTurn = existingMeta === null;
+  // Discriminate missing (first turn) from corrupt (warn, don't clobber).
+  const metaResult = await readSessionMetaFull(chatSessionId);
+  const isFirstTurn = metaResult.kind === "missing";
+  if (metaResult.kind === "corrupt") {
+    log.warn("agent", "session meta is corrupt — treating as existing", {
+      chatSessionId,
+    });
+  }
   const persistedHasUnread =
-    existingMeta?.hasUnread === true ? true : undefined;
+    metaResult.kind === "ok" && metaResult.meta.hasUnread === true
+      ? true
+      : undefined;
 
   const now = new Date().toISOString();
   getOrCreateSession(chatSessionId, {

@@ -42,17 +42,33 @@ export interface SessionMeta {
   [key: string]: unknown;
 }
 
+export type ReadMetaResult =
+  | { kind: "missing" }
+  | { kind: "ok"; meta: SessionMeta }
+  | { kind: "corrupt"; raw: string };
+
+/** Read session metadata with full outcome discrimination. */
+export async function readSessionMetaFull(
+  id: string,
+  r?: string,
+): Promise<ReadMetaResult> {
+  const raw = await readTextUnder(root(r), metaRel(id));
+  if (raw === null) return { kind: "missing" };
+  try {
+    return { kind: "ok", meta: JSON.parse(raw) as SessionMeta };
+  } catch {
+    return { kind: "corrupt", raw };
+  }
+}
+
+/** Convenience: returns the meta or null. Treats corrupt as null
+ *  (callers that need to distinguish use readSessionMetaFull). */
 export async function readSessionMeta(
   id: string,
   r?: string,
 ): Promise<SessionMeta | null> {
-  const raw = await readTextUnder(root(r), metaRel(id));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as SessionMeta;
-  } catch {
-    return null;
-  }
+  const result = await readSessionMetaFull(id, r);
+  return result.kind === "ok" ? result.meta : null;
 }
 
 export async function writeSessionMeta(
