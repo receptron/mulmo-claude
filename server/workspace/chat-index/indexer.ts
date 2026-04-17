@@ -22,7 +22,7 @@ import {
   sessionMetaPathFor,
 } from "./paths.js";
 import type { ChatIndexEntry, ChatIndexManifest } from "./types.js";
-import { writeJsonAtomic } from "../../utils/file.js";
+import { writeJsonAtomic } from "../../utils/files/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
 
 // Freshness throttle: a session whose existing index entry is

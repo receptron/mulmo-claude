@@ -22,7 +22,7 @@ import {
 } from "mulmocast";
 import type { MulmoBeat, MulmoImagePromptMedia } from "@mulmocast/types";
 import { slugify } from "../../utils/slug.js";
-import { resolveWithinRoot } from "../../utils/fs.js";
+import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
 import { log } from "../../system/logger/index.js";

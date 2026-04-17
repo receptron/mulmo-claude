@@ -12,7 +12,7 @@ import fsp from "node:fs/promises";
 import { defaultSourceState, type SourceState } from "./types.js";
 import { isValidSlug, sourceStatePath } from "./paths.js";
 import { errorMessage } from "../../utils/errors.js";
-import { writeJsonAtomic } from "../../utils/file.js";
+import { writeJsonAtomic } from "../../utils/files/index.js";
 
 // Shallow-parse + type-guard one state record. Returns a
 // default state (zeroed counters, empty cursor) when the file

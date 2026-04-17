@@ -42,7 +42,7 @@ import {
 } from "./diff.js";
 import { rewriteWorkspaceLinks } from "./linkRewrite.js";
 import { writeState, type JournalState } from "./state.js";
-import { readTextOrNull } from "../../utils/fs.js";
+import { readTextOrNull } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 

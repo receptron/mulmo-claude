@@ -15,7 +15,7 @@ import path from "node:path";
 import { archivePath, dailyNewsPath } from "../paths.js";
 import { errorMessage } from "../../../utils/errors.js";
 import type { SourceItem } from "../types.js";
-import { writeFileAtomic } from "../../../utils/file.js";
+import { writeFileAtomic } from "../../../utils/files/index.js";
 
 // --- JSON index --------------------------------------------------------
 

@@ -15,7 +15,7 @@ import { unlink, rmdir } from "node:fs/promises";
 import { discoverSkills } from "./discovery.js";
 import { isValidSlug, projectSkillDir, projectSkillPath } from "./paths.js";
 import { log } from "../../system/logger/index.js";
-import { writeFileAtomic } from "../../utils/file.js";
+import { writeFileAtomic } from "../../utils/files/index.js";
 
 export interface SaveSkillInput {
   /** Workspace root (typically `~/mulmoclaude`). */

@@ -47,7 +47,7 @@ import {
 } from "./types.js";
 import { normalizeCategories } from "./taxonomy.js";
 import type { CategorySlug } from "./taxonomy.js";
-import { writeFileAtomic } from "../../utils/file.js";
+import { writeFileAtomic } from "../../utils/files/index.js";
 import { isValidSlug, sourceFilePath, sourcesRoot } from "./paths.js";
 import { log } from "../../system/logger/index.js";
 

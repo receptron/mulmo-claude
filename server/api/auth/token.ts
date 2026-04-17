@@ -22,7 +22,7 @@
 
 import { randomBytes } from "crypto";
 import fs from "fs";
-import { writeFileAtomic } from "../../utils/file.js";
+import { writeFileAtomic } from "../../utils/files/index.js";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { log } from "../../system/logger/index.js";
 

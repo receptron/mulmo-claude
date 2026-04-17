@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isSpreadsheetPath } from "../../server/utils/spreadsheet-store.js";
+import { isSpreadsheetPath } from "../../server/utils/files/spreadsheet-store.js";
 
 describe("isSpreadsheetPath", () => {
   it("accepts a canonical path", () => {

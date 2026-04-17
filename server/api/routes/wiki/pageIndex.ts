@@ -8,7 +8,7 @@
 // Eliminates the sync `readdirSync` + linear `find()` in the old
 // `resolvePagePath` — see #201.
 
-import { readDirSafeAsync, statSafeAsync } from "../../../utils/fs.js";
+import { readDirSafeAsync, statSafeAsync } from "../../../utils/files/safe.js";
 
 export interface PageIndex {
   mtimeMs: number;

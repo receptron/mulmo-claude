@@ -8,7 +8,7 @@ import {
   readDirSafe,
   readTextOrNull,
   resolveWithinRoot,
-} from "../../server/utils/fs.js";
+} from "../../server/utils/files/safe.js";
 
 // Each test gets its own scratch dir so they can run in parallel and
 // don't have to clean up after each other. We realpath the dir up

@@ -9,7 +9,7 @@ import {
   writeFileAtomic,
   writeJsonAtomic,
   readJsonOrNull,
-} from "../../server/utils/file.ts";
+} from "../../server/utils/files/index.js";
 
 let tmpDir = "";
 

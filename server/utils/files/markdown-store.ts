@@ -1,8 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
-import { workspacePath } from "../workspace/workspace.js";
-import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../workspace/paths.js";
+import { workspacePath } from "../../workspace/workspace.js";
+import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 
 /** Save markdown content as a file. Returns the workspace-relative path. */
 export async function saveMarkdown(content: string): Promise<string> {

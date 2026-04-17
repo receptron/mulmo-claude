@@ -12,7 +12,7 @@ import {
   loadImageBase64,
   stripDataUri,
   isImagePath,
-} from "../../utils/image-store.js";
+} from "../../utils/files/image-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();

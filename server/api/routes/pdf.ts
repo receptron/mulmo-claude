@@ -7,7 +7,7 @@ import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
-import { resolveWithinRoot } from "../../utils/fs.js";
+import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 

@@ -12,7 +12,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { summariesRoot, STATE_FILE } from "./paths.js";
 import { log } from "../../system/logger/index.js";
-import { writeJsonAtomic } from "../../utils/file.js";
+import { writeJsonAtomic } from "../../utils/files/index.js";
 
 // Bump this when the schema changes in a backwards-incompatible way.
 // Older state files are treated as corrupted and replaced with a

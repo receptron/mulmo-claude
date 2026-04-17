@@ -15,17 +15,17 @@ import {
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { log } from "../../system/logger/index.js";
-import { saveImage } from "../../utils/image-store.js";
+import { saveImage } from "../../utils/files/image-store.js";
 import {
   saveMarkdown,
   overwriteMarkdown,
   isMarkdownPath,
-} from "../../utils/markdown-store.js";
+} from "../../utils/files/markdown-store.js";
 import {
   saveSpreadsheet,
   overwriteSpreadsheet,
   isSpreadsheetPath,
-} from "../../utils/spreadsheet-store.js";
+} from "../../utils/files/spreadsheet-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 

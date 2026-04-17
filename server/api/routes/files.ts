@@ -7,7 +7,7 @@ import {
   statSafeAsync,
   readDirSafeAsync,
   resolveWithinRoot,
-} from "../../utils/fs.js";
+} from "../../utils/files/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import {
   badRequest,
