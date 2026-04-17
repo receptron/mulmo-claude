@@ -46,45 +46,38 @@ const defaultLog = {
   error: (m: string) => console.error(m),
 };
 
+interface PhotoResult {
+  attachments: Attachment[];
+  failed: boolean;
+}
+
 export function createMessageRouter(deps: RouterDeps): MessageRouter {
   const { api, allowlist, sendToMulmo } = deps;
   const log = deps.log ?? defaultLog;
 
   // One denial reply per chat per bridge lifetime — restart clears.
-  // Prevents a sender from spamming the operator (and Telegram's
-  // rate limits) by repeatedly messaging a denied bot.
   const deniedAlreadyNotified = new Set<number>();
 
-  async function handleAllowed(msg: TelegramMessage): Promise<void> {
-    const chatId = msg.chat.id;
-    const text = msg.text ?? msg.caption ?? "";
+  async function tryDownloadPhoto(msg: TelegramMessage): Promise<PhotoResult> {
     const hasPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;
-    if (text.trim().length === 0 && !hasPhoto) return;
-    const user = userLabel(msg);
-    log.info(
-      `[telegram] accepted chat=${chatId} user=@${user} len=${text.length}${hasPhoto ? " +photo" : ""}`,
-    );
-
-    const attachments: Attachment[] = [];
-    if (hasPhoto) {
-      const largest = msg.photo![msg.photo!.length - 1];
-      try {
-        const dataUrl = await api.downloadPhoto(largest.file_id);
-        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          attachments.push({ mimeType: match[1], data: match[2] });
-        }
-      } catch (err) {
-        log.error(`[telegram] photo download failed: ${String(err)}`);
+    if (!hasPhoto) return { attachments: [], failed: false };
+    const largest = msg.photo![msg.photo!.length - 1];
+    try {
+      const dataUrl = await api.downloadPhoto(largest.file_id);
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        return {
+          attachments: [{ mimeType: match[1], data: match[2] }],
+          failed: false,
+        };
       }
+    } catch (err) {
+      log.error(`[telegram] photo download failed: ${String(err)}`);
     }
+    return { attachments: [], failed: true };
+  }
 
-    const messageText = text.trim().length > 0 ? text : "What is this image?";
-    const ack = await sendToMulmo(
-      String(chatId),
-      messageText,
-      attachments.length > 0 ? attachments : undefined,
-    );
+  async function sendReply(chatId: number, ack: MessageAck): Promise<void> {
     if (ack.ok) {
       await sendChunked(api, chatId, ack.reply ?? "");
     } else {
@@ -97,11 +90,43 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
     }
   }
 
+  async function handleAllowed(msg: TelegramMessage): Promise<void> {
+    const chatId = msg.chat.id;
+    const text = msg.text ?? msg.caption ?? "";
+    const hasPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;
+    if (text.trim().length === 0 && !hasPhoto) return;
+
+    log.info(
+      `[telegram] accepted chat=${chatId} user=@${userLabel(msg)} len=${text.length}${hasPhoto ? " +photo" : ""}`,
+    );
+
+    const { attachments, failed } = await tryDownloadPhoto(msg);
+
+    // Photo-only message where download failed: bail out instead
+    // of sending "What is this image?" without the actual image.
+    if (failed && text.trim().length === 0) {
+      await api
+        .sendMessage(
+          chatId,
+          "Sorry, I could not download the photo. Please try again.",
+        )
+        .catch(() => {});
+      return;
+    }
+
+    const messageText = text.trim().length > 0 ? text : "What is this image?";
+    const ack = await sendToMulmo(
+      String(chatId),
+      messageText,
+      attachments.length > 0 ? attachments : undefined,
+    );
+    await sendReply(chatId, ack);
+  }
+
   async function handleDenied(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
-    const user = userLabel(msg);
     log.warn(
-      `[telegram] denied chat=${chatId} user=@${user} — not on allowlist`,
+      `[telegram] denied chat=${chatId} user=@${userLabel(msg)} — not on allowlist`,
     );
     if (deniedAlreadyNotified.has(chatId)) return;
     deniedAlreadyNotified.add(chatId);
@@ -130,10 +155,6 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
         log.warn(`[telegram] push chatId is not integer: ${ev.chatId}`);
         return;
       }
-      // Defense in depth: never sendMessage to a non-allowlisted
-      // chat, even when the push comes from our own server. A
-      // buggy task-manager or a compromised server shouldn't be
-      // able to reach arbitrary Telegram users.
       if (!allowlist.allows(chatId)) {
         log.warn(`[telegram] push denied: chat ${chatId} not on allowlist`);
         return;

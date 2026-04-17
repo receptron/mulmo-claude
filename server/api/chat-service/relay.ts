@@ -65,10 +65,19 @@ export function createRelay(deps: RelayDeps): RelayFn {
   ): Promise<RelayResult> {
     const { transportId, externalChatId, text, attachments } = params;
 
+    // Log attachment summary (count + mimeTypes) — NEVER log raw
+    // base64 data (performance, log size, information leak risk).
+    const attachmentSummary = attachments
+      ? {
+          count: attachments.length,
+          mimeTypes: attachments.map((a) => a.mimeType),
+        }
+      : undefined;
     logger.info("chat-service", "message received", {
       transportId,
       externalChatId,
       textLength: text.length,
+      ...(attachmentSummary ? { attachments: attachmentSummary } : {}),
     });
 
     let chatState = await store.getChatState(transportId, externalChatId);
