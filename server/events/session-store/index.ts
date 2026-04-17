@@ -12,7 +12,6 @@ import {
   sessionChannel,
 } from "../../../src/config/pubsubChannels.js";
 import { log } from "../../system/logger/index.js";
-import { workspacePath } from "../../workspace/workspace.js";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 
@@ -145,19 +144,18 @@ export function cancelRun(chatSessionId: string): boolean {
  *  Awaits the disk write so the caller can respond only after the
  *  flag is actually persisted — avoids the race where the client
  *  refetches before the write lands and sees the stale value. */
-export async function markRead(chatSessionId: string): Promise<boolean> {
+export async function markRead(chatSessionId: string): Promise<void> {
   const session = store.get(chatSessionId);
   if (!session) {
     // No in-memory session — still persist to disk so the flag is
     // cleared for the next server restart / session listing.
     await persistHasUnread(chatSessionId, false);
-    return true;
+    return;
   }
-  if (!session.hasUnread) return true;
+  if (!session.hasUnread) return;
   session.hasUnread = false;
   await persistHasUnread(chatSessionId, false);
   notifySessionsChanged();
-  return true;
 }
 
 // ── Event publishing ───────────────────────────────────────────
@@ -265,10 +263,7 @@ async function persistHasUnread(
   chatSessionId: string,
   hasUnread: boolean,
 ): Promise<void> {
-  const metaFilePath = path.join(
-    WORKSPACE_PATHS.chat,
-    `${chatSessionId}.json`,
-  );
+  const metaFilePath = path.join(WORKSPACE_PATHS.chat, `${chatSessionId}.json`);
   try {
     const raw = await readFile(metaFilePath, "utf-8");
     const meta = JSON.parse(raw);
