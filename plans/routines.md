@@ -1,417 +1,644 @@
-# Routines — Design Document
+# Scheduler — Persistence, Catch-Up, Execution Logs
 
-## 1) Overview
-
-A **Routine** is a user-defined recurring job that invokes the LLM agent on a schedule. Examples:
-
-- "Search X on topic related to OpenAI, and write the summary article on Office role at 4am Pacific time everyday"
-- "Summarize my calendar events for today at 8am"
-- "Check my todos and send a digest every Monday at 9am"
-
-Routines sit on top of the Task Manager. Each routine is a persistent record stored in `{workspace}/tasks/tasks.json`. On server boot, routines are loaded from this file and registered with the Task Manager. The Task Manager handles the scheduling; Routines handles persistence and LLM invocation.
+> Rewritten 2026-04-17. The original "Routines" plan covered user-defined LLM-driven recurring jobs. This revision widens the scope to **all scheduled work** — system tasks (journal, sources), skill-originated schedules, and user tasks — in a single unified scheduler with persistence, catch-up after downtime, and user-visible execution logs.
 
 ---
 
-## 2) Design Goals and Non-Goals
+## 1) Motivation
 
-### Goals
-1. **Persistent** — routines survive server restarts via `tasks.json`.
-2. **LLM-driven** — each routine invokes `runAgent()` with a role and prompt.
-3. **Simple storage** — one JSON file, no database.
-4. **Registerable by user or LLM** — via REST API or tool call.
+Reading across #140, #141, #144, #166, and the original routines plan, the underlying intent:
+
+> MulmoClaude should run things on its own, even when I'm not looking. When I come back — whether 5 minutes or 3 days later — I should see what it did, what it missed, and be able to fix it.
+
+### Use cases
+
+| UC | Origin | Schedule | If server was down |
+|---|---|---|---|
+| Daily news summary | Skill `daily-news` | daily 08:00 | Run once on catch-up (3-day-old summary still useful) |
+| Standup reminder | User | daily 09:00 | Skip (yesterday's 9am is noise) |
+| Source fetch (RSS) | System `sources` | daily 08:00 | Run once (fetch window auto-adjusts) |
+| Journal daily pass | System `journal` | interval 1h | Run once (ingests everything since last run) |
+| Hourly metrics ping | Skill | interval 1h | Run all missed (each data point matters) |
+| One-shot reminder | User | once 2026-04-20 14:00 | Run late (reminder still useful) |
+| Weekly report | Skill | weekly Mon 09:00 | Run once (late report > no report) |
+| Chat-index backfill | System | interval 1h | Run once (idempotent) |
+
+---
+
+## 2) Design Goals
+
+1. **One scheduler for everything** — system / skill / user tasks in a single registry with unified state + logs.
+2. **Persistent across restarts** — task definitions (user), execution state (all), and logs survive server restart and crash.
+3. **Catch-up after gaps** — server down 3 days? Each task's missed-run policy decides what to do.
+4. **Server lifecycle aware** — handles startup, graceful shutdown, and crash recovery.
+5. **User-visible** — execution log with what ran, when, result, and a link to the chat session.
+6. **Timezone-friendly** — schedules stored in UTC; UI converts to/from the user's local time.
+7. **No cron expressions** — typed schedule variants instead.
 
 ### Non-Goals
-1. Cron expressions — use typed schedule variants instead.
-2. Output routing (email, notification, etc.) — output goes to a chat session file in `workspace/chat/`.
+
+- DAG/workflow orchestration (sequential multi-step is just a skill prompt)
+- Output routing to external channels (that's #142)
+- Real-time sub-second precision (tick granularity is 60 s)
 
 ---
 
-## 3) Data Model
+## 3) Core Concepts
+
+### 3.1 Schedule
 
 ```ts
-// Routine-level schedule types — richer than TaskSchedule.
-// The routines layer translates these down to TaskSchedule for the task manager.
-type RoutineSchedule =
-  | { type: "daily"; time: string }                          // "HH:MM" in UTC
-  | { type: "interval"; intervalMs: number }
-  | { type: "weekly"; daysOfWeek: number[]; time: string }   // daysOfWeek: 0=Sun..6=Sat, time: "HH:MM" UTC
-  | { type: "once"; at: string };                            // ISO 8601 timestamp
-
-interface Routine {
-  id: string;                    // unique, stable across restarts (e.g., UUID)
-  name: string;                  // human-readable label
-  roleId: string;                // which role to invoke (e.g., "office", "general")
-  prompt: string;                // the message sent to the agent
-  schedule: RoutineSchedule;
-  enabled: boolean;              // can be toggled without deleting
-  createdAt: string;             // ISO timestamp
-}
+type TaskSchedule =
+  | { type: "interval"; intervalSec: number }               // e.g. 3600 = every 1 hour
+  | { type: "daily"; time: string }                         // "HH:MM" UTC
+  | { type: "weekly"; daysOfWeek: number[]; time: string }  // 0=Sun..6=Sat, "HH:MM" UTC
+  | { type: "once"; at: string };                           // ISO 8601 UTC (absolute)
 ```
 
-### Mapping to TaskSchedule
+`weekly` and `once` are first-class — no hack of "register daily, check day-of-week in the callback". The scheduler handles them directly.
 
-The task manager only understands `interval` and `daily`. The routines layer handles the translation:
+**`interval` uses seconds, not milliseconds** — the tick granularity is 60 s, so sub-second precision is meaningless. `3600` is more readable than `3600000`.
 
-| RoutineSchedule | TaskSchedule | Notes |
+**`once` is always stored as an absolute UTC timestamp.** But users can specify it two ways:
+
+| Input form | Example | Resolved to |
 |---|---|---|
-| `daily` | `daily` | Pass through as-is |
-| `interval` | `interval` | Pass through as-is |
-| `weekly` | `daily` | Register as daily; the `run()` callback checks `now.getUTCDay()` against `daysOfWeek` and skips non-matching days |
-| `once` | `interval: 60_000` | Register with 1-minute interval; the `run()` callback checks if `now >= at`, fires once, then calls `removeTask()` to self-unregister |
+| Absolute datetime | `2026-04-20T14:00:00Z` | stored as-is |
+| Relative delay | `5h` / `30m` / `3600s` | resolved at creation time: `now + delay` → absolute UTC |
 
-This keeps the task manager simple while supporting richer schedules at the routines layer.
+The API / SKILL.md parser / MCP tool all accept both forms; the conversion to absolute happens before storage. Once stored, the scheduler only sees the absolute `at` field — no ambiguity.
 
-### `tasks.json` format
+Examples of `once` usage:
+- **User via chat**: "Remind me in 5 hours" → MCP tool sends `{ type: "once", delay: "5h" }` → API resolves to `at: "2026-04-17T17:30:00Z"` and stores
+- **User via UI**: picks "2026-04-20 14:00" in a datetime picker → API converts local → UTC → stores
+- **Skill frontmatter**: `schedule: once 2026-04-20T14:00:00Z` (always absolute in code-authored files)
 
-```json
-{
-  "routines": [
-    {
-      "id": "a1b2c3",
-      "name": "Daily OpenAI summary",
-      "roleId": "office",
-      "prompt": "Search X on topic related to OpenAI, and write the summary article.",
-      "schedule": { "type": "daily", "time": "11:00" },
-      "enabled": true,
-      "createdAt": "2026-04-11T00:00:00Z"
-    },
-    {
-      "id": "d4e5f6",
-      "name": "One-time reminder",
-      "roleId": "general",
-      "prompt": "Remind me about the design review meeting.",
-      "schedule": { "type": "once", "at": "2026-04-15T21:00:00Z" },
-      "enabled": true,
-      "createdAt": "2026-04-11T00:00:00Z"
-    },
-    {
-      "id": "g7h8i9",
-      "name": "MWF evening digest",
-      "roleId": "office",
-      "prompt": "Summarize today's activity.",
-      "schedule": { "type": "weekly", "daysOfWeek": [1, 3, 5], "time": "18:00" },
-      "enabled": true,
-      "createdAt": "2026-04-11T00:00:00Z"
-    }
-  ]
+### 3.2 Missed-Run Policy
+
+```ts
+type MissedRunPolicy =
+  | "skip"      // time-sensitive: window passed → discard silently
+  | "run-once"  // catch up with a single run, regardless of N missed
+  | "run-all";  // catch up with min(N, MAX_CATCHUP) runs
+```
+
+Each task declares its policy. Applied on **startup** and whenever a **gap** is detected during normal ticking (laptop sleep → wake).
+
+### 3.3 Task Origin
+
+```ts
+type TaskOrigin =
+  | { kind: "system"; module: string }    // journal, sources, chat-index
+  | { kind: "skill"; skillPath: string }  // SKILL.md with schedule: frontmatter
+  | { kind: "user" };                     // created via UI / chat / API
+```
+
+| Origin | Definition lives in | Execution state persisted | Editable by user |
+|---|---|---|---|
+| System | Code (programmatic registration at boot) | Yes (state.json) | Enable/disable only |
+| Skill | SKILL.md file with `schedule:` frontmatter | Yes (state.json) | Edit the SKILL.md file |
+| User | config/scheduler/tasks.json | Yes (state.json) | Full CRUD via API/UI |
+
+### 3.4 Execution Context — `scheduledFor`
+
+Every task run receives a **`scheduledFor`** timestamp: the UTC instant the run was originally supposed to fire. This is critical for `run-all` catch-up, where 3 missed daily runs produce 3 separate executions each targeting a different date.
+
+```ts
+interface TaskRunContext {
+  /** The window this run belongs to. For a daily 08:00 task that was
+   *  missed on Oct 10–12, the three catch-up runs get:
+   *    scheduledFor: "2026-10-10T08:00:00Z"
+   *    scheduledFor: "2026-10-11T08:00:00Z"
+   *    scheduledFor: "2026-10-12T08:00:00Z"
+   *  For a normal on-time run, this equals the current tick's time. */
+  scheduledFor: string;    // ISO 8601 UTC
+
+  /** Why this run is happening. */
+  trigger: "scheduled" | "catch-up" | "manual" | "startup" | "shutdown";
 }
 ```
 
-Note: `schedule.time` for daily/weekly is in UTC. The API layer converts user-specified local time (e.g., "4am Pacific") to UTC before storing.
+**How executors use `scheduledFor`**:
+
+| Executor | Usage |
+|---|---|
+| System (journal) | `maybeRunJournal()` already uses its own `lastDailyRunAt` for range — `scheduledFor` is informational for the log |
+| System (sources) | `runSourcesPipeline({ scheduleType: "daily" })` — `scheduledFor` is informational; the pipeline's own state handles range |
+| Skill / User (LLM) | **Injected into the prompt** (see §13). The skill body can reference it as `{{scheduledFor}}` or the scheduler prepends a system line. Example: a skill that writes a "work log for Oct 10" needs to know it's running for Oct 10, not Oct 13. |
+
+**Why this matters**: without `scheduledFor`, a `run-all` catch-up of "make a daily work log" would produce 3 identical logs all dated today. With it, each run knows which day it's responsible for and can title/scope its output correctly.
+
+### 3.5 Executor
+
+What happens when a task fires:
+
+| Origin | Executor |
+|---|---|
+| System (journal) | `maybeRunJournal()` — existing function |
+| System (sources) | `runSourcesPipeline()` — existing function |
+| System (chat-index) | `maybeIndexSession()` — existing function |
+| Skill / User | `startChat({ message, roleId, chatSessionId })` — full agent run, sidebar-visible session |
+
+All executors receive `TaskRunContext` so they can log and act on `scheduledFor`.
 
 ---
 
-## 4) Architecture
+## 4) Data Model
+
+### 4.1 Task Definition (user-created, persisted)
+
+```ts
+interface PersistedTask {
+  id: string;                    // UUID
+  name: string;
+  description: string;
+  schedule: TaskSchedule;
+  missedRunPolicy: MissedRunPolicy;
+  enabled: boolean;
+  origin: TaskOrigin;
+  roleId?: string;               // for skill/user tasks
+  prompt?: string;               // for skill/user tasks
+  createdAt: string;             // ISO UTC
+  updatedAt: string;
+}
+```
+
+### 4.2 Execution State (all origins, persisted)
+
+```ts
+interface TaskExecutionState {
+  taskId: string;
+  lastRunAt: string | null;        // ISO UTC — null = never run
+  lastRunResult: "success" | "error" | "skipped" | null;
+  lastRunDurationMs: number | null;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  totalRuns: number;
+  nextScheduledAt: string | null;  // pre-computed for UI display
+}
+```
+
+### 4.3 Execution Log Entry (append-only)
+
+```ts
+interface TaskLogEntry {
+  taskId: string;
+  taskName: string;
+  scheduledFor: string;            // the window this run targets (ISO UTC)
+  startedAt: string;               // when the run actually began
+  completedAt: string;
+  result: "success" | "error" | "skipped";
+  durationMs: number;
+  trigger: "scheduled" | "catch-up" | "manual" | "startup" | "shutdown";
+  errorMessage?: string;
+  chatSessionId?: string;          // if the task spawned an agent run
+}
+```
+
+`scheduledFor` ≠ `startedAt`. For an on-time run they're close; for a catch-up run, `scheduledFor` may be days before `startedAt`. This lets the user see "this run was for Oct 11" even though it executed on Oct 13.
+
+---
+
+## 5) Persistence Layout
 
 ```text
-tasks.json (persistence)
-    ↕ load/save
-Routines module
-    ↕ registerTask / removeTask
-Task Manager (scheduling)
-    ↕ tick fires run()
-runAgent() (LLM invocation)
-    ↕ output
-workspace/chat/{sessionId}.jsonl
+~/mulmoclaude/
+  config/
+    scheduler/
+      tasks.json             ← user-created tasks (PersistedTask[])
+      state.json             ← execution state for ALL tasks (keyed by taskId)
+  data/
+    scheduler/
+      logs/
+        2026-04-17.jsonl     ← daily execution log (rotate, keep 30 days)
 ```
 
-### Boot sequence
-
-1. Server starts, creates Task Manager.
-2. Routines module loads `tasks.json`.
-3. For each enabled routine, registers a task with the Task Manager whose `run()` calls `runAgent()`.
-4. Task Manager `start()` begins ticking.
-
-### Runtime changes
-
-When a routine is created/updated/deleted via API:
-1. Update the in-memory list.
-2. Write `tasks.json` to disk.
-3. Call `removeTask()` / `registerTask()` on the Task Manager to sync.
+System tasks aren't in tasks.json (code IS the definition), but their execution state IS in state.json so catch-up works across restarts.
 
 ---
 
-## 5) Server API
+## 6) Server Lifecycle
 
-```ts
-// POST /api/routines         — create a routine
-// GET  /api/routines         — list all routines
-// PUT  /api/routines/:id     — update a routine
-// DELETE /api/routines/:id   — delete a routine
+### 6.1 Normal startup
+
+```text
+1. Load config/scheduler/state.json (execution state for all tasks)
+2. Register system tasks (journal, sources, chat-index)
+3. Scan skills with schedule: frontmatter → register skill tasks
+4. Load config/scheduler/tasks.json → register user tasks
+5. For each enabled task:
+     run catch-up algorithm (§7)
+6. Compute nextScheduledAt for each task → write state.json
+7. Start tick loop (every 60s)
+8. Log: "scheduler started, N tasks registered, M catch-up runs enqueued"
 ```
 
-### Create
+### 6.2 Graceful shutdown (`SIGTERM` / `SIGINT`)
 
-```ts
-interface CreateRoutineBody {
-  name: string;
-  roleId: string;
-  prompt: string;
-  schedule: TaskSchedule;
-  enabled?: boolean;             // default: true
-}
+```text
+1. Stop tick loop (no new tasks fire)
+2. Wait for in-flight task runs to complete (timeout: 30s)
+3. Write state.json with current timestamps
+4. Log entry: trigger="shutdown" for each completed task
+5. If timeout hit: log warning for still-running tasks
 ```
 
-Returns the created `Routine` with generated `id` and `createdAt`.
+The saved state.json ensures the next startup knows exactly where each task left off. No work is lost.
 
-### Update
+### 6.3 Crash recovery (process killed / OOM / power loss)
 
-Accepts partial fields. If `schedule` or `enabled` changes, the corresponding Task Manager registration is updated (remove + re-register).
+State.json is written **atomically** (tmp + rename) after every task completion. On crash:
+- The file reflects state as of the last completed task, not mid-write.
+- On next startup, the catch-up algorithm (§7) detects the gap between lastRunAt and now, and applies each task's missed-run policy.
+- **In-flight task at crash time**: its state.lastRunAt was NOT advanced (write happens after completion), so the catch-up algorithm treats it as a missed window → re-runs it.
 
-### Delete
+### 6.4 Laptop sleep / suspend
 
-Removes from `tasks.json` and calls `removeTask()` on the Task Manager.
+The tick loop compares `now - lastTickAt`. If the gap exceeds 2× tickMs (e.g., laptop lid closed 30 min, tick is 60s), it runs the startup catch-up algorithm for all tasks. This handles resume-from-sleep without a restart.
 
 ---
 
-## 6) MCP Tool — manageRoutines
+## 7) Catch-Up Algorithm
 
-Expose routines as an MCP tool so the LLM can create, list, and delete routines during a conversation. For example, the user says "remind me to check OpenAI news every morning at 9am" and the LLM calls this tool directly.
+```text
+for each enabled task:
+  windows[] = listMissedWindows(state.lastRunAt, now, task.schedule)
+  //  e.g. daily 08:00, lastRunAt = Oct 10 08:30, now = Oct 13 10:00
+  //  → windows = ["2026-10-11T08:00Z", "2026-10-12T08:00Z", "2026-10-13T08:00Z"]
+  if windows.length == 0: continue
 
-### Tool Definition
+  switch task.missedRunPolicy:
+    "skip":
+      advance state.lastRunAt to now
+      log(taskId, result="skipped", trigger="catch-up",
+          note="{windows.length} windows skipped: {windows[0]}..{windows[-1]}")
 
-```ts
-{
-  name: "manageRoutines",
-  description: "Create, list, or delete scheduled routines that run automatically.",
-  input_schema: {
-    type: "object",
-    properties: {
-      action: {
-        type: "string",
-        enum: ["create", "list", "delete"],
-      },
-      // For "create":
-      name: { type: "string" },
-      roleId: { type: "string" },
-      prompt: { type: "string" },
-      scheduleType: { type: "string", enum: ["daily", "interval", "weekly", "once"] },
-      time: { type: "string", description: "HH:MM in UTC (for daily/weekly)" },
-      intervalMs: { type: "number", description: "Milliseconds (for interval)" },
-      daysOfWeek: { type: "array", items: { type: "number" }, description: "0=Sun..6=Sat (for weekly)" },
-      at: { type: "string", description: "ISO 8601 timestamp (for once)" },
-      // For "delete":
-      id: { type: "string" },
-    },
-    required: ["action"],
-  },
-}
+    "run-once":
+      // Use the LATEST missed window as scheduledFor — the most
+      // relevant one to catch up on. Example: 3 missed daily news
+      // summaries → run once for Oct 12 (yesterday), not Oct 10.
+      enqueue 1 run:
+        trigger = "catch-up"
+        scheduledFor = windows[windows.length - 1]
+
+    "run-all":
+      // Enqueue one run per missed window, oldest first, each with
+      // its own scheduledFor so the prompt can reference the correct
+      // date. Example: "work log for 10/10", "work log for 10/11", "work log for 10/12".
+      n = min(windows.length, MAX_CATCHUP)
+      for i in 0..n:
+        enqueue run:
+          trigger = "catch-up"
+          scheduledFor = windows[i]
+      // Runs execute sequentially (no concurrent agent runs on same role).
 ```
 
-### Behavior
+**`MAX_CATCHUP`**: 24 (= 1 day of hourly tasks). Configurable per task in Phase 2 if needed.
 
-- **create** — calls `POST /api/routines` internally. Returns the created routine.
-- **list** — calls `GET /api/routines`. Returns all routines.
-- **delete** — calls `DELETE /api/routines/:id`. Returns confirmation.
+### Concrete example: "daily work log" with `run-all`
 
-The tool calls the same REST endpoints as the UI, so behavior is identical. The tool should be added to roles that need scheduling capability (e.g., "general", "office").
+Server down Oct 10 evening → startup Oct 13 morning.
+
+```text
+Task: "Daily work log", daily 18:00, run-all
+Missed windows:
+  2026-10-11T18:00Z  ← Oct 11 evening
+  2026-10-12T18:00Z  ← Oct 12 evening
+
+Catch-up enqueues 2 runs, oldest first:
+  Run 1: scheduledFor = "2026-10-11T18:00:00Z"
+    → prompt includes: "Create a work log for 2026-10-11."
+    → agent creates: "Work log for Oct 11"
+  Run 2: scheduledFor = "2026-10-12T18:00:00Z"
+    → prompt includes: "Create a work log for 2026-10-12."
+    → agent creates: "Work log for Oct 12"
+```
+
+Each run is a separate chat session visible in the sidebar.
+
+### `countMissedWindows` logic
+
+| Schedule | Missed count |
+|---|---|
+| `interval` | `floor((now - lastRunAt) / intervalSec) - 1` |
+| `daily` | number of times HH:MM UTC has passed between lastRunAt and now |
+| `weekly` | number of matching dayOfWeek + HH:MM between lastRunAt and now |
+| `once` | 1 if `at < now && (lastRunAt == null \|\| lastRunAt < at)`, else 0 |
 
 ---
 
-## 7) LLM Execution (when a routine fires)
+## 8) Timezone Handling
 
-When the Task Manager fires a routine's task:
+**Storage**: all schedule times are UTC. `tasks.json` stores `"time": "23:00"` (UTC).
+
+**UI input**: the browser sends its `Intl.DateTimeFormat().resolvedOptions().timeZone` (e.g. `"Asia/Tokyo"`). The API converts the user's local time to UTC before storing. Example: user in Tokyo enters "08:00" → stored as `"23:00"` UTC (08:00 JST = 23:00 UTC previous day).
+
+**UI display**: the frontend converts UTC back to the browser's timezone for display. "Daily at 23:00 UTC" renders as "Daily at 08:00" in a Tokyo browser.
+
+**Travel**: if the user sets 4am in Japan and travels to New York, the task still fires at the same UTC moment. It doesn't follow the user. This is intentional — the original time was meaningful in context (e.g. "before the Tokyo office wakes up"), and shifting it would break the intent. The user can edit if they want a different local time.
+
+**Original timezone metadata**: optionally store `{ time: "23:00", displayTz: "Asia/Tokyo", displayTime: "08:00" }` so the UI can show "08:00 JST" even when the user is browsing from a US timezone. Not required for Phase 1.
+
+---
+
+## 9) System Task Registration
+
+Currently, journal / sources / chat-index use ad-hoc scheduling (agent-route finally hook, not the scheduler). This plan migrates them:
+
+| Module | Current trigger | New trigger |
+|---|---|---|
+| Journal daily pass | Agent route finally hook | Scheduler: `system:journal`, interval 1h, run-once |
+| Journal optimization | Agent route finally hook | Scheduler: `system:journal-opt`, interval 7d, run-once |
+| Sources daily | Not wired yet | Scheduler: `system:sources-daily`, daily configurable, run-once |
+| Chat-index backfill | Agent route finally hook | Scheduler: `system:chat-index`, interval 1h, run-once |
+
+**Journal's finally-hook stays as a supplementary trigger**: the scheduler fires journal every 1h, but the agent-route finally hook ALSO calls `maybeRunJournal()` so journals run immediately after user activity. The module's internal `isDailyDue()` + lock prevents double runs. This gives the best of both: scheduler ensures catch-up after gaps, finally-hook ensures responsiveness during active use.
+
+---
+
+## 10) Skill Schedule Frontmatter
+
+```yaml
+---
+description: Daily news summary from RSS sources
+schedule: daily 08:00
+missedRunPolicy: run-once
+roleId: office
+---
+
+Fetch the latest items from all configured RSS sources and write
+a summary for {{scheduledDate}}.
+```
+
+**Template variables** available in the skill body:
+
+| Variable | Replaced with | Example |
+|---|---|---|
+| `{{scheduledFor}}` | Full ISO timestamp of the target window | `2026-10-11T08:00:00Z` |
+| `{{scheduledDate}}` | Date portion only (YYYY-MM-DD) | `2026-10-11` |
+
+Skills that use `run-all` SHOULD use `{{scheduledDate}}` in their prompt so each catch-up run targets the correct date. Example:
+
+```yaml
+---
+description: Daily work log
+schedule: daily 18:00
+missedRunPolicy: run-all
+roleId: office
+---
+
+Create a work log for {{scheduledDate}}.
+Summarize the day's activities from chat history and wiki updates.
+```
+
+If the server was down Oct 10–12, the catch-up produces:
+- Run 1: prompt = "Create a work log for 2026-10-11. …"
+- Run 2: prompt = "Create a work log for 2026-10-12. …"
+
+Skills that use `run-once` or `skip` may omit `{{scheduledDate}}` — the preamble (§13) still injects the window as system context for the LLM.
+
+**Parsing format**: `schedule:` is a single string, parsed into `TaskSchedule`:
+
+| Frontmatter string | Parsed |
+|---|---|
+| `daily 08:00` | `{ type: "daily", time: "08:00" }` |
+| `interval 6h` | `{ type: "interval", intervalSec: 21600 }` |
+| `interval 3600s` | `{ type: "interval", intervalSec: 3600 }` |
+| `weekly Mon,Wed 18:00` | `{ type: "weekly", daysOfWeek: [1,3], time: "18:00" }` |
+| `once 2026-04-20T14:00:00Z` | `{ type: "once", at: "2026-04-20T14:00:00Z" }` |
+| `once 5h` | `{ type: "once", at: "<now + 5h, resolved at parse time>" }` |
+
+**Note**: skill schedule times are UTC (the skill author knows this). No timezone conversion — skills are developer-written, not end-user-written.
+
+`missedRunPolicy` defaults to `run-once` if omitted.
+`roleId` defaults to `general` if omitted.
+
+---
+
+## 11) API Surface
+
+```text
+GET    /api/scheduler/tasks              ← all tasks (system + skill + user) with state
+GET    /api/scheduler/tasks/:id          ← single task + state + recent log entries
+POST   /api/scheduler/tasks              ← create user task
+PUT    /api/scheduler/tasks/:id          ← update (enable/disable, schedule, prompt, etc.)
+DELETE /api/scheduler/tasks/:id          ← delete (user tasks only)
+POST   /api/scheduler/tasks/:id/run      ← manual trigger (any origin)
+
+GET    /api/scheduler/logs               ← execution log
+         ?since=ISO                        filter: after this time
+         ?taskId=ID                        filter: for this task
+         ?limit=N                          pagination (default 50)
+```
+
+System and skill tasks return `origin.kind` so the UI can grey out Edit/Delete.
+
+### MCP Tool: `manageScheduler`
+
+Same tool shape as the original `manageRoutines`, renamed. `action: "create" | "list" | "delete" | "run"`. Added to roles that need scheduling (general, office).
+
+---
+
+## 12) Execution Visibility (UI)
+
+### Task list view
+
+| Column | Source |
+|---|---|
+| Name | task.name |
+| Origin | 🔧 system / 📜 skill / 👤 user |
+| Schedule | "Daily at 08:00" (displayed in user's local tz) |
+| Missed policy | `skip` / `run-once` / `run-all` badge |
+| Last run | time + ✓/✗/⏭ icon |
+| Next run | pre-computed from state.nextScheduledAt |
+| Enabled | toggle |
+| Actions | ▶ Run now, ✏️ Edit (user), 🗑 Delete (user) |
+
+### Execution log (expandable per task)
+
+| Time | Trigger | Duration | Result | Session |
+|---|---|---|---|---|
+| 04-17 08:00 | scheduled | 45s | ✓ | [→ open] |
+| 04-17 startup | catch-up | 52s | ✓ | [→ open] |
+| 04-15 08:00 | scheduled | — | ⏭ skipped | — |
+
+"Session" link opens the chat session the task spawned.
+
+### Notification integration (Phase 4)
+
+- #144 (in-app): toast "✓ Daily news summary completed"
+- #142 (external): push to Telegram/Slack on completion or failure
+
+---
+
+## 13) LLM Execution (when a skill/user task fires)
 
 ```ts
-async function executeRoutine(routine: Routine, pubsub: IPubSub): Promise<void> {
-  const role = getRole(routine.roleId);
-  const sessionId = uuidv4();
+async function executeScheduledTask(
+  task: PersistedTask,
+  ctx: TaskRunContext,
+  deps: { startChat, log, appendLog, updateState },
+): Promise<void> {
+  const chatSessionId = `sched-${task.id}-${Date.now()}`;
+  const startedAt = new Date().toISOString();
 
-  // Notify the client that a new session has started
-  pubsub.publish("sessions", {
-    event: "session.started",
-    sessionId,
-    routineId: routine.id,
-    routineName: routine.name,
-    roleId: routine.roleId,
+  // ── Inject scheduledFor into the prompt ──────────────────────
+  // The agent MUST know which window this run targets. Without it,
+  // a catch-up run for "work log for 10/11" would produce a log dated
+  // today instead of Oct 11.
+  //
+  // Two injection methods (both applied):
+  //
+  // 1. System preamble: always prepended, invisible to the user but
+  //    available to the LLM as grounding context.
+  //
+  // 2. Template variable: if the prompt contains {{scheduledFor}}
+  //    or {{scheduledDate}}, those are replaced with the ISO
+  //    timestamp or YYYY-MM-DD date respectively.
+
+  const scheduledDate = ctx.scheduledFor.slice(0, 10); // "2026-10-11"
+  const preamble =
+    `[Scheduler context] This task is running for the window: ${ctx.scheduledFor} (${scheduledDate}).` +
+    (ctx.trigger === "catch-up"
+      ? ` This is a catch-up run — the originally scheduled time has passed.`
+      : "") +
+    `\n\n`;
+  const rawPrompt = task.prompt ?? "";
+  const expandedPrompt = rawPrompt
+    .replace(/\{\{scheduledFor\}\}/g, ctx.scheduledFor)
+    .replace(/\{\{scheduledDate\}\}/g, scheduledDate);
+  const message = preamble + expandedPrompt;
+
+  const result = await deps.startChat({
+    message,
+    roleId: task.roleId ?? "general",
+    chatSessionId,
   });
 
-  for await (const event of runAgent(
-    routine.prompt,
-    role,
-    workspacePath,
-    sessionId,
-    PORT,
-  )) {
-    // Agent events (text, tool_result, status, etc.) are forwarded to the client
-    // so the UI updates in real time, just like a user-initiated session.
-    pubsub.publish("sessions", { event: "agent.event", sessionId, data: event });
+  if (result.kind === "error") {
+    deps.appendLog({
+      taskId: task.id, taskName: task.name, startedAt,
+      completedAt: new Date().toISOString(),
+      result: "error", trigger: ctx.trigger,
+      scheduledFor: ctx.scheduledFor,
+      errorMessage: result.error,
+    });
+    deps.updateState(task.id, { lastRunResult: "error", ... });
+    return;
   }
 
-  // Notify the client that the session is complete
-  pubsub.publish("sessions", {
-    event: "session.completed",
-    sessionId,
-    routineId: routine.id,
+  // Wait for session_finished via onSessionEvent
+  await waitForSessionFinished(chatSessionId, deps);
+
+  deps.appendLog({
+    taskId: task.id, taskName: task.name,
+    startedAt, completedAt: new Date().toISOString(),
+    result: "success", trigger: ctx.trigger,
+    scheduledFor: ctx.scheduledFor,
+    chatSessionId,
+  });
+  deps.updateState(task.id, {
+    lastRunAt: ctx.scheduledFor, // advance to the window, not wall-clock
+    lastRunResult: "success", ...
   });
 }
 ```
 
-A routine creates a real chat session — the same as if the user had typed the prompt. The conversation is recorded in `workspace/chat/{sessionId}.jsonl` and the session metadata in `workspace/chat/{sessionId}.json`, exactly like any other session.
-
-The client subscribes to the `"sessions"` pub/sub channel. When a routine fires:
-1. `session.started` — the session list updates to show a new active session (with the routine name and role).
-2. `agent.event` — streamed events update the conversation in real time. If the user switches to this session, they see it progressing live.
-3. `session.completed` — the session is marked as finished.
-
-This means the user can open the app, see a routine's session appear in the sidebar, click on it, and watch it work — or review the results later. There is no distinction in the UI between a user-initiated session and a routine-initiated session.
+The session appears in the sidebar like any other conversation. User can open it, see what the agent did, and continue the conversation if needed.
 
 ---
 
-## 8) Execution History
+## 14) Implementation Phases
 
-Each routine execution is recorded in `{workspace}/tasks/history.json` so users can see past runs and jump to the corresponding chat session.
+### Phase 1: Persistence + catch-up engine
 
-### Data Model
+- Extend `server/events/task-manager/` with:
+  - `types.ts` — `TaskSchedule` (weekly/once), `MissedRunPolicy`, `PersistedTask`, `TaskExecutionState`, `TaskLogEntry`
+  - `state.ts` — load/save state.json (atomic write)
+  - `catchup.ts` — `countMissedWindows`, `applyCatchUp` (pure, testable)
+  - `log.ts` — append log entry, query log (JSONL read/write)
+  - `index.ts` — extended: weekly/once schedule matching, gap detection, shutdown hook
+- Register journal + sources + chat-index as system tasks
+- `WORKSPACE_PATHS` entries for `config/scheduler/` and `data/scheduler/logs/`
+- API: `GET /api/scheduler/tasks`, `GET /api/scheduler/logs`
+- Unit tests: catch-up algorithm, schedule matchers, gap detection, state persistence
 
-Each entry is a pointer from a routine to the chat session it created. All other details (role, timestamps, conversation content) live in the chat session record itself.
+### Phase 2: Skill scheduling
 
-```ts
-interface RoutineExecution {
-  routineId: string;             // which routine ran
-  sessionId: string;             // pointer to workspace/chat/{sessionId}.*
-}
-```
+- Extend `server/workspace/skills/parser.ts` with `schedule:` / `missedRunPolicy:` / `roleId:`
+- `loadSkillSchedules()` at boot → register
+- Skill tasks fire `startChat()` → sidebar-visible sessions
 
-### `history.json` format
+### Phase 3: User tasks + UI
 
-```json
-{
-  "executions": [
-    { "routineId": "a1b2c3", "sessionId": "d4e5f6-..." },
-    { "routineId": "a1b2c3", "sessionId": "g7h8i9-..." }
-  ]
-}
-```
+- `tasks.json` CRUD + MCP tool `manageScheduler`
+- `SchedulerView.vue` — task list + execution log
+- Canvas or sidebar integration
 
-The array is append-only. Newest entries are appended to the end. A reasonable cap (e.g., keep the last 500 entries) prevents unbounded growth.
+### Phase 4: Notification wiring
 
-### Recording
-
-In `executeRoutine()`, append the pointer after the agent finishes:
-
-```ts
-appendExecution({ routineId: routine.id, sessionId });
-```
-
-### Server API
-
-```ts
-// GET /api/routines/history              — list all executions (newest first)
-// GET /api/routines/history?routineId=X  — filter by routine
-```
+- Task completion → #144 in-app notification
+- Task failure → #142 external notification
 
 ---
 
-## 9) UI — Routines Tab
-
-The Routines view is a fourth tab in the canvas area's `CanvasViewToggle`, alongside Single, Stack, and Files.
-
-### CanvasViewToggle changes
-
-Add a new mode to `CanvasViewMode`:
-```ts
-export type CanvasViewMode = "single" | "stack" | "files" | "routines";
-```
-
-New button in the toggle bar:
-- Icon: `schedule` (Material Icons)
-- Label: "Routines"
-- Shortcut: `Cmd/Ctrl + 4`
-
-### RoutinesView component
-
-`src/components/RoutinesView.vue` — rendered when `canvasViewMode === "routines"`.
-
-**Layout:**
-- Top: "Add Routine" button
-- Below: list of all routines as cards
-
-**Each routine card shows:**
-- Name
-- Role (icon + name)
-- Prompt (truncated)
-- Schedule (e.g., "Daily at 4:00 AM PT" or "Every 4 hours")
-- Enabled toggle switch
-- Edit / Delete buttons
-- Expandable **execution history** — recent runs with timestamp, status (success/error), and a "View" link that switches to the chat session
-
-**Add / Edit form (inline or modal):**
-- Name (text input)
-- Role (dropdown — populated from available roles)
-- Prompt (textarea)
-- Schedule type (daily / interval / weekly / once)
-  - Daily: time picker + timezone selector
-  - Interval: number input + unit selector (minutes / hours)
-  - Weekly: day-of-week checkboxes + time picker + timezone selector
-  - Once: date-time picker + timezone selector
-- Enabled checkbox
-
-**Actions:**
-- Toggle enabled → `PUT /api/routines/:id` with `{ enabled: !current }`
-- Delete → `DELETE /api/routines/:id` with confirmation
-- Save (create/edit) → `POST /api/routines` or `PUT /api/routines/:id`
-
-All actions call the REST API; the routines list is refreshed after each mutation.
-
----
-
-## 10) File/Module Plan
+## 15) File / Module Plan
 
 ```text
 server/
-  routines/
-    index.ts                // loadRoutines, createRoutine, deleteRoutine, etc.
-    types.ts                // Routine interface
-  routes/
-    routines.ts             // REST endpoints
+  events/
+    task-manager/
+      index.ts              ← EXTENDED: persistence, catch-up, weekly/once, lifecycle hooks
+      types.ts              ← NEW: full type definitions
+      catchup.ts            ← NEW: catch-up algorithm (pure, testable)
+      log.ts                ← NEW: JSONL execution log read/write
+      state.ts              ← NEW: state.json load/save (atomic)
+  api/
+    routes/
+      scheduler.ts          ← EXTENDED: tasks CRUD + logs endpoint
+  workspace/
+    skills/
+      parser.ts             ← EXTENDED: schedule frontmatter (Phase 2)
+    journal/
+      index.ts              ← MODIFIED: register as system task (keep finally-hook too)
 
 src/
   plugins/
-    manageRoutines/         // MCP tool for LLM to create/list/delete routines
-      definition.ts
-      index.ts
+    manageScheduler/        ← MCP tool (Phase 3)
   components/
-    RoutinesView.vue        // Routines tab content
-  utils/
-    canvas/
-      viewMode.ts           // add "routines" to CanvasViewMode
+    SchedulerView.vue       ← Task list + log viewer (Phase 3)
 
-workspace/
-  tasks/
-    tasks.json              // persisted routines
-    history.json            // execution history
+~/mulmoclaude/
+  config/scheduler/
+    tasks.json
+    state.json
+  data/scheduler/
+    logs/YYYY-MM-DD.jsonl
 ```
 
-Follow the standard local plugin registration path (see CLAUDE.md "Adding a local plugin").
+---
 
-The `tasks` subdirectory needs to be added to `SUBDIRS` in `server/workspace/workspace.ts`.
+## 16) Related Issues
+
+| Issue | Relation |
+|---|---|
+| #166 (source registry) | Sources register as a system task |
+| #144 (in-app notifications) | Task completion → notification pipeline (Phase 4) |
+| #142 (external notifications) | Same pipeline, external delivery |
+| #253 (top page) | Scheduler view could be a panel |
+| ~~#140~~ (daily batch) | Closed → absorbed into #166 |
+| ~~#141~~ (workflow builder) | Closed → absorbed by skills |
 
 ---
 
-## 11) Required Changes to Task Manager
+## 17) Decisions Log
 
-The current Task Manager works as-is for Routines. No changes to its API or scheduling logic are needed.
-
-One consideration: the Task Manager currently throws if a task ID is already registered. On boot, if `tasks.json` has routines and they are registered before `start()`, this is fine. But if the Routines module tries to re-register after a hot reload (e.g., during development), it would throw. Two options:
-
-- **Option A**: Add an `upsertTask()` method to the Task Manager that replaces if exists.
-- **Option B**: Always call `removeTask()` before `registerTask()` in the Routines module.
-
-Option B requires no Task Manager changes. Prefer Option B for now.
-
----
-
-## 12) Timezone Handling
-
-Users specify times in local time (e.g., "4am Pacific"). The Routines API converts to UTC before storing in `tasks.json`. The Task Manager only deals with UTC.
-
-Conversion happens in the API layer using standard `Intl.DateTimeFormat` or a helper function. The stored `schedule.time` is always UTC `"HH:MM"`.
-
-The original user-specified time and timezone could optionally be stored as metadata for display purposes, but the scheduling logic only sees UTC.
-
----
-
-## 13) Decision Summary
-
-Routines is a thin persistence and LLM-invocation layer on top of the Task Manager. It owns `tasks.json` for storage, converts user schedules to UTC, and registers tasks whose `run()` calls `runAgent()`. The Task Manager is unchanged — it just sees normal task definitions. Output goes to `workspace/chat/` as regular sessions.
+| Question | Decision | Rationale |
+|---|---|---|
+| Timezone storage | UTC only; UI converts via browser tz | Simpler; travel doesn't shift the task from its original intent |
+| Journal migration | Scheduler + keep finally-hook | Scheduler for catch-up; finally-hook for responsiveness |
+| Cron expressions | No | Typed variants are safer and self-documenting |
+| weekly/once in task-manager | First-class | Avoids fragile "daily + day-check" hack |
+| Crash recovery | Atomic state.json + catch-up on startup | No data loss; in-flight task re-runs |
+| MAX_CATCHUP | 24 | 1 day of hourly = safe default; per-task override in Phase 2 |
+| Execution log format | Daily JSONL rotation, 30-day retention | Grep-friendly, bounded growth |
