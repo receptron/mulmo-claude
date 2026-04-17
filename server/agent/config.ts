@@ -345,6 +345,12 @@ export interface DockerSpawnArgsParams {
   /** Extra `-v` / `-e` tokens for opt-in host credentials (#259).
    *  Built by `resolveSandboxAuth` in `sandboxMounts.ts`. Default []. */
   sandboxAuthArgs?: readonly string[];
+  /** Whether SSH agent forwarding is active. When true, the container
+   *  uses the entrypoint (root → setup → setpriv drop) instead of
+   *  `--user`, and adds the minimum capabilities the entrypoint needs.
+   *  When false (default), `--user uid:gid --cap-drop ALL` with zero
+   *  capabilities — identical to the pre-#259 security posture. */
+  sshAgentForward?: boolean;
 }
 
 // Pure helper that returns the full `docker run ... claude <args>`
@@ -360,6 +366,7 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     projectRoot = process.cwd(),
     homeDir = homedir(),
     sandboxAuthArgs = [],
+    sshAgentForward = false,
   } = params;
   const toDockerPath = (p: string): string => p.replace(/\\/g, "/");
   const extraHosts: string[] =
@@ -376,8 +383,32 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     "-i",
     "--cap-drop",
     "ALL",
-    "--user",
-    `${uid}:${gid}`,
+    // When SSH agent forwarding is active, the entrypoint needs root
+    // to fix /etc/passwd, chown /home/node, and chmod the socket.
+    // These 5 caps are the minimum set; setpriv --inh-caps=-all
+    // drops them on exec so Claude runs with zero capabilities.
+    //
+    // When SSH is OFF, use the simpler `--user uid:gid` which runs
+    // the entire container as the host user — zero caps from the
+    // start, identical to the pre-#259 security posture.
+    ...(sshAgentForward
+      ? [
+          "--cap-add",
+          "CHOWN",
+          "--cap-add",
+          "FOWNER",
+          "--cap-add",
+          "DAC_OVERRIDE",
+          "--cap-add",
+          "SETUID",
+          "--cap-add",
+          "SETGID",
+          "-e",
+          `HOST_UID=${uid}`,
+          "-e",
+          `HOST_GID=${gid}`,
+        ]
+      : ["--user", `${uid}:${gid}`]),
     "-e",
     "HOME=/home/node",
     "-v",

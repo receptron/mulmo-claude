@@ -144,21 +144,47 @@ export interface SshAgentForwardResult {
   skippedReason: string | null;
 }
 
+// Docker Desktop for Mac exposes the host SSH agent through a
+// well-known magic socket inside the VM. Direct bind-mounting the
+// macOS $SSH_AUTH_SOCK (/private/tmp/…) fails with "operation not
+// supported" because Docker's Linux VM can't mkdir a Unix socket.
+// Using the magic path sidesteps the issue entirely and works on
+// Docker Desktop ≥ 2.3.0 (2020+).
+const DOCKER_DESKTOP_MAC_SSH_SOCK = "/run/host-services/ssh-auth.sock";
+
 /**
  * Return the docker argv fragment that forwards the host SSH agent
- * into the container. The agent socket is bind-mounted and
- * `SSH_AUTH_SOCK` is re-pointed so ssh / git pick it up.
+ * into the container. On macOS + Docker Desktop, the built-in
+ * magic socket is used instead of a raw bind-mount. On Linux, the
+ * host `$SSH_AUTH_SOCK` is bind-mounted directly.
  *
  * Skipped (empty args + reason) when:
  * - the flag is off
- * - $SSH_AUTH_SOCK isn't set (no agent running on host)
- * - the socket path doesn't exist on the host
+ * - $SSH_AUTH_SOCK isn't set (no agent running on host) — on
+ *   non-macOS only; macOS always has the magic socket available
+ *   when Docker Desktop is running, regardless of $SSH_AUTH_SOCK
  */
 export function sshAgentForwardArgs(
   enabled: boolean,
   sshAuthSock: string | undefined,
+  platform: typeof process.platform = process.platform,
 ): SshAgentForwardResult {
   if (!enabled) return { args: [], skippedReason: null };
+
+  // macOS + Docker Desktop: use the magic VM-internal socket.
+  if (platform === "darwin") {
+    return {
+      args: [
+        "-v",
+        `${DOCKER_DESKTOP_MAC_SSH_SOCK}:${SSH_AGENT_CONTAINER_SOCK}`,
+        "-e",
+        `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
+      ],
+      skippedReason: null,
+    };
+  }
+
+  // Linux / other: bind-mount the host socket directly.
   if (!sshAuthSock || sshAuthSock.length === 0) {
     return {
       args: [],
@@ -193,6 +219,11 @@ export interface ResolvedSandboxAuth {
 
 export interface ResolveSandboxAuthParams {
   sshAgentForward: boolean;
+  /** Comma-separated host whitelist for the SSH agent. Default
+   *  "github.com". Passed to the container as
+   *  `SANDBOX_SSH_ALLOWED_HOSTS` and consumed by the entrypoint
+   *  to generate a restrictive `~/.ssh/config`. */
+  sshAllowedHosts?: string;
   configMountNames: readonly string[];
   sshAuthSock?: string | undefined;
   home?: string;
@@ -235,10 +266,28 @@ export function resolveSandboxAuth(
     });
   }
 
-  const args = [...configMountArgs(parsed.resolved), ...sshResult.args];
+  // Pass the allowed-hosts whitelist to the container so the
+  // entrypoint can generate a restrictive ~/.ssh/config. Only
+  // included when SSH agent forward is actually active.
+  const sshAllowedHostsArgs =
+    sshResult.args.length > 0 && params.sshAllowedHosts
+      ? ["-e", `SANDBOX_SSH_ALLOWED_HOSTS=${params.sshAllowedHosts}`]
+      : [];
+
+  const args = [
+    ...configMountArgs(parsed.resolved),
+    ...sshResult.args,
+    ...sshAllowedHostsArgs,
+  ];
+  const allowedHostsSuffix =
+    sshResult.args.length > 0 && params.sshAllowedHosts
+      ? ` → hosts: ${params.sshAllowedHosts}`
+      : "";
   const appliedDescriptions = [
     ...parsed.resolved.map((s) => `${s.name} (${s.description})`),
-    ...(sshResult.args.length > 0 ? ["ssh-agent forward"] : []),
+    ...(sshResult.args.length > 0
+      ? [`ssh-agent forward${allowedHostsSuffix}`]
+      : []),
   ];
 
   if (appliedDescriptions.length > 0) {

@@ -108,7 +108,7 @@ describe("buildSandboxStatus", () => {
     assert.deepEqual(status, { sshAgent: true, mounts: [] });
   });
 
-  it("reports sshAgent=false when the flag is on but SSH_AUTH_SOCK is unset", () => {
+  it("reports sshAgent=false when the flag is on but SSH_AUTH_SOCK is unset (Linux)", () => {
     const home = makeFixtureHome({});
     const status = buildSandboxStatus({
       sandboxEnabled: true,
@@ -116,11 +116,25 @@ describe("buildSandboxStatus", () => {
       configMountNames: [],
       sshAuthSock: undefined,
       home,
+      platform: "linux",
     });
     assert.deepEqual(status, { sshAgent: false, mounts: [] });
   });
 
-  it("reports sshAgent=false when the socket path does not exist on the host", () => {
+  it("reports sshAgent=true on macOS even without SSH_AUTH_SOCK (Docker Desktop magic socket)", () => {
+    const home = makeFixtureHome({});
+    const status = buildSandboxStatus({
+      sandboxEnabled: true,
+      sshAgentForward: true,
+      configMountNames: [],
+      sshAuthSock: undefined,
+      home,
+      platform: "darwin",
+    });
+    assert.deepEqual(status, { sshAgent: true, mounts: [] });
+  });
+
+  it("reports sshAgent=false when the socket path does not exist on the host (Linux)", () => {
     const home = makeFixtureHome({});
     const status = buildSandboxStatus({
       sandboxEnabled: true,
@@ -128,6 +142,7 @@ describe("buildSandboxStatus", () => {
       configMountNames: [],
       sshAuthSock: path.join(home, "missing-socket"),
       home,
+      platform: "linux",
     });
     assert.deepEqual(status, { sshAgent: false, mounts: [] });
   });

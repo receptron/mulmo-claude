@@ -65,6 +65,7 @@ export const env = Object.freeze({
   // Host-credential opt-ins for the Docker sandbox (#259). Both off
   // by default. See docs/sandbox-credentials.md for the contract.
   sandboxSshAgentForward: asFlag(process.env.SANDBOX_SSH_AGENT_FORWARD),
+  sandboxSshAllowedHosts: process.env.SANDBOX_SSH_ALLOWED_HOSTS || "github.com",
   sandboxMountConfigs: asCsv(process.env.SANDBOX_MOUNT_CONFIGS),
 
   // API credentials (undefined when not configured)

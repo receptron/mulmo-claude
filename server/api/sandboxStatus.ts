@@ -38,6 +38,8 @@ export interface BuildSandboxStatusParams {
   configMountNames: readonly string[];
   sshAuthSock?: string | undefined;
   home?: string;
+  /** Injected for tests; defaults to `process.platform`. */
+  platform?: typeof process.platform;
 }
 
 /**
@@ -58,7 +60,11 @@ export function buildSandboxStatus(
   const allowed = buildAllowedConfigMounts(params.home);
   const parsed = resolveMountNames(params.configMountNames, allowed);
 
-  const ssh = sshAgentForwardArgs(params.sshAgentForward, params.sshAuthSock);
+  const ssh = sshAgentForwardArgs(
+    params.sshAgentForward,
+    params.sshAuthSock,
+    params.platform,
+  );
   const sshAgent = ssh.args.length > 0;
 
   return {

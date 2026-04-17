@@ -42,19 +42,34 @@ git config --global user.email
 
 Set `SANDBOX_SSH_AGENT_FORWARD=1`.
 
-**What it does.** Bind-mounts the host's `$SSH_AUTH_SOCK` into the container at `/ssh-agent` and sets `SSH_AUTH_SOCK=/ssh-agent` inside. OpenSSH, `git`, and anything else that speaks the agent protocol will use the host's running `ssh-agent` to sign challenges. **Your private key bytes never enter the container.**
+**What it does.** Forwards the host SSH agent into the container so `git`, `ssh`, and anything else that speaks the agent protocol can authenticate using the host's keys. **Your private key bytes never enter the container.**
+
+On macOS, Docker Desktop's built-in magic socket (`/run/host-services/ssh-auth.sock`) is used. On Linux, the host's `$SSH_AUTH_SOCK` is bind-mounted directly.
+
+**Host whitelist (security).** By default, the forwarded agent is restricted to `github.com` only — the container cannot use your keys to SSH into other servers. To allow additional hosts:
+
+```bash
+SANDBOX_SSH_ALLOWED_HOSTS=github.com,gitlab.com,bitbucket.org
+```
+
+The entrypoint generates a restrictive `~/.ssh/config` inside the container (SSH is first-match-wins, so whitelisted hosts come first):
+```
+Host github.com
+  IdentityAgent /ssh-agent    # exception: agent allowed
+
+Host *
+  IdentityAgent none          # catch-all: agent blocked
+```
 
 **Prerequisites on the host:**
 
-- An SSH agent is running and `$SSH_AUTH_SOCK` is set.
+- An SSH agent is running and `$SSH_AUTH_SOCK` is set (Linux only; macOS agent is automatic).
 - Your keys have been added (`ssh-add`). Passphrase-protected keys need to be unlocked once on the host before starting the server — the container has no TTY to prompt for a passphrase.
-- macOS: the Apple keychain agent is set up by default. To verify: `echo $SSH_AUTH_SOCK`.
-- Linux: typically provided by `gnome-keyring`, `keychain`, or manually via `eval "$(ssh-agent)"`.
 
 **Skipped automatically (with a `log.warn`) when:**
 
-- `$SSH_AUTH_SOCK` is not set on the host.
-- The socket path doesn't exist on disk.
+- Linux: `$SSH_AUTH_SOCK` is not set or the socket path doesn't exist.
+- macOS: never skipped (Docker Desktop's magic socket is always available).
 
 The server doesn't fail — it just logs the reason and continues without the forward.
 

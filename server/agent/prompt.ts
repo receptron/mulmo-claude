@@ -27,6 +27,7 @@ All data lives in the workspace directory as plain files:
 - \`data/scheduler/\` — scheduled tasks
 - \`artifacts/documents/\`, \`artifacts/images/\`, \`artifacts/html/\`, \`artifacts/charts/\`, \`artifacts/spreadsheets/\`, \`artifacts/stories/\` — LLM-generated output
 - \`config/\` — settings.json, mcp.json, roles/, helps/
+- \`github/\` — git-cloned repositories. Clone here, not /tmp/. If the dir already exists with the same remote, \`git pull\` to update. If a different remote, ask the user for a new dir name.
 
 ## Memory Management
 
