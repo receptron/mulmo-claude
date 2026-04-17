@@ -376,8 +376,14 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     "-i",
     "--cap-drop",
     "ALL",
-    "--user",
-    `${uid}:${gid}`,
+    // UID/GID are passed as env vars instead of `--user` so the
+    // entrypoint (sandbox-entrypoint.sh) can run as root for setup
+    // (fix /etc/passwd, chmod SSH socket) then drop privileges via
+    // setpriv. See #259 for the full motivation.
+    "-e",
+    `HOST_UID=${uid}`,
+    "-e",
+    `HOST_GID=${gid}`,
     "-e",
     "HOME=/home/node",
     "-v",

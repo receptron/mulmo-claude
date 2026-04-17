@@ -74,5 +74,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g @anthropic-ai/claude-code tsx
 
-USER node
+COPY sandbox-entrypoint.sh /sandbox-entrypoint.sh
+RUN chmod +x /sandbox-entrypoint.sh
+
+# No `USER node` — the entrypoint starts as root to fix /etc/passwd
+# and socket permissions, then drops to HOST_UID:HOST_GID via setpriv.
 WORKDIR /home/node/mulmoclaude
+ENTRYPOINT ["/sandbox-entrypoint.sh"]

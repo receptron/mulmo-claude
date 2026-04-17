@@ -214,10 +214,12 @@ describe("buildDockerSpawnArgs", () => {
     assert.equal(args[idx + 1], "ALL");
   });
 
-  it("passes uid:gid via --user", () => {
+  it("passes uid:gid as HOST_UID/HOST_GID env vars (not --user)", () => {
     const args = buildDockerSpawnArgs({ ...baseParams(), uid: 501, gid: 20 });
-    const idx = args.indexOf("--user");
-    assert.equal(args[idx + 1], "501:20");
+    // --user is gone; the entrypoint handles privilege drop via setpriv.
+    assert.equal(args.indexOf("--user"), -1);
+    assert.ok(args.includes("HOST_UID=501"));
+    assert.ok(args.includes("HOST_GID=20"));
   });
 
   it("mounts the workspace at the container path", () => {
