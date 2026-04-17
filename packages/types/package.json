@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "description": "Shared types and constants for the MulmoBridge protocol",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
     }
   },
-  "files": ["dist"],
+  "files": ["src"],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "yarn build",
     "typecheck": "tsc --noEmit"
   },
   "license": "AGPL-3.0-only"
