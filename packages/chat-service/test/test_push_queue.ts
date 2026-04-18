@@ -1,9 +1,6 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createPushQueue,
-  type PushQueue,
-} from "../../server/api/chat-service/push-queue.js";
+import { createPushQueue, type PushQueue } from "../src/push-queue.js";
 
 const msg = (chatId: string, message: string) => ({
   chatId,

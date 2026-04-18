@@ -19,7 +19,7 @@ import {
   resolveMcpConfigPaths,
   userServerAllowedToolNames,
 } from "./config.js";
-import type { Attachment } from "../api/chat-service/types.js";
+import type { Attachment } from "@mulmobridge/protocol";
 import {
   parseStreamEvent,
   type AgentEvent,

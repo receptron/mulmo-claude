@@ -8,10 +8,10 @@ import {
   CHAT_SOCKET_EVENTS,
   CHAT_SOCKET_PATH,
   type ChatSocketHandle,
-} from "../../server/api/chat-service/socket.js";
-import { createPushQueue } from "../../server/api/chat-service/push-queue.js";
-import type { RelayResult } from "../../server/api/chat-service/relay.js";
-import type { Logger } from "../../server/api/chat-service/types.js";
+} from "../src/socket.js";
+import { createPushQueue } from "../src/push-queue.js";
+import type { RelayResult } from "../src/relay.js";
+import type { Logger } from "../src/types.js";
 
 const silentLogger: Logger = {
   error: () => {},

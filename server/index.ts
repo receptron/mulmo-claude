@@ -23,7 +23,7 @@ import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
 import type { NotificationDeps } from "./events/notifications.js";
-import { createChatService } from "./api/chat-service/index.js";
+import { createChatService } from "@mulmobridge/chat-service";
 import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";

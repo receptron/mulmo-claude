@@ -41,7 +41,7 @@ import {
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { env } from "../../system/env.js";
-import type { Attachment } from "../chat-service/types.js";
+import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "../../../bridges/_lib/mime.js";
 
 const router = Router();

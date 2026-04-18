@@ -1,7 +1,7 @@
 {
-  "name": "@mulmobridge/protocol",
-  "version": "0.1.1",
-  "description": "Shared types and constants for the MulmoBridge protocol",
+  "name": "@mulmobridge/chat-service",
+  "version": "0.1.0",
+  "description": "Server-side chat service for MulmoBridge — socket.io + REST bridge to Claude Code agents",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,7 +24,15 @@
   },
   "license": "MIT",
   "author": "Receptron Team",
+  "dependencies": {
+    "@mulmobridge/protocol": "^0.1.0"
+  },
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0",
+    "socket.io": "^4.0.0"
+  },
   "devDependencies": {
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "@types/express": "^5.0.0"
   }
 }

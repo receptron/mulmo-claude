@@ -5,7 +5,7 @@ import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { MCP_PLUGIN_NAMES } from "./plugin-names.js";
 import type { McpServerSpec } from "../system/config.js";
 import { getCurrentToken } from "../api/auth/token.js";
-import type { Attachment } from "../api/chat-service/types.js";
+import type { Attachment } from "@mulmobridge/protocol";
 import {
   isImageMime,
   isPdfMime,
