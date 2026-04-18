@@ -5,8 +5,10 @@ Server-side chat service for [MulmoBridge](https://github.com/receptron/mulmocla
 ## Install
 
 ```bash
-npm install @mulmobridge/chat-service
+npm install @mulmobridge/chat-service express socket.io
 ```
+
+> `express` and `socket.io` are peer dependencies.
 
 ## Overview
 
@@ -35,7 +37,7 @@ chatService.attachSocket(httpServer);
 
 ## Architecture
 
-```
+```text
 ┌─────────────┐     socket.io      ┌──────────────────┐
 │ CLI bridge   │ ◄──────────────► │  chat-service     │
 │ TG bridge    │    /ws/chat       │  (this package)   │
