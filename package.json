@@ -9,7 +9,9 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "yarn build:packages",
     "dev": "concurrently -n server,client -k \"npm run server\" \"sleep 2 && vite\"",
+    "predev:debug": "yarn build:packages",
     "dev:debug": "concurrently -n server,client -k \"npm run server:debug\" \"sleep 2 && vite\"",
     "dev:client": "vite",
     "dev:server": "tsx server/index.ts",
