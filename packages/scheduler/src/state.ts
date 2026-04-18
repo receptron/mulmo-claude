@@ -31,12 +31,8 @@ export async function loadState(
     for (const [id, entry] of Object.entries(parsed)) {
       // Only spread if entry is a plain object — strings, numbers,
       // arrays would produce a malformed state.
-      if (
-        typeof entry === "object" &&
-        entry !== null &&
-        !Array.isArray(entry)
-      ) {
-        map.set(id, { ...emptyState(id), ...(entry as TaskExecutionState) });
+      if (isPartialState(entry)) {
+        map.set(id, { ...emptyState(id), ...entry });
       } else {
         map.set(id, emptyState(id));
       }
@@ -75,4 +71,12 @@ export async function updateAndSave(
 
 function isStateRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isPartialState(v: unknown): v is Partial<TaskExecutionState> {
+  if (!isStateRecord(v)) return false;
+  // Check key fields have expected types when present
+  if ("taskId" in v && typeof v.taskId !== "string") return false;
+  if ("totalRuns" in v && typeof v.totalRuns !== "number") return false;
+  return true;
 }

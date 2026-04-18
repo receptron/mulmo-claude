@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { computeCatchUpPlan, type CatchUpTask } from "../src/catchup.ts";
-import { emptyState, type TaskExecutionState } from "../src/types.ts";
+import {
+  emptyState,
+  TASK_TRIGGERS,
+  type TaskExecutionState,
+} from "../src/types.ts";
 
 function makeTask(
   overrides: Partial<CatchUpTask> & { id: string },
@@ -64,7 +68,9 @@ describe("computeCatchUpPlan — run-all policy", () => {
     assert.ok(plan.runs[0].context.scheduledFor.includes("2026-04-15"));
     assert.ok(plan.runs[1].context.scheduledFor.includes("2026-04-16"));
     assert.ok(plan.runs[2].context.scheduledFor.includes("2026-04-17"));
-    plan.runs.forEach((r) => assert.equal(r.context.trigger, "catch-up"));
+    plan.runs.forEach((r) =>
+      assert.equal(r.context.trigger, TASK_TRIGGERS.catchUp),
+    );
   });
 
   it("caps at maxCatchUp", () => {

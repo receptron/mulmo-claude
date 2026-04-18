@@ -4,6 +4,7 @@
 // tick loop's "is this task due NOW?" check.
 
 import type { TaskSchedule } from "./types.js";
+import { SCHEDULE_TYPES } from "./types.js";
 
 const MS_PER_SEC = 1000;
 const MS_PER_MIN = 60_000;
@@ -25,18 +26,18 @@ export function nextWindowAfter(
   schedule: TaskSchedule,
   afterMs: number,
 ): number | null {
-  if (schedule.type === "interval") {
+  if (schedule.type === SCHEDULE_TYPES.interval) {
     const intervalMs = schedule.intervalSec * MS_PER_SEC;
     // Intervals are anchored to epoch — the Nth window is N * interval.
     // Find the smallest multiple >= afterMs.
     return Math.ceil(afterMs / intervalMs) * intervalMs;
   }
 
-  if (schedule.type === "daily") {
+  if (schedule.type === SCHEDULE_TYPES.daily) {
     return nextDailyWindow(parseTimeToMs(schedule.time), afterMs);
   }
 
-  if (schedule.type === "weekly") {
+  if (schedule.type === SCHEDULE_TYPES.weekly) {
     return nextWeeklyWindow(
       schedule.daysOfWeek,
       parseTimeToMs(schedule.time),
@@ -44,7 +45,7 @@ export function nextWindowAfter(
     );
   }
 
-  if (schedule.type === "once") {
+  if (schedule.type === SCHEDULE_TYPES.once) {
     const atMs = new Date(schedule.at).getTime();
     return atMs >= afterMs ? atMs : null;
   }

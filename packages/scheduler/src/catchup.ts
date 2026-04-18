@@ -10,7 +10,11 @@ import type {
   TaskRunContext,
   TaskExecutionState,
 } from "./types.js";
+import { TASK_TRIGGERS, MISSED_RUN_POLICIES } from "./types.js";
 import { listMissedWindows } from "./windows.js";
+
+/** Default cap for run-all catch-up (1 day of hourly tasks). */
+const DEFAULT_MAX_CATCHUP = 24;
 
 export interface CatchUpTask {
   id: string;
@@ -51,7 +55,7 @@ export function computeCatchUpPlan(
   tasks: readonly CatchUpTask[],
   states: ReadonlyMap<string, TaskExecutionState>,
   nowMs: number,
-  maxCatchUp = 24,
+  maxCatchUp = DEFAULT_MAX_CATCHUP,
 ): CatchUpPlan {
   const runs: CatchUpRun[] = [];
   const skipped: CatchUpPlan["skipped"] = [];
@@ -90,7 +94,7 @@ function applyPolicy(
 ): { runs: CatchUpRun[]; skipped?: CatchUpPlan["skipped"][number] } {
   const toIso = (ms: number) => new Date(ms).toISOString();
 
-  if (task.missedRunPolicy === "skip") {
+  if (task.missedRunPolicy === MISSED_RUN_POLICIES.skip) {
     return {
       runs: [],
       skipped: {
@@ -102,7 +106,7 @@ function applyPolicy(
     };
   }
 
-  if (task.missedRunPolicy === "run-once") {
+  if (task.missedRunPolicy === MISSED_RUN_POLICIES.runOnce) {
     // Use the LATEST missed window — the most relevant to catch up on.
     return {
       runs: [
@@ -111,7 +115,7 @@ function applyPolicy(
           taskName: task.name,
           context: {
             scheduledFor: toIso(windows[windows.length - 1]),
-            trigger: "catch-up",
+            trigger: TASK_TRIGGERS.catchUp,
           },
         },
       ],
@@ -126,7 +130,7 @@ function applyPolicy(
       taskName: task.name,
       context: {
         scheduledFor: toIso(w),
-        trigger: "catch-up" as const,
+        trigger: TASK_TRIGGERS.catchUp,
       },
     })),
   };

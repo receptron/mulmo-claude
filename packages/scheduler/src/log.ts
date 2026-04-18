@@ -6,6 +6,8 @@
 import type { TaskLogEntry } from "./types.js";
 import { toUtcIsoDate } from "./date.js";
 
+const DEFAULT_QUERY_LIMIT = 50;
+
 /** What the log layer needs from the host environment. */
 export interface LogDeps {
   appendFile: (path: string, content: string) => Promise<void>;
@@ -42,7 +44,7 @@ export async function queryLog(
   },
   deps: LogDeps,
 ): Promise<TaskLogEntry[]> {
-  const limit = opts.limit ?? 50;
+  const limit = opts.limit ?? DEFAULT_QUERY_LIMIT;
   const sinceMs = opts.since ? new Date(opts.since).getTime() : 0;
 
   // Read the target day's log (single-day query for now).
