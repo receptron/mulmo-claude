@@ -22,6 +22,10 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 import type { Attachment } from "@mulmobridge/protocol";
+import {
+  SUBPROCESS_PROBE_TIMEOUT_MS,
+  SUBPROCESS_WORK_TIMEOUT_MS,
+} from "../utils/time.js";
 
 export interface ContentBlock {
   type: string;
@@ -96,7 +100,9 @@ const PPTX_MIME =
 
 async function tryNativeLibreOffice(): Promise<boolean> {
   try {
-    await execFileAsync("libreoffice", ["--version"], { timeout: 5000 });
+    await execFileAsync("libreoffice", ["--version"], {
+      timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
+    });
     return true;
   } catch {
     return false;
@@ -106,7 +112,7 @@ async function tryNativeLibreOffice(): Promise<boolean> {
 async function tryDockerLibreOffice(): Promise<boolean> {
   try {
     await execFileAsync("docker", ["image", "inspect", "mulmoclaude-sandbox"], {
-      timeout: 5000,
+      timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
     });
     return true;
   } catch {
@@ -127,7 +133,7 @@ async function convertPptxToPdf(data: string): Promise<Buffer | null> {
       await execFileAsync(
         "libreoffice",
         ["--headless", "--convert-to", "pdf", "--outdir", tmpDir, inputPath],
-        { timeout: 60_000 },
+        { timeout: SUBPROCESS_WORK_TIMEOUT_MS },
       );
     } else if (await tryDockerLibreOffice()) {
       // Use the sandbox Docker image for conversion
@@ -147,7 +153,7 @@ async function convertPptxToPdf(data: string): Promise<Buffer | null> {
           "/data",
           "/data/input.pptx",
         ],
-        { timeout: 60_000 },
+        { timeout: SUBPROCESS_WORK_TIMEOUT_MS },
       );
     } else {
       return null;

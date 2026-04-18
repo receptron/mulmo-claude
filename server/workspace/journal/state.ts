@@ -12,6 +12,7 @@ import {
   writeJournalState as writeJournalStateRaw,
   journalStateExists as journalStateExistsRaw,
 } from "../../utils/files/journal-io.js";
+import { ONE_HOUR_MS, ONE_DAY_MS } from "../../utils/time.js";
 
 // Bump this when the schema changes in a backwards-incompatible way.
 // Older state files are treated as corrupted and replaced with a
@@ -109,7 +110,7 @@ export function isDailyDue(state: JournalState, nowMs: number): boolean {
   if (state.lastDailyRunAt === null) return true;
   const last = Date.parse(state.lastDailyRunAt);
   if (Number.isNaN(last)) return true;
-  const intervalMs = state.dailyIntervalHours * 60 * 60 * 1000;
+  const intervalMs = state.dailyIntervalHours * ONE_HOUR_MS;
   return nowMs - last >= intervalMs;
 }
 
@@ -117,7 +118,7 @@ export function isOptimizationDue(state: JournalState, nowMs: number): boolean {
   if (state.lastOptimizationRunAt === null) return true;
   const last = Date.parse(state.lastOptimizationRunAt);
   if (Number.isNaN(last)) return true;
-  const intervalMs = state.optimizationIntervalDays * 24 * 60 * 60 * 1000;
+  const intervalMs = state.optimizationIntervalDays * ONE_DAY_MS;
   return nowMs - last >= intervalMs;
 }
 

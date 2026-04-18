@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { promisify } from "util";
 import { log } from "./logger/index.js";
+import { ONE_SECOND_MS, ONE_MINUTE_MS } from "../utils/time.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -11,11 +12,11 @@ const CREDENTIALS_PATH = join(homedir(), ".claude", ".credentials.json");
 const KEYCHAIN_SERVICE = "Claude Code-credentials";
 
 /** Safety margin — treat tokens as expired 60s before actual expiry. */
-const EXPIRY_MARGIN_MS = 60_000;
+const EXPIRY_MARGIN_MS = ONE_MINUTE_MS;
 /** Maximum time to wait for the claude CLI to respond. */
-const PTY_TIMEOUT_MS = 30_000;
+const PTY_TIMEOUT_MS = 30 * ONE_SECOND_MS;
 /** Delay before sending input to the claude CLI. */
-const PTY_INPUT_DELAY_MS = 3_000;
+const PTY_INPUT_DELAY_MS = 3 * ONE_SECOND_MS;
 
 interface CredentialsJson {
   claudeAiOauth?: {
@@ -101,7 +102,7 @@ async function renewTokenViaPty(): Promise<boolean> {
     const timeout = setTimeout(() => {
       log.error(
         "credentials",
-        `Token renewal timed out after ${PTY_TIMEOUT_MS / 1000}s`,
+        `Token renewal timed out after ${PTY_TIMEOUT_MS / ONE_SECOND_MS}s`,
       );
       finish(false);
     }, PTY_TIMEOUT_MS);

@@ -22,10 +22,12 @@
 // instance — no module-level globals. Tests can spin up a fresh
 // limiter per case and fully observe the ordering.
 
+import { ONE_SECOND_MS } from "../../utils/time.js";
+
 // Seconds of quiet between requests to the same host when the
 // caller doesn't specify an explicit `minDelayMs` for the host.
 // One second is polite-default for public feeds.
-export const DEFAULT_MIN_DELAY_MS = 1000;
+export const DEFAULT_MIN_DELAY_MS = ONE_SECOND_MS;
 
 export interface RateLimiterDeps {
   // Returns current wall-clock milliseconds. `Date.now` in prod,

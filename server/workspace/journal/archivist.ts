@@ -8,6 +8,7 @@
 // production path supplies `runClaudeCli`.
 
 import { spawn } from "node:child_process";
+import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../utils/time.js";
 
 // (systemPrompt, userPrompt) → raw model output as a string.
 // The daily/optimization passes parse JSON out of the string
@@ -20,7 +21,7 @@ export type Summarize = (
 // Wall-clock cap per CLI invocation. 5 minutes is comfortably above
 // the worst-case summarization run we've seen and still short enough
 // that a wedged subprocess doesn't tie up resources forever.
-const CLI_TIMEOUT_MS = 5 * 60 * 1000;
+const CLI_TIMEOUT_MS = CLI_SUBPROCESS_TIMEOUT_MS;
 
 // Sentinel we throw on ENOENT so maybeRunJournal can disable the
 // feature for the rest of the server lifetime instead of retrying

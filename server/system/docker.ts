@@ -6,6 +6,7 @@ import { homedir } from "os";
 import { join, resolve as resolvePath } from "path";
 import { log } from "./logger/index.js";
 import { env } from "./env.js";
+import { SUBPROCESS_PROBE_TIMEOUT_MS } from "../utils/time.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -51,7 +52,9 @@ export async function isDockerAvailable(): Promise<boolean> {
   if (_dockerEnabled !== null) return _dockerEnabled;
   assertClaudeFiles();
   try {
-    await execFileAsync("docker", ["ps", "-q"], { timeout: 5000 });
+    await execFileAsync("docker", ["ps", "-q"], {
+      timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
+    });
     _dockerEnabled = true;
   } catch {
     _dockerEnabled = false;

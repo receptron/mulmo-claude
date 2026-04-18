@@ -30,6 +30,7 @@ import {
   type RateLimiterDeps,
 } from "./rateLimiter.js";
 import { isAllowedByRobots, parseRobots } from "./robots.js";
+import { ONE_SECOND_MS } from "../../utils/time.js";
 
 // The User-Agent value sent on every fetch. Identifies us clearly
 // enough for a site operator to find the project and contact us.
@@ -40,7 +41,7 @@ export const USER_AGENT =
 // Per-request wall-clock cap. Fetchers can still cancel earlier
 // via a passed-in AbortSignal; this is the outer safety net so a
 // hung server never holds a rate-limit slot forever.
-export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+export const DEFAULT_FETCH_TIMEOUT_MS = 30 * ONE_SECOND_MS;
 
 // Thrown when a URL would violate the target host's robots.txt
 // policy for our User-Agent. Caught by fetchers so a single

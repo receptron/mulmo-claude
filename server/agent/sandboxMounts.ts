@@ -19,6 +19,7 @@ import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { log } from "../system/logger/index.js";
+import { SUBPROCESS_PROBE_TIMEOUT_MS } from "../utils/time.js";
 
 // ── Config-mount allowlist ──────────────────────────────────────────
 
@@ -342,7 +343,7 @@ function resolveGhTokenFallback(
     try {
       const token = execFileSync("gh", ["auth", "token"], {
         encoding: "utf-8",
-        timeout: 5_000,
+        timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
       }).trim();
       if (token.length > 0) {
         log.info(

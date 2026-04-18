@@ -18,12 +18,13 @@
 // a PoC; #144's production scheduler will persist to disk.
 
 import { PUBSUB_CHANNELS } from "../../src/config/pubsubChannels.js";
+import { ONE_SECOND_MS, MAX_NOTIFICATION_DELAY_SEC } from "../utils/time.js";
 
 // Guard against a caller passing an accidentally-huge delay (typo,
 // ms-vs-seconds confusion, etc.). 1 hour ceiling is plenty for a
 // test ping and still leaves headroom for "fire in 30 minutes".
 const DEFAULT_DELAY_SECONDS = 60;
-const MAX_DELAY_SECONDS = 3_600;
+const MAX_DELAY_SECONDS = MAX_NOTIFICATION_DELAY_SEC;
 
 export const DEFAULT_NOTIFICATION_MESSAGE = "Test notification";
 export const DEFAULT_NOTIFICATION_TRANSPORT_ID = "cli";
@@ -69,7 +70,7 @@ export function scheduleTestNotification(
   const transportId = opts.transportId ?? DEFAULT_NOTIFICATION_TRANSPORT_ID;
   const chatId = opts.chatId ?? DEFAULT_NOTIFICATION_CHAT_ID;
   const delaySeconds = clampDelay(opts.delaySeconds);
-  const delayMs = delaySeconds * 1_000;
+  const delayMs = delaySeconds * ONE_SECOND_MS;
 
   const firesAt = new Date(Date.now() + delayMs).toISOString();
 

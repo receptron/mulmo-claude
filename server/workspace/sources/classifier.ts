@@ -21,6 +21,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
 import { formatSpawnFailure } from "../../utils/spawn.js";
+import { ONE_MINUTE_MS } from "../../utils/time.js";
 import {
   CATEGORY_SLUGS,
   normalizeCategories,
@@ -66,7 +67,7 @@ export type ClassifyFn = (input: ClassifyInput) => Promise<ClassifyResult>;
 // Max time we let `claude` run during registration. Registration
 // is a foreground user action, so anything longer than 2 min is
 // effectively broken anyway.
-export const DEFAULT_TIMEOUT_MS = 120_000;
+export const DEFAULT_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
 
 // Budget cap. Classification is one small call per source (once
 // at registration, rarely re-classified) so $0.05 is fine — we

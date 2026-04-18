@@ -13,6 +13,7 @@ import {
 import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
+import { ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -42,8 +43,8 @@ export interface ServerSession {
 
 // ── Constants ──────────────────────────────────────────────────
 
-const IDLE_EVICTION_MS = 60 * 60 * 1000; // 1 hour
-const EVICTION_CHECK_INTERVAL_MS = 5 * 60 * 1000; // check every 5 min
+const IDLE_EVICTION_MS = ONE_HOUR_MS;
+const EVICTION_CHECK_INTERVAL_MS = 5 * ONE_MINUTE_MS;
 
 // ── Store ──────────────────────────────────────────────────────
 

@@ -21,11 +21,12 @@ import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";
 import { log } from "../../system/logger/index.js";
 import { updateSessionBacklinks } from "./sessionBacklinks.js";
+import { ONE_SECOND_MS } from "../../utils/time.js";
 
 // Small tolerance for filesystem mtime granularity (some filesystems
 // only record to 1-second precision). Without this, a page written
 // within the same millisecond as turnStartedAt could be skipped.
-const MTIME_TOLERANCE_MS = 1000;
+const MTIME_TOLERANCE_MS = ONE_SECOND_MS;
 
 export interface WikiBacklinksDeps {
   readdir: (dir: string) => Promise<string[]>;

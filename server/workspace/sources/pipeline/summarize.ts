@@ -16,6 +16,7 @@ import { ClaudeCliNotFoundError } from "../../journal/archivist.js";
 import { formatSpawnFailure } from "../../../utils/spawn.js";
 import { errorMessage } from "../../../utils/errors.js";
 import type { SourceItem } from "../types.js";
+import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../../utils/time.js";
 
 // A function that takes items and returns markdown. The
 // production implementation spawns claude; tests pass a
@@ -25,7 +26,7 @@ export type SummarizeFn = (items: readonly SourceItem[]) => Promise<string>;
 // Wall-clock cap per summarize call. 5 minutes is plenty for a
 // daily brief across a few dozen items; beyond that the call is
 // almost certainly wedged.
-export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
+export const DEFAULT_TIMEOUT_MS = CLI_SUBPROCESS_TIMEOUT_MS;
 
 // Budget per summarize call. A daily brief is longer and more
 // expensive than a classify call, so the cap is higher than the

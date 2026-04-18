@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
 import { errorMessage } from "../../utils/errors.js";
 import type { SummaryResult } from "./types.js";
+import { ONE_MINUTE_MS } from "../../utils/time.js";
 
 const SYSTEM_PROMPT =
   "You summarize a single chat session. Output strict JSON matching the provided schema. " +
@@ -43,7 +44,7 @@ const TAIL_CHARS = 5000;
 const PER_MESSAGE_MAX = 500;
 
 // Spawn / budget constants.
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
 // Budget cap per summarization call, forwarded to `claude
 // --max-budget-usd`. Previously 0.05 but that was tight enough
 // that a first-burst call — which pays a one-time cache creation

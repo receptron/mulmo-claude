@@ -24,13 +24,14 @@ import {
 import type { ChatIndexEntry, ChatIndexManifest } from "./types.js";
 import { writeJsonAtomic } from "../../utils/files/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
+import { ONE_MINUTE_MS } from "../../utils/time.js";
 
 // Freshness throttle: a session whose existing index entry is
 // newer than this is skipped. The 15-minute window is a compromise
 // — long enough that a single conversation doesn't re-summarize
 // every turn, short enough that a user who leaves for lunch and
 // comes back sees the title refresh.
-export const MIN_INDEX_INTERVAL_MS = 15 * 60 * 1000;
+export const MIN_INDEX_INTERVAL_MS = 15 * ONE_MINUTE_MS;
 
 // Injection points for tests. Defaults are the production spawn +
 // wall-clock.

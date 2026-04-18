@@ -18,6 +18,7 @@ import { notFound } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { env } from "../../system/env.js";
+import { ONE_DAY_MS } from "../../utils/time.js";
 import {
   encodeCursor,
   parseCursor,
@@ -99,7 +100,7 @@ const router = Router();
 
 // Sessions older than this are excluded from the listing. Set
 // SESSIONS_LIST_WINDOW_DAYS to override (0 = no cutoff).
-const WINDOW_MS = env.sessionsListWindowDays * 86_400_000;
+const WINDOW_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 
 // Read the full session list off disk. Each row carries its
 // `changeMs` — the later of the jsonl mtime and the chat-index

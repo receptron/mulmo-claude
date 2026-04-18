@@ -19,6 +19,7 @@ import type {
 import type { FetcherKind, Source, SourceState } from "../types.js";
 import { defaultSourceState } from "../types.js";
 import { errorMessage } from "../../../utils/errors.js";
+import { ONE_MINUTE_MS, ONE_DAY_MS } from "../../../utils/time.js";
 
 // Outcome of one source's fetch attempt.
 export type FetchOutcome =
@@ -104,12 +105,12 @@ async function fetchOneSource(
 // Exponential backoff (in ms) for the Nth consecutive failure.
 // Bounded at BACKOFF_MAX so even a permanently-broken source
 // gets retried eventually.
-export const BACKOFF_MAX_MS = 24 * 60 * 60 * 1000; // 24h
+export const BACKOFF_MAX_MS = ONE_DAY_MS;
 
 export function backoffDelayMs(consecutiveFailures: number): number {
   if (consecutiveFailures <= 0) return 0;
   // 1m, 2m, 4m, 8m, 16m, ..., capped at 24h.
-  const base = 60_000;
+  const base = ONE_MINUTE_MS;
   const ms = base * 2 ** Math.min(consecutiveFailures - 1, 20);
   return Math.min(ms, BACKOFF_MAX_MS);
 }
