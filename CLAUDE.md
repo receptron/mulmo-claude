@@ -147,7 +147,9 @@ URL-based navigation via `vue-router` (history mode — clean paths, no `#`). Th
 | `server/workspace/roles.ts` | Custom-role loader over `<workspace>/roles/` |
 | `server/events/pub-sub/` | In-process publish/subscribe (socket.io-backed) |
 | `server/events/session-store/` | In-memory session state + event fan-out |
-| `server/events/task-manager/` | Cron-ish scheduled task runner |
+| `server/events/task-manager/` | Cron-ish scheduled task runner (tick loop) |
+| `server/events/scheduler-adapter.ts` | Wires `@receptron/task-scheduler` to MulmoClaude (catch-up + persistence) |
+| `packages/scheduler/` | `@receptron/task-scheduler` — pure scheduler library (independent npm package) |
 | `server/system/env.ts` | Single source of truth for `process.env.*` |
 | `server/system/logger/` | Structured logger (console + rotating file + telemetry stub) |
 | `server/utils/` | Shared helpers: `fs.ts`, `errors.ts` |

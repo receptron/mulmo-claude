@@ -177,6 +177,16 @@ it for subsequent ticks.
 
 ---
 
+## Relationship to @receptron/task-scheduler
+
+The task-manager is the **tick loop** — it calls `setInterval`, walks registered tasks, and fires the ones that are due. It has no persistence: if the server restarts, it starts fresh.
+
+[`@receptron/task-scheduler`](https://www.npmjs.com/package/@receptron/task-scheduler) (in `packages/scheduler/`) adds **persistence and catch-up** on top. It tracks execution state in a JSON file, detects missed windows after a restart, and applies per-task catch-up policies (skip / run-once / run-all). The scheduler-adapter (`server/events/scheduler-adapter.ts`) wires the two together: it registers system tasks with the task-manager for ongoing ticks, and uses the scheduler library's `computeCatchUpPlan()` on startup.
+
+In short: task-manager = timer, @receptron/task-scheduler = state + catch-up.
+
+---
+
 ## Error handling
 
 `run()` is awaited with a `.catch()`. Rejections are logged at

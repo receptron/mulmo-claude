@@ -385,6 +385,27 @@ Cross-platform compatibility is a hard requirement — use `node:path` joins, `n
 
 ---
 
+## Internal packages (`packages/`)
+
+MulmoClaude uses a yarn-workspaces monorepo. Shared code lives in `packages/`, published to npm as independent MIT-licensed packages.
+
+| Package | Scope | Description |
+|---|---|---|
+| `@mulmobridge/protocol` | messaging | Wire protocol types and constants |
+| `@mulmobridge/chat-service` | messaging | Server-side Express + socket.io chat service |
+| `@mulmobridge/client` | messaging | Bridge-side socket.io client library |
+| `@mulmobridge/cli` | messaging | Interactive terminal bridge |
+| `@mulmobridge/telegram` | messaging | Telegram bot bridge |
+| `@receptron/task-scheduler` | general | Persistent task scheduler with catch-up recovery |
+
+**Build order matters** — `build:packages` in root `package.json` runs them in dependency order. When adding a new package, insert it at the correct position in the chain.
+
+**Source-first dev** — in the workspace, `tsx` resolves symlinks to `.ts` source directly, so `dist/` builds are only needed for npm publish and CI typecheck.
+
+See [`packages/README.md`](../packages/README.md) for the MulmoBridge architecture overview.
+
+---
+
 ## Common gotchas
 
 - **Vite `reuseExistingServer: true`** in `e2e/playwright.config.ts` — if a stale `vite` process is already serving `:5173` (e.g. from a different working tree), Playwright happily talks to *that* one. Symptom: tests fail because UI changes "haven't landed". Kill the stray process: `lsof -i :5173 | grep LISTEN`.
