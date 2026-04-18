@@ -82,37 +82,12 @@ export const WORKSPACE_DIRS = {
   github: "github",
 } as const;
 
-// Well-known individual files. Values are workspace-relative paths.
-// Grouped alongside `WORKSPACE_DIRS` so cross-module callers use a
-// single source of truth (a rename needs one-file change here, not
-// a grep across server / tests).
-export const WORKSPACE_FILES = {
-  memory: "conversations/memory.md",
-  // Bearer auth token (#272). Written at server startup, mode 0600, read
-  // by the Vite plugin (dev) / Express HTML serve (prod) to inject into
-  // the `<meta name="mulmoclaude-auth">` tag, and by CLI bridges
-  // (Phase 2) to pick up Authorization headers. Deleted on graceful
-  // shutdown; stale files after a crash are harmless since the next
-  // startup regenerates and the in-memory token is the only one checked.
-  sessionToken: ".session-token",
-  // Wiki metadata. Consumed by `server/routes/wiki.ts` (the API) and
-  // `server/agent/prompt.ts` (the system-prompt hint) — keep them
-  // here so a rename hits both.
-  wikiIndex: "data/wiki/index.md",
-  wikiLog: "data/wiki/log.md",
-  wikiSchema: "data/wiki/SCHEMA.md",
-  wikiSummary: "data/wiki/summary.md",
-  // Journal index for the summaries/ grouping. Read by the system
-  // prompt's `prependJournalPointer` to decide whether the journal
-  // is bootstrapped yet.
-  summariesIndex: "conversations/summaries/_index.md",
-  // Plugin data files. Currently each is written by one module, but
-  // name-here-so-future-consumers-can-import (tests, CLI tools,
-  // migration scripts).
-  todosItems: "data/todos/todos.json",
-  todosColumns: "data/todos/columns.json",
-  schedulerItems: "data/scheduler/items.json",
-} as const;
+// Well-known individual files — imported from the shared
+// src/config/workspacePaths.ts (single source of truth for both
+// server and frontend). Re-exported so server callers keep the
+// same `import { WORKSPACE_FILES } from "./paths.js"` they use.
+import { WORKSPACE_FILES } from "../../src/config/workspacePaths.js";
+export { WORKSPACE_FILES };
 
 // Absolute paths, built once at module load from `workspacePath`.
 // The `workspacePath` const is itself fixed (reads `os.homedir()`

@@ -239,7 +239,7 @@ import TextResponseView from "../plugins/textResponse/View.vue";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
-import { WORKSPACE_PATHS } from "../config/workspacePaths";
+import { WORKSPACE_FILES } from "../config/workspacePaths";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
@@ -393,7 +393,7 @@ function isScheduledItemArray(x: unknown): x is ScheduledItem[] {
 // component receives the same shape it normally gets in chat mode.
 const schedulerResult = computed(
   (): ToolResultComplete<SchedulerData> | null => {
-    if (selectedPath.value !== WORKSPACE_PATHS.schedulerItems) return null;
+    if (selectedPath.value !== WORKSPACE_FILES.schedulerItems) return null;
     if (!content.value || content.value.kind !== "text") return null;
     let parsed: unknown;
     try {
@@ -405,7 +405,7 @@ const schedulerResult = computed(
     return {
       uuid: "files-scheduler-preview",
       toolName: "manageScheduler",
-      message: WORKSPACE_PATHS.schedulerItems,
+      message: WORKSPACE_FILES.schedulerItems,
       title: "Scheduler",
       data: { items: parsed },
     };
@@ -432,7 +432,7 @@ function isTodoItemArray(x: unknown): x is TodoItem[] {
 }
 
 const todoExplorerResult = computed((): ToolResultComplete<TodoData> | null => {
-  if (selectedPath.value !== WORKSPACE_PATHS.todosItems) return null;
+  if (selectedPath.value !== WORKSPACE_FILES.todosItems) return null;
   if (!content.value || content.value.kind !== "text") return null;
   let parsed: unknown;
   try {
@@ -445,7 +445,7 @@ const todoExplorerResult = computed((): ToolResultComplete<TodoData> | null => {
   return {
     uuid: "files-todo-preview",
     toolName: "manageTodoList",
-    message: WORKSPACE_PATHS.todosItems,
+    message: WORKSPACE_FILES.todosItems,
     title: "Todo",
     data: { items, columns },
   };

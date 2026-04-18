@@ -1,14 +1,22 @@
-// Workspace-relative file paths used by the frontend.
+// Workspace-relative file paths — single source of truth.
 //
-// The server-side equivalent is `WORKSPACE_FILES` in
-// `server/workspace/paths.ts`. These are kept in sync manually
-// because the server module depends on `node:path`, which is
-// unavailable in the browser.
+// Shared by both the Vue frontend and the Express server.
+// This file MUST NOT import node:path, node:os, or any Node-only
+// module so it stays browser-compatible.
 //
-// When a workspace path changes, update BOTH this file and
-// `server/workspace/paths.ts`.
+// The server's `server/workspace/paths.ts` imports these and
+// joins them with the workspace root to produce absolute paths.
 
-export const WORKSPACE_PATHS = {
+/** Well-known individual files. Values are workspace-relative paths. */
+export const WORKSPACE_FILES = {
+  memory: "conversations/memory.md",
+  sessionToken: ".session-token",
+  wikiIndex: "data/wiki/index.md",
+  wikiLog: "data/wiki/log.md",
+  wikiSchema: "data/wiki/SCHEMA.md",
+  wikiSummary: "data/wiki/summary.md",
+  summariesIndex: "conversations/summaries/_index.md",
   todosItems: "data/todos/todos.json",
+  todosColumns: "data/todos/columns.json",
   schedulerItems: "data/scheduler/items.json",
 } as const;

@@ -17,6 +17,7 @@
   "include": [
     "**/*.ts",
     "../src/config/roles.ts",
+    "../src/config/workspacePaths.ts",
     "../src/plugins/*/definition.ts",
     "../packages/*/src/**/*.ts"
   ],
