@@ -51,7 +51,7 @@ const props = defineProps<{
 
 export type PluginLauncherKind =
   | "invoke" // Call the matching plugin's client endpoint and push the ToolResult into the current session
-  | "files"; // Switch the canvas to files view (no plugin call)
+  | "view"; // Switch the canvas to a dedicated view mode (files, todos, scheduler)
 
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
@@ -69,17 +69,17 @@ const TARGETS: PluginLauncherTarget[] = [
   // ─── Data plugins ───
   {
     key: "todos",
-    kind: "invoke",
+    kind: "view",
     icon: "checklist",
     label: "Todos",
-    title: "Open todos",
+    title: "Open todos (⌘4)",
   },
   {
     key: "scheduler",
-    kind: "invoke",
+    kind: "view",
     icon: "event",
     label: "Schedule",
-    title: "Open schedule",
+    title: "Open schedule (⌘5)",
   },
   {
     key: "wiki",
@@ -105,10 +105,10 @@ const TARGETS: PluginLauncherTarget[] = [
   },
   {
     key: "files",
-    kind: "files",
+    kind: "view",
     icon: "folder",
     label: "Files",
-    title: "Open workspace files",
+    title: "Open workspace files (⌘3)",
   },
 ];
 
@@ -128,8 +128,8 @@ const KEY_TO_TOOL_NAME: Record<string, string> = {
 };
 
 function isActive(target: PluginLauncherTarget): boolean {
-  if (target.kind === "files") {
-    return props.activeViewMode === "files";
+  if (target.kind === "view") {
+    return props.activeViewMode === target.key;
   }
   const toolName = KEY_TO_TOOL_NAME[target.key];
   return !!toolName && toolName === props.activeToolName;

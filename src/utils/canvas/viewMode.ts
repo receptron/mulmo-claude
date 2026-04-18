@@ -9,7 +9,7 @@ const VIEW_MODES = ["single", "stack", "files", "todos", "scheduler"] as const;
 
 export type CanvasViewMode = (typeof VIEW_MODES)[number];
 
-function isCanvasViewMode(value: string): value is CanvasViewMode {
+export function isCanvasViewMode(value: string): value is CanvasViewMode {
   return (VIEW_MODES as readonly string[]).includes(value);
 }
 

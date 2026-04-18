@@ -476,6 +476,7 @@ import {
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
+import { isCanvasViewMode } from "./utils/canvas/viewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
 import { BUILTIN_ROLE_IDS } from "./config/roles";
@@ -990,20 +991,8 @@ async function invokePluginForLauncher(
 //   the current session, select it, switch canvas to single view so
 //   the plugin's View component takes the stage.
 async function onPluginNavigate(target: PluginLauncherTarget): Promise<void> {
-  if (target.kind === "files") {
-    setCanvasViewMode("files");
-    const base = buildViewQuery();
-    const query: Record<string, string> = {};
-    for (const [k, v] of Object.entries(base)) {
-      if (typeof v === "string") query[k] = v;
-    }
-    delete query.path;
-    router.replace({ query }).catch((err: unknown) => {
-      if (!isNavigationFailure(err)) {
-        // eslint-disable-next-line no-console
-        console.error("[plugin-launcher] navigation failed:", err);
-      }
-    });
+  if (target.kind === "view" && isCanvasViewMode(target.key)) {
+    setCanvasViewMode(target.key);
     return;
   }
 
