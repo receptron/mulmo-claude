@@ -7,7 +7,7 @@
 // `createRelay(deps)` so the module has no direct imports from the
 // host.
 
-import { EVENT_TYPES } from "../../../src/types/events.js";
+import { EVENT_TYPES } from "@mulmobridge/protocol";
 import type { ChatStateStore } from "./chat-state.js";
 import type { CommandHandler } from "./commands.js";
 import type {

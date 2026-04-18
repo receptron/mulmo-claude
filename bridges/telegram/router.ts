@@ -7,7 +7,7 @@
 import type { TelegramApi, TelegramMessage } from "./api.js";
 import type { Allowlist } from "./allowlist.js";
 import type { MessageAck, PushEvent } from "../_lib/client.js";
-import type { Attachment } from "../../server/api/chat-service/types.js";
+import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "../_lib/mime.js";
 
 // Telegram caps a single message at 4096 chars. We split long

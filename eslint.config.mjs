@@ -16,7 +16,7 @@ export default [
     ],
   },
   {
-    ignores: ["lib", "src/plugins/spreadsheet/engine"],
+    ignores: ["lib", "src/plugins/spreadsheet/engine", "packages/*/dist"],
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,

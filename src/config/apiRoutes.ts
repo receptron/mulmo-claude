@@ -18,6 +18,8 @@
 // constant from the router file. Keep the nesting shallow and the
 // key names matched to the last URL segment where possible.
 
+import { CHAT_SERVICE_ROUTES } from "@mulmobridge/protocol";
+
 export const API_ROUTES = {
   health: "/api/health",
   sandbox: "/api/sandbox",
@@ -39,17 +41,8 @@ export const API_ROUTES = {
     rebuild: "/api/chat-index/rebuild",
   },
 
-  chatService: {
-    // POST /api/transports/:transportId/chats/:externalChatId           — send a message
-    // POST /api/transports/:transportId/chats/:externalChatId/connect   — set active session
-    //
-    // Namespace is deliberately separate from /api/chat/ so the word
-    // "chat" is not overloaded (the Web UI's /api/sessions is the
-    // conversation concept; /api/transports/* is the external-
-    // platform-to-session pointer concept). See plans/messaging_transports.md.
-    message: "/api/transports/:transportId/chats/:externalChatId",
-    connect: "/api/transports/:transportId/chats/:externalChatId/connect",
-  },
+  // Single source of truth: @mulmobridge/protocol. See plans/messaging_transports.md.
+  chatService: CHAT_SERVICE_ROUTES,
 
   config: {
     base: "/api/config",

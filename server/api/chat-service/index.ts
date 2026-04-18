@@ -19,7 +19,7 @@
 import type http from "http";
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { CHAT_SERVICE_ROUTES } from "@mulmobridge/protocol";
 import { createChatStateStore } from "./chat-state.js";
 import { createCommandHandler } from "./commands.js";
 import { createRelay } from "./relay.js";
@@ -126,7 +126,7 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
 
   // POST /api/transports/:transportId/chats/:externalChatId — send text, get a reply.
   router.post(
-    API_ROUTES.chatService.message,
+    CHAT_SERVICE_ROUTES.message,
     async (
       req: Request<ChatRequestParams, unknown, ChatRequestBody>,
       res: Response,
@@ -153,7 +153,7 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
   // POST /api/transports/:transportId/chats/:externalChatId/connect —
   // reassign the active session pointer for a transport chat.
   router.post(
-    API_ROUTES.chatService.connect,
+    CHAT_SERVICE_ROUTES.connect,
     async (
       req: Request<ConnectRequestParams, unknown, ConnectRequestBody>,
       res: Response,
