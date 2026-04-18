@@ -8,7 +8,7 @@
 //   3. The ack carries the full accumulated text
 //   4. When no chunks are emitted, the ack still works (fallback)
 
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import http from "http";
 import express from "express";
