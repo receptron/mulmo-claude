@@ -20,7 +20,7 @@ function stubApi(): TelegramApi & { sent: SentMessage[] } {
     async sendMessage(chatId, text) {
       sent.push({ chatId, text });
     },
-    async downloadPhoto() {
+    async downloadFile() {
       return "data:image/jpeg;base64,AAAA";
     },
   };
@@ -182,7 +182,7 @@ describe("router.handleMessage — allowed chat", () => {
       photo: [{ file_id: "f", file_unique_id: "u", width: 100, height: 100 }],
     };
     await router.handleMessage(photoMsg);
-    assert.equal(receivedText, "What is this image?");
+    assert.equal(receivedText, "Describe / analyze this file.");
   });
 });
 

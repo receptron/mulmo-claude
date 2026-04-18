@@ -26,12 +26,21 @@ export interface TelegramPhotoSize {
   file_size?: number;
 }
 
+export interface TelegramDocument {
+  file_id: string;
+  file_unique_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 export interface TelegramMessage {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
   photo?: TelegramPhotoSize[];
+  document?: TelegramDocument;
   caption?: string;
   date: number;
 }
@@ -74,7 +83,10 @@ export interface TelegramApi {
     messageId: number,
     text: string,
   ): Promise<void>;
-  downloadPhoto(fileId: string): Promise<string>;
+  /** Download any file by file_id via the Telegram getFile API.
+   *  Returns a data URL (`data:<mime>;base64,...`).
+   *  Works for photos, documents, audio, etc. */
+  downloadFile(fileId: string, fallbackMime?: string): Promise<string>;
 }
 
 const DEFAULT_BASE = "https://api.telegram.org";
@@ -153,7 +165,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
       }
     },
 
-    async downloadPhoto(fileId) {
+    async downloadFile(fileId, fallbackMime = "application/octet-stream") {
       const getFileRes = await fetchImpl(
         `${base}/getFile?file_id=${encodeURIComponent(fileId)}`,
       );
@@ -180,7 +192,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
       const buffer = await fileRes.arrayBuffer();
       const b64 = Buffer.from(buffer).toString("base64");
       const ext = getFileBody.result.file_path.split(".").pop() ?? "";
-      const mediaType = mimeFromExtension(ext, "image/jpeg");
+      const mediaType = mimeFromExtension(ext, fallbackMime);
       return buildDataUrl(mediaType, b64);
     },
   };
