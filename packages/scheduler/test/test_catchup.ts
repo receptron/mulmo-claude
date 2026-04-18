@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { computeCatchUpPlan, type CatchUpTask } from "../src/catchup.ts";
 import {
   emptyState,
+  MISSED_RUN_POLICIES,
+  SCHEDULE_TYPES,
   TASK_TRIGGERS,
   type TaskExecutionState,
 } from "../src/types.ts";
@@ -12,8 +14,8 @@ function makeTask(
 ): CatchUpTask {
   return {
     name: overrides.id,
-    schedule: { type: "daily", time: "08:00" },
-    missedRunPolicy: "run-once",
+    schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
+    missedRunPolicy: MISSED_RUN_POLICIES.runOnce,
     enabled: true,
     ...overrides,
   };
@@ -28,7 +30,9 @@ function stateAt(taskId: string, lastRunAt: string): TaskExecutionState {
 
 describe("computeCatchUpPlan — skip policy", () => {
   it("produces no runs and records the skip", () => {
-    const tasks = [makeTask({ id: "t", missedRunPolicy: "skip" })];
+    const tasks = [
+      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.skip }),
+    ];
     const states = new Map([
       ["t", stateAt("t", new Date(apr14_09).toISOString())],
     ]);
@@ -43,14 +47,16 @@ describe("computeCatchUpPlan — skip policy", () => {
 
 describe("computeCatchUpPlan — run-once policy", () => {
   it("produces one run targeting the latest missed window", () => {
-    const tasks = [makeTask({ id: "t", missedRunPolicy: "run-once" })];
+    const tasks = [
+      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce }),
+    ];
     const states = new Map([
       ["t", stateAt("t", new Date(apr14_09).toISOString())],
     ]);
     const plan = computeCatchUpPlan(tasks, states, apr17_10);
 
     assert.equal(plan.runs.length, 1);
-    assert.equal(plan.runs[0].context.trigger, "catch-up");
+    assert.equal(plan.runs[0].context.trigger, TASK_TRIGGERS.catchUp);
     // Latest window = Apr 17 08:00
     assert.ok(plan.runs[0].context.scheduledFor.includes("2026-04-17"));
   });
@@ -58,7 +64,9 @@ describe("computeCatchUpPlan — run-once policy", () => {
 
 describe("computeCatchUpPlan — run-all policy", () => {
   it("produces one run per missed window, oldest first", () => {
-    const tasks = [makeTask({ id: "t", missedRunPolicy: "run-all" })];
+    const tasks = [
+      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runAll }),
+    ];
     const states = new Map([
       ["t", stateAt("t", new Date(apr14_09).toISOString())],
     ]);
@@ -77,8 +85,8 @@ describe("computeCatchUpPlan — run-all policy", () => {
     const tasks = [
       makeTask({
         id: "t",
-        missedRunPolicy: "run-all",
-        schedule: { type: "interval", intervalSec: 60 },
+        missedRunPolicy: MISSED_RUN_POLICIES.runAll,
+        schedule: { type: SCHEDULE_TYPES.interval, intervalSec: 60 },
       }),
     ];
     // Last ran 1 hour ago — hundreds of 60s windows missed, capped to 3.
@@ -98,7 +106,9 @@ describe("computeCatchUpPlan — edge cases", () => {
   });
 
   it("treats never-run tasks as just registered — no catch-up from epoch", () => {
-    const tasks = [makeTask({ id: "t", missedRunPolicy: "run-once" })];
+    const tasks = [
+      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce }),
+    ];
     const plan = computeCatchUpPlan(tasks, new Map(), apr17_10);
     // Never-run tasks: lastRunMs = nowMs, so no missed windows.
     assert.equal(plan.runs.length, 0);
@@ -114,8 +124,8 @@ describe("computeCatchUpPlan — edge cases", () => {
 
   it("handles multiple tasks independently", () => {
     const tasks = [
-      makeTask({ id: "a", missedRunPolicy: "skip" }),
-      makeTask({ id: "b", missedRunPolicy: "run-all" }),
+      makeTask({ id: "a", missedRunPolicy: MISSED_RUN_POLICIES.skip }),
+      makeTask({ id: "b", missedRunPolicy: MISSED_RUN_POLICIES.runAll }),
     ];
     const states = new Map([
       ["a", stateAt("a", new Date(apr14_09).toISOString())],
