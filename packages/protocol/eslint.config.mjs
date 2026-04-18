@@ -1,7 +1,11 @@
 import eslintBase from "../../config/eslint.packages.mjs";
 
+const packageTsFiles = ["{src,test}/**/*.ts"];
+
 export default [
-  { files: ["{src,test}/**/*.ts"] },
   { ignores: ["dist/**/*"] },
-  ...eslintBase,
+  ...eslintBase.map((config) => ({
+    ...config,
+    files: packageTsFiles,
+  })),
 ];

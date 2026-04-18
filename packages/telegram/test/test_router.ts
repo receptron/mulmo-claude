@@ -1,15 +1,9 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createMessageRouter,
-  type SendToMulmoFn,
-} from "../../../bridges/telegram/router.ts";
-import type {
-  TelegramApi,
-  TelegramMessage,
-} from "../../../bridges/telegram/api.ts";
-import { createAllowlist } from "../../../bridges/telegram/allowlist.ts";
-import type { PushEvent } from "../../../bridges/_lib/client.ts";
+import { createMessageRouter, type SendToMulmoFn } from "../src/router.ts";
+import type { TelegramApi, TelegramMessage } from "../src/api.ts";
+import { createAllowlist } from "../src/allowlist.ts";
+import type { PushEvent } from "@mulmobridge/client";
 
 interface SentMessage {
   chatId: number;

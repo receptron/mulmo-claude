@@ -29,7 +29,7 @@
     "**/*.ts",
     "../src/**/*.ts",
     "../server/**/*.ts",
-    "../bridges/**/*.ts"
+    "../packages/*/src/**/*.ts"
   ],
   "exclude": ["../node_modules", "../dist"]
 }

@@ -6,9 +6,12 @@
 
 import type { TelegramApi, TelegramMessage } from "./api.js";
 import type { Allowlist } from "./allowlist.js";
-import type { MessageAck, PushEvent } from "../_lib/client.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import { parseDataUrl } from "../_lib/mime.js";
+import {
+  parseDataUrl,
+  type MessageAck,
+  type PushEvent,
+} from "@mulmobridge/client";
 
 // Telegram caps a single message at 4096 chars. We split long
 // replies naively; pretty formatting (preserve markdown, break on
@@ -117,12 +120,7 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
     }
 
     // Surface the photo-drop so the user knows the image was lost.
-    const messageText =
-      failed && text.trim().length > 0
-        ? `${text}\n\n(note: attached photo could not be downloaded)`
-        : text.trim().length > 0
-          ? text
-          : "What is this image?";
+    const messageText = resolveMessageText(text, failed);
     const ack = await sendToMulmo(
       String(chatId),
       messageText,
@@ -195,6 +193,15 @@ async function sendChunked(
       text.slice(i, i + TELEGRAM_MAX_MESSAGE_CHARS),
     );
   }
+}
+
+function resolveMessageText(text: string, photoFailed: boolean): string {
+  const hasText = text.trim().length > 0;
+  if (photoFailed && hasText) {
+    return `${text}\n\n(note: attached photo could not be downloaded)`;
+  }
+  if (hasText) return text;
+  return "What is this image?";
 }
 
 function userLabel(msg: TelegramMessage): string {

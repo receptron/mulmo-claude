@@ -7,7 +7,7 @@ Discord, the CLI, a web page, …) to MulmoClaude's chat service.
 This is the wire-level contract. It is deliberately small: a
 bridge is ~100–200 lines of platform-side code plus the boilerplate
 covered here. The boilerplate for TypeScript bridges is already
-wrapped in [`bridges/_lib/client.ts`](../bridges/_lib/client.ts).
+wrapped in [`@mulmobridge/client`](../packages/client/).
 Non-Node implementations (Python, Go, anything with a socket.io
 4.x client) can follow this document directly.
 
@@ -219,8 +219,8 @@ await new Promise<void>((resolve) => {
 ```
 
 For the production-grade TS version with error paths baked in, use
-`createBridgeClient` from [`bridges/_lib/client.ts`](../bridges/_lib/client.ts)
-— `bridges/cli/index.ts` is a ~40-line example built on top of it.
+`createBridgeClient` from [`@mulmobridge/client`](../packages/client/)
+— `packages/cli/src/index.ts` is a ~40-line example built on top of it.
 
 ---
 

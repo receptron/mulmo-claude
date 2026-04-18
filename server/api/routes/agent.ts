@@ -42,7 +42,7 @@ import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import { parseDataUrl } from "../../../bridges/_lib/mime.js";
+import { parseDataUrl } from "@mulmobridge/client";
 
 const router = Router();
 const PORT = env.port;

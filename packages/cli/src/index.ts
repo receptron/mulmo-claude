@@ -1,6 +1,7 @@
+#!/usr/bin/env node
 import "dotenv/config";
 import * as readline from "readline";
-import { createBridgeClient } from "../_lib/client.js";
+import { createBridgeClient } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "cli";
 const CHAT_ID = "terminal";

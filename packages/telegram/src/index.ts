@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Telegram bridge (issue #321). Polls Telegram for incoming
 // messages and dispatches them through the shared message router,
 // which enforces the chat-ID allowlist, forwards to MulmoClaude,
@@ -12,7 +13,7 @@
 //   TELEGRAM_POLL_TIMEOUT_SEC   — optional, default 25
 
 import "dotenv/config";
-import { createBridgeClient } from "../_lib/client.js";
+import { createBridgeClient } from "@mulmobridge/client";
 import { createTelegramApi, type TelegramApi } from "./api.js";
 import { parseAllowlist, type Allowlist } from "./allowlist.js";
 import { createMessageRouter, type MessageRouter } from "./router.js";

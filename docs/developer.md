@@ -50,9 +50,9 @@ All env vars are **optional unless flagged "required"**. The server reads them a
 |---|---|---|
 | `GEMINI_API_KEY` | `server/utils/gemini.ts` | Enables Gemini image generation / editing. Without it, image plugins surface a UI warning. The `geminiAvailable` flag in `GET /api/health` mirrors this. |
 | `X_BEARER_TOKEN` | `server/agent/mcp-tools/x.ts` | **Required** to enable `readXPost` / `searchX` MCP tools. Tools are silently disabled if absent. |
-| `TELEGRAM_BOT_TOKEN` | `bridges/telegram/` | **Required** for the Telegram bridge. BotFather token. Treat like a password. See [`message_apps/telegram/`](message_apps/telegram/). |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | `bridges/telegram/` | CSV of integer Telegram chat IDs allowed to message the bot. Empty / unset → deny everyone. A non-integer entry halts startup. |
-| `TELEGRAM_POLL_TIMEOUT_SEC` | `bridges/telegram/` | Long-polling timeout in seconds. Defaults `25` (Telegram's recommended max). |
+| `TELEGRAM_BOT_TOKEN` | `@mulmobridge/telegram` | **Required** for the Telegram bridge. BotFather token. Treat like a password. See [`message_apps/telegram/`](message_apps/telegram/). |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | `@mulmobridge/telegram` | CSV of integer Telegram chat IDs allowed to message the bot. Empty / unset → deny everyone. A non-integer entry halts startup. |
+| `TELEGRAM_POLL_TIMEOUT_SEC` | `@mulmobridge/telegram` | Long-polling timeout in seconds. Defaults `25` (Telegram's recommended max). |
 
 ### Runtime
 
@@ -239,8 +239,8 @@ Every HTTP call to `/api/*` requires `Authorization: Bearer <token>`. Layered on
 - `server/api/auth/bearerAuth.ts` — Express middleware
 - `src/utils/api.ts` — `setAuthToken()` + header injection (no call site changes needed; `apiFetch` auto-attaches)
 - `vite.config.ts` — `mulmoclaudeAuthTokenPlugin` for dev HTML substitution
-- `bridges/_lib/token.ts` — bridge-side resolver (env var → file)
-- `bridges/_lib/client.ts` — shared socket.io setup for every bridge (see `docs/bridge-protocol.md`)
+- `@mulmobridge/client` (token.ts) — bridge-side resolver (env var → file)
+- `@mulmobridge/client` (client.ts) — shared socket.io setup for every bridge (see `docs/bridge-protocol.md`)
 
 ---
 

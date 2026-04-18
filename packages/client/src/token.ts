@@ -1,5 +1,5 @@
 // Resolve the bearer token the CLI bridge sends to /api/*. Used by
-// bridges/cli/index.ts at startup (#272 Phase 2).
+// @mulmobridge/cli at startup (#272 Phase 2).
 //
 // Resolution order:
 //   1. `MULMOCLAUDE_AUTH_TOKEN` env var (useful for parallel shells,

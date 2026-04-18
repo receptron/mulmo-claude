@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createAllowlist,
-  parseAllowlist,
-} from "../../../bridges/telegram/allowlist.ts";
+import { createAllowlist, parseAllowlist } from "../src/allowlist.ts";
 
 describe("parseAllowlist", () => {
   it("empty / undefined → deny-everyone allowlist", () => {

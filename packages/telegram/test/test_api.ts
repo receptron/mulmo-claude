@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createTelegramApi } from "../../../bridges/telegram/api.ts";
+import { createTelegramApi } from "../src/api.ts";
 
 interface FakeCall {
   url: string;

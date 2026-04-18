@@ -10,7 +10,7 @@ import {
   isImageMime,
   isPdfMime,
   isSupportedAttachmentMime,
-} from "../../bridges/_lib/mime.js";
+} from "@mulmobridge/client";
 
 export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 

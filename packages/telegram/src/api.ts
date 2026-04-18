@@ -1,4 +1,4 @@
-import { mimeFromExtension, buildDataUrl } from "../_lib/mime.js";
+import { mimeFromExtension, buildDataUrl } from "@mulmobridge/client";
 
 // Raw `fetch` wrapper for the Telegram Bot API. Only the two methods
 // the bridge actually uses (`getUpdates`, `sendMessage`) are exposed.
@@ -11,7 +11,7 @@ import { mimeFromExtension, buildDataUrl } from "../_lib/mime.js";
 //
 // Message-length handling (4096 char cap, markdown mode, media
 // uploads) is deliberately out of scope for this file — the caller
-// in `bridges/telegram/index.ts` decides how to chunk long replies.
+// in `packages/telegram/src/index.ts` decides how to chunk long replies.
 
 export interface TelegramUpdate {
   update_id: number;

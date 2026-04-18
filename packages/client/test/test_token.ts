@@ -23,7 +23,7 @@ interface TokenModule {
 let cacheBuster = 0;
 async function loadFresh(): Promise<TokenModule> {
   cacheBuster++;
-  const mod = await import(`../../bridges/_lib/token.ts?t=${cacheBuster}`);
+  const mod = await import(`../src/token.ts?t=${cacheBuster}`);
   return mod as TokenModule;
 }
 

@@ -18,7 +18,7 @@
     "**/*.ts",
     "../src/config/roles.ts",
     "../src/plugins/*/definition.ts",
-    "../bridges/**/*.ts"
+    "../packages/*/src/**/*.ts"
   ],
   "exclude": ["node_modules", "../dist"]
 }
