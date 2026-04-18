@@ -281,19 +281,30 @@ function parseMessagePayload(payload: MessagePayload): ParsedMessage {
   return { ok: true, externalChatId, text, attachments };
 }
 
+// Hard limits to prevent oversized payloads from bridges (DoS /
+// accidental misconfiguration). Express's JSON body limit (50 MB)
+// is the outer gate; these are tighter, attachment-specific caps.
+const MAX_ATTACHMENT_COUNT = 10;
+const MAX_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024; // 20 MB base64
+
 function parseAttachments(raw: unknown): Attachment[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   const valid: Attachment[] = [];
+  let totalBytes = 0;
   for (const item of raw) {
+    if (valid.length >= MAX_ATTACHMENT_COUNT) break;
     if (
       item &&
       typeof item === "object" &&
       typeof (item as Record<string, unknown>).mimeType === "string" &&
       typeof (item as Record<string, unknown>).data === "string"
     ) {
+      const data = (item as Record<string, unknown>).data as string;
+      totalBytes += data.length;
+      if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) break;
       const entry: Attachment = {
         mimeType: (item as Record<string, unknown>).mimeType as string,
-        data: (item as Record<string, unknown>).data as string,
+        data,
       };
       const fn = (item as Record<string, unknown>).filename;
       if (typeof fn === "string" && fn.length > 0) entry.filename = fn;
