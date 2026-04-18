@@ -386,13 +386,13 @@ function isScheduledItemArray(x: unknown): x is ScheduledItem[] {
   return Array.isArray(x) && x.every(isScheduledItem);
 }
 
-// When the user opens scheduler/items.json, render it with the
+// When the user opens data/scheduler/items.json, render it with the
 // scheduler plugin's calendar view instead of as a JSON blob. We
 // synthesize a fake ToolResultComplete<SchedulerData> so the View
 // component receives the same shape it normally gets in chat mode.
 const schedulerResult = computed(
   (): ToolResultComplete<SchedulerData> | null => {
-    if (selectedPath.value !== "scheduler/items.json") return null;
+    if (selectedPath.value !== "data/scheduler/items.json") return null;
     if (!content.value || content.value.kind !== "text") return null;
     let parsed: unknown;
     try {
@@ -404,14 +404,14 @@ const schedulerResult = computed(
     return {
       uuid: "files-scheduler-preview",
       toolName: "manageScheduler",
-      message: "scheduler/items.json",
+      message: "data/scheduler/items.json",
       title: "Scheduler",
       data: { items: parsed },
     };
   },
 );
 
-// Same idea as schedulerResult: when the user opens todos/todos.json
+// Same idea as schedulerResult: when the user opens data/todos/todos.json
 // we render it as a full TodoExplorer (kanban / table / list) instead
 // of a raw JSON blob. The TodoExplorer fetches its own state from
 // /api/todos so the data we synthesize here is just a starter — the
@@ -431,7 +431,7 @@ function isTodoItemArray(x: unknown): x is TodoItem[] {
 }
 
 const todoExplorerResult = computed((): ToolResultComplete<TodoData> | null => {
-  if (selectedPath.value !== "todos/todos.json") return null;
+  if (selectedPath.value !== "data/todos/todos.json") return null;
   if (!content.value || content.value.kind !== "text") return null;
   let parsed: unknown;
   try {
@@ -444,7 +444,7 @@ const todoExplorerResult = computed((): ToolResultComplete<TodoData> | null => {
   return {
     uuid: "files-todo-preview",
     toolName: "manageTodoList",
-    message: "todos/todos.json",
+    message: "data/todos/todos.json",
     title: "Todo",
     data: { items, columns },
   };
