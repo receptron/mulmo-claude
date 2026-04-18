@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the MulmoClaude rep
 
 ## Project Overview
 
-MulmoClaude is a text/task-driven agent app with rich visual output. It uses **Claude Code Agent SDK** as the LLM core and **gui-chat-protocol** as the plugin layer.
+MulmoClaude is a text/task-driven agent app with rich visual output. It uses **Claude Code Agent SDK** as the LLM core and **gui-chat-protocol** as the plugin layer. Shared code is published as `@mulmobridge/*` npm packages under `packages/`.
 
 **Core philosophy**: The workspace is the database. Files are the source of truth. Claude is the intelligent interface.
 
@@ -128,9 +128,10 @@ URL-based navigation via `vue-router` (history mode — clean paths, no `#`). Th
 |---|---|
 | `server/agent/index.ts` | Agent loop, MCP server creation per role |
 | `server/agent/mcp-server.ts` | stdio JSON-RPC MCP bridge spawned by the Claude CLI |
+| `server/agent/attachmentConverter.ts` | Converts non-native attachments (DOCX/XLSX/PPTX/text) to Claude content blocks |
 | `server/api/routes/agent.ts` | `POST /api/agent` → SSE stream |
-| `server/api/chat-service/` | External-bridge HTTP + socket.io surface |
-| `server/api/auth/` | Bearer token + CSRF gate |
+| `server/api/chat-service/` | External-bridge HTTP + socket.io surface (DI factory, `@mulmobridge/chat-service`) |
+| `server/api/auth/` | Bearer token + CSRF gate (`/api/files/*` exempt for `<img>` tags) |
 | `server/workspace/journal/` | Workspace journal (daily + optimization passes) |
 | `server/workspace/chat-index/` | Per-session summarizer + sidebar title cache |
 | `server/workspace/roles.ts` | Custom-role loader over `<workspace>/roles/` |
@@ -361,7 +362,7 @@ server/                     ← 6 topical dirs + index.ts + tsconfig.json (#323)
     index.ts                ← runAgent, the agent orchestrator
     mcp-server.ts           ← stdio MCP bridge spawned by Claude CLI
     mcp-tools/              ← auto-registered non-GUI MCP tools
-    config.ts, prompt.ts, stream.ts, resumeFailover.ts, sandboxMounts.ts
+    config.ts, prompt.ts, stream.ts, resumeFailover.ts, sandboxMounts.ts, attachmentConverter.ts
   api/                      ← everything external clients touch
     routes/                 ← one file per /api/* surface
     chat-service/           ← bridge HTTP + socket.io
@@ -377,6 +378,13 @@ server/                     ← 6 topical dirs + index.ts + tsconfig.json (#323)
     env.ts, config.ts, docker.ts, credentials.ts
     logger/, logs/          (logs/ is gitignored runtime output)
   utils/                    ← shared helpers, one file per concept
+
+packages/                   ← @mulmobridge/* npm packages (yarn workspaces)
+  protocol/                 ← shared types + constants (EVENT_TYPES, Attachment)
+  client/                   ← socket.io client + token reader + MIME utils
+  chat-service/             ← server-side chat service (DI factory)
+  cli/                      ← interactive terminal bridge
+  telegram/                 ← Telegram bot bridge
 
 src/
   components/     ← shared Vue components

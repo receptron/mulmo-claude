@@ -29,6 +29,27 @@ yarn dev
 
 This starts both the frontend (Vite) and the backend (Express + Claude Code agent) concurrently. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+### Messaging bridges (Telegram, CLI)
+
+MulmoClaude can be accessed from messaging apps via **bridge processes**. Bridges run as separate child processes and connect to the server over socket.io.
+
+```bash
+# Interactive CLI bridge (same machine)
+yarn cli
+
+# Telegram bot bridge (requires TELEGRAM_BOT_TOKEN in .env)
+yarn telegram
+```
+
+Bridges are also available as standalone npm packages:
+
+```bash
+npx @mulmobridge/cli@latest      # CLI bridge
+npx @mulmobridge/telegram@latest # Telegram bridge
+```
+
+See [`docs/message_apps/telegram/README.md`](docs/message_apps/telegram/README.md) for Telegram bot setup (BotFather, chat ID allowlist, etc.).
+
 ### Why do you need a Gemini API key?
 
 MulmoClaude uses Google's **Gemini 3.1 Flash Image (nano banana 2)** model for image generation and editing. This powers:
@@ -55,6 +76,15 @@ MulmoClaude uses Claude Code as its AI backend, which has access to tools includ
 **Without Docker**, Claude can access any file your user account can reach, including SSH keys and credentials stored outside your workspace. This is acceptable for personal local use, but worth understanding.
 
 **With Docker Desktop installed**, MulmoClaude automatically runs Claude inside a sandboxed container. Only your workspace and Claude's own config (`~/.claude`) are mounted — the rest of your filesystem is invisible to Claude. No configuration is required: the app detects Docker on startup and enables the sandbox automatically.
+
+**Bearer token auth**: every `/api/*` endpoint requires an `Authorization: Bearer <token>` header. The token is auto-generated on server startup and injected into the browser via a `<meta>` tag — no manual setup. The only exception is `/api/files/*` (exempt because `<img>` tags in rendered documents can't attach headers). See [`docs/developer.md`](docs/developer.md#auth-bearer-token-on-api) for details.
+
+**Sandbox credential forwarding** (opt-in): by default the sandbox has no access to host credentials. Two environment variables let you selectively expose what `git` / `gh` need:
+
+- `SANDBOX_SSH_AGENT_FORWARD=1` — forwards the host's SSH agent socket. Private keys stay on the host.
+- `SANDBOX_MOUNT_CONFIGS=gh,gitconfig` — mounts `~/.config/gh` and `~/.gitconfig` read-only.
+
+Full contract and security notes: [`docs/sandbox-credentials.md`](docs/sandbox-credentials.md).
 
 ### Installing Docker Desktop
 
@@ -389,6 +419,21 @@ Constraints the server enforces when loading the file:
 
 You don't need to list `mcp__<id>` entries for servers defined in `mcp.json` — those are allowed automatically on every agent run. `extraAllowedTools` is only for tools that aren't reachable through your own `mcpServers`, typically Claude Code's built-in `mcp__claude_ai_*` bridges after you've run `claude mcp` and completed OAuth.
 
+## Chat Attachments
+
+Paste (Ctrl+V / Cmd+V) or drag-and-drop files into the chat input to send them to Claude alongside your message.
+
+| File type | What Claude sees | Dependency |
+|---|---|---|
+| Image (PNG, JPEG, GIF, WebP, …) | Vision content block (native) | None |
+| PDF | Document content block (native) | None |
+| Text (.txt, .csv, .json, .md, .xml, .html, .yaml) | Decoded UTF-8 text | None |
+| DOCX | Extracted plain text | `mammoth` (npm) |
+| XLSX | CSV per sheet | `xlsx` (npm) |
+| PPTX | Converted to PDF | LibreOffice (Docker sandbox) |
+
+PPTX conversion runs inside the Docker sandbox image (`libreoffice --headless`). Without Docker, a message suggests exporting to PDF or images instead. Maximum attachment size is 30 MB.
+
 ## Workspace
 
 All data is stored as plain files in the workspace directory, grouped into four semantic buckets (#284):
@@ -426,3 +471,17 @@ fields.
 The chat-side `manageTodoList` MCP tool keeps its existing behaviour
 unchanged — it can read and edit text / note / labels / completed
 todos, and the explorer's extra fields are preserved across MCP edits.
+
+## Monorepo Packages
+
+Shared code is extracted into publishable npm packages under `packages/`:
+
+| Package | Description |
+|---|---|
+| `@mulmobridge/protocol` | Shared types and constants (EVENT_TYPES, Attachment, socket events) |
+| `@mulmobridge/client` | Socket.io client library + bearer token reader + MIME utilities |
+| `@mulmobridge/chat-service` | Server-side chat service (socket.io + REST bridge, DI factory) |
+| `@mulmobridge/cli` | Interactive terminal bridge (`yarn cli` or `npx @mulmobridge/cli`) |
+| `@mulmobridge/telegram` | Telegram bot bridge (`yarn telegram` or `npx @mulmobridge/telegram`) |
+
+Anyone can write a bridge in any language — just speak the socket.io protocol documented in [`docs/bridge-protocol.md`](docs/bridge-protocol.md).
