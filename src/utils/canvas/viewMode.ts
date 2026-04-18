@@ -1,41 +1,35 @@
 // Pure helpers for the canvas view mode.
 // The type also lives here, so test files and composables can
 // import it without pulling in a .vue file.
+//
+// To add a new view mode, append it to VIEW_MODES below.
+// Everything else (type, set, parser, shortcut) derives automatically.
 
-export type CanvasViewMode =
-  | "single"
-  | "stack"
-  | "files"
-  | "todos"
-  | "scheduler";
+const VIEW_MODES = ["single", "stack", "files", "todos", "scheduler"] as const;
+
+export type CanvasViewMode = (typeof VIEW_MODES)[number];
+
+function isCanvasViewMode(value: string): value is CanvasViewMode {
+  return (VIEW_MODES as readonly string[]).includes(value);
+}
 
 /** All valid view mode values. Guards and parsers check against this. */
-export const VALID_VIEW_MODES: ReadonlySet<string> = new Set<CanvasViewMode>([
-  "single",
-  "stack",
-  "files",
-  "todos",
-  "scheduler",
-]);
+export const VALID_VIEW_MODES: ReadonlySet<string> = new Set(VIEW_MODES);
 
 export const VIEW_MODE_STORAGE_KEY = "canvas_view_mode";
 
 // Parse a value pulled out of localStorage. Anything other than the
 // known modes — including null — falls back to "single".
 export function parseStoredViewMode(stored: string | null): CanvasViewMode {
-  if (typeof stored === "string" && VALID_VIEW_MODES.has(stored)) {
-    return stored as CanvasViewMode;
+  if (typeof stored === "string" && isCanvasViewMode(stored)) {
+    return stored;
   }
   return "single";
 }
 
 // Map a Cmd/Ctrl + N keyboard shortcut digit to its view mode.
-// Returns null when the key is not a known shortcut.
+// Shortcut keys are 1-indexed into the VIEW_MODES array.
 export function viewModeForShortcutKey(key: string): CanvasViewMode | null {
-  if (key === "1") return "single";
-  if (key === "2") return "stack";
-  if (key === "3") return "files";
-  if (key === "4") return "todos";
-  if (key === "5") return "scheduler";
-  return null;
+  const index = Number(key) - 1;
+  return VIEW_MODES[index] ?? null;
 }
