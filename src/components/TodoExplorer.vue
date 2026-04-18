@@ -242,7 +242,7 @@ const VIEW_MODES: ViewModeOption[] = [
 const VIEW_MODE_KEY = "todo_explorer_view_mode";
 
 const props = defineProps<{
-  selectedResult: ToolResultComplete<TodoData>;
+  selectedResult?: ToolResultComplete<TodoData>;
 }>();
 
 const {
@@ -259,18 +259,18 @@ const {
   deleteColumn,
   reorderColumns,
 } = useTodos(
-  props.selectedResult.data?.items ?? [],
-  props.selectedResult.data?.columns ?? [],
+  props.selectedResult?.data?.items ?? [],
+  props.selectedResult?.data?.columns ?? [],
 );
 
 // When the parent swaps in a different tool result, reseed the local
 // state and re-fetch from the server. Watching the uuid (not items)
 // so empty-result swaps still trigger.
 watch(
-  () => props.selectedResult.uuid,
+  () => props.selectedResult?.uuid,
   () => {
-    items.value = props.selectedResult.data?.items ?? [];
-    columns.value = props.selectedResult.data?.columns ?? [];
+    items.value = props.selectedResult?.data?.items ?? [];
+    columns.value = props.selectedResult?.data?.columns ?? [];
     void refresh();
   },
 );

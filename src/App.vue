@@ -394,10 +394,19 @@
         />
         <!-- Files mode -->
         <FilesView
-          v-else
+          v-else-if="canvasViewMode === 'files'"
           :refresh-token="filesRefreshToken"
           @load-session="onFilesViewLoadSession"
         />
+        <!-- Todos mode -->
+        <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
+        <!-- Scheduler mode (placeholder until SchedulerView lands) -->
+        <div
+          v-else-if="canvasViewMode === 'scheduler'"
+          class="flex items-center justify-center h-full text-gray-500"
+        >
+          Scheduler view (coming soon)
+        </div>
       </div>
     </div>
     <!-- Right sidebar: tool call history -->
@@ -436,6 +445,7 @@ import PluginLauncher, {
 } from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
+import TodoExplorer from "./components/TodoExplorer.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
 import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";

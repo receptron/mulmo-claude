@@ -1,7 +1,7 @@
-// Composable for the canvas view mode (single / stack / files):
+// Composable for the canvas view mode (single / stack / files / todos / scheduler):
 // owns the reactive ref, syncs to the URL via vue-router, persists
 // to localStorage as fallback, hooks the "refresh files tree after
-// each agent run" side effect, and exposes the Cmd/Ctrl+1/2/3
+// each agent run" side effect, and exposes the Cmd/Ctrl+1–5
 // keydown handler. The pure parsing helpers live in
 // src/utils/canvas/viewMode.ts so the rules are unit-testable.
 

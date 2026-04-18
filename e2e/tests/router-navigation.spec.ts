@@ -123,6 +123,18 @@ test.describe("view mode in URL", () => {
     expect(new URL(page.url()).searchParams.get("view")).toBe("stack");
   });
 
+  test("?view=todos switches to todos view", async ({ page }) => {
+    await page.goto("/chat?view=todos");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("view")).toBe("todos");
+  });
+
+  test("?view=scheduler switches to scheduler view", async ({ page }) => {
+    await page.goto("/chat?view=scheduler");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("view")).toBe("scheduler");
+  });
+
   test("no ?view= defaults to single (no param in URL)", async ({ page }) => {
     await page.goto("/chat");
     await page.waitForURL(/\/chat\//);
