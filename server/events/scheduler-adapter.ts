@@ -295,7 +295,7 @@ function computeCurrentWindow(task: SystemTaskDef): string {
   const windowMs = nextWindowAfter(
     coreSchedule,
     nowMs -
-      (coreSchedule.type === "interval"
+      (coreSchedule.type === SCHEDULE_TYPES.interval
         ? coreSchedule.intervalSec * ONE_SECOND_MS
         : 0),
   );
@@ -313,7 +313,7 @@ function computeNextScheduled(task: SystemTaskDef): string | null {
 function toCoreSchedule(schedule: TaskDefinition["schedule"]): TaskSchedule {
   if (schedule.type === SCHEDULE_TYPES.interval) {
     return {
-      type: "interval",
+      type: SCHEDULE_TYPES.interval,
       intervalSec: Math.round(schedule.intervalMs / ONE_SECOND_MS),
     };
   }
