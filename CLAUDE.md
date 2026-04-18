@@ -212,8 +212,30 @@ String literals that form cross-module contracts (endpoint paths, event types, t
 | Built-in role IDs | `src/config/roles.ts` → `BUILTIN_ROLE_IDS` | `if (roleId === BUILTIN_ROLE_IDS.general)` |
 | Pub-sub channels | `src/config/pubsubChannels.ts` → `sessionChannel()` | `pubsub.publish(sessionChannel(id), event)` |
 | SSE event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `event.type === EVENT_TYPES.toolCall` |
+| Time constants | `server/utils/time.ts` → `ONE_SECOND_MS` / `ONE_MINUTE_MS` / `ONE_HOUR_MS` / `ONE_DAY_MS` | `intervalMs: ONE_HOUR_MS`, `timeout: 5 * ONE_SECOND_MS` |
+| Timeout presets | `server/utils/time.ts` → `SUBPROCESS_PROBE_TIMEOUT_MS` / `SUBPROCESS_WORK_TIMEOUT_MS` / `CLI_SUBPROCESS_TIMEOUT_MS` | `{ timeout: SUBPROCESS_PROBE_TIMEOUT_MS }` |
+| Scheduler types | `@receptron/task-scheduler` → `SCHEDULE_TYPES` / `TASK_RESULTS` / `TASK_TRIGGERS` / `MISSED_RUN_POLICIES` | `schedule.type === SCHEDULE_TYPES.interval` |
 
 **Adding a new endpoint**: add the path to `src/config/apiRoutes.ts` first, then reference `API_ROUTES.<group>.<name>` from both the router file and the frontend `fetch()` call. Routers register the full `/api/...` path directly (no mount prefix in `server/index.ts`).
+
+### Time literals — NEVER use raw numbers
+
+NEVER write raw millisecond literals (`1000`, `5000`, `60_000`, `3_600_000`, `86_400_000`) or raw arithmetic (`60 * 60 * 1000`). MUST import from `server/utils/time.ts`:
+
+```typescript
+// GOOD
+import { ONE_HOUR_MS, ONE_MINUTE_MS, SUBPROCESS_PROBE_TIMEOUT_MS } from "../utils/time.js";
+const INTERVAL_MS = 15 * ONE_MINUTE_MS;
+await execFileAsync("docker", ["ps"], { timeout: SUBPROCESS_PROBE_TIMEOUT_MS });
+
+// BAD
+const INTERVAL_MS = 15 * 60 * 1000;
+await execFileAsync("docker", ["ps"], { timeout: 5000 });
+```
+
+When a new timeout value is needed in 3+ places, add a named preset to `server/utils/time.ts` rather than repeating `N * ONE_SECOND_MS` inline.
+
+Scheduler-related string literals (`"interval"`, `"daily"`, `"success"`, `"error"`, `"scheduled"`, `"catch-up"`, `"run-once"`) MUST use constants from `@receptron/task-scheduler` (`SCHEDULE_TYPES`, `TASK_RESULTS`, `TASK_TRIGGERS`, `MISSED_RUN_POLICIES`). Typos in string literals are silent bugs; constants produce compile errors.
 
 ## Cross-platform considerations
 
@@ -310,6 +332,9 @@ Key shared helpers in this repo:
 | `loadJsonFile` / `saveJsonFile` | `server/utils/files/json.ts` |
 | `errorMessage(err)` | `server/utils/errors.ts` |
 | `dispatchResponse(res, result)` | `server/api/routes/dispatchResponse.ts` |
+| `ONE_SECOND_MS` / `ONE_MINUTE_MS` / `ONE_HOUR_MS` / `ONE_DAY_MS` | `server/utils/time.ts` |
+| `SUBPROCESS_PROBE_TIMEOUT_MS` / `SUBPROCESS_WORK_TIMEOUT_MS` / `CLI_SUBPROCESS_TIMEOUT_MS` | `server/utils/time.ts` |
+| `SCHEDULE_TYPES` / `TASK_RESULTS` / `TASK_TRIGGERS` / `MISSED_RUN_POLICIES` | `@receptron/task-scheduler` |
 | `useFreshPluginData(opts)` | `src/composables/useFreshPluginData.ts` |
 | `useCanvasViewMode(opts)` | `src/composables/useCanvasViewMode.ts` |
 | `applyViewToQuery(query, mode)` | `src/composables/useCanvasViewMode.ts` |
