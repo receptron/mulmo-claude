@@ -7,7 +7,7 @@
           {
             "type": "command",
             "if": "Bash(git commit *)",
-            "command": "yarn format --check && yarn lint && yarn typecheck && yarn build && yarn test",
+            "command": "yarn build:packages && yarn format --check && yarn lint && yarn typecheck && yarn build && yarn test",
             "timeout": 300,
             "statusMessage": "Pre-commit checks (format/lint/typecheck/build/test)..."
           }

@@ -91,6 +91,8 @@ Run `git diff --stat` and `git diff` first, then check every item below against 
 
 - [ ] README.md updated if features/roles/commands changed.
 - [ ] CLAUDE.md updated if architecture/key-files/helpers changed.
+- [ ] `docs/developer.md` updated if environment variables, scripts, workspace layout, or process map changed.
+- [ ] **Any spec change, feature addition, or API change MUST be reflected in README.md, CLAUDE.md, and docs/ in the same PR.** Do not leave documentation updates as a follow-up — they are part of the definition of done.
 - [ ] `docs/manual-testing.md` updated if a scenario is deliberately left uncovered by E2E.
 - [ ] New plugins update all required places (see Plugin Development in CLAUDE.md — 4 places for package, 8 for local).
 - [ ] New endpoints added to `src/config/apiRoutes.ts` FIRST, then referenced.
