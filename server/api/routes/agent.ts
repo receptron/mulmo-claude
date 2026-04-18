@@ -318,10 +318,14 @@ interface BackgroundRunParams {
 }
 
 // Per-event side-effect context passed to `handleAgentEvent`.
+// `textAccumulator` collects streaming text chunks so we write
+// one consolidated line to the jsonl instead of per-chunk lines
+// (which would appear as separate cards on session reload).
 interface EventContext {
   chatSessionId: string;
   resultsFilePath: string;
   toolArgsCache: ReturnType<typeof createArgsCache>;
+  textAccumulator: string[];
 }
 
 // Returns true if the event was handled "out of band" (no pub-sub
@@ -336,22 +340,23 @@ async function handleAgentEvent(
   ctx: EventContext,
 ): Promise<void> {
   if (event.type === EVENT_TYPES.claudeSessionId) {
+    await flushTextAccumulator(ctx);
     await setClaudeId(ctx.chatSessionId, event.id);
     return;
   }
   pushSessionEvent(ctx.chatSessionId, event as Record<string, unknown>);
 
   if (event.type === EVENT_TYPES.text) {
-    await appendSessionLine(
-      ctx.chatSessionId,
-      JSON.stringify({
-        source: "assistant",
-        type: EVENT_TYPES.text,
-        message: event.message,
-      }),
-    );
+    // Accumulate text chunks instead of writing each one to jsonl.
+    // Flushed when a non-text event arrives (preserving jsonl order
+    // relative to tool events) or when the run ends.
+    ctx.textAccumulator.push(event.message);
     return;
   }
+  // Any non-text event marks the end of a text burst — flush so
+  // jsonl order matches the live stream and crashes mid-run don't
+  // lose already-streamed text.
+  await flushTextAccumulator(ctx);
   if (event.type === EVENT_TYPES.toolCall) {
     log.info("agent-tool", "call", {
       chatSessionId: ctx.chatSessionId,
@@ -382,6 +387,25 @@ async function handleAgentEvent(
   }).catch(logBackgroundError("tool-trace"));
 }
 
+// Write the accumulated streaming text chunks as one consolidated
+// jsonl line. Called at the end of each agent run (success or error)
+// so the session transcript has exactly one assistant text entry
+// per response, not N per-chunk entries.
+async function flushTextAccumulator(ctx: EventContext): Promise<void> {
+  if (ctx.textAccumulator.length === 0) return;
+  const fullText = ctx.textAccumulator.join("");
+  ctx.textAccumulator.length = 0;
+  if (!fullText) return;
+  await appendSessionLine(
+    ctx.chatSessionId,
+    JSON.stringify({
+      source: "assistant",
+      type: EVENT_TYPES.text,
+      message: fullText,
+    }),
+  );
+}
+
 async function runAgentInBackground(
   params: BackgroundRunParams,
 ): Promise<void> {
@@ -401,6 +425,7 @@ async function runAgentInBackground(
     chatSessionId,
     resultsFilePath,
     toolArgsCache,
+    textAccumulator: [],
   };
 
   // Retry budget for the stale `--resume` id fail-over (#211). Only
@@ -463,11 +488,17 @@ async function runAgentInBackground(
           "Previous session unavailable — continuing with local transcript.",
       });
     }
+    // Flush any accumulated streaming text as a single consolidated
+    // line in the jsonl. This prevents per-chunk lines that would
+    // appear as separate cards on session reload.
+    await flushTextAccumulator(eventCtx);
+
     log.info("agent", "request completed", {
       chatSessionId,
       durationMs: Date.now() - requestStartedAt,
     });
   } catch (err) {
+    await flushTextAccumulator(eventCtx);
     log.error("agent", "request failed", {
       chatSessionId,
       error: String(err),

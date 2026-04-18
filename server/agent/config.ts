@@ -268,6 +268,7 @@ export function buildCliArgs(params: CliArgsParams): string[] {
     "stream-json",
     "--input-format",
     "stream-json",
+    "--include-partial-messages",
     "--verbose",
     "--system-prompt",
     systemPrompt,
