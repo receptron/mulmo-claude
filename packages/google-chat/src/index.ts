@@ -191,9 +191,29 @@ async function verifyGoogleChatToken(
 
 // ── Webhook server ──────────────────────────────────────────────
 
+const BODY_LIMIT = "1mb";
+const RATE_WINDOW_MS = 60_000;
+const MAX_REQUESTS_PER_WINDOW = 120;
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimitCheck(ip: string): boolean {
+  const now = Date.now();
+  const entry = requestCounts.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    requestCounts.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= MAX_REQUESTS_PER_WINDOW;
+}
+
+function redactId(id: string): string {
+  return id.length > 6 ? `${id.slice(0, 3)}***${id.slice(-3)}` : "***";
+}
+
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json());
+app.use(express.json({ limit: BODY_LIMIT }));
 
 function extractEventType(body: unknown): string {
   if (!isObj(body) || typeof body.type !== "string") return "";
@@ -222,6 +242,12 @@ function extractMessage(body: unknown): ParsedMessage | null {
 }
 
 app.post("/", async (req: Request, res: Response) => {
+  const clientIp = req.ip ?? "unknown";
+  if (!rateLimitCheck(clientIp)) {
+    res.status(429).json({ error: "Too Many Requests" });
+    return;
+  }
+
   // Verify the request is from Google Chat
   const authHeader =
     typeof req.headers.authorization === "string"
@@ -229,7 +255,7 @@ app.post("/", async (req: Request, res: Response) => {
       : undefined;
   const verified = await verifyGoogleChatToken(authHeader);
   if (!verified) {
-    console.warn("[google-chat] JWT verification failed");
+    console.warn("[google-chat] AUTH_FAILED: JWT verification failed");
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -248,14 +274,14 @@ app.post("/", async (req: Request, res: Response) => {
 
   const parsed = extractMessage(req.body);
   if (!parsed || !parsed.text.trim()) {
-    res.json({});
+    res.status(400).json({ error: "PAYLOAD_INVALID" });
     return;
   }
 
   const { spaceName, senderName, text } = parsed;
 
   console.log(
-    `[google-chat] message space=${spaceName} sender=${senderName} len=${text.length}`,
+    `[google-chat] message space=${redactId(spaceName)} sender=${redactId(senderName)} len=${text.length}`,
   );
 
   try {
@@ -264,11 +290,12 @@ app.post("/", async (req: Request, res: Response) => {
       res.json({ text: ack.reply ?? "(empty reply)" });
     } else {
       const status = ack.status ? ` (${ack.status})` : "";
+      console.error(`[google-chat] UPSTREAM_ERROR: ${ack.error ?? "unknown"}`);
       res.json({ text: `Error${status}: ${ack.error ?? "unknown"}` });
     }
   } catch (err) {
-    console.error(`[google-chat] message handling failed: ${err}`);
-    res.json({ text: "Sorry, an error occurred processing your message." });
+    console.error(`[google-chat] UPSTREAM_ERROR: ${err}`);
+    res.status(500).json({ error: "Internal error" });
   }
 });
 

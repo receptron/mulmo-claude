@@ -95,9 +95,25 @@ function verifySignature(rawBody: string, signature: string): boolean {
 
 // ── Webhook server ──────────────────────────────────────────────
 
+const BODY_LIMIT = "1mb";
+const RATE_WINDOW_MS = 60_000;
+const MAX_REQUESTS_PER_WINDOW = 120;
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimitCheck(ip: string): boolean {
+  const now = Date.now();
+  const entry = requestCounts.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    requestCounts.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= MAX_REQUESTS_PER_WINDOW;
+}
+
 const app = express();
 app.disable("x-powered-by");
-app.use(express.text({ type: "application/json" }));
+app.use(express.text({ type: "application/json", limit: BODY_LIMIT }));
 
 // Webhook verification (GET)
 app.get("/webhook", (req: Request, res: Response) => {
@@ -127,11 +143,20 @@ async function handleWebhookBody(rawBody: string): Promise<void> {
 
 // Webhook events (POST)
 app.post("/webhook", async (req: Request, res: Response) => {
-  const signature = req.headers["x-hub-signature-256"] as string;
-  const rawBody = req.body as string;
+  const clientIp = req.ip ?? "unknown";
+  if (!rateLimitCheck(clientIp)) {
+    res.status(429).send("Too Many Requests");
+    return;
+  }
+
+  const signature =
+    typeof req.headers["x-hub-signature-256"] === "string"
+      ? req.headers["x-hub-signature-256"]
+      : "";
+  const rawBody = typeof req.body === "string" ? req.body : "";
 
   if (!signature || !verifySignature(rawBody, signature)) {
-    console.warn("[messenger] signature verification failed");
+    console.warn("[messenger] AUTH_FAILED: signature verification failed");
     res.status(401).send("Invalid signature");
     return;
   }
@@ -140,9 +165,13 @@ app.post("/webhook", async (req: Request, res: Response) => {
   await handleWebhookBody(rawBody);
 });
 
+function redactId(id: string): string {
+  return id.length > 6 ? `${id.slice(0, 3)}***${id.slice(-3)}` : "***";
+}
+
 async function processOneMessage(msg: ExtractedMessage): Promise<void> {
   console.log(
-    `[messenger] message from=${msg.senderId} len=${msg.text.length}`,
+    `[messenger] message from=${redactId(msg.senderId)} len=${msg.text.length}`,
   );
   try {
     const ack = await mulmo.send(msg.senderId, msg.text);
