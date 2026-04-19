@@ -109,13 +109,14 @@ npx @mulmobridge/telegram
 
 | Platform | Package | Status |
 |---|---|---|
-| CLI | `@mulmobridge/cli` | ✅ Available |
-| Telegram | `@mulmobridge/telegram` | ✅ Available |
-| LINE | — | 🔲 Planned |
-| Slack | — | 🔲 Planned |
-| Discord | — | 🔲 Planned |
-| WhatsApp | — | 🔲 Planned |
-| Matrix | — | 🔲 Planned |
+| CLI | [`@mulmobridge/cli`](https://www.npmjs.com/package/@mulmobridge/cli) | Stable |
+| Telegram | [`@mulmobridge/telegram`](https://www.npmjs.com/package/@mulmobridge/telegram) | Stable |
+| Discord | [`@mulmobridge/discord`](https://www.npmjs.com/package/@mulmobridge/discord) | Experimental |
+| Slack | [`@mulmobridge/slack`](https://www.npmjs.com/package/@mulmobridge/slack) | Experimental |
+| LINE | [`@mulmobridge/line`](https://www.npmjs.com/package/@mulmobridge/line) | Experimental |
+| WhatsApp | [`@mulmobridge/whatsapp`](https://www.npmjs.com/package/@mulmobridge/whatsapp) | Experimental |
+| Matrix | [`@mulmobridge/matrix`](https://www.npmjs.com/package/@mulmobridge/matrix) | Experimental |
+| IRC | [`@mulmobridge/irc`](https://www.npmjs.com/package/@mulmobridge/irc) | Experimental |
 
 Want to build a bridge for your platform? The [bridge protocol docs](https://github.com/receptron/mulmoclaude/blob/main/docs/bridge-protocol.md) cover the full wire-level contract. Any language with a socket.io 4.x client works.
 
