@@ -7,7 +7,9 @@
 | ドキュメント | 言語 | 説明 |
 |---|---|---|
 | [MulmoBridge ガイド](mulmobridge-guide.md) | 日本語 | メッセージアプリから自宅PCのAIと話す方法。仕組み、設定方法、ダミーサーバーの使い方 |
-| [スケジュー���ー ガイド](scheduler-guide.md) | ��本語 | カレンダーと定期タスク。AIに自動で仕事をさせる方法 |
+| [MulmoBridge Guide](mulmobridge-guide.en.md) | English | Same as above in English |
+| [スケジューラー ガイド](scheduler-guide.md) | 日本語 | カレンダーと定期タスク。AIに自動で仕事をさせる方法 |
+| [Scheduler Guide](scheduler-guide.en.md) | English | Same as above in English |
 | [Telegram セットアップ](message_apps/telegram/README.md) | English | Telegram Bot の作成と接続手順 |
 | [Telegram セットアップ](message_apps/telegram/README.ja.md) | 日本語 | 同上の日本語版 |
 
