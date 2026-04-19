@@ -9,6 +9,7 @@ import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import {
   scheduleTestNotification,
+  initNotifications,
   DEFAULT_NOTIFICATION_MESSAGE,
   DEFAULT_NOTIFICATION_TRANSPORT_ID,
   DEFAULT_NOTIFICATION_CHAT_ID,
@@ -20,13 +21,15 @@ function createSpyDeps(): NotificationDeps & {
 } {
   const pushCalls: { transportId: string; chatId: string; message: string }[] =
     [];
-  return {
+  const deps: NotificationDeps & { pushCalls: typeof pushCalls } = {
     pushCalls,
     publish: () => {},
     pushToBridge: (transportId, chatId, message) => {
       pushCalls.push({ transportId, chatId, message });
     },
   };
+  initNotifications(deps);
+  return deps;
 }
 
 beforeEach(() => {
