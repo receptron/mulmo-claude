@@ -677,13 +677,6 @@
     wrap-ansi "^8.1.0"
     wrap-ansi-cjs "npm:wrap-ansi@^7.0.0"
 
-"@isaacs/fs-minipass@^4.0.0":
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz#2d59ae3ab4b38fb4270bfa23d30f8e2e86c7fe32"
-  integrity sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==
-  dependencies:
-    minipass "^7.0.4"
-
 "@jridgewell/gen-mapping@^0.3.12", "@jridgewell/gen-mapping@^0.3.5":
   version "0.3.13"
   resolved "https://registry.yarnpkg.com/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz#6342a19f44347518c93e43b1ac69deb3c4656a1f"
@@ -1016,7 +1009,7 @@
   dependencies:
     "@types/node" ">=18"
 
-"@slack/socket-mode@^2.0.3":
+"@slack/socket-mode@^2.0.6":
   version "2.0.6"
   resolved "https://registry.yarnpkg.com/@slack/socket-mode/-/socket-mode-2.0.6.tgz#9fff31f180d9bab1f7051f4bf49b1889d9542e18"
   integrity sha512-Aj5RO3MoYVJ+b2tUjHUXuA3tiIaCUMOf1Ss5tPiz29XYVUi6qNac2A8ulcU1pUPERpXVHTmT1XW6HzQIO74daQ==
@@ -1033,7 +1026,7 @@
   resolved "https://registry.yarnpkg.com/@slack/types/-/types-2.20.1.tgz#2528592813eb088691a8665d55e21ec47ddc8217"
   integrity sha512-eWX2mdt1ktpn8+40iiMc404uGrih+2fxiky3zBcPjtXKj6HLRdYlmhrPkJi7JTJm8dpXR6BWVWEDBXtaWMKD6A==
 
-"@slack/web-api@^7.15.0", "@slack/web-api@^7.8.0":
+"@slack/web-api@^7.15.0", "@slack/web-api@^7.15.1":
   version "7.15.1"
   resolved "https://registry.yarnpkg.com/@slack/web-api/-/web-api-7.15.1.tgz#164b95ba3a9b4f1f0d5f30793e3d42e02afe8bb3"
   integrity sha512-y+TAF7TszcmFzbVtBkFqAdBwKSoD+8shkNxhp4WIfFwXmCKdFje9WD6evROApPa2FTy1v1uc9yBaJs3609PPgg==
@@ -1268,6 +1261,13 @@
   version "0.0.29"
   resolved "https://registry.yarnpkg.com/@types/json5/-/json5-0.0.29.tgz#ee28707ae94e11d2b827bcbe5270bcea7f3e71ee"
   integrity sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==
+
+"@types/matrix-js-sdk@^11.1.0":
+  version "11.1.0"
+  resolved "https://registry.yarnpkg.com/@types/matrix-js-sdk/-/matrix-js-sdk-11.1.0.tgz#0383e7b64d4dd661651e50a1562d472953a6ce1b"
+  integrity sha512-uBiwPqe5luvSOI+1IuzHwm1VgnvpNXpPgWkSsKPOeMFBJNB73ySA4BVLsg94CvoouNDPEcnrQMluPRTOKx/vog==
+  dependencies:
+    matrix-js-sdk "*"
 
 "@types/node-fetch@^2.6.4":
   version "2.6.13"
@@ -2167,11 +2167,6 @@ chokidar@^5.0.0:
   dependencies:
     readdirp "^5.0.0"
 
-chownr@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/chownr/-/chownr-3.0.0.tgz#9855e64ecd240a9cc4267ce8a4aa5d24a1da15e4"
-  integrity sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==
-
 chromium-bidi@14.0.0:
   version "14.0.0"
   resolved "https://registry.yarnpkg.com/chromium-bidi/-/chromium-bidi-14.0.0.tgz#15a12ab083ae519a49a724e94994ca0a9ced9c8e"
@@ -2539,7 +2534,7 @@ discord-api-types@^0.38.1, discord-api-types@^0.38.33, discord-api-types@^0.38.4
   resolved "https://registry.yarnpkg.com/discord-api-types/-/discord-api-types-0.38.47.tgz#34f2dde6ff65d31fc8950b298426d61b46836901"
   integrity sha512-XgXQodHQBAE6kfD7kMvVo30863iHX1LHSqNq6MGUTDwIFCCvHva13+rwxyxVXDqudyApMNAd32PGjgVETi5rjA==
 
-discord.js@^14.18.0:
+discord.js@^14.26.3:
   version "14.26.3"
   resolved "https://registry.yarnpkg.com/discord.js/-/discord.js-14.26.3.tgz#51d0b781780058cce4a2d71caa5653bfcc152559"
   integrity sha512-XEKtYn28YFsiJ5l4fLRyikdbo6RD5oFyqfVHQlvXz2104JhH/E8slN28dbky05w3DCrJcNVWvhVvcJCTSl/KIg==
@@ -4638,7 +4633,7 @@ matrix-events-sdk@0.0.1:
   resolved "https://registry.yarnpkg.com/matrix-events-sdk/-/matrix-events-sdk-0.0.1.tgz#c8c38911e2cb29023b0bbac8d6f32e0de2c957dd"
   integrity sha512-1QEOsXO+bhyCroIe2/A5OwaxHvBm7EsSQ46DEDn8RBIfQwN5HWBpFvyWWR4QY0KHPPnnJdI99wgRiAl7Ad5qaA==
 
-matrix-js-sdk@^41.3.0:
+matrix-js-sdk@*, matrix-js-sdk@^41.3.0:
   version "41.3.0"
   resolved "https://registry.yarnpkg.com/matrix-js-sdk/-/matrix-js-sdk-41.3.0.tgz#7003a7a862232d06e015db90c5174d61ad673b2c"
   integrity sha512-QTNHpBQEKPH3WS4O92CBfFj6GxeyijT8osI/QxNvOrM3rE6CySXRtRRKnzR0ntFSdrk1CxrDGV6h2wmk7B3peQ==
@@ -4765,17 +4760,10 @@ minimist@^1.2.0, minimist@^1.2.6:
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.8.tgz#c1a464e7693302e082a075cee0c057741ac4772c"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
 
-"minipass@^5.0.0 || ^6.0.2 || ^7.0.0", minipass@^7.0.4, minipass@^7.1.2:
+"minipass@^5.0.0 || ^6.0.2 || ^7.0.0", minipass@^7.1.2:
   version "7.1.3"
   resolved "https://registry.yarnpkg.com/minipass/-/minipass-7.1.3.tgz#79389b4eb1bb2d003a9bba87d492f2bd37bdc65b"
   integrity sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==
-
-minizlib@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/minizlib/-/minizlib-3.1.0.tgz#6ad76c3a8f10227c9b51d1c9ac8e30b27f5a251c"
-  integrity sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==
-  dependencies:
-    minipass "^7.1.2"
 
 mitt@^3.0.1:
   version "3.0.1"
@@ -6329,17 +6317,6 @@ tar-stream@^3.0.0, tar-stream@^3.1.5:
     fast-fifo "^1.2.0"
     streamx "^2.15.0"
 
-tar@7.5.13:
-  version "7.5.13"
-  resolved "https://registry.yarnpkg.com/tar/-/tar-7.5.13.tgz#0d214ed56781a26edc313581c0e2d929ceeb866d"
-  integrity sha512-tOG/7GyXpFevhXVh8jOPJrmtRpOTsYqUIkVdVooZYJS/z8WhfQUX8RJILmeuJNinGAMSu1veBr4asSHFt5/hng==
-  dependencies:
-    "@isaacs/fs-minipass" "^4.0.0"
-    chownr "^3.0.0"
-    minipass "^7.1.2"
-    minizlib "^3.1.0"
-    yallist "^5.0.0"
-
 teeny-request@^10.0.0:
   version "10.1.2"
   resolved "https://registry.yarnpkg.com/teeny-request/-/teeny-request-10.1.2.tgz#13aa65d98dce099a85bfc6ef77760b536e3cc040"
@@ -7036,11 +7013,6 @@ y18n@^5.0.5:
   version "5.0.8"
   resolved "https://registry.yarnpkg.com/y18n/-/y18n-5.0.8.tgz#7f4934d0f7ca8c56f95314939ddcd2dd91ce1d55"
   integrity sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==
-
-yallist@^5.0.0:
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/yallist/-/yallist-5.0.0.tgz#00e2de443639ed0d78fd87de0d27469fbcffb533"
-  integrity sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==
 
 yaml@^2.8.2, yaml@^2.8.3:
   version "2.8.3"
