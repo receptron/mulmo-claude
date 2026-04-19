@@ -1,0 +1,31 @@
+{
+  "name": "@receptron/task-scheduler",
+  "version": "0.1.0",
+  "description": "Persistent task scheduler with catch-up — schedule recurring tasks, survive restarts, recover missed runs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts",
+    "lint": "eslint src test"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

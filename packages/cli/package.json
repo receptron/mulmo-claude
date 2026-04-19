@@ -1,0 +1,32 @@
+{
+  "name": "@mulmobridge/cli",
+  "version": "0.1.1",
+  "description": "Interactive CLI bridge for MulmoBridge — talk to MulmoClaude from your terminal",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mulmobridge-cli": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts",
+    "lint": "eslint src test"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "dependencies": {
+    "@mulmobridge/client": "^0.1.0",
+    "dotenv": "^17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

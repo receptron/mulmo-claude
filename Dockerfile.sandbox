@@ -1,0 +1,100 @@
+FROM node:22-slim
+
+# Sandbox tool set (see #162). Grouped into layers by purpose so the
+# rationale is obvious from the diff:
+#
+# 1. Core CLI — read local git history, fetch over HTTP, pipeline JSON,
+#    run Makefile-driven workspaces, handle archives, query SQLite.
+#    `ca-certificates` is needed because `node:22-slim` ships without
+#    a trust store. `ripgrep` backs Claude's grep tool.
+# 2. Data analysis + plotting — Python with pandas/numpy/matplotlib
+#    and `requests` for API fetches. Graphviz for structural diagrams.
+#    ImageMagick for raster ops. Covers the "investment / data / chart"
+#    and "visualize this workflow" use cases in the issue.
+# 3. Document + media conversion — pandoc bridges Markdown ↔ PDF/DOCX/
+#    HTML/EPUB for report output. ffmpeg covers audio/video transcode
+#    and probing. poppler-utils extracts text / images from PDFs.
+# 4. Small extras — `tree` for directory listing, `bc` for arbitrary-
+#    precision arithmetic, `less` for pagers.
+#
+# Deferred on purpose:
+#
+# - `@mermaid-js/mermaid-cli` — pulls in headless Chromium (~300MB).
+#   Revisit as a separate layer if diagram generation becomes common.
+# - `texlive-*` — ~150MB+ for marginal PDF quality gains over pandoc's
+#   default LaTeX-free path; add when a user actually needs math/
+#   journal-style typesetting.
+# - `gh` CLI — now installed (Layer 1b). Auth via SANDBOX_MOUNT_CONFIGS=gh
+#   which mounts ~/.config/gh:ro into the container (#259).
+#
+# Runtime `pip install` is intentionally NOT wired up. Everything the
+# agent might need for data work is preinstalled at build time so
+# supply-chain risk stays out of the sandbox.
+
+# Layer 1: core CLI + SSH client (needed for SSH agent forwarding #259)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
+      curl \
+      jq \
+      make \
+      ca-certificates \
+      openssh-client \
+      sqlite3 \
+      zip \
+      unzip \
+      ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 1b: GitHub CLI (#164). Installed from the official apt repo.
+# Auth is provided at runtime via SANDBOX_MOUNT_CONFIGS=gh which
+# bind-mounts ~/.config/gh:ro (#259). On macOS where the token lives
+# in the system keyring, the server falls back to GH_TOKEN env var.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 2: data analysis + plotting
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 \
+      python3-pip \
+      graphviz \
+      imagemagick \
+    && rm -rf /var/lib/apt/lists/* \
+ && pip3 install --no-cache-dir --break-system-packages \
+      pandas \
+      numpy \
+      matplotlib \
+      requests
+
+# Layer 3: document + media conversion
+# LibreOffice core + Impress + Writer enable server-side PPTX→PDF and
+# DOCX→PDF conversion for the attachment pipeline (#386). Only the
+# headless renderer is used (`--headless --convert-to pdf`).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      pandoc \
+      ffmpeg \
+      poppler-utils \
+      libreoffice-core \
+      libreoffice-impress \
+      libreoffice-writer \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 4: small extras
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      tree \
+      bc \
+      less \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @anthropic-ai/claude-code tsx
+
+COPY sandbox-entrypoint.sh /sandbox-entrypoint.sh
+RUN chmod +x /sandbox-entrypoint.sh
+
+# No `USER node` — the entrypoint starts as root to fix /etc/passwd
+# and socket permissions, then drops to HOST_UID:HOST_GID via setpriv.
+WORKDIR /home/node/mulmoclaude
+ENTRYPOINT ["/sandbox-entrypoint.sh"]

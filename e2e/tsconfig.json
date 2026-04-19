@@ -1,0 +1,21 @@
+{
+  // Type-check config for Playwright E2E specs + fixtures.
+  //
+  // Playwright reads its own `e2e/playwright.config.ts` to RUN the
+  // tests; this file exists only so `yarn typecheck:e2e` can flag
+  // type drift in the spec files.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../src/**/*.ts"],
+  "exclude": ["../node_modules"]
+}

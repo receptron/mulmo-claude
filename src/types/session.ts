@@ -1,0 +1,81 @@
+// Per-session client-side state and the on-disk envelope shapes
+// returned by the server's session routes.
+
+import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import { EVENT_TYPES } from "./events";
+import type { ToolCallHistoryItem } from "./toolCallHistory";
+
+// Server `/api/sessions` summary. Optional `summary` and `keywords`
+// are populated by the chat indexer (#123) when present.
+//
+// `updatedAt` is the most recent activity timestamp — taken from the
+// jsonl file's mtime on the server side and bumped whenever the
+// client appends a message in-memory. Used for the "most recently
+// touched" sort order in the session history sidebar (users expect
+// active sessions to float to the top, not to stay pinned in
+// creation order).
+export interface SessionSummary {
+  id: string;
+  roleId: string;
+  startedAt: string;
+  updatedAt: string;
+  preview: string;
+  summary?: string;
+  keywords?: string[];
+  // Live state from the server session store (present when the
+  // session has an active in-memory entry on the server).
+  isRunning?: boolean;
+  hasUnread?: boolean;
+  statusMessage?: string;
+}
+
+// One line of a session jsonl as returned by `/api/sessions/:id`.
+// Generic envelope; concrete narrowed shapes below.
+export interface SessionEntry {
+  type?: string;
+  source?: string;
+  roleId?: string;
+  message?: string;
+  result?: ToolResultComplete;
+}
+
+export interface TextEntry extends SessionEntry {
+  source: "user" | "assistant";
+  type: typeof EVENT_TYPES.text;
+  message: string;
+}
+
+export interface ToolResultEntry extends SessionEntry {
+  source: "tool";
+  type: typeof EVENT_TYPES.toolResult;
+  result: ToolResultComplete;
+}
+
+export const isTextEntry = (e: SessionEntry): e is TextEntry =>
+  (e.source === "user" || e.source === "assistant") &&
+  e.type === EVENT_TYPES.text &&
+  typeof e.message === "string";
+
+export const isToolResultEntry = (e: SessionEntry): e is ToolResultEntry =>
+  e.source === "tool" &&
+  e.type === EVENT_TYPES.toolResult &&
+  e.result !== undefined;
+
+// In-memory session held in `sessionMap`. PR #88 introduced this so
+// multiple chats can run concurrently — `id` matches the `chatSessionId`
+// the server uses for the on-disk jsonl.
+export interface ActiveSession {
+  id: string;
+  roleId: string;
+  toolResults: ToolResultComplete[];
+  isRunning: boolean;
+  statusMessage: string;
+  toolCallHistory: ToolCallHistoryItem[];
+  selectedResultUuid: string | null;
+  hasUnread: boolean;
+  startedAt: string;
+  // Bumped whenever the user sends a new message in this session.
+  // Used by `mergedSessions` to sort the sidebar history list by
+  // "most recently touched" rather than "created first".
+  updatedAt: string;
+}

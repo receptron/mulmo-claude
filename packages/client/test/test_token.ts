@@ -1,0 +1,116 @@
+// Unit tests for the bridge token reader (#272 Phase 2). The
+// helper is tiny but covers the two sources (env var, file) and
+// three "no token" shapes (missing file, empty file, whitespace-
+// only file), so explicit coverage is worth it.
+
+import { describe, it, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import fs from "fs";
+import os from "os";
+import path from "path";
+
+// The token file path is computed once at module load from
+// `os.homedir()`, so we cache-bust the module per test via a query
+// string and override process.env.HOME to point at a tmp dir before
+// importing. That way we can drop real `.session-token` files into
+// the tmp-dir workspace layout and exercise the production code path.
+
+interface TokenModule {
+  readBridgeToken: () => string | null;
+  TOKEN_FILE_PATH: string;
+}
+
+let cacheBuster = 0;
+async function loadFresh(): Promise<TokenModule> {
+  cacheBuster++;
+  const mod = await import(`../src/token.ts?t=${cacheBuster}`);
+  return mod as TokenModule;
+}
+
+let tmpDir = "";
+let savedHome: string | undefined;
+let savedUserProfile: string | undefined;
+let savedToken: string | undefined;
+
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmo-bridge-token-test-"));
+  savedHome = process.env.HOME;
+  savedUserProfile = process.env.USERPROFILE;
+  savedToken = process.env.MULMOCLAUDE_AUTH_TOKEN;
+  // `os.homedir()` reads HOME on POSIX and USERPROFILE on Windows;
+  // override both so the test is platform-agnostic.
+  process.env.HOME = tmpDir;
+  process.env.USERPROFILE = tmpDir;
+  delete process.env.MULMOCLAUDE_AUTH_TOKEN;
+  // Pre-create the workspace dir so the token file has a home.
+  fs.mkdirSync(path.join(tmpDir, "mulmoclaude"), { recursive: true });
+});
+
+afterEach(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  if (savedHome === undefined) delete process.env.HOME;
+  else process.env.HOME = savedHome;
+  if (savedUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = savedUserProfile;
+  if (savedToken === undefined) delete process.env.MULMOCLAUDE_AUTH_TOKEN;
+  else process.env.MULMOCLAUDE_AUTH_TOKEN = savedToken;
+});
+
+function writeTokenFile(home: string, value: string): void {
+  fs.writeFileSync(
+    path.join(home, "mulmoclaude", ".session-token"),
+    value,
+    "utf-8",
+  );
+}
+
+describe("readBridgeToken — env var wins", () => {
+  it("returns MULMOCLAUDE_AUTH_TOKEN when set", async () => {
+    process.env.MULMOCLAUDE_AUTH_TOKEN = "env-token";
+    writeTokenFile(tmpDir, "file-token");
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), "env-token");
+  });
+
+  it("falls through to the file when env var is empty string", async () => {
+    process.env.MULMOCLAUDE_AUTH_TOKEN = "";
+    writeTokenFile(tmpDir, "file-token");
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), "file-token");
+  });
+});
+
+describe("readBridgeToken — file fallback", () => {
+  it("reads the token file and trims surrounding whitespace", async () => {
+    writeTokenFile(tmpDir, "file-token-with-newline\n");
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), "file-token-with-newline");
+  });
+
+  it("returns null when the file is missing", async () => {
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), null);
+  });
+
+  it("returns null when the file is empty", async () => {
+    writeTokenFile(tmpDir, "");
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), null);
+  });
+
+  it("returns null when the file is whitespace only", async () => {
+    writeTokenFile(tmpDir, "   \n\t  ");
+    const { readBridgeToken } = await loadFresh();
+    assert.equal(readBridgeToken(), null);
+  });
+});
+
+describe("TOKEN_FILE_PATH", () => {
+  it("is <homedir>/mulmoclaude/.session-token", async () => {
+    const { TOKEN_FILE_PATH } = await loadFresh();
+    assert.equal(
+      TOKEN_FILE_PATH,
+      path.join(tmpDir, "mulmoclaude", ".session-token"),
+    );
+  });
+});

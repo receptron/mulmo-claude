@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "yarn build:packages && yarn format --check && yarn lint && yarn typecheck && yarn build && yarn test",
+            "timeout": 300,
+            "statusMessage": "Pre-commit checks (format/lint/typecheck/build/test)..."
+          }
+        ]
+      }
+    ]
+  }
+}

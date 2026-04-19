@@ -1,0 +1,38 @@
+{
+  "name": "@mulmobridge/chat-service",
+  "version": "0.1.0",
+  "description": "Server-side chat service for MulmoBridge — socket.io + REST bridge to Claude Code agents",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts",
+    "lint": "eslint src test"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "dependencies": {
+    "@mulmobridge/protocol": "^0.1.0"
+  },
+  "peerDependencies": {
+    "express": "^5.0.0",
+    "socket.io": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "typescript": "^6.0.3"
+  }
+}

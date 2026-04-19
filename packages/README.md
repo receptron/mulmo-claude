@@ -1,0 +1,127 @@
+# MulmoBridge — Securely Connect Messaging Apps to Your Personal Computer
+
+MulmoBridge lets you talk to **the AI agent running on your home PC** from **Telegram, LINE, Slack, or any messaging app** — securely, over the internet.
+
+Your personal computer is becoming your most powerful AI assistant. It runs local agents (Claude Code, OpenAI, LangChain, etc.), has access to your files, your calendar, your code. But you're not always at your desk. MulmoBridge is the secure pipe that connects your phone's messaging apps to that agent on your PC, so you can ask it questions, give it tasks, and get results — from anywhere.
+
+**MulmoBridge is not tied to MulmoClaude.** It was extracted from MulmoClaude as an independent, MIT-licensed protocol. We want every AI tool builder to use it — the more agents and messaging platforms speak MulmoBridge, the more useful the ecosystem becomes for everyone.
+
+## How It Works
+
+```text
+ You, on your phone                     Your PC at home
+┌─────────────────┐                    ┌──────────────────────────┐
+│  Telegram        │                   │  MulmoBridge chat-service │
+│  LINE            │  ── socket.io ──► │         ↓                 │
+│  Slack           │     (secure)      │  Your AI Agent            │
+│  Discord         │  ◄── replies ──── │  (Claude, GPT, custom)    │
+│  ...             │                   │         ↓                 │
+└─────────────────┘                    │  Your files, tools, data  │
+                                       └──────────────────────────┘
+
+```
+
+A **bridge** is a tiny process (~100 lines) that translates between a messaging platform's API and the MulmoBridge socket.io protocol. The `@mulmobridge/client` library handles all the socket.io boilerplate — writing a new bridge is just writing the platform adapter.
+
+## Packages
+
+| Package | Description | npm |
+|---|---|---|
+| [@mulmobridge/protocol](./protocol/) | Wire protocol types and constants | [![npm](https://img.shields.io/npm/v/@mulmobridge/protocol)](https://www.npmjs.com/package/@mulmobridge/protocol) |
+| [@mulmobridge/chat-service](./chat-service/) | Server-side chat service (Express + socket.io, DI-pure) | [![npm](https://img.shields.io/npm/v/@mulmobridge/chat-service)](https://www.npmjs.com/package/@mulmobridge/chat-service) |
+| [@mulmobridge/client](./client/) | Bridge-side socket.io client library | [![npm](https://img.shields.io/npm/v/@mulmobridge/client)](https://www.npmjs.com/package/@mulmobridge/client) |
+| [@mulmobridge/cli](./cli/) | Terminal bridge — talk to your agent from the command line | [![npm](https://img.shields.io/npm/v/@mulmobridge/cli)](https://www.npmjs.com/package/@mulmobridge/cli) |
+| [@mulmobridge/telegram](./telegram/) | Telegram bot bridge — photo support, chat-ID allowlist | [![npm](https://img.shields.io/npm/v/@mulmobridge/telegram)](https://www.npmjs.com/package/@mulmobridge/telegram) |
+
+## Quick Start
+
+### With MulmoClaude
+
+```bash
+# Start the MulmoClaude server on your PC
+yarn dev
+
+# Talk from your terminal
+npx @mulmobridge/cli@latest
+
+# Or connect a Telegram bot
+TELEGRAM_BOT_TOKEN=your-token TELEGRAM_ALLOWED_CHAT_IDS=123 \
+  npx @mulmobridge/telegram@latest
+```
+
+### With your own agent
+
+The chat-service is backend-agnostic. Inject your own agent function:
+
+```typescript
+import express from "express";
+import { createServer } from "http";
+import { createChatService } from "@mulmobridge/chat-service";
+
+const app = express();
+const server = createServer(app);
+
+const chatService = createChatService({
+  startChat: async ({ text, attachments }) => {
+    const reply = await myAgent.run(text); // your agent here
+    return { reply };
+  },
+  // ... see chat-service README for full deps interface
+});
+
+app.use(chatService.router);
+chatService.attachSocket(server);
+server.listen(3001);
+```
+
+Now any MulmoBridge-compatible client can connect — CLI, Telegram, or your own custom bridge.
+
+## Writing a New Bridge
+
+A bridge connects one messaging platform to the chat-service:
+
+```typescript
+import { createBridgeClient } from "@mulmobridge/client";
+
+const client = createBridgeClient({ transportId: "my-platform" });
+
+// Forward a user message to the agent
+const ack = await client.send(chatId, userText);
+if (ack.ok) {
+  await replyOnMyPlatform(chatId, ack.reply);
+}
+
+// Receive server-initiated pushes
+client.onPush((ev) => {
+  replyOnMyPlatform(ev.chatId, ev.message);
+});
+```
+
+The [CLI bridge](./cli/src/index.ts) is a ~50-line reference implementation. See the [Bridge Protocol](../docs/bridge-protocol.md) for the full wire-level spec.
+
+The protocol is plain socket.io 4.x — Python, Go, or any language with a socket.io client can implement a bridge without these TypeScript packages.
+
+## Relation to MulmoClaude
+
+[MulmoClaude](https://github.com/receptron/mulmoclaude) is the GUI chat app where MulmoBridge was born. But the packages are **fully independent**:
+
+- **MulmoClaude uses these packages** — but the packages don't import anything from MulmoClaude
+- **Any Express app can host the chat-service** — just inject your agent via the DI interface
+- **MIT licensed** — free to use in any project (MulmoClaude itself is AGPL)
+
+We encourage other AI tool projects to adopt MulmoBridge. The protocol is simple, the packages are small, and more bridges + backends means a better ecosystem for everyone.
+
+## Directory Structure
+
+```text
+packages/
+  protocol/       ← wire types + constants (zero deps)
+  chat-service/   ← server-side Express + socket.io service
+  client/         ← bridge-side socket.io client + MIME utils
+  cli/            ← reference bridge: interactive terminal
+  telegram/       ← production bridge: Telegram bot
+```
+
+## License
+
+All packages are MIT licensed.

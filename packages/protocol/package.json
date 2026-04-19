@@ -1,0 +1,30 @@
+{
+  "name": "@mulmobridge/protocol",
+  "version": "0.1.1",
+  "description": "Shared types and constants for the MulmoBridge protocol",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts",
+    "lint": "eslint src test"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
