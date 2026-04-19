@@ -123,6 +123,10 @@ export const API_ROUTES = {
 
   scheduler: {
     base: "/api/scheduler",
+    tasks: "/api/scheduler/tasks",
+    task: "/api/scheduler/tasks/:id",
+    taskRun: "/api/scheduler/tasks/:id/run",
+    logs: "/api/scheduler/logs",
   },
 
   sessions: {

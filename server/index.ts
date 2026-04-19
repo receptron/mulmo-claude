@@ -62,6 +62,7 @@ import {
 import { log } from "./system/logger/index.js";
 import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
+import { registerUserTasks } from "./workspace/skills/user-tasks.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
@@ -409,6 +410,19 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
     })
     .catch((err) => {
       log.warn("skills", "failed to register scheduled skills", {
+        error: String(err),
+      });
+    });
+
+  // Register user-created scheduled tasks from tasks.json.
+  registerUserTasks({ taskManager, startChat })
+    .then((count) => {
+      if (count > 0) {
+        log.info("user-tasks", "user tasks registered", { count });
+      }
+    })
+    .catch((err) => {
+      log.warn("user-tasks", "failed to register user tasks", {
         error: String(err),
       });
     });
