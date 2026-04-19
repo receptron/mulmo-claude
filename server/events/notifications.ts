@@ -13,6 +13,8 @@ import { PUBSUB_CHANNELS } from "../../src/config/pubsubChannels.js";
 import {
   NOTIFICATION_KINDS,
   NOTIFICATION_ICONS,
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_PRIORITIES,
   type NotificationPayload,
   type NotificationKind,
   type NotificationAction,
@@ -63,9 +65,9 @@ export function publishNotification(opts: PublishNotificationOpts): void {
       title: opts.title,
       body: opts.body,
       icon: NOTIFICATION_ICONS[opts.kind],
-      action: opts.action ?? { type: "none" },
+      action: opts.action ?? { type: NOTIFICATION_ACTION_TYPES.none },
       firedAt: new Date().toISOString(),
-      priority: opts.priority ?? "normal",
+      priority: opts.priority ?? NOTIFICATION_PRIORITIES.normal,
       sessionId: opts.sessionId,
       transportId: opts.transportId,
     };
@@ -141,7 +143,7 @@ export function scheduleTestNotification(
     publishNotification({
       kind: NOTIFICATION_KINDS.push,
       title: message,
-      priority: "normal",
+      priority: NOTIFICATION_PRIORITIES.normal,
     });
     legacyDeps.pushToBridge(transportId, chatId, message);
   }, delayMs);

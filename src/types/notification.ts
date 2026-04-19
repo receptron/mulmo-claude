@@ -21,17 +21,41 @@ export const NOTIFICATION_ICONS: Record<NotificationKind, string> = {
   bridge: "chat",
 };
 
+export const NOTIFICATION_ACTION_TYPES = {
+  navigate: "navigate",
+  none: "none",
+} as const;
+
+export type NotificationActionType =
+  (typeof NOTIFICATION_ACTION_TYPES)[keyof typeof NOTIFICATION_ACTION_TYPES];
+
+export const NOTIFICATION_VIEWS = {
+  todos: "todos",
+  scheduler: "scheduler",
+  files: "files",
+  chat: "chat",
+} as const;
+
+export type NotificationView =
+  (typeof NOTIFICATION_VIEWS)[keyof typeof NOTIFICATION_VIEWS];
+
+export const NOTIFICATION_PRIORITIES = {
+  normal: "normal",
+  high: "high",
+} as const;
+
+export type NotificationPriority =
+  (typeof NOTIFICATION_PRIORITIES)[keyof typeof NOTIFICATION_PRIORITIES];
+
 export type NotificationAction =
   | {
-      type: "navigate";
-      view: "todos" | "scheduler" | "files" | "chat";
+      type: typeof NOTIFICATION_ACTION_TYPES.navigate;
+      view: NotificationView;
       path?: string;
       sessionId?: string;
       itemId?: string;
     }
-  | { type: "none" };
-
-export type NotificationPriority = "normal" | "high";
+  | { type: typeof NOTIFICATION_ACTION_TYPES.none };
 
 export interface NotificationPayload {
   id: string;

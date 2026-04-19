@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useNotifications } from "../composables/useNotifications";
-import { NOTIFICATION_ICONS } from "../types/notification";
+import {
+  NOTIFICATION_ICONS,
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_PRIORITIES,
+} from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 
 const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
@@ -69,7 +73,7 @@ function formatTime(iso: string): string {
 }
 
 function handleClick(n: NotificationPayload): void {
-  if (n.action.type === "navigate") {
+  if (n.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
     emit("navigate", n.action);
     close();
   }
@@ -143,7 +147,11 @@ function handleDismiss(e: Event, id: string): void {
         >
           <span
             class="material-icons text-lg mt-0.5 shrink-0"
-            :class="n.priority === 'high' ? 'text-red-500' : 'text-gray-400'"
+            :class="
+              n.priority === NOTIFICATION_PRIORITIES.high
+                ? 'text-red-500'
+                : 'text-gray-400'
+            "
           >
             {{ iconName(n) }}
           </span>

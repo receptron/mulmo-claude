@@ -459,7 +459,11 @@ import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
 import NotificationBell from "./components/NotificationBell.vue";
-import type { NotificationAction } from "./types/notification";
+import {
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_VIEWS,
+  type NotificationAction,
+} from "./types/notification";
 import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
 import type { SseEvent } from "./types/sse";
 import {
@@ -617,15 +621,14 @@ function onNotificationOpen(isOpen: boolean): void {
 }
 
 function handleNotificationNavigate(action: NotificationAction): void {
-  if (action.type !== "navigate") return;
-  if (action.view === "chat") {
+  if (action.type !== NOTIFICATION_ACTION_TYPES.navigate) return;
+  if (action.view === NOTIFICATION_VIEWS.chat) {
     if (action.sessionId) navigateToSession(action.sessionId);
-    // No sessionId → stay on current view (notification is informational)
-  } else if (action.view === "todos") {
+  } else if (action.view === NOTIFICATION_VIEWS.todos) {
     setCanvasViewMode("todos");
-  } else if (action.view === "scheduler") {
+  } else if (action.view === NOTIFICATION_VIEWS.scheduler) {
     setCanvasViewMode("scheduler");
-  } else if (action.view === "files") {
+  } else if (action.view === NOTIFICATION_VIEWS.files) {
     setCanvasViewMode("files");
   }
 }
