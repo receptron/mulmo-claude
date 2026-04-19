@@ -78,4 +78,11 @@ export interface ActiveSession {
   // Used by `mergedSessions` to sort the sidebar history list by
   // "most recently touched" rather than "created first".
   updatedAt: string;
+  // Index into `toolResults` at which the current run's outputs begin.
+  // Rewritten on every user turn by `beginUserTurn`; consumed by
+  // `shouldSelectAssistantText` to decide whether a trailing text
+  // reply should become the selected canvas result. Lives on the
+  // session (not on the subscription closure) so updates on turn N+1
+  // are visible to the reused subscription callback.
+  runStartIndex: number;
 }

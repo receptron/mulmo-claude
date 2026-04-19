@@ -1074,7 +1074,7 @@ watch(currentSessionId, (id) => {
   const session = sessionMap.get(id);
   // Subscribe to the new session's channel
   if (session) {
-    ensureSessionSubscription(session, session.toolResults.length);
+    ensureSessionSubscription(session);
   }
   // Unsubscribe from the previous session if it's not running
   if (previousSessionId && previousSessionId !== id) {
@@ -1264,6 +1264,7 @@ function createNewSession(roleId?: string): ActiveSession {
     hasUnread: false,
     startedAt: now,
     updatedAt: now,
+    runStartIndex: 0,
   };
   sessionMap.set(id, session);
   navigateToSession(id, true);
@@ -1370,6 +1371,7 @@ async function loadSession(id: string) {
     hasUnread: false,
     startedAt,
     updatedAt,
+    runStartIndex: toolResultsList.length,
   };
   sessionMap.set(id, newSession);
   // Subscribe immediately — the watch(currentSessionId) may have
@@ -1378,10 +1380,7 @@ async function loadSession(id: string) {
   // Use sessionMap.get() to obtain the reactive proxy — passing the
   // raw object would bypass Vue's reactivity tracking.
   const reactiveSession = sessionMap.get(id)!;
-  ensureSessionSubscription(
-    reactiveSession,
-    reactiveSession.toolResults.length,
-  );
+  ensureSessionSubscription(reactiveSession);
   navigateToSession(id, replaced);
   currentRoleId.value = roleId;
   showHistory.value = false;
@@ -1409,18 +1408,18 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
 
 // Seed the session state for a fresh user turn. Not pure (mutates
 // session), but isolated so sendMessage doesn't have the init
-// pattern inline. Returns `runStartIndex` — the index into
-// toolResults at which this run's outputs start, used later to
-// decide whether a trailing text response becomes the selected
-// canvas result.
-function beginUserTurn(session: ActiveSession, message: string): number {
+// pattern inline. Writes `runStartIndex` onto the session — the
+// index into toolResults at which this run's outputs start, used
+// later to decide whether a trailing text response becomes the
+// selected canvas result.
+function beginUserTurn(session: ActiveSession, message: string): void {
   // Append the user's message so it renders immediately. State like
   // isRunning / statusMessage is NOT set here — it comes from the
   // server via the `sessions` channel notification → refetch cycle,
   // keeping all clients (including the initiator) in sync.
   session.updatedAt = new Date().toISOString();
   session.toolResults.push(makeTextResult(message, "user"));
-  return session.toolResults.length;
+  session.runStartIndex = session.toolResults.length;
 }
 
 // Subscribe to a session's pub/sub channel so events from the server
@@ -1428,10 +1427,7 @@ function beginUserTurn(session: ActiveSession, message: string): number {
 // WebSocket and are dispatched into the session's reactive state.
 // Returns the unsubscribe function. Idempotent — if a subscription
 // already exists for this session, it's reused.
-function ensureSessionSubscription(
-  session: ActiveSession,
-  runStartIndex: number,
-): void {
+function ensureSessionSubscription(session: ActiveSession): void {
   if (sessionSubscriptions.has(session.id)) return;
 
   const sessionId = session.id;
@@ -1441,7 +1437,6 @@ function ensureSessionSubscription(
       // reactive proxy — loadSession may replace the object.
       return sessionMap.get(sessionId) ?? session;
     },
-    runStartIndex,
     setCurrentRoleId: (roleId) => {
       currentRoleId.value = roleId;
     },
@@ -1496,7 +1491,6 @@ function unsubscribeSession(chatSessionId: string): void {
 // with a clear signature.
 interface AgentEventContext {
   session: ActiveSession;
-  runStartIndex: number;
   setCurrentRoleId: (roleId: string) => void;
   onRoleChange: () => void;
   refreshRoles: () => Promise<void>;
@@ -1526,7 +1520,7 @@ async function applyAgentEvent(
   event: SseEvent,
   ctx: AgentEventContext,
 ): Promise<void> {
-  const { session, runStartIndex } = ctx;
+  const { session } = ctx;
   switch (event.type) {
     case EVENT_TYPES.toolCall:
       session.toolCallHistory.push({
@@ -1582,7 +1576,9 @@ async function applyAgentEvent(
       if (appendToLastAssistantText(session, event.message)) return;
       const textResult = makeTextResult(event.message, "assistant");
       session.toolResults.push(textResult);
-      if (shouldSelectAssistantText(session.toolResults, runStartIndex)) {
+      if (
+        shouldSelectAssistantText(session.toolResults, session.runStartIndex)
+      ) {
         session.selectedResultUuid = textResult.uuid;
       }
       return;
@@ -1620,7 +1616,7 @@ async function sendMessage(text?: string) {
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
 
-  const runStartIndex = beginUserTurn(session, message);
+  beginUserTurn(session, message);
   const sessionRole =
     roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
   const selectedRes =
@@ -1630,7 +1626,7 @@ async function sendMessage(text?: string) {
   // Subscribe to the session's pub/sub channel BEFORE posting so we
   // don't miss events. The subscription callback dispatches each
   // event into the session's reactive state via applyAgentEvent.
-  ensureSessionSubscription(session, runStartIndex);
+  ensureSessionSubscription(session);
 
   try {
     const response = await apiFetchRaw(API_ROUTES.agent.run, {
