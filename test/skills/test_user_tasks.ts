@@ -10,6 +10,7 @@ import {
 } from "../../server/workspace/skills/user-tasks.ts";
 import { saveUserTasks } from "../../server/utils/files/user-tasks-io.ts";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
+import { ONE_MINUTE_MS, ONE_HOUR_MS } from "../../server/utils/time.ts";
 
 function tmpRoot(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "user-tasks-"));
@@ -31,8 +32,8 @@ describe("loadUserTasks", () => {
         id: "abc",
         name: "Test",
         description: "",
-        schedule: { type: "daily", time: "08:00" },
-        missedRunPolicy: "run-once",
+        schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
+        missedRunPolicy: MISSED_RUN_POLICIES.runOnce,
         enabled: true,
         roleId: "general",
         prompt: "hello",
@@ -65,7 +66,7 @@ describe("saveUserTasks", () => {
     const root = tmpRoot();
     const schedule = {
       type: SCHEDULE_TYPES.interval,
-      intervalMs: 60000,
+      intervalMs: ONE_MINUTE_MS,
     };
     const tasks = [
       {
@@ -97,7 +98,7 @@ describe("validateAndCreate", () => {
     const result = validateAndCreate({
       name: "Daily news",
       prompt: "Summarize the news",
-      schedule: { type: "daily", time: "08:00" },
+      schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
     });
     assert.equal(result.kind, "ok");
     if (result.kind === "ok") {
@@ -112,7 +113,7 @@ describe("validateAndCreate", () => {
   it("rejects missing name", () => {
     const result = validateAndCreate({
       prompt: "hello",
-      schedule: { type: "daily", time: "08:00" },
+      schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
     });
     assert.equal(result.kind, "error");
   });
@@ -120,7 +121,7 @@ describe("validateAndCreate", () => {
   it("rejects missing prompt", () => {
     const result = validateAndCreate({
       name: "Test",
-      schedule: { type: "daily", time: "08:00" },
+      schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
     });
     assert.equal(result.kind, "error");
   });
@@ -143,12 +144,12 @@ describe("validateAndCreate", () => {
     const result = validateAndCreate({
       name: "Metrics",
       prompt: "Ping metrics",
-      schedule: { type: "interval", intervalMs: 3600000 },
-      missedRunPolicy: "run-all",
+      schedule: { type: SCHEDULE_TYPES.interval, intervalMs: ONE_HOUR_MS },
+      missedRunPolicy: MISSED_RUN_POLICIES.runAll,
     });
     assert.equal(result.kind, "ok");
     if (result.kind === "ok") {
-      assert.equal(result.task.missedRunPolicy, "run-all");
+      assert.equal(result.task.missedRunPolicy, MISSED_RUN_POLICIES.runAll);
     }
   });
 });
