@@ -49,6 +49,11 @@
             @update:open="showLockPopup = $event"
             @test-query="sendMessage"
           />
+          <NotificationBell
+            :force-close="showLockPopup"
+            @navigate="handleNotificationNavigate"
+            @update:open="onNotificationOpen"
+          />
           <button
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showRightSidebar }"
@@ -453,6 +458,13 @@ import SkillsView from "./plugins/manageSkills/View.vue";
 import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
+import NotificationBell from "./components/NotificationBell.vue";
+import {
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_VIEWS,
+  type NotificationAction,
+} from "./types/notification";
+import { CANVAS_VIEW } from "./utils/canvas/viewMode";
 import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
 import type { SseEvent } from "./types/sse";
 import {
@@ -603,6 +615,23 @@ function navigateToSession(id: string, replace = false): void {
       console.error("[navigateToSession] push failed:", err);
     }
   });
+}
+
+function onNotificationOpen(isOpen: boolean): void {
+  if (isOpen) showLockPopup.value = false;
+}
+
+function handleNotificationNavigate(action: NotificationAction): void {
+  if (action.type !== NOTIFICATION_ACTION_TYPES.navigate) return;
+  if (action.view === NOTIFICATION_VIEWS.chat) {
+    if (action.sessionId) navigateToSession(action.sessionId);
+  } else if (action.view === NOTIFICATION_VIEWS.todos) {
+    setCanvasViewMode(CANVAS_VIEW.todos);
+  } else if (action.view === NOTIFICATION_VIEWS.scheduler) {
+    setCanvasViewMode(CANVAS_VIEW.scheduler);
+  } else if (action.view === NOTIFICATION_VIEWS.files) {
+    setCanvasViewMode(CANVAS_VIEW.files);
+  }
 }
 
 // External URL changes (back/forward button, typed URL) → update ref.
@@ -1083,8 +1112,8 @@ function handleUpdateResult(updatedResult: ToolResultComplete) {
 // actually shows up in the canvas.
 function onSidebarItemClick(uuid: string) {
   selectedResultUuid.value = uuid;
-  if (canvasViewMode.value === "files") {
-    setCanvasViewMode("single");
+  if (canvasViewMode.value === CANVAS_VIEW.files) {
+    setCanvasViewMode(CANVAS_VIEW.single);
   }
 }
 
@@ -1097,8 +1126,8 @@ function onFilesViewLoadSession(sessionId: string): void {
   // Set view mode BEFORE loading session so that navigateToSession
   // (called inside loadSession) picks up the updated canvasViewMode
   // in its query — avoids a race where two router.push calls fight.
-  if (canvasViewMode.value === "files") {
-    setCanvasViewMode("single");
+  if (canvasViewMode.value === CANVAS_VIEW.files) {
+    setCanvasViewMode(CANVAS_VIEW.single);
   }
   loadSession(sessionId);
 }

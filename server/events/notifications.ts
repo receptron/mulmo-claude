@@ -1,49 +1,118 @@
-// Time-delayed push fan-out scaffold (#144 / #142 stepping stone).
+// Notification system (#144).
 //
-// `scheduleTestNotification` takes a message, a delay, and a bridge
-// target, then fires a single push to both the Web pub-sub channel
-// and the chat-service bridge at the stated time. The goal is a
-// minimal proof-of-concept for the production notification pipeline
-// the in-app and external-channel notification issues will build on.
+// Publishes NotificationPayload to:
+//   1. Web pub-sub → bell badge + panel
+//   2. Chat-service bridge → Telegram / CLI
 //
-// **Why this file, not `task-manager`**: task-manager is an interval
-// runner today (`schedule: { type: "interval", intervalMs }`). A
-// one-shot delay is a different shape, and the first real consumers
-// will want cancellable, persisted, per-user scheduling — neither of
-// which this scaffold promises. Keeping it separate avoids stretching
-// task-manager's API before the real requirements are known.
-//
-// **No persistence**: `setTimeout` is in-memory. If the server
-// restarts before the delay elapses, the push is dropped. Fine for
-// a PoC; #144's production scheduler will persist to disk.
+// Callers (trigger sources) use `publishNotification()` to fire.
+// In-memory store keeps the last N notifications for the bell panel.
+// publishNotification() is wrapped in try-catch so failures never
+// propagate to callers (e.g. endRun in session-store).
 
 import { PUBSUB_CHANNELS } from "../../src/config/pubsubChannels.js";
+import {
+  NOTIFICATION_KINDS,
+  NOTIFICATION_ICONS,
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_PRIORITIES,
+  type NotificationPayload,
+  type NotificationKind,
+  type NotificationAction,
+  type NotificationPriority,
+} from "../../src/types/notification.js";
 import { ONE_SECOND_MS, MAX_NOTIFICATION_DELAY_SEC } from "../utils/time.js";
+import { log } from "../system/logger/index.js";
 
-// Guard against a caller passing an accidentally-huge delay (typo,
-// ms-vs-seconds confusion, etc.). 1 hour ceiling is plenty for a
-// test ping and still leaves headroom for "fire in 30 minutes".
-const DEFAULT_DELAY_SECONDS = 60;
-const MAX_DELAY_SECONDS = MAX_NOTIFICATION_DELAY_SEC;
+// ── Dependencies (injected at startup) ──────────────────────────
+
+export interface NotificationDeps {
+  publish: (channel: string, payload: unknown) => void;
+  pushToBridge: (transportId: string, chatId: string, message: string) => void;
+}
+
+let deps: NotificationDeps | null = null;
+
+export function initNotifications(d: NotificationDeps): void {
+  deps = d;
+}
+
+// ── In-memory store ─────────────────────────────────────────────
+
+const MAX_STORED = 50;
+const store: NotificationPayload[] = [];
+
+export function getRecentNotifications(): readonly NotificationPayload[] {
+  return store;
+}
+
+// ── Publish ─────────────────────────────────────────────────────
+
+export interface PublishNotificationOpts {
+  kind: NotificationKind;
+  title: string;
+  body?: string;
+  action?: NotificationAction;
+  priority?: NotificationPriority;
+  sessionId?: string;
+  transportId?: string;
+}
+
+export function publishNotification(opts: PublishNotificationOpts): void {
+  try {
+    const payload: NotificationPayload = {
+      id: crypto.randomUUID(),
+      kind: opts.kind,
+      title: opts.title,
+      body: opts.body,
+      icon: NOTIFICATION_ICONS[opts.kind],
+      action: opts.action ?? { type: NOTIFICATION_ACTION_TYPES.none },
+      firedAt: new Date().toISOString(),
+      priority: opts.priority ?? NOTIFICATION_PRIORITIES.normal,
+      sessionId: opts.sessionId,
+      transportId: opts.transportId,
+    };
+
+    // Store for bell panel
+    store.unshift(payload);
+    if (store.length > MAX_STORED) store.length = MAX_STORED;
+
+    // Push to Web UI via pub-sub
+    if (deps) {
+      deps.publish(PUBSUB_CHANNELS.notifications, payload);
+    }
+
+    // Push to bridge (Telegram/CLI)
+    if (deps && opts.transportId) {
+      deps.pushToBridge(
+        opts.transportId,
+        "notifications",
+        formatBridgeMessage(payload),
+      );
+    }
+
+    log.info("notifications", "published", {
+      kind: payload.kind,
+      title: payload.title,
+      id: payload.id,
+    });
+  } catch (err) {
+    // Never let notification failures break the caller (e.g. endRun).
+    log.warn("notifications", "publish failed", { error: String(err) });
+  }
+}
+
+function formatBridgeMessage(p: NotificationPayload): string {
+  const icon = p.kind === NOTIFICATION_KINDS.agent ? "\u2705" : "\u{1F514}";
+  const parts = [icon, p.title];
+  if (p.body) parts.push(p.body);
+  return parts.join(" ");
+}
+
+// ── Legacy test notification (kept for PoC endpoint) ────────────
 
 export const DEFAULT_NOTIFICATION_MESSAGE = "Test notification";
 export const DEFAULT_NOTIFICATION_TRANSPORT_ID = "cli";
 export const DEFAULT_NOTIFICATION_CHAT_ID = "notifications";
-
-export interface NotificationPublishPayload {
-  message: string;
-  firedAt: string;
-}
-
-export interface NotificationDeps {
-  /** Emit a payload on a pub/sub channel. Typed as `unknown` to match
-   *  the concrete `IPubSub.publish` signature without pulling its
-   *  import here. */
-  publish: (channel: string, payload: unknown) => void;
-  /** Send an async message to a bridge transport (see chat-service
-   *  `pushToBridge`). Offline-queued on the chat-service side. */
-  pushToBridge: (transportId: string, chatId: string, message: string) => void;
-}
 
 export interface ScheduleNotificationOptions {
   message?: string;
@@ -53,18 +122,14 @@ export interface ScheduleNotificationOptions {
 }
 
 export interface ScheduledNotification {
-  /** Wall-clock ISO8601 when the push will fire. Handy for callers
-   *  that want to echo this back to the UI ("fires at 15:03:42"). */
   firesAt: string;
-  /** Normalised delay actually used (after default + cap). */
   delaySeconds: number;
-  /** Cancel the pending push. No-op if it has already fired. */
   cancel: () => void;
 }
 
 export function scheduleTestNotification(
   opts: ScheduleNotificationOptions,
-  deps: NotificationDeps,
+  legacyDeps: NotificationDeps,
 ): ScheduledNotification {
   const message = opts.message ?? DEFAULT_NOTIFICATION_MESSAGE;
   const transportId = opts.transportId ?? DEFAULT_NOTIFICATION_TRANSPORT_ID;
@@ -75,10 +140,12 @@ export function scheduleTestNotification(
   const firesAt = new Date(Date.now() + delayMs).toISOString();
 
   const timer = setTimeout(() => {
-    const firedAt = new Date().toISOString();
-    const payload: NotificationPublishPayload = { message, firedAt };
-    deps.publish(PUBSUB_CHANNELS.notifications, payload);
-    deps.pushToBridge(transportId, chatId, message);
+    publishNotification({
+      kind: NOTIFICATION_KINDS.push,
+      title: message,
+      priority: NOTIFICATION_PRIORITIES.normal,
+    });
+    legacyDeps.pushToBridge(transportId, chatId, message);
   }, delayMs);
 
   return {
@@ -88,11 +155,13 @@ export function scheduleTestNotification(
   };
 }
 
+const DEFAULT_DELAY_SECONDS = 60;
+
 function clampDelay(raw: number | undefined): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
     return DEFAULT_DELAY_SECONDS;
   }
   if (raw < 0) return 0;
-  if (raw > MAX_DELAY_SECONDS) return MAX_DELAY_SECONDS;
+  if (raw > MAX_NOTIFICATION_DELAY_SEC) return MAX_NOTIFICATION_DELAY_SEC;
   return Math.floor(raw);
 }

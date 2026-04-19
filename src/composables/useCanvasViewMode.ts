@@ -10,6 +10,7 @@ import { ref, watch, type ComputedRef, type Ref } from "vue";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import {
   type CanvasViewMode,
+  CANVAS_VIEW,
   VIEW_MODE_STORAGE_KEY,
   parseStoredViewMode,
   viewModeForShortcutKey,
@@ -35,8 +36,8 @@ function applyViewToQuery(
   delete rest.view;
   // Remove ?path= when leaving the files view — it's only meaningful
   // in files mode and would cause a stale file selection on reload.
-  if (mode !== "files") delete rest.path;
-  if (mode === "single") return rest;
+  if (mode !== CANVAS_VIEW.files) delete rest.path;
+  if (mode === CANVAS_VIEW.single) return rest;
   return { ...rest, view: mode };
 }
 

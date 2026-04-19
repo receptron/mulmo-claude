@@ -22,7 +22,10 @@ import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
-import type { NotificationDeps } from "./events/notifications.js";
+import {
+  type NotificationDeps,
+  initNotifications,
+} from "./events/notifications.js";
 import { createChatService } from "@mulmobridge/chat-service";
 import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
@@ -351,6 +354,12 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   // module-scope placeholder above).
   notificationDeps.publish = (channel, payload) =>
     pubsub.publish(channel, payload);
+
+  // --- Notification system (#144) ---
+  initNotifications({
+    publish: (channel, payload) => pubsub.publish(channel, payload),
+    pushToBridge: chatService.pushToBridge,
+  });
 
   // --- Chat socket transport (Phase A of #268) ---
   chatService.attachSocket(httpServer);
