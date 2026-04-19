@@ -12,6 +12,8 @@ Guides for using MulmoClaude. No programming knowledge required.
 | [Scheduler Guide](scheduler-guide.en.md) | English | Calendar and recurring tasks |
 | [Telegram Setup](message_apps/telegram/README.md) | English | Create and connect a Telegram Bot |
 | [Telegram セットアップ](message_apps/telegram/README.ja.md) | 日本語 | Telegram Bot の作成と接続手順 |
+| [LINE Setup](message_apps/line/README.md) | English | Create and connect a LINE bot (requires ngrok) |
+| [LINE セットアップ](message_apps/line/README.ja.md) | 日本語 | LINE bot の作成と接続手順 (ngrok 必要) |
 
 ## Developers
 
