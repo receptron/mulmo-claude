@@ -47,8 +47,13 @@ export function createCommandHandler(opts: {
   connectSession: ChatStateStore["connectSession"];
   listSessions?: () => Promise<SessionSummary[]>;
 }): CommandHandler {
-  const { loadAllRoles, getRole, resetChatState, connectSession, listSessions } =
-    opts;
+  const {
+    loadAllRoles,
+    getRole,
+    resetChatState,
+    connectSession,
+    listSessions,
+  } = opts;
 
   // Cache the last /sessions result so /switch <number> can reference it.
   let lastSessionList: SessionSummary[] = [];
@@ -63,7 +68,7 @@ export function createCommandHandler(opts: {
     [
       "Commands:",
       "  /reset  — Start a new session",
-      "  /sessions — List recent sessions",
+      "  /sessions [page] — List recent sessions (e.g. /sessions 2)",
       "  /switch <number> — Switch to a session from the list",
       "  /help   — Show this help",
       "  /roles  — List available roles",
@@ -122,7 +127,11 @@ export function createCommandHandler(opts: {
     };
   };
 
-  const handleSessions = async (): Promise<CommandResult> => {
+  const PAGE_SIZE = 10;
+
+  const handleSessions = async (
+    pageArg: string | undefined,
+  ): Promise<CommandResult> => {
     if (!listSessions) {
       return { reply: "Session listing is not available." };
     }
@@ -131,16 +140,26 @@ export function createCommandHandler(opts: {
       return { reply: "No sessions found." };
     }
     lastSessionList = sessions;
-    const MAX_DISPLAY = 10;
-    const lines = sessions.slice(0, MAX_DISPLAY).map((s, i) => {
-      const preview = s.preview.length > 40
-        ? s.preview.slice(0, 40) + "..."
-        : s.preview;
-      return `  ${i + 1}. [${s.roleId}] ${preview || "(no title)"} — ${formatRelativeTime(s.updatedAt)}`;
+    const page = Math.max(1, parseInt(pageArg ?? "1", 10) || 1);
+    const start = (page - 1) * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, sessions.length);
+    if (start >= sessions.length) {
+      return { reply: `No more sessions. Total: ${sessions.length}` };
+    }
+    const lines = sessions.slice(start, end).map((s, i) => {
+      const num = start + i + 1;
+      const preview =
+        s.preview.length > 40 ? s.preview.slice(0, 40) + "..." : s.preview;
+      return `  ${num}. [${s.roleId}] ${preview || "(no title)"} — ${formatRelativeTime(s.updatedAt)}`;
     });
-    const header = `Recent sessions (${Math.min(sessions.length, MAX_DISPLAY)} of ${sessions.length}):`;
-    const footer = "\nUse /switch <number> to connect.";
-    return { reply: [header, ...lines, footer].join("\n") };
+    const totalPages = Math.ceil(sessions.length / PAGE_SIZE);
+    const header = `Sessions (page ${page}/${totalPages}, total ${sessions.length}):`;
+    const parts = [header, ...lines];
+    if (page < totalPages) {
+      parts.push(`\n/sessions ${page + 1} for next page`);
+    }
+    parts.push("Use /switch <number> to connect.");
+    return { reply: parts.join("\n") };
   };
 
   const handleSwitch = async (
@@ -149,14 +168,21 @@ export function createCommandHandler(opts: {
     arg: string | undefined,
   ): Promise<CommandResult> => {
     if (!arg) {
-      return { reply: "Usage: /switch <number>\nRun /sessions first to see the list." };
+      return {
+        reply: "Usage: /switch <number>\nRun /sessions first to see the list.",
+      };
     }
     const index = parseInt(arg, 10);
-    if (!Number.isInteger(index) || index < 1 || index > lastSessionList.length) {
+    if (
+      !Number.isInteger(index) ||
+      index < 1 ||
+      index > lastSessionList.length
+    ) {
       return {
-        reply: lastSessionList.length > 0
-          ? `Invalid number. Pick 1-${lastSessionList.length} from the /sessions list.`
-          : "Run /sessions first to see available sessions.",
+        reply:
+          lastSessionList.length > 0
+            ? `Invalid number. Pick 1-${lastSessionList.length} from the /sessions list.`
+            : "Run /sessions first to see available sessions.",
       };
     }
     const target = lastSessionList[index - 1];
@@ -188,7 +214,7 @@ export function createCommandHandler(opts: {
       case "/reset":
         return handleReset(transportId, chatState);
       case "/sessions":
-        return handleSessions();
+        return handleSessions(args[0]);
       case "/switch":
         return handleSwitch(transportId, chatState, args[0]);
       case "/help":
