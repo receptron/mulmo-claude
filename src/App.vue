@@ -1,175 +1,219 @@
 <template>
-  <div class="flex fixed inset-0 bg-gray-900 text-white">
-    <!-- Sidebar -->
-    <div
-      class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
-    >
-      <SidebarHeader
-        :sandbox-enabled="sandboxEnabled"
-        :show-right-sidebar="showRightSidebar"
-        :title-style="debugTitleStyle"
-        @test-query="(q) => sendMessage(q)"
-        @notification-navigate="handleNotificationNavigate"
-        @toggle-right-sidebar="toggleRightSidebar"
-        @open-settings="showSettings = true"
-      />
-      <!-- History popup -->
-      <SessionHistoryPanel
-        v-if="showHistory"
-        ref="historyPanelRef"
-        :sessions="mergedSessions"
-        :current-session-id="currentSessionId"
-        :roles="roles"
-        :top-offset="historyPopupTopOffset"
-        :error-message="historyError"
-        @load-session="loadSession"
-      />
-
-      <!-- Role selector -->
-      <RoleSelector
-        v-model:current-role-id="currentRoleId"
-        :roles="roles"
-        @change="onRoleChange"
-      />
-
-      <!-- Session tab bar -->
-      <SessionTabBar
-        ref="sessionTabBarRef"
-        :sessions="tabSessions"
-        :current-session-id="currentSessionId"
-        :roles="roles"
-        :active-session-count="activeSessionCount"
-        :unread-count="unreadCount"
-        :history-open="showHistory"
-        @new-session="createNewSession()"
-        @load-session="loadSession"
-        @toggle-history="toggleHistory"
-      />
-
-      <!-- Gemini API key warning -->
-      <div
-        v-if="!geminiAvailable && needsGemini(currentRoleId)"
-        class="mx-4 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700"
-      >
-        <span class="material-icons text-xs align-middle mr-1">warning</span>
-        Image generation requires <code class="font-mono">GEMINI_API_KEY</code>.
-        Add it to <code class="font-mono">.env</code> and restart the app.
+  <div class="flex flex-col fixed inset-0 bg-gray-900 text-white">
+    <!-- Global top bar — shown in every view mode -->
+    <div ref="topBarRef" class="shrink-0 bg-white text-gray-900">
+      <!-- Row 1: title + plugin launcher + canvas toggle -->
+      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-200">
+        <SidebarHeader
+          variant="topbar"
+          :sandbox-enabled="sandboxEnabled"
+          :show-right-sidebar="showRightSidebar"
+          :title-style="debugTitleStyle"
+          @test-query="(q) => sendMessage(q)"
+          @notification-navigate="handleNotificationNavigate"
+          @toggle-right-sidebar="toggleRightSidebar"
+          @open-settings="showSettings = true"
+        />
+        <div class="flex-1 flex items-center justify-between gap-2 min-w-0">
+          <PluginLauncher
+            :active-tool-name="selectedResult?.toolName ?? null"
+            :active-view-mode="canvasViewMode"
+            @navigate="onPluginNavigate"
+          />
+          <CanvasViewToggle
+            :model-value="canvasViewMode"
+            @update:model-value="setCanvasViewMode"
+          />
+        </div>
       </div>
-
-      <!-- Tool result previews -->
-      <ToolResultsPanel
-        ref="toolResultsPanelRef"
-        :results="sidebarResults"
-        :selected-uuid="selectedResultUuid"
-        :is-running="isRunning"
-        :status-message="statusMessage"
-        :pending-calls="pendingCalls"
-        @select="onSidebarItemClick"
-        @activate="activePane = 'sidebar'"
-      />
-
-      <!-- Sample queries (expandable pane) -->
-      <SuggestionsPanel
-        ref="suggestionsPanelRef"
-        :queries="currentRole.queries ?? []"
-        @send="(q) => sendMessage(q)"
-        @edit="onQueryEdit"
-      />
-
-      <!-- Text input -->
-      <ChatInput
-        ref="chatInputRef"
-        v-model="userInput"
-        v-model:pasted-file="pastedFile"
-        :is-running="isRunning"
-        @send="sendMessage()"
-      />
+      <!-- Row 2: role selector + session tabs -->
+      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+        <RoleSelector
+          v-model:current-role-id="currentRoleId"
+          variant="topbar"
+          :roles="roles"
+          @change="onRoleChange"
+        />
+        <SessionTabBar
+          ref="sessionTabBarRef"
+          variant="topbar"
+          :sessions="tabSessions"
+          :current-session-id="displayedCurrentSessionId"
+          :roles="roles"
+          :active-session-count="activeSessionCount"
+          :unread-count="unreadCount"
+          :history-open="showHistory"
+          @new-session="createNewSession()"
+          @load-session="loadSession"
+          @toggle-history="toggleHistory"
+        />
+      </div>
     </div>
 
-    <!-- Canvas -->
-    <div
-      class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden"
-    >
+    <!-- History popup (all layouts) -->
+    <SessionHistoryPanel
+      v-if="showHistory"
+      ref="historyPanelRef"
+      :sessions="mergedSessions"
+      :current-session-id="currentSessionId"
+      :roles="roles"
+      :top-offset="historyTopOffset"
+      :error-message="historyError"
+      @load-session="loadSession"
+    />
+
+    <!-- Body: sidebar (Single only) + canvas column + right sidebar -->
+    <div class="flex flex-1 min-h-0">
+      <!-- Sidebar (Single layout only) -->
       <div
-        class="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0 gap-2"
+        v-if="!isStackLayout"
+        class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
       >
-        <PluginLauncher
-          :active-tool-name="selectedResult?.toolName ?? null"
-          :active-view-mode="canvasViewMode"
-          @navigate="onPluginNavigate"
+        <!-- Gemini API key warning -->
+        <div
+          v-if="!geminiAvailable && needsGemini(currentRoleId)"
+          class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0"
+        >
+          <span class="material-icons text-xs align-middle mr-1">warning</span>
+          Image generation requires
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
+          <code class="font-mono">.env</code> and restart the app.
+        </div>
+
+        <!-- Tool result previews -->
+        <ToolResultsPanel
+          ref="toolResultsPanelRef"
+          :results="sidebarResults"
+          :selected-uuid="selectedResultUuid"
+          :is-running="isRunning"
+          :status-message="statusMessage"
+          :pending-calls="pendingCalls"
+          @select="onSidebarItemClick"
+          @activate="activePane = 'sidebar'"
         />
-        <CanvasViewToggle
-          :model-value="canvasViewMode"
-          @update:model-value="setCanvasViewMode"
+
+        <!-- Sample queries (expandable pane) -->
+        <SuggestionsPanel
+          ref="suggestionsPanelRef"
+          :queries="currentRole.queries ?? []"
+          @send="(q) => sendMessage(q)"
+          @edit="onQueryEdit"
+        />
+
+        <!-- Text input -->
+        <ChatInput
+          ref="chatInputRef"
+          v-model="userInput"
+          v-model:pasted-file="pastedFile"
+          :is-running="isRunning"
+          @send="sendMessage()"
         />
       </div>
+
+      <!-- Canvas column -->
       <div
-        ref="canvasRef"
-        class="flex-1 overflow-hidden outline-none min-h-0"
-        tabindex="0"
-        @mousedown="activePane = 'main'"
-        @keydown="handleCanvasKeydown"
+        class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden relative"
       >
-        <!-- Single mode -->
-        <template v-if="canvasViewMode === 'single'">
-          <component
-            :is="getPlugin(selectedResult.toolName)?.viewComponent"
-            v-if="
-              selectedResult &&
-              getPlugin(selectedResult.toolName)?.viewComponent
-            "
-            :selected-result="selectedResult"
+        <!-- Gemini API key warning (Stack layouts — no sidebar to host it) -->
+        <div
+          v-if="isStackLayout && !geminiAvailable && needsGemini(currentRoleId)"
+          class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
+        >
+          <span class="material-icons text-xs align-middle mr-1">warning</span>
+          Image generation requires
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
+          <code class="font-mono">.env</code> and restart the app.
+        </div>
+
+        <div
+          ref="canvasRef"
+          class="flex-1 overflow-hidden outline-none min-h-0"
+          tabindex="0"
+          @mousedown="activePane = 'main'"
+          @keydown="handleCanvasKeydown"
+        >
+          <!-- Single mode -->
+          <template v-if="canvasViewMode === 'single'">
+            <component
+              :is="getPlugin(selectedResult.toolName)?.viewComponent"
+              v-if="
+                selectedResult &&
+                getPlugin(selectedResult.toolName)?.viewComponent
+              "
+              :selected-result="selectedResult"
+              :send-text-message="sendMessage"
+              @update-result="handleUpdateResult"
+            />
+            <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
+              <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
+                JSON.stringify(selectedResult, null, 2)
+              }}</pre>
+            </div>
+            <div
+              v-else
+              class="flex items-center justify-center h-full text-gray-600"
+            >
+              <p>Start a conversation</p>
+            </div>
+          </template>
+          <!-- Stack mode -->
+          <StackView
+            v-else-if="canvasViewMode === 'stack'"
+            :tool-results="sidebarResults"
+            :selected-result-uuid="selectedResultUuid"
             :send-text-message="sendMessage"
+            @select="(uuid) => (selectedResultUuid = uuid)"
             @update-result="handleUpdateResult"
           />
-          <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
-            <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
-              JSON.stringify(selectedResult, null, 2)
-            }}</pre>
-          </div>
-          <div
-            v-else
-            class="flex items-center justify-center h-full text-gray-600"
-          >
-            <p>Start a conversation</p>
-          </div>
-        </template>
-        <!-- Stack mode -->
-        <StackView
-          v-else-if="canvasViewMode === 'stack'"
-          :tool-results="sidebarResults"
-          :selected-result-uuid="selectedResultUuid"
-          :send-text-message="sendMessage"
-          @select="(uuid) => (selectedResultUuid = uuid)"
-          @update-result="handleUpdateResult"
-        />
-        <!-- Files mode -->
-        <FilesView
-          v-else-if="canvasViewMode === 'files'"
-          :refresh-token="filesRefreshToken"
-          @load-session="onFilesViewLoadSession"
-        />
-        <!-- Todos mode -->
-        <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
-        <!-- Scheduler mode -->
-        <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
-        <!-- Wiki mode -->
-        <WikiView v-else-if="canvasViewMode === 'wiki'" />
-        <!-- Skills mode -->
-        <SkillsView v-else-if="canvasViewMode === 'skills'" />
-        <!-- Roles mode -->
-        <RolesView v-else-if="canvasViewMode === 'roles'" />
+          <!-- Files mode -->
+          <FilesView
+            v-else-if="canvasViewMode === 'files'"
+            :refresh-token="filesRefreshToken"
+            @load-session="onFilesViewLoadSession"
+          />
+          <!-- Todos mode -->
+          <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
+          <!-- Scheduler mode -->
+          <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
+          <!-- Wiki mode -->
+          <WikiView v-else-if="canvasViewMode === 'wiki'" />
+          <!-- Skills mode -->
+          <SkillsView v-else-if="canvasViewMode === 'skills'" />
+          <!-- Roles mode -->
+          <RolesView v-else-if="canvasViewMode === 'roles'" />
+        </div>
+
+        <!-- Bottom bar (Stack layouts) -->
+        <div
+          v-if="isStackLayout"
+          class="border-t border-gray-200 bg-white shrink-0"
+        >
+          <SuggestionsPanel
+            ref="suggestionsPanelRef"
+            :queries="currentRole.queries ?? []"
+            @send="(q) => sendMessage(q)"
+            @edit="onQueryEdit"
+          />
+          <ChatInput
+            ref="chatInputRef"
+            v-model="userInput"
+            v-model:pasted-file="pastedFile"
+            :is-running="isRunning"
+            @send="sendMessage()"
+          />
+        </div>
       </div>
+
+      <!-- Right sidebar: tool call history -->
+      <RightSidebar
+        v-if="showRightSidebar"
+        ref="rightSidebarRef"
+        :tool-call-history="toolCallHistory"
+        :available-tools="availableTools"
+        :role-prompt="currentRole.prompt"
+        :tool-descriptions="toolDescriptions"
+      />
     </div>
-    <!-- Right sidebar: tool call history -->
-    <RightSidebar
-      v-if="showRightSidebar"
-      ref="rightSidebarRef"
-      :tool-call-history="toolCallHistory"
-      :available-tools="availableTools"
-      :role-prompt="currentRole.prompt"
-      :tool-descriptions="toolDescriptions"
-    />
 
     <!-- Global settings modal -->
     <SettingsModal
@@ -534,6 +578,11 @@ const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const chatInputRef = ref<{ focus: () => void } | null>(null);
+const topBarRef = ref<HTMLDivElement | null>(null);
+// Measured when the history popup opens — the popup is a direct child
+// of the root, so its absolute `top` must equal the global top bar's
+// full height.
+const historyTopOffset = ref<number | undefined>(undefined);
 
 function focusChatInput(): void {
   chatInputRef.value?.focus();
@@ -548,11 +597,6 @@ const historyButtonRef = computed(
 // needs the actual popup DOM element (not the component instance).
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
-const historyPopupTopOffset = computed(() => {
-  const btn = historyButtonRef.value;
-  if (!btn) return undefined;
-  return btn.offsetTop + btn.offsetHeight;
-});
 function scrollChatToBottom() {
   nextTick(() => {
     if (chatListRef.value) {
@@ -580,6 +624,62 @@ const {
   filesRefreshToken,
   handleViewModeShortcut,
 } = useCanvasViewMode({ isRunning });
+
+// The no-sidebar "stack-style" layout (top bar + full-width canvas +
+// bottom bar) is used for every view mode except Single. Clicking a
+// plugin launcher button (Todos / Scheduler / Files / ...) swaps the
+// canvas content without collapsing the frame back to the sidebar
+// layout.
+const isStackLayout = computed(
+  () => canvasViewMode.value !== CANVAS_VIEW.single,
+);
+
+// Remember the last chat-oriented view (single or stack) so that
+// selecting a session from a plugin view (Todos / Files / ...) can
+// restore the user's preferred chat layout rather than leaving them
+// on the plugin view.
+const CHAT_VIEWS = [CANVAS_VIEW.single, CANVAS_VIEW.stack] as const;
+type ChatViewMode = (typeof CHAT_VIEWS)[number];
+const isChatView = (m: string): m is ChatViewMode =>
+  (CHAT_VIEWS as readonly string[]).includes(m);
+
+const lastChatViewMode = ref<ChatViewMode>(
+  isChatView(canvasViewMode.value) ? canvasViewMode.value : CANVAS_VIEW.stack,
+);
+watch(canvasViewMode, (mode) => {
+  if (isChatView(mode)) lastChatViewMode.value = mode;
+});
+
+function restoreChatViewForSession(): void {
+  if (!isChatView(canvasViewMode.value)) {
+    setCanvasViewMode(lastChatViewMode.value);
+  }
+}
+
+// In plugin views (Todos / Files / ...) no chat is active, so the
+// session tabs should show no tab as "current". That way clicking
+// any tab — including the session the user was last on — counts as a
+// fresh selection and routes back to the chat view.
+const displayedCurrentSessionId = computed(() =>
+  isChatView(canvasViewMode.value) ? currentSessionId.value : "",
+);
+
+// Keep arrow-key navigation tied to the canvas when the sidebar list
+// doesn't exist (Stack layout has no ToolResultsPanel to navigate).
+watch(isStackLayout, (stack) => {
+  if (stack) activePane.value = "main";
+});
+
+// Measure the top bar's height whenever the history popup is about
+// to open. Defer to nextTick so the popup's v-if transition doesn't
+// race the measurement.
+watch(showHistory, (open) => {
+  if (open) {
+    nextTick(() => {
+      historyTopOffset.value = topBarRef.value?.offsetHeight;
+    });
+  }
+});
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
 // Plugin-launcher click: switch canvas to the matching view mode.
@@ -759,16 +859,10 @@ function onSidebarItemClick(uuid: string) {
 
 // Bridge from FilesView: a user clicked a markdown link to a chat
 // session (e.g. "[session abc](../../chat/abc-123.jsonl)" inside
-// a journal summary). Switch the active session AND pop the canvas
-// out of files mode, otherwise they'd still be staring at the file
-// tree after the session loaded.
+// a journal summary). loadSession pops the canvas out of files mode
+// via restoreChatViewForSession, so we don't need an explicit view
+// switch here.
 function onFilesViewLoadSession(sessionId: string): void {
-  // Set view mode BEFORE loading session so that navigateToSession
-  // (called inside loadSession) picks up the updated canvasViewMode
-  // in its query — avoids a race where two router.push calls fight.
-  if (canvasViewMode.value === CANVAS_VIEW.files) {
-    setCanvasViewMode(CANVAS_VIEW.single);
-  }
   loadSession(sessionId);
 }
 
@@ -796,6 +890,10 @@ function removeCurrentIfEmpty(): boolean {
 function createNewSession(roleId?: string): ActiveSession {
   // Remove the current session if it's empty (no messages exchanged).
   removeCurrentIfEmpty();
+
+  // Starting a fresh chat from a plugin view (Todos / Files / ...)
+  // should drop the user back into their preferred chat layout.
+  restoreChatViewForSession();
 
   const id = uuidv4();
   const rId = roleId ?? currentRoleId.value;
@@ -866,11 +964,23 @@ async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
 }
 
 async function loadSession(id: string) {
-  // Re-selecting the already-active, loaded session is a no-op.
+  // Re-selecting the already-active, loaded session is a no-op —
+  // unless the canvas is showing a plugin view, in which case the
+  // click's purpose is to return to chat (see restoreChatView below).
   // The sessionMap check is needed because the route watcher sets
   // currentSessionId before calling loadSession — without it the
   // guard would bail before the session data is fetched.
-  if (id === currentSessionId.value && sessionMap.has(id)) return;
+  if (
+    id === currentSessionId.value &&
+    sessionMap.has(id) &&
+    isChatView(canvasViewMode.value)
+  ) {
+    return;
+  }
+
+  // Clicking a session from a plugin view (Todos / Files / ...) should
+  // surface the chat, not leave the user staring at the same plugin.
+  restoreChatViewForSession();
 
   // If the current session is empty, remove it from memory and use
   // replace-navigation so the empty session doesn't linger in

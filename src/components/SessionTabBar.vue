@@ -1,5 +1,5 @@
 <template>
-  <div class="px-2 py-1 border-b border-gray-200 flex gap-1 items-center">
+  <div :class="containerClass">
     <button
       class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
       data-testid="new-session-btn"
@@ -63,19 +63,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { Role } from "../config/roles";
 import type { SessionSummary } from "../types/session";
 import { roleIcon, roleName } from "../utils/role/icon";
 
-defineProps<{
+const props = defineProps<{
   sessions: SessionSummary[];
   currentSessionId: string;
   roles: Role[];
   activeSessionCount: number;
   unreadCount: number;
   historyOpen: boolean;
+  variant?: "sidebar" | "topbar";
 }>();
+
+const containerClass = computed(() =>
+  props.variant === "topbar"
+    ? "flex-1 flex gap-1 items-center min-w-0"
+    : "px-2 py-1 border-b border-gray-200 flex gap-1 items-center",
+);
 
 const emit = defineEmits<{
   newSession: [];

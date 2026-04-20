@@ -1,6 +1,6 @@
 <template>
-  <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-    <div>
+  <div :class="containerClass">
+    <div v-if="variant !== 'topbar'">
       <h1
         data-testid="app-title"
         class="text-lg font-semibold"
@@ -9,6 +9,14 @@
         MulmoClaude
       </h1>
     </div>
+    <h1
+      v-else
+      data-testid="app-title"
+      class="text-sm font-semibold text-gray-800 mr-1"
+      :style="titleStyle"
+    >
+      MulmoClaude
+    </h1>
     <div class="flex gap-2">
       <LockStatusPopup
         ref="lockPopup"
@@ -56,11 +64,18 @@ import NotificationBell from "./NotificationBell.vue";
 import { useClickOutside } from "../composables/useClickOutside";
 import type { NotificationPayload } from "../types/notification";
 
-defineProps<{
+const props = defineProps<{
   sandboxEnabled: boolean;
   showRightSidebar: boolean;
   titleStyle?: CSSProperties;
+  variant?: "sidebar" | "topbar";
 }>();
+
+const containerClass = computed(() =>
+  props.variant === "topbar"
+    ? "flex items-center gap-2"
+    : "p-4 border-b border-gray-200 flex items-center justify-between",
+);
 
 const emit = defineEmits<{
   testQuery: [query: string];
