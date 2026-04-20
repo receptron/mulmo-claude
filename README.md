@@ -575,3 +575,7 @@ Full documentation lives in [`docs/`](docs/README.md). Here are the key entry po
 | [Sandbox Credentials](docs/sandbox-credentials.md) | Docker sandbox credential forwarding (SSH, GitHub CLI) |
 | [Logging](docs/logging.md) | Log levels, formats, file rotation |
 | [CHANGELOG](docs/CHANGELOG.md) | Release history |
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -10,7 +10,12 @@
     "./client": "./dist/client.js",
     "./types": "./dist/types.js"
   },
-  "files": ["dist", "src", "wrangler.toml", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "wrangler.toml",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "wrangler dev",
@@ -26,5 +31,5 @@
   "engines": {
     "node": ">=20"
   },
-  "license": "AGPL-3.0-only"
+  "license": "MIT"
 }

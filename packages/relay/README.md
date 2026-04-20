@@ -91,4 +91,4 @@ RELAY_TOKEN=<same token as step 2>
 
 ## License
 
-AGPL-3.0-only
+MIT
