@@ -131,6 +131,9 @@ export interface StartChatParams {
   chatSessionId: string;
   selectedImageData?: string;
   attachments?: Attachment[];
+  /** Where this session originates (#486). Accepts string for
+   *  cross-package compatibility (chat-service passes string). */
+  origin?: string;
 }
 
 export type StartChatResult =
@@ -193,7 +196,13 @@ export async function startChat(
   // title cache; the append follows so the jsonl is always a
   // superset of what metadata advertised.
   if (isFirstTurn) {
-    await createSessionMeta(chatSessionId, roleId, message);
+    await createSessionMeta(
+      chatSessionId,
+      roleId,
+      message,
+      undefined,
+      params.origin,
+    );
   } else {
     await backfillMeta(chatSessionId, message);
   }

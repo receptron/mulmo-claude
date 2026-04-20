@@ -39,6 +39,7 @@ export interface SessionMeta {
   firstUserMessage?: string;
   claudeSessionId?: string;
   hasUnread?: boolean;
+  origin?: "human" | "scheduler" | "skill" | "bridge";
   [key: string]: unknown;
 }
 
@@ -84,12 +85,15 @@ export async function createSessionMeta(
   roleId: string,
   firstUserMessage: string,
   r?: string,
+  origin?: string,
 ): Promise<void> {
-  await writeSessionMeta(
-    id,
-    { roleId, startedAt: new Date().toISOString(), firstUserMessage },
-    r,
-  );
+  const meta: Record<string, unknown> = {
+    roleId,
+    startedAt: new Date().toISOString(),
+    firstUserMessage,
+  };
+  if (origin) meta.origin = origin;
+  await writeSessionMeta(id, meta, r);
 }
 
 export async function backfillFirstUserMessage(

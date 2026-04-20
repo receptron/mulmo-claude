@@ -5,6 +5,18 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { EVENT_TYPES } from "./events";
 import type { ToolCallHistoryItem } from "./toolCallHistory";
 
+// ── Session origin (#486) ───────────────────────────────────
+
+export const SESSION_ORIGINS = {
+  human: "human",
+  scheduler: "scheduler",
+  skill: "skill",
+  bridge: "bridge",
+} as const;
+
+export type SessionOrigin =
+  (typeof SESSION_ORIGINS)[keyof typeof SESSION_ORIGINS];
+
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
 // are populated by the chat indexer (#123) when present.
 //
@@ -22,6 +34,8 @@ export interface SessionSummary {
   preview: string;
   summary?: string;
   keywords?: string[];
+  /** Where this session originated. Missing = "human" (backward compat). */
+  origin?: SessionOrigin;
   // Live state from the server session store (present when the
   // session has an active in-memory entry on the server).
   isRunning?: boolean;

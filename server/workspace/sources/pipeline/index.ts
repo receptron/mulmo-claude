@@ -50,6 +50,9 @@ import { runFetchPhase, computeNextState, type FetchOutcome } from "./fetch.js";
 import { dedupAcrossSources, type DedupStats } from "./dedup.js";
 import { makeDefaultSummarize, type SummarizeFn } from "./summarize.js";
 import { writeDailyFile, appendItemsToArchives } from "./write.js";
+import { runNotifyPhase } from "./notify.js";
+import { discoverAndRegister } from "../arxivDiscovery.js";
+import { log } from "../../../system/logger/index.js";
 import { toLocalIsoDate } from "../../../utils/date.js";
 
 export interface RunPipelineInput {
@@ -123,6 +126,19 @@ export async function runSourcesPipeline(
   const fallbackMonth = toLocalYearMonth(startMs);
   const summarizeFn = input.summarizeFn ?? makeDefaultSummarize(isoDate);
 
+  // --- 0. Auto-discover arXiv sources from interests ------------------
+  // Best-effort: a bad interests.json or FS error must not abort the
+  // entire pipeline. The daily news fetch is more important than
+  // auto-registering arXiv sources.
+  onProgress("discover");
+  try {
+    await discoverAndRegister(workspaceRoot);
+  } catch (err) {
+    log.warn("pipeline", "arXiv auto-discovery failed (non-fatal)", {
+      error: String(err),
+    });
+  }
+
   // --- 1. Load registry + state --------------------------------------
   onProgress("load");
   const allSources = await listSources(workspaceRoot);
@@ -184,11 +200,15 @@ export async function runSourcesPipeline(
   const rawItems = flattenItems(outcomes);
   const dedup = dedupAcrossSources(rawItems);
 
-  // --- 5. Summarize + write ----------------------------------------
+  // --- 5. Notify (user interest matching) ----------------------------
+  onProgress("notify");
+  runNotifyPhase(dedup.items, workspaceRoot);
+
+  // --- 6. Summarize + write ----------------------------------------
   onProgress("summarize");
   const markdown = await summarizeFn(dedup.items);
 
-  onProgress("write");
+  onProgress("write"); // step 7
   const dailyPath = await writeDailyFile(
     workspaceRoot,
     isoDate,
@@ -201,7 +221,7 @@ export async function runSourcesPipeline(
     fallbackMonth,
   );
 
-  // --- 6. Persist state ---------------------------------------------
+  // --- 8. Persist state ---------------------------------------------
   onProgress("persist");
   const nextStates = buildNextStates(eligible, statesBySlug, outcomes, nowMs());
   await writeManyStates(workspaceRoot, nextStates);

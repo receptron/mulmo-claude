@@ -466,6 +466,12 @@ import {
 } from "./types/notification";
 import { CANVAS_VIEW } from "./utils/canvas/viewMode";
 import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
+import {
+  useDynamicFavicon,
+  FAVICON_STATES,
+  type FaviconState,
+} from "./composables/useDynamicFavicon";
+import { useNotifications } from "./composables/useNotifications";
 import type { SseEvent } from "./types/sse";
 import {
   type SessionSummary,
@@ -735,6 +741,7 @@ const statusMessage = computed(
 const toolCallHistory = computed(
   () => activeSession.value?.toolCallHistory ?? [],
 );
+
 const selectedResultUuid = computed({
   get: () => activeSession.value?.selectedResultUuid ?? null,
   set: (val: string | null) => {
@@ -842,6 +849,23 @@ const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
   useSessionHistory();
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 const showLockPopup = ref(false);
+
+// ── Dynamic favicon (#470) ──────────────────────────────────
+const faviconState = computed<FaviconState>(() => {
+  if (isRunning.value) return FAVICON_STATES.running;
+  const hasUnread =
+    currentSummary.value?.hasUnread ?? activeSession.value?.hasUnread ?? false;
+  if (hasUnread) return FAVICON_STATES.done;
+  return FAVICON_STATES.idle;
+});
+
+const { unreadCount: notificationUnreadCount } = useNotifications();
+const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0);
+
+useDynamicFavicon({
+  state: faviconState,
+  hasNotification: hasNotificationBadge,
+});
 
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);

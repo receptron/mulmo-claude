@@ -19,6 +19,29 @@
         @select="selectFile"
         @load-children="loadDirChildren"
       />
+      <!-- Reference directories -->
+      <template v-if="refRoots.length > 0">
+        <div
+          class="mt-2 pt-2 border-t border-gray-200 px-1 mb-1 flex items-center gap-1"
+        >
+          <span class="text-[10px] font-semibold text-gray-400 uppercase"
+            >Reference</span
+          >
+          <span class="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-600"
+            >RO</span
+          >
+        </div>
+        <FileTree
+          v-for="refNode in refRoots"
+          :key="refNode.path"
+          :node="refNode"
+          :selected-path="selectedPath"
+          :recent-paths="emptySet"
+          :children-by-path="childrenByPath"
+          @select="selectFile"
+          @load-children="loadDirChildren"
+        />
+      </template>
     </div>
     <!-- Content pane -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -120,7 +143,16 @@
                       mdFrontmatter ? mdFrontmatter.body : content.content,
                     )
                   "
+                  :editable-source="content.content"
+                  @update-source="saveRawMarkdown"
                 />
+              </div>
+              <div
+                v-if="rawSaveError"
+                class="shrink-0 m-4 mt-0 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700"
+                role="alert"
+              >
+                ⚠ {{ rawSaveError }}
               </div>
             </div>
             <!-- Markdown raw source (includes frontmatter) -->
@@ -248,7 +280,7 @@ import FileTree, { type TreeNode } from "./FileTree.vue";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
-import { apiGet } from "../utils/api";
+import { apiGet, apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 import { WORKSPACE_FILES } from "../config/workspacePaths";
 import { formatDateTime } from "../utils/format/date";
@@ -326,6 +358,8 @@ const { expand } = useExpandedDirs();
 // `childrenByPath` below so the lazy-expand cache has a single
 // home — see Phase-2 notes for #200.
 const rootNode = ref<TreeNode | null>(null);
+const refRoots = ref<TreeNode[]>([]);
+const emptySet = new Set<string>();
 // Lazy-expand cache: one entry per directory we've fetched via
 // `/api/files/dir`. `undefined` (= not in the map) means "not
 // loaded yet". `null` means "load in flight — show spinner".
@@ -362,6 +396,50 @@ function toggleMdRaw(): void {
   mdRawMode.value = !mdRawMode.value;
   localStorage.setItem(MD_RAW_STORAGE_KEY, String(mdRawMode.value));
 }
+
+// Save-error banner shown above the Rendered-mode markdown editor.
+// Cleared on every new file load and on the next successful save.
+const rawSaveError = ref<string | null>(null);
+
+async function saveRawMarkdown(newSource: string): Promise<void> {
+  if (!selectedPath.value) return;
+  if (content.value?.kind !== "text") return;
+  if (newSource === content.value.content) return;
+  // Snapshot the target path so a late response from a PUT for file A
+  // can't overwrite `content.value` after the user has navigated to
+  // file B. Server-side the save still completes — we only suppress
+  // the stale UI update.
+  const pathAtSave = selectedPath.value;
+  rawSaveError.value = null;
+  const result = await apiPut<{
+    path: string;
+    size: number;
+    modifiedMs: number;
+  }>(API_ROUTES.files.content, {
+    path: pathAtSave,
+    content: newSource,
+  });
+  if (selectedPath.value !== pathAtSave) return;
+  if (!result.ok) {
+    rawSaveError.value = result.error;
+    return;
+  }
+  // Reflect the saved state locally — size/modifiedMs come from the
+  // server's post-write stat, and `content` is what we just sent. Avoid
+  // a round-trip GET since the server has already confirmed the write.
+  content.value = {
+    kind: "text",
+    path: result.data.path,
+    content: newSource,
+    size: result.data.size,
+    modifiedMs: result.data.modifiedMs,
+  };
+}
+
+// Clear any stale save error whenever a new file is loaded.
+watch(content, () => {
+  rawSaveError.value = null;
+});
 const isHtml = computed(() => hasExt(selectedPath.value, [".html", ".htm"]));
 
 // The HTML body handed to the iframe's `srcdoc`. We inject a CSP
@@ -709,6 +787,13 @@ watch(
 
 onMounted(async () => {
   await loadDirChildren("");
+
+  // Fetch reference directory roots (read-only external dirs)
+  const refResult = await apiGet<TreeNode[]>(API_ROUTES.files.refRoots);
+  if (refResult.ok && Array.isArray(refResult.data)) {
+    refRoots.value = refResult.data;
+  }
+
   // Deep-link: if the URL has a selected path, reveal its ancestors
   // by fetching each dir in sequence so the tree auto-expands to
   // the selection.

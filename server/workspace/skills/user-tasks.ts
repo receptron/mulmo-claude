@@ -15,6 +15,10 @@ import type { MissedRunPolicy } from "@receptron/task-scheduler";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 import type { TaskSchedule as LocalTaskSchedule } from "../../events/task-manager/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
+import {
+  SESSION_ORIGINS,
+  type SessionOrigin,
+} from "../../../src/types/session.js";
 import { log } from "../../system/logger/index.js";
 import type { ITaskManager } from "../../events/task-manager/index.js";
 
@@ -195,6 +199,7 @@ export interface UserTaskDeps {
     message: string;
     roleId: string;
     chatSessionId: string;
+    origin?: SessionOrigin;
   }) => Promise<{ kind: string; error?: string }>;
 }
 
@@ -250,6 +255,7 @@ async function doRegisterUserTasks(deps: UserTaskDeps): Promise<number> {
           message: task.prompt,
           roleId: task.roleId,
           chatSessionId,
+          origin: SESSION_ORIGINS.scheduler,
         });
         if (result.kind === "error") {
           throw new Error(`user task failed: ${result.error ?? "unknown"}`);

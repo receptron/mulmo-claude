@@ -128,4 +128,4 @@ Both can coexist. Some platforms via Relay, others via local Bridge.
 
 ## License
 
-AGPL-3.0-only
+MIT
