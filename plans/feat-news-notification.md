@@ -1,131 +1,143 @@
-# News Pipeline → Notification Integration (#466 Phase 1)
+# News Notification — Concierge-Style Proactive Support (#466)
 
 ## Goal
 
-When the news sources pipeline fetches new articles, notify the user about interesting findings via the notification center (bell UI + bridge push). Currently the pipeline writes daily briefs silently — users must manually check the files.
+Without the user explicitly saying "notify me", Claude detects interests from natural conversation, proposes relevant news sources, and automatically notifies when interesting articles are found.
 
-## Scope
+## User Experience
 
-Phase 1 focuses on the **pipeline → notification** path. Proactive source recommendation during conversation is Phase 2 (separate PR).
+```
+User: "I can't keep up with WebAssembly developments lately"
+
+Claude: "Want me to track WebAssembly news automatically?
+  I can register these sources:
+  - WebAssembly Blog (official)
+  - Bytecode Alliance Blog
+  - Hacker News wasm tag
+  I'll check daily and notify you when something interesting comes up."
+
+User: "Sure, go ahead"
+
+Claude: registers 3 sources + adds keywords to interests.json
+  → everything automatic from here
+
+--- (next day) ---
+
+📰 Notification: "WebAssembly 3.0 proposal published (wasm-blog)"
+  → bell icon + Telegram/Slack delivery
+```
 
 ## Design
 
-### User interest profile
+### 1. System Prompt (no code change needed)
 
-Store in `<workspace>/config/interests.json`:
+Add to the existing system prompt:
+
+```
+## News Concierge
+
+When you detect the user's interest in a specific topic during conversation:
+1. Propose relevant news sources (RSS, arXiv, GitHub releases)
+2. On agreement, register sources via the manageSource tool
+3. Add keywords/categories to config/interests.json (via Edit tool)
+4. Confirm: "I'll notify you when interesting articles come up"
+
+Read interest signals naturally — don't wait for "notify me".
+Propose once per topic. Don't push if declined.
+```
+
+Claude uses existing file tools (read/write/edit) to manage `interests.json` directly — no dedicated API needed.
+
+### 2. Interest Profile
+
+`<workspace>/config/interests.json`:
 
 ```json
 {
   "keywords": ["WebAssembly", "transformer", "Rust"],
   "categories": ["ai", "ml-research", "security"],
   "minRelevance": 0.5,
-  "maxNotificationsPerRun": 5,
-  "notify": true
+  "maxNotificationsPerRun": 5
 }
 ```
 
-- `keywords`: free-text terms matched against item title + summary (case-insensitive)
-- `categories`: CategorySlug values — items from sources in these categories always score higher
-- `minRelevance`: threshold (0–1) below which items are not notified
-- `maxNotificationsPerRun`: cap to prevent notification flood
-- `notify`: master toggle
+- `keywords`: case-insensitive match against item title + summary
+- `categories`: CategorySlug values — items from matching sources score higher
+- `minRelevance`: notification threshold (0–1), default 0.5
+- `maxNotificationsPerRun`: cap per pipeline run, default 5
 
-Default when file doesn't exist: no notifications (backward compatible).
+No file = no notifications (backward compatible).
 
-### Relevance scoring
-
-Simple keyword + category matching. No LLM call — keeps the pipeline fast and free.
+### 3. Relevance Scoring (no LLM cost)
 
 ```
 score = 0
 
-// Keyword match: +0.4 per keyword found in title, +0.2 in summary
-for each keyword in interests.keywords:
-  if title contains keyword: score += 0.4
-  else if summary contains keyword: score += 0.2
+keyword in title:     +0.4
+keyword in summary:   +0.2
+category match:       +0.3
+severity critical:    +0.3
+severity warn:        +0.1
 
-// Category match: +0.3 if source category overlaps with interests
-if item.categories ∩ interests.categories is non-empty: score += 0.3
-
-// Severity boost: critical → +0.3, warn → +0.1
-if severity == "critical": score += 0.3
-else if severity == "warn": score += 0.1
-
-// Clamp to [0, 1]
-return min(score, 1.0)
+→ clamp(0, 1)
 ```
 
-This is intentionally simple. Can upgrade to LLM-based scoring in a future phase if needed.
+Pure string matching. Sub-millisecond, zero API cost.
 
-### Pipeline integration
+### 4. Pipeline Integration
 
-Insert a new phase between dedup (step 5) and summarize (step 6) in `pipeline/index.ts`:
+Insert notify phase between dedup and summarize in `pipeline/index.ts`:
 
 ```
-... existing phases ...
-4. Dedup
-5. NEW: Score relevance + notify
-6. Summarize
-7. Write
-...
+1. Load → 2. Plan → 3. Fetch → 4. Dedup
+→ 5. Notify (NEW)
+→ 6. Summarize → 7. Write → 8. Archive → 9. Persist
 ```
 
-The notification step:
-1. Load interests from `config/interests.json`
+Notify phase:
+1. Load `config/interests.json` (skip if absent)
 2. Score each dedup'd item
-3. Filter items where `score >= minRelevance`
-4. Sort by score descending, take top `maxNotificationsPerRun`
-5. For each: call `publishNotification()` with kind=`push`, title=item title, body=source + summary
+3. Filter by threshold, sort by score, take top N
+4. Call `publishNotification()` (bell + bridge push)
 
-### Notification format
+### 5. Notification Format
 
-Single batch notification when multiple interesting items found:
+**Single item**: article title as notification title
 
 ```
-📰 5 interesting articles found
-• WebAssembly 3.0 proposal published (wasm-blog)
-• New Rust async runtime (hacker-news)  
-• GPT-5 security audit results (arxiv)
+📰 WebAssembly 3.0 proposal published
+From wasm-blog — New milestone for the component model
 ```
 
-If only 1 item: individual notification with the item title as the notification title.
+**Multiple items**: batch notification
 
-### Files to create/modify
+```
+📰 3 interesting articles found
+• WebAssembly 3.0 proposal (wasm-blog)
+• New Rust async runtime (hacker-news)
+• GPT-5 security audit (arxiv)
+```
+
+## Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `server/workspace/sources/interests.ts` | **NEW** — load/save/validate interests profile + relevance scoring |
-| `server/workspace/sources/pipeline/notify.ts` | **NEW** — score items, filter, call publishNotification |
-| `server/workspace/sources/pipeline/index.ts` | Add notify phase between dedup and summarize |
-| `server/api/routes/sources.ts` | Add GET/PUT `/api/sources/interests` endpoints |
-| `src/config/apiRoutes.ts` | Add `sources.interests` route constant |
+| `server/workspace/sources/interests.ts` | **NEW** — load interests + scoring function |
+| `server/workspace/sources/pipeline/notify.ts` | **NEW** — filter by score → publishNotification |
+| `server/workspace/sources/pipeline/index.ts` | Add notify phase |
+| `server/agent/prompt.ts` | Add News Concierge instructions to system prompt |
 | `src/types/notification.ts` | Add `news` to NOTIFICATION_KINDS |
+| `test/sources/test_interests.ts` | Scoring unit tests |
 
-### API endpoints
+## Testing
 
-```
-GET  /api/sources/interests → { interests: InterestsProfile }
-PUT  /api/sources/interests → { interests: InterestsProfile }
-```
+- Scoring: keyword match, category match, severity boost, clamp to [0,1]
+- Interests file: load/validate (invalid JSON, empty, missing file)
+- Pipeline integration: stub fetcher → verify notification fires with correct items
 
-Settings UI integration is deferred — `config/interests.json` direct edit or chat-based for now.
-
-### Testing
-
-- Unit test for relevance scoring (keyword match, category match, severity boost, clamping)
-- Unit test for interests load/save/validate
-- Pipeline integration: stub fetcher returns known items, assert notification was called with expected items
-
-## Non-goals (Phase 2+)
+## Out of Scope (future)
 
 - LLM-based relevance scoring
-- Conversation-driven interest extraction (auto-populate keywords from chat)
-- Proactive source recommendation ("You mentioned X — want to add this RSS feed?")
-- Settings UI tab for interests
-- Dedup notifications across runs (don't re-notify same item next day)
-
-## Risks
-
-- **Notification fatigue**: Mitigated by `maxNotificationsPerRun` cap and `minRelevance` threshold
-- **Keyword false positives**: "Rust" matching Rust language articles AND Rust the game — accept as MVP, LLM scoring in Phase 2 would fix
-- **Pipeline latency**: Scoring is pure computation (no LLM), adds < 1ms
+- Notification dedup across runs (don't re-notify same article next day)
+- Settings UI for interests editing
+- Auto-learning interests from conversation history
