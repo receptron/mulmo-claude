@@ -272,8 +272,15 @@ import {
 } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
 import { extractImageData, makeTextResult } from "./utils/tools/result";
-import { findScrollableChild } from "./utils/dom/scrollable";
+import { deduplicateResults } from "./utils/tools/dedup";
 import { buildAgentRequestBody } from "./utils/agent/request";
+import {
+  pushResult,
+  pushErrorMessage,
+  beginUserTurn,
+  appendToLastAssistantText,
+} from "./utils/session/sessionHelpers";
+import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
 import {
   findPendingToolCall,
   shouldSelectAssistantText,
@@ -286,11 +293,11 @@ import {
 } from "./utils/session/sessionEntries";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
+import { useKeyNavigation } from "./composables/useKeyNavigation";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { isCanvasViewMode } from "./utils/canvas/viewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
-import { BUILTIN_ROLE_IDS } from "./config/roles";
 import { usePubSub } from "./composables/usePubSub";
 import { PUBSUB_CHANNELS, sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
@@ -491,17 +498,7 @@ const toolResults = computed(() => activeSession.value?.toolResults ?? []);
 // text-response is never collapsed because each user/assistant
 // message is unique content.
 const sidebarResults = computed(() => {
-  const all = toolResults.value;
-  return all.filter((r, i) => {
-    if (r.toolName === "text-response") return true;
-    const next = all[i + 1];
-    if (!next) return true;
-    if (next.toolName !== r.toolName) return true;
-    // Same tool as the next item — only collapse when BOTH results
-    // are full-state refreshes (updating: true). Individual-artifact
-    // tools that don't set `updating` stay visible.
-    return !(r.updating === true && next.updating === true);
-  });
+  return deduplicateResults(toolResults.value);
 });
 
 // Read running/status from the server session list (single source of
@@ -777,86 +774,18 @@ watch(currentSessionId, (id) => {
   }
 });
 
-const SCROLL_AMOUNT = 60;
-
-function handleCanvasKeydown(e: KeyboardEvent) {
-  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-  if (
-    e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement
-  ) {
-    return;
-  }
-  if (!canvasRef.value) return;
-  const scrollable = findScrollableChild(canvasRef.value);
-  if (!scrollable) return;
-  e.preventDefault();
-  const delta = e.key === "ArrowDown" ? SCROLL_AMOUNT : -SCROLL_AMOUNT;
-  scrollable.scrollBy({ top: delta, behavior: "smooth" });
-}
-
-function handleKeyNavigation(e: KeyboardEvent) {
-  if (activePane.value !== "sidebar") return;
-  if (
-    e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement
-  ) {
-    return;
-  }
-  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-  e.preventDefault();
-  // Navigate the deduplicated sidebar list so duplicates are skipped.
-  const results = sidebarResults.value;
-  if (results.length === 0) return;
-  const currentIndex = results.findIndex(
-    (r) => r.uuid === selectedResultUuid.value,
-  );
-  // If the currently selected UUID is filtered out of sidebarResults
-  // (e.g. an older duplicate that was hidden by dedup), jump to the
-  // edge instead of an arbitrary index. ArrowDown → first item;
-  // ArrowUp → last item.
-  if (currentIndex === -1) {
-    selectedResultUuid.value =
-      e.key === "ArrowDown"
-        ? results[0].uuid
-        : results[results.length - 1].uuid;
-    return;
-  }
-  const nextIndex =
-    e.key === "ArrowUp"
-      ? Math.max(0, currentIndex - 1)
-      : Math.min(results.length - 1, currentIndex + 1);
-  selectedResultUuid.value = results[nextIndex].uuid;
-}
+const { handleCanvasKeydown, handleKeyNavigation } = useKeyNavigation({
+  canvasRef,
+  activePane,
+  sidebarResults,
+  selectedResultUuid,
+});
 
 const suggestionsPanelRef = ref<{ collapse: () => void } | null>(null);
 
 function onQueryEdit(query: string): void {
   userInput.value = query;
   nextTick(() => focusChatInput());
-}
-
-/** Push a result and record its timestamp in one place. */
-function pushResult(session: ActiveSession, result: ToolResultComplete): void {
-  session.toolResults.push(result);
-  session.resultTimestamps.set(result.uuid, Date.now());
-}
-
-// Surface a server-side or transport-level error as a card in the
-// session's chat so the user actually sees it. The status-message
-// channel can't be used because `finally` clears it the moment the
-// run ends.
-function pushErrorMessage(session: ActiveSession, message: string): void {
-  const text = `[Error] ${message}`;
-  const errorResult: ToolResultComplete = {
-    uuid: uuidv4(),
-    toolName: "text-response",
-    message: text,
-    title: "Error",
-    data: { text, role: "assistant", transportKind: "text-rest" },
-  };
-  pushResult(session, errorResult);
-  session.selectedResultUuid = errorResult.uuid;
 }
 
 function handleUpdateResult(updatedResult: ToolResultComplete) {
@@ -937,39 +866,6 @@ function onRoleChange() {
 // to first ask Claude to list anything. The result is client-only
 // (never persisted server-side) — any subsequent LLM tool call will
 // replace / augment it in the normal way.
-async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
-  if (session.roleId !== BUILTIN_ROLE_IDS.sourceManager) return;
-  const response = await apiGet<{ sources?: unknown[] }>(
-    API_ROUTES.sources.list,
-  );
-  if (!response.ok) {
-    // Non-fatal: the Add / Rebuild buttons remain reachable via
-    // chat as soon as the user sends any message. Still surface
-    // a visible hint so the blank canvas isn't a mystery.
-    if (session.toolResults.length === 0) {
-      const detail =
-        response.status === 0 ? response.error : `HTTP ${response.status}`;
-      pushErrorMessage(
-        session,
-        `Could not preload sources (${detail}). Ask Claude to list them, or check the server log.`,
-      );
-    }
-    return;
-  }
-  const result: ToolResultComplete = {
-    uuid: uuidv4(),
-    toolName: "manageSource",
-    message: "Loaded source registry.",
-    title: "Information sources",
-    data: { sources: response.data.sources ?? [] },
-  };
-  // Skip if the user has already produced their own result in the
-  // meantime (fast typer + slow fetch race).
-  if (session.toolResults.length > 0) return;
-  pushResult(session, result);
-  session.selectedResultUuid = result.uuid;
-}
-
 async function loadSession(id: string) {
   // Re-selecting the already-active, loaded session is a no-op.
   // The sessionMap check is needed because the route watcher sets
@@ -1077,15 +973,6 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
 // index into toolResults at which this run's outputs start, used
 // later to decide whether a trailing text response becomes the
 // selected canvas result.
-function beginUserTurn(session: ActiveSession, message: string): void {
-  // Append the user's message so it renders immediately. State like
-  // isRunning / statusMessage is NOT set here — it comes from the
-  // server via the `sessions` channel notification → refetch cycle,
-  // keeping all clients (including the initiator) in sync.
-  session.updatedAt = new Date().toISOString();
-  pushResult(session, makeTextResult(message, "user"));
-  session.runStartIndex = session.toolResults.length;
-}
 
 // Subscribe to a session's pub/sub channel so events from the server
 // (tool_call, text, tool_result, session_finished, etc.) arrive via
@@ -1166,20 +1053,6 @@ interface AgentEventContext {
 // result in the session. Returns true if appended, false if a new
 // result should be created instead. Extracted to keep
 // applyAgentEvent under the cognitive-complexity threshold.
-function appendToLastAssistantText(
-  session: ActiveSession,
-  text: string,
-): boolean {
-  const last = session.toolResults[session.toolResults.length - 1];
-  const lastData = last?.data as { role?: string; text?: string } | undefined;
-  if (last?.toolName !== "text-response" || lastData?.role !== "assistant") {
-    return false;
-  }
-  lastData.text = (lastData.text ?? "") + text;
-  last.message = (last.message ?? "") + text;
-  return true;
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing 15; streaming append adds 1
 async function applyAgentEvent(
   event: SseEvent,
