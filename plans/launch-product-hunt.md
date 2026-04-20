@@ -3,7 +3,9 @@
 **Owner:** CMO (strategy), Engineering (demo assets), Community (day-of ops)
 **Target launch:** Tuesday, one week out — 12:01 AM PT kickoff
 **Positioning one-liner:** *Claude Code that creates documents, videos, and your personal knowledge base.*
-**Core thesis (the story behind the product):** This is the first visible surface of an AI-native operating system. Claude Code is the kernel; MulmoClaude is the shell, the compositor, and the filesystem users actually see. **The unique thing isn't any single feature — it's the *location.*** Web articles, chat conversations, local files, scheduled runs, phone messages all converge into one local folder (`~/mulmoclaude/`), as plain Markdown, maintained by AI. It's the reinvention of the home directory for the AI era.
+**Core thesis (the story behind the product):** **Every AI agent in 2026 has amnesia.** Claude Code, Devin, Codex, ChatGPT, Cursor — they all start each task from zero. ChatGPT's "memory" is a fragmented bullet list. Claude.ai Projects require manual uploads. Mem.ai and Obsidian are inert — they don't grow themselves. **MulmoClaude is the cure.** It gives Claude Code a file system, a scheduler, and a memory that compounds — all in one local folder (`~/mulmoclaude/`) on the user's machine. The AI has a home. It remembers. It works while you sleep. You own it. That's the whole thesis.
+
+**2026 reality check (what's commoditized vs. what's frontier):** Rich output (Artifacts), mobile AI (ChatGPT app, OpenClaw), sandboxing, and code generation are all **commoditized** — don't lead with them. The remaining frontier, and where MulmoClaude wins, is **memory + autonomy + ownership**. These three are still unsolved by every major player. That's the category-defining gap, and this plan is organized entirely around filling it.
 **Target early adopter (one audience, not four):** Claude Code power users who have already hit the limits of the terminal. Everyone else — productivity users, knowledge workers, AI enthusiasts — is phase 2 and will come via these users, not in parallel to them.
 
 ---
@@ -57,34 +59,58 @@ That distinction is the whole reason the product can do what it does. Repeat it 
 
 Product Hunt voters reward three things: **a clear "aha"**, **a short demo**, and **a narrative that isn't another wrapper**. MulmoClaude lands all three:
 
-| Hunt instinct                  | MulmoClaude's answer                                                                                      |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| "Is this just a ChatGPT clone?"| No — it rides on Claude Code (local auth, your filesystem, your tools), not an API wrapper.               |
-| "What's the new idea?"         | **One folder holds everything** — web articles, chats, files, scheduled runs — as Markdown, AI-maintained. It's the home directory reinvented. |
-| "Isn't that just Notion / Obsidian?" | Notion is cloud. Obsidian is local but doesn't grow itself. MulmoClaude is **local + AI-maintained + multi-source** — all three, in one place. |
-| "Can I try it in 60 seconds?"  | Hosted demo at `demo.mulmoclaude.com`. No signup, no cloud account, no vendor lock-in.                   |
-| "Why should I care tomorrow?"  | Every chat, every crawled article, every scheduled run **lands in the same folder** and gets wired into the wiki. It compounds. |
+| Hunt instinct                                   | MulmoClaude's answer                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| "Is this just another AI chat wrapper?"         | No — it runs the Claude Code CLI directly (not the API). And the pitch isn't "chat + pretty output" — it's **fixing agent amnesia.** |
+| "What's the new idea?"                          | **Every AI agent has amnesia. This one doesn't.** Claude gets a file system, a scheduler, and a memory that compounds across sessions. |
+| "Isn't that just ChatGPT Memory / Obsidian?"    | ChatGPT Memory is a bullet list. Obsidian is inert. Mem.ai needs manual curation. **MulmoClaude builds a cross-linked knowledge base as a byproduct of the chat.** Zero manual effort. |
+| "Can Claude.ai Projects do this?"               | Projects need manual uploads. MulmoClaude auto-accumulates — every chat, every crawled article, every scheduled run lands in the wiki. |
+| "Why should I care tomorrow?"                   | It **works while you sleep.** Register a source, get a morning briefing. Schedule a task, find the report done. No other agent ships this. |
 
 ---
 
-## 4. Key Messages (collapsed from 9 to 5, reordered)
+## 4. Key Messages (3, collapsed from 5 — 2026 re-cut)
 
-A PH viewer skims for ~10 seconds and remembers one idea. So we drop to **five** messages, in the order a user's brain actually asks the question. Everything else (roles, skills, bridges-as-feature-list, Markdown storage) is supporting evidence — keep in reserve for the comment thread and FAQ, not the hero copy.
+A PH viewer skims for ~10 seconds and remembers **one** idea. Five is too many. The 2026 market has commoditized rich output, mobile AI, and sandboxing — so those can't anchor the pitch anymore. The three remaining anchors are **memory, autonomy, ownership.** That's it.
 
-### The five (rank-ordered)
+### The three (rank-ordered)
 
-1. **Docs, presentations, spreadsheets, videos — not text.** Claude Code answers with **real documents, narrated slide decks, spreadsheets, ECharts dashboards, and AI-generated videos** (MulmoScript / MulmoCast: Gemini image + Veo 3.1 video + audio narration). Not a chat bubble. This is what "multi-modal" actually means — powered by the open GUI Chat Protocol.
-2. **Parallel Claude Code, in one browser tab.** Run **many sessions at once** — one generates a video, another refactors code, a third drafts email. Claude Code is no longer single-threaded. *This is the category-defining shot for the hero video.*
-3. **Everything in one folder, growing itself.** Web articles (via source crawling), chat conversations, local files, scheduled runs, phone messages — *all converge into one local folder* (`~/mulmoclaude/`), as plain Markdown, cross-linked and maintained by Claude itself. Karpathy's *LLM Knowledge Bases* idea, shipped. **This is the moat, and it's about place, not feature:** Notion is cloud; Obsidian is local but inert; MulmoClaude is **local + AI-maintained + multi-source** — all three at once. Every other Claude client starts from zero; MulmoClaude compounds, because every input lands in the same place.
-4. **Your phone is a Claude Code client.** Bridges to Telegram, Slack, LINE, Discord, WhatsApp, Matrix — same agent, same workspace, same wiki. Fire a task from the subway, see the document (or the video) waiting on your laptop.
-5. **Sandboxed, so you can trust it.** Claude Code has filesystem access — that's the whole point and the whole risk. MulmoClaude auto-runs Claude in a **Docker container that only sees your workspace**. SSH keys, `.env` files, home directory: invisible. No configuration, no permissions dialogs. *Reframe AGPL + Docker as "serious enough to be safe," not "complicated."*
+**1. The agent that remembers.** — *Every AI agent has amnesia. This one doesn't.*
 
-### Kept in reserve (don't lead with these — they're comment-thread fuel)
+A personal wiki grows from every chat — automatically, cross-linked, in plain Markdown on your machine. Three days later, Claude wires today's question to what it learned then, without you saving anything. **This is the moat.** The longer you use it, the more painful it is to switch away.
 
-- Roles (General, Office, Guide & Planner, Artist, Tutor, Storyteller, MulmoCaster) — mention only when someone asks *"what can it do?"*
-- Skills launcher + SKILL.md scheduling — a Claude-Code-insider wink, save for HN.
-- Markdown-as-database / workspace portability — powers the "gets smarter" story; surface only if someone probes on lock-in.
-- ECharts, file attachments, DOCX/XLSX/PPTX — individual features, not the pitch.
+- **vs ChatGPT Memory:** fragmented bullet points, not a knowledge base. MulmoClaude gives you a *cross-linked wiki*.
+- **vs Mem.ai / Obsidian:** zero manual effort. Knowledge grows as a byproduct of conversation — you never stop to "file" anything.
+- **vs Claude.ai Projects:** no manual uploads. Chats, crawled articles, generated images, search results, temporary summaries — *all* flow into memory automatically and become available from any future session.
+- *Eventually, memory itself should be inferred:* the agent decides what's worth remembering, the way it already decides what to generate. That's the endgame.
+
+**2. The agent that works while you sleep.** — *Other agents wait for you. This one has a schedule.*
+
+Register a source — get a morning briefing waiting when you open the lid. Schedule a weekly report — find it in the workspace without asking. Close the laptop, come back to a catch-up. **GUI + persistent state + catch-up after missed runs — no other AI agent ships this combination.** The memory moat (#1) plus autonomous execution (#2) is what compounds: the agent keeps learning while you're not looking.
+
+- **vs Devin / Codex / Claude Code today:** they're one-shot executors. You open them, they work, they stop. MulmoClaude runs in the background.
+- **vs cron + Claude API hacks:** power users cobble these together, but nobody ships GUI + persistence + catch-up out of the box.
+- *Eventually, scheduling should be autonomous too:* like memory, the agent should infer what to schedule, not wait for the user to specify cron expressions. That's what "an agent that works while you sleep" means at full resolution.
+
+**3. Your machine, your data, your agent.** — *It all lives in `~/mulmoclaude/`. Plain Markdown. Git-friendly. No cloud. No lock-in.*
+
+Web articles, chats, local files, generated images and videos, search results, scheduled outputs — everything lands in one folder as plain text. `git push` to a private repo and it's backed up. Open any file in any editor. Read it in 10 years without a migration.
+
+- **vs Notion / Mem.ai / ChatGPT:** not cloud. No export flow because there's nothing to export — it's already plain text on your disk.
+- **vs Obsidian:** local, but the AI grows it for you. Zero manual curation.
+- Hits the "own your AI" sentiment directly — a phrase that already travels on X.
+- Sandbox (Docker, auto-detected) gets folded in here, not its own message: it's *how* we keep "your machine, your data" honest, not a separate pitch.
+
+### The visual hook (not a message — a demo banger)
+
+**Three parallel Claude Code sessions running at once** is still the single strongest shareable visual we have. But it's no longer a *message* — it's the **hook**. Use it to earn attention on Twitter and in the PH gallery; use the three messages above to earn the follow-through. Visuals sell the click; memory + autonomy + ownership sell the try.
+
+### Kept in reserve (2026 table stakes — don't lead, but keep warm for FAQ)
+
+- **Multi-modal output — documents, decks, spreadsheets, videos.** Claude Artifacts commoditized this. Still a capability, still strong demo material, but no longer category-defining. Mention after the three messages have landed.
+- **Mobile bridges (Telegram, Slack, LINE, WhatsApp, Discord, Matrix).** OpenClaw (Claude's mobile app) arrived first to the "Claude on your phone" story. Our unique angle now: *your phone writes into the same persistent memory as your laptop* — but that's a message-#1 proof point, not its own pillar.
+- **Docker sandbox.** Expected hygiene in 2026, not a headline. Absorbed into message #3.
+- **Roles, skills launcher, Markdown-as-database, ECharts, file attachments.** Comment-thread fuel — deploy when a specific question opens the door.
 
 ---
 
@@ -161,14 +187,13 @@ what computing looks like when AI is the kernel.
 
 ### Description / gallery captions (one per screenshot)
 
-Cut from 9 to 6. Each one maps to one of the five key messages (plus the shock demo). No orphans.
+5 captions. Caption #1 is the parallel-sessions visual hook; captions #2–#4 are the three key messages; caption #5 is the anti-wrapper proof. No orphans, no reserve features.
 
-1. **The shock demo** — "Drop in a research paper. Out comes a summary document, a slide deck, and a narrated video. No other tools opened." *(Leads the gallery because it's the ‘wait, it does THAT?' moment.)*
-2. **Parallel sessions (hero)** — "Three Claude Code sessions running at once, one browser tab. One renders a video, one builds a spreadsheet, one drafts email."
-3. **Docs, decks, spreadsheets, videos — not text** — "Claude Code's answer isn't a chat bubble. It's a document, a deck, a spreadsheet, a chart, or a narrated video you can edit and keep."
-4. **Everything in one folder** — "Web articles, chats, local files, scheduled runs — all converge into `~/mulmoclaude/` as Markdown, maintained by Claude. The home directory, reinvented."
-5. **Phone as a client** — "Message Claude from Telegram, LINE, Slack, WhatsApp. Send a photo from the subway, get a document back on your laptop."
-6. **Sandboxed by default** — "Docker auto-detected. Claude only sees your workspace. SSH keys, .env files, home directory — invisible."
+1. **Hook — Parallel sessions** — "Three Claude Code agents in one browser tab. One researches, one writes docs, one builds charts. Now watch what happens tomorrow."
+2. **#1 Memory** — "Every AI agent has amnesia. This one doesn't. A cross-linked wiki grows from every chat — automatically, in plain Markdown on your machine."
+3. **#2 Autonomy** — "Other agents wait for you. This one has a schedule. Register a source, get a morning briefing. Close the lid, come back to catch-up."
+4. **#3 Ownership** — "It all lives in `~/mulmoclaude/`. Plain Markdown. `git push` is the backup. No cloud, no lock-in."
+5. **Proof — not a wrapper** — "Runs the Claude Code CLI directly. Your auth, your tools, your files. Sandboxed in Docker so it stays in its lane."
 
 ---
 
@@ -179,17 +204,17 @@ Three videos — each serves a different channel. **Always record silent first; 
 ### Video A — The 60-second hero (Product Hunt gallery + Twitter/X)
 
 - **Goal:** earn one upvote per viewer. No feature-listing.
-- **The single moment we must land:** split-screen with three Claude Code sessions running simultaneously, one of them producing a narrated MulmoCast video from a dropped-in research paper. That shot is the entire pitch in one frame.
-- **The shock demo (opener):** drag a real research paper PDF into one session → out comes a **summary document + slide deck + narrated video**. Not a water-cycle explainer. A real artifact people in our target audience would actually want.
+- **The single moment we must land:** a session "tomorrow" asking about something learned "yesterday" — and Claude answers grounded in the wiki it built itself. *That* is the amnesia cure made visible. The parallel-sessions splash is the eye-catcher; the memory payoff is the heart.
+- **Hook (opener):** three parallel Claude Code sessions already running when the video starts. It reads as "wait, it runs multiple agents at once?" — attention earned in 3 seconds.
 - **Structure:**
-  - 0:00–0:05 — Cold open: hand drags a PDF (visibly labeled "Attention Is All You Need" or similar) onto the browser. No logo, no title card.
-  - 0:05–0:20 — Split-screen snaps to three sessions. Session 1 (largest): the paper → summary doc → deck → MulmoCast narrated video with Veo 3.1 clips. Session 2: a spreadsheet being built from pasted CSV. Session 3: ECharts candlestick appears. **All running at the same time, no cuts, no spinner waits.**
-  - 0:20–0:30 — Caption overlay: *"Every conversation makes the next one smarter."* Zoom on the wiki sidebar: a new page appears, cross-linked to two existing ones.
-  - 0:30–0:40 — Phone enters frame: a Telegram message to the same workspace → laptop canvas updates live. Caption: *"Your phone is a Claude Code client."*
-  - 0:40–0:50 — Docker sandbox banner on screen. Caption: *"Sandboxed. Claude only sees your workspace."*
-  - 0:50–0:55 — Anti-wrapper beat. Single white-on-black frame: *"This is not an API wrapper. This is Claude Code — with a shell."*
-  - 0:55–1:00 — Logo + github URL + one-line install. **No install command on-screen if we're shipping a hosted demo** (see §10.5); instead, "try it in your browser: demo.mulmoclaude.com".
-- **Production notes:** 1080p screen capture, 24fps, no zoom transitions, monospace captions. Music: one royalty-free lo-fi track at 40% — cut it at 0:55. **Non-negotiable:** zero spinner time. Pre-render, splice, don't wait.
+  - 0:00–0:08 — Cold open: split-screen, three sessions already mid-stream. Session 1 researches a topic, Session 2 drafts docs from it, Session 3 renders charts. No logo, no title card. Caption fades in: *"3 Claude Code agents. One browser tab."*
+  - 0:08–0:15 — Wiki sidebar zoom: new pages appear, auto-cross-linked to existing ones as the sessions work. Caption: *"Everything they learn is saved — automatically."*
+  - 0:15–0:30 — **The memory payoff (money shot).** Time-cut overlay: *"Tomorrow."* A fresh session opens. User types a question that touches yesterday's topic. Claude answers with the wiki cross-link visible. Caption: *"Every AI agent has amnesia. This one doesn't."*
+  - 0:30–0:40 — Scheduler beat. Show the scheduler view: a registered source triggers overnight, a morning briefing appears on the canvas. Caption: *"Other agents wait for you. This one works while you sleep."*
+  - 0:40–0:50 — Ownership beat. Finder / terminal open `~/mulmoclaude/` — plain Markdown files visible. A `git push` scrolls by. Caption: *"It all lives on your machine. Plain Markdown. Git-friendly. No cloud."*
+  - 0:50–0:55 — Anti-wrapper beat. Single white-on-black frame: *"Not an API wrapper. Claude Code, directly."*
+  - 0:55–1:00 — Logo + `npx create-mulmoclaude` + github URL. (If a hosted demo or `--demo` mode ships — see §10.5 — swap in that CTA.)
+- **Production notes:** 1080p screen capture, 24fps, no zoom transitions, monospace captions. Music: one royalty-free lo-fi track at 40% — cut it at 0:55. **Non-negotiable:** zero spinner time. Pre-render, splice, don't wait. The 0:15–0:30 memory payoff is the money shot — shoot it twice, pick the crisper take.
 
 ### Video B — The 3-minute deep-dive (YouTube + landing page)
 
@@ -266,21 +291,23 @@ Three videos — each serves a different channel. **Always record silent first; 
 
 ### X / Twitter
 
-**Launch thread (7 tweets) — drafts. Order matches the five key messages + shock demo + CTA.**
+**Opening tweet (sells the click with the parallel-sessions visual):**
+> *"3 Claude Code agents running in parallel. One researches, one writes docs, one builds charts. Tomorrow they remember everything. [GIF]"*
 
-1. *MulmoClaude is live on Product Hunt today. It's Claude Code that creates documents, videos, and your personal knowledge base. Not an API wrapper. It runs Claude Code directly — your auth, your tools, your files. 🧵*
-2. **[Shock demo]** *Drop a research paper in. Out comes a summary document, a slide deck, and a narrated video. No other tools opened. [60s video]*
-3. **[Parallel sessions]** *Three Claude Code sessions, one browser tab. One renders a video, one refactors code, one drafts email. Claude Code is no longer single-threaded. [multi-session gif]*
-4. **[Everything in one folder]** *Web articles, chats, local files, scheduled runs — all converge into one folder (`~/mulmoclaude/`) as Markdown, maintained by Claude itself. Notion is cloud. Obsidian is inert. MulmoClaude is local + AI-maintained + multi-source. The home directory, reinvented. [wiki/folder gif]*
-5. **[Phone as client]** *Message the same agent from Telegram, LINE, Slack, WhatsApp, Discord, Matrix. Fire a task from the subway, see the document (or the narrated video) waiting on your laptop. [bridges gif]*
-6. **[Trust]** *Claude runs in a Docker sandbox — auto-detected, no configuration. It only sees your workspace. SSH keys, .env, home dir: invisible. This is the level of care a real shell needs. [sandbox screenshot]*
-7. *Try it in your browser right now: [hosted demo link]. Or `git clone` it — open source, AGPL. One upvote on PH costs you nothing and means everything today: [link]*
+**Launch thread (6 tweets) — Order: hook → 3 messages → CTA. Memory/autonomy/ownership are the anchors; parallel sessions is the visual opener, not a message.**
+
+1. **[Hook — parallel sessions GIF]** *"3 Claude Code agents running in parallel. One researches, one writes docs, one builds charts. Tomorrow they remember everything. This is MulmoClaude — live on Product Hunt today. 🧵"*
+2. **[Message #1 — Memory]** *Every AI agent has amnesia. This one doesn't. A cross-linked wiki grows from every chat, automatically, in plain Markdown on your machine. ChatGPT Memory is a bullet list. Obsidian is inert. This is the moat. [wiki-compounding gif]*
+3. **[Message #2 — Autonomy]** *Other agents wait for you. This one has a schedule. Register a source → morning briefing. Set a recurring task → weekly report done. Close the lid, come back to a catch-up. No other AI agent ships this. [scheduler gif]*
+4. **[Message #3 — Ownership]** *It all lives in `~/mulmoclaude/`. Plain Markdown. `git push` is the backup. No cloud, no lock-in, no export flow. Your machine, your data, your agent. [folder + git gif]*
+5. **[Anti-wrapper beat]** *This is not an API wrapper. It runs the Claude Code CLI directly — your auth, your tools, your files. That's why it can do what it does.*
+6. **[CTA]** *Install with `npx create-mulmoclaude` or `git clone` — open source, AGPL. One upvote on PH costs you nothing and means everything today: [link]* (If a hosted demo or `--demo` mode ships by launch, swap the first clause.)
 
 ### Hacker News
 
-Title: **Show HN: MulmoClaude – Claude Code that creates documents, videos, and your personal knowledge base**
+**Title:** `Show HN: MulmoClaude – Every AI agent has amnesia. I gave Claude Code a memory that compounds.`
 
-Body (first comment): lead with the **AI-native OS thesis** and the Karpathy *LLM Knowledge Bases* reference. HN respects ideas over features — sell the idea, not the feature list. Explicitly state: *this runs the Claude Code CLI directly, not the API — that's why it can do what it does.*
+**Opening line of the body:** *"Every AI agent has amnesia. I gave Claude Code a file system, a scheduler, and a memory that compounds. Here's what happened."* Then walk through the thesis (2026 is saturated; memory/autonomy/ownership is the frontier), the three messages, and the AI-native-OS context at the end. HN rewards ideas over features — sell the amnesia framing first. Explicitly state: *this runs the Claude Code CLI directly, not the API — that's why it can do what it does.*
 
 ### Reddit (r/ClaudeAI, r/LocalLLaMA, r/selfhosted)
 
@@ -309,7 +336,7 @@ Satoshi has a strong JP audience. Ship a Japanese version of the maker post and 
 
 | Risk                                                   | Probability | Mitigation                                                                                                                           |
 | ------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Activation gap — setup too heavy for PH day**        | **High**    | **Ship a hosted demo (see §10.5 below).** `npx create-mulmoclaude` alone isn't enough — 5-min install = 50% drop-off.                |
+| **Activation gap — setup too heavy for PH day**        | **High**    | **Commit to an activation path by T-10 (see §10.5):** a hosted demo *if* we build one (currently not built), or `--demo` replay mode, or a scripted walkthrough. `npx create-mulmoclaude` alone = 50% drop-off. |
 | Claude Code CLI auth fails on first run                | Medium      | Pre-flight check in the app; friendly error page linking to Claude Code docs                                                          |
 | "It's just a wrapper" objection                        | Medium      | Lead with the anti-wrapper line verbatim: *"It runs Claude Code directly — not the API."* Reinforce with wiki + multi-session proof.  |
 | Cognitive overload (too many features in one message)  | Medium      | Already addressed in §4 — 9 messages collapsed to 5, rest kept in reserve. Hold the line; don't let screenshots creep the list back. |
@@ -324,11 +351,11 @@ This is the single biggest gap in the v1 plan. Reality check: even with `npx cre
 
 **Three options, ranked by impact:**
 
-**Option A (strongly recommended) — Hosted read-only demo at `demo.mulmoclaude.com`**
-- Pre-loaded workspace with 10 prepared sessions: the research-paper → video flow, a Kyoto-trip doc, an ingested wiki with backlinks, a MulmoCast narrated presentation, a multi-session snapshot.
-- Visitors can click through existing artifacts and replay the canvas — no typing required, no auth, no API key, no Docker.
-- Budget: ~3 engineer-days. Ship it T-3. **This is the single highest-leverage change in the entire plan.**
-- CTA in the hero video and every tweet becomes *"try it in your browser: demo.mulmoclaude.com"* instead of *"git clone"*.
+**Option A (strongly recommended, but NOT yet built) — a hosted read-only demo**
+- Pre-loaded workspace with 10 prepared sessions: the "tomorrow, it remembers" memory moment, a scheduler catch-up, a wiki with backlinks, a multi-session snapshot, an ingested article → wiki page flow.
+- Visitors click through existing artifacts and replay the canvas — no typing required, no auth, no API key, no Docker.
+- Budget: ~3 engineer-days + hosting. Ship by T-3. **This is the single highest-leverage change in the entire plan, but we don't have a domain or instance yet.** If we commit, reserve a subdomain and provision a VM at T-10.
+- If shipped, CTA in the hero video and every tweet becomes *"try it in your browser"* (with whatever URL we land on) instead of *"git clone"*.
 
 **Option B (minimum viable) — "Watch Claude work" mode**
 - A local mode that runs without a Gemini key or Claude auth, using pre-recorded session replays baked into the repo. `npx create-mulmoclaude --demo` drops the user into an interactive walkthrough in 30 seconds.
@@ -347,8 +374,8 @@ This is the single biggest gap in the v1 plan. Reality check: even with `npx cre
 **Day of:**
 - Product Hunt: **Top 5 of the day**; Top 10 is floor.
 - GitHub stars: **+500** in 24h.
-- **Hosted-demo sessions: 3,000 unique** (the real activation metric — §10.5).
-- Installs (Gemini key inputs as proxy): **500** — secondary, since the demo absorbs the casual traffic.
+- **Activation-path sessions: 3,000 unique** if a hosted demo or `--demo` replay ships (§10.5); otherwise this line is N/A.
+- Installs (Gemini key inputs as proxy): **500** if a demo absorbs casual traffic; **~1,500** if install is the only path (higher volume but lower quality — most drop off).
 - PH comments: **50+ substantive** (not counting our team).
 
 **Week of:**
@@ -368,21 +395,25 @@ This is the single biggest gap in the v1 plan. Reality check: even with `npx cre
 
 There are two things we have to land. Miss either and the launch is a 6 out of 10.
 
-**Bet 1 — The shot (earns the upvote).**
-The hero video's first 20 seconds: **a research paper dropped in, three Claude Code sessions producing a summary doc, a slide deck, and a narrated MulmoCast video in parallel.** That single frame is the pitch — concrete outputs + parallel sessions + MulmoCast, end of sentence. Nothing else on the market looks like it.
+**Bet 1 — The memory moment (earns the upvote).**
+The hero video's 0:15–0:30 window: **a fresh session "tomorrow" asking a question that touches yesterday's work, and Claude answering grounded in the wiki it built itself.** That single sequence is the pitch — "every AI agent has amnesia; this one doesn't" — made visible. The parallel-sessions opener (0:00–0:08) earns the click; the memory payoff earns the upvote. Without the memory beat, the video is just "another Claude wrapper with a pretty UI." With it, we're the only ones claiming the amnesia cure.
 
-**Bet 2 — The hosted demo (earns the try).**
-`demo.mulmoclaude.com` lets a PH skimmer click through the shock demo without installing anything. Without this, the upvote from Bet 1 doesn't convert into a GitHub star, a Twitter follow, or a build. Bet 1 gets you noticed; Bet 2 gets you remembered.
+**Bet 2 — The activation path (earns the try).**
+A zero-install way for a PH skimmer to experience the memory moment and the scheduler beat. Today this means one of: (a) a hosted read-only demo if we commit to building it before T-3 (§10.5 Option A, currently NOT built), (b) `npx create-mulmoclaude --demo` with pre-recorded session replays baked in (§10.5 Option B), or (c) a scripted screenshot walkthrough on the landing page (§10.5 Option C). Without *one* of these, the upvote from Bet 1 doesn't convert into a star, a follow, or a build. **Decision owed by T-10.** Bet 1 gets you noticed; Bet 2 gets you remembered.
 
-Everything else in this plan — bridges, sandbox, roles, wiki tour, skills launcher — is confirmation bias for a viewer who already believes. Cut anything that doesn't serve one of the two bets.
+Everything else in this plan — bridges, sandbox, roles, wiki tour, skills launcher, multi-modal output — is confirmation bias for a viewer who already believes. Cut anything that doesn't serve one of the two bets.
 
 ---
 
 ## 13. The Story Underneath (why we're doing this at all)
 
-This is the first visible surface of a much bigger thesis: **computing is being re-platformed on top of AI agents, and the shell that platform needs doesn't exist yet.** Claude Code is the kernel. MulmoClaude is the first draft of the shell — and the shell's user-facing form is **a single folder that every input flows into and every output comes out of.**
+The PH-day frame is *"every AI agent has amnesia; this one doesn't."* But the deeper frame — the one we hold for HN, for long-form writing, for the people who want to know where this is going — is that **every AI agent today is homeless.** They have no persistent filesystem, no schedule, no memory that compounds. They're summoned, they work, they're gone. That's not an agent. That's a function call.
 
-`~/mulmoclaude/` is the home directory, reinvented for the AI era. In 1975 the home directory was where your files lived. In 2026 it's where your files, your research, your conversations, your scheduled work, and the knowledge extracted from all of them live — maintained by an AI that knows how to put things in the right place. That's the unlock. Not multi-modal output. Not parallel sessions. Not the bridges. Those are all *consequences* of having a single, local, AI-maintained convergence point. The differentiator is the **location**, not any feature on the list.
+MulmoClaude gives the agent a home: `~/mulmoclaude/`. A bookshelf (the wiki), filing cabinets (documents), a calendar (the scheduler), phones (the bridges). Because it has a home, it accumulates. Because it accumulates, it gets smarter. Because it gets smarter, it can be trusted with more autonomy. Memory → compounding → trust → delegation. That's the loop this plan is trying to open.
+
+This is the first visible surface of a much bigger thesis: **computing is being re-platformed on top of AI agents, and the shell that platform needs doesn't exist yet.** Claude Code is the kernel. MulmoClaude is the first draft of the shell, and the shell's user-facing form is that single folder that every input flows into and every output comes out of. In 1975 the home directory was where your files lived. In 2026 it's where your files, your research, your conversations, your scheduled work, and the knowledge extracted from all of them live — maintained by an AI that knows what to remember, what to file, and eventually what to schedule on its own.
+
+That last clause matters. **Both memory and scheduling should become autonomous.** Today, MulmoClaude remembers automatically but still asks the user to set up schedules by hand. The endgame is an agent that decides for itself what to repeat, what to watch, what to summarize every morning — the way it already decides what's worth writing into the wiki. Everything the user does (searches, temp notes, generated images and videos, scheduled outputs) flows into the same memory and is available from any session, any device, any time. At that point, "MulmoClaude" stops being a tool you open and becomes an ambient collaborator that's already been working.
 
 If the launch goes well, we're not celebrating a successful product launch — we're announcing the existence of a new computing surface. Phase 2 audiences (productivity users, knowledge workers, JP market, enterprise) come later, pulled in by the dev-native gravity we establish on day one.
 
@@ -390,4 +421,4 @@ That framing is what makes this plan aggressive rather than cautious. We're not 
 
 ---
 
-*Prepared for the MulmoClaude launch. Revise after the asset dry-run at T-7. Hosted-demo scope decision at T-10 — this is the critical path item.*
+*Prepared for the MulmoClaude launch. Revise after the asset dry-run at T-7. **Activation-path decision owed at T-10** — pick one of §10.5 Options A / B / C. This is the critical-path item.*
