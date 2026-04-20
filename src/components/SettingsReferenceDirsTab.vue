@@ -62,13 +62,24 @@ function addEntry(): void {
     draftError.value = "Must be an absolute path or start with ~/";
     return;
   }
-  if (dirs.value.some((d) => d.hostPath === p)) {
+  // Normalize: trim trailing slashes for consistent comparison
+  let normalized = p;
+  while (normalized.length > 1 && normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+  const stripSlash = (s: string): string => {
+    let r = s;
+    while (r.length > 1 && r.endsWith("/")) r = r.slice(0, -1);
+    return r;
+  };
+  if (dirs.value.some((d) => stripSlash(d.hostPath) === normalized)) {
     draftError.value = "Already exists";
     return;
   }
+  const lastSeg = normalized.split("/").pop();
   dirs.value.push({
-    hostPath: p,
-    label: draftLabel.value.trim() || p.split("/").pop() || p,
+    hostPath: normalized,
+    label: draftLabel.value.trim() || lastSeg || normalized,
   });
   draftPath.value = "";
   draftLabel.value = "";
@@ -129,6 +140,7 @@ onMounted(load);
           <button
             class="text-gray-300 hover:text-red-500 shrink-0"
             title="Remove"
+            data-testid="reference-dir-remove-btn"
             @click="removeEntry(i)"
           >
             <span class="material-icons text-sm">close</span>

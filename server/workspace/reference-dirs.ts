@@ -6,10 +6,11 @@
 // Docker mode: mounted as `:ro` — filesystem-enforced read-only.
 // Non-Docker mode: prompt-based restriction only.
 
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { workspacePath } from "./paths.js";
+import { workspacePath, WORKSPACE_DIRS } from "./paths.js";
 import { log } from "../system/logger/index.js";
 import { writeFileAtomicSync } from "../utils/files/atomic.js";
 
@@ -24,19 +25,33 @@ export interface ReferenceDirEntry {
 
 // ── Constants ───────────────────────────────────────────────────
 
-const CONFIG_FILE = "config/reference-dirs.json";
+const CONFIG_FILE_NAME = "reference-dirs.json";
 const MAX_ENTRIES = 20;
 const MAX_LABEL_LENGTH = 100;
 const CONTAINER_MOUNT_ROOT = "/mnt/readonly";
 
-/** Directories that must never be mounted — credential/key stores. */
-const BLOCKED_PATHS = [
+/** Home-relative directories that must never be mounted. */
+const HOME_RELATIVE_BLOCKED = [
   ".ssh",
   ".aws",
   ".gnupg",
   ".config/gh",
   ".kube",
   ".docker",
+];
+
+/** Absolute system paths that must never be mounted. */
+const SYSTEM_BLOCKED_PREFIXES = [
+  "/etc",
+  "/root",
+  "/var",
+  "/proc",
+  "/sys",
+  "/boot",
+  "/private/etc",
+  "/private/var",
+  "/System",
+  "/Library",
 ];
 
 // eslint-disable-next-line no-control-regex
@@ -52,16 +67,39 @@ function expandHome(p: string): string {
 }
 
 function isSensitivePath(absPath: string): boolean {
+  const normalized = path.resolve(absPath);
+
+  // Reject filesystem root
+  if (normalized === path.parse(normalized).root) return true;
+
   const home = os.homedir();
-  return BLOCKED_PATHS.some((bp) => {
-    const full = path.join(home, bp);
-    return absPath === full || absPath.startsWith(full + path.sep);
-  });
+
+  // Block $HOME itself (transitively exposes .ssh etc.)
+  if (normalized === home) return true;
+
+  // Block home-relative sensitive dirs
+  if (
+    HOME_RELATIVE_BLOCKED.some((bp) => {
+      const full = path.join(home, bp);
+      return normalized === full || normalized.startsWith(full + path.sep);
+    })
+  ) {
+    return true;
+  }
+
+  // Block system directories
+  return SYSTEM_BLOCKED_PREFIXES.some(
+    (p) => normalized === p || normalized.startsWith(p + path.sep),
+  );
 }
 
 function sanitizeLabel(raw: string): string {
   if (typeof raw !== "string") return "";
   return raw.replace(CONTROL_CHAR_RE_G, " ").trim().slice(0, MAX_LABEL_LENGTH);
+}
+
+function hasTraversalSegment(p: string): boolean {
+  return p.split(path.sep).some((seg) => seg === "..");
 }
 
 function validateEntry(raw: unknown): ReferenceDirEntry | null {
@@ -71,13 +109,16 @@ function validateEntry(raw: unknown): ReferenceDirEntry | null {
   const rawPath = typeof obj.hostPath === "string" ? obj.hostPath : "";
   if (!rawPath) return null;
 
-  const absPath = expandHome(rawPath);
+  const expanded = expandHome(rawPath);
 
   // Must be absolute
-  if (!path.isAbsolute(absPath)) return null;
+  if (!path.isAbsolute(expanded)) return null;
 
-  // No path traversal
-  if (absPath.includes("..")) return null;
+  // Normalize to collapse . and // segments
+  const absPath = path.resolve(expanded);
+
+  // Reject actual ".." traversal segments (not substrings in filenames)
+  if (hasTraversalSegment(expanded)) return null;
 
   // Block sensitive directories
   if (isSensitivePath(absPath)) {
@@ -94,7 +135,7 @@ function validateEntry(raw: unknown): ReferenceDirEntry | null {
 
 export function loadReferenceDirs(root?: string): ReferenceDirEntry[] {
   const base = root ?? workspacePath;
-  const filePath = path.join(base, CONFIG_FILE);
+  const filePath = path.join(base, WORKSPACE_DIRS.configs, CONFIG_FILE_NAME);
   try {
     if (!fs.existsSync(filePath)) return [];
     const raw = fs.readFileSync(filePath, "utf-8");
@@ -128,7 +169,7 @@ export function saveReferenceDirs(
   root?: string,
 ): void {
   const base = root ?? workspacePath;
-  const filePath = path.join(base, CONFIG_FILE);
+  const filePath = path.join(base, WORKSPACE_DIRS.configs, CONFIG_FILE_NAME);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileAtomicSync(filePath, JSON.stringify(entries, null, 2));
   invalidateCache();
@@ -182,10 +223,16 @@ function invalidateCache(): void {
 
 // ── Docker mount args ───────────────────────────────────────────
 
-/** Container path for a reference directory. */
+/** Container path for a reference directory.
+ *  Disambiguates with a short hash suffix to prevent collisions
+ *  when different host paths share the same basename. */
 export function containerPath(entry: ReferenceDirEntry): string {
   const basename = path.basename(entry.hostPath);
-  return path.posix.join(CONTAINER_MOUNT_ROOT, basename);
+  const hash = createHash("sha256")
+    .update(entry.hostPath)
+    .digest("hex")
+    .slice(0, 8);
+  return path.posix.join(CONTAINER_MOUNT_ROOT, `${basename}-${hash}`);
 }
 
 /**
