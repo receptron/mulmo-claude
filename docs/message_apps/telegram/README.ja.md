@@ -20,6 +20,11 @@ English: [`README.md`](README.md)
 
 PC を閉じたりネットを切ったりすると bot は沈黙します。
 
+> **ヒント**: オフライン時のメッセージキューが欲しいですか？
+> [MulmoBridge Relay](../relay/README.ja.md) を使えば、メッセージが
+> クラウドに保存され、PC がオンラインに戻ったときに届きます。
+> セットアップ: Claude Code で `/setup-relay` を実行。
+
 ---
 
 ## ステップ 1 — BotFather で bot を作る

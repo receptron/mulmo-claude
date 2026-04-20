@@ -242,3 +242,19 @@ wrangler deploy
 ```
 
 Your secrets are preserved — no need to re-enter them.
+
+---
+
+## Guided setup with Claude Code
+
+If you're using Claude Code inside MulmoClaude, you can run the
+setup interactively:
+
+```
+/setup-relay
+```
+
+Claude will walk you through each step — checking prerequisites,
+deploying the Relay, configuring secrets, and connecting MulmoClaude.
+Commands that require browser interaction (like `wrangler login`)
+are run in your terminal via the `!` prefix.

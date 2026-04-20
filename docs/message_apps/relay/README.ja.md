@@ -213,3 +213,15 @@ wrangler deploy
 ```
 
 シークレットは保持されます — 再入力の必要はありません。
+
+---
+
+## Claude Code でガイド付きセットアップ
+
+MulmoClaude 内で Claude Code を使っている場合、対話的にセットアップを実行できます：
+
+```
+/setup-relay
+```
+
+Claude が各ステップを案内します — 前提条件の確認、Relay のデプロイ、シークレットの設定、MulmoClaude との接続まで。ブラウザ操作が必要なコマンド（`wrangler login` など）は `!` プレフィックスでユーザーのターミナルで実行します。

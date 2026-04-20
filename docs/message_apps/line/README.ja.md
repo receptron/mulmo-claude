@@ -21,6 +21,11 @@ English: [`README.md`](README.md)
 
 PC を閉じたりネットを切ったりすると bot は沈黙します。
 
+> **ヒント**: ngrok の設定が面倒ですか？代わりに
+> [MulmoBridge Relay](../relay/README.ja.md) を使えば、固定 URL で
+> オフライン時のメッセージキューも可能です。ngrok 不要。
+> セットアップ: Claude Code で `/setup-relay` を実行。
+
 ### Telegram との違い
 
 Telegram はポーリング方式（bot 側からサーバに聞きに行く）なので
