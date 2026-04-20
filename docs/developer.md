@@ -202,12 +202,14 @@ Three independent Node processes cooperate at runtime:
   .mulmoclaude/       internal: per-session MCP config files
 ```
 
-Existing workspaces from before #284 need to run the one-shot migration script once before the server will start:
+Existing workspaces from before #284 can optionally run the migration script to reorganize old directories:
 
 ```bash
 yarn tsx scripts/migrate-workspace-284.ts --dry-run   # preview
 yarn tsx scripts/migrate-workspace-284.ts --execute   # commit (backs up via rsync first)
 ```
+
+> The server no longer blocks startup on pre-#284 layouts. The script is kept for users who want to clean up old directory names.
 
 The `config/` dir is the home for the [web Settings UI](../README.md#configuring-additional-tools-web-settings) — `settings.json` carries `extraAllowedTools`, `mcp.json` follows Claude CLI's `--mcp-config` format so you can copy it between machines.
 
