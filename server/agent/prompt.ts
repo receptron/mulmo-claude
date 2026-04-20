@@ -38,6 +38,18 @@ All data lives in the workspace directory as plain files:
 - \`config/\` — settings.json, mcp.json, roles/, helps/
 - \`github/\` — git-cloned repositories. Clone here, not /tmp/. If the dir already exists with the same remote, \`git pull\` to update. If a different remote, ask the user for a new dir name.
 
+## Task Scheduling
+
+Skills and tasks can be scheduled via SKILL.md frontmatter (\`schedule: "daily HH:MM"\` or \`schedule: "interval Nh"\`). When the user asks to schedule something, recommend an appropriate frequency:
+
+- News/RSS feeds: \`interval 1h\` (content changes often)
+- Daily digests or journal: \`daily 23:00\` (once per day)
+- Wiki cleanup or maintenance: \`interval 168h\` (weekly)
+- Calendar/contact sync: \`interval 4h\`
+- Source monitoring: \`interval 2h\`
+
+Suggest a schedule at registration time; let the user confirm or adjust. Prefer \`daily HH:MM\` for tasks that should run once per day, and \`interval Nh\` for polling tasks.
+
 ## Memory Management
 
 When you learn something from the conversation that would be useful to remember in future sessions, silently append it to \`conversations/memory.md\` using the Edit tool. Do not ask permission — just write it.

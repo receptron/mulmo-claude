@@ -16,6 +16,10 @@ export interface TaskDefinition {
   description?: string;
   schedule: TaskSchedule;
   enabled?: boolean; // default: true
+  /** If set, this task only fires after the named task has completed
+   *  successfully in the current tick cycle. Enforces ordering like
+   *  "news fetch → journal → memory extraction". */
+  dependsOn?: string;
   run: (ctx: TaskRunContext) => Promise<void>;
 }
 
@@ -24,10 +28,13 @@ export interface ITaskManager {
   removeTask(taskId: string): void;
   start(): void;
   stop(): void;
+  /** Run one tick manually (for testing). */
+  tick(): Promise<void>;
   listTasks(): Array<{
     id: string;
     description?: string;
     schedule: TaskSchedule;
+    dependsOn?: string;
   }>;
 }
 
@@ -67,22 +74,81 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
   const registry = new Map<string, TaskDefinition>();
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  function onTick() {
-    const currentTime = now();
+  function collectDueTasks(currentTime: Date): {
+    independent: TaskDefinition[];
+    dependent: TaskDefinition[];
+  } {
+    const independent: TaskDefinition[] = [];
+    const dependent: TaskDefinition[] = [];
     for (const def of registry.values()) {
       if (def.enabled === false) continue;
       if (!isDue(currentTime, def.schedule, tickMs)) continue;
+      if (def.dependsOn) {
+        dependent.push(def);
+      } else {
+        independent.push(def);
+      }
+    }
+    return { independent, dependent };
+  }
 
-      def.run({ taskId: def.id, now: currentTime }).catch((err) => {
-        log.error("task-manager", "task failed", {
-          id: def.id,
-          error: String(err),
-        });
+  async function runAndTrack(
+    def: TaskDefinition,
+    currentTime: Date,
+    succeeded: Set<string>,
+  ): Promise<void> {
+    try {
+      await def.run({ taskId: def.id, now: currentTime });
+      succeeded.add(def.id);
+    } catch (err) {
+      log.error("task-manager", "task failed", {
+        id: def.id,
+        error: String(err),
       });
     }
   }
 
+  async function runDependentChain(
+    dependent: TaskDefinition[],
+    currentTime: Date,
+    succeeded: Set<string>,
+  ): Promise<void> {
+    let remaining = [...dependent];
+    let progress = true;
+    while (remaining.length > 0 && progress) {
+      progress = false;
+      const next: TaskDefinition[] = [];
+      for (const def of remaining) {
+        if (!succeeded.has(def.dependsOn!)) {
+          next.push(def);
+          continue;
+        }
+        await runAndTrack(def, currentTime, succeeded);
+        progress = true;
+      }
+      remaining = next;
+    }
+  }
+
+  async function onTick(): Promise<void> {
+    const currentTime = now();
+    const { independent, dependent } = collectDueTasks(currentTime);
+
+    // Per-invocation set — success does not leak across tick() calls.
+    const succeeded = new Set<string>();
+
+    await Promise.all(
+      independent.map((def) => runAndTrack(def, currentTime, succeeded)),
+    );
+
+    await runDependentChain(dependent, currentTime, succeeded);
+  }
+
   return {
+    async tick() {
+      await onTick();
+    },
+
     registerTask(def: TaskDefinition) {
       if (registry.has(def.id)) {
         throw new Error(
@@ -118,6 +184,7 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
         id: d.id,
         description: d.description,
         schedule: d.schedule,
+        dependsOn: d.dependsOn,
       }));
     },
   };
