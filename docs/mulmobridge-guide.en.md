@@ -209,7 +209,7 @@ The newer bridges (Discord, Slack, LINE, WhatsApp, Matrix, IRC) haven't been tho
 
 - **Tried it?** Please tell us at [Issues](https://github.com/receptron/mulmoclaude/issues/new) — both "it worked" and "it broke" reports help
 - **Found a bug?** Include the `--verbose` log from the mock server
-- **Want a new platform?** Open an issue. Bridges are ~100 lines, so PRs are welcome too
+- **Want a new platform?** Open an issue with a plan. See [developer.md](../docs/developer.md) for the contribution flow
 
 GitHub: https://github.com/receptron/mulmoclaude
 npm: https://www.npmjs.com/org/mulmobridge

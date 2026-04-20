@@ -21,7 +21,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "echo no tests yet"
+    "test": "tsx --test test/test_*.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250419.0",

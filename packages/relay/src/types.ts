@@ -6,6 +6,12 @@ export const PLATFORMS = {
   slack: "slack",
   discord: "discord",
   messenger: "messenger",
+  mattermost: "mattermost",
+  zulip: "zulip",
+  whatsapp: "whatsapp",
+  matrix: "matrix",
+  irc: "irc",
+  googleChat: "google-chat",
 } as const;
 
 export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
@@ -34,18 +40,19 @@ export interface RelayResponse {
   replyToken?: string;
 }
 
-// Env is defined with `any` for the DO binding because
-// DurableObjectNamespace is a Cloudflare Workers type not available
-// in the server tsconfig. The actual type safety comes from
-// wrangler + @cloudflare/workers-types at deploy time.
+// Env uses Record<string, unknown> as a base so platform plugins
+// can access their own secrets without extending this interface.
+// Each plugin checks for its own keys via `env.KEY_NAME`.
 export interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   RELAY: any;
   RELAY_TOKEN: string;
-  // LINE
-  LINE_CHANNEL_SECRET?: string;
-  LINE_CHANNEL_ACCESS_TOKEN?: string;
-  // Telegram
-  TELEGRAM_BOT_TOKEN?: string;
-  TELEGRAM_WEBHOOK_SECRET?: string;
+  // Platform-specific secrets are accessed dynamically.
+  // Known keys for reference (not exhaustive):
+  //   LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN
+  //   TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET
+  //   SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN
+  //   DISCORD_PUBLIC_KEY, DISCORD_BOT_TOKEN
+  //   MESSENGER_APP_SECRET, MESSENGER_PAGE_ACCESS_TOKEN
+  [key: string]: unknown;
 }
