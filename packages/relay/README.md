@@ -89,6 +89,43 @@ RELAY_TOKEN=<same token as step 2>
 - **Body size limit**: 1MB max per webhook request
 - **Queue limit**: 1000 messages max (oldest dropped when exceeded)
 
+## Adding a new platform (developer notes)
+
+The relay uses a plugin architecture. Each platform is a self-contained
+file in `src/webhooks/` that implements `PlatformPlugin`:
+
+```typescript
+// src/webhooks/slack.ts
+const slackPlugin: PlatformPlugin = {
+  name: PLATFORMS.slack,
+  mode: CONNECTION_MODES.webhook,  // or "polling" or "persistent"
+  webhookPath: "/webhook/slack",
+  isConfigured: (env) => !!env.SLACK_SIGNING_SECRET,
+  handleWebhook: async (request, body, env) => { /* ... */ },
+  sendResponse: async (chatId, text, env) => { /* ... */ },
+};
+registerPlatform(slackPlugin);
+```
+
+Three connection modes are supported:
+
+| Mode | Examples | Method |
+|------|----------|--------|
+| `webhook` | LINE, Messenger, Google Chat | Platform POSTs to relay URL |
+| `polling` | Telegram (alt) | Relay fetches from platform API |
+| `persistent` | Slack Socket Mode, Discord Gateway | Relay maintains WS to platform |
+
+### Relay vs Bridge packages
+
+| | Relay | Bridge (`@mulmobridge/*`) |
+|---|---|---|
+| Runs on | Cloud (CF Workers) | User's computer |
+| Public URL | Permanent | Requires ngrok |
+| Offline queue | Yes | No |
+| Multi-platform | One relay | One process each |
+
+Both can coexist. Some platforms via Relay, others via local Bridge.
+
 ## License
 
 AGPL-3.0-only

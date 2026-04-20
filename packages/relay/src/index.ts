@@ -1,14 +1,21 @@
 // MulmoBridge Relay — Cloudflare Worker entry point.
 //
-// Routes:
-//   POST /webhook/line       — LINE webhook (signature verified)
-//   POST /webhook/telegram   — Telegram webhook (secret verified)
-//   GET  /ws                 — MulmoClaude WebSocket connection
-//   GET  /health             — health check
+// Routes are auto-discovered from registered platform plugins.
+// Adding a new platform: create a file in webhooks/, implement
+// PlatformPlugin, call registerPlatform(), import it below.
 
 import type { Env, RelayMessage } from "./types.js";
-import { handleLineWebhook } from "./webhooks/line.js";
-import { handleTelegramWebhook } from "./webhooks/telegram.js";
+import {
+  getPlatformByPath,
+  getConfiguredPlatforms,
+  CONNECTION_MODES,
+} from "./platform.js";
+
+// ── Register platform plugins (side-effect imports) ─────────
+// Each import registers itself via registerPlatform().
+import "./webhooks/line.js";
+import "./webhooks/telegram.js";
+
 export { RelayDurableObject } from "./durable-object.js";
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
@@ -17,14 +24,11 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Health check
+    // Health check — shows all registered + configured platforms
     if (url.pathname === "/health") {
       return Response.json({
         status: "ok",
-        platforms: {
-          line: !!env.LINE_CHANNEL_SECRET,
-          telegram: !!env.TELEGRAM_BOT_TOKEN,
-        },
+        platforms: getConfiguredPlatforms(env),
       });
     }
 
@@ -38,32 +42,45 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
-    // Body size check (header + actual body)
+    // Body size check (Content-Length header)
     const contentLength = request.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
       return new Response("Payload too large", { status: 413 });
     }
 
+    // Route to platform plugin by path
+    const plugin = getPlatformByPath(url.pathname);
+    if (!plugin) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (plugin.mode !== CONNECTION_MODES.webhook || !plugin.handleWebhook) {
+      return new Response("Not a webhook platform", { status: 400 });
+    }
+
+    if (!plugin.isConfigured(env)) {
+      return new Response(`${plugin.name} not configured`, { status: 404 });
+    }
+
     try {
-      if (url.pathname === "/webhook/line") {
-        return await handleLine(request, env);
-      }
-      if (url.pathname === "/webhook/telegram") {
-        return await handleTelegram(request, env);
-      }
+      const body = await readBodyWithLimit(request);
+      const messages = await plugin.handleWebhook(request, body, env);
+      await enqueueMessages(messages, env);
+      return new Response("ok", { status: 200 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("verification failed")) {
+      if (
+        msg.includes("verification failed") ||
+        msg.includes("not configured")
+      ) {
         return new Response("Unauthorized", { status: 401 });
       }
       return new Response("Internal error", { status: 500 });
     }
-
-    return new Response("Not found", { status: 404 });
   },
 };
 
-// ── Body reader with size limit ──────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────
 
 async function readBodyWithLimit(request: Request): Promise<string> {
   const body = await request.text();
@@ -72,37 +89,6 @@ async function readBodyWithLimit(request: Request): Promise<string> {
   }
   return body;
 }
-
-// ── Webhook handlers ─────────────────────────────────────────
-
-async function handleLine(request: Request, env: Env): Promise<Response> {
-  if (!env.LINE_CHANNEL_SECRET) {
-    return new Response("LINE not configured", { status: 404 });
-  }
-
-  const messages = await handleLineWebhook(request, env.LINE_CHANNEL_SECRET);
-  await enqueueMessages(messages, env);
-  return new Response("ok", { status: 200 });
-}
-
-async function handleTelegram(request: Request, env: Env): Promise<Response> {
-  if (!env.TELEGRAM_BOT_TOKEN) {
-    return new Response("Telegram not configured", { status: 404 });
-  }
-
-  const body = await readBodyWithLimit(request);
-  const headerSecret = request.headers.get("x-telegram-bot-api-secret-token");
-  const messages = handleTelegramWebhook(
-    body,
-    env.TELEGRAM_WEBHOOK_SECRET,
-    headerSecret,
-  );
-
-  await enqueueMessages(messages, env);
-  return new Response("ok", { status: 200 });
-}
-
-// ── Durable Object helpers ───────────────────────────────────
 
 async function enqueueMessages(
   messages: RelayMessage[],

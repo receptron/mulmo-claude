@@ -7,9 +7,11 @@
 // and delivered on reconnect.
 
 import type { RelayMessage, RelayResponse, Env } from "./types.js";
-import { sendLineReply, sendLinePush } from "./webhooks/line.js";
-import { sendTelegramMessage } from "./webhooks/telegram.js";
-import { PLATFORMS } from "./types.js";
+import { getPlatformByName } from "./platform.js";
+
+// Import plugins so they register themselves
+import "./webhooks/line.js";
+import "./webhooks/telegram.js";
 
 const MAX_QUEUE_SIZE = 1000;
 const QUEUE_KEY_PREFIX = "q:";
@@ -45,19 +47,17 @@ export class RelayDurableObject implements DurableObject {
       return new Response("Expected WebSocket", { status: 426 });
     }
 
-    // Auth: token from query param (WS API can't set headers)
     const url = new URL(request.url);
     const token = url.searchParams.get("token") ?? "";
     if (!token || token !== this.env.RELAY_TOKEN) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    // Close existing connection (1 connection limit)
     if (this.ws) {
       try {
         this.ws.close(1000, "replaced by new connection");
       } catch {
-        // already closed
+        /* already closed */
       }
       this.ws = null;
     }
@@ -68,14 +68,13 @@ export class RelayDurableObject implements DurableObject {
     this.state.acceptWebSocket(server);
     this.ws = server;
 
-    // Deliver queued messages
     this.flushQueue().catch(() => {});
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(
-    _ws: WebSocket,
+    __ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
     if (typeof message !== "string") return;
@@ -84,13 +83,12 @@ export class RelayDurableObject implements DurableObject {
     try {
       response = JSON.parse(message);
     } catch {
-      return; // malformed JSON — skip
+      return;
     }
 
     try {
       await this.handleResponse(response);
     } catch (err) {
-      // Platform delivery failed — send error back to MulmoClaude
       const errorMsg = err instanceof Error ? err.message : String(err);
       this.ws?.send(
         JSON.stringify({
@@ -122,17 +120,14 @@ export class RelayDurableObject implements DurableObject {
     const msg: RelayMessage = await request.json();
 
     if (this.ws) {
-      // Connected — forward immediately
       try {
         this.ws.send(JSON.stringify(msg));
         return new Response("forwarded", { status: 200 });
       } catch {
         this.ws = null;
-        // Fall through to queue
       }
     }
 
-    // Not connected — queue
     await this.enqueue(msg);
     return new Response("queued", { status: 202 });
   }
@@ -141,7 +136,6 @@ export class RelayDurableObject implements DurableObject {
     const key = `${QUEUE_KEY_PREFIX}${msg.receivedAt}:${msg.id}`;
     await this.state.storage.put(key, JSON.stringify(msg));
 
-    // Enforce max queue size
     const keys = await this.listQueueKeys();
     if (keys.length > MAX_QUEUE_SIZE) {
       const toDelete = keys.slice(0, keys.length - MAX_QUEUE_SIZE);
@@ -161,34 +155,28 @@ export class RelayDurableObject implements DurableObject {
         this.ws.send(raw);
         await this.state.storage.delete(key);
       } catch {
-        break; // WS failed, stop flushing
+        break;
       }
     }
   }
 
   private async listQueueKeys(): Promise<string[]> {
-    const map = await this.state.storage.list({
-      prefix: QUEUE_KEY_PREFIX,
-    });
+    const map = await this.state.storage.list({ prefix: QUEUE_KEY_PREFIX });
     return [...map.keys()].sort();
   }
 
-  // ── Response handling (send replies back to platforms) ──────
+  // ── Response routing (plugin-based) ───────────────────────
 
   private async handleResponse(response: RelayResponse): Promise<void> {
-    if (response.platform === PLATFORMS.line) {
-      const accessToken = this.env.LINE_CHANNEL_ACCESS_TOKEN;
-      if (!accessToken) return;
-
-      if (response.replyToken) {
-        await sendLineReply(response.replyToken, response.text, accessToken);
-      } else {
-        await sendLinePush(response.chatId, response.text, accessToken);
-      }
-    } else if (response.platform === PLATFORMS.telegram) {
-      const botToken = this.env.TELEGRAM_BOT_TOKEN;
-      if (!botToken) return;
-      await sendTelegramMessage(response.chatId, response.text, botToken);
+    const plugin = getPlatformByName(response.platform);
+    if (!plugin) {
+      throw new Error(`unknown platform: ${response.platform}`);
     }
+    await plugin.sendResponse(
+      response.chatId,
+      response.text,
+      this.env,
+      response.replyToken,
+    );
   }
 }

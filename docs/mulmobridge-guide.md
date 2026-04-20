@@ -238,7 +238,7 @@ if (ack.ok) {
 
 - **試してくれた方**: [Issue](https://github.com/receptron/mulmoclaude/issues/new) で教えてください！動いた・動かなかった、どちらの報告も助かります
 - **バグを見つけた方**: `--verbose` オプション（ダミーサーバー）のログを貼ってもらえると原因特定しやすいです
-- **新しいプラットフォームが欲しい方**: Issue で提案してください。ブリッジは ~100 行なので、PR も歓迎です
+- **新しいプラットフォームが欲しい方**: Issue でプランを提案してください。貢献の流れは [developer.md](../docs/developer.md) を参照
 
 GitHub: https://github.com/receptron/mulmoclaude
 npm: https://www.npmjs.com/org/mulmobridge
