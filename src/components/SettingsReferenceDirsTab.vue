@@ -77,10 +77,13 @@ function addEntry(): void {
     return;
   }
   const lastSeg = normalized.split("/").pop();
-  dirs.value.push({
-    hostPath: normalized,
-    label: draftLabel.value.trim() || lastSeg || normalized,
-  });
+  const label = draftLabel.value.trim() || lastSeg || normalized;
+  // Reject duplicate labels — @ref/<label> routing requires uniqueness
+  if (dirs.value.some((d) => d.label === label)) {
+    draftError.value = `Label "${label}" already exists`;
+    return;
+  }
+  dirs.value.push({ hostPath: normalized, label });
   draftPath.value = "";
   draftLabel.value = "";
 }

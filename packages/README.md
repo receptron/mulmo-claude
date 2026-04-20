@@ -125,7 +125,7 @@ The protocol is plain socket.io 4.x — Python, Go, or any language with a socke
 
 - **MulmoClaude uses these packages** — but the packages don't import anything from MulmoClaude
 - **Any Express app can host the chat-service** — just inject your agent via the DI interface
-- **MIT licensed** — free to use in any project (MulmoClaude itself is AGPL)
+- **MIT licensed** — free to use in any project (MulmoClaude itself is also MIT)
 
 We encourage other AI tool projects to adopt MulmoBridge. The protocol is simple, the packages are small, and more bridges + backends means a better ecosystem for everyone.
 

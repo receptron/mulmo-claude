@@ -7,6 +7,7 @@ import {
   statSafeAsync,
   readDirSafeAsync,
   resolveWithinRoot,
+  writeFileAtomic,
 } from "../../utils/files/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import {
@@ -17,6 +18,7 @@ import {
 } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
+import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
 
 const router = Router();
 
@@ -171,6 +173,17 @@ interface FileContentText {
   modifiedMs: number;
 }
 
+interface WriteContentRequest {
+  path?: unknown;
+  content?: unknown;
+}
+
+interface WriteContentResponse {
+  path: string;
+  size: number;
+  modifiedMs: number;
+}
+
 interface FileContentMeta {
   kind: "image" | "pdf" | "audio" | "video" | "binary" | "too-large";
   path: string;
@@ -225,6 +238,55 @@ function resolveSafe(relPath: string): string | null {
   // matches on the basename so it catches `.env`, `id_rsa`, and
   // friends regardless of which directory they sit in.
   if (isSensitivePath(resolved)) return null;
+  return resolved;
+}
+
+// ── Reference directory path resolution ──────────────────────────
+
+const REF_PREFIX = "@ref/";
+
+function isRefPath(relPath: string): boolean {
+  return relPath.startsWith(REF_PREFIX);
+}
+
+/**
+ * Resolve a `@ref/<label>/remainder` path against a registered
+ * reference directory. Returns the absolute host path or null if
+ * the label is unknown, the path escapes the ref root, or the
+ * resolved file is sensitive / hidden.
+ */
+function resolveRefPath(prefixedPath: string): string | null {
+  const afterPrefix = prefixedPath.slice(REF_PREFIX.length);
+  const slashIdx = afterPrefix.indexOf("/");
+  const label = slashIdx >= 0 ? afterPrefix.slice(0, slashIdx) : afterPrefix;
+  const remainder = slashIdx >= 0 ? afterPrefix.slice(slashIdx + 1) : "";
+
+  const entries = getCachedReferenceDirs();
+  const entry = entries.find((e) => e.label === label);
+  if (!entry) return null;
+
+  let rootReal: string;
+  try {
+    rootReal = fs.realpathSync(entry.hostPath);
+  } catch {
+    return null;
+  }
+
+  // For root of the reference dir (no remainder), return the dir itself
+  if (!remainder) return rootReal;
+
+  const resolved = resolveWithinRoot(rootReal, remainder);
+  if (!resolved) return null;
+
+  // Apply the same hidden-dir and sensitive-path filters
+  const relFromRoot = path.relative(rootReal, resolved);
+  if (relFromRoot) {
+    for (const seg of relFromRoot.split(path.sep)) {
+      if (HIDDEN_DIRS.has(seg)) return null;
+    }
+  }
+  if (isSensitivePath(resolved)) return null;
+
   return resolved;
 }
 
@@ -496,8 +558,25 @@ router.get(
     res: Response<TreeNode | ErrorResponse>,
   ) => {
     const relPath = typeof req.query.path === "string" ? req.query.path : "";
-    // Empty path = root. resolveSafe handles "" by returning the
-    // workspace root; any traversal / sensitive / missing path → null.
+
+    // Reference directory branch — resolve against the registered ref dir
+    if (isRefPath(relPath)) {
+      const absPath = resolveRefPath(relPath);
+      if (!absPath) {
+        notFound(res, "Not found");
+        return;
+      }
+      const stat = await statSafeAsync(absPath);
+      if (!stat || !stat.isDirectory()) {
+        notFound(res, "Not found");
+        return;
+      }
+      const node = await listDirShallow(absPath, relPath, undefined);
+      res.json(node);
+      return;
+    }
+
+    // Workspace path — existing logic
     const absPath = resolveSafe(relPath);
     if (!absPath) {
       notFound(res, "Not found");
@@ -568,6 +647,23 @@ function resolveAndStatFile<T>(
     badRequest(res, "path required");
     return null;
   }
+
+  // Reference directory branch
+  if (isRefPath(relPath)) {
+    const absPath = resolveRefPath(relPath);
+    if (!absPath) {
+      notFound(res, "Not found");
+      return null;
+    }
+    const stat = statSafe(absPath);
+    if (!stat || !stat.isFile()) {
+      notFound(res, "File not found");
+      return null;
+    }
+    return { relPath, absPath, stat };
+  }
+
+  // Workspace path — existing logic
   // Syntactic candidate (no symlink resolution yet).
   const candidate = path.resolve(workspaceReal, path.normalize(relPath));
   const stat = statSafe(candidate);
@@ -669,6 +765,78 @@ router.get(
   },
 );
 
+// Write the body of an existing text file. Only text-classified files
+// (per `classify`) are editable — binary, image, audio, etc. are
+// refused so the endpoint can't be used to ship arbitrary uploads.
+// The file must already exist; creating new files is out of scope.
+router.put(
+  API_ROUTES.files.content,
+  async (
+    req: Request<object, unknown, WriteContentRequest>,
+    res: Response<WriteContentResponse | ErrorResponse>,
+  ) => {
+    const { path: relPathRaw, content: contentRaw } = req.body ?? {};
+    if (typeof relPathRaw !== "string" || relPathRaw.length === 0) {
+      badRequest(res, "path required");
+      return;
+    }
+    if (typeof contentRaw !== "string") {
+      badRequest(res, "content required");
+      return;
+    }
+    if (Buffer.byteLength(contentRaw, "utf-8") > MAX_PREVIEW_BYTES) {
+      badRequest(res, `content exceeds ${MAX_PREVIEW_BYTES} byte limit`);
+      return;
+    }
+    // Two-step resolution to distinguish "path outside workspace" (400)
+    // from "file does not exist" (404): realpath throws on ENOENT, so
+    // resolveSafe conflates the two. Stat the syntactic candidate
+    // first; if it exists, THEN run the symlink-hardened resolveSafe.
+    const candidate = path.resolve(workspaceReal, path.normalize(relPathRaw));
+    const existing = await statSafeAsync(candidate);
+    if (!existing) {
+      const relativeFromWorkspace = path.relative(workspaceReal, candidate);
+      const escapesSyntactically =
+        relativeFromWorkspace === ".." ||
+        relativeFromWorkspace.startsWith(`..${path.sep}`);
+      if (escapesSyntactically) {
+        badRequest(res, "Path outside workspace");
+      } else {
+        notFound(res, "File not found");
+      }
+      return;
+    }
+    if (!existing.isFile()) {
+      badRequest(res, "Not a file");
+      return;
+    }
+    const absPath = resolveSafe(relPathRaw);
+    if (!absPath) {
+      badRequest(res, "Path outside workspace");
+      return;
+    }
+    if (classify(absPath) !== "text") {
+      badRequest(res, "File type not editable");
+      return;
+    }
+    try {
+      // `uniqueTmp: true` appends a randomUUID to the tmp filename so
+      // two simultaneous PUTs to the same path can't clobber each
+      // other's staging file and race through the rename.
+      await writeFileAtomic(absPath, contentRaw, { uniqueTmp: true });
+    } catch (err) {
+      serverError(res, `Failed to write file: ${errorMessage(err)}`);
+      return;
+    }
+    const fresh = await statSafeAsync(absPath);
+    res.json({
+      path: relPathRaw,
+      size: fresh?.size ?? Buffer.byteLength(contentRaw, "utf-8"),
+      modifiedMs: fresh?.mtimeMs ?? Date.now(),
+    });
+  },
+);
+
 router.get(
   API_ROUTES.files.raw,
   (
@@ -729,6 +897,31 @@ router.get(
 
     res.setHeader("Content-Length", String(stat.size));
     pipeWithErrorHandling(fs.createReadStream(absPath), res);
+  },
+);
+
+// ── Reference directory roots ───────────────────────────────────
+//
+// Returns configured reference directories as top-level TreeNode[]
+// for the file explorer. Each node's path uses the @ref/<label>
+// prefix so subsequent /dir and /content requests route correctly.
+
+router.get(
+  API_ROUTES.files.refRoots,
+  async (_req: Request, res: Response<TreeNode[]>) => {
+    const entries = getCachedReferenceDirs();
+    const nodes: TreeNode[] = [];
+    for (const entry of entries) {
+      const stat = await statSafeAsync(entry.hostPath);
+      if (!stat || !stat.isDirectory()) continue;
+      nodes.push({
+        name: entry.label,
+        path: `${REF_PREFIX}${entry.label}`,
+        type: "dir",
+        modifiedMs: stat.mtimeMs,
+      });
+    }
+    res.json(nodes);
   },
 );
 

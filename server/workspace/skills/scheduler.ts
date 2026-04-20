@@ -17,6 +17,10 @@ import { parseSkillFrontmatter } from "./parser.js";
 import { log } from "../../system/logger/index.js";
 import { readFileSync } from "fs";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
+import {
+  SESSION_ORIGINS,
+  type SessionOrigin,
+} from "../../../src/types/session.js";
 
 interface SkillScheduleInfo {
   schedule: TaskSchedule;
@@ -36,6 +40,7 @@ export interface SkillSchedulerDeps {
     message: string;
     roleId: string;
     chatSessionId: string;
+    origin?: SessionOrigin;
   }) => Promise<StartChatResult>;
 }
 
@@ -113,6 +118,7 @@ async function doRegister(deps: SkillSchedulerDeps): Promise<number> {
           message: `/${skill.name}`,
           roleId,
           chatSessionId,
+          origin: SESSION_ORIGINS.skill,
         });
         if (result.kind === "error") {
           throw new Error(

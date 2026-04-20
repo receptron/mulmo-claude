@@ -71,6 +71,7 @@ import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
 import { registerUserTasks } from "./workspace/skills/user-tasks.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
+import { SESSION_ORIGINS } from "../src/types/session.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 
@@ -542,6 +543,7 @@ function registerDebugTasks(taskManager: ITaskManager, pubsub: IPubSub) {
         message: "Tell me about this app, MulmoClaude.",
         roleId: DEFAULT_ROLE_ID,
         chatSessionId,
+        origin: SESSION_ORIGINS.scheduler,
       });
       log.info("debug", "auto-chat result", { kind: result.kind });
     },

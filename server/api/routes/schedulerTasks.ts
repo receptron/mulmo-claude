@@ -14,6 +14,7 @@ import {
 } from "../../events/scheduler-adapter.js";
 import type { TaskLogEntry } from "@receptron/task-scheduler";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { SESSION_ORIGINS } from "../../../src/types/session.js";
 import {
   loadUserTasks,
   validateAndCreate,
@@ -137,6 +138,7 @@ router.post(
         message: userTask.prompt,
         roleId: userTask.roleId,
         chatSessionId,
+        origin: SESSION_ORIGINS.scheduler,
       }).catch((err) => {
         log.error("scheduler-tasks", "manual run failed", {
           error: String(err),

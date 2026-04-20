@@ -57,6 +57,7 @@ export const API_ROUTES = {
     dir: "/api/files/dir",
     content: "/api/files/content",
     raw: "/api/files/raw",
+    refRoots: "/api/files/ref-roots",
   },
 
   html: {

@@ -136,10 +136,17 @@ function validateEntry(raw: unknown): ReferenceDirEntry | null {
 
 export function loadReferenceDirs(root?: string): ReferenceDirEntry[] {
   const parsed = readReferenceDirsJson(root);
+  const seenLabels = new Set<string>();
   const entries = parsed
     .slice(0, MAX_ENTRIES)
     .map(validateEntry)
-    .filter((e): e is ReferenceDirEntry => e !== null);
+    .filter((e): e is ReferenceDirEntry => {
+      if (!e) return false;
+      // Deduplicate labels — first entry wins
+      if (seenLabels.has(e.label)) return false;
+      seenLabels.add(e.label);
+      return true;
+    });
 
   const skipped = parsed.length - entries.length;
   if (skipped > 0) {
@@ -185,6 +192,15 @@ export function validateReferenceDirs(
   });
   if (errors.length > 0) {
     return { error: errors.join("; ") };
+  }
+
+  // Reject duplicate labels — @ref/<label> routing requires uniqueness
+  const seenLabels = new Set<string>();
+  for (const entry of entries) {
+    if (seenLabels.has(entry.label)) {
+      return { error: `duplicate label "${entry.label}"` };
+    }
+    seenLabels.add(entry.label);
   }
   return { entries };
 }

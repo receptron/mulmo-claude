@@ -13,6 +13,7 @@ import {
   type DispatchErrorResponse,
 } from "./dispatchResponse.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { SESSION_ORIGINS } from "../../../src/types/session.js";
 import {
   loadUserTasks,
   validateAndCreate,
@@ -157,6 +158,7 @@ async function handleTaskAction(
         message: task.prompt,
         roleId: task.roleId,
         chatSessionId,
+        origin: SESSION_ORIGINS.scheduler,
       }).catch((err) => {
         log.error("scheduler", "manual run failed", {
           error: String(err),

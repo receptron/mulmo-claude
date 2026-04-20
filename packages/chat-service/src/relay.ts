@@ -104,6 +104,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
       roleId: chatState.roleId,
       chatSessionId: chatState.sessionId,
       attachments,
+      origin: "bridge",
     });
 
     if (result.kind === "error") {

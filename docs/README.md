@@ -14,6 +14,8 @@ Guides for using MulmoClaude. No programming knowledge required.
 | [Telegram セットアップ](message_apps/telegram/README.ja.md) | 日本語 | Telegram Bot の作成と接続手順 |
 | [LINE Setup](message_apps/line/README.md) | English | Create and connect a LINE bot (requires ngrok) |
 | [LINE セットアップ](message_apps/line/README.ja.md) | 日本語 | LINE bot の作成と接続手順 (ngrok 必要) |
+| [Relay Setup](message_apps/relay/README.md) | English | Deploy a cloud relay — no ngrok, offline queue |
+| [Relay セットアップ](message_apps/relay/README.ja.md) | 日本語 | クラウドリレーのデプロイ — ngrok 不要、オフラインキュー |
 
 ## Tips & Integrations
 

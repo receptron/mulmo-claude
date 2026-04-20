@@ -55,17 +55,26 @@
         </div>
 
         <!-- Collapsible Editor -->
-        <details ref="detailsEl" class="text-response-source">
-          <summary>Edit Text Content</summary>
+        <details
+          v-if="editable"
+          ref="detailsEl"
+          class="text-response-source"
+          data-testid="text-response-edit"
+        >
+          <summary data-testid="text-response-edit-summary">
+            Edit Text Content
+          </summary>
           <textarea
             v-model="editedText"
             class="text-response-editor"
             spellcheck="false"
+            data-testid="text-response-edit-textarea"
           ></textarea>
           <button
-            @click="applyChanges"
             class="apply-btn"
             :disabled="!hasChanges"
+            data-testid="text-response-apply-btn"
+            @click="applyChanges"
           >
             Apply Changes
           </button>
@@ -97,24 +106,39 @@ import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
-const props = defineProps<{
-  selectedResult: ToolResultComplete<TextResponseData>;
+const props = withDefaults(
+  defineProps<{
+    selectedResult: ToolResultComplete<TextResponseData>;
+    editable?: boolean;
+    // When set, the editor textarea edits this string instead of the
+    // displayed `data.text`. FilesView uses it to feed the editor the
+    // raw on-disk source (with frontmatter intact, no image-URL
+    // rewriting) while the rendered pane keeps showing the cleaned-up
+    // display text. Callers listen for `updateSource` to receive the
+    // edited source and handle persistence themselves.
+    editableSource?: string;
+  }>(),
+  { editable: true, editableSource: undefined },
+);
+const emit = defineEmits<{
+  updateResult: [result: ToolResult];
+  updateSource: [source: string];
 }>();
-const emit = defineEmits<{ updateResult: [result: ToolResult] }>();
 
 // --- Data & computed from upstream View ---
 
 const messageText = computed(() => props.selectedResult.data?.text ?? "");
-const editedText = ref(messageText.value);
-
-watch(
-  () => props.selectedResult.data?.text,
-  (newText) => {
-    if (newText !== undefined) {
-      editedText.value = newText;
-    }
-  },
+// Source fed into the editor. When the parent passes `editableSource`
+// it wins; otherwise we edit the displayed text, matching the
+// component's original (chat-message) behaviour.
+const editorSource = computed(() =>
+  props.editableSource !== undefined ? props.editableSource : messageText.value,
 );
+const editedText = ref(editorSource.value);
+
+watch(editorSource, (next) => {
+  editedText.value = next;
+});
 
 const messageRole = computed(
   () => props.selectedResult.data?.role ?? "assistant",
@@ -176,20 +200,27 @@ const roleTheme = computed(() => {
   }
 });
 
-const hasChanges = computed(() => editedText.value !== messageText.value);
+const hasChanges = computed(() => editedText.value !== editorSource.value);
 
 function applyChanges() {
   if (!hasChanges.value) return;
 
-  const updatedResult: ToolResult = {
-    ...props.selectedResult,
-    data: {
-      ...props.selectedResult.data,
-      text: editedText.value,
-    },
-  };
-
-  emit("updateResult", updatedResult);
+  if (props.editableSource !== undefined) {
+    // Source-editing mode: hand the edited string to the parent and
+    // let it decide how to persist. The component's own `data.text`
+    // isn't touched — the parent will re-supply `editableSource` after
+    // the save round-trip.
+    emit("updateSource", editedText.value);
+  } else {
+    const updatedResult: ToolResult = {
+      ...props.selectedResult,
+      data: {
+        ...props.selectedResult.data,
+        text: editedText.value,
+      },
+    };
+    emit("updateResult", updatedResult);
+  }
   if (detailsEl.value) detailsEl.value.open = false;
 }
 
@@ -226,8 +257,10 @@ onBeforeUnmount(() => {
 
 function cancelEdit() {
   if (detailsEl.value) detailsEl.value.open = false;
-  // Reset edited text to original
-  editedText.value = messageText.value;
+  // Reset edited text to whatever the editor started with — in
+  // source-editing mode that's the raw source, otherwise the display
+  // text. Using the computed `editorSource` keeps both paths correct.
+  editedText.value = editorSource.value;
 }
 
 const { copied, copy } = useClipboardCopy();

@@ -30,7 +30,7 @@ MulmoBridge was originally part of [MulmoClaude](https://github.com/receptron/mu
 
 1. **Works with any AI tool** — not limited to MulmoClaude. Connect to OpenAI, LangChain, or your own custom agent
 2. **Pick only what you need** — want only Telegram? Install just the Telegram package
-3. **MIT licensed** — free for any use, including commercial (MulmoClaude itself is AGPL, but the bridge packages are MIT)
+3. **MIT licensed** — free for any use, including commercial (both MulmoClaude and the bridge packages are MIT licensed)
 4. **Easy to extend** — each package is small and independent, making it simple to add new platforms
 
 ---
