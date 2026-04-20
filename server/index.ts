@@ -189,10 +189,10 @@ async function getSessionHistoryForBridge(
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (entry.type === "text" && typeof entry.content === "string") {
+      if (entry.type === "text" && typeof entry.message === "string") {
         allMessages.push({
           source: entry.source ?? "unknown",
-          text: entry.content,
+          text: entry.message,
         });
       }
     } catch {
