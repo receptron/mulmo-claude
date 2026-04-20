@@ -22,7 +22,10 @@ import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
-import type { NotificationDeps } from "./events/notifications.js";
+import {
+  type NotificationDeps,
+  initNotifications,
+} from "./events/notifications.js";
 import { createChatService } from "@mulmobridge/chat-service";
 import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
@@ -66,6 +69,7 @@ import {
 import { log } from "./system/logger/index.js";
 import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
+import { registerUserTasks } from "./workspace/skills/user-tasks.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
@@ -355,6 +359,12 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   notificationDeps.publish = (channel, payload) =>
     pubsub.publish(channel, payload);
 
+  // --- Notification system (#144) ---
+  initNotifications({
+    publish: (channel, payload) => pubsub.publish(channel, payload),
+    pushToBridge: chatService.pushToBridge,
+  });
+
   // --- Chat socket transport (Phase A of #268) ---
   chatService.attachSocket(httpServer);
 
@@ -413,6 +423,19 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
     })
     .catch((err) => {
       log.warn("skills", "failed to register scheduled skills", {
+        error: String(err),
+      });
+    });
+
+  // Register user-created scheduled tasks from tasks.json.
+  registerUserTasks({ taskManager, startChat })
+    .then((count) => {
+      if (count > 0) {
+        log.info("user-tasks", "user tasks registered", { count });
+      }
+    })
+    .catch((err) => {
+      log.warn("user-tasks", "failed to register user tasks", {
         error: String(err),
       });
     });

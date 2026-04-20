@@ -48,6 +48,8 @@ export const API_ROUTES = {
     base: "/api/config",
     settings: "/api/config/settings",
     mcp: "/api/config/mcp",
+    workspaceDirs: "/api/config/workspace-dirs",
+    referenceDirs: "/api/config/reference-dirs",
   },
 
   files: {
@@ -123,6 +125,10 @@ export const API_ROUTES = {
 
   scheduler: {
     base: "/api/scheduler",
+    tasks: "/api/scheduler/tasks",
+    task: "/api/scheduler/tasks/:id",
+    taskRun: "/api/scheduler/tasks/:id/run",
+    logs: "/api/scheduler/logs",
   },
 
   sessions: {

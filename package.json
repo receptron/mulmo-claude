@@ -1,10 +1,13 @@
 {
   "name": "mulmoclaude",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "author": "snakajima",
   "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -28,7 +31,7 @@
     "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
     "typecheck:e2e": "tsc -p e2e/tsconfig.json --noEmit",
     "build:client": "vite build",
-    "build:packages": "yarn workspace @mulmobridge/protocol run build && yarn workspace @receptron/task-scheduler run build && yarn workspace @mulmobridge/client run build && yarn workspace @mulmobridge/chat-service run build && yarn workspace @mulmobridge/cli run build && yarn workspace @mulmobridge/telegram run build",
+    "build:packages": "yarn workspace @mulmobridge/protocol run build && yarn workspace @receptron/task-scheduler run build && yarn workspace @mulmobridge/client run build && yarn workspace @mulmobridge/chat-service run build && yarn workspace @mulmobridge/cli run build && yarn workspace @mulmobridge/telegram run build && yarn workspace @mulmobridge/mock-server run build && yarn workspace @mulmobridge/discord run build && yarn workspace @mulmobridge/slack run build && yarn workspace @mulmobridge/line run build && yarn workspace @mulmobridge/whatsapp run build && yarn workspace @mulmobridge/matrix run build && yarn workspace @mulmobridge/irc run build",
     "build": "yarn build:packages && vite build",
     "test": "tsx --test ./test/*/test_*.ts ./test/*/*/test_*.ts ./test/*/*/*/test_*.ts && yarn workspaces run test",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
@@ -41,18 +44,18 @@
     "tar": "7.5.13"
   },
   "dependencies": {
-    "@google/genai": "^1.49.0",
+    "@google/genai": "^1.50.1",
     "@gui-chat-plugin/browse": "^0.2.0",
     "@gui-chat-plugin/camera": "^0.4.0",
     "@gui-chat-plugin/mindmap": "^0.4.0",
     "@gui-chat-plugin/present3d": "^0.1.0",
     "@gui-chat-plugin/weather": "^0.1.0",
     "@mulmobridge/client": "^0.1.0",
-    "@receptron/task-scheduler": "^0.1.0",
     "@mulmocast/types": "^2.6.7",
     "@mulmochat-plugin/form": "0.5.0",
     "@mulmochat-plugin/quiz": "0.4.0",
     "@mulmochat-plugin/ui-image": "^0.3.0",
+    "@receptron/task-scheduler": "^0.1.0",
     "@types/dompurify": "^3.2.0",
     "cors": "^2.8.6",
     "dompurify": "^3.4.0",
@@ -63,7 +66,7 @@
     "gui-chat-protocol": "0.1.0",
     "ignore": "^7.0.5",
     "mammoth": "^1.12.0",
-    "marked": "^18.0.1",
+    "marked": "^18.0.2",
     "material-icons": "^1.13.14",
     "mulmocast": "^2.6.7",
     "node-pty": "^1.1.0",
@@ -103,6 +106,6 @@
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.8",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.2.5"
+    "vue-tsc": "^3.2.7"
   }
 }

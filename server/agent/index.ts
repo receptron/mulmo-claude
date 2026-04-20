@@ -29,6 +29,10 @@ import { log } from "../system/logger/index.js";
 import { EVENT_TYPES } from "../../src/types/events.js";
 import { env } from "../system/env.js";
 import { resolveSandboxAuth } from "./sandboxMounts.js";
+import {
+  getCachedReferenceDirs,
+  referenceDirMountArgs,
+} from "../workspace/reference-dirs.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -49,13 +53,14 @@ function spawnClaude(
     configMountNames: env.sandboxMountConfigs,
     sshAuthSock: process.env.SSH_AUTH_SOCK,
   });
+  const refDirArgs = referenceDirMountArgs(getCachedReferenceDirs());
   const dockerArgs = buildDockerSpawnArgs({
     workspacePath,
     cliArgs,
     uid: process.getuid?.() ?? 1000,
     gid: process.getgid?.() ?? 1000,
     platform: process.platform,
-    sandboxAuthArgs: sandboxAuth.args,
+    sandboxAuthArgs: [...sandboxAuth.args, ...refDirArgs],
     sshAgentForward: env.sandboxSshAgentForward,
   });
   return spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });

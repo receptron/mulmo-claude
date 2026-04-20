@@ -57,6 +57,30 @@
         >
           MCP Servers
         </button>
+        <button
+          class="px-3 py-2 text-sm border-b-2"
+          :class="
+            activeTab === 'dirs'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          "
+          data-testid="settings-tab-dirs"
+          @click="activeTab = 'dirs'"
+        >
+          Directories
+        </button>
+        <button
+          class="px-3 py-2 text-sm border-b-2"
+          :class="
+            activeTab === 'refs'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          "
+          data-testid="settings-tab-refs"
+          @click="activeTab = 'refs'"
+        >
+          Reference Dirs
+        </button>
       </div>
 
       <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4 text-gray-900">
@@ -113,6 +137,10 @@
             @remove="removeMcpServer"
           />
         </div>
+
+        <SettingsWorkspaceDirsTab v-else-if="activeTab === 'dirs'" />
+
+        <SettingsReferenceDirsTab v-else-if="activeTab === 'refs'" />
       </div>
 
       <div
@@ -159,6 +187,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import SettingsMcpTab from "./SettingsMcpTab.vue";
+import SettingsWorkspaceDirsTab from "./SettingsWorkspaceDirsTab.vue";
+import SettingsReferenceDirsTab from "./SettingsReferenceDirsTab.vue";
 import type { McpServerEntry } from "./SettingsMcpTab.vue";
 import { apiGet, apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
@@ -186,7 +216,7 @@ const emit = defineEmits<{
 // button" footgun). Null when the MCP tab isn't the active one.
 const mcpTabRef = ref<{ flushDraft: () => boolean } | null>(null);
 
-const activeTab = ref<"tools" | "mcp">("tools");
+const activeTab = ref<"tools" | "mcp" | "dirs" | "refs">("tools");
 const toolsText = ref("");
 const mcpServers = ref<McpServerEntry[]>([]);
 const loadError = ref("");

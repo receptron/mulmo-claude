@@ -86,7 +86,7 @@
               >
             </td>
             <td class="px-3 py-2 text-xs text-gray-400">
-              {{ formatCreated(item.createdAt) }}
+              {{ formatShortDate(item.createdAt) }}
             </td>
             <td class="px-3 py-2 text-right">
               <button
@@ -127,6 +127,7 @@ import {
 } from "../../plugins/todo/priority";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 import TodoEditPanel from "./TodoEditPanel.vue";
+import { formatShortDate } from "../../utils/format/date";
 
 type SortKey =
   | "completed"
@@ -236,11 +237,4 @@ const sortedItems = computed(() => {
   });
   return list;
 });
-
-function formatCreated(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
 </script>

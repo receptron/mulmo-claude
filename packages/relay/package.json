@@ -1,0 +1,30 @@
+{
+  "name": "@mulmobridge/relay",
+  "version": "0.1.0",
+  "description": "Cloudflare Workers relay for MulmoBridge — receives webhooks, queues messages, forwards via WebSocket to MulmoClaude",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./types": "./dist/types.js"
+  },
+  "files": ["dist", "src", "wrangler.toml", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "echo no tests yet"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250419.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.14.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "AGPL-3.0-only"
+}

@@ -33,6 +33,15 @@ When creating a release (tagging a version, `gh release create`, npm publish):
 4. For npm package releases, list package names and versions in the entry
 5. MUST run `date` to get today's date — NEVER guess
 
+### Git tag conventions
+
+- **MulmoClaude (app)**: `v0.1.2` — semver with `v` prefix
+- **npm packages**: `@scope/name@version` — e.g. `@mulmobridge/protocol@0.1.2`, `@receptron/task-scheduler@0.1.0`
+- NEVER use the app tag (`v*`) for individual package releases — each package gets its own `@scope/name@version` tag
+- One `gh release create` per tag — title matches the tag name
+- Published packages with changes since last publish get a **patch bump**; new packages ship at `0.1.0`
+- Version bumps and publish changes MUST go through a feature branch + PR — NEVER push directly to main
+
 ## GitHub posts (gh pr comment / gh issue comment / PR body / issue body)
 
 > **🚨 CRITICAL — NEVER escape backticks with backslash (`\``) in ANY `gh` command output.**
@@ -121,8 +130,15 @@ URL-based navigation via `vue-router` (history mode — clean paths, no `#`). Th
 /chat/:sessionId                           → existing session, single view
 /chat/:sessionId?view=stack                → stack view
 /chat/:sessionId?view=files                → files view
-/chat/:sessionId?view=files&path=wiki/foo  → files view + file selected (future)
+/chat/:sessionId?view=files&path=data/wiki/pages/foo.md → files view + file selected
+/chat/:sessionId?view=todos                → todos view (kanban/table/list)
+/chat/:sessionId?view=scheduler            → scheduler view (calendar/list)
+/chat/:sessionId?view=wiki                 → wiki index view
+/chat/:sessionId?view=skills               → skills list view
+/chat/:sessionId?view=roles                → roles management view
 ```
+
+**Keyboard shortcuts**: `Cmd/Ctrl + 1–8` switch between views (single, stack, files, todos, scheduler, wiki, skills, roles). The mapping is derived from the `VIEW_MODES` array in `src/utils/canvas/viewMode.ts` — adding a new mode is a single array append.
 
 **Key pattern — ref + bidirectional sync**: `router.push` is async, so state that must be readable synchronously (e.g. `currentSessionId`, `canvasViewMode`) is kept as a plain `ref`. The ref is the source of truth for reads; `router.push`/`router.replace` keeps the URL in sync. A `watch` on route params/query handles external URL changes (back/forward button, typed URL).
 
@@ -134,32 +150,32 @@ URL-based navigation via `vue-router` (history mode — clean paths, no `#`). Th
 
 `server/` is grouped by concern (#323). Top-level directories: `agent/`, `api/`, `workspace/`, `events/`, `system/`, `utils/`.
 
-| File | Purpose |
-|---|---|
-| `server/agent/index.ts` | Agent loop, MCP server creation per role |
-| `server/agent/mcp-server.ts` | stdio JSON-RPC MCP bridge spawned by the Claude CLI |
-| `server/agent/attachmentConverter.ts` | Converts non-native attachments (DOCX/XLSX/PPTX/text) to Claude content blocks |
-| `server/api/routes/agent.ts` | `POST /api/agent` → SSE stream |
-| `server/api/chat-service/` | External-bridge HTTP + socket.io surface (DI factory, `@mulmobridge/chat-service`) |
-| `server/api/auth/` | Bearer token + CSRF gate (`/api/files/*` exempt for `<img>` tags) |
-| `server/workspace/journal/` | Workspace journal (daily + optimization passes) |
-| `server/workspace/chat-index/` | Per-session summarizer + sidebar title cache |
-| `server/workspace/roles.ts` | Custom-role loader over `<workspace>/roles/` |
-| `server/events/pub-sub/` | In-process publish/subscribe (socket.io-backed) |
-| `server/events/session-store/` | In-memory session state + event fan-out |
-| `server/events/task-manager/` | Cron-ish scheduled task runner (tick loop) |
-| `server/events/scheduler-adapter.ts` | Wires `@receptron/task-scheduler` to MulmoClaude (catch-up + persistence) |
-| `packages/scheduler/` | `@receptron/task-scheduler` — pure scheduler library (independent npm package) |
-| `server/system/env.ts` | Single source of truth for `process.env.*` |
-| `server/system/logger/` | Structured logger (console + rotating file + telemetry stub) |
-| `server/utils/` | Shared helpers: `fs.ts`, `errors.ts` |
-| `src/config/apiRoutes.ts` | Central `/api/*` endpoint path constants (shared by server + frontend) |
-| `src/config/roles.ts` | Role definitions |
-| `src/tools/index.ts` | Plugin registry |
-| `src/router/index.ts` | Vue-router setup (history mode, route definitions) |
-| `src/router/guards.ts` | Navigation guards (param validation + sanitize) |
-| `src/composables/useCanvasViewMode.ts` | View mode state — URL sync via router, localStorage fallback |
-| `src/App.vue` | Main UI — sidebar + canvas + role switcher |
+| File                                   | Purpose                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `server/agent/index.ts`                | Agent loop, MCP server creation per role                                           |
+| `server/agent/mcp-server.ts`           | stdio JSON-RPC MCP bridge spawned by the Claude CLI                                |
+| `server/agent/attachmentConverter.ts`  | Converts non-native attachments (DOCX/XLSX/PPTX/text) to Claude content blocks     |
+| `server/api/routes/agent.ts`           | `POST /api/agent` → SSE stream                                                     |
+| `server/api/chat-service/`             | External-bridge HTTP + socket.io surface (DI factory, `@mulmobridge/chat-service`) |
+| `server/api/auth/`                     | Bearer token + CSRF gate (`/api/files/*` exempt for `<img>` tags)                  |
+| `server/workspace/journal/`            | Workspace journal (daily + optimization passes)                                    |
+| `server/workspace/chat-index/`         | Per-session summarizer + sidebar title cache                                       |
+| `server/workspace/roles.ts`            | Custom-role loader over `<workspace>/roles/`                                       |
+| `server/events/pub-sub/`               | In-process publish/subscribe (socket.io-backed)                                    |
+| `server/events/session-store/`         | In-memory session state + event fan-out                                            |
+| `server/events/task-manager/`          | Cron-ish scheduled task runner (tick loop)                                         |
+| `server/events/scheduler-adapter.ts`   | Wires `@receptron/task-scheduler` to MulmoClaude (catch-up + persistence)          |
+| `packages/scheduler/`                  | `@receptron/task-scheduler` — pure scheduler library (independent npm package)     |
+| `server/system/env.ts`                 | Single source of truth for `process.env.*`                                         |
+| `server/system/logger/`                | Structured logger (console + rotating file + telemetry stub)                       |
+| `server/utils/`                        | Shared helpers: `fs.ts`, `errors.ts`                                               |
+| `src/config/apiRoutes.ts`              | Central `/api/*` endpoint path constants (shared by server + frontend)             |
+| `src/config/roles.ts`                  | Role definitions                                                                   |
+| `src/tools/index.ts`                   | Plugin registry                                                                    |
+| `src/router/index.ts`                  | Vue-router setup (history mode, route definitions)                                 |
+| `src/router/guards.ts`                 | Navigation guards (param validation + sanitize)                                    |
+| `src/composables/useCanvasViewMode.ts` | View mode state — URL sync via router, localStorage fallback                       |
+| `src/App.vue`                          | Main UI — sidebar + canvas + role switcher                                         |
 
 ## Plugin Development
 
@@ -203,18 +219,45 @@ router.post("/items/:id", (req: Request, res: Response) => { const x = req.body 
 
 String literals that form cross-module contracts (endpoint paths, event types, tool names, role IDs, pub-sub channels, workspace directory names) MUST be defined once in a shared `as const` module and referenced everywhere else. NEVER introduce a new raw string literal for something that already has a constant.
 
-| What | Source of truth | Pattern |
-|---|---|---|
-| API endpoint paths | `src/config/apiRoutes.ts` → `API_ROUTES` | `router.post(API_ROUTES.todos.items, ...)` / `fetch(API_ROUTES.todos.items)` |
-| SSE / event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `{ type: EVENT_TYPES.toolResult, ... }` — also used in `AgentEvent` union |
-| Workspace directories | `server/workspace/paths.ts` → `WORKSPACE_PATHS` | `path.join(WORKSPACE_PATHS.wiki, "pages")` |
-| Tool names | `src/config/toolNames.ts` → `TOOL_NAMES` / `ToolName` | `availablePlugins: [TOOL_NAMES.manageTodoList, ...]` |
-| Built-in role IDs | `src/config/roles.ts` → `BUILTIN_ROLE_IDS` | `if (roleId === BUILTIN_ROLE_IDS.general)` |
-| Pub-sub channels | `src/config/pubsubChannels.ts` → `sessionChannel()` | `pubsub.publish(sessionChannel(id), event)` |
-| SSE event types | `src/types/events.ts` → `EVENT_TYPES` / `EventType` | `event.type === EVENT_TYPES.toolCall` |
+| What                  | Source of truth                                                                                                     | Pattern                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| API endpoint paths    | `src/config/apiRoutes.ts` → `API_ROUTES`                                                                            | `router.post(API_ROUTES.todos.items, ...)` / `fetch(API_ROUTES.todos.items)` |
+| SSE / event types     | `src/types/events.ts` → `EVENT_TYPES` / `EventType`                                                                 | `{ type: EVENT_TYPES.toolResult, ... }` — also used in `AgentEvent` union    |
+| Workspace directories | `server/workspace/paths.ts` → `WORKSPACE_PATHS`                                                                     | `path.join(WORKSPACE_PATHS.wiki, "pages")`                                   |
+| Workspace files       | `src/config/workspacePaths.ts` → `WORKSPACE_FILES`                                                                  | `WORKSPACE_FILES.todosItems` — shared by server (re-export) and frontend     |
+| Canvas view modes     | `src/utils/canvas/viewMode.ts` → `VIEW_MODES` / `CanvasViewMode`                                                    | `isCanvasViewMode(value)` — add mode by appending to array                   |
+| Tool names            | `src/config/toolNames.ts` → `TOOL_NAMES` / `ToolName`                                                               | `availablePlugins: [TOOL_NAMES.manageTodoList, ...]`                         |
+| Built-in role IDs     | `src/config/roles.ts` → `BUILTIN_ROLE_IDS`                                                                          | `if (roleId === BUILTIN_ROLE_IDS.general)`                                   |
+| Pub-sub channels      | `src/config/pubsubChannels.ts` → `sessionChannel()`                                                                 | `pubsub.publish(sessionChannel(id), event)`                                  |
+| SSE event types       | `src/types/events.ts` → `EVENT_TYPES` / `EventType`                                                                 | `event.type === EVENT_TYPES.toolCall`                                        |
+| Time constants        | `server/utils/time.ts` → `ONE_SECOND_MS` / `ONE_MINUTE_MS` / `ONE_HOUR_MS` / `ONE_DAY_MS`                           | `intervalMs: ONE_HOUR_MS`, `timeout: 5 * ONE_SECOND_MS`                      |
+| Timeout presets       | `server/utils/time.ts` → `SUBPROCESS_PROBE_TIMEOUT_MS` / `SUBPROCESS_WORK_TIMEOUT_MS` / `CLI_SUBPROCESS_TIMEOUT_MS` | `{ timeout: SUBPROCESS_PROBE_TIMEOUT_MS }`                                   |
+| Scheduler types       | `@receptron/task-scheduler` → `SCHEDULE_TYPES` / `TASK_RESULTS` / `TASK_TRIGGERS` / `MISSED_RUN_POLICIES`           | `schedule.type === SCHEDULE_TYPES.interval`                                  |
 
 **Adding a new endpoint**: add the path to `src/config/apiRoutes.ts` first, then reference `API_ROUTES.<group>.<name>` from both the router file and the frontend `fetch()` call. Routers register the full `/api/...` path directly (no mount prefix in `server/index.ts`).
 
+### Time literals — NEVER use raw numbers
+
+NEVER write raw millisecond literals (`1000`, `5000`, `60_000`, `3_600_000`, `86_400_000`) or raw arithmetic (`60 * 60 * 1000`). MUST import from `server/utils/time.ts`:
+
+```typescript
+// GOOD
+import {
+  ONE_HOUR_MS,
+  ONE_MINUTE_MS,
+  SUBPROCESS_PROBE_TIMEOUT_MS,
+} from "../utils/time.js";
+const INTERVAL_MS = 15 * ONE_MINUTE_MS;
+await execFileAsync("docker", ["ps"], { timeout: SUBPROCESS_PROBE_TIMEOUT_MS });
+
+// BAD
+const INTERVAL_MS = 15 * 60 * 1000;
+await execFileAsync("docker", ["ps"], { timeout: 5000 });
+```
+
+When a new timeout value is needed in 3+ places, add a named preset to `server/utils/time.ts` rather than repeating `N * ONE_SECOND_MS` inline.
+
+Scheduler-related string literals (`"interval"`, `"daily"`, `"success"`, `"error"`, `"scheduled"`, `"catch-up"`, `"run-once"`) MUST use constants from `@receptron/task-scheduler` (`SCHEDULE_TYPES`, `TASK_RESULTS`, `TASK_TRIGGERS`, `MISSED_RUN_POLICIES`). Typos in string literals are silent bugs; constants produce compile errors.
 ## Cross-platform considerations
 
 CI runs the matrix `{ubuntu, windows, macOS} × {Node 22, Node 24}` (see `docs/developer.md`). Server / shared code MUST run on all three. Patches that build hardcoded POSIX paths or rely on `/tmp` semantics break Windows CI immediately and are the most common cause of red builds.
@@ -293,26 +336,29 @@ When the same 3+ line pattern appears in two or more files, extract a shared hel
 
 Key shared helpers in this repo:
 
-| Helper | Location |
-|---|---|
-| `API_ROUTES` | `src/config/apiRoutes.ts` |
-| `EVENT_TYPES` / `EventType` | `src/types/events.ts` |
-| `WORKSPACE_PATHS` / `WORKSPACE_DIRS` | `server/workspace/paths.ts` |
-| `TOOL_NAMES` / `ToolName` | `src/config/toolNames.ts` |
-| `BUILTIN_ROLE_IDS` / `BuiltInRoleId` | `src/config/roles.ts` |
-| `PUBSUB_CHANNELS` / `sessionChannel()` | `src/config/pubsubChannels.ts` |
-| `EVENT_TYPES` / `EventType` | `src/types/events.ts` |
-| `writeFileAtomic` / `writeFileAtomicSync` | `server/utils/files/atomic.ts` |
-| `readWorkspaceText` / `writeWorkspaceText` | `server/utils/files/workspace-io.ts` |
-| `readWorkspaceJson` / `writeWorkspaceJson` | `server/utils/files/workspace-io.ts` |
-| `resolveWithinRoot(root, relPath)` | `server/utils/files/safe.ts` |
-| `statSafe` / `readDirSafe` | `server/utils/files/safe.ts` |
-| `loadJsonFile` / `saveJsonFile` | `server/utils/files/json.ts` |
-| `errorMessage(err)` | `server/utils/errors.ts` |
-| `dispatchResponse(res, result)` | `server/api/routes/dispatchResponse.ts` |
-| `useFreshPluginData(opts)` | `src/composables/useFreshPluginData.ts` |
-| `useCanvasViewMode(opts)` | `src/composables/useCanvasViewMode.ts` |
-| `applyViewToQuery(query, mode)` | `src/composables/useCanvasViewMode.ts` |
+| Helper                                                                                     | Location                                |
+| ------------------------------------------------------------------------------------------ | --------------------------------------- |
+| `API_ROUTES`                                                                               | `src/config/apiRoutes.ts`               |
+| `EVENT_TYPES` / `EventType`                                                                | `src/types/events.ts`                   |
+| `WORKSPACE_PATHS` / `WORKSPACE_DIRS`                                                       | `server/workspace/paths.ts`             |
+| `TOOL_NAMES` / `ToolName`                                                                  | `src/config/toolNames.ts`               |
+| `BUILTIN_ROLE_IDS` / `BuiltInRoleId`                                                       | `src/config/roles.ts`                   |
+| `PUBSUB_CHANNELS` / `sessionChannel()`                                                     | `src/config/pubsubChannels.ts`          |
+| `EVENT_TYPES` / `EventType`                                                                | `src/types/events.ts`                   |
+| `writeFileAtomic` / `writeFileAtomicSync`                                                  | `server/utils/files/atomic.ts`          |
+| `readWorkspaceText` / `writeWorkspaceText`                                                 | `server/utils/files/workspace-io.ts`    |
+| `readWorkspaceJson` / `writeWorkspaceJson`                                                 | `server/utils/files/workspace-io.ts`    |
+| `resolveWithinRoot(root, relPath)`                                                         | `server/utils/files/safe.ts`            |
+| `statSafe` / `readDirSafe`                                                                 | `server/utils/files/safe.ts`            |
+| `loadJsonFile` / `saveJsonFile`                                                            | `server/utils/files/json.ts`            |
+| `errorMessage(err)`                                                                        | `server/utils/errors.ts`                |
+| `dispatchResponse(res, result)`                                                            | `server/api/routes/dispatchResponse.ts` |
+| `ONE_SECOND_MS` / `ONE_MINUTE_MS` / `ONE_HOUR_MS` / `ONE_DAY_MS`                           | `server/utils/time.ts`                  |
+| `SUBPROCESS_PROBE_TIMEOUT_MS` / `SUBPROCESS_WORK_TIMEOUT_MS` / `CLI_SUBPROCESS_TIMEOUT_MS` | `server/utils/time.ts`                  |
+| `SCHEDULE_TYPES` / `TASK_RESULTS` / `TASK_TRIGGERS` / `MISSED_RUN_POLICIES`                | `@receptron/task-scheduler`             |
+| `useFreshPluginData(opts)`                                                                 | `src/composables/useFreshPluginData.ts` |
+| `useCanvasViewMode(opts)`                                                                  | `src/composables/useCanvasViewMode.ts`  |
+| `applyViewToQuery(query, mode)`                                                            | `src/composables/useCanvasViewMode.ts`  |
 
 Periodically audit for duplication (`sonarjs/no-duplicate-string` warnings, `jscpd`). Batch low-risk extractions into a single refactor PR (as #145 did).
 
@@ -322,13 +368,13 @@ Periodically audit for duplication (`sonarjs/no-duplicate-string` warnings, `jsc
 
 **Where to put what:**
 
-| Layer | Location | Example |
-|---|---|---|
-| **Domain I/O** (highest) | `server/utils/files/<domain>-io.ts` | `readSessionMeta(id)`, `saveTodos(items)`, `writeDailySummary(date, content)` |
-| **Generic workspace I/O** | `server/utils/files/workspace-io.ts` | `readWorkspaceText(relPath)`, `writeWorkspaceJson(relPath, data)` |
-| **Atomic primitives** | `server/utils/files/atomic.ts` | `writeFileAtomic(absPath, content)` |
-| **Safe wrappers** | `server/utils/files/safe.ts` | `resolveWithinRoot(root, relPath)`, `readTextSafeSync(absPath)` |
-| **Path constants** | `server/workspace/paths.ts` | `WORKSPACE_DIRS.chat`, `WORKSPACE_FILES.todosItems` |
+| Layer                     | Location                             | Example                                                                       |
+| ------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
+| **Domain I/O** (highest)  | `server/utils/files/<domain>-io.ts`  | `readSessionMeta(id)`, `saveTodos(items)`, `writeDailySummary(date, content)` |
+| **Generic workspace I/O** | `server/utils/files/workspace-io.ts` | `readWorkspaceText(relPath)`, `writeWorkspaceJson(relPath, data)`             |
+| **Atomic primitives**     | `server/utils/files/atomic.ts`       | `writeFileAtomic(absPath, content)`                                           |
+| **Safe wrappers**         | `server/utils/files/safe.ts`         | `resolveWithinRoot(root, relPath)`, `readTextSafeSync(absPath)`               |
+| **Path constants**        | `server/workspace/paths.ts`          | `WORKSPACE_DIRS.chat`, `WORKSPACE_FILES.todosItems`                           |
 
 **Adding a new domain I/O module:**
 
@@ -341,13 +387,13 @@ Periodically audit for duplication (`sonarjs/no-duplicate-string` warnings, `jsc
 
 **Existing domain I/O modules:**
 
-| Module | Functions |
-|---|---|
-| `session-io.ts` | `readSessionMeta`, `createSessionMeta`, `backfillFirstUserMessage`, `setClaudeSessionId`, `clearClaudeSessionId`, `updateHasUnread`, `readSessionJsonl`, `appendSessionLine`, `ensureChatDir` |
-| `todos-io.ts` | `loadTodos`, `saveTodos`, `loadColumns`, `saveColumns` |
-| `scheduler-io.ts` | `loadSchedulerItems`, `saveSchedulerItems` |
-| `html-io.ts` | `readCurrentHtml`, `writeCurrentHtml` |
-| `journal-io.ts` | `readDailySummary`, `writeDailySummary`, `readTopicFile`, `writeTopicFile`, `appendOrCreateTopic`, `readJournalState`, `writeJournalState`, `writeJournalIndex`, `listTopicSlugs`, `archiveTopic`, `listDailyFiles`, `countArchivedTopics` |
+| Module            | Functions                                                                                                                                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `session-io.ts`   | `readSessionMeta`, `createSessionMeta`, `backfillFirstUserMessage`, `setClaudeSessionId`, `clearClaudeSessionId`, `updateHasUnread`, `readSessionJsonl`, `appendSessionLine`, `ensureChatDir`                                              |
+| `todos-io.ts`     | `loadTodos`, `saveTodos`, `loadColumns`, `saveColumns`                                                                                                                                                                                     |
+| `scheduler-io.ts` | `loadSchedulerItems`, `saveSchedulerItems`                                                                                                                                                                                                 |
+| `html-io.ts`      | `readCurrentHtml`, `writeCurrentHtml`                                                                                                                                                                                                      |
+| `journal-io.ts`   | `readDailySummary`, `writeDailySummary`, `readTopicFile`, `writeTopicFile`, `appendOrCreateTopic`, `readJournalState`, `writeJournalState`, `writeJournalIndex`, `listTopicSlugs`, `archiveTopic`, `listDailyFiles`, `countArchivedTopics` |
 
 ### Network I/O — centralized API helpers
 
@@ -415,7 +461,7 @@ plans/done/       ← completed plans (moved here when the PR lands)
 ```
 
 - **Plan files lifecycle**: create under `plans/` before implementation; move to `plans/done/` in the PR that completes the work. Never delete — `plans/done/` is the archive.
-- Group by *what files are about*, not file kind. `src/plugins/wiki/` keeps def/index/View/Preview together.
+- Group by _what files are about_, not file kind. `src/plugins/wiki/` keeps def/index/View/Preview together.
 - Mirror source layout in `test/`. `server/workspace/journal/dailyPass.ts` → `test/journal/test_dailyPass.ts`.
 - Prefer a new named directory over dropping files into the closest pre-existing bucket.
 
@@ -481,7 +527,7 @@ Some behaviours can't be covered by E2E — drag-and-drop via `vuedraggable` / S
 
 - MUST update [`docs/manual-testing.md`](docs/manual-testing.md) whenever a change deliberately leaves a scenario uncovered by E2E — add an entry with the flow, the reason it can't be automated, and how to smoke-check it.
 - MUST remove / strike-through an entry when a change brings a previously-manual scenario under E2E coverage.
-- Per-PR smoke-test notes go in the PR description, NOT in this doc. The doc is for *persistent* manual-test obligations only.
+- Per-PR smoke-test notes go in the PR description, NOT in this doc. The doc is for _persistent_ manual-test obligations only.
 
 See `plans/` entries and past PR descriptions (#193 wiki-backlinks, #195 tool-trace, #209 todo-items-crud) for examples of cleanly separating "E2E covers this" from "manual check after each release covers this".
 

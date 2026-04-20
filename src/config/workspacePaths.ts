@@ -19,4 +19,5 @@ export const WORKSPACE_FILES = {
   todosItems: "data/todos/todos.json",
   todosColumns: "data/todos/columns.json",
   schedulerItems: "data/scheduler/items.json",
+  schedulerUserTasks: "config/scheduler/tasks.json",
 } as const;

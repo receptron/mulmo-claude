@@ -153,3 +153,30 @@ describe("shouldSelectAssistantText — boundary conditions", () => {
     assert.equal(shouldSelectAssistantText(results, 99), true);
   });
 });
+
+describe("shouldSelectAssistantText — multi-turn regression (#stale-runStartIndex)", () => {
+  it("turn 2 with a plugin result in turn 1 → true for text-only turn 2", () => {
+    // Simulates the two-turn bug:
+    //   Turn 1 (runStart=1): user asks a question that triggers a
+    //   plugin; LLM also emits text. Plugin result lands.
+    //   Turn 2 (runStart=4): user sends a text-only follow-up; LLM
+    //   replies with text only.
+    // Before the fix, the subscription closed over turn 1's
+    // runStartIndex (=1) forever — so on turn 2 the scan still saw
+    // the turn-1 plugin result and returned false. With the fix,
+    // runStartIndex lives on the session and is refreshed per turn;
+    // the turn-2 scan starts at index 4 and sees only the two
+    // text-responses, returning true.
+    const results = [
+      makeToolResult("u1-user", "text-response"),
+      makeToolResult("u1-plugin", "generateImage"),
+      makeToolResult("u1-text", "text-response"),
+      makeToolResult("u2-user", "text-response"),
+      makeToolResult("u2-text", "text-response"),
+    ];
+    // Stale index (turn 1's) — demonstrates the bug.
+    assert.equal(shouldSelectAssistantText(results, 1), false);
+    // Fresh per-turn index — the fix.
+    assert.equal(shouldSelectAssistantText(results, 4), true);
+  });
+});

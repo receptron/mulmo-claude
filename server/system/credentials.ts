@@ -233,7 +233,7 @@ export async function refreshCredentials(): Promise<boolean> {
       }
     }
 
-    await writeFile(CREDENTIALS_PATH, credentials + "\n");
+    await writeFile(CREDENTIALS_PATH, credentials + "\n", { mode: 0o600 });
     log.info(
       "credentials",
       "Fresh credentials written to ~/.claude/.credentials.json",

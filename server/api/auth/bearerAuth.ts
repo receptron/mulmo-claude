@@ -1,3 +1,10 @@
+import { timingSafeEqual } from "crypto";
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 // Bearer token middleware (#272). Reject any `/api/*` request whose
 // `Authorization: Bearer <token>` header doesn't match the current
 // server token.
@@ -50,7 +57,7 @@ export function bearerAuth(
     return;
   }
   const provided = header.slice(BEARER_PREFIX.length);
-  if (provided !== expected) {
+  if (!safeEqual(provided, expected)) {
     unauthorized(res, "unauthorized");
     return;
   }

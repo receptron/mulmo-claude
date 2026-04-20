@@ -2,21 +2,23 @@
 // The type also lives here, so test files and composables can
 // import it without pulling in a .vue file.
 //
-// To add a new view mode, append it to VIEW_MODES below.
+// To add a new view mode, add it to CANVAS_VIEW below in shortcut order.
 // Everything else (type, set, parser, shortcut) derives automatically.
 
-const VIEW_MODES = [
-  "single",
-  "stack",
-  "files",
-  "todos",
-  "scheduler",
-  "wiki",
-  "skills",
-  "roles",
-] as const;
+export const CANVAS_VIEW = {
+  single: "single",
+  stack: "stack",
+  files: "files",
+  todos: "todos",
+  scheduler: "scheduler",
+  wiki: "wiki",
+  skills: "skills",
+  roles: "roles",
+} as const;
 
-export type CanvasViewMode = (typeof VIEW_MODES)[number];
+const VIEW_MODES = Object.values(CANVAS_VIEW);
+
+export type CanvasViewMode = (typeof CANVAS_VIEW)[keyof typeof CANVAS_VIEW];
 
 export function isCanvasViewMode(value: string): value is CanvasViewMode {
   return (VIEW_MODES as readonly string[]).includes(value);
@@ -33,7 +35,7 @@ export function parseStoredViewMode(stored: string | null): CanvasViewMode {
   if (typeof stored === "string" && isCanvasViewMode(stored)) {
     return stored;
   }
-  return "single";
+  return CANVAS_VIEW.single;
 }
 
 // Map a Cmd/Ctrl + N keyboard shortcut digit to its view mode.

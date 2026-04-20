@@ -1,20 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import {
-  useNotifications,
-  type NotificationItem,
-} from "../composables/useNotifications";
+import { useNotifications } from "../composables/useNotifications";
+import { NOTIFICATION_ICONS } from "../types/notification";
+import type { NotificationPayload } from "../types/notification";
+import { ONE_SECOND_MS } from "../../server/utils/time";
 
-// Simple top-right toast — PoC for #144. A production notification
-// center would stack / persist / auto-dismiss per-item with
-// configurable duration; this one just shows the latest inbound
-// message for `AUTO_HIDE_MS` before fading. Anything new that
-// arrives while a toast is up replaces the current one.
-
-const AUTO_HIDE_MS = 5000;
+const AUTO_HIDE_MS = 5 * ONE_SECOND_MS;
 
 const { latest } = useNotifications();
-const visible = ref<NotificationItem | null>(null);
+const visible = ref<NotificationPayload | null>(null);
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(latest, (item) => {
@@ -32,6 +26,21 @@ function dismiss(): void {
   hideTimer = null;
   visible.value = null;
 }
+
+function iconName(n: NotificationPayload): string {
+  return n.icon ?? NOTIFICATION_ICONS[n.kind] ?? "notifications";
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 </script>
 
 <template>
@@ -42,11 +51,19 @@ function dismiss(): void {
       class="fixed top-4 right-4 z-50 max-w-sm rounded-lg bg-slate-800 text-white shadow-lg p-4 flex items-start gap-3"
     >
       <span class="material-icons text-sky-300" aria-hidden="true">
-        notifications
+        {{ iconName(visible) }}
       </span>
       <div class="flex-1 min-w-0">
-        <p class="text-sm break-words">{{ visible.message }}</p>
-        <p class="mt-1 text-xs text-slate-400">{{ visible.firedAt }}</p>
+        <p class="text-sm font-medium break-words">{{ visible.title }}</p>
+        <p
+          v-if="visible.body"
+          class="mt-0.5 text-xs text-slate-300 break-words"
+        >
+          {{ visible.body }}
+        </p>
+        <p class="mt-1 text-xs text-slate-400">
+          {{ formatTime(visible.firedAt) }}
+        </p>
       </div>
       <button
         type="button"

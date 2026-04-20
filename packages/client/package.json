@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Socket.io client library for MulmoBridge — shared by all bridge implementations",
   "type": "module",
   "main": "./dist/index.js",

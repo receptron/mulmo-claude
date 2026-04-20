@@ -10,6 +10,8 @@ server/logs/
 .claude/scheduled_tasks.lock
 playwright-report/
 test-results/
+.playwright-mcp/
+.mcp.json
 
 # workspace data (user data — backed up separately as daily gzip)
 conversations/

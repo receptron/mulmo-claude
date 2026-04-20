@@ -49,6 +49,11 @@
             @update:open="showLockPopup = $event"
             @test-query="sendMessage"
           />
+          <NotificationBell
+            :force-close="showLockPopup"
+            @navigate="handleNotificationNavigate"
+            @update:open="onNotificationOpen"
+          />
           <button
             class="text-gray-400 hover:text-gray-700"
             :class="{ 'text-blue-500': showRightSidebar }"
@@ -453,6 +458,13 @@ import SkillsView from "./plugins/manageSkills/View.vue";
 import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
+import NotificationBell from "./components/NotificationBell.vue";
+import {
+  NOTIFICATION_ACTION_TYPES,
+  NOTIFICATION_VIEWS,
+  type NotificationAction,
+} from "./types/notification";
+import { CANVAS_VIEW } from "./utils/canvas/viewMode";
 import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
 import type { SseEvent } from "./types/sse";
 import {
@@ -603,6 +615,23 @@ function navigateToSession(id: string, replace = false): void {
       console.error("[navigateToSession] push failed:", err);
     }
   });
+}
+
+function onNotificationOpen(isOpen: boolean): void {
+  if (isOpen) showLockPopup.value = false;
+}
+
+function handleNotificationNavigate(action: NotificationAction): void {
+  if (action.type !== NOTIFICATION_ACTION_TYPES.navigate) return;
+  if (action.view === NOTIFICATION_VIEWS.chat) {
+    if (action.sessionId) navigateToSession(action.sessionId);
+  } else if (action.view === NOTIFICATION_VIEWS.todos) {
+    setCanvasViewMode(CANVAS_VIEW.todos);
+  } else if (action.view === NOTIFICATION_VIEWS.scheduler) {
+    setCanvasViewMode(CANVAS_VIEW.scheduler);
+  } else if (action.view === NOTIFICATION_VIEWS.files) {
+    setCanvasViewMode(CANVAS_VIEW.files);
+  }
 }
 
 // External URL changes (back/forward button, typed URL) → update ref.
@@ -891,132 +920,10 @@ const {
 } = useCanvasViewMode({ isRunning });
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
-// Kept for potential future "invoke" launcher targets. Currently all
-// launcher buttons use kind:"view", so this block is dormant.
-//
-// Default HTTP call (endpoint + body + resulting toolName) for each
-// "invoke" launcher target. Mirrors what each plugin's `execute()`
-// does — duplicated here intentionally so the launcher doesn't drag
-// the Vue components into this synchronous code path.
-//
-// Most endpoints already return a `{ data: ... }` envelope that the
-// plugin View expects. Skills is the odd one out — its REST surface
-// returns `{ skills: [...] }` flat, so `wrapData` lifts the payload
-// under `data` before the ToolResult reaches the View.
-const LAUNCHER_INVOKE_SPECS: Record<
-  "todos" | "scheduler" | "skills" | "wiki" | "roles",
-  {
-    endpoint: string;
-    method: "GET" | "POST";
-    body?: unknown;
-    toolName: string;
-    defaultTitle: string;
-    /** Optional response-shape transform: when set, the ToolResult
-     *  gets `data = wrapData(json)` overlaid on top of the spread. */
-    wrapData?: (json: Record<string, unknown>) => unknown;
-  }
-> = {
-  todos: {
-    endpoint: API_ROUTES.todos.dispatch,
-    method: "POST",
-    body: { action: "show" },
-    toolName: "manageTodoList",
-    defaultTitle: "Todos",
-  },
-  scheduler: {
-    endpoint: API_ROUTES.scheduler.base,
-    method: "POST",
-    body: { action: "show" },
-    toolName: "manageScheduler",
-    defaultTitle: "Schedule",
-  },
-  skills: {
-    endpoint: API_ROUTES.skills.list,
-    method: "GET",
-    toolName: "manageSkills",
-    defaultTitle: "Skills",
-    wrapData: (json) => ({ skills: json.skills ?? [] }),
-  },
-  wiki: {
-    endpoint: API_ROUTES.wiki.base,
-    method: "POST",
-    body: { action: "index" },
-    toolName: "manageWiki",
-    defaultTitle: "Wiki",
-  },
-  roles: {
-    endpoint: API_ROUTES.roles.manage,
-    method: "POST",
-    body: { action: "list" },
-    toolName: "manageRoles",
-    defaultTitle: "Roles",
-  },
-};
-
-type LauncherInvokeKey = keyof typeof LAUNCHER_INVOKE_SPECS;
-
-function isLauncherInvokeKey(key: string): key is LauncherInvokeKey {
-  return key in LAUNCHER_INVOKE_SPECS;
-}
-
-// Call a plugin's REST endpoint locally and shape the response into
-// a ToolResultComplete so the canvas renders it through the plugin's
-// own View component. Throws on HTTP / network failure; caller is
-// responsible for surfacing the error to the user.
-//
-// Uses apiGet/apiPost so the module-level bearer token (#272) is
-// attached automatically — a raw `fetch()` here would skip the auth
-// header and 401 on every launcher click.
-async function invokePluginForLauncher(
-  key: LauncherInvokeKey,
-): Promise<ToolResultComplete> {
-  const spec = LAUNCHER_INVOKE_SPECS[key];
-  const result =
-    spec.method === "POST"
-      ? await apiPost<unknown>(spec.endpoint, spec.body ?? {})
-      : await apiGet<unknown>(spec.endpoint);
-  if (!result.ok) {
-    throw new Error(`${spec.toolName} failed: ${result.error}`);
-  }
-  const json = (result.data ?? {}) as Record<string, unknown>;
-  const data = spec.wrapData ? spec.wrapData(json) : json.data;
-  return {
-    ...json,
-    data,
-    toolName: spec.toolName,
-    uuid: typeof json.uuid === "string" ? json.uuid : crypto.randomUUID(),
-    title: typeof json.title === "string" ? json.title : spec.defaultTitle,
-    message:
-      typeof json.message === "string"
-        ? json.message
-        : `Opened ${spec.defaultTitle}`,
-  } as ToolResultComplete;
-}
-
-// Plugin-launcher click:
-// - "view" target → switch canvas to the matching view mode (no plugin call).
-// - "invoke" target → call the plugin locally, push the result into
-//   the current session, select it, switch canvas to single view so
-//   the plugin's View component takes the stage.
-async function onPluginNavigate(target: PluginLauncherTarget): Promise<void> {
-  if (target.kind === "view" && isCanvasViewMode(target.key)) {
+// Plugin-launcher click: switch canvas to the matching view mode.
+function onPluginNavigate(target: PluginLauncherTarget): void {
+  if (isCanvasViewMode(target.key)) {
     setCanvasViewMode(target.key);
-    return;
-  }
-
-  const session = sessionMap.get(currentSessionId.value);
-  if (!session) return;
-  if (!isLauncherInvokeKey(target.key)) return;
-
-  try {
-    const result = await invokePluginForLauncher(target.key);
-    session.toolResults.push(result);
-    session.selectedResultUuid = result.uuid;
-    // Single view so the plugin's View takes the full canvas —
-    // stack view would bury the fresh result below older entries.
-    setCanvasViewMode("single");
-  } catch (err) {
-    pushErrorMessage(session, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -1074,7 +981,7 @@ watch(currentSessionId, (id) => {
   const session = sessionMap.get(id);
   // Subscribe to the new session's channel
   if (session) {
-    ensureSessionSubscription(session, session.toolResults.length);
+    ensureSessionSubscription(session);
   }
   // Unsubscribe from the previous session if it's not running
   if (previousSessionId && previousSessionId !== id) {
@@ -1205,8 +1112,8 @@ function handleUpdateResult(updatedResult: ToolResultComplete) {
 // actually shows up in the canvas.
 function onSidebarItemClick(uuid: string) {
   selectedResultUuid.value = uuid;
-  if (canvasViewMode.value === "files") {
-    setCanvasViewMode("single");
+  if (canvasViewMode.value === CANVAS_VIEW.files) {
+    setCanvasViewMode(CANVAS_VIEW.single);
   }
 }
 
@@ -1219,8 +1126,8 @@ function onFilesViewLoadSession(sessionId: string): void {
   // Set view mode BEFORE loading session so that navigateToSession
   // (called inside loadSession) picks up the updated canvasViewMode
   // in its query — avoids a race where two router.push calls fight.
-  if (canvasViewMode.value === "files") {
-    setCanvasViewMode("single");
+  if (canvasViewMode.value === CANVAS_VIEW.files) {
+    setCanvasViewMode(CANVAS_VIEW.single);
   }
   loadSession(sessionId);
 }
@@ -1264,6 +1171,7 @@ function createNewSession(roleId?: string): ActiveSession {
     hasUnread: false,
     startedAt: now,
     updatedAt: now,
+    runStartIndex: 0,
   };
   sessionMap.set(id, session);
   navigateToSession(id, true);
@@ -1370,6 +1278,7 @@ async function loadSession(id: string) {
     hasUnread: false,
     startedAt,
     updatedAt,
+    runStartIndex: toolResultsList.length,
   };
   sessionMap.set(id, newSession);
   // Subscribe immediately — the watch(currentSessionId) may have
@@ -1378,10 +1287,7 @@ async function loadSession(id: string) {
   // Use sessionMap.get() to obtain the reactive proxy — passing the
   // raw object would bypass Vue's reactivity tracking.
   const reactiveSession = sessionMap.get(id)!;
-  ensureSessionSubscription(
-    reactiveSession,
-    reactiveSession.toolResults.length,
-  );
+  ensureSessionSubscription(reactiveSession);
   navigateToSession(id, replaced);
   currentRoleId.value = roleId;
   showHistory.value = false;
@@ -1409,18 +1315,18 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
 
 // Seed the session state for a fresh user turn. Not pure (mutates
 // session), but isolated so sendMessage doesn't have the init
-// pattern inline. Returns `runStartIndex` — the index into
-// toolResults at which this run's outputs start, used later to
-// decide whether a trailing text response becomes the selected
-// canvas result.
-function beginUserTurn(session: ActiveSession, message: string): number {
+// pattern inline. Writes `runStartIndex` onto the session — the
+// index into toolResults at which this run's outputs start, used
+// later to decide whether a trailing text response becomes the
+// selected canvas result.
+function beginUserTurn(session: ActiveSession, message: string): void {
   // Append the user's message so it renders immediately. State like
   // isRunning / statusMessage is NOT set here — it comes from the
   // server via the `sessions` channel notification → refetch cycle,
   // keeping all clients (including the initiator) in sync.
   session.updatedAt = new Date().toISOString();
   session.toolResults.push(makeTextResult(message, "user"));
-  return session.toolResults.length;
+  session.runStartIndex = session.toolResults.length;
 }
 
 // Subscribe to a session's pub/sub channel so events from the server
@@ -1428,15 +1334,16 @@ function beginUserTurn(session: ActiveSession, message: string): number {
 // WebSocket and are dispatched into the session's reactive state.
 // Returns the unsubscribe function. Idempotent — if a subscription
 // already exists for this session, it's reused.
-function ensureSessionSubscription(
-  session: ActiveSession,
-  runStartIndex: number,
-): void {
+function ensureSessionSubscription(session: ActiveSession): void {
   if (sessionSubscriptions.has(session.id)) return;
 
+  const sessionId = session.id;
   const ctx: AgentEventContext = {
-    session,
-    runStartIndex,
+    get session() {
+      // Always resolve from sessionMap so we track the latest
+      // reactive proxy — loadSession may replace the object.
+      return sessionMap.get(sessionId) ?? session;
+    },
     setCurrentRoleId: (roleId) => {
       currentRoleId.value = roleId;
     },
@@ -1491,7 +1398,6 @@ function unsubscribeSession(chatSessionId: string): void {
 // with a clear signature.
 interface AgentEventContext {
   session: ActiveSession;
-  runStartIndex: number;
   setCurrentRoleId: (roleId: string) => void;
   onRoleChange: () => void;
   refreshRoles: () => Promise<void>;
@@ -1521,7 +1427,7 @@ async function applyAgentEvent(
   event: SseEvent,
   ctx: AgentEventContext,
 ): Promise<void> {
-  const { session, runStartIndex } = ctx;
+  const { session } = ctx;
   switch (event.type) {
     case EVENT_TYPES.toolCall:
       session.toolCallHistory.push({
@@ -1577,7 +1483,9 @@ async function applyAgentEvent(
       if (appendToLastAssistantText(session, event.message)) return;
       const textResult = makeTextResult(event.message, "assistant");
       session.toolResults.push(textResult);
-      if (shouldSelectAssistantText(session.toolResults, runStartIndex)) {
+      if (
+        shouldSelectAssistantText(session.toolResults, session.runStartIndex)
+      ) {
         session.selectedResultUuid = textResult.uuid;
       }
       return;
@@ -1615,7 +1523,7 @@ async function sendMessage(text?: string) {
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
 
-  const runStartIndex = beginUserTurn(session, message);
+  beginUserTurn(session, message);
   const sessionRole =
     roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
   const selectedRes =
@@ -1625,7 +1533,7 @@ async function sendMessage(text?: string) {
   // Subscribe to the session's pub/sub channel BEFORE posting so we
   // don't miss events. The subscription callback dispatches each
   // event into the session's reactive state via applyAgentEvent.
-  ensureSessionSubscription(session, runStartIndex);
+  ensureSessionSubscription(session);
 
   try {
     const response = await apiFetchRaw(API_ROUTES.agent.run, {

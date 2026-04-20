@@ -41,17 +41,11 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 // later without touching the App.vue wiring.
 
 const props = defineProps<{
-  /** toolName of the currently selected ToolResult (e.g. "manageTodoList").
-   *  Null when nothing is selected or the result is from a non-launcher
-   *  plugin — the active indicator simply stays off. */
-  activeToolName?: string | null;
-  /** Current canvas view mode. When "files", the Files button lights up. */
+  /** Current canvas view mode — the matching button lights up. */
   activeViewMode?: string | null;
 }>();
 
-export type PluginLauncherKind =
-  | "invoke" // Call the matching plugin's client endpoint and push the ToolResult into the current session
-  | "view"; // Switch the canvas to a dedicated view mode (files, todos, scheduler)
+export type PluginLauncherKind = "view"; // Switch the canvas to a dedicated view mode
 
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
@@ -116,23 +110,8 @@ const TARGETS: PluginLauncherTarget[] = [
 // and skills — data plugins on the left, management on the right).
 const SEPARATOR_AFTER_INDEX = 3;
 
-// Map launcher key → the toolName the corresponding plugin
-// uses in its ToolResult. Kept for future "invoke" kind targets —
-// currently all targets use "view" so this map is unused.
-const KEY_TO_TOOL_NAME: Record<string, string> = {
-  todos: "manageTodoList",
-  scheduler: "manageScheduler",
-  skills: "manageSkills",
-  wiki: "manageWiki",
-  roles: "manageRoles",
-};
-
 function isActive(target: PluginLauncherTarget): boolean {
-  if (target.kind === "view") {
-    return props.activeViewMode === target.key;
-  }
-  const toolName = KEY_TO_TOOL_NAME[target.key];
-  return !!toolName && toolName === props.activeToolName;
+  return props.activeViewMode === target.key;
 }
 
 const emit = defineEmits<{

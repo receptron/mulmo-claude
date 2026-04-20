@@ -25,13 +25,31 @@ A **bridge** is a tiny process (~100 lines) that translates between a messaging 
 
 ## Packages
 
+### Core
+
 | Package | Description | npm |
 |---|---|---|
 | [@mulmobridge/protocol](./protocol/) | Wire protocol types and constants | [![npm](https://img.shields.io/npm/v/@mulmobridge/protocol)](https://www.npmjs.com/package/@mulmobridge/protocol) |
 | [@mulmobridge/chat-service](./chat-service/) | Server-side chat service (Express + socket.io, DI-pure) | [![npm](https://img.shields.io/npm/v/@mulmobridge/chat-service)](https://www.npmjs.com/package/@mulmobridge/chat-service) |
 | [@mulmobridge/client](./client/) | Bridge-side socket.io client library | [![npm](https://img.shields.io/npm/v/@mulmobridge/client)](https://www.npmjs.com/package/@mulmobridge/client) |
-| [@mulmobridge/cli](./cli/) | Terminal bridge — talk to your agent from the command line | [![npm](https://img.shields.io/npm/v/@mulmobridge/cli)](https://www.npmjs.com/package/@mulmobridge/cli) |
-| [@mulmobridge/telegram](./telegram/) | Telegram bot bridge — photo support, chat-ID allowlist | [![npm](https://img.shields.io/npm/v/@mulmobridge/telegram)](https://www.npmjs.com/package/@mulmobridge/telegram) |
+| [@mulmobridge/mock-server](./mock-server/) | Lightweight mock server for testing | [![npm](https://img.shields.io/npm/v/@mulmobridge/mock-server)](https://www.npmjs.com/package/@mulmobridge/mock-server) |
+
+### Bridges
+
+| Package | Description | npm |
+|---|---|---|
+| [@mulmobridge/cli](./cli/) | Terminal bridge | [![npm](https://img.shields.io/npm/v/@mulmobridge/cli)](https://www.npmjs.com/package/@mulmobridge/cli) |
+| [@mulmobridge/telegram](./telegram/) | Telegram bot (photo support, allowlist) | [![npm](https://img.shields.io/npm/v/@mulmobridge/telegram)](https://www.npmjs.com/package/@mulmobridge/telegram) |
+| [@mulmobridge/slack](./slack/) | Slack bot (Socket Mode) | [![npm](https://img.shields.io/npm/v/@mulmobridge/slack)](https://www.npmjs.com/package/@mulmobridge/slack) |
+| [@mulmobridge/discord](./discord/) | Discord bot | [![npm](https://img.shields.io/npm/v/@mulmobridge/discord)](https://www.npmjs.com/package/@mulmobridge/discord) |
+| [@mulmobridge/line](./line/) | LINE bot (webhook) | [![npm](https://img.shields.io/npm/v/@mulmobridge/line)](https://www.npmjs.com/package/@mulmobridge/line) |
+| [@mulmobridge/whatsapp](./whatsapp/) | WhatsApp Cloud API (webhook + HMAC) | [![npm](https://img.shields.io/npm/v/@mulmobridge/whatsapp)](https://www.npmjs.com/package/@mulmobridge/whatsapp) |
+| [@mulmobridge/matrix](./matrix/) | Matrix (matrix-js-sdk) | [![npm](https://img.shields.io/npm/v/@mulmobridge/matrix)](https://www.npmjs.com/package/@mulmobridge/matrix) |
+| [@mulmobridge/irc](./irc/) | IRC (irc-framework) | [![npm](https://img.shields.io/npm/v/@mulmobridge/irc)](https://www.npmjs.com/package/@mulmobridge/irc) |
+| [@mulmobridge/mattermost](./mattermost/) | Mattermost (WebSocket + REST) | [![npm](https://img.shields.io/npm/v/@mulmobridge/mattermost)](https://www.npmjs.com/package/@mulmobridge/mattermost) |
+| [@mulmobridge/zulip](./zulip/) | Zulip (long-polling events API) | [![npm](https://img.shields.io/npm/v/@mulmobridge/zulip)](https://www.npmjs.com/package/@mulmobridge/zulip) |
+| [@mulmobridge/messenger](./messenger/) | Facebook Messenger (webhook + HMAC) | [![npm](https://img.shields.io/npm/v/@mulmobridge/messenger)](https://www.npmjs.com/package/@mulmobridge/messenger) |
+| [@mulmobridge/google-chat](./google-chat/) | Google Chat (webhook + JWT/OIDC) | [![npm](https://img.shields.io/npm/v/@mulmobridge/google-chat)](https://www.npmjs.com/package/@mulmobridge/google-chat) |
 
 ## Quick Start
 
@@ -118,8 +136,19 @@ packages/
   protocol/       ← wire types + constants (zero deps)
   chat-service/   ← server-side Express + socket.io service
   client/         ← bridge-side socket.io client + MIME utils
+  mock-server/    ← test mock server (echo mode)
   cli/            ← reference bridge: interactive terminal
-  telegram/       ← production bridge: Telegram bot
+  telegram/       ← Telegram bot bridge
+  slack/          ← Slack bot bridge (Socket Mode)
+  discord/        ← Discord bot bridge
+  line/           ← LINE bot bridge (webhook)
+  whatsapp/       ← WhatsApp Cloud API bridge (webhook)
+  matrix/         ← Matrix bridge (matrix-js-sdk)
+  irc/            ← IRC bridge (irc-framework)
+  mattermost/     ← Mattermost bridge (WebSocket)
+  zulip/          ← Zulip bridge (long-polling)
+  messenger/      ← Facebook Messenger bridge (webhook)
+  google-chat/    ← Google Chat bridge (webhook + JWT)
 ```
 
 ## License

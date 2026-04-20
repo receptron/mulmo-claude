@@ -212,7 +212,8 @@ onMounted(async () => {
   if (result.ok) {
     availablePlugins.value = [...guiPlugins, ...result.data];
   }
-  // silently fall back to GUI plugins only on failure
+  // Non-critical: MCP tools enrich the plugin palette for role editing
+  // but the view works fine with GUI plugins alone. No error banner needed.
 });
 
 const props = defineProps<{

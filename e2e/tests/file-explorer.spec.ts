@@ -157,4 +157,26 @@ test.describe("file explorer path in URL", () => {
       expect(url.searchParams.get("path")).toBeNull();
     }).toPass({ timeout: 5000 });
   });
+
+  test("closing a file removes ?path= from URL", async ({ page }) => {
+    await page.goto("/chat?view=files&path=wiki/hello.md");
+    await expect(page.getByText("This is a test.")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Click the close button
+    await expect(page.getByTestId("close-file-btn")).toBeVisible({
+      timeout: 5000,
+    });
+    await page.getByTestId("close-file-btn").click();
+
+    // ?path= should be removed
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.searchParams.get("path")).toBeNull();
+    }).toPass({ timeout: 5000 });
+
+    // "Select a file" placeholder should be visible
+    await expect(page.getByText("Select a file")).toBeVisible();
+  });
 });

@@ -1,0 +1,33 @@
+{
+  "name": "@mulmobridge/discord",
+  "version": "0.1.0",
+  "description": "Discord bridge for MulmoBridge — connect a Discord bot to MulmoClaude",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mulmobridge-discord": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "echo no tests yet"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "dependencies": {
+    "@mulmobridge/client": "^0.1.0",
+    "@mulmobridge/protocol": "^0.1.0",
+    "discord.js": "^14.26.3",
+    "dotenv": "^17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

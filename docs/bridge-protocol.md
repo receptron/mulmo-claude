@@ -13,7 +13,7 @@ Non-Node implementations (Python, Go, anything with a socket.io
 
 For the architectural context (why bridges are separate processes,
 how they fit into the five layers), see
-[`plans/messaging_layers_guide.md`](../plans/messaging_layers_guide.md).
+[`plans/done/messaging_layers_guide.md`](../plans/done/messaging_layers_guide.md).
 
 ---
 
@@ -246,8 +246,8 @@ For the production-grade TS version with error paths baked in, use
 
 ## Related reading
 
-- [`plans/messaging_layers_guide.md`](../plans/messaging_layers_guide.md) — architecture, why out-of-process
-- [`plans/messaging_transports.md`](../plans/messaging_transports.md) — design decisions log
-- [`plans/feat-chat-socketio.md`](../plans/feat-chat-socketio.md) — Phase A (socket transport)
-- [`plans/feat-chat-socketio-phase-b.md`](../plans/feat-chat-socketio-phase-b.md) — Phase B (server→bridge push)
+- [`plans/done/messaging_layers_guide.md`](../plans/done/messaging_layers_guide.md) — architecture, why out-of-process
+- [`plans/done/messaging_transports.md`](../plans/done/messaging_transports.md) — design decisions log
+- [`plans/done/feat-chat-socketio.md`](../plans/done/feat-chat-socketio.md) — Phase A (socket transport)
+- [`plans/done/feat-chat-socketio-phase-b.md`](../plans/done/feat-chat-socketio-phase-b.md) — Phase B (server→bridge push)
 - [`docs/developer.md` § Auth](developer.md) — bearer token details

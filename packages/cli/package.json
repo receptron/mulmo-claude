@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Interactive CLI bridge for MulmoBridge — talk to MulmoClaude from your terminal",
   "type": "module",
   "main": "./dist/index.js",

@@ -109,6 +109,8 @@ export default [
       "sonarjs/publicly-writable-directories": "off",
       "sonarjs/file-permissions": "off",
       "sonarjs/no-clear-text-protocols": "off",
+      // MCP smoke test spawns tsx subprocess — safe in test context.
+      "sonarjs/os-command": "off",
       // Playwright / jsdom-style specs commonly use `any`-ish casts
       // against DOM types to build minimal mocks. Keep
       // `no-explicit-any` at `error` in production code; demote to

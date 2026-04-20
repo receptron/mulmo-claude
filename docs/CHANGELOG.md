@@ -6,6 +6,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [0.2.0] - 2026-04-20
+
+### Highlights
+
+- **Unified Scheduler (#357)** — persistence, catch-up after downtime, skill scheduling via SKILL.md frontmatter, user-created tasks with CRUD API + MCP tool + Tasks UI
+- **Notification Center (#144)** — bell icon with unread badge, dropdown panel, agent completion triggers, click-to-navigate
+- **12 Messaging Bridges** — Slack, Discord, LINE, WhatsApp, Matrix, IRC, Mattermost, Zulip, Messenger, Google Chat (LINE verified)
+- **User-Defined Workspace Directories (#239)** — custom data/ and artifacts/ subdirectories via Settings UI
+- **Magic Number Elimination** — all time literals and scheduler string literals replaced with named constants
+
+### Added
+
+- Scheduler Phase 1: `@receptron/task-scheduler` pure library with catch-up algorithm + execution logs
+- Scheduler Phase 2: `schedule:` frontmatter in SKILL.md for automatic skill execution
+- Scheduler Phase 3: user task CRUD API (`POST/PUT/DELETE /api/scheduler/tasks`), MCP tool (`createTask/listTasks/deleteTask/runTask`), Tasks tab UI
+- Notification center: `NotificationBell.vue` + `NotificationPayload` type + `publishNotification()` server API
+- Agent completion → notification trigger (P0)
+- User-defined workspace directories: `config/workspace-dirs.json` + Settings "Directories" tab
+- `CANVAS_VIEW` constants for view mode literals
+- `NOTIFICATION_KINDS` / `NOTIFICATION_ACTION_TYPES` / `NOTIFICATION_VIEWS` / `NOTIFICATION_PRIORITIES` constants
+- `SCHEDULER_ACTIONS` constants for MCP tool actions
+- Time constants: `SUBPROCESS_PROBE_TIMEOUT_MS`, `SUBPROCESS_WORK_TIMEOUT_MS`, `CLI_SUBPROCESS_TIMEOUT_MS`
+- `CanvasViewMode` extended with `todos` / `scheduler` for URL-driven plugin access (#418)
+- `@mulmobridge/mock-server` for bridge integration testing
+
+### Changed
+
+- Minimum Node.js version: 18 → 20 (24 recommended)
+- All time literals (`1000`, `60000`, `3600000`) replaced with `server/utils/time.ts` constants across 13 files
+- All scheduler string literals (`"interval"`, `"daily"`, `"success"`, etc.) replaced with `@receptron/task-scheduler` constants
+- `WORKSPACE_FILES` reunified to shared `src/config/workspacePaths.ts`
+- Date/time formatting helpers consolidated into `src/utils/format/date.ts`
+
+### Fixed
+
+- Tool Call History not updating after page reload (#432)
+- `?path=` URL param cleanup when file is closed or view changes (#434)
+- MCP server crash in Docker — missing require export + packages mount (#429)
+- Attachment parsing: count + size limits added (#425)
+- Security: `.session-token` blocked from file API, `timingSafeEqual` for token comparison (#447)
+- Broken plan links in docs (plans moved to plans/done/)
+- LINE bridge status updated to "Verified"
+
+### Security
+
+- Token handling hardened: `timingSafeEqual`, file API blocklist
+- Webhook bridges: 1MB body limit, per-IP rate limiting, PII redaction
+- Google Chat: JWT/OIDC verification
+- Workspace custom dirs: path traversal prevention, reserved dir protection, prompt injection defense
+
+---
+
+## [0.1.2] - 2026-04-19 (package release)
+
+> **Note**: This was a package-only release for `@mulmobridge/*` npm packages. The MulmoClaude app version was v0.1.1 at this time.
+
+### Added
+
+- `@mulmobridge/slack` (v0.1.0) — Slack bot bridge (Socket Mode, no public URL needed)
+- `@mulmobridge/discord` (v0.1.0) — Discord bot bridge (Partials.Channel for DMs)
+- `@mulmobridge/line` (v0.1.0) — LINE bot bridge (webhook + HMAC signature)
+- `@mulmobridge/whatsapp` (v0.1.0) — WhatsApp Cloud API bridge (webhook + HMAC)
+- `@mulmobridge/matrix` (v0.1.0) — Matrix bridge (matrix-js-sdk, end-to-end encryption ready)
+- `@mulmobridge/irc` (v0.1.0) — IRC bridge (irc-framework, TLS, channel + DM)
+- `@mulmobridge/mattermost` (v0.1.0) — Mattermost bridge (WebSocket + REST, auto-reconnect)
+- `@mulmobridge/zulip` (v0.1.0) — Zulip bridge (long-polling events API)
+- `@mulmobridge/messenger` (v0.1.0) — Facebook Messenger bridge (webhook + x-hub-signature-256 HMAC)
+- `@mulmobridge/google-chat` (v0.1.0) — Google Chat bridge (webhook + JWT/OIDC verification)
+- `@mulmobridge/mock-server` (v0.1.0) — Lightweight mock server for bridge integration testing
+
+### Fixed
+
+- Google Chat webhook now verifies JWT tokens against Google's JWKS endpoint (iss/aud/exp claims)
+- Webhook bridges (Messenger, Google Chat) enforce 1MB body size limit and per-IP rate limiting
+- PII redaction in bridge logs — sender IDs are partially masked
+
+---
+
 ## [0.1.1] - 2026-04-18
 
 ### Highlights
@@ -106,5 +184,6 @@ First tagged release. GUI-chat with Claude Code — chat with Claude and get bac
 
 ---
 
+[0.1.2]: https://github.com/receptron/mulmoclaude/releases/tag/v0.1.2
 [0.1.1]: https://github.com/receptron/mulmoclaude/releases/tag/v0.1.1
 [0.1.0]: https://github.com/receptron/mulmoclaude/releases/tag/v0.1.0

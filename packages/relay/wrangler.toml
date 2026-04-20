@@ -1,0 +1,12 @@
+name = "mulmobridge-relay"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+# Durable Objects binding — the relay message queue + WS server
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "RelayDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RelayDurableObject"]

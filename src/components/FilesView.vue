@@ -31,7 +31,7 @@
           >· {{ formatBytes(content.size) }}</span
         >
         <span v-if="content?.modifiedMs" class="text-gray-400 shrink-0"
-          >· {{ formatTime(content.modifiedMs) }}</span
+          >· {{ formatDateTime(content.modifiedMs) }}</span
         >
         <button
           v-if="isMarkdown"
@@ -40,6 +40,17 @@
           @click="toggleMdRaw"
         >
           {{ mdRawMode ? "Rendered" : "Raw" }}
+        </button>
+        <button
+          type="button"
+          class="shrink-0 px-1 py-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          :class="{ 'ml-auto': !isMarkdown }"
+          title="Close file"
+          aria-label="Close file"
+          data-testid="close-file-btn"
+          @click="deselectFile"
+        >
+          <span class="material-icons text-base" aria-hidden="true">close</span>
         </button>
       </div>
       <div class="flex-1 overflow-auto min-h-0">
@@ -240,6 +251,7 @@ import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRef
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 import { WORKSPACE_FILES } from "../config/workspacePaths";
+import { formatDateTime } from "../utils/format/date";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
@@ -508,15 +520,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 // Fetch the immediate children of one directory via the lazy-expand
 // endpoint added in #207. Stores them in `childrenByPath` under the
 // same `path` the server returned. Idempotent — if already loaded,
@@ -622,6 +625,22 @@ function selectFile(filePath: string): void {
         console.error("[selectFile] navigation failed:", err);
       }
     });
+}
+
+function deselectFile(): void {
+  contentAbort?.abort();
+  contentAbort = null;
+  selectedPath.value = null;
+  content.value = null;
+  contentLoading.value = false;
+  contentError.value = null;
+  // Remove ?path= from URL for a clean state on reload.
+  const { path: __path, ...restQuery } = route.query;
+  router.replace({ query: restQuery }).catch((err: unknown) => {
+    if (!isNavigationFailure(err)) {
+      console.error("[deselectFile] navigation failed:", err);
+    }
+  });
 }
 
 // When the user clicks an <a> inside a rendered markdown body, check

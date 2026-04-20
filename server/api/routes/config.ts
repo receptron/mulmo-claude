@@ -13,6 +13,19 @@ import {
 } from "../../system/config.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import {
+  loadCustomDirs,
+  saveCustomDirs,
+  ensureCustomDirs,
+  validateCustomDirs,
+  type CustomDirEntry,
+} from "../../workspace/custom-dirs.js";
+import {
+  loadReferenceDirs,
+  saveReferenceDirs,
+  validateReferenceDirs,
+  type ReferenceDirEntry,
+} from "../../workspace/reference-dirs.js";
 
 // Public surface of /api/config. GET returns the full config tree so
 // the client can render every section in one request. PUT surfaces are
@@ -177,6 +190,77 @@ router.put(
       return;
     }
     res.json(buildFullResponse());
+  },
+);
+
+// ── Workspace custom directories (#239) ──────────────────────────
+
+router.get(
+  API_ROUTES.config.workspaceDirs,
+  (_req: Request, res: Response<{ dirs: CustomDirEntry[] }>) => {
+    res.json({ dirs: loadCustomDirs() });
+  },
+);
+
+router.put(
+  API_ROUTES.config.workspaceDirs,
+  (
+    req: Request<unknown, unknown, { dirs: unknown }>,
+    res: Response<{ dirs: CustomDirEntry[] } | ConfigErrorResponse>,
+  ) => {
+    const body = req.body;
+    if (typeof body !== "object" || body === null || !("dirs" in body)) {
+      badRequest(res, "expected { dirs: [...] }");
+      return;
+    }
+    const result = validateCustomDirs((body as Record<string, unknown>).dirs);
+    if ("error" in result) {
+      badRequest(res, result.error);
+      return;
+    }
+    try {
+      saveCustomDirs(result.entries);
+      ensureCustomDirs(result.entries);
+      res.json({ dirs: result.entries });
+    } catch (err) {
+      serverError(res, err instanceof Error ? err.message : "save failed");
+    }
+  },
+);
+
+// ── Reference directories (#455) ────────────────────────────────
+
+router.get(
+  API_ROUTES.config.referenceDirs,
+  (_req: Request, res: Response<{ dirs: ReferenceDirEntry[] }>) => {
+    res.json({ dirs: loadReferenceDirs() });
+  },
+);
+
+router.put(
+  API_ROUTES.config.referenceDirs,
+  (
+    req: Request<unknown, unknown, { dirs: unknown }>,
+    res: Response<{ dirs: ReferenceDirEntry[] } | ConfigErrorResponse>,
+  ) => {
+    const body = req.body;
+    if (typeof body !== "object" || body === null || !("dirs" in body)) {
+      badRequest(res, "expected { dirs: [...] }");
+      return;
+    }
+    const result = validateReferenceDirs(
+      (body as Record<string, unknown>).dirs,
+    );
+    if ("error" in result) {
+      badRequest(res, result.error);
+      return;
+    }
+    try {
+      saveReferenceDirs(result.entries);
+      res.json({ dirs: result.entries });
+    } catch (err) {
+      serverError(res, err instanceof Error ? err.message : "save failed");
+    }
   },
 );
 

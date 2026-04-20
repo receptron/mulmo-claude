@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
 import type { ToolCallHistoryItem } from "../types/toolCallHistory";
+import { formatTime } from "../utils/format/date";
 
 defineProps<{
   toolCallHistory: ToolCallHistoryItem[];
@@ -132,10 +133,6 @@ function toggleTool(tool: string): void {
     expandedTools.value.add(tool);
   }
   expandedTools.value = new Set(expandedTools.value);
-}
-
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString();
 }
 
 function formatJson(obj: unknown): string {

@@ -50,6 +50,7 @@ import { runFetchPhase, computeNextState, type FetchOutcome } from "./fetch.js";
 import { dedupAcrossSources, type DedupStats } from "./dedup.js";
 import { makeDefaultSummarize, type SummarizeFn } from "./summarize.js";
 import { writeDailyFile, appendItemsToArchives } from "./write.js";
+import { toLocalIsoDate } from "../../../utils/date.js";
 
 export interface RunPipelineInput {
   workspaceRoot: string;
@@ -92,15 +93,8 @@ export interface RunPipelineResult {
 // Convert a wall-clock millis value to YYYY-MM-DD in LOCAL
 // time, matching the #188 Q6 decision ("Local time, like the
 // journal"). The journal's `toIsoDate` in paths.ts uses the
-// same algorithm — duplicated here to avoid a cross-module
-// import that would pull journal code into the sources module.
-export function toLocalIsoDate(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+// Re-export for callers that imported from this module.
+export { toLocalIsoDate } from "../../../utils/date.js";
 
 // Convert a wall-clock millis value to the LOCAL year-month
 // key (YYYY-MM) used as the archive fallback for items without

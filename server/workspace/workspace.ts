@@ -13,6 +13,7 @@ import {
   existsInWorkspace,
   writeWorkspaceTextSync,
 } from "../utils/files/workspace-io.js";
+import { loadCustomDirs, ensureCustomDirs } from "./custom-dirs.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "helps");
@@ -118,6 +119,15 @@ export function initWorkspace(): string {
         "",
       ].join("\n"),
     );
+  }
+
+  // User-defined custom directories (#239)
+  const customDirs = loadCustomDirs();
+  if (customDirs.length > 0) {
+    ensureCustomDirs(customDirs);
+    log.info("workspace", "custom directories loaded", {
+      count: customDirs.length,
+    });
   }
 
   // Git init if not already a repo

@@ -31,6 +31,9 @@ const HIDDEN_DIRS = new Set([".git"]);
 const SENSITIVE_BASENAMES = new Set([
   "credentials.json",
   // Claude Code credentials file written by server/credentials.ts.
+  ".session-token",
+  // Bearer auth token file — readable without auth via /api/files/*
+  // exemption, so it must be blocked here (defense in depth).
   ".npmrc",
   ".htpasswd",
   "id_rsa",
