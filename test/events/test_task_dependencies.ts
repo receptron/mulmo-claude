@@ -123,6 +123,129 @@ describe("task-manager dependsOn", () => {
     assert.deepEqual(order, ["fetch", "journal", "memory"]);
   });
 
+  it("skips dependent when dependsOn references a nonexistent task", async () => {
+    const order: string[] = [];
+    const tm = createTaskManager({
+      tickMs: 60_000,
+      now: () => new Date("2026-01-01T00:00:00Z"),
+    });
+
+    tm.registerTask({
+      id: "orphan",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      dependsOn: "nonexistent",
+      run: async () => {
+        order.push("orphan");
+      },
+    });
+
+    await tm.tick();
+    assert.deepEqual(order, []);
+  });
+
+  it("skips dependent when parent is disabled", async () => {
+    const order: string[] = [];
+    const tm = createTaskManager({
+      tickMs: 60_000,
+      now: () => new Date("2026-01-01T00:00:00Z"),
+    });
+
+    tm.registerTask({
+      id: "parent",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      enabled: false,
+      run: async () => {
+        order.push("parent");
+      },
+    });
+    tm.registerTask({
+      id: "child",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      dependsOn: "parent",
+      run: async () => {
+        order.push("child");
+      },
+    });
+
+    await tm.tick();
+    assert.deepEqual(order, []);
+  });
+
+  it("independent tasks run regardless of dependent task failures", async () => {
+    const order: string[] = [];
+    const tm = createTaskManager({
+      tickMs: 60_000,
+      now: () => new Date("2026-01-01T00:00:00Z"),
+    });
+
+    tm.registerTask({
+      id: "independent",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      run: async () => {
+        order.push("independent");
+      },
+    });
+    tm.registerTask({
+      id: "parent",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      run: async () => {
+        order.push("parent");
+        throw new Error("boom");
+      },
+    });
+    tm.registerTask({
+      id: "child",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      dependsOn: "parent",
+      run: async () => {
+        order.push("child");
+      },
+    });
+
+    await tm.tick();
+    // independent and parent both run (parallel), child skipped
+    assert.ok(order.includes("independent"));
+    assert.ok(order.includes("parent"));
+    assert.ok(!order.includes("child"));
+  });
+
+  it("previous tick success does not carry over to next tick", async () => {
+    const order: string[] = [];
+    let tickCount = 0;
+    // Advance time between ticks so tickId changes
+    let fakeTime = new Date("2026-01-01T00:00:00Z");
+    const tm = createTaskManager({
+      tickMs: 60_000,
+      now: () => fakeTime,
+    });
+
+    tm.registerTask({
+      id: "parent",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      run: async () => {
+        tickCount++;
+        if (tickCount === 2) throw new Error("fail on second tick");
+        order.push("parent");
+      },
+    });
+    tm.registerTask({
+      id: "child",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      dependsOn: "parent",
+      run: async () => {
+        order.push("child");
+      },
+    });
+
+    await tm.tick(); // tick 1: parent succeeds → child runs
+    assert.deepEqual(order, ["parent", "child"]);
+
+    order.length = 0;
+    fakeTime = new Date("2026-01-01T00:01:00Z"); // advance 1 tick
+    await tm.tick(); // tick 2: parent fails → child skipped
+    assert.deepEqual(order, []);
+  });
+
   it("includes dependsOn in listTasks output", () => {
     const tm = createTaskManager();
     tm.registerTask({
