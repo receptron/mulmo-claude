@@ -275,12 +275,16 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { useRoute, useRouter, isNavigationFailure } from "vue-router";
-import FileTree, { type TreeNode } from "./FileTree.vue";
-import { useExpandedDirs } from "../composables/useExpandedDirs";
+import { useRoute } from "vue-router";
+import FileTree from "./FileTree.vue";
+import { useFileTree } from "../composables/useFileTree";
+import {
+  useFileSelection,
+  isValidFilePath,
+} from "../composables/useFileSelection";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
-import { apiGet, apiPut } from "../utils/api";
+import { apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 import { WORKSPACE_FILES } from "../config/workspacePaths";
 import { formatDateTime } from "../utils/format/date";
@@ -308,35 +312,6 @@ const MD_RAW_STORAGE_KEY = "files_md_raw_mode";
 const RECENT_THRESHOLD_MS = 60 * 1000;
 
 const route = useRoute();
-const router = useRouter();
-
-// Validate a file path from the URL: reject traversal attempts and
-// obviously invalid values. We don't check existence here — a 404 is
-// handled gracefully by the content loader.
-function isValidFilePath(p: unknown): p is string {
-  if (typeof p !== "string" || p.length === 0) return false;
-  if (p.includes("..")) return false;
-  if (p.startsWith("/")) return false;
-  return true;
-}
-
-interface TextContent {
-  kind: "text";
-  path: string;
-  content: string;
-  size: number;
-  modifiedMs: number;
-}
-
-interface MetaContent {
-  kind: "image" | "pdf" | "audio" | "video" | "binary" | "too-large";
-  path: string;
-  size: number;
-  modifiedMs: number;
-  message?: string;
-}
-
-type FileContent = TextContent | MetaContent;
 
 const props = defineProps<{
   refreshToken?: number;
@@ -349,36 +324,29 @@ const emit = defineEmits<{
   loadSession: [sessionId: string];
 }>();
 
-// Share the expand-state composable with FileTree so deep-link
-// auto-expand (`?path=wiki/pages/foo.md`) can mark ancestors as
-// expanded before the children arrive.
-const { expand } = useExpandedDirs();
+const {
+  rootNode,
+  refRoots,
+  childrenByPath,
+  treeError,
+  loadDirChildren,
+  ensureAncestorsLoaded,
+  reloadRoot,
+  loadRefRoots,
+} = useFileTree();
 
-// Root dir metadata (name/path/modifiedMs). Children live in
-// `childrenByPath` below so the lazy-expand cache has a single
-// home — see Phase-2 notes for #200.
-const rootNode = ref<TreeNode | null>(null);
-const refRoots = ref<TreeNode[]>([]);
 const emptySet = new Set<string>();
-// Lazy-expand cache: one entry per directory we've fetched via
-// `/api/files/dir`. `undefined` (= not in the map) means "not
-// loaded yet". `null` means "load in flight — show spinner".
-const childrenByPath = ref<Map<string, TreeNode[] | null>>(new Map());
-const treeError = ref<string | null>(null);
 
-// Seed selectedPath from URL query ?path=, falling back to
-// localStorage. Same bidirectional-sync pattern as sessionId
-// and canvasViewMode: ref is the source of truth for reads,
-// router.push keeps the URL in sync, watcher handles external
-// URL changes (back/forward).
-const urlPath = route.query.path;
-const selectedPath = ref<string | null>(
-  isValidFilePath(urlPath) ? urlPath : null,
-);
-
-const content = ref<FileContent | null>(null);
-const contentLoading = ref(false);
-const contentError = ref<string | null>(null);
+const {
+  selectedPath,
+  content,
+  contentLoading,
+  contentError,
+  loadContent,
+  selectFile,
+  deselectFile,
+  abortContent,
+} = useFileSelection();
 
 function hasExt(filePath: string | null, exts: string[]): boolean {
   if (!filePath) return false;
@@ -598,129 +566,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Fetch the immediate children of one directory via the lazy-expand
-// endpoint added in #207. Stores them in `childrenByPath` under the
-// same `path` the server returned. Idempotent — if already loaded,
-// no-ops. Setting the map value to `null` briefly lets the UI show
-// a spinner while the request is in flight.
-async function loadDirChildren(path: string): Promise<void> {
-  // Already loaded or in flight — skip. `undefined` (not present)
-  // is the only case that kicks off a fetch.
-  if (childrenByPath.value.has(path)) return;
-
-  const next = new Map(childrenByPath.value);
-  next.set(path, null);
-  childrenByPath.value = next;
-
-  const result = await apiGet<TreeNode>(API_ROUTES.files.dir, { path });
-  if (!result.ok) {
-    // Drop the `null` marker so the user can retry (e.g. via the
-    // refresh-token watcher). Keep the error visible too.
-    const rollback = new Map(childrenByPath.value);
-    rollback.delete(path);
-    childrenByPath.value = rollback;
-    treeError.value = result.error || `dir: ${result.status}`;
-    return;
-  }
-  const node = result.data;
-  const updated = new Map(childrenByPath.value);
-  updated.set(path, node.children ?? []);
-  childrenByPath.value = updated;
-  // Also expose the root dir's own metadata (name / path /
-  // modifiedMs) for the FileTree header — only relevant for the
-  // workspace root, which the tree renders as "(workspace)".
-  if (path === "") rootNode.value = { ...node, children: [] };
-}
-
-// Walk each ancestor of a file path and expand + load it. Used on
-// mount for deep links like `?path=wiki/pages/foo.md` so the tree
-// reveals the selection rather than keeping every directory
-// collapsed.
-async function ensureAncestorsLoaded(filePath: string): Promise<void> {
-  const parts = filePath.split("/").filter(Boolean);
-  if (parts.length <= 1) return; // file sits at root, nothing to expand
-  const ancestors: string[] = [];
-  for (let i = 1; i < parts.length; i++) {
-    ancestors.push(parts.slice(0, i).join("/"));
-  }
-  for (const dir of ancestors) {
-    expand(dir);
-    await loadDirChildren(dir);
-  }
-}
-
-async function reloadRoot(): Promise<void> {
-  // Wipe the whole lazy cache, then re-seed the root. Any
-  // currently-expanded descendants will be re-fetched lazily when
-  // the FileTree re-emits `load-children` from their expanded
-  // state.
-  childrenByPath.value = new Map();
-  treeError.value = null;
-  await loadDirChildren("");
-}
-
-// Tracks the currently in-flight content fetch so a stale response from
-// a previously-clicked file can't overwrite the latest selection.
-let contentAbort: AbortController | null = null;
-
-async function loadContent(filePath: string): Promise<void> {
-  contentAbort?.abort();
-  const controller = new AbortController();
-  contentAbort = controller;
-
-  contentLoading.value = true;
-  contentError.value = null;
-  content.value = null;
-  const result = await apiGet<FileContent>(
-    API_ROUTES.files.content,
-    { path: filePath },
-    { signal: controller.signal },
-  );
-  // Early-return covers abort (network error with status 0) and
-  // exits before any state mutation, so the error branch below only
-  // fires for real failures.
-  if (controller.signal.aborted) return;
-  if (!result.ok) {
-    contentError.value = result.error;
-  } else {
-    content.value = result.data;
-  }
-  if (contentAbort === controller) {
-    contentLoading.value = false;
-    contentAbort = null;
-  }
-}
-
-function selectFile(filePath: string): void {
-  selectedPath.value = filePath;
-  loadContent(filePath);
-  // Push file path into the URL so it's bookmarkable / back-navigable.
-  const { path: __path, ...restQuery } = route.query;
-  router
-    .push({ query: { ...restQuery, path: filePath } })
-    .catch((err: unknown) => {
-      if (!isNavigationFailure(err)) {
-        console.error("[selectFile] navigation failed:", err);
-      }
-    });
-}
-
-function deselectFile(): void {
-  contentAbort?.abort();
-  contentAbort = null;
-  selectedPath.value = null;
-  content.value = null;
-  contentLoading.value = false;
-  contentError.value = null;
-  // Remove ?path= from URL for a clean state on reload.
-  const { path: __path, ...restQuery } = route.query;
-  router.replace({ query: restQuery }).catch((err: unknown) => {
-    if (!isNavigationFailure(err)) {
-      console.error("[deselectFile] navigation failed:", err);
-    }
-  });
-}
-
 // When the user clicks an <a> inside a rendered markdown body, check
 // if it's a workspace-internal relative/absolute link. If so, resolve
 // it against the current file and navigate inside FilesView instead
@@ -787,12 +632,7 @@ watch(
 
 onMounted(async () => {
   await loadDirChildren("");
-
-  // Fetch reference directory roots (read-only external dirs)
-  const refResult = await apiGet<TreeNode[]>(API_ROUTES.files.refRoots);
-  if (refResult.ok && Array.isArray(refResult.data)) {
-    refRoots.value = refResult.data;
-  }
+  await loadRefRoots();
 
   // Deep-link: if the URL has a selected path, reveal its ancestors
   // by fetching each dir in sequence so the tree auto-expands to
@@ -804,6 +644,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  contentAbort?.abort();
+  abortContent();
 });
 </script>
