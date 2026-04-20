@@ -11,6 +11,7 @@ import { WORKSPACE_FILES } from "../../../src/config/workspacePaths.js";
 import { loadJsonFile } from "./json.js";
 import { writeFileAtomicSync } from "./atomic.js";
 import { log } from "../../system/logger/index.js";
+import { isRecord } from "../types.js";
 
 export interface ScheduleOverride {
   /** Override interval in milliseconds (for interval-type schedules). */
@@ -25,8 +26,8 @@ export type ScheduleOverrides = Record<string, ScheduleOverride>;
 export const UTC_HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function isScheduleOverride(value: unknown): value is ScheduleOverride {
-  if (typeof value !== "object" || value === null) return false;
-  const obj = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const obj = value;
   const hasInterval =
     "intervalMs" in obj &&
     typeof obj.intervalMs === "number" &&
@@ -46,12 +47,12 @@ function overridesPath(root?: string): string {
 /** Load schedule overrides. Filters out invalid entries with a warning. */
 export function loadSchedulerOverrides(root?: string): ScheduleOverrides {
   const raw = loadJsonFile<unknown>(overridesPath(root), {});
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     log.warn("scheduler-overrides", "overrides.json is not an object");
     return {};
   }
   const result: ScheduleOverrides = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(raw)) {
     if (isScheduleOverride(value)) {
       result[key] = value;
     } else {
