@@ -127,7 +127,7 @@ Web articles, chats, local files, generated images and videos, search results, s
 ```
 Hi Product Hunt 👋
 
-I'm Satoshi Nakajima. I spent eight years at Microsoft working on
+I'm Satoshi Nakajima. I spent thirteen and half years at Microsoft working on
 operating systems (lead architect on early Windows releases), then
 spent the last year obsessing over a single question: **what does an
 AI-native OS actually look like?**

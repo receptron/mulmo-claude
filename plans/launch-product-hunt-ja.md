@@ -129,7 +129,7 @@ PH 閲覧者は約 10 秒でスキミングし、覚えるアイディアは **1
 ```
 Hi Product Hunt 👋
 
-I'm Satoshi Nakajima. I spent eight years at Microsoft working on
+I'm Satoshi Nakajima. I spent thirteen and half years at Microsoft working on
 operating systems (lead architect on early Windows releases), then
 spent the last year obsessing over a single question: **what does an
 AI-native OS actually look like?**
