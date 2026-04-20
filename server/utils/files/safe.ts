@@ -9,15 +9,11 @@
 
 import fs from "fs";
 import path from "path";
+import { isErrorWithCode } from "../types.js";
 
 /** Check if an error is ENOENT (file/dir not found). */
 export function isEnoent(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "ENOENT"
-  );
+  return isErrorWithCode(err) && err.code === "ENOENT";
 }
 
 /** Read a binary file by absolute path. Null on ENOENT. */

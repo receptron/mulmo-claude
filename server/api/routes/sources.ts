@@ -50,6 +50,7 @@ import {
   serverError,
 } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { isRecord } from "../../utils/types.js";
 
 const router = Router();
 
@@ -455,7 +456,7 @@ export function validateSchedule(
 // missing entirely.
 export function validateFetcherParams(raw: unknown): FetcherParams | null {
   if (raw === undefined) return {};
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     return null;
   }
   const out: FetcherParams = {};

@@ -15,6 +15,7 @@ import {
   writeReferenceDirsJson,
   isExistingDirectory,
 } from "../utils/files/reference-dirs-io.js";
+import { isRecord } from "../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ function hasTraversalSegment(p: string): boolean {
 }
 
 function validateEntry(raw: unknown): ReferenceDirEntry | null {
-  if (typeof raw !== "object" || raw === null) return null;
+  if (!isRecord(raw)) return null;
   const obj = raw as Record<string, unknown>;
 
   const rawPath = typeof obj.hostPath === "string" ? obj.hostPath : "";
@@ -183,10 +184,9 @@ export function validateReferenceDirs(
     if (entry) {
       entries.push(entry);
     } else {
-      const p =
-        typeof item === "object" && item !== null
-          ? String((item as Record<string, unknown>).hostPath ?? "")
-          : "";
+      const p = isRecord(item)
+        ? String((item as Record<string, unknown>).hostPath ?? "")
+        : "";
       errors.push(`entry ${i}: invalid or blocked path "${p}"`);
     }
   });

@@ -50,6 +50,7 @@ import { writeState, type JournalState } from "./state.js";
 import { log } from "../../system/logger/index.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { extractAndAppendMemory } from "./memoryExtractor.js";
+import { isRecord } from "../../utils/types.js";
 
 // --- Constants ------------------------------------------------------
 
@@ -694,7 +695,7 @@ function parseJsonlLine(line: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     return null;
   }
   return parsed as Record<string, unknown>;
@@ -784,11 +785,7 @@ export function entryToExcerpt(
   // `typeof null === "object"` so we must explicitly reject null
   // to avoid a NullPointerException-style crash when accessing
   // r.toolName below.
-  if (
-    type === EVENT_TYPES.toolResult &&
-    typeof entry.result === "object" &&
-    entry.result !== null
-  ) {
+  if (type === EVENT_TYPES.toolResult && isRecord(entry.result)) {
     const r = entry.result as Record<string, unknown>;
     const toolName = typeof r.toolName === "string" ? r.toolName : "tool";
     const label =
@@ -811,10 +808,10 @@ export function entryToExcerpt(
 export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
   if (entry.type !== "tool_result") return [];
   const result = entry.result;
-  if (typeof result !== "object" || result === null) return [];
+  if (!isRecord(result)) return [];
   const r = result as Record<string, unknown>;
   const data = r.data;
-  if (typeof data !== "object" || data === null) return [];
+  if (!isRecord(data)) return [];
   const d = data as Record<string, unknown>;
   const paths: string[] = [];
 

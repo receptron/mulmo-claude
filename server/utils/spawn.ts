@@ -3,6 +3,8 @@
 // and sources/classifier — each with its own log prefix but identical
 // logic. Consolidated as part of the server/utils grouping.
 
+import { isRecord } from "./types.js";
+
 const PREVIEW_LEN = 500;
 
 /**
@@ -23,17 +25,16 @@ export function extractClaudeErrorMessage(stdout: string): string | null {
   } catch {
     return null;
   }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
-  if (obj.is_error !== true) return null;
-  if (Array.isArray(obj.errors) && obj.errors.length > 0) {
-    const joined = obj.errors
+  if (!isRecord(parsed)) return null;
+  if (parsed.is_error !== true) return null;
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+    const joined = parsed.errors
       .filter((e): e is string => typeof e === "string")
       .join("; ");
     if (joined.length > 0) return joined;
   }
-  const subtype = typeof obj.subtype === "string" ? obj.subtype : "";
-  const result = typeof obj.result === "string" ? obj.result : "";
+  const subtype = typeof parsed.subtype === "string" ? parsed.subtype : "";
+  const result = typeof parsed.result === "string" ? parsed.result : "";
   if (subtype && result) return `${subtype}: ${result}`;
   return subtype || result || null;
 }

@@ -13,6 +13,7 @@ import {
   journalStateExists as journalStateExistsRaw,
 } from "../../utils/files/journal-io.js";
 import { ONE_HOUR_MS, ONE_DAY_MS } from "../../utils/time.js";
+import { isRecord } from "../../utils/types.js";
 
 // Bump this when the schema changes in a backwards-incompatible way.
 // Older state files are treated as corrupted and replaced with a
@@ -58,7 +59,7 @@ export function defaultState(): JournalState {
 // fields and fills defaults — users can hand-edit the file to change
 // intervals and we want to be forgiving.
 export function parseState(raw: unknown): JournalState {
-  if (typeof raw !== "object" || raw === null) return defaultState();
+  if (!isRecord(raw)) return defaultState();
   const obj = raw as Record<string, unknown>;
 
   // Version mismatch → throw it all out. Cheap to rebuild.
@@ -92,10 +93,10 @@ export function parseState(raw: unknown): JournalState {
 function parseProcessedSessions(
   raw: unknown,
 ): Record<string, ProcessedSessionRecord> {
-  if (typeof raw !== "object" || raw === null) return {};
+  if (!isRecord(raw)) return {};
   const out: Record<string, ProcessedSessionRecord> = {};
   for (const [id, rec] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof rec !== "object" || rec === null) continue;
+    if (!isRecord(rec)) continue;
     const mtime = (rec as Record<string, unknown>).lastMtimeMs;
     if (typeof mtime === "number" && mtime >= 0) {
       out[id] = { lastMtimeMs: mtime };

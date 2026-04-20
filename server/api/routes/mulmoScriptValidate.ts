@@ -9,6 +9,7 @@
 // `src/plugins/presentMulmoScript/View.vue`.
 
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
+import { isRecord } from "../../utils/types.js";
 
 export type ValidationResult<T> =
   | { ok: true; value: T }
@@ -43,17 +44,16 @@ export function validateUpdateScriptBody(body: unknown): ValidationResult<{
   filePath: string;
   script: unknown;
 }> {
-  if (body === null || typeof body !== "object") {
+  if (!isRecord(body)) {
     return { ok: false, error: "body must be an object" };
   }
-  const record = body as Record<string, unknown>;
-  if (typeof record.filePath !== "string" || record.filePath === "") {
+  if (typeof body.filePath !== "string" || body.filePath === "") {
     return { ok: false, error: "filePath must be a non-empty string" };
   }
-  if (record.script === undefined) {
+  if (body.script === undefined) {
     return { ok: false, error: "script is required" };
   }
-  const parsed = mulmoScriptSchema.safeParse(record.script);
+  const parsed = mulmoScriptSchema.safeParse(body.script);
   if (!parsed.success) {
     return {
       ok: false,
@@ -62,7 +62,7 @@ export function validateUpdateScriptBody(body: unknown): ValidationResult<{
   }
   return {
     ok: true,
-    value: { filePath: record.filePath, script: parsed.data },
+    value: { filePath: body.filePath as string, script: parsed.data },
   };
 }
 
@@ -76,24 +76,23 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   beatIndex: number;
   beat: unknown;
 }> {
-  if (body === null || typeof body !== "object") {
+  if (!isRecord(body)) {
     return { ok: false, error: "body must be an object" };
   }
-  const record = body as Record<string, unknown>;
-  if (typeof record.filePath !== "string" || record.filePath === "") {
+  if (typeof body.filePath !== "string" || body.filePath === "") {
     return { ok: false, error: "filePath must be a non-empty string" };
   }
   if (
-    typeof record.beatIndex !== "number" ||
-    !Number.isInteger(record.beatIndex) ||
-    record.beatIndex < 0
+    typeof body.beatIndex !== "number" ||
+    !Number.isInteger(body.beatIndex) ||
+    body.beatIndex < 0
   ) {
     return { ok: false, error: "beatIndex must be a non-negative integer" };
   }
-  if (record.beat === undefined) {
+  if (body.beat === undefined) {
     return { ok: false, error: "beat is required" };
   }
-  const parsed = mulmoBeatSchema.safeParse(record.beat);
+  const parsed = mulmoBeatSchema.safeParse(body.beat);
   if (!parsed.success) {
     return {
       ok: false,
@@ -103,8 +102,8 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   return {
     ok: true,
     value: {
-      filePath: record.filePath,
-      beatIndex: record.beatIndex,
+      filePath: body.filePath as string,
+      beatIndex: body.beatIndex as number,
       beat: parsed.data,
     },
   };

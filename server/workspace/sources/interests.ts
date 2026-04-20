@@ -11,6 +11,7 @@ import { log } from "../../system/logger/index.js";
 import type { SourceItem } from "./types.js";
 import type { CategorySlug } from "./taxonomy.js";
 import { isCategorySlug } from "./taxonomy.js";
+import { isRecord } from "../../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function loadInterests(root?: string): InterestsProfile | null {
 }
 
 function validateInterests(raw: unknown): InterestsProfile | null {
-  if (typeof raw !== "object" || raw === null) return null;
+  if (!isRecord(raw)) return null;
   const obj = raw as Record<string, unknown>;
 
   // Filter out blank/whitespace-only keywords — "" matches every title
