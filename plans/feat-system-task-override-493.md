@@ -7,7 +7,7 @@ Users cannot change their frequency without editing code.
 
 ## Design
 
-### Config file: `config/scheduler-overrides.json`
+### Config file: `config/scheduler/overrides.json`
 
 ```json
 {

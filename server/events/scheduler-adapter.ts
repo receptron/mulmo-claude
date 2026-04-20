@@ -160,8 +160,8 @@ export async function applyScheduleOverride(
 ): Promise<boolean> {
   const task = systemTasks.find((t) => t.id === taskId);
   if (!task || !taskManagerRef) return false;
+  if (!taskManagerRef.updateSchedule(taskId, schedule)) return false;
   task.schedule = schedule;
-  taskManagerRef.updateSchedule(taskId, schedule);
 
   // Recalculate next window so the UI reflects the new schedule
   const nextScheduledAt = computeNextScheduled(task);

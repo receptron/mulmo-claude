@@ -269,6 +269,7 @@ router.put(
 import {
   loadSchedulerOverrides,
   saveSchedulerOverrides,
+  UTC_HH_MM_RE,
   type ScheduleOverrides,
 } from "../../utils/files/scheduler-overrides-io.js";
 import { applyScheduleOverride } from "../../events/scheduler-adapter.js";
@@ -310,7 +311,7 @@ router.put(
           });
         } else if (
           typeof ovr.time === "string" &&
-          /^\d{2}:\d{2}$/.test(ovr.time)
+          UTC_HH_MM_RE.test(ovr.time)
         ) {
           await applyScheduleOverride(taskId, {
             type: SCHEDULE_TYPES.daily,

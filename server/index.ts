@@ -55,7 +55,10 @@ import {
   type SystemTaskDef,
 } from "./events/scheduler-adapter.js";
 import schedulerTasksRoutes from "./api/routes/schedulerTasks.js";
-import { loadSchedulerOverrides } from "./utils/files/scheduler-overrides-io.js";
+import {
+  loadSchedulerOverrides,
+  UTC_HH_MM_RE,
+} from "./utils/files/scheduler-overrides-io.js";
 import type { IPubSub } from "./events/pub-sub/index.js";
 import { initSessionStore } from "./events/session-store/index.js";
 import { requireSameOrigin } from "./api/csrfGuard.js";
@@ -473,7 +476,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
     if (
       task.schedule.type === SCHEDULE_TYPES.daily &&
       typeof ovr.time === "string" &&
-      /^\d{2}:\d{2}$/.test(ovr.time)
+      UTC_HH_MM_RE.test(ovr.time)
     ) {
       log.info("scheduler", "applying override", {
         id: task.id,
