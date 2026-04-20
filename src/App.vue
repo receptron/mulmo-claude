@@ -149,7 +149,7 @@
           title="Session history"
           @click="toggleHistory"
         >
-          <span class="material-icons text-base">history</span>
+          <span class="material-icons text-base">expand_more</span>
           <!-- Active sessions badge (yellow, left) -->
           <span
             v-if="activeSessionCount > 0"
