@@ -12,37 +12,15 @@
     />
     <!-- Content pane -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <div
-        v-if="selectedPath"
-        class="px-4 py-2 border-b border-gray-200 text-xs text-gray-500 font-mono shrink-0 flex items-center gap-2"
-      >
-        <span class="truncate min-w-0">{{ selectedPath }}</span>
-        <span v-if="content" class="text-gray-400 shrink-0"
-          >· {{ formatBytes(content.size) }}</span
-        >
-        <span v-if="content?.modifiedMs" class="text-gray-400 shrink-0"
-          >· {{ formatDateTime(content.modifiedMs) }}</span
-        >
-        <button
-          v-if="isMarkdown"
-          class="ml-auto shrink-0 px-2 py-0.5 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 font-sans"
-          :title="mdRawMode ? 'Show rendered Markdown' : 'Show raw source'"
-          @click="toggleMdRaw"
-        >
-          {{ mdRawMode ? "Rendered" : "Raw" }}
-        </button>
-        <button
-          type="button"
-          class="shrink-0 px-1 py-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-          :class="{ 'ml-auto': !isMarkdown }"
-          title="Close file"
-          aria-label="Close file"
-          data-testid="close-file-btn"
-          @click="deselectFile"
-        >
-          <span class="material-icons text-base" aria-hidden="true">close</span>
-        </button>
-      </div>
+      <FileContentHeader
+        :selected-path="selectedPath"
+        :size="content?.size ?? null"
+        :modified-ms="content?.modifiedMs ?? null"
+        :is-markdown="isMarkdown"
+        :md-raw-mode="mdRawMode"
+        @toggle-md-raw="toggleMdRaw"
+        @deselect="deselectFile"
+      />
       <div class="flex-1 overflow-auto min-h-0">
         <div
           v-if="!selectedPath"
@@ -244,6 +222,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import FileTreePane from "./FileTreePane.vue";
+import FileContentHeader from "./FileContentHeader.vue";
 import { useFileTree } from "../composables/useFileTree";
 import {
   useFileSelection,
@@ -256,7 +235,6 @@ import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRef
 import { apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 import { WORKSPACE_FILES } from "../config/workspacePaths";
-import { formatDateTime } from "../utils/format/date";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
@@ -482,12 +460,6 @@ const recentPaths = computed(() => {
 
 function rawUrl(filePath: string): string {
   return `${API_ROUTES.files.raw}?path=${encodeURIComponent(filePath)}`;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 // When the user clicks an <a> inside a rendered markdown body, check
