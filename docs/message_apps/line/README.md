@@ -21,6 +21,11 @@ Japanese: [`README.ja.md`](README.ja.md)
 Your computer has to be on and connected to the internet for the
 bot to respond. Close the laptop, the bot goes silent.
 
+> **Tip**: Don't want to deal with ngrok? Use the
+> [MulmoBridge Relay](../relay/README.md) instead — a permanent
+> cloud URL with offline message queuing. No ngrok needed.
+> Setup: `/setup-relay` in Claude Code.
+
 ### How it differs from Telegram
 
 Telegram uses polling (the bot asks the server for new messages),

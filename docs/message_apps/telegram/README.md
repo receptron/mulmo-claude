@@ -20,6 +20,11 @@ sharing the bot with friends / family.
 Your computer has to be on and connected to the internet for the
 bot to respond. Close the laptop → the bot goes silent.
 
+> **Tip**: Want offline message queuing? Use the
+> [MulmoBridge Relay](../relay/README.md) — messages are stored
+> in the cloud and delivered when your computer comes back online.
+> Setup: `/setup-relay` in Claude Code.
+
 ---
 
 ## Step 1 — Create the bot with BotFather
