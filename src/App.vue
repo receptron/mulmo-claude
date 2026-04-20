@@ -2,7 +2,7 @@
   <div class="flex flex-col fixed inset-0 bg-gray-900 text-white">
     <!-- Global top bar — shown in every view mode -->
     <div ref="topBarRef" class="shrink-0 bg-white text-gray-900">
-      <!-- Row 1: title + plugin launcher + canvas toggle -->
+      <!-- Row 1: title + plugin launcher -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-200">
         <SidebarHeader
           variant="topbar"
@@ -14,20 +14,20 @@
           @toggle-right-sidebar="toggleRightSidebar"
           @open-settings="showSettings = true"
         />
-        <div class="flex-1 flex items-center justify-between gap-2 min-w-0">
+        <div class="flex-1 flex items-center gap-2 min-w-0">
           <PluginLauncher
             :active-tool-name="selectedResult?.toolName ?? null"
             :active-view-mode="canvasViewMode"
             @navigate="onPluginNavigate"
           />
-          <CanvasViewToggle
-            :model-value="canvasViewMode"
-            @update:model-value="setCanvasViewMode"
-          />
         </div>
       </div>
-      <!-- Row 2: role selector + session tabs -->
+      <!-- Row 2: canvas toggle + role selector + session tabs -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+        <CanvasViewToggle
+          :model-value="canvasViewMode"
+          @update:model-value="setCanvasViewMode"
+        />
         <RoleSelector
           v-model:current-role-id="currentRoleId"
           variant="topbar"

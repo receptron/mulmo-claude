@@ -1,34 +1,26 @@
 <template>
-  <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
-    <button
-      v-for="mode in MODES"
-      :key="mode.key"
-      class="px-2.5 py-1 flex items-center gap-1"
-      :class="
-        modelValue === mode.key
-          ? 'bg-blue-500 text-white'
-          : 'bg-white text-gray-600 hover:bg-gray-50'
-      "
-      :title="mode.title"
-      @click="emit('update:modelValue', mode.key)"
-    >
-      <span class="material-icons text-sm">{{ mode.icon }}</span>
-      <span>{{ mode.label }}</span>
-    </button>
-  </div>
+  <button
+    class="flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+    :title="current.title"
+    :aria-label="current.title"
+    :data-testid="`canvas-view-toggle-${modelValue}`"
+    @click="emit('update:modelValue', other.key)"
+  >
+    <span class="material-icons text-base">{{ current.icon }}</span>
+  </button>
 </template>
 
 <script setup lang="ts">
-import type { CanvasViewMode } from "../utils/canvas/viewMode";
+import { computed } from "vue";
+import { CANVAS_VIEW, type CanvasViewMode } from "../utils/canvas/viewMode";
 
 interface ModeOption {
   key: CanvasViewMode;
   icon: string;
-  label: string;
   title: string;
 }
 
-defineProps<{
+const props = defineProps<{
   modelValue: CanvasViewMode;
 }>();
 
@@ -36,22 +28,22 @@ const emit = defineEmits<{
   "update:modelValue": [mode: CanvasViewMode];
 }>();
 
-// Files view is no longer exposed through this toggle — the plugin
-// launcher (src/components/PluginLauncher.vue) is the entry point,
-// with dedicated buttons for todos / scheduler / wiki / skills plus
-// a generic "Files" button for the workspace root.
-const MODES: ModeOption[] = [
-  {
-    key: "single",
-    icon: "crop_square",
-    label: "Single",
-    title: "Single result (⌘1)",
-  },
-  {
-    key: "stack",
-    icon: "layers",
-    label: "Stack",
-    title: "All results stacked (⌘2)",
-  },
-];
+const SINGLE: ModeOption = {
+  key: CANVAS_VIEW.single,
+  icon: "crop_square",
+  title: "Single view · click to switch to Stack (⌘2)",
+};
+const STACK: ModeOption = {
+  key: CANVAS_VIEW.stack,
+  icon: "layers",
+  title: "Stack view · click to switch to Single (⌘1)",
+};
+
+// Show the current mode's icon; clicking switches to the other.
+const current = computed<ModeOption>(() =>
+  props.modelValue === CANVAS_VIEW.stack ? STACK : SINGLE,
+);
+const other = computed<ModeOption>(() =>
+  props.modelValue === CANVAS_VIEW.stack ? SINGLE : STACK,
+);
 </script>
