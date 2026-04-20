@@ -40,8 +40,8 @@
           :active-session-count="activeSessionCount"
           :unread-count="unreadCount"
           :history-open="showHistory"
-          @new-session="createNewSession()"
-          @load-session="loadSession"
+          @new-session="handleNewSessionClick"
+          @load-session="handleSessionSelect"
           @toggle-history="toggleHistory"
         />
       </div>
@@ -56,7 +56,7 @@
       :roles="roles"
       :top-offset="historyTopOffset"
       :error-message="historyError"
-      @load-session="loadSession"
+      @load-session="handleSessionSelect"
     />
 
     <!-- Body: sidebar (Single only) + canvas column + right sidebar -->
@@ -166,7 +166,7 @@
           <FilesView
             v-else-if="canvasViewMode === 'files'"
             :refresh-token="filesRefreshToken"
-            @load-session="loadSession"
+            @load-session="handleSessionSelect"
           />
           <!-- Todos mode -->
           <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
@@ -654,6 +654,23 @@ function restoreChatViewForSession(): void {
   }
 }
 
+// User-initiated session switches: clicking a session tab, a history
+// row, or a chat link in FilesView. In plugin views (Todos / Files /
+// ...) no chat is active, so the click's purpose is to surface the
+// chat — restore the preferred Single/Stack mode before loading.
+// Not wired into the internal `loadSession` call path because that
+// also fires on initial mount with `?view=plugin` URLs, which must
+// be honoured as-is.
+function handleSessionSelect(id: string): void {
+  restoreChatViewForSession();
+  loadSession(id);
+}
+
+function handleNewSessionClick(): void {
+  restoreChatViewForSession();
+  createNewSession();
+}
+
 // In plugin views (Todos / Files / ...) no chat is active, so the
 // session tabs should show no tab as "current". That way clicking
 // any tab — including the session the user was last on — counts as a
@@ -872,10 +889,6 @@ function createNewSession(roleId?: string): ActiveSession {
   // Remove the current session if it's empty (no messages exchanged).
   removeCurrentIfEmpty();
 
-  // Starting a fresh chat from a plugin view (Todos / Files / ...)
-  // should drop the user back into their preferred chat layout.
-  restoreChatViewForSession();
-
   const id = uuidv4();
   const rId = roleId ?? currentRoleId.value;
   const now = new Date().toISOString();
@@ -901,6 +914,10 @@ function createNewSession(roleId?: string): ActiveSession {
 }
 
 function onRoleChange() {
+  // Covers both the user dropdown click and the agent-triggered role
+  // switch (EVENT_TYPES.switchRole) — either way the user ends up in
+  // a fresh chat session, so a plugin view should yield to chat.
+  restoreChatViewForSession();
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
 }
@@ -945,23 +962,11 @@ async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
 }
 
 async function loadSession(id: string) {
-  // Re-selecting the already-active, loaded session is a no-op —
-  // unless the canvas is showing a plugin view, in which case the
-  // click's purpose is to return to chat (see restoreChatView below).
+  // Re-selecting the already-active, loaded session is a no-op.
   // The sessionMap check is needed because the route watcher sets
   // currentSessionId before calling loadSession — without it the
   // guard would bail before the session data is fetched.
-  if (
-    id === currentSessionId.value &&
-    sessionMap.has(id) &&
-    isChatView(canvasViewMode.value)
-  ) {
-    return;
-  }
-
-  // Clicking a session from a plugin view (Todos / Files / ...) should
-  // surface the chat, not leave the user staring at the same plugin.
-  restoreChatViewForSession();
+  if (id === currentSessionId.value && sessionMap.has(id)) return;
 
   // If the current session is empty, remove it from memory and use
   // replace-navigation so the empty session doesn't linger in

@@ -58,8 +58,10 @@ test.describe("history panel (useSessionHistory)", () => {
     const item = page.getByTestId(`session-item-${SESSION_A.id}`);
     await expect(item).toBeVisible();
 
-    // Click somewhere neutral (main chat canvas area, far from the header).
-    await page.locator("body").click({ position: { x: 600, y: 500 } });
+    // Click a neutral element in the top bar — the popup now spans
+    // the full canvas width, so the only clickable "outside" region
+    // is the header itself.
+    await page.getByTestId("app-title").click();
     await expect(item).toBeHidden();
   });
 
