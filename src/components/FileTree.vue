@@ -60,14 +60,11 @@
 import { computed, watch } from "vue";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
 
-export interface TreeNode {
-  name: string;
-  path: string;
-  type: "file" | "dir";
-  size?: number;
-  modifiedMs?: number;
-  children?: TreeNode[];
-}
+// TreeNode lives in src/types/fileTree.ts so .ts composables can
+// import it without depending on a .vue module. Re-export here so
+// existing `import { TreeNode } from "./FileTree.vue"` keeps working.
+export type { TreeNode } from "../types/fileTree";
+import type { TreeNode } from "../types/fileTree";
 
 const props = defineProps<{
   node: TreeNode;

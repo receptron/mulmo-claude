@@ -2,7 +2,7 @@
 // Extracted from FilesView.vue (#507 step 1).
 
 import { ref } from "vue";
-import type { TreeNode } from "../components/FileTree.vue";
+import type { TreeNode } from "../types/fileTree";
 import { useExpandedDirs } from "./useExpandedDirs";
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
