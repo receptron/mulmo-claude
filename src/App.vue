@@ -4,75 +4,15 @@
     <div
       class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
     >
-      <div
-        ref="headerRef"
-        class="p-4 border-b border-gray-200 flex items-center justify-between"
-      >
-        <div>
-          <h1
-            data-testid="app-title"
-            class="text-lg font-semibold"
-            :style="debugTitleStyle"
-          >
-            MulmoClaude
-          </h1>
-        </div>
-        <div class="flex gap-2">
-          <button
-            ref="historyButtonRef"
-            data-testid="history-btn"
-            class="relative text-gray-400 hover:text-gray-700"
-            :class="{ 'text-blue-500': showHistory }"
-            title="Session history"
-            @click="toggleHistory"
-          >
-            <span class="material-icons">history</span>
-            <!-- Active sessions badge (yellow, left) -->
-            <span
-              v-if="activeSessionCount > 0"
-              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
-              >{{ activeSessionCount }}</span
-            >
-            <!-- Unread replies badge (red, right) -->
-            <span
-              v-if="unreadCount > 0"
-              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
-              >{{ unreadCount }}</span
-            >
-          </button>
-          <LockStatusPopup
-            ref="lockPopupRef"
-            :sandbox-enabled="sandboxEnabled"
-            :open="showLockPopup"
-            @update:open="showLockPopup = $event"
-            @test-query="sendMessage"
-          />
-          <NotificationBell
-            :force-close="showLockPopup"
-            @navigate="handleNotificationNavigate"
-            @update:open="onNotificationOpen"
-          />
-          <button
-            class="text-gray-400 hover:text-gray-700"
-            :class="{ 'text-blue-500': showRightSidebar }"
-            title="Tool call history"
-            @click="toggleRightSidebar"
-          >
-            <span class="material-icons">build</span>
-          </button>
-          <button
-            class="text-gray-400 hover:text-gray-700"
-            data-testid="settings-btn"
-            title="Settings"
-            aria-label="Settings"
-            @click="showSettings = true"
-          >
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
+      <SidebarHeader
+        :sandbox-enabled="sandboxEnabled"
+        :show-right-sidebar="showRightSidebar"
+        :title-style="debugTitleStyle"
+        @test-query="(q) => sendMessage(q)"
+        @notification-navigate="handleNotificationNavigate"
+        @toggle-right-sidebar="toggleRightSidebar"
+        @open-settings="showSettings = true"
+      />
       <!-- History popup -->
       <SessionHistoryPanel
         v-if="showHistory"
@@ -80,92 +20,31 @@
         :sessions="mergedSessions"
         :current-session-id="currentSessionId"
         :roles="roles"
-        :top-offset="headerRef?.offsetHeight"
+        :top-offset="historyPopupTopOffset"
         :error-message="historyError"
         @load-session="loadSession"
       />
 
       <!-- Role selector -->
-      <div
-        class="p-4 border-b border-gray-200 flex items-center gap-2 relative"
-      >
-        <span class="text-sm text-gray-500 shrink-0">Role</span>
-        <button
-          ref="roleButtonRef"
-          class="flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 text-left"
-          data-testid="role-selector-btn"
-          @click="showRoleDropdown = !showRoleDropdown"
-        >
-          <span class="material-icons text-base text-gray-500">{{
-            roleIcon(currentRoleId)
-          }}</span>
-          <span class="flex-1 truncate">{{ currentRole.name }}</span>
-          <span class="material-icons text-sm text-gray-400">expand_more</span>
-        </button>
-        <div
-          v-if="showRoleDropdown"
-          ref="roleDropdownRef"
-          class="absolute left-4 right-4 top-full z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-        >
-          <button
-            v-for="role in roles"
-            :key="role.id"
-            :data-testid="`role-option-${role.id}`"
-            class="w-full flex items-center gap-1.5 px-3 py-1 text-sm text-gray-900 hover:bg-gray-50 text-left"
-            @click="
-              currentRoleId = role.id;
-              showRoleDropdown = false;
-              onRoleChange();
-            "
-          >
-            <span class="material-icons text-base text-gray-400">{{
-              roleIcon(role.id)
-            }}</span>
-            {{ role.name }}
-          </button>
-        </div>
-      </div>
+      <RoleSelector
+        v-model:current-role-id="currentRoleId"
+        :roles="roles"
+        @change="onRoleChange"
+      />
 
       <!-- Session tab bar -->
-      <div class="px-2 py-1 border-b border-gray-200 flex gap-1 items-center">
-        <button
-          class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-          data-testid="new-session-btn"
-          title="New session"
-          aria-label="New session"
-          @click="createNewSession()"
-        >
-          <span class="material-icons text-sm">add</span>
-        </button>
-        <template v-for="i in 6" :key="i">
-          <button
-            v-if="tabSessions[i - 1]"
-            class="flex-1 flex items-center justify-center py-1 rounded transition-colors"
-            :class="
-              tabSessions[i - 1].id === currentSessionId
-                ? 'border border-gray-300 bg-white shadow-sm'
-                : 'hover:bg-gray-100'
-            "
-            :title="
-              tabSessions[i - 1].preview || roleName(tabSessions[i - 1].roleId)
-            "
-            :data-testid="`session-tab-${tabSessions[i - 1].id}`"
-            @click="loadSession(tabSessions[i - 1].id)"
-          >
-            <span
-              class="material-icons text-base"
-              :class="[
-                tabColor(tabSessions[i - 1]),
-                tabSessions[i - 1].isRunning
-                  ? 'animate-spin [animation-duration:3s]'
-                  : '',
-              ]"
-              >{{ roleIcon(tabSessions[i - 1].roleId) }}</span
-            >
-          </button>
-          <div v-else class="flex-1" />
-        </template>
-      </div>
+      <SessionTabBar
+        ref="sessionTabBarRef"
+        :sessions="tabSessions"
+        :current-session-id="currentSessionId"
+        :roles="roles"
+        :active-session-count="activeSessionCount"
+        :unread-count="unreadCount"
+        :history-open="showHistory"
+        @new-session="createNewSession()"
+        @load-session="loadSession"
+        @toggle-history="toggleHistory"
+      />
 
       <!-- Gemini API key warning -->
       <div
@@ -190,154 +69,21 @@
       />
 
       <!-- Sample queries (expandable pane) -->
-      <div v-if="showQueries" class="border-t border-gray-200">
-        <div
-          v-if="queriesExpanded"
-          ref="queriesListRef"
-          class="px-4 pt-2 max-h-64 overflow-y-auto flex flex-col gap-1"
-        >
-          <button
-            v-for="query in currentRole.queries"
-            :key="query"
-            class="text-left text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded px-3 py-1.5 border border-gray-300 transition-colors"
-            @click="onQueryClick($event, query)"
-          >
-            {{ query }}
-          </button>
-          <p class="text-center text-[10px] text-gray-400 py-0.5">
-            click to send · shift+click to edit
-          </p>
-        </div>
-        <button
-          class="w-full flex items-center justify-between px-4 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-          @click="queriesExpanded = !queriesExpanded"
-        >
-          <span class="flex items-center gap-1">
-            <span class="material-icons text-sm">lightbulb</span>
-            Suggestions
-          </span>
-          <span
-            class="material-icons text-sm transition-transform"
-            :class="{ 'rotate-180': !queriesExpanded }"
-            >expand_less</span
-          >
-        </button>
-      </div>
+      <SuggestionsPanel
+        ref="suggestionsPanelRef"
+        :queries="currentRole.queries ?? []"
+        @send="(q) => sendMessage(q)"
+        @edit="onQueryEdit"
+      />
 
       <!-- Text input -->
-      <div
-        class="p-4 border-t border-gray-200"
-        @dragover.prevent
-        @drop="onDropFile"
-      >
-        <div
-          v-if="fileError"
-          class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5"
-          data-testid="file-error"
-        >
-          {{ fileError }}
-        </div>
-        <ChatAttachmentPreview
-          v-if="pastedFile"
-          :data-url="pastedFile.dataUrl"
-          :filename="pastedFile.name"
-          :mime="pastedFile.mime"
-          @remove="pastedFile = null"
-        />
-        <div class="flex gap-2" :class="{ 'mt-2': pastedFile }">
-          <textarea
-            ref="textareaRef"
-            v-model="userInput"
-            data-testid="user-input"
-            placeholder="Type a task..."
-            :rows="inputFocused ? 8 : 2"
-            class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-all duration-200"
-            :class="inputFocused ? 'ring-2 ring-blue-300' : ''"
-            :disabled="isRunning"
-            @focus="inputFocused = true"
-            @compositionstart="imeEnter.onCompositionStart"
-            @compositionend="imeEnter.onCompositionEnd"
-            @keydown="imeEnter.onKeydown"
-            @blur="onInputBlur"
-            @paste="onPasteFile"
-          />
-          <div class="flex flex-col gap-1">
-            <button
-              data-testid="send-btn"
-              class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="isRunning"
-              @click="sendMessage()"
-            >
-              <span class="material-icons text-base">send</span>
-            </button>
-            <button
-              data-testid="expand-input-btn"
-              class="text-gray-400 hover:text-gray-600 rounded px-3 py-1 text-sm"
-              title="Expand editor"
-              @click="openExpandedEditor"
-            >
-              <span class="material-icons text-base">open_in_full</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Expanded editor modal -->
-        <div
-          v-if="expandedEditorOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          @click.self="closeExpandedEditor"
-        >
-          <div
-            class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col"
-            style="max-height: 80vh"
-          >
-            <div
-              class="flex items-center justify-between px-4 py-3 border-b border-gray-200"
-            >
-              <h3 class="text-sm font-semibold text-gray-700">
-                Compose message
-              </h3>
-              <button
-                class="text-gray-400 hover:text-gray-600"
-                @click="closeExpandedEditor"
-              >
-                <span class="material-icons text-base">close</span>
-              </button>
-            </div>
-            <textarea
-              ref="expandedTextareaRef"
-              v-model="userInput"
-              data-testid="expanded-input"
-              placeholder="Type a task..."
-              class="flex-1 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none"
-              style="min-height: 300px"
-              @keydown.meta.enter="sendFromExpanded"
-              @keydown.ctrl.enter="sendFromExpanded"
-            ></textarea>
-            <div
-              class="flex items-center justify-between px-4 py-3 border-t border-gray-200"
-            >
-              <p class="text-xs text-gray-400">Cmd+Enter to send</p>
-              <div class="flex gap-2">
-                <button
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-                  @click="closeExpandedEditor"
-                >
-                  Cancel
-                </button>
-                <button
-                  class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
-                  :disabled="isRunning"
-                  data-testid="expanded-send-btn"
-                  @click="sendFromExpanded"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ChatInput
+        ref="chatInputRef"
+        v-model="userInput"
+        v-model:pasted-file="pastedFile"
+        :is-running="isRunning"
+        @send="sendMessage()"
+      />
     </div>
 
     <!-- Canvas -->
@@ -442,8 +188,12 @@ import { v4 as uuidv4 } from "uuid";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
+import SidebarHeader from "./components/SidebarHeader.vue";
+import RoleSelector from "./components/RoleSelector.vue";
+import SessionTabBar from "./components/SessionTabBar.vue";
+import SuggestionsPanel from "./components/SuggestionsPanel.vue";
+import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
-import LockStatusPopup from "./components/LockStatusPopup.vue";
 import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import PluginLauncher, {
@@ -458,14 +208,12 @@ import SkillsView from "./plugins/manageSkills/View.vue";
 import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
-import NotificationBell from "./components/NotificationBell.vue";
 import {
   NOTIFICATION_ACTION_TYPES,
   NOTIFICATION_VIEWS,
   type NotificationAction,
 } from "./types/notification";
 import { CANVAS_VIEW } from "./utils/canvas/viewMode";
-import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
 import {
   useDynamicFavicon,
   FAVICON_STATES,
@@ -480,10 +228,6 @@ import {
 } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
 import { extractImageData, makeTextResult } from "./utils/tools/result";
-import {
-  roleIcon as roleIconLookup,
-  roleName as roleNameLookup,
-} from "./utils/role/icon";
 import { findScrollableChild } from "./utils/dom/scrollable";
 import { buildAgentRequestBody } from "./utils/agent/request";
 import {
@@ -508,9 +252,7 @@ import { PUBSUB_CHANNELS, sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
 import { useSessionHistory } from "./composables/useSessionHistory";
 import { useRightSidebar } from "./composables/useRightSidebar";
-import { useQueriesPanel } from "./composables/useQueriesPanel";
 import { useEventListeners } from "./composables/useEventListeners";
-import { useImeAwareEnter } from "./composables/useImeAwareEnter";
 import { provideAppApi } from "./composables/useAppApi";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import { apiGet, apiPost, apiFetchRaw } from "./utils/api";
@@ -621,10 +363,6 @@ function navigateToSession(id: string, replace = false): void {
       console.error("[navigateToSession] push failed:", err);
     }
   });
-}
-
-function onNotificationOpen(isOpen: boolean): void {
-  if (isOpen) showLockPopup.value = false;
 }
 
 function handleNotificationNavigate(action: NotificationAction): void {
@@ -768,87 +506,12 @@ const unreadCount = computed(
 const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
 const userInput = ref("");
-const pastedFile = ref<{ dataUrl: string; name: string; mime: string } | null>(
-  null,
-);
-const fileError = ref<string | null>(null);
+const pastedFile = ref<PastedFile | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
-
-const MAX_ATTACH_BYTES = 30 * 1024 * 1024; // 30 MB
-
-// MIME types accepted by the chat input paste/drop handler. Covers
-// native Claude types (image, PDF) plus server-side convertible
-// types (text, office documents). Must stay aligned with the server's
-// attachmentConverter.ts — don't use a broad prefix like
-// "application/vnd.openxmlformats-officedocument.*" because the
-// server only handles the exact docx/xlsx/pptx variants.
-const ACCEPTED_MIME_PREFIXES = ["image/", "text/"];
-const ACCEPTED_MIME_EXACT = new Set([
-  "application/pdf",
-  "application/json",
-  "application/xml",
-  "application/x-yaml",
-  "application/toml",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-]);
-
-function isAcceptedType(mime: string): boolean {
-  return (
-    ACCEPTED_MIME_PREFIXES.some((p) => mime.startsWith(p)) ||
-    ACCEPTED_MIME_EXACT.has(mime)
-  );
-}
-
-function readAttachmentFile(file: File): void {
-  fileError.value = null;
-  if (!isAcceptedType(file.type)) return;
-  if (file.size > MAX_ATTACH_BYTES) {
-    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-    fileError.value = `File too large (${sizeMB} MB). Maximum is 30 MB.`;
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (typeof reader.result === "string") {
-      pastedFile.value = {
-        dataUrl: reader.result,
-        name: file.name,
-        mime: file.type,
-      };
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function onPasteFile(e: ClipboardEvent): void {
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (isAcceptedType(item.type)) {
-      const file = item.getAsFile();
-      if (file) {
-        e.preventDefault();
-        readAttachmentFile(file);
-        return;
-      }
-    }
-  }
-}
-
-function onDropFile(e: DragEvent): void {
-  e.preventDefault();
-  const file = e.dataTransfer?.files[0];
-  if (file) readAttachmentFile(file);
-}
-
-const imeEnter = useImeAwareEnter(() => sendMessage());
 
 const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
   useSessionHistory();
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
-const showLockPopup = ref(false);
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
 const faviconState = computed<FaviconState>(() => {
@@ -870,51 +533,26 @@ useDynamicFavicon({
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
 const canvasRef = ref<HTMLDivElement | null>(null);
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const expandedTextareaRef = ref<HTMLTextAreaElement | null>(null);
-const inputFocused = ref(false);
-const expandedEditorOpen = ref(false);
+const chatInputRef = ref<{ focus: () => void } | null>(null);
 
-function onInputBlur(): void {
-  imeEnter.onBlur();
-  // Delay collapsing so a click on send/expand buttons registers first
-  setTimeout(() => {
-    inputFocused.value = false;
-  }, 150);
+function focusChatInput(): void {
+  chatInputRef.value?.focus();
 }
-
-function openExpandedEditor(): void {
-  expandedEditorOpen.value = true;
-  nextTick(() => expandedTextareaRef.value?.focus());
-}
-
-function closeExpandedEditor(): void {
-  expandedEditorOpen.value = false;
-  nextTick(() => textareaRef.value?.focus());
-}
-
-function sendFromExpanded(): void {
-  closeExpandedEditor();
-  sendMessage();
-}
-const historyButtonRef = ref<HTMLButtonElement | null>(null);
+const sessionTabBarRef = ref<{
+  historyButton: HTMLButtonElement | null;
+} | null>(null);
+const historyButtonRef = computed(
+  () => sessionTabBarRef.value?.historyButton ?? null,
+);
 // Exposed `root` from SessionHistoryPanel — the click-outside guard
 // needs the actual popup DOM element (not the component instance).
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
-// Lock popup exposes its button + popup DOM via defineExpose so the
-// click-outside guard has both references without poking the template.
-const lockPopupRef = ref<{
-  button: HTMLButtonElement | null;
-  popup: HTMLDivElement | null;
-} | null>(null);
-const lockButtonRef = computed(() => lockPopupRef.value?.button ?? null);
-const lockPopupElRef = computed(() => lockPopupRef.value?.popup ?? null);
-const headerRef = ref<HTMLDivElement | null>(null);
-const roleButtonRef = ref<HTMLButtonElement | null>(null);
-const roleDropdownRef = ref<HTMLDivElement | null>(null);
-const showRoleDropdown = ref(false);
-
+const historyPopupTopOffset = computed(() => {
+  const btn = historyButtonRef.value;
+  if (!btn) return undefined;
+  return btn.offsetTop + btn.offsetHeight;
+});
 function scrollChatToBottom() {
   nextTick(() => {
     if (chatListRef.value) {
@@ -928,7 +566,7 @@ watch(isRunning, (running) => {
   if (running) {
     scrollChatToBottom();
   } else {
-    nextTick(() => textareaRef.value?.focus());
+    nextTick(() => focusChatInput());
   }
 });
 
@@ -988,12 +626,6 @@ const mergedSessions = computed((): SessionSummary[] =>
 );
 
 const tabSessions = computed(() => mergedSessions.value.slice(0, 6));
-
-function tabColor(session: SessionSummary): string {
-  if (session.isRunning) return "text-yellow-400";
-  if (session.hasUnread) return "text-gray-900";
-  return "text-gray-400";
-}
 
 // Centralised session-switch handler: subscribe to the current session's
 // pub/sub channel so we receive real-time events even if the session is
@@ -1080,27 +712,11 @@ function handleKeyNavigation(e: KeyboardEvent) {
   selectedResultUuid.value = results[nextIndex].uuid;
 }
 
-// The sendMessage wrapper defers resolution until call time so the
-// composable can be instantiated here, before sendMessage is
-// declared further down. Function declarations are hoisted so the
-// reference is valid at click time.
-const { queriesExpanded, queriesListRef, onQueryClick } = useQueriesPanel({
-  userInput,
-  textareaRef,
-  sendMessage: (msg) => sendMessage(msg),
-});
+const suggestionsPanelRef = ref<{ collapse: () => void } | null>(null);
 
-const showQueries = computed(() => !!currentRole.value.queries?.length);
-
-// Local wrappers that thread the reactive `roles.value` into the
-// pure helpers in src/utils/role.ts. Template bindings keep the
-// short names `roleIcon(id)` / `roleName(id)`.
-function roleIcon(roleId: string): string {
-  return roleIconLookup(roles.value, roleId);
-}
-
-function roleName(roleId: string): string {
-  return roleNameLookup(roles.value, roleId);
+function onQueryEdit(query: string): void {
+  userInput.value = query;
+  nextTick(() => focusChatInput());
 }
 
 // Surface a server-side or transport-level error as a card in the
@@ -1200,8 +816,8 @@ function createNewSession(roleId?: string): ActiveSession {
   sessionMap.set(id, session);
   navigateToSession(id, true);
   currentRoleId.value = rId;
-  queriesExpanded.value = false;
-  nextTick(() => textareaRef.value?.focus());
+  suggestionsPanelRef.value?.collapse();
+  nextTick(() => focusChatInput());
   return sessionMap.get(id)!;
 }
 
@@ -1597,16 +1213,6 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
   buttonRef: historyButtonRef,
   popupRef: historyPopupRef,
 });
-const { handler: handleClickOutsideLock } = useClickOutside({
-  isOpen: showLockPopup,
-  buttonRef: lockButtonRef,
-  popupRef: lockPopupElRef,
-});
-const { handler: handleClickOutsideRoleDropdown } = useClickOutside({
-  isOpen: showRoleDropdown,
-  buttonRef: roleButtonRef,
-  popupRef: roleDropdownRef,
-});
 
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
@@ -1618,8 +1224,6 @@ useEventListeners({
   onKeyNavigation: handleKeyNavigation,
   onViewModeShortcut: handleViewModeShortcut,
   onClickOutsideHistory: handleClickOutsideHistory,
-  onClickOutsideLock: handleClickOutsideLock,
-  onClickOutsideRoleDropdown: handleClickOutsideRoleDropdown,
   onTeardown: teardownPendingCalls,
 });
 

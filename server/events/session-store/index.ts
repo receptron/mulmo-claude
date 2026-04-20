@@ -14,12 +14,6 @@ import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
-import { publishNotification } from "../notifications.js";
-import {
-  NOTIFICATION_KINDS,
-  NOTIFICATION_ACTION_TYPES,
-  NOTIFICATION_VIEWS,
-} from "../../../src/types/notification.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -138,22 +132,6 @@ export function endRun(chatSessionId: string): void {
     type: EVENT_TYPES.sessionFinished,
   });
   notifySessionsChanged();
-
-  // P0 trigger: agent completed → notification.
-  // Fires for all sessions (web UI + bridge-initiated). Bridge users
-  // benefit from the bell notification when they later open the web UI
-  // to review agent output. publishNotification is try-catch wrapped,
-  // so failures here never break the session lifecycle.
-  publishNotification({
-    kind: NOTIFICATION_KINDS.agent,
-    title: `Session completed (${session.roleId})`,
-    action: {
-      type: NOTIFICATION_ACTION_TYPES.navigate,
-      view: NOTIFICATION_VIEWS.chat,
-      sessionId: chatSessionId,
-    },
-    sessionId: chatSessionId,
-  });
 }
 
 /** Cancel a running session by killing the child process. */

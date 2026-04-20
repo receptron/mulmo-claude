@@ -7,6 +7,7 @@ import {
   statSafeAsync,
   readDirSafeAsync,
   resolveWithinRoot,
+  writeFileAtomic,
 } from "../../utils/files/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import {
@@ -168,6 +169,17 @@ interface FileContentText {
   kind: "text";
   path: string;
   content: string;
+  size: number;
+  modifiedMs: number;
+}
+
+interface WriteContentRequest {
+  path?: unknown;
+  content?: unknown;
+}
+
+interface WriteContentResponse {
+  path: string;
   size: number;
   modifiedMs: number;
 }
@@ -750,6 +762,78 @@ router.get(
       return;
     }
     res.json({ kind: "text", ...meta, content });
+  },
+);
+
+// Write the body of an existing text file. Only text-classified files
+// (per `classify`) are editable — binary, image, audio, etc. are
+// refused so the endpoint can't be used to ship arbitrary uploads.
+// The file must already exist; creating new files is out of scope.
+router.put(
+  API_ROUTES.files.content,
+  async (
+    req: Request<object, unknown, WriteContentRequest>,
+    res: Response<WriteContentResponse | ErrorResponse>,
+  ) => {
+    const { path: relPathRaw, content: contentRaw } = req.body ?? {};
+    if (typeof relPathRaw !== "string" || relPathRaw.length === 0) {
+      badRequest(res, "path required");
+      return;
+    }
+    if (typeof contentRaw !== "string") {
+      badRequest(res, "content required");
+      return;
+    }
+    if (Buffer.byteLength(contentRaw, "utf-8") > MAX_PREVIEW_BYTES) {
+      badRequest(res, `content exceeds ${MAX_PREVIEW_BYTES} byte limit`);
+      return;
+    }
+    // Two-step resolution to distinguish "path outside workspace" (400)
+    // from "file does not exist" (404): realpath throws on ENOENT, so
+    // resolveSafe conflates the two. Stat the syntactic candidate
+    // first; if it exists, THEN run the symlink-hardened resolveSafe.
+    const candidate = path.resolve(workspaceReal, path.normalize(relPathRaw));
+    const existing = await statSafeAsync(candidate);
+    if (!existing) {
+      const relativeFromWorkspace = path.relative(workspaceReal, candidate);
+      const escapesSyntactically =
+        relativeFromWorkspace === ".." ||
+        relativeFromWorkspace.startsWith(`..${path.sep}`);
+      if (escapesSyntactically) {
+        badRequest(res, "Path outside workspace");
+      } else {
+        notFound(res, "File not found");
+      }
+      return;
+    }
+    if (!existing.isFile()) {
+      badRequest(res, "Not a file");
+      return;
+    }
+    const absPath = resolveSafe(relPathRaw);
+    if (!absPath) {
+      badRequest(res, "Path outside workspace");
+      return;
+    }
+    if (classify(absPath) !== "text") {
+      badRequest(res, "File type not editable");
+      return;
+    }
+    try {
+      // `uniqueTmp: true` appends a randomUUID to the tmp filename so
+      // two simultaneous PUTs to the same path can't clobber each
+      // other's staging file and race through the rename.
+      await writeFileAtomic(absPath, contentRaw, { uniqueTmp: true });
+    } catch (err) {
+      serverError(res, `Failed to write file: ${errorMessage(err)}`);
+      return;
+    }
+    const fresh = await statSafeAsync(absPath);
+    res.json({
+      path: relPathRaw,
+      size: fresh?.size ?? Buffer.byteLength(contentRaw, "utf-8"),
+      modifiedMs: fresh?.mtimeMs ?? Date.now(),
+    });
   },
 );
 

@@ -22,8 +22,6 @@ export interface EventListenerHandlers {
   onViewModeShortcut: (e: KeyboardEvent) => void;
   /** mousedown click-outside handlers for each popup. */
   onClickOutsideHistory: (e: MouseEvent) => void;
-  onClickOutsideLock: (e: MouseEvent) => void;
-  onClickOutsideRoleDropdown: (e: MouseEvent) => void;
   /** Called in onUnmounted after all window listeners are removed. */
   onTeardown?: () => void;
 }
@@ -33,19 +31,12 @@ export function useEventListeners(handlers: EventListenerHandlers): void {
     window.addEventListener("keydown", handlers.onKeyNavigation);
     window.addEventListener("keydown", handlers.onViewModeShortcut);
     window.addEventListener("mousedown", handlers.onClickOutsideHistory);
-    window.addEventListener("mousedown", handlers.onClickOutsideLock);
-    window.addEventListener("mousedown", handlers.onClickOutsideRoleDropdown);
   });
 
   onUnmounted(() => {
     window.removeEventListener("keydown", handlers.onKeyNavigation);
     window.removeEventListener("keydown", handlers.onViewModeShortcut);
     window.removeEventListener("mousedown", handlers.onClickOutsideHistory);
-    window.removeEventListener("mousedown", handlers.onClickOutsideLock);
-    window.removeEventListener(
-      "mousedown",
-      handlers.onClickOutsideRoleDropdown,
-    );
     handlers.onTeardown?.();
   });
 }

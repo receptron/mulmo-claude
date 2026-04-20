@@ -43,13 +43,13 @@ const emit = defineEmits<{
 const MODES: ModeOption[] = [
   {
     key: "single",
-    icon: "view_agenda",
+    icon: "crop_square",
     label: "Single",
     title: "Single result (⌘1)",
   },
   {
     key: "stack",
-    icon: "view_stream",
+    icon: "layers",
     label: "Stack",
     title: "All results stacked (⌘2)",
   },
