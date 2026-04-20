@@ -60,3 +60,4 @@ export * from "./todos-io.js";
 export * from "./scheduler-io.js";
 export * from "./html-io.js";
 export * from "./reference-dirs-io.js";
+export * from "./scheduler-overrides-io.js";

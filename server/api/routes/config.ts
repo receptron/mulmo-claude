@@ -264,4 +264,67 @@ router.put(
   },
 );
 
+// ── Scheduler overrides (#493) ──────────────────────────────────
+
+import {
+  loadSchedulerOverrides,
+  saveSchedulerOverrides,
+  UTC_HH_MM_RE,
+  type ScheduleOverrides,
+} from "../../utils/files/scheduler-overrides-io.js";
+import { applyScheduleOverride } from "../../events/scheduler-adapter.js";
+import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
+
+router.get(
+  API_ROUTES.config.schedulerOverrides,
+  (_req: Request, res: Response<{ overrides: ScheduleOverrides }>) => {
+    res.json({ overrides: loadSchedulerOverrides() });
+  },
+);
+
+router.put(
+  API_ROUTES.config.schedulerOverrides,
+  async (
+    req: Request<unknown, unknown, { overrides: unknown }>,
+    res: Response<{ overrides: ScheduleOverrides } | ConfigErrorResponse>,
+  ) => {
+    const body = req.body;
+    if (typeof body !== "object" || body === null || !("overrides" in body)) {
+      badRequest(res, "expected { overrides: { ... } }");
+      return;
+    }
+    const raw = (body as Record<string, unknown>).overrides;
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      badRequest(res, "overrides must be an object");
+      return;
+    }
+    const overrides = raw as ScheduleOverrides;
+    try {
+      saveSchedulerOverrides(overrides);
+
+      // Apply to running task-manager immediately
+      for (const [taskId, ovr] of Object.entries(overrides)) {
+        if (typeof ovr.intervalMs === "number" && ovr.intervalMs > 0) {
+          await applyScheduleOverride(taskId, {
+            type: SCHEDULE_TYPES.interval,
+            intervalMs: ovr.intervalMs,
+          });
+        } else if (
+          typeof ovr.time === "string" &&
+          UTC_HH_MM_RE.test(ovr.time)
+        ) {
+          await applyScheduleOverride(taskId, {
+            type: SCHEDULE_TYPES.daily,
+            time: ovr.time,
+          });
+        }
+      }
+
+      res.json({ overrides: loadSchedulerOverrides() });
+    } catch (err) {
+      serverError(res, err instanceof Error ? err.message : "save failed");
+    }
+  },
+);
+
 export default router;

@@ -59,7 +59,7 @@ async function readSessionMeta(
   return null;
 }
 
-interface SessionSummary {
+export interface SessionSummary {
   id: string;
   roleId: string;
   startedAt: string;
@@ -110,7 +110,7 @@ const WINDOW_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 // `changeMs` — the later of the jsonl mtime and the chat-index
 // `indexedAt` — so the handler can filter against `?since=` and
 // compute the new cursor without re-statting anything.
-async function loadAllSessions(): Promise<
+export async function loadAllSessions(): Promise<
   { summary: SessionSummary; changeMs: number }[]
 > {
   const chatDir = WORKSPACE_PATHS.chat;

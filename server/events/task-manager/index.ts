@@ -26,6 +26,8 @@ export interface TaskDefinition {
 export interface ITaskManager {
   registerTask(def: TaskDefinition): void;
   removeTask(taskId: string): void;
+  /** Update the schedule of an existing task. Returns false if not found. */
+  updateSchedule(taskId: string, schedule: TaskSchedule): boolean;
   start(): void;
   stop(): void;
   /** Run one tick manually (for testing). */
@@ -157,6 +159,14 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
       }
       registry.set(def.id, def);
       log.info("task-manager", "registered", { id: def.id });
+    },
+
+    updateSchedule(taskId: string, schedule: TaskSchedule): boolean {
+      const def = registry.get(taskId);
+      if (!def) return false;
+      def.schedule = schedule;
+      log.info("task-manager", "schedule updated", { id: taskId });
+      return true;
     },
 
     removeTask(taskId: string) {

@@ -102,8 +102,8 @@
                   class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
                   :disabled="detailLoading || deleting"
                   data-testid="skill-delete-btn"
-                  @click="deleteSkill"
                   title="Delete this project-scope skill"
+                  @click="deleteSkill"
                 >
                   <span class="material-icons text-base">delete</span>
                   Delete

@@ -50,6 +50,7 @@ export const API_ROUTES = {
     mcp: "/api/config/mcp",
     workspaceDirs: "/api/config/workspace-dirs",
     referenceDirs: "/api/config/reference-dirs",
+    schedulerOverrides: "/api/config/scheduler-overrides",
   },
 
   files: {

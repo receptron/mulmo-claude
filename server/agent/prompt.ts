@@ -50,6 +50,19 @@ Skills and tasks can be scheduled via SKILL.md frontmatter (\`schedule: "daily H
 
 Suggest a schedule at registration time; let the user confirm or adjust. Prefer \`daily HH:MM\` for tasks that should run once per day, and \`interval Nh\` for polling tasks.
 
+### Changing system task frequency
+
+System tasks (journal, chat-index) have default schedules. Users can override them by editing \`config/scheduler/overrides.json\`:
+
+\`\`\`json
+{
+  "system:journal": { "intervalMs": 7200000 },
+  "system:chat-index": { "intervalMs": 3600000 }
+}
+\`\`\`
+
+When the user asks to change a system task's frequency, use the WebFetch tool to PUT to \`/api/config/scheduler-overrides\` with \`{ "overrides": { "system:journal": { "intervalMs": <ms> } } }\`. This saves the config and applies the change immediately without a server restart.
+
 ## Memory Management
 
 When you learn something from the conversation that would be useful to remember in future sessions, silently append it to \`conversations/memory.md\` using the Edit tool. Do not ask permission — just write it.

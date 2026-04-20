@@ -17,6 +17,14 @@ export const SESSION_ORIGINS = {
 export type SessionOrigin =
   (typeof SESSION_ORIGINS)[keyof typeof SESSION_ORIGINS];
 
+const VALID_ORIGINS: ReadonlySet<string> = new Set(
+  Object.values(SESSION_ORIGINS),
+);
+
+export function isSessionOrigin(value: unknown): value is SessionOrigin {
+  return typeof value === "string" && VALID_ORIGINS.has(value);
+}
+
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
 // are populated by the chat indexer (#123) when present.
 //

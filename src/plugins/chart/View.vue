@@ -112,7 +112,6 @@ function renderAll(): void {
     try {
       instance.setOption(disableWheelZoom(chart.option));
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(`[chart] setOption failed for chart ${i}`, err);
     }
     instances[i] = instance;

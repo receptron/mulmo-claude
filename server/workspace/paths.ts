@@ -134,6 +134,10 @@ export const WORKSPACE_PATHS = {
     workspacePath,
     WORKSPACE_FILES.schedulerUserTasks,
   ),
+  schedulerOverrides: path.join(
+    workspacePath,
+    WORKSPACE_FILES.schedulerOverrides,
+  ),
 } as const;
 
 export type WorkspaceDirKey = keyof typeof WORKSPACE_DIRS;
