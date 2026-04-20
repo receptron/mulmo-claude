@@ -6,6 +6,8 @@
 //
 // See plans/done/feat-tool-trace-persistence.md for the design rationale.
 
+import { isRecord } from "../../utils/types.js";
+
 export type Classification =
   | { kind: "pointer"; contentRef: string }
   | { kind: "inline"; content: string; truncated: boolean };
@@ -61,8 +63,8 @@ export function classifyToolResult(input: ClassifyInput): Classification {
 }
 
 function filePointerFromArgs(args: unknown): string | null {
-  if (!args || typeof args !== "object") return null;
-  const record = args as Record<string, unknown>;
+  if (!isRecord(args)) return null;
+  const record = args;
   const raw = record.file_path;
   if (typeof raw !== "string" || raw.length === 0) return null;
   return normalizeWorkspacePath(raw);

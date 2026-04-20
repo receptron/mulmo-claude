@@ -12,6 +12,7 @@
 // something to map to.
 
 import { hasNonAscii, hashSlug } from "../../utils/slug.js";
+import { isRecord } from "../../utils/types.js";
 import type { TodoItem } from "./todos.js";
 
 export interface StatusColumn {
@@ -125,8 +126,8 @@ export function normalizeColumns(raw: unknown): StatusColumn[] {
   if (!Array.isArray(raw)) return [...DEFAULT_COLUMNS];
   const cleaned: StatusColumn[] = [];
   for (const entry of raw) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const e = entry as Record<string, unknown>;
+    if (!isRecord(entry)) continue;
+    const e = entry;
     if (typeof e["id"] !== "string" || typeof e["label"] !== "string") continue;
     const col: StatusColumn = { id: e["id"], label: e["label"] };
     if (e["isDone"] === true) col.isDone = true;

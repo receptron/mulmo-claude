@@ -4,6 +4,7 @@ import { writeWorkspaceText } from "../../utils/files/workspace-io.js";
 import { buildArtifactPath } from "../../utils/files/naming.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
+import { isRecord } from "../../utils/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -48,8 +49,8 @@ function isOptionalString(value: unknown): boolean {
 }
 
 export function isValidChartDocument(value: unknown): value is ChartDocument {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   if (!isOptionalString(candidate.title)) return false;
   if (!Array.isArray(candidate.charts)) return false;
   if (candidate.charts.length === 0) return false;
@@ -57,15 +58,11 @@ export function isValidChartDocument(value: unknown): value is ChartDocument {
 }
 
 function isValidChartEntry(value: unknown): value is ChartEntry {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   if (!isOptionalString(candidate.title)) return false;
   if (!isOptionalString(candidate.type)) return false;
-  if (
-    typeof candidate.option !== "object" ||
-    candidate.option === null ||
-    Array.isArray(candidate.option)
-  ) {
+  if (!isRecord(candidate.option)) {
     return false;
   }
   return true;

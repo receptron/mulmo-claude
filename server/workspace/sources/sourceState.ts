@@ -14,6 +14,7 @@ import { sourceStatePath } from "./paths.js";
 import { isValidSlug } from "../../utils/slug.js";
 import { errorMessage } from "../../utils/errors.js";
 import { writeJsonAtomic } from "../../utils/files/index.js";
+import { isRecord } from "../../utils/types.js";
 
 // Shallow-parse + type-guard one state record. Returns a
 // default state (zeroed counters, empty cursor) when the file
@@ -46,7 +47,7 @@ export async function readSourceState(
 // crash the pipeline, it should quietly get rebuilt on the
 // next successful run.
 export function validateSourceState(raw: unknown, slug: string): SourceState {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     return defaultSourceState(slug);
   }
   const o = raw as Record<string, unknown>;
@@ -71,7 +72,7 @@ export function validateSourceState(raw: unknown, slug: string): SourceState {
 }
 
 function validateCursor(raw: unknown): Record<string, string> {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     return {};
   }
   const out: Record<string, string> = {};

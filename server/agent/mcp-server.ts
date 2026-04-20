@@ -8,6 +8,7 @@ import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
 import { errorMessage } from "../utils/errors.js";
+import { isRecord } from "../utils/types.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
 import { extractFetchError } from "../utils/fetch.js";
@@ -29,7 +30,7 @@ interface JsonRpcMessage {
 }
 
 const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage =>
-  typeof v === "object" && v !== null && !Array.isArray(v) && "method" in v;
+  isRecord(v) && "method" in v;
 
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;

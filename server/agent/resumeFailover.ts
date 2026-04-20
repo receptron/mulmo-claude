@@ -25,6 +25,7 @@
 // surrounding meta-file and pub-sub plumbing already sits.
 
 import { EVENT_TYPES } from "../../src/types/events.js";
+import { isRecord } from "../utils/types.js";
 
 const STALE_SESSION_PHRASE = "No conversation found with session ID";
 
@@ -78,8 +79,8 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
     } catch {
       continue;
     }
-    if (typeof entry !== "object" || entry === null) continue;
-    const o = entry as Record<string, unknown>;
+    if (!isRecord(entry)) continue;
+    const o = entry;
     if (o.type !== EVENT_TYPES.text) continue;
     if (o.source !== "user" && o.source !== "assistant") continue;
     const message = o.message;

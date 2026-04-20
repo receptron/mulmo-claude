@@ -25,6 +25,7 @@ import type { ChatIndexEntry, ChatIndexManifest } from "./types.js";
 import { writeJsonAtomic } from "../../utils/files/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
 import { ONE_MINUTE_MS } from "../../utils/time.js";
+import { isRecord } from "../../utils/types.js";
 
 // Freshness throttle: a session whose existing index entry is
 // newer than this is skipped. The 15-minute window is a compromise
@@ -62,7 +63,7 @@ export async function readManifest(
 }
 
 function isManifest(raw: unknown): raw is ChatIndexManifest {
-  if (typeof raw !== "object" || raw === null) return false;
+  if (!isRecord(raw)) return false;
   const o = raw as Record<string, unknown>;
   return o.version === 1 && Array.isArray(o.entries);
 }
@@ -139,7 +140,7 @@ export async function isFresh(
       "utf-8",
     );
     const entry: unknown = JSON.parse(raw);
-    if (typeof entry !== "object" || entry === null) return false;
+    if (!isRecord(entry)) return false;
     const indexedAt = (entry as Record<string, unknown>).indexedAt;
     if (typeof indexedAt !== "string") return false;
     const ts = Date.parse(indexedAt);
@@ -167,7 +168,7 @@ async function readSessionMeta(
       "utf-8",
     );
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return {};
+    if (!isRecord(parsed)) return {};
     const o = parsed as Record<string, unknown>;
     return {
       roleId: typeof o.roleId === "string" ? o.roleId : undefined,
