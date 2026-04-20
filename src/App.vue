@@ -682,10 +682,16 @@ const displayedCurrentSessionId = computed(() =>
 );
 
 // Keep arrow-key navigation tied to the canvas when the sidebar list
-// doesn't exist (Stack layout has no ToolResultsPanel to navigate).
-watch(isStackLayout, (stack) => {
-  if (stack) activePane.value = "main";
-});
+// doesn't exist (Stack layout has no ToolResultsPanel to navigate),
+// and restore sidebar focus when returning to Single. `immediate`
+// covers the case of an initial stack-style URL (?view=stack, …).
+watch(
+  isStackLayout,
+  (stack) => {
+    activePane.value = stack ? "main" : "sidebar";
+  },
+  { immediate: true },
+);
 
 // Measure the top bar's height whenever the history popup is about
 // to open. Defer to nextTick so the popup's v-if transition doesn't
