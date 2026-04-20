@@ -18,30 +18,6 @@
           </h1>
         </div>
         <div class="flex gap-2">
-          <button
-            ref="historyButtonRef"
-            data-testid="history-btn"
-            class="relative text-gray-400 hover:text-gray-700"
-            :class="{ 'text-blue-500': showHistory }"
-            title="Session history"
-            @click="toggleHistory"
-          >
-            <span class="material-icons">history</span>
-            <!-- Active sessions badge (yellow, left) -->
-            <span
-              v-if="activeSessionCount > 0"
-              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
-              >{{ activeSessionCount }}</span
-            >
-            <!-- Unread replies badge (red, right) -->
-            <span
-              v-if="unreadCount > 0"
-              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
-              >{{ unreadCount }}</span
-            >
-          </button>
           <LockStatusPopup
             ref="lockPopupRef"
             :sandbox-enabled="sandboxEnabled"
@@ -80,7 +56,7 @@
         :sessions="mergedSessions"
         :current-session-id="currentSessionId"
         :roles="roles"
-        :top-offset="headerRef?.offsetHeight"
+        :top-offset="historyPopupTopOffset"
         :error-message="historyError"
         @load-session="loadSession"
       />
@@ -165,6 +141,30 @@
           </button>
           <div v-else class="flex-1" />
         </template>
+        <button
+          ref="historyButtonRef"
+          data-testid="history-btn"
+          class="relative flex-shrink-0 flex items-center justify-center w-7 py-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          :class="{ 'text-blue-500': showHistory }"
+          title="Session history"
+          @click="toggleHistory"
+        >
+          <span class="material-icons text-base">history</span>
+          <!-- Active sessions badge (yellow, left) -->
+          <span
+            v-if="activeSessionCount > 0"
+            class="absolute -top-0.5 -left-0.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+            :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
+            >{{ activeSessionCount }}</span
+          >
+          <!-- Unread replies badge (red, right) -->
+          <span
+            v-if="unreadCount > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
+            :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
+            >{{ unreadCount }}</span
+          >
+        </button>
       </div>
 
       <!-- Gemini API key warning -->
@@ -902,6 +902,11 @@ const historyButtonRef = ref<HTMLButtonElement | null>(null);
 // needs the actual popup DOM element (not the component instance).
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
+const historyPopupTopOffset = computed(() => {
+  const btn = historyButtonRef.value;
+  if (!btn) return undefined;
+  return btn.offsetTop + btn.offsetHeight;
+});
 // Lock popup exposes its button + popup DOM via defineExpose so the
 // click-outside guard has both references without poking the template.
 const lockPopupRef = ref<{
