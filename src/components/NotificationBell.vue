@@ -104,7 +104,7 @@ function handleDismiss(e: Event, id: string): void {
     <!-- Dropdown panel -->
     <div
       v-if="open"
-      class="absolute right-0 top-full mt-1 w-72 max-h-80 overflow-y-auto rounded-lg shadow-xl border border-gray-200 bg-white z-50"
+      class="fixed top-12 right-4 w-72 max-h-80 overflow-y-auto rounded-lg shadow-xl border border-gray-200 bg-white z-50"
       data-testid="notification-panel"
     >
       <!-- Header -->
