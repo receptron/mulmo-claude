@@ -242,10 +242,12 @@ export function handleRemoveLabel(items: TodoItem[], input: TodosActionInput): T
 
 export function handleListLabels(items: TodoItem[]): TodosActionResult {
   const inventory = listLabelsWithCount(items);
+  const summary = inventory.map((l) => `${l.label} (${l.count})`).join(", ");
+  const message = inventory.length === 0 ? "No labels in use" : `${inventory.length} label(s) in use: ${summary}`;
   return {
     kind: "success",
     items,
-    message: inventory.length === 0 ? "No labels in use" : `${inventory.length} label(s) in use: ${inventory.map((l) => `${l.label} (${l.count})`).join(", ")}`,
+    message,
     jsonData: { labels: inventory },
   };
 }
