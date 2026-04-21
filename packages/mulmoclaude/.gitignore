@@ -4,3 +4,7 @@ client/
 server/
 src/
 node_modules/
+
+# npm pack output + accidental tarball expansions during local tests.
+*.tgz
+package/

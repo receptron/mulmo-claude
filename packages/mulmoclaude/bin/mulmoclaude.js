@@ -9,6 +9,7 @@ import { execSync, spawn } from "child_process";
 import { existsSync } from "fs";
 import { get as httpGet } from "http";
 import { createRequire } from "module";
+import net from "net";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -42,6 +43,27 @@ function pickOpenCommand() {
   if (process.platform === "darwin") return "open";
   if (process.platform === "win32") return "start";
   return "xdg-open";
+}
+
+function isPortFree(portNum) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(portNum, "127.0.0.1");
+  });
+}
+
+// Walk forward from `start` to find a free port. `MAX_PORT_PROBES` caps
+// the scan so an accidentally-saturated system doesn't spin forever.
+const MAX_PORT_PROBES = 20;
+async function findFreePort(start) {
+  for (let candidate = start; candidate < start + MAX_PORT_PROBES; candidate++) {
+    if (await isPortFree(candidate)) return candidate;
+  }
+  return null;
 }
 
 // Poll the server until it answers an HTTP request, then call `onReady`.
@@ -99,16 +121,16 @@ Options:
 }
 
 if (args.includes("--version")) {
-  console.log("mulmoclaude 0.2.0");
+  console.log("mulmoclaude 0.1.2");
   process.exit(0);
 }
 
-const port = resolvePort();
+const { requestedPort, portExplicit } = parsePortArg();
 const noOpen = args.includes("--no-open");
 
-function resolvePort() {
+function parsePortArg() {
   const idx = args.indexOf("--port");
-  if (idx === -1) return DEFAULT_PORT;
+  if (idx === -1) return { requestedPort: DEFAULT_PORT, portExplicit: false };
   const raw = args[idx + 1];
   if (raw === undefined) {
     error("--port requires a value (integer 1..65535)");
@@ -119,7 +141,7 @@ function resolvePort() {
     error(`Invalid --port value: "${raw}" (expected integer 1..65535)`);
     process.exit(1);
   }
-  return parsed;
+  return { requestedPort: parsed, portExplicit: true };
 }
 
 // ── Pre-flight checks ───────────────────────────────────────
@@ -140,6 +162,29 @@ log("Claude Code CLI ✓");
 if (!existsSync(SERVER_ENTRY)) {
   error(`Server source not found at ${SERVER_ENTRY}`);
   process.exit(1);
+}
+
+// ── Resolve a usable port ───────────────────────────────────
+
+// Check the requested port before spawning the server — an explicit
+// --port that's taken is a hard error (respect the user's choice),
+// while the default can walk forward to the next free slot so casual
+// double-launches don't crash.
+const port = await chooseAvailablePort(requestedPort, portExplicit);
+
+async function chooseAvailablePort(requested, explicit) {
+  if (await isPortFree(requested)) return requested;
+  if (explicit) {
+    error(`Port ${requested} is already in use. Stop the other process or pick a different --port.`);
+    process.exit(1);
+  }
+  const fallback = await findFreePort(requested + 1);
+  if (fallback === null) {
+    error(`Port ${requested} is in use and no free port found in ${requested}..${requested + MAX_PORT_PROBES - 1}.`);
+    process.exit(1);
+  }
+  log(`Port ${requested} busy → using ${fallback} instead. (Pass --port <N> to pin.)`);
+  return fallback;
 }
 
 // ── Start server ────────────────────────────────────────────
