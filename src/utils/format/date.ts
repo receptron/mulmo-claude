@@ -71,3 +71,21 @@ export function formatSmartTime(value: number | string): string {
   if (isToday(d)) return time;
   return `${formatShortDate(d)} ${time}`;
 }
+
+const ONE_MINUTE = 60_000;
+const ONE_HOUR = 3_600_000;
+const ONE_DAY = 86_400_000;
+
+/** "just now", "5m ago", "2h ago", "Apr 11" — relative time from ISO string. */
+export function formatRelativeTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const diffMs = Date.now() - d.getTime();
+    if (diffMs < ONE_MINUTE) return "just now";
+    if (diffMs < ONE_HOUR) return `${Math.floor(diffMs / ONE_MINUTE)}m ago`;
+    if (diffMs < ONE_DAY) return `${Math.floor(diffMs / ONE_HOUR)}h ago`;
+    return formatShortDate(d);
+  } catch {
+    return iso;
+  }
+}

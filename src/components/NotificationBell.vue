@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useNotifications } from "../composables/useNotifications";
+import { formatRelativeTime } from "../utils/format/date";
 import {
   NOTIFICATION_ICONS,
   NOTIFICATION_ACTION_TYPES,
@@ -54,19 +55,7 @@ function iconName(n: NotificationPayload): string {
 }
 
 function formatTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    const now = Date.now();
-    const diffMs = now - d.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "just now";
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `${diffH}h ago`;
-    return d.toLocaleDateString();
-  } catch {
-    return iso;
-  }
+  return formatRelativeTime(iso);
 }
 
 function handleClick(n: NotificationPayload): void {
