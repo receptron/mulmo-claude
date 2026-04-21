@@ -1,6 +1,6 @@
 // LINE platform plugin.
 
-import { chunkText } from "@mulmobridge/client";
+import { chunkText } from "@mulmobridge/client/text";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 

@@ -499,8 +499,8 @@ function createNewSession(roleId?: string): ActiveSession {
   const rId = roleId ?? currentRoleId.value;
   const session = createEmptySession(uuidv4(), rId);
   sessionMap.set(session.id, session);
-  navigateToSession(session.id, true);
   currentRoleId.value = rId;
+  navigateToSession(session.id, true);
   suggestionsPanelRef.value?.collapse();
   nextTick(() => focusChatInput());
   return sessionMap.get(session.id)!;
@@ -518,8 +518,11 @@ function onRoleChange() {
 function activateSession(id: string, roleId: string, replace: boolean): void {
   const reactiveSession = sessionMap.get(id);
   if (reactiveSession) ensureSessionSubscription(reactiveSession);
-  navigateToSession(id, replace);
+  // Set role before navigating: buildRoleQuery() reads currentRoleId to
+  // build ?role=, and the route.query.role watcher would otherwise fire
+  // after navigation and revert currentRoleId to the previous session's role.
   currentRoleId.value = roleId;
+  navigateToSession(id, replace);
   showHistory.value = false;
 }
 

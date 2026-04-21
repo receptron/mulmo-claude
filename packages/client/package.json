@@ -11,6 +11,24 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "import": "./dist/text.js",
+      "require": "./dist/text.js",
+      "default": "./dist/text.js"
+    },
+    "./mime": {
+      "types": "./dist/mime.d.ts",
+      "import": "./dist/mime.js",
+      "require": "./dist/mime.js",
+      "default": "./dist/mime.js"
+    },
+    "./token": {
+      "types": "./dist/token.d.ts",
+      "import": "./dist/token.js",
+      "require": "./dist/token.js",
+      "default": "./dist/token.js"
     }
   },
   "files": [

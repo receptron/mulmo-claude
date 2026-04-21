@@ -122,25 +122,36 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
 interface PresentDocumentBody {
   title: string;
   markdown: string;
-  filenameHint?: string;
+  filenamePrefix: string;
 }
 
-interface PresentDocumentResponse {
+interface PresentDocumentSuccess {
   message: string;
   title: string;
-  data: { markdown: string; filenameHint?: string };
+  data: { markdown: string; filenamePrefix: string };
 }
 
-router.post(API_ROUTES.plugins.presentDocument, async (req: Request<object, unknown, PresentDocumentBody>, res: Response<PresentDocumentResponse>) => {
-  const { title, markdown, filenameHint } = req.body;
-  const filledMarkdown = await fillImagePlaceholders(markdown);
-  const markdownPath = await saveMarkdown(filledMarkdown);
-  res.json({
-    message: `Document "${title}" is ready.`,
-    title,
-    data: { markdown: markdownPath, filenameHint },
-  });
-});
+interface PresentDocumentError {
+  error: string;
+}
+
+router.post(
+  API_ROUTES.plugins.presentDocument,
+  async (req: Request<object, unknown, PresentDocumentBody>, res: Response<PresentDocumentSuccess | PresentDocumentError>) => {
+    const { title, markdown, filenamePrefix } = req.body;
+    if (typeof filenamePrefix !== "string" || filenamePrefix.trim().length === 0) {
+      badRequest(res, "filenamePrefix is required");
+      return;
+    }
+    const filledMarkdown = await fillImagePlaceholders(markdown);
+    const markdownPath = await saveMarkdown(filledMarkdown, filenamePrefix);
+    res.json({
+      message: `Document "${title}" is ready.`,
+      title,
+      data: { markdown: markdownPath, filenamePrefix },
+    });
+  },
+);
 
 // Update markdown file on disk (user edits in View)
 interface UpdateMarkdownBody {

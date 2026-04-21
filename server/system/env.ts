@@ -86,6 +86,11 @@ export const env = Object.freeze({
   journalForceRunOnStartup: asFlag(process.env.JOURNAL_FORCE_RUN_ON_STARTUP),
   chatIndexForceRunOnStartup: asFlag(process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP),
 
+  // MulmoBridge Relay (#520). Optional — when both are set the server
+  // connects to the Relay via WebSocket and forwards bridge messages.
+  relayUrl: process.env.RELAY_URL,
+  relayToken: process.env.RELAY_TOKEN,
+
   // MCP subprocess: set by the parent server when spawning
   // mcp-server.ts. The MCP process reads them via this same module —
   // OS-level env vars are shared across both processes.

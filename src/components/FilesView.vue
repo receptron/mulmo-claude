@@ -7,8 +7,10 @@
       :tree-error="treeError"
       :selected-path="selectedPath"
       :recent-paths="recentPaths"
+      :sort-mode="sortMode"
       @select="selectFile"
       @load-children="loadDirChildren"
+      @update:sort-mode="setSortMode"
     />
     <!-- Content pane -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -54,6 +56,7 @@ import FileContentRenderer from "./FileContentRenderer.vue";
 import { useFileTree } from "../composables/useFileTree";
 import { useFileSelection, isValidFilePath } from "../composables/useFileSelection";
 import { useMarkdownMode } from "../composables/useMarkdownMode";
+import { useFileSortMode } from "../composables/useFileSortMode";
 import { useContentDisplay } from "../composables/useContentDisplay";
 import { useMarkdownLinkHandler } from "../composables/useMarkdownLinkHandler";
 import { apiPut } from "../utils/api";
@@ -81,6 +84,8 @@ const { rootNode, refRoots, childrenByPath, treeError, loadDirChildren, ensureAn
 const { selectedPath, content, contentLoading, contentError, loadContent, selectFile, deselectFile, abortContent } = useFileSelection();
 
 const { mdRawMode, toggleMdRaw } = useMarkdownMode();
+
+const { sortMode, setSortMode } = useFileSortMode();
 
 const { isMarkdown, isHtml, isJson, isJsonl, sandboxedHtml, jsonTokens, jsonlLines, mdFrontmatter } = useContentDisplay(selectedPath, content);
 

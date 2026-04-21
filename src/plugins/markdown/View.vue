@@ -61,6 +61,7 @@ import { usePdfDownload } from "../../composables/usePdfDownload";
 import { apiGet, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
+import { toSafeFilename } from "../../utils/files/filename";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -176,8 +177,9 @@ const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload
 
 async function downloadPdf() {
   if (!markdownContent.value) return;
-  const hint = props.selectedResult.data?.filenameHint;
-  const title = hint ? hint.replace(/[/\\:*?"<>|]/g, "_") : props.selectedResult.title ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_") : "document";
+  const prefix = props.selectedResult.data?.filenamePrefix;
+  const rawName = prefix || props.selectedResult.title || "document";
+  const title = toSafeFilename(rawName, "document");
   await rawDownloadPdf(markdownContent.value, `${title}.pdf`);
 }
 

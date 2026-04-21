@@ -79,6 +79,7 @@
     "vue-drawing-canvas": "^1.0.14",
     "vue-router": "^5.0.3",
     "vuedraggable": "^4.1.0",
+    "ws": "^8.20.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.3.6"
   },
