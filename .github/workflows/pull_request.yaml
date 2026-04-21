@@ -14,18 +14,37 @@ permissions:
 jobs:
   lint_test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         node-version: [22.x, 24.x]
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-2022, macos-latest]
     steps:
     - uses: actions/checkout@v6
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'yarn'
-    - run: yarn install
+        # Skip setup-node's built-in yarn cache on Windows — tar
+        # extraction on NTFS is slower than a fresh install.
+        # We use actions/cache for node_modules instead.
+        cache: ${{ runner.os == 'Windows' && '' || 'yarn' }}
+    # Windows: disable Defender realtime monitoring to prevent
+    # EPERM on atomic rename (#CI)
+    - name: Disable Windows Defender realtime monitoring
+      if: runner.os == 'Windows'
+      run: Set-MpPreference -DisableRealtimeMonitoring $true
+      shell: powershell
+    # Windows: cache node_modules directly (faster than yarn cache
+    # because it skips the tar extract → yarn install file-write cycle)
+    - name: Cache node_modules (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: win-node-modules-${{ matrix.node-version }}-${{ hashFiles('yarn.lock') }}
+    - run: yarn install --frozen-lockfile --network-timeout 120000
     - name: Build internal packages (required before typecheck)
       run: yarn build:packages
     - run: yarn run typecheck
@@ -35,6 +54,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
     - uses: actions/checkout@v6
     - name: Use Node.js 22.x
@@ -42,7 +62,7 @@ jobs:
       with:
         node-version: 22.x
         cache: 'yarn'
-    - run: yarn install
+    - run: yarn install --frozen-lockfile --network-timeout 120000
     - name: Build internal packages
       run: yarn build:packages
     - name: Install Playwright browsers

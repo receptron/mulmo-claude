@@ -9,14 +9,14 @@ import type {
   TodoItem,
 } from "../../plugins/todo/index";
 import { WORKSPACE_FILES } from "../../config/workspacePaths";
+import { isRecord } from "../types";
 
 function isTodoItem(value: unknown): value is TodoItem {
-  if (typeof value !== "object" || value === null) return false;
-  const rec = value as Record<string, unknown>;
-  if (typeof rec["id"] !== "string" || typeof rec["text"] !== "string")
+  if (!isRecord(value)) return false;
+  if (typeof value["id"] !== "string" || typeof value["text"] !== "string")
     return false;
-  if (typeof rec["completed"] !== "boolean") return false;
-  if (typeof rec["createdAt"] !== "number") return false;
+  if (typeof value["completed"] !== "boolean") return false;
+  if (typeof value["createdAt"] !== "number") return false;
   return true;
 }
 

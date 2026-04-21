@@ -22,6 +22,72 @@ export interface WriteAtomicOptions {
   uniqueTmp?: boolean;
 }
 
+// ── Windows rename retry ────────────────────────────────────────
+//
+// On Windows, `rename` (MoveFileEx with MOVEFILE_REPLACE_EXISTING) can
+// transiently fail with EPERM or EBUSY when antivirus / Search
+// Indexer / Defender momentarily holds a handle on the tmp file or
+// destination file. The failure window is tiny (usually <100ms) and
+// the rename succeeds on a retry.
+//
+// On POSIX, `rename` is atomic and overwrites unconditionally. EPERM
+// there means a real permission problem (read-only filesystem, sticky
+// bit, cross-device link) — retrying wouldn't help and would only add
+// latency before the inevitable throw. So the retry loop is gated to
+// Windows.
+const IS_WINDOWS = process.platform === "win32";
+const RENAME_RETRY_DELAYS_MS = [30, 100, 300] as const;
+
+function hasErrnoCode(err: unknown): err is { code: string } {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    typeof (err as { code: unknown }).code === "string"
+  );
+}
+
+function isTransientRenameError(err: unknown): boolean {
+  if (!IS_WINDOWS || !hasErrnoCode(err)) return false;
+  return err.code === "EPERM" || err.code === "EBUSY" || err.code === "EACCES";
+}
+
+async function renameWithWindowsRetry(from: string, to: string): Promise<void> {
+  for (const delayMs of RENAME_RETRY_DELAYS_MS) {
+    try {
+      await fs.promises.rename(from, to);
+      return;
+    } catch (err) {
+      if (!isTransientRenameError(err)) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  // Final attempt — let any error propagate.
+  await fs.promises.rename(from, to);
+}
+
+// Sync sleep that parks the thread instead of burning CPU. Only
+// invoked on the transient-Windows-rename path, so the total worst-
+// case block is the sum of RENAME_RETRY_DELAYS_MS (~430ms) and only
+// triggers under AV/indexer contention.
+const SYNC_SLEEP_BUF = new Int32Array(new SharedArrayBuffer(4));
+function sleepSync(ms: number): void {
+  Atomics.wait(SYNC_SLEEP_BUF, 0, 0, ms);
+}
+
+function renameSyncWithWindowsRetry(from: string, to: string): void {
+  for (const delayMs of RENAME_RETRY_DELAYS_MS) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (err) {
+      if (!isTransientRenameError(err)) throw err;
+      sleepSync(delayMs);
+    }
+  }
+  fs.renameSync(from, to);
+}
+
 /**
  * Write `content` to `filePath` atomically. The parent directory is
  * created if missing. The tmp file is cleaned up on failure so a
@@ -41,7 +107,7 @@ export async function writeFileAtomic(
       encoding: "utf-8",
       mode: opts.mode,
     });
-    await fs.promises.rename(tmp, filePath);
+    await renameWithWindowsRetry(tmp, filePath);
   } catch (err) {
     await fs.promises.unlink(tmp).catch(() => {});
     throw err;
@@ -64,7 +130,7 @@ export function writeFileAtomicSync(
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   try {
     fs.writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });
-    fs.renameSync(tmp, filePath);
+    renameSyncWithWindowsRetry(tmp, filePath);
   } catch (err) {
     try {
       fs.unlinkSync(tmp);

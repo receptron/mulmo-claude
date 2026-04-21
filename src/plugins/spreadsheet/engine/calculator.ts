@@ -16,6 +16,7 @@ import type {
   FormulaInfo,
   SpreadsheetCell,
 } from "./types";
+import { isObj } from "../../../utils/types";
 
 /**
  * Normalize malformed data structures
@@ -48,7 +49,7 @@ function normalizeData(data: any): SpreadsheetCell[][] {
   // If data is a flat array of cell objects, convert to 2D by pairing cells
   // Pattern: [cell1, cell2, cell3, cell4] -> [[cell1, cell2], [cell3, cell4]]
   // This handles the case where models output flat arrays instead of rows
-  if (typeof data[0] === "object" && data[0] !== null) {
+  if (isObj(data[0])) {
     const rows: SpreadsheetCell[][] = [];
     for (let i = 0; i < data.length; i += 2) {
       const row = [data[i]];
@@ -75,7 +76,7 @@ function preprocessDates(data: SpreadsheetCell[][]): SpreadsheetCell[][] {
   return data.map((row) =>
     row.map((cell) => {
       // Skip if not a cell object or if it has a formula
-      if (!cell || typeof cell !== "object" || !("v" in cell)) {
+      if (!isObj(cell) || !("v" in cell)) {
         return cell;
       }
 
@@ -175,7 +176,7 @@ export function calculateSheet(
     }
 
     // Handle new cell format {v, f}
-    if (typeof cell === "object" && cell !== null && "v" in cell) {
+    if (isObj(cell) && "v" in cell) {
       const value = cell.v;
       // If value is a string starting with "=", it's a formula
       if (typeof value === "string" && value.startsWith("=")) {
@@ -231,9 +232,14 @@ export function calculateSheet(
         }
         return 0; // No position info, can't evaluate
       }
-      // Try to parse as number, but preserve strings
-      const num = parseFloat(value);
-      return isNaN(num) ? value : num;
+      // Try to parse as number, but preserve original type on failure
+      if (typeof value === "number") return value;
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") {
+        const num = parseFloat(value);
+        return isNaN(num) ? value : num;
+      }
+      return String(value);
     }
 
     // Try to parse cell as number, but preserve strings
@@ -405,8 +411,7 @@ export function calculateSheet(
       // Skip if cell was already calculated recursively
       if (
         typeof calculatedCell === "number" &&
-        originalCell &&
-        typeof originalCell === "object" &&
+        isObj(originalCell) &&
         "f" in originalCell
       ) {
         // Cell was already evaluated - keep it as number for now
@@ -415,11 +420,7 @@ export function calculateSheet(
       }
 
       // Handle cell format {v, f}
-      if (
-        originalCell &&
-        typeof originalCell === "object" &&
-        "v" in originalCell
-      ) {
+      if (isObj(originalCell) && "v" in originalCell) {
         const value = originalCell.v;
 
         // Check if value is a formula (string starting with "=")
@@ -458,11 +459,7 @@ export function calculateSheet(
       const originalCell = data[rowIdx][colIdx];
       const calculatedValue = calculated[rowIdx][colIdx];
 
-      if (
-        originalCell &&
-        typeof originalCell === "object" &&
-        "v" in originalCell
-      ) {
+      if (isObj(originalCell) && "v" in originalCell) {
         const isFormula =
           typeof originalCell.v === "string" && originalCell.v.startsWith("=");
 

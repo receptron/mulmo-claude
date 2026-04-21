@@ -22,6 +22,8 @@ describe("@mulmobridge/protocol exports", () => {
       "sessionFinished",
       "sessionMeta",
       "rolesUpdated",
+      "generationStarted",
+      "generationFinished",
     ];
     assert.deepEqual(Object.keys(EVENT_TYPES).sort(), expected.sort());
   });

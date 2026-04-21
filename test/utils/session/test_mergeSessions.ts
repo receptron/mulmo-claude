@@ -29,6 +29,7 @@ function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
     startedAt: "2026-04-10T10:00:00.000Z",
     updatedAt: "2026-04-10T10:05:00.000Z",
     runStartIndex: 0,
+    pendingGenerations: {},
     ...overrides,
   };
 }

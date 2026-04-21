@@ -258,21 +258,10 @@ import {
   type NotificationAction,
 } from "./types/notification";
 import { CANVAS_VIEW } from "./utils/canvas/viewMode";
-import {
-  useDynamicFavicon,
-  FAVICON_STATES,
-  type FaviconState,
-} from "./composables/useDynamicFavicon";
-import { useNotifications } from "./composables/useNotifications";
 import type { SseEvent } from "./types/sse";
-import {
-  type SessionSummary,
-  type SessionEntry,
-  type ActiveSession,
-} from "./types/session";
-import { EVENT_TYPES } from "./types/events";
+import { type SessionEntry, type ActiveSession } from "./types/session";
+import { EVENT_TYPES, generationKey } from "./types/events";
 import { extractImageData, makeTextResult } from "./utils/tools/result";
-import { deduplicateResults } from "./utils/tools/dedup";
 import { buildAgentRequestBody } from "./utils/agent/request";
 import {
   pushResult,
@@ -285,7 +274,6 @@ import {
   findPendingToolCall,
   shouldSelectAssistantText,
 } from "./utils/agent/toolCalls";
-import { mergeSessionLists } from "./utils/session/mergeSessions";
 import {
   parseSessionEntries,
   resolveSelectedUuid,
@@ -297,19 +285,24 @@ import { useKeyNavigation } from "./composables/useKeyNavigation";
 import { useDebugBeat } from "./composables/useDebugBeat";
 import { useChatScroll } from "./composables/useChatScroll";
 import { useViewLayout } from "./composables/useViewLayout";
+import { useSessionSync } from "./composables/useSessionSync";
+import { useSessionDerived } from "./composables/useSessionDerived";
+import { useFaviconState } from "./composables/useFaviconState";
+import { useMergedSessions } from "./composables/useMergedSessions";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { isCanvasViewMode } from "./utils/canvas/viewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
 import { usePubSub } from "./composables/usePubSub";
-import { PUBSUB_CHANNELS, sessionChannel } from "./config/pubsubChannels";
+import { sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
 import { useSessionHistory } from "./composables/useSessionHistory";
 import { useRightSidebar } from "./composables/useRightSidebar";
 import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
+import { provideActiveSession } from "./composables/useActiveSession";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
-import { apiGet, apiPost, apiFetchRaw } from "./utils/api";
+import { apiGet, apiFetchRaw } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
 
 // --- Per-session state ---
@@ -334,45 +327,6 @@ const currentSessionId = ref("");
 const { debugTitleStyle } = useDebugBeat();
 
 const { subscribe: pubsubSubscribe } = usePubSub();
-
-// --- Sessions channel (pub/sub) ---
-// Subscribe to the global `sessions` channel. The server publishes a
-// bare notification (no data) whenever any session's state changes.
-// The client refetches the session list via REST — the server is the
-// single source of truth for isRunning, hasUnread, etc.
-pubsubSubscribe(PUBSUB_CHANNELS.sessions, () => {
-  refreshSessionStates();
-});
-
-async function refreshSessionStates(): Promise<void> {
-  const summaries = await fetchSessions();
-  for (const s of summaries) {
-    const live = sessionMap.get(s.id);
-    if (!live) continue;
-    // Missing fields mean the server has no live entry — reset to defaults.
-    live.isRunning = s.isRunning ?? false;
-    live.statusMessage = s.statusMessage ?? "";
-    const unread = s.hasUnread ?? false;
-    // Don't mark the currently viewed session as unread
-    if (!(unread && s.id === currentSessionId.value)) {
-      live.hasUnread = unread;
-    }
-  }
-}
-
-async function markSessionRead(id: string): Promise<void> {
-  const result = await apiPost<{ ok: boolean }>(
-    API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)),
-  );
-  // The server returns `{ ok: boolean }` — a 200 with `ok: false`
-  // means the endpoint was reached but the flag wasn't actually
-  // cleared (e.g. session not found). Treat that the same as a
-  // transport failure and refetch so the sidebar doesn't go stale.
-  if (!result.ok || result.data.ok === false) {
-    // Server didn't clear the flag — refetch to restore truth.
-    await refreshSessionStates();
-  }
-}
 
 // --- Routing ---
 const route = useRoute();
@@ -462,54 +416,7 @@ watch(
   },
 );
 
-const activeSession = computed(() => sessionMap.get(currentSessionId.value));
-
-const toolResults = computed(() => activeSession.value?.toolResults ?? []);
-
 // Deduplicate consecutive tool results with the same toolName for the
-// sidebar preview list. Tools like manageScheduler / manageTodoList
-// return the full item list on every call, so 4 consecutive scheduler
-// calls produce 4 identical "22 upcoming" previews. We keep only the
-// last one in each consecutive run. text-response is excluded because
-// each user/assistant message is unique content.
-// Deduplicate consecutive tool results that represent "full-state
-// refreshes" of the same collection. Tools like manageScheduler /
-// manageTodoList / manageWiki return the full list on every call
-// and set `updating: true` on the response — that flag is the
-// signal that the previous result is superseded, not a new artifact.
-//
-// Tools that create individual artifacts (generateImage,
-// presentDocument, editImage) DO NOT set `updating`, so consecutive
-// calls stay visible as separate preview cards. This matches the
-// "tennis vs golf docs" case raised in review: two different
-// documents produced in a row must both be shown.
-//
-// text-response is never collapsed because each user/assistant
-// message is unique content.
-const sidebarResults = computed(() => {
-  return deduplicateResults(toolResults.value);
-});
-
-// Read running/status from the server session list (single source of
-// truth). Falls back to sessionMap for the brief window before the
-// first fetchSessions completes.
-const currentSummary = computed(() =>
-  sessions.value.find((s) => s.id === currentSessionId.value),
-);
-const isRunning = computed(
-  () =>
-    currentSummary.value?.isRunning ?? activeSession.value?.isRunning ?? false,
-);
-const statusMessage = computed(
-  () =>
-    currentSummary.value?.statusMessage ??
-    activeSession.value?.statusMessage ??
-    "",
-);
-const toolCallHistory = computed(
-  () => activeSession.value?.toolCallHistory ?? [],
-);
-
 const selectedResultUuid = computed({
   get: () => activeSession.value?.selectedResultUuid ?? null,
   set: (val: string | null) => {
@@ -525,13 +432,6 @@ const selectedResultUuid = computed({
   },
 });
 
-const activeSessionCount = computed(
-  () => sessions.value.filter((s) => s.isRunning).length,
-);
-const unreadCount = computed(
-  () => sessions.value.filter((s) => s.hasUnread).length,
-);
-
 // --- Global state ---
 const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
@@ -541,24 +441,27 @@ const activePane = ref<"sidebar" | "main">("sidebar");
 
 const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
   useSessionHistory();
+const { markSessionRead } = useSessionSync({
+  sessionMap,
+  currentSessionId,
+  fetchSessions,
+});
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 
+const {
+  activeSession,
+  toolResults,
+  sidebarResults,
+  currentSummary,
+  isRunning,
+  statusMessage,
+  toolCallHistory,
+  activeSessionCount,
+  unreadCount,
+} = useSessionDerived({ sessionMap, currentSessionId, sessions });
+
 // ── Dynamic favicon (#470) ──────────────────────────────────
-const faviconState = computed<FaviconState>(() => {
-  if (isRunning.value) return FAVICON_STATES.running;
-  const hasUnread =
-    currentSummary.value?.hasUnread ?? activeSession.value?.hasUnread ?? false;
-  if (hasUnread) return FAVICON_STATES.done;
-  return FAVICON_STATES.idle;
-});
-
-const { unreadCount: notificationUnreadCount } = useNotifications();
-const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0);
-
-useDynamicFavicon({
-  state: faviconState,
-  hasNotification: hasNotificationBadge,
-});
+useFaviconState({ isRunning, currentSummary, activeSession });
 
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
@@ -673,22 +576,10 @@ const selectedResult = computed(
 // that haven't been persisted to disk yet.
 // Merged list for the history pane: live sessions in `sessionMap`
 // merged with server-only sessions, sorted newest-first by
-// `updatedAt` (most recently touched floats to the top). `updatedAt`
-// is bumped in `sendMessage` for live sessions and taken from the
-// jsonl file mtime for server-only sessions.
-//
-// When a session exists on the server side (the indexer has produced
-// a title / summary / keywords for it), we prefer those fields over
-// the live-session fallback: a live session that was loaded from a
-// pre-indexed jsonl should keep showing the AI-generated title in
-// the sidebar, not regress to the raw first user message. Without
-// this merge, opening an indexed session immediately clobbered its
-// sidebar row with the first-user-message preview.
-const mergedSessions = computed((): SessionSummary[] =>
-  mergeSessionLists([...sessionMap.values()], sessions.value),
-);
-
-const tabSessions = computed(() => mergedSessions.value.slice(0, 6));
+const { mergedSessions, tabSessions } = useMergedSessions({
+  sessionMap,
+  sessions,
+});
 
 // Centralised session-switch handler: subscribe to the current session's
 // pub/sub channel so we receive real-time events even if the session is
@@ -702,10 +593,17 @@ watch(currentSessionId, (id) => {
   if (session) {
     ensureSessionSubscription(session);
   }
-  // Unsubscribe from the previous session if it's not running
+  // Unsubscribe from the previous session if it's not running and has
+  // no in-flight background generations. Tearing down the subscription
+  // while a generation is still running would orphan its completion
+  // event, leaving the session's busy indicator stuck on.
   if (previousSessionId && previousSessionId !== id) {
     const prevSession = sessionMap.get(previousSessionId);
-    if (prevSession && !prevSession.isRunning) {
+    const prevBusy =
+      !!prevSession &&
+      (prevSession.isRunning ||
+        Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
+    if (prevSession && !prevBusy) {
       unsubscribeSession(previousSessionId);
     }
   }
@@ -791,6 +689,7 @@ function createNewSession(roleId?: string): ActiveSession {
     startedAt: now,
     updatedAt: now,
     runStartIndex: 0,
+    pendingGenerations: {},
   };
   sessionMap.set(id, session);
   navigateToSession(id, true);
@@ -876,6 +775,7 @@ async function loadSession(id: string) {
     startedAt,
     updatedAt,
     runStartIndex: toolResultsList.length,
+    pendingGenerations: {},
   };
   sessionMap.set(id, newSession);
   // Subscribe immediately — the watch(currentSessionId) may have
@@ -952,7 +852,13 @@ function ensureSessionSubscription(session: ActiveSession): void {
       if (currentSessionId.value === session.id) {
         markSessionRead(session.id);
       } else {
-        unsubscribeSession(session.id);
+        // Keep the subscription alive if background generations are
+        // still in flight — otherwise their completion events would
+        // be lost and the busy indicator would stay stuck.
+        const live = sessionMap.get(session.id);
+        const hasPending =
+          !!live && Object.keys(live.pendingGenerations ?? {}).length > 0;
+        if (!hasPending) unsubscribeSession(session.id);
       }
       return;
     }
@@ -1077,6 +983,27 @@ async function applyAgentEvent(
     case EVENT_TYPES.sessionFinished:
       // Handled in the subscription callback — no-op here.
       return;
+    case EVENT_TYPES.generationStarted: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      session.pendingGenerations[mapKey] = {
+        kind: event.kind,
+        filePath: event.filePath,
+        key: event.key,
+      };
+      return;
+    }
+    case EVENT_TYPES.generationFinished: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      delete session.pendingGenerations[mapKey];
+      // When the last pending generation drains and the user is
+      // actively viewing this session, clear the unread flag server
+      // set on drain. Mirrors the sessionFinished handler.
+      const drained = Object.keys(session.pendingGenerations).length === 0;
+      if (drained && currentSessionId.value === session.id) {
+        markSessionRead(session.id);
+      }
+      return;
+    }
   }
 }
 
@@ -1146,6 +1073,9 @@ provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
 });
+// Plugin Views that need to tag background work with the current
+// session (e.g. MulmoScript generations) inject this.
+provideActiveSession(activeSession);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,

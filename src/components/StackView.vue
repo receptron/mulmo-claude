@@ -106,6 +106,7 @@ import { View as TextResponseOriginalView } from "../plugins/textResponse/index"
 import { handleExternalLinkClick } from "../utils/dom/externalLink";
 import type { TextResponseData } from "../plugins/textResponse/types";
 import { formatSmartTime } from "../utils/format/date";
+import { isRecord } from "../utils/types";
 
 // Most plugin viewComponents use h-full internally, so a defined parent
 // height is required for them to render. text-response and the
@@ -205,8 +206,7 @@ function isTextResponse(
 ): result is ToolResultComplete<TextResponseData> {
   if (result.toolName !== "text-response") return false;
   const data = result.data;
-  if (typeof data !== "object" || data === null) return false;
-  if (!("text" in data)) return false;
+  if (!isRecord(data)) return false;
   return typeof data.text === "string";
 }
 

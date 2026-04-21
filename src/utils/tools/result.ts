@@ -4,6 +4,7 @@
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { v4 as uuidv4 } from "uuid";
+import { isRecord } from "../types";
 
 // Type guard: a text-response entry whose `data.role` is `"user"`.
 // Used by App.vue to find the first user message in a live session
@@ -11,8 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 export function isUserTextResponse(r: ToolResultComplete): boolean {
   if (r.toolName !== "text-response") return false;
   const data = r.data;
-  if (typeof data !== "object" || data === null) return false;
-  if (!("role" in data)) return false;
+  if (!isRecord(data)) return false;
   return data.role === "user";
 }
 
@@ -23,8 +23,8 @@ export function extractImageData(
   result: ToolResultComplete | undefined,
 ): string | undefined {
   const data = result?.data;
-  if (typeof data === "object" && data !== null && "imageData" in data) {
-    return typeof data.imageData === "string" ? data.imageData : undefined;
+  if (isRecord(data) && typeof data.imageData === "string") {
+    return data.imageData;
   }
   return undefined;
 }

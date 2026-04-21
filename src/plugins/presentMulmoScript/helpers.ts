@@ -2,6 +2,7 @@
 // their logic is unit-testable without mounting the Vue component.
 
 import { errorMessage } from "../../utils/errors";
+import { isRecord } from "../../utils/types";
 
 export type SSEEvent =
   | { type: "beat_image_done"; beatIndex: number }
@@ -25,8 +26,8 @@ export function parseSSEEventLine(line: string): SSEEvent | null {
   } catch {
     return null;
   }
-  if (typeof obj !== "object" || obj === null) return null;
-  const event = obj as Record<string, unknown>;
+  if (!isRecord(obj)) return null;
+  const event = obj;
   if (event.type === "beat_image_done" && typeof event.beatIndex === "number") {
     return { type: "beat_image_done", beatIndex: event.beatIndex };
   }
