@@ -1,6 +1,8 @@
-// Request-body construction for `POST /api/agent`.
+// Request-body construction and dispatch for `POST /api/agent`.
 
 import type { Role } from "../../config/roles";
+import { API_ROUTES } from "../../config/apiRoutes";
+import { apiFetchRaw } from "../api";
 
 export interface AgentRequestBodyParams {
   message: string;
@@ -25,4 +27,33 @@ export function buildAgentRequestBody(
     chatSessionId: params.chatSessionId,
     selectedImageData: params.selectedImageData,
   };
+}
+
+/** POST the agent request body and return the response.
+ *  On network or HTTP error, returns a descriptive error string
+ *  instead. The caller decides how to surface it. */
+export async function postAgentRun(
+  body: AgentRequestBody,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await apiFetchRaw(API_ROUTES.agent.run, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      return {
+        ok: false,
+        error: `Server error ${response.status}: ${errBody.slice(0, 200)}`,
+      };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[agent] fetch error:", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Connection error.",
+    };
+  }
 }

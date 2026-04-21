@@ -14,6 +14,7 @@ import {
   VIEW_MODE_STORAGE_KEY,
   parseStoredViewMode,
   viewModeForShortcutKey,
+  isCanvasViewMode,
 } from "../utils/canvas/viewMode";
 import type { LocationQuery } from "vue-router";
 
@@ -47,6 +48,7 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
   buildViewQuery: () => LocationQuery;
   filesRefreshToken: Ref<number>;
   handleViewModeShortcut: (e: KeyboardEvent) => void;
+  onPluginNavigate: (target: { key: string }) => void;
 } {
   const route = useRoute();
   const router = useRouter();
@@ -111,11 +113,19 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
     e.preventDefault();
   }
 
+  /** Plugin-launcher click: switch canvas to the matching view mode. */
+  function onPluginNavigate(target: { key: string }): void {
+    if (isCanvasViewMode(target.key)) {
+      setCanvasViewMode(target.key);
+    }
+  }
+
   return {
     canvasViewMode,
     setCanvasViewMode,
     buildViewQuery,
     filesRefreshToken,
     handleViewModeShortcut,
+    onPluginNavigate,
   };
 }

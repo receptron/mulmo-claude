@@ -68,7 +68,7 @@
       >
         <!-- Gemini API key warning -->
         <div
-          v-if="!geminiAvailable && needsGemini(currentRoleId)"
+          v-if="!geminiAvailable && needsGeminiForRole(currentRoleId)"
           class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
@@ -114,7 +114,11 @@
       >
         <!-- Gemini API key warning (Stack layouts — no sidebar to host it) -->
         <div
-          v-if="isStackLayout && !geminiAvailable && needsGemini(currentRoleId)"
+          v-if="
+            isStackLayout &&
+            !geminiAvailable &&
+            needsGeminiForRole(currentRoleId)
+          "
           class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
@@ -240,9 +244,7 @@ import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
 import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
-import PluginLauncher, {
-  type PluginLauncherTarget,
-} from "./components/PluginLauncher.vue";
+import PluginLauncher from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
 import TodoExplorer from "./components/TodoExplorer.vue";
@@ -261,23 +263,19 @@ import { CANVAS_VIEW } from "./utils/canvas/viewMode";
 import type { SseEvent } from "./types/sse";
 import { type SessionEntry, type ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
-import { extractImageData, makeTextResult } from "./utils/tools/result";
-import { buildAgentRequestBody } from "./utils/agent/request";
+import { extractImageData } from "./utils/tools/result";
+import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import {
-  pushResult,
   pushErrorMessage,
   beginUserTurn,
-  appendToLastAssistantText,
+  applyTextEvent,
+  applyToolResultToSession,
 } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
+import { findPendingToolCall, toToolCallEntry } from "./utils/agent/toolCalls";
 import {
-  findPendingToolCall,
-  shouldSelectAssistantText,
-} from "./utils/agent/toolCalls";
-import {
+  buildLoadedSession,
   parseSessionEntries,
-  resolveSelectedUuid,
-  resolveSessionTimestamps,
 } from "./utils/session/sessionEntries";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
@@ -290,7 +288,6 @@ import { useSessionDerived } from "./composables/useSessionDerived";
 import { useFaviconState } from "./composables/useFaviconState";
 import { useMergedSessions } from "./composables/useMergedSessions";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
-import { isCanvasViewMode } from "./utils/canvas/viewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
 import { usePubSub } from "./composables/usePubSub";
@@ -301,8 +298,9 @@ import { useRightSidebar } from "./composables/useRightSidebar";
 import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
-import { apiGet, apiFetchRaw } from "./utils/api";
+import { apiGet } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
+import { needsGemini } from "./utils/role/plugins";
 
 // --- Per-session state ---
 // Declared early so that pub/sub callbacks and function declarations
@@ -331,27 +329,21 @@ const { subscribe: pubsubSubscribe } = usePubSub();
 const route = useRoute();
 const router = useRouter();
 
+// Omit ?role= for the default role to keep URLs clean.
+function buildRoleQuery(): Record<string, string> {
+  const id = currentRoleId.value;
+  if (!id || id === roles.value[0]?.id) return {};
+  return { role: id };
+}
+
 function navigateToSession(id: string, replace = false): void {
   currentSessionId.value = id;
   const method = replace ? router.replace : router.push;
-  // Use buildViewQuery() (reads canvasViewMode ref) instead of raw
-  // route.query — the ref may have been updated synchronously by
-  // setCanvasViewMode before this navigation runs, while
-  // route.query.view is still stale (router.push is async).
-  // Build query: view mode + role (omit role if it's the default
-  // to keep URLs clean for the common case).
-  const viewQuery = buildViewQuery();
-  const roleQuery =
-    currentRoleId.value && currentRoleId.value !== roles.value[0]?.id
-      ? { role: currentRoleId.value }
-      : {};
   method({
     name: "chat",
     params: { sessionId: id },
-    query: { ...viewQuery, ...roleQuery },
+    query: { ...buildViewQuery(), ...buildRoleQuery() },
   }).catch((err) => {
-    // NavigationDuplicated is harmless (user clicked the same session
-    // they're already on). Anything else is a real bug.
     if (err?.type !== 16) {
       console.error("[navigateToSession] push failed:", err);
     }
@@ -502,6 +494,7 @@ const {
   buildViewQuery,
   filesRefreshToken,
   handleViewModeShortcut,
+  onPluginNavigate,
 } = useCanvasViewMode({ isRunning });
 
 // The no-sidebar "stack-style" layout (top bar + full-width canvas +
@@ -546,13 +539,6 @@ watch(showHistory, (open) => {
   }
 });
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
-
-// Plugin-launcher click: switch canvas to the matching view mode.
-function onPluginNavigate(target: PluginLauncherTarget): void {
-  if (isCanvasViewMode(target.key)) {
-    setCanvasViewMode(target.key);
-  }
-}
 
 const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } =
   useMcpTools({
@@ -640,11 +626,7 @@ function onSidebarItemClick(uuid: string) {
   selectedResultUuid.value = uuid;
 }
 
-const GEMINI_PLUGINS = new Set(["generateImage", "presentDocument"]);
-const needsGemini = (roleId: string) =>
-  (roles.value.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
-    GEMINI_PLUGINS.has(p),
-  );
+const needsGeminiForRole = (roleId: string) => needsGemini(roles.value, roleId);
 
 // Remove the current session from sessionMap if it's empty (no messages).
 // Returns true if a session was removed, so the caller can use
@@ -726,47 +708,16 @@ async function loadSession(id: string) {
     API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(id)),
   );
   if (!response.ok) return;
-  const entries = response.data;
 
-  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
-  const roleId = meta?.roleId ?? currentRoleId.value;
-  const toolResultsList = parseSessionEntries(entries);
-  const urlResult =
-    typeof route.query.result === "string" ? route.query.result : null;
-  const resolvedSelectedUuid = resolveSelectedUuid(toolResultsList, urlResult);
-  // Use server summary for live state (isRunning, etc.) and timestamps
-  const serverSummary = sessions.value.find((s) => s.id === id);
-  const { startedAt, updatedAt } = resolveSessionTimestamps(
-    serverSummary,
-    new Date().toISOString(),
-  );
-  // Approximate per-entry timestamps for a loaded session: the JSONL
-  // format doesn't persist them yet, so spread entries evenly between
-  // startedAt and updatedAt. New results pushed in this session via
-  // pushResult() will overwrite with the real Date.now().
-  const loadedTimestamps = new Map<string, number>();
-  const t0 = new Date(startedAt).getTime();
-  const t1 = new Date(updatedAt).getTime();
-  toolResultsList.forEach((r, i) => {
-    const frac =
-      toolResultsList.length > 1 ? i / (toolResultsList.length - 1) : 0;
-    loadedTimestamps.set(r.uuid, t0 + (t1 - t0) * frac);
-  });
-
-  const newSession: ActiveSession = {
+  const newSession = buildLoadedSession({
     id,
-    roleId,
-    toolResults: toolResultsList,
-    resultTimestamps: loadedTimestamps,
-    isRunning: serverSummary?.isRunning ?? false,
-    statusMessage: serverSummary?.statusMessage ?? "",
-    toolCallHistory: [],
-    selectedResultUuid: resolvedSelectedUuid,
-    hasUnread: false,
-    startedAt,
-    updatedAt,
-    runStartIndex: toolResultsList.length,
-  };
+    entries: response.data,
+    defaultRoleId: currentRoleId.value,
+    urlResult:
+      typeof route.query.result === "string" ? route.query.result : null,
+    serverSummary: sessions.value.find((s) => s.id === id),
+    nowIso: new Date().toISOString(),
+  });
   sessionMap.set(id, newSession);
   // Subscribe immediately — the watch(currentSessionId) may have
   // already fired before the session was in sessionMap (e.g. when
@@ -776,7 +727,7 @@ async function loadSession(id: string) {
   const reactiveSession = sessionMap.get(id)!;
   ensureSessionSubscription(reactiveSession);
   navigateToSession(id, replaced);
-  currentRoleId.value = roleId;
+  currentRoleId.value = newSession.roleId;
   showHistory.value = false;
 }
 
@@ -875,11 +826,6 @@ interface AgentEventContext {
   scrollSidebarToBottom: () => void;
 }
 
-// Try to append a text chunk to the last assistant text-response
-// result in the session. Returns true if appended, false if a new
-// result should be created instead. Extracted to keep
-// applyAgentEvent under the cognitive-complexity threshold.
-// eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing 15; streaming append adds 1
 async function applyAgentEvent(
   event: SseEvent,
   ctx: AgentEventContext,
@@ -887,12 +833,7 @@ async function applyAgentEvent(
   const { session } = ctx;
   switch (event.type) {
     case EVENT_TYPES.toolCall:
-      session.toolCallHistory.push({
-        toolUseId: event.toolUseId,
-        toolName: event.toolName,
-        args: event.args,
-        timestamp: Date.now(),
-      });
+      session.toolCallHistory.push(toToolCallEntry(event));
       ctx.scrollSidebarToBottom();
       return;
     case EVENT_TYPES.toolCallResult: {
@@ -916,50 +857,12 @@ async function applyAgentEvent(
     case EVENT_TYPES.rolesUpdated:
       await ctx.refreshRoles();
       return;
-    case EVENT_TYPES.text: {
-      const source = event.source ?? "assistant";
-      if (source === "user") {
-        // The tab that sent the message already added it locally via
-        // beginUserTurn. Deduplicate: skip if the last text-response
-        // is a user message with identical text.
-        const last = session.toolResults[session.toolResults.length - 1];
-        const lastData = last?.data as
-          | { role?: string; text?: string }
-          | undefined;
-        if (
-          last?.toolName === "text-response" &&
-          lastData?.role === "user" &&
-          lastData?.text === event.message
-        )
-          return;
-        pushResult(session, makeTextResult(event.message, "user"));
-        return;
-      }
-      // Streaming: append to the last assistant text-response if one
-      // exists, rather than creating a new card per chunk.
-      if (appendToLastAssistantText(session, event.message)) return;
-      const textResult = makeTextResult(event.message, "assistant");
-      pushResult(session, textResult);
-      if (
-        shouldSelectAssistantText(session.toolResults, session.runStartIndex)
-      ) {
-        session.selectedResultUuid = textResult.uuid;
-      }
+    case EVENT_TYPES.text:
+      applyTextEvent(session, event.message, event.source ?? "assistant");
       return;
-    }
-    case EVENT_TYPES.toolResult: {
-      const { result } = event;
-      const existing = session.toolResults.findIndex(
-        (r) => r.uuid === result.uuid,
-      );
-      if (existing >= 0) {
-        session.toolResults[existing] = result;
-      } else {
-        pushResult(session, result);
-        session.selectedResultUuid = result.uuid;
-      }
+    case EVENT_TYPES.toolResult:
+      applyToolResultToSession(session, event.result);
       return;
-    }
     case EVENT_TYPES.error:
       console.error("[agent] error event:", event.message);
       pushErrorMessage(session, event.message);
@@ -987,40 +890,18 @@ async function sendMessage(text?: string) {
     session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
     undefined;
 
-  // Subscribe to the session's pub/sub channel BEFORE posting so we
-  // don't miss events. The subscription callback dispatches each
-  // event into the session's reactive state via applyAgentEvent.
   ensureSessionSubscription(session);
 
-  try {
-    const response = await apiFetchRaw(API_ROUTES.agent.run, {
-      method: "POST",
-      body: JSON.stringify(
-        buildAgentRequestBody({
-          message,
-          role: sessionRole,
-          chatSessionId: session.id,
-          selectedImageData:
-            fileSnapshot?.dataUrl ?? extractImageData(selectedRes),
-        }),
-      ),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      pushErrorMessage(
-        session,
-        `Server error ${response.status}: ${errBody.slice(0, 200)}`,
-      );
-      unsubscribeSession(session.id);
-    }
-  } catch (e) {
-    console.error("[agent] fetch error:", e);
-    pushErrorMessage(
-      session,
-      e instanceof Error ? e.message : "Connection error.",
-    );
+  const result = await postAgentRun(
+    buildAgentRequestBody({
+      message,
+      role: sessionRole,
+      chatSessionId: session.id,
+      selectedImageData: fileSnapshot?.dataUrl ?? extractImageData(selectedRes),
+    }),
+  );
+  if (!result.ok) {
+    pushErrorMessage(session, result.error);
     unsubscribeSession(session.id);
   }
 }

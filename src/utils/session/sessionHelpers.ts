@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ActiveSession } from "../../types/session";
 import { makeTextResult } from "../tools/result";
+import { shouldSelectAssistantText } from "../agent/toolCalls";
 
 /** Push a result and record its timestamp in one place. */
 export function pushResult(
@@ -54,4 +55,54 @@ export function appendToLastAssistantText(
   lastData.text = (lastData.text ?? "") + text;
   last.message = (last.message ?? "") + text;
   return true;
+}
+
+/** Check if an incoming user text event is a duplicate of the last
+ *  user message (sent by this tab via beginUserTurn). */
+function isDuplicateUserText(session: ActiveSession, message: string): boolean {
+  const last = session.toolResults[session.toolResults.length - 1];
+  const lastData = last?.data as { role?: string; text?: string } | undefined;
+  return (
+    last?.toolName === "text-response" &&
+    lastData?.role === "user" &&
+    lastData?.text === message
+  );
+}
+
+/** Handle an incoming text event (user or assistant) from the
+ *  agent's SSE/pubsub stream. Deduplicates user messages,
+ *  streams assistant text into the last card, and selects the
+ *  result when appropriate. */
+export function applyTextEvent(
+  session: ActiveSession,
+  message: string,
+  source: "user" | "assistant",
+): void {
+  if (source === "user") {
+    if (!isDuplicateUserText(session, message)) {
+      pushResult(session, makeTextResult(message, "user"));
+    }
+    return;
+  }
+  if (appendToLastAssistantText(session, message)) return;
+  const textResult = makeTextResult(message, "assistant");
+  pushResult(session, textResult);
+  if (shouldSelectAssistantText(session.toolResults, session.runStartIndex)) {
+    session.selectedResultUuid = textResult.uuid;
+  }
+}
+
+/** Handle an incoming tool_result event: upsert into the session's
+ *  result list and select it. */
+export function applyToolResultToSession(
+  session: ActiveSession,
+  result: ToolResultComplete,
+): void {
+  const idx = session.toolResults.findIndex((r) => r.uuid === result.uuid);
+  if (idx >= 0) {
+    session.toolResults[idx] = result;
+  } else {
+    pushResult(session, result);
+    session.selectedResultUuid = result.uuid;
+  }
 }

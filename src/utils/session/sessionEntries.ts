@@ -9,6 +9,7 @@ import { makeTextResult } from "../tools/result";
 import {
   isTextEntry,
   isToolResultEntry,
+  type ActiveSession,
   type SessionEntry,
   type SessionSummary,
 } from "../../types/session";
@@ -81,4 +82,64 @@ export function resolveSessionTimestamps(
   const startedAt = serverSummary?.startedAt ?? nowIso;
   const updatedAt = serverSummary?.updatedAt ?? startedAt;
   return { startedAt, updatedAt };
+}
+
+// Spread toolResults evenly between startedAt and updatedAt to
+// approximate per-entry timestamps for sessions loaded from disk.
+// Real-time results will overwrite with Date.now() via pushResult.
+export function interpolateTimestamps(
+  toolResults: readonly ToolResultComplete[],
+  startedAt: string,
+  updatedAt: string,
+): Map<string, number> {
+  const timestamps = new Map<string, number>();
+  const t0 = new Date(startedAt).getTime();
+  const t1 = new Date(updatedAt).getTime();
+  toolResults.forEach((r, i) => {
+    const frac = toolResults.length > 1 ? i / (toolResults.length - 1) : 0;
+    timestamps.set(r.uuid, t0 + (t1 - t0) * frac);
+  });
+  return timestamps;
+}
+
+// Build an ActiveSession from server-fetched entries + metadata.
+// Pure — the caller is responsible for inserting into sessionMap
+// and subscribing.
+export function buildLoadedSession(opts: {
+  id: string;
+  entries: readonly SessionEntry[];
+  defaultRoleId: string;
+  urlResult: string | null;
+  serverSummary: SessionSummary | undefined;
+  nowIso: string;
+}): ActiveSession {
+  const { id, entries, defaultRoleId, urlResult, serverSummary, nowIso } = opts;
+  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
+  const roleId = meta?.roleId ?? defaultRoleId;
+  const toolResults = parseSessionEntries(entries);
+  const selectedResultUuid = resolveSelectedUuid(toolResults, urlResult);
+  const { startedAt, updatedAt } = resolveSessionTimestamps(
+    serverSummary,
+    nowIso,
+  );
+  const resultTimestamps = interpolateTimestamps(
+    toolResults,
+    startedAt,
+    updatedAt,
+  );
+
+  return {
+    id,
+    roleId,
+    toolResults,
+    resultTimestamps,
+    isRunning: serverSummary?.isRunning ?? false,
+    statusMessage: serverSummary?.statusMessage ?? "",
+    toolCallHistory: [],
+    selectedResultUuid,
+    hasUnread: false,
+    startedAt,
+    updatedAt,
+    runStartIndex: toolResults.length,
+  };
 }

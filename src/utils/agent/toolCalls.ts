@@ -6,7 +6,19 @@
 // in #175.
 
 import type { ToolCallHistoryItem } from "../../types/toolCallHistory";
+import type { SseToolCall } from "../../types/sse";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+// Convert an SSE tool_call event into a ToolCallHistoryItem ready
+// to push onto a session's toolCallHistory. Pure.
+export function toToolCallEntry(event: SseToolCall): ToolCallHistoryItem {
+  return {
+    toolUseId: event.toolUseId,
+    toolName: event.toolName,
+    args: event.args,
+    timestamp: Date.now(),
+  };
+}
 
 // When an SSE `tool_call_result` event arrives, the server tells
 // us which tool call it belongs to via `toolUseId`. Find the most
