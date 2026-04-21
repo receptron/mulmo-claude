@@ -51,7 +51,7 @@
         <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Characters</span>
         <button
           class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-          :disabled="movieGenerating || anyBeatRendering || characterKeys.every((k) => charRenderState[k] === 'rendering')"
+          :disabled="movieGenerating || anyBeatRendering || characterKeys.every((key) => charRenderState[key] === 'rendering')"
           @click="generateAllCharacters"
         >
           Generate All
@@ -435,7 +435,7 @@ const anyBeatRendering = computed(() => Object.values(renderState).some((s) => s
 
 const characterKeys = computed(() => {
   const imgs = script.value.imageParams?.images ?? {};
-  return Object.keys(imgs).filter((k) => imgs[k]?.type === "imagePrompt");
+  return Object.keys(imgs).filter((key) => imgs[key]?.type === "imagePrompt");
 });
 
 // Session-scoped pending generations — lets spinners survive view
@@ -862,7 +862,7 @@ async function loadExistingCharacterImage(key: string) {
 }
 
 function refreshMissingCharacterImages() {
-  getMissingCharacterKeys(characterKeys.value, charImages, charRenderState).forEach((k) => loadExistingCharacterImage(k));
+  getMissingCharacterKeys(characterKeys.value, charImages, charRenderState).forEach((key) => loadExistingCharacterImage(key));
 }
 
 async function renderCharacter(key: string, force: boolean) {
@@ -889,28 +889,28 @@ async function renderCharacter(key: string, force: boolean) {
 }
 
 async function generateAllCharacters() {
-  await Promise.all(characterKeys.value.filter((k) => charRenderState[k] !== "rendering").map((k) => renderCharacter(k, false)));
+  await Promise.all(characterKeys.value.filter((key) => charRenderState[key] !== "rendering").map((key) => renderCharacter(key, false)));
 }
 
 async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
-  Object.keys(renderState).forEach((k) => delete renderState[+k]);
-  Object.keys(renderedImages).forEach((k) => delete renderedImages[+k]);
-  Object.keys(renderErrors).forEach((k) => delete renderErrors[+k]);
-  Object.keys(sourceOpen).forEach((k) => delete sourceOpen[+k]);
-  Object.keys(sourceText).forEach((k) => delete sourceText[+k]);
-  Object.keys(beatSaveErrors).forEach((k) => delete beatSaveErrors[+k]);
-  Object.keys(beatSaving).forEach((k) => delete beatSaving[+k]);
-  Object.keys(localOverrides).forEach((k) => delete localOverrides[+k]);
-  Object.keys(beatAudios).forEach((k) => delete beatAudios[+k]);
-  Object.keys(audioState).forEach((k) => delete audioState[+k]);
-  Object.keys(audioErrors).forEach((k) => delete audioErrors[+k]);
-  Object.keys(charRenderState).forEach((k) => delete charRenderState[k]);
-  Object.keys(charImages).forEach((k) => delete charImages[k]);
-  Object.keys(charErrors).forEach((k) => delete charErrors[k]);
-  Object.keys(beatDragOver).forEach((k) => delete beatDragOver[+k]);
+  Object.keys(renderState).forEach((key) => delete renderState[+key]);
+  Object.keys(renderedImages).forEach((key) => delete renderedImages[+key]);
+  Object.keys(renderErrors).forEach((key) => delete renderErrors[+key]);
+  Object.keys(sourceOpen).forEach((key) => delete sourceOpen[+key]);
+  Object.keys(sourceText).forEach((key) => delete sourceText[+key]);
+  Object.keys(beatSaveErrors).forEach((key) => delete beatSaveErrors[+key]);
+  Object.keys(beatSaving).forEach((key) => delete beatSaving[+key]);
+  Object.keys(localOverrides).forEach((key) => delete localOverrides[+key]);
+  Object.keys(beatAudios).forEach((key) => delete beatAudios[+key]);
+  Object.keys(audioState).forEach((key) => delete audioState[+key]);
+  Object.keys(audioErrors).forEach((key) => delete audioErrors[+key]);
+  Object.keys(charRenderState).forEach((key) => delete charRenderState[key]);
+  Object.keys(charImages).forEach((key) => delete charImages[key]);
+  Object.keys(charErrors).forEach((key) => delete charErrors[key]);
+  Object.keys(beatDragOver).forEach((key) => delete beatDragOver[+key]);
   moviePath.value = null;
   if (sourceDetails.value) sourceDetails.value.open = false;
 
