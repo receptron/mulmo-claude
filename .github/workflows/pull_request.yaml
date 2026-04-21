@@ -14,7 +14,9 @@ permissions:
 jobs:
   lint_test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         node-version: [22.x, 24.x]
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -25,7 +27,13 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'yarn'
-    - run: yarn install
+    # Windows: disable Defender realtime monitoring to prevent
+    # EPERM on atomic rename and yarn install hangs (#CI)
+    - name: Disable Windows Defender realtime monitoring
+      if: runner.os == 'Windows'
+      run: Set-MpPreference -DisableRealtimeMonitoring $true
+      shell: powershell
+    - run: yarn install --frozen-lockfile --network-timeout 120000
     - name: Build internal packages (required before typecheck)
       run: yarn build:packages
     - run: yarn run typecheck
@@ -35,6 +43,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
     - uses: actions/checkout@v6
     - name: Use Node.js 22.x
@@ -42,7 +51,7 @@ jobs:
       with:
         node-version: 22.x
         cache: 'yarn'
-    - run: yarn install
+    - run: yarn install --frozen-lockfile --network-timeout 120000
     - name: Build internal packages
       run: yarn build:packages
     - name: Install Playwright browsers
