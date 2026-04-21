@@ -59,8 +59,8 @@ export function renderTopicsSection(topics: readonly IndexTopicEntry[]): string[
   // Newest-first by last update (topics with no timestamp sort
   // last, ordered alphabetically among themselves for stability).
   const sorted = [...topics].sort(compareTopicsNewestFirst);
-  for (const t of sorted) {
-    lines.push(renderTopicRow(t));
+  for (const topicEntry of sorted) {
+    lines.push(renderTopicRow(topicEntry));
   }
   return lines;
 }
@@ -72,10 +72,14 @@ export function renderRecentDaysSection(days: readonly IndexDailyEntry[], maxRec
     return lines;
   }
   // Newest-first by date string (YYYY-MM-DD sorts lexically).
-  const sorted = [...days].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  const sorted = [...days].sort((leftDay, rightDay) => {
+    if (leftDay.date < rightDay.date) return 1;
+    if (leftDay.date > rightDay.date) return -1;
+    return 0;
+  });
   const head = sorted.slice(0, maxRecent);
-  for (const d of head) {
-    lines.push(renderDailyRow(d));
+  for (const dayEntry of head) {
+    lines.push(renderDailyRow(dayEntry));
   }
   const rest = sorted.length - head.length;
   if (rest > 0) {
@@ -100,37 +104,37 @@ export function renderArchiveSection(archivedTopicCount: number): string[] {
 // timestamps get -Infinity so they sort to the bottom (oldest).
 function topicSortKey(entry: IndexTopicEntry): number {
   if (!entry.lastUpdatedIso) return -Infinity;
-  const ms = Date.parse(entry.lastUpdatedIso);
-  return Number.isNaN(ms) ? -Infinity : ms;
+  const timestampMs = Date.parse(entry.lastUpdatedIso);
+  return Number.isNaN(timestampMs) ? -Infinity : timestampMs;
 }
 
-function compareBySlug(a: IndexTopicEntry, b: IndexTopicEntry): number {
-  if (a.slug < b.slug) return -1;
-  if (a.slug > b.slug) return 1;
+function compareBySlug(leftEntry: IndexTopicEntry, rightEntry: IndexTopicEntry): number {
+  if (leftEntry.slug < rightEntry.slug) return -1;
+  if (leftEntry.slug > rightEntry.slug) return 1;
   return 0;
 }
 
-function compareTopicsNewestFirst(a: IndexTopicEntry, b: IndexTopicEntry): number {
-  const ak = topicSortKey(a);
-  const bk = topicSortKey(b);
+function compareTopicsNewestFirst(leftEntry: IndexTopicEntry, rightEntry: IndexTopicEntry): number {
+  const leftKey = topicSortKey(leftEntry);
+  const rightKey = topicSortKey(rightEntry);
   // Both valid timestamps → compare numerically.
   // One or both invalid (-Infinity) → valid wins; if both invalid,
   // fall through to the slug tie-breaker.
-  const aValid = Number.isFinite(ak);
-  const bValid = Number.isFinite(bk);
-  if (aValid && bValid && bk !== ak) return bk - ak;
-  if (aValid !== bValid) return aValid ? -1 : 1;
+  const leftIsValid = Number.isFinite(leftKey);
+  const rightIsValid = Number.isFinite(rightKey);
+  if (leftIsValid && rightIsValid && rightKey !== leftKey) return rightKey - leftKey;
+  if (leftIsValid !== rightIsValid) return leftIsValid ? -1 : 1;
   // Tie-break on slug for determinism.
-  return compareBySlug(a, b);
+  return compareBySlug(leftEntry, rightEntry);
 }
 
-function renderTopicRow(t: IndexTopicEntry): string {
-  const label = t.title && t.title.trim().length > 0 ? t.title : t.slug;
-  const stamp = t.lastUpdatedIso ? ` — updated ${isoDateOnly(t.lastUpdatedIso)}` : "";
-  return `- [${label}](topics/${t.slug}.md)${stamp}`;
+function renderTopicRow(topicEntry: IndexTopicEntry): string {
+  const label = topicEntry.title && topicEntry.title.trim().length > 0 ? topicEntry.title : topicEntry.slug;
+  const stamp = topicEntry.lastUpdatedIso ? ` — updated ${isoDateOnly(topicEntry.lastUpdatedIso)}` : "";
+  return `- [${label}](topics/${topicEntry.slug}.md)${stamp}`;
 }
 
-function renderDailyRow(d: IndexDailyEntry): string {
-  const [year, month, day] = d.date.split("-");
-  return `- [${d.date}](daily/${year}/${month}/${day}.md)`;
+function renderDailyRow(dayEntry: IndexDailyEntry): string {
+  const [year, month, day] = dayEntry.date.split("-");
+  return `- [${dayEntry.date}](daily/${year}/${month}/${day}.md)`;
 }

@@ -26,14 +26,14 @@ interface SessionMeta {
   origin?: SessionOrigin;
 }
 
-async function readSessionMeta(__chatDir: string, id: string): Promise<SessionMeta | null> {
+async function readSessionMeta(__chatDir: string, sessionId: string): Promise<SessionMeta | null> {
   // Try new-style .json meta first
-  const meta = await readSessionMetaIO(id);
+  const meta = await readSessionMetaIO(sessionId);
   if (meta?.roleId && meta?.startedAt) {
     return meta as SessionMeta;
   }
   // Legacy: read first line of .jsonl
-  const jsonl = await readSessionJsonl(id);
+  const jsonl = await readSessionJsonl(sessionId);
   if (jsonl) {
     const first = jsonl.split("\n").find(Boolean);
     if (first) {
@@ -102,19 +102,19 @@ const WINDOW_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 export async function loadAllSessions(): Promise<{ summary: SessionSummary; changeMs: number }[]> {
   const chatDir = WORKSPACE_PATHS.chat;
   const manifest = await readManifest(workspacePath);
-  const indexById = new Map<string, ChatIndexEntry>(manifest.entries.map((e) => [e.id, e]));
+  const indexById = new Map<string, ChatIndexEntry>(manifest.entries.map((entry) => [entry.id, entry]));
   const cutoff = WINDOW_MS > 0 ? Date.now() - WINDOW_MS : 0;
 
-  const files = (await readdir(chatDir)).filter((f) => f.endsWith(".jsonl"));
+  const files = (await readdir(chatDir)).filter((fileName) => fileName.endsWith(".jsonl"));
   const rows = await Promise.all(
     files.map(async (file) => {
-      const id = file.replace(".jsonl", "");
+      const sessionId = file.replace(".jsonl", "");
       try {
         // stat only — no readFile on .jsonl content
-        const fileStat = await stat(sessionJsonlAbsPath(id));
+        const fileStat = await stat(sessionJsonlAbsPath(sessionId));
         if (cutoff > 0 && fileStat.mtimeMs < cutoff) return null;
 
-        const meta = await readSessionMeta(chatDir, id);
+        const meta = await readSessionMeta(chatDir, sessionId);
         if (!meta) return null;
 
         // The meta sidecar bumps its mtime on hasUnread / origin
@@ -122,20 +122,20 @@ export async function loadAllSessions(): Promise<{ summary: SessionSummary; chan
         // pick up drains of background generations (which only touch
         // meta, not the jsonl). Missing stat (brand-new session
         // before its first meta write) contributes 0.
-        const metaMtimeMs = await stat(sessionMetaAbsPath(id))
-          .then((s) => s.mtimeMs)
+        const metaMtimeMs = await stat(sessionMetaAbsPath(sessionId))
+          .then((stats) => stats.mtimeMs)
           .catch(() => 0);
 
-        const indexEntry = indexById.get(id);
+        const indexEntry = indexById.get(sessionId);
         // Prefer AI title → meta.firstUserMessage → empty.
         // `summary` and `keywords` are spread conditionally
         // to respect the server tsconfig's
         // exactOptionalPropertyTypes.
         const preview = indexEntry?.title ?? meta.firstUserMessage ?? "";
 
-        const live = getSession(id);
+        const live = getSession(sessionId);
         const summary: SessionSummary = {
-          id,
+          ["id"]: sessionId,
           roleId: meta.roleId,
           startedAt: meta.startedAt,
           updatedAt: new Date(fileStat.mtimeMs).toISOString(),
@@ -161,7 +161,7 @@ export async function loadAllSessions(): Promise<{ summary: SessionSummary; chan
       }
     }),
   );
-  return rows.filter((r): r is { summary: SessionSummary; changeMs: number } => r !== null);
+  return rows.filter((row): row is { summary: SessionSummary; changeMs: number } => row !== null);
 }
 
 router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsResponse, object, SessionsQuery>, res: Response<SessionsResponse>) => {
@@ -173,15 +173,15 @@ router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsRespons
     // of whether it's in the diff. Echoing the same cursor back on an
     // empty diff (nothing changed since `?since=`) is fine; the
     // client no-ops.
-    const maxChangeMs = rows.reduce((acc, r) => Math.max(acc, r.changeMs), 0);
+    const maxChangeMs = rows.reduce((acc, row) => Math.max(acc, row.changeMs), 0);
 
-    const filtered = sinceMs > 0 ? rows.filter((r) => r.changeMs > sinceMs) : rows;
+    const filtered = sinceMs > 0 ? rows.filter((row) => row.changeMs > sinceMs) : rows;
 
-    const sessions = filtered.map((r) => r.summary);
-    sessions.sort((a, b) => {
-      const byUpdated = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    const sessions = filtered.map((row) => row.summary);
+    sessions.sort((leftSession, rightSession) => {
+      const byUpdated = new Date(rightSession.updatedAt).getTime() - new Date(leftSession.updatedAt).getTime();
       if (byUpdated !== 0) return byUpdated;
-      return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+      return new Date(rightSession.startedAt).getTime() - new Date(leftSession.startedAt).getTime();
     });
 
     res.json({
@@ -207,13 +207,13 @@ interface SessionErrorResponse {
 }
 
 router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<unknown[] | SessionErrorResponse>) => {
-  const { id } = req.params;
+  const { id: sessionId } = req.params;
   const chatDir = WORKSPACE_PATHS.chat;
   try {
-    const meta = await readSessionMeta(chatDir, id);
-    const content = await readSessionJsonl(id);
+    const meta = await readSessionMeta(chatDir, sessionId);
+    const content = await readSessionJsonl(sessionId);
     if (!content) {
-      notFound(res, `Session ${id} not found`);
+      notFound(res, `Session ${sessionId} not found`);
       return;
     }
     const entries = (
@@ -288,7 +288,7 @@ router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res
 // completes — prevents the client from refetching stale hasUnread values.
 router.post(API_ROUTES.sessions.markRead, async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
   await markRead(req.params.id);
-  res.json({ ok: true });
+  res.json({ ["ok"]: true });
 });
 
 export default router;

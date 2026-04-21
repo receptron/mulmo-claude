@@ -81,7 +81,7 @@ export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Pr
   };
 
   // --- Phase 1: figure out what work there is to do ------------------
-  const eligible = (await listSessionMetas(chatDir)).filter((m) => !deps.activeSessionIds.has(m.id));
+  const eligible = (await listSessionMetas(chatDir)).filter((sessionMeta) => !deps.activeSessionIds.has(sessionMeta.id));
   const { dirty } = findDirtySessions(eligible, state.processedSessions);
   if (dirty.length === 0) return { nextState: { ...state }, result };
 
@@ -110,7 +110,7 @@ export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Pr
     ...state,
     knownTopics: [...newTopicsSeen].sort(),
   };
-  const dirtyMetaById = new Map(eligible.map((m) => [m.id, m]));
+  const dirtyMetaById = new Map(eligible.map((sessionMeta) => [sessionMeta.id, sessionMeta]));
   // Process days in chronological order so topic state accumulates
   // naturally: an earlier day's update is visible to the next day.
   const orderedDays = [...dayBuckets.keys()].sort();
@@ -191,7 +191,7 @@ async function processDayAndAdvance(input: ProcessDayInput): Promise<ProcessDayO
   }
 
   const justCompleted = computeJustCompletedSessions(input.date, excerpts, input.sessionToDays, input.dirtyMetaById);
-  const sessionsIngested = justCompleted.map((m) => m.id);
+  const sessionsIngested = justCompleted.map((sessionMeta) => sessionMeta.id);
   const nextState = advanceJournalState(input.nextState, justCompleted, input.newTopicsSeen);
   await persistStateAfterDay(input.workspaceRoot, nextState, input.date);
 
@@ -218,7 +218,9 @@ async function maybeExtractMemory(
   const excerptLines: string[] = [];
   for (const [, byDate] of perSessionExcerpts) {
     for (const [, excerpt] of byDate) {
-      const userLines = excerpt.events.filter((e: SessionEventExcerpt) => e.source === "user").map((e: SessionEventExcerpt) => `[user] ${e.content}`);
+      const userLines = excerpt.events
+        .filter((eventExcerpt: SessionEventExcerpt) => eventExcerpt.source === "user")
+        .map((eventExcerpt: SessionEventExcerpt) => `[user] ${eventExcerpt.content}`);
       if (userLines.length > 0) excerptLines.push(userLines.join("\n"));
     }
   }
@@ -362,7 +364,7 @@ async function refreshTopicSnapshot(workspaceRoot: string, slug: string, existin
   const newBody = await readTopicFile(slug, workspaceRoot);
   if (newBody === null) return;
   const snapshot: ExistingTopicSnapshot = { slug, content: newBody };
-  const idx = existingTopics.findIndex((t) => t.slug === slug);
+  const idx = existingTopics.findIndex((topic) => topic.slug === slug);
   if (idx === -1) existingTopics.push(snapshot);
   else existingTopics[idx] = snapshot;
 }
@@ -427,7 +429,7 @@ export function buildDayBuckets(perSessionExcerpts: ReadonlyMap<string, Readonly
 // to the target topic file's location.
 export function normalizeTopicAction(update: TopicUpdate, existingTopics: readonly ExistingTopicSnapshot[]): TopicUpdate {
   const canonicalSlug = slugify(update.slug);
-  const exists = existingTopics.some((t) => t.slug === canonicalSlug);
+  const exists = existingTopics.some((topic) => topic.slug === canonicalSlug);
   const topicFileWsPath = path.posix.join(WORKSPACE_DIRS.summaries, "topics", `${canonicalSlug}.md`);
   return {
     slug: canonicalSlug,
@@ -527,10 +529,10 @@ async function listSessionMetas(chatDir: string): Promise<SessionFileMeta[]> {
     if (!name.endsWith(".jsonl")) continue;
     const full = path.join(chatDir, name);
     try {
-      const st = await fsp.stat(full);
+      const stats = await fsp.stat(full);
       out.push({
-        id: name.replace(/\.jsonl$/, ""),
-        mtimeMs: st.mtimeMs,
+        ["id"]: name.replace(/\.jsonl$/, ""),
+        mtimeMs: stats.mtimeMs,
       });
     } catch {
       // file vanished between readdir and stat — ignore
@@ -607,8 +609,8 @@ export function bucketParsedEvents(events: readonly ParsedEntry[], sessionId: st
       buckets.set(fallbackDate, bucket);
     }
     bucket.events.push(parsed.excerpt);
-    for (const p of parsed.artifactPaths) {
-      if (!bucket.artifactPaths.includes(p)) bucket.artifactPaths.push(p);
+    for (const artifactPath of parsed.artifactPaths) {
+      if (!bucket.artifactPaths.includes(artifactPath)) bucket.artifactPaths.push(artifactPath);
     }
   }
   return buckets;
@@ -662,9 +664,10 @@ export function entryToExcerpt(entry: Record<string, unknown>): SessionEventExce
   // to avoid a NullPointerException-style crash when accessing
   // r.toolName below.
   if (type === EVENT_TYPES.toolResult && isRecord(entry.result)) {
-    const r = entry.result as Record<string, unknown>;
-    const toolName = typeof r.toolName === "string" ? r.toolName : "tool";
-    const label = (typeof r.title === "string" && r.title) || (typeof r.message === "string" && r.message) || "(no message)";
+    const resultRecord = entry.result as Record<string, unknown>;
+    const toolName = typeof resultRecord.toolName === "string" ? resultRecord.toolName : "tool";
+    const label =
+      (typeof resultRecord.title === "string" && resultRecord.title) || (typeof resultRecord.message === "string" && resultRecord.message) || "(no message)";
     return {
       source,
       type,
@@ -682,23 +685,23 @@ export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
   if (entry.type !== "tool_result") return [];
   const result = entry.result;
   if (!isRecord(result)) return [];
-  const r = result as Record<string, unknown>;
-  const data = r.data;
+  const resultRecord = result as Record<string, unknown>;
+  const data = resultRecord.data;
   if (!isRecord(data)) return [];
-  const d = data as Record<string, unknown>;
+  const dataRecord = data as Record<string, unknown>;
   const paths: string[] = [];
 
   // Direct `filePath: string` — presentMulmoScript, presentHtml.
-  if (typeof d.filePath === "string" && d.filePath.length > 0) {
-    paths.push(d.filePath);
+  if (typeof dataRecord.filePath === "string" && dataRecord.filePath.length > 0) {
+    paths.push(dataRecord.filePath);
   }
 
   // Wiki uses `pageName: string` and stores the page at
   // `wiki/pages/<pageName>.md`. The plugin itself doesn't surface
   // the full path in the result, so we synthesise it from the
   // convention established in server/routes/wiki.ts.
-  if (r.toolName === "manageWiki" && typeof d.pageName === "string") {
-    paths.push(`wiki/pages/${d.pageName}.md`);
+  if (resultRecord.toolName === "manageWiki" && typeof dataRecord.pageName === "string") {
+    paths.push(`wiki/pages/${dataRecord.pageName}.md`);
   }
 
   // Paths must be workspace-relative (not absolute, no escape).
@@ -709,18 +712,18 @@ export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
 // Defensive: refuse absolute paths, parent-escapes, or scheme-like
 // strings. Protects against a malformed tool result wedging a
 // filesystem-absolute path into the archivist prompt.
-function isSafeWorkspacePath(p: string): boolean {
-  if (!p) return false;
-  if (p.startsWith("/")) return false;
-  if (p.startsWith("..")) return false;
-  if (p.includes("://")) return false;
+function isSafeWorkspacePath(candidatePath: string): boolean {
+  if (!candidatePath) return false;
+  if (candidatePath.startsWith("/")) return false;
+  if (candidatePath.startsWith("..")) return false;
+  if (candidatePath.includes("://")) return false;
   return true;
 }
 
-function truncate(s: string, max: number): string {
+function truncate(text: string, max: number): string {
   if (max <= 0) return "";
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
 }
 
 async function readAllTopics(workspaceRoot: string): Promise<ExistingTopicSnapshot[]> {

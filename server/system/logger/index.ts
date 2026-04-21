@@ -23,7 +23,7 @@ export function createLogger(config: LoggerConfig): Logger {
 
   function emit(level: LogLevel, prefix: string, message: string, data?: Record<string, unknown>): void {
     const record: LogRecord = {
-      ts: new Date().toISOString(),
+      ["ts"]: new Date().toISOString(),
       level,
       prefix,
       message,
@@ -42,10 +42,10 @@ export function createLogger(config: LoggerConfig): Logger {
   }
 
   return {
-    error: (p, m, d) => emit("error", p, m, d),
-    warn: (p, m, d) => emit("warn", p, m, d),
-    info: (p, m, d) => emit("info", p, m, d),
-    debug: (p, m, d) => emit("debug", p, m, d),
+    error: (prefix, message, data) => emit("error", prefix, message, data),
+    warn: (prefix, message, data) => emit("warn", prefix, message, data),
+    info: (prefix, message, data) => emit("info", prefix, message, data),
+    debug: (prefix, message, data) => emit("debug", prefix, message, data),
   };
 }
 

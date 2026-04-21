@@ -60,11 +60,11 @@ export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
       child.kill("SIGKILL");
     }, CLI_TIMEOUT_MS);
 
-    child.stdout.on("data", (d: Buffer) => {
-      stdout += d.toString();
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
     });
-    child.stderr.on("data", (d: Buffer) => {
-      stderr += d.toString();
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
     });
 
     child.on("error", (err: Error & { code?: string }) => {
@@ -234,8 +234,8 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   if (input.existingTopicSummaries.length === 0) {
     parts.push("(none yet)");
   } else {
-    for (const t of input.existingTopicSummaries) {
-      parts.push(`- ${t.slug}`);
+    for (const topicSummary of input.existingTopicSummaries) {
+      parts.push(`- ${topicSummary.slug}`);
     }
   }
   parts.push("");
@@ -244,24 +244,24 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   // sessions produced, deduped and sorted. Given to the archivist
   // so it can link to them from the summary text.
   const allArtifacts = new Set<string>();
-  for (const s of input.sessionExcerpts) {
-    for (const p of s.artifactPaths) allArtifacts.add(p);
+  for (const sessionExcerpt of input.sessionExcerpts) {
+    for (const artifactPath of sessionExcerpt.artifactPaths) allArtifacts.add(artifactPath);
   }
   parts.push("ARTIFACTS REFERENCED:");
   if (allArtifacts.size === 0) {
     parts.push("(none)");
   } else {
-    for (const p of [...allArtifacts].sort()) {
-      parts.push(`- ${p}`);
+    for (const artifactPath of [...allArtifacts].sort()) {
+      parts.push(`- ${artifactPath}`);
     }
   }
   parts.push("");
 
   parts.push("SESSION EXCERPTS:");
-  for (const s of input.sessionExcerpts) {
-    parts.push(`### session ${s.sessionId} (role: ${s.roleId})`);
-    for (const e of s.events) {
-      parts.push(`- [${e.source}/${e.type}] ${e.content}`);
+  for (const sessionExcerpt of input.sessionExcerpts) {
+    parts.push(`### session ${sessionExcerpt.sessionId} (role: ${sessionExcerpt.roleId})`);
+    for (const eventExcerpt of sessionExcerpt.events) {
+      parts.push(`- [${eventExcerpt.source}/${eventExcerpt.type}] ${eventExcerpt.content}`);
     }
     parts.push("");
   }
@@ -324,10 +324,10 @@ LANGUAGE
 export function buildOptimizationUserPrompt(input: OptimizationInput): string {
   const parts: string[] = [];
   parts.push("CURRENT TOPICS:");
-  for (const t of input.topics) {
-    parts.push(`### ${t.slug}`);
+  for (const topic of input.topics) {
+    parts.push(`### ${topic.slug}`);
     parts.push("```md");
-    parts.push(t.headContent);
+    parts.push(topic.headContent);
     parts.push("```");
     parts.push("");
   }
@@ -352,35 +352,35 @@ import { isRecord } from "../../utils/types.js";
 // guards rather than `as` casts per project conventions.
 export function isDailyArchivistOutput(value: unknown): value is DailyArchivistOutput {
   if (!isRecord(value)) return false;
-  const v = value as Record<string, unknown>;
-  if (typeof v.dailySummaryMarkdown !== "string") return false;
-  if (!Array.isArray(v.topicUpdates)) return false;
-  return v.topicUpdates.every(isTopicUpdate);
+  const recordValue = value as Record<string, unknown>;
+  if (typeof recordValue.dailySummaryMarkdown !== "string") return false;
+  if (!Array.isArray(recordValue.topicUpdates)) return false;
+  return recordValue.topicUpdates.every(isTopicUpdate);
 }
 
 function isTopicUpdate(value: unknown): value is TopicUpdate {
   if (!isRecord(value)) return false;
-  const v = value as Record<string, unknown>;
-  if (typeof v.slug !== "string") return false;
-  if (typeof v.content !== "string") return false;
-  return v.action === "create" || v.action === "append" || v.action === "rewrite";
+  const recordValue = value as Record<string, unknown>;
+  if (typeof recordValue.slug !== "string") return false;
+  if (typeof recordValue.content !== "string") return false;
+  return recordValue.action === "create" || recordValue.action === "append" || recordValue.action === "rewrite";
 }
 
 export function isOptimizationOutput(value: unknown): value is OptimizationOutput {
   if (!isRecord(value)) return false;
-  const v = value as Record<string, unknown>;
-  if (!Array.isArray(v.merges)) return false;
-  if (!Array.isArray(v.archives)) return false;
-  if (!v.merges.every(isTopicMerge)) return false;
-  return v.archives.every((a: unknown) => typeof a === "string");
+  const recordValue = value as Record<string, unknown>;
+  if (!Array.isArray(recordValue.merges)) return false;
+  if (!Array.isArray(recordValue.archives)) return false;
+  if (!recordValue.merges.every(isTopicMerge)) return false;
+  return recordValue.archives.every((archiveSlug: unknown) => typeof archiveSlug === "string");
 }
 
 function isTopicMerge(value: unknown): value is TopicMerge {
   if (!isRecord(value)) return false;
-  const v = value as Record<string, unknown>;
-  if (!Array.isArray(v.from)) return false;
-  if (!v.from.every((f: unknown) => typeof f === "string")) return false;
-  if (typeof v.into !== "string") return false;
-  if (typeof v.newContent !== "string") return false;
+  const recordValue = value as Record<string, unknown>;
+  if (!Array.isArray(recordValue.from)) return false;
+  if (!recordValue.from.every((fromSlug: unknown) => typeof fromSlug === "string")) return false;
+  if (typeof recordValue.into !== "string") return false;
+  if (typeof recordValue.newContent !== "string") return false;
   return true;
 }

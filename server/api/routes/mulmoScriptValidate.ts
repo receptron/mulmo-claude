@@ -11,7 +11,7 @@
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
 import { isRecord } from "../../utils/types.js";
 
-export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string };
+export type ValidationResult<T> = { ["ok"]: true; value: T } | { ["ok"]: false; error: string };
 
 function formatZodIssues(
   // Zod's `$ZodIssue.path` is `PropertyKey[]` (includes `symbol`).
@@ -40,23 +40,23 @@ export function validateUpdateScriptBody(body: unknown): ValidationResult<{
   script: unknown;
 }> {
   if (!isRecord(body)) {
-    return { ok: false, error: "body must be an object" };
+    return { ["ok"]: false, error: "body must be an object" };
   }
   if (typeof body.filePath !== "string" || body.filePath === "") {
-    return { ok: false, error: "filePath must be a non-empty string" };
+    return { ["ok"]: false, error: "filePath must be a non-empty string" };
   }
   if (body.script === undefined) {
-    return { ok: false, error: "script is required" };
+    return { ["ok"]: false, error: "script is required" };
   }
   const parsed = mulmoScriptSchema.safeParse(body.script);
   if (!parsed.success) {
     return {
-      ok: false,
+      ["ok"]: false,
       error: `invalid script: ${formatZodIssues(parsed.error.issues)}`,
     };
   }
   return {
-    ok: true,
+    ["ok"]: true,
     value: { filePath: body.filePath as string, script: parsed.data },
   };
 }
@@ -72,26 +72,26 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   beat: unknown;
 }> {
   if (!isRecord(body)) {
-    return { ok: false, error: "body must be an object" };
+    return { ["ok"]: false, error: "body must be an object" };
   }
   if (typeof body.filePath !== "string" || body.filePath === "") {
-    return { ok: false, error: "filePath must be a non-empty string" };
+    return { ["ok"]: false, error: "filePath must be a non-empty string" };
   }
   if (typeof body.beatIndex !== "number" || !Number.isInteger(body.beatIndex) || body.beatIndex < 0) {
-    return { ok: false, error: "beatIndex must be a non-negative integer" };
+    return { ["ok"]: false, error: "beatIndex must be a non-negative integer" };
   }
   if (body.beat === undefined) {
-    return { ok: false, error: "beat is required" };
+    return { ["ok"]: false, error: "beat is required" };
   }
   const parsed = mulmoBeatSchema.safeParse(body.beat);
   if (!parsed.success) {
     return {
-      ok: false,
+      ["ok"]: false,
       error: `invalid beat: ${formatZodIssues(parsed.error.issues)}`,
     };
   }
   return {
-    ok: true,
+    ["ok"]: true,
     value: {
       filePath: body.filePath as string,
       beatIndex: body.beatIndex as number,

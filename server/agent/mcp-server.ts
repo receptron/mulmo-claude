@@ -30,7 +30,7 @@ interface JsonRpcMessage {
   params?: ToolCallParams;
 }
 
-const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage => isRecord(v) && "method" in v;
+const isJsonRpcMessage = (value: unknown): value is JsonRpcMessage => isRecord(value) && "method" in value;
 
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;
@@ -80,12 +80,12 @@ function fromPackage(def: ToolDefinition, endpoint: string): ToolDef {
 
 // Pure MCP tools (no GUI) — auto-registered from server/mcp-tools/
 const mcpToolDefs: Record<string, ToolDef> = Object.fromEntries(
-  mcpTools.filter(isMcpToolEnabled).map((t) => [
-    t.definition.name,
+  mcpTools.filter(isMcpToolEnabled).map((toolDef) => [
+    toolDef.definition.name,
     {
-      name: t.definition.name,
-      description: t.definition.description,
-      inputSchema: t.definition.inputSchema,
+      name: toolDef.definition.name,
+      description: toolDef.definition.description,
+      inputSchema: toolDef.definition.inputSchema,
     },
   ]),
 );
@@ -303,7 +303,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly
   // (no frontend push). Opt out of postJson's HTTP error throw because
   // we want to surface the JSON error body to the caller as a string.
-  const mcpTool = mcpTools.find((t) => t.definition.name === name);
+  const mcpTool = mcpTools.find((toolDef) => toolDef.definition.name === name);
   if (mcpTool) {
     const res = await postJson(`/api/mcp-tools/${name}`, args, {
       allowHttpError: true,
@@ -313,7 +313,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     return typeof json.result === "string" ? json.result : JSON.stringify(json.result);
   }
 
-  const tool = tools.find((t) => t.name === name);
+  const tool = tools.find((toolDef) => toolDef.name === name);
   if (!tool) throw new Error(`Unknown tool: ${name}`);
 
   const res = await postJson(tool.endpoint!, args);
@@ -347,12 +347,12 @@ process.stdin.on("data", (chunk: Buffer) => {
     }
     if (!isJsonRpcMessage(msg)) continue;
 
-    const { id, method, params } = msg;
+    const { id: requestId, method, params } = msg;
 
     if (method === "initialize") {
       respond({
         jsonrpc: "2.0",
-        id,
+        ["id"]: requestId,
         result: {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
@@ -362,12 +362,12 @@ process.stdin.on("data", (chunk: Buffer) => {
     } else if (method === "tools/list") {
       respond({
         jsonrpc: "2.0",
-        id,
+        ["id"]: requestId,
         result: {
-          tools: tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
+          tools: tools.map((toolDef) => ({
+            name: toolDef.name,
+            description: toolDef.description,
+            inputSchema: toolDef.inputSchema,
           })),
         },
       });
@@ -375,7 +375,7 @@ process.stdin.on("data", (chunk: Buffer) => {
       if (!params?.name) {
         respond({
           jsonrpc: "2.0",
-          id,
+          ["id"]: requestId,
           error: {
             code: -32602,
             message: "Invalid params: tools/call requires params.name",
@@ -388,14 +388,14 @@ process.stdin.on("data", (chunk: Buffer) => {
         .then((text) => {
           respond({
             jsonrpc: "2.0",
-            id,
+            ["id"]: requestId,
             result: { content: [{ type: "text", text }] },
           });
         })
         .catch((err: unknown) => {
           respond({
             jsonrpc: "2.0",
-            id,
+            ["id"]: requestId,
             result: {
               content: [{ type: "text", text: String(err) }],
               isError: true,
@@ -403,7 +403,7 @@ process.stdin.on("data", (chunk: Buffer) => {
           });
         });
     } else if (method === "ping") {
-      respond({ jsonrpc: "2.0", id, result: {} });
+      respond({ jsonrpc: "2.0", ["id"]: requestId, result: {} });
     }
     // notifications/initialized and other notifications: no response needed
   }

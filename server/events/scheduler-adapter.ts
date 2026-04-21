@@ -52,16 +52,16 @@ function logsDir(root = workspacePath): string {
 // ── I/O deps (real filesystem) ───────────────────────────────────
 
 const stateDeps: StateDeps = {
-  readFile: (p: string) => readFile(p, "utf-8"),
-  writeFileAtomic: (p: string, content: string) => writeFileAtomic(p, content),
+  readFile: (filePath: string) => readFile(filePath, "utf-8"),
+  writeFileAtomic: (filePath: string, content: string) => writeFileAtomic(filePath, content),
   exists: existsSync,
 };
 
 const logDeps: LogDeps = {
-  appendFile: (p: string, content: string) => appendFile(p, content),
-  readFile: (p: string) => readFile(p, "utf-8"),
+  appendFile: (filePath: string, content: string) => appendFile(filePath, content),
+  readFile: (filePath: string) => readFile(filePath, "utf-8"),
   exists: existsSync,
-  ensureDir: (p: string) => mkdir(p, { recursive: true }).then(() => {}),
+  ensureDir: (directoryPath: string) => mkdir(directoryPath, { recursive: true }).then(() => {}),
 };
 
 // ── System task registry ─────────────────────────────────────────
@@ -95,11 +95,11 @@ export async function initScheduler(taskManager: ITaskManager, tasks: SystemTask
   taskManagerRef = taskManager;
 
   // Run catch-up
-  const catchUpTasks: CatchUpTask[] = tasks.map((t) => ({
-    id: t.id,
-    name: t.name,
-    schedule: toCoreSchedule(t.schedule),
-    missedRunPolicy: t.missedRunPolicy,
+  const catchUpTasks: CatchUpTask[] = tasks.map((taskDef) => ({
+    ["id"]: taskDef.id,
+    name: taskDef.name,
+    schedule: toCoreSchedule(taskDef.schedule),
+    missedRunPolicy: taskDef.missedRunPolicy,
     enabled: true,
   }));
   const plan = computeCatchUpPlan(catchUpTasks, stateMap, Date.now());
@@ -117,7 +117,7 @@ export async function initScheduler(taskManager: ITaskManager, tasks: SystemTask
       runs: plan.runs.length,
     });
     for (const run of plan.runs) {
-      const task = tasks.find((t) => t.id === run.taskId);
+      const task = tasks.find((taskDef) => taskDef.id === run.taskId);
       if (!task) continue;
       await executeAndLog(task, run.context.scheduledFor, TASK_TRIGGERS.catchUp);
     }
@@ -126,7 +126,7 @@ export async function initScheduler(taskManager: ITaskManager, tasks: SystemTask
   // Register with task-manager for ongoing ticks
   for (const task of tasks) {
     taskManager.registerTask({
-      id: task.id,
+      ["id"]: task.id,
       description: task.description,
       schedule: task.schedule,
       run: async () => {
@@ -137,7 +137,7 @@ export async function initScheduler(taskManager: ITaskManager, tasks: SystemTask
   }
 
   log.info("scheduler", "initialized", {
-    tasks: tasks.map((t) => t.id),
+    tasks: tasks.map((taskDef) => taskDef.id),
     stateEntries: stateMap.size,
   });
 }
@@ -146,7 +146,7 @@ export async function initScheduler(taskManager: ITaskManager, tasks: SystemTask
  *  Updates the in-memory task definition, the task-manager, and
  *  recalculates nextScheduledAt in persisted state. */
 export async function applyScheduleOverride(taskId: string, schedule: SystemTaskDef["schedule"]): Promise<boolean> {
-  const task = systemTasks.find((t) => t.id === taskId);
+  const task = systemTasks.find((taskDef) => taskDef.id === taskId);
   if (!task || !taskManagerRef) return false;
   if (!taskManagerRef.updateSchedule(taskId, schedule)) return false;
   task.schedule = schedule;
@@ -172,13 +172,13 @@ export function getSchedulerTasks(): Array<{
   missedRunPolicy: string;
   state: TaskExecutionState;
 }> {
-  return systemTasks.map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-    schedule: t.schedule,
-    missedRunPolicy: t.missedRunPolicy,
-    state: stateMap.get(t.id) ?? emptyState(t.id),
+  return systemTasks.map((taskDef) => ({
+    ["id"]: taskDef.id,
+    name: taskDef.name,
+    description: taskDef.description,
+    schedule: taskDef.schedule,
+    missedRunPolicy: taskDef.missedRunPolicy,
+    state: stateMap.get(taskDef.id) ?? emptyState(taskDef.id),
   }));
 }
 
