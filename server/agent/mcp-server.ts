@@ -8,7 +8,7 @@ import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
 import { errorMessage } from "../utils/errors.js";
-import { isRecord } from "../utils/types.js";
+import { isNonEmptyString, isRecord } from "../utils/types.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
 import { extractFetchError } from "../utils/fetch.js";
@@ -45,7 +45,7 @@ const BASE_URL = `http://${MCP_HOST}:${PORT}`;
 // lifetime. Same resolution order as bridges/cli/token.ts.
 function readSessionToken(): string {
   const fromEnv = process.env.MULMOCLAUDE_AUTH_TOKEN;
-  if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv;
+  if (isNonEmptyString(fromEnv)) return fromEnv;
   return readTextSafeSync(WORKSPACE_PATHS.sessionToken)?.trim() ?? "";
 }
 const SESSION_TOKEN = readSessionToken();

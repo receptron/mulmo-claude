@@ -8,7 +8,7 @@
 // Pure — no I/O. Unit-testable with fixture strings.
 
 import { XMLParser } from "fast-xml-parser";
-import { isRecord } from "../../../utils/types.js";
+import { isNonEmptyString, isRecord } from "../../../utils/types.js";
 
 export interface ParsedFeedItem {
   // Best-effort stable identity from the feed itself. For RSS
@@ -236,7 +236,7 @@ type AtomLinkOutcome =
 // and report whether it's a rel="alternate" winner, a usable
 // fallback, or nothing we can use.
 function classifyAtomLinkCandidate(candidate: unknown): AtomLinkOutcome {
-  if (typeof candidate === "string" && candidate.length > 0) {
+  if (isNonEmptyString(candidate)) {
     // Form 1: bare `<link>url</link>`. Unattributed → fallback.
     return { kind: "fallback", href: candidate };
   }
@@ -261,9 +261,8 @@ function classifyAtomLinkCandidate(candidate: unknown): AtomLinkOutcome {
 //   - an array (pick the first non-empty)
 // Returns null when nothing plausibly-textual is found.
 function readString(value: unknown): string | null {
-  if (typeof value === "string") {
-    return value.length > 0 ? value : null;
-  }
+  if (isNonEmptyString(value)) return value;
+  if (typeof value === "string") return null;
   if (isRecord(value)) return readStringFromRecord(value);
   if (Array.isArray(value)) return readStringFromArray(value);
   return null;
@@ -271,9 +270,9 @@ function readString(value: unknown): string | null {
 
 function readStringFromRecord(record: Record<string, unknown>): string | null {
   const text = record["#text"];
-  if (typeof text === "string" && text.length > 0) return text;
+  if (isNonEmptyString(text)) return text;
   const cdata = record["#cdata"];
-  if (typeof cdata === "string" && cdata.length > 0) return cdata;
+  if (isNonEmptyString(cdata)) return cdata;
   return null;
 }
 

@@ -8,7 +8,7 @@ import { log } from "../../system/logger/index.js";
 import { WEB_SEARCH_TOOL_NAME, classifyToolResult } from "./classify.js";
 import { writeSearchResult } from "./writeSearch.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
-import { isRecord } from "../../utils/types.js";
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
 export interface ToolCallEvent {
   type: typeof EVENT_TYPES.toolCall;
@@ -121,7 +121,7 @@ function extractUrl(args: unknown): string | null {
   if (!isRecord(args)) return null;
   const record = args;
   const raw = record.url;
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  return isNonEmptyString(raw) ? raw : null;
 }
 
 // Emit progress on the result side. For WebSearch we specifically

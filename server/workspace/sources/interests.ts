@@ -11,7 +11,7 @@ import { log } from "../../system/logger/index.js";
 import type { SourceItem } from "./types.js";
 import type { CategorySlug } from "./taxonomy.js";
 import { isCategorySlug } from "./taxonomy.js";
-import { isRecord } from "../../utils/types.js";
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -59,9 +59,7 @@ function validateInterests(raw: unknown): InterestsProfile | null {
 
   // Filter out blank/whitespace-only keywords — "" matches every title
   const keywords = Array.isArray(obj.keywords)
-    ? obj.keywords.filter(
-        (k): k is string => typeof k === "string" && k.trim().length > 0,
-      )
+    ? obj.keywords.filter((k): k is string => isNonEmptyString(k))
     : [];
 
   const categories = Array.isArray(obj.categories)

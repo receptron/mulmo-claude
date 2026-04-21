@@ -50,7 +50,7 @@ import {
   serverError,
 } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
-import { isRecord } from "../../utils/types.js";
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
 const router = Router();
 
@@ -477,7 +477,7 @@ export function validateFetcherParams(raw: unknown): FetcherParams | null {
 // English sources registrable even when they can't produce an
 // ASCII-meaningful slug.
 export function resolveSlug(rawSlug: unknown, title: string): string | null {
-  if (typeof rawSlug === "string" && rawSlug.trim().length > 0) {
+  if (isNonEmptyString(rawSlug)) {
     const candidate = rawSlug.trim();
     return isValidSlug(candidate) ? candidate : null;
   }

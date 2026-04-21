@@ -23,8 +23,9 @@
 import { randomBytes } from "crypto";
 import fs from "fs";
 import { writeFileAtomic } from "../../utils/files/index.js";
-import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { log } from "../../system/logger/index.js";
+import { isNonEmptyString } from "../../utils/types.js";
+import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 
 const TOKEN_BYTES = 32; // 64 hex chars
 // Below this length a random 32-byte token would be 64 hex chars;
@@ -67,7 +68,7 @@ export async function generateAndWriteToken(
 }
 
 function resolveToken(override: string | undefined): string {
-  if (typeof override === "string" && override.length > 0) {
+  if (isNonEmptyString(override)) {
     if (override.length < MIN_RECOMMENDED_CHARS) {
       // Visible on startup so a half-typed override doesn't silently
       // become a security hole in dev.
