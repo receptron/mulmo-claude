@@ -46,10 +46,10 @@ const displayTitle = computed(() => {
   if (props.result.title) {
     return props.result.title;
   }
-  const md = resolvedMarkdown.value;
-  if (md) {
-    const h1 = extractFirstH1(md);
-    if (h1) return h1;
+  const markdown = resolvedMarkdown.value;
+  if (markdown) {
+    const heading = extractFirstH1(markdown);
+    if (heading) return heading;
   }
   return "Markdown Document";
 });
@@ -60,18 +60,18 @@ const resolvedMarkdown = computed(() => {
   return isFilePath(raw) ? fetchedContent.value : raw;
 });
 
-function extractPreview(md: string): string {
-  const lines = md
+function extractPreview(markdown: string): string {
+  const lines = markdown
     .split("\n")
-    .filter((l) => !/^#{1,6}\s/.test(l) && l.trim() !== "")
-    .map((l) => l.replace(/[*_`~[\]]/g, "").trim())
+    .filter((line) => !/^#{1,6}\s/.test(line) && line.trim() !== "")
+    .map((line) => line.replace(/[*_`~[\]]/g, "").trim())
     .filter(Boolean);
   return lines.slice(0, 6).join("\n");
 }
 
 const contentPreview = computed(() => {
-  const md = resolvedMarkdown.value;
-  if (!md) return "";
-  return extractPreview(md);
+  const markdown = resolvedMarkdown.value;
+  if (!markdown) return "";
+  return extractPreview(markdown);
 });
 </script>

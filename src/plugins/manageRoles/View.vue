@@ -157,7 +157,7 @@ interface PluginEntry {
 // Plugins the user can assign — exclude internal/auto-managed ones
 const EXCLUDED = new Set(["text-response", "switchRole"]);
 const guiPlugins: PluginEntry[] = getAllPluginNames()
-  .filter((p) => !EXCLUDED.has(p))
+  .filter((name) => !EXCLUDED.has(name))
   .map((name) => ({ name, enabled: true, requiredEnv: [] }));
 
 const availablePlugins = ref<PluginEntry[]>(guiPlugins);
@@ -229,7 +229,7 @@ function selectRole(role: CustomRole) {
     name: role.name,
     icon: role.icon,
     prompt: role.prompt,
-    selectedPlugins: role.availablePlugins.filter((p) => p !== "switchRole"),
+    selectedPlugins: role.availablePlugins.filter((plugin) => plugin !== "switchRole"),
     queriesText: (role.queries ?? []).join("\n"),
   };
 }
@@ -273,18 +273,18 @@ async function refreshList() {
   }
 }
 
-async function saveEdit(id: string) {
+async function saveEdit(roleId: string) {
   saving.value = true;
   saveError.value = "";
   const role: CustomRole = {
-    id,
+    id: roleId,
     name: editForm.value.name.trim(),
     icon: editForm.value.icon.trim(),
     prompt: editForm.value.prompt,
     availablePlugins: editForm.value.selectedPlugins,
     queries: editForm.value.queriesText
       .split("\n")
-      .map((s) => s.trim())
+      .map((line) => line.trim())
       .filter(Boolean),
   };
   const result = await callManage({ action: "update", role });
@@ -297,10 +297,10 @@ async function saveEdit(id: string) {
   saving.value = false;
 }
 
-async function deleteRole(id: string) {
+async function deleteRole(roleId: string) {
   saving.value = true;
   saveError.value = "";
-  const result = await callManage({ action: "delete", roleId: id });
+  const result = await callManage({ action: "delete", roleId });
   if (result.success) {
     selectedId.value = null;
     await refreshList();

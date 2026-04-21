@@ -276,8 +276,8 @@ const items = ref<ScheduledItem[]>(props.selectedResult?.data?.items ?? []);
 const { refresh } = useFreshPluginData<ScheduledItem[]>({
   endpoint: () => API_ROUTES.scheduler.base,
   extract: (json) => {
-    const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
-    return Array.isArray(v) ? v : null;
+    const payload = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
+    return Array.isArray(payload) ? payload : null;
   },
   apply: (data) => {
     items.value = data;
@@ -306,20 +306,20 @@ const currentDate = ref(new Date());
 // ── Calendar utilities ─────────────────────────────────────────────────────
 
 function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
+  const result = new Date(date);
+  const day = result.getDay();
   const diff = day === 0 ? -6 : 1 - day; // Monday start
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  result.setDate(result.getDate() + diff);
+  result.setHours(0, 0, 0, 0);
+  return result;
 }
 
 function getWeekDays(date: Date): Date[] {
   const start = startOfWeek(date);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
+  return Array.from({ length: 7 }, (__unused, i) => {
+    const next = new Date(start);
+    next.setDate(start.getDate() + i);
+    return next;
   });
 }
 
@@ -328,11 +328,11 @@ function getMonthGrid(year: number, month: number): Date[][] {
   const start = startOfWeek(firstDay);
   const weeks: Date[][] = [];
   const WEEK_COUNT = 6;
-  for (let w = 0; w < WEEK_COUNT; w++) {
+  for (let weekIdx = 0; weekIdx < WEEK_COUNT; weekIdx++) {
     const week: Date[] = [];
-    for (let d = 0; d < 7; d++) {
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
       const date = new Date(start);
-      date.setDate(start.getDate() + w * 7 + d);
+      date.setDate(start.getDate() + weekIdx * 7 + dayIdx);
       week.push(date);
     }
     weeks.push(week);
@@ -345,22 +345,22 @@ function isCurrentMonth(date: Date): boolean {
 }
 
 function toDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function itemsForDay(day: Date): ScheduledItem[] {
-  const ds = toDateString(day);
-  return items.value.filter((item) => String(item.props.date) === ds);
+  const dateStr = toDateString(day);
+  return items.value.filter((item) => String(item.props.date) === dateStr);
 }
 
 const unscheduledItems = computed(() => items.value.filter((item) => !item.props.date));
 
 function itemTime(item: ScheduledItem): string {
-  const t = item.props.time;
-  return typeof t === "string" ? t : "";
+  const time = item.props.time;
+  return typeof time === "string" ? time : "";
 }
 
 function dayLabel(date: Date): string {
@@ -376,7 +376,7 @@ const monthGrid = computed(() => getMonthGrid(currentDate.value.getFullYear(), c
 const headerLabel = computed(() => {
   if (viewMode.value === "week") {
     const days = weekDays.value;
-    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const fmt = (date: Date) => date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     return `${fmt(days[0])} – ${fmt(days[6])}, ${days[0].getFullYear()}`;
   }
   return currentDate.value.toLocaleDateString(undefined, {
@@ -390,43 +390,43 @@ function goToday() {
 }
 
 function goPrev() {
-  const d = new Date(currentDate.value);
+  const next = new Date(currentDate.value);
   if (viewMode.value === "week") {
-    d.setDate(d.getDate() - 7);
+    next.setDate(next.getDate() - 7);
   } else {
-    d.setMonth(d.getMonth() - 1);
+    next.setMonth(next.getMonth() - 1);
   }
-  currentDate.value = d;
+  currentDate.value = next;
 }
 
 function goNext() {
-  const d = new Date(currentDate.value);
+  const next = new Date(currentDate.value);
   if (viewMode.value === "week") {
-    d.setDate(d.getDate() + 7);
+    next.setDate(next.getDate() + 7);
   } else {
-    d.setMonth(d.getMonth() + 1);
+    next.setMonth(next.getMonth() + 1);
   }
-  currentDate.value = d;
+  currentDate.value = next;
 }
 
 // ── YAML helpers ────────────────────────────────────────────────────────────
 
-function yamlStringValue(v: string): string {
-  const needsQuotes = v === "" || /[:#[\]{},&*?|<>=!%@`]/.test(v) || /^\s|\s$/.test(v) || /^(true|false|null|~)$/i.test(v) || /^\d/.test(v);
+function yamlStringValue(raw: string): string {
+  const needsQuotes = raw === "" || /[:#[\]{},&*?|<>=!%@`]/.test(raw) || /^\s|\s$/.test(raw) || /^(true|false|null|~)$/i.test(raw) || /^\d/.test(raw);
   if (needsQuotes) {
-    return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    return `"${raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
-  return v;
+  return raw;
 }
 
 function serializeYaml(item: ScheduledItem): string {
   const lines: string[] = [`title: ${yamlStringValue(item.title)}`];
-  for (const [k, v] of Object.entries(item.props)) {
-    if (v === null) continue;
-    if (typeof v === "string") {
-      lines.push(`${k}: ${yamlStringValue(v)}`);
+  for (const [key, value] of Object.entries(item.props)) {
+    if (value === null) continue;
+    if (typeof value === "string") {
+      lines.push(`${key}: ${yamlStringValue(value)}`);
     } else {
-      lines.push(`${k}: ${v}`);
+      lines.push(`${key}: ${value}`);
     }
   }
   return lines.join("\n");
@@ -504,13 +504,13 @@ async function applyItemEdit() {
     yamlError.value = "Could not parse YAML — ensure 'title' is present";
     return;
   }
-  const ok = await callApi({
+  const success = await callApi({
     action: "update",
     id: selectedId.value,
     title: parsed.title,
     props: parsed.props,
   });
-  if (ok) selectedId.value = null;
+  if (success) selectedId.value = null;
 }
 
 // ── JSON source editor ───────────────────────────────────────────────────────
@@ -556,8 +556,8 @@ async function applyChanges() {
   try {
     parsed = JSON.parse(editorText.value);
     if (!Array.isArray(parsed)) throw new Error("Expected a JSON array");
-  } catch (e) {
-    parseError.value = e instanceof Error ? e.message : "Invalid JSON";
+  } catch (err) {
+    parseError.value = err instanceof Error ? err.message : "Invalid JSON";
     return;
   }
   callApi({ action: "replace", items: parsed });

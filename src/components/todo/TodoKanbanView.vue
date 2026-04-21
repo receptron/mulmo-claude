@@ -163,11 +163,11 @@ watch(
 );
 
 function onColumnDragEnd(): void {
-  const before = props.columns.map((c) => c.id);
-  const after = columnsLocal.value.map((c) => c.id);
+  const before = props.columns.map((column) => column.id);
+  const after = columnsLocal.value.map((column) => column.id);
   // No-op drops: avoid an unnecessary network round-trip when the
   // drop position equals the original.
-  if (before.length === after.length && before.every((id, i) => id === after[i])) {
+  if (before.length === after.length && before.every((columnId, i) => columnId === after[i])) {
     return;
   }
   emit("reorderColumns", after);
@@ -179,19 +179,19 @@ const itemsByStatus = computed(() => {
   const map = new Map<string, TodoItem[]>();
   for (const col of props.columns) map.set(col.id, []);
   for (const item of props.filteredItems) {
-    const id = item.status ?? props.columns[0]?.id;
-    if (!id) continue;
-    if (!map.has(id)) map.set(id, []);
-    map.get(id)!.push(item);
+    const columnId = item.status ?? props.columns[0]?.id;
+    if (!columnId) continue;
+    if (!map.has(columnId)) map.set(columnId, []);
+    map.get(columnId)!.push(item);
   }
   for (const list of map.values()) {
-    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    list.sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
   }
   return map;
 });
 
-function itemsByColumn(id: string): TodoItem[] {
-  return itemsByStatus.value.get(id) ?? [];
+function itemsByColumn(columnId: string): TodoItem[] {
+  return itemsByStatus.value.get(columnId) ?? [];
 }
 
 function onDragChange(columnId: string, event: DragChangeEvent): void {
@@ -211,8 +211,8 @@ const renamingId = ref<string | null>(null);
 const renameDraft = ref("");
 const renameInput = ref<HTMLInputElement[] | HTMLInputElement | null>(null);
 
-function toggleMenu(id: string): void {
-  menuOpenId.value = menuOpenId.value === id ? null : id;
+function toggleMenu(columnId: string): void {
+  menuOpenId.value = menuOpenId.value === columnId ? null : columnId;
 }
 
 function startRename(col: StatusColumn): void {
@@ -221,29 +221,29 @@ function startRename(col: StatusColumn): void {
   renameDraft.value = col.label;
   void nextTick(() => {
     const inputRef = renameInput.value;
-    const el = Array.isArray(inputRef) ? inputRef[0] : inputRef;
-    el?.focus();
-    el?.select();
+    const input = Array.isArray(inputRef) ? inputRef[0] : inputRef;
+    input?.focus();
+    input?.select();
   });
 }
 
-function commitRename(id: string): void {
-  if (renamingId.value !== id) return;
+function commitRename(columnId: string): void {
+  if (renamingId.value !== columnId) return;
   const next = renameDraft.value.trim();
   renamingId.value = null;
   if (next.length === 0) return;
-  const current = props.columns.find((c) => c.id === id);
+  const current = props.columns.find((column) => column.id === columnId);
   if (!current || current.label === next) return;
-  emit("renameColumn", id, next);
+  emit("renameColumn", columnId, next);
 }
 
-function deleteColumn(id: string): void {
+function deleteColumn(columnId: string): void {
   menuOpenId.value = null;
-  emit("deleteColumn", id);
+  emit("deleteColumn", columnId);
 }
 
-function markAsDone(id: string): void {
+function markAsDone(columnId: string): void {
   menuOpenId.value = null;
-  emit("markDone", id);
+  emit("markDone", columnId);
 }
 </script>

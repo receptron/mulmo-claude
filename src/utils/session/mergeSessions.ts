@@ -63,10 +63,10 @@ function buildLiveSummary(live: ActiveSession, serverEntry: SessionSummary | und
 // if updatedAt ties (same second-granularity mtime on two
 // server-only rows, say), fall back to `startedAt`. Exported so
 // tests can exercise the tie-break directly.
-export function compareSessionsByRecency(a: SessionSummary, b: SessionSummary): number {
-  const byUpdated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+export function compareSessionsByRecency(left: SessionSummary, right: SessionSummary): number {
+  const byUpdated = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
   if (byUpdated !== 0) return byUpdated;
-  return Date.parse(b.startedAt) - Date.parse(a.startedAt);
+  return Date.parse(right.startedAt) - Date.parse(left.startedAt);
 }
 
 // Merge live sessions (in-memory, still editable) with server
@@ -75,10 +75,10 @@ export function compareSessionsByRecency(a: SessionSummary, b: SessionSummary): 
 // but pull over the server's AI title / summary / keywords when
 // present. Pure, returns a new array; does not mutate inputs.
 export function mergeSessionLists(liveSessions: readonly ActiveSession[], serverSessions: readonly SessionSummary[]): SessionSummary[] {
-  const liveIds = new Set(liveSessions.map((s) => s.id));
-  const serverById = new Map<string, SessionSummary>(serverSessions.map((s) => [s.id, s]));
+  const liveIds = new Set(liveSessions.map((session) => session.id));
+  const serverById = new Map<string, SessionSummary>(serverSessions.map((session) => [session.id, session]));
   const liveSummaries = liveSessions.map((live) => buildLiveSummary(live, serverById.get(live.id)));
-  const serverOnly = serverSessions.filter((s) => !liveIds.has(s.id));
+  const serverOnly = serverSessions.filter((session) => !liveIds.has(session.id));
   return [...liveSummaries, ...serverOnly].sort(compareSessionsByRecency);
 }
 
@@ -95,9 +95,9 @@ export function mergeSessionLists(liveSessions: readonly ActiveSession[], server
 // sites that don't care which they got.
 export function applySessionDiff(cache: readonly SessionSummary[], diff: readonly SessionSummary[], deletedIds: readonly string[]): SessionSummary[] {
   const deleted = new Set(deletedIds);
-  const diffById = new Map<string, SessionSummary>(diff.map((s) => [s.id, s]));
-  const kept = cache.filter((s) => !deleted.has(s.id)).map((s) => diffById.get(s.id) ?? s);
-  const existingIds = new Set(kept.map((s) => s.id));
-  const added = diff.filter((s) => !existingIds.has(s.id));
+  const diffById = new Map<string, SessionSummary>(diff.map((session) => [session.id, session]));
+  const kept = cache.filter((session) => !deleted.has(session.id)).map((session) => diffById.get(session.id) ?? session);
+  const existingIds = new Set(kept.map((session) => session.id));
+  const added = diff.filter((session) => !existingIds.has(session.id));
   return [...kept, ...added].sort(compareSessionsByRecency);
 }

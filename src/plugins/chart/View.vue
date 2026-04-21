@@ -52,8 +52,8 @@ const containers = ref<Array<HTMLDivElement | null>>([]);
 // imperatively and should not trigger Vue re-renders on mutation.
 const instances: echarts.ECharts[] = [];
 
-function setChartRef(idx: number, el: HTMLDivElement | null): void {
-  containers.value[idx] = el;
+function setChartRef(idx: number, element: HTMLDivElement | null): void {
+  containers.value[idx] = element;
 }
 
 function disposeAll(): void {
@@ -69,8 +69,8 @@ function disposeAll(): void {
 // (zoomOnMouseWheel=true), which traps the scroll over the canvas.
 // Toolbox/slider/drag zoom still work — only the wheel is disabled.
 function disableWheelZoom(option: Record<string, unknown>): Record<string, unknown> {
-  const dz = option.dataZoom;
-  if (dz === undefined || dz === null) return option;
+  const dataZoom = option.dataZoom;
+  if (dataZoom === undefined || dataZoom === null) return option;
   const normalise = (entry: unknown): unknown => {
     if (!isRecord(entry)) return entry;
     return {
@@ -79,17 +79,17 @@ function disableWheelZoom(option: Record<string, unknown>): Record<string, unkno
       moveOnMouseWheel: false,
     };
   };
-  const next = Array.isArray(dz) ? dz.map(normalise) : normalise(dz);
+  const next = Array.isArray(dataZoom) ? dataZoom.map(normalise) : normalise(dataZoom);
   return { ...option, dataZoom: next };
 }
 
 function renderAll(): void {
   disposeAll();
   for (let i = 0; i < charts.value.length; i += 1) {
-    const el = containers.value[i];
+    const element = containers.value[i];
     const chart = charts.value[i];
-    if (!el || !chart) continue;
-    const instance = echarts.init(el);
+    if (!element || !chart) continue;
+    const instance = echarts.init(element);
     try {
       instance.setOption(disableWheelZoom(chart.option));
     } catch (err) {
@@ -133,11 +133,11 @@ function exportPng(idx: number, chartTitle?: string): void {
   while (filenameSlug.startsWith("-")) filenameSlug = filenameSlug.slice(1);
   while (filenameSlug.endsWith("-")) filenameSlug = filenameSlug.slice(0, -1);
   if (!filenameSlug) filenameSlug = "chart";
-  const a = document.createElement("a");
-  a.href = dataUrl;
-  a.download = `${filenameSlug}-${idx + 1}.png`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const anchor = document.createElement("a");
+  anchor.href = dataUrl;
+  anchor.download = `${filenameSlug}-${idx + 1}.png`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
 }
 </script>

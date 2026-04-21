@@ -290,11 +290,11 @@ interface RegisterPayload {
   fetcherParams: Record<string, string>;
 }
 
-function buildRegisterPayload(d: DraftState): RegisterPayload | string {
-  const primary = d.primary.trim();
-  const title = d.title.trim();
+function buildRegisterPayload(input: DraftState): RegisterPayload | string {
+  const primary = input.primary.trim();
+  const title = input.title.trim();
   if (!primary) return "Please fill in the URL / query field.";
-  switch (d.kind) {
+  switch (input.kind) {
     case "rss": {
       if (!/^https?:\/\//i.test(primary)) {
         return "RSS feed URL must start with http:// or https://";
@@ -324,7 +324,7 @@ function buildRegisterPayload(d: DraftState): RegisterPayload | string {
       return {
         title: title || slug,
         url: `https://github.com/${slug}`,
-        fetcherKind: d.kind,
+        fetcherKind: input.kind,
         fetcherParams: { github_repo: slug },
       };
     }
@@ -440,8 +440,8 @@ const PRESETS: Preset[] = [
 
 async function installPreset(preset: Preset): Promise<void> {
   busy.value = `preset-${preset.id}`;
-  const alreadyHave = new Set(sources.value.map((s) => s.slug));
-  const toRegister = preset.entries.filter((e) => !alreadyHave.has(e.slug));
+  const alreadyHave = new Set(sources.value.map((source) => source.slug));
+  const toRegister = preset.entries.filter((entry) => !alreadyHave.has(entry.slug));
   if (toRegister.length === 0) {
     flash(`All sources in "${preset.label}" are already registered.`);
     busy.value = null;
@@ -607,16 +607,16 @@ const briefFilePath = ref("");
 // Build `news/daily/YYYY/MM/DD.md` from an ISO date. Local-time
 // matches how the pipeline writes the file (see toLocalIsoDate).
 function dailyPathFor(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-");
-  return `news/daily/${y}/${m}/${d}.md`;
+  const [year, month, day] = isoDate.split("-");
+  return `news/daily/${year}/${month}/${day}.md`;
 }
 
 function todayIsoDate(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 // Monotonically-increasing token so concurrent loadBrief() calls

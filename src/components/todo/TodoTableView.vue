@@ -118,33 +118,33 @@ function setSort(key: SortKey): void {
   }
 }
 
-function toggleExpand(id: string): void {
-  expandedId.value = expandedId.value === id ? null : id;
+function toggleExpand(itemId: string): void {
+  expandedId.value = expandedId.value === itemId ? null : itemId;
 }
 
-function onSave(id: string, input: PatchItemInput): void {
-  emit("patch", id, input);
+function onSave(itemId: string, input: PatchItemInput): void {
+  emit("patch", itemId, input);
   expandedId.value = null;
 }
 
 function statusLabel(item: TodoItem): string {
   if (!item.status) return "";
-  return props.columns.find((c) => c.id === item.status)?.label ?? "";
+  return props.columns.find((col) => col.id === item.status)?.label ?? "";
 }
 
-function compareValues(a: unknown, b: unknown): number {
+function compareValues(left: unknown, right: unknown): number {
   // Undefined sorts last regardless of direction so empty cells stay
   // at the bottom of the list (ascending) or top (descending — flipped
   // by the caller). This matches GitHub's "issues with no due date"
   // ordering, which I find the least surprising.
-  if (a === undefined && b === undefined) return 0;
-  if (a === undefined) return 1;
-  if (b === undefined) return -1;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "boolean" && typeof b === "boolean") {
-    return a === b ? 0 : a ? 1 : -1;
+  if (left === undefined && right === undefined) return 0;
+  if (left === undefined) return 1;
+  if (right === undefined) return -1;
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  if (typeof left === "boolean" && typeof right === "boolean") {
+    return left === right ? 0 : left ? 1 : -1;
   }
-  return String(a).localeCompare(String(b));
+  return String(left).localeCompare(String(right));
 }
 
 function sortValueOf(item: TodoItem, key: SortKey): unknown {
@@ -168,8 +168,8 @@ function sortValueOf(item: TodoItem, key: SortKey): unknown {
 
 const sortedItems = computed(() => {
   const list = [...props.filteredItems];
-  list.sort((x, y) => {
-    const result = compareValues(sortValueOf(x, sortKey.value), sortValueOf(y, sortKey.value));
+  list.sort((left, right) => {
+    const result = compareValues(sortValueOf(left, sortKey.value), sortValueOf(right, sortKey.value));
     return sortDir.value === "asc" ? result : -result;
   });
   return list;

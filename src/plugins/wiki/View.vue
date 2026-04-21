@@ -124,12 +124,12 @@ const { refresh } = useFreshPluginData<WikiData>({
 watch(
   () => props.selectedResult?.uuid,
   () => {
-    const d = props.selectedResult?.data;
-    if (d) {
-      action.value = d.action ?? "index";
-      title.value = d.title ?? "Wiki";
-      content.value = d.content ?? "";
-      pageEntries.value = d.pageEntries ?? [];
+    const data = props.selectedResult?.data;
+    if (data) {
+      action.value = data.action ?? "index";
+      title.value = data.title ?? "Wiki";
+      content.value = data.content ?? "";
+      pageEntries.value = data.pageEntries ?? [];
     }
     void refresh();
   },
@@ -214,19 +214,19 @@ async function downloadPdf() {
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${title.value}.pdf`;
-  a.click();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${title.value}.pdf`;
+  anchor.click();
   URL.revokeObjectURL(url);
   pdfDownloading.value = false;
 }
 
-function handleContentClick(e: MouseEvent) {
+function handleContentClick(event: MouseEvent) {
   // 1. Internal wiki links: `[[Page Name]]` was rewritten to a
   //    `<span class="wiki-link">` during markdown pre-processing,
   //    so it doesn't overlap with regular `<a>` handling.
-  const target = e.target as HTMLElement;
+  const target = event.target as HTMLElement;
   const link = target.closest(".wiki-link") as HTMLElement | null;
   if (link?.dataset.page) {
     navigatePage(link.dataset.page);
@@ -236,7 +236,7 @@ function handleContentClick(e: MouseEvent) {
   //    in a new tab so clicking them doesn't navigate the whole
   //    SPA away from MulmoClaude. Same-origin and non-http links
   //    (mailto:, tel:, anchors) fall through to the browser default.
-  handleExternalLinkClick(e);
+  handleExternalLinkClick(event);
 }
 </script>
 

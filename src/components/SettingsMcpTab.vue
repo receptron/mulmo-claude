@@ -204,23 +204,25 @@ const ID_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 // Covers the common shapes: a scoped npm package in stdio args
 // (`@modelcontextprotocol/server-everything` → `everything`), or a
 // hostname for an HTTP url (`mcp.deepwiki.com` → `deepwiki`).
-function suggestIdFromDraft(d: DraftState): string {
-  if (d.type === "http") {
-    return suggestIdFromUrl(d.url.trim());
+function suggestIdFromDraft(state: DraftState): string {
+  if (state.type === "http") {
+    return suggestIdFromUrl(state.url.trim());
   }
-  const args = d.argsText
+  const args = state.argsText
     .split("\n")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   return suggestIdFromStdioArgs(args);
 }
 
 function suggestIdFromUrl(rawUrl: string): string {
   try {
     const host = new URL(rawUrl).hostname;
-    const parts = host.split(".").filter((p) => p.length > 0);
+    const parts = host.split(".").filter((part) => part.length > 0);
     // Drop generic subdomain / TLD noise so `mcp.deepwiki.com` → `deepwiki`.
-    const filtered = parts.filter((p, i) => !(i === 0 && (p === "mcp" || p === "www" || p === "api")) && !(i === parts.length - 1 && /^[a-z]{2,4}$/.test(p)));
+    const filtered = parts.filter(
+      (part, i) => !(i === 0 && (part === "mcp" || part === "www" || part === "api")) && !(i === parts.length - 1 && /^[a-z]{2,4}$/.test(part)),
+    );
     const candidate = filtered[0] ?? parts[0] ?? "";
     return slugifyToId(candidate);
   } catch {
@@ -230,7 +232,7 @@ function suggestIdFromUrl(rawUrl: string): string {
 
 function suggestIdFromStdioArgs(args: string[]): string {
   // First arg that isn't a flag is typically the package/script name.
-  const payload = args.find((a) => !a.startsWith("-"));
+  const payload = args.find((arg) => !arg.startsWith("-"));
   if (!payload) return "";
   // For scoped packages / paths, keep only the last segment.
   const lastSegment = payload.split("/").pop() ?? payload;
@@ -254,10 +256,10 @@ function slugifyToId(raw: string): string {
 
 function ensureUniqueId(base: string): string {
   if (!base) return "";
-  if (!props.servers.some((s) => s.id === base)) return base;
+  if (!props.servers.some((server) => server.id === base)) return base;
   for (let i = 2; i < 1000; i += 1) {
     const candidate = `${base}-${i}`;
-    if (!props.servers.some((s) => s.id === candidate)) return candidate;
+    if (!props.servers.some((server) => server.id === candidate)) return candidate;
   }
   return "";
 }
@@ -276,7 +278,7 @@ function commitAdd(): void {
     draftError.value = "Name must start with a lowercase letter and contain only [a-z0-9_-].";
     return;
   }
-  if (props.servers.some((s) => s.id === id)) {
+  if (props.servers.some((server) => server.id === id)) {
     draftError.value = `Server id "${id}" already exists.`;
     return;
   }
@@ -291,8 +293,8 @@ function commitAdd(): void {
   } else {
     const args = draft.value.argsText
       .split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
     spec = {
       type: "stdio",
       command: draft.value.command,

@@ -19,12 +19,12 @@ interface TodosResponse {
   data?: { items?: TodoItem[]; columns?: StatusColumn[] };
 }
 
-function isTodoItemArray(x: unknown): x is TodoItem[] {
-  return Array.isArray(x);
+function isTodoItemArray(value: unknown): value is TodoItem[] {
+  return Array.isArray(value);
 }
 
-function isStatusColumnArray(x: unknown): x is StatusColumn[] {
-  return Array.isArray(x);
+function isStatusColumnArray(value: unknown): value is StatusColumn[] {
+  return Array.isArray(value);
 }
 
 function extractItems(json: unknown): TodoItem[] | null {
@@ -114,10 +114,10 @@ export function useTodos(initialItems: TodoItem[] = [], initialColumns: StatusCo
   }>({
     endpoint: () => API_ROUTES.todos.list,
     extract: (json) => {
-      const i = extractItems(json);
-      const c = extractColumns(json);
-      if (!i) return null;
-      return { items: i, columns: c ?? [] };
+      const extractedItems = extractItems(json);
+      const extractedColumns = extractColumns(json);
+      if (!extractedItems) return null;
+      return { items: extractedItems, columns: extractedColumns ?? [] };
     },
     apply: ({ items: nextItems, columns: nextColumns }) => {
       items.value = nextItems;
@@ -131,9 +131,9 @@ export function useTodos(initialItems: TodoItem[] = [], initialColumns: StatusCo
   // through the same `error` ref the rest of the composable uses.
   async function refresh(): Promise<boolean> {
     error.value = null;
-    const ok = await rawRefresh();
-    if (!ok) error.value = "Failed to load todos";
-    return ok;
+    const success = await rawRefresh();
+    if (!success) error.value = "Failed to load todos";
+    return success;
   }
 
   // Thin wrapper around apiCall that applies the response payload

@@ -68,20 +68,20 @@ describe("buildTreeAsync", () => {
 
   it("orders dirs before files, alphabetically within type", async () => {
     const tree = (await buildTreeAsync(root, "")) as TreeNodeShape;
-    const names = (tree.children ?? []).map((c) => c.name);
+    const names = (tree.children ?? []).map((child) => child.name);
     // dir1 (dir) should come before a.md (file).
     assert.ok(names.indexOf("dir1") < names.indexOf("a.md"));
   });
 
   it("hides `.git/` hidden dir", async () => {
     const tree = (await buildTreeAsync(root, "")) as TreeNodeShape;
-    const names = (tree.children ?? []).map((c) => c.name);
+    const names = (tree.children ?? []).map((child) => child.name);
     assert.ok(!names.includes(".git"));
   });
 
   it("hides `.env`, `id_rsa`, and `*.key` sensitive files", async () => {
     const tree = (await buildTreeAsync(root, "")) as TreeNodeShape;
-    const names = (tree.children ?? []).map((c) => c.name);
+    const names = (tree.children ?? []).map((child) => child.name);
     assert.ok(!names.includes(".env"));
     assert.ok(!names.includes("id_rsa"));
     assert.ok(!names.includes("ok.key"));
@@ -89,13 +89,13 @@ describe("buildTreeAsync", () => {
 
   it("recurses into subdirs (sub/c.md reachable via dir1/sub)", async () => {
     const tree = (await buildTreeAsync(root, "")) as TreeNodeShape;
-    const dir1 = (tree.children ?? []).find((c) => c.name === "dir1");
+    const dir1 = (tree.children ?? []).find((child) => child.name === "dir1");
     assert.ok(dir1);
-    const sub = (dir1.children ?? []).find((c) => c.name === "sub");
+    const sub = (dir1.children ?? []).find((child) => child.name === "sub");
     assert.ok(sub);
-    const c = (sub.children ?? []).find((n) => n.name === "c.md");
-    assert.ok(c);
-    assert.equal(c.type, "file");
+    const leaf = (sub.children ?? []).find((node) => node.name === "c.md");
+    assert.ok(leaf);
+    assert.equal(leaf.type, "file");
   });
 
   it("skips symlinks (no workspace escape)", async () => {
@@ -106,7 +106,7 @@ describe("buildTreeAsync", () => {
     try {
       await symlink(linkTarget, linkPath);
       const tree = (await buildTreeAsync(root, "")) as TreeNodeShape;
-      const names = (tree.children ?? []).map((c) => c.name);
+      const names = (tree.children ?? []).map((child) => child.name);
       assert.ok(!names.includes("escape"));
     } finally {
       await rm(linkPath, { force: true });
@@ -136,7 +136,7 @@ describe("listDirShallow", () => {
   it("returns only the immediate children, no nested `children` field on sub-dirs", async () => {
     const node = (await listDirShallow(root, "")) as TreeNodeShape;
     assert.equal(node.type, "dir");
-    const dir1 = (node.children ?? []).find((c) => c.name === "dir1");
+    const dir1 = (node.children ?? []).find((child) => child.name === "dir1");
     assert.ok(dir1);
     assert.equal(dir1.type, "dir");
     // Shallow → no grandchildren materialised.
@@ -145,7 +145,7 @@ describe("listDirShallow", () => {
 
   it("applies the same hidden/sensitive filters as the recursive walk", async () => {
     const node = (await listDirShallow(root, "")) as TreeNodeShape;
-    const names = (node.children ?? []).map((c) => c.name);
+    const names = (node.children ?? []).map((child) => child.name);
     assert.ok(!names.includes(".git"));
     assert.ok(!names.includes(".env"));
     assert.ok(!names.includes("id_rsa"));
@@ -154,19 +154,19 @@ describe("listDirShallow", () => {
 
   it("orders dirs before files, alphabetically", async () => {
     const node = (await listDirShallow(root, "")) as TreeNodeShape;
-    const names = (node.children ?? []).map((c) => c.name);
+    const names = (node.children ?? []).map((child) => child.name);
     assert.ok(names.indexOf("dir1") < names.indexOf("a.md"));
   });
 
   it("reads a sub-directory when given its path", async () => {
     const subAbs = path.join(root, "dir1");
     const node = (await listDirShallow(subAbs, "dir1")) as TreeNodeShape;
-    const names = (node.children ?? []).map((c) => c.name);
+    const names = (node.children ?? []).map((child) => child.name);
     // dir1 contains `b.md` (file) and `sub/` (dir).
     assert.ok(names.includes("b.md"));
     assert.ok(names.includes("sub"));
     // sub/ reported as a dir, not expanded.
-    const sub = (node.children ?? []).find((c) => c.name === "sub");
+    const sub = (node.children ?? []).find((child) => child.name === "sub");
     assert.equal(sub?.type, "dir");
     assert.equal(sub?.children, undefined);
   });

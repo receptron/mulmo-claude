@@ -27,17 +27,17 @@ const NOTIFICATION_DOT_COLOR = "#F97316"; // orange-500
 const SIZE = 32;
 const RADIUS = 6;
 
-function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function drawRoundedRect(ctx: CanvasRenderingContext2D, posX: number, posY: number, width: number, height: number, radius: number): void {
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(posX + radius, posY);
+  ctx.lineTo(posX + width - radius, posY);
+  ctx.quadraticCurveTo(posX + width, posY, posX + width, posY + radius);
+  ctx.lineTo(posX + width, posY + height - radius);
+  ctx.quadraticCurveTo(posX + width, posY + height, posX + width - radius, posY + height);
+  ctx.lineTo(posX + radius, posY + height);
+  ctx.quadraticCurveTo(posX, posY + height, posX, posY + height - radius);
+  ctx.lineTo(posX, posY + radius);
+  ctx.quadraticCurveTo(posX, posY, posX + radius, posY);
   ctx.closePath();
 }
 

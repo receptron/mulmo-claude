@@ -219,11 +219,11 @@ function clearFilters(): void {
 
 const filteredItems = computed(() => {
   const byLabels = filterByLabels(items.value, [...activeFilters.value]);
-  const q = search.value.trim().toLowerCase();
-  if (q.length === 0) return byLabels;
+  const query = search.value.trim().toLowerCase();
+  if (query.length === 0) return byLabels;
   return byLabels.filter((item) => {
-    if (item.text.toLowerCase().includes(q)) return true;
-    if (item.note?.toLowerCase().includes(q)) return true;
+    if (item.text.toLowerCase().includes(query)) return true;
+    if (item.note?.toLowerCase().includes(query)) return true;
     return false;
   });
 });
@@ -241,8 +241,8 @@ function quickAddInColumn(statusId: string): void {
 }
 
 async function onCreateItem(input: CreateItemInput): Promise<void> {
-  const ok = await createItem(input);
-  if (ok) {
+  const created = await createItem(input);
+  if (created) {
     addOpen.value = false;
     addDefaultStatus.value = undefined;
   }
@@ -256,8 +256,8 @@ const newColumnLabel = ref("");
 async function commitNewColumn(): Promise<void> {
   const label = newColumnLabel.value.trim();
   if (label.length === 0) return;
-  const ok = await addColumn({ label });
-  if (ok) {
+  const added = await addColumn({ label });
+  if (added) {
     addColumnOpen.value = false;
     newColumnLabel.value = "";
   }
@@ -277,33 +277,33 @@ onUnmounted(() => document.removeEventListener("keydown", onExplorerKeydown));
 
 // ── Item handlers ──────────────────────────────────────────────
 
-function onPatchItem(id: string, input: PatchItemInput): void {
-  void patchItem(id, input);
+function onPatchItem(itemId: string, input: PatchItemInput): void {
+  void patchItem(itemId, input);
 }
 
 // Single confirm gate for every item deletion path: row "✕" buttons
 // in list/table, the kanban edit dialog's delete button, anything
 // else that wants to remove an item. Centralised so we never
 // accidentally bypass the confirm in a future caller.
-function confirmAndDelete(id: string): boolean {
-  const item = items.value.find((i) => i.id === id);
+function confirmAndDelete(itemId: string): boolean {
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return false;
-  const ok = window.confirm(`Delete "${item.text}"?`);
-  if (!ok) return false;
-  void deleteItem(id);
+  const confirmed = window.confirm(`Delete "${item.text}"?`);
+  if (!confirmed) return false;
+  void deleteItem(itemId);
   return true;
 }
 
-function onDeleteItem(id: string): void {
-  confirmAndDelete(id);
+function onDeleteItem(itemId: string): void {
+  confirmAndDelete(itemId);
 }
 
 function onToggleComplete(item: TodoItem): void {
   void patchItem(item.id, { completed: !item.completed });
 }
 
-function onMove(id: string, statusId: string, position: number): void {
-  void moveItem(id, { status: statusId, position });
+function onMove(itemId: string, statusId: string, position: number): void {
+  void moveItem(itemId, { status: statusId, position });
 }
 
 // ── Edit dialog (kanban click) ─────────────────────────────────
@@ -319,37 +319,37 @@ function onOpenItem(item: TodoItem): void {
 async function onEditDialogSave(input: PatchItemInput): Promise<void> {
   const target = editingItem.value;
   if (!target) return;
-  const ok = await patchItem(target.id, input);
-  if (ok) editingItem.value = null;
+  const saved = await patchItem(target.id, input);
+  if (saved) editingItem.value = null;
 }
 
-function onEditDialogDelete(id: string): void {
+function onEditDialogDelete(itemId: string): void {
   // Funnel through the same confirm gate as the inline ✕ buttons.
   // The dialog only closes if the user confirmed; if they cancelled
   // the confirm, the dialog stays open so they can keep editing.
-  if (confirmAndDelete(id)) editingItem.value = null;
+  if (confirmAndDelete(itemId)) editingItem.value = null;
 }
 
 // ── Column handlers ────────────────────────────────────────────
 
-function onRenameColumn(id: string, label: string): void {
-  void patchColumn(id, { label });
+function onRenameColumn(columnId: string, label: string): void {
+  void patchColumn(columnId, { label });
 }
 
-function onDeleteColumn(id: string): void {
+function onDeleteColumn(columnId: string): void {
   // Use a native confirm dialog: deleting a column reassigns its
   // items, which is reversible but worth a beat. The other column
   // operations (rename, mark-done) are inexpensive enough not to need
   // confirmation.
-  const col = columns.value.find((c) => c.id === id);
+  const col = columns.value.find((column) => column.id === columnId);
   if (!col) return;
-  const ok = window.confirm(`Delete column "${col.label}"? Items in this column will be moved to another column.`);
-  if (!ok) return;
-  void deleteColumn(id);
+  const confirmed = window.confirm(`Delete column "${col.label}"? Items in this column will be moved to another column.`);
+  if (!confirmed) return;
+  void deleteColumn(columnId);
 }
 
-function onMarkDone(id: string): void {
-  void patchColumn(id, { isDone: true });
+function onMarkDone(columnId: string): void {
+  void patchColumn(columnId, { isDone: true });
 }
 
 function onReorderColumns(ids: string[]): void {

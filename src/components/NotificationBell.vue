@@ -9,9 +9,9 @@ const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
 
-function onDocumentClick(e: MouseEvent): void {
+function onDocumentClick(event: MouseEvent): void {
   if (!open.value || !rootRef.value) return;
-  if (!rootRef.value.contains(e.target as Node)) {
+  if (!rootRef.value.contains(event.target as Node)) {
     close();
   }
 }
@@ -30,8 +30,8 @@ const emit = defineEmits<{
 
 watch(
   () => props.forceClose,
-  (v) => {
-    if (v && open.value) close();
+  (shouldClose) => {
+    if (shouldClose && open.value) close();
   },
 );
 
@@ -46,24 +46,24 @@ function close(): void {
   emit("update:open", false);
 }
 
-function iconName(n: NotificationPayload): string {
-  return n.icon ?? NOTIFICATION_ICONS[n.kind] ?? "notifications";
+function iconName(notification: NotificationPayload): string {
+  return notification.icon ?? NOTIFICATION_ICONS[notification.kind] ?? "notifications";
 }
 
 function formatTime(iso: string): string {
   return formatRelativeTime(iso);
 }
 
-function handleClick(n: NotificationPayload): void {
-  if (n.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
-    emit("navigate", n.action);
+function handleClick(notification: NotificationPayload): void {
+  if (notification.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
+    emit("navigate", notification.action);
     close();
   }
 }
 
-function handleDismiss(e: Event, id: string): void {
-  e.stopPropagation();
-  dismiss(id);
+function handleDismiss(event: Event, notificationId: string): void {
+  event.stopPropagation();
+  dismiss(notificationId);
 }
 </script>
 

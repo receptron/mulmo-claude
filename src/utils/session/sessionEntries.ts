@@ -40,7 +40,7 @@ export function parseSessionEntries(entries: readonly SessionEntry[]): ToolResul
 //      any kind.
 //   4. If the list is empty, return null.
 export function resolveSelectedUuid(toolResults: readonly ToolResultComplete[], urlResult: string | null): string | null {
-  if (urlResult && toolResults.some((r) => r.uuid === urlResult)) {
+  if (urlResult && toolResults.some((result) => result.uuid === urlResult)) {
     return urlResult;
   }
   // Iterate backwards for the "last non-text" lookup so callers
@@ -75,11 +75,11 @@ export function resolveSessionTimestamps(serverSummary: SessionSummary | undefin
 // Real-time results will overwrite with Date.now() via pushResult.
 export function interpolateTimestamps(toolResults: readonly ToolResultComplete[], startedAt: string, updatedAt: string): Map<string, number> {
   const timestamps = new Map<string, number>();
-  const t0 = new Date(startedAt).getTime();
-  const t1 = new Date(updatedAt).getTime();
-  toolResults.forEach((r, i) => {
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(updatedAt).getTime();
+  toolResults.forEach((result, i) => {
     const frac = toolResults.length > 1 ? i / (toolResults.length - 1) : 0;
-    timestamps.set(r.uuid, t0 + (t1 - t0) * frac);
+    timestamps.set(result.uuid, startMs + (endMs - startMs) * frac);
   });
   return timestamps;
 }
@@ -96,7 +96,7 @@ export function buildLoadedSession(opts: {
   nowIso: string;
 }): ActiveSession {
   const { id, entries, defaultRoleId, urlResult, serverSummary, nowIso } = opts;
-  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
+  const meta = entries.find((entry) => entry.type === EVENT_TYPES.sessionMeta);
   const roleId = meta?.roleId ?? defaultRoleId;
   const toolResults = parseSessionEntries(entries);
   const selectedResultUuid = resolveSelectedUuid(toolResults, urlResult);

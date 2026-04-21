@@ -4,7 +4,7 @@
     <div
       v-for="result in toolResults"
       :key="result.uuid"
-      :ref="(el) => setItemRef(result.uuid, el as HTMLElement | null)"
+      :ref="(element) => setItemRef(result.uuid, element as HTMLElement | null)"
       class="bg-white rounded-lg border transition-colors"
       :class="result.uuid === selectedResultUuid ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200'"
     >
@@ -39,7 +39,11 @@
            / flex-1 via the .stack-natural scoped styles below. For
            plugins that embed iframes (e.g. presentHtml) we also size
            each iframe to its content after load. -->
-      <div v-else-if="isStackNatural(result.toolName)" :ref="(el) => setNaturalWrapperRef(result.uuid, el as HTMLElement | null)" class="stack-natural">
+      <div
+        v-else-if="isStackNatural(result.toolName)"
+        :ref="(element) => setNaturalWrapperRef(result.uuid, element as HTMLElement | null)"
+        class="stack-natural"
+      >
         <component
           :is="getPlugin(result.toolName)?.viewComponent"
           v-if="getPlugin(result.toolName)?.viewComponent"
@@ -117,15 +121,15 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const itemRefs = new Map<string, HTMLElement>();
 const naturalWrapperRefs = new Map<string, HTMLElement>();
 
-function setItemRef(uuid: string, el: HTMLElement | null): void {
-  if (el) itemRefs.set(uuid, el);
+function setItemRef(uuid: string, element: HTMLElement | null): void {
+  if (element) itemRefs.set(uuid, element);
   else itemRefs.delete(uuid);
 }
 
-function setNaturalWrapperRef(uuid: string, el: HTMLElement | null): void {
-  if (el) {
-    naturalWrapperRefs.set(uuid, el);
-    nextTick(() => sizeIframesIn(el));
+function setNaturalWrapperRef(uuid: string, element: HTMLElement | null): void {
+  if (element) {
+    naturalWrapperRefs.set(uuid, element);
+    nextTick(() => sizeIframesIn(element));
   } else {
     naturalWrapperRefs.delete(uuid);
   }
@@ -203,8 +207,8 @@ function beginSuppressScrollSync(): void {
   }, SCROLL_SPY_SUPPRESS_MS);
 }
 
-function readPaddingTop(el: HTMLElement): number {
-  const value = parseFloat(getComputedStyle(el).paddingTop);
+function readPaddingTop(element: HTMLElement): number {
+  const value = parseFloat(getComputedStyle(element).paddingTop);
   return Number.isFinite(value) ? value : 0;
 }
 
@@ -220,9 +224,9 @@ function computeActiveUuidFromScroll(): string | null {
   const paddedTop = container.getBoundingClientRect().top + readPaddingTop(container);
   let activeUuid: string | null = null;
   for (const result of props.toolResults) {
-    const el = itemRefs.get(result.uuid);
-    if (!el) continue;
-    if (el.getBoundingClientRect().top <= paddedTop) {
+    const element = itemRefs.get(result.uuid);
+    if (!element) continue;
+    if (element.getBoundingClientRect().top <= paddedTop) {
       activeUuid = result.uuid;
     } else {
       break;
@@ -260,10 +264,10 @@ watch(
     }
     scrollSpyEmittedUuid = null;
     nextTick(() => {
-      const el = itemRefs.get(uuid);
-      if (!el) return;
+      const element = itemRefs.get(uuid);
+      if (!element) return;
       beginSuppressScrollSync();
-      el.scrollIntoView({ block: "start", behavior: "auto" });
+      element.scrollIntoView({ block: "start", behavior: "auto" });
     });
   },
 );
@@ -297,10 +301,10 @@ onMounted(() => {
   // item so the sidebar and stack start in sync on mount.
   nextTick(() => {
     if (!props.selectedResultUuid) return;
-    const el = itemRefs.get(props.selectedResultUuid);
-    if (!el) return;
+    const element = itemRefs.get(props.selectedResultUuid);
+    if (!element) return;
     beginSuppressScrollSync();
-    el.scrollIntoView({ block: "start", behavior: "auto" });
+    element.scrollIntoView({ block: "start", behavior: "auto" });
   });
 });
 
