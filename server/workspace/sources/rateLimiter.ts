@@ -41,7 +41,7 @@ export interface RateLimiterDeps {
 export function defaultRateLimiterDeps(): RateLimiterDeps {
   return {
     now: () => Date.now(),
-    sleep: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    sleep: (millis: number) => new Promise<void>((resolve) => setTimeout(resolve, millis)),
   };
 }
 

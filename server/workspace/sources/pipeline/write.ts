@@ -130,11 +130,11 @@ export function renderItemForArchive(item: SourceItem): string {
 // Malformed dates fall back to the caller-supplied default
 // (typically the current YYYY-MM) so we don't drop items.
 export function archiveMonthFor(isoPublishedAt: string, fallbackMonth: string): string {
-  const ts = Date.parse(isoPublishedAt);
-  if (!Number.isFinite(ts)) return fallbackMonth;
-  const d = new Date(ts);
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const parsed = Date.parse(isoPublishedAt);
+  if (!Number.isFinite(parsed)) return fallbackMonth;
+  const date = new Date(parsed);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 

@@ -17,7 +17,7 @@ export interface McpTool {
 
 export const mcpTools: McpTool[] = [readXPost, searchX];
 
-const toolMap = new Map(mcpTools.map((t) => [t.definition.name, t]));
+const toolMap = new Map(mcpTools.map((tool) => [tool.definition.name, tool]));
 
 export function isMcpToolEnabled(tool: McpTool): boolean {
   return (tool.requiredEnv ?? []).every((key) => !!process.env[key]);
@@ -34,11 +34,11 @@ interface McpToolParams {
 // GET /api/mcp-tools — returns { name, enabled, requiredEnv } for each tool (used by the role builder UI)
 mcpToolsRouter.get(API_ROUTES.mcpTools.list, (_req: Request, res: Response) => {
   res.json(
-    mcpTools.map((t) => ({
-      name: t.definition.name,
-      enabled: isMcpToolEnabled(t),
-      requiredEnv: t.requiredEnv ?? [],
-      prompt: t.prompt,
+    mcpTools.map((tool) => ({
+      name: tool.definition.name,
+      enabled: isMcpToolEnabled(tool),
+      requiredEnv: tool.requiredEnv ?? [],
+      prompt: tool.prompt,
     })),
   );
 });

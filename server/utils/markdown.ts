@@ -68,15 +68,15 @@ export function rewriteMarkdownLinks(input: string, rewrite: (href: string) => s
  * Split a trailing `#fragment` or `?query` off a path so the caller
  * can rewrite the path portion and concatenate the suffix back.
  */
-export function splitFragmentAndQuery(s: string): {
+export function splitFragmentAndQuery(href: string): {
   pathPart: string;
   suffix: string;
 } {
-  const hashIdx = s.indexOf("#");
-  const queryIdx = s.indexOf("?");
+  const hashIdx = href.indexOf("#");
+  const queryIdx = href.indexOf("?");
   let cut = -1;
   if (hashIdx !== -1) cut = hashIdx;
   if (queryIdx !== -1 && (cut === -1 || queryIdx < cut)) cut = queryIdx;
-  if (cut === -1) return { pathPart: s, suffix: "" };
-  return { pathPart: s.slice(0, cut), suffix: s.slice(cut) };
+  if (cut === -1) return { pathPart: href, suffix: "" };
+  return { pathPart: href.slice(0, cut), suffix: href.slice(cut) };
 }

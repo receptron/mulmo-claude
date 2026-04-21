@@ -55,17 +55,17 @@ interface DeleteSkillResponse {
 router.get(API_ROUTES.skills.list, async (_req: Request, res: Response<SkillsListResponse>) => {
   const skills = await discoverSkills({ workspaceRoot: workspacePath });
   res.json({
-    skills: skills.map((s) => ({
-      name: s.name,
-      description: s.description,
-      source: s.source,
+    skills: skills.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      source: skill.source,
     })),
   });
 });
 
 router.get(API_ROUTES.skills.detail, async (req: Request<{ name: string }>, res: Response<SkillDetailResponse | ErrorResponse>) => {
   const skills = await discoverSkills({ workspaceRoot: workspacePath });
-  const skill = skills.find((s) => s.name === req.params.name);
+  const skill = skills.find((candidate) => candidate.name === req.params.name);
   if (!skill) {
     notFound(res, `skill not found: ${req.params.name}`);
     return;

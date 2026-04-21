@@ -71,11 +71,11 @@ export function newsRoot(workspaceRoot: string): string {
 export function dailyNewsPath(workspaceRoot: string, isoDate: string): string {
   // Validate shape at the boundary so an empty / bogus date can't
   // produce "undefined/undefined/undefined.md" downstream.
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (!m) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) {
     throw new Error(`[sources] dailyNewsPath: expected YYYY-MM-DD, got "${isoDate}"`);
   }
-  const [, year, month, day] = m;
+  const [, year, month, day] = match;
   return path.join(newsRoot(workspaceRoot), DAILY_DIR, year, month, `${day}.md`);
 }
 
@@ -94,11 +94,11 @@ export function archiveDir(workspaceRoot: string, slug: string): string {
 // to split; we do the split here.
 export function archivePath(workspaceRoot: string, slug: string, yearMonth: string): string {
   assertValidSlug(slug);
-  const m = /^(\d{4})-(\d{2})$/.exec(yearMonth);
-  if (!m) {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth);
+  if (!match) {
     throw new Error(`[sources] archivePath: expected YYYY-MM, got "${yearMonth}"`);
   }
-  const [, year, month] = m;
+  const [, year, month] = match;
   return path.join(archiveDir(workspaceRoot, slug), year, `${month}.md`);
 }
 

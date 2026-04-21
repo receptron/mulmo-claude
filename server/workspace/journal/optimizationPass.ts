@@ -54,7 +54,7 @@ export function planMerges(merges: readonly RawMerge[]): MergePlanItem[] {
   const plans: MergePlanItem[] = [];
   for (const merge of merges) {
     const intoSlug = slugify(merge.into);
-    const fromSlugs = merge.from.map(slugify).filter((s) => s !== intoSlug);
+    const fromSlugs = merge.from.map(slugify).filter((slug) => slug !== intoSlug);
     if (fromSlugs.length === 0) continue;
     plans.push({ intoSlug, fromSlugs, newContent: merge.newContent });
   }
@@ -66,7 +66,7 @@ export function planMerges(merges: readonly RawMerge[]): MergePlanItem[] {
 export function applyRemovedTopics(state: JournalState, removed: ReadonlySet<string>): JournalState {
   return {
     ...state,
-    knownTopics: state.knownTopics.filter((t) => !removed.has(t)),
+    knownTopics: state.knownTopics.filter((topic) => !removed.has(topic)),
   };
 }
 

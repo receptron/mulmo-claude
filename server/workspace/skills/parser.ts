@@ -56,9 +56,9 @@ function parseScheduleValue(raw: string): SkillSchedule["parsed"] {
   // daily HH:MM — validate range: HH 00-23, MM 00-59
   const dailyMatch = trimmed.match(/^daily\s+(\d{2}):(\d{2})$/);
   if (dailyMatch) {
-    const hh = Number(dailyMatch[1]);
-    const mm = Number(dailyMatch[2]);
-    if (hh > 23 || mm > 59) return null;
+    const hours = Number(dailyMatch[1]);
+    const minutes = Number(dailyMatch[2]);
+    if (hours > 23 || minutes > 59) return null;
     return {
       type: SCHEDULE_TYPES.daily,
       time: `${dailyMatch[1]}:${dailyMatch[2]}`,
@@ -70,9 +70,9 @@ function parseScheduleValue(raw: string): SkillSchedule["parsed"] {
   if (intervalMatch) {
     const value = Number(intervalMatch[1]);
     const unit = intervalMatch[2];
-    const ms = TIME_UNIT_MS[unit];
-    if (!ms) return null;
-    const intervalMs = value * ms;
+    const unitMs = TIME_UNIT_MS[unit];
+    if (!unitMs) return null;
+    const intervalMs = value * unitMs;
     if (intervalMs < MIN_INTERVAL_MS) return null;
     return { type: SCHEDULE_TYPES.interval, intervalMs };
   }
