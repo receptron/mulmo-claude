@@ -227,10 +227,10 @@ if (env.isProduction) {
   // `{ index: false }` so express.static doesn't intercept `GET /`
   // with the built index.html. We need our own handler that reads
   // the file and substitutes the bearer token placeholder on each
-  // request — see the `app.get("*")` fallback below.
+  // request — see the wildcard fallback below.
   app.use(express.static(path.join(__dirname, "../client"), { index: false }));
   const indexHtmlPath = path.join(__dirname, "../client/index.html");
-  app.get("*", (_req: Request, res: Response) => {
+  app.get("/{*splat}", (_req: Request, res: Response) => {
     let html: string;
     try {
       html = fs.readFileSync(indexHtmlPath, "utf-8");

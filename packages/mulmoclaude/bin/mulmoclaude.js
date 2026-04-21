@@ -2,17 +2,20 @@
 
 // MulmoClaude launcher — `npx mulmoclaude` entry point.
 //
-// The npm package ships with pre-built server + client in dist/.
-// This script starts the Express server in production mode.
+// Ships with server source (TypeScript) + pre-built client (Vite).
+// Runs the server via tsx (TypeScript executor).
 
-import { execSync, fork } from "child_process";
+import { execSync, spawn } from "child_process";
 import { existsSync } from "fs";
+import { createRequire } from "module";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
+const require = createRequire(import.meta.url);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DIST_SERVER = join(__dirname, "..", "dist", "server", "server", "index.js");
-const DIST_CLIENT = join(__dirname, "..", "dist", "client");
+const PKG_DIR = join(__dirname, "..");
+const SERVER_ENTRY = join(PKG_DIR, "server", "index.ts");
 const DEFAULT_PORT = 3001;
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -32,6 +35,12 @@ function checkClaude() {
   } catch {
     return false;
   }
+}
+
+function pickOpenCommand() {
+  if (process.platform === "darwin") return "open";
+  if (process.platform === "win32") return "start";
+  return "xdg-open";
 }
 
 // ── Parse args ──────────────────────────────────────────────
@@ -74,9 +83,8 @@ if (!checkClaude()) {
 
 log("Claude Code CLI ✓");
 
-if (!existsSync(DIST_SERVER)) {
-  error(`Server dist not found at ${DIST_SERVER}`);
-  error("The package may be corrupted. Try: npm cache clean --force && npx mulmoclaude");
+if (!existsSync(SERVER_ENTRY)) {
+  error(`Server source not found at ${SERVER_ENTRY}`);
   process.exit(1);
 }
 
@@ -84,15 +92,26 @@ if (!existsSync(DIST_SERVER)) {
 
 log(`Starting MulmoClaude on port ${port}...`);
 
-const env = {
-  ...process.env,
-  NODE_ENV: "production",
-  PORT: String(port),
-};
+// Resolve tsx's CLI entry via Node's module resolution so this works
+// whether tsx is nested (`npx`/local install) or hoisted (`npm i -g`).
+// tsx doesn't export `./cli`, so locate via its package.json + `bin`.
+let tsxCli;
+try {
+  const tsxPkgJson = require.resolve("tsx/package.json");
+  const tsxPkg = require(tsxPkgJson);
+  tsxCli = join(dirname(tsxPkgJson), tsxPkg.bin);
+} catch {
+  error("Failed to locate 'tsx' — the package may be installed incorrectly.");
+  process.exit(1);
+}
 
-const server = fork(DIST_SERVER, [], {
-  cwd: join(__dirname, ".."),
-  env,
+const server = spawn(process.execPath, [tsxCli, SERVER_ENTRY], {
+  cwd: PKG_DIR,
+  env: {
+    ...process.env,
+    NODE_ENV: "production",
+    PORT: String(port),
+  },
   stdio: "inherit",
 });
 
@@ -101,18 +120,15 @@ if (!noOpen) {
   setTimeout(() => {
     const url = `http://localhost:${port}`;
     log(`Opening ${url}`);
-    const openCmd =
-      process.platform === "darwin"
-        ? "open"
-        : process.platform === "win32"
-          ? "start"
-          : "xdg-open";
+    const openCmd = pickOpenCommand();
     try {
+      // openCmd is a hard-coded literal; url is http://localhost:<numeric-port>.
+      // eslint-disable-next-line sonarjs/os-command
       execSync(`${openCmd} ${url}`, { stdio: "pipe" });
     } catch {
       log(`Open your browser: ${url}`);
     }
-  }, 2000);
+  }, 3000);
 }
 
 // Graceful shutdown

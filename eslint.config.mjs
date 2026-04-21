@@ -16,7 +16,16 @@ export default [
     ],
   },
   {
-    ignores: ["lib", "src/plugins/spreadsheet/engine", "packages/*/dist"],
+    ignores: [
+      "lib",
+      "src/plugins/spreadsheet/engine",
+      "packages/*/dist",
+      // mulmoclaude launcher copies server/client/shared src here at
+      // publish time. Original sources are linted at their real paths.
+      "packages/mulmoclaude/client",
+      "packages/mulmoclaude/server",
+      "packages/mulmoclaude/src",
+    ],
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,

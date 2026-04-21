@@ -8,11 +8,14 @@
   },
   "scripts": {
     "prepublish:copy": "node bin/prepare-dist.js",
+    "typecheck": "echo \"mulmoclaude: no typecheck (launcher is plain JS; server and src are dist artifacts)\"",
     "test": "echo no tests yet"
   },
   "files": [
     "bin/",
-    "dist/"
+    "client/",
+    "server/",
+    "src/"
   ],
   "dependencies": {
     "@mulmobridge/chat-service": "^0.1.0",
@@ -40,7 +43,8 @@
     "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "tsx": "^4.19.0"
   },
   "engines": {
     "node": ">=20"
