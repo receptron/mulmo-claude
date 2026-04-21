@@ -20,6 +20,8 @@ export interface AppApi {
   refreshRoles: () => void | Promise<void>;
   /** Send a chat message through App.vue's normal sendMessage pipeline. */
   sendMessage: (message: string) => void;
+  /** Navigate to a workspace-internal link (wiki page, file, session). */
+  navigateToWorkspacePath: (href: string) => void;
 }
 
 const APP_API_KEY = Symbol("appApi");

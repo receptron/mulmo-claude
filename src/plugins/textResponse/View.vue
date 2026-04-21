@@ -46,8 +46,12 @@ import { marked } from "marked";
 import type { ToolResult, ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "./types";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { classifyWorkspacePath } from "../../utils/path/workspaceLinkRouter";
+import { useAppApi } from "../../composables/useAppApi";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
+
+const appApi = useAppApi();
 
 const props = withDefaults(
   defineProps<{
@@ -161,11 +165,17 @@ const isAssistant = computed(() => (props.selectedResult.data?.role ?? "assistan
 
 function openLinksInNewTab(event: MouseEvent): void {
   if (handleExternalLinkClick(event)) return;
-  // Prevent relative workspace-path links (rendered by marked from
-  // agent Markdown) from navigating the SPA to a non-existent route.
+  // Internal workspace-path links (rendered by marked from agent
+  // Markdown): route to the appropriate view instead of letting them
+  // navigate the SPA to a non-existent session route.
   const target = event.target as HTMLElement;
-  if (target.closest("a")) {
-    event.preventDefault();
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href");
+  if (!href || href.startsWith("#")) return;
+  event.preventDefault();
+  if (classifyWorkspacePath(href)) {
+    appApi.navigateToWorkspacePath(href);
   }
 }
 

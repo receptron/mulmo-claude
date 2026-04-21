@@ -35,6 +35,7 @@ function applyViewToQuery(currentQuery: LocationQuery, mode: CanvasViewMode): Lo
   // Remove ?path= when leaving the files view — it's only meaningful
   // in files mode and would cause a stale file selection on reload.
   if (mode !== CANVAS_VIEW.files) delete rest.path;
+  if (mode !== CANVAS_VIEW.wiki) delete rest.page;
   if (mode === CANVAS_VIEW.single) return rest;
   return { ...rest, view: mode };
 }
