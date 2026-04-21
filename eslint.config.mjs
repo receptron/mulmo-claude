@@ -64,6 +64,7 @@ export default [
             "_",
             "i",
             "j",
+            "ok",
             "fs",
             "os"
           ],
