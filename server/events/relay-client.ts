@@ -3,6 +3,11 @@
 // Connects to the Relay (Cloudflare Workers) and forwards incoming
 // platform messages to the chat-service relay function. Handles
 // reconnection with exponential backoff.
+//
+// NOTE: packages/relay/src/client.ts is a parallel implementation
+// for browser/edge environments using the global WebSocket API.
+// This module uses the `ws` npm package for Node.js. If you change
+// reconnection logic or URL handling here, check the other file too.
 
 import WebSocket from "ws";
 import type { ChatService } from "@mulmobridge/chat-service";
@@ -52,6 +57,7 @@ const LOG_PREFIX = "relay-client";
 const TRANSPORT_ID = "relay";
 const MIN_RECONNECT_MS = ONE_SECOND_MS;
 const MAX_RECONNECT_MS = 30 * ONE_SECOND_MS;
+const MAX_RESPONSE_QUEUE = 100;
 
 // ── Factory ─────────────────────────────────────────────────
 
@@ -62,16 +68,31 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
   let reconnectMs = MIN_RECONNECT_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
+  const responseQueue: RelayResponse[] = [];
+
+  function buildUrl(): string {
+    const url = new URL(relayUrl);
+    url.searchParams.set("token", relayToken);
+    return url.toString();
+  }
 
   function connect(): void {
     if (stopped) return;
 
-    const url = `${relayUrl}?token=${relayToken}`;
-    ws = new WebSocket(url);
+    try {
+      ws = new WebSocket(buildUrl());
+    } catch (err) {
+      logger.error(LOG_PREFIX, "failed to create WebSocket", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      scheduleReconnect();
+      return;
+    }
 
     ws.on("open", () => {
       logger.info(LOG_PREFIX, "connected", { url: relayUrl });
       reconnectMs = MIN_RECONNECT_MS;
+      flushResponseQueue();
     });
 
     ws.on("message", (data) => {
@@ -137,8 +158,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
         text: msg.text,
       });
 
-      const replyText =
-        result.kind === "ok" ? result.reply : `Error: ${result.message}`;
+      const replyText = result.kind === "ok" ? result.reply : `Error: ${result.message}`;
 
       sendResponse({
         platform: msg.platform,
@@ -155,14 +175,36 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
   }
 
   function sendResponse(response: RelayResponse): void {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      logger.warn(LOG_PREFIX, "cannot send response, not connected", {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(response));
+      return;
+    }
+    // Queue for delivery on reconnect
+    if (responseQueue.length >= MAX_RESPONSE_QUEUE) {
+      logger.error(LOG_PREFIX, "response queue full, dropping oldest", {
         platform: response.platform,
         chatId: response.chatId,
       });
-      return;
+      responseQueue.shift();
     }
-    ws.send(JSON.stringify(response));
+    responseQueue.push(response);
+    logger.error(LOG_PREFIX, "response queued (not connected)", {
+      platform: response.platform,
+      chatId: response.chatId,
+      queueSize: responseQueue.length,
+    });
+  }
+
+  function flushResponseQueue(): void {
+    if (responseQueue.length === 0) return;
+    logger.info(LOG_PREFIX, "flushing response queue", {
+      count: responseQueue.length,
+    });
+    while (responseQueue.length > 0) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) break;
+      const response = responseQueue.shift()!;
+      ws.send(JSON.stringify(response));
+    }
   }
 
   function disconnect(): void {
