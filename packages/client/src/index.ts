@@ -11,6 +11,8 @@ export {
 
 export { readBridgeToken, TOKEN_FILE_PATH } from "./token.js";
 
+export { chunkText } from "./text.js";
+
 export {
   mimeFromExtension,
   isImageMime,

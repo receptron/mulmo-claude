@@ -16,7 +16,7 @@
 import "dotenv/config";
 import crypto from "crypto";
 import express, { type Request, type Response } from "express";
-import { createBridgeClient } from "@mulmobridge/client";
+import { createBridgeClient, chunkText } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "line";
 const PORT = Number(process.env.LINE_BRIDGE_PORT) || 3002;
@@ -42,7 +42,10 @@ client.onPush((ev) => {
 // ── LINE API helpers ────────────────────────────────────────────
 
 async function pushMessage(userId: string, text: string): Promise<void> {
-  const messages = chunkText(text).map((t) => ({ type: "text", text: t }));
+  const messages = chunkText(text, 5000).map((t) => ({
+    type: "text",
+    text: t,
+  }));
   // LINE allows max 5 messages per push
   for (let i = 0; i < messages.length; i += 5) {
     try {
@@ -68,15 +71,6 @@ async function pushMessage(userId: string, text: string): Promise<void> {
       console.error(`[line] pushMessage network error: ${err}`);
     }
   }
-}
-
-function chunkText(text: string, max = 5000): string[] {
-  if (text.length === 0) return ["(empty reply)"];
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += max) {
-    chunks.push(text.slice(i, i + max));
-  }
-  return chunks;
 }
 
 // ── Signature verification ──────────────────────────────────────
