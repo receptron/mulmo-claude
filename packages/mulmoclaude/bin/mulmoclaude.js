@@ -103,9 +103,24 @@ if (args.includes("--version")) {
   process.exit(0);
 }
 
-const portIdx = args.indexOf("--port");
-const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : DEFAULT_PORT;
+const port = resolvePort();
 const noOpen = args.includes("--no-open");
+
+function resolvePort() {
+  const idx = args.indexOf("--port");
+  if (idx === -1) return DEFAULT_PORT;
+  const raw = args[idx + 1];
+  if (raw === undefined) {
+    error("--port requires a value (integer 1..65535)");
+    process.exit(1);
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || String(parsed) !== raw || parsed < 1 || parsed > 65535) {
+    error(`Invalid --port value: "${raw}" (expected integer 1..65535)`);
+    process.exit(1);
+  }
+  return parsed;
+}
 
 // ── Pre-flight checks ───────────────────────────────────────
 
