@@ -38,11 +38,13 @@ export function useContentDisplay(
 
   const jsonTokens = computed(() => {
     if (!content.value || content.value.kind !== "text") return [];
+    if (!isJson.value) return [];
     return tokenizeJson(prettyJson(content.value.content));
   });
 
   const jsonlLines = computed(() => {
     if (!content.value || content.value.kind !== "text") return [];
+    if (!isJsonl.value) return [];
     return tokenizeJsonl(content.value.content);
   });
 

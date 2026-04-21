@@ -23,8 +23,8 @@ export function useMarkdownLinkHandler(
   function handleMarkdownLinkClick(event: MouseEvent): void {
     if (event.button !== 0) return;
     if (event.ctrlKey || event.metaKey || event.shiftKey) return;
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
     const anchor = target.closest("a");
     if (!anchor) return;
     const href = anchor.getAttribute("href");

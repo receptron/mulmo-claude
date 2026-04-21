@@ -7,7 +7,7 @@
     <span v-if="size !== null" class="text-gray-400 shrink-0"
       >· {{ formatBytes(size) }}</span
     >
-    <span v-if="modifiedMs" class="text-gray-400 shrink-0"
+    <span v-if="modifiedMs !== null" class="text-gray-400 shrink-0"
       >· {{ formatDateTime(modifiedMs) }}</span
     >
     <button
