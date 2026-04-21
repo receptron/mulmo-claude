@@ -3,6 +3,7 @@
     ref="root"
     class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-100 outline-none"
     tabindex="0"
+    data-testid="tool-results-scroll"
     @mousedown="emit('activate')"
   >
     <div

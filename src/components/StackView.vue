@@ -2,6 +2,7 @@
   <div
     ref="containerRef"
     class="h-full overflow-y-auto bg-gray-50 p-4 space-y-3"
+    data-testid="stack-scroll"
   >
     <div
       v-if="toolResults.length === 0"
