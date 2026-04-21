@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import {
-  maybeAppendWikiBacklinks,
-  type WikiBacklinksDeps,
-} from "../../server/workspace/wiki-backlinks/index.js";
+import { maybeAppendWikiBacklinks, type WikiBacklinksDeps } from "../../server/workspace/wiki-backlinks/index.js";
 import { BACKLINKS_MARKER } from "../../server/workspace/wiki-backlinks/sessionBacklinks.js";
 import { WORKSPACE_DIRS } from "../../server/workspace/paths.js";
 
@@ -16,13 +13,7 @@ const SID = "3e0382cb-f02f-4f5b-a9a3-a71e50d7ad0c";
 // (conversations/chat/). Derived from WORKSPACE_DIRS so the layout
 // rename in #284 — or any future rename — only needs one source-of-
 // truth update.
-const EXPECTED_BACKLINK_HREF = path.posix.join(
-  "..",
-  "..",
-  "..",
-  WORKSPACE_DIRS.chat,
-  `${SID}.jsonl`,
-);
+const EXPECTED_BACKLINK_HREF = path.posix.join("..", "..", "..", WORKSPACE_DIRS.chat, `${SID}.jsonl`);
 
 async function setMtime(filePath: string, mtimeMs: number): Promise<void> {
   const secs = mtimeMs / 1000;
@@ -95,17 +86,7 @@ describe("maybeAppendWikiBacklinks (driver)", () => {
     await mkdir(pagesDir, { recursive: true });
 
     const filePath = path.join(pagesDir, "already.md");
-    const original = [
-      "# Already",
-      "",
-      "Body.",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session 3e0382cb](${EXPECTED_BACKLINK_HREF})`,
-      "",
-    ].join("\n");
+    const original = ["# Already", "", "Body.", "", BACKLINKS_MARKER, "## History", "", `- [session 3e0382cb](${EXPECTED_BACKLINK_HREF})`, ""].join("\n");
     await writeFile(filePath, original, "utf-8");
 
     let writeCalls = 0;

@@ -1,45 +1,24 @@
 <template>
-  <div
-    ref="containerRef"
-    class="h-full overflow-y-auto bg-gray-50 p-4 space-y-3"
-    data-testid="stack-scroll"
-  >
-    <div
-      v-if="toolResults.length === 0"
-      class="flex items-center justify-center h-full text-gray-400 text-sm"
-    >
-      No results yet
-    </div>
+  <div ref="containerRef" class="h-full overflow-y-auto bg-gray-50 p-4 space-y-3" data-testid="stack-scroll">
+    <div v-if="toolResults.length === 0" class="flex items-center justify-center h-full text-gray-400 text-sm">No results yet</div>
     <div
       v-for="result in toolResults"
       :key="result.uuid"
       :ref="(el) => setItemRef(result.uuid, el as HTMLElement | null)"
       class="bg-white rounded-lg border transition-colors"
-      :class="
-        result.uuid === selectedResultUuid
-          ? 'border-blue-400 ring-2 ring-blue-200'
-          : 'border-gray-200'
-      "
+      :class="result.uuid === selectedResultUuid ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200'"
     >
       <button
         class="w-full flex items-center gap-2 px-3 py-2 border-b border-gray-100 text-left hover:bg-gray-50"
         :title="result.title || result.toolName"
         @click="emit('select', result.uuid)"
       >
-        <span class="material-icons text-sm text-gray-400">{{
-          iconFor(result.toolName)
+        <span class="material-icons text-sm text-gray-400">{{ iconFor(result.toolName) }}</span>
+        <span class="text-sm font-medium text-gray-800 truncate">{{ result.title || result.toolName }}</span>
+        <span v-if="resultTimestamps.get(result.uuid)" class="text-[10px] text-gray-400 shrink-0">{{
+          formatSmartTime(resultTimestamps.get(result.uuid)!)
         }}</span>
-        <span class="text-sm font-medium text-gray-800 truncate">{{
-          result.title || result.toolName
-        }}</span>
-        <span
-          v-if="resultTimestamps.get(result.uuid)"
-          class="text-[10px] text-gray-400 shrink-0"
-          >{{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}</span
-        >
-        <span class="font-mono text-xs text-gray-400 shrink-0">{{
-          result.toolName
-        }}</span>
+        <span class="font-mono text-xs text-gray-400 shrink-0">{{ result.toolName }}</span>
       </button>
       <!-- text-response: render the message as Markdown via the
            underlying plugin View. The .stack-text-response class below
@@ -52,11 +31,7 @@
            "open external links in a new tab" click handler. Attach
            the same handler here via @click.capture so cross-origin
            links in assistant Markdown don't navigate the SPA away. -->
-      <div
-        v-if="isTextResponse(result)"
-        class="stack-text-response"
-        @click.capture="handleExternalLinkClick"
-      >
+      <div v-if="isTextResponse(result)" class="stack-text-response" @click.capture="handleExternalLinkClick">
         <TextResponseOriginalView :selected-result="result" />
       </div>
       <!-- Document-like plugins: let the content flow at its natural
@@ -64,13 +39,7 @@
            / flex-1 via the .stack-natural scoped styles below. For
            plugins that embed iframes (e.g. presentHtml) we also size
            each iframe to its content after load. -->
-      <div
-        v-else-if="isStackNatural(result.toolName)"
-        :ref="
-          (el) => setNaturalWrapperRef(result.uuid, el as HTMLElement | null)
-        "
-        class="stack-natural"
-      >
+      <div v-else-if="isStackNatural(result.toolName)" :ref="(el) => setNaturalWrapperRef(result.uuid, el as HTMLElement | null)" class="stack-natural">
         <component
           :is="getPlugin(result.toolName)?.viewComponent"
           v-if="getPlugin(result.toolName)?.viewComponent"
@@ -89,11 +58,7 @@
           :send-text-message="sendTextMessage"
           @update-result="(r: ToolResultComplete) => emit('updateResult', r)"
         />
-        <pre
-          v-else
-          class="h-full overflow-auto p-4 text-xs text-gray-500 whitespace-pre-wrap"
-          >{{ JSON.stringify(result, null, 2) }}</pre
-        >
+        <pre v-else class="h-full overflow-auto p-4 text-xs text-gray-500 whitespace-pre-wrap">{{ JSON.stringify(result, null, 2) }}</pre>
       </div>
     </div>
   </div>
@@ -192,19 +157,14 @@ function resizeOneIframe(iframe: HTMLIFrameElement): void {
   try {
     const doc = iframe.contentDocument;
     if (!doc) return;
-    const height = Math.max(
-      doc.documentElement?.scrollHeight ?? 0,
-      doc.body?.scrollHeight ?? 0,
-    );
+    const height = Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body?.scrollHeight ?? 0);
     if (height > 0) iframe.style.height = `${height}px`;
   } catch {
     // cross-origin sandbox — can't measure, leave default
   }
 }
 
-function isTextResponse(
-  result: ToolResultComplete,
-): result is ToolResultComplete<TextResponseData> {
+function isTextResponse(result: ToolResultComplete): result is ToolResultComplete<TextResponseData> {
   if (result.toolName !== "text-response") return false;
   const data = result.data;
   if (!isRecord(data)) return false;
@@ -257,8 +217,7 @@ function readPaddingTop(el: HTMLElement): number {
 function computeActiveUuidFromScroll(): string | null {
   if (!containerRef.value) return null;
   const container = containerRef.value;
-  const paddedTop =
-    container.getBoundingClientRect().top + readPaddingTop(container);
+  const paddedTop = container.getBoundingClientRect().top + readPaddingTop(container);
   let activeUuid: string | null = null;
   for (const result of props.toolResults) {
     const el = itemRefs.get(result.uuid);

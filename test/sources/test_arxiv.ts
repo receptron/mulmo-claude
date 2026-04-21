@@ -9,19 +9,10 @@ import {
   ARXIV_CURSOR_KEY,
   ARXIV_API_BASE,
 } from "../../server/workspace/sources/fetchers/arxiv.js";
-import type {
-  Source,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
+import type { Source, SourceState } from "../../server/workspace/sources/types.js";
 import type { FetcherDeps } from "../../server/workspace/sources/fetchers/index.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
 
 // --- helpers -------------------------------------------------------------
 
@@ -94,20 +85,12 @@ describe("arxivUrl — canonical URL shape", () => {
   });
 
   it("URL-encodes exotic query strings", () => {
-    const url = arxivUrl(
-      'ti:"large language model" AND cat:cs.CL',
-      "submittedDate",
-      "descending",
-      20,
-    );
+    const url = arxivUrl('ti:"large language model" AND cat:cs.CL', "submittedDate", "descending", 20);
     // URLSearchParams uses `+` for spaces by default which arXiv
     // accepts; the important thing is no literal space survives.
     assert.doesNotMatch(url, / /);
     const parsed = new URL(url);
-    assert.equal(
-      parsed.searchParams.get("search_query"),
-      'ti:"large language model" AND cat:cs.CL',
-    );
+    assert.equal(parsed.searchParams.get("search_query"), 'ti:"large language model" AND cat:cs.CL');
   });
 });
 
@@ -123,18 +106,9 @@ describe("arxivUrl — defensive defaults and clamping", () => {
   });
 
   it("clamps max_results into [1, 200]", () => {
-    assert.match(
-      arxivUrl("q", "submittedDate", "descending", 0),
-      /max_results=1/,
-    );
-    assert.match(
-      arxivUrl("q", "submittedDate", "descending", 99999),
-      /max_results=200/,
-    );
-    assert.match(
-      arxivUrl("q", "submittedDate", "descending", 17),
-      /max_results=17/,
-    );
+    assert.match(arxivUrl("q", "submittedDate", "descending", 0), /max_results=1/);
+    assert.match(arxivUrl("q", "submittedDate", "descending", 99999), /max_results=200/);
+    assert.match(arxivUrl("q", "submittedDate", "descending", 17), /max_results=17/);
   });
 });
 
@@ -195,11 +169,7 @@ describe("normalizeArxivFeed — happy path", () => {
         }),
       ),
     };
-    const items = normalizeArxivFeed(
-      feed,
-      makeSource({ maxItemsPerFetch: 10 }),
-      {},
-    );
+    const items = normalizeArxivFeed(feed, makeSource({ maxItemsPerFetch: 10 }), {});
     assert.equal(items.length, 10);
   });
 
@@ -305,10 +275,7 @@ describe("updateArxivCursor", () => {
     const feed = {
       kind: "atom" as const,
       title: "t",
-      items: [
-        makeFeedItem({ publishedAt: null }),
-        makeFeedItem({ publishedAt: "bogus" }),
-      ],
+      items: [makeFeedItem({ publishedAt: null }), makeFeedItem({ publishedAt: "bogus" })],
     };
     const existing = { [ARXIV_CURSOR_KEY]: "2026-04-10T00:00:00Z" };
     const cursor = updateArxivCursor(existing, feed);
@@ -340,11 +307,7 @@ describe("arxivFetcher.fetch", () => {
         headers: { "Content-Type": "application/atom+xml" },
       });
     };
-    const result = await arxivFetcher.fetch(
-      makeSource(),
-      makeState(),
-      makeFetcherDeps(fetchImpl),
-    );
+    const result = await arxivFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl));
     assert.ok(capturedUrl.startsWith(ARXIV_API_BASE));
     const parsedUrl = new URL(capturedUrl);
     assert.equal(parsedUrl.searchParams.get("search_query"), "cat:cs.CL");
@@ -360,9 +323,7 @@ describe("arxivFetcher.fetch", () => {
     const source = makeSource({ fetcherParams: {} });
     await assert.rejects(
       () => arxivFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)),
-      (err: unknown) =>
-        err instanceof ArxivFetcherError &&
-        /arxiv_query param is required/.test(err.message),
+      (err: unknown) => err instanceof ArxivFetcherError && /arxiv_query param is required/.test(err.message),
     );
   });
 
@@ -371,43 +332,24 @@ describe("arxivFetcher.fetch", () => {
       throw new Error("should not fetch");
     };
     const source = makeSource({ fetcherParams: { arxiv_query: "   " } });
-    await assert.rejects(
-      () => arxivFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)),
-      ArxivFetcherError,
-    );
+    await assert.rejects(() => arxivFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)), ArxivFetcherError);
   });
 
   it("surfaces non-2xx as ArxivFetcherError", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("<error/>", { status: 500 });
+    const fetchImpl: typeof fetch = async () => new Response("<error/>", { status: 500 });
     await assert.rejects(
-      () =>
-        arxivFetcher.fetch(
-          makeSource(),
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
+      () => arxivFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)),
       (err: unknown) => err instanceof ArxivFetcherError && err.status === 500,
     );
   });
 
   it("rejects when body doesn't parse as a feed", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("<html>not a feed</html>", { status: 200 });
-    await assert.rejects(
-      () =>
-        arxivFetcher.fetch(
-          makeSource(),
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
-      /did not parse as Atom/,
-    );
+    const fetchImpl: typeof fetch = async () => new Response("<html>not a feed</html>", { status: 200 });
+    await assert.rejects(() => arxivFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)), /did not parse as Atom/);
   });
 
   it("registers itself as the `arxiv` fetcher on import", async () => {
-    const { getFetcher } =
-      await import("../../server/workspace/sources/fetchers/index.js");
+    const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("arxiv");
     assert.ok(fetcher);
     assert.equal(fetcher!.kind, "arxiv");

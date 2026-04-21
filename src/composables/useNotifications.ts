@@ -20,8 +20,7 @@ const VALID_KINDS = new Set<string>(Object.values(NOTIFICATION_KINDS));
 function isNotificationPayload(value: unknown): value is NotificationPayload {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string") return false;
-  if (typeof value.kind !== "string" || !VALID_KINDS.has(value.kind))
-    return false;
+  if (typeof value.kind !== "string" || !VALID_KINDS.has(value.kind)) return false;
   if (typeof value.title !== "string") return false;
   if (typeof value.firedAt !== "string") return false;
   if (!isValidAction(value.action)) return false;
@@ -41,9 +40,7 @@ const readAt = ref<string | null>(null);
 let subscriberCount = 0;
 let unsubscribeFn: (() => void) | null = null;
 
-function ensureSubscribed(
-  subscribe: ReturnType<typeof usePubSub>["subscribe"],
-): void {
+function ensureSubscribed(subscribe: ReturnType<typeof usePubSub>["subscribe"]): void {
   subscriberCount++;
   if (unsubscribeFn) return; // already listening
   unsubscribeFn = subscribe(PUBSUB_CHANNELS.notifications, (data) => {

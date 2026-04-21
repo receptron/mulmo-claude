@@ -73,12 +73,7 @@ export function blockToEvent(block: ClaudeContentBlock): AgentEvent | null {
   }
   if (block.type === "tool_result" && block.tool_use_id) {
     const raw = block.content;
-    const content =
-      typeof raw === "string"
-        ? raw
-        : raw === undefined
-          ? ""
-          : JSON.stringify(raw);
+    const content = typeof raw === "string" ? raw : raw === undefined ? "" : JSON.stringify(raw);
     return {
       type: EVENT_TYPES.toolCallResult,
       toolUseId: block.tool_use_id,
@@ -94,12 +89,7 @@ export function blockToEvent(block: ClaudeContentBlock): AgentEvent | null {
 function extractTextDelta(event: RawStreamEvent): string | null {
   if (event.type !== "stream_event" || !event.event) return null;
   const inner = event.event;
-  if (
-    inner.type !== "content_block_delta" ||
-    !("delta" in inner) ||
-    inner.delta.type !== "text_delta" ||
-    typeof inner.delta.text !== "string"
-  ) {
+  if (inner.type !== "content_block_delta" || !("delta" in inner) || inner.delta.type !== "text_delta" || typeof inner.delta.text !== "string") {
     return null;
   }
   return inner.delta.text;
@@ -107,13 +97,8 @@ function extractTextDelta(event: RawStreamEvent): string | null {
 
 // Filter assistant block events: when deltas already streamed the
 // text, remove text-type events to prevent duplication.
-function filterAssistantBlocks(
-  blockEvents: AgentEvent[],
-  deltaStreamed: boolean,
-): AgentEvent[] {
-  return deltaStreamed
-    ? blockEvents.filter((e) => e.type !== EVENT_TYPES.text)
-    : blockEvents;
+function filterAssistantBlocks(blockEvents: AgentEvent[], deltaStreamed: boolean): AgentEvent[] {
+  return deltaStreamed ? blockEvents.filter((e) => e.type !== EVENT_TYPES.text) : blockEvents;
 }
 
 // Stateful parser that deduplicates text across the three stages
@@ -166,22 +151,14 @@ export function createStreamParser(): {
     }
 
     const content = event.message?.content;
-    const blockEvents = Array.isArray(content)
-      ? content.map(blockToEvent).filter((e): e is AgentEvent => e !== null)
-      : [];
+    const blockEvents = Array.isArray(content) ? content.map(blockToEvent).filter((e): e is AgentEvent => e !== null) : [];
 
     if (event.type === "assistant") {
-      const filtered = filterAssistantBlocks(
-        blockEvents,
-        textStreamedFromDeltas,
-      );
+      const filtered = filterAssistantBlocks(blockEvents, textStreamedFromDeltas);
       if (filtered.some((e) => e.type === EVENT_TYPES.text)) {
         textEmitted = true;
       }
-      return [
-        { type: EVENT_TYPES.status, message: "Thinking..." },
-        ...filtered,
-      ];
+      return [{ type: EVENT_TYPES.status, message: "Thinking..." }, ...filtered];
     }
     return blockEvents;
   }
@@ -193,9 +170,7 @@ export function createStreamParser(): {
 // For the agent loop, use createStreamParser() to get dedup.
 export function parseStreamEvent(event: RawStreamEvent): AgentEvent[] {
   if (event.type === "result" && event.result) {
-    const events: AgentEvent[] = [
-      { type: EVENT_TYPES.text, message: event.result },
-    ];
+    const events: AgentEvent[] = [{ type: EVENT_TYPES.text, message: event.result }];
     if (event.session_id) {
       events.push({
         type: EVENT_TYPES.claudeSessionId,
@@ -210,15 +185,10 @@ export function parseStreamEvent(event: RawStreamEvent): AgentEvent[] {
   }
 
   const content = event.message?.content;
-  const blockEvents = Array.isArray(content)
-    ? content.map(blockToEvent).filter((e): e is AgentEvent => e !== null)
-    : [];
+  const blockEvents = Array.isArray(content) ? content.map(blockToEvent).filter((e): e is AgentEvent => e !== null) : [];
 
   if (event.type === "assistant") {
-    return [
-      { type: EVENT_TYPES.status, message: "Thinking..." },
-      ...blockEvents,
-    ];
+    return [{ type: EVENT_TYPES.status, message: "Thinking..." }, ...blockEvents];
   }
   return blockEvents;
 }

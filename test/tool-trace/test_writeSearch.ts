@@ -20,10 +20,7 @@ describe("formatSearchDateDir", () => {
   });
 
   it("zero-pads single-digit months and days", () => {
-    assert.equal(
-      formatSearchDateDir(new Date("2026-01-02T00:00:00Z")),
-      "2026-01-02",
-    );
+    assert.equal(formatSearchDateDir(new Date("2026-01-02T00:00:00Z")), "2026-01-02");
   });
 });
 
@@ -171,12 +168,7 @@ describe("writeSearchResult (I/O)", () => {
       ts: FIXED_TS,
       resultBody: "b",
     });
-    const dir = path.join(
-      workspaceRoot,
-      "conversations",
-      "searches",
-      "2026-04-13",
-    );
+    const dir = path.join(workspaceRoot, "conversations", "searches", "2026-04-13");
     const files = (await readdir(dir)).filter((n) => n.endsWith(".md"));
     // At least two files (prior test in this block wrote one too).
     assert.ok(files.length >= 2);

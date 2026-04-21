@@ -7,9 +7,7 @@ import { PUBSUB_CHANNELS } from "../config/pubsubChannels";
 
 export function useDebugBeat() {
   const debugBeatColor = ref<string | null>(null);
-  const debugTitleStyle = computed<CSSProperties>(() =>
-    debugBeatColor.value ? { color: debugBeatColor.value } : {},
-  );
+  const debugTitleStyle = computed<CSSProperties>(() => (debugBeatColor.value ? { color: debugBeatColor.value } : {}));
 
   const { subscribe } = usePubSub();
   subscribe(PUBSUB_CHANNELS.debugBeat, (data) => {

@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  appendLogEntry,
-  queryLog,
-  logFilePathFor,
-  type LogDeps,
-} from "../src/log.ts";
+import { appendLogEntry, queryLog, logFilePathFor, type LogDeps } from "../src/log.ts";
 import type { TaskLogEntry } from "../src/types.ts";
 
 function inMemoryLogDeps(): LogDeps & { store: Map<string, string> } {
@@ -68,16 +63,8 @@ describe("appendLogEntry", () => {
 describe("queryLog", () => {
   it("returns entries newest first", async () => {
     const deps = inMemoryLogDeps();
-    await appendLogEntry(
-      "/logs",
-      makeEntry({ taskId: "old", startedAt: "2026-04-17T06:00:00.000Z" }),
-      deps,
-    );
-    await appendLogEntry(
-      "/logs",
-      makeEntry({ taskId: "new", startedAt: "2026-04-17T09:00:00.000Z" }),
-      deps,
-    );
+    await appendLogEntry("/logs", makeEntry({ taskId: "old", startedAt: "2026-04-17T06:00:00.000Z" }), deps);
+    await appendLogEntry("/logs", makeEntry({ taskId: "new", startedAt: "2026-04-17T09:00:00.000Z" }), deps);
     const testDate = new Date("2026-04-17T12:00:00Z");
     const entries = await queryLog("/logs", { date: testDate }, deps);
     assert.equal(entries[0].taskId, "new");
@@ -89,11 +76,7 @@ describe("queryLog", () => {
     await appendLogEntry("/logs", makeEntry({ taskId: "a" }), deps);
     await appendLogEntry("/logs", makeEntry({ taskId: "b" }), deps);
     const testDate = new Date("2026-04-17T12:00:00Z");
-    const entries = await queryLog(
-      "/logs",
-      { taskId: "a", date: testDate },
-      deps,
-    );
+    const entries = await queryLog("/logs", { taskId: "a", date: testDate }, deps);
     assert.equal(entries.length, 1);
     assert.equal(entries[0].taskId, "a");
   });
@@ -110,33 +93,17 @@ describe("queryLog", () => {
 
   it("filters by since timestamp", async () => {
     const deps = inMemoryLogDeps();
-    await appendLogEntry(
-      "/logs",
-      makeEntry({ taskId: "old", startedAt: "2026-04-17T06:00:00.000Z" }),
-      deps,
-    );
-    await appendLogEntry(
-      "/logs",
-      makeEntry({ taskId: "new", startedAt: "2026-04-17T09:00:00.000Z" }),
-      deps,
-    );
+    await appendLogEntry("/logs", makeEntry({ taskId: "old", startedAt: "2026-04-17T06:00:00.000Z" }), deps);
+    await appendLogEntry("/logs", makeEntry({ taskId: "new", startedAt: "2026-04-17T09:00:00.000Z" }), deps);
     const testDate = new Date("2026-04-17T12:00:00Z");
-    const entries = await queryLog(
-      "/logs",
-      { since: "2026-04-17T08:00:00.000Z", date: testDate },
-      deps,
-    );
+    const entries = await queryLog("/logs", { since: "2026-04-17T08:00:00.000Z", date: testDate }, deps);
     assert.equal(entries.length, 1);
     assert.equal(entries[0].taskId, "new");
   });
 
   it("returns empty array when no log file exists", async () => {
     const deps = inMemoryLogDeps();
-    const entries = await queryLog(
-      "/logs",
-      { date: new Date("2099-01-01") },
-      deps,
-    );
+    const entries = await queryLog("/logs", { date: new Date("2099-01-01") }, deps);
     assert.deepEqual(entries, []);
   });
 });

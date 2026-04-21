@@ -54,11 +54,7 @@ export function keywordsToSlug(keywords: readonly string[]): string {
     .join("-");
   // Short hash of ALL keywords ensures uniqueness even when the
   // Latin portion is empty (non-ASCII) or identical across chunks.
-  const hash = crypto
-    .createHash("sha256")
-    .update(keywords.join("|"))
-    .digest("hex")
-    .slice(0, 6);
+  const hash = crypto.createHash("sha256").update(keywords.join("|")).digest("hex").slice(0, 6);
   const base = latin ? `${latin}-${hash}` : hash;
   return `${ARXIV_SLUG_PREFIX}${base}`;
 }
@@ -83,9 +79,7 @@ export interface DiscoveryResult {
  * Groups all keywords into a single arXiv query source.
  * Skips if the source already exists.
  */
-export async function discoverAndRegister(
-  root?: string,
-): Promise<DiscoveryResult> {
+export async function discoverAndRegister(root?: string): Promise<DiscoveryResult> {
   const base = root ?? workspacePath;
   const profile = loadInterests(base);
   if (!profile || profile.keywords.length === 0) {
@@ -126,8 +120,7 @@ export async function discoverAndRegister(
         arxiv_order: "descending",
       },
       schedule: "daily",
-      categories:
-        profile.categories.length > 0 ? profile.categories : ["papers"],
+      categories: profile.categories.length > 0 ? profile.categories : ["papers"],
       maxItemsPerFetch: DEFAULT_MAX_ITEMS,
       addedAt: new Date().toISOString(),
       notes: `Auto-registered from interests.json keywords: ${chunk.join(", ")}`,
@@ -165,16 +158,12 @@ export async function pruneStaleAutoSources(root?: string): Promise<string[]> {
   const base = root ?? workspacePath;
   const profile = loadInterests(base);
   const existing = await listSources(base);
-  const autoSources = existing.filter((s) =>
-    s.slug.startsWith(ARXIV_SLUG_PREFIX),
-  );
+  const autoSources = existing.filter((s) => s.slug.startsWith(ARXIV_SLUG_PREFIX));
 
   if (autoSources.length === 0) return [];
 
   // If no profile at all, prune everything auto-registered
-  const currentKeywords = profile
-    ? new Set(profile.keywords.map((k) => k.toLowerCase()))
-    : new Set<string>();
+  const currentKeywords = profile ? new Set(profile.keywords.map((k) => k.toLowerCase())) : new Set<string>();
 
   const pruned: string[] = [];
   for (const source of autoSources) {

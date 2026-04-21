@@ -4,15 +4,8 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  mergeSessionLists,
-  applySessionDiff,
-  compareSessionsByRecency,
-} from "../../../src/utils/session/mergeSessions.js";
-import type {
-  ActiveSession,
-  SessionSummary,
-} from "../../../src/types/session.js";
+import { mergeSessionLists, applySessionDiff, compareSessionsByRecency } from "../../../src/utils/session/mergeSessions.js";
+import type { ActiveSession, SessionSummary } from "../../../src/types/session.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
@@ -261,10 +254,7 @@ describe("mergeSessionLists — does not mutate inputs", () => {
 // row with the same id, new ids prepend, and deletedIds remove.
 describe("applySessionDiff — upsert", () => {
   it("replaces the cached row when a diff row shares its id", () => {
-    const cache = [
-      makeSummary({ id: "a", preview: "old" }),
-      makeSummary({ id: "b" }),
-    ];
+    const cache = [makeSummary({ id: "a", preview: "old" }), makeSummary({ id: "b" })];
     const diff = [makeSummary({ id: "a", preview: "new" })];
     const out = applySessionDiff(cache, diff, []);
     const a = out.find((s) => s.id === "a");
@@ -289,11 +279,7 @@ describe("applySessionDiff — upsert", () => {
 
 describe("applySessionDiff — deletedIds", () => {
   it("removes cached rows whose id is in deletedIds", () => {
-    const cache = [
-      makeSummary({ id: "a" }),
-      makeSummary({ id: "b" }),
-      makeSummary({ id: "c" }),
-    ];
+    const cache = [makeSummary({ id: "a" }), makeSummary({ id: "b" }), makeSummary({ id: "c" })];
     const out = applySessionDiff(cache, [], ["b"]);
     assert.deepEqual(out.map((s) => s.id).sort(), ["a", "c"]);
   });
@@ -317,12 +303,8 @@ describe("applySessionDiff — deletedIds", () => {
 
 describe("applySessionDiff — sort + immutability", () => {
   it("returns the merged list sorted by updatedAt desc", () => {
-    const cache = [
-      makeSummary({ id: "old", updatedAt: "2026-04-10T00:00:00.000Z" }),
-    ];
-    const diff = [
-      makeSummary({ id: "new", updatedAt: "2026-04-17T00:00:00.000Z" }),
-    ];
+    const cache = [makeSummary({ id: "old", updatedAt: "2026-04-10T00:00:00.000Z" })];
+    const diff = [makeSummary({ id: "new", updatedAt: "2026-04-17T00:00:00.000Z" })];
     const out = applySessionDiff(cache, diff, []);
     assert.equal(out[0].id, "new");
     assert.equal(out[1].id, "old");

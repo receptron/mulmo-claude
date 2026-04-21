@@ -38,10 +38,7 @@ describe("buildAllowedConfigMounts", () => {
     assert.equal(allowed.gh.hostPath, path.join("/fake/home", ".config", "gh"));
     assert.equal(allowed.gh.containerPath, "/home/node/.config/gh");
     assert.equal(allowed.gh.kind, "dir");
-    assert.equal(
-      allowed.gitconfig.hostPath,
-      path.join("/fake/home", ".gitconfig"),
-    );
+    assert.equal(allowed.gitconfig.hostPath, path.join("/fake/home", ".gitconfig"));
     assert.equal(allowed.gitconfig.kind, "file");
   });
 });
@@ -53,10 +50,7 @@ describe("resolveMountNames", () => {
   });
 
   it("flags unknown names without crashing", () => {
-    const out = resolveMountNames(
-      ["nope", "also-nope"],
-      buildAllowedConfigMounts("/fake/home"),
-    );
+    const out = resolveMountNames(["nope", "also-nope"], buildAllowedConfigMounts("/fake/home"));
     assert.deepEqual(out.unknown, ["nope", "also-nope"]);
     assert.equal(out.resolved.length, 0);
   });
@@ -79,10 +73,7 @@ describe("resolveMountNames", () => {
 
   it("resolves a present file", () => {
     const home = makeFixtureHome({ gitconfig: true });
-    const out = resolveMountNames(
-      ["gitconfig"],
-      buildAllowedConfigMounts(home),
-    );
+    const out = resolveMountNames(["gitconfig"], buildAllowedConfigMounts(home));
     assert.equal(out.resolved.length, 1);
     assert.equal(out.resolved[0].name, "gitconfig");
   });
@@ -99,10 +90,7 @@ describe("resolveMountNames", () => {
 
   it("preserves CSV order, skips blanks", () => {
     const home = makeFixtureHome({ gh: true, gitconfig: true });
-    const out = resolveMountNames(
-      ["gitconfig", "", "gh"],
-      buildAllowedConfigMounts(home),
-    );
+    const out = resolveMountNames(["gitconfig", "", "gh"], buildAllowedConfigMounts(home));
     assert.deepEqual(
       out.resolved.map((r) => r.name),
       ["gitconfig", "gh"],
@@ -113,10 +101,7 @@ describe("resolveMountNames", () => {
 describe("configMountArgs", () => {
   it("emits read-only -v pairs for each spec", () => {
     const home = makeFixtureHome({ gh: true, gitconfig: true });
-    const { resolved } = resolveMountNames(
-      ["gh", "gitconfig"],
-      buildAllowedConfigMounts(home),
-    );
+    const { resolved } = resolveMountNames(["gh", "gitconfig"], buildAllowedConfigMounts(home));
     const args = configMountArgs(resolved);
     assert.equal(args[0], "-v");
     assert.match(args[1], /:\/home\/node\/\.config\/gh:ro$/);
@@ -139,12 +124,7 @@ describe("sshAgentForwardArgs", () => {
   it("uses Docker Desktop magic socket on macOS", () => {
     const r = sshAgentForwardArgs(true, "/tmp/irrelevant", "darwin");
     assert.equal(r.skippedReason, null);
-    assert.deepEqual(r.args, [
-      "-v",
-      `/run/host-services/ssh-auth.sock:${SSH_AGENT_CONTAINER_SOCK}`,
-      "-e",
-      `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
-    ]);
+    assert.deepEqual(r.args, ["-v", `/run/host-services/ssh-auth.sock:${SSH_AGENT_CONTAINER_SOCK}`, "-e", `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`]);
   });
 
   it("macOS path ignores SSH_AUTH_SOCK value entirely", () => {
@@ -160,29 +140,17 @@ describe("sshAgentForwardArgs", () => {
   });
 
   it("reports socket path missing on disk (Linux)", () => {
-    const r = sshAgentForwardArgs(
-      true,
-      "/tmp/definitely-not-a-real-sock",
-      "linux",
-    );
+    const r = sshAgentForwardArgs(true, "/tmp/definitely-not-a-real-sock", "linux");
     assert.deepEqual(r.args, []);
     assert.match(r.skippedReason ?? "", /not found/);
   });
 
   it("binds socket and sets SSH_AUTH_SOCK when sock exists (Linux)", () => {
-    const fake = path.join(
-      fs.mkdtempSync(path.join(os.tmpdir(), "sock-")),
-      "agent.sock",
-    );
+    const fake = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sock-")), "agent.sock");
     fs.writeFileSync(fake, "");
     const r = sshAgentForwardArgs(true, fake, "linux");
     assert.equal(r.skippedReason, null);
     const expectedHostPath = fake.replace(/\\/g, "/");
-    assert.deepEqual(r.args, [
-      "-v",
-      `${expectedHostPath}:${SSH_AGENT_CONTAINER_SOCK}`,
-      "-e",
-      `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
-    ]);
+    assert.deepEqual(r.args, ["-v", `${expectedHostPath}:${SSH_AGENT_CONTAINER_SOCK}`, "-e", `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`]);
   });
 });

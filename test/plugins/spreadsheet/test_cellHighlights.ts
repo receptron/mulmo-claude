@@ -53,9 +53,7 @@ function makeTable(rowsAndCols: number[][]): {
 // querySelectorAll responses. Arrays are already iterable so we can
 // return them directly.
 function makeContainer(opts: {
-  onQuerySelector?: (
-    sel: string,
-  ) => HighlightableElement | HighlightableTable | null;
+  onQuerySelector?: (sel: string) => HighlightableElement | HighlightableTable | null;
   onQueryAll?: (sel: string) => HighlightableElement[];
 }): HighlightableContainer {
   // The `querySelector` overloaded signature can't be satisfied by

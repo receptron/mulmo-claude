@@ -11,9 +11,7 @@ import { mockAllApis } from "../fixtures/api";
 // per-test 500 override wins over the catch-all.
 
 test.describe("fetch failure → inline error banner (#280)", () => {
-  test("Settings modal: GET /api/config 500 shows loadError + disables Save", async ({
-    page,
-  }) => {
+  test("Settings modal: GET /api/config 500 shows loadError + disables Save", async ({ page }) => {
     await mockAllApis(page);
 
     // Make the config load fail. Registered AFTER mockAllApis so it
@@ -35,12 +33,7 @@ test.describe("fetch failure → inline error banner (#280)", () => {
 
     await page.goto("/chat");
     // Arrange: wait for the failing GET to land before asserting on UI.
-    const failedGet = page.waitForResponse(
-      (r) =>
-        r.url().includes("/api/config") &&
-        r.request().method() === "GET" &&
-        r.status() === 500,
-    );
+    const failedGet = page.waitForResponse((r) => r.url().includes("/api/config") && r.request().method() === "GET" && r.status() === 500);
     await page.locator('[data-testid="settings-btn"]').click();
     await failedGet;
 
@@ -58,9 +51,7 @@ test.describe("fetch failure → inline error banner (#280)", () => {
     await expect(saveBtn).toBeDisabled();
   });
 
-  test("SessionHistoryPanel: GET /api/sessions 500 shows error banner", async ({
-    page,
-  }) => {
+  test("SessionHistoryPanel: GET /api/sessions 500 shows error banner", async ({ page }) => {
     await mockAllApis(page);
 
     // Override the sessions list to return 500 on every call.
@@ -77,12 +68,7 @@ test.describe("fetch failure → inline error banner (#280)", () => {
     await page.goto("/chat");
 
     // Open the history popup — this is what calls fetchSessions().
-    const failedGet = page.waitForResponse(
-      (r) =>
-        r.url().includes("/api/sessions") &&
-        r.request().method() === "GET" &&
-        r.status() === 500,
-    );
+    const failedGet = page.waitForResponse((r) => r.url().includes("/api/sessions") && r.request().method() === "GET" && r.status() === 500);
     await page.locator('[data-testid="history-btn"]').click();
     await failedGet;
 

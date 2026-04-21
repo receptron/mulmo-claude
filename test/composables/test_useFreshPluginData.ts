@@ -1,9 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import {
-  refreshOnce,
-  type UseFreshPluginDataOptions,
-} from "../../src/composables/useFreshPluginData.js";
+import { refreshOnce, type UseFreshPluginDataOptions } from "../../src/composables/useFreshPluginData.js";
 
 // The Vue-lifecycle-wrapping `useFreshPluginData` needs a Vue test
 // harness we don't yet have. These tests exercise the pure core
@@ -23,20 +20,14 @@ afterEach(() => {
   (globalThis as any).fetch = originalFetch;
 });
 
-function stubFetch(
-  impl: (input: unknown, init?: unknown) => Promise<Response>,
-): void {
+function stubFetch(impl: (input: unknown, init?: unknown) => Promise<Response>): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).fetch = impl;
 }
 
 // Build a minimal Response-like object that satisfies the parts of
 // the `fetch` contract `refreshOnce` actually touches (`ok`, `json`).
-function mockResponse(
-  ok: boolean,
-  jsonPayload: unknown,
-  opts?: { throwOnJson?: boolean },
-): Response {
+function mockResponse(ok: boolean, jsonPayload: unknown, opts?: { throwOnJson?: boolean }): Response {
   return {
     ok,
     json: async () => {
@@ -175,16 +166,13 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
   });
 
   it("handles the array-wrapper flavor (todo / scheduler shape)", async () => {
-    stubFetch(async () =>
-      mockResponse(true, { data: { items: [{ id: "a" }, { id: "b" }] } }),
-    );
+    stubFetch(async () => mockResponse(true, { data: { items: [{ id: "a" }, { id: "b" }] } }));
     const controller = new AbortController();
     const ok = await refreshOnce<Array<{ id: string }>>(
       {
         endpoint: () => "/api/todos",
         extract: (json) => {
-          const v = (json as { data?: { items?: Array<{ id: string }> } }).data
-            ?.items;
+          const v = (json as { data?: { items?: Array<{ id: string }> } }).data?.items;
           return Array.isArray(v) ? v : null;
         },
         apply: (data) => appliedWith.push(data),
@@ -201,8 +189,7 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
     const ok = await refreshOnce<Array<{ id: string }>>(
       {
         endpoint: () => "/api/roles",
-        extract: (json) =>
-          Array.isArray(json) ? (json as Array<{ id: string }>) : null,
+        extract: (json) => (Array.isArray(json) ? (json as Array<{ id: string }>) : null),
         apply: (data) => appliedWith.push(data),
       },
       controller.signal,
@@ -232,9 +219,7 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
       controller.signal,
     );
     assert.equal(ok, true);
-    assert.deepEqual(appliedWith, [
-      { action: "index", title: "Wiki Index", pageEntries: [] },
-    ]);
+    assert.deepEqual(appliedWith, [{ action: "index", title: "Wiki Index", pageEntries: [] }]);
   });
 
   it("lets apply guard based on caller state (wiki/Preview index guard)", async () => {
@@ -288,8 +273,7 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
     let slug = "alpha";
     const opts: UseFreshPluginDataOptions<unknown[]> = {
       endpoint: () => `/api/wiki?slug=${slug}`,
-      extract: (json) =>
-        (json as { data?: { items?: unknown[] } }).data?.items ?? [],
+      extract: (json) => (json as { data?: { items?: unknown[] } }).data?.items ?? [],
       apply: () => {},
     };
     await refreshOnce(opts, new AbortController().signal);

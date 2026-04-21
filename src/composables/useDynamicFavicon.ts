@@ -27,14 +27,7 @@ const NOTIFICATION_DOT_COLOR = "#F97316"; // orange-500
 const SIZE = 32;
 const RADIUS = 6;
 
-function drawRoundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
@@ -101,9 +94,7 @@ function renderFavicon(state: FaviconState, hasNotification: boolean): string {
 
 function applyFavicon(dataUrl: string): void {
   if (!dataUrl) return;
-  let link = document.querySelector(
-    "link[rel='icon']",
-  ) as HTMLLinkElement | null;
+  let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
   if (!link) {
     link = document.createElement("link");
     link.rel = "icon";
@@ -114,10 +105,7 @@ function applyFavicon(dataUrl: string): void {
   link.href = dataUrl;
 }
 
-export function useDynamicFavicon(opts: {
-  state: Ref<FaviconState> | ComputedRef<FaviconState>;
-  hasNotification: Ref<boolean> | ComputedRef<boolean>;
-}): void {
+export function useDynamicFavicon(opts: { state: Ref<FaviconState> | ComputedRef<FaviconState>; hasNotification: Ref<boolean> | ComputedRef<boolean> }): void {
   function update(): void {
     const dataUrl = renderFavicon(opts.state.value, opts.hasNotification.value);
     applyFavicon(dataUrl);

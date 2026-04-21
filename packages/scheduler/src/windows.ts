@@ -22,10 +22,7 @@ export function parseTimeToMs(time: string): number {
  * Returns the window's epoch-ms timestamp, or `null` for `once`
  * schedules whose `at` has already passed.
  */
-export function nextWindowAfter(
-  schedule: TaskSchedule,
-  afterMs: number,
-): number | null {
+export function nextWindowAfter(schedule: TaskSchedule, afterMs: number): number | null {
   if (schedule.type === SCHEDULE_TYPES.interval) {
     const intervalMs = schedule.intervalSec * MS_PER_SEC;
     // Intervals are anchored to epoch — the Nth window is N * interval.
@@ -38,11 +35,7 @@ export function nextWindowAfter(
   }
 
   if (schedule.type === SCHEDULE_TYPES.weekly) {
-    return nextWeeklyWindow(
-      schedule.daysOfWeek,
-      parseTimeToMs(schedule.time),
-      afterMs,
-    );
+    return nextWeeklyWindow(schedule.daysOfWeek, parseTimeToMs(schedule.time), afterMs);
   }
 
   if (schedule.type === SCHEDULE_TYPES.once) {
@@ -58,12 +51,7 @@ export function nextWindowAfter(
  * `(afterMs, untilMs]`. Used by the catch-up algorithm to enumerate
  * missed runs.
  */
-export function listMissedWindows(
-  schedule: TaskSchedule,
-  afterMs: number,
-  untilMs: number,
-  maxWindows = 24,
-): number[] {
+export function listMissedWindows(schedule: TaskSchedule, afterMs: number, untilMs: number, maxWindows = 24): number[] {
   const windows: number[] = [];
   // Start searching from just after the last-run timestamp.
   let cursor = afterMs + 1;
@@ -82,11 +70,7 @@ export function listMissedWindows(
  * (default 60s). A window "hits" if the tick that contains `nowMs`
  * also contains the scheduled instant.
  */
-export function isDueAt(
-  schedule: TaskSchedule,
-  nowMs: number,
-  tickMs: number,
-): boolean {
+export function isDueAt(schedule: TaskSchedule, nowMs: number, tickMs: number): boolean {
   const next = nextWindowAfter(schedule, nowMs - tickMs + 1);
   if (next === null) return false;
   // The window hits if it falls within [nowMs - tickMs + 1, nowMs].
@@ -98,28 +82,17 @@ export function isDueAt(
 function nextDailyWindow(timeOfDayMs: number, afterMs: number): number {
   const d = new Date(afterMs);
   // Today's candidate: midnight UTC + timeOfDayMs
-  const todayMidnight = Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate(),
-  );
+  const todayMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
   const candidate = todayMidnight + timeOfDayMs;
   return candidate >= afterMs ? candidate : candidate + MS_PER_DAY;
 }
 
-function nextWeeklyWindow(
-  daysOfWeek: number[],
-  timeOfDayMs: number,
-  afterMs: number,
-): number | null {
+function nextWeeklyWindow(daysOfWeek: number[], timeOfDayMs: number, afterMs: number): number | null {
   if (daysOfWeek.length === 0) return null;
   const daySet = new Set(daysOfWeek);
   // Check today + next 7 days
   for (let offset = 0; offset <= 7; offset++) {
-    const candidate = nextDailyWindow(
-      timeOfDayMs,
-      afterMs + offset * MS_PER_DAY,
-    );
+    const candidate = nextDailyWindow(timeOfDayMs, afterMs + offset * MS_PER_DAY);
     const dow = new Date(candidate).getUTCDay();
     if (daySet.has(dow) && candidate >= afterMs) return candidate;
   }

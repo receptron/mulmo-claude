@@ -14,9 +14,7 @@ export interface MarkdownToolData {
  *  prefix for sessions whose jsonl hasn't been migrated yet. */
 export function isFilePath(value: string): boolean {
   if (!value.endsWith(".md")) return false;
-  return (
-    value.startsWith("artifacts/documents/") || value.startsWith("markdowns/")
-  );
+  return value.startsWith("artifacts/documents/") || value.startsWith("markdowns/");
 }
 
 const toolDefinition: ToolDefinition = {

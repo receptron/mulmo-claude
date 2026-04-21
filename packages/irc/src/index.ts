@@ -22,10 +22,7 @@ const server = process.env.IRC_SERVER;
 const nick = process.env.IRC_NICK;
 const channelsStr = process.env.IRC_CHANNELS;
 if (!server || !nick || !channelsStr) {
-  console.error(
-    "IRC_SERVER, IRC_NICK, and IRC_CHANNELS are required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("IRC_SERVER, IRC_NICK, and IRC_CHANNELS are required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
@@ -63,54 +60,40 @@ irc.on("registered", () => {
   }
 });
 
-irc.on(
-  "message",
-  async (event: { target: string; nick: string; message: string }) => {
-    // Ignore our own messages
-    if (event.nick === nick) return;
+irc.on("message", async (event: { target: string; nick: string; message: string }) => {
+  // Ignore our own messages
+  if (event.nick === nick) return;
 
-    // IRC channel prefixes: #, &, +, ! (RFC 2812 §1.3)
-    const isChannel = /^[#&+!]/.test(event.target);
-    const chatId = isChannel ? event.target : event.nick;
-    const text = event.message.trim();
-    if (!text) return;
+  // IRC channel prefixes: #, &, +, ! (RFC 2812 §1.3)
+  const isChannel = /^[#&+!]/.test(event.target);
+  const chatId = isChannel ? event.target : event.nick;
+  const text = event.message.trim();
+  if (!text) return;
 
-    // In channels, only respond when mentioned or prefixed with bot nick
-    if (isChannel) {
-      const mentionPrefix = `${nick}:`;
-      const mentionPrefix2 = `${nick},`;
-      if (!text.startsWith(mentionPrefix) && !text.startsWith(mentionPrefix2)) {
-        return;
-      }
-      // Strip the mention prefix
-      const stripped = text
-        .slice(
-          text.startsWith(mentionPrefix)
-            ? mentionPrefix.length
-            : mentionPrefix2.length,
-        )
-        .trim();
-      if (!stripped) return;
-
-      console.log(
-        `[irc] message channel=${chatId} nick=${event.nick} len=${stripped.length}`,
-      );
-      const ack = await mulmo.send(chatId, stripped);
-      sendReply(chatId, ack);
+  // In channels, only respond when mentioned or prefixed with bot nick
+  if (isChannel) {
+    const mentionPrefix = `${nick}:`;
+    const mentionPrefix2 = `${nick},`;
+    if (!text.startsWith(mentionPrefix) && !text.startsWith(mentionPrefix2)) {
       return;
     }
+    // Strip the mention prefix
+    const stripped = text.slice(text.startsWith(mentionPrefix) ? mentionPrefix.length : mentionPrefix2.length).trim();
+    if (!stripped) return;
 
-    // Private messages — respond directly
-    console.log(`[irc] pm from=${event.nick} len=${text.length}`);
-    const ack = await mulmo.send(chatId, text);
+    console.log(`[irc] message channel=${chatId} nick=${event.nick} len=${stripped.length}`);
+    const ack = await mulmo.send(chatId, stripped);
     sendReply(chatId, ack);
-  },
-);
+    return;
+  }
 
-function sendReply(
-  target: string,
-  ack: { ok: boolean; reply?: string; error?: string; status?: number },
-): void {
+  // Private messages — respond directly
+  console.log(`[irc] pm from=${event.nick} len=${text.length}`);
+  const ack = await mulmo.send(chatId, text);
+  sendReply(chatId, ack);
+});
+
+function sendReply(target: string, ack: { ok: boolean; reply?: string; error?: string; status?: number }): void {
   if (ack.ok) {
     const text = ack.reply ?? "(empty reply)";
     // IRC messages are max ~512 bytes per line. Chunk at 400 chars.

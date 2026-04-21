@@ -12,9 +12,7 @@ function urlEndsWith(suffix: string): (url: URL) => boolean {
 // Capture the POST body sent to /api/agent so we can assert that a
 // click on a quick-query actually fired sendMessage with the right
 // text.
-async function captureAgentPost(
-  page: Page,
-): Promise<{ getBody: () => string | null }> {
+async function captureAgentPost(page: Page): Promise<{ getBody: () => string | null }> {
   let capturedBody: string | null = null;
   await page.route(urlEndsWith("/api/agent"), (route: Route) => {
     if (route.request().method() !== "POST") return route.fallback();
@@ -66,9 +64,7 @@ test.describe("queries panel (useQueriesPanel)", () => {
     await query.click();
 
     // sendMessage posts to /api/agent with the query text in the body.
-    await expect
-      .poll(() => captured.getBody(), { timeout: 3000 })
-      .not.toBeNull();
+    await expect.poll(() => captured.getBody(), { timeout: 3000 }).not.toBeNull();
     const body = captured.getBody();
     expect(body).toContain("Tell me about this app, MulmoClaude.");
 
@@ -76,9 +72,7 @@ test.describe("queries panel (useQueriesPanel)", () => {
     await expect(query).toBeHidden();
   });
 
-  test("Shift+click on a query fills the input without sending", async ({
-    page,
-  }) => {
+  test("Shift+click on a query fills the input without sending", async ({ page }) => {
     const captured = await captureAgentPost(page);
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();

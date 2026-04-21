@@ -40,9 +40,7 @@ interface PresentChartErrorResponse {
   error: string;
 }
 
-type PresentChartResponse =
-  | PresentChartSuccessResponse
-  | PresentChartErrorResponse;
+type PresentChartResponse = PresentChartSuccessResponse | PresentChartErrorResponse;
 
 function isOptionalString(value: unknown): boolean {
   return value === undefined || typeof value === "string";
@@ -68,50 +66,33 @@ function isValidChartEntry(value: unknown): value is ChartEntry {
   return true;
 }
 
-router.post(
-  API_ROUTES.chart.present,
-  async (
-    req: Request<object, unknown, PresentChartBody>,
-    res: Response<PresentChartResponse>,
-  ) => {
-    const { document, title } = req.body;
+router.post(API_ROUTES.chart.present, async (req: Request<object, unknown, PresentChartBody>, res: Response<PresentChartResponse>) => {
+  const { document, title } = req.body;
 
-    if (!isValidChartDocument(document)) {
-      badRequest(
-        res,
-        "document must be { charts: [{ option: {...}, title?, type? }, ...] } with at least one entry",
-      );
-      return;
-    }
+  if (!isValidChartDocument(document)) {
+    badRequest(res, "document must be { charts: [{ option: {...}, title?, type? }, ...] } with at least one entry");
+    return;
+  }
 
-    if (title !== undefined && typeof title !== "string") {
-      badRequest(res, "title must be a string when provided");
-      return;
-    }
+  if (title !== undefined && typeof title !== "string") {
+    badRequest(res, "title must be a string when provided");
+    return;
+  }
 
-    try {
-      const baseLabel = title ?? document.title ?? "chart";
-      const filePath = buildArtifactPath(
-        WORKSPACE_DIRS.charts,
-        baseLabel,
-        ".chart.json",
-        "chart",
-      );
-      await writeWorkspaceText(
-        filePath,
-        `${JSON.stringify(document, null, 2)}\n`,
-      );
-      res.json({
-        message: `Saved chart document to ${filePath}`,
-        instructions:
-          "Acknowledge that the chart(s) have been presented to the user. The document contains " +
-          `${document.charts.length} chart${document.charts.length === 1 ? "" : "s"}.`,
-        data: { document, title, filePath },
-      });
-    } catch (err) {
-      serverError(res, errorMessage(err));
-    }
-  },
-);
+  try {
+    const baseLabel = title ?? document.title ?? "chart";
+    const filePath = buildArtifactPath(WORKSPACE_DIRS.charts, baseLabel, ".chart.json", "chart");
+    await writeWorkspaceText(filePath, `${JSON.stringify(document, null, 2)}\n`);
+    res.json({
+      message: `Saved chart document to ${filePath}`,
+      instructions:
+        "Acknowledge that the chart(s) have been presented to the user. The document contains " +
+        `${document.charts.length} chart${document.charts.length === 1 ? "" : "s"}.`,
+      data: { document, title, filePath },
+    });
+  } catch (err) {
+    serverError(res, errorMessage(err));
+  }
+});
 
 export default router;

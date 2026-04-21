@@ -18,9 +18,7 @@ export interface AgentRequestBody {
   selectedImageData: string | undefined;
 }
 
-export function buildAgentRequestBody(
-  params: AgentRequestBodyParams,
-): AgentRequestBody {
+export function buildAgentRequestBody(params: AgentRequestBodyParams): AgentRequestBody {
   return {
     message: params.message,
     roleId: params.role.id,
@@ -32,9 +30,7 @@ export function buildAgentRequestBody(
 /** POST the agent request body and return the response.
  *  On network or HTTP error, returns a descriptive error string
  *  instead. The caller decides how to surface it. */
-export async function postAgentRun(
-  body: AgentRequestBody,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function postAgentRun(body: AgentRequestBody): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const response = await apiFetchRaw(API_ROUTES.agent.run, {
       method: "POST",

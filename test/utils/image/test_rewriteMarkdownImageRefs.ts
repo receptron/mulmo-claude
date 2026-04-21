@@ -19,8 +19,7 @@ describe("rewriteMarkdownImageRefs — no basePath", () => {
   });
 
   it("leaves http/https URLs alone", () => {
-    const src =
-      "![cdn](https://cdn.example.com/x.png)\n![http](http://example.com/y.png)";
+    const src = "![cdn](https://cdn.example.com/x.png)\n![http](http://example.com/y.png)";
     assert.equal(rewriteMarkdownImageRefs(src), src);
   });
 
@@ -42,14 +41,8 @@ text
   });
 
   it("preserves alt text and empty alt", () => {
-    assert.equal(
-      rewriteMarkdownImageRefs("![some alt](images/x.png)"),
-      "![some alt](/api/files/raw?path=images%2Fx.png)",
-    );
-    assert.equal(
-      rewriteMarkdownImageRefs("![](images/x.png)"),
-      "![](/api/files/raw?path=images%2Fx.png)",
-    );
+    assert.equal(rewriteMarkdownImageRefs("![some alt](images/x.png)"), "![some alt](/api/files/raw?path=images%2Fx.png)");
+    assert.equal(rewriteMarkdownImageRefs("![](images/x.png)"), "![](/api/files/raw?path=images%2Fx.png)");
   });
 
   it("does not touch non-image markdown links", () => {
@@ -68,18 +61,12 @@ text
 
 describe("rewriteMarkdownImageRefs — with basePath", () => {
   it("resolves `../images/foo.png` from wiki/pages to wiki/images/foo.png", () => {
-    const out = rewriteMarkdownImageRefs(
-      "![a](../images/foo.png)",
-      "wiki/pages",
-    );
+    const out = rewriteMarkdownImageRefs("![a](../images/foo.png)", "wiki/pages");
     assert.equal(out, "![a](/api/files/raw?path=wiki%2Fimages%2Ffoo.png)");
   });
 
   it("resolves `../../images/foo.png` from markdowns/2026 to images/foo.png", () => {
-    const out = rewriteMarkdownImageRefs(
-      "![a](../../images/foo.png)",
-      "markdowns/2026",
-    );
+    const out = rewriteMarkdownImageRefs("![a](../../images/foo.png)", "markdowns/2026");
     assert.equal(out, "![a](/api/files/raw?path=images%2Ffoo.png)");
   });
 
@@ -105,34 +92,19 @@ describe("rewriteMarkdownImageRefs — with basePath", () => {
   });
 
   it("normalizes redundant `./` and `..` segments mid-path", () => {
-    const out = rewriteMarkdownImageRefs(
-      "![a](./sub/../images/foo.png)",
-      "wiki/pages",
-    );
-    assert.equal(
-      out,
-      "![a](/api/files/raw?path=wiki%2Fpages%2Fimages%2Ffoo.png)",
-    );
+    const out = rewriteMarkdownImageRefs("![a](./sub/../images/foo.png)", "wiki/pages");
+    assert.equal(out, "![a](/api/files/raw?path=wiki%2Fpages%2Fimages%2Ffoo.png)");
   });
 
   it("leaves data/http/api refs untouched even when basePath is given", () => {
-    const src =
-      "![a](data:image/png;base64,AAA=) ![b](https://ex.com/x.png) ![c](/api/files/raw?path=x)";
+    const src = "![a](data:image/png;base64,AAA=) ![b](https://ex.com/x.png) ![c](/api/files/raw?path=x)";
     assert.equal(rewriteMarkdownImageRefs(src, "wiki/pages"), src);
   });
 });
 
 describe("rewriteMarkdownImageRefs — code blocks and special chars", () => {
   it("leaves image-ref syntax inside a fenced code block untouched", () => {
-    const src = [
-      "Before",
-      "",
-      "```",
-      "![example](images/foo.png)",
-      "```",
-      "",
-      "After ![real](images/bar.png)",
-    ].join("\n");
+    const src = ["Before", "", "```", "![example](images/foo.png)", "```", "", "After ![real](images/bar.png)"].join("\n");
     const out = rewriteMarkdownImageRefs(src);
     // The one inside the code block stays literal.
     assert.ok(out.includes("![example](images/foo.png)"));
@@ -141,8 +113,7 @@ describe("rewriteMarkdownImageRefs — code blocks and special chars", () => {
   });
 
   it("leaves image-ref syntax inside an inline code span untouched", () => {
-    const src =
-      "Use `![example](images/foo.png)` in a doc; ![real](images/bar.png) renders.";
+    const src = "Use `![example](images/foo.png)` in a doc; ![real](images/bar.png) renders.";
     const out = rewriteMarkdownImageRefs(src);
     assert.ok(out.includes("`![example](images/foo.png)`"));
     assert.ok(out.includes("path=images%2Fbar.png"));
@@ -173,10 +144,7 @@ describe("rewriteMarkdownImageRefs — code blocks and special chars", () => {
   });
 
   it("preserves markdown title when rewriting", () => {
-    const out = rewriteMarkdownImageRefs(
-      '![alt](images/foo.png "a title")',
-      "",
-    );
+    const out = rewriteMarkdownImageRefs('![alt](images/foo.png "a title")', "");
     assert.equal(out, '![alt](/api/files/raw?path=images%2Ffoo.png "a title")');
   });
 

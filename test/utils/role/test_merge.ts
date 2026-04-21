@@ -31,10 +31,7 @@ describe("mergeRoles", () => {
   });
 
   it("custom roles override built-ins with the same id", () => {
-    const out = mergeRoles(
-      [role("a", "Built-in A"), role("b", "Built-in B")],
-      [role("a", "Custom A")],
-    );
+    const out = mergeRoles([role("a", "Built-in A"), role("b", "Built-in B")], [role("a", "Custom A")]);
     assert.equal(out.length, 2);
     // The built-in 'a' is dropped, the custom 'a' is appended at the end
     assert.equal(out[0].id, "b");
@@ -56,10 +53,7 @@ describe("mergeRoles", () => {
   });
 
   it("preserves the order of built-in roles that are not overridden", () => {
-    const out = mergeRoles(
-      [role("a"), role("b"), role("c"), role("d")],
-      [role("c", "Custom C")],
-    );
+    const out = mergeRoles([role("a"), role("b"), role("c"), role("d")], [role("c", "Custom C")]);
     assert.deepEqual(
       out.map((r) => r.id),
       ["a", "b", "d", "c"],

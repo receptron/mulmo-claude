@@ -35,9 +35,7 @@ function makeRes(): RecordedResponse {
 // A minimal stand-in for the mulmo studio context. `withStoryContext`
 // treats it as an opaque value — it only checks truthiness and passes
 // the reference to the handler.
-const fakeContext = { studio: { script: {} } } as unknown as NonNullable<
-  Parameters<Parameters<typeof withStoryContext>[3]>[0]["context"]
->;
+const fakeContext = { studio: { script: {} } } as unknown as NonNullable<Parameters<Parameters<typeof withStoryContext>[3]>[0]["context"]>;
 
 describe("withStoryContext — resolver rejects filePath", () => {
   it("short-circuits without calling buildContext or handler", async () => {
@@ -103,8 +101,7 @@ describe("withStoryContext — buildContext returns null", () => {
       res as unknown as Response,
       "stories/x.json",
       {
-        onContextMissing: (r) =>
-          (r as unknown as RecordedResponse).json({ audio: null }),
+        onContextMissing: (r) => (r as unknown as RecordedResponse).json({ audio: null }),
       },
       async () => {
         handlerCalled = true;
@@ -211,38 +208,26 @@ describe("withStoryContext — happy path", () => {
   it("forwards the force option to buildContext", async () => {
     const res = makeRes();
     let seenForce: boolean | undefined;
-    await withStoryContext(
-      res as unknown as Response,
-      "stories/x.json",
-      { force: true },
-      async () => {},
-      {
-        resolveStoryPath: () => "/abs/stories/x.json",
-        buildContext: async (_fp, force) => {
-          seenForce = force;
-          return fakeContext;
-        },
+    await withStoryContext(res as unknown as Response, "stories/x.json", { force: true }, async () => {}, {
+      resolveStoryPath: () => "/abs/stories/x.json",
+      buildContext: async (_fp, force) => {
+        seenForce = force;
+        return fakeContext;
       },
-    );
+    });
     assert.equal(seenForce, true);
   });
 
   it("defaults force to false when option is omitted", async () => {
     const res = makeRes();
     let seenForce: boolean | undefined;
-    await withStoryContext(
-      res as unknown as Response,
-      "stories/x.json",
-      {},
-      async () => {},
-      {
-        resolveStoryPath: () => "/abs/stories/x.json",
-        buildContext: async (_fp, force) => {
-          seenForce = force;
-          return fakeContext;
-        },
+    await withStoryContext(res as unknown as Response, "stories/x.json", {}, async () => {}, {
+      resolveStoryPath: () => "/abs/stories/x.json",
+      buildContext: async (_fp, force) => {
+        seenForce = force;
+        return fakeContext;
       },
-    );
+    });
     assert.equal(seenForce, false);
   });
 });

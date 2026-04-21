@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  scoreItem,
-  scoreAndFilter,
-  loadInterests,
-  type InterestsProfile,
-} from "../../server/workspace/sources/interests.js";
+import { scoreItem, scoreAndFilter, loadInterests, type InterestsProfile } from "../../server/workspace/sources/interests.js";
 import type { SourceItem } from "../../server/workspace/sources/types.js";
 import fs from "fs";
 import path from "path";
@@ -200,10 +195,7 @@ describe("loadInterests", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
     fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(configDir, "interests.json"),
-      JSON.stringify({ keywords: [], categories: [] }),
-    );
+    fs.writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: [], categories: [] }));
     const result = loadInterests(tmpDir);
     assert.equal(result, null);
     fs.rmSync(tmpDir, { recursive: true });
@@ -223,10 +215,7 @@ describe("loadInterests", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
     fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(configDir, "interests.json"),
-      JSON.stringify({ keywords: ["test"] }),
-    );
+    fs.writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: ["test"] }));
     const result = loadInterests(tmpDir);
     assert.notEqual(result, null);
     assert.equal(result!.minRelevance, 0.5);

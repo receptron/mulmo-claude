@@ -91,10 +91,7 @@ describe("loadSettings", () => {
 
   it("returns defaults when shape does not match", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(
-      mod.settingsPath(),
-      JSON.stringify({ extraAllowedTools: [1, 2, 3] }),
-    );
+    fs.writeFileSync(mod.settingsPath(), JSON.stringify({ extraAllowedTools: [1, 2, 3] }));
     assert.deepEqual(mod.loadSettings(), { extraAllowedTools: [] });
   });
 
@@ -109,9 +106,7 @@ describe("loadSettings", () => {
 
 describe("isMcpServerSpec", () => {
   it("accepts valid http specs", () => {
-    assert.ok(
-      mod.isMcpServerSpec({ type: "http", url: "https://example.com/mcp" }),
-    );
+    assert.ok(mod.isMcpServerSpec({ type: "http", url: "https://example.com/mcp" }));
     assert.ok(
       mod.isMcpServerSpec({
         type: "http",
@@ -128,26 +123,15 @@ describe("isMcpServerSpec", () => {
   });
 
   it("accepts stdio specs using the command allowlist", () => {
-    assert.ok(
-      mod.isMcpServerSpec({ type: "stdio", command: "npx", args: ["-y"] }),
-    );
+    assert.ok(mod.isMcpServerSpec({ type: "stdio", command: "npx", args: ["-y"] }));
     assert.ok(mod.isMcpServerSpec({ type: "stdio", command: "node" }));
     assert.ok(mod.isMcpServerSpec({ type: "stdio", command: "tsx" }));
   });
 
   it("rejects stdio specs with a disallowed command", () => {
-    assert.equal(
-      mod.isMcpServerSpec({ type: "stdio", command: "bash" }),
-      false,
-    );
-    assert.equal(
-      mod.isMcpServerSpec({ type: "stdio", command: "python3" }),
-      false,
-    );
-    assert.equal(
-      mod.isMcpServerSpec({ type: "stdio", command: "/usr/bin/node" }),
-      false,
-    );
+    assert.equal(mod.isMcpServerSpec({ type: "stdio", command: "bash" }), false);
+    assert.equal(mod.isMcpServerSpec({ type: "stdio", command: "python3" }), false);
+    assert.equal(mod.isMcpServerSpec({ type: "stdio", command: "/usr/bin/node" }), false);
   });
 
   it("rejects stdio specs with non-string args or env values", () => {
@@ -226,10 +210,7 @@ describe("loadMcpConfig / saveMcpConfig", () => {
 
   it("returns defaults when schema does not match", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(
-      mod.mcpConfigPath(),
-      JSON.stringify({ mcpServers: { BAD: { type: "http", url: "x" } } }),
-    );
+    fs.writeFileSync(mod.mcpConfigPath(), JSON.stringify({ mcpServers: { BAD: { type: "http", url: "x" } } }));
     assert.deepEqual(mod.loadMcpConfig(), { mcpServers: {} });
   });
 
@@ -268,11 +249,7 @@ describe("toMcpEntries / fromMcpEntries", () => {
   });
 
   it("throws on invalid id shape", () => {
-    assert.throws(() =>
-      mod.fromMcpEntries([
-        { id: "BAD", spec: { type: "http", url: "https://x" } },
-      ]),
-    );
+    assert.throws(() => mod.fromMcpEntries([{ id: "BAD", spec: { type: "http", url: "https://x" } }]));
   });
 });
 

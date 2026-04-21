@@ -1,19 +1,10 @@
 import { Router, Request, Response } from "express";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { getSessionImageData } from "../../events/session-store/index.js";
-import {
-  generateGeminiImageContent,
-  generateGeminiImageFromPrompt,
-} from "../../utils/gemini.js";
+import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
-import {
-  saveImage,
-  overwriteImage,
-  loadImageBase64,
-  stripDataUri,
-  isImagePath,
-} from "../../utils/files/image-store.js";
+import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -93,100 +84,70 @@ interface GenerateImageBody {
   model?: string;
 }
 
-router.post(
-  API_ROUTES.image.generate,
-  async (
-    req: Request<object, unknown, GenerateImageBody>,
-    res: Response<ImageResponse>,
-  ) => {
-    const { prompt, model } = req.body;
-    if (!prompt) {
-      res.status(400).json({ success: false, message: "prompt is required" });
-      return;
-    }
-    try {
-      const { imageData, message } = await generateGeminiImageFromPrompt(
-        prompt,
-        model,
-      );
-      await respondWithImage(res, imageData, message, prompt, "generation");
-    } catch (err) {
-      res.status(500).json({ success: false, message: errorMessage(err) });
-    }
-  },
-);
+router.post(API_ROUTES.image.generate, async (req: Request<object, unknown, GenerateImageBody>, res: Response<ImageResponse>) => {
+  const { prompt, model } = req.body;
+  if (!prompt) {
+    res.status(400).json({ success: false, message: "prompt is required" });
+    return;
+  }
+  try {
+    const { imageData, message } = await generateGeminiImageFromPrompt(prompt, model);
+    await respondWithImage(res, imageData, message, prompt, "generation");
+  } catch (err) {
+    res.status(500).json({ success: false, message: errorMessage(err) });
+  }
+});
 
 interface EditImageBody {
   prompt: string;
 }
 
-router.post(
-  API_ROUTES.image.edit,
-  async (
-    req: Request<object, unknown, EditImageBody>,
-    res: Response<ImageResponse>,
-  ) => {
-    const { prompt } = req.body;
-    const session = getOptionalStringQuery(req, "session");
-    if (!prompt) {
-      res.status(400).json({ success: false, message: "prompt is required" });
-      return;
-    }
-    const currentImageData = session ? getSessionImageData(session) : undefined;
-    if (!currentImageData) {
-      res.status(400).json({
-        success: false,
-        message:
-          "No image is selected. Please click an image in the sidebar first, then ask me to edit it.",
-      });
-      return;
-    }
-    try {
-      // Resolve input image to raw base64 — supports both file paths and legacy data URIs
-      const base64Data = isImagePath(currentImageData)
-        ? await loadImageBase64(currentImageData)
-        : stripDataUri(currentImageData);
-      // /edit-image deliberately omits `config` (no aspectRatio) so
-      // Gemini preserves the input image's dimensions.
-      const { imageData, message } = await generateGeminiImageContent([
-        {
-          parts: [
-            { inlineData: { mimeType: "image/png", data: base64Data } },
-            { text: prompt },
-          ],
-        },
-      ]);
-      await respondWithImage(res, imageData, message, prompt, "edit");
-    } catch (err) {
-      res.status(500).json({ success: false, message: errorMessage(err) });
-    }
-  },
-);
+router.post(API_ROUTES.image.edit, async (req: Request<object, unknown, EditImageBody>, res: Response<ImageResponse>) => {
+  const { prompt } = req.body;
+  const session = getOptionalStringQuery(req, "session");
+  if (!prompt) {
+    res.status(400).json({ success: false, message: "prompt is required" });
+    return;
+  }
+  const currentImageData = session ? getSessionImageData(session) : undefined;
+  if (!currentImageData) {
+    res.status(400).json({
+      success: false,
+      message: "No image is selected. Please click an image in the sidebar first, then ask me to edit it.",
+    });
+    return;
+  }
+  try {
+    // Resolve input image to raw base64 — supports both file paths and legacy data URIs
+    const base64Data = isImagePath(currentImageData) ? await loadImageBase64(currentImageData) : stripDataUri(currentImageData);
+    // /edit-image deliberately omits `config` (no aspectRatio) so
+    // Gemini preserves the input image's dimensions.
+    const { imageData, message } = await generateGeminiImageContent([
+      {
+        parts: [{ inlineData: { mimeType: "image/png", data: base64Data } }, { text: prompt }],
+      },
+    ]);
+    await respondWithImage(res, imageData, message, prompt, "edit");
+  } catch (err) {
+    res.status(500).json({ success: false, message: errorMessage(err) });
+  }
+});
 
 // Canvas image persistence — POST creates a new file, PUT overwrites.
 
-router.post(
-  API_ROUTES.image.upload,
-  async (
-    req: Request<object, unknown, CanvasImageBody>,
-    res: Response<CanvasImageResponse | CanvasImageError>,
-  ) => {
-    const { imageData } = req.body;
-    if (!imageData) {
-      badRequest(res, "imageData is required");
-      return;
-    }
-    const base64 = stripDataUri(imageData);
-    await saveCanvasImage(res, base64, async (b64) => saveImage(b64));
-  },
-);
+router.post(API_ROUTES.image.upload, async (req: Request<object, unknown, CanvasImageBody>, res: Response<CanvasImageResponse | CanvasImageError>) => {
+  const { imageData } = req.body;
+  if (!imageData) {
+    badRequest(res, "imageData is required");
+    return;
+  }
+  const base64 = stripDataUri(imageData);
+  await saveCanvasImage(res, base64, async (b64) => saveImage(b64));
+});
 
 router.put(
   API_ROUTES.image.update,
-  async (
-    req: Request<{ filename: string }, unknown, CanvasImageBody>,
-    res: Response<CanvasImageResponse | CanvasImageError>,
-  ) => {
+  async (req: Request<{ filename: string }, unknown, CanvasImageBody>, res: Response<CanvasImageResponse | CanvasImageError>) => {
     const relativePath = `images/${req.params.filename}`;
     const { imageData } = req.body;
     if (!imageData || !relativePath) {

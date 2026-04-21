@@ -23,10 +23,7 @@ export function getSessionQuery(req: HasQuery): string {
  * Extract an optional string query parameter.
  * Returns the string value, or undefined if missing/non-string.
  */
-export function getOptionalStringQuery(
-  req: HasQuery,
-  key: string,
-): string | undefined {
+export function getOptionalStringQuery(req: HasQuery, key: string): string | undefined {
   const raw = req.query[key];
   return typeof raw === "string" ? raw : undefined;
 }

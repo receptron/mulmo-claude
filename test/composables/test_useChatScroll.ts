@@ -12,10 +12,7 @@ import assert from "node:assert/strict";
 import { computed, nextTick, reactive, ref } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { useChatScroll } from "../../src/composables/useChatScroll.js";
-import {
-  applyTextEvent,
-  pushResult,
-} from "../../src/utils/session/sessionHelpers.js";
+import { applyTextEvent, pushResult } from "../../src/utils/session/sessionHelpers.js";
 import { createEmptySession } from "../../src/utils/session/sessionFactory.js";
 import { makeTextResult } from "../../src/utils/tools/result.js";
 
@@ -47,9 +44,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>({
       root: el,
     });
-    const toolResults = computed<ToolResultComplete[]>(
-      () => session.toolResults,
-    );
+    const toolResults = computed<ToolResultComplete[]>(() => session.toolResults);
     const isRunning = computed(() => false);
     const chatInputRef = ref<{ focus: () => void } | null>(null);
 
@@ -79,9 +74,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>({
       root: el,
     });
-    const toolResults = computed<ToolResultComplete[]>(
-      () => session.toolResults,
-    );
+    const toolResults = computed<ToolResultComplete[]>(() => session.toolResults);
     const isRunning = computed(() => false);
     const chatInputRef = ref<{ focus: () => void } | null>(null);
 

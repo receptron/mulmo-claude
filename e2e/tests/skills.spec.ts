@@ -25,9 +25,7 @@ async function setupSkillsSession(page: Page) {
   // Session transcript with a manageSkills tool_result so the View
   // is reachable by clicking the sidebar entry.
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) => {
       return route.fulfill({
         json: [
@@ -91,8 +89,7 @@ async function setupSkillsSession(page: Page) {
   // Detail endpoint. Return a different body per name so we can
   // assert the Run message reflects the selected skill.
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
+    (url) => url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
     (route: Route) => {
       const name = route.request().url().split("/api/skills/").pop() ?? "";
       const bodies: Record<string, string> = {
@@ -145,29 +142,21 @@ test.describe("manageSkills plugin", () => {
     await expect(page.getByTestId("skill-item-publish")).toBeVisible();
   });
 
-  test("selecting a skill loads its detail body from the API", async ({
-    page,
-  }) => {
+  test("selecting a skill loads its detail body from the API", async ({ page }) => {
     await page.goto("/chat/skills-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.getByText("2 skills").first().click();
     await expect(page.getByTestId("skill-item-ci_enable")).toBeVisible();
 
     // The first skill is auto-selected; its body should be visible.
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "CI Enable",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("CI Enable");
 
     // Click the second skill → body swaps.
     await page.getByTestId("skill-item-publish").click();
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "Publish",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("Publish");
   });
 
-  test("skill body is rendered as formatted HTML, not raw markdown", async ({
-    page,
-  }) => {
+  test("skill body is rendered as formatted HTML, not raw markdown", async ({ page }) => {
     await page.goto("/chat/skills-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.getByText("2 skills").first().click();
@@ -181,9 +170,7 @@ test.describe("manageSkills plugin", () => {
     await expect(rendered.locator("li").first()).toContainText("Add workflow");
   });
 
-  test("Run button sends the skill invocation as a slash command", async ({
-    page,
-  }) => {
+  test("Run button sends the skill invocation as a slash command", async ({ page }) => {
     // Capture the body of the agent POST so we can assert what
     // sendMessage forwarded. Registered AFTER mockAllApis so this
     // route wins (Playwright matches last-registered first).
@@ -205,18 +192,14 @@ test.describe("manageSkills plugin", () => {
     await expect(page.getByTestId("skill-item-ci_enable")).toBeVisible();
 
     // Wait for the detail endpoint to resolve before clicking Run.
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "CI Enable",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("CI Enable");
     await page.getByTestId("skill-run-btn").click();
 
     // Run button routes through App.vue's sendMessage via the
     // useAppApi() provide/inject contract (#227). The slash command
     // form (`/<name>`) is what Claude CLI resolves against
     // ~/.claude/skills/ natively, so we don't need to ship the body.
-    await expect
-      .poll(() => agentPosts.length, { timeout: 5000 })
-      .toBeGreaterThan(0);
+    await expect.poll(() => agentPosts.length, { timeout: 5000 }).toBeGreaterThan(0);
     expect(agentPosts[0]?.message).toBe("/ci_enable");
   });
 });
@@ -237,9 +220,7 @@ async function setupSkillsWithProjectScope(page: Page) {
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) => {
       return route.fulfill({
         json: [
@@ -279,14 +260,10 @@ async function setupSkillsWithProjectScope(page: Page) {
   );
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
+    (url) => url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
     (route: Route) => {
       const method = route.request().method();
-      const name =
-        decodeURIComponent(
-          route.request().url().split("/api/skills/").pop() ?? "",
-        ).split("?")[0] ?? "";
+      const name = decodeURIComponent(route.request().url().split("/api/skills/").pop() ?? "").split("?")[0] ?? "";
       if (method === "DELETE") {
         // Stubbed delete response — phase 1 server returns
         // { deleted: true, name } on success.
@@ -307,10 +284,7 @@ async function setupSkillsWithProjectScope(page: Page) {
         json: {
           skill: {
             name,
-            description:
-              source === "user"
-                ? "Read-only user skill"
-                : "Captured from a chat",
+            description: source === "user" ? "Read-only user skill" : "Captured from a chat",
             body: `## ${name}\n\nbody`,
             source,
             path: `/fake/${name}/SKILL.md`,
@@ -335,44 +309,31 @@ test.describe("manageSkills plugin — delete (phase 1)", () => {
     // First skill (user-only) is auto-selected on mount; Delete
     // button should not appear.
     await page.getByTestId("skill-item-user-only").click();
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "user-only",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("user-only");
     await expect(page.getByTestId("skill-delete-btn")).toHaveCount(0);
   });
 
-  test("Delete button is visible for project-scope skills", async ({
-    page,
-  }) => {
+  test("Delete button is visible for project-scope skills", async ({ page }) => {
     await page.goto("/chat/skills-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.getByText("2 skills").first().click();
     await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
 
     await page.getByTestId("skill-item-my-project-skill").click();
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "my-project-skill",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("my-project-skill");
     await expect(page.getByTestId("skill-delete-btn")).toBeVisible();
   });
 
-  test("clicking Delete fires DELETE /api/skills/:name and removes the row", async ({
-    page,
-  }) => {
+  test("clicking Delete fires DELETE /api/skills/:name and removes the row", async ({ page }) => {
     // Auto-accept the native confirm() dialog the View shows.
     page.on("dialog", (d) => d.accept());
 
     let deletedName: string | null = null;
     await page.route(
-      (url) =>
-        url.pathname.startsWith("/api/skills/") &&
-        url.pathname !== "/api/skills",
+      (url) => url.pathname.startsWith("/api/skills/") && url.pathname !== "/api/skills",
       (route: Route) => {
         if (route.request().method() === "DELETE") {
-          const name =
-            decodeURIComponent(
-              route.request().url().split("/api/skills/").pop() ?? "",
-            ).split("?")[0] ?? "";
+          const name = decodeURIComponent(route.request().url().split("/api/skills/").pop() ?? "").split("?")[0] ?? "";
           deletedName = name;
           return route.fulfill({ json: { deleted: true, name } });
         }
@@ -394,15 +355,11 @@ test.describe("manageSkills plugin — delete (phase 1)", () => {
     await expect.poll(() => deletedName).toBe("my-project-skill");
 
     // Row is removed from the left list — only the user skill remains.
-    await expect(page.getByTestId("skill-item-my-project-skill")).toHaveCount(
-      0,
-    );
+    await expect(page.getByTestId("skill-item-my-project-skill")).toHaveCount(0);
     await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
   });
 
-  test("Edit button opens edit mode, saves changes, and returns to view mode", async ({
-    page,
-  }) => {
+  test("Edit button opens edit mode, saves changes, and returns to view mode", async ({ page }) => {
     // Mock PUT /api/skills/my-project-skill to return success.
     await page.route(
       (url) => url.pathname === "/api/skills/my-project-skill",
@@ -423,9 +380,7 @@ test.describe("manageSkills plugin — delete (phase 1)", () => {
 
     // Select the project-scope skill — Edit button should be visible.
     await page.getByTestId("skill-item-my-project-skill").click();
-    await expect(page.getByTestId("skill-body-rendered")).toContainText(
-      "my-project-skill",
-    );
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("my-project-skill");
     await expect(page.getByTestId("skill-edit-btn")).toBeVisible();
 
     // Click Edit → description input + body textarea should appear.

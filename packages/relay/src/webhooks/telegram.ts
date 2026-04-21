@@ -1,11 +1,7 @@
 // Telegram platform plugin.
 
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
-import {
-  registerPlatform,
-  CONNECTION_MODES,
-  type PlatformPlugin,
-} from "../platform.js";
+import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 
 interface TelegramUpdate {
   message?: {
@@ -27,11 +23,7 @@ const telegramPlugin: PlatformPlugin = {
     return !!env.TELEGRAM_BOT_TOKEN && !!env.TELEGRAM_WEBHOOK_SECRET;
   },
 
-  async handleWebhook(
-    request: Request,
-    body: string,
-    env: Env,
-  ): Promise<RelayMessage[]> {
+  async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
     // Fail closed: secret must be configured
     if (!env.TELEGRAM_WEBHOOK_SECRET) {
       throw new Error("Telegram webhook secret not configured");
@@ -72,24 +64,17 @@ const telegramPlugin: PlatformPlugin = {
     for (const chunk of chunks) {
       let response: Response;
       try {
-        response = await fetch(
-          `https://api.telegram.org/bot${String(botToken)}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: chatId, text: chunk }),
-          },
-        );
+        response = await fetch(`https://api.telegram.org/bot${String(botToken)}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: chunk }),
+        });
       } catch (err) {
-        throw new Error(
-          `Telegram API network error: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        throw new Error(`Telegram API network error: ${err instanceof Error ? err.message : String(err)}`);
       }
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
-        throw new Error(
-          `Telegram sendMessage failed: ${response.status} ${detail}`,
-        );
+        throw new Error(`Telegram sendMessage failed: ${response.status} ${detail}`);
       }
     }
   },

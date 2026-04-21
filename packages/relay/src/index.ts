@@ -5,11 +5,7 @@
 // PlatformPlugin, call registerPlatform(), import it below.
 
 import type { Env, RelayMessage } from "./types.js";
-import {
-  getPlatformByPath,
-  getConfiguredPlatforms,
-  CONNECTION_MODES,
-} from "./platform.js";
+import { getPlatformByPath, getConfiguredPlatforms, CONNECTION_MODES } from "./platform.js";
 
 // ── Register platform plugins (side-effect imports) ─────────
 // Each import registers itself via registerPlatform().
@@ -69,10 +65,7 @@ export default {
       return new Response("ok", { status: 200 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (
-        msg.includes("verification failed") ||
-        msg.includes("not configured")
-      ) {
+      if (msg.includes("verification failed") || msg.includes("not configured")) {
         return new Response("Unauthorized", { status: 401 });
       }
       return new Response("Internal error", { status: 500 });
@@ -90,10 +83,7 @@ async function readBodyWithLimit(request: Request): Promise<string> {
   return body;
 }
 
-async function enqueueMessages(
-  messages: RelayMessage[],
-  env: Env,
-): Promise<void> {
+async function enqueueMessages(messages: RelayMessage[], env: Env): Promise<void> {
   for (const msg of messages) {
     const response = await forwardToDurableObject(
       new Request("https://internal/enqueue", {
@@ -109,11 +99,7 @@ async function enqueueMessages(
   }
 }
 
-async function forwardToDurableObject(
-  request: Request,
-  env: Env,
-  path: string,
-): Promise<Response> {
+async function forwardToDurableObject(request: Request, env: Env, path: string): Promise<Response> {
   const id = env.RELAY.idFromName("singleton");
   const stub = env.RELAY.get(id);
   const url = new URL(request.url);

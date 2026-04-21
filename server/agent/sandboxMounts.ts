@@ -46,9 +46,7 @@ export interface SandboxMountSpec {
  * 2. Add a row in docs/sandbox-credentials.md.
  * 3. That's it — no env var changes, no parser changes.
  */
-export function buildAllowedConfigMounts(
-  home: string = homedir(),
-): Record<string, SandboxMountSpec> {
+export function buildAllowedConfigMounts(home: string = homedir()): Record<string, SandboxMountSpec> {
   return {
     gh: {
       name: "gh",
@@ -83,10 +81,7 @@ export interface ParsedMountList {
  * check that each host path exists. The three output buckets let the
  * caller decide what to error on (unknown) vs warn on (missing).
  */
-export function resolveMountNames(
-  names: readonly string[],
-  allowed: Record<string, SandboxMountSpec> = buildAllowedConfigMounts(),
-): ParsedMountList {
+export function resolveMountNames(names: readonly string[], allowed: Record<string, SandboxMountSpec> = buildAllowedConfigMounts()): ParsedMountList {
   const resolved: SandboxMountSpec[] = [];
   const unknown: string[] = [];
   const missing: SandboxMountSpec[] = [];
@@ -124,9 +119,7 @@ function hostPathExists(spec: SandboxMountSpec): boolean {
  * Always read-only. The caller splices these into the full docker
  * argv in `buildDockerSpawnArgs`.
  */
-export function configMountArgs(
-  resolved: readonly SandboxMountSpec[],
-): string[] {
+export function configMountArgs(resolved: readonly SandboxMountSpec[]): string[] {
   const args: string[] = [];
   for (const spec of resolved) {
     args.push("-v", `${toDockerPath(spec.hostPath)}:${spec.containerPath}:ro`);
@@ -176,12 +169,7 @@ export function sshAgentForwardArgs(
   // macOS + Docker Desktop: use the magic VM-internal socket.
   if (platform === "darwin") {
     return {
-      args: [
-        "-v",
-        `${DOCKER_DESKTOP_MAC_SSH_SOCK}:${SSH_AGENT_CONTAINER_SOCK}`,
-        "-e",
-        `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
-      ],
+      args: ["-v", `${DOCKER_DESKTOP_MAC_SSH_SOCK}:${SSH_AGENT_CONTAINER_SOCK}`, "-e", `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`],
       skippedReason: null,
     };
   }
@@ -200,12 +188,7 @@ export function sshAgentForwardArgs(
     };
   }
   return {
-    args: [
-      "-v",
-      `${toDockerPath(sshAuthSock)}:${SSH_AGENT_CONTAINER_SOCK}`,
-      "-e",
-      `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`,
-    ],
+    args: ["-v", `${toDockerPath(sshAuthSock)}:${SSH_AGENT_CONTAINER_SOCK}`, "-e", `SSH_AUTH_SOCK=${SSH_AGENT_CONTAINER_SOCK}`],
     skippedReason: null,
   };
 }
@@ -238,9 +221,7 @@ export interface ResolveSandboxAuthParams {
  * `log.info` line listing what actually got mounted so the startup
  * log shows the sandbox's effective auth posture.
  */
-export function resolveSandboxAuth(
-  params: ResolveSandboxAuthParams,
-): ResolvedSandboxAuth {
+export function resolveSandboxAuth(params: ResolveSandboxAuthParams): ResolvedSandboxAuth {
   const home = params.home ?? homedir();
   const allowed = buildAllowedConfigMounts(home);
   const parsed = resolveMountNames(params.configMountNames, allowed);
@@ -258,10 +239,7 @@ export function resolveSandboxAuth(
     });
   }
 
-  const sshResult = sshAgentForwardArgs(
-    params.sshAgentForward,
-    params.sshAuthSock,
-  );
+  const sshResult = sshAgentForwardArgs(params.sshAgentForward, params.sshAuthSock);
   if (sshResult.skippedReason !== null) {
     log.warn("sandbox", "SSH agent forward requested but skipped", {
       reason: sshResult.skippedReason,
@@ -271,10 +249,7 @@ export function resolveSandboxAuth(
   // Pass the allowed-hosts whitelist to the container so the
   // entrypoint can generate a restrictive ~/.ssh/config. Only
   // included when SSH agent forward is actually active.
-  const sshAllowedHostsArgs =
-    sshResult.args.length > 0 && params.sshAllowedHosts
-      ? ["-e", `SANDBOX_SSH_ALLOWED_HOSTS=${params.sshAllowedHosts}`]
-      : [];
+  const sshAllowedHostsArgs = sshResult.args.length > 0 && params.sshAllowedHosts ? ["-e", `SANDBOX_SSH_ALLOWED_HOSTS=${params.sshAllowedHosts}`] : [];
 
   // gh CLI keyring fallback (#259 + #164). When the user opted in
   // to `gh` via SANDBOX_MOUNT_CONFIGS but the file mount succeeded
@@ -283,21 +258,11 @@ export function resolveSandboxAuth(
   // var instead. Only runs when "gh" was explicitly requested.
   const ghTokenArgs = resolveGhTokenFallback(params.configMountNames, parsed);
 
-  const args = [
-    ...configMountArgs(parsed.resolved),
-    ...sshResult.args,
-    ...sshAllowedHostsArgs,
-    ...ghTokenArgs.args,
-  ];
-  const allowedHostsSuffix =
-    sshResult.args.length > 0 && params.sshAllowedHosts
-      ? ` → hosts: ${params.sshAllowedHosts}`
-      : "";
+  const args = [...configMountArgs(parsed.resolved), ...sshResult.args, ...sshAllowedHostsArgs, ...ghTokenArgs.args];
+  const allowedHostsSuffix = sshResult.args.length > 0 && params.sshAllowedHosts ? ` → hosts: ${params.sshAllowedHosts}` : "";
   const appliedDescriptions = [
     ...parsed.resolved.map((s) => `${s.name} (${s.description})`),
-    ...(sshResult.args.length > 0
-      ? [`ssh-agent forward${allowedHostsSuffix}`]
-      : []),
+    ...(sshResult.args.length > 0 ? [`ssh-agent forward${allowedHostsSuffix}`] : []),
     ...(ghTokenArgs.args.length > 0 ? ["gh CLI (GH_TOKEN fallback)"] : []),
   ];
 
@@ -318,10 +283,7 @@ export function resolveSandboxAuth(
 // extract the token via `gh auth token` on the host and pass it as
 // GH_TOKEN env var. This only runs when "gh" was explicitly
 // requested (#259 opt-in principle).
-function resolveGhTokenFallback(
-  requestedNames: readonly string[],
-  parsed: ParsedMountList,
-): { args: string[] } {
+function resolveGhTokenFallback(requestedNames: readonly string[], parsed: ParsedMountList): { args: string[] } {
   const ghRequested = requestedNames.some((n) => n.trim() === "gh");
   if (!ghRequested) return { args: [] };
 
@@ -346,17 +308,11 @@ function resolveGhTokenFallback(
         timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
       }).trim();
       if (token.length > 0) {
-        log.info(
-          "sandbox",
-          "gh token extracted from host keyring (GH_TOKEN fallback)",
-        );
+        log.info("sandbox", "gh token extracted from host keyring (GH_TOKEN fallback)");
         return { args: ["-e", `GH_TOKEN=${token}`] };
       }
     } catch {
-      log.info(
-        "sandbox",
-        "gh auth token failed — gh CLI may not work in sandbox",
-      );
+      log.info("sandbox", "gh auth token failed — gh CLI may not work in sandbox");
     }
   }
 

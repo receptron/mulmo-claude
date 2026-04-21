@@ -5,11 +5,7 @@ import { BUILTIN_ROLES, type Role } from "../../../src/config/roles.js";
 import { pushSessionEvent } from "../../events/session-store/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
-import {
-  roleExists,
-  deleteRole,
-  saveRole,
-} from "../../utils/files/roles-io.js";
+import { roleExists, deleteRole, saveRole } from "../../utils/files/roles-io.js";
 
 const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((r) => r.id));
 
@@ -19,14 +15,11 @@ router.get(API_ROUTES.roles.list, (_req: Request, res: Response<Role[]>) => {
   res.json(loadCustomRoles());
 });
 
-router.post(
-  API_ROUTES.roles.manage,
-  async (req: Request, res: Response<Record<string, unknown>>) => {
-    const session = getSessionQuery(req);
-    const result = await executeManageRoles(req.body, session);
-    res.json(result);
-  },
-);
+router.post(API_ROUTES.roles.manage, async (req: Request, res: Response<Record<string, unknown>>) => {
+  const session = getSessionQuery(req);
+  const result = await executeManageRoles(req.body, session);
+  res.json(result);
+});
 
 export default router;
 
@@ -47,10 +40,7 @@ interface ManageRolesInput {
   roleId?: string;
 }
 
-export async function executeManageRoles(
-  input: ManageRolesInput,
-  sessionId: string,
-): Promise<Record<string, unknown>> {
+export async function executeManageRoles(input: ManageRolesInput, sessionId: string): Promise<Record<string, unknown>> {
   const { action, role, roleId } = input;
 
   if (action === "list") {
@@ -64,8 +54,7 @@ export async function executeManageRoles(
 
   if (action === "delete") {
     const id = roleId;
-    if (!id)
-      return { success: false, error: "roleId is required for delete action" };
+    if (!id) return { success: false, error: "roleId is required for delete action" };
     if (BUILTIN_IDS.has(id)) {
       return { success: false, error: "Cannot delete built-in roles." };
     }

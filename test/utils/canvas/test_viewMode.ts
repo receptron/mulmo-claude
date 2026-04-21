@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseStoredViewMode,
-  viewModeForShortcutKey,
-  VIEW_MODE_STORAGE_KEY,
-} from "../../../src/utils/canvas/viewMode.js";
+import { parseStoredViewMode, viewModeForShortcutKey, VIEW_MODE_STORAGE_KEY } from "../../../src/utils/canvas/viewMode.js";
 
 describe("parseStoredViewMode", () => {
   it("returns the stored value when it is one of the known modes", () => {

@@ -1,11 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { planEligibleSources } from "../../server/workspace/sources/pipeline/plan.js";
-import type {
-  Source,
-  SourceSchedule,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
+import type { Source, SourceSchedule, SourceState } from "../../server/workspace/sources/types.js";
 
 function makeSource(over: Partial<Source> = {}): Source {
   return {
@@ -56,9 +52,7 @@ describe("planEligibleSources — schedule matching", () => {
   });
 
   it("never picks up on-demand sources in a scheduled run", () => {
-    const sources: Source[] = [
-      makeSource({ slug: "od", schedule: "on-demand" }),
-    ];
+    const sources: Source[] = [makeSource({ slug: "od", schedule: "on-demand" })];
     for (const kind of ["hourly", "daily", "weekly"] as SourceSchedule[]) {
       const eligible = planEligibleSources({
         sources,
@@ -94,11 +88,7 @@ describe("planEligibleSources — schedule matching", () => {
 
 describe("planEligibleSources — sort ordering", () => {
   it("returns eligible sources sorted by slug for deterministic runs", () => {
-    const sources = [
-      makeSource({ slug: "charlie" }),
-      makeSource({ slug: "alpha" }),
-      makeSource({ slug: "bravo" }),
-    ];
+    const sources = [makeSource({ slug: "charlie" }), makeSource({ slug: "alpha" }), makeSource({ slug: "bravo" })];
     const eligible = planEligibleSources({
       sources,
       statesBySlug: new Map(),
@@ -128,9 +118,7 @@ describe("planEligibleSources — backoff respect", () => {
 
   it("includes sources with state but no nextAttemptAt", () => {
     const sources = [makeSource({ slug: "settled" })];
-    const states = new Map([
-      ["settled", makeState({ slug: "settled", nextAttemptAt: null })],
-    ]);
+    const states = new Map([["settled", makeState({ slug: "settled", nextAttemptAt: null })]]);
     const eligible = planEligibleSources({
       sources,
       statesBySlug: states,

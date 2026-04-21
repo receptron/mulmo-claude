@@ -5,12 +5,7 @@ import { readTextSafe } from "../../utils/files/safe.js";
 import path from "path";
 import { workspacePath } from "../../workspace/workspace.js";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
-import {
-  readSessionMeta as readSessionMetaIO,
-  readSessionJsonl,
-  sessionJsonlAbsPath,
-  sessionMetaAbsPath,
-} from "../../utils/files/session-io.js";
+import { readSessionMeta as readSessionMetaIO, readSessionJsonl, sessionJsonlAbsPath, sessionMetaAbsPath } from "../../utils/files/session-io.js";
 import { readManifest } from "../../workspace/chat-index/indexer.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import type { ChatIndexEntry } from "../../workspace/chat-index/types.js";
@@ -21,11 +16,7 @@ import { EVENT_TYPES } from "../../../src/types/events.js";
 import type { SessionOrigin } from "../../../src/types/session.js";
 import { env } from "../../system/env.js";
 import { ONE_DAY_MS } from "../../utils/time.js";
-import {
-  encodeCursor,
-  parseCursor,
-  sessionChangeMs,
-} from "./sessionsCursor.js";
+import { encodeCursor, parseCursor, sessionChangeMs } from "./sessionsCursor.js";
 
 interface SessionMeta {
   roleId: string;
@@ -35,10 +26,7 @@ interface SessionMeta {
   origin?: SessionOrigin;
 }
 
-async function readSessionMeta(
-  __chatDir: string,
-  id: string,
-): Promise<SessionMeta | null> {
+async function readSessionMeta(__chatDir: string, id: string): Promise<SessionMeta | null> {
   // Try new-style .json meta first
   const meta = await readSessionMetaIO(id);
   if (meta?.roleId && meta?.startedAt) {
@@ -111,14 +99,10 @@ const WINDOW_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 // `changeMs` — the later of the jsonl mtime and the chat-index
 // `indexedAt` — so the handler can filter against `?since=` and
 // compute the new cursor without re-statting anything.
-export async function loadAllSessions(): Promise<
-  { summary: SessionSummary; changeMs: number }[]
-> {
+export async function loadAllSessions(): Promise<{ summary: SessionSummary; changeMs: number }[]> {
   const chatDir = WORKSPACE_PATHS.chat;
   const manifest = await readManifest(workspacePath);
-  const indexById = new Map<string, ChatIndexEntry>(
-    manifest.entries.map((e) => [e.id, e]),
-  );
+  const indexById = new Map<string, ChatIndexEntry>(manifest.entries.map((e) => [e.id, e]));
   const cutoff = WINDOW_MS > 0 ? Date.now() - WINDOW_MS : 0;
 
   const files = (await readdir(chatDir)).filter((f) => f.endsWith(".jsonl"));
@@ -159,79 +143,60 @@ export async function loadAllSessions(): Promise<
           hasUnread: live?.hasUnread ?? meta.hasUnread ?? false,
         };
         if (meta.origin) summary.origin = meta.origin;
-        if (indexEntry?.summary !== undefined)
-          summary.summary = indexEntry.summary;
-        if (indexEntry?.keywords !== undefined)
-          summary.keywords = indexEntry.keywords;
+        if (indexEntry?.summary !== undefined) summary.summary = indexEntry.summary;
+        if (indexEntry?.keywords !== undefined) summary.keywords = indexEntry.keywords;
         if (live) {
           // Background generations (image/audio/movie) keep the session
           // "busy" even when the agent turn has ended, so the sidebar
           // indicator stays lit across view navigation.
-          summary.isRunning =
-            live.isRunning || Object.keys(live.pendingGenerations).length > 0;
+          summary.isRunning = live.isRunning || Object.keys(live.pendingGenerations).length > 0;
           summary.statusMessage = live.statusMessage;
         }
         return {
           summary,
-          changeMs: sessionChangeMs(
-            fileStat.mtimeMs,
-            indexEntry?.indexedAt,
-            metaMtimeMs,
-          ),
+          changeMs: sessionChangeMs(fileStat.mtimeMs, indexEntry?.indexedAt, metaMtimeMs),
         };
       } catch {
         return null;
       }
     }),
   );
-  return rows.filter(
-    (r): r is { summary: SessionSummary; changeMs: number } => r !== null,
-  );
+  return rows.filter((r): r is { summary: SessionSummary; changeMs: number } => r !== null);
 }
 
-router.get(
-  API_ROUTES.sessions.list,
-  async (
-    req: Request<object, SessionsResponse, object, SessionsQuery>,
-    res: Response<SessionsResponse>,
-  ) => {
-    try {
-      const sinceMs = parseCursor(req.query.since);
-      const rows = await loadAllSessions();
+router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsResponse, object, SessionsQuery>, res: Response<SessionsResponse>) => {
+  try {
+    const sinceMs = parseCursor(req.query.since);
+    const rows = await loadAllSessions();
 
-      // Cursor = max(changeMs) across every visible session, regardless
-      // of whether it's in the diff. Echoing the same cursor back on an
-      // empty diff (nothing changed since `?since=`) is fine; the
-      // client no-ops.
-      const maxChangeMs = rows.reduce((acc, r) => Math.max(acc, r.changeMs), 0);
+    // Cursor = max(changeMs) across every visible session, regardless
+    // of whether it's in the diff. Echoing the same cursor back on an
+    // empty diff (nothing changed since `?since=`) is fine; the
+    // client no-ops.
+    const maxChangeMs = rows.reduce((acc, r) => Math.max(acc, r.changeMs), 0);
 
-      const filtered =
-        sinceMs > 0 ? rows.filter((r) => r.changeMs > sinceMs) : rows;
+    const filtered = sinceMs > 0 ? rows.filter((r) => r.changeMs > sinceMs) : rows;
 
-      const sessions = filtered.map((r) => r.summary);
-      sessions.sort((a, b) => {
-        const byUpdated =
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        if (byUpdated !== 0) return byUpdated;
-        return (
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        );
-      });
+    const sessions = filtered.map((r) => r.summary);
+    sessions.sort((a, b) => {
+      const byUpdated = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      if (byUpdated !== 0) return byUpdated;
+      return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+    });
 
-      res.json({
-        sessions,
-        cursor: encodeCursor(maxChangeMs),
-        // No session-delete code path exists today — issue #205 picked
-        // approach A (tombstones) so the client already merges this
-        // field; populating it becomes a server-only change when
-        // deletion lands.
-        deletedIds: [],
-      });
-    } catch {
-      res.json({ sessions: [], cursor: encodeCursor(0), deletedIds: [] });
-    }
-  },
-);
+    res.json({
+      sessions,
+      cursor: encodeCursor(maxChangeMs),
+      // No session-delete code path exists today — issue #205 picked
+      // approach A (tombstones) so the client already merges this
+      // field; populating it becomes a server-only change when
+      // deletion lands.
+      deletedIds: [],
+    });
+  } catch {
+    res.json({ sessions: [], cursor: encodeCursor(0), deletedIds: [] });
+  }
+});
 
 interface SessionIdParams {
   id: string;
@@ -241,109 +206,89 @@ interface SessionErrorResponse {
   error: string;
 }
 
-router.get(
-  API_ROUTES.sessions.detail,
-  async (
-    req: Request<SessionIdParams>,
-    res: Response<unknown[] | SessionErrorResponse>,
-  ) => {
-    const { id } = req.params;
-    const chatDir = WORKSPACE_PATHS.chat;
-    try {
-      const meta = await readSessionMeta(chatDir, id);
-      const content = await readSessionJsonl(id);
-      if (!content) {
-        notFound(res, `Session ${id} not found`);
-        return;
-      }
-      const entries = (
-        await Promise.all(
-          content
-            .split("\n")
-            .filter(Boolean)
-            .map(async (line) => {
-              try {
-                const entry = JSON.parse(line);
-                // Skip legacy metadata entries now stored in .json
-                if (
-                  entry.type === EVENT_TYPES.sessionMeta ||
-                  entry.type === EVENT_TYPES.claudeSessionId
-                )
-                  return null;
-                // For presentMulmoScript results, re-read the script from disk
-                if (
-                  entry.source === "tool" &&
-                  entry.type === EVENT_TYPES.toolResult &&
-                  entry.result?.toolName === "presentMulmoScript" &&
-                  entry.result?.data?.filePath
-                ) {
-                  try {
-                    // Realpath-based traversal check defeats symlink
-                    // escapes — see resolveWithinRoot in utils/fs.ts.
-                    // Resolve the stories dir's realpath so the
-                    // boundary check works even when stories/ itself
-                    // is a legitimate symlink to another disk.
-                    const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
-                    let storiesReal: string;
-                    try {
-                      storiesReal = fs.realpathSync(storiesDir);
-                    } catch {
-                      return entry;
-                    }
-                    const scriptRelPath: string = entry.result.data.filePath;
-                    if (path.isAbsolute(scriptRelPath)) return entry;
-                    // Strip optional "stories/" prefix so the
-                    // remainder is relative to storiesReal.
-                    const relFromStories = scriptRelPath.startsWith("stories/")
-                      ? scriptRelPath.slice("stories/".length)
-                      : scriptRelPath;
-                    const scriptPath = resolveWithinRoot(
-                      storiesReal,
-                      relFromStories,
-                    );
-                    if (!scriptPath) return entry;
-                    const scriptJson = (await readTextSafe(scriptPath)) ?? "";
-                    return {
-                      ...entry,
-                      result: {
-                        ...entry.result,
-                        data: {
-                          ...entry.result.data,
-                          script: JSON.parse(scriptJson),
-                        },
-                      },
-                    };
-                  } catch {
-                    // file missing — return original entry
-                  }
-                }
-                return entry;
-              } catch {
-                return null;
-              }
-            }),
-        )
-      ).filter(Boolean);
-      // Prepend metadata as session_meta entry for the frontend
-      const result = meta
-        ? [{ type: EVENT_TYPES.sessionMeta, ...meta }, ...entries]
-        : entries;
-      res.json(result);
-    } catch {
-      notFound(res, "Session not found");
+router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<unknown[] | SessionErrorResponse>) => {
+  const { id } = req.params;
+  const chatDir = WORKSPACE_PATHS.chat;
+  try {
+    const meta = await readSessionMeta(chatDir, id);
+    const content = await readSessionJsonl(id);
+    if (!content) {
+      notFound(res, `Session ${id} not found`);
+      return;
     }
-  },
-);
+    const entries = (
+      await Promise.all(
+        content
+          .split("\n")
+          .filter(Boolean)
+          .map(async (line) => {
+            try {
+              const entry = JSON.parse(line);
+              // Skip legacy metadata entries now stored in .json
+              if (entry.type === EVENT_TYPES.sessionMeta || entry.type === EVENT_TYPES.claudeSessionId) return null;
+              // For presentMulmoScript results, re-read the script from disk
+              if (
+                entry.source === "tool" &&
+                entry.type === EVENT_TYPES.toolResult &&
+                entry.result?.toolName === "presentMulmoScript" &&
+                entry.result?.data?.filePath
+              ) {
+                try {
+                  // Realpath-based traversal check defeats symlink
+                  // escapes — see resolveWithinRoot in utils/fs.ts.
+                  // Resolve the stories dir's realpath so the
+                  // boundary check works even when stories/ itself
+                  // is a legitimate symlink to another disk.
+                  const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
+                  let storiesReal: string;
+                  try {
+                    storiesReal = fs.realpathSync(storiesDir);
+                  } catch {
+                    return entry;
+                  }
+                  const scriptRelPath: string = entry.result.data.filePath;
+                  if (path.isAbsolute(scriptRelPath)) return entry;
+                  // Strip optional "stories/" prefix so the
+                  // remainder is relative to storiesReal.
+                  const relFromStories = scriptRelPath.startsWith("stories/") ? scriptRelPath.slice("stories/".length) : scriptRelPath;
+                  const scriptPath = resolveWithinRoot(storiesReal, relFromStories);
+                  if (!scriptPath) return entry;
+                  const scriptJson = (await readTextSafe(scriptPath)) ?? "";
+                  return {
+                    ...entry,
+                    result: {
+                      ...entry.result,
+                      data: {
+                        ...entry.result.data,
+                        script: JSON.parse(scriptJson),
+                      },
+                    },
+                  };
+                } catch {
+                  // file missing — return original entry
+                }
+              }
+              return entry;
+            } catch {
+              return null;
+            }
+          }),
+      )
+    ).filter(Boolean);
+    // Prepend metadata as session_meta entry for the frontend
+    const result = meta ? [{ type: EVENT_TYPES.sessionMeta, ...meta }, ...entries] : entries;
+    res.json(result);
+  } catch {
+    notFound(res, "Session not found");
+  }
+});
 
 // Mark a session as read (clears the hasUnread flag in the session store).
 // Awaits persistence so the response only arrives after the disk write
 // completes — prevents the client from refetching stale hasUnread values.
-router.post(
-  API_ROUTES.sessions.markRead,
-  async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
-    await markRead(req.params.id);
-    res.json({ ok: true });
-  },
-);
+router.post(API_ROUTES.sessions.markRead, async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
+  await markRead(req.params.id);
+  res.json({ ok: true });
+});
 
 export default router;

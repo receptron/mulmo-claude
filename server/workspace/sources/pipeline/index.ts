@@ -33,18 +33,8 @@ import { existsSync } from "fs";
 import { listSources } from "../registry.js";
 import { readManyStates, writeManyStates } from "../sourceState.js";
 import { dailyNewsPath } from "../paths.js";
-import {
-  getFetcher as registryGetFetcher,
-  type FetcherDeps,
-  type SourceFetcher,
-} from "../fetchers/index.js";
-import type {
-  FetcherKind,
-  Source,
-  SourceItem,
-  SourceState,
-  SourceSchedule,
-} from "../types.js";
+import { getFetcher as registryGetFetcher, type FetcherDeps, type SourceFetcher } from "../fetchers/index.js";
+import type { FetcherKind, Source, SourceItem, SourceState, SourceSchedule } from "../types.js";
 import { planEligibleSources } from "./plan.js";
 import { runFetchPhase, computeNextState, type FetchOutcome } from "./fetch.js";
 import { dedupAcrossSources, type DedupStats } from "./dedup.js";
@@ -109,17 +99,8 @@ export function toLocalYearMonth(ms: number): string {
   return `${y}-${m}`;
 }
 
-export async function runSourcesPipeline(
-  input: RunPipelineInput,
-): Promise<RunPipelineResult> {
-  const {
-    workspaceRoot,
-    scheduleType,
-    fetcherDeps,
-    nowMs,
-    getFetcher = registryGetFetcher,
-    onProgress = () => {},
-  } = input;
+export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPipelineResult> {
+  const { workspaceRoot, scheduleType, fetcherDeps, nowMs, getFetcher = registryGetFetcher, onProgress = () => {} } = input;
 
   const startMs = nowMs();
   const isoDate = toLocalIsoDate(startMs);
@@ -166,9 +147,7 @@ export async function runSourcesPipeline(
     // afternoon.
     onProgress("write-empty");
     const existingPath = dailyNewsPath(workspaceRoot, isoDate);
-    const dailyPath = existsSync(existingPath)
-      ? existingPath
-      : await writeDailyFile(workspaceRoot, isoDate, await summarizeFn([]), []);
+    const dailyPath = existsSync(existingPath) ? existingPath : await writeDailyFile(workspaceRoot, isoDate, await summarizeFn([]), []);
     return {
       plannedCount: 0,
       outcomes: [],
@@ -209,17 +188,8 @@ export async function runSourcesPipeline(
   const markdown = await summarizeFn(dedup.items);
 
   onProgress("write"); // step 7
-  const dailyPath = await writeDailyFile(
-    workspaceRoot,
-    isoDate,
-    markdown,
-    dedup.items,
-  );
-  const archiveResult = await appendItemsToArchives(
-    workspaceRoot,
-    dedup.items,
-    fallbackMonth,
-  );
+  const dailyPath = await writeDailyFile(workspaceRoot, isoDate, markdown, dedup.items);
+  const archiveResult = await appendItemsToArchives(workspaceRoot, dedup.items, fallbackMonth);
 
   // --- 8. Persist state ---------------------------------------------
   onProgress("persist");

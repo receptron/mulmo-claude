@@ -51,9 +51,7 @@ function shouldSkip(url: string): boolean {
 function resolveWorkspacePath(basePath: string, url: string): string | null {
   // Absolute-within-workspace (e.g. "/images/foo.png") — reset base.
   const isAbsolute = url.startsWith("/");
-  const baseSegs = isAbsolute
-    ? []
-    : basePath.split("/").filter((s) => s !== "" && s !== ".");
+  const baseSegs = isAbsolute ? [] : basePath.split("/").filter((s) => s !== "" && s !== ".");
   const segs = [...baseSegs];
 
   const urlSegs = (isAbsolute ? url.slice(1) : url).split("/");
@@ -88,10 +86,7 @@ function extractBracketedAlt(raw: string): string | null {
   return null;
 }
 
-function rewriteImageToken(
-  token: Tokens.Image,
-  basePath: string,
-): string | null {
+function rewriteImageToken(token: Tokens.Image, basePath: string): string | null {
   const href = (token.href ?? "").trim();
   if (href === "" || shouldSkip(href)) return null;
   const resolved = resolveWorkspacePath(basePath, href);
@@ -108,9 +103,7 @@ function rewriteImageToken(
 }
 
 function isSkippable(token: Token): boolean {
-  return (
-    token.type === "code" || token.type === "codespan" || token.type === "html"
-  );
+  return token.type === "code" || token.type === "codespan" || token.type === "html";
 }
 
 function getContainerChildren(token: Token): Token[] | null {
@@ -129,15 +122,8 @@ function getContainerChildren(token: Token): Token[] | null {
 // raw span (list markers, blockquote prefixes, trailing newlines).
 // Returns true if the container was rendered via its children, false
 // if the caller should fall back to emitting the parent's raw.
-function renderContainerChildren(
-  raw: string,
-  children: Token[],
-  basePath: string,
-  out: string[],
-): boolean {
-  const joined = children
-    .map((c) => (c as { raw?: string }).raw ?? "")
-    .join("");
+function renderContainerChildren(raw: string, children: Token[], basePath: string, out: string[]): boolean {
+  const joined = children.map((c) => (c as { raw?: string }).raw ?? "").join("");
   if (joined === "") return false;
   const idx = raw.indexOf(joined);
   if (idx < 0) return false;
@@ -188,10 +174,7 @@ function renderToken(token: Token, basePath: string, out: string[]): void {
  * ref instead of silently re-pointing it. Image-ref syntax inside
  * code blocks / inline code spans is left alone.
  */
-export function rewriteMarkdownImageRefs(
-  markdown: string,
-  basePath: string = "",
-): string {
+export function rewriteMarkdownImageRefs(markdown: string, basePath: string = ""): string {
   const tokens = marked.lexer(markdown);
   const parts: string[] = [];
   for (const token of tokens) renderToken(token, basePath, parts);

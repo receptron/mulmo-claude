@@ -52,10 +52,7 @@ import FileTreePane from "./FileTreePane.vue";
 import FileContentHeader from "./FileContentHeader.vue";
 import FileContentRenderer from "./FileContentRenderer.vue";
 import { useFileTree } from "../composables/useFileTree";
-import {
-  useFileSelection,
-  isValidFilePath,
-} from "../composables/useFileSelection";
+import { useFileSelection, isValidFilePath } from "../composables/useFileSelection";
 import { useMarkdownMode } from "../composables/useMarkdownMode";
 import { useContentDisplay } from "../composables/useContentDisplay";
 import { useMarkdownLinkHandler } from "../composables/useMarkdownLinkHandler";
@@ -79,40 +76,13 @@ const emit = defineEmits<{
   loadSession: [sessionId: string];
 }>();
 
-const {
-  rootNode,
-  refRoots,
-  childrenByPath,
-  treeError,
-  loadDirChildren,
-  ensureAncestorsLoaded,
-  reloadRoot,
-  loadRefRoots,
-} = useFileTree();
+const { rootNode, refRoots, childrenByPath, treeError, loadDirChildren, ensureAncestorsLoaded, reloadRoot, loadRefRoots } = useFileTree();
 
-const {
-  selectedPath,
-  content,
-  contentLoading,
-  contentError,
-  loadContent,
-  selectFile,
-  deselectFile,
-  abortContent,
-} = useFileSelection();
+const { selectedPath, content, contentLoading, contentError, loadContent, selectFile, deselectFile, abortContent } = useFileSelection();
 
 const { mdRawMode, toggleMdRaw } = useMarkdownMode();
 
-const {
-  isMarkdown,
-  isHtml,
-  isJson,
-  isJsonl,
-  sandboxedHtml,
-  jsonTokens,
-  jsonlLines,
-  mdFrontmatter,
-} = useContentDisplay(selectedPath, content);
+const { isMarkdown, isHtml, isJson, isJsonl, sandboxedHtml, jsonTokens, jsonlLines, mdFrontmatter } = useContentDisplay(selectedPath, content);
 
 // Save-error banner shown above the Rendered-mode markdown editor.
 // Cleared on every new file load and on the next successful save.
@@ -158,19 +128,9 @@ watch(content, () => {
   rawSaveError.value = null;
 });
 
-const schedulerResult = computed(() =>
-  toSchedulerResult(
-    selectedPath.value,
-    content.value?.kind === "text" ? content.value.content : null,
-  ),
-);
+const schedulerResult = computed(() => toSchedulerResult(selectedPath.value, content.value?.kind === "text" ? content.value.content : null));
 
-const todoExplorerResult = computed(() =>
-  toTodoExplorerResult(
-    selectedPath.value,
-    content.value?.kind === "text" ? content.value.content : null,
-  ),
-);
+const todoExplorerResult = computed(() => toTodoExplorerResult(selectedPath.value, content.value?.kind === "text" ? content.value.content : null));
 
 const recentPaths = computed(() => {
   const set = new Set<string>();
@@ -181,11 +141,7 @@ const recentPaths = computed(() => {
   for (const children of childrenByPath.value.values()) {
     if (!children) continue;
     for (const node of children) {
-      if (
-        node.type === "file" &&
-        node.modifiedMs &&
-        now - node.modifiedMs < RECENT_THRESHOLD_MS
-      ) {
+      if (node.type === "file" && node.modifiedMs && now - node.modifiedMs < RECENT_THRESHOLD_MS) {
         set.add(node.path);
       }
     }

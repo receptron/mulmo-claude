@@ -46,11 +46,7 @@ interface RouterInternals {
   stack: StackFrame[];
 }
 
-function extractRouteHandler(
-  mod: RouteModule,
-  routePath: string,
-  method: "get" | "put",
-): Handler {
+function extractRouteHandler(mod: RouteModule, routePath: string, method: "get" | "put"): Handler {
   const router = mod.default as unknown as RouterInternals;
   // Each router.get/put() registers its own stack frame, so find the
   // frame matching BOTH path and method rather than the first path hit.
@@ -93,11 +89,7 @@ before(async () => {
   configMod = await import("../../server/system/config.js");
   routeMod = await import("../../server/api/routes/config.js");
   getHandler = extractRouteHandler(routeMod, "/api/config", "get");
-  putSettingsHandler = extractRouteHandler(
-    routeMod,
-    "/api/config/settings",
-    "put",
-  );
+  putSettingsHandler = extractRouteHandler(routeMod, "/api/config/settings", "put");
   putConfigHandler = extractRouteHandler(routeMod, "/api/config", "put");
 });
 
@@ -153,10 +145,7 @@ describe("PUT /config/settings", () => {
 
   it("rejects invalid shape with 400", () => {
     const { state, res } = mockRes();
-    putSettingsHandler(
-      { body: { extraAllowedTools: "not-an-array" } } as Request,
-      res,
-    );
+    putSettingsHandler({ body: { extraAllowedTools: "not-an-array" } } as Request, res);
     assert.equal(state.status, 400);
     const body = state.body as { error: string };
     assert.match(body.error, /Invalid/);
@@ -170,20 +159,14 @@ describe("PUT /config/settings", () => {
 
   it("rejects arrays containing non-strings", () => {
     const { state, res } = mockRes();
-    putSettingsHandler(
-      { body: { extraAllowedTools: ["ok", 42] } } as Request,
-      res,
-    );
+    putSettingsHandler({ body: { extraAllowedTools: ["ok", 42] } } as Request, res);
     assert.equal(state.status, 400);
   });
 
   it("overwrites a prior save", () => {
     configMod.saveSettings({ extraAllowedTools: ["old"] });
     const { state, res } = mockRes();
-    putSettingsHandler(
-      { body: { extraAllowedTools: ["new"] } } as Request,
-      res,
-    );
+    putSettingsHandler({ body: { extraAllowedTools: ["new"] } } as Request, res);
     assert.equal(state.status, 200);
     assert.deepEqual(configMod.loadSettings().extraAllowedTools, ["new"]);
   });
@@ -209,11 +192,7 @@ describe("PUT /config (atomic)", () => {
     const { state, res } = mockRes();
     putConfigHandler({ body } as Request, res);
     assert.equal(state.status, 200);
-    assert.deepEqual(
-      (state.body as { settings: { extraAllowedTools: string[] } }).settings
-        .extraAllowedTools,
-      ["alpha"],
-    );
+    assert.deepEqual((state.body as { settings: { extraAllowedTools: string[] } }).settings.extraAllowedTools, ["alpha"]);
     assert.deepEqual(configMod.loadSettings().extraAllowedTools, ["alpha"]);
   });
 

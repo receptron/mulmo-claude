@@ -4,14 +4,8 @@
       <span>📅</span>
       <span>{{ upcomingItems.length }} upcoming</span>
     </div>
-    <div
-      v-for="item in preview"
-      :key="item.id"
-      class="text-xs truncate text-gray-600"
-    >
-      <span v-if="item.props.date" class="text-gray-400 mr-1">{{
-        item.props.date
-      }}</span>
+    <div v-for="item in preview" :key="item.id" class="text-xs truncate text-gray-600">
+      <span v-if="item.props.date" class="text-gray-400 mr-1">{{ item.props.date }}</span>
       {{ item.title }}
     </div>
     <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
@@ -63,9 +57,7 @@ const upcomingItems = computed(() => {
     }
   }
 
-  withDate.sort((a, b) =>
-    String(a.props.date) < String(b.props.date) ? -1 : 1,
-  );
+  withDate.sort((a, b) => (String(a.props.date) < String(b.props.date) ? -1 : 1));
 
   return [...withDate, ...noDate];
 });

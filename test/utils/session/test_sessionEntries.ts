@@ -3,15 +3,8 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseSessionEntries,
-  resolveSelectedUuid,
-  resolveSessionTimestamps,
-} from "../../../src/utils/session/sessionEntries.js";
-import type {
-  SessionEntry,
-  SessionSummary,
-} from "../../../src/types/session.js";
+import { parseSessionEntries, resolveSelectedUuid, resolveSessionTimestamps } from "../../../src/utils/session/sessionEntries.js";
+import type { SessionEntry, SessionSummary } from "../../../src/types/session.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 // --- parseSessionEntries ------------------------------------------
@@ -92,9 +85,7 @@ describe("parseSessionEntries", () => {
   });
 
   it("skips entries that are neither text nor tool_result", () => {
-    const entries = [
-      { source: "unknown", type: "unknown-kind", message: "x" },
-    ] as unknown as SessionEntry[];
+    const entries = [{ source: "unknown", type: "unknown-kind", message: "x" }] as unknown as SessionEntry[];
     assert.deepEqual(parseSessionEntries(entries), []);
   });
 
@@ -126,11 +117,7 @@ describe("resolveSelectedUuid — empty list", () => {
 
 describe("resolveSelectedUuid — URL override", () => {
   it("honours url-specified uuid when it exists in the list", () => {
-    const results = [
-      makeResult("a", "text-response"),
-      makeResult("b", "generateImage"),
-      makeResult("c", "text-response"),
-    ];
+    const results = [makeResult("a", "text-response"), makeResult("b", "generateImage"), makeResult("c", "text-response")];
     assert.equal(resolveSelectedUuid(results, "a"), "a");
     assert.equal(resolveSelectedUuid(results, "b"), "b");
     assert.equal(resolveSelectedUuid(results, "c"), "c");
@@ -161,26 +148,17 @@ describe("resolveSelectedUuid — heuristic (last non-text)", () => {
   });
 
   it("picks a non-text result even at the end of the list", () => {
-    const results = [
-      makeResult("text-1", "text-response"),
-      makeResult("img-1", "generateImage"),
-    ];
+    const results = [makeResult("text-1", "text-response"), makeResult("img-1", "generateImage")];
     assert.equal(resolveSelectedUuid(results, null), "img-1");
   });
 
   it("falls back to the last text result when all results are text", () => {
-    const results = [
-      makeResult("text-1", "text-response"),
-      makeResult("text-2", "text-response"),
-    ];
+    const results = [makeResult("text-1", "text-response"), makeResult("text-2", "text-response")];
     assert.equal(resolveSelectedUuid(results, null), "text-2");
   });
 
   it("returns the only result regardless of type", () => {
-    assert.equal(
-      resolveSelectedUuid([makeResult("only", "text-response")], null),
-      "only",
-    );
+    assert.equal(resolveSelectedUuid([makeResult("only", "text-response")], null), "only");
   });
 });
 

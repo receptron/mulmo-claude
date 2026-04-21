@@ -7,11 +7,7 @@
 import { computed, ref, type ComputedRef } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
 import type { Role } from "../config/roles";
-import {
-  availableToolsFor,
-  toolDescriptionsFor,
-  type ToolDefinitionMetadata,
-} from "../utils/tools/mcp";
+import { availableToolsFor, toolDescriptionsFor, type ToolDefinitionMetadata } from "../utils/tools/mcp";
 import { apiGet } from "../utils/api";
 
 interface UseMcpToolsOptions {
@@ -32,20 +28,9 @@ export function useMcpTools(opts: UseMcpToolsOptions) {
   // list looks incomplete / unfiltered.
   const mcpToolsError = ref<string | null>(null);
 
-  const availableTools = computed(() =>
-    availableToolsFor(
-      opts.currentRole.value.availablePlugins,
-      disabledMcpTools.value,
-    ),
-  );
+  const availableTools = computed(() => availableToolsFor(opts.currentRole.value.availablePlugins, disabledMcpTools.value));
 
-  const toolDescriptions = computed(() =>
-    toolDescriptionsFor(
-      opts.currentRole.value.availablePlugins,
-      opts.getDefinition,
-      mcpToolDescriptions.value,
-    ),
-  );
+  const toolDescriptions = computed(() => toolDescriptionsFor(opts.currentRole.value.availablePlugins, opts.getDefinition, mcpToolDescriptions.value));
 
   interface McpToolStatus {
     name: string;
@@ -53,9 +38,7 @@ export function useMcpTools(opts: UseMcpToolsOptions) {
     prompt?: string;
   }
 
-  function hasPrompt(
-    tool: McpToolStatus,
-  ): tool is McpToolStatus & { prompt: string } {
+  function hasPrompt(tool: McpToolStatus): tool is McpToolStatus & { prompt: string } {
     return typeof tool.prompt === "string" && tool.prompt.length > 0;
   }
 
@@ -73,12 +56,8 @@ export function useMcpTools(opts: UseMcpToolsOptions) {
     }
     mcpToolsError.value = null;
     const tools = result.data;
-    disabledMcpTools.value = new Set(
-      tools.filter((t) => !t.enabled).map((t) => t.name),
-    );
-    mcpToolDescriptions.value = Object.fromEntries(
-      tools.filter(hasPrompt).map((t) => [t.name, t.prompt]),
-    );
+    disabledMcpTools.value = new Set(tools.filter((t) => !t.enabled).map((t) => t.name));
+    mcpToolDescriptions.value = Object.fromEntries(tools.filter(hasPrompt).map((t) => [t.name, t.prompt]));
   }
 
   return {

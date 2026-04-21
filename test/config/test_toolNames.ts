@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  ALL_TOOL_NAMES,
-  isToolName,
-  TOOL_NAMES,
-  type ToolName,
-} from "../../src/config/toolNames.js";
+import { ALL_TOOL_NAMES, isToolName, TOOL_NAMES, type ToolName } from "../../src/config/toolNames.js";
 
 describe("TOOL_NAMES", () => {
   it("value and key align (the key is the camelCase form of the literal)", () => {

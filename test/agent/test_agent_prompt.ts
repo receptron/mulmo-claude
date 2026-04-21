@@ -3,13 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import {
-  buildMemoryContext,
-  buildWikiContext,
-  buildSystemPrompt,
-  headingSection,
-  prependJournalPointer,
-} from "../../server/agent/prompt.js";
+import { buildMemoryContext, buildWikiContext, buildSystemPrompt, headingSection, prependJournalPointer } from "../../server/agent/prompt.js";
 import { WORKSPACE_FILES } from "../../server/workspace/paths.js";
 import { dirname } from "path";
 import type { Role } from "../../src/config/roles.js";
@@ -46,14 +40,8 @@ afterEach(() => {
 
 describe("headingSection", () => {
   it("wraps items under a ## heading joined by blank lines", () => {
-    const out = headingSection("Plugin Instructions", [
-      "### a\n\nbody a",
-      "### b\n\nbody b",
-    ]);
-    assert.equal(
-      out,
-      "## Plugin Instructions\n\n### a\n\nbody a\n\n### b\n\nbody b",
-    );
+    const out = headingSection("Plugin Instructions", ["### a\n\nbody a", "### b\n\nbody b"]);
+    assert.equal(out, "## Plugin Instructions\n\n### a\n\nbody a\n\n### b\n\nbody b");
   });
 
   it("returns null when the list is empty so callers can skip the section", () => {
@@ -61,9 +49,7 @@ describe("headingSection", () => {
   });
 
   it("keeps a single item verbatim under the heading", () => {
-    const out = headingSection("Reference Files", [
-      "### helps/index.md\n\ncontent",
-    ]);
+    const out = headingSection("Reference Files", ["### helps/index.md\n\ncontent"]);
     assert.equal(out, "## Reference Files\n\n### helps/index.md\n\ncontent");
   });
 
@@ -117,11 +103,7 @@ describe("buildWikiContext", () => {
 
   it("includes summary when summary.md exists", () => {
     writeFileAt(workspace, WORKSPACE_FILES.wikiIndex, "# Index");
-    writeFileAt(
-      workspace,
-      WORKSPACE_FILES.wikiSummary,
-      "Key topics: AI, cooking",
-    );
+    writeFileAt(workspace, WORKSPACE_FILES.wikiSummary, "Key topics: AI, cooking");
     const result = buildWikiContext(workspace);
     assert.ok(result !== null);
     assert.ok(result.includes("Key topics: AI, cooking"));
@@ -273,11 +255,7 @@ describe("buildSystemPrompt", () => {
 
 describe("prependJournalPointer", () => {
   function writeJournalIndex(): void {
-    writeFileAt(
-      workspace,
-      WORKSPACE_FILES.summariesIndex,
-      "# Workspace Journal\n\n- refactoring\n- video-generation\n",
-    );
+    writeFileAt(workspace, WORKSPACE_FILES.summariesIndex, "# Workspace Journal\n\n- refactoring\n- video-generation\n");
   }
 
   it("returns the original message unchanged when _index.md is absent", () => {
@@ -305,20 +283,14 @@ describe("prependJournalPointer", () => {
     writeJournalIndex();
     const message = "What did I do last week with the video plugin?";
     const result = prependJournalPointer(message, workspace);
-    assert.ok(
-      result.endsWith(`\n${message}`),
-      "decorated message should end with the original message on its own line",
-    );
+    assert.ok(result.endsWith(`\n${message}`), "decorated message should end with the original message on its own line");
   });
 
   it("preserves a trailing newline in the original message", () => {
     writeJournalIndex();
     const message = "What did I do last week with the video plugin?\n";
     const result = prependJournalPointer(message, workspace);
-    assert.ok(
-      result.endsWith(`\n${message}`),
-      "decorated message should preserve a trailing newline in the original message",
-    );
+    assert.ok(result.endsWith(`\n${message}`), "decorated message should preserve a trailing newline in the original message");
   });
 
   it("handles an empty message without crashing", () => {
@@ -334,9 +306,6 @@ describe("prependJournalPointer", () => {
     // rewording doesn't turn the pointer into a mandatory Read.
     writeJournalIndex();
     const result = prependJournalPointer("hi", workspace);
-    assert.ok(
-      result.toLowerCase().includes("skip"),
-      "pointer should tell the model it can skip when not needed",
-    );
+    assert.ok(result.toLowerCase().includes("skip"), "pointer should tell the model it can skip when not needed");
   });
 });

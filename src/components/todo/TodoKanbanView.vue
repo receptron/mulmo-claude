@@ -10,29 +10,16 @@
       @end="onColumnDragEnd"
     >
       <template #item="{ element: col }: { element: StatusColumn }">
-        <div
-          :data-testid="`todo-column-${col.id}`"
-          class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg"
-        >
+        <div :data-testid="`todo-column-${col.id}`" class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg">
           <!-- Column header. The whole header is the drag handle —
              clicking the menu button still works because the menu
              button has its own @click handler that doesn't kick off
              a drag, but pressing-and-holding anywhere on the header
              starts a column drag. -->
-          <div
-            class="flex items-center justify-between px-3 py-2 border-b border-gray-200 col-handle cursor-grab active:cursor-grabbing"
-          >
+          <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 col-handle cursor-grab active:cursor-grabbing">
             <div class="flex items-center gap-2 min-w-0">
-              <span
-                class="w-2 h-2 rounded-full shrink-0"
-                :class="col.isDone ? 'bg-green-500' : 'bg-gray-400'"
-              />
-              <span
-                v-if="renamingId !== col.id"
-                class="font-semibold text-sm text-gray-700 truncate"
-                :title="col.label"
-                >{{ col.label }}</span
-              >
+              <span class="w-2 h-2 rounded-full shrink-0" :class="col.isDone ? 'bg-green-500' : 'bg-gray-400'" />
+              <span v-if="renamingId !== col.id" class="font-semibold text-sm text-gray-700 truncate" :title="col.label">{{ col.label }}</span>
               <input
                 v-else
                 ref="renameInput"
@@ -42,16 +29,10 @@
                 @keydown.escape="renamingId = null"
                 @blur="commitRename(col.id)"
               />
-              <span class="text-xs text-gray-500 shrink-0">{{
-                itemsByColumn(col.id).length
-              }}</span>
+              <span class="text-xs text-gray-500 shrink-0">{{ itemsByColumn(col.id).length }}</span>
             </div>
             <div class="relative">
-              <button
-                class="text-gray-400 hover:text-gray-600 px-1"
-                title="Column actions"
-                @click="toggleMenu(col.id)"
-              >
+              <button class="text-gray-400 hover:text-gray-600 px-1" title="Column actions" @click="toggleMenu(col.id)">
                 <span class="material-icons text-base">more_horiz</span>
               </button>
               <div
@@ -59,26 +40,11 @@
                 class="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded shadow-md text-xs w-40 py-1"
                 @click.stop
               >
-                <button
-                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                  @click="startRename(col)"
-                >
-                  Rename
+                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="startRename(col)">Rename</button>
+                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="markAsDone(col.id)">
+                  {{ col.isDone ? "Already done column" : "Mark as done column" }}
                 </button>
-                <button
-                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                  @click="markAsDone(col.id)"
-                >
-                  {{
-                    col.isDone ? "Already done column" : "Mark as done column"
-                  }}
-                </button>
-                <button
-                  class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
-                  @click="deleteColumn(col.id)"
-                >
-                  Delete column
-                </button>
+                <button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50" @click="deleteColumn(col.id)">Delete column</button>
               </div>
             </div>
           </div>
@@ -96,11 +62,7 @@
               <div
                 :data-testid="`todo-card-${element.id}`"
                 class="bg-white border border-l-4 border-gray-200 rounded shadow-sm p-2 cursor-grab hover:shadow active:cursor-grabbing"
-                :class="
-                  element.priority
-                    ? PRIORITY_BORDER[element.priority]
-                    : 'border-l-gray-200'
-                "
+                :class="element.priority ? PRIORITY_BORDER[element.priority] : 'border-l-gray-200'"
                 @click="emit('open', element)"
               >
                 <div class="flex items-start gap-2">
@@ -112,42 +74,19 @@
                     @change="emit('toggleComplete', element)"
                   />
                   <div class="flex-1 min-w-0">
-                    <div
-                      class="text-sm"
-                      :class="
-                        element.completed
-                          ? 'line-through text-gray-400'
-                          : 'text-gray-800'
-                      "
-                    >
+                    <div class="text-sm" :class="element.completed ? 'line-through text-gray-400' : 'text-gray-800'">
                       {{ element.text }}
                     </div>
-                    <div
-                      v-if="element.note"
-                      class="text-[11px] text-gray-400 mt-0.5 line-clamp-2"
-                    >
+                    <div v-if="element.note" class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">
                       {{ element.note }}
                     </div>
-                    <div
-                      v-if="
-                        (element.labels && element.labels.length > 0) ||
-                        element.priority ||
-                        element.dueDate
-                      "
-                      class="flex flex-wrap gap-1 mt-1.5"
-                    >
-                      <span
-                        v-if="element.priority"
-                        class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                        :class="PRIORITY_CLASSES[element.priority]"
-                        >{{ PRIORITY_LABELS[element.priority] }}</span
-                      >
-                      <span
-                        v-if="element.dueDate"
-                        class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                        :class="dueDateClasses(element.dueDate)"
-                        >{{ formatDueLabel(element.dueDate) }}</span
-                      >
+                    <div v-if="(element.labels && element.labels.length > 0) || element.priority || element.dueDate" class="flex flex-wrap gap-1 mt-1.5">
+                      <span v-if="element.priority" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="PRIORITY_CLASSES[element.priority]">{{
+                        PRIORITY_LABELS[element.priority]
+                      }}</span>
+                      <span v-if="element.dueDate" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="dueDateClasses(element.dueDate)">{{
+                        formatDueLabel(element.dueDate)
+                      }}</span>
                       <span
                         v-for="label in element.labels ?? []"
                         :key="label"
@@ -163,10 +102,7 @@
           </draggable>
 
           <!-- Add card stub -->
-          <button
-            class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors"
-            @click="emit('quickAdd', col.id)"
-          >
+          <button class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors" @click="emit('quickAdd', col.id)">
             + Add card
           </button>
         </div>
@@ -180,13 +116,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import draggable from "vuedraggable";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import { colorForLabel } from "../../plugins/todo/labels";
-import {
-  PRIORITY_BORDER,
-  PRIORITY_CLASSES,
-  PRIORITY_LABELS,
-  dueDateClasses,
-  formatDueLabel,
-} from "../../plugins/todo/priority";
+import { PRIORITY_BORDER, PRIORITY_CLASSES, PRIORITY_LABELS, dueDateClasses, formatDueLabel } from "../../plugins/todo/priority";
 
 // vuedraggable @change event shape. The library emits one of these
 // three keys depending on whether the move was within the same list,
@@ -237,10 +167,7 @@ function onColumnDragEnd(): void {
   const after = columnsLocal.value.map((c) => c.id);
   // No-op drops: avoid an unnecessary network round-trip when the
   // drop position equals the original.
-  if (
-    before.length === after.length &&
-    before.every((id, i) => id === after[i])
-  ) {
+  if (before.length === after.length && before.every((id, i) => id === after[i])) {
     return;
   }
   emit("reorderColumns", after);

@@ -9,11 +9,7 @@
 // and saving JSON to disk.
 
 import type { TodoItem, TodoPriority } from "./todos.js";
-import {
-  type StatusColumn,
-  defaultStatusId,
-  doneColumnId,
-} from "./todosColumnsHandlers.js";
+import { type StatusColumn, defaultStatusId, doneColumnId } from "./todosColumnsHandlers.js";
 import { mergeLabels } from "../../../src/plugins/todo/labels.js";
 import { makeId } from "../../utils/id.js";
 
@@ -22,9 +18,7 @@ const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
 
 // ── Result type ───────────────────────────────────────────────────
 
-export type ItemsActionResult =
-  | { kind: "error"; status: number; error: string }
-  | { kind: "success"; items: TodoItem[]; item?: TodoItem };
+export type ItemsActionResult = { kind: "error"; status: number; error: string } | { kind: "success"; items: TodoItem[]; item?: TodoItem };
 
 // ── Migration ─────────────────────────────────────────────────────
 
@@ -39,10 +33,7 @@ export type ItemsActionResult =
 // just use createdAt as the order key because it's a milliseconds
 // number which makes hand-editing painful and conflicts with the
 // 1000-step convention drag-drop uses for new items.
-export function migrateItems(
-  rawItems: TodoItem[],
-  columns: StatusColumn[],
-): TodoItem[] {
+export function migrateItems(rawItems: TodoItem[], columns: StatusColumn[]): TodoItem[] {
   const doneId = doneColumnId(columns);
   const openId = defaultStatusId(columns);
   const validStatusIds = new Set(columns.map((c) => c.id));
@@ -60,8 +51,7 @@ export function migrateItems(
   // PATCH path (which keeps them in sync explicitly) and the legacy
   // MCP actions (which only touch `completed`) working correctly.
   const withStatus = rawItems.map((it): TodoItem => {
-    const hasValidStatus =
-      typeof it.status === "string" && validStatusIds.has(it.status);
+    const hasValidStatus = typeof it.status === "string" && validStatusIds.has(it.status);
     if (hasValidStatus) return it;
     const status = it.completed ? doneId : openId;
     return { ...it, status };
@@ -83,9 +73,7 @@ export function migrateItems(
   for (const [, group] of byStatus) {
     const missing = group.filter((it) => typeof it.order !== "number");
     if (missing.length === 0) continue;
-    const existingMax = group
-      .filter((it) => typeof it.order === "number")
-      .reduce((acc, it) => Math.max(acc, it.order!), 0);
+    const existingMax = group.filter((it) => typeof it.order === "number").reduce((acc, it) => Math.max(acc, it.order!), 0);
     const sorted = [...missing].sort((a, b) => a.createdAt - b.createdAt);
     sorted.forEach((it, i) => {
       orderById.set(it.id, existingMax + (i + 1) * ORDER_STEP);
@@ -110,9 +98,7 @@ function isDueDate(v: unknown): v is string {
 }
 
 function nextOrder(items: TodoItem[], statusId: string): number {
-  const inColumn = items
-    .filter((i) => i.status === statusId)
-    .map((i) => i.order ?? 0);
+  const inColumn = items.filter((i) => i.status === statusId).map((i) => i.order ?? 0);
   if (inColumn.length === 0) return ORDER_STEP;
   return Math.max(...inColumn) + ORDER_STEP;
 }
@@ -130,14 +116,9 @@ export interface CreateInput {
 
 // Resolve the status field from input, validating against known
 // columns. Returns the resolved column id or an error result.
-type ResolveStatusResult =
-  | { kind: "ok"; status: string }
-  | { kind: "error"; status: number; error: string };
+type ResolveStatusResult = { kind: "ok"; status: string } | { kind: "error"; status: number; error: string };
 
-function resolveStatus(
-  input: CreateInput,
-  columns: StatusColumn[],
-): ResolveStatusResult {
+function resolveStatus(input: CreateInput, columns: StatusColumn[]): ResolveStatusResult {
   if (input.status === undefined || input.status === "") {
     return { kind: "ok", status: defaultStatusId(columns) };
   }
@@ -154,10 +135,7 @@ function resolveStatus(
 
 // Apply optional priority + dueDate to an item, returning an error
 // result on validation failure.
-function applyOptionalFields(
-  item: TodoItem,
-  input: CreateInput,
-): ItemsActionResult | null {
+function applyOptionalFields(item: TodoItem, input: CreateInput): ItemsActionResult | null {
   if (input.priority !== undefined && input.priority !== "") {
     if (!isPriority(input.priority)) {
       return { kind: "error", status: 400, error: "invalid priority" };
@@ -177,11 +155,7 @@ function applyOptionalFields(
   return null;
 }
 
-export function handleCreate(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: CreateInput,
-): ItemsActionResult {
+export function handleCreate(items: TodoItem[], columns: StatusColumn[], input: CreateInput): ItemsActionResult {
   if (!input.text || input.text.trim().length === 0) {
     return { kind: "error", status: 400, error: "text required" };
   }
@@ -225,10 +199,7 @@ export interface PatchInput {
 // complexity threshold and so each field's edit semantics live in one
 // obvious place.
 
-function applyTextPatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyTextPatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (typeof input.text !== "string") return null;
   if (input.text.trim().length === 0) {
     return { kind: "error", status: 400, error: "text cannot be empty" };
@@ -252,10 +223,7 @@ function applyLabelsPatch(updated: TodoItem, input: PatchInput): void {
   else delete updated.labels;
 }
 
-function applyPriorityPatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyPriorityPatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (input.priority === null || input.priority === "") {
     delete updated.priority;
     return null;
@@ -268,10 +236,7 @@ function applyPriorityPatch(
   return null;
 }
 
-function applyDueDatePatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyDueDatePatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (input.dueDate === null || input.dueDate === "") {
     delete updated.dueDate;
     return null;
@@ -284,13 +249,7 @@ function applyDueDatePatch(
   return null;
 }
 
-function applyStatusPatch(
-  updated: TodoItem,
-  target: TodoItem,
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyStatusPatch(updated: TodoItem, target: TodoItem, items: TodoItem[], columns: StatusColumn[], input: PatchInput): ItemsActionResult | null {
   if (typeof input.status !== "string" || input.status === target.status) {
     return null;
   }
@@ -311,30 +270,18 @@ function applyStatusPatch(
 // Explicit `completed` toggle without changing status: lets the user
 // check / uncheck a card and have it move between the done column and
 // a default open column the obvious way.
-function applyCompletedPatch(
-  updated: TodoItem,
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: PatchInput,
-): void {
+function applyCompletedPatch(updated: TodoItem, items: TodoItem[], columns: StatusColumn[], input: PatchInput): void {
   if (typeof input.completed !== "boolean") return;
   if (input.completed === updated.completed) return;
   updated.completed = input.completed;
-  const targetStatus = input.completed
-    ? doneColumnId(columns)
-    : defaultStatusId(columns);
+  const targetStatus = input.completed ? doneColumnId(columns) : defaultStatusId(columns);
   if (targetStatus !== updated.status) {
     updated.status = targetStatus;
     updated.order = nextOrder(items, targetStatus);
   }
 }
 
-export function handlePatch(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  id: string,
-  input: PatchInput,
-): ItemsActionResult {
+export function handlePatch(items: TodoItem[], columns: StatusColumn[], id: string, input: PatchInput): ItemsActionResult {
   const target = items.find((i) => i.id === id);
   if (!target) {
     return { kind: "error", status: 404, error: `item not found: ${id}` };
@@ -376,12 +323,7 @@ export interface MoveInput {
   position?: number;
 }
 
-export function handleMove(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  id: string,
-  input: MoveInput,
-): ItemsActionResult {
+export function handleMove(items: TodoItem[], columns: StatusColumn[], id: string, input: MoveInput): ItemsActionResult {
   const target = items.find((i) => i.id === id);
   if (!target) {
     return { kind: "error", status: 404, error: `item not found: ${id}` };
@@ -403,9 +345,7 @@ export function handleMove(
   };
   // Re-collect the items in the target column with the moving item
   // pulled out, then splice it back in at `position`.
-  const others = items
-    .filter((it) => it.id !== id && it.status === newStatus)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const others = items.filter((it) => it.id !== id && it.status === newStatus).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const insertAt = clampPosition(input.position, others.length);
   const reordered = [...others];
   reordered.splice(insertAt, 0, updatedSelf);
@@ -437,10 +377,7 @@ function clampPosition(raw: number | undefined, max: number): number {
 
 // ── Delete ────────────────────────────────────────────────────────
 
-export function handleDeleteItem(
-  items: TodoItem[],
-  id: string,
-): ItemsActionResult {
+export function handleDeleteItem(items: TodoItem[], id: string): ItemsActionResult {
   const target = items.find((i) => i.id === id);
   if (!target) {
     return { kind: "error", status: 404, error: `item not found: ${id}` };

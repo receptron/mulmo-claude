@@ -29,10 +29,7 @@ export function readReferenceDirsJson(root?: string): unknown[] {
 }
 
 /** Write reference-dirs.json atomically. Creates config/ if needed. */
-export function writeReferenceDirsJson(
-  entries: readonly unknown[],
-  root?: string,
-): void {
+export function writeReferenceDirsJson(entries: readonly unknown[], root?: string): void {
   const filePath = configPath(root ?? workspacePath);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileAtomicSync(filePath, JSON.stringify(entries, null, 2));

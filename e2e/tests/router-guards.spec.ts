@@ -27,9 +27,7 @@ test.describe("URL injection defence", () => {
     expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
   });
 
-  test("extremely long path segment → app renders normally", async ({
-    page,
-  }) => {
+  test("extremely long path segment → app renders normally", async ({ page }) => {
     const longStr = "a".repeat(200);
     await page.goto(`/chat/${longStr}`);
     await expect(page.getByText("MulmoClaude")).toBeVisible();

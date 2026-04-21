@@ -5,8 +5,7 @@
 import { functionRegistry, toString, type FunctionHandler } from "../registry";
 
 const concatenateHandler: FunctionHandler = (args, context) => {
-  if (args.length === 0)
-    throw new Error("CONCATENATE requires at least 1 argument");
+  if (args.length === 0) throw new Error("CONCATENATE requires at least 1 argument");
 
   return args
     .map((arg) => {
@@ -24,8 +23,7 @@ const leftHandler: FunctionHandler = (args, context) => {
   }
 
   const text = toString(context.evaluateFormula(args[0]));
-  const numChars =
-    args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
+  const numChars = args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
 
   return text.substring(0, numChars);
 };
@@ -36,8 +34,7 @@ const rightHandler: FunctionHandler = (args, context) => {
   }
 
   const text = toString(context.evaluateFormula(args[0]));
-  const numChars =
-    args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
+  const numChars = args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
 
   return text.substring(text.length - numChars);
 };
@@ -80,9 +77,7 @@ const properHandler: FunctionHandler = (args, context) => {
   return text
     .toLowerCase()
     .split(" ")
-    .map((word) =>
-      word.length > 0 ? word[0].toUpperCase() + word.slice(1) : "",
-    )
+    .map((word) => (word.length > 0 ? word[0].toUpperCase() + word.slice(1) : ""))
     .join(" ");
 };
 
@@ -115,11 +110,7 @@ const substituteHandler: FunctionHandler = (args, context) => {
 
       count++;
       if (count === instance) {
-        return (
-          text.substring(0, pos) +
-          newText +
-          text.substring(pos + oldText.length)
-        );
+        return text.substring(0, pos) + newText + text.substring(pos + oldText.length);
       }
       index = pos + 1;
     }
@@ -138,11 +129,7 @@ const replaceHandler: FunctionHandler = (args, context) => {
   const numChars = Number(context.evaluateFormula(args[2]));
   const newText = toString(context.evaluateFormula(args[3]));
 
-  return (
-    oldText.substring(0, startPos) +
-    newText +
-    oldText.substring(startPos + numChars)
-  );
+  return oldText.substring(0, startPos) + newText + oldText.substring(startPos + numChars);
 };
 
 const findHandler: FunctionHandler = (args, context) => {
@@ -152,8 +139,7 @@ const findHandler: FunctionHandler = (args, context) => {
 
   const findText = toString(context.evaluateFormula(args[0]));
   const withinText = toString(context.evaluateFormula(args[1]));
-  const startPos =
-    args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
+  const startPos = args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
 
   const index = withinText.indexOf(findText, startPos);
   return index === -1 ? "#VALUE!" : index + 1; // Return 1-indexed position
@@ -166,8 +152,7 @@ const searchHandler: FunctionHandler = (args, context) => {
 
   const findText = toString(context.evaluateFormula(args[0]));
   const withinText = toString(context.evaluateFormula(args[1]));
-  const startPos =
-    args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
+  const startPos = args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
 
   // SEARCH is case-insensitive
   const lowerFind = findText.toLowerCase();
@@ -248,8 +233,7 @@ functionRegistry.register({
   name: "CONCAT",
   handler: concatHandler,
   minArgs: 1,
-  description:
-    "Joins several text strings into one string (same as CONCATENATE)",
+  description: "Joins several text strings into one string (same as CONCATENATE)",
   examples: ['CONCAT("Hello", " ", "World")', "CONCAT(A1, B1)"],
   category: "Text",
 });
@@ -340,10 +324,7 @@ functionRegistry.register({
   minArgs: 3,
   maxArgs: 4,
   description: "Replaces old text with new text in a string",
-  examples: [
-    'SUBSTITUTE("Hello World", "World", "Earth")',
-    'SUBSTITUTE(A1, "old", "new", 1)',
-  ],
+  examples: ['SUBSTITUTE("Hello World", "World", "Earth")', 'SUBSTITUTE(A1, "old", "new", 1)'],
   category: "Text",
 });
 
@@ -353,10 +334,7 @@ functionRegistry.register({
   minArgs: 4,
   maxArgs: 4,
   description: "Replaces part of a text string with a different text string",
-  examples: [
-    'REPLACE("Hello World", 7, 5, "Earth")',
-    'REPLACE(A1, 1, 3, "New")',
-  ],
+  examples: ['REPLACE("Hello World", 7, 5, "Earth")', 'REPLACE(A1, 1, 3, "New")'],
   category: "Text",
 });
 

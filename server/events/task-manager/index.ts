@@ -2,9 +2,7 @@ import { log } from "../../system/logger/index.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "../../utils/time.js";
 import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
 
-export type TaskSchedule =
-  | { type: typeof SCHEDULE_TYPES.interval; intervalMs: number }
-  | { type: typeof SCHEDULE_TYPES.daily; time: string }; // time: "HH:MM" in UTC
+export type TaskSchedule = { type: typeof SCHEDULE_TYPES.interval; intervalMs: number } | { type: typeof SCHEDULE_TYPES.daily; time: string }; // time: "HH:MM" in UTC
 
 export interface TaskRunContext {
   taskId: string;
@@ -47,10 +45,7 @@ export interface TaskManagerOptions {
 
 function isDue(now: Date, schedule: TaskSchedule, tickMs: number): boolean {
   if (schedule.type === SCHEDULE_TYPES.interval) {
-    const msSinceMidnight =
-      now.getUTCHours() * ONE_HOUR_MS +
-      now.getUTCMinutes() * ONE_MINUTE_MS +
-      now.getUTCSeconds() * ONE_SECOND_MS;
+    const msSinceMidnight = now.getUTCHours() * ONE_HOUR_MS + now.getUTCMinutes() * ONE_MINUTE_MS + now.getUTCSeconds() * ONE_SECOND_MS;
     // Round down to tick boundary, then check if it aligns with the interval
     const rounded = Math.floor(msSinceMidnight / tickMs) * tickMs;
     return rounded % schedule.intervalMs === 0;
@@ -59,10 +54,7 @@ function isDue(now: Date, schedule: TaskSchedule, tickMs: number): boolean {
   if (schedule.type === SCHEDULE_TYPES.daily) {
     const [hh, mm] = schedule.time.split(":").map(Number);
     const targetMs = hh * ONE_HOUR_MS + mm * ONE_MINUTE_MS;
-    const msSinceMidnight =
-      now.getUTCHours() * ONE_HOUR_MS +
-      now.getUTCMinutes() * ONE_MINUTE_MS +
-      now.getUTCSeconds() * ONE_SECOND_MS;
+    const msSinceMidnight = now.getUTCHours() * ONE_HOUR_MS + now.getUTCMinutes() * ONE_MINUTE_MS + now.getUTCSeconds() * ONE_SECOND_MS;
     const rounded = Math.floor(msSinceMidnight / tickMs) * tickMs;
     return rounded === targetMs;
   }
@@ -94,11 +86,7 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
     return { independent, dependent };
   }
 
-  async function runAndTrack(
-    def: TaskDefinition,
-    currentTime: Date,
-    succeeded: Set<string>,
-  ): Promise<void> {
+  async function runAndTrack(def: TaskDefinition, currentTime: Date, succeeded: Set<string>): Promise<void> {
     try {
       await def.run({ taskId: def.id, now: currentTime });
       succeeded.add(def.id);
@@ -110,11 +98,7 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
     }
   }
 
-  async function runDependentChain(
-    dependent: TaskDefinition[],
-    currentTime: Date,
-    succeeded: Set<string>,
-  ): Promise<void> {
+  async function runDependentChain(dependent: TaskDefinition[], currentTime: Date, succeeded: Set<string>): Promise<void> {
     let remaining = [...dependent];
     let progress = true;
     while (remaining.length > 0 && progress) {
@@ -139,9 +123,7 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
     // Per-invocation set — success does not leak across tick() calls.
     const succeeded = new Set<string>();
 
-    await Promise.all(
-      independent.map((def) => runAndTrack(def, currentTime, succeeded)),
-    );
+    await Promise.all(independent.map((def) => runAndTrack(def, currentTime, succeeded)));
 
     await runDependentChain(dependent, currentTime, succeeded);
   }
@@ -153,9 +135,7 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
 
     registerTask(def: TaskDefinition) {
       if (registry.has(def.id)) {
-        throw new Error(
-          `[task-manager] Task "${def.id}" is already registered`,
-        );
+        throw new Error(`[task-manager] Task "${def.id}" is already registered`);
       }
       registry.set(def.id, def);
       log.info("task-manager", "registered", { id: def.id });

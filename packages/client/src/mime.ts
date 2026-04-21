@@ -30,10 +30,7 @@ const EXT_TO_MIME: Record<string, string> = {
 
 /** Infer MIME type from a file extension (case-insensitive).
  *  Returns the fallback if the extension is not recognised. */
-export function mimeFromExtension(
-  ext: string,
-  fallback = "application/octet-stream",
-): string {
+export function mimeFromExtension(ext: string, fallback = "application/octet-stream"): string {
   return EXT_TO_MIME[ext.toLowerCase()] ?? fallback;
 }
 

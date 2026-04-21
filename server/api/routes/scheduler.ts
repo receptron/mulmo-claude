@@ -1,31 +1,14 @@
 import { Router, Request, Response } from "express";
-import {
-  loadSchedulerItems,
-  saveSchedulerItems,
-} from "../../utils/files/scheduler-io.js";
-import {
-  dispatchScheduler,
-  type SchedulerActionInput,
-} from "./schedulerHandlers.js";
-import {
-  respondWithDispatchResult,
-  type DispatchSuccessResponse,
-  type DispatchErrorResponse,
-} from "./dispatchResponse.js";
+import { loadSchedulerItems, saveSchedulerItems } from "../../utils/files/scheduler-io.js";
+import { dispatchScheduler, type SchedulerActionInput } from "./schedulerHandlers.js";
+import { respondWithDispatchResult, type DispatchSuccessResponse, type DispatchErrorResponse } from "./dispatchResponse.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { SESSION_ORIGINS } from "../../../src/types/session.js";
-import {
-  loadUserTasks,
-  validateAndCreate,
-  refreshUserTasks,
-} from "../../workspace/skills/user-tasks.js";
+import { loadUserTasks, validateAndCreate, refreshUserTasks } from "../../workspace/skills/user-tasks.js";
 import { saveUserTasks } from "../../utils/files/user-tasks-io.js";
 import { startChat } from "./agent.js";
 import { log } from "../../system/logger/index.js";
-import {
-  SCHEDULER_ACTIONS,
-  TASK_ACTIONS,
-} from "../../../src/config/schedulerActions.js";
+import { SCHEDULER_ACTIONS, TASK_ACTIONS } from "../../../src/config/schedulerActions.js";
 
 const router = Router();
 
@@ -44,12 +27,9 @@ function saveItems(items: ScheduledItem[]): void {
   saveSchedulerItems(items);
 }
 
-router.get(
-  API_ROUTES.scheduler.base,
-  (_req: Request, res: Response<{ data: { items: ScheduledItem[] } }>) => {
-    res.json({ data: { items: loadItems() } });
-  },
-);
+router.get(API_ROUTES.scheduler.base, (_req: Request, res: Response<{ data: { items: ScheduledItem[] } }>) => {
+  res.json({ data: { items: loadItems() } });
+});
 
 interface SchedulerBody extends SchedulerActionInput {
   action: string;
@@ -62,12 +42,7 @@ interface SchedulerBody extends SchedulerActionInput {
 
 router.post(
   API_ROUTES.scheduler.base,
-  async (
-    req: Request<object, unknown, SchedulerBody>,
-    res: Response<
-      DispatchSuccessResponse<ScheduledItem> | DispatchErrorResponse | unknown
-    >,
-  ) => {
+  async (req: Request<object, unknown, SchedulerBody>, res: Response<DispatchSuccessResponse<ScheduledItem> | DispatchErrorResponse | unknown>) => {
     const { action, ...input } = req.body;
 
     // Route task actions to the user-task subsystem
@@ -87,11 +62,7 @@ router.post(
   },
 );
 
-async function handleTaskAction(
-  action: string,
-  input: Record<string, unknown>,
-  res: Response,
-): Promise<void> {
+async function handleTaskAction(action: string, input: Record<string, unknown>, res: Response): Promise<void> {
   try {
     if (action === SCHEDULER_ACTIONS.listTasks) {
       const tasks = loadUserTasks();

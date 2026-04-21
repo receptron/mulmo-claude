@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center"
-    @click="emit('cancel')"
-  >
+  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" @click="emit('cancel')">
     <div
       class="bg-white rounded-lg shadow-xl w-96 max-w-[90vw] p-5 space-y-3"
       role="dialog"
@@ -10,12 +7,7 @@
       aria-labelledby="todo-add-dialog-title"
       @click.stop
     >
-      <h3
-        id="todo-add-dialog-title"
-        class="text-base font-semibold text-gray-800"
-      >
-        Add Todo
-      </h3>
+      <h3 id="todo-add-dialog-title" class="text-base font-semibold text-gray-800">Add Todo</h3>
       <label class="block text-xs text-gray-600">
         Text
         <input
@@ -38,10 +30,7 @@
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-xs text-gray-600">
           Status
-          <select
-            v-model="status"
-            class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          >
+          <select v-model="status" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
             <option v-for="col in columns" :key="col.id" :value="col.id">
               {{ col.label }}
             </option>
@@ -49,10 +38,7 @@
         </label>
         <label class="block text-xs text-gray-600">
           Priority
-          <select
-            v-model="priority"
-            class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          >
+          <select v-model="priority" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
             <option value="">— None —</option>
             <option v-for="p in PRIORITIES" :key="p" :value="p">
               {{ PRIORITY_LABELS[p] }}
@@ -78,18 +64,8 @@
         </label>
       </div>
       <div class="flex justify-end gap-2 pt-1">
-        <button
-          class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-          @click="emit('cancel')"
-        >
-          Cancel
-        </button>
-        <button
-          class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-          @click="submit"
-        >
-          Add
-        </button>
+        <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">Cancel</button>
+        <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="submit">Add</button>
       </div>
     </div>
   </div>

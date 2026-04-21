@@ -25,8 +25,7 @@ async function mockLazyDirs(page: Page): Promise<CountingMock> {
   await page.route(
     (url) => url.pathname === "/api/files/dir",
     (route: Route) => {
-      const path =
-        new URL(route.request().url()).searchParams.get("path") ?? "";
+      const path = new URL(route.request().url()).searchParams.get("path") ?? "";
       counts.set(path, (counts.get(path) ?? 0) + 1);
       if (path === "") {
         return route.fulfill({
@@ -108,14 +107,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("file explorer lazy expand (#200 phase 2)", () => {
-  test("root listing lands once on mount, no subtree fetched yet", async ({
-    page,
-  }) => {
+  test("root listing lands once on mount, no subtree fetched yet", async ({ page }) => {
     const mock = await mockLazyDirs(page);
     await page.goto("/chat?view=files");
-    await expect(
-      page.locator('[data-testid="file-tree-dir-wiki"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-dir-wiki"]')).toBeVisible();
     // Only the root fetch should have fired — children of collapsed
     // `wiki` / `notes` must wait for an expand click.
     expect(mock.counts.get("") ?? 0).toBeGreaterThan(0);
@@ -123,28 +118,20 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
     expect(mock.counts.get("notes") ?? 0).toBe(0);
   });
 
-  test("clicking a collapsed dir fetches its children exactly once", async ({
-    page,
-  }) => {
+  test("clicking a collapsed dir fetches its children exactly once", async ({ page }) => {
     const mock = await mockLazyDirs(page);
     await page.goto("/chat?view=files");
-    await expect(
-      page.locator('[data-testid="file-tree-dir-wiki"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-dir-wiki"]')).toBeVisible();
 
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
     // Wait for wiki's contents to surface
-    await expect(
-      page.locator('[data-testid="file-tree-file-readme.md"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-file-readme.md"]')).toBeVisible();
     expect(mock.counts.get("wiki")).toBe(1);
 
     // Collapse + re-expand: should NOT refetch — cache hit.
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
-    await expect(
-      page.locator('[data-testid="file-tree-file-readme.md"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-file-readme.md"]')).toBeVisible();
     expect(mock.counts.get("wiki")).toBe(1);
   });
 
@@ -155,12 +142,8 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
 
     // Both `wiki` and `wiki/pages` should have been fetched so the
     // tree can reveal the selection.
-    await expect
-      .poll(() => mock.counts.get("wiki") ?? 0, { timeout: 3000 })
-      .toBeGreaterThan(0);
-    await expect
-      .poll(() => mock.counts.get("wiki/pages") ?? 0, { timeout: 3000 })
-      .toBeGreaterThan(0);
+    await expect.poll(() => mock.counts.get("wiki") ?? 0, { timeout: 3000 }).toBeGreaterThan(0);
+    await expect.poll(() => mock.counts.get("wiki/pages") ?? 0, { timeout: 3000 }).toBeGreaterThan(0);
 
     // The selected file's content loads.
     await expect(page.getByText("stub content")).toBeVisible();

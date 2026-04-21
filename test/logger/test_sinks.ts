@@ -41,10 +41,7 @@ describe("createFileSink", () => {
     sink.write(record({ message: "first" }));
     sink.write(record({ message: "second" }));
     await sink.flush?.();
-    const contents = await readFile(
-      path.join(dir, "server-2026-04-13.log"),
-      "utf-8",
-    );
+    const contents = await readFile(path.join(dir, "server-2026-04-13.log"), "utf-8");
     const lines = contents.trim().split("\n");
     assert.equal(lines.length, 2);
     const parsed0: { message: string } = JSON.parse(lines[0]);
@@ -74,14 +71,8 @@ describe("createFileSink", () => {
     const files = await readdir(rotDir);
     assert.ok(files.includes("server-2026-05-01.log"));
     assert.ok(files.includes("server-2026-05-02.log"));
-    const day1 = await readFile(
-      path.join(rotDir, "server-2026-05-01.log"),
-      "utf-8",
-    );
-    const day2 = await readFile(
-      path.join(rotDir, "server-2026-05-02.log"),
-      "utf-8",
-    );
+    const day1 = await readFile(path.join(rotDir, "server-2026-05-01.log"), "utf-8");
+    const day2 = await readFile(path.join(rotDir, "server-2026-05-02.log"), "utf-8");
     assert.ok(day1.includes("day1"));
     assert.ok(day2.includes("day2"));
     await rm(rotDir, { recursive: true, force: true });

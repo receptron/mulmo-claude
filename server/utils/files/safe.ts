@@ -90,10 +90,7 @@ export async function readTextOrNull(file: string): Promise<string | null> {
  *
  * `rootReal` MUST already be a realpath.
  */
-export function resolveWithinRoot(
-  rootReal: string,
-  relPath: string,
-): string | null {
+export function resolveWithinRoot(rootReal: string, relPath: string): string | null {
   const normalized = path.normalize(relPath || "");
   const resolved = path.resolve(rootReal, normalized);
   let resolvedReal: string;
@@ -102,10 +99,7 @@ export function resolveWithinRoot(
   } catch {
     return null;
   }
-  if (
-    resolvedReal !== rootReal &&
-    !resolvedReal.startsWith(rootReal + path.sep)
-  ) {
+  if (resolvedReal !== rootReal && !resolvedReal.startsWith(rootReal + path.sep)) {
     return null;
   }
   return resolvedReal;

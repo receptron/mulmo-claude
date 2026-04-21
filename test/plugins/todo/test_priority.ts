@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  PRIORITIES,
-  PRIORITY_LABELS,
-  isPriority,
-} from "../../../src/plugins/todo/priority.js";
+import { PRIORITIES, PRIORITY_LABELS, isPriority } from "../../../src/plugins/todo/priority.js";
 
 describe("isPriority", () => {
   it("accepts every value in PRIORITIES", () => {

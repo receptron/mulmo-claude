@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  encodeCursor,
-  parseCursor,
-  sessionChangeMs,
-} from "../../server/api/routes/sessionsCursor.js";
+import { encodeCursor, parseCursor, sessionChangeMs } from "../../server/api/routes/sessionsCursor.js";
 
 // Pure helpers backing the /api/sessions?since= implementation
 // (issue #205). Exercised in isolation so the route handler's
@@ -28,10 +24,7 @@ describe("encodeCursor", () => {
 
 describe("parseCursor", () => {
   it("roundtrips encodeCursor", () => {
-    assert.equal(
-      parseCursor(encodeCursor(1_700_000_000_000)),
-      1_700_000_000_000,
-    );
+    assert.equal(parseCursor(encodeCursor(1_700_000_000_000)), 1_700_000_000_000);
   });
   it("returns 0 for non-strings", () => {
     assert.equal(parseCursor(undefined), 0);
@@ -71,10 +64,7 @@ describe("sessionChangeMs", () => {
   });
   it("folds meta mtime into the max", () => {
     const mtime = 1_700_000_000_000;
-    assert.equal(
-      sessionChangeMs(mtime, undefined, mtime + 9_000),
-      mtime + 9_000,
-    );
+    assert.equal(sessionChangeMs(mtime, undefined, mtime + 9_000), mtime + 9_000);
     assert.equal(sessionChangeMs(mtime, undefined, mtime - 9_000), mtime);
   });
   it("ignores an undefined or non-finite meta mtime", () => {

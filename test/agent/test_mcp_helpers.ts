@@ -14,10 +14,7 @@ import assert from "node:assert/strict";
 // protocol has only `description` — no `prompt` field — so the
 // prompt content must ride along.
 
-function fromPackageDescription(
-  description: string,
-  prompt: string | undefined,
-): string {
+function fromPackageDescription(description: string, prompt: string | undefined): string {
   const parts = [description];
   if (typeof prompt === "string" && prompt.length > 0) {
     parts.push(prompt);
@@ -35,10 +32,7 @@ describe("fromPackage description concatenation (#345)", () => {
   });
 
   it("joins description and prompt with double newline", () => {
-    assert.equal(
-      fromPackageDescription("A tool", "Use it like this."),
-      "A tool\n\nUse it like this.",
-    );
+    assert.equal(fromPackageDescription("A tool", "Use it like this."), "A tool\n\nUse it like this.");
   });
 
   it("handles multi-line prompt", () => {
@@ -53,10 +47,7 @@ describe("fromPackage description concatenation (#345)", () => {
 // The real function reads WORKSPACE_PATHS.sessionToken which is
 // module-level; here we test the algorithm in isolation.
 
-function readSessionTokenAlgo(
-  envValue: string | undefined,
-  fileRead: () => string,
-): string {
+function readSessionTokenAlgo(envValue: string | undefined, fileRead: () => string): string {
   if (typeof envValue === "string" && envValue.length > 0) return envValue;
   try {
     return fileRead().trim();

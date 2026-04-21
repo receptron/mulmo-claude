@@ -20,9 +20,7 @@ async function setupChartSession(page: Page) {
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) => {
       return route.fulfill({
         json: [
@@ -101,21 +99,15 @@ test.describe("chart plugin rendering", () => {
     await expect(page.locator('[data-testid="chart-canvas-0"]')).toBeVisible();
     await expect(page.locator('[data-testid="chart-canvas-1"]')).toBeVisible();
 
-    await expect(
-      page.locator('[data-testid="chart-export-png-0"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="chart-export-png-1"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="chart-export-png-0"]')).toBeVisible();
+    await expect(page.locator('[data-testid="chart-export-png-1"]')).toBeVisible();
   });
 
   test("PNG export button triggers a download", async ({ page }) => {
     await page.goto("/chat/chart-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.getByText("Sales Overview").first().click();
-    await expect(
-      page.locator('[data-testid="chart-export-png-0"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="chart-export-png-0"]')).toBeVisible();
 
     // Click the PNG button and confirm a download is initiated.
     const downloadPromise = page.waitForEvent("download");

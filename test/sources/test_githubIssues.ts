@@ -11,19 +11,10 @@ import {
   ISSUES_CURSOR_KEY,
 } from "../../server/workspace/sources/fetchers/githubIssues.js";
 import { GithubFetcherError } from "../../server/workspace/sources/fetchers/github.js";
-import type {
-  Source,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
+import type { Source, SourceState } from "../../server/workspace/sources/types.js";
 import type { FetcherDeps } from "../../server/workspace/sources/fetchers/index.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
 
 // --- helpers -------------------------------------------------------------
 
@@ -116,45 +107,21 @@ describe("resolveIssuesParams", () => {
   });
 
   it("accepts state=closed and state=all", () => {
-    assert.equal(
-      resolveIssuesParams({ github_issue_state: "closed" }).state,
-      "closed",
-    );
-    assert.equal(
-      resolveIssuesParams({ github_issue_state: "all" }).state,
-      "all",
-    );
+    assert.equal(resolveIssuesParams({ github_issue_state: "closed" }).state, "closed");
+    assert.equal(resolveIssuesParams({ github_issue_state: "all" }).state, "all");
   });
 
   it("falls back to `open` for unknown state values (typo tolerance)", () => {
-    assert.equal(
-      resolveIssuesParams({ github_issue_state: "Open" }).state,
-      "open",
-    );
-    assert.equal(
-      resolveIssuesParams({ github_issue_state: "bogus" }).state,
-      "open",
-    );
+    assert.equal(resolveIssuesParams({ github_issue_state: "Open" }).state, "open");
+    assert.equal(resolveIssuesParams({ github_issue_state: "bogus" }).state, "open");
   });
 
   it("treats include_prs=`false` (lowercase) as false, anything else as true", () => {
-    assert.equal(
-      resolveIssuesParams({ github_include_prs: "false" }).includePrs,
-      false,
-    );
-    assert.equal(
-      resolveIssuesParams({ github_include_prs: "true" }).includePrs,
-      true,
-    );
+    assert.equal(resolveIssuesParams({ github_include_prs: "false" }).includePrs, false);
+    assert.equal(resolveIssuesParams({ github_include_prs: "true" }).includePrs, true);
     // Typos / other values default to true (the safer more-inclusive option)
-    assert.equal(
-      resolveIssuesParams({ github_include_prs: "False" }).includePrs,
-      true,
-    );
-    assert.equal(
-      resolveIssuesParams({ github_include_prs: "0" }).includePrs,
-      true,
-    );
+    assert.equal(resolveIssuesParams({ github_include_prs: "False" }).includePrs, true);
+    assert.equal(resolveIssuesParams({ github_include_prs: "0" }).includePrs, true);
   });
 });
 
@@ -204,10 +171,7 @@ describe("parseGithubIssue", () => {
     assert.equal(p!.id, 42);
     assert.equal(p!.number, 7);
     assert.equal(p!.title, "Bug: thing broken");
-    assert.equal(
-      p!.htmlUrl,
-      "https://github.com/receptron/mulmoclaude/issues/7",
-    );
+    assert.equal(p!.htmlUrl, "https://github.com/receptron/mulmoclaude/issues/7");
     assert.equal(p!.updatedAt, "2026-04-10T10:00:00Z");
     assert.equal(p!.state, "open");
     assert.equal(p!.isPr, false);
@@ -281,12 +245,7 @@ describe("issueToSourceItem — filtering", () => {
 
   it("drops PRs when includePrs is false", () => {
     const pr = parseGithubIssue(makePr())!;
-    const item = issueToSourceItem(
-      pr,
-      makeSource(),
-      { state: "open", includePrs: false },
-      null,
-    );
+    const item = issueToSourceItem(pr, makeSource(), { state: "open", includePrs: false }, null);
     assert.equal(item, null);
   });
 
@@ -298,28 +257,14 @@ describe("issueToSourceItem — filtering", () => {
   });
 
   it("drops items at-or-older than the cursor (strict > filter)", () => {
-    const issue = parseGithubIssue(
-      makeIssue({ updated_at: "2026-04-10T10:00:00Z" }),
-    )!;
-    const atCursor = issueToSourceItem(
-      issue,
-      makeSource(),
-      params,
-      Date.parse("2026-04-10T10:00:00Z"),
-    );
+    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!;
+    const atCursor = issueToSourceItem(issue, makeSource(), params, Date.parse("2026-04-10T10:00:00Z"));
     assert.equal(atCursor, null);
   });
 
   it("keeps items strictly newer than the cursor", () => {
-    const issue = parseGithubIssue(
-      makeIssue({ updated_at: "2026-04-11T10:00:00Z" }),
-    )!;
-    const item = issueToSourceItem(
-      issue,
-      makeSource(),
-      params,
-      Date.parse("2026-04-10T10:00:00Z"),
-    );
+    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-11T10:00:00Z" }))!;
+    const item = issueToSourceItem(issue, makeSource(), params, Date.parse("2026-04-10T10:00:00Z"));
     assert.ok(item);
   });
 });
@@ -340,10 +285,7 @@ describe("updateIssuesCursor", () => {
   });
 
   it("ignores PRs for cursor advancement when PRs are excluded", () => {
-    const issues = [
-      parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!,
-      parseGithubIssue(makePr({ updated_at: "2026-04-13T10:00:00Z" }))!,
-    ];
+    const issues = [parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!, parseGithubIssue(makePr({ updated_at: "2026-04-13T10:00:00Z" }))!];
     const cursor = updateIssuesCursor({}, issues, {
       state: "open",
       includePrs: false,
@@ -354,9 +296,7 @@ describe("updateIssuesCursor", () => {
   });
 
   it("never rolls the cursor backwards", () => {
-    const issues = [
-      parseGithubIssue(makeIssue({ updated_at: "2026-04-01T00:00:00Z" }))!,
-    ];
+    const issues = [parseGithubIssue(makeIssue({ updated_at: "2026-04-01T00:00:00Z" }))!];
     const existing = { [ISSUES_CURSOR_KEY]: "2026-04-10T10:00:00Z" };
     const cursor = updateIssuesCursor(existing, issues, params);
     assert.equal(cursor[ISSUES_CURSOR_KEY], "2026-04-10T10:00:00Z");
@@ -369,10 +309,7 @@ describe("processIssuesResponse", () => {
   const params = { state: "open" as const, includePrs: true };
 
   it("filters by cursor and caps by maxItemsPerFetch", () => {
-    const body = [
-      makeIssue({ id: 1, updated_at: "2026-04-10T10:00:00Z" }),
-      makeIssue({ id: 2, updated_at: "2026-04-13T10:00:00Z" }),
-    ];
+    const body = [makeIssue({ id: 1, updated_at: "2026-04-10T10:00:00Z" }), makeIssue({ id: 2, updated_at: "2026-04-13T10:00:00Z" })];
     const cursor = { [ISSUES_CURSOR_KEY]: "2026-04-11T00:00:00Z" };
     const result = processIssuesResponse(body, makeSource(), params, cursor);
     assert.equal(result.items.length, 1);
@@ -382,27 +319,14 @@ describe("processIssuesResponse", () => {
 
   it("returns empty items + unchanged cursor on a non-array body", () => {
     const cursor = { [ISSUES_CURSOR_KEY]: "2026-04-10T10:00:00Z" };
-    const result = processIssuesResponse(
-      { message: "Not Found" },
-      makeSource(),
-      params,
-      cursor,
-    );
+    const result = processIssuesResponse({ message: "Not Found" }, makeSource(), params, cursor);
     assert.deepEqual(result.items, []);
     assert.equal(result.cursor[ISSUES_CURSOR_KEY], "2026-04-10T10:00:00Z");
   });
 
   it("excludes PRs when includePrs=false", () => {
-    const body = [
-      makeIssue({ id: 1, updated_at: "2026-04-10T10:00:00Z" }),
-      makePr({ id: 2, updated_at: "2026-04-13T10:00:00Z" }),
-    ];
-    const result = processIssuesResponse(
-      body,
-      makeSource(),
-      { state: "open", includePrs: false },
-      {},
-    );
+    const body = [makeIssue({ id: 1, updated_at: "2026-04-10T10:00:00Z" }), makePr({ id: 2, updated_at: "2026-04-13T10:00:00Z" })];
+    const result = processIssuesResponse(body, makeSource(), { state: "open", includePrs: false }, {});
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].title, "Bug: thing broken");
   });
@@ -420,15 +344,8 @@ describe("githubIssuesFetcher.fetch", () => {
         headers: { "Content-Type": "application/json" },
       });
     };
-    const result = await githubIssuesFetcher.fetch(
-      makeSource(),
-      makeState(),
-      makeFetcherDeps(fetchImpl),
-    );
-    assert.match(
-      capturedUrl,
-      /^https:\/\/api\.github\.com\/repos\/receptron\/mulmoclaude\/issues\?/,
-    );
+    const result = await githubIssuesFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl));
+    assert.match(capturedUrl, /^https:\/\/api\.github\.com\/repos\/receptron\/mulmoclaude\/issues\?/);
     const parsedUrl = new URL(capturedUrl);
     assert.equal(parsedUrl.searchParams.get("state"), "open");
     assert.equal(parsedUrl.searchParams.get("sort"), "updated");
@@ -445,11 +362,7 @@ describe("githubIssuesFetcher.fetch", () => {
     const state = makeState({
       cursor: { [ISSUES_CURSOR_KEY]: "2026-04-10T10:00:00Z" },
     });
-    await githubIssuesFetcher.fetch(
-      makeSource(),
-      state,
-      makeFetcherDeps(fetchImpl),
-    );
+    await githubIssuesFetcher.fetch(makeSource(), state, makeFetcherDeps(fetchImpl));
     const parsedUrl = new URL(capturedUrl);
     assert.equal(parsedUrl.searchParams.get("since"), "2026-04-10T10:00:00Z");
   });
@@ -485,20 +398,11 @@ describe("githubIssuesFetcher.fetch", () => {
       throw new Error("should not fetch");
     };
     const source = makeSource({ fetcherParams: {} });
-    await assert.rejects(
-      () =>
-        githubIssuesFetcher.fetch(
-          source,
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
-      GithubFetcherError,
-    );
+    await assert.rejects(() => githubIssuesFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)), GithubFetcherError);
   });
 
   it("registers itself as the `github-issues` fetcher on import", async () => {
-    const { getFetcher } =
-      await import("../../server/workspace/sources/fetchers/index.js");
+    const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("github-issues");
     assert.ok(fetcher);
     assert.equal(fetcher!.kind, "github-issues");

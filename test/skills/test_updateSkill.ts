@@ -21,10 +21,7 @@ afterEach(() => {
 function createSkill(name: string, desc: string, body: string): void {
   const skillDir = path.join(tmpDir, ".claude", "skills", name);
   fs.mkdirSync(skillDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(skillDir, "SKILL.md"),
-    `---\ndescription: ${desc}\n---\n\n${body}`,
-  );
+  fs.writeFileSync(path.join(skillDir, "SKILL.md"), `---\ndescription: ${desc}\n---\n\n${body}`);
 }
 
 describe("updateProjectSkill", () => {
@@ -86,10 +83,7 @@ describe("updateProjectSkill", () => {
       description: "v2",
       body: "body v2",
     });
-    const content = fs.readFileSync(
-      path.join(tmpDir, ".claude", "skills", "my-skill", "SKILL.md"),
-      "utf-8",
-    );
+    const content = fs.readFileSync(path.join(tmpDir, ".claude", "skills", "my-skill", "SKILL.md"), "utf-8");
     assert.ok(!content.includes("v1"));
     assert.ok(content.includes("v2"));
     assert.ok(content.includes("body v2"));

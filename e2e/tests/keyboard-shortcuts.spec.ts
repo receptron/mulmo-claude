@@ -42,9 +42,7 @@ test.describe("view-mode keyboard shortcuts (useEventListeners)", () => {
     await expect(page).toHaveURL(/[?&]view=todos/);
   });
 
-  test("Cmd/Ctrl+5 switches to scheduler view (?view=scheduler)", async ({
-    page,
-  }) => {
+  test("Cmd/Ctrl+5 switches to scheduler view (?view=scheduler)", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -60,9 +58,7 @@ test.describe("view-mode keyboard shortcuts (useEventListeners)", () => {
     await expect(page).toHaveURL(/[?&]view=wiki/);
   });
 
-  test("Cmd/Ctrl+7 switches to skills view (?view=skills)", async ({
-    page,
-  }) => {
+  test("Cmd/Ctrl+7 switches to skills view (?view=skills)", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -78,9 +74,7 @@ test.describe("view-mode keyboard shortcuts (useEventListeners)", () => {
     await expect(page).toHaveURL(/[?&]view=roles/);
   });
 
-  test("Cmd/Ctrl+1 returns to single view (?view= removed)", async ({
-    page,
-  }) => {
+  test("Cmd/Ctrl+1 returns to single view (?view= removed)", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 

@@ -42,13 +42,7 @@ describe("normalizeColumns", () => {
   });
 
   it("strips entries missing id or label", () => {
-    const result = normalizeColumns([
-      { id: "a", label: "A" },
-      { id: 5, label: "B" },
-      { id: "c" },
-      { label: "D" },
-      { id: "e", label: "E" },
-    ]);
+    const result = normalizeColumns([{ id: "a", label: "A" }, { id: 5, label: "B" }, { id: "c" }, { label: "D" }, { id: "e", label: "E" }]);
     assert.deepEqual(
       result.map((c) => c.id),
       ["a", "e"],
@@ -106,10 +100,7 @@ describe("handleAddColumn", () => {
   });
 
   it("disambiguates colliding ids", () => {
-    const start = [
-      ...cols(),
-      { id: "review", label: "Review" } as StatusColumn,
-    ];
+    const start = [...cols(), { id: "review", label: "Review" } as StatusColumn];
     const result = handleAddColumn(start, [], { label: "Review" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -149,10 +140,7 @@ describe("handleAddColumn", () => {
     if (a.kind !== "success" || b.kind !== "success") {
       assert.fail("both should succeed");
     }
-    assert.equal(
-      a.columns[a.columns.length - 1]?.id,
-      b.columns[b.columns.length - 1]?.id,
-    );
+    assert.equal(a.columns[a.columns.length - 1]?.id, b.columns[b.columns.length - 1]?.id);
   });
 
   it("demotes existing done columns when isDone is true", () => {
@@ -171,10 +159,7 @@ describe("handleAddColumn", () => {
     // a brand-new column is promoted to be the done column, the old
     // ones should flip back to completed=false because their column
     // is no longer the done column.
-    const items = [
-      makeItem({ id: "a", status: "done", completed: true }),
-      makeItem({ id: "b", status: "todo", completed: false }),
-    ];
+    const items = [makeItem({ id: "a", status: "done", completed: true }), makeItem({ id: "b", status: "todo", completed: false })];
     const result = handleAddColumn(cols(), items, {
       label: "Archived",
       isDone: true,
@@ -200,12 +185,7 @@ describe("handleAddColumn", () => {
 describe("handlePatchColumn", () => {
   it("renames a column without touching items", () => {
     const items = [makeItem({ status: "todo" })];
-    const result = handlePatchColumn(
-      cols(),
-      "todo",
-      { label: "Up Next" },
-      items,
-    );
+    const result = handlePatchColumn(cols(), "todo", { label: "Up Next" }, items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.equal(result.columns.find((c) => c.id === "todo")?.label, "Up Next");
@@ -220,16 +200,8 @@ describe("handlePatchColumn", () => {
   });
 
   it("promoting a column to done demotes the prior done column and syncs items in BOTH directions", () => {
-    const items = [
-      makeItem({ id: "a", status: "in_progress", completed: false }),
-      makeItem({ id: "b", status: "done", completed: true }),
-    ];
-    const result = handlePatchColumn(
-      cols(),
-      "in_progress",
-      { isDone: true },
-      items,
-    );
+    const items = [makeItem({ id: "a", status: "in_progress", completed: false }), makeItem({ id: "b", status: "done", completed: true })];
+    const result = handlePatchColumn(cols(), "in_progress", { isDone: true }, items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     const inProgress = result.columns.find((c) => c.id === "in_progress");
@@ -262,19 +234,12 @@ describe("handleDeleteColumn", () => {
   });
 
   it("refuses to delete the last remaining column", () => {
-    const result = handleDeleteColumn(
-      [{ id: "only", label: "Only", isDone: true }],
-      "only",
-      [],
-    );
+    const result = handleDeleteColumn([{ id: "only", label: "Only", isDone: true }], "only", []);
     assert.equal(result.kind, "error");
   });
 
   it("removes a non-done column and migrates its items to the open default", () => {
-    const items = [
-      makeItem({ id: "a", status: "backlog" }),
-      makeItem({ id: "b", status: "todo" }),
-    ];
+    const items = [makeItem({ id: "a", status: "backlog" }), makeItem({ id: "b", status: "todo" })];
     const result = handleDeleteColumn(cols(), "backlog", items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -302,9 +267,7 @@ describe("handleDeleteColumn", () => {
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     // All four items now live in "todo" with unique, contiguous orders.
-    const todoItems = result
-      .items!.filter((i) => i.status === "todo")
-      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    const todoItems = result.items!.filter((i) => i.status === "todo").sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
     const orders = todoItems.map((i) => i.order);
     // No duplicates.
     assert.equal(new Set(orders).size, 4);
@@ -313,10 +276,7 @@ describe("handleDeleteColumn", () => {
   });
 
   it("removing the done column promotes a new done column and marks orphans complete", () => {
-    const items = [
-      makeItem({ id: "a", status: "done", completed: true }),
-      makeItem({ id: "b", status: "todo", completed: false }),
-    ];
+    const items = [makeItem({ id: "a", status: "done", completed: true }), makeItem({ id: "b", status: "todo", completed: false })];
     const result = handleDeleteColumn(cols(), "done", items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -340,32 +300,17 @@ describe("handleReorderColumns", () => {
   });
 
   it("rejects unknown ids", () => {
-    const result = handleReorderColumns(cols(), [
-      "todo",
-      "done",
-      "in_progress",
-      "ghost",
-    ]);
+    const result = handleReorderColumns(cols(), ["todo", "done", "in_progress", "ghost"]);
     assert.equal(result.kind, "error");
   });
 
   it("rejects duplicate ids", () => {
-    const result = handleReorderColumns(cols(), [
-      "todo",
-      "todo",
-      "in_progress",
-      "done",
-    ]);
+    const result = handleReorderColumns(cols(), ["todo", "todo", "in_progress", "done"]);
     assert.equal(result.kind, "error");
   });
 
   it("returns columns in the requested order", () => {
-    const result = handleReorderColumns(cols(), [
-      "done",
-      "in_progress",
-      "todo",
-      "backlog",
-    ]);
+    const result = handleReorderColumns(cols(), ["done", "in_progress", "todo", "backlog"]);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.deepEqual(

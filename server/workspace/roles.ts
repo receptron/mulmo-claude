@@ -1,14 +1,7 @@
 import path from "node:path";
-import {
-  BUILTIN_ROLES,
-  RoleSchema,
-  type Role,
-} from "../../src/config/roles.js";
+import { BUILTIN_ROLES, RoleSchema, type Role } from "../../src/config/roles.js";
 import { WORKSPACE_DIRS } from "./paths.js";
-import {
-  readdirUnderSync,
-  readTextUnderSync,
-} from "../utils/files/workspace-io.js";
+import { readdirUnderSync, readTextUnderSync } from "../utils/files/workspace-io.js";
 import { workspacePath } from "./paths.js";
 
 function withSwitchRole(role: Role): Role {
@@ -24,10 +17,7 @@ export function loadCustomRoles(): Role[] {
     .filter((f) => f.endsWith(".json"))
     .flatMap((f) => {
       try {
-        const raw = readTextUnderSync(
-          workspacePath,
-          path.posix.join(WORKSPACE_DIRS.roles, f),
-        );
+        const raw = readTextUnderSync(workspacePath, path.posix.join(WORKSPACE_DIRS.roles, f));
         if (!raw) return [];
         return [withSwitchRole(RoleSchema.parse(JSON.parse(raw)))];
       } catch {
@@ -38,9 +28,7 @@ export function loadCustomRoles(): Role[] {
 
 export function loadAllRoles(): Role[] {
   const custom = loadCustomRoles();
-  const builtIn = BUILTIN_ROLES.filter(
-    (r) => !custom.find((c) => c.id === r.id),
-  );
+  const builtIn = BUILTIN_ROLES.filter((r) => !custom.find((c) => c.id === r.id));
   return [...builtIn, ...custom];
 }
 

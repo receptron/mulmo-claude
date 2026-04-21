@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  applyRemovedTopics,
-  planMerges,
-  type RawMerge,
-} from "../../server/workspace/journal/optimizationPass.js";
+import { applyRemovedTopics, planMerges, type RawMerge } from "../../server/workspace/journal/optimizationPass.js";
 import type { JournalState } from "../../server/workspace/journal/state.js";
 
 describe("planMerges", () => {
@@ -13,9 +9,7 @@ describe("planMerges", () => {
   });
 
   it("slugifies the into and from fields", () => {
-    const raw: RawMerge[] = [
-      { into: "Video Generation", from: ["Old Video Notes"], newContent: "x" },
-    ];
+    const raw: RawMerge[] = [{ into: "Video Generation", from: ["Old Video Notes"], newContent: "x" }];
     const plans = planMerges(raw);
     assert.equal(plans.length, 1);
     assert.equal(plans[0]?.intoSlug, "video-generation");
@@ -23,17 +17,13 @@ describe("planMerges", () => {
   });
 
   it("preserves newContent verbatim", () => {
-    const raw: RawMerge[] = [
-      { into: "a", from: ["b"], newContent: "# Merged body\n\nstuff" },
-    ];
+    const raw: RawMerge[] = [{ into: "a", from: ["b"], newContent: "# Merged body\n\nstuff" }];
     const plans = planMerges(raw);
     assert.equal(plans[0]?.newContent, "# Merged body\n\nstuff");
   });
 
   it("drops merges where every from slug equals the into slug", () => {
-    const raw: RawMerge[] = [
-      { into: "Topic A", from: ["Topic-A", "topic a"], newContent: "x" },
-    ];
+    const raw: RawMerge[] = [{ into: "Topic A", from: ["Topic-A", "topic a"], newContent: "x" }];
     assert.deepEqual(planMerges(raw), []);
   });
 

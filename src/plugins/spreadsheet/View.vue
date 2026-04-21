@@ -3,16 +3,10 @@
     <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
       <div class="text-gray-500">Loading spreadsheet...</div>
     </div>
-    <div
-      v-else-if="errorMessage"
-      class="min-h-full p-8 flex items-center justify-center"
-    >
+    <div v-else-if="errorMessage" class="min-h-full p-8 flex items-center justify-center">
       <div class="error">{{ errorMessage }}</div>
     </div>
-    <div
-      v-else-if="!resolvedSheets || resolvedSheets.length === 0"
-      class="min-h-full p-8 flex items-center justify-center"
-    >
+    <div v-else-if="!resolvedSheets || resolvedSheets.length === 0" class="min-h-full p-8 flex items-center justify-center">
       <div class="text-gray-500">No spreadsheet data available</div>
     </div>
     <template v-else>
@@ -43,40 +37,21 @@
           </div>
 
           <!-- Spreadsheet table -->
-          <div
-            ref="tableContainer"
-            class="table-container"
-            @click="handleTableClick"
-            v-html="renderedHtml"
-          ></div>
+          <div ref="tableContainer" class="table-container" @click="handleTableClick" v-html="renderedHtml"></div>
         </div>
       </div>
 
       <!-- Collapsible Editor -->
-      <details
-        v-if="!miniEditorOpen"
-        ref="editorDetails"
-        class="spreadsheet-source"
-      >
+      <details v-if="!miniEditorOpen" ref="editorDetails" class="spreadsheet-source">
         <summary>Edit Spreadsheet Data</summary>
-        <textarea
-          ref="editorTextarea"
-          v-model="editableData"
-          class="spreadsheet-editor"
-          spellcheck="false"
-          @input="handleDataEdit"
-        ></textarea>
-        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">
-          Apply Changes
-        </button>
+        <textarea ref="editorTextarea" v-model="editableData" class="spreadsheet-editor" spellcheck="false" @input="handleDataEdit"></textarea>
+        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">Apply Changes</button>
       </details>
 
       <!-- Mini Editor at Bottom -->
       <div v-if="miniEditorOpen" class="mini-editor-panel">
         <div class="mini-editor-content">
-          <span v-if="miniEditorCell" class="cell-ref">
-            {{ indexToCol(miniEditorCell.col) }}{{ miniEditorCell.row + 1 }}
-          </span>
+          <span v-if="miniEditorCell" class="cell-ref"> {{ indexToCol(miniEditorCell.col) }}{{ miniEditorCell.row + 1 }} </span>
 
           <!-- Type Selector -->
           <div class="radio-group">
@@ -109,13 +84,7 @@
               placeholder="Value or Formula (e.g., 100 or SUM(B2:B11))"
               @keyup.enter="saveMiniEditor"
             />
-            <input
-              v-model="miniEditorFormat"
-              type="text"
-              class="form-input"
-              placeholder="Format (e.g., $#,##0.00)"
-              @keyup.enter="saveMiniEditor"
-            />
+            <input v-model="miniEditorFormat" type="text" class="form-input" placeholder="Format (e.g., $#,##0.00)" @keyup.enter="saveMiniEditor" />
           </template>
 
           <button class="save-btn" @click="saveMiniEditor">Update</button>
@@ -213,12 +182,7 @@ const errorMessage = ref("");
 const resolvedSheets = ref<SpreadsheetSheet[]>([]);
 
 function isFilePath(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    (value.startsWith("artifacts/spreadsheets/") ||
-      value.startsWith("spreadsheets/")) &&
-    value.endsWith(".json")
-  );
+  return typeof value === "string" && (value.startsWith("artifacts/spreadsheets/") || value.startsWith("spreadsheets/")) && value.endsWith(".json");
 }
 
 async function fetchSheets(): Promise<void> {
@@ -237,10 +201,7 @@ async function fetchSheets(): Promise<void> {
     return;
   }
   loading.value = true;
-  const response = await apiGet<FilesContentResponseLike>(
-    API_ROUTES.files.content,
-    { path: raw },
-  );
+  const response = await apiGet<FilesContentResponseLike>(API_ROUTES.files.content, { path: raw });
   if (!response.ok) {
     errorMessage.value = `Failed to load spreadsheet: ${response.error}`;
     resolvedSheets.value = [];
@@ -269,16 +230,10 @@ fetchSheets().then(() => {
 async function persistSheets(sheets: SpreadsheetSheet[]): Promise<void> {
   const raw = props.selectedResult.data?.sheets;
   if (isFilePath(raw)) {
-    const filename = raw.replace(
-      /^(artifacts\/spreadsheets|spreadsheets)\//,
-      "",
-    );
-    const result = await apiPut<unknown>(
-      API_ROUTES.plugins.updateSpreadsheet.replace(":filename", filename),
-      {
-        sheets,
-      },
-    );
+    const filename = raw.replace(/^(artifacts\/spreadsheets|spreadsheets)\//, "");
+    const result = await apiPut<unknown>(API_ROUTES.plugins.updateSpreadsheet.replace(":filename", filename), {
+      sheets,
+    });
     if (!result.ok) {
       errorMessage.value = `Failed to save spreadsheet: ${result.error}`;
       return;
@@ -329,10 +284,7 @@ const hasChanges = computed(() => {
 const indexToCol = indexToColumn;
 
 // Calculate formulas in the data using the spreadsheet engine
-const calculateFormulas = (
-  data: SpreadsheetCell[][],
-  sheetName?: string,
-): CellValue[][] => {
+const calculateFormulas = (data: SpreadsheetCell[][], sheetName?: string): CellValue[][] => {
   // If we have a sheet name, we need to find all sheets for cross-sheet references
   const allSheets = resolvedSheets.value;
 
@@ -395,17 +347,13 @@ const downloadExcel = () => {
     });
 
     // Generate filename
-    const filename = props.selectedResult.title
-      ? `${props.selectedResult.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.xlsx`
-      : "spreadsheet.xlsx";
+    const filename = props.selectedResult.title ? `${props.selectedResult.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.xlsx` : "spreadsheet.xlsx";
 
     // Write file
     XLSX.writeFile(workbook, filename);
   } catch (error) {
     console.error("Failed to download Excel:", error);
-    alert(
-      `Failed to download Excel file: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    alert(`Failed to download Excel file: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 };
 
@@ -432,10 +380,7 @@ function openMiniEditor(rowIndex: number, colIndex: number) {
     // Normalize the data in case it's malformed
     const normalizedData = normalizeSheetData(currentSheet.data);
 
-    if (
-      !normalizedData[rowIndex] ||
-      normalizedData[rowIndex][colIndex] === undefined
-    ) {
+    if (!normalizedData[rowIndex] || normalizedData[rowIndex][colIndex] === undefined) {
       return;
     }
 
@@ -547,9 +492,7 @@ function saveMiniEditor() {
     // Don't close the mini editor - keep it open so user can see the updated references
     // closeMiniEditor();
   } catch (error) {
-    alert(
-      `Failed to save cell: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    alert(`Failed to save cell: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
 
@@ -582,34 +525,20 @@ function handleTableClick(event: MouseEvent) {
     const currentSheet = sheets[activeSheetIndex.value];
     if (!currentSheet || !currentSheet.data) return;
     const normalizedData = normalizeSheetData(currentSheet.data);
-    if (
-      !normalizedData[rowIndex] ||
-      normalizedData[rowIndex][colIndex] === undefined
-    ) {
+    if (!normalizedData[rowIndex] || normalizedData[rowIndex][colIndex] === undefined) {
       return;
     }
     const cellStr = JSON.stringify(normalizedData[rowIndex][colIndex]);
-    const cellStart = findCellJsonPosition(
-      editableData.value,
-      currentSheet.name,
-      rowIndex,
-      colIndex,
-    );
+    const cellStart = findCellJsonPosition(editableData.value, currentSheet.name, rowIndex, colIndex);
     if (cellStart < 0) return;
     editorTextarea.value.focus();
-    editorTextarea.value.setSelectionRange(
-      cellStart,
-      cellStart + cellStr.length,
-    );
+    editorTextarea.value.setSelectionRange(cellStart, cellStart + cellStr.length);
     // Scroll the textarea to make the selection visible.
     const textBeforeSelection = editableData.value.substring(0, cellStart);
     const lineNumber = textBeforeSelection.split("\n").length;
     const lineHeight = 22;
     const textarea = editorTextarea.value;
-    textarea.scrollTop = Math.max(
-      0,
-      lineNumber * lineHeight - textarea.clientHeight / 2,
-    );
+    textarea.scrollTop = Math.max(0, lineNumber * lineHeight - textarea.clientHeight / 2);
   } catch (error) {
     console.error("Failed to select cell in editor:", error);
   }
@@ -631,9 +560,7 @@ async function applyChanges() {
     // Reset to first sheet after update
     activeSheetIndex.value = 0;
   } catch (error) {
-    alert(
-      `Invalid JSON format: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    alert(`Invalid JSON format: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
 
@@ -668,11 +595,7 @@ watch(
   () => {
     clearCellHighlights(tableContainer.value);
     if (!miniEditorOpen.value) return;
-    applyCellHighlights(
-      tableContainer.value,
-      miniEditorCell.value,
-      referencedCells.value,
-    );
+    applyCellHighlights(tableContainer.value, miniEditorCell.value, referencedCells.value);
   },
   { flush: "post" },
 );
@@ -684,11 +607,7 @@ function handleKeyboardNavigation(event: KeyboardEvent) {
 
   // Don't interfere if user is typing in an input field
   const target = event.target as HTMLElement;
-  if (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  ) {
+  if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
     return;
   }
 
@@ -722,13 +641,7 @@ function handleKeyboardNavigation(event: KeyboardEvent) {
     if (!currentSheet || !currentSheet.data) return;
 
     // Validate new position is within bounds
-    if (
-      newRow < 0 ||
-      newRow >= currentSheet.data.length ||
-      newCol < 0 ||
-      !currentSheet.data[newRow] ||
-      newCol >= currentSheet.data[newRow].length
-    ) {
+    if (newRow < 0 || newRow >= currentSheet.data.length || newCol < 0 || !currentSheet.data[newRow] || newCol >= currentSheet.data[newRow].length) {
       return; // Out of bounds, ignore
     }
 

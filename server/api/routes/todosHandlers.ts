@@ -10,12 +10,7 @@
 // complexity of the route handler under the lint threshold.
 
 import type { TodoItem } from "./todos.js";
-import {
-  filterByLabels,
-  listLabelsWithCount,
-  mergeLabels,
-  subtractLabels,
-} from "../../../src/plugins/todo/labels.js";
+import { filterByLabels, listLabelsWithCount, mergeLabels, subtractLabels } from "../../../src/plugins/todo/labels.js";
 import { makeId } from "../../utils/id.js";
 
 export interface TodosActionInput {
@@ -43,18 +38,12 @@ export type TodosActionResult =
 // Substring match (case-insensitive). Used by delete / update /
 // check / uncheck / add_label / remove_label — all share the same
 // lookup contract.
-export function findTodoByText(
-  items: TodoItem[],
-  text: string,
-): TodoItem | undefined {
+export function findTodoByText(items: TodoItem[], text: string): TodoItem | undefined {
   const needle = text.toLowerCase();
   return items.find((i) => i.text.toLowerCase().includes(needle));
 }
 
-export function handleShow(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleShow(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   const filterLabels = input.filterLabels ?? [];
   const filtered = filterByLabels(items, filterLabels);
   const filtering = filterLabels.length > 0;
@@ -75,10 +64,7 @@ export function handleShow(
   };
 }
 
-export function handleAdd(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleAdd(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   if (!input.text) {
     return { kind: "error", status: 400, error: "text required" };
   }
@@ -97,18 +83,12 @@ export function handleAdd(
   return {
     kind: "success",
     items: [...items, item],
-    message:
-      normalizedLabels.length > 0
-        ? `Added: "${input.text}" [${normalizedLabels.join(", ")}]`
-        : `Added: "${input.text}"`,
+    message: normalizedLabels.length > 0 ? `Added: "${input.text}" [${normalizedLabels.join(", ")}]` : `Added: "${input.text}"`,
     jsonData: { added: input.text, labels: normalizedLabels },
   };
 }
 
-export function handleDelete(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleDelete(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   if (!input.text) {
     return { kind: "error", status: 400, error: "text required" };
   }
@@ -118,17 +98,12 @@ export function handleDelete(
   return {
     kind: "success",
     items: next,
-    message: found
-      ? `Deleted: "${input.text}"`
-      : `Item not found: "${input.text}"`,
+    message: found ? `Deleted: "${input.text}"` : `Item not found: "${input.text}"`,
     jsonData: { deleted: input.text },
   };
 }
 
-export function handleUpdate(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleUpdate(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   if (!input.text || !input.newText) {
     return { kind: "error", status: 400, error: "text and newText required" };
   }
@@ -185,17 +160,11 @@ function setCompleted(
   };
 }
 
-export function handleCheck(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleCheck(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   return setCompleted(items, input, true, "Checked", "checkedItem");
 }
 
-export function handleUncheck(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleUncheck(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   return setCompleted(items, input, false, "Unchecked", "uncheckedItem");
 }
 
@@ -210,10 +179,7 @@ export function handleClearCompleted(items: TodoItem[]): TodosActionResult {
   };
 }
 
-export function handleAddLabel(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleAddLabel(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   if (!input.text || !input.labels || input.labels.length === 0) {
     return {
       kind: "error",
@@ -241,10 +207,7 @@ export function handleAddLabel(
   };
 }
 
-export function handleRemoveLabel(
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function handleRemoveLabel(items: TodoItem[], input: TodosActionInput): TodosActionResult {
   if (!input.text || !input.labels || input.labels.length === 0) {
     return {
       kind: "error",
@@ -272,33 +235,24 @@ export function handleRemoveLabel(
   return {
     kind: "success",
     items: next,
-    message:
-      remaining.length > 0
-        ? `Labels on "${target.text}": ${remaining.join(", ")}`
-        : `"${target.text}" now has no labels`,
+    message: remaining.length > 0 ? `Labels on "${target.text}": ${remaining.join(", ")}` : `"${target.text}" now has no labels`,
     jsonData: { item: target.text, labels: remaining },
   };
 }
 
 export function handleListLabels(items: TodoItem[]): TodosActionResult {
   const inventory = listLabelsWithCount(items);
+  const summary = inventory.map((l) => `${l.label} (${l.count})`).join(", ");
+  const message = inventory.length === 0 ? "No labels in use" : `${inventory.length} label(s) in use: ${summary}`;
   return {
     kind: "success",
     items,
-    message:
-      inventory.length === 0
-        ? "No labels in use"
-        : `${inventory.length} label(s) in use: ${inventory
-            .map((l) => `${l.label} (${l.count})`)
-            .join(", ")}`,
+    message,
     jsonData: { labels: inventory },
   };
 }
 
-const HANDLERS: Record<
-  string,
-  (items: TodoItem[], input: TodosActionInput) => TodosActionResult
-> = {
+const HANDLERS: Record<string, (items: TodoItem[], input: TodosActionInput) => TodosActionResult> = {
   show: handleShow,
   add: handleAdd,
   delete: handleDelete,
@@ -311,11 +265,7 @@ const HANDLERS: Record<
   list_labels: handleListLabels,
 };
 
-export function dispatchTodos(
-  action: string,
-  items: TodoItem[],
-  input: TodosActionInput,
-): TodosActionResult {
+export function dispatchTodos(action: string, items: TodoItem[], input: TodosActionInput): TodosActionResult {
   const handler = HANDLERS[action];
   if (!handler) {
     return { kind: "error", status: 400, error: `Unknown action: ${action}` };

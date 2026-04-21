@@ -54,15 +54,8 @@ describe("isValidChartDocument", () => {
   it("rejects entries without a valid option object", () => {
     assert.equal(isValidChartDocument({ charts: [{}] }), false);
     assert.equal(isValidChartDocument({ charts: [{ option: null }] }), false);
-    assert.equal(
-      isValidChartDocument({ charts: [{ option: "not-an-object" }] }),
-      false,
-    );
-    assert.equal(
-      isValidChartDocument({ charts: [{ option: [] }] }),
-      false,
-      "arrays are not valid option objects",
-    );
+    assert.equal(isValidChartDocument({ charts: [{ option: "not-an-object" }] }), false);
+    assert.equal(isValidChartDocument({ charts: [{ option: [] }] }), false, "arrays are not valid option objects");
   });
 
   it("rejects when any one chart in the array is malformed", () => {
@@ -75,24 +68,12 @@ describe("isValidChartDocument", () => {
   });
 
   it("rejects non-string document.title", () => {
-    assert.equal(
-      isValidChartDocument({ title: 42, charts: [{ option: {} }] }),
-      false,
-    );
-    assert.equal(
-      isValidChartDocument({ title: null, charts: [{ option: {} }] }),
-      false,
-    );
+    assert.equal(isValidChartDocument({ title: 42, charts: [{ option: {} }] }), false);
+    assert.equal(isValidChartDocument({ title: null, charts: [{ option: {} }] }), false);
   });
 
   it("rejects non-string chart entry title or type", () => {
-    assert.equal(
-      isValidChartDocument({ charts: [{ title: 42, option: {} }] }),
-      false,
-    );
-    assert.equal(
-      isValidChartDocument({ charts: [{ type: {}, option: {} }] }),
-      false,
-    );
+    assert.equal(isValidChartDocument({ charts: [{ title: 42, option: {} }] }), false);
+    assert.equal(isValidChartDocument({ charts: [{ type: {}, option: {} }] }), false);
   });
 });

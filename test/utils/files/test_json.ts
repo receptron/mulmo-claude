@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  loadJsonFile,
-  saveJsonFile,
-  writeJsonAtomic,
-  readJsonOrNull,
-} from "../../../server/utils/files/json.js";
+import { loadJsonFile, saveJsonFile, writeJsonAtomic, readJsonOrNull } from "../../../server/utils/files/json.js";
 
 let tmpDir: string;
 

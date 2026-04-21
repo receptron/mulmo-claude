@@ -17,12 +17,7 @@ import { slugify } from "../slug.js";
  * @param fallbackSlug  Slug to use when title is empty/undefined
  * @returns  Workspace-relative path like "artifacts/charts/sales-1776135210389.chart.json"
  */
-export function buildArtifactPath(
-  dir: string,
-  title: string | undefined,
-  ext: string,
-  fallbackSlug = "file",
-): string {
+export function buildArtifactPath(dir: string, title: string | undefined, ext: string, fallbackSlug = "file"): string {
   const slug = title ? slugify(title) || fallbackSlug : fallbackSlug;
   const fname = `${slug}-${Date.now()}${ext}`;
   return path.posix.join(dir, fname);

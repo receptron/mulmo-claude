@@ -13,10 +13,7 @@ import {
   bucketParsedEvents,
   type ParsedEntry,
 } from "../../server/workspace/journal/dailyPass.js";
-import type {
-  SessionExcerpt,
-  ExistingTopicSnapshot,
-} from "../../server/workspace/journal/archivist.js";
+import type { SessionExcerpt, ExistingTopicSnapshot } from "../../server/workspace/journal/archivist.js";
 import type { SessionFileMeta } from "../../server/workspace/journal/diff.js";
 import type { JournalState } from "../../server/workspace/journal/state.js";
 
@@ -84,10 +81,7 @@ describe("entryToExcerpt", () => {
   });
 
   it("returns null for unrecognised entry types", () => {
-    assert.equal(
-      entryToExcerpt({ source: "user", type: "mystery", message: "x" }),
-      null,
-    );
+    assert.equal(entryToExcerpt({ source: "user", type: "mystery", message: "x" }), null);
   });
 
   it("returns null for text entries with no message", () => {
@@ -95,10 +89,7 @@ describe("entryToExcerpt", () => {
   });
 
   it("returns null for tool_result with non-object result", () => {
-    assert.equal(
-      entryToExcerpt({ source: "tool", type: "tool_result", result: "str" }),
-      null,
-    );
+    assert.equal(entryToExcerpt({ source: "tool", type: "tool_result", result: "str" }), null);
   });
 
   it("handles missing source/type by using 'unknown'", () => {
@@ -110,10 +101,7 @@ describe("entryToExcerpt", () => {
 
 describe("extractArtifactPaths", () => {
   it("returns [] for text entries", () => {
-    assert.deepEqual(
-      extractArtifactPaths({ source: "user", type: "text", message: "hi" }),
-      [],
-    );
+    assert.deepEqual(extractArtifactPaths({ source: "user", type: "text", message: "hi" }), []);
   });
 
   it("extracts data.filePath from a tool_result", () => {
@@ -222,10 +210,7 @@ describe("parseEntry", () => {
       },
     });
     assert.ok(parsed);
-    assert.match(
-      parsed!.excerpt.content,
-      /presentMulmoScript: story about a cat/,
-    );
+    assert.match(parsed!.excerpt.content, /presentMulmoScript: story about a cat/);
     assert.deepEqual(parsed!.artifactPaths, ["stories/cat.json"]);
   });
 
@@ -272,10 +257,7 @@ describe("buildDayBuckets", () => {
     assert.equal(plan.dayBuckets.size, 2);
     assert.equal(plan.dayBuckets.get("2026-04-10")!.length, 1);
     assert.equal(plan.dayBuckets.get("2026-04-11")!.length, 1);
-    assert.deepEqual([...plan.sessionToDays.get("s1")!].sort(), [
-      "2026-04-10",
-      "2026-04-11",
-    ]);
+    assert.deepEqual([...plan.sessionToDays.get("s1")!].sort(), ["2026-04-10", "2026-04-11"]);
   });
 
   it("merges multiple sessions that share a date into the same bucket", () => {
@@ -302,44 +284,25 @@ describe("buildDayBuckets", () => {
 
 describe("normalizeTopicAction", () => {
   it("canonicalises the slug (slugify)", () => {
-    const out = normalizeTopicAction(
-      { slug: "Video Generation!", action: "create", content: "body" },
-      [],
-    );
+    const out = normalizeTopicAction({ slug: "Video Generation!", action: "create", content: "body" }, []);
     assert.equal(out.slug, "video-generation");
   });
 
   it("promotes append-to-missing into create", () => {
-    const out = normalizeTopicAction(
-      { slug: "new-topic", action: "append", content: "body" },
-      [],
-    );
+    const out = normalizeTopicAction({ slug: "new-topic", action: "append", content: "body" }, []);
     assert.equal(out.action, "create");
   });
 
   it("keeps append when the topic already exists", () => {
-    const existing: ExistingTopicSnapshot[] = [
-      { slug: "existing", content: "old body" },
-    ];
-    const out = normalizeTopicAction(
-      { slug: "existing", action: "append", content: "new body" },
-      existing,
-    );
+    const existing: ExistingTopicSnapshot[] = [{ slug: "existing", content: "old body" }];
+    const out = normalizeTopicAction({ slug: "existing", action: "append", content: "new body" }, existing);
     assert.equal(out.action, "append");
   });
 
   it("leaves create and rewrite actions untouched", () => {
-    const existing: ExistingTopicSnapshot[] = [
-      { slug: "existing", content: "old" },
-    ];
-    const created = normalizeTopicAction(
-      { slug: "new", action: "create", content: "x" },
-      existing,
-    );
-    const rewritten = normalizeTopicAction(
-      { slug: "existing", action: "rewrite", content: "y" },
-      existing,
-    );
+    const existing: ExistingTopicSnapshot[] = [{ slug: "existing", content: "old" }];
+    const created = normalizeTopicAction({ slug: "new", action: "create", content: "x" }, existing);
+    const rewritten = normalizeTopicAction({ slug: "existing", action: "rewrite", content: "y" }, existing);
     assert.equal(created.action, "create");
     assert.equal(rewritten.action, "rewrite");
   });
@@ -366,14 +329,11 @@ describe("normalizeTopicAction", () => {
 describe("parseArchivistOutput", () => {
   const validOutput = {
     dailySummaryMarkdown: "# 2026-04-12\n- something happened",
-    topicUpdates: [
-      { slug: "refactoring", action: "append", content: "more progress" },
-    ],
+    topicUpdates: [{ slug: "refactoring", action: "append", content: "more progress" }],
   };
 
   it("returns the parsed output for a well-formed JSON fence", () => {
-    const raw =
-      "Some preface\n```json\n" + JSON.stringify(validOutput) + "\n```";
+    const raw = "Some preface\n```json\n" + JSON.stringify(validOutput) + "\n```";
     const out = parseArchivistOutput(raw);
     assert.ok(out);
     assert.equal(out!.dailySummaryMarkdown, validOutput.dailySummaryMarkdown);
@@ -414,12 +374,7 @@ describe("computeJustCompletedSessions", () => {
     const sessionToDays = new Map([["s1", new Set(["2026-04-10"])]]);
     const dirtyMetaById = new Map([["s1", makeMeta("s1")]]);
     const excerpts = [mkExcerpt("s1", "hi")];
-    const completed = computeJustCompletedSessions(
-      "2026-04-10",
-      excerpts,
-      sessionToDays,
-      dirtyMetaById,
-    );
+    const completed = computeJustCompletedSessions("2026-04-10", excerpts, sessionToDays, dirtyMetaById);
     assert.deepEqual(
       completed.map((m) => m.id),
       ["s1"],
@@ -429,17 +384,10 @@ describe("computeJustCompletedSessions", () => {
   });
 
   it("does not mark a session complete while other days are still pending", () => {
-    const sessionToDays = new Map([
-      ["s1", new Set(["2026-04-10", "2026-04-11"])],
-    ]);
+    const sessionToDays = new Map([["s1", new Set(["2026-04-10", "2026-04-11"])]]);
     const dirtyMetaById = new Map([["s1", makeMeta("s1")]]);
     const excerpts = [mkExcerpt("s1", "first day")];
-    const completed = computeJustCompletedSessions(
-      "2026-04-10",
-      excerpts,
-      sessionToDays,
-      dirtyMetaById,
-    );
+    const completed = computeJustCompletedSessions("2026-04-10", excerpts, sessionToDays, dirtyMetaById);
     assert.equal(completed.length, 0);
     assert.deepEqual(
       [...sessionToDays.get("s1")!],
@@ -457,12 +405,7 @@ describe("computeJustCompletedSessions", () => {
       ["s2", makeMeta("s2")],
     ]);
     const excerpts = [mkExcerpt("s1", "a"), mkExcerpt("s2", "b")];
-    const completed = computeJustCompletedSessions(
-      "2026-04-10",
-      excerpts,
-      sessionToDays,
-      dirtyMetaById,
-    );
+    const completed = computeJustCompletedSessions("2026-04-10", excerpts, sessionToDays, dirtyMetaById);
     // Only s1 completes; s2 still has 2026-04-11 pending.
     assert.deepEqual(
       completed.map((m) => m.id),
@@ -475,12 +418,7 @@ describe("computeJustCompletedSessions", () => {
   it("silently skips sessions missing from sessionToDays", () => {
     const sessionToDays = new Map<string, Set<string>>();
     const dirtyMetaById = new Map([["ghost", { id: "ghost", mtimeMs: 1 }]]);
-    const completed = computeJustCompletedSessions(
-      "2026-04-10",
-      [mkExcerpt("ghost", "x")],
-      sessionToDays,
-      dirtyMetaById,
-    );
+    const completed = computeJustCompletedSessions("2026-04-10", [mkExcerpt("ghost", "x")], sessionToDays, dirtyMetaById);
     assert.equal(completed.length, 0);
   });
 
@@ -490,12 +428,7 @@ describe("computeJustCompletedSessions", () => {
     // must not emit an undefined entry.
     const sessionToDays = new Map([["orphan", new Set(["2026-04-10"])]]);
     const dirtyMetaById = new Map<string, SessionFileMeta>();
-    const completed = computeJustCompletedSessions(
-      "2026-04-10",
-      [mkExcerpt("orphan", "x")],
-      sessionToDays,
-      dirtyMetaById,
-    );
+    const completed = computeJustCompletedSessions("2026-04-10", [mkExcerpt("orphan", "x")], sessionToDays, dirtyMetaById);
     assert.equal(completed.length, 0);
     assert.equal(sessionToDays.has("orphan"), false);
   });
@@ -515,20 +448,12 @@ describe("advanceJournalState", () => {
   }
 
   it("upserts just-completed sessions into processedSessions", () => {
-    const out = advanceJournalState(
-      baseState(),
-      [{ id: "s1", mtimeMs: 1234 }],
-      new Set(),
-    );
+    const out = advanceJournalState(baseState(), [{ id: "s1", mtimeMs: 1234 }], new Set());
     assert.deepEqual(out.processedSessions["s1"], { lastMtimeMs: 1234 });
   });
 
   it("sorts knownTopics alphabetically", () => {
-    const out = advanceJournalState(
-      baseState(),
-      [],
-      new Set(["banana", "apple", "cherry"]),
-    );
+    const out = advanceJournalState(baseState(), [], new Set(["banana", "apple", "cherry"]));
     assert.deepEqual(out.knownTopics, ["apple", "banana", "cherry"]);
   });
 
@@ -561,13 +486,7 @@ describe("parseJsonlEvents", () => {
   });
 
   it("skips blank lines and malformed JSON", () => {
-    const raw = [
-      "",
-      "not json",
-      JSON.stringify({ source: "user", type: "text", message: "hi" }),
-      "{",
-      "",
-    ].join("\n");
+    const raw = ["", "not json", JSON.stringify({ source: "user", type: "text", message: "hi" }), "{", ""].join("\n");
     const out = parseJsonlEvents(raw, 10);
     assert.equal(out.length, 1);
     assert.equal(out[0].excerpt.content, "hi");
@@ -587,9 +506,7 @@ describe("parseJsonlEvents", () => {
   it("honours the maxEvents cap", () => {
     const lines: string[] = [];
     for (let i = 0; i < 20; i++) {
-      lines.push(
-        JSON.stringify({ source: "user", type: "text", message: `m${i}` }),
-      );
+      lines.push(JSON.stringify({ source: "user", type: "text", message: `m${i}` }));
     }
     const out = parseJsonlEvents(lines.join("\n"), 5);
     assert.equal(out.length, 5);
@@ -618,14 +535,7 @@ describe("parseJsonlEvents", () => {
     // would crash the whole session at `entry.type === ...`.
     // parseJsonlLine's guard should collapse each of these into
     // the same "skip this line" path.
-    const raw = [
-      "null",
-      "[1,2,3]",
-      '"just a string"',
-      "42",
-      "true",
-      JSON.stringify({ source: "user", type: "text", message: "real" }),
-    ].join("\n");
+    const raw = ["null", "[1,2,3]", '"just a string"', "42", "true", JSON.stringify({ source: "user", type: "text", message: "real" })].join("\n");
     const out = parseJsonlEvents(raw, 10);
     assert.equal(out.length, 1);
     assert.equal(out[0].excerpt.content, "real");
@@ -646,12 +556,7 @@ describe("bucketParsedEvents", () => {
   });
 
   it("creates one bucket at the fallback date with all events", () => {
-    const out = bucketParsedEvents(
-      [mkParsed("a"), mkParsed("b")],
-      "s1",
-      "general",
-      "2026-04-12",
-    );
+    const out = bucketParsedEvents([mkParsed("a"), mkParsed("b")], "s1", "general", "2026-04-12");
     assert.equal(out.size, 1);
     const bucket = out.get("2026-04-12")!;
     assert.equal(bucket.sessionId, "s1");
@@ -671,9 +576,6 @@ describe("bucketParsedEvents", () => {
       "2026-04-12",
     );
     const bucket = out.get("2026-04-12")!;
-    assert.deepEqual(bucket.artifactPaths, [
-      "stories/one.json",
-      "stories/two.json",
-    ]);
+    assert.deepEqual(bucket.artifactPaths, ["stories/one.json", "stories/two.json"]);
   });
 });

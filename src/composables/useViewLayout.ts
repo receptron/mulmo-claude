@@ -19,16 +19,11 @@ export function useViewLayout(opts: {
   currentSessionId: Ref<string>;
   activePane: Ref<"sidebar" | "main">;
 }) {
-  const { canvasViewMode, setCanvasViewMode, currentSessionId, activePane } =
-    opts;
+  const { canvasViewMode, setCanvasViewMode, currentSessionId, activePane } = opts;
 
-  const isStackLayout = computed(
-    () => canvasViewMode.value !== CANVAS_VIEW.single,
-  );
+  const isStackLayout = computed(() => canvasViewMode.value !== CANVAS_VIEW.single);
 
-  const lastChatViewMode = ref<ChatViewMode>(
-    isChatView(canvasViewMode.value) ? canvasViewMode.value : CANVAS_VIEW.stack,
-  );
+  const lastChatViewMode = ref<ChatViewMode>(isChatView(canvasViewMode.value) ? canvasViewMode.value : CANVAS_VIEW.stack);
 
   watch(canvasViewMode, (mode) => {
     if (isChatView(mode)) lastChatViewMode.value = mode;
@@ -40,9 +35,7 @@ export function useViewLayout(opts: {
     }
   }
 
-  const displayedCurrentSessionId = computed(() =>
-    isChatView(canvasViewMode.value) ? currentSessionId.value : "",
-  );
+  const displayedCurrentSessionId = computed(() => (isChatView(canvasViewMode.value) ? currentSessionId.value : ""));
 
   // Keep arrow-key navigation tied to the canvas when the sidebar
   // list doesn't exist (Stack layout has no ToolResultsPanel).

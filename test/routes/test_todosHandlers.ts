@@ -50,10 +50,7 @@ describe("findTodoByText", () => {
 
 describe("handleShow", () => {
   it("returns items + count message + jsonData with text/completed pairs", () => {
-    const items = [
-      makeTodo({ id: "a", text: "x", completed: true }),
-      makeTodo({ id: "b", text: "y", completed: false }),
-    ];
+    const items = [makeTodo({ id: "a", text: "x", completed: true }), makeTodo({ id: "b", text: "y", completed: false })];
     const result = handleShow(items, {});
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -72,10 +69,7 @@ describe("handleShow", () => {
   });
 
   it("includes labels in jsonData when present", () => {
-    const items = [
-      makeTodo({ id: "a", text: "x", labels: ["work", "urgent"] }),
-      makeTodo({ id: "b", text: "y" }),
-    ];
+    const items = [makeTodo({ id: "a", text: "x", labels: ["work", "urgent"] }), makeTodo({ id: "b", text: "y" })];
     const result = handleShow(items, {});
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -103,10 +97,7 @@ describe("handleShow", () => {
   });
 
   it("treats an empty filterLabels as no filter", () => {
-    const items = [
-      makeTodo({ id: "a", labels: ["work"] }),
-      makeTodo({ id: "b" }),
-    ];
+    const items = [makeTodo({ id: "a", labels: ["work"] }), makeTodo({ id: "b" })];
     const result = handleShow(items, { filterLabels: [] });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -163,10 +154,7 @@ describe("handleDelete", () => {
   });
 
   it("removes items matching the substring", () => {
-    const items = [
-      makeTodo({ id: "a", text: "Buy milk" }),
-      makeTodo({ id: "b", text: "Walk dog" }),
-    ];
+    const items = [makeTodo({ id: "a", text: "Buy milk" }), makeTodo({ id: "b", text: "Walk dog" })];
     const result = handleDelete(items, { text: "milk" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -183,11 +171,7 @@ describe("handleDelete", () => {
   });
 
   it("deletes multiple items if multiple match", () => {
-    const items = [
-      makeTodo({ id: "a", text: "milk in fridge" }),
-      makeTodo({ id: "b", text: "almond milk" }),
-      makeTodo({ id: "c", text: "bread" }),
-    ];
+    const items = [makeTodo({ id: "a", text: "milk in fridge" }), makeTodo({ id: "b", text: "almond milk" }), makeTodo({ id: "c", text: "bread" })];
     const result = handleDelete(items, { text: "milk" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -293,11 +277,7 @@ describe("handleUncheck", () => {
 
 describe("handleClearCompleted", () => {
   it("removes only completed items", () => {
-    const items = [
-      makeTodo({ id: "a", completed: false }),
-      makeTodo({ id: "b", completed: true }),
-      makeTodo({ id: "c", completed: true }),
-    ];
+    const items = [makeTodo({ id: "a", completed: false }), makeTodo({ id: "b", completed: true }), makeTodo({ id: "c", completed: true })];
     const result = handleClearCompleted(items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -314,10 +294,7 @@ describe("handleClearCompleted", () => {
   });
 
   it("returns 0 cleared when nothing is completed", () => {
-    const items = [
-      makeTodo({ id: "a", completed: false }),
-      makeTodo({ id: "b", completed: false }),
-    ];
+    const items = [makeTodo({ id: "a", completed: false }), makeTodo({ id: "b", completed: false })];
     const result = handleClearCompleted(items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -452,11 +429,7 @@ describe("handleListLabels", () => {
   });
 
   it("counts each distinct label across items", () => {
-    const items = [
-      makeTodo({ id: "a", labels: ["work", "urgent"] }),
-      makeTodo({ id: "b", labels: ["work"] }),
-      makeTodo({ id: "c", labels: ["personal"] }),
-    ];
+    const items = [makeTodo({ id: "a", labels: ["work", "urgent"] }), makeTodo({ id: "b", labels: ["work"] }), makeTodo({ id: "c", labels: ["personal"] })];
     const result = handleListLabels(items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -478,38 +451,16 @@ describe("dispatchTodos", () => {
   });
 
   it("dispatches each known action", () => {
-    const items = [
-      makeTodo({ id: "a", text: "thing", completed: false, labels: ["work"] }),
-    ];
+    const items = [makeTodo({ id: "a", text: "thing", completed: false, labels: ["work"] })];
     assert.equal(dispatchTodos("show", items, {}).kind, "success");
     assert.equal(dispatchTodos("add", items, { text: "x" }).kind, "success");
-    assert.equal(
-      dispatchTodos("delete", items, { text: "thing" }).kind,
-      "success",
-    );
-    assert.equal(
-      dispatchTodos("update", items, { text: "thing", newText: "thing2" }).kind,
-      "success",
-    );
-    assert.equal(
-      dispatchTodos("check", items, { text: "thing" }).kind,
-      "success",
-    );
-    assert.equal(
-      dispatchTodos("uncheck", items, { text: "thing" }).kind,
-      "success",
-    );
+    assert.equal(dispatchTodos("delete", items, { text: "thing" }).kind, "success");
+    assert.equal(dispatchTodos("update", items, { text: "thing", newText: "thing2" }).kind, "success");
+    assert.equal(dispatchTodos("check", items, { text: "thing" }).kind, "success");
+    assert.equal(dispatchTodos("uncheck", items, { text: "thing" }).kind, "success");
     assert.equal(dispatchTodos("clear_completed", items, {}).kind, "success");
-    assert.equal(
-      dispatchTodos("add_label", items, { text: "thing", labels: ["urgent"] })
-        .kind,
-      "success",
-    );
-    assert.equal(
-      dispatchTodos("remove_label", items, { text: "thing", labels: ["work"] })
-        .kind,
-      "success",
-    );
+    assert.equal(dispatchTodos("add_label", items, { text: "thing", labels: ["urgent"] }).kind, "success");
+    assert.equal(dispatchTodos("remove_label", items, { text: "thing", labels: ["work"] }).kind, "success");
     assert.equal(dispatchTodos("list_labels", items, {}).kind, "success");
   });
 });

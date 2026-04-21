@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  loadTodos,
-  saveTodos,
-  loadColumns,
-  saveColumns,
-} from "../../../server/utils/files/todos-io.js";
+import { loadTodos, saveTodos, loadColumns, saveColumns } from "../../../server/utils/files/todos-io.js";
 
 let root: string;
 
@@ -39,9 +34,7 @@ describe("loadTodos / saveTodos", () => {
   });
 
   it("returns fallback on corrupt JSON (not crash)", () => {
-    const corruptRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "todos-corrupt-"),
-    );
+    const corruptRoot = fs.mkdtempSync(path.join(os.tmpdir(), "todos-corrupt-"));
     const dir = path.join(corruptRoot, "data", "todos");
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "todos.json"), "{broken json");

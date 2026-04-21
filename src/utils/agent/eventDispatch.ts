@@ -5,11 +5,7 @@ import type { ActiveSession } from "../../types/session";
 import type { SseEvent } from "../../types/sse";
 import { EVENT_TYPES, generationKey } from "../../types/events";
 import { findPendingToolCall, toToolCallEntry } from "./toolCalls";
-import {
-  pushErrorMessage,
-  applyTextEvent,
-  applyToolResultToSession,
-} from "../session/sessionHelpers";
+import { pushErrorMessage, applyTextEvent, applyToolResultToSession } from "../session/sessionHelpers";
 
 export interface AgentEventContext {
   session: ActiveSession;
@@ -20,10 +16,7 @@ export interface AgentEventContext {
   onGenerationsDrained: () => void;
 }
 
-export async function applyAgentEvent(
-  event: SseEvent,
-  ctx: AgentEventContext,
-): Promise<void> {
+export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): Promise<void> {
   const { session } = ctx;
   switch (event.type) {
     case EVENT_TYPES.toolCall:
@@ -31,10 +24,7 @@ export async function applyAgentEvent(
       ctx.scrollSidebarToBottom();
       return;
     case EVENT_TYPES.toolCallResult: {
-      const entry = findPendingToolCall(
-        session.toolCallHistory,
-        event.toolUseId,
-      );
+      const entry = findPendingToolCall(session.toolCallHistory, event.toolUseId);
       if (entry) entry.result = event.content;
       ctx.scrollSidebarToBottom();
       return;

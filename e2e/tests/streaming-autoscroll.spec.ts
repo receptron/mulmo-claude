@@ -35,29 +35,17 @@ function buildStreamingEvents(chunkCount: number, chunkBody: string) {
 
 // Relay a sequence of pub/sub events to the mocked WebSocket with a
 // small gap between each send so Vue re-renders between chunks.
-async function streamEventsToSocket(
-  ws: { send: (data: string) => void },
-  channel: string,
-  events: readonly unknown[],
-): Promise<void> {
+async function streamEventsToSocket(ws: { send: (data: string) => void }, channel: string, events: readonly unknown[]): Promise<void> {
   for (const event of events) {
     ws.send("42" + JSON.stringify(["data", { channel, data: event }]));
     await new Promise((r) => setTimeout(r, 20));
   }
-  ws.send(
-    "42" +
-      JSON.stringify(["data", { channel, data: { type: "session_finished" } }]),
-  );
+  ws.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
 }
 
-function handleSocketFrame(
-  text: string,
-  ws: { send: (data: string) => void },
-  events: readonly unknown[],
-): void {
+function handleSocketFrame(text: string, ws: { send: (data: string) => void }, events: readonly unknown[]): void {
   if (text === "2") return ws.send("3");
-  if (text === "40")
-    return ws.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
+  if (text === "40") return ws.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
   if (!text.startsWith("42")) return;
   let parsed: unknown;
   try {
@@ -67,19 +55,11 @@ function handleSocketFrame(
   }
   if (!Array.isArray(parsed)) return;
   const [name, arg] = parsed as [string, unknown];
-  if (
-    name !== "subscribe" ||
-    typeof arg !== "string" ||
-    !arg.startsWith("session.")
-  )
-    return;
+  if (name !== "subscribe" || typeof arg !== "string" || !arg.startsWith("session.")) return;
   void streamEventsToSocket(ws, arg, events);
 }
 
-async function mockAgentWithPubSub(
-  page: Page,
-  events: readonly unknown[],
-): Promise<void> {
+async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Promise<void> {
   await page.routeWebSocket(
     (url) => url.pathname.startsWith("/ws/pubsub"),
     (ws) => {
@@ -108,20 +88,14 @@ async function mockAgentWithPubSub(
 
 /** Wait until scrollHeight stops growing for two consecutive samples,
  *  meaning the streaming has finished and the DOM has settled. */
-async function waitForScrollHeightStable(
-  page: Page,
-  testId: string,
-  opts: { sampleGapMs?: number; maxWaitMs?: number } = {},
-): Promise<void> {
+async function waitForScrollHeightStable(page: Page, testId: string, opts: { sampleGapMs?: number; maxWaitMs?: number } = {}): Promise<void> {
   const gap = opts.sampleGapMs ?? 300;
   const maxWait = opts.maxWaitMs ?? 10_000;
   const deadline = Date.now() + maxWait;
   let last = -1;
   let stable = 0;
   while (Date.now() < deadline) {
-    const current = await page
-      .getByTestId(testId)
-      .evaluate((el) => el.scrollHeight);
+    const current = await page.getByTestId(testId).evaluate((el) => el.scrollHeight);
     if (current === last && current > 0) {
       stable++;
       if (stable >= 2) return;
@@ -134,10 +108,7 @@ async function waitForScrollHeightStable(
 }
 
 /** Read scrollTop + scrollHeight + clientHeight from a scroll container. */
-async function scrollMetrics(
-  page: Page,
-  testId: string,
-): Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number }> {
+async function scrollMetrics(page: Page, testId: string): Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number }> {
   return page.getByTestId(testId).evaluate((el) => ({
     scrollTop: el.scrollTop,
     scrollHeight: el.scrollHeight,
@@ -159,9 +130,7 @@ test.describe("assistant text streaming — auto-scroll follows the stream", () 
     await mockAllApis(page);
   });
 
-  test("StackView (Stack mode) stays pinned to the bottom during streaming", async ({
-    page,
-  }) => {
+  test("StackView (Stack mode) stays pinned to the bottom during streaming", async ({ page }) => {
     const chunk = "Streaming chunk with enough text to matter. ".repeat(5);
     await mockAgentWithPubSub(page, buildStreamingEvents(40, chunk));
 
@@ -175,13 +144,8 @@ test.describe("assistant text streaming — auto-scroll follows the stream", () 
 
     await waitForScrollHeightStable(page, "stack-scroll");
 
-    const { scrollTop, scrollHeight, clientHeight } = await scrollMetrics(
-      page,
-      "stack-scroll",
-    );
+    const { scrollTop, scrollHeight, clientHeight } = await scrollMetrics(page, "stack-scroll");
     expect(scrollHeight).toBeGreaterThan(clientHeight);
-    expect(scrollHeight - scrollTop - clientHeight).toBeLessThan(
-      BOTTOM_TOLERANCE_PX,
-    );
+    expect(scrollHeight - scrollTop - clientHeight).toBeLessThan(BOTTOM_TOLERANCE_PX);
   });
 });

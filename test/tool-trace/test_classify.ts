@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  MAX_INLINE_CONTENT_CHARS,
-  classifyToolResult,
-} from "../../server/workspace/tool-trace/classify.js";
+import { MAX_INLINE_CONTENT_CHARS, classifyToolResult } from "../../server/workspace/tool-trace/classify.js";
 
 describe("classifyToolResult — WebSearch", () => {
   it("returns a pointer when searchContentRef is provided", () => {

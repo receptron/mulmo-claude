@@ -71,10 +71,7 @@ export interface SystemTaskDef {
   name: string;
   description: string;
   schedule: TaskDefinition["schedule"];
-  missedRunPolicy:
-    | typeof MISSED_RUN_POLICIES.skip
-    | typeof MISSED_RUN_POLICIES.runOnce
-    | typeof MISSED_RUN_POLICIES.runAll;
+  missedRunPolicy: typeof MISSED_RUN_POLICIES.skip | typeof MISSED_RUN_POLICIES.runOnce | typeof MISSED_RUN_POLICIES.runAll;
   run: () => Promise<void>;
 }
 
@@ -88,10 +85,7 @@ let taskManagerRef: ITaskManager | null = null;
  * Initialize the scheduler adapter. Call once at server startup
  * AFTER the task-manager is created but BEFORE `taskManager.start()`.
  */
-export async function initScheduler(
-  taskManager: ITaskManager,
-  tasks: SystemTaskDef[],
-): Promise<void> {
+export async function initScheduler(taskManager: ITaskManager, tasks: SystemTaskDef[]): Promise<void> {
   await mkdir(path.dirname(stateFilePath()), { recursive: true });
   await mkdir(logsDir(), { recursive: true });
 
@@ -125,11 +119,7 @@ export async function initScheduler(
     for (const run of plan.runs) {
       const task = tasks.find((t) => t.id === run.taskId);
       if (!task) continue;
-      await executeAndLog(
-        task,
-        run.context.scheduledFor,
-        TASK_TRIGGERS.catchUp,
-      );
+      await executeAndLog(task, run.context.scheduledFor, TASK_TRIGGERS.catchUp);
     }
   }
 
@@ -155,10 +145,7 @@ export async function initScheduler(
 /** Apply a schedule override to a running system task.
  *  Updates the in-memory task definition, the task-manager, and
  *  recalculates nextScheduledAt in persisted state. */
-export async function applyScheduleOverride(
-  taskId: string,
-  schedule: SystemTaskDef["schedule"],
-): Promise<boolean> {
+export async function applyScheduleOverride(taskId: string, schedule: SystemTaskDef["schedule"]): Promise<boolean> {
   const task = systemTasks.find((t) => t.id === taskId);
   if (!task || !taskManagerRef) return false;
   if (!taskManagerRef.updateSchedule(taskId, schedule)) return false;
@@ -172,11 +159,7 @@ export async function applyScheduleOverride(
 }
 
 /** Query execution logs — used by API routes. */
-export async function getSchedulerLogs(opts: {
-  since?: string;
-  taskId?: string;
-  limit?: number;
-}): Promise<TaskLogEntry[]> {
+export async function getSchedulerLogs(opts: { since?: string; taskId?: string; limit?: number }): Promise<TaskLogEntry[]> {
   return queryLog(logsDir(), opts, logDeps);
 }
 
@@ -201,11 +184,7 @@ export function getSchedulerTasks(): Array<{
 
 // ── Internal ─────────────────────────────────────────────────────
 
-async function executeAndLog(
-  task: SystemTaskDef,
-  scheduledFor: string,
-  trigger: TaskTrigger,
-): Promise<void> {
+async function executeAndLog(task: SystemTaskDef, scheduledFor: string, trigger: TaskTrigger): Promise<void> {
   const startedAt = new Date().toISOString();
   const startMs = Date.now();
   let errMsg: string | null = null;
@@ -246,9 +225,7 @@ async function safePersist(
         lastRunResult: isSuccess ? TASK_RESULTS.success : TASK_RESULTS.error,
         lastRunDurationMs: durationMs,
         lastErrorMessage: errMsg,
-        consecutiveFailures: isSuccess
-          ? 0
-          : (currentState?.consecutiveFailures ?? 0) + 1,
+        consecutiveFailures: isSuccess ? 0 : (currentState?.consecutiveFailures ?? 0) + 1,
         totalRuns: (currentState?.totalRuns ?? 0) + 1,
         nextScheduledAt: computeNextScheduled(task),
       },
@@ -285,10 +262,7 @@ async function safePersist(
 }
 
 /** Safe state update — swallows errors. */
-async function safeUpdateState(
-  taskId: string,
-  patch: Partial<TaskExecutionState>,
-): Promise<void> {
+async function safeUpdateState(taskId: string, patch: Partial<TaskExecutionState>): Promise<void> {
   try {
     await updateAndSave(stateFilePath(), stateMap, taskId, patch, stateDeps);
   } catch (err) {
@@ -307,16 +281,8 @@ function computeCurrentWindow(task: SystemTaskDef): string {
   const coreSchedule = toCoreSchedule(task.schedule);
   // The window that just fired is the latest one at or before now.
   const nowMs = Date.now();
-  const windowMs = nextWindowAfter(
-    coreSchedule,
-    nowMs -
-      (coreSchedule.type === SCHEDULE_TYPES.interval
-        ? coreSchedule.intervalSec * ONE_SECOND_MS
-        : 0),
-  );
-  return windowMs !== null && windowMs <= nowMs
-    ? new Date(windowMs).toISOString()
-    : new Date(nowMs).toISOString();
+  const windowMs = nextWindowAfter(coreSchedule, nowMs - (coreSchedule.type === SCHEDULE_TYPES.interval ? coreSchedule.intervalSec * ONE_SECOND_MS : 0));
+  return windowMs !== null && windowMs <= nowMs ? new Date(windowMs).toISOString() : new Date(nowMs).toISOString();
 }
 
 function computeNextScheduled(task: SystemTaskDef): string | null {

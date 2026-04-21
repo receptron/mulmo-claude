@@ -17,21 +17,15 @@ import { mockAllApis } from "../fixtures/api";
 
 const EXPECTED_TOKEN = "e2e-test-token";
 
-test("meta tag contains the bearer token injected by Vite plugin", async ({
-  page,
-}) => {
+test("meta tag contains the bearer token injected by Vite plugin", async ({ page }) => {
   await mockAllApis(page);
   await page.goto("/");
 
-  const metaContent = await page
-    .locator('meta[name="mulmoclaude-auth"]')
-    .getAttribute("content");
+  const metaContent = await page.locator('meta[name="mulmoclaude-auth"]').getAttribute("content");
   expect(metaContent).toBe(EXPECTED_TOKEN);
 });
 
-test("apiFetch attaches Authorization: Bearer <token> to /api/* requests", async ({
-  page,
-}) => {
+test("apiFetch attaches Authorization: Bearer <token> to /api/* requests", async ({ page }) => {
   await mockAllApis(page);
 
   // Capture the Authorization header on the very first /api/health

@@ -56,9 +56,7 @@ describe("createSessionMeta", () => {
   });
 
   it("creates parent dir if missing", async () => {
-    const freshRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "session-io-nodir-"),
-    );
+    const freshRoot = fs.mkdtempSync(path.join(os.tmpdir(), "session-io-nodir-"));
     // Don't pre-create chat dir
     await createSessionMeta("nodir-test", "general", "hi", freshRoot);
     const meta = await readSessionMeta("nodir-test", freshRoot);
@@ -90,11 +88,7 @@ describe("backfillFirstUserMessage", () => {
   });
 
   it("does not overwrite when already set", async () => {
-    await writeSessionMeta(
-      "backfill-noop",
-      { roleId: "general", firstUserMessage: "original" },
-      root,
-    );
+    await writeSessionMeta("backfill-noop", { roleId: "general", firstUserMessage: "original" }, root);
     await backfillFirstUserMessage("backfill-noop", "replacement", root);
     const meta = await readSessionMeta("backfill-noop", root);
     assert.equal(meta?.firstUserMessage, "original");

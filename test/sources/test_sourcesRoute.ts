@@ -5,13 +5,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  validateFetcherKind,
-  validateSchedule,
-  validateFetcherParams,
-  resolveSlug,
-  deriveSourceSlug,
-} from "../../server/api/routes/sources.js";
+import { validateFetcherKind, validateSchedule, validateFetcherParams, resolveSlug, deriveSourceSlug } from "../../server/api/routes/sources.js";
 
 // --- validateFetcherKind ------------------------------------------------
 
@@ -21,14 +15,7 @@ describe("validateFetcherKind", () => {
   });
 
   it("returns the value when it matches the enum", () => {
-    for (const kind of [
-      "rss",
-      "github-releases",
-      "github-issues",
-      "arxiv",
-      "web-fetch",
-      "web-search",
-    ] as const) {
+    for (const kind of ["rss", "github-releases", "github-issues", "arxiv", "web-fetch", "web-search"] as const) {
       assert.equal(validateFetcherKind(kind, "rss"), kind);
     }
   });
@@ -108,10 +95,7 @@ describe("validateFetcherParams", () => {
 describe("deriveSourceSlug", () => {
   it("derives a clean slug from an ASCII title", () => {
     assert.equal(deriveSourceSlug("Hacker News"), "hacker-news");
-    assert.equal(
-      deriveSourceSlug("Claude Code Releases"),
-      "claude-code-releases",
-    );
+    assert.equal(deriveSourceSlug("Claude Code Releases"), "claude-code-releases");
   });
 
   it("collapses runs of whitespace and punctuation into single hyphens", () => {

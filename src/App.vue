@@ -14,24 +14,13 @@
           @open-settings="showSettings = true"
         />
         <div class="flex-1 min-w-0">
-          <PluginLauncher
-            :active-tool-name="selectedResult?.toolName ?? null"
-            :active-view-mode="canvasViewMode"
-            @navigate="onPluginNavigate"
-          />
+          <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="canvasViewMode" @navigate="onPluginNavigate" />
         </div>
       </div>
       <!-- Row 2: canvas toggle + role selector + session tabs -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
-        <CanvasViewToggle
-          :model-value="canvasViewMode"
-          @update:model-value="setCanvasViewMode"
-        />
-        <RoleSelector
-          v-model:current-role-id="currentRoleId"
-          :roles="roles"
-          @change="onRoleChange"
-        />
+        <CanvasViewToggle :model-value="canvasViewMode" @update:model-value="setCanvasViewMode" />
+        <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           ref="sessionTabBarRef"
           :sessions="tabSessions"
@@ -62,10 +51,7 @@
     <!-- Body: sidebar (Single only) + canvas column + right sidebar -->
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar (Single layout only) -->
-      <div
-        v-if="!isStackLayout"
-        class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
-      >
+      <div v-if="!isStackLayout" class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative">
         <!-- Gemini API key warning -->
         <div
           v-if="!geminiAvailable && needsGeminiForRole(currentRoleId)"
@@ -73,8 +59,7 @@
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
           Image generation requires
-          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
-          <code class="font-mono">.env</code> and restart the app.
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to <code class="font-mono">.env</code> and restart the app.
         </div>
 
         <!-- Tool result previews -->
@@ -91,70 +76,38 @@
         />
 
         <!-- Sample queries (expandable pane) -->
-        <SuggestionsPanel
-          ref="suggestionsPanelRef"
-          :queries="currentRole.queries ?? []"
-          @send="(q) => sendMessage(q)"
-          @edit="onQueryEdit"
-        />
+        <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
 
         <!-- Text input -->
-        <ChatInput
-          ref="chatInputRef"
-          v-model="userInput"
-          v-model:pasted-file="pastedFile"
-          :is-running="isRunning"
-          @send="sendMessage()"
-        />
+        <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="isRunning" @send="sendMessage()" />
       </div>
 
       <!-- Canvas column -->
-      <div
-        class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden relative"
-      >
+      <div class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden relative">
         <!-- Gemini API key warning (Stack layouts — no sidebar to host it) -->
         <div
-          v-if="
-            isStackLayout &&
-            !geminiAvailable &&
-            needsGeminiForRole(currentRoleId)
-          "
+          v-if="isStackLayout && !geminiAvailable && needsGeminiForRole(currentRoleId)"
           class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
           Image generation requires
-          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
-          <code class="font-mono">.env</code> and restart the app.
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to <code class="font-mono">.env</code> and restart the app.
         </div>
 
-        <div
-          ref="canvasRef"
-          class="flex-1 overflow-hidden outline-none min-h-0"
-          tabindex="0"
-          @mousedown="activePane = 'main'"
-          @keydown="handleCanvasKeydown"
-        >
+        <div ref="canvasRef" class="flex-1 overflow-hidden outline-none min-h-0" tabindex="0" @mousedown="activePane = 'main'" @keydown="handleCanvasKeydown">
           <!-- Single mode -->
           <template v-if="canvasViewMode === 'single'">
             <component
               :is="getPlugin(selectedResult.toolName)?.viewComponent"
-              v-if="
-                selectedResult &&
-                getPlugin(selectedResult.toolName)?.viewComponent
-              "
+              v-if="selectedResult && getPlugin(selectedResult.toolName)?.viewComponent"
               :selected-result="selectedResult"
               :send-text-message="sendMessage"
               @update-result="handleUpdateResult"
             />
             <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
-              <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
-                JSON.stringify(selectedResult, null, 2)
-              }}</pre>
+              <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{ JSON.stringify(selectedResult, null, 2) }}</pre>
             </div>
-            <div
-              v-else
-              class="flex items-center justify-center h-full text-gray-600"
-            >
+            <div v-else class="flex items-center justify-center h-full text-gray-600">
               <p>Start a conversation</p>
             </div>
           </template>
@@ -169,11 +122,7 @@
             @update-result="handleUpdateResult"
           />
           <!-- Files mode -->
-          <FilesView
-            v-else-if="canvasViewMode === 'files'"
-            :refresh-token="filesRefreshToken"
-            @load-session="handleSessionSelect"
-          />
+          <FilesView v-else-if="canvasViewMode === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
           <!-- Todos mode -->
           <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
           <!-- Scheduler mode -->
@@ -188,23 +137,9 @@
 
         <!-- Bottom bar (Stack chat only — plugin views have no
              session context, so no chat input is shown) -->
-        <div
-          v-if="canvasViewMode === 'stack'"
-          class="border-t border-gray-200 bg-white shrink-0"
-        >
-          <SuggestionsPanel
-            ref="suggestionsPanelRef"
-            :queries="currentRole.queries ?? []"
-            @send="(q) => sendMessage(q)"
-            @edit="onQueryEdit"
-          />
-          <ChatInput
-            ref="chatInputRef"
-            v-model="userInput"
-            v-model:pasted-file="pastedFile"
-            :is-running="isRunning"
-            @send="sendMessage()"
-          />
+        <div v-if="canvasViewMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
+          <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
+          <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="isRunning" @send="sendMessage()" />
         </div>
       </div>
 
@@ -220,12 +155,7 @@
     </div>
 
     <!-- Global settings modal -->
-    <SettingsModal
-      :open="showSettings"
-      :docker-mode="sandboxEnabled"
-      :mcp-tools-error="mcpToolsError"
-      @update:open="showSettings = $event"
-    />
+    <SettingsModal :open="showSettings" :docker-mode="sandboxEnabled" :mcp-tools-error="mcpToolsError" @update:open="showSettings = $event" />
     <NotificationToast />
   </div>
 </template>
@@ -261,21 +191,11 @@ import { type SessionEntry, type ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
-import {
-  applyAgentEvent,
-  type AgentEventContext,
-} from "./utils/agent/eventDispatch";
-import {
-  pushErrorMessage,
-  beginUserTurn,
-  updateResult,
-} from "./utils/session/sessionHelpers";
+import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
+import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
 import { createEmptySession } from "./utils/session/sessionFactory";
-import {
-  buildLoadedSession,
-  parseSessionEntries,
-} from "./utils/session/sessionEntries";
+import { buildLoadedSession, parseSessionEntries } from "./utils/session/sessionEntries";
 import { resolveNotificationTarget } from "./utils/notification/dispatch";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
@@ -398,8 +318,7 @@ const userInput = ref("");
 const pastedFile = ref<PastedFile | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
 
-const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
-  useSessionHistory();
+const { sessions, showHistory, historyError, fetchSessions, toggleHistory } = useSessionHistory();
 const { markSessionRead } = useSessionSync({
   sessionMap,
   currentSessionId,
@@ -407,17 +326,8 @@ const { markSessionRead } = useSessionSync({
 });
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
 
-const {
-  activeSession,
-  toolResults,
-  sidebarResults,
-  currentSummary,
-  isRunning,
-  statusMessage,
-  toolCallHistory,
-  activeSessionCount,
-  unreadCount,
-} = useSessionDerived({ sessionMap, currentSessionId, sessions });
+const { activeSession, toolResults, sidebarResults, currentSummary, isRunning, statusMessage, toolCallHistory, activeSessionCount, unreadCount } =
+  useSessionDerived({ sessionMap, currentSessionId, sessions });
 
 const { selectedResultUuid } = useSelectedResult({
   activeSession,
@@ -437,9 +347,7 @@ const historyTopOffset = ref<number | undefined>(undefined);
 const sessionTabBarRef = ref<{
   historyButton: HTMLButtonElement | null;
 } | null>(null);
-const historyButtonRef = computed(
-  () => sessionTabBarRef.value?.historyButton ?? null,
-);
+const historyButtonRef = computed(() => sessionTabBarRef.value?.historyButton ?? null);
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
 
@@ -453,27 +361,19 @@ const { focusChatInput } = useChatScroll({
 const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
 const showSettings = ref(false);
 
-const {
-  canvasViewMode,
-  setCanvasViewMode,
-  buildViewQuery,
-  filesRefreshToken,
-  handleViewModeShortcut,
-  onPluginNavigate,
-} = useCanvasViewMode({ isRunning });
+const { canvasViewMode, setCanvasViewMode, buildViewQuery, filesRefreshToken, handleViewModeShortcut, onPluginNavigate } = useCanvasViewMode({ isRunning });
 
 // The no-sidebar "stack-style" layout (top bar + full-width canvas +
 // bottom bar) is used for every view mode except Single. Clicking a
 // plugin launcher button (Todos / Scheduler / Files / ...) swaps the
 // canvas content without collapsing the frame back to the sidebar
 // layout.
-const { isStackLayout, restoreChatViewForSession, displayedCurrentSessionId } =
-  useViewLayout({
-    canvasViewMode,
-    setCanvasViewMode,
-    currentSessionId,
-    activePane,
-  });
+const { isStackLayout, restoreChatViewForSession, displayedCurrentSessionId } = useViewLayout({
+  canvasViewMode,
+  setCanvasViewMode,
+  currentSessionId,
+  activePane,
+});
 
 // User-initiated session switches: clicking a session tab, a history
 // row, or a chat link in FilesView. In plugin views (Todos / Files /
@@ -502,23 +402,17 @@ watch(showHistory, (open) => {
 });
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
-const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } =
-  useMcpTools({
-    currentRole,
-    getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
-  });
+const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } = useMcpTools({
+  currentRole,
+  getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
+});
 
 const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
   isRunning,
   toolCallHistory,
 });
 
-const selectedResult = computed(
-  () =>
-    toolResults.value.find(
-      (result) => result.uuid === selectedResultUuid.value,
-    ) ?? null,
-);
+const selectedResult = computed(() => toolResults.value.find((result) => result.uuid === selectedResultUuid.value) ?? null);
 
 const { mergedSessions, tabSessions } = useMergedSessions({
   sessionMap,
@@ -543,10 +437,7 @@ watch(currentSessionId, (id) => {
   // event, leaving the session's busy indicator stuck on.
   if (previousSessionId && previousSessionId !== id) {
     const prevSession = sessionMap.get(previousSessionId);
-    const prevBusy =
-      !!prevSession &&
-      (prevSession.isRunning ||
-        Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
+    const prevBusy = !!prevSession && (prevSession.isRunning || Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
     if (prevSession && !prevBusy) {
       unsubscribeSession(previousSessionId);
     }
@@ -556,8 +447,7 @@ watch(currentSessionId, (id) => {
   // Clear unread in both sessionMap and sessions list (for badge count),
   // then tell the server so other tabs see it too.
   const summary = sessions.value.find((entry) => entry.id === id);
-  const wasUnread =
-    (session && session.hasUnread) || (summary && summary.hasUnread);
+  const wasUnread = (session && session.hasUnread) || (summary && summary.hasUnread);
   if (wasUnread) {
     if (session) session.hasUnread = false;
     if (summary) summary.hasUnread = false;
@@ -643,17 +533,14 @@ async function loadSession(id: string) {
     return;
   }
 
-  const response = await apiGet<SessionEntry[]>(
-    API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(id)),
-  );
+  const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(id)));
   if (!response.ok) return;
 
   const newSession = buildLoadedSession({
     id,
     entries: response.data,
     defaultRoleId: currentRoleId.value,
-    urlResult:
-      typeof route.query.result === "string" ? route.query.result : null,
+    urlResult: typeof route.query.result === "string" ? route.query.result : null,
     serverSummary: sessions.value.find((s) => s.id === id),
     nowIso: new Date().toISOString(),
   });
@@ -668,9 +555,7 @@ async function loadSession(id: string) {
 async function refreshSessionTranscript(sessionId: string): Promise<void> {
   const session = sessionMap.get(sessionId);
   if (!session) return;
-  const response = await apiGet<SessionEntry[]>(
-    API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)),
-  );
+  const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
   if (!response.ok) return;
   const serverResults = parseSessionEntries(response.data);
   // Only patch if the server knows more than we do — avoids
@@ -717,10 +602,7 @@ function handleSessionFinished(sessionId: string): void {
   }
 }
 
-function createSessionEventHandler(
-  session: ActiveSession,
-  ctx: AgentEventContext,
-): (data: unknown) => void {
+function createSessionEventHandler(session: ActiveSession, ctx: AgentEventContext): (data: unknown) => void {
   return (data: unknown) => {
     const event = data as SseEvent;
     if (!event || typeof event !== "object") return;
@@ -761,12 +643,8 @@ async function sendMessage(text?: string) {
   if (!session) return;
 
   beginUserTurn(session, message);
-  const sessionRole =
-    roles.value.find((role) => role.id === session.roleId) ?? roles.value[0];
-  const selectedRes =
-    session.toolResults.find(
-      (result) => result.uuid === session.selectedResultUuid,
-    ) ?? undefined;
+  const sessionRole = roles.value.find((role) => role.id === session.roleId) ?? roles.value[0];
+  const selectedRes = session.toolResults.find((result) => result.uuid === session.selectedResultUuid) ?? undefined;
 
   ensureSessionSubscription(session);
 
@@ -817,8 +695,7 @@ onMounted(async () => {
   await refreshRoles();
 
   // If the URL specifies a role, apply it before session creation.
-  const urlRole =
-    typeof route.query.role === "string" ? route.query.role : null;
+  const urlRole = typeof route.query.role === "string" ? route.query.role : null;
   if (urlRole && roles.value.some((role) => role.id === urlRole)) {
     currentRoleId.value = urlRole;
   }

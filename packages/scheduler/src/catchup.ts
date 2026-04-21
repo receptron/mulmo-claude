@@ -4,12 +4,7 @@
 // each task up to date after a gap (server restart, laptop sleep,
 // crash recovery).
 
-import type {
-  TaskSchedule,
-  MissedRunPolicy,
-  TaskRunContext,
-  TaskExecutionState,
-} from "./types.js";
+import type { TaskSchedule, MissedRunPolicy, TaskRunContext, TaskExecutionState } from "./types.js";
 import { TASK_TRIGGERS, MISSED_RUN_POLICIES } from "./types.js";
 import { listMissedWindows } from "./windows.js";
 
@@ -65,16 +60,9 @@ export function computeCatchUpPlan(
     const state = states.get(task.id);
     // Never-run tasks: treat as "just registered" — no catch-up
     // from epoch. Only catch up from the current time onward.
-    const lastRunMs = state?.lastRunAt
-      ? new Date(state.lastRunAt).getTime()
-      : nowMs;
+    const lastRunMs = state?.lastRunAt ? new Date(state.lastRunAt).getTime() : nowMs;
 
-    const windows = listMissedWindows(
-      task.schedule,
-      lastRunMs,
-      nowMs,
-      maxCatchUp,
-    );
+    const windows = listMissedWindows(task.schedule, lastRunMs, nowMs, maxCatchUp);
     if (windows.length === 0) continue;
 
     const planForTask = applyPolicy(task, windows, maxCatchUp);
@@ -87,11 +75,7 @@ export function computeCatchUpPlan(
 
 // ── Internal ─────────────────────────────────────────────────────
 
-function applyPolicy(
-  task: CatchUpTask,
-  windows: number[],
-  maxCatchUp: number,
-): { runs: CatchUpRun[]; skipped?: CatchUpPlan["skipped"][number] } {
+function applyPolicy(task: CatchUpTask, windows: number[], maxCatchUp: number): { runs: CatchUpRun[]; skipped?: CatchUpPlan["skipped"][number] } {
   const toIso = (ms: number) => new Date(ms).toISOString();
 
   if (task.missedRunPolicy === MISSED_RUN_POLICIES.skip) {

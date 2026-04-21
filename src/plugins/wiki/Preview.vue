@@ -4,11 +4,7 @@
       <span class="material-icons" style="font-size: 14px">menu_book</span>
       <span>{{ label }}</span>
     </div>
-    <div
-      v-for="entry in previewEntries"
-      :key="entry.slug"
-      class="text-xs text-gray-500 truncate"
-    >
+    <div v-for="entry in previewEntries" :key="entry.slug" class="text-xs text-gray-500 truncate">
       {{ entry.title }}
     </div>
     <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
@@ -58,8 +54,7 @@ watch(
 );
 
 const label = computed(() => {
-  if (action.value === "index")
-    return `Wiki Index (${pageEntries.value.length} pages)`;
+  if (action.value === "index") return `Wiki Index (${pageEntries.value.length} pages)`;
   if (action.value === "log") return "Wiki Log";
   if (action.value === "lint_report") return "Wiki Lint";
   return `Wiki: ${title.value}`;

@@ -9,9 +9,7 @@ test.describe("localStorage state restoration", () => {
   test("canvas_view_mode=files → starts in files view", async ({ page }) => {
     // Set localStorage BEFORE navigating so the app picks it up on init.
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem("canvas_view_mode", "files"),
-    );
+    await page.evaluate(() => localStorage.setItem("canvas_view_mode", "files"));
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     // URL should reflect files view
@@ -23,9 +21,7 @@ test.describe("localStorage state restoration", () => {
 
   test("canvas_view_mode=stack → starts in stack view", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem("canvas_view_mode", "stack"),
-    );
+    await page.evaluate(() => localStorage.setItem("canvas_view_mode", "stack"));
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await expect(async () => {
@@ -34,13 +30,9 @@ test.describe("localStorage state restoration", () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test("canvas_view_mode with invalid value → defaults to single", async ({
-    page,
-  }) => {
+  test("canvas_view_mode with invalid value → defaults to single", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem("canvas_view_mode", "<script>alert(1)</script>"),
-    );
+    await page.evaluate(() => localStorage.setItem("canvas_view_mode", "<script>alert(1)</script>"));
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     // "single" is the default — no ?view= param in the URL
@@ -50,13 +42,9 @@ test.describe("localStorage state restoration", () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test("right_sidebar_visible is preserved across reloads", async ({
-    page,
-  }) => {
+  test("right_sidebar_visible is preserved across reloads", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem("right_sidebar_visible", "true"),
-    );
+    await page.evaluate(() => localStorage.setItem("right_sidebar_visible", "true"));
     await page.reload();
     // The right sidebar should be visible (it contains tool call history).
     // We check for the build icon which toggles it.
@@ -64,9 +52,7 @@ test.describe("localStorage state restoration", () => {
     // The right sidebar state is a UI pref — just verify no crash.
   });
 
-  test("corrupted localStorage values don't crash the app", async ({
-    page,
-  }) => {
+  test("corrupted localStorage values don't crash the app", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
       localStorage.setItem("canvas_view_mode", '{"__proto__":{"x":1}}');
@@ -78,39 +64,24 @@ test.describe("localStorage state restoration", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
   });
 
-  test("todo_explorer_view_mode=table persists across reload", async ({
-    page,
-  }) => {
+  test("todo_explorer_view_mode=table persists across reload", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem("todo_explorer_view_mode", "table"),
-    );
+    await page.evaluate(() => localStorage.setItem("todo_explorer_view_mode", "table"));
     // The todo view mode is read when TodoExplorer mounts, not at
     // app startup. We just verify the value survives a reload and
     // the app doesn't crash.
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    const stored = await page.evaluate(() =>
-      localStorage.getItem("todo_explorer_view_mode"),
-    );
+    const stored = await page.evaluate(() => localStorage.getItem("todo_explorer_view_mode"));
     expect(stored).toBe("table");
   });
 
-  test("files_expanded_dirs with valid JSON set is preserved", async ({
-    page,
-  }) => {
+  test("files_expanded_dirs with valid JSON set is preserved", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() =>
-      localStorage.setItem(
-        "files_expanded_dirs",
-        JSON.stringify(["", "wiki", "todos"]),
-      ),
-    );
+    await page.evaluate(() => localStorage.setItem("files_expanded_dirs", JSON.stringify(["", "wiki", "todos"])));
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    const stored = await page.evaluate(() =>
-      localStorage.getItem("files_expanded_dirs"),
-    );
+    const stored = await page.evaluate(() => localStorage.getItem("files_expanded_dirs"));
     expect(JSON.parse(stored!)).toContain("wiki");
   });
 });

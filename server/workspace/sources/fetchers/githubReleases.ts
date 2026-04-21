@@ -21,13 +21,7 @@ import { normalizeUrl, stableItemId } from "../urls.js";
 import type { Source, SourceItem, SourceState } from "../types.js";
 import type { FetcherDeps, FetchResult, SourceFetcher } from "./index.js";
 import { registerFetcher } from "./index.js";
-import {
-  GITHUB_API_BASE,
-  GithubFetcherError,
-  githubFetchJson,
-  isRecord,
-  parseRepoSlug,
-} from "./github.js";
+import { GITHUB_API_BASE, GithubFetcherError, githubFetchJson, isRecord, parseRepoSlug } from "./github.js";
 
 export const RELEASES_CURSOR_KEY = "github_releases_last_published_at";
 
@@ -58,14 +52,12 @@ interface ParsedRelease {
 // hitting the network.
 export function parseGithubRelease(raw: unknown): ParsedRelease | null {
   if (!isRecord(raw)) return null;
-  const id =
-    typeof raw.id === "number" && Number.isFinite(raw.id) ? raw.id : null;
+  const id = typeof raw.id === "number" && Number.isFinite(raw.id) ? raw.id : null;
   const name = typeof raw.name === "string" ? raw.name : null;
   const tagName = typeof raw.tag_name === "string" ? raw.tag_name : null;
   const htmlUrl = typeof raw.html_url === "string" ? raw.html_url : null;
   const body = typeof raw.body === "string" ? raw.body : null;
-  const publishedAt =
-    typeof raw.published_at === "string" ? raw.published_at : null;
+  const publishedAt = typeof raw.published_at === "string" ? raw.published_at : null;
   const draft = raw.draft === true;
   const prerelease = raw.prerelease === true;
   return { id, name, tagName, htmlUrl, body, publishedAt, draft, prerelease };
@@ -75,11 +67,7 @@ export function parseGithubRelease(raw: unknown): ParsedRelease | null {
 // Returns null when the release doesn't carry the fields we need
 // to make a useful item (missing URL, or cursor says we've seen
 // this release already).
-export function releaseToSourceItem(
-  release: ParsedRelease,
-  source: Source,
-  lastSeenTs: number | null,
-): SourceItem | null {
+export function releaseToSourceItem(release: ParsedRelease, source: Source, lastSeenTs: number | null): SourceItem | null {
   // Drafts are private — GitHub only shows them to authed readers.
   // But defensively skip if the API somehow returns one.
   if (release.draft) return null;
@@ -135,10 +123,7 @@ export function firstParagraph(body: string): string | null {
 // release on every run.
 //
 // Exported pure for direct unit testing.
-export function updateReleasesCursor(
-  current: Record<string, string>,
-  releases: readonly ParsedRelease[],
-): Record<string, string> {
+export function updateReleasesCursor(current: Record<string, string>, releases: readonly ParsedRelease[]): Record<string, string> {
   let newest: number | null = null;
   for (const release of releases) {
     if (release.draft) continue;
@@ -148,9 +133,7 @@ export function updateReleasesCursor(
     if (newest === null || ts > newest) newest = ts;
   }
   if (newest === null) return current;
-  const currentTs = current[RELEASES_CURSOR_KEY]
-    ? Date.parse(current[RELEASES_CURSOR_KEY])
-    : -Infinity;
+  const currentTs = current[RELEASES_CURSOR_KEY] ? Date.parse(current[RELEASES_CURSOR_KEY]) : -Infinity;
   if (newest <= currentTs) return current;
   return {
     ...current,
@@ -162,11 +145,7 @@ export function updateReleasesCursor(
 // already-fetched JSON body. Exposed separately from the fetch
 // itself so we can test the full normalization path with
 // fabricated API responses and no HTTP stubbing.
-export function processReleasesResponse(
-  rawBody: unknown,
-  source: Source,
-  cursor: Record<string, string>,
-): FetchResult {
+export function processReleasesResponse(rawBody: unknown, source: Source, cursor: Record<string, string>): FetchResult {
   if (!Array.isArray(rawBody)) {
     return { items: [], cursor };
   }
@@ -175,11 +154,8 @@ export function processReleasesResponse(
     const release = parseGithubRelease(raw);
     if (release) parsed.push(release);
   }
-  const lastSeenTs = cursor[RELEASES_CURSOR_KEY]
-    ? Date.parse(cursor[RELEASES_CURSOR_KEY])
-    : null;
-  const effectiveLastSeen =
-    lastSeenTs !== null && Number.isFinite(lastSeenTs) ? lastSeenTs : null;
+  const lastSeenTs = cursor[RELEASES_CURSOR_KEY] ? Date.parse(cursor[RELEASES_CURSOR_KEY]) : null;
+  const effectiveLastSeen = lastSeenTs !== null && Number.isFinite(lastSeenTs) ? lastSeenTs : null;
 
   const items: SourceItem[] = [];
   for (const release of parsed) {
@@ -195,19 +171,11 @@ export function processReleasesResponse(
 
 export const githubReleasesFetcher: SourceFetcher = {
   kind: "github-releases",
-  async fetch(
-    source: Source,
-    state: SourceState,
-    deps: FetcherDeps,
-  ): Promise<FetchResult> {
+  async fetch(source: Source, state: SourceState, deps: FetcherDeps): Promise<FetchResult> {
     const repoRaw = source.fetcherParams["github_repo"];
     const slug = parseRepoSlug(repoRaw ?? "");
     if (!slug) {
-      throw new GithubFetcherError(
-        source.url,
-        0,
-        `github_repo param is required and must be owner/repo, got ${JSON.stringify(repoRaw)}`,
-      );
+      throw new GithubFetcherError(source.url, 0, `github_repo param is required and must be owner/repo, got ${JSON.stringify(repoRaw)}`);
     }
     const url = releasesUrl(slug.owner, slug.repo);
     const body = await githubFetchJson(url, deps.http);

@@ -130,14 +130,8 @@ export const WORKSPACE_PATHS = {
   todosItems: path.join(workspacePath, WORKSPACE_FILES.todosItems),
   todosColumns: path.join(workspacePath, WORKSPACE_FILES.todosColumns),
   schedulerItems: path.join(workspacePath, WORKSPACE_FILES.schedulerItems),
-  schedulerUserTasks: path.join(
-    workspacePath,
-    WORKSPACE_FILES.schedulerUserTasks,
-  ),
-  schedulerOverrides: path.join(
-    workspacePath,
-    WORKSPACE_FILES.schedulerOverrides,
-  ),
+  schedulerUserTasks: path.join(workspacePath, WORKSPACE_FILES.schedulerUserTasks),
+  schedulerOverrides: path.join(workspacePath, WORKSPACE_FILES.schedulerOverrides),
 } as const;
 
 export type WorkspaceDirKey = keyof typeof WORKSPACE_DIRS;

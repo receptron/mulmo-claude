@@ -24,18 +24,12 @@ const wikiPlugin: ToolPlugin<WikiData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<WikiData>>(
-      API_ROUTES.wiki.base,
-      args,
-    );
+    const result = await apiPost<ToolResult<WikiData>>(API_ROUTES.wiki.base, args);
     if (!result.ok) {
       // Return an error ToolResult instead of throwing so execute()
       // stays symmetric with every other plugin in this repo. Callers
       // can branch on the `error` field uniformly.
-      const prefix =
-        result.status === 0
-          ? "Wiki request failed"
-          : `Wiki API error ${result.status}`;
+      const prefix = result.status === 0 ? "Wiki request failed" : `Wiki API error ${result.status}`;
       return {
         toolName: "manageWiki",
         uuid: crypto.randomUUID(),

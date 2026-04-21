@@ -45,11 +45,7 @@ describe("parseSourceFile", () => {
     assert.ok(out);
     assert.equal(out!.fields.get("slug"), "hn-front-page");
     assert.equal(out!.fields.get("title"), "Hacker News front page");
-    assert.deepEqual(out!.fields.get("categories"), [
-      "tech-news",
-      "general",
-      "english",
-    ]);
+    assert.deepEqual(out!.fields.get("categories"), ["tech-news", "general", "english"]);
     assert.match(out!.body, /# Notes/);
   });
 
@@ -191,15 +187,9 @@ describe("buildSource — validation", () => {
   it("falls back to the default for a zero / negative max", () => {
     const f = base();
     f.set("max_items_per_fetch", "0");
-    assert.equal(
-      buildSource(f, "")!.maxItemsPerFetch,
-      DEFAULT_MAX_ITEMS_PER_FETCH,
-    );
+    assert.equal(buildSource(f, "")!.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
     f.set("max_items_per_fetch", "-10");
-    assert.equal(
-      buildSource(f, "")!.maxItemsPerFetch,
-      DEFAULT_MAX_ITEMS_PER_FETCH,
-    );
+    assert.equal(buildSource(f, "")!.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
   });
 
   it("collects unrecognized keys into fetcherParams", () => {
@@ -378,10 +368,7 @@ describe("writeSource + readSource — filesystem round trip", () => {
     await writeSource(workspace, source);
     // Manually rename on disk to simulate the drift.
     const { rename } = await import("node:fs/promises");
-    await rename(
-      sourceFilePath(workspace, "hn"),
-      sourceFilePath(workspace, "renamed"),
-    );
+    await rename(sourceFilePath(workspace, "hn"), sourceFilePath(workspace, "renamed"));
     const read = await readSource(workspace, "renamed");
     assert.equal(read, null);
   });
@@ -407,8 +394,7 @@ describe("writeSource + readSource — filesystem round trip", () => {
   it("does not leave a .tmp file behind after a successful write", async () => {
     await writeSource(workspace, makeSource());
     const { readdir } = await import("node:fs/promises");
-    const { sourcesRoot } =
-      await import("../../server/workspace/sources/paths.js");
+    const { sourcesRoot } = await import("../../server/workspace/sources/paths.js");
     const entries = await readdir(sourcesRoot(workspace));
     assert.equal(
       entries.some((name) => name.endsWith(".tmp")),
@@ -440,8 +426,7 @@ describe("listSources", () => {
     await writeSource(workspace, makeSource());
     // Meta file written alongside by a hypothetical index generator.
     const { writeFile } = await import("node:fs/promises");
-    const { sourcesRoot } =
-      await import("../../server/workspace/sources/paths.js");
+    const { sourcesRoot } = await import("../../server/workspace/sources/paths.js");
     await writeFile(join(sourcesRoot(workspace), "_index.md"), "# Index\n");
     const listed = await listSources(workspace);
     assert.equal(listed.length, 1);
@@ -451,12 +436,8 @@ describe("listSources", () => {
   it("skips non-.md files", async () => {
     await writeSource(workspace, makeSource());
     const { writeFile } = await import("node:fs/promises");
-    const { sourcesRoot } =
-      await import("../../server/workspace/sources/paths.js");
-    await writeFile(
-      join(sourcesRoot(workspace), "hn.json"),
-      JSON.stringify({ something: "else" }),
-    );
+    const { sourcesRoot } = await import("../../server/workspace/sources/paths.js");
+    await writeFile(join(sourcesRoot(workspace), "hn.json"), JSON.stringify({ something: "else" }));
     const listed = await listSources(workspace);
     assert.equal(listed.length, 1);
   });
@@ -464,12 +445,8 @@ describe("listSources", () => {
   it("logs + skips malformed source files without crashing", async () => {
     await writeSource(workspace, makeSource());
     const { writeFile } = await import("node:fs/promises");
-    const { sourcesRoot } =
-      await import("../../server/workspace/sources/paths.js");
-    await writeFile(
-      join(sourcesRoot(workspace), "broken.md"),
-      "no frontmatter here",
-    );
+    const { sourcesRoot } = await import("../../server/workspace/sources/paths.js");
+    await writeFile(join(sourcesRoot(workspace), "broken.md"), "no frontmatter here");
     const listed = await listSources(workspace);
     assert.equal(listed.length, 1);
     assert.equal(listed[0].slug, "hn");

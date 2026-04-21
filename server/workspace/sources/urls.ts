@@ -11,12 +11,7 @@ import { createHash } from "node:crypto";
 
 // Tracking parameters we always strip. Case-insensitive on the
 // parameter NAME only.
-const TRACKING_PARAM_PREFIXES: readonly string[] = [
-  "utm_",
-  "mc_",
-  "pk_",
-  "hsa_",
-];
+const TRACKING_PARAM_PREFIXES: readonly string[] = ["utm_", "mc_", "pk_", "hsa_"];
 
 const TRACKING_PARAMS: ReadonlySet<string> = new Set([
   "fbclid",
@@ -100,10 +95,7 @@ export function normalizeUrl(raw: string): string | null {
   }
 
   // Drop default ports.
-  if (
-    (url.protocol === "http:" && url.port === "80") ||
-    (url.protocol === "https:" && url.port === "443")
-  ) {
+  if ((url.protocol === "http:" && url.port === "80") || (url.protocol === "https:" && url.port === "443")) {
     url.port = "";
   }
 
@@ -116,8 +108,5 @@ export function normalizeUrl(raw: string): string | null {
 // FNV-1a 32-bit which starts colliding in the tens of thousands
 // (birthday-paradox territory at our projected volume).
 export function stableItemId(normalizedUrl: string): string {
-  return createHash("sha256")
-    .update(normalizedUrl, "utf8")
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(normalizedUrl, "utf8").digest("hex").slice(0, 16);
 }

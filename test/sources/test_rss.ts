@@ -1,26 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  rssFetcher,
-  normalizeToSourceItems,
-  updateCursor,
-  RSS_CURSOR_KEY,
-  RssFetcherError,
-} from "../../server/workspace/sources/fetchers/rss.js";
-import type {
-  Source,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
+import { rssFetcher, normalizeToSourceItems, updateCursor, RSS_CURSOR_KEY, RssFetcherError } from "../../server/workspace/sources/fetchers/rss.js";
+import type { Source, SourceState } from "../../server/workspace/sources/types.js";
 import type { FetcherDeps } from "../../server/workspace/sources/fetchers/index.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-  type RobotsProvider,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps, type RobotsProvider } from "../../server/workspace/sources/httpFetcher.js";
 import type { ParsedFeed } from "../../server/workspace/sources/fetchers/rssParser.js";
 
 // --- helpers -------------------------------------------------------------
@@ -160,9 +144,7 @@ describe("normalizeToSourceItems — basic", () => {
   });
 
   it("synthesizes a fetch-time publishedAt when the feed omits one", () => {
-    const feed = makeFeed([
-      { title: "no date", link: "https://example.com/1", publishedAt: null },
-    ]);
+    const feed = makeFeed([{ title: "no date", link: "https://example.com/1", publishedAt: null }]);
     const items = normalizeToSourceItems(feed, makeSource(), {}, 30);
     assert.equal(items.length, 1);
     // Must be a valid ISO timestamp.
@@ -199,9 +181,7 @@ describe("normalizeToSourceItems — cursor filtering", () => {
 
   it("keeps items with no publishedAt even when cursor is set", () => {
     // Don't lose items forever just because the feed omitted a date.
-    const feed = makeFeed([
-      { title: "no date", link: "https://example.com/1", publishedAt: null },
-    ]);
+    const feed = makeFeed([{ title: "no date", link: "https://example.com/1", publishedAt: null }]);
     const cursor = { [RSS_CURSOR_KEY]: "2026-04-01T00:00:00Z" };
     const items = normalizeToSourceItems(feed, makeSource(), cursor, 30);
     assert.equal(items.length, 1);
@@ -255,20 +235,13 @@ describe("updateCursor", () => {
     // Even if `normalizeToSourceItems` emitted nothing (all
     // items were already seen), the cursor should advance to
     // the newest observed timestamp so we don't re-check.
-    const feed = makeFeed([
-      { title: "a", link: "x", publishedAt: "2026-04-01T00:00:00Z" },
-    ]);
-    const cursor = updateCursor(
-      { [RSS_CURSOR_KEY]: "2026-03-15T00:00:00Z" },
-      feed,
-    );
+    const feed = makeFeed([{ title: "a", link: "x", publishedAt: "2026-04-01T00:00:00Z" }]);
+    const cursor = updateCursor({ [RSS_CURSOR_KEY]: "2026-03-15T00:00:00Z" }, feed);
     assert.equal(cursor[RSS_CURSOR_KEY], "2026-04-01T00:00:00.000Z");
   });
 
   it("leaves an already-newer cursor alone", () => {
-    const feed = makeFeed([
-      { title: "old", link: "x", publishedAt: "2026-04-01T00:00:00Z" },
-    ]);
+    const feed = makeFeed([{ title: "old", link: "x", publishedAt: "2026-04-01T00:00:00Z" }]);
     const existing = { [RSS_CURSOR_KEY]: "2026-04-10T00:00:00Z" };
     const cursor = updateCursor(existing, feed);
     // Must not roll backwards even if the feed republished older items.
@@ -286,9 +259,7 @@ describe("updateCursor", () => {
   });
 
   it("preserves unrelated cursor keys", () => {
-    const feed = makeFeed([
-      { title: "a", link: "x", publishedAt: "2026-04-03T00:00:00Z" },
-    ]);
+    const feed = makeFeed([{ title: "a", link: "x", publishedAt: "2026-04-03T00:00:00Z" }]);
     const existing = { [RSS_CURSOR_KEY]: "2026-04-01T00:00:00Z", etag: "abc" };
     const cursor = updateCursor(existing, feed);
     assert.equal(cursor.etag, "abc");
@@ -317,10 +288,7 @@ function controllableClock(start = 0): {
   };
 }
 
-function makeFetcherDeps(
-  fetchImpl: typeof fetch,
-  robots: RobotsProvider = async () => null,
-): FetcherDeps {
+function makeFetcherDeps(fetchImpl: typeof fetch, robots: RobotsProvider = async () => null): FetcherDeps {
   const clock = controllableClock();
   return {
     http: {
@@ -351,15 +319,10 @@ const RSS_BODY = `<?xml version="1.0" encoding="UTF-8"?>
 
 describe("rssFetcher.fetch", () => {
   it("fetches, parses, and returns a SourceItem + updated cursor", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(RSS_BODY, { status: 200 });
+    const fetchImpl: typeof fetch = async () => new Response(RSS_BODY, { status: 200 });
     const source = makeSource();
     const state = makeState();
-    const result = await rssFetcher.fetch(
-      source,
-      state,
-      makeFetcherDeps(fetchImpl),
-    );
+    const result = await rssFetcher.fetch(source, state, makeFetcherDeps(fetchImpl));
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].title, "Hello");
     assert.equal(result.items[0].url, "https://example.com/1");
@@ -367,61 +330,38 @@ describe("rssFetcher.fetch", () => {
   });
 
   it("respects the cursor across successive fetches", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(RSS_BODY, { status: 200 });
+    const fetchImpl: typeof fetch = async () => new Response(RSS_BODY, { status: 200 });
     const deps = makeFetcherDeps(fetchImpl);
     const source = makeSource();
     // First call: no cursor, emit the one item.
     const first = await rssFetcher.fetch(source, makeState(), deps);
     assert.equal(first.items.length, 1);
     // Second call: cursor advanced, same body returns no new items.
-    const second = await rssFetcher.fetch(
-      source,
-      makeState({ cursor: first.cursor }),
-      deps,
-    );
+    const second = await rssFetcher.fetch(source, makeState({ cursor: first.cursor }), deps);
     assert.equal(second.items.length, 0);
   });
 
   it("throws RssFetcherError on non-2xx response", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("not found", { status: 404 });
+    const fetchImpl: typeof fetch = async () => new Response("not found", { status: 404 });
     await assert.rejects(
-      () =>
-        rssFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)),
+      () => rssFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)),
       (err: unknown) => err instanceof RssFetcherError && err.status === 404,
     );
   });
 
   it("throws RssFetcherError when the body is not parseable as a feed", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("<html>not a feed</html>", { status: 200 });
-    await assert.rejects(
-      () =>
-        rssFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)),
-      /did not parse as RSS/,
-    );
+    const fetchImpl: typeof fetch = async () => new Response("<html>not a feed</html>", { status: 200 });
+    await assert.rejects(() => rssFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)), /did not parse as RSS/);
   });
 
   it("propagates RobotsDisallowedError via fetchPolite", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(RSS_BODY, { status: 200 });
-    const robots: RobotsProvider = async () =>
-      "User-agent: *\nDisallow: /feed.xml\n";
-    await assert.rejects(
-      () =>
-        rssFetcher.fetch(
-          makeSource(),
-          makeState(),
-          makeFetcherDeps(fetchImpl, robots),
-        ),
-      /robots.txt disallows/,
-    );
+    const fetchImpl: typeof fetch = async () => new Response(RSS_BODY, { status: 200 });
+    const robots: RobotsProvider = async () => "User-agent: *\nDisallow: /feed.xml\n";
+    await assert.rejects(() => rssFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl, robots)), /robots.txt disallows/);
   });
 
   it("registers itself as the `rss` fetcher on import", async () => {
-    const { getFetcher } =
-      await import("../../server/workspace/sources/fetchers/index.js");
+    const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("rss");
     assert.ok(fetcher);
     assert.equal(fetcher!.kind, "rss");

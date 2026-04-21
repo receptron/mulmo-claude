@@ -23,20 +23,14 @@
 // Every moving part has an injectable dep so tests can drive the
 // whole flow without network or disk.
 
-import {
-  DEFAULT_MIN_DELAY_MS,
-  HostRateLimiter,
-  defaultRateLimiterDeps,
-  type RateLimiterDeps,
-} from "./rateLimiter.js";
+import { DEFAULT_MIN_DELAY_MS, HostRateLimiter, defaultRateLimiterDeps, type RateLimiterDeps } from "./rateLimiter.js";
 import { isAllowedByRobots, parseRobots } from "./robots.js";
 import { ONE_SECOND_MS } from "../../utils/time.js";
 
 // The User-Agent value sent on every fetch. Identifies us clearly
 // enough for a site operator to find the project and contact us.
 // Update the URL if the repo ever moves.
-export const USER_AGENT =
-  "MulmoClaude-SourceBot/1.0 (+https://github.com/receptron/mulmoclaude)";
+export const USER_AGENT = "MulmoClaude-SourceBot/1.0 (+https://github.com/receptron/mulmoclaude)";
 
 // Per-request wall-clock cap. Fetchers can still cancel earlier
 // via a passed-in AbortSignal; this is the outer safety net so a
@@ -76,9 +70,7 @@ export class RedirectLimitError extends Error {
   readonly startUrl: string;
   readonly lastUrl: string;
   constructor(startUrl: string, lastUrl: string) {
-    super(
-      `[sources] too many redirects (>${MAX_REDIRECTS}) starting from ${startUrl}`,
-    );
+    super(`[sources] too many redirects (>${MAX_REDIRECTS}) starting from ${startUrl}`);
     this.name = "RedirectLimitError";
     this.startUrl = startUrl;
     this.lastUrl = lastUrl;
@@ -140,10 +132,7 @@ export function defaultHttpFetcherDeps(
 // same robots-check + per-host rate-limit. Auto-follow (`fetch`'s
 // default) would let a 302 to another host or another path bypass
 // those checks entirely — a silent politeness violation.
-export async function fetchPolite(
-  rawUrl: string,
-  deps: HttpFetcherDeps,
-): Promise<Response> {
+export async function fetchPolite(rawUrl: string, deps: HttpFetcherDeps): Promise<Response> {
   let currentUrl = rawUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const response = await fetchSingleHop(currentUrl, deps);
@@ -158,18 +147,13 @@ export async function fetchPolite(
 // under the per-host rate limit. Returns whatever Response the
 // server produced (including 3xx with a Location header — the
 // caller in fetchPolite inspects and may re-enter).
-async function fetchSingleHop(
-  rawUrl: string,
-  deps: HttpFetcherDeps,
-): Promise<Response> {
+async function fetchSingleHop(rawUrl: string, deps: HttpFetcherDeps): Promise<Response> {
   const url = new URL(rawUrl);
   // Only http(s) reach the fetch — file://, data:, mailto: would
   // never be legitimate source URLs and robots.txt doesn't cover
   // them. Reject at the boundary.
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(
-      `[sources] fetchPolite: refusing non-http(s) URL ${rawUrl}`,
-    );
+    throw new Error(`[sources] fetchPolite: refusing non-http(s) URL ${rawUrl}`);
   }
   const host = url.host.toLowerCase();
 
@@ -183,11 +167,7 @@ async function fetchSingleHop(
   }
 
   const minDelay = deps.crawlDelayMs(host) ?? DEFAULT_MIN_DELAY_MS;
-  return deps.rateLimiter.run(
-    host,
-    () => fetchWithTimeout(rawUrl, deps),
-    minDelay,
-  );
+  return deps.rateLimiter.run(host, () => fetchWithTimeout(rawUrl, deps), minDelay);
 }
 
 // Return the absolute URL the caller should hop to next, or null
@@ -210,21 +190,13 @@ function redirectTarget(response: Response, currentUrl: string): string | null {
   }
 }
 
-async function fetchWithTimeout(
-  rawUrl: string,
-  deps: HttpFetcherDeps,
-): Promise<Response> {
+async function fetchWithTimeout(rawUrl: string, deps: HttpFetcherDeps): Promise<Response> {
   // Combine the caller's signal with an internal timeout. Each
   // fetch gets its own AbortController so a slow request doesn't
   // affect the next caller.
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => {
-    controller.abort(
-      new DOMException(
-        `[sources] fetch timed out after ${deps.timeoutMs}ms`,
-        "TimeoutError",
-      ),
-    );
+    controller.abort(new DOMException(`[sources] fetch timed out after ${deps.timeoutMs}ms`, "TimeoutError"));
   }, deps.timeoutMs);
 
   const external = deps.externalSignal;
@@ -232,10 +204,7 @@ async function fetchWithTimeout(
   if (external) {
     if (external.aborted) {
       clearTimeout(timeoutHandle);
-      throw (
-        (external as AbortSignal & { reason?: unknown }).reason ??
-        new DOMException("Aborted", "AbortError")
-      );
+      throw (external as AbortSignal & { reason?: unknown }).reason ?? new DOMException("Aborted", "AbortError");
     }
     const onAbort = () => {
       controller.abort((external as AbortSignal & { reason?: unknown }).reason);

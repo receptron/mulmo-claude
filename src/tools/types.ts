@@ -1,9 +1,4 @@
-import type {
-  ToolPlugin as BaseToolPlugin,
-  InputHandler,
-  ToolContextApp,
-  ToolDefinition,
-} from "gui-chat-protocol/vue";
+import type { ToolPlugin as BaseToolPlugin, InputHandler, ToolContextApp, ToolDefinition } from "gui-chat-protocol/vue";
 import type { Component } from "vue";
 
 /**
@@ -18,11 +13,7 @@ export interface MulmoClaudeToolContextApp extends ToolContextApp {
 /**
  * MulmoClaude ToolPlugin — no app-specific server response type needed
  */
-export type ToolPlugin<
-  T = unknown,
-  J = unknown,
-  A extends object = object,
-> = BaseToolPlugin<T, J, A, InputHandler, Record<string, unknown>>;
+export type ToolPlugin<T = unknown, J = unknown, A extends object = object> = BaseToolPlugin<T, J, A, InputHandler, Record<string, unknown>>;
 
 /**
  * View-only plugin entry for the frontend registry.

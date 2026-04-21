@@ -3,16 +3,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { log } from "../system/logger/index.js";
-import {
-  EAGER_WORKSPACE_DIRS,
-  WORKSPACE_FILES,
-  WORKSPACE_PATHS,
-  workspacePath,
-} from "./paths.js";
-import {
-  existsInWorkspace,
-  writeWorkspaceTextSync,
-} from "../utils/files/workspace-io.js";
+import { EAGER_WORKSPACE_DIRS, WORKSPACE_FILES, WORKSPACE_PATHS, workspacePath } from "./paths.js";
+import { existsInWorkspace, writeWorkspaceTextSync } from "../utils/files/workspace-io.js";
 import { loadCustomDirs, ensureCustomDirs } from "./custom-dirs.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,19 +26,13 @@ export function initWorkspace(): string {
 
   // Create memory.md if it doesn't exist
   if (!existsInWorkspace(WORKSPACE_FILES.memory)) {
-    writeWorkspaceTextSync(
-      WORKSPACE_FILES.memory,
-      "# Memory\n\nDistilled facts about you and your work.\n",
-    );
+    writeWorkspaceTextSync(WORKSPACE_FILES.memory, "# Memory\n\nDistilled facts about you and your work.\n");
   }
 
   // Always sync all files from server/helps/ into workspace/helps/
   fs.mkdirSync(WORKSPACE_PATHS.helps, { recursive: true });
   for (const file of fs.readdirSync(TEMPLATES_DIR)) {
-    fs.copyFileSync(
-      path.join(TEMPLATES_DIR, file),
-      path.join(WORKSPACE_PATHS.helps, file),
-    );
+    fs.copyFileSync(path.join(TEMPLATES_DIR, file), path.join(WORKSPACE_PATHS.helps, file));
   }
 
   // Create .gitignore if missing. The workspace is a git repo for
@@ -55,14 +41,7 @@ export function initWorkspace(): string {
   if (!existsInWorkspace(".gitignore")) {
     writeWorkspaceTextSync(
       ".gitignore",
-      [
-        "# Cloned repositories have their own .git — don't nest",
-        "github/",
-        "",
-        "# Auth token (regenerated each startup)",
-        ".session-token",
-        "",
-      ].join("\n"),
+      ["# Cloned repositories have their own .git — don't nest", "github/", "", "# Auth token (regenerated each startup)", ".session-token", ""].join("\n"),
     );
   }
 

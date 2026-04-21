@@ -17,11 +17,7 @@
 
 // ── Type coercion helpers ───────────────────────────────────────────
 
-function asInt(
-  value: string | undefined,
-  fallback: number,
-  opts: { min?: number; max?: number } = {},
-): number {
+function asInt(value: string | undefined, fallback: number, opts: { min?: number; max?: number } = {}): number {
   if (value === undefined || value === "") return fallback;
   const n = Number(value);
   if (!Number.isInteger(n)) return fallback;
@@ -88,9 +84,7 @@ export const env = Object.freeze({
   // immediate run on startup instead of waiting for the scheduled
   // interval.
   journalForceRunOnStartup: asFlag(process.env.JOURNAL_FORCE_RUN_ON_STARTUP),
-  chatIndexForceRunOnStartup: asFlag(
-    process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP,
-  ),
+  chatIndexForceRunOnStartup: asFlag(process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP),
 
   // MCP subprocess: set by the parent server when spawning
   // mcp-server.ts. The MCP process reads them via this same module —

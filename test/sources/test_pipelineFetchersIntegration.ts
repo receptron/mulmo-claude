@@ -28,19 +28,9 @@ import { join } from "node:path";
 // the realistic HTTP routing even runs.
 import { runSourcesPipeline } from "../../server/workspace/sources/pipeline/index.js";
 import { writeSource } from "../../server/workspace/sources/registry.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import type {
-  FetcherKind,
-  Source,
-  SourceItem,
-} from "../../server/workspace/sources/types.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import type { FetcherKind, Source, SourceItem } from "../../server/workspace/sources/types.js";
 
 let workspace: string;
 
@@ -88,15 +78,11 @@ function makeSource(over: Partial<Source> & Pick<Source, "slug">): Source {
 // Minimal HTTP deps with a URL-keyed response table. Any URL not in
 // the table fails the test immediately (better than silently fetching
 // the real network).
-function makeHttpDeps(
-  routes: Array<{ url: RegExp | string; body: string; contentType?: string }>,
-): HttpFetcherDeps {
+function makeHttpDeps(routes: Array<{ url: RegExp | string; body: string; contentType?: string }>): HttpFetcherDeps {
   const clock = controllableClock();
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
-    const match = routes.find((r) =>
-      typeof r.url === "string" ? url === r.url : r.url.test(url),
-    );
+    const match = routes.find((r) => (typeof r.url === "string" ? url === r.url : r.url.test(url)));
     if (!match) {
       throw new Error(`test: unexpected fetch ${url}`);
     }
@@ -297,20 +283,14 @@ describe("pipeline integration with real fetchers", () => {
         nowMs: () => Date.now(),
       });
       assert.equal(result.plannedCount, 1);
-      assert.ok(
-        result.items.length >= c.expectedMinItems,
-        `expected at least ${c.expectedMinItems} items for ${c.kind}, got ${result.items.length}`,
-      );
+      assert.ok(result.items.length >= c.expectedMinItems, `expected at least ${c.expectedMinItems} items for ${c.kind}, got ${result.items.length}`);
       assert.ok(
         result.items.some((i) => i.title?.includes(c.expectedTitleFragment)),
         `expected an item titled ~"${c.expectedTitleFragment}" for ${c.kind}; got titles: ${result.items.map((i) => i.title).join(", ")}`,
       );
       // Daily file actually contains the items we fetched.
       const daily = await readFile(result.dailyPath, "utf-8");
-      assert.ok(
-        daily.includes(c.expectedTitleFragment),
-        `daily file should mention "${c.expectedTitleFragment}"`,
-      );
+      assert.ok(daily.includes(c.expectedTitleFragment), `daily file should mention "${c.expectedTitleFragment}"`);
     });
   }
 

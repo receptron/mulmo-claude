@@ -27,26 +27,20 @@ interface RebuildErrorResponse {
 
 const router = Router();
 
-router.post(
-  API_ROUTES.chatIndex.rebuild,
-  async (
-    _req: Request,
-    res: Response<RebuildResponse | RebuildErrorResponse>,
-  ) => {
-    try {
-      log.info("chat-index", "manual rebuild triggered");
-      const result = await backfillAllSessions();
-      log.info("chat-index", "rebuild complete", {
-        indexed: result.indexed,
-        total: result.total,
-        skipped: result.skipped,
-      });
-      res.json(result);
-    } catch (err) {
-      log.warn("chat-index", "rebuild failed", { error: String(err) });
-      serverError(res, err instanceof Error ? err.message : "unknown error");
-    }
-  },
-);
+router.post(API_ROUTES.chatIndex.rebuild, async (_req: Request, res: Response<RebuildResponse | RebuildErrorResponse>) => {
+  try {
+    log.info("chat-index", "manual rebuild triggered");
+    const result = await backfillAllSessions();
+    log.info("chat-index", "rebuild complete", {
+      indexed: result.indexed,
+      total: result.total,
+      skipped: result.skipped,
+    });
+    res.json(result);
+  } catch (err) {
+    log.warn("chat-index", "rebuild failed", { error: String(err) });
+    serverError(res, err instanceof Error ? err.message : "unknown error");
+  }
+});
 
 export default router;

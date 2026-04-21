@@ -18,9 +18,7 @@ export function isNonEmptyString(value: unknown): value is string {
 }
 
 /** Record whose values are all strings. */
-export function isStringRecord(
-  value: unknown,
-): value is Record<string, string> {
+export function isStringRecord(value: unknown): value is Record<string, string> {
   if (!isRecord(value)) return false;
   return Object.values(value).every((v) => typeof v === "string");
 }
@@ -31,24 +29,16 @@ export function isStringArray(value: unknown): value is string[] {
 }
 
 /** Error-like object with a `code` property. */
-export function isErrorWithCode(
-  value: unknown,
-): value is { code: string; message?: string } {
+export function isErrorWithCode(value: unknown): value is { code: string; message?: string } {
   return isRecord(value) && typeof value.code === "string";
 }
 
 /** Check that a record has a specific key with a string value. */
-export function hasStringProp<K extends string>(
-  value: unknown,
-  key: K,
-): value is Record<K, string> & Record<string, unknown> {
+export function hasStringProp<K extends string>(value: unknown, key: K): value is Record<K, string> & Record<string, unknown> {
   return isRecord(value) && typeof value[key] === "string";
 }
 
 /** Check that a record has a specific key with a number value. */
-export function hasNumberProp<K extends string>(
-  value: unknown,
-  key: K,
-): value is Record<K, number> & Record<string, unknown> {
+export function hasNumberProp<K extends string>(value: unknown, key: K): value is Record<K, number> & Record<string, unknown> {
   return isRecord(value) && typeof value[key] === "number";
 }

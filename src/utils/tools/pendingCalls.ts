@@ -10,10 +10,7 @@ import type { ToolCallHistoryItem } from "../../types/toolCallHistory";
 // off the screen if the response was very fast.
 export const PENDING_MIN_MS = 500;
 
-export function isCallStillPending(
-  call: ToolCallHistoryItem,
-  nowMs: number,
-): boolean {
+export function isCallStillPending(call: ToolCallHistoryItem, nowMs: number): boolean {
   if (call.result === undefined && call.error === undefined) return true;
   return nowMs < call.timestamp + PENDING_MIN_MS;
 }

@@ -11,10 +11,7 @@ const spreadsheetPlugin: ToolPlugin<SpreadsheetToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<SpreadsheetToolData>>(
-      API_ROUTES.plugins.presentSpreadsheet,
-      args,
-    );
+    const result = await apiPost<ToolResult<SpreadsheetToolData>>(API_ROUTES.plugins.presentSpreadsheet, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

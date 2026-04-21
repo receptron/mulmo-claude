@@ -1,20 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildUserPrompt,
-  parseExtractedFacts,
-  appendFacts,
-  filterNewFacts,
-} from "../../server/workspace/journal/memoryExtractor.js";
+import { buildUserPrompt, parseExtractedFacts, appendFacts, filterNewFacts } from "../../server/workspace/journal/memoryExtractor.js";
 
 describe("parseExtractedFacts", () => {
   it("parses bullet-point lines", () => {
     const raw = "- Likes curry\n- Drives a Tesla\n- Lives in Kochi";
-    assert.deepEqual(parseExtractedFacts(raw), [
-      "- Likes curry",
-      "- Drives a Tesla",
-      "- Lives in Kochi",
-    ]);
+    assert.deepEqual(parseExtractedFacts(raw), ["- Likes curry", "- Drives a Tesla", "- Lives in Kochi"]);
   });
 
   it("returns empty array for NONE", () => {
@@ -26,12 +17,8 @@ describe("parseExtractedFacts", () => {
   });
 
   it("filters out non-bullet lines", () => {
-    const raw =
-      "Here are the facts:\n- Likes sushi\nSome explanation\n- Has a dog";
-    assert.deepEqual(parseExtractedFacts(raw), [
-      "- Likes sushi",
-      "- Has a dog",
-    ]);
+    const raw = "Here are the facts:\n- Likes sushi\nSome explanation\n- Has a dog";
+    assert.deepEqual(parseExtractedFacts(raw), ["- Likes sushi", "- Has a dog"]);
   });
 
   it("filters out very short bullets (just dash + space)", () => {
@@ -42,10 +29,7 @@ describe("parseExtractedFacts", () => {
 
   it("trims whitespace", () => {
     const raw = "  - Plays piano  \n  - Runs on Sundays  ";
-    assert.deepEqual(parseExtractedFacts(raw), [
-      "- Plays piano",
-      "- Runs on Sundays",
-    ]);
+    assert.deepEqual(parseExtractedFacts(raw), ["- Plays piano", "- Runs on Sundays"]);
   });
 });
 
@@ -81,11 +65,7 @@ describe("appendFacts", () => {
   });
 
   it("joins multiple facts with newlines", () => {
-    const result = appendFacts("# Memory\n", [
-      "- Fact A",
-      "- Fact B",
-      "- Fact C",
-    ]);
+    const result = appendFacts("# Memory\n", ["- Fact A", "- Fact B", "- Fact C"]);
     assert.ok(result.includes("- Fact A\n- Fact B\n- Fact C"));
   });
 });
@@ -103,10 +83,7 @@ describe("filterNewFacts", () => {
   });
 
   it("deduplicates within the new facts themselves", () => {
-    assert.deepEqual(filterNewFacts("", ["- Fact A", "- Fact A", "- Fact B"]), [
-      "- Fact A",
-      "- Fact B",
-    ]);
+    assert.deepEqual(filterNewFacts("", ["- Fact A", "- Fact A", "- Fact B"]), ["- Fact A", "- Fact B"]);
   });
 
   it("returns all facts when memory is empty", () => {

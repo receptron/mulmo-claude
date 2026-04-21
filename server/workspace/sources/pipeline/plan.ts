@@ -57,10 +57,7 @@ export function planEligibleSources(input: PlanInput): Source[] {
 //   file permanently lock out a source).
 // - nextAttemptAt in the future → skip.
 // - nextAttemptAt at or before now → run.
-function isWithinBackoff(
-  state: SourceState | undefined,
-  nowMs: number,
-): boolean {
+function isWithinBackoff(state: SourceState | undefined, nowMs: number): boolean {
   if (!state) return false;
   if (!state.nextAttemptAt) return false;
   const ts = Date.parse(state.nextAttemptAt);

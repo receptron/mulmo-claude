@@ -19,10 +19,7 @@
       </label>
       <label class="block text-xs text-gray-600">
         Status
-        <select
-          v-model="status"
-          class="mt-1 w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded focus:outline-none focus:border-blue-500"
-        >
+        <select v-model="status" class="mt-1 w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded focus:outline-none focus:border-blue-500">
           <option v-for="col in columns" :key="col.id" :value="col.id">
             {{ col.label }}
           </option>
@@ -30,10 +27,7 @@
       </label>
       <label class="block text-xs text-gray-600">
         Priority
-        <select
-          v-model="priority"
-          class="mt-1 w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded focus:outline-none focus:border-blue-500"
-        >
+        <select v-model="priority" class="mt-1 w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded focus:outline-none focus:border-blue-500">
           <option value="">— None —</option>
           <option v-for="p in PRIORITIES" :key="p" :value="p">
             {{ PRIORITY_LABELS[p] }}
@@ -59,29 +53,15 @@
       </label>
     </div>
     <div class="flex items-center gap-2 pt-1">
-      <button
-        class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-        @click="save"
-      >
-        Save
-      </button>
-      <button
-        class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-        @click="emit('cancel')"
-      >
-        Cancel
-      </button>
+      <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="save">Save</button>
+      <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">Cancel</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import type {
-  StatusColumn,
-  TodoItem,
-  TodoPriority,
-} from "../../plugins/todo/index";
+import type { StatusColumn, TodoItem, TodoPriority } from "../../plugins/todo/index";
 import { PRIORITIES, PRIORITY_LABELS } from "../../plugins/todo/priority";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 

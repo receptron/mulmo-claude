@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  extractJsonObject,
-  findBalancedBraceBlock,
-} from "../../server/workspace/journal/archivist.js";
+import { extractJsonObject, findBalancedBraceBlock } from "../../server/workspace/journal/archivist.js";
 
 describe("findBalancedBraceBlock", () => {
   it("extracts a simple JSON object", () => {
@@ -23,10 +20,7 @@ describe("findBalancedBraceBlock", () => {
   });
 
   it("skips leading text before the first brace", () => {
-    assert.equal(
-      findBalancedBraceBlock('some text {"key":"val"}'),
-      '{"key":"val"}',
-    );
+    assert.equal(findBalancedBraceBlock('some text {"key":"val"}'), '{"key":"val"}');
   });
 
   it("returns null when no braces exist", () => {

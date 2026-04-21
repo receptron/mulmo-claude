@@ -18,10 +18,7 @@ export interface FunctionContext {
   evaluateFormula: (formula: string) => CellValue;
 }
 
-export type FunctionHandler = (
-  args: string[],
-  context: FunctionContext,
-) => CellValue;
+export type FunctionHandler = (args: string[], context: FunctionContext) => CellValue;
 
 export interface FunctionDefinition {
   name: string;

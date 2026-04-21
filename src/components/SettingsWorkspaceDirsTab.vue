@@ -24,9 +24,7 @@ const draftError = ref("");
 async function load(): Promise<void> {
   loading.value = true;
   error.value = "";
-  const result = await apiGet<{ dirs: DirEntry[] }>(
-    API_ROUTES.config.workspaceDirs,
-  );
+  const result = await apiGet<{ dirs: DirEntry[] }>(API_ROUTES.config.workspaceDirs);
   loading.value = false;
   if (!result.ok) {
     error.value = result.error;
@@ -38,10 +36,7 @@ async function load(): Promise<void> {
 async function save(): Promise<void> {
   saving.value = true;
   saveStatus.value = "";
-  const result = await apiPut<{ dirs: DirEntry[] }>(
-    API_ROUTES.config.workspaceDirs,
-    { dirs: dirs.value },
-  );
+  const result = await apiPut<{ dirs: DirEntry[] }>(API_ROUTES.config.workspaceDirs, { dirs: dirs.value });
   saving.value = false;
   if (!result.ok) {
     saveStatus.value = result.error;
@@ -90,25 +85,18 @@ onMounted(load);
   <div class="space-y-3">
     <p class="text-xs text-gray-600 leading-relaxed">
       Custom directories for organizing files under
-      <code class="bg-gray-100 px-1 rounded">data/</code> and
-      <code class="bg-gray-100 px-1 rounded">artifacts/</code>. Claude uses
-      these to route file saves.
+      <code class="bg-gray-100 px-1 rounded">data/</code> and <code class="bg-gray-100 px-1 rounded">artifacts/</code>. Claude uses these to route file saves.
     </p>
 
     <!-- Loading -->
     <div v-if="loading" class="text-sm text-gray-400">Loading...</div>
-    <div
-      v-else-if="error"
-      class="text-sm text-red-600 bg-red-50 rounded px-3 py-2"
-    >
+    <div v-else-if="error" class="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
       {{ error }}
     </div>
 
     <template v-else>
       <!-- Existing entries -->
-      <div v-if="dirs.length === 0" class="text-sm text-gray-400">
-        No custom directories configured.
-      </div>
+      <div v-if="dirs.length === 0" class="text-sm text-gray-400">No custom directories configured.</div>
       <div v-else class="space-y-1.5">
         <div
           v-for="(dir, i) in dirs"
@@ -122,16 +110,10 @@ onMounted(load);
               {{ dir.description }}
             </div>
           </div>
-          <span
-            class="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 shrink-0"
-          >
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 shrink-0">
             {{ dir.structure }}
           </span>
-          <button
-            class="text-gray-300 hover:text-red-500 shrink-0"
-            title="Remove"
-            @click="removeEntry(i)"
-          >
+          <button class="text-gray-300 hover:text-red-500 shrink-0" title="Remove" @click="removeEntry(i)">
             <span class="material-icons text-sm">close</span>
           </button>
         </div>
@@ -168,16 +150,8 @@ onMounted(load);
           @keydown.stop
         />
         <div class="flex items-center gap-2">
-          <button
-            class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600"
-            data-testid="workspace-dir-add-btn"
-            @click="addEntry"
-          >
-            Add
-          </button>
-          <span v-if="draftError" class="text-xs text-red-500">{{
-            draftError
-          }}</span>
+          <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="workspace-dir-add-btn" @click="addEntry">Add</button>
+          <span v-if="draftError" class="text-xs text-red-500">{{ draftError }}</span>
         </div>
       </div>
 
@@ -191,11 +165,7 @@ onMounted(load);
         >
           {{ saving ? "Saving..." : "Save" }}
         </button>
-        <span
-          v-if="saveStatus"
-          class="text-xs"
-          :class="saveStatus === 'Saved' ? 'text-green-600' : 'text-red-600'"
-        >
+        <span v-if="saveStatus" class="text-xs" :class="saveStatus === 'Saved' ? 'text-green-600' : 'text-red-600'">
           {{ saveStatus }}
         </span>
       </div>

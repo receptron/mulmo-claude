@@ -14,10 +14,7 @@ import { writeFileAtomic } from "./atomic.js";
 const root = (r?: string) => r ?? workspacePath;
 
 export function loadUserTasks<T>(r?: string): T[] {
-  const tasks = loadJsonFile<T[]>(
-    resolvePath(root(r), WORKSPACE_FILES.schedulerUserTasks),
-    [],
-  );
+  const tasks = loadJsonFile<T[]>(resolvePath(root(r), WORKSPACE_FILES.schedulerUserTasks), []);
   return Array.isArray(tasks) ? tasks : [];
 }
 

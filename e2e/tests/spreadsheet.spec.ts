@@ -13,10 +13,7 @@ interface SpreadsheetResultOptions {
   title?: string;
 }
 
-async function setupSpreadsheetSession(
-  page: Page,
-  opts: SpreadsheetResultOptions,
-) {
+async function setupSpreadsheetSession(page: Page, opts: SpreadsheetResultOptions) {
   const sessionId = opts.sessionId ?? "sheet-session";
   await mockAllApis(page, {
     sessions: [
@@ -31,9 +28,7 @@ async function setupSpreadsheetSession(
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) =>
       route.fulfill({
         json: [
@@ -55,26 +50,16 @@ async function setupSpreadsheetSession(
   );
 }
 
-async function mockFileContent(
-  page: Page,
-  path: string,
-  body: { kind?: string; content?: string; message?: string },
-) {
+async function mockFileContent(page: Page, path: string, body: { kind?: string; content?: string; message?: string }) {
   await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === path,
+    (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === path,
     (route) => route.fulfill({ json: body }),
   );
 }
 
 // Shared helper: open the session and click the sidebar entry so the
 // View mounts. Returns only after the View is visible.
-async function openSpreadsheetView(
-  page: Page,
-  sessionId = "sheet-session",
-  sidebarTitle = "Test Sheet",
-) {
+async function openSpreadsheetView(page: Page, sessionId = "sheet-session", sidebarTitle = "Test Sheet") {
   await page.goto(`/chat/${sessionId}`);
   await expect(page.getByText("MulmoClaude")).toBeVisible();
   // Wait for the actual sidebar item rather than a fixed sleep —
@@ -120,9 +105,7 @@ test.describe("spreadsheet — rendering", () => {
     });
   });
 
-  test("title from tool result is displayed in the header", async ({
-    page,
-  }) => {
+  test("title from tool result is displayed in the header", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets, title: "Q1 Revenue" });
     await page.goto("/chat/sheet-session");
@@ -130,9 +113,7 @@ test.describe("spreadsheet — rendering", () => {
     const item = page.getByText("Q1 Revenue").first();
     await expect(item).toBeVisible({ timeout: 5000 });
     await item.click();
-    await expect(
-      page.locator("h1.title", { hasText: "Q1 Revenue" }),
-    ).toBeVisible({
+    await expect(page.locator("h1.title", { hasText: "Q1 Revenue" })).toBeVisible({
       timeout: 5000,
     });
   });
@@ -148,9 +129,7 @@ test.describe("spreadsheet — rendering", () => {
 });
 
 test.describe("spreadsheet — multi-sheet", () => {
-  test("sheet tabs appear only when there is more than one sheet", async ({
-    page,
-  }) => {
+  test("sheet tabs appear only when there is more than one sheet", async ({ page }) => {
     const sheets = [{ name: "Single", data: [[{ v: "only" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -158,9 +137,7 @@ test.describe("spreadsheet — multi-sheet", () => {
     await expect(page.locator(".sheet-tabs")).toHaveCount(0);
   });
 
-  test("multiple sheets show tabs and switching changes the rendered data", async ({
-    page,
-  }) => {
+  test("multiple sheets show tabs and switching changes the rendered data", async ({ page }) => {
     const sheets = [
       { name: "Q1", data: [[{ v: "January-Q1" }]] },
       { name: "Q2", data: [[{ v: "April-Q2" }]] },
@@ -213,9 +190,7 @@ test.describe("spreadsheet — formula & format", () => {
     });
   });
 
-  test("currency format renders with dollar sign and comma separators", async ({
-    page,
-  }) => {
+  test("currency format renders with dollar sign and comma separators", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",
@@ -245,9 +220,7 @@ test.describe("spreadsheet — formula & format", () => {
 });
 
 test.describe("spreadsheet — mini editor", () => {
-  test("clicking a cell opens the mini editor with the correct cell ref label", async ({
-    page,
-  }) => {
+  test("clicking a cell opens the mini editor with the correct cell ref label", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",
@@ -280,12 +253,8 @@ test.describe("spreadsheet — mini editor", () => {
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
       timeout: 5000,
     });
-    await expect(
-      page.locator(".radio-option", { hasText: "String" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(".radio-option", { hasText: "Formula" }),
-    ).toBeVisible();
+    await expect(page.locator(".radio-option", { hasText: "String" })).toBeVisible();
+    await expect(page.locator(".radio-option", { hasText: "Formula" })).toBeVisible();
   });
 
   test("mini editor close button (✕) closes the panel", async ({ page }) => {
@@ -300,9 +269,7 @@ test.describe("spreadsheet — mini editor", () => {
     await expect(page.locator(".mini-editor-panel")).toHaveCount(0);
   });
 
-  test("formula mode shows a second input for format code", async ({
-    page,
-  }) => {
+  test("formula mode shows a second input for format code", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "hi" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -313,28 +280,20 @@ test.describe("spreadsheet — mini editor", () => {
     // Switch to Formula mode
     await page.locator(".radio-option", { hasText: "Formula" }).click();
     // Two inputs: value/formula + format
-    await expect(
-      page.locator('input[placeholder^="Value or Formula"]'),
-    ).toBeVisible();
+    await expect(page.locator('input[placeholder^="Value or Formula"]')).toBeVisible();
     await expect(page.locator('input[placeholder^="Format"]')).toBeVisible();
   });
 });
 
 test.describe("spreadsheet — source editor", () => {
-  test("Details section 'Edit Spreadsheet Data' is present", async ({
-    page,
-  }) => {
+  test("Details section 'Edit Spreadsheet Data' is present", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
-    await expect(
-      page.locator("summary", { hasText: "Edit Spreadsheet Data" }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("summary", { hasText: "Edit Spreadsheet Data" })).toBeVisible({ timeout: 5000 });
   });
 
-  test("Apply Changes button is disabled when textarea matches state", async ({
-    page,
-  }) => {
+  test("Apply Changes button is disabled when textarea matches state", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -369,9 +328,7 @@ test.describe("spreadsheet — error handling", () => {
     });
   });
 
-  test("binary file shows the default 'Cannot load' message", async ({
-    page,
-  }) => {
+  test("binary file shows the default 'Cannot load' message", async ({ page }) => {
     const path = "spreadsheets/blob.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, { kind: "binary" });
@@ -415,9 +372,7 @@ test.describe("spreadsheet — error handling", () => {
     const path = "spreadsheets/404.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await page.route(
-      (url) =>
-        url.pathname === "/api/files/content" &&
-        url.searchParams.get("path") === path,
+      (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === path,
       (route) =>
         route.fulfill({
           status: 404,
@@ -432,9 +387,7 @@ test.describe("spreadsheet — error handling", () => {
 });
 
 test.describe("spreadsheet — edge cases", () => {
-  test("empty spreadsheet array shows 'No spreadsheet data available'", async ({
-    page,
-  }) => {
+  test("empty spreadsheet array shows 'No spreadsheet data available'", async ({ page }) => {
     await setupSpreadsheetSession(page, { sheets: [] });
     await openSpreadsheetView(page);
     await expect(page.getByText("No spreadsheet data available")).toBeVisible({
@@ -442,9 +395,7 @@ test.describe("spreadsheet — edge cases", () => {
     });
   });
 
-  test("cells with special characters (commas, quotes) render safely", async ({
-    page,
-  }) => {
+  test("cells with special characters (commas, quotes) render safely", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",

@@ -44,26 +44,20 @@ mcpToolsRouter.get(API_ROUTES.mcpTools.list, (_req: Request, res: Response) => {
 });
 
 // POST /api/mcp-tools/:tool — dispatches to the right handler
-mcpToolsRouter.post(
-  API_ROUTES.mcpTools.invoke,
-  async (
-    req: Request<McpToolParams, unknown, Record<string, unknown>>,
-    res: Response,
-  ) => {
-    const tool = toolMap.get(req.params.tool);
-    if (!tool) {
-      notFound(res, `Unknown MCP tool: ${req.params.tool}`);
-      return;
-    }
-    if (!isMcpToolEnabled(tool)) {
-      sendError(res, 503, `Tool ${req.params.tool} is not configured.`);
-      return;
-    }
-    try {
-      const result = await tool.handler(req.body);
-      res.json({ result });
-    } catch (err) {
-      serverError(res, errorMessage(err));
-    }
-  },
-);
+mcpToolsRouter.post(API_ROUTES.mcpTools.invoke, async (req: Request<McpToolParams, unknown, Record<string, unknown>>, res: Response) => {
+  const tool = toolMap.get(req.params.tool);
+  if (!tool) {
+    notFound(res, `Unknown MCP tool: ${req.params.tool}`);
+    return;
+  }
+  if (!isMcpToolEnabled(tool)) {
+    sendError(res, 503, `Tool ${req.params.tool} is not configured.`);
+    return;
+  }
+  try {
+    const result = await tool.handler(req.body);
+    res.json({ result });
+  } catch (err) {
+    serverError(res, errorMessage(err));
+  }
+});

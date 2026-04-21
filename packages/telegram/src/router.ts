@@ -7,22 +7,14 @@
 import type { TelegramApi, TelegramMessage } from "./api.js";
 import type { Allowlist } from "./allowlist.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import {
-  parseDataUrl,
-  type MessageAck,
-  type PushEvent,
-} from "@mulmobridge/client";
+import { parseDataUrl, type MessageAck, type PushEvent } from "@mulmobridge/client";
 
 // Telegram caps a single message at 4096 chars. We split long
 // replies naively; pretty formatting (preserve markdown, break on
 // sentence boundaries) is a follow-up.
 const TELEGRAM_MAX_MESSAGE_CHARS = 4096;
 
-export type SendToMulmoFn = (
-  externalChatId: string,
-  text: string,
-  attachments?: Attachment[],
-) => Promise<MessageAck>;
+export type SendToMulmoFn = (externalChatId: string, text: string, attachments?: Attachment[]) => Promise<MessageAck>;
 
 export interface RouterDeps {
   api: TelegramApi;
@@ -124,9 +116,7 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
   // exclusive (photo OR document), but forwarded messages or future
   // API changes could carry both. We collect all available attachments
   // rather than picking one.
-  async function tryDownloadAttachments(
-    msg: TelegramMessage,
-  ): Promise<AttachmentResult> {
+  async function tryDownloadAttachments(msg: TelegramMessage): Promise<AttachmentResult> {
     const attachments: Attachment[] = [];
     let anyFailed = false;
 
@@ -174,38 +164,25 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
       await sendChunked(api, chatId, ack.reply ?? "");
     } else {
       const status = ack.status ? ` (${ack.status})` : "";
-      await sendChunked(
-        api,
-        chatId,
-        `Error${status}: ${ack.error ?? "unknown"}`,
-      );
+      await sendChunked(api, chatId, `Error${status}: ${ack.error ?? "unknown"}`);
     }
   }
 
   async function handleAllowed(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
     const text = msg.text ?? msg.caption ?? "";
-    const hasMedia =
-      (Array.isArray(msg.photo) && msg.photo.length > 0) ||
-      msg.document !== undefined;
+    const hasMedia = (Array.isArray(msg.photo) && msg.photo.length > 0) || msg.document !== undefined;
     if (text.trim().length === 0 && !hasMedia) return;
 
     const mediaLabel = buildMediaLabel(msg);
-    log.info(
-      `[telegram] accepted chat=${chatId} user=@${userLabel(msg)} len=${text.length}${mediaLabel}`,
-    );
+    log.info(`[telegram] accepted chat=${chatId} user=@${userLabel(msg)} len=${text.length}${mediaLabel}`);
 
     const { attachments, failed } = await tryDownloadAttachments(msg);
 
     // Attachment-only message where download failed: bail out instead
     // of sending a query without the actual file.
     if (failed && text.trim().length === 0) {
-      await api
-        .sendMessage(
-          chatId,
-          "Sorry, I could not download the attachment. Please try again.",
-        )
-        .catch(() => {});
+      await api.sendMessage(chatId, "Sorry, I could not download the attachment. Please try again.").catch(() => {});
       return;
     }
 
@@ -215,11 +192,7 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
     // Start streaming: chunks will arrive via handleTextChunk and
     // be sent/edited in the Telegram chat in real time.
     startStream(chatId);
-    const ack = await sendToMulmo(
-      String(chatId),
-      messageText,
-      attachments.length > 0 ? attachments : undefined,
-    );
+    const ack = await sendToMulmo(String(chatId), messageText, attachments.length > 0 ? attachments : undefined);
     // Final flush + capture the message id before stopStream clears it.
     flushStream();
     const sentMsgId = streamMessageId;
@@ -229,9 +202,7 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
     // to catch any trailing chunks. If no streaming happened,
     // send the full reply as a new message.
     if (sentMsgId !== null && ack.ok) {
-      await api
-        .editMessageText(chatId, sentMsgId, ack.reply ?? "")
-        .catch(() => {});
+      await api.editMessageText(chatId, sentMsgId, ack.reply ?? "").catch(() => {});
     } else if (sentMsgId === null) {
       await sendReply(chatId, ack);
     }
@@ -239,16 +210,11 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
 
   async function handleDenied(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
-    log.warn(
-      `[telegram] denied chat=${chatId} user=@${userLabel(msg)} — not on allowlist`,
-    );
+    log.warn(`[telegram] denied chat=${chatId} user=@${userLabel(msg)} — not on allowlist`);
     if (deniedAlreadyNotified.has(chatId)) return;
     deniedAlreadyNotified.add(chatId);
     try {
-      await api.sendMessage(
-        chatId,
-        "Access denied. Contact the operator to be added to the allowlist.",
-      );
+      await api.sendMessage(chatId, "Access denied. Contact the operator to be added to the allowlist.");
     } catch (err) {
       log.error(`[telegram] access-denied reply failed: ${String(err)}`);
     }
@@ -292,20 +258,13 @@ export function createMessageRouter(deps: RouterDeps): MessageRouter {
   };
 }
 
-async function sendChunked(
-  api: TelegramApi,
-  chatId: number,
-  text: string,
-): Promise<void> {
+async function sendChunked(api: TelegramApi, chatId: number, text: string): Promise<void> {
   if (text.length === 0) {
     await api.sendMessage(chatId, "(empty reply)");
     return;
   }
   for (let i = 0; i < text.length; i += TELEGRAM_MAX_MESSAGE_CHARS) {
-    await api.sendMessage(
-      chatId,
-      text.slice(i, i + TELEGRAM_MAX_MESSAGE_CHARS),
-    );
+    await api.sendMessage(chatId, text.slice(i, i + TELEGRAM_MAX_MESSAGE_CHARS));
   }
 }
 

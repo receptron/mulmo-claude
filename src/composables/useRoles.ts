@@ -17,19 +17,14 @@ export function useRoles(): {
 } {
   const roles = ref<Role[]>(ROLES);
   const currentRoleId = ref(ROLES[0].id);
-  const currentRole = computed(
-    () =>
-      roles.value.find((r) => r.id === currentRoleId.value) ?? roles.value[0],
-  );
+  const currentRole = computed(() => roles.value.find((r) => r.id === currentRoleId.value) ?? roles.value[0]);
 
   async function refreshRoles(): Promise<void> {
     const result = await apiGet<Role[]>(API_ROUTES.roles.list);
     if (!result.ok) {
       // Keep the current role list on failure — losing custom roles
       // is preferable to crashing the UI on a transient API hiccup.
-      console.warn(
-        `[useRoles] refreshRoles failed: ${result.status} ${result.error}`,
-      );
+      console.warn(`[useRoles] refreshRoles failed: ${result.status} ${result.error}`);
       return;
     }
     roles.value = mergeRoles(ROLES, result.data);

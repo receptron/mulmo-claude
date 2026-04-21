@@ -29,9 +29,7 @@ interface EnvConfig {
 function readEnv(): EnvConfig {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken || botToken.trim().length === 0) {
-    console.error(
-      "TELEGRAM_BOT_TOKEN is required. See docs/message_apps/telegram/.",
-    );
+    console.error("TELEGRAM_BOT_TOKEN is required. See docs/message_apps/telegram/.");
     process.exit(1);
   }
   let allowlist: Allowlist;
@@ -49,11 +47,7 @@ function readEnv(): EnvConfig {
   return { botToken, allowlist, pollTimeoutSec };
 }
 
-async function pollLoop(
-  api: TelegramApi,
-  router: MessageRouter,
-  opts: { pollTimeoutSec: number; abortSignal: AbortSignal },
-): Promise<void> {
+async function pollLoop(api: TelegramApi, router: MessageRouter, opts: { pollTimeoutSec: number; abortSignal: AbortSignal }): Promise<void> {
   let offset: number | undefined;
   while (!opts.abortSignal.aborted) {
     let updates;
@@ -87,21 +81,14 @@ async function main(): Promise<void> {
   const { botToken, allowlist, pollTimeoutSec } = readEnv();
 
   console.log("MulmoClaude Telegram bridge");
-  console.log(
-    `Allowlist: ${
-      allowlist.size() > 0
-        ? allowlist.snapshot().join(", ")
-        : "(empty — all chats will be denied)"
-    }`,
-  );
+  console.log(`Allowlist: ${allowlist.size() > 0 ? allowlist.snapshot().join(", ") : "(empty — all chats will be denied)"}`);
 
   const api = createTelegramApi({ botToken });
   const client = createBridgeClient({ transportId: TRANSPORT_ID });
   const router = createMessageRouter({
     api,
     allowlist,
-    sendToMulmo: (chatId, text, attachments) =>
-      client.send(chatId, text, attachments),
+    sendToMulmo: (chatId, text, attachments) => client.send(chatId, text, attachments),
   });
 
   // Server → Telegram streaming text chunks (Phase C of #268).
@@ -111,11 +98,7 @@ async function main(): Promise<void> {
 
   // Server → Telegram async push (Phase B of #268).
   client.onPush((ev) => {
-    router
-      .handlePush(ev)
-      .catch((err) =>
-        console.error(`[telegram] handlePush failed: ${String(err)}`),
-      );
+    router.handlePush(ev).catch((err) => console.error(`[telegram] handlePush failed: ${String(err)}`));
   });
 
   const abortController = new AbortController();

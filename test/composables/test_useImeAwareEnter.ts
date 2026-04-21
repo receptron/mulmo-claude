@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  useImeAwareEnter,
-  SAFARI_IME_RACE_WINDOW_MS,
-} from "../../src/composables/useImeAwareEnter.ts";
+import { useImeAwareEnter, SAFARI_IME_RACE_WINDOW_MS } from "../../src/composables/useImeAwareEnter.ts";
 
 // Minimal KeyboardEvent stub so tests can run under node:test without
 // jsdom. Only the surface the composable touches is modelled.
@@ -15,11 +12,7 @@ interface TestKeyboardEvent {
   defaultPrevented: boolean;
 }
 
-function fakeKeydown(opts: {
-  key: string;
-  shiftKey?: boolean;
-  isComposing?: boolean;
-}): TestKeyboardEvent {
+function fakeKeydown(opts: { key: string; shiftKey?: boolean; isComposing?: boolean }): TestKeyboardEvent {
   const ev: TestKeyboardEvent = {
     key: opts.key,
     shiftKey: opts.shiftKey ?? false,

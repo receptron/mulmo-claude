@@ -1,38 +1,21 @@
 <template>
   <div class="flex-1 overflow-y-auto min-h-0 p-4">
     <!-- Mutation error banner -->
-    <div
-      v-if="mutationError"
-      class="mb-3 px-4 py-2 bg-red-50 text-red-700 rounded text-sm"
-      data-testid="scheduler-task-error"
-    >
+    <div v-if="mutationError" class="mb-3 px-4 py-2 bg-red-50 text-red-700 rounded text-sm" data-testid="scheduler-task-error">
       {{ mutationError }}
     </div>
 
     <!-- Loading -->
-    <div
-      v-if="loading"
-      class="flex items-center justify-center h-32 text-gray-400"
-    >
-      Loading...
-    </div>
+    <div v-if="loading" class="flex items-center justify-center h-32 text-gray-400">Loading...</div>
 
     <!-- Error -->
-    <div
-      v-else-if="error"
-      class="px-4 py-2 bg-red-50 text-red-700 rounded text-sm"
-    >
+    <div v-else-if="error" class="px-4 py-2 bg-red-50 text-red-700 rounded text-sm">
       {{ error }}
     </div>
 
     <!-- Task list -->
     <div v-else>
-      <div
-        v-if="tasks.length === 0"
-        class="flex items-center justify-center h-32 text-gray-400"
-      >
-        No scheduled tasks
-      </div>
+      <div v-if="tasks.length === 0" class="flex items-center justify-center h-32 text-gray-400">No scheduled tasks</div>
 
       <div v-else class="space-y-2">
         <div
@@ -45,10 +28,7 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
               <!-- Origin badge -->
-              <span
-                class="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
-                :class="originClass(task.origin)"
-              >
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium shrink-0" :class="originClass(task.origin)">
                 {{ originLabel(task.origin) }}
               </span>
               <span class="font-medium text-gray-800 truncate">
@@ -71,11 +51,7 @@
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs rounded"
-                :class="
-                  task.enabled !== false
-                    ? 'text-green-600 hover:bg-green-50'
-                    : 'text-gray-400 hover:bg-gray-100'
-                "
+                :class="task.enabled !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'"
                 :title="task.enabled !== false ? 'Disable' : 'Enable'"
                 @click="toggleEnabled(task)"
               >
@@ -100,26 +76,15 @@
           <!-- Details row -->
           <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
             <span>{{ formatSchedule(task.schedule) }}</span>
-            <span
-              v-if="task.state?.lastRunResult"
-              class="flex items-center gap-1"
-            >
-              <span
-                class="inline-block w-2 h-2 rounded-full"
-                :class="resultDotClass(task.state.lastRunResult)"
-              ></span>
+            <span v-if="task.state?.lastRunResult" class="flex items-center gap-1">
+              <span class="inline-block w-2 h-2 rounded-full" :class="resultDotClass(task.state.lastRunResult)"></span>
               {{ task.state.lastRunResult }}
             </span>
-            <span v-if="task.state?.nextScheduledAt">
-              Next: {{ formatShortTime(task.state.nextScheduledAt) }}
-            </span>
+            <span v-if="task.state?.nextScheduledAt"> Next: {{ formatShortTime(task.state.nextScheduledAt) }} </span>
           </div>
 
           <!-- Description -->
-          <div
-            v-if="task.description"
-            class="mt-1 text-xs text-gray-400 truncate"
-          >
+          <div v-if="task.description" class="mt-1 text-xs text-gray-400 truncate">
             {{ task.description }}
           </div>
         </div>
@@ -164,9 +129,7 @@ const mutationError = ref("");
 async function fetchTasks(): Promise<void> {
   loading.value = true;
   error.value = "";
-  const result = await apiGet<{ tasks: SchedulerTask[] }>(
-    API_ROUTES.scheduler.tasks,
-  );
+  const result = await apiGet<{ tasks: SchedulerTask[] }>(API_ROUTES.scheduler.tasks);
   loading.value = false;
   if (!result.ok) {
     error.value = result.error;

@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  isExternalHref,
-  resolveWorkspaceLink,
-  extractSessionIdFromPath,
-} from "../../../src/utils/path/relativeLink.js";
+import { isExternalHref, resolveWorkspaceLink, extractSessionIdFromPath } from "../../../src/utils/path/relativeLink.js";
 
 describe("isExternalHref", () => {
   it("treats http and https as external", () => {
@@ -56,62 +52,35 @@ describe("isExternalHref", () => {
 
 describe("resolveWorkspaceLink", () => {
   it("resolves a relative link from a topic file into a sibling folder", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "../../wiki/foo.md"),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "../../wiki/foo.md"), "wiki/foo.md");
   });
 
   it("resolves a workspace-absolute link", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "/wiki/foo.md"),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "/wiki/foo.md"), "wiki/foo.md");
   });
 
   it("resolves ./sibling.md correctly", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "./bar.md"),
-      "summaries/topics/bar.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "./bar.md"), "summaries/topics/bar.md");
   });
 
   it("resolves a bare filename as a sibling", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "bar.md"),
-      "summaries/topics/bar.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "bar.md"), "summaries/topics/bar.md");
   });
 
   it("strips #fragment from the resolved path", () => {
-    assert.equal(
-      resolveWorkspaceLink(
-        "summaries/topics/foo.md",
-        "../../wiki/foo.md#heading",
-      ),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "../../wiki/foo.md#heading"), "wiki/foo.md");
   });
 
   it("strips ?query from the resolved path", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "../../wiki/foo.md?v=2"),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "../../wiki/foo.md?v=2"), "wiki/foo.md");
   });
 
   it("returns null for external URLs", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "https://example.com"),
-      null,
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "https://example.com"), null);
   });
 
   it("returns null for anchor-only links", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "#section"),
-      null,
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "#section"), null);
   });
 
   it("returns null for an empty href", () => {
@@ -123,57 +92,33 @@ describe("resolveWorkspaceLink", () => {
   });
 
   it("returns null when workspace-absolute ../ escapes", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "/../../etc/passwd"),
-      null,
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "/../../etc/passwd"), null);
   });
 
   it("resolves from a deeply-nested daily file", () => {
-    assert.equal(
-      resolveWorkspaceLink(
-        "summaries/daily/2026/04/11.md",
-        "../../../../wiki/foo.md",
-      ),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/daily/2026/04/11.md", "../../../../wiki/foo.md"), "wiki/foo.md");
   });
 
   it("handles a file at the workspace root", () => {
-    assert.equal(
-      resolveWorkspaceLink("memory.md", "wiki/foo.md"),
-      "wiki/foo.md",
-    );
+    assert.equal(resolveWorkspaceLink("memory.md", "wiki/foo.md"), "wiki/foo.md");
   });
 
   it("handles dot-dot that lands on a sibling", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "../daily/2026/04/11.md"),
-      "summaries/daily/2026/04/11.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "../daily/2026/04/11.md"), "summaries/daily/2026/04/11.md");
   });
 
   it("collapses redundant ./ segments", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "./././bar.md"),
-      "summaries/topics/bar.md",
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "./././bar.md"), "summaries/topics/bar.md");
   });
 
   it("returns null for a pure fragment after stripping", () => {
-    assert.equal(
-      resolveWorkspaceLink("summaries/topics/foo.md", "?query=1"),
-      null,
-    );
+    assert.equal(resolveWorkspaceLink("summaries/topics/foo.md", "?query=1"), null);
   });
 });
 
 describe("extractSessionIdFromPath", () => {
   it("extracts a session id from chat/<id>.jsonl", () => {
-    assert.equal(
-      extractSessionIdFromPath("chat/abc-123-def.jsonl"),
-      "abc-123-def",
-    );
+    assert.equal(extractSessionIdFromPath("chat/abc-123-def.jsonl"), "abc-123-def");
   });
 
   it("handles a full UUID", () => {

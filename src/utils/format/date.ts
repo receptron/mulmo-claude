@@ -5,11 +5,7 @@
 /** "Apr 11 06:32" — short month + day + 24h time. */
 export function formatDate(iso: string): string {
   const d = new Date(iso);
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
-    " " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 /** "Apr 11 06:32" — same format as formatDate but from epoch ms. */
@@ -51,11 +47,7 @@ export function formatShortDate(value: Date | number | string): string {
 
 /** True when two Dates fall on the same calendar day. */
 export function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 /** True when the given Date is today. */

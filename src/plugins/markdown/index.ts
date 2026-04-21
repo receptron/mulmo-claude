@@ -11,10 +11,7 @@ const markdownPlugin: ToolPlugin<MarkdownToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<MarkdownToolData>>(
-      API_ROUTES.plugins.presentDocument,
-      args,
-    );
+    const result = await apiPost<ToolResult<MarkdownToolData>>(API_ROUTES.plugins.presentDocument, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

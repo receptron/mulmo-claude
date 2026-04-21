@@ -65,22 +65,13 @@ export interface ChatService {
 // Inlined (not imported from `../utils/httpError.js`) so the module
 // has no outbound dependency on the host app's utility modules.
 // See `@package-contract` in ./types.ts.
-const badRequest = (res: Response, error: string) =>
-  res.status(400).json({ error });
-const notFound = (res: Response, error: string) =>
-  res.status(404).json({ error });
+const badRequest = (res: Response, error: string) => res.status(400).json({ error });
+const notFound = (res: Response, error: string) => res.status(404).json({ error });
 
 // ── Factory ──────────────────────────────────────────────────
 
 export function createChatService(deps: ChatServiceDeps): ChatService {
-  const {
-    startChat,
-    onSessionEvent,
-    loadAllRoles,
-    getRole,
-    defaultRoleId,
-    tokenProvider,
-  } = deps;
+  const { startChat, onSessionEvent, loadAllRoles, getRole, defaultRoleId, tokenProvider } = deps;
   const logger = deps.logger;
   const store = createChatStateStore({
     transportsDir: deps.transportsDir,
@@ -128,63 +119,43 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
   const router = Router();
 
   // POST /api/transports/:transportId/chats/:externalChatId — send text, get a reply.
-  router.post(
-    CHAT_SERVICE_ROUTES.message,
-    async (
-      req: Request<ChatRequestParams, unknown, ChatRequestBody>,
-      res: Response,
-    ) => {
-      const { transportId, externalChatId } = req.params;
-      const text =
-        typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  router.post(CHAT_SERVICE_ROUTES.message, async (req: Request<ChatRequestParams, unknown, ChatRequestBody>, res: Response) => {
+    const { transportId, externalChatId } = req.params;
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
 
-      if (!text) {
-        badRequest(res, "text is required");
-        return;
-      }
+    if (!text) {
+      badRequest(res, "text is required");
+      return;
+    }
 
-      const result = await relay({ transportId, externalChatId, text });
+    const result = await relay({ transportId, externalChatId, text });
 
-      if (result.kind === "ok") {
-        res.json({ reply: result.reply });
-        return;
-      }
-      res.status(result.status).json({ reply: result.message });
-    },
-  );
+    if (result.kind === "ok") {
+      res.json({ reply: result.reply });
+      return;
+    }
+    res.status(result.status).json({ reply: result.message });
+  });
 
   // POST /api/transports/:transportId/chats/:externalChatId/connect —
   // reassign the active session pointer for a transport chat.
-  router.post(
-    CHAT_SERVICE_ROUTES.connect,
-    async (
-      req: Request<ConnectRequestParams, unknown, ConnectRequestBody>,
-      res: Response,
-    ) => {
-      const { transportId, externalChatId } = req.params;
-      const chatSessionId =
-        typeof req.body?.chatSessionId === "string"
-          ? req.body.chatSessionId.trim()
-          : "";
+  router.post(CHAT_SERVICE_ROUTES.connect, async (req: Request<ConnectRequestParams, unknown, ConnectRequestBody>, res: Response) => {
+    const { transportId, externalChatId } = req.params;
+    const chatSessionId = typeof req.body?.chatSessionId === "string" ? req.body.chatSessionId.trim() : "";
 
-      if (!chatSessionId) {
-        badRequest(res, "chatSessionId is required");
-        return;
-      }
+    if (!chatSessionId) {
+      badRequest(res, "chatSessionId is required");
+      return;
+    }
 
-      const updated = await store.connectSession(
-        transportId,
-        externalChatId,
-        chatSessionId,
-      );
-      if (!updated) {
-        notFound(res, "No chat state found for this transport");
-        return;
-      }
+    const updated = await store.connectSession(transportId, externalChatId, chatSessionId);
+    if (!updated) {
+      notFound(res, "No chat state found for this transport");
+      return;
+    }
 
-      res.json({ ok: true });
-    },
-  );
+    res.json({ ok: true });
+  });
 
   return {
     router,
@@ -202,10 +173,6 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
   };
 }
 
-export type {
-  ChatServiceDeps,
-  StartChatFn,
-  OnSessionEventFn,
-} from "./types.js";
+export type { ChatServiceDeps, StartChatFn, OnSessionEventFn } from "./types.js";
 
 export { writeFileAtomic } from "./atomic-write.js";

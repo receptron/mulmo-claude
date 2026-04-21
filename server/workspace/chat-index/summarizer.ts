@@ -87,11 +87,7 @@ export function extractText(jsonlContent: string): string {
       continue;
     }
     const source = entry.source;
-    if (
-      (source === "user" || source === "assistant") &&
-      entry.type === EVENT_TYPES.text &&
-      typeof entry.message === "string"
-    ) {
+    if ((source === "user" || source === "assistant") && entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
       parts.push(`[${source}] ${trimMessage(entry.message)}`);
     }
   }
@@ -122,14 +118,10 @@ export function parseClaudeJsonResult(stdout: string): SummaryResult {
   try {
     parsed = JSON.parse(stdout.trim());
   } catch (err) {
-    throw new Error(
-      `[chat-index] failed to parse claude json output: ${errorMessage(err)}`,
-    );
+    throw new Error(`[chat-index] failed to parse claude json output: ${errorMessage(err)}`);
   }
   if (parsed.is_error) {
-    throw new Error(
-      `[chat-index] claude returned error: ${parsed.result ?? "unknown"}`,
-    );
+    throw new Error(`[chat-index] claude returned error: ${parsed.result ?? "unknown"}`);
   }
   return validateSummaryResult(parsed.structured_output);
 }
@@ -148,11 +140,7 @@ export function parseClaudeJsonResult(stdout: string): SummaryResult {
 // and extract a human-readable reason from `errors[]` /
 // `subtype` / `result`; fall back to stderr, then to a raw
 // stdout slice, then to a generic "no error output".
-export function formatSpawnError(
-  code: number | null,
-  stdout: string,
-  stderr: string,
-): string {
+export function formatSpawnError(code: number | null, stdout: string, stderr: string): string {
   return formatSpawnFailure("[chat-index]", code, stdout, stderr);
 }
 
@@ -167,9 +155,7 @@ export function validateSummaryResult(obj: unknown): SummaryResult {
   const o = obj as Record<string, unknown>;
   const title = typeof o.title === "string" ? o.title : "";
   const summary = typeof o.summary === "string" ? o.summary : "";
-  const keywords = Array.isArray(o.keywords)
-    ? o.keywords.filter((k): k is string => typeof k === "string")
-    : [];
+  const keywords = Array.isArray(o.keywords) ? o.keywords.filter((k): k is string => typeof k === "string") : [];
   return { title, summary, keywords };
 }
 
@@ -187,10 +173,7 @@ export async function loadJsonlInput(jsonlPath: string): Promise<string> {
 
 // --- spawn layer ----------------------------------------------------
 
-function spawnClaudeSummarize(
-  input: string,
-  timeoutMs: number,
-): Promise<string> {
+function spawnClaudeSummarize(input: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       "--print",
@@ -223,11 +206,7 @@ function spawnClaudeSummarize(
       if (settled) return;
       settled = true;
       proc.kill("SIGKILL");
-      reject(
-        new Error(
-          `[chat-index] claude summarize timed out after ${timeoutMs}ms`,
-        ),
-      );
+      reject(new Error(`[chat-index] claude summarize timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.stdout.on("data", (chunk: Buffer) => {

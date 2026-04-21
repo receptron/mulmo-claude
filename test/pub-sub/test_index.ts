@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { AddressInfo } from "node:net";
 import { io as connect, type Socket } from "socket.io-client";
-import {
-  createPubSub,
-  type IPubSub,
-} from "../../server/events/pub-sub/index.js";
+import { createPubSub, type IPubSub } from "../../server/events/pub-sub/index.js";
 
 // Round-trip test for the socket.io-backed pub/sub transport.
 // Boots a real HTTP server on an ephemeral port, attaches the
@@ -22,9 +19,7 @@ describe("pub-sub (socket.io round trip)", () => {
   before(async () => {
     server = http.createServer();
     pubsub = createPubSub(server);
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const { port } = server.address() as AddressInfo;
     url = `http://127.0.0.1:${port}`;
   });
@@ -44,9 +39,7 @@ describe("pub-sub (socket.io round trip)", () => {
 
   it("delivers publish() to a subscribed client", async () => {
     const s = await connected();
-    const received = new Promise<unknown>((resolve) =>
-      s.once("data", (msg) => resolve(msg)),
-    );
+    const received = new Promise<unknown>((resolve) => s.once("data", (msg) => resolve(msg)));
     s.emit("subscribe", "alpha");
     // Wait for the subscribe to register as a room join before
     // publishing — socket.io rooms join synchronously on the
@@ -71,9 +64,7 @@ describe("pub-sub (socket.io round trip)", () => {
       otherGotData = true;
     });
 
-    const received = new Promise<unknown>((resolve) =>
-      sub.once("data", (msg) => resolve(msg)),
-    );
+    const received = new Promise<unknown>((resolve) => sub.once("data", (msg) => resolve(msg)));
     pubsub.publish("beta", { n: 1 });
     await received;
     // Give the "other" client a tick to receive (and thus fail).
@@ -90,9 +81,7 @@ describe("pub-sub (socket.io round trip)", () => {
     await new Promise((r) => setTimeout(r, 20));
 
     // First publish — should arrive.
-    const first = new Promise<unknown>((resolve) =>
-      s.once("data", (msg) => resolve(msg)),
-    );
+    const first = new Promise<unknown>((resolve) => s.once("data", (msg) => resolve(msg)));
     pubsub.publish("gamma", { seq: 1 });
     await first;
 

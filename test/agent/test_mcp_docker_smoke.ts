@@ -83,78 +83,72 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
       "/app/server/agent/mcp-server.ts",
     ];
 
-    const responses = await new Promise<JsonRpcResponse[]>(
-      (resolve, reject) => {
-        const child = spawn("docker", dockerArgs, {
-          cwd: PROJECT_ROOT,
-          stdio: ["pipe", "pipe", "pipe"],
-        });
+    const responses = await new Promise<JsonRpcResponse[]>((resolve, reject) => {
+      const child = spawn("docker", dockerArgs, {
+        cwd: PROJECT_ROOT,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
-        let stdout = "";
-        let stderr = "";
+      let stdout = "";
+      let stderr = "";
 
-        child.stdout.on("data", (chunk: Buffer) => {
-          stdout += chunk.toString();
-        });
-        child.stderr.on("data", (chunk: Buffer) => {
-          stderr += chunk.toString();
-        });
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
 
-        const lines = [
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "initialize",
-            params: {
-              protocolVersion: "2024-11-05",
-              capabilities: {},
-              clientInfo: { name: "docker-test", version: "0.0.0" },
-            },
-          }),
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: 2,
-            method: "tools/list",
-            params: {},
-          }),
-        ];
+      const lines = [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "docker-test", version: "0.0.0" },
+          },
+        }),
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list",
+          params: {},
+        }),
+      ];
 
-        for (const line of lines) {
-          child.stdin.write(line + "\n");
+      for (const line of lines) {
+        child.stdin.write(line + "\n");
+      }
+      child.stdin.end();
+
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error(`Docker MCP server timed out. stderr: ${stderr}`));
+      }, 30_000);
+
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        const parsed: JsonRpcResponse[] = stdout
+          .split("\n")
+          .filter((l) => l.trim())
+          .map((l) => {
+            try {
+              return JSON.parse(l) as JsonRpcResponse;
+            } catch {
+              return null;
+            }
+          })
+          .filter((r): r is JsonRpcResponse => r !== null);
+
+        if (parsed.length === 0 && code !== 0) {
+          reject(new Error(`Docker MCP server exited ${code}. stderr:\n${stderr.slice(0, 1000)}`));
+          return;
         }
-        child.stdin.end();
-
-        const timer = setTimeout(() => {
-          child.kill("SIGTERM");
-          reject(new Error(`Docker MCP server timed out. stderr: ${stderr}`));
-        }, 30_000);
-
-        child.on("close", (code) => {
-          clearTimeout(timer);
-          const parsed: JsonRpcResponse[] = stdout
-            .split("\n")
-            .filter((l) => l.trim())
-            .map((l) => {
-              try {
-                return JSON.parse(l) as JsonRpcResponse;
-              } catch {
-                return null;
-              }
-            })
-            .filter((r): r is JsonRpcResponse => r !== null);
-
-          if (parsed.length === 0 && code !== 0) {
-            reject(
-              new Error(
-                `Docker MCP server exited ${code}. stderr:\n${stderr.slice(0, 1000)}`,
-              ),
-            );
-            return;
-          }
-          resolve(parsed);
-        });
-      },
-    );
+        resolve(parsed);
+      });
+    });
 
     const initResp = responses.find((r) => r.id === 1);
     assert.ok(initResp?.result, "Missing initialize response");
@@ -164,13 +158,7 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
     assert.ok(toolsResp?.result?.tools, "Missing tools/list response");
 
     const toolNames = toolsResp.result.tools.map((t) => t.name);
-    assert.ok(
-      toolNames.includes("presentMulmoScript"),
-      `presentMulmoScript not in tools: ${toolNames.join(", ")}`,
-    );
-    assert.ok(
-      toolNames.includes("manageTodoList"),
-      `manageTodoList not in tools: ${toolNames.join(", ")}`,
-    );
+    assert.ok(toolNames.includes("presentMulmoScript"), `presentMulmoScript not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes("manageTodoList"), `manageTodoList not in tools: ${toolNames.join(", ")}`);
   });
 });

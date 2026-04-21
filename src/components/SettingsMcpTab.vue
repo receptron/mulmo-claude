@@ -1,21 +1,12 @@
 <template>
   <div class="space-y-3">
     <p class="text-xs text-gray-600 leading-relaxed">
-      Add external MCP servers. HTTP servers work in every mode. Stdio servers
-      use the sandbox image's
-      <code class="bg-gray-100 px-1 rounded">npx</code> /
-      <code class="bg-gray-100 px-1 rounded">node</code> /
-      <code class="bg-gray-100 px-1 rounded">tsx</code>; paths must live under
-      the workspace when Docker is enabled.
+      Add external MCP servers. HTTP servers work in every mode. Stdio servers use the sandbox image's
+      <code class="bg-gray-100 px-1 rounded">npx</code> / <code class="bg-gray-100 px-1 rounded">node</code> /
+      <code class="bg-gray-100 px-1 rounded">tsx</code>; paths must live under the workspace when Docker is enabled.
     </p>
 
-    <div
-      v-if="servers.length === 0"
-      class="text-xs text-gray-500 italic"
-      data-testid="mcp-empty"
-    >
-      No MCP servers configured yet.
-    </div>
+    <div v-if="servers.length === 0" class="text-xs text-gray-500 italic" data-testid="mcp-empty">No MCP servers configured yet.</div>
 
     <ul v-else class="space-y-2" data-testid="mcp-server-list">
       <li
@@ -26,49 +17,26 @@
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-semibold text-gray-800">{{
-              entry.id
-            }}</span>
+            <span class="text-sm font-semibold text-gray-800">{{ entry.id }}</span>
             <span
               class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5"
-              :class="
-                entry.spec.type === 'http'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-amber-100 text-amber-700'
-              "
+              :class="entry.spec.type === 'http' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
               >{{ entry.spec.type }}</span
             >
             <label class="flex items-center gap-1 text-xs text-gray-600 ml-2">
-              <input
-                type="checkbox"
-                :checked="entry.spec.enabled !== false"
-                :data-testid="'mcp-enabled-' + entry.id"
-                @change="onToggleEnabled(idx, $event)"
-              />
+              <input type="checkbox" :checked="entry.spec.enabled !== false" :data-testid="'mcp-enabled-' + entry.id" @change="onToggleEnabled(idx, $event)" />
               enabled
             </label>
           </div>
-          <button
-            class="text-xs text-red-600 hover:text-red-800"
-            :data-testid="'mcp-remove-' + entry.id"
-            @click="emit('remove', idx)"
-          >
-            Remove
-          </button>
+          <button class="text-xs text-red-600 hover:text-red-800" :data-testid="'mcp-remove-' + entry.id" @click="emit('remove', idx)">Remove</button>
         </div>
         <div v-if="entry.spec.type === 'http'" class="text-xs space-y-1">
           <div>
             <span class="text-gray-500">URL:</span>
             <code class="ml-1">{{ entry.spec.url }}</code>
           </div>
-          <div
-            v-if="
-              dockerMode && wouldRewriteLocalhost((entry.spec as HttpSpec).url)
-            "
-            class="text-amber-700"
-          >
-            In Docker mode <code>localhost</code> is rewritten to
-            <code>host.docker.internal</code>.
+          <div v-if="dockerMode && wouldRewriteLocalhost((entry.spec as HttpSpec).url)" class="text-amber-700">
+            In Docker mode <code>localhost</code> is rewritten to <code>host.docker.internal</code>.
           </div>
         </div>
         <div v-else-if="entry.spec.type === 'stdio'" class="text-xs space-y-1">
@@ -80,34 +48,21 @@
             </code>
           </div>
           <div
-            v-if="
-              dockerMode &&
-              stdioHasNonWorkspaceArg((entry.spec as StdioSpec).args)
-            "
+            v-if="dockerMode && stdioHasNonWorkspaceArg((entry.spec as StdioSpec).args)"
             class="text-red-600"
             :data-testid="'mcp-docker-warning-' + entry.id"
           >
-            ⚠ Contains paths outside the workspace — will not resolve inside
-            Docker.
+            ⚠ Contains paths outside the workspace — will not resolve inside Docker.
           </div>
         </div>
       </li>
     </ul>
 
-    <button
-      v-if="!adding"
-      class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-      data-testid="mcp-add-btn"
-      @click="startAdd"
-    >
+    <button v-if="!adding" class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50" data-testid="mcp-add-btn" @click="startAdd">
       + Add MCP Server
     </button>
 
-    <div
-      v-else
-      class="border border-blue-300 rounded p-3 space-y-2"
-      data-testid="mcp-add-form"
-    >
+    <div v-else class="border border-blue-300 rounded p-3 space-y-2" data-testid="mcp-add-form">
       <label class="block text-xs font-semibold text-gray-700">
         Name
         <input
@@ -121,21 +76,11 @@
       </label>
       <div class="flex gap-3 text-xs">
         <label class="flex items-center gap-1">
-          <input
-            v-model="draft.type"
-            type="radio"
-            value="http"
-            data-testid="mcp-draft-type-http"
-          />
+          <input v-model="draft.type" type="radio" value="http" data-testid="mcp-draft-type-http" />
           HTTP
         </label>
         <label class="flex items-center gap-1">
-          <input
-            v-model="draft.type"
-            type="radio"
-            value="stdio"
-            data-testid="mcp-draft-type-stdio"
-          />
+          <input v-model="draft.type" type="radio" value="stdio" data-testid="mcp-draft-type-stdio" />
           Stdio (command)
         </label>
       </div>
@@ -176,28 +121,14 @@
           ></textarea>
         </label>
       </div>
-      <div
-        v-if="draftError"
-        class="text-xs text-red-600"
-        data-testid="mcp-draft-error"
-      >
+      <div v-if="draftError" class="text-xs text-red-600" data-testid="mcp-draft-error">
         {{ draftError }}
       </div>
       <div class="flex justify-end gap-2">
-        <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-          data-testid="mcp-draft-cancel"
-          @click="cancelAdd"
-        >
+        <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="mcp-draft-cancel" @click="cancelAdd">
           Cancel
         </button>
-        <button
-          class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600"
-          data-testid="mcp-draft-add"
-          @click="commitAdd"
-        >
-          Add
-        </button>
+        <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="mcp-draft-add" @click="commitAdd">Add</button>
       </div>
     </div>
   </div>
@@ -289,11 +220,7 @@ function suggestIdFromUrl(rawUrl: string): string {
     const host = new URL(rawUrl).hostname;
     const parts = host.split(".").filter((p) => p.length > 0);
     // Drop generic subdomain / TLD noise so `mcp.deepwiki.com` → `deepwiki`.
-    const filtered = parts.filter(
-      (p, i) =>
-        !(i === 0 && (p === "mcp" || p === "www" || p === "api")) &&
-        !(i === parts.length - 1 && /^[a-z]{2,4}$/.test(p)),
-    );
+    const filtered = parts.filter((p, i) => !(i === 0 && (p === "mcp" || p === "www" || p === "api")) && !(i === parts.length - 1 && /^[a-z]{2,4}$/.test(p)));
     const candidate = filtered[0] ?? parts[0] ?? "";
     return slugifyToId(candidate);
   } catch {
@@ -308,9 +235,7 @@ function suggestIdFromStdioArgs(args: string[]): string {
   // For scoped packages / paths, keep only the last segment.
   const lastSegment = payload.split("/").pop() ?? payload;
   // Strip common MCP naming prefixes so `server-everything` → `everything`.
-  const stripped = lastSegment
-    .replace(/^(mcp-server-|server-|mcp-)/, "")
-    .replace(/\.(?:[jt]s|mjs|cjs)$/, "");
+  const stripped = lastSegment.replace(/^(mcp-server-|server-|mcp-)/, "").replace(/\.(?:[jt]s|mjs|cjs)$/, "");
   return slugifyToId(stripped);
 }
 
@@ -342,15 +267,13 @@ function commitAdd(): void {
   if (!id) {
     const suggested = ensureUniqueId(suggestIdFromDraft(draft.value));
     if (!suggested) {
-      draftError.value =
-        "Please provide a Name, or enter a URL / args we can derive one from.";
+      draftError.value = "Please provide a Name, or enter a URL / args we can derive one from.";
       return;
     }
     id = suggested;
   }
   if (!ID_RE.test(id)) {
-    draftError.value =
-      "Name must start with a lowercase letter and contain only [a-z0-9_-].";
+    draftError.value = "Name must start with a lowercase letter and contain only [a-z0-9_-].";
     return;
   }
   if (props.servers.some((s) => s.id === id)) {
@@ -420,9 +343,6 @@ function wouldRewriteLocalhost(url: string): boolean {
 
 function stdioHasNonWorkspaceArg(args?: string[]): boolean {
   if (!args) return false;
-  return args.some(
-    (arg) =>
-      /^\//.test(arg) && arg !== "/workspace" && !arg.startsWith("/workspace/"),
-  );
+  return args.some((arg) => /^\//.test(arg) && arg !== "/workspace" && !arg.startsWith("/workspace/"));
 }
 </script>

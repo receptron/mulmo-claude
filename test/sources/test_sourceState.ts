@@ -13,24 +13,15 @@ import {
   validateSourceState,
 } from "../../server/workspace/sources/sourceState.js";
 import { sourceStatePath } from "../../server/workspace/sources/paths.js";
-import {
-  defaultSourceState,
-  type SourceState,
-} from "../../server/workspace/sources/types.js";
+import { defaultSourceState, type SourceState } from "../../server/workspace/sources/types.js";
 
 // --- validateSourceState (pure) ------------------------------------------
 
 describe("validateSourceState", () => {
   it("returns default state for non-object input", () => {
     assert.deepEqual(validateSourceState(null, "s"), defaultSourceState("s"));
-    assert.deepEqual(
-      validateSourceState("string", "s"),
-      defaultSourceState("s"),
-    );
-    assert.deepEqual(
-      validateSourceState([1, 2, 3], "s"),
-      defaultSourceState("s"),
-    );
+    assert.deepEqual(validateSourceState("string", "s"), defaultSourceState("s"));
+    assert.deepEqual(validateSourceState([1, 2, 3], "s"), defaultSourceState("s"));
   });
 
   it("parses a complete state object", () => {
@@ -63,15 +54,8 @@ describe("validateSourceState", () => {
   });
 
   it("rejects non-numeric / negative consecutiveFailures", () => {
-    assert.equal(
-      validateSourceState({ consecutiveFailures: "many" }, "s")
-        .consecutiveFailures,
-      0,
-    );
-    assert.equal(
-      validateSourceState({ consecutiveFailures: -5 }, "s").consecutiveFailures,
-      0,
-    );
+    assert.equal(validateSourceState({ consecutiveFailures: "many" }, "s").consecutiveFailures, 0);
+    assert.equal(validateSourceState({ consecutiveFailures: -5 }, "s").consecutiveFailures, 0);
   });
 
   it("floors fractional consecutiveFailures", () => {
@@ -90,14 +74,8 @@ describe("validateSourceState", () => {
   });
 
   it("rejects non-object cursor", () => {
-    assert.deepEqual(
-      validateSourceState({ cursor: "not-an-object" }, "s").cursor,
-      {},
-    );
-    assert.deepEqual(
-      validateSourceState({ cursor: [1, 2, 3] }, "s").cursor,
-      {},
-    );
+    assert.deepEqual(validateSourceState({ cursor: "not-an-object" }, "s").cursor, {});
+    assert.deepEqual(validateSourceState({ cursor: [1, 2, 3] }, "s").cursor, {});
   });
 });
 
@@ -161,10 +139,7 @@ describe("writeSourceState", () => {
 
   it("rejects an invalid slug", async () => {
     const bad: SourceState = { ...makeState(), slug: "../etc" };
-    await assert.rejects(
-      () => writeSourceState(workspace, bad),
-      /invalid slug/,
-    );
+    await assert.rejects(() => writeSourceState(workspace, bad), /invalid slug/);
   });
 
   it("overwrites an existing state", async () => {

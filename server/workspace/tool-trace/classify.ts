@@ -8,9 +8,7 @@
 
 import { isRecord } from "../../utils/types.js";
 
-export type Classification =
-  | { kind: "pointer"; contentRef: string }
-  | { kind: "inline"; content: string; truncated: boolean };
+export type Classification = { kind: "pointer"; contentRef: string } | { kind: "inline"; content: string; truncated: boolean };
 
 // Max characters kept when content is stored inline in the jsonl.
 // Picked to keep per-turn jsonl size sane while still capturing

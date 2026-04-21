@@ -44,11 +44,7 @@ export function isoDateOnly(iso: string): string {
 export function isValidIsoDate(s: string): boolean {
   if (s.length !== 10) return false;
   if (s[4] !== "-" || s[7] !== "-") return false;
-  return (
-    isNumeric(s.slice(0, 4)) &&
-    isNumeric(s.slice(5, 7)) &&
-    isNumeric(s.slice(8, 10))
-  );
+  return isNumeric(s.slice(0, 4)) && isNumeric(s.slice(5, 7)) && isNumeric(s.slice(8, 10));
 }
 
 function isNumeric(s: string): boolean {

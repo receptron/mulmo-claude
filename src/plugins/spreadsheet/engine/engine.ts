@@ -5,12 +5,7 @@
  */
 
 import { calculateSheet, calculateWorkbook } from "./calculator";
-import type {
-  SheetData,
-  CalculatedSheet,
-  EngineOptions,
-  SpreadsheetCell,
-} from "./types";
+import type { SheetData, CalculatedSheet, EngineOptions, SpreadsheetCell } from "./types";
 import { isObj } from "../../../utils/types";
 
 /**
@@ -147,10 +142,7 @@ export class SpreadsheetEngine {
    * ]);
    * ```
    */
-  createSheet(
-    name: string,
-    data: Array<Array<SpreadsheetCell | string | number>>,
-  ): SheetData {
+  createSheet(name: string, data: Array<Array<SpreadsheetCell | string | number>>): SheetData {
     return {
       name,
       data: data.map((row) =>

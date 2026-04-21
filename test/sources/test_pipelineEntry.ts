@@ -8,33 +8,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  runSourcesPipeline,
-  toLocalIsoDate,
-} from "../../server/workspace/sources/pipeline/index.js";
-import type {
-  FetcherDeps,
-  SourceFetcher,
-} from "../../server/workspace/sources/fetchers/index.js";
-import type {
-  FetcherKind,
-  Source,
-  SourceItem,
-} from "../../server/workspace/sources/types.js";
+import { runSourcesPipeline, toLocalIsoDate } from "../../server/workspace/sources/pipeline/index.js";
+import type { FetcherDeps, SourceFetcher } from "../../server/workspace/sources/fetchers/index.js";
+import type { FetcherKind, Source, SourceItem } from "../../server/workspace/sources/types.js";
 import { writeSource } from "../../server/workspace/sources/registry.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
 import { readSourceState } from "../../server/workspace/sources/sourceState.js";
-import {
-  archivePath,
-  dailyNewsPath,
-} from "../../server/workspace/sources/paths.js";
+import { archivePath, dailyNewsPath } from "../../server/workspace/sources/paths.js";
 
 // --- helpers -------------------------------------------------------------
 
@@ -94,10 +75,7 @@ function makeFetcherDeps(): FetcherDeps {
 }
 
 // Fake fetcher that returns prebuilt items per slug.
-function fakeFetcher(
-  kind: FetcherKind,
-  itemsBySlug: Record<string, SourceItem[]>,
-): SourceFetcher {
+function fakeFetcher(kind: FetcherKind, itemsBySlug: Record<string, SourceItem[]>): SourceFetcher {
   return {
     kind,
     async fetch(source) {
@@ -133,10 +111,7 @@ const FIXED_NOW_MS = new Date(
 
 describe("runSourcesPipeline — happy path", () => {
   it("loads registry, fetches, dedups, summarizes, writes", async () => {
-    await writeSource(
-      workspace,
-      makeSource({ slug: "hn", categories: ["tech-news"] }),
-    );
+    await writeSource(workspace, makeSource({ slug: "hn", categories: ["tech-news"] }));
     await writeSource(
       workspace,
       makeSource({
@@ -170,10 +145,7 @@ describe("runSourcesPipeline — happy path", () => {
     assert.equal(summaries[0].length, 2);
     // Daily file exists and contains the JSON block.
     const dailyPath = result.dailyPath;
-    assert.equal(
-      dailyPath,
-      dailyNewsPath(workspace, toLocalIsoDate(FIXED_NOW_MS)),
-    );
+    assert.equal(dailyPath, dailyNewsPath(workspace, toLocalIsoDate(FIXED_NOW_MS)));
     const daily = await readFile(dailyPath, "utf-8");
     assert.match(daily, /# Daily brief/);
     assert.match(daily, /```json/);
@@ -183,15 +155,9 @@ describe("runSourcesPipeline — happy path", () => {
     // Archive files created per source.
     assert.equal(result.archiveWrittenPaths.length, 2);
     assert.equal(result.archiveErrors.length, 0);
-    const hnArchive = await readFile(
-      archivePath(workspace, "hn", "2026-04"),
-      "utf-8",
-    );
+    const hnArchive = await readFile(archivePath(workspace, "hn", "2026-04"), "utf-8");
     assert.match(hnArchive, /HN A/);
-    const redditArchive = await readFile(
-      archivePath(workspace, "reddit", "2026-04"),
-      "utf-8",
-    );
+    const redditArchive = await readFile(archivePath(workspace, "reddit", "2026-04"), "utf-8");
     assert.match(redditArchive, /Reddit B/);
     // Per-source state persisted with failure count = 0.
     const hnState = await readSourceState(workspace, "hn");
@@ -238,18 +204,14 @@ describe("runSourcesPipeline — happy path", () => {
 describe("runSourcesPipeline — empty day", () => {
   it("writes the empty-day daily file when no sources are eligible", async () => {
     // Register an hourly source — daily run skips it.
-    await writeSource(
-      workspace,
-      makeSource({ slug: "hourly-only", schedule: "hourly" }),
-    );
+    await writeSource(workspace, makeSource({ slug: "hourly-only", schedule: "hourly" }));
     const result = await runSourcesPipeline({
       workspaceRoot: workspace,
       scheduleType: "daily",
       fetcherDeps: makeFetcherDeps(),
       nowMs: () => FIXED_NOW_MS,
       getFetcher: () => fakeFetcher("rss", {}),
-      summarizeFn: async () =>
-        "# Daily brief — 2026-04-13\n\n_No new items today._\n",
+      summarizeFn: async () => "# Daily brief — 2026-04-13\n\n_No new items today._\n",
     });
     assert.equal(result.plannedCount, 0);
     assert.equal(result.items.length, 0);
@@ -266,8 +228,7 @@ describe("runSourcesPipeline — empty day", () => {
       fetcherDeps: makeFetcherDeps(),
       nowMs: () => FIXED_NOW_MS,
       getFetcher: () => fetcher,
-      summarizeFn: async (items) =>
-        items.length === 0 ? "# empty\n" : "# has items\n",
+      summarizeFn: async (items) => (items.length === 0 ? "# empty\n" : "# has items\n"),
     });
     // Plan had 1 source but fetch returned 0 items → dedup 0.
     assert.equal(result.plannedCount, 1);
@@ -323,8 +284,7 @@ describe("runSourcesPipeline — failure isolation (Q8)", () => {
   it("success after a failure resets the failure counter", async () => {
     await writeSource(workspace, makeSource());
     // Seed state: 3 consecutive failures on the way out.
-    const { writeSourceState } =
-      await import("../../server/workspace/sources/sourceState.js");
+    const { writeSourceState } = await import("../../server/workspace/sources/sourceState.js");
     await writeSourceState(workspace, {
       slug: "hn",
       lastFetchedAt: null,
@@ -355,14 +315,8 @@ describe("runSourcesPipeline — failure isolation (Q8)", () => {
 
 describe("runSourcesPipeline — schedule filtering", () => {
   it("only runs sources whose schedule matches scheduleType", async () => {
-    await writeSource(
-      workspace,
-      makeSource({ slug: "daily-1", schedule: "daily" }),
-    );
-    await writeSource(
-      workspace,
-      makeSource({ slug: "hourly-1", schedule: "hourly" }),
-    );
+    await writeSource(workspace, makeSource({ slug: "daily-1", schedule: "daily" }));
+    await writeSource(workspace, makeSource({ slug: "hourly-1", schedule: "hourly" }));
     await writeSource(
       workspace,
       makeSource({

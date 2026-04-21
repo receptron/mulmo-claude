@@ -1,17 +1,10 @@
 <template>
   <div class="flex-1 overflow-auto min-h-0">
-    <div
-      v-if="!selectedPath"
-      class="h-full flex items-center justify-center text-gray-400 text-sm"
-    >
-      Select a file
-    </div>
+    <div v-if="!selectedPath" class="h-full flex items-center justify-center text-gray-400 text-sm">Select a file</div>
     <div v-else-if="contentError" class="p-4 text-sm text-red-600">
       {{ contentError }}
     </div>
-    <div v-else-if="contentLoading" class="p-4 text-sm text-gray-400">
-      Loading...
-    </div>
+    <div v-else-if="contentLoading" class="p-4 text-sm text-gray-400">Loading...</div>
     <template v-else-if="content">
       <template v-if="content.kind === 'text'">
         <!-- Scheduler items.json: render with the scheduler plugin's
@@ -24,66 +17,33 @@
           <TodoExplorer :selected-result="todoExplorerResult" />
         </div>
         <!-- Markdown rendered: frontmatter panel + body -->
-        <div
-          v-else-if="isMarkdown && !mdRawMode"
-          class="h-full flex flex-col overflow-auto"
-        >
-          <div
-            v-if="mdFrontmatter && mdFrontmatter.fields.length > 0"
-            class="shrink-0 m-4 mb-0 rounded border border-gray-200 bg-gray-50 p-3 text-xs"
-          >
-            <div
-              v-for="field in mdFrontmatter.fields"
-              :key="field.key"
-              class="flex items-baseline gap-2 py-0.5"
-            >
-              <span class="font-semibold text-gray-600 shrink-0"
-                >{{ field.key }}:</span
-              >
+        <div v-else-if="isMarkdown && !mdRawMode" class="h-full flex flex-col overflow-auto">
+          <div v-if="mdFrontmatter && mdFrontmatter.fields.length > 0" class="shrink-0 m-4 mb-0 rounded border border-gray-200 bg-gray-50 p-3 text-xs">
+            <div v-for="field in mdFrontmatter.fields" :key="field.key" class="flex items-baseline gap-2 py-0.5">
+              <span class="font-semibold text-gray-600 shrink-0">{{ field.key }}:</span>
               <template v-if="Array.isArray(field.value)">
                 <span class="flex flex-wrap gap-1">
-                  <span
-                    v-for="item in field.value"
-                    :key="item"
-                    class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700"
-                  >
+                  <span v-for="item in field.value" :key="item" class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700">
                     {{ item }}
                   </span>
                 </span>
               </template>
-              <span v-else class="text-gray-800 break-words">{{
-                field.value
-              }}</span>
+              <span v-else class="text-gray-800 break-words">{{ field.value }}</span>
             </div>
           </div>
-          <div
-            class="flex-1 min-h-0"
-            @click.capture="(e: MouseEvent) => emit('markdownLinkClick', e)"
-          >
+          <div class="flex-1 min-h-0" @click.capture="(e: MouseEvent) => emit('markdownLinkClick', e)">
             <TextResponseView
-              :selected-result="
-                markdownResult(
-                  mdFrontmatter ? mdFrontmatter.body : content.content,
-                )
-              "
+              :selected-result="markdownResult(mdFrontmatter ? mdFrontmatter.body : content.content)"
               :editable-source="content.content"
               @update-source="(src: string) => emit('updateSource', src)"
             />
           </div>
-          <div
-            v-if="rawSaveError"
-            class="shrink-0 m-4 mt-0 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700"
-            role="alert"
-          >
+          <div v-if="rawSaveError" class="shrink-0 m-4 mt-0 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700" role="alert">
             ⚠ {{ rawSaveError }}
           </div>
         </div>
         <!-- Markdown raw source (includes frontmatter) -->
-        <pre
-          v-else-if="isMarkdown && mdRawMode"
-          class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800"
-          >{{ content.content }}</pre
-        >
+        <pre v-else-if="isMarkdown && mdRawMode" class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800">{{ content.content }}</pre>
         <!-- HTML: sandboxed iframe preview.
              `allow-scripts` lets Chart.js / canvas drawing / other
              JS-driven HTML (the common case for LLM-generated
@@ -95,40 +55,19 @@
              to restrict script loads to a vetted CDN whitelist +
              inline; connect-src is `'none'` so the page can't
              phone home. See src/utils/html/previewCsp.ts. -->
-        <iframe
-          v-else-if="isHtml"
-          :srcdoc="sandboxedHtml"
-          class="w-full h-full border-0"
-          sandbox="allow-scripts"
-          title="HTML preview"
-        />
+        <iframe v-else-if="isHtml" :srcdoc="sandboxedHtml" class="w-full h-full border-0" sandbox="allow-scripts" title="HTML preview" />
         <!-- JSON: pretty-printed with simple syntax coloring. Fall
              back to raw content if the file is malformed. -->
-        <pre
-          v-else-if="isJson"
-          class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800"
-        ><span
+        <pre v-else-if="isJson" class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800"><span
           v-for="(tok, i) in jsonTokens"
           :key="i"
           :class="JSON_TOKEN_CLASS[tok.type]"
         >{{ tok.value }}</span></pre>
         <!-- JSONL / NDJSON: one pretty-printed + colored record per line -->
         <div v-else-if="isJsonl" class="p-4 space-y-2">
-          <div
-            v-for="(line, i) in jsonlLines"
-            :key="i"
-            class="rounded border bg-gray-50 p-3"
-            :class="line.parseError ? 'border-red-300' : 'border-gray-200'"
-          >
-            <div
-              v-if="line.parseError"
-              class="text-xs text-red-600 mb-1 font-sans"
-            >
-              parse error
-            </div>
-            <pre
-              class="text-xs font-mono text-gray-800 whitespace-pre-wrap"
-            ><span
+          <div v-for="(line, i) in jsonlLines" :key="i" class="rounded border bg-gray-50 p-3" :class="line.parseError ? 'border-red-300' : 'border-gray-200'">
+            <div v-if="line.parseError" class="text-xs text-red-600 mb-1 font-sans">parse error</div>
+            <pre class="text-xs font-mono text-gray-800 whitespace-pre-wrap"><span
               v-for="(tok, j) in line.tokens"
               :key="j"
               :class="JSON_TOKEN_CLASS[tok.type]"
@@ -136,55 +75,21 @@
           </div>
         </div>
         <!-- Plain text fallback -->
-        <pre
-          v-else
-          class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800"
-          >{{ content.content }}</pre
-        >
+        <pre v-else class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800">{{ content.content }}</pre>
       </template>
       <!-- Image -->
-      <div
-        v-else-if="content.kind === 'image' && selectedPath"
-        class="h-full flex items-center justify-center p-4"
-      >
-        <img
-          :src="rawUrl(selectedPath)"
-          :alt="selectedPath"
-          class="max-w-full max-h-full object-contain"
-        />
+      <div v-else-if="content.kind === 'image' && selectedPath" class="h-full flex items-center justify-center p-4">
+        <img :src="rawUrl(selectedPath)" :alt="selectedPath" class="max-w-full max-h-full object-contain" />
       </div>
       <!-- PDF -->
-      <iframe
-        v-else-if="content.kind === 'pdf' && selectedPath"
-        :src="rawUrl(selectedPath)"
-        class="w-full h-full border-0"
-        title="PDF preview"
-      />
+      <iframe v-else-if="content.kind === 'pdf' && selectedPath" :src="rawUrl(selectedPath)" class="w-full h-full border-0" title="PDF preview" />
       <!-- Audio -->
-      <div
-        v-else-if="content.kind === 'audio' && selectedPath"
-        class="h-full flex items-center justify-center p-4"
-      >
-        <audio
-          :key="selectedPath"
-          :src="rawUrl(selectedPath)"
-          controls
-          preload="metadata"
-          class="w-full max-w-2xl"
-        />
+      <div v-else-if="content.kind === 'audio' && selectedPath" class="h-full flex items-center justify-center p-4">
+        <audio :key="selectedPath" :src="rawUrl(selectedPath)" controls preload="metadata" class="w-full max-w-2xl" />
       </div>
       <!-- Video -->
-      <div
-        v-else-if="content.kind === 'video' && selectedPath"
-        class="h-full flex items-center justify-center p-4 bg-black"
-      >
-        <video
-          :key="selectedPath"
-          :src="rawUrl(selectedPath)"
-          controls
-          preload="metadata"
-          class="max-w-full max-h-full"
-        />
+      <div v-else-if="content.kind === 'video' && selectedPath" class="h-full flex items-center justify-center p-4 bg-black">
+        <video :key="selectedPath" :src="rawUrl(selectedPath)" controls preload="metadata" class="max-w-full max-h-full" />
       </div>
       <!-- Binary or too-large -->
       <div v-else class="p-4 text-sm text-gray-500">

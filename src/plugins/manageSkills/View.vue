@@ -1,41 +1,27 @@
 <template>
   <div class="h-full bg-white flex flex-col overflow-hidden">
     <!-- Header -->
-    <div
-      class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0"
-    >
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div>
         <h2 class="text-lg font-semibold text-gray-800">Skills</h2>
-        <p class="text-xs text-gray-400 mt-0.5">
-          {{ skills.length }} available · click one to view · "Run" invokes it
-          as /&lt;name&gt;
-        </p>
+        <p class="text-xs text-gray-400 mt-0.5">{{ skills.length }} available · click one to view · "Run" invokes it as /&lt;name&gt;</p>
       </div>
     </div>
 
     <!-- List load error (standalone mode) -->
-    <div
-      v-if="listError"
-      class="px-6 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100"
-    >
+    <div v-if="listError" class="px-6 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100">
       {{ listError }}
     </div>
 
     <div class="flex-1 min-h-0 flex overflow-hidden">
       <!-- Left: skill list -->
-      <div
-        class="w-64 shrink-0 border-r border-gray-100 overflow-y-auto bg-gray-50"
-      >
+      <div class="w-64 shrink-0 border-r border-gray-100 overflow-y-auto bg-gray-50">
         <div
           v-for="skill in skills"
           :key="skill.name"
           :data-testid="`skill-item-${skill.name}`"
           class="cursor-pointer px-4 py-3 border-b border-gray-100 text-sm hover:bg-white transition-colors"
-          :class="
-            selectedName === skill.name
-              ? 'bg-white border-l-2 border-l-blue-500'
-              : ''
-          "
+          :class="selectedName === skill.name ? 'bg-white border-l-2 border-l-blue-500' : ''"
           @click="selectedName = skill.name"
         >
           <div class="font-medium text-gray-800 truncate">{{ skill.name }}</div>
@@ -54,9 +40,7 @@
 
       <!-- Right: detail pane -->
       <div class="flex-1 min-w-0 overflow-y-auto">
-        <div v-if="!selected" class="p-6 text-sm text-gray-400 italic">
-          Select a skill on the left to view its SKILL.md.
-        </div>
+        <div v-if="!selected" class="p-6 text-sm text-gray-400 italic">Select a skill on the left to view its SKILL.md.</div>
         <div v-else class="p-6">
           <div class="flex items-start justify-between gap-4 mb-4">
             <div class="min-w-0">
@@ -120,18 +104,14 @@
               </template>
             </div>
           </div>
-          <div v-if="detailLoading" class="text-sm text-gray-400 italic">
-            Loading…
-          </div>
+          <div v-if="detailLoading" class="text-sm text-gray-400 italic">Loading…</div>
           <div v-else-if="detailError" class="text-sm text-red-600">
             {{ detailError }}
           </div>
           <!-- Edit mode -->
           <div v-else-if="editing && detail" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">
-                Description
-              </label>
+              <label class="block text-xs font-medium text-gray-500 mb-1"> Description </label>
               <input
                 v-model="editDescription"
                 data-testid="skill-edit-description"
@@ -139,9 +119,7 @@
               />
             </div>
             <div class="flex-1">
-              <label class="block text-xs font-medium text-gray-500 mb-1">
-                Body (Markdown)
-              </label>
+              <label class="block text-xs font-medium text-gray-500 mb-1"> Body (Markdown) </label>
               <textarea
                 v-model="editBody"
                 data-testid="skill-edit-body"
@@ -151,15 +129,8 @@
           </div>
           <!-- View mode -->
           <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify -->
-          <div
-            v-else-if="detail && renderedBody"
-            class="markdown-content text-gray-700"
-            data-testid="skill-body-rendered"
-            v-html="renderedBody"
-          ></div>
-          <p v-else-if="detail" class="text-sm text-gray-400 italic">
-            (empty body)
-          </p>
+          <div v-else-if="detail && renderedBody" class="markdown-content text-gray-700" data-testid="skill-body-rendered" v-html="renderedBody"></div>
+          <p v-else-if="detail" class="text-sm text-gray-400 italic">(empty body)</p>
         </div>
       </div>
     </div>
@@ -202,9 +173,7 @@ const saving = ref(false);
 const editDescription = ref("");
 const editBody = ref("");
 
-const selected = computed(
-  () => skills.value.find((s) => s.name === selectedName.value) ?? null,
-);
+const selected = computed(() => skills.value.find((s) => s.name === selectedName.value) ?? null);
 
 const renderedBody = computed(() => {
   const body = detail.value?.body;
@@ -228,9 +197,7 @@ const listError = ref<string | null>(null);
 // list from the API on mount so the view is populated.
 onMounted(async () => {
   if (props.selectedResult || skills.value.length > 0) return;
-  const response = await apiGet<{ skills: SkillSummary[] }>(
-    API_ROUTES.skills.list,
-  );
+  const response = await apiGet<{ skills: SkillSummary[] }>(API_ROUTES.skills.list);
   if (!response.ok) {
     listError.value = `Failed to load skills: ${response.error}`;
     return;
@@ -258,9 +225,7 @@ watch(
     editing.value = false;
     detailLoading.value = true;
     detailError.value = null;
-    const response = await apiGet<{ skill: SkillDetail }>(
-      API_ROUTES.skills.detail.replace(":name", encodeURIComponent(name)),
-    );
+    const response = await apiGet<{ skill: SkillDetail }>(API_ROUTES.skills.detail.replace(":name", encodeURIComponent(name)));
     if (selectedName.value !== name) {
       // Selection changed while this request was in flight — drop it.
       return;
@@ -292,10 +257,10 @@ async function saveEdit(): Promise<void> {
   const name = detail.value.name;
   saving.value = true;
   detailError.value = null;
-  const result = await apiPut<{ updated: boolean; path: string }>(
-    API_ROUTES.skills.update.replace(":name", encodeURIComponent(name)),
-    { description: editDescription.value, body: editBody.value },
-  );
+  const result = await apiPut<{ updated: boolean; path: string }>(API_ROUTES.skills.update.replace(":name", encodeURIComponent(name)), {
+    description: editDescription.value,
+    body: editBody.value,
+  });
   saving.value = false;
   if (!result.ok) {
     detailError.value = `Save failed: ${result.error}`;
@@ -335,17 +300,11 @@ function runSkill(): void {
 async function deleteSkill(): Promise<void> {
   if (!detail.value || detail.value.source !== "project") return;
   const name = detail.value.name;
-  if (
-    !window.confirm(
-      `Delete skill "${name}"? This removes ~/mulmoclaude/.claude/skills/${name}/SKILL.md.`,
-    )
-  ) {
+  if (!window.confirm(`Delete skill "${name}"? This removes ~/mulmoclaude/.claude/skills/${name}/SKILL.md.`)) {
     return;
   }
   deleting.value = true;
-  const result = await apiDelete<unknown>(
-    API_ROUTES.skills.remove.replace(":name", encodeURIComponent(name)),
-  );
+  const result = await apiDelete<unknown>(API_ROUTES.skills.remove.replace(":name", encodeURIComponent(name)));
   deleting.value = false;
   if (!result.ok) {
     detailError.value = result.error || "Failed to delete";

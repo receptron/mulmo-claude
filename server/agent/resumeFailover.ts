@@ -55,10 +55,7 @@ export interface BuildPreambleOptions {
  * Returns "" when no replayable turns exist (no transcript, or every
  * entry was a tool call / non-text event).
  */
-export function buildTranscriptPreamble(
-  jsonlContent: string,
-  opts: BuildPreambleOptions = {},
-): string {
+export function buildTranscriptPreamble(jsonlContent: string, opts: BuildPreambleOptions = {}): string {
   const entries = parseTranscriptEntries(jsonlContent);
   if (entries.length === 0) return "";
 
@@ -95,10 +92,7 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
 // preamble is chronological. The `truncated` flag lets the caller
 // tell Claude "earlier turns were dropped" instead of silently
 // showing a partial history.
-function selectMostRecent(
-  entries: TranscriptEntry[],
-  maxChars: number,
-): { kept: TranscriptEntry[]; truncated: boolean } {
+function selectMostRecent(entries: TranscriptEntry[], maxChars: number): { kept: TranscriptEntry[]; truncated: boolean } {
   const picked: TranscriptEntry[] = [];
   let size = 0;
   for (let i = entries.length - 1; i >= 0; i--) {
@@ -113,10 +107,7 @@ function selectMostRecent(
   return { kept: picked.reverse(), truncated: false };
 }
 
-function formatPreamble(
-  entries: TranscriptEntry[],
-  truncated: boolean,
-): string {
+function formatPreamble(entries: TranscriptEntry[], truncated: boolean): string {
   const lines: string[] = [];
   lines.push(
     "[Continuing from an earlier session. The original Claude CLI " +

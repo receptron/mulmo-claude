@@ -4,11 +4,7 @@
 // from the top-level runner.
 
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
-import {
-  writeTopicFile,
-  readAllTopicFiles,
-  archiveTopic,
-} from "../../utils/files/journal-io.js";
+import { writeTopicFile, readAllTopicFiles, archiveTopic } from "../../utils/files/journal-io.js";
 import {
   type Summarize,
   type OptimizationTopicSnapshot,
@@ -67,22 +63,14 @@ export function planMerges(merges: readonly RawMerge[]): MergePlanItem[] {
 
 // Pure transform: returns the next JournalState with any slug in
 // `removed` filtered out of knownTopics.
-export function applyRemovedTopics(
-  state: JournalState,
-  removed: ReadonlySet<string>,
-): JournalState {
+export function applyRemovedTopics(state: JournalState, removed: ReadonlySet<string>): JournalState {
   return {
     ...state,
     knownTopics: state.knownTopics.filter((t) => !removed.has(t)),
   };
 }
 
-async function executeMergePlans(
-  workspaceRoot: string,
-  plans: MergePlanItem[],
-  removed: Set<string>,
-  mergedSlugs: string[],
-): Promise<void> {
+async function executeMergePlans(workspaceRoot: string, plans: MergePlanItem[], removed: Set<string>, mergedSlugs: string[]): Promise<void> {
   for (const plan of plans) {
     await writeTopicFile(plan.intoSlug, plan.newContent, workspaceRoot);
     for (const src of plan.fromSlugs) {
@@ -97,12 +85,7 @@ async function executeMergePlans(
   }
 }
 
-async function executeArchives(
-  workspaceRoot: string,
-  rawSlugs: readonly string[],
-  removed: Set<string>,
-  archivedSlugs: string[],
-): Promise<void> {
+async function executeArchives(workspaceRoot: string, rawSlugs: readonly string[], removed: Set<string>, archivedSlugs: string[]): Promise<void> {
   for (const raw of rawSlugs) {
     const slug = slugify(raw);
     if (removed.has(slug)) continue;
@@ -135,10 +118,7 @@ export async function runOptimizationPass(
 
   let raw: string;
   try {
-    raw = await deps.summarize(
-      OPTIMIZATION_SYSTEM_PROMPT,
-      buildOptimizationUserPrompt({ topics }),
-    );
+    raw = await deps.summarize(OPTIMIZATION_SYSTEM_PROMPT, buildOptimizationUserPrompt({ topics }));
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) throw err;
     log.warn("journal", "optimization summarize failed", {
@@ -161,25 +141,13 @@ export async function runOptimizationPass(
 
   // Apply merges first, then archives (which skip slugs already
   // removed by a merge).
-  await executeMergePlans(
-    workspaceRoot,
-    planMerges(parsed.merges),
-    removed,
-    result.mergedSlugs,
-  );
-  await executeArchives(
-    workspaceRoot,
-    parsed.archives,
-    removed,
-    result.archivedSlugs,
-  );
+  await executeMergePlans(workspaceRoot, planMerges(parsed.merges), removed, result.mergedSlugs);
+  await executeArchives(workspaceRoot, parsed.archives, removed, result.archivedSlugs);
 
   return { nextState: applyRemovedTopics(state, removed), result };
 }
 
-async function loadTopicHeads(
-  workspaceRoot: string,
-): Promise<OptimizationTopicSnapshot[]> {
+async function loadTopicHeads(workspaceRoot: string): Promise<OptimizationTopicSnapshot[]> {
   const topicMap = await readAllTopicFiles(workspaceRoot);
   const out: OptimizationTopicSnapshot[] = [];
   for (const [slug, content] of topicMap) {

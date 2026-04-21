@@ -2,13 +2,7 @@
 // syntax coloring. Keeps itself dependency-free so it can be reused
 // and unit-tested without pulling in Vue or Tailwind.
 
-export type JsonTokenType =
-  | "key"
-  | "string"
-  | "number"
-  | "keyword"
-  | "punct"
-  | "whitespace";
+export type JsonTokenType = "key" | "string" | "number" | "keyword" | "punct" | "whitespace";
 
 export interface JsonToken {
   type: JsonTokenType;
@@ -76,11 +70,7 @@ function markKeys(tokens: JsonToken[]): void {
     if (tokens[i].type !== "string") continue;
     let j = i + 1;
     while (j < tokens.length && tokens[j].type === "whitespace") j++;
-    if (
-      j < tokens.length &&
-      tokens[j].type === "punct" &&
-      tokens[j].value === ":"
-    ) {
+    if (j < tokens.length && tokens[j].type === "punct" && tokens[j].value === ":") {
       tokens[i] = { type: "key", value: tokens[i].value };
     }
   }

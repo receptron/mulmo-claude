@@ -41,11 +41,7 @@ function extractColumns(json: unknown): StatusColumn[] | null {
 // the new REST routes) into the local refs. Centralised so every
 // helper uses the same parser and error guard. Returns false on a
 // payload missing the items array.
-function applyPayload(
-  json: unknown,
-  items: Ref<TodoItem[]>,
-  columns: Ref<StatusColumn[]>,
-): boolean {
+function applyPayload(json: unknown, items: Ref<TodoItem[]>, columns: Ref<StatusColumn[]>): boolean {
   const nextItems = extractItems(json);
   const nextColumns = extractColumns(json);
   if (nextItems) items.value = nextItems;
@@ -107,10 +103,7 @@ export interface PatchColumnInput {
 // Initial values come from the caller (e.g. the parent View receives
 // items via its `selectedResult` prop). The composable then refreshes
 // from the server on mount and updates the refs in place.
-export function useTodos(
-  initialItems: TodoItem[] = [],
-  initialColumns: StatusColumn[] = [],
-): UseTodosHandle {
+export function useTodos(initialItems: TodoItem[] = [], initialColumns: StatusColumn[] = []): UseTodosHandle {
   const items = ref<TodoItem[]>(initialItems);
   const columns = ref<StatusColumn[]>(initialColumns);
   const error = ref<string | null>(null);
@@ -147,11 +140,7 @@ export function useTodos(
   // into the local refs and surfaces errors through `error.value`.
   // Using apiCall (not raw fetch) ensures the #272 bearer token is
   // attached to every request.
-  async function call(
-    url: string,
-    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-    body?: unknown,
-  ): Promise<boolean> {
+  async function call(url: string, method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown): Promise<boolean> {
     error.value = null;
     try {
       const result = await apiCall<unknown>(url, { method, body });
@@ -177,36 +166,12 @@ export function useTodos(
     error,
     refresh,
     createItem: (input) => call(API_ROUTES.todos.items, "POST", input),
-    patchItem: (id, input) =>
-      call(
-        API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)),
-        "PATCH",
-        input,
-      ),
-    moveItem: (id, input) =>
-      call(
-        API_ROUTES.todos.itemMove.replace(":id", encodeURIComponent(id)),
-        "POST",
-        input,
-      ),
-    deleteItem: (id) =>
-      call(
-        API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)),
-        "DELETE",
-      ),
+    patchItem: (id, input) => call(API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)), "PATCH", input),
+    moveItem: (id, input) => call(API_ROUTES.todos.itemMove.replace(":id", encodeURIComponent(id)), "POST", input),
+    deleteItem: (id) => call(API_ROUTES.todos.item.replace(":id", encodeURIComponent(id)), "DELETE"),
     addColumn: (input) => call(API_ROUTES.todos.columns, "POST", input),
-    patchColumn: (id, input) =>
-      call(
-        API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)),
-        "PATCH",
-        input,
-      ),
-    deleteColumn: (id) =>
-      call(
-        API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)),
-        "DELETE",
-      ),
-    reorderColumns: (ids) =>
-      call(API_ROUTES.todos.columnsOrder, "PUT", { ids }),
+    patchColumn: (id, input) => call(API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)), "PATCH", input),
+    deleteColumn: (id) => call(API_ROUTES.todos.column.replace(":id", encodeURIComponent(id)), "DELETE"),
+    reorderColumns: (ids) => call(API_ROUTES.todos.columnsOrder, "PUT", { ids }),
   };
 }

@@ -8,15 +8,10 @@ import { mergeSessionLists } from "../utils/session/mergeSessions";
 
 const MAX_TABS = 6;
 
-export function useMergedSessions(opts: {
-  sessionMap: Map<string, ActiveSession>;
-  sessions: Ref<SessionSummary[]>;
-}) {
+export function useMergedSessions(opts: { sessionMap: Map<string, ActiveSession>; sessions: Ref<SessionSummary[]> }) {
   const { sessionMap, sessions } = opts;
 
-  const mergedSessions = computed((): SessionSummary[] =>
-    mergeSessionLists([...sessionMap.values()], sessions.value),
-  );
+  const mergedSessions = computed((): SessionSummary[] => mergeSessionLists([...sessionMap.values()], sessions.value));
 
   const tabSessions = computed(() => mergedSessions.value.slice(0, MAX_TABS));
 

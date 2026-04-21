@@ -49,9 +49,7 @@ export interface MaybeAppendWikiBacklinksOptions {
   deps?: Partial<WikiBacklinksDeps>;
 }
 
-export async function maybeAppendWikiBacklinks(
-  opts: MaybeAppendWikiBacklinksOptions,
-): Promise<void> {
+export async function maybeAppendWikiBacklinks(opts: MaybeAppendWikiBacklinksOptions): Promise<void> {
   if (!opts.chatSessionId) return;
   const workspaceRoot = opts.workspaceRoot ?? defaultWorkspacePath;
   const deps: WikiBacklinksDeps = { ...defaultDeps, ...(opts.deps ?? {}) };
@@ -62,20 +60,11 @@ export async function maybeAppendWikiBacklinks(
 
   const threshold = opts.turnStartedAt - MTIME_TOLERANCE_MS;
   for (const fileName of files) {
-    await processOneFile(
-      pagesDir,
-      fileName,
-      opts.chatSessionId,
-      threshold,
-      deps,
-    );
+    await processOneFile(pagesDir, fileName, opts.chatSessionId, threshold, deps);
   }
 }
 
-async function listPageFiles(
-  pagesDir: string,
-  deps: WikiBacklinksDeps,
-): Promise<string[]> {
+async function listPageFiles(pagesDir: string, deps: WikiBacklinksDeps): Promise<string[]> {
   try {
     const entries = await deps.readdir(pagesDir);
     return entries.filter((name) => name.endsWith(".md"));
@@ -86,13 +75,7 @@ async function listPageFiles(
   }
 }
 
-async function processOneFile(
-  pagesDir: string,
-  fileName: string,
-  sessionId: string,
-  mtimeThreshold: number,
-  deps: WikiBacklinksDeps,
-): Promise<void> {
+async function processOneFile(pagesDir: string, fileName: string, sessionId: string, mtimeThreshold: number, deps: WikiBacklinksDeps): Promise<void> {
   const fullPath = path.join(pagesDir, fileName);
   try {
     const st = await deps.stat(fullPath);
@@ -104,17 +87,10 @@ async function processOneFile(
     // and `conversations/chat/` post-#284, so the href is no longer
     // a fixed `../../chat/…` — derive from the constants.
     const workspaceRoot = path.resolve(pagesDir, "..", "..", "..");
-    const chatFileAbs = path.join(
-      workspaceRoot,
-      WORKSPACE_DIRS.chat,
-      `${sessionId}.jsonl`,
-    );
+    const chatFileAbs = path.join(workspaceRoot, WORKSPACE_DIRS.chat, `${sessionId}.jsonl`);
     // Markdown link targets are URL-ish and must use forward slashes
     // even on Windows, where `path.relative` returns backslashes.
-    const linkHref = path
-      .relative(path.dirname(fullPath), chatFileAbs)
-      .split(path.sep)
-      .join("/");
+    const linkHref = path.relative(path.dirname(fullPath), chatFileAbs).split(path.sep).join("/");
     const updated = updateSessionBacklinks(content, sessionId, linkHref);
     if (updated === content) return;
 

@@ -1,12 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  formatDate,
-  formatDateTime,
-  formatTime,
-  formatShortTime,
-  formatShortDate,
-} from "../../../src/utils/format/date.js";
+import { formatDate, formatDateTime, formatTime, formatShortTime, formatShortDate } from "../../../src/utils/format/date.js";
 
 describe("formatDate", () => {
   it("returns a non-empty string for a valid ISO date", () => {

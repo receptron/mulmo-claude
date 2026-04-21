@@ -83,11 +83,7 @@ export function publishNotification(opts: PublishNotificationOpts): void {
 
     // Push to bridge (Telegram/CLI)
     if (deps && opts.transportId) {
-      deps.pushToBridge(
-        opts.transportId,
-        "notifications",
-        formatBridgeMessage(payload),
-      );
+      deps.pushToBridge(opts.transportId, "notifications", formatBridgeMessage(payload));
     }
 
     log.info("notifications", "published", {
@@ -127,10 +123,7 @@ export interface ScheduledNotification {
   cancel: () => void;
 }
 
-export function scheduleTestNotification(
-  opts: ScheduleNotificationOptions,
-  legacyDeps: NotificationDeps,
-): ScheduledNotification {
+export function scheduleTestNotification(opts: ScheduleNotificationOptions, legacyDeps: NotificationDeps): ScheduledNotification {
   const message = opts.message ?? DEFAULT_NOTIFICATION_MESSAGE;
   const transportId = opts.transportId ?? DEFAULT_NOTIFICATION_TRANSPORT_ID;
   const chatId = opts.chatId ?? DEFAULT_NOTIFICATION_CHAT_ID;

@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  statSafe,
-  readDirSafe,
-  readTextOrNull,
-  resolveWithinRoot,
-} from "../../server/utils/files/safe.js";
+import { statSafe, readDirSafe, readTextOrNull, resolveWithinRoot } from "../../server/utils/files/safe.js";
 
 // Each test gets its own scratch dir so they can run in parallel and
 // don't have to clean up after each other. We realpath the dir up
@@ -95,10 +90,7 @@ describe("readTextOrNull", () => {
   after(() => rm(scratch));
 
   it("returns the file contents as a string", async () => {
-    assert.equal(
-      await readTextOrNull(path.join(scratch, "hi.txt")),
-      "hello world",
-    );
+    assert.equal(await readTextOrNull(path.join(scratch, "hi.txt")), "hello world");
   });
 
   it("returns null for a missing file", async () => {
@@ -139,10 +131,7 @@ describe("resolveWithinRoot — happy path", () => {
   });
 
   it("normalizes redundant separators and ./", () => {
-    assert.equal(
-      resolveWithinRoot(scratch, "./sub/./nested.txt"),
-      path.join(scratch, "sub", "nested.txt"),
-    );
+    assert.equal(resolveWithinRoot(scratch, "./sub/./nested.txt"), path.join(scratch, "sub", "nested.txt"));
   });
 });
 
@@ -206,10 +195,7 @@ describe("resolveWithinRoot — security: symlinks", () => {
     // Symlink inside scratch pointing to another file inside scratch
     // — a legitimate symlink that should resolve normally.
     try {
-      fs.symlinkSync(
-        path.join(scratch, "real.txt"),
-        path.join(scratch, "alias.txt"),
-      );
+      fs.symlinkSync(path.join(scratch, "real.txt"), path.join(scratch, "alias.txt"));
     } catch {
       /* ignore */
     }
@@ -229,10 +215,7 @@ describe("resolveWithinRoot — security: symlinks", () => {
     const aliasLink = path.join(scratch, "alias.txt");
     if (!fs.existsSync(aliasLink)) return; // platform skip
     // The alias is followed to its target — both are inside scratch.
-    assert.equal(
-      resolveWithinRoot(scratch, "alias.txt"),
-      path.join(scratch, "real.txt"),
-    );
+    assert.equal(resolveWithinRoot(scratch, "alias.txt"), path.join(scratch, "real.txt"));
   });
 });
 

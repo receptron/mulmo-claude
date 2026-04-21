@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  BACKLINKS_MARKER,
-  updateSessionBacklinks,
-} from "../../server/workspace/wiki-backlinks/sessionBacklinks.js";
+import { BACKLINKS_MARKER, updateSessionBacklinks } from "../../server/workspace/wiki-backlinks/sessionBacklinks.js";
 
 const SID_A = "3e0382cb-f02f-4f5b-a9a3-a71e50d7ad0c";
 const SID_B = "4d7f5377-1bac-460c-8ec5-ea054fa0492d";
@@ -17,10 +14,7 @@ describe("updateSessionBacklinks — appendix creation", () => {
     assert.ok(out.includes(BACKLINKS_MARKER));
     assert.ok(out.includes("## History"));
     assert.ok(out.includes(`[session 3e0382cb](${HREF_A})`));
-    assert.ok(
-      out.startsWith(existing),
-      "existing body should be preserved verbatim at the front",
-    );
+    assert.ok(out.startsWith(existing), "existing body should be preserved verbatim at the front");
   });
 
   it("adds blank-line separator before the appendix when body does not end in newline", () => {
@@ -41,31 +35,13 @@ describe("updateSessionBacklinks — appendix creation", () => {
 
 describe("updateSessionBacklinks — dedupe (idempotent)", () => {
   it("returns the input unchanged when sessionId is already listed", () => {
-    const existing = [
-      "# Page title",
-      "",
-      "Body.",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session 3e0382cb](${HREF_A})`,
-      "",
-    ].join("\n");
+    const existing = ["# Page title", "", "Body.", "", BACKLINKS_MARKER, "## History", "", `- [session 3e0382cb](${HREF_A})`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_A, HREF_A);
     assert.equal(out, existing);
   });
 
   it("returns unchanged even if existing link uses absolute `/chat/` form", () => {
-    const existing = [
-      "# Page",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session 3e0382cb](/chat/${SID_A}.jsonl)`,
-      "",
-    ].join("\n");
+    const existing = ["# Page", "", BACKLINKS_MARKER, "## History", "", `- [session 3e0382cb](/chat/${SID_A}.jsonl)`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_A, HREF_A);
     assert.equal(out, existing);
   });
@@ -80,23 +56,12 @@ describe("updateSessionBacklinks — dedupe (idempotent)", () => {
 
 describe("updateSessionBacklinks — append second session", () => {
   it("appends a new bullet under an existing appendix", () => {
-    const existing = [
-      "# Page",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session 3e0382cb](${HREF_A})`,
-      "",
-    ].join("\n");
+    const existing = ["# Page", "", BACKLINKS_MARKER, "## History", "", `- [session 3e0382cb](${HREF_A})`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_B, HREF_B);
     assert.ok(out.includes(`[session 3e0382cb](${HREF_A})`));
     assert.ok(out.includes(`[session 4d7f5377](${HREF_B})`));
     // Existing bullet should appear before the new one.
-    assert.ok(
-      out.indexOf(`[session 3e0382cb]`) < out.indexOf(`[session 4d7f5377]`),
-      "new bullet must be appended after existing bullets",
-    );
+    assert.ok(out.indexOf(`[session 3e0382cb]`) < out.indexOf(`[session 4d7f5377]`), "new bullet must be appended after existing bullets");
   });
 
   it("preserves bullets from multiple earlier sessions", () => {
@@ -125,54 +90,26 @@ describe("updateSessionBacklinks — edge cases", () => {
 
   it("uses full id as short form when id is shorter than 8 chars", () => {
     const shortId = "abc";
-    const out = updateSessionBacklinks(
-      "# Page\n",
-      shortId,
-      `../../chat/${shortId}.jsonl`,
-    );
+    const out = updateSessionBacklinks("# Page\n", shortId, `../../chat/${shortId}.jsonl`);
     assert.ok(out.includes(`[session abc](../../chat/abc.jsonl)`));
   });
 
   it("ignores a bullet whose href has no `chat/` segment", () => {
     // The existing bullet does NOT point at a chat session, so the new
     // sessionId should still be added (not treated as already-present).
-    const existing = [
-      "# Page",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [not a session](../../wiki/pages/other.md)`,
-      "",
-    ].join("\n");
+    const existing = ["# Page", "", BACKLINKS_MARKER, "## History", "", `- [not a session](../../wiki/pages/other.md)`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_A, HREF_A);
     assert.ok(out.includes(`[session 3e0382cb](${HREF_A})`));
   });
 
   it("ignores a malformed bullet (no closing paren)", () => {
-    const existing = [
-      "# Page",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session broken](../../chat/broken.jsonl`,
-      "",
-    ].join("\n");
+    const existing = ["# Page", "", BACKLINKS_MARKER, "## History", "", `- [session broken](../../chat/broken.jsonl`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_A, HREF_A);
     assert.ok(out.includes(`[session 3e0382cb](${HREF_A})`));
   });
 
   it("strips fragment/query from href before id extraction", () => {
-    const existing = [
-      "# Page",
-      "",
-      BACKLINKS_MARKER,
-      "## History",
-      "",
-      `- [session 3e0382cb](${HREF_A}#top)`,
-      "",
-    ].join("\n");
+    const existing = ["# Page", "", BACKLINKS_MARKER, "## History", "", `- [session 3e0382cb](${HREF_A}#top)`, ""].join("\n");
     const out = updateSessionBacklinks(existing, SID_A, HREF_A);
     // #top variant counts as an existing record of SID_A → no append.
     assert.equal(out, existing);

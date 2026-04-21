@@ -6,11 +6,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createBridgeClient,
-  requireBearerToken,
-  readBridgeToken,
-} from "@mulmobridge/client";
+import { createBridgeClient, requireBearerToken, readBridgeToken } from "@mulmobridge/client";
 
 describe("@mulmobridge/cli — dependency smoke", () => {
   it("@mulmobridge/client exports createBridgeClient", () => {
@@ -30,10 +26,7 @@ describe("@mulmobridge/cli — dependency smoke", () => {
       // ~/mulmoclaude/.session-token, so it should return null.
       const token = readBridgeToken();
       // Either null (no file) or a string (dev machine has the server running)
-      assert.ok(
-        token === null || typeof token === "string",
-        "readBridgeToken should return null or string",
-      );
+      assert.ok(token === null || typeof token === "string", "readBridgeToken should return null or string");
     } finally {
       if (saved !== undefined) process.env.MULMOCLAUDE_AUTH_TOKEN = saved;
     }

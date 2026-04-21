@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  writeFileAtomic,
-  writeFileAtomicSync,
-} from "../../../server/utils/files/atomic.js";
+import { writeFileAtomic, writeFileAtomicSync } from "../../../server/utils/files/atomic.js";
 
 let tmpDir: string;
 
@@ -60,10 +57,7 @@ describe("writeFileAtomic", () => {
   it("uses unique tmp filenames when uniqueTmp is set", async () => {
     const file = path.join(tmpDir, "unique.txt");
     // Two concurrent writes should both succeed without collision
-    await Promise.all([
-      writeFileAtomic(file, "a", { uniqueTmp: true }),
-      writeFileAtomic(file, "b", { uniqueTmp: true }),
-    ]);
+    await Promise.all([writeFileAtomic(file, "a", { uniqueTmp: true }), writeFileAtomic(file, "b", { uniqueTmp: true })]);
     const content = fs.readFileSync(file, "utf-8");
     assert.ok(content === "a" || content === "b");
   });

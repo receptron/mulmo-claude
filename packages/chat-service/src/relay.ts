@@ -10,13 +10,7 @@
 import { EVENT_TYPES } from "@mulmobridge/protocol";
 import type { ChatStateStore } from "./chat-state.js";
 import type { CommandHandler } from "./commands.js";
-import type {
-  Attachment,
-  Logger,
-  OnSessionEventFn,
-  Role,
-  StartChatFn,
-} from "./types.js";
+import type { Attachment, Logger, OnSessionEventFn, Role, StartChatFn } from "./types.js";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -31,9 +25,7 @@ export interface RelayParams {
   onChunk?: (text: string) => void;
 }
 
-export type RelayResult =
-  | { kind: "ok"; reply: string }
-  | { kind: "error"; status: number; message: string };
+export type RelayResult = { kind: "ok"; reply: string } | { kind: "error"; status: number; message: string };
 
 export type RelayFn = (params: RelayParams) => Promise<RelayResult>;
 
@@ -54,19 +46,9 @@ const REPLY_TIMEOUT_MS = 5 * 60 * 1000;
 // ── Factory ──────────────────────────────────────────────────
 
 export function createRelay(deps: RelayDeps): RelayFn {
-  const {
-    store,
-    handleCommand,
-    startChat,
-    onSessionEvent,
-    getRole,
-    defaultRoleId,
-    logger,
-  } = deps;
+  const { store, handleCommand, startChat, onSessionEvent, getRole, defaultRoleId, logger } = deps;
 
-  return async function relayMessage(
-    params: RelayParams,
-  ): Promise<RelayResult> {
+  return async function relayMessage(params: RelayParams): Promise<RelayResult> {
     const { transportId, externalChatId, text, attachments } = params;
 
     // Log attachment summary (count + mimeTypes) — NEVER log raw
@@ -87,11 +69,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
     let chatState = await store.getChatState(transportId, externalChatId);
     if (!chatState) {
       const defaultRole = getRole(defaultRoleId);
-      chatState = await store.resetChatState(
-        transportId,
-        externalChatId,
-        defaultRole.id,
-      );
+      chatState = await store.resetChatState(transportId, externalChatId, defaultRole.id);
     }
 
     const commandResult = await handleCommand(text, transportId, chatState);
@@ -132,11 +110,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
     }
 
     try {
-      const reply = await collectAgentReply(
-        onSessionEvent,
-        chatState.sessionId,
-        params.onChunk,
-      );
+      const reply = await collectAgentReply(onSessionEvent, chatState.sessionId, params.onChunk);
       await store.setChatState(transportId, {
         ...chatState,
         updatedAt: new Date().toISOString(),
@@ -161,20 +135,13 @@ export function createRelay(deps: RelayDeps): RelayFn {
 
 // Kept out of the factory closure so future packaging doesn't need
 // to re-capture anything; `onSessionEvent` arrives as a plain param.
-function collectAgentReply(
-  onSessionEvent: OnSessionEventFn,
-  chatSessionId: string,
-  onChunk?: (text: string) => void,
-): Promise<string> {
+function collectAgentReply(onSessionEvent: OnSessionEventFn, chatSessionId: string, onChunk?: (text: string) => void): Promise<string> {
   return new Promise((resolve) => {
     const textChunks: string[] = [];
 
     const timer = setTimeout(() => {
       unsubscribe();
-      resolve(
-        textChunks.join("") ||
-          "The request timed out before a reply was generated.",
-      );
+      resolve(textChunks.join("") || "The request timed out before a reply was generated.");
     }, REPLY_TIMEOUT_MS);
 
     const unsubscribe = onSessionEvent(chatSessionId, (event) => {
@@ -195,10 +162,7 @@ function collectAgentReply(
       if (type === EVENT_TYPES.sessionFinished) {
         clearTimeout(timer);
         unsubscribe();
-        resolve(
-          textChunks.join("") ||
-            "The assistant completed the request but produced no text reply.",
-        );
+        resolve(textChunks.join("") || "The assistant completed the request but produced no text reply.");
       }
     });
   });

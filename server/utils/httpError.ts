@@ -26,11 +26,7 @@
 import type { Response } from "express";
 
 /** Send a `{ error: string }` body with the given HTTP status. */
-export function sendError(
-  res: Response,
-  status: number,
-  error: string,
-): Response {
+export function sendError(res: Response, status: number, error: string): Response {
   return res.status(status).json({ error });
 }
 

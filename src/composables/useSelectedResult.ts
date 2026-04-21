@@ -1,12 +1,7 @@
 // Writable computed that bridges activeSession.selectedResultUuid
 // with the URL's ?result= query parameter.
 
-import {
-  computed,
-  watch,
-  type ComputedRef,
-  type WritableComputedRef,
-} from "vue";
+import { computed, watch, type ComputedRef, type WritableComputedRef } from "vue";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import type { ActiveSession } from "../types/session";
 

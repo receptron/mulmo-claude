@@ -27,8 +27,7 @@ function makeAnchor(href: string | null): FakeElement {
     closest(selector) {
       if (selector !== "a") return null;
       return {
-        getAttribute: (name: string) =>
-          name === "href" ? (href ?? null) : null,
+        getAttribute: (name: string) => (name === "href" ? (href ?? null) : null),
       };
     },
   };
@@ -44,8 +43,7 @@ function makeSpanInsideAnchor(href: string | null): FakeElement {
     closest(selector) {
       if (selector !== "a") return null;
       return {
-        getAttribute: (name: string) =>
-          name === "href" ? (anchorAttrs ?? null) : null,
+        getAttribute: (name: string) => (name === "href" ? (anchorAttrs ?? null) : null),
       };
     },
   };

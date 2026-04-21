@@ -30,11 +30,7 @@ export function installGuards(router: Router): void {
 
     // ── sessionId format check ───────────────────────────────────
     const sessionId = to.params.sessionId;
-    if (
-      typeof sessionId === "string" &&
-      sessionId.length > 0 &&
-      !isValidSessionId(sessionId)
-    ) {
+    if (typeof sessionId === "string" && sessionId.length > 0 && !isValidSessionId(sessionId)) {
       // Garbage sessionId → strip it and go to /chat (new session).
       return { name: "chat", params: {}, query: {}, replace: true };
     }

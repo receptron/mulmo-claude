@@ -31,11 +31,7 @@ const SESSION_ID_SHORT_LEN = 8;
  * content. If it exists and already lists `sessionId` the content is
  * returned unchanged (idempotent).
  */
-export function updateSessionBacklinks(
-  existingContent: string,
-  sessionId: string,
-  linkHref: string,
-): string {
+export function updateSessionBacklinks(existingContent: string, sessionId: string, linkHref: string): string {
   if (!sessionId) return existingContent;
 
   const markerIdx = existingContent.indexOf(BACKLINKS_MARKER);
@@ -58,11 +54,7 @@ function buildBullet(sessionId: string, linkHref: string): string {
   return `- [session ${short}](${linkHref})`;
 }
 
-function appendFreshAppendix(
-  body: string,
-  sessionId: string,
-  linkHref: string,
-): string {
+function appendFreshAppendix(body: string, sessionId: string, linkHref: string): string {
   const bullet = buildBullet(sessionId, linkHref);
   const separator = body.length === 0 || body.endsWith("\n") ? "" : "\n";
   const leadingBlank = body.length === 0 ? "" : "\n";
@@ -113,10 +105,7 @@ function extractSessionIdFromHref(href: string): string | null {
   if (lastSlash === -1) return null;
   const parentSegment = findPrecedingSegment(cleanHref, lastSlash);
   if (parentSegment !== "chat") return null;
-  const id = cleanHref.slice(
-    lastSlash + 1,
-    cleanHref.length - JSONL_SUFFIX.length,
-  );
+  const id = cleanHref.slice(lastSlash + 1, cleanHref.length - JSONL_SUFFIX.length);
   if (id.length === 0 || id.includes("/")) return null;
   return id;
 }

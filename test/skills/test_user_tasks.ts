@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "fs";
 import path from "path";
 import os from "os";
-import {
-  loadUserTasks,
-  validateAndCreate,
-  applyUpdate,
-} from "../../server/workspace/skills/user-tasks.ts";
+import { loadUserTasks, validateAndCreate, applyUpdate } from "../../server/workspace/skills/user-tasks.ts";
 import { saveUserTasks } from "../../server/utils/files/user-tasks-io.ts";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 import { ONE_MINUTE_MS, ONE_HOUR_MS } from "../../server/utils/time.ts";
@@ -41,10 +37,7 @@ describe("loadUserTasks", () => {
         updatedAt: "2026-01-01T00:00:00Z",
       },
     ];
-    writeFileSync(
-      path.join(root, "config", "scheduler", "tasks.json"),
-      JSON.stringify(data),
-    );
+    writeFileSync(path.join(root, "config", "scheduler", "tasks.json"), JSON.stringify(data));
     const tasks = loadUserTasks(root);
     assert.equal(tasks.length, 1);
     assert.equal(tasks[0].name, "Test");
@@ -52,10 +45,7 @@ describe("loadUserTasks", () => {
 
   it("returns empty array for corrupted JSON", () => {
     const root = tmpRoot();
-    writeFileSync(
-      path.join(root, "config", "scheduler", "tasks.json"),
-      "not json",
-    );
+    writeFileSync(path.join(root, "config", "scheduler", "tasks.json"), "not json");
     const tasks = loadUserTasks(root);
     assert.deepEqual(tasks, []);
   });
@@ -83,10 +73,7 @@ describe("saveUserTasks", () => {
       },
     ];
     await saveUserTasks(tasks, root);
-    const raw = readFileSync(
-      path.join(root, "config", "scheduler", "tasks.json"),
-      "utf-8",
-    );
+    const raw = readFileSync(path.join(root, "config", "scheduler", "tasks.json"), "utf-8");
     const parsed = JSON.parse(raw);
     assert.equal(parsed.length, 1);
     assert.equal(parsed[0].name, "Saved");

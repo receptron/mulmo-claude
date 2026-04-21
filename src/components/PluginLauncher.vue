@@ -1,21 +1,12 @@
 <template>
-  <div
-    ref="rootRef"
-    class="flex border border-gray-300 rounded overflow-hidden text-xs"
-    data-testid="plugin-launcher"
-  >
+  <div ref="rootRef" class="flex border border-gray-300 rounded overflow-hidden text-xs" data-testid="plugin-launcher">
     <template v-for="(target, idx) in TARGETS" :key="target.key">
       <!-- Visual separator between data plugins and management plugins -->
-      <div
-        v-if="idx === SEPARATOR_AFTER_INDEX"
-        class="w-px bg-gray-300 my-0.5"
-      />
+      <div v-if="idx === SEPARATOR_AFTER_INDEX" class="w-px bg-gray-300 my-0.5" />
       <button
         :class="[
           'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
-          isActive(target)
-            ? 'bg-blue-50 text-blue-600 font-medium'
-            : 'bg-white text-gray-600 hover:bg-gray-50',
+          isActive(target) ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
         ]"
         :title="target.title"
         :data-testid="`plugin-launcher-${target.key}`"

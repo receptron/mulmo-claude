@@ -1,20 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "crypto";
-import {
-  hasNonAscii,
-  hashSlug,
-  isValidSlug,
-  slugify,
-} from "../../server/utils/slug.js";
+import { hasNonAscii, hashSlug, isValidSlug, slugify } from "../../server/utils/slug.js";
 
 const HASH_LEN = 16;
 
 function expectedHash(input: string, len = HASH_LEN): string {
-  return createHash("sha256")
-    .update(input, "utf-8")
-    .digest("base64url")
-    .slice(0, len);
+  return createHash("sha256").update(input, "utf-8").digest("base64url").slice(0, len);
 }
 
 describe("hasNonAscii", () => {

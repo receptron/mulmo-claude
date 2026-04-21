@@ -37,11 +37,7 @@ import { unauthorized } from "../../utils/httpError.js";
 
 const BEARER_PREFIX = "Bearer ";
 
-export function bearerAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function bearerAuth(req: Request, res: Response, next: NextFunction): void {
   const expected = getCurrentToken();
   if (expected === null) {
     // Server hasn't finished bootstrap. This can only happen if a

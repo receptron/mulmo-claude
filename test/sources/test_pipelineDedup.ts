@@ -24,11 +24,7 @@ describe("dedupAcrossSources", () => {
   });
 
   it("passes through a dedup-free list unchanged", () => {
-    const items = [
-      makeItem("a", "hn"),
-      makeItem("b", "hn"),
-      makeItem("c", "reddit"),
-    ];
+    const items = [makeItem("a", "hn"), makeItem("b", "hn"), makeItem("c", "reddit")];
     const out = dedupAcrossSources(items);
     assert.equal(out.items.length, 3);
     assert.equal(out.stats.uniqueCount, 3);
@@ -55,30 +51,17 @@ describe("dedupAcrossSources", () => {
   });
 
   it("records the winning sourceSlug for each duplicate id", () => {
-    const items = [
-      makeItem("a", "hn"),
-      makeItem("a", "reddit"),
-      makeItem("a", "twitter"),
-      makeItem("b", "hn"),
-      makeItem("b", "reddit"),
-    ];
+    const items = [makeItem("a", "hn"), makeItem("a", "reddit"), makeItem("a", "twitter"), makeItem("b", "hn"), makeItem("b", "reddit")];
     const out = dedupAcrossSources(items);
     assert.equal(out.items.length, 2);
-    assert.deepEqual(out.stats.duplicateSlugsById.get("a"), [
-      "reddit",
-      "twitter",
-    ]);
+    assert.deepEqual(out.stats.duplicateSlugsById.get("a"), ["reddit", "twitter"]);
     assert.deepEqual(out.stats.duplicateSlugsById.get("b"), ["reddit"]);
     assert.equal(out.stats.duplicateCount, 3);
   });
 
   it("preserves insertion order (doesn't sort)", () => {
     // Caller's sort (e.g. newest-first) survives dedup.
-    const items = [
-      makeItem("c", "s1"),
-      makeItem("a", "s1"),
-      makeItem("b", "s1"),
-    ];
+    const items = [makeItem("c", "s1"), makeItem("a", "s1"), makeItem("b", "s1")];
     const out = dedupAcrossSources(items);
     assert.deepEqual(
       out.items.map((i) => i.id),

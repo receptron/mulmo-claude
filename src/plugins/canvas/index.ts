@@ -11,10 +11,7 @@ const canvasPlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<ImageToolData>>(
-      API_ROUTES.plugins.canvas,
-      args,
-    );
+    const result = await apiPost<ToolResult<ImageToolData>>(API_ROUTES.plugins.canvas, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

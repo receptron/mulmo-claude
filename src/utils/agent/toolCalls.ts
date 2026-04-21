@@ -33,17 +33,10 @@ export function toToolCallEntry(event: SseToolCall): ToolCallHistoryItem {
 //
 // Returns `undefined` when no pending call matches (race / retry /
 // late-arriving event). Pure.
-export function findPendingToolCall(
-  history: readonly ToolCallHistoryItem[],
-  toolUseId: string,
-): ToolCallHistoryItem | undefined {
+export function findPendingToolCall(history: readonly ToolCallHistoryItem[], toolUseId: string): ToolCallHistoryItem | undefined {
   for (let i = history.length - 1; i >= 0; i--) {
     const entry = history[i];
-    if (
-      entry.toolUseId === toolUseId &&
-      entry.result === undefined &&
-      entry.error === undefined
-    ) {
+    if (entry.toolUseId === toolUseId && entry.result === undefined && entry.error === undefined) {
       return entry;
     }
   }
@@ -61,10 +54,7 @@ export function findPendingToolCall(
 // to previous turns and don't count.
 //
 // Pure — returns a boolean for the caller to act on.
-export function shouldSelectAssistantText(
-  toolResults: readonly ToolResultComplete[],
-  runStartIndex: number,
-): boolean {
+export function shouldSelectAssistantText(toolResults: readonly ToolResultComplete[], runStartIndex: number): boolean {
   for (let i = runStartIndex; i < toolResults.length; i++) {
     if (toolResults[i].toolName !== "text-response") return false;
   }

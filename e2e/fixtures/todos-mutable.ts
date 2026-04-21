@@ -40,19 +40,9 @@ type DispatchResult = {
   extra?: Record<string, unknown>;
 };
 
-export type ItemDispatcher = (
-  method: string,
-  path: string,
-  body: Record<string, unknown>,
-  state: MutableTodoState,
-) => DispatchResult | void;
+export type ItemDispatcher = (method: string, path: string, body: Record<string, unknown>, state: MutableTodoState) => DispatchResult | void;
 
-export type ColumnDispatcher = (
-  method: string,
-  id: string | null,
-  body: Record<string, unknown>,
-  state: MutableTodoState,
-) => DispatchResult | void;
+export type ColumnDispatcher = (method: string, id: string | null, body: Record<string, unknown>, state: MutableTodoState) => DispatchResult | void;
 
 export interface MutableTodoOptions {
   items?: TodoFixture[];
@@ -79,10 +69,7 @@ export function mockSlugifyColumnId(label: string): string {
   // eslint-disable-next-line no-control-regex
   const hasNonAscii = /[^\x00-\x7F]/.test(label);
   if (!hasNonAscii) return slug.length > 0 ? slug : "column";
-  const hash = createHash("sha256")
-    .update(label.trim(), "utf-8")
-    .digest("base64url")
-    .slice(0, 16);
+  const hash = createHash("sha256").update(label.trim(), "utf-8").digest("base64url").slice(0, 16);
   if (slug.length >= 3) return `${slug}_${hash}`;
   return hash;
 }
@@ -95,10 +82,7 @@ export function mockSlugifyColumnId(label: string): string {
  * Returns the mutable state handle so individual tests can inspect
  * it after the fact (e.g. to assert a final columns.length).
  */
-export async function setupMutableTodoMocks(
-  page: Page,
-  options: MutableTodoOptions = {},
-): Promise<MutableTodoState> {
+export async function setupMutableTodoMocks(page: Page, options: MutableTodoOptions = {}): Promise<MutableTodoState> {
   const state: MutableTodoState = {
     items: (options.items ?? TODO_ITEMS).map((i) => ({ ...i })),
     columns: (options.columns ?? TODO_COLUMNS).map((c) => ({ ...c })),
@@ -123,12 +107,8 @@ export async function setupMutableTodoMocks(
       const method = route.request().method();
       const url = new URL(route.request().url());
       const path = url.pathname.replace(/^\/api\/todos\/items\/?/, "");
-      const body = (route.request().postDataJSON() ?? {}) as Record<
-        string,
-        unknown
-      >;
-      const outcome =
-        options.dispatchItem?.(method, path, body, state) ?? undefined;
+      const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+      const outcome = options.dispatchItem?.(method, path, body, state) ?? undefined;
       if (outcome?.items) state.items = outcome.items;
       if (outcome?.columns) state.columns = outcome.columns;
       return route.fulfill({ json: buildResponse(outcome?.extra) });
@@ -143,12 +123,8 @@ export async function setupMutableTodoMocks(
       const method = route.request().method();
       const url = new URL(route.request().url());
       const id = url.pathname.replace(/^\/api\/todos\/columns\/?/, "") || null;
-      const body = (route.request().postDataJSON() ?? {}) as Record<
-        string,
-        unknown
-      >;
-      const outcome =
-        options.dispatchColumn?.(method, id, body, state) ?? undefined;
+      const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+      const outcome = options.dispatchColumn?.(method, id, body, state) ?? undefined;
       if (outcome?.items) state.items = outcome.items;
       if (outcome?.columns) state.columns = outcome.columns;
       return route.fulfill({ json: buildResponse(outcome?.extra) });
@@ -161,9 +137,7 @@ export async function setupMutableTodoMocks(
   // /api/files/dir (lazy-expand) is intentionally not mocked because
   // todo tests deep-link straight into the content view.
   await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === WORKSPACE_FILES.todosItems,
+    (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === WORKSPACE_FILES.todosItems,
     (route: Route) =>
       route.fulfill({
         json: {

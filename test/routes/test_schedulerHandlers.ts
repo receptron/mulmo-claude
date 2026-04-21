@@ -1,14 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  dispatchScheduler,
-  handleAdd,
-  handleDelete,
-  handleReplace,
-  handleShow,
-  handleUpdate,
-  sortItems,
-} from "../../server/api/routes/schedulerHandlers.js";
+import { dispatchScheduler, handleAdd, handleDelete, handleReplace, handleShow, handleUpdate, sortItems } from "../../server/api/routes/schedulerHandlers.js";
 import type { ScheduledItem } from "../../server/api/routes/scheduler.js";
 
 function makeItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
@@ -298,11 +290,7 @@ describe("dispatchScheduler", () => {
   });
 
   it("dispatches update", () => {
-    const result = dispatchScheduler(
-      "update",
-      [makeItem({ id: "a", title: "Old" })],
-      { id: "a", title: "New" },
-    );
+    const result = dispatchScheduler("update", [makeItem({ id: "a", title: "Old" })], { id: "a", title: "New" });
     assert.equal(result.kind, "success");
   });
 

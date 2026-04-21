@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  HostRateLimiter,
-  DEFAULT_MIN_DELAY_MS,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
+import { HostRateLimiter, DEFAULT_MIN_DELAY_MS, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
 
 // Controllable clock + sleep for deterministic tests. Returns a
 // deps object plus direct state access so tests can advance time
@@ -174,10 +170,7 @@ describe("HostRateLimiter — minimum delay enforcement", () => {
     await lim.run("a.com", async () => "first");
     const before = clock.read();
     await lim.run("a.com", async () => "second");
-    assert.ok(
-      clock.read() - before >= DEFAULT_MIN_DELAY_MS,
-      `expected default ${DEFAULT_MIN_DELAY_MS}ms delay, got ${clock.read() - before}`,
-    );
+    assert.ok(clock.read() - before >= DEFAULT_MIN_DELAY_MS, `expected default ${DEFAULT_MIN_DELAY_MS}ms delay, got ${clock.read() - before}`);
   });
 
   it("marks finishedAt even on error so the next retry waits", async () => {

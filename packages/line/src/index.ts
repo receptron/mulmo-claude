@@ -24,19 +24,14 @@ const PORT = Number(process.env.LINE_BRIDGE_PORT) || 3002;
 const channelSecret = process.env.LINE_CHANNEL_SECRET;
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 if (!channelSecret || !channelAccessToken) {
-  console.error(
-    "LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
 const client = createBridgeClient({ transportId: TRANSPORT_ID });
 
 client.onPush((ev) => {
-  pushMessage(ev.chatId, ev.message).catch((err) =>
-    console.error(`[line] push send failed: ${err}`),
-  );
+  pushMessage(ev.chatId, ev.message).catch((err) => console.error(`[line] push send failed: ${err}`));
 });
 
 // ── LINE API helpers ────────────────────────────────────────────
@@ -63,9 +58,7 @@ async function pushMessage(userId: string, text: string): Promise<void> {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error(
-          `[line] pushMessage failed: ${res.status} ${body.slice(0, 200)}`,
-        );
+        console.error(`[line] pushMessage failed: ${res.status} ${body.slice(0, 200)}`);
       }
     } catch (err) {
       console.error(`[line] pushMessage network error: ${err}`);
@@ -76,10 +69,7 @@ async function pushMessage(userId: string, text: string): Promise<void> {
 // ── Signature verification ──────────────────────────────────────
 
 function verifySignature(body: string, signature: string): boolean {
-  const expected = crypto
-    .createHmac("SHA256", channelSecret!)
-    .update(body)
-    .digest("base64");
+  const expected = crypto.createHmac("SHA256", channelSecret!).update(body).digest("base64");
   if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }

@@ -40,9 +40,7 @@ export interface DailyJsonIndex {
   }>;
 }
 
-export function buildDailyJsonIndex(
-  items: readonly SourceItem[],
-): DailyJsonIndex {
+export function buildDailyJsonIndex(items: readonly SourceItem[]): DailyJsonIndex {
   const byCategory: Record<string, number> = {};
   for (const item of items) {
     for (const cat of item.categories) {
@@ -71,10 +69,7 @@ export function buildDailyJsonIndex(
 // with a trailing newline already; we guard both cases). The
 // JSON block always ends with a final newline so editors don't
 // complain about "no newline at end of file".
-export function assembleDailyFile(
-  markdown: string,
-  items: readonly SourceItem[],
-): string {
+export function assembleDailyFile(markdown: string, items: readonly SourceItem[]): string {
   const trimmed = markdown.endsWith("\n") ? markdown.slice(0, -1) : markdown;
   const index = buildDailyJsonIndex(items);
   // Pretty-printed JSON — the daily file is meant to be
@@ -88,12 +83,7 @@ export function assembleDailyFile(
 // Atomic write: stage to a sibling `.tmp` then rename. Crash
 // mid-write can't leave a half-written daily file visible to
 // downstream readers.
-export async function writeDailyFile(
-  workspaceRoot: string,
-  isoDate: string,
-  markdown: string,
-  items: readonly SourceItem[],
-): Promise<string> {
+export async function writeDailyFile(workspaceRoot: string, isoDate: string, markdown: string, items: readonly SourceItem[]): Promise<string> {
   const target = dailyNewsPath(workspaceRoot, isoDate);
   await writeFileAtomic(target, assembleDailyFile(markdown, items));
   return target;
@@ -139,10 +129,7 @@ export function renderItemForArchive(item: SourceItem): string {
 // ISO `publishedAt` → `YYYY-MM` used as the archive-month key.
 // Malformed dates fall back to the caller-supplied default
 // (typically the current YYYY-MM) so we don't drop items.
-export function archiveMonthFor(
-  isoPublishedAt: string,
-  fallbackMonth: string,
-): string {
+export function archiveMonthFor(isoPublishedAt: string, fallbackMonth: string): string {
   const ts = Date.parse(isoPublishedAt);
   if (!Number.isFinite(ts)) return fallbackMonth;
   const d = new Date(ts);
@@ -154,10 +141,7 @@ export function archiveMonthFor(
 // Group items by (sourceSlug, YYYY-MM) so each destination file
 // gets one append instead of many. Exported so the orchestrator
 // can size the concurrency and tests can pin the bucketing logic.
-export function groupItemsForArchive(
-  items: readonly SourceItem[],
-  fallbackMonth: string,
-): Map<string, SourceItem[]> {
+export function groupItemsForArchive(items: readonly SourceItem[], fallbackMonth: string): Map<string, SourceItem[]> {
   const groups = new Map<string, SourceItem[]>();
   for (const item of items) {
     const month = archiveMonthFor(item.publishedAt, fallbackMonth);

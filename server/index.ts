@@ -22,10 +22,7 @@ import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
-import {
-  type NotificationDeps,
-  initNotifications,
-} from "./events/notifications.js";
+import { type NotificationDeps, initNotifications } from "./events/notifications.js";
 import { createChatService } from "@mulmobridge/chat-service";
 import { loadAllSessions } from "./api/routes/sessions.js";
 import { readSessionJsonl } from "./utils/files/session-io.js";
@@ -33,11 +30,7 @@ import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
 import { serverError } from "./utils/httpError.js";
-import {
-  mcpToolsRouter,
-  mcpTools,
-  isMcpToolEnabled,
-} from "./agent/mcp-tools/index.js";
+import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
@@ -50,24 +43,14 @@ import { createPubSub } from "./events/pub-sub/index.js";
 import { PUBSUB_CHANNELS } from "../src/config/pubsubChannels.js";
 import { createTaskManager } from "./events/task-manager/index.js";
 import type { ITaskManager } from "./events/task-manager/index.js";
-import {
-  initScheduler,
-  type SystemTaskDef,
-} from "./events/scheduler-adapter.js";
+import { initScheduler, type SystemTaskDef } from "./events/scheduler-adapter.js";
 import schedulerTasksRoutes from "./api/routes/schedulerTasks.js";
-import {
-  loadSchedulerOverrides,
-  UTC_HH_MM_RE,
-} from "./utils/files/scheduler-overrides-io.js";
+import { loadSchedulerOverrides, UTC_HH_MM_RE } from "./utils/files/scheduler-overrides-io.js";
 import type { IPubSub } from "./events/pub-sub/index.js";
 import { initSessionStore } from "./events/session-store/index.js";
 import { requireSameOrigin } from "./api/csrfGuard.js";
 import { bearerAuth } from "./api/auth/bearerAuth.js";
-import {
-  deleteTokenFile,
-  generateAndWriteToken,
-  getCurrentToken,
-} from "./api/auth/token.js";
+import { deleteTokenFile, generateAndWriteToken, getCurrentToken } from "./api/auth/token.js";
 import { log } from "./system/logger/index.js";
 import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
@@ -175,20 +158,15 @@ async function listSessionsForBridge(opts: { limit: number; offset: number }) {
   const rows = await loadAllSessions();
   const sorted = rows.sort((a, b) => b.changeMs - a.changeMs);
   const total = sorted.length;
-  const sessions = sorted
-    .slice(opts.offset, opts.offset + opts.limit)
-    .map((r) => ({
-      id: r.summary.id,
-      roleId: r.summary.roleId,
-      preview: r.summary.preview,
-      updatedAt: r.summary.updatedAt,
-    }));
+  const sessions = sorted.slice(opts.offset, opts.offset + opts.limit).map((r) => ({
+    id: r.summary.id,
+    roleId: r.summary.roleId,
+    preview: r.summary.preview,
+    updatedAt: r.summary.updatedAt,
+  }));
   return { sessions, total };
 }
-async function getSessionHistoryForBridge(
-  sessionId: string,
-  opts: { limit: number; offset: number },
-) {
+async function getSessionHistoryForBridge(sessionId: string, opts: { limit: number; offset: number }) {
   const content = await readSessionJsonl(sessionId);
   if (!content) return { messages: [], total: 0 };
   const allMessages: Array<{ source: string; text: string }> = [];
@@ -197,10 +175,7 @@ async function getSessionHistoryForBridge(
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (
-        entry.type === EVENT_TYPES.text &&
-        typeof entry.message === "string"
-      ) {
+      if (entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
         allMessages.push({
           source: entry.source ?? "unknown",
           text: entry.message,
@@ -294,36 +269,23 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 async function ensureCredentialsAvailable(): Promise<void> {
-  const credentialsPath = path.join(
-    os.homedir(),
-    ".claude",
-    ".credentials.json",
-  );
+  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
   if (fs.existsSync(credentialsPath)) return;
 
   if (process.platform === "darwin") {
     const { refreshCredentials } = await import("./system/credentials.js");
     const ok = await refreshCredentials();
     if (ok) return;
-    log.error(
-      "sandbox",
-      "Failed to export credentials from macOS Keychain. Run `npm run sandbox:login` manually.",
-    );
+    log.error("sandbox", "Failed to export credentials from macOS Keychain. Run `npm run sandbox:login` manually.");
     process.exit(1);
   }
-  log.error(
-    "sandbox",
-    "Missing credentials file at ~/.claude/.credentials.json. Run `claude auth login` to authenticate Claude Code.",
-  );
+  log.error("sandbox", "Missing credentials file at ~/.claude/.credentials.json. Run `claude auth login` to authenticate Claude Code.");
   process.exit(1);
 }
 
 async function setupSandbox(): Promise<boolean> {
   if (env.disableSandbox) {
-    log.info(
-      "sandbox",
-      "DISABLE_SANDBOX=1 — running unrestricted (debug mode)",
-    );
+    log.info("sandbox", "DISABLE_SANDBOX=1 — running unrestricted (debug mode)");
     return false;
   }
   try {
@@ -354,12 +316,7 @@ function logMcpStatus(): void {
     });
   }
   if (disabledMcpTools.length > 0) {
-    const names = disabledMcpTools
-      .map(
-        (t) =>
-          t.definition.name + " (" + (t.requiredEnv ?? []).join(", ") + ")",
-      )
-      .join(", ");
+    const names = disabledMcpTools.map((t) => t.definition.name + " (" + (t.requiredEnv ?? []).join(", ") + ")").join(", ");
     log.info("mcp", "Unavailable (missing env)", { tools: names });
   }
 }
@@ -405,8 +362,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   const pubsub = createPubSub(httpServer);
   // Back-fill the notifications router with the live publisher (see
   // module-scope placeholder above).
-  notificationDeps.publish = (channel, payload) =>
-    pubsub.publish(channel, payload);
+  notificationDeps.publish = (channel, payload) => pubsub.publish(channel, payload);
 
   // --- Notification system (#144) ---
   initNotifications({
@@ -459,11 +415,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   for (const task of systemTasks) {
     const ovr = overrides[task.id];
     if (!ovr) continue;
-    if (
-      task.schedule.type === SCHEDULE_TYPES.interval &&
-      typeof ovr.intervalMs === "number" &&
-      ovr.intervalMs > 0
-    ) {
+    if (task.schedule.type === SCHEDULE_TYPES.interval && typeof ovr.intervalMs === "number" && ovr.intervalMs > 0) {
       log.info("scheduler", "applying override", {
         id: task.id,
         intervalMs: ovr.intervalMs,
@@ -473,11 +425,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
         intervalMs: ovr.intervalMs,
       };
     }
-    if (
-      task.schedule.type === SCHEDULE_TYPES.daily &&
-      typeof ovr.time === "string" &&
-      UTC_HH_MM_RE.test(ovr.time)
-    ) {
+    if (task.schedule.type === SCHEDULE_TYPES.daily && typeof ovr.time === "string" && UTC_HH_MM_RE.test(ovr.time)) {
       log.info("scheduler", "applying override", {
         id: task.id,
         time: ovr.time,
@@ -553,10 +501,7 @@ process.on("SIGTERM", () => {
 (async () => {
   const portFree = await isPortFree(PORT);
   if (!portFree) {
-    log.error(
-      "server",
-      `Port ${PORT} is already in use. Stop the other process and try again.`,
-    );
+    log.error("server", `Port ${PORT} is already in use. Stop the other process and try again.`);
     process.exit(1);
   }
 
@@ -589,8 +534,7 @@ function registerDebugTasks(taskManager: ITaskManager, pubsub: IPubSub) {
 
   taskManager.registerTask({
     id: "debug.auto-chat",
-    description:
-      "Debug — toggles title color 10 times then starts a General-mode chat, then self-removes",
+    description: "Debug — toggles title color 10 times then starts a General-mode chat, then self-removes",
     schedule: { type: SCHEDULE_TYPES.interval, intervalMs: ONE_SECOND_MS },
     run: async () => {
       tick++;

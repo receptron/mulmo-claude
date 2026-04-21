@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createStreamParser,
-  blockToEvent,
-  type RawStreamEvent,
-} from "../../server/agent/stream.ts";
+import { createStreamParser, blockToEvent, type RawStreamEvent } from "../../server/agent/stream.ts";
 import { EVENT_TYPES } from "../../src/types/events.ts";
 
 describe("blockToEvent", () => {

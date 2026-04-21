@@ -53,10 +53,7 @@ export interface UseFreshPluginDataHandle {
 // exercise it without spinning up a Vue component lifecycle. The
 // composable below wraps this with AbortController / onMounted /
 // onUnmounted management.
-export async function refreshOnce<T>(
-  opts: UseFreshPluginDataOptions<T>,
-  signal: AbortSignal,
-): Promise<boolean> {
+export async function refreshOnce<T>(opts: UseFreshPluginDataOptions<T>, signal: AbortSignal): Promise<boolean> {
   const result = await apiGet<unknown>(opts.endpoint(), undefined, { signal });
   // AbortError / network error / non-OK HTTP / malformed JSON all land
   // as { ok: false }. The caller still has prop-initialised state as a
@@ -68,9 +65,7 @@ export async function refreshOnce<T>(
   return true;
 }
 
-export function useFreshPluginData<T>(
-  opts: UseFreshPluginDataOptions<T>,
-): UseFreshPluginDataHandle {
+export function useFreshPluginData<T>(opts: UseFreshPluginDataOptions<T>): UseFreshPluginDataHandle {
   let controller: AbortController | null = null;
 
   async function refresh(): Promise<boolean> {

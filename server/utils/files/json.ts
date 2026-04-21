@@ -50,11 +50,7 @@ export function saveJsonFile(filePath: string, data: unknown): void {
 /**
  * JSON-pretty-print `data` and write atomically.
  */
-export async function writeJsonAtomic(
-  filePath: string,
-  data: unknown,
-  opts: Parameters<typeof writeFileAtomic>[2] = {},
-): Promise<void> {
+export async function writeJsonAtomic(filePath: string, data: unknown, opts: Parameters<typeof writeFileAtomic>[2] = {}): Promise<void> {
   await writeFileAtomic(filePath, JSON.stringify(data, null, 2), opts);
 }
 

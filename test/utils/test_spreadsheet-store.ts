@@ -8,10 +8,7 @@ describe("isSpreadsheetPath", () => {
   });
 
   it("accepts a UUID-like filename", () => {
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/a1b2c3d4e5f6g7h8.json"),
-      true,
-    );
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/a1b2c3d4e5f6g7h8.json"), true);
   });
 
   it("rejects non-spreadsheet prefixes", () => {
@@ -26,18 +23,9 @@ describe("isSpreadsheetPath", () => {
   });
 
   it("rejects path traversal attempts (regression)", () => {
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/../outside.json"),
-      false,
-    );
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/../../etc/passwd.json"),
-      false,
-    );
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/./local.json"),
-      false,
-    );
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/../outside.json"), false);
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/../../etc/passwd.json"), false);
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/./local.json"), false);
   });
 
   it("rejects empty string", () => {

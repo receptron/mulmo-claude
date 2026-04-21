@@ -50,11 +50,7 @@ export function parseSSEEventLine(line: string): SSEEvent | null {
  * characters must be rendered first so they can be referenced by
  * any character-using beat.
  */
-export function shouldAutoRenderBeat(
-  beat: { image?: { type?: string } | undefined },
-  hasCharacters: boolean,
-  autoRenderTypes: readonly string[],
-): boolean {
+export function shouldAutoRenderBeat(beat: { image?: { type?: string } | undefined }, hasCharacters: boolean, autoRenderTypes: readonly string[]): boolean {
   if (hasCharacters) return false;
   const type = beat.image?.type;
   if (typeof type !== "string") return false;
@@ -66,11 +62,7 @@ export function shouldAutoRenderBeat(
  * yet loaded and is not currently rendering. Used to fetch only
  * what's missing after a movie-generation event arrives.
  */
-export function getMissingCharacterKeys(
-  keys: readonly string[],
-  images: Record<string, unknown>,
-  renderState: Record<string, string | undefined>,
-): string[] {
+export function getMissingCharacterKeys(keys: readonly string[], images: Record<string, unknown>, renderState: Record<string, string | undefined>): string[] {
   return keys.filter((k) => !images[k] && renderState[k] !== "rendering");
 }
 
@@ -86,10 +78,7 @@ export interface SafeParseSchema {
  * Validate a candidate Beat JSON string against a schema.
  * Returns false on any JSON parse error or schema mismatch.
  */
-export function validateBeatJSON(
-  json: string,
-  schema: SafeParseSchema,
-): boolean {
+export function validateBeatJSON(json: string, schema: SafeParseSchema): boolean {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -127,10 +116,7 @@ export interface MovieEventHandlers {
  * event types before the client catches up, and we don't want
  * those to tear down an otherwise-healthy stream.
  */
-export function applyMovieEvent(
-  event: SSEEvent,
-  handlers: MovieEventHandlers,
-): void {
+export function applyMovieEvent(event: SSEEvent, handlers: MovieEventHandlers): void {
   switch (event.type) {
     case "beat_image_done":
       handlers.onBeatImageDone(event.beatIndex);
@@ -157,10 +143,7 @@ export function applyMovieEvent(
  * line-buffer state machine is a single named unit instead of a
  * pyramid of `while` / `for` / `if` inside a Vue component.
  */
-export async function streamMovieEvents(
-  body: ReadableStream<Uint8Array>,
-  handlers: MovieEventHandlers,
-): Promise<void> {
+export async function streamMovieEvents(body: ReadableStream<Uint8Array>, handlers: MovieEventHandlers): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";

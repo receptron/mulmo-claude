@@ -1,49 +1,28 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  rewriteJsonEntry,
-  rewritePathValue,
-  rewriteProseText,
-  DIR_MIGRATIONS,
-  PATH_REWRITE_PREFIXES,
-} from "../../scripts/migrate-workspace-284.js";
+import { rewriteJsonEntry, rewritePathValue, rewriteProseText, DIR_MIGRATIONS, PATH_REWRITE_PREFIXES } from "../../scripts/migrate-workspace-284.js";
 
 describe("rewritePathValue", () => {
   it("rewrites a legacy markdowns/ prefix to artifacts/documents/", () => {
-    assert.equal(
-      rewritePathValue("markdowns/foo.md"),
-      "artifacts/documents/foo.md",
-    );
+    assert.equal(rewritePathValue("markdowns/foo.md"), "artifacts/documents/foo.md");
   });
 
   it("rewrites HTMLs/ to artifacts/html/ (case-sensitive)", () => {
-    assert.equal(
-      rewritePathValue("HTMLs/report.html"),
-      "artifacts/html/report.html",
-    );
+    assert.equal(rewritePathValue("HTMLs/report.html"), "artifacts/html/report.html");
   });
 
   it("rewrites configs/ to config/", () => {
-    assert.equal(
-      rewritePathValue("configs/settings.json"),
-      "config/settings.json",
-    );
+    assert.equal(rewritePathValue("configs/settings.json"), "config/settings.json");
   });
 
   it("rewrites wiki/ to data/wiki/", () => {
-    assert.equal(
-      rewritePathValue("wiki/pages/foo.md"),
-      "data/wiki/pages/foo.md",
-    );
+    assert.equal(rewritePathValue("wiki/pages/foo.md"), "data/wiki/pages/foo.md");
   });
 
   it("leaves an unrelated path alone", () => {
     assert.equal(rewritePathValue("other/foo"), "other/foo");
     assert.equal(rewritePathValue(""), "");
-    assert.equal(
-      rewritePathValue("https://example.com/markdowns/foo"),
-      "https://example.com/markdowns/foo",
-    );
+    assert.equal(rewritePathValue("https://example.com/markdowns/foo"), "https://example.com/markdowns/foo");
   });
 
   it("does not double-migrate an already-migrated path", () => {
@@ -102,11 +81,7 @@ describe("rewriteJsonEntry", () => {
 
   it("counts rewrites across arrays and deep nesting", () => {
     const { value, rewrites } = rewriteJsonEntry({
-      results: [
-        { filePath: "markdowns/a.md" },
-        { filePath: "HTMLs/b.html" },
-        { filePath: "unrelated" },
-      ],
+      results: [{ filePath: "markdowns/a.md" }, { filePath: "HTMLs/b.html" }, { filePath: "unrelated" }],
     });
     assert.equal(rewrites, 2);
     const out = (value as { results: { filePath: string }[] }).results;
@@ -162,8 +137,7 @@ describe("rewriteProseText", () => {
     // left boundary, so `data/wiki/foo.md` → `data/data/wiki/foo.md`
     // on a second run. Multiple call sites already persist migrated
     // paths to disk, so the script MUST stay idempotent.
-    const alreadyMigrated =
-      "See data/wiki/foo.md and conversations/summaries/_index.md.";
+    const alreadyMigrated = "See data/wiki/foo.md and conversations/summaries/_index.md.";
     const first = rewriteProseText(alreadyMigrated);
     assert.equal(first.rewrites, 0);
     assert.equal(first.value, alreadyMigrated);
@@ -177,8 +151,7 @@ describe("rewriteProseText", () => {
   it("does NOT rewrite URLs or relative paths that happen to contain a legacy prefix", () => {
     // `/` must be excluded from the left-boundary class so neither
     // `../wiki/...` nor `https://example.com/wiki/...` get mangled.
-    const input =
-      "Relative link: ../wiki/foo.md\nExternal: https://example.com/wiki/foo\nLeading dot: ./wiki/bar";
+    const input = "Relative link: ../wiki/foo.md\nExternal: https://example.com/wiki/foo\nLeading dot: ./wiki/bar";
     const { value, rewrites } = rewriteProseText(input);
     assert.equal(rewrites, 0);
     assert.equal(value, input);
@@ -198,9 +171,7 @@ describe("invariants", () => {
   it("all target paths are under one of the 4 grouping dirs", () => {
     const groupings = ["config/", "conversations/", "data/", "artifacts/"];
     for (const { to } of DIR_MIGRATIONS) {
-      const under = groupings.some(
-        (g) => to === g.slice(0, -1) || to.startsWith(g),
-      );
+      const under = groupings.some((g) => to === g.slice(0, -1) || to.startsWith(g));
       assert.ok(under, `target "${to}" does not fit any grouping`);
     }
   });
@@ -209,10 +180,7 @@ describe("invariants", () => {
     for (const a of DIR_MIGRATIONS) {
       for (const b of DIR_MIGRATIONS) {
         if (a === b) continue;
-        assert.ok(
-          !b.from.startsWith(`${a.from}/`),
-          `"${b.from}" is nested under "${a.from}" — migration order matters`,
-        );
+        assert.ok(!b.from.startsWith(`${a.from}/`), `"${b.from}" is nested under "${a.from}" — migration order matters`);
       }
     }
   });

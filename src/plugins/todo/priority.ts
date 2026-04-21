@@ -41,12 +41,7 @@ export const PRIORITY_BORDER: Record<TodoPriority, string> = {
   urgent: "border-l-red-500",
 };
 
-export const PRIORITIES: readonly TodoPriority[] = [
-  "low",
-  "medium",
-  "high",
-  "urgent",
-];
+export const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
 
 export function isPriority(v: unknown): v is TodoPriority {
   // Use hasOwnProperty rather than the `in` operator: `in` walks the
@@ -54,10 +49,7 @@ export function isPriority(v: unknown): v is TodoPriority {
   // true and incorrectly narrow `"toString"` to TodoPriority. We use
   // the .call form (rather than Object.hasOwn) because the project's
   // client tsconfig targets ES2021, and Object.hasOwn is ES2022.
-  return (
-    typeof v === "string" &&
-    Object.prototype.hasOwnProperty.call(PRIORITY_ORDER, v)
-  );
+  return typeof v === "string" && Object.prototype.hasOwnProperty.call(PRIORITY_ORDER, v);
 }
 
 // ── due date helpers ─────────────────────────────────────────────
@@ -73,9 +65,7 @@ export function dueDateClasses(dueDate: string | undefined): string {
   // Within 3 days?
   const t = new Date(today);
   const d = new Date(dueDate);
-  const diffDays = Math.round(
-    (d.getTime() - t.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const diffDays = Math.round((d.getTime() - t.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays <= 3) return "bg-yellow-100 text-yellow-700";
   return "bg-gray-100 text-gray-600";
 }

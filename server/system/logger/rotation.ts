@@ -29,14 +29,9 @@ export async function listLogFiles(dir: string): Promise<string[]> {
     .reverse();
 }
 
-export async function enforceMaxFiles(
-  dir: string,
-  maxFiles: number,
-): Promise<void> {
+export async function enforceMaxFiles(dir: string, maxFiles: number): Promise<void> {
   if (maxFiles <= 0) return;
   const files = await listLogFiles(dir);
   const toDelete = files.slice(maxFiles);
-  await Promise.all(
-    toDelete.map((f) => unlink(path.join(dir, f)).catch(() => {})),
-  );
+  await Promise.all(toDelete.map((f) => unlink(path.join(dir, f)).catch(() => {})));
 }

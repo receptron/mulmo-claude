@@ -30,10 +30,7 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
-function sendAndReceive(
-  lines: string[],
-  env: Record<string, string>,
-): Promise<JsonRpcResponse[]> {
+function sendAndReceive(lines: string[], env: Record<string, string>): Promise<JsonRpcResponse[]> {
   return new Promise((resolve, reject) => {
     // shell: true so Windows resolves .cmd wrappers in node_modules/.bin/.
     // Pass args as a single command string to avoid DEP0190 warning.
@@ -80,19 +77,11 @@ function sendAndReceive(
         .filter((r): r is JsonRpcResponse => r !== null);
 
       if (code !== 0) {
-        reject(
-          new Error(
-            `MCP server exited with code ${code}. stderr: ${stderr.slice(0, 500)}`,
-          ),
-        );
+        reject(new Error(`MCP server exited with code ${code}. stderr: ${stderr.slice(0, 500)}`));
         return;
       }
       if (responses.length === 0) {
-        reject(
-          new Error(
-            `MCP server produced no valid JSON-RPC responses. stdout: ${stdout.slice(0, 500)}`,
-          ),
-        );
+        reject(new Error(`MCP server produced no valid JSON-RPC responses. stdout: ${stdout.slice(0, 500)}`));
         return;
       }
       resolve(responses);
@@ -132,10 +121,7 @@ describe("MCP server subprocess smoke test", () => {
     );
 
     // Should get exactly 2 responses (initialize + tools/list).
-    assert.ok(
-      responses.length >= 2,
-      `Expected >= 2 responses, got ${responses.length}: ${JSON.stringify(responses)}`,
-    );
+    assert.ok(responses.length >= 2, `Expected >= 2 responses, got ${responses.length}: ${JSON.stringify(responses)}`);
 
     // Initialize response
     const initResp = responses.find((r) => r.id === 1);
@@ -150,26 +136,12 @@ describe("MCP server subprocess smoke test", () => {
     assert.ok(Array.isArray(toolsResp.result.tools), "tools is not an array");
 
     // The tools we requested via PLUGIN_NAMES should be present.
-    const toolNames = toolsResp.result.tools.map(
-      (t: { name: string }) => t.name,
-    );
-    assert.ok(
-      toolNames.includes("manageTodoList"),
-      `manageTodoList not in tools: ${toolNames.join(", ")}`,
-    );
-    assert.ok(
-      toolNames.includes("presentMulmoScript"),
-      `presentMulmoScript not in tools: ${toolNames.join(", ")}`,
-    );
-    assert.ok(
-      toolNames.includes("manageWiki"),
-      `manageWiki not in tools: ${toolNames.join(", ")}`,
-    );
+    const toolNames = toolsResp.result.tools.map((t: { name: string }) => t.name);
+    assert.ok(toolNames.includes("manageTodoList"), `manageTodoList not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes("presentMulmoScript"), `presentMulmoScript not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes("manageWiki"), `manageWiki not in tools: ${toolNames.join(", ")}`);
 
     // switchRole should always be included.
-    assert.ok(
-      toolNames.includes("switchRole"),
-      `switchRole not in tools: ${toolNames.join(", ")}`,
-    );
+    assert.ok(toolNames.includes("switchRole"), `switchRole not in tools: ${toolNames.join(", ")}`);
   });
 });

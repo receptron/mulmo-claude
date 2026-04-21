@@ -3,13 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import {
-  loadJsonFile,
-  saveJsonFile,
-  writeFileAtomic,
-  writeJsonAtomic,
-  readJsonOrNull,
-} from "../../server/utils/files/index.js";
+import { loadJsonFile, saveJsonFile, writeFileAtomic, writeJsonAtomic, readJsonOrNull } from "../../server/utils/files/index.js";
 
 let tmpDir = "";
 
@@ -25,12 +19,9 @@ describe("loadJsonFile (existing)", () => {
   it("returns the parsed JSON when the file exists", () => {
     const filePath = path.join(tmpDir, "x.json");
     fs.writeFileSync(filePath, JSON.stringify({ hello: "world" }));
-    assert.deepEqual(
-      loadJsonFile<{ hello: string }>(filePath, { hello: "default" }),
-      {
-        hello: "world",
-      },
-    );
+    assert.deepEqual(loadJsonFile<{ hello: string }>(filePath, { hello: "default" }), {
+      hello: "world",
+    });
   });
 
   it("returns the default when the file is missing", () => {
@@ -126,11 +117,7 @@ describe("writeJsonAtomic", () => {
   it("supports arrays, numbers, and nested structures", async () => {
     const filePath = path.join(tmpDir, "nested.json");
     await writeJsonAtomic(filePath, [1, 2, { a: [3, 4] }]);
-    assert.deepEqual(JSON.parse(fs.readFileSync(filePath, "utf-8")), [
-      1,
-      2,
-      { a: [3, 4] },
-    ]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(filePath, "utf-8")), [1, 2, { a: [3, 4] }]);
   });
 });
 

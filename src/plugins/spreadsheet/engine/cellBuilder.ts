@@ -49,11 +49,7 @@ const STRICT_NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
  * formula and gets the "=" prefix the engine expects.
  */
 export function looksLikeFormula(input: string): boolean {
-  return (
-    FORMULA_FUNCTION_CALL.test(input) ||
-    FORMULA_CELL_OP.test(input) ||
-    FORMULA_NUMERIC_OP.test(input)
-  );
+  return FORMULA_FUNCTION_CALL.test(input) || FORMULA_CELL_OP.test(input) || FORMULA_NUMERIC_OP.test(input);
 }
 
 /**

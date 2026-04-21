@@ -1,26 +1,12 @@
 <template>
   <div class="h-full overflow-auto">
-    <div
-      v-if="filteredItems.length === 0"
-      class="h-full flex items-center justify-center text-gray-400 text-sm"
-    >
-      No items match the current filter
-    </div>
+    <div v-if="filteredItems.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">No items match the current filter</div>
     <table v-else class="min-w-full text-sm">
       <thead class="bg-gray-50 sticky top-0 z-10">
         <tr class="text-left text-xs font-medium text-gray-500 uppercase">
-          <th
-            v-for="col in COLUMNS"
-            :key="col.key"
-            class="px-3 py-2 cursor-pointer hover:bg-gray-100 select-none"
-            @click="setSort(col.key)"
-          >
+          <th v-for="col in COLUMNS" :key="col.key" class="px-3 py-2 cursor-pointer hover:bg-gray-100 select-none" @click="setSort(col.key)">
             {{ col.label }}
-            <span
-              v-if="sortKey === col.key"
-              class="material-icons text-xs align-middle"
-              >{{ sortDir === "asc" ? "arrow_upward" : "arrow_downward" }}</span
-            >
+            <span v-if="sortKey === col.key" class="material-icons text-xs align-middle">{{ sortDir === "asc" ? "arrow_upward" : "arrow_downward" }}</span>
           </th>
           <th class="px-3 py-2"></th>
         </tr>
@@ -29,29 +15,13 @@
         <template v-for="item in sortedItems" :key="item.id">
           <tr class="hover:bg-gray-50">
             <td class="px-3 py-2">
-              <input
-                type="checkbox"
-                :checked="item.completed"
-                @change="emit('toggleComplete', item)"
-              />
+              <input type="checkbox" :checked="item.completed" @change="emit('toggleComplete', item)" />
             </td>
-            <td
-              class="px-3 py-2 max-w-md cursor-pointer"
-              @click="toggleExpand(item.id)"
-            >
-              <div
-                :class="
-                  item.completed
-                    ? 'line-through text-gray-400'
-                    : 'text-gray-800'
-                "
-              >
+            <td class="px-3 py-2 max-w-md cursor-pointer" @click="toggleExpand(item.id)">
+              <div :class="item.completed ? 'line-through text-gray-400' : 'text-gray-800'">
                 {{ item.text }}
               </div>
-              <div
-                v-if="item.note"
-                class="text-xs text-gray-400 truncate max-w-xs"
-              >
+              <div v-if="item.note" class="text-xs text-gray-400 truncate max-w-xs">
                 {{ item.note }}
               </div>
             </td>
@@ -59,12 +29,9 @@
               {{ statusLabel(item) }}
             </td>
             <td class="px-3 py-2">
-              <span
-                v-if="item.priority"
-                class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                :class="PRIORITY_CLASSES[item.priority]"
-                >{{ PRIORITY_LABELS[item.priority] }}</span
-              >
+              <span v-if="item.priority" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="PRIORITY_CLASSES[item.priority]">{{
+                PRIORITY_LABELS[item.priority]
+              }}</span>
             </td>
             <td class="px-3 py-2">
               <div class="flex flex-wrap gap-1">
@@ -78,34 +45,20 @@
               </div>
             </td>
             <td class="px-3 py-2 text-xs">
-              <span
-                v-if="item.dueDate"
-                class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                :class="dueDateClasses(item.dueDate)"
-                >{{ formatDueLabel(item.dueDate) }}</span
-              >
+              <span v-if="item.dueDate" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="dueDateClasses(item.dueDate)">{{
+                formatDueLabel(item.dueDate)
+              }}</span>
             </td>
             <td class="px-3 py-2 text-xs text-gray-400">
               {{ formatShortDate(item.createdAt) }}
             </td>
             <td class="px-3 py-2 text-right">
-              <button
-                class="text-gray-300 hover:text-red-500 text-xs"
-                title="Delete item"
-                @click="emit('delete', item.id)"
-              >
-                ✕
-              </button>
+              <button class="text-gray-300 hover:text-red-500 text-xs" title="Delete item" @click="emit('delete', item.id)">✕</button>
             </td>
           </tr>
           <tr v-if="expandedId === item.id">
             <td colspan="8" class="bg-blue-50 p-0">
-              <TodoEditPanel
-                :item="item"
-                :columns="columns"
-                @save="(input) => onSave(item.id, input)"
-                @cancel="expandedId = null"
-              />
+              <TodoEditPanel :item="item" :columns="columns" @save="(input) => onSave(item.id, input)" @cancel="expandedId = null" />
             </td>
           </tr>
         </template>
@@ -118,25 +71,12 @@
 import { computed, ref } from "vue";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import { colorForLabel } from "../../plugins/todo/labels";
-import {
-  PRIORITY_CLASSES,
-  PRIORITY_LABELS,
-  PRIORITY_ORDER,
-  dueDateClasses,
-  formatDueLabel,
-} from "../../plugins/todo/priority";
+import { PRIORITY_CLASSES, PRIORITY_LABELS, PRIORITY_ORDER, dueDateClasses, formatDueLabel } from "../../plugins/todo/priority";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 import TodoEditPanel from "./TodoEditPanel.vue";
 import { formatShortDate } from "../../utils/format/date";
 
-type SortKey =
-  | "completed"
-  | "text"
-  | "status"
-  | "priority"
-  | "labels"
-  | "dueDate"
-  | "createdAt";
+type SortKey = "completed" | "text" | "status" | "priority" | "labels" | "dueDate" | "createdAt";
 type SortDir = "asc" | "desc";
 
 interface ColumnDef {
@@ -229,10 +169,7 @@ function sortValueOf(item: TodoItem, key: SortKey): unknown {
 const sortedItems = computed(() => {
   const list = [...props.filteredItems];
   list.sort((x, y) => {
-    const result = compareValues(
-      sortValueOf(x, sortKey.value),
-      sortValueOf(y, sortKey.value),
-    );
+    const result = compareValues(sortValueOf(x, sortKey.value), sortValueOf(y, sortKey.value));
     return sortDir.value === "asc" ? result : -result;
   });
   return list;

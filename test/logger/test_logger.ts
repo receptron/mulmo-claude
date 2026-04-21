@@ -39,9 +39,7 @@ describe("createLogger level filtering", () => {
       logger.warn("x", "kept-warn");
       logger.error("x", "kept-error");
       for (const line of lines) {
-        const parsed: { level: string; message: string } = JSON.parse(
-          line.trim(),
-        );
+        const parsed: { level: string; message: string } = JSON.parse(line.trim());
         captured.push(parsed);
       }
     } finally {

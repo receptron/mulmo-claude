@@ -6,20 +6,14 @@
 // so the rules are unit-testable without a Vue runtime.
 
 import { ref, watch, type Ref } from "vue";
-import {
-  EXPANDED_DIRS_STORAGE_KEY,
-  parseStoredExpandedDirs,
-  serializeExpandedDirs,
-} from "../utils/files/expandedDirs";
+import { EXPANDED_DIRS_STORAGE_KEY, parseStoredExpandedDirs, serializeExpandedDirs } from "../utils/files/expandedDirs";
 
 function loadInitial(): Set<string> {
   if (typeof localStorage === "undefined") {
     return parseStoredExpandedDirs(null);
   }
   try {
-    return parseStoredExpandedDirs(
-      localStorage.getItem(EXPANDED_DIRS_STORAGE_KEY),
-    );
+    return parseStoredExpandedDirs(localStorage.getItem(EXPANDED_DIRS_STORAGE_KEY));
   } catch {
     return parseStoredExpandedDirs(null);
   }

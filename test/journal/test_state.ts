@@ -18,10 +18,7 @@ describe("defaultState", () => {
     assert.equal(s.lastDailyRunAt, null);
     assert.equal(s.lastOptimizationRunAt, null);
     assert.equal(s.dailyIntervalHours, DEFAULT_DAILY_INTERVAL_HOURS);
-    assert.equal(
-      s.optimizationIntervalDays,
-      DEFAULT_OPTIMIZATION_INTERVAL_DAYS,
-    );
+    assert.equal(s.optimizationIntervalDays, DEFAULT_OPTIMIZATION_INTERVAL_DAYS);
     assert.deepEqual(s.processedSessions, {});
     assert.deepEqual(s.knownTopics, []);
   });
@@ -59,10 +56,7 @@ describe("parseState", () => {
       optimizationIntervalDays: -3,
     });
     assert.equal(parsed.dailyIntervalHours, DEFAULT_DAILY_INTERVAL_HOURS);
-    assert.equal(
-      parsed.optimizationIntervalDays,
-      DEFAULT_OPTIMIZATION_INTERVAL_DAYS,
-    );
+    assert.equal(parsed.optimizationIntervalDays, DEFAULT_OPTIMIZATION_INTERVAL_DAYS);
   });
 
   it("drops processedSessions entries with invalid mtime", () => {

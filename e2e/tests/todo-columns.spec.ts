@@ -1,9 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
-import {
-  mockSlugifyColumnId,
-  setupMutableTodoMocks,
-} from "../fixtures/todos-mutable";
+import { mockSlugifyColumnId, setupMutableTodoMocks } from "../fixtures/todos-mutable";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 
 const TODOS_URL = `/chat?view=files&path=${WORKSPACE_FILES.todosItems}`;
@@ -13,10 +10,7 @@ async function setupTodoMocks(page: Page): Promise<void> {
   await setupMutableTodoMocks(page, {
     dispatchColumn(method, id, body, state) {
       if (method === "POST") {
-        const label =
-          typeof body.label === "string" && body.label.length > 0
-            ? body.label
-            : "New Column";
+        const label = typeof body.label === "string" && body.label.length > 0 ? body.label : "New Column";
         const baseId = mockSlugifyColumnId(label);
         const existing = new Set(state.columns.map((c) => c.id));
         let newId = baseId;
@@ -31,9 +25,7 @@ async function setupTodoMocks(page: Page): Promise<void> {
       }
       if (method === "PATCH" && id) {
         return {
-          columns: state.columns.map((c) =>
-            c.id === id ? { ...c, label: "Renamed" } : c,
-          ),
+          columns: state.columns.map((c) => (c.id === id ? { ...c, label: "Renamed" } : c)),
         };
       }
     },
@@ -87,18 +79,10 @@ test.describe("Todo column management", () => {
     });
 
     // Check columns exist via data-testid (more reliable than text)
-    await expect(
-      page.locator('[data-testid="todo-column-backlog"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="todo-column-todo"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="todo-column-in_progress"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="todo-column-done"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="todo-column-backlog"]')).toBeVisible();
+    await expect(page.locator('[data-testid="todo-column-todo"]')).toBeVisible();
+    await expect(page.locator('[data-testid="todo-column-in_progress"]')).toBeVisible();
+    await expect(page.locator('[data-testid="todo-column-done"]')).toBeVisible();
   });
 
   test("menu shows Mark as done column option", async ({ page }) => {
@@ -140,9 +124,7 @@ test.describe("Todo column management", () => {
     await expect(page.getByText("完了")).toBeVisible({ timeout: 5000 });
   });
 
-  test("two distinct Japanese labels produce two distinct columns (#161)", async ({
-    page,
-  }) => {
+  test("two distinct Japanese labels produce two distinct columns (#161)", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
       timeout: 5000,

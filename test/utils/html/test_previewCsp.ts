@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  HTML_PREVIEW_CSP_ALLOWED_CDNS,
-  buildHtmlPreviewCsp,
-  wrapHtmlWithPreviewCsp,
-} from "../../../src/utils/html/previewCsp";
+import { HTML_PREVIEW_CSP_ALLOWED_CDNS, buildHtmlPreviewCsp, wrapHtmlWithPreviewCsp } from "../../../src/utils/html/previewCsp";
 
 describe("buildHtmlPreviewCsp", () => {
   it("defaults to the exported CDN whitelist", () => {
@@ -21,9 +17,7 @@ describe("buildHtmlPreviewCsp", () => {
 
   it("allows inline scripts alongside the CDN whitelist", () => {
     const csp = buildHtmlPreviewCsp();
-    assert.ok(
-      csp.includes("script-src 'unsafe-inline' https://cdn.jsdelivr.net"),
-    );
+    assert.ok(csp.includes("script-src 'unsafe-inline' https://cdn.jsdelivr.net"));
   });
 
   it("blocks connect-src entirely (no phone-home)", () => {
@@ -58,11 +52,7 @@ describe("wrapHtmlWithPreviewCsp", () => {
   it("injects the meta tag into an existing <head>", () => {
     const html = `<!DOCTYPE html><html><head><title>x</title></head><body>x</body></html>`;
     const out = wrapHtmlWithPreviewCsp(html);
-    assert.ok(
-      out.includes(
-        `<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'`,
-      ),
-    );
+    assert.ok(out.includes(`<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'`));
     // Original <title> preserved right after the injected meta.
     assert.ok(out.includes(`"><title>x</title>`));
   });

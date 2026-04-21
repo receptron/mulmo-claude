@@ -1,29 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  runFetchPhase,
-  computeNextState,
-  backoffDelayMs,
-  BACKOFF_MAX_MS,
-} from "../../server/workspace/sources/pipeline/fetch.js";
-import type {
-  FetcherDeps,
-  FetchResult,
-  SourceFetcher,
-} from "../../server/workspace/sources/fetchers/index.js";
-import type {
-  FetcherKind,
-  Source,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { runFetchPhase, computeNextState, backoffDelayMs, BACKOFF_MAX_MS } from "../../server/workspace/sources/pipeline/fetch.js";
+import type { FetcherDeps, FetchResult, SourceFetcher } from "../../server/workspace/sources/fetchers/index.js";
+import type { FetcherKind, Source, SourceState } from "../../server/workspace/sources/types.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
 
 // --- helpers -------------------------------------------------------------
 
@@ -86,10 +67,7 @@ function makeDeps(): FetcherDeps {
 // Fake fetcher factory — returns a SourceFetcher whose `fetch`
 // implementation is whatever you pass in. Keeps tests free of
 // actual HTTP plumbing.
-function fakeFetcher(
-  kind: FetcherKind,
-  impl: (source: Source, state: SourceState) => Promise<FetchResult>,
-): SourceFetcher {
+function fakeFetcher(kind: FetcherKind, impl: (source: Source, state: SourceState) => Promise<FetchResult>): SourceFetcher {
   return {
     kind,
     async fetch(source, state) {
@@ -99,9 +77,7 @@ function fakeFetcher(
 }
 
 // Build a `getFetcher` lookup for a set of fakes.
-function makeGetFetcher(
-  fetchers: SourceFetcher[],
-): (kind: FetcherKind) => SourceFetcher | null {
+function makeGetFetcher(fetchers: SourceFetcher[]): (kind: FetcherKind) => SourceFetcher | null {
   const byKind = new Map<FetcherKind, SourceFetcher>();
   for (const f of fetchers) byKind.set(f.kind, f);
   return (kind) => byKind.get(kind) ?? null;
@@ -137,9 +113,7 @@ describe("runFetchPhase — success path", () => {
     });
     await runFetchPhase({
       sources: [makeSource({ slug: "a" })],
-      statesBySlug: new Map([
-        ["a", makeState({ slug: "a", cursor: { old: "cursor" } })],
-      ]),
+      statesBySlug: new Map([["a", makeState({ slug: "a", cursor: { old: "cursor" } })]]),
       deps: makeDeps(),
       getFetcher: makeGetFetcher([fetcher]),
     });
@@ -175,11 +149,7 @@ describe("runFetchPhase — failure isolation (Q8)", () => {
       return { items: [], cursor: {} };
     });
     const result = await runFetchPhase({
-      sources: [
-        makeSource({ slug: "ok-a" }),
-        makeSource({ slug: "broken" }),
-        makeSource({ slug: "ok-b" }),
-      ],
+      sources: [makeSource({ slug: "ok-a" }), makeSource({ slug: "broken" }), makeSource({ slug: "ok-b" })],
       statesBySlug: new Map(),
       deps: makeDeps(),
       getFetcher: makeGetFetcher([fetcher]),
@@ -205,10 +175,7 @@ describe("runFetchPhase — failure isolation (Q8)", () => {
     assert.equal(result.outcomes.length, 1);
     assert.equal(result.outcomes[0].kind, "no-fetcher");
     if (result.outcomes[0].kind === "no-fetcher") {
-      assert.match(
-        result.outcomes[0].error,
-        /no fetcher registered for kind "web-fetch"/,
-      );
+      assert.match(result.outcomes[0].error, /no fetcher registered for kind "web-fetch"/);
     }
   });
 

@@ -2,8 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
 // A 1x1 red PNG as base64 for testing image rendering.
-const TINY_PNG =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
 
 async function setupImageSession(page: Page) {
   await mockAllApis(page, {
@@ -19,9 +18,7 @@ async function setupImageSession(page: Page) {
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) => {
       return route.fulfill({
         json: [
@@ -76,9 +73,7 @@ async function setupImageSession(page: Page) {
   );
 
   await page.route(
-    (url) =>
-      url.pathname === "/api/files/raw" &&
-      typeof url.searchParams.get("path") === "string",
+    (url) => url.pathname === "/api/files/raw" && typeof url.searchParams.get("path") === "string",
     (route) => {
       return route.fulfill({
         contentType: "image/png",
@@ -103,9 +98,7 @@ test.describe("image plugin rendering", () => {
     await expect(page.getByText("Generate an image")).toBeVisible();
   });
 
-  test("empty imageData does not produce a broken <img> tag", async ({
-    page,
-  }) => {
+  test("empty imageData does not produce a broken <img> tag", async ({ page }) => {
     await page.goto("/chat/img-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.waitForTimeout(1000);

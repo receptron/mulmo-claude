@@ -11,10 +11,7 @@ const editImagePlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<ImageToolData>>(
-      API_ROUTES.image.edit,
-      args,
-    );
+    const result = await apiPost<ToolResult<ImageToolData>>(API_ROUTES.image.edit, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

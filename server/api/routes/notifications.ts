@@ -16,11 +16,7 @@
 // this file pulling in either module directly.
 
 import { Router, type Request, type Response } from "express";
-import {
-  scheduleTestNotification,
-  type NotificationDeps,
-  type ScheduleNotificationOptions,
-} from "../../events/notifications.js";
+import { scheduleTestNotification, type NotificationDeps, type ScheduleNotificationOptions } from "../../events/notifications.js";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
@@ -55,25 +51,19 @@ function parseBody(body: TestRequestBody): ScheduleNotificationOptions {
 
 export function createNotificationsRouter(deps: NotificationDeps): Router {
   const router = Router();
-  router.post(
-    API_ROUTES.notifications.test,
-    (
-      req: Request<object, unknown, TestRequestBody>,
-      res: Response<TestResponse>,
-    ) => {
-      const opts = parseBody(req.body ?? {});
-      const scheduled = scheduleTestNotification(opts, deps);
-      log.info("notifications", "scheduled test push", {
-        delaySeconds: scheduled.delaySeconds,
-        firesAt: scheduled.firesAt,
-        transportId: opts.transportId,
-        chatId: opts.chatId,
-      });
-      res.status(202).json({
-        firesAt: scheduled.firesAt,
-        delaySeconds: scheduled.delaySeconds,
-      });
-    },
-  );
+  router.post(API_ROUTES.notifications.test, (req: Request<object, unknown, TestRequestBody>, res: Response<TestResponse>) => {
+    const opts = parseBody(req.body ?? {});
+    const scheduled = scheduleTestNotification(opts, deps);
+    log.info("notifications", "scheduled test push", {
+      delaySeconds: scheduled.delaySeconds,
+      firesAt: scheduled.firesAt,
+      transportId: opts.transportId,
+      chatId: opts.chatId,
+    });
+    res.status(202).json({
+      firesAt: scheduled.firesAt,
+      delaySeconds: scheduled.delaySeconds,
+    });
+  });
   return router;
 }

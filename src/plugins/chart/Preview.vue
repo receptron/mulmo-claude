@@ -17,9 +17,7 @@ import type { PresentChartData } from "./index";
 const props = defineProps<{ result: ToolResultComplete<PresentChartData> }>();
 
 const data = computed(() => props.result.data);
-const title = computed(
-  () => data.value?.title ?? data.value?.document?.title ?? "Chart",
-);
+const title = computed(() => data.value?.title ?? data.value?.document?.title ?? "Chart");
 
 // Condensed "n charts: line, bar, …" hint derived from the document
 // so the preview card tells the user what's inside without opening.

@@ -13,15 +13,9 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
-async function mockFileContent(
-  page: Page,
-  pathMatch: string,
-  body: { kind: "text" | "image"; content?: string },
-): Promise<void> {
+async function mockFileContent(page: Page, pathMatch: string, body: { kind: "text" | "image"; content?: string }): Promise<void> {
   await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === pathMatch,
+    (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === pathMatch,
     (route: Route) =>
       route.fulfill({
         json: {
@@ -40,9 +34,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
     await mockAllApis(page);
   });
 
-  test("HTML preview iframe allows scripts (Chart.js would run)", async ({
-    page,
-  }) => {
+  test("HTML preview iframe allows scripts (Chart.js would run)", async ({ page }) => {
     const html = `<!DOCTYPE html>
 <html>
 <head><title>Chart</title></head>
@@ -70,9 +62,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
     expect(sandbox).not.toContain("allow-same-origin");
   });
 
-  test("HTML preview injects a CSP meta tag narrowing scripts to whitelisted CDNs", async ({
-    page,
-  }) => {
+  test("HTML preview injects a CSP meta tag narrowing scripts to whitelisted CDNs", async ({ page }) => {
     const html = `<!DOCTYPE html><html><head></head><body>x</body></html>`;
     await mockFileContent(page, "HTMLs/x.html", {
       kind: "text",
@@ -85,9 +75,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
 
     const srcdoc = await iframe.getAttribute("srcdoc");
     expect(srcdoc).toBeTruthy();
-    expect(srcdoc).toContain(
-      `<meta http-equiv="Content-Security-Policy" content="default-src 'none'`,
-    );
+    expect(srcdoc).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'`);
     expect(srcdoc).toContain(`https://cdn.jsdelivr.net`);
     expect(srcdoc).toContain(`connect-src 'none'`);
   });
@@ -98,9 +86,7 @@ test.describe("Files view — markdown image path rewrite", () => {
     await mockAllApis(page);
   });
 
-  test("`![](images/foo.png)` renders as an `<img src=/api/files/raw?...>`", async ({
-    page,
-  }) => {
+  test("`![](images/foo.png)` renders as an `<img src=/api/files/raw?...>`", async ({ page }) => {
     const md = `# Page\n\n![chart](images/foo.png)\n`;
     await mockFileContent(page, "markdowns/sample.md", {
       kind: "text",
@@ -117,9 +103,7 @@ test.describe("Files view — markdown image path rewrite", () => {
     expect(src).toContain("foo.png");
   });
 
-  test("`![](../../images/foo.png)` with relative-up prefix also resolves", async ({
-    page,
-  }) => {
+  test("`![](../../images/foo.png)` with relative-up prefix also resolves", async ({ page }) => {
     const md = `![two](../../images/two.png)`;
     await mockFileContent(page, "wiki/pages/a.md", {
       kind: "text",

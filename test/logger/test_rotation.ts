@@ -3,25 +3,15 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import {
-  dailyFileName,
-  enforceMaxFiles,
-  listLogFiles,
-} from "../../server/system/logger/rotation.js";
+import { dailyFileName, enforceMaxFiles, listLogFiles } from "../../server/system/logger/rotation.js";
 
 describe("dailyFileName", () => {
   it("formats a UTC date into server-YYYY-MM-DD.log", () => {
-    assert.equal(
-      dailyFileName(new Date("2026-04-13T07:12:45.123Z")),
-      "server-2026-04-13.log",
-    );
+    assert.equal(dailyFileName(new Date("2026-04-13T07:12:45.123Z")), "server-2026-04-13.log");
   });
 
   it("zero-pads single-digit months and days", () => {
-    assert.equal(
-      dailyFileName(new Date("2026-01-02T00:00:00Z")),
-      "server-2026-01-02.log",
-    );
+    assert.equal(dailyFileName(new Date("2026-01-02T00:00:00Z")), "server-2026-01-02.log");
   });
 });
 
@@ -47,11 +37,7 @@ describe("listLogFiles / enforceMaxFiles", () => {
     await writeFile(path.join(dir, "server-2026-04-12.log"), "c");
     await writeFile(path.join(dir, "unrelated.txt"), "x");
     const files = await listLogFiles(dir);
-    assert.deepEqual(files, [
-      "server-2026-04-12.log",
-      "server-2026-04-11.log",
-      "server-2026-04-10.log",
-    ]);
+    assert.deepEqual(files, ["server-2026-04-12.log", "server-2026-04-11.log", "server-2026-04-10.log"]);
   });
 
   it("deletes oldest files beyond maxFiles", async () => {

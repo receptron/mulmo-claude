@@ -1,10 +1,6 @@
 import { appendFile } from "fs/promises";
 import path from "path";
-import type {
-  ConsoleSinkConfig,
-  FileSinkConfig,
-  TelemetrySinkConfig,
-} from "./config.js";
+import type { ConsoleSinkConfig, FileSinkConfig, TelemetrySinkConfig } from "./config.js";
 import { formatJson, formatText } from "./formatters.js";
 import { dailyFileName, enforceMaxFiles, ensureDir } from "./rotation.js";
 import type { Formatter, LogRecord, Sink } from "./types.js";
@@ -20,10 +16,7 @@ export function createConsoleSink(config: ConsoleSinkConfig): Sink {
     level: config.level,
     write(record: LogRecord) {
       const line = fmt(record) + "\n";
-      const stream =
-        record.level === "error" || record.level === "warn"
-          ? process.stderr
-          : process.stdout;
+      const stream = record.level === "error" || record.level === "warn" ? process.stderr : process.stdout;
       stream.write(line);
     },
   };
@@ -37,14 +30,9 @@ export interface FileSinkDeps {
 
 // Factory for the rotating file sink. `deps` is only used by tests to
 // inject a fake clock and an in-memory writer.
-export function createFileSink(
-  config: FileSinkConfig,
-  deps: FileSinkDeps = {},
-): Sink {
+export function createFileSink(config: FileSinkConfig, deps: FileSinkDeps = {}): Sink {
   const now = deps.now ?? (() => new Date());
-  const writeLine =
-    deps.writeLine ??
-    ((p: string, line: string) => appendFile(p, line, "utf-8"));
+  const writeLine = deps.writeLine ?? ((p: string, line: string) => appendFile(p, line, "utf-8"));
   const onError =
     deps.onError ??
     ((err: unknown) => {

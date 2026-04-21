@@ -48,9 +48,7 @@ export interface MaybeIndexSessionOptions {
 
 // Fire-and-forget entry point. Errors are swallowed here; a
 // defensive `.catch(...)` at the call site is still recommended.
-export async function maybeIndexSession(
-  opts: MaybeIndexSessionOptions,
-): Promise<void> {
+export async function maybeIndexSession(opts: MaybeIndexSessionOptions): Promise<void> {
   if (disabled) return;
 
   const { sessionId } = opts;
@@ -67,11 +65,7 @@ export async function maybeIndexSession(
 
   running.add(sessionId);
   try {
-    await indexSession(
-      opts.workspaceRoot ?? defaultWorkspacePath,
-      sessionId,
-      effectiveDeps,
-    );
+    await indexSession(opts.workspaceRoot ?? defaultWorkspacePath, sessionId, effectiveDeps);
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) {
       disabled = true;

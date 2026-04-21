@@ -47,11 +47,7 @@ export interface FetchResult {
 
 export interface SourceFetcher {
   readonly kind: FetcherKind;
-  fetch(
-    source: Source,
-    state: SourceState,
-    deps: FetcherDeps,
-  ): Promise<FetchResult>;
+  fetch(source: Source, state: SourceState, deps: FetcherDeps): Promise<FetchResult>;
 }
 
 // Registry of all known fetchers. Populated lazily via

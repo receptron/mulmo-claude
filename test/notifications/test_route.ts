@@ -19,8 +19,7 @@ import {
 function createSpyDeps(): NotificationDeps & {
   pushCalls: { transportId: string; chatId: string; message: string }[];
 } {
-  const pushCalls: { transportId: string; chatId: string; message: string }[] =
-    [];
+  const pushCalls: { transportId: string; chatId: string; message: string }[] = [];
   const deps: NotificationDeps & { pushCalls: typeof pushCalls } = {
     pushCalls,
     publish: () => {},
@@ -95,10 +94,7 @@ describe("notification route — body validation via scheduleTestNotification", 
 
   it("accepts custom transportId and chatId", () => {
     const deps = createSpyDeps();
-    scheduleTestNotification(
-      { transportId: "slack", chatId: "general", delaySeconds: 0 },
-      deps,
-    );
+    scheduleTestNotification({ transportId: "slack", chatId: "general", delaySeconds: 0 }, deps);
     mock.timers.tick(0);
     assert.equal(deps.pushCalls[0].transportId, "slack");
     assert.equal(deps.pushCalls[0].chatId, "general");

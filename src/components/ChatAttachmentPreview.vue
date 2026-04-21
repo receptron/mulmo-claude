@@ -1,18 +1,8 @@
 <template>
-  <div
-    data-testid="chat-attachment-preview"
-    class="relative inline-flex items-center gap-2 border border-gray-300 rounded overflow-hidden px-2 py-1"
-  >
-    <img
-      v-if="isImage"
-      :src="dataUrl"
-      alt="Attached image"
-      class="max-h-20 max-w-40 object-contain"
-    />
+  <div data-testid="chat-attachment-preview" class="relative inline-flex items-center gap-2 border border-gray-300 rounded overflow-hidden px-2 py-1">
+    <img v-if="isImage" :src="dataUrl" alt="Attached image" class="max-h-20 max-w-40 object-contain" />
     <div v-else class="flex items-center gap-1.5 text-xs text-gray-700">
-      <span class="material-icons text-base" :class="iconColor">{{
-        icon
-      }}</span>
+      <span class="material-icons text-base" :class="iconColor">{{ icon }}</span>
       <span class="max-w-40 truncate">{{ filename || "attachment" }}</span>
     </div>
     <button

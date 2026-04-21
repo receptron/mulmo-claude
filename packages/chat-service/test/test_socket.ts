@@ -4,11 +4,7 @@ import http from "http";
 import express from "express";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Server as SocketServer } from "socket.io";
-import {
-  attachChatSocket,
-  CHAT_SOCKET_EVENTS,
-  CHAT_SOCKET_PATH,
-} from "../src/socket.js";
+import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH } from "../src/socket.js";
 import { createPushQueue } from "../src/push-queue.js";
 import type { RelayParams, RelayResult } from "../src/relay.js";
 import type { Logger } from "../src/types.js";
@@ -48,9 +44,7 @@ async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
     tokenProvider: opts.tokenProvider,
   });
 
-  await new Promise<void>((resolve) =>
-    httpServer.listen(0, "127.0.0.1", () => resolve()),
-  );
+  await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", () => resolve()));
   const address = httpServer.address();
   if (!address || typeof address === "string") {
     throw new Error("Failed to get server address");
@@ -73,10 +67,7 @@ async function stopHarness(h: Harness): Promise<void> {
   await new Promise<void>((resolve) => h.httpServer.close(() => resolve()));
 }
 
-function connectClient(
-  url: string,
-  auth: Record<string, unknown> | undefined,
-): ClientSocket {
+function connectClient(url: string, auth: Record<string, unknown> | undefined): ClientSocket {
   return ioClient(url, {
     path: CHAT_SOCKET_PATH,
     auth: auth ?? {},
@@ -93,10 +84,7 @@ function waitConnect(socket: ClientSocket): Promise<void> {
   });
 }
 
-function emitMessage(
-  client: ClientSocket,
-  payload: unknown,
-): Promise<{ ok: boolean; reply?: string; error?: string; status?: number }> {
+function emitMessage(client: ClientSocket, payload: unknown): Promise<{ ok: boolean; reply?: string; error?: string; status?: number }> {
   return new Promise((resolve) => {
     client.emit(CHAT_SOCKET_EVENTS.message, payload, resolve);
   });

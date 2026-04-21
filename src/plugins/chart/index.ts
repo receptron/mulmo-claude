@@ -27,10 +27,7 @@ const presentChartPlugin: ToolPlugin<PresentChartData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<PresentChartData>>(
-      API_ROUTES.chart.present,
-      args,
-    );
+    const result = await apiPost<ToolResult<PresentChartData>>(API_ROUTES.chart.present, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

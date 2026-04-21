@@ -68,12 +68,5 @@ function trimTrailingSpace(out: string[]): void {
 }
 
 function isWhitespace(c: string): boolean {
-  return (
-    c === " " ||
-    c === "\t" ||
-    c === "\n" ||
-    c === "\r" ||
-    c === "\v" ||
-    c === "\f"
-  );
+  return c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\v" || c === "\f";
 }

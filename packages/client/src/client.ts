@@ -13,11 +13,7 @@
 // minimal non-Node equivalent.
 
 import { io, type Socket } from "socket.io-client";
-import {
-  CHAT_SOCKET_EVENTS,
-  CHAT_SOCKET_PATH,
-  type Attachment,
-} from "@mulmobridge/protocol";
+import { CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, type Attachment } from "@mulmobridge/protocol";
 import { readBridgeToken, TOKEN_FILE_PATH } from "./token.js";
 
 // 6 min > the server's REPLY_TIMEOUT_MS (5 min) so the server's
@@ -48,11 +44,7 @@ export interface BridgeClientOptions {
 
 export interface BridgeClient {
   /** Send a user turn to MulmoClaude, wait for the assistant reply. */
-  send(
-    externalChatId: string,
-    text: string,
-    attachments?: Attachment[],
-  ): Promise<MessageAck>;
+  send(externalChatId: string, text: string, attachments?: Attachment[]): Promise<MessageAck>;
   /** Subscribe to server → bridge async pushes (Phase B of #268). */
   onPush(handler: (event: PushEvent) => void): void;
   /** Subscribe to streaming text chunks during a relay (Phase C of
@@ -90,8 +82,7 @@ export function requireBearerToken(): string {
 }
 
 export function createBridgeClient(opts: BridgeClientOptions): BridgeClient {
-  const apiUrl =
-    opts.apiUrl ?? process.env.MULMOCLAUDE_API_URL ?? DEFAULT_API_URL;
+  const apiUrl = opts.apiUrl ?? process.env.MULMOCLAUDE_API_URL ?? DEFAULT_API_URL;
   const token = requireBearerToken();
 
   const socket = io(apiUrl, {
@@ -103,8 +94,7 @@ export function createBridgeClient(opts: BridgeClientOptions): BridgeClient {
   installDefaultLogging(socket);
 
   return {
-    send: (externalChatId, text, attachments) =>
-      sendMessage(socket, externalChatId, text, attachments),
+    send: (externalChatId, text, attachments) => sendMessage(socket, externalChatId, text, attachments),
     onPush: (handler) => {
       socket.on(CHAT_SOCKET_EVENTS.push, handler);
     },
@@ -126,28 +116,17 @@ export function createBridgeClient(opts: BridgeClientOptions): BridgeClient {
   };
 }
 
-function sendMessage(
-  socket: Socket,
-  externalChatId: string,
-  text: string,
-  attachments?: Attachment[],
-): Promise<MessageAck> {
+function sendMessage(socket: Socket, externalChatId: string, text: string, attachments?: Attachment[]): Promise<MessageAck> {
   const payload: Record<string, unknown> = { externalChatId, text };
   if (attachments && attachments.length > 0) payload.attachments = attachments;
   return new Promise((resolve) => {
-    socket
-      .timeout(REPLY_TIMEOUT_MS)
-      .emit(
-        CHAT_SOCKET_EVENTS.message,
-        payload,
-        (err: Error | null, ack: MessageAck | undefined) => {
-          if (err) {
-            resolve({ ok: false, error: `timeout: ${err.message}` });
-            return;
-          }
-          resolve(ack ?? { ok: false, error: "no ack from server" });
-        },
-      );
+    socket.timeout(REPLY_TIMEOUT_MS).emit(CHAT_SOCKET_EVENTS.message, payload, (err: Error | null, ack: MessageAck | undefined) => {
+      if (err) {
+        resolve({ ok: false, error: `timeout: ${err.message}` });
+        return;
+      }
+      resolve(ack ?? { ok: false, error: "no ack from server" });
+    });
   });
 }
 

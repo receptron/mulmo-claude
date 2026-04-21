@@ -39,9 +39,7 @@ export type SaveResult =
  * Write a new SKILL.md atomically. Refuses to overwrite — if the
  * skill already exists at either scope, returns `kind: "exists"`.
  */
-export async function saveProjectSkill(
-  input: SaveSkillInput,
-): Promise<SaveResult> {
+export async function saveProjectSkill(input: SaveSkillInput): Promise<SaveResult> {
   const { workspaceRoot, name, description, body } = input;
 
   if (!isValidSlug(name)) return { kind: "invalid-slug", slug: name };
@@ -88,9 +86,7 @@ export type UpdateResult =
  * Overwrite an existing project-scope SKILL.md. Refuses to touch
  * user-scope skills and rejects names that don't exist.
  */
-export async function updateProjectSkill(
-  input: SaveSkillInput,
-): Promise<UpdateResult> {
+export async function updateProjectSkill(input: SaveSkillInput): Promise<UpdateResult> {
   const { workspaceRoot, name, description, body } = input;
 
   if (!isValidSlug(name)) return { kind: "invalid-slug", slug: name };
@@ -135,9 +131,7 @@ export type DeleteResult =
  * Refuses to touch the user scope even if a user skill with this
  * name exists — protects against accidental ~/.claude mutation.
  */
-export async function deleteProjectSkill(
-  input: DeleteSkillInput,
-): Promise<DeleteResult> {
+export async function deleteProjectSkill(input: DeleteSkillInput): Promise<DeleteResult> {
   const { workspaceRoot, name } = input;
 
   if (!isValidSlug(name)) return { kind: "invalid-slug", slug: name };
@@ -187,10 +181,7 @@ function formatSkillFile(description: string, body: string): string {
  */
 function escapeYamlScalar(value: string): string {
   const oneLine = value.replace(/\r?\n/g, " ").trim();
-  const needsQuoting =
-    /[:#'"\\[\]{}>|`*&!%@?]/.test(oneLine) ||
-    /^\s|\s$/.test(oneLine) ||
-    /^(true|false|null|~|yes|no|on|off)$/i.test(oneLine);
+  const needsQuoting = /[:#'"\\[\]{}>|`*&!%@?]/.test(oneLine) || /^\s|\s$/.test(oneLine) || /^(true|false|null|~|yes|no|on|off)$/i.test(oneLine);
   if (!needsQuoting) return oneLine;
   // JSON.stringify gives us escapes for `\`, `"`, control chars in
   // one shot — the result is also valid YAML when wrapped in `"..."`.

@@ -1,15 +1,9 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <div
-      class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2"
-    >
-      <span class="text-sm font-medium text-gray-700 truncate">
-        Information sources
-      </span>
+    <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
+      <span class="text-sm font-medium text-gray-700 truncate"> Information sources </span>
       <div class="flex items-center gap-2 shrink-0">
-        <span class="text-xs text-gray-500">
-          {{ sources.length }} source{{ sources.length === 1 ? "" : "s" }}
-        </span>
+        <span class="text-xs text-gray-500"> {{ sources.length }} source{{ sources.length === 1 ? "" : "s" }} </span>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="adding || busy === 'rebuild'"
@@ -31,20 +25,11 @@
       </div>
     </div>
 
-    <div
-      v-if="adding"
-      class="px-4 py-3 border-b border-blue-200 bg-blue-50/50 shrink-0 space-y-2"
-      data-testid="sources-add-form"
-    >
+    <div v-if="adding" class="px-4 py-3 border-b border-blue-200 bg-blue-50/50 shrink-0 space-y-2" data-testid="sources-add-form">
       <div class="flex flex-wrap items-center gap-2">
         <label class="text-xs text-gray-700">
           Type
-          <select
-            v-model="draft.kind"
-            class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5"
-            data-testid="sources-draft-kind"
-            @change="onKindChange"
-          >
+          <select v-model="draft.kind" class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5" data-testid="sources-draft-kind" @change="onKindChange">
             <option value="rss">RSS</option>
             <option value="github-releases">GitHub releases</option>
             <option value="github-issues">GitHub issues</option>
@@ -71,11 +56,7 @@
           {{ primaryHint }}
         </span>
         <div class="flex gap-2">
-          <button
-            class="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-            data-testid="sources-draft-cancel"
-            @click="cancelAdd"
-          >
+          <button class="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="sources-draft-cancel" @click="cancelAdd">
             Cancel
           </button>
           <button
@@ -88,11 +69,7 @@
           </button>
         </div>
       </div>
-      <div
-        v-if="draftError"
-        class="text-xs text-red-600"
-        data-testid="sources-draft-error"
-      >
+      <div v-if="draftError" class="text-xs text-red-600" data-testid="sources-draft-error">
         {{ draftError }}
       </div>
     </div>
@@ -100,22 +77,14 @@
     <div
       v-if="actionMessage"
       class="px-4 py-2 text-xs border-b shrink-0"
-      :class="
-        actionError
-          ? 'bg-red-50 text-red-700 border-red-200'
-          : 'bg-green-50 text-green-700 border-green-200'
-      "
+      :class="actionError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'"
       data-testid="sources-action-message"
     >
       {{ actionMessage }}
     </div>
 
     <div class="flex-1 overflow-y-auto">
-      <div
-        v-if="sources.length === 0"
-        class="flex flex-col items-center justify-center h-full p-6 gap-4"
-        data-testid="sources-empty"
-      >
+      <div v-if="sources.length === 0" class="flex flex-col items-center justify-center h-full p-6 gap-4" data-testid="sources-empty">
         <p class="text-sm text-gray-500 italic text-center max-w-md">
           No sources registered yet. Pick a starter pack below, click
           <strong>+ Add</strong> above, or ask Claude to register one.
@@ -133,21 +102,12 @@
               <span class="text-sm font-medium text-gray-800">
                 {{ preset.label }}
               </span>
-              <span class="text-[11px] text-gray-500 shrink-0">
-                {{ preset.entries.length }} source{{
-                  preset.entries.length === 1 ? "" : "s"
-                }}
-              </span>
+              <span class="text-[11px] text-gray-500 shrink-0"> {{ preset.entries.length }} source{{ preset.entries.length === 1 ? "" : "s" }} </span>
             </div>
             <div class="text-xs text-gray-500 mt-1">
               {{ preset.description }}
             </div>
-            <div
-              v-if="busy === 'preset-' + preset.id"
-              class="text-xs text-blue-600 mt-1 italic"
-            >
-              Registering + fetching…
-            </div>
+            <div v-if="busy === 'preset-' + preset.id" class="text-xs text-blue-600 mt-1 italic">Registering + fetching…</div>
           </button>
         </div>
       </div>
@@ -161,20 +121,12 @@
           }"
           :data-testid="`source-row-${source.slug}`"
         >
-          <span
-            class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 mt-0.5 shrink-0"
-            :class="kindBadgeClass(source.fetcherKind)"
-          >
+          <span class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 mt-0.5 shrink-0" :class="kindBadgeClass(source.fetcherKind)">
             {{ kindLabel(source.fetcherKind) }}
           </span>
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline gap-2">
-              <a
-                :href="source.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-sm font-medium text-blue-700 hover:underline truncate"
-              >
+              <a :href="source.url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-blue-700 hover:underline truncate">
                 {{ source.title }}
               </a>
               <code class="text-[11px] text-gray-400 shrink-0">
@@ -184,15 +136,8 @@
             <div class="text-xs text-gray-500 truncate">
               {{ source.url }}
             </div>
-            <div
-              v-if="source.categories.length > 0"
-              class="mt-1 flex flex-wrap gap-1"
-            >
-              <span
-                v-for="cat in source.categories"
-                :key="cat"
-                class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"
-              >
+            <div v-if="source.categories.length > 0" class="mt-1 flex flex-wrap gap-1">
+              <span v-for="cat in source.categories" :key="cat" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                 {{ cat }}
               </span>
             </div>
@@ -214,34 +159,18 @@
       <!-- Today's brief. Auto-fetched on mount and refreshed after
            every Rebuild. Rendered as markdown so lists / headings
            feel like a document, not a dump. -->
-      <div
-        v-if="sources.length > 0 && (briefLoading || briefHtml || briefError)"
-        class="p-4"
-        data-testid="sources-brief"
-      >
+      <div v-if="sources.length > 0 && (briefLoading || briefHtml || briefError)" class="p-4" data-testid="sources-brief">
         <div class="flex items-baseline justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-800">
             Today's brief
-            <span v-if="briefDate" class="text-xs text-gray-400 font-normal">
-              ({{ briefDate }})
-            </span>
+            <span v-if="briefDate" class="text-xs text-gray-400 font-normal"> ({{ briefDate }}) </span>
           </h3>
-          <button
-            v-if="briefFilePath"
-            class="text-[11px] text-gray-500 hover:text-gray-700"
-            :title="briefFilePath"
-          >
+          <button v-if="briefFilePath" class="text-[11px] text-gray-500 hover:text-gray-700" :title="briefFilePath">
             {{ briefFilePath }}
           </button>
         </div>
-        <div v-if="briefLoading" class="text-xs text-gray-500 italic">
-          Loading today's brief…
-        </div>
-        <div
-          v-else-if="briefError"
-          class="text-xs text-gray-500 italic"
-          data-testid="sources-brief-empty"
-        >
+        <div v-if="briefLoading" class="text-xs text-gray-500 italic">Loading today's brief…</div>
+        <div v-else-if="briefError" class="text-xs text-gray-500 italic" data-testid="sources-brief-empty">
           {{ briefError }}
         </div>
         <!-- eslint-disable-next-line vue/no-v-html -->
@@ -249,18 +178,10 @@
       </div>
     </div>
 
-    <div
-      v-if="lastRebuild"
-      class="px-4 py-2 border-t border-gray-100 shrink-0 text-xs text-gray-600"
-      data-testid="sources-rebuild-summary"
-    >
-      Last rebuild ({{ lastRebuild.isoDate }}):
-      <strong>{{ lastRebuild.itemCount }}</strong> items from
-      <strong>{{ lastRebuild.plannedCount }}</strong> sources,
+    <div v-if="lastRebuild" class="px-4 py-2 border-t border-gray-100 shrink-0 text-xs text-gray-600" data-testid="sources-rebuild-summary">
+      Last rebuild ({{ lastRebuild.isoDate }}): <strong>{{ lastRebuild.itemCount }}</strong> items from <strong>{{ lastRebuild.plannedCount }}</strong> sources,
       <strong>{{ lastRebuild.duplicateCount }}</strong> duplicates dropped.
-      <span v-if="lastRebuild.archiveErrors.length > 0" class="text-red-600">
-        ({{ lastRebuild.archiveErrors.length }} archive errors)
-      </span>
+      <span v-if="lastRebuild.archiveErrors.length > 0" class="text-red-600"> ({{ lastRebuild.archiveErrors.length }} archive errors) </span>
     </div>
   </div>
 </template>
@@ -354,9 +275,7 @@ const primaryHint = computed(() => {
 function parseRepoSlug(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  const urlMatch = trimmed.match(
-    /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+)/i,
-  );
+  const urlMatch = trimmed.match(/^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+)/i);
   if (urlMatch) return `${urlMatch[1]}/${urlMatch[2].replace(/\.git$/, "")}`;
   if (/^[^/\s]+\/[^/\s]+$/.test(trimmed)) return trimmed.replace(/\.git$/, "");
   return null;
@@ -482,8 +401,7 @@ const PRESETS: Preset[] = [
   {
     id: "ai-research",
     label: "AI research",
-    description:
-      "Latest arXiv papers in NLP (cs.CL) and machine learning (cs.LG).",
+    description: "Latest arXiv papers in NLP (cs.CL) and machine learning (cs.LG).",
     entries: [
       {
         slug: "arxiv-cs-cl",
@@ -506,8 +424,7 @@ const PRESETS: Preset[] = [
   {
     id: "claude-code",
     label: "Claude Code updates",
-    description:
-      "New releases of the Claude Code CLI from the anthropics/claude-code repo.",
+    description: "New releases of the Claude Code CLI from the anthropics/claude-code repo.",
     entries: [
       {
         slug: "claude-code-releases",
@@ -548,14 +465,9 @@ async function installPreset(preset: Preset): Promise<void> {
     }
   }
   if (failures.length > 0) {
-    flash(
-      `Registered ${toRegister.length - failures.length}/${toRegister.length}. Errors: ${failures.join("; ")}`,
-      true,
-    );
+    flash(`Registered ${toRegister.length - failures.length}/${toRegister.length}. Errors: ${failures.join("; ")}`, true);
   } else {
-    flash(
-      `Registered ${toRegister.length} source${toRegister.length === 1 ? "" : "s"} from "${preset.label}". Fetching…`,
-    );
+    flash(`Registered ${toRegister.length} source${toRegister.length === 1 ? "" : "s"} from "${preset.label}". Fetching…`);
   }
   await refreshList();
   await rebuildInline();
@@ -572,9 +484,7 @@ async function rebuildInline(): Promise<void> {
   }
   const summary = response.data;
   lastRebuild.value = summary;
-  flash(
-    `Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`,
-  );
+  flash(`Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`);
   await loadBrief(summary.isoDate);
 }
 
@@ -583,17 +493,12 @@ const sources = computed<Source[]>(() => {
   return props.selectedResult.data?.sources ?? [];
 });
 
-const highlightSlug = computed(
-  () => props.selectedResult.data?.highlightSlug ?? null,
-);
+const highlightSlug = computed(() => props.selectedResult.data?.highlightSlug ?? null);
 
 // Initialize lastRebuild from the result if the LLM-side rebuild
 // landed before any in-View button click — but never overwrite a
 // fresher result the user's own click produced.
-if (
-  lastRebuild.value === null &&
-  props.selectedResult.data?.lastRebuild !== undefined
-) {
+if (lastRebuild.value === null && props.selectedResult.data?.lastRebuild !== undefined) {
   lastRebuild.value = props.selectedResult.data.lastRebuild;
 }
 
@@ -611,10 +516,7 @@ watch(
     // authoritative when the user switches between results.
     localSources.value = incoming.sources ?? [];
     const nextRebuild = incoming.lastRebuild;
-    if (
-      nextRebuild &&
-      (!lastRebuild.value || nextRebuild.isoDate >= lastRebuild.value.isoDate)
-    ) {
+    if (nextRebuild && (!lastRebuild.value || nextRebuild.isoDate >= lastRebuild.value.isoDate)) {
       lastRebuild.value = nextRebuild;
     }
   },
@@ -666,9 +568,7 @@ async function refreshList(): Promise<void> {
 async function remove(slug: string): Promise<void> {
   if (!confirm(`Remove source "${slug}"?`)) return;
   busy.value = slug;
-  const response = await apiDelete<unknown>(
-    API_ROUTES.sources.remove.replace(":slug", encodeURIComponent(slug)),
-  );
+  const response = await apiDelete<unknown>(API_ROUTES.sources.remove.replace(":slug", encodeURIComponent(slug)));
   busy.value = null;
   if (!response.ok) {
     flash(`Remove failed: ${response.error}`, true);
@@ -688,9 +588,7 @@ async function rebuild(): Promise<void> {
   }
   const summary = response.data;
   lastRebuild.value = summary;
-  flash(
-    `Rebuild complete: ${summary.itemCount} items from ${summary.plannedCount} sources.`,
-  );
+  flash(`Rebuild complete: ${summary.itemCount} items from ${summary.plannedCount} sources.`);
   await Promise.all([refreshList(), loadBrief(summary.isoDate)]);
   busy.value = null;
 }
@@ -735,16 +633,12 @@ async function loadBrief(isoDate: string): Promise<void> {
   briefDate.value = isoDate;
   const relPath = dailyPathFor(isoDate);
   briefFilePath.value = relPath;
-  const response = await apiGet<{ content?: string; kind?: string }>(
-    API_ROUTES.files.content,
-    { path: relPath },
-  );
+  const response = await apiGet<{ content?: string; kind?: string }>(API_ROUTES.files.content, { path: relPath });
   if (token !== briefLoadToken) return;
   if (!response.ok) {
     if (response.status === 404) {
       briefMarkdown.value = "";
-      briefError.value =
-        "No brief written for this date yet. Click Rebuild now.";
+      briefError.value = "No brief written for this date yet. Click Rebuild now.";
     } else {
       briefError.value = response.error || "Failed to load brief";
     }

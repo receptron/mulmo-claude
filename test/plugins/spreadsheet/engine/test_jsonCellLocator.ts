@@ -27,15 +27,8 @@ describe("findCellJsonPosition", () => {
   // substring contains the unique cell value.
   function assertCellAt(pos: number, expectedSubstring: string) {
     assert.ok(pos > 0, `expected a positive offset, got ${pos}`);
-    assert.equal(
-      sample[pos],
-      "{",
-      `expected offset to land on '{', got '${sample[pos]}'`,
-    );
-    assert.ok(
-      sample.substring(pos).includes(expectedSubstring),
-      `expected substring ${JSON.stringify(expectedSubstring)} after position ${pos}`,
-    );
+    assert.equal(sample[pos], "{", `expected offset to land on '{', got '${sample[pos]}'`);
+    assert.ok(sample.substring(pos).includes(expectedSubstring), `expected substring ${JSON.stringify(expectedSubstring)} after position ${pos}`);
   }
 
   it("locates cell (0,0) in the first sheet", () => {
@@ -47,10 +40,7 @@ describe("findCellJsonPosition", () => {
   });
 
   it("locates cell (1,2) with a formula value", () => {
-    assertCellAt(
-      findCellJsonPosition(sample, "Sheet1", 1, 2),
-      `"v": "=SUM(A1:B1)"`,
-    );
+    assertCellAt(findCellJsonPosition(sample, "Sheet1", 1, 2), `"v": "=SUM(A1:B1)"`);
   });
 
   it("locates cell in a non-first sheet by name", () => {

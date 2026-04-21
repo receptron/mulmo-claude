@@ -67,13 +67,7 @@ describe("readWorkspaceText / writeWorkspaceText", () => {
 
   it("creates parent directories on write", async () => {
     await mod.writeWorkspaceText("deep/nested/dir/file.md", "content");
-    assert.equal(
-      fs.readFileSync(
-        path.join(wsRoot(), "deep", "nested", "dir", "file.md"),
-        "utf-8",
-      ),
-      "content",
-    );
+    assert.equal(fs.readFileSync(path.join(wsRoot(), "deep", "nested", "dir", "file.md"), "utf-8"), "content");
   });
 });
 

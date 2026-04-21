@@ -25,8 +25,7 @@ export const CONNECTION_MODES = {
   persistent: "persistent",
 } as const;
 
-export type ConnectionMode =
-  (typeof CONNECTION_MODES)[keyof typeof CONNECTION_MODES];
+export type ConnectionMode = (typeof CONNECTION_MODES)[keyof typeof CONNECTION_MODES];
 
 // ── Plugin interface ────────────────────────────────────────────
 
@@ -47,11 +46,7 @@ export interface PlatformPlugin {
    * Handle an incoming webhook request.
    * Only called when mode=webhook. Parse + verify → RelayMessage[].
    */
-  handleWebhook?(
-    request: Request,
-    body: string,
-    env: Env,
-  ): Promise<RelayMessage[]>;
+  handleWebhook?(request: Request, body: string, env: Env): Promise<RelayMessage[]>;
 
   /**
    * Start a persistent connection or polling loop.
@@ -59,18 +54,10 @@ export interface PlatformPlugin {
    * The callback enqueues messages to the Durable Object.
    * Returns a cleanup function to stop the loop/connection.
    */
-  startIngestion?(
-    env: Env,
-    onMessage: (msg: RelayMessage) => Promise<void>,
-  ): Promise<() => void>;
+  startIngestion?(env: Env, onMessage: (msg: RelayMessage) => Promise<void>): Promise<() => void>;
 
   /** Send a response back to the platform. */
-  sendResponse(
-    chatId: string,
-    text: string,
-    env: Env,
-    replyToken?: string,
-  ): Promise<void>;
+  sendResponse(chatId: string, text: string, env: Env, replyToken?: string): Promise<void>;
 }
 
 // ── Plugin registry ─────────────────────────────────────────────

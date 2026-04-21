@@ -3,24 +3,15 @@
     <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
       <div class="text-gray-500">Loading document...</div>
     </div>
-    <div
-      v-else-if="loadError && !markdownContent"
-      class="min-h-full p-8 flex items-center justify-center"
-    >
-      <div class="load-error-banner" role="alert">
-        ⚠ Failed to load document: {{ loadError }}
-      </div>
+    <div v-else-if="loadError && !markdownContent" class="min-h-full p-8 flex items-center justify-center">
+      <div class="load-error-banner" role="alert">⚠ Failed to load document: {{ loadError }}</div>
     </div>
-    <div
-      v-else-if="!markdownContent"
-      class="min-h-full p-8 flex items-center justify-center"
-    >
+    <div v-else-if="!markdownContent" class="min-h-full p-8 flex items-center justify-center">
       <div class="text-gray-500">No markdown content available</div>
     </div>
     <template v-else>
       <div v-if="loadError" class="load-error-banner" role="alert">
-        ⚠ Failed to refresh document: {{ loadError }} — showing last
-        successfully loaded content.
+        ⚠ Failed to refresh document: {{ loadError }} — showing last successfully loaded content.
       </div>
       <div class="markdown-content-wrapper">
         <div class="p-4">
@@ -29,66 +20,31 @@
               {{ selectedResult.title || "Document" }}
             </h1>
             <div class="button-group">
-              <button
-                class="download-btn download-btn-green"
-                :disabled="pdfDownloading"
-                @click="downloadPdf"
-              >
-                <span class="material-icons">{{
-                  pdfDownloading ? "hourglass_empty" : "download"
-                }}</span>
+              <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
+                <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
                 PDF
               </button>
             </div>
-            <span
-              v-if="pdfError"
-              class="text-xs text-red-500 self-center ml-2"
-              :title="pdfError"
-              >⚠ PDF failed</span
-            >
+            <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
           </div>
-          <div
-            class="markdown-content prose prose-slate max-w-none"
-            v-html="renderedHtml"
-          ></div>
+          <div class="markdown-content prose prose-slate max-w-none" v-html="renderedHtml"></div>
         </div>
       </div>
 
       <div class="bottom-bar-wrapper">
-        <details
-          ref="sourceDetails"
-          class="markdown-source"
-          @toggle="onDetailsToggle"
-        >
+        <details ref="sourceDetails" class="markdown-source" @toggle="onDetailsToggle">
           <summary>Edit Markdown Source</summary>
-          <textarea
-            v-model="editableMarkdown"
-            class="markdown-editor"
-            spellcheck="false"
-          ></textarea>
+          <textarea v-model="editableMarkdown" class="markdown-editor" spellcheck="false"></textarea>
           <div class="editor-actions">
-            <button
-              class="apply-btn"
-              :disabled="!hasChanges || saving"
-              @click="applyMarkdown"
-            >
+            <button class="apply-btn" :disabled="!hasChanges || saving" @click="applyMarkdown">
               {{ saving ? "Saving..." : "Apply Changes" }}
             </button>
             <button class="cancel-btn" @click="cancelEdit">Cancel</button>
           </div>
-          <p v-if="saveError" class="save-error" role="alert">
-            ⚠ {{ saveError }}
-          </p>
+          <p v-if="saveError" class="save-error" role="alert">⚠ {{ saveError }}</p>
         </details>
-        <button
-          v-show="!editing"
-          class="copy-btn"
-          :title="copied ? 'Copied!' : 'Copy'"
-          @click="copyText"
-        >
-          <span class="material-icons">{{
-            copied ? "check" : "content_copy"
-          }}</span>
+        <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
+          <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
         </button>
       </div>
     </template>
@@ -137,12 +93,9 @@ async function fetchMarkdownContent(): Promise<void> {
   }
   if (isFilePath(raw)) {
     loading.value = true;
-    const result = await apiGet<{ content?: string }>(
-      API_ROUTES.files.content,
-      {
-        path: raw,
-      },
-    );
+    const result = await apiGet<{ content?: string }>(API_ROUTES.files.content, {
+      path: raw,
+    });
     if (!result.ok) {
       // Preserve any previously-loaded content instead of wiping it —
       // the user sees the banner AND whatever they were reading, not
@@ -177,10 +130,7 @@ const renderedHtml = computed(() => {
   // content we have no path, so basePath is empty and only rooted
   // references get rewritten.
   const raw = props.selectedResult.data?.markdown;
-  const basePath =
-    typeof raw === "string" && isFilePath(raw)
-      ? raw.slice(0, raw.lastIndexOf("/"))
-      : "";
+  const basePath = typeof raw === "string" && isFilePath(raw) ? raw.slice(0, raw.lastIndexOf("/")) : "";
   const withImages = rewriteMarkdownImageRefs(markdownContent.value, basePath);
   return marked(withImages) as string;
 });
@@ -222,20 +172,12 @@ async function copyText() {
   await copy(markdownContent.value);
 }
 
-const {
-  pdfDownloading,
-  pdfError,
-  downloadPdf: rawDownloadPdf,
-} = usePdfDownload();
+const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
 
 async function downloadPdf() {
   if (!markdownContent.value) return;
   const hint = props.selectedResult.data?.filenameHint;
-  const title = hint
-    ? hint.replace(/[/\\:*?"<>|]/g, "_")
-    : props.selectedResult.title
-      ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_")
-      : "document";
+  const title = hint ? hint.replace(/[/\\:*?"<>|]/g, "_") : props.selectedResult.title ? props.selectedResult.title.replace(/[/\\:*?"<>|]/g, "_") : "document";
   await rawDownloadPdf(markdownContent.value, `${title}.pdf`);
 }
 
@@ -249,12 +191,9 @@ async function applyMarkdown() {
   if (isFilePath(raw)) {
     saving.value = true;
     const filename = raw.replace(/^(artifacts\/documents|markdowns)\//, "");
-    const result = await apiPut<unknown>(
-      API_ROUTES.plugins.updateMarkdown.replace(":filename", filename),
-      {
-        markdown: editableMarkdown.value,
-      },
-    );
+    const result = await apiPut<unknown>(API_ROUTES.plugins.updateMarkdown.replace(":filename", filename), {
+      markdown: editableMarkdown.value,
+    });
     saving.value = false;
     if (!result.ok) {
       saveError.value = `Save failed: ${result.error}`;

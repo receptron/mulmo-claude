@@ -58,29 +58,19 @@ function validateInterests(raw: unknown): InterestsProfile | null {
   const obj = raw as Record<string, unknown>;
 
   // Filter out blank/whitespace-only keywords — "" matches every title
-  const keywords = Array.isArray(obj.keywords)
-    ? obj.keywords.filter((k): k is string => isNonEmptyString(k))
-    : [];
+  const keywords = Array.isArray(obj.keywords) ? obj.keywords.filter((k): k is string => isNonEmptyString(k)) : [];
 
-  const categories = Array.isArray(obj.categories)
-    ? obj.categories.filter((c): c is CategorySlug => isCategorySlug(c))
-    : [];
+  const categories = Array.isArray(obj.categories) ? obj.categories.filter((c): c is CategorySlug => isCategorySlug(c)) : [];
 
   if (keywords.length === 0 && categories.length === 0) return null;
 
   // Clamp minRelevance to [0, 1] — values > 1 would make notifications
   // impossible since scores are clamped to 1.0
-  const rawMin =
-    typeof obj.minRelevance === "number"
-      ? obj.minRelevance
-      : DEFAULT_MIN_RELEVANCE;
+  const rawMin = typeof obj.minRelevance === "number" ? obj.minRelevance : DEFAULT_MIN_RELEVANCE;
   const minRelevance = Math.max(0, Math.min(1, rawMin));
 
   // Floor to integer, minimum 1
-  const rawMax =
-    typeof obj.maxNotificationsPerRun === "number"
-      ? obj.maxNotificationsPerRun
-      : DEFAULT_MAX_NOTIFICATIONS;
+  const rawMax = typeof obj.maxNotificationsPerRun === "number" ? obj.maxNotificationsPerRun : DEFAULT_MAX_NOTIFICATIONS;
   const maxNotificationsPerRun = Math.max(1, Math.floor(rawMax));
 
   return { keywords, categories, minRelevance, maxNotificationsPerRun };
@@ -107,9 +97,7 @@ export function scoreItem(item: SourceItem, profile: InterestsProfile): number {
     }
   }
 
-  const hasCategory = item.categories.some((c) =>
-    profile.categories.includes(c),
-  );
+  const hasCategory = item.categories.some((c) => profile.categories.includes(c));
   if (hasCategory) {
     score += CATEGORY_MATCH_WEIGHT;
   }
@@ -123,10 +111,7 @@ export function scoreItem(item: SourceItem, profile: InterestsProfile): number {
   return Math.min(score, 1.0);
 }
 
-export function scoreAndFilter(
-  items: readonly SourceItem[],
-  profile: InterestsProfile,
-): ScoredItem[] {
+export function scoreAndFilter(items: readonly SourceItem[], profile: InterestsProfile): ScoredItem[] {
   return items
     .map((item) => ({ item, score: scoreItem(item, profile) }))
     .filter((s) => s.score >= profile.minRelevance)

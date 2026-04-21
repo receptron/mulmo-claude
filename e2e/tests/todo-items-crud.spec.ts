@@ -39,10 +39,7 @@ function nextItemId(): string {
 // same reference if no change). Kept outside the dispatcher so the
 // handlers stay tiny + are individually testable if we ever want
 // to.
-function applyCreate(
-  items: TodoFixture[],
-  body: Record<string, unknown>,
-): { items: TodoFixture[]; item: TodoFixture } {
+function applyCreate(items: TodoFixture[], body: Record<string, unknown>): { items: TodoFixture[]; item: TodoFixture } {
   const item: TodoFixture = {
     id: nextItemId(),
     text: typeof body.text === "string" ? body.text : "",
@@ -58,11 +55,7 @@ function applyCreate(
   return { items: [...items, item], item };
 }
 
-function applyPatch(
-  items: TodoFixture[],
-  id: string,
-  body: Record<string, unknown>,
-): { items: TodoFixture[]; item: TodoFixture | null } {
+function applyPatch(items: TodoFixture[], id: string, body: Record<string, unknown>): { items: TodoFixture[]; item: TodoFixture | null } {
   let item: TodoFixture | null = null;
   const next = items.map((it) => {
     if (it.id !== id) return it;
@@ -72,11 +65,7 @@ function applyPatch(
   return { items: next, item };
 }
 
-function applyMove(
-  items: TodoFixture[],
-  id: string,
-  body: Record<string, unknown>,
-): TodoFixture[] {
+function applyMove(items: TodoFixture[], id: string, body: Record<string, unknown>): TodoFixture[] {
   return items.map((it) =>
     it.id === id
       ? {
@@ -129,9 +118,7 @@ test.describe("Todo items CRUD (mutable-state)", () => {
     await openTodoExplorer(page);
   });
 
-  test("add dialog: filling text and submitting appends a new todo card", async ({
-    page,
-  }) => {
+  test("add dialog: filling text and submitting appends a new todo card", async ({ page }) => {
     // Sanity: fresh item isn't in the DOM yet.
     await expect(page.getByText("Brand new task")).toHaveCount(0);
 
@@ -139,9 +126,7 @@ test.describe("Todo items CRUD (mutable-state)", () => {
     const dialog = page.getByRole("dialog", { name: "Add Todo" });
     await expect(dialog).toBeVisible();
 
-    await dialog
-      .locator('input[placeholder="What needs doing?"]')
-      .fill("Brand new task");
+    await dialog.locator('input[placeholder="What needs doing?"]').fill("Brand new task");
     await dialog.getByRole("button", { name: "Add" }).click();
 
     // Card mounts once the POST response roundtrips and the explorer
@@ -149,14 +134,10 @@ test.describe("Todo items CRUD (mutable-state)", () => {
     await expect(page.getByText("Brand new task")).toBeVisible();
   });
 
-  test("add dialog: explicitly targeting the `todo` column lands the card there", async ({
-    page,
-  }) => {
+  test("add dialog: explicitly targeting the `todo` column lands the card there", async ({ page }) => {
     await page.getByTestId("todo-add-btn").click();
     const dialog = page.getByRole("dialog", { name: "Add Todo" });
-    await dialog
-      .locator('input[placeholder="What needs doing?"]')
-      .fill("Targeted status card");
+    await dialog.locator('input[placeholder="What needs doing?"]').fill("Targeted status card");
 
     // The first <select> in the Add dialog is Status — see
     // TodoAddDialog.vue template. Pick "todo" explicitly rather than
@@ -169,9 +150,7 @@ test.describe("Todo items CRUD (mutable-state)", () => {
     await expect(todoCol.getByText("Targeted status card")).toBeVisible();
   });
 
-  test("edit dialog: changing the text persists the new value", async ({
-    page,
-  }) => {
+  test("edit dialog: changing the text persists the new value", async ({ page }) => {
     // Open the edit dialog by clicking an existing kanban card.
     await page.getByTestId("todo-card-todo_a").click();
     const dialog = page.getByRole("dialog");
@@ -183,14 +162,10 @@ test.describe("Todo items CRUD (mutable-state)", () => {
 
     await expect(page.getByText("Buy groceries AND milk")).toBeVisible();
     // Old text gone.
-    await expect(page.getByText("Buy groceries", { exact: true })).toHaveCount(
-      0,
-    );
+    await expect(page.getByText("Buy groceries", { exact: true })).toHaveCount(0);
   });
 
-  test("delete confirms via window.confirm() and removes the card", async ({
-    page,
-  }) => {
+  test("delete confirms via window.confirm() and removes the card", async ({ page }) => {
     // Pre-accept the browser confirm dialog so the DELETE request
     // fires. Playwright surfaces `window.confirm` through `dialog`.
     page.on("dialog", (dialog) => dialog.accept());
@@ -201,14 +176,10 @@ test.describe("Todo items CRUD (mutable-state)", () => {
     const editDialog = page.getByRole("dialog");
     await editDialog.getByRole("button", { name: "Delete" }).click();
 
-    await expect(page.getByText("Buy groceries", { exact: true })).toHaveCount(
-      0,
-    );
+    await expect(page.getByText("Buy groceries", { exact: true })).toHaveCount(0);
   });
 
-  test("checkbox toggle in list view moves the item to the done column", async ({
-    page,
-  }) => {
+  test("checkbox toggle in list view moves the item to the done column", async ({ page }) => {
     // Switch to list view — checkboxes live there.
     await page.getByTestId("todo-view-list").click();
 

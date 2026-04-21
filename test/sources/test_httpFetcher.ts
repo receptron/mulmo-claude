@@ -10,10 +10,7 @@ import {
   type HttpFetcherDeps,
   type RobotsProvider,
 } from "../../server/workspace/sources/httpFetcher.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
 
 // Controllable clock for the rate limiter.
 function controllableClock(start = 0): {
@@ -99,26 +96,16 @@ describe("fetchPolite — User-Agent + scheme guard", () => {
 
   it("rejects non-http(s) URLs", async () => {
     const deps = makeDeps();
-    await assert.rejects(
-      () => fetchPolite("file:///etc/passwd", deps),
-      /refusing non-http/,
-    );
-    await assert.rejects(
-      () => fetchPolite("ftp://example.com/feed", deps),
-      /refusing non-http/,
-    );
-    await assert.rejects(
-      () => fetchPolite("javascript:alert(1)", deps),
-      /refusing non-http/,
-    );
+    await assert.rejects(() => fetchPolite("file:///etc/passwd", deps), /refusing non-http/);
+    await assert.rejects(() => fetchPolite("ftp://example.com/feed", deps), /refusing non-http/);
+    await assert.rejects(() => fetchPolite("javascript:alert(1)", deps), /refusing non-http/);
   });
 });
 
 describe("fetchPolite — robots.txt enforcement", () => {
   it("throws RobotsDisallowedError for a disallowed path", async () => {
     const url = "https://example.com/private";
-    const robots: RobotsProvider = async (host) =>
-      host === "example.com" ? "User-agent: *\nDisallow: /private\n" : null;
+    const robots: RobotsProvider = async (host) => (host === "example.com" ? "User-agent: *\nDisallow: /private\n" : null);
     const deps = makeDeps({ robots });
     await assert.rejects(
       () => fetchPolite(url, deps),
@@ -131,8 +118,7 @@ describe("fetchPolite — robots.txt enforcement", () => {
     const stub = makeStubFetch({
       [url]: new Response("{}", { status: 200 }),
     });
-    const robots: RobotsProvider = async () =>
-      "User-agent: *\nDisallow: /api/\nAllow: /api/public/\n";
+    const robots: RobotsProvider = async () => "User-agent: *\nDisallow: /api/\nAllow: /api/public/\n";
     const deps = makeDeps({ fetchImpl: stub.fetchImpl, robots });
     const res = await fetchPolite(url, deps);
     assert.equal(res.status, 200);
@@ -156,8 +142,7 @@ describe("fetchPolite — robots.txt enforcement", () => {
     // `Disallow: /*?*session_id=`. We pass path+query, so the
     // evaluator sees the query.
     const url = "https://example.com/page?session_id=abc";
-    const robots: RobotsProvider = async () =>
-      "User-agent: *\nDisallow: /*?*session_id=\n";
+    const robots: RobotsProvider = async () => "User-agent: *\nDisallow: /*?*session_id=\n";
     const deps = makeDeps({ robots });
     await assert.rejects(() => fetchPolite(url, deps), RobotsDisallowedError);
   });
@@ -195,12 +180,7 @@ describe("fetchPolite — rate limiting", () => {
     releaseA();
     await Promise.all([a, b]);
     // b starts only after a ends.
-    assert.deepEqual(order, [
-      "start:https://example.com/a",
-      "end:https://example.com/a",
-      "start:https://example.com/b",
-      "end:https://example.com/b",
-    ]);
+    assert.deepEqual(order, ["start:https://example.com/a", "end:https://example.com/a", "start:https://example.com/b", "end:https://example.com/b"]);
   });
 
   it("uses crawlDelayMs() per host", async () => {
@@ -220,10 +200,7 @@ describe("fetchPolite — rate limiting", () => {
     await fetchPolite("https://slow.com/1", deps);
     const before = clock.read();
     await fetchPolite("https://slow.com/2", deps);
-    assert.ok(
-      clock.read() - before >= 5_000,
-      `expected ≥5000ms gap, got ${clock.read() - before}`,
-    );
+    assert.ok(clock.read() - before >= 5_000, `expected ≥5000ms gap, got ${clock.read() - before}`);
   });
 });
 
@@ -253,10 +230,7 @@ describe("fetchPolite — timeout + abort", () => {
     const deps = makeDeps({
       externalSignal: controller.signal,
     });
-    await assert.rejects(
-      () => fetchPolite("https://example.com/x", deps),
-      /pre/,
-    );
+    await assert.rejects(() => fetchPolite("https://example.com/x", deps), /pre/);
   });
 
   it("calls onWillFetch right before the fetch fires", async () => {

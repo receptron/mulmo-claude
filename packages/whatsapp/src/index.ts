@@ -28,8 +28,7 @@ const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 const appSecret = process.env.WHATSAPP_APP_SECRET;
 if (!accessToken || !phoneNumberId || !verifyToken || !appSecret) {
   console.error(
-    "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\n" +
-      "See README for setup instructions.",
+    "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\n" + "See README for setup instructions.",
   );
   process.exit(1);
 }
@@ -45,9 +44,7 @@ const allowAll = allowedNumbers.size === 0;
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
 mulmo.onPush((ev) => {
-  sendWhatsAppMessage(ev.chatId, ev.message).catch((err) =>
-    console.error(`[whatsapp] push send failed: ${err}`),
-  );
+  sendWhatsAppMessage(ev.chatId, ev.message).catch((err) => console.error(`[whatsapp] push send failed: ${err}`));
 });
 
 // ── WhatsApp Cloud API ──────────────────────────────────────────
@@ -56,12 +53,7 @@ const API_BASE = `https://graph.facebook.com/v21.0/${phoneNumberId}`;
 
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   const MAX = 4096;
-  const chunks =
-    text.length === 0
-      ? ["(empty reply)"]
-      : Array.from({ length: Math.ceil(text.length / MAX) }, (_, i) =>
-          text.slice(i * MAX, (i + 1) * MAX),
-        );
+  const chunks = text.length === 0 ? ["(empty reply)"] : Array.from({ length: Math.ceil(text.length / MAX) }, (_, i) => text.slice(i * MAX, (i + 1) * MAX));
 
   for (const chunk of chunks) {
     try {
@@ -81,9 +73,7 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error(
-          `[whatsapp] sendMessage failed: ${res.status} ${body.slice(0, 200)}`,
-        );
+        console.error(`[whatsapp] sendMessage failed: ${res.status} ${body.slice(0, 200)}`);
       }
     } catch (err) {
       console.error(`[whatsapp] sendMessage error: ${err}`);
@@ -94,10 +84,7 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
 // ── Signature verification (x-hub-signature-256) ────────────────
 
 function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const expected = crypto
-    .createHmac("sha256", appSecret!)
-    .update(rawBody)
-    .digest("hex");
+  const expected = crypto.createHmac("sha256", appSecret!).update(rawBody).digest("hex");
   const provided = signature.replace("sha256=", "");
   if (expected.length !== provided.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
@@ -191,9 +178,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
       continue;
     }
 
-    console.log(
-      `[whatsapp] message from=${msg.from} len=${msg.text.body.length}`,
-    );
+    console.log(`[whatsapp] message from=${msg.from} len=${msg.text.body.length}`);
 
     try {
       const ack = await mulmo.send(msg.from, msg.text.body);
@@ -201,10 +186,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
         await sendWhatsAppMessage(msg.from, ack.reply ?? "");
       } else {
         const status = ack.status ? ` (${ack.status})` : "";
-        await sendWhatsAppMessage(
-          msg.from,
-          `Error${status}: ${ack.error ?? "unknown"}`,
-        );
+        await sendWhatsAppMessage(msg.from, `Error${status}: ${ack.error ?? "unknown"}`);
       }
     } catch (err) {
       console.error(`[whatsapp] message handling failed: ${err}`);

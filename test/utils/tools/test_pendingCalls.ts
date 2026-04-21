@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  isCallStillPending,
-  PENDING_MIN_MS,
-} from "../../../src/utils/tools/pendingCalls.js";
+import { isCallStillPending, PENDING_MIN_MS } from "../../../src/utils/tools/pendingCalls.js";
 import type { ToolCallHistoryItem } from "../../../src/types/toolCallHistory";
 
 function call(over: Partial<ToolCallHistoryItem>): ToolCallHistoryItem {

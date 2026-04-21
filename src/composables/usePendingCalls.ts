@@ -7,16 +7,11 @@
 
 import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { ToolCallHistoryItem } from "../types/toolCallHistory";
-import {
-  isCallStillPending,
-  PENDING_MIN_MS,
-} from "../utils/tools/pendingCalls";
+import { isCallStillPending, PENDING_MIN_MS } from "../utils/tools/pendingCalls";
 
 interface UsePendingCallsOptions {
   isRunning: ComputedRef<boolean> | Ref<boolean>;
-  toolCallHistory:
-    | ComputedRef<ToolCallHistoryItem[]>
-    | Ref<ToolCallHistoryItem[]>;
+  toolCallHistory: ComputedRef<ToolCallHistoryItem[]> | Ref<ToolCallHistoryItem[]>;
 }
 
 export function usePendingCalls(opts: UsePendingCallsOptions) {
@@ -64,9 +59,7 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
     // unused.
     const __tickDep = displayTick.value;
     const now = Date.now();
-    return opts.toolCallHistory.value.filter(
-      (c) => __tickDep >= 0 && isCallStillPending(c, now),
-    );
+    return opts.toolCallHistory.value.filter((c) => __tickDep >= 0 && isCallStillPending(c, now));
   });
 
   function teardown(): void {

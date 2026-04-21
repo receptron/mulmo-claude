@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import {
-  GitignoreFilter,
-  createRootFilter,
-} from "../../server/utils/gitignore.ts";
+import { GitignoreFilter, createRootFilter } from "../../server/utils/gitignore.ts";
 
 let tmpDir = "";
 
@@ -72,10 +69,7 @@ describe("createRootFilter", () => {
   });
 
   it("reads the root .gitignore", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, ".gitignore"),
-      "github/\n.session-token\n",
-    );
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "github/\n.session-token\n");
     const f = createRootFilter(tmpDir);
     assert.equal(f.ignores("github/"), true);
     assert.equal(f.ignores("github/repo/file.ts"), true);

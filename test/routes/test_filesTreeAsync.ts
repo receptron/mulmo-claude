@@ -11,10 +11,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {
-  buildTreeAsync,
-  listDirShallow,
-} from "../../server/api/routes/files.js";
+import { buildTreeAsync, listDirShallow } from "../../server/api/routes/files.js";
 
 // Rough shape — the real TreeNode type isn't exported so we match on
 // the fields we assert against.
@@ -183,10 +180,7 @@ describe("listDirShallow", () => {
 
   it("returns an empty-dir node when the target doesn't exist", async () => {
     const missing = path.join(root, "does-not-exist");
-    const node = (await listDirShallow(
-      missing,
-      "does-not-exist",
-    )) as TreeNodeShape;
+    const node = (await listDirShallow(missing, "does-not-exist")) as TreeNodeShape;
     assert.equal(node.type, "dir");
     assert.deepEqual(node.children, []);
   });

@@ -6,19 +6,10 @@
 
 import { appendFile } from "fs/promises";
 import type { IPubSub } from "../pub-sub/index.js";
-import {
-  PUBSUB_CHANNELS,
-  sessionChannel,
-} from "../../../src/config/pubsubChannels.js";
+import { PUBSUB_CHANNELS, sessionChannel } from "../../../src/config/pubsubChannels.js";
 import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
-import {
-  EVENT_TYPES,
-  GENERATION_KINDS,
-  type GenerationKind,
-  type PendingGeneration,
-  generationKey,
-} from "../../../src/types/events.js";
+import { EVENT_TYPES, GENERATION_KINDS, type GenerationKind, type PendingGeneration, generationKey } from "../../../src/types/events.js";
 import { ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -186,14 +177,9 @@ export async function markRead(chatSessionId: string): Promise<void> {
 // ── Event publishing ───────────────────────────────────────────
 
 /** Publish an agent event to the session's channel + update store. */
-export function pushSessionEvent(
-  chatSessionId: string,
-  event: Record<string, unknown>,
-): void {
+export function pushSessionEvent(chatSessionId: string, event: Record<string, unknown>): void {
   const type = event.type as string;
-  const isGenerationEvent =
-    type === EVENT_TYPES.generationStarted ||
-    type === EVENT_TYPES.generationFinished;
+  const isGenerationEvent = type === EVENT_TYPES.generationStarted || type === EVENT_TYPES.generationFinished;
 
   // Non-generation events keep the pre-existing "store or drop"
   // behavior: toolCall / toolCallResult / status fire only during a
@@ -244,27 +230,16 @@ export function pushSessionEvent(
  * Returns the empty↔non-empty transition so the caller can decide
  * whether to flip hasUnread and notify.
  */
-function resolveGenerationDelta(
-  chatSessionId: string,
-  type: string,
-  event: Record<string, unknown>,
-): GenerationDelta {
+function resolveGenerationDelta(chatSessionId: string, type: string, event: Record<string, unknown>): GenerationDelta {
   const session = store.get(chatSessionId);
   if (session) return applyEventToSession(session, type, event);
-  if (
-    type === EVENT_TYPES.generationStarted ||
-    type === EVENT_TYPES.generationFinished
-  ) {
+  if (type === EVENT_TYPES.generationStarted || type === EVENT_TYPES.generationFinished) {
     return updateStorelessPending(chatSessionId, type, event);
   }
   return "same";
 }
 
-function updateStorelessPending(
-  chatSessionId: string,
-  type: string,
-  event: Record<string, unknown>,
-): GenerationDelta {
+function updateStorelessPending(chatSessionId: string, type: string, event: Record<string, unknown>): GenerationDelta {
   const payload = parseGenerationPayload(event);
   if (!payload) {
     log.warn("session-store", "malformed generation event", {
@@ -311,9 +286,7 @@ interface GenerationPayload {
   key: string;
 }
 
-const GENERATION_KIND_VALUES: ReadonlySet<string> = new Set(
-  Object.values(GENERATION_KINDS),
-);
+const GENERATION_KIND_VALUES: ReadonlySet<string> = new Set(Object.values(GENERATION_KINDS));
 
 function isGenerationKind(v: unknown): v is GenerationKind {
   return typeof v === "string" && GENERATION_KIND_VALUES.has(v);
@@ -325,20 +298,14 @@ function isGenerationKind(v: unknown): v is GenerationKind {
  * every field before handing back a typed struct. Unknown kinds or
  * missing fields return null; the caller should log + no-op.
  */
-function parseGenerationPayload(
-  event: Record<string, unknown>,
-): GenerationPayload | null {
+function parseGenerationPayload(event: Record<string, unknown>): GenerationPayload | null {
   const { kind, filePath, key } = event;
   if (!isGenerationKind(kind)) return null;
   if (typeof filePath !== "string" || typeof key !== "string") return null;
   return { kind, filePath, key };
 }
 
-function applyEventToSession(
-  session: ServerSession,
-  type: string,
-  event: Record<string, unknown>,
-): GenerationDelta {
+function applyEventToSession(session: ServerSession, type: string, event: Record<string, unknown>): GenerationDelta {
   if (type === EVENT_TYPES.toolCall) {
     session.toolCallHistory.push({
       toolUseId: event.toolUseId as string,
@@ -347,28 +314,19 @@ function applyEventToSession(
       timestamp: Date.now(),
     });
   } else if (type === EVENT_TYPES.toolCallResult) {
-    const entry = session.toolCallHistory.find(
-      (e) => e.toolUseId === event.toolUseId,
-    );
+    const entry = session.toolCallHistory.find((e) => e.toolUseId === event.toolUseId);
     if (entry) entry.result = event.content as string;
   } else if (type === EVENT_TYPES.status) {
     session.statusMessage = event.message as string;
     // No notifySessionsChanged() here — status updates are high-frequency
     // and flow to subscribed clients via the session.<id> channel directly.
-  } else if (
-    type === EVENT_TYPES.generationStarted ||
-    type === EVENT_TYPES.generationFinished
-  ) {
+  } else if (type === EVENT_TYPES.generationStarted || type === EVENT_TYPES.generationFinished) {
     return updatePendingGenerations(session, type, event);
   }
   return "same";
 }
 
-function updatePendingGenerations(
-  session: ServerSession,
-  type: string,
-  event: Record<string, unknown>,
-): GenerationDelta {
+function updatePendingGenerations(session: ServerSession, type: string, event: Record<string, unknown>): GenerationDelta {
   const payload = parseGenerationPayload(event);
   if (!payload) {
     log.warn("session-store", "malformed generation event", {
@@ -407,9 +365,7 @@ export function publishGeneration(
 ): void {
   if (!chatSessionId) return;
   const event: Record<string, unknown> = {
-    type: finished
-      ? EVENT_TYPES.generationFinished
-      : EVENT_TYPES.generationStarted,
+    type: finished ? EVENT_TYPES.generationFinished : EVENT_TYPES.generationStarted,
     kind,
     filePath,
     key,
@@ -418,15 +374,10 @@ export function publishGeneration(
   pushSessionEvent(chatSessionId, event);
 }
 
-export type PushToolResultOutcome =
-  | { kind: "skipped"; reason: string }
-  | { kind: "processed" };
+export type PushToolResultOutcome = { kind: "skipped"; reason: string } | { kind: "processed" };
 
 /** Persist a tool_result to JSONL, then publish to the session channel. */
-export async function pushToolResult(
-  chatSessionId: string,
-  result: unknown,
-): Promise<PushToolResultOutcome> {
+export async function pushToolResult(chatSessionId: string, result: unknown): Promise<PushToolResultOutcome> {
   const session = store.get(chatSessionId);
   if (!session) return { kind: "skipped", reason: "unknown session" };
 
@@ -468,10 +419,7 @@ const sessionListeners = new Map<string, Set<SessionEventListener>>();
  * Subscribe to session events in-process (no WebSocket needed).
  * Returns an unsubscribe function.
  */
-export function onSessionEvent(
-  chatSessionId: string,
-  listener: SessionEventListener,
-): () => void {
+export function onSessionEvent(chatSessionId: string, listener: SessionEventListener): () => void {
   let listeners = sessionListeners.get(chatSessionId);
   if (!listeners) {
     listeners = new Set();
@@ -486,10 +434,7 @@ export function onSessionEvent(
 
 // ── Internal helpers ───────────────────────────────────────────
 
-async function persistHasUnread(
-  chatSessionId: string,
-  hasUnread: boolean,
-): Promise<void> {
+async function persistHasUnread(chatSessionId: string, hasUnread: boolean): Promise<void> {
   try {
     await updateHasUnread(chatSessionId, hasUnread);
   } catch (err) {

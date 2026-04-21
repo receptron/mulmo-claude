@@ -8,11 +8,7 @@ import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 export async function saveMarkdown(content: string): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const filename = `${id}.md`;
-  await fs.writeFile(
-    path.join(WORKSPACE_PATHS.markdowns, filename),
-    content,
-    "utf-8",
-  );
+  await fs.writeFile(path.join(WORKSPACE_PATHS.markdowns, filename), content, "utf-8");
   return path.posix.join(WORKSPACE_DIRS.markdowns, filename);
 }
 
@@ -23,17 +19,12 @@ export async function loadMarkdown(relativePath: string): Promise<string> {
 }
 
 /** Overwrite an existing markdown file. */
-export async function overwriteMarkdown(
-  relativePath: string,
-  content: string,
-): Promise<void> {
+export async function overwriteMarkdown(relativePath: string, content: string): Promise<void> {
   const absPath = path.join(workspacePath, relativePath);
   await fs.writeFile(absPath, content, "utf-8");
 }
 
 /** Check if a string is a markdown file path (not inline content). */
 export function isMarkdownPath(value: string): boolean {
-  return (
-    value.startsWith(`${WORKSPACE_DIRS.markdowns}/`) && value.endsWith(".md")
-  );
+  return value.startsWith(`${WORKSPACE_DIRS.markdowns}/`) && value.endsWith(".md");
 }

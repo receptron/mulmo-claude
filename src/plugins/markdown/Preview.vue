@@ -3,10 +3,7 @@
     <div class="text-sm text-gray-800 font-medium truncate">
       {{ displayTitle }}
     </div>
-    <div
-      v-if="contentPreview"
-      class="text-xs text-gray-500 mt-1 line-clamp-4 whitespace-pre-line"
-    >
+    <div v-if="contentPreview" class="text-xs text-gray-500 mt-1 line-clamp-4 whitespace-pre-line">
       {{ contentPreview }}
     </div>
   </div>

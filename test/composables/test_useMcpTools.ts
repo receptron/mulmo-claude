@@ -16,9 +16,7 @@ afterEach(() => {
   (globalThis as any).fetch = originalFetch;
 });
 
-function stubFetch(
-  impl: (input: unknown, init?: unknown) => Promise<Response>,
-): void {
+function stubFetch(impl: (input: unknown, init?: unknown) => Promise<Response>): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).fetch = impl;
 }
@@ -50,18 +48,13 @@ function makeComposable() {
 
 describe("useMcpTools — error surfacing (#280)", () => {
   it("sets mcpToolsError on HTTP failure and keeps the fallback", async () => {
-    const { mcpToolsError, disabledMcpTools, fetchMcpToolsStatus } =
-      makeComposable();
+    const { mcpToolsError, disabledMcpTools, fetchMcpToolsStatus } = makeComposable();
 
     stubFetch(async () => mockJsonResponse(500, { error: "tool svc down" }));
     await fetchMcpToolsStatus();
 
     assert.ok(mcpToolsError.value, "error surfaced");
-    assert.equal(
-      disabledMcpTools.value.size,
-      0,
-      "fallback preserved — no tools marked disabled",
-    );
+    assert.equal(disabledMcpTools.value.size, 0, "fallback preserved — no tools marked disabled");
   });
 
   it("sets a shape-error message on non-array payloads", async () => {
@@ -70,16 +63,11 @@ describe("useMcpTools — error surfacing (#280)", () => {
     stubFetch(async () => mockJsonResponse(200, { unexpected: true }));
     await fetchMcpToolsStatus();
 
-    assert.ok(
-      mcpToolsError.value &&
-        /Unexpected response shape/.test(mcpToolsError.value),
-      "shape-error populated",
-    );
+    assert.ok(mcpToolsError.value && /Unexpected response shape/.test(mcpToolsError.value), "shape-error populated");
   });
 
   it("clears mcpToolsError on the next successful fetch", async () => {
-    const { mcpToolsError, disabledMcpTools, fetchMcpToolsStatus } =
-      makeComposable();
+    const { mcpToolsError, disabledMcpTools, fetchMcpToolsStatus } = makeComposable();
 
     stubFetch(async () => mockJsonResponse(500, { error: "bad" }));
     await fetchMcpToolsStatus();

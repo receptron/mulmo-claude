@@ -85,8 +85,7 @@ IMPORTANT: "imagePrompt" and "moviePrompt" are plain string fields on the beat, 
       },
       filename: {
         type: "string",
-        description:
-          "Optional filename without extension. Defaults to a slug of the script title.",
+        description: "Optional filename without extension. Defaults to a slug of the script title.",
       },
     },
     required: ["script"],

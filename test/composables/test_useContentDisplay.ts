@@ -90,9 +90,7 @@ describe("useContentDisplay — sandboxedHtml", () => {
 describe("useContentDisplay — JSON guards (regression: #517 review)", () => {
   it("jsonTokens is [] for non-JSON text files (no eager parsing)", () => {
     const selectedPath = ref<string | null>("a.md");
-    const content = ref<FileContent | null>(
-      textContent("a.md", "not json at all ["),
-    );
+    const content = ref<FileContent | null>(textContent("a.md", "not json at all ["));
     const { jsonTokens } = useContentDisplay(selectedPath, content);
     // Without the isJson guard, prettyJson/tokenizeJson would run
     // on arbitrary markdown. Guard must short-circuit first.
@@ -115,9 +113,7 @@ describe("useContentDisplay — JSON guards (regression: #517 review)", () => {
 
   it("jsonlLines has lines for actual .jsonl files", () => {
     const selectedPath = ref<string | null>("a.jsonl");
-    const content = ref<FileContent | null>(
-      textContent("a.jsonl", '{"k":1}\n{"k":2}'),
-    );
+    const content = ref<FileContent | null>(textContent("a.jsonl", '{"k":1}\n{"k":2}'));
     const { jsonlLines } = useContentDisplay(selectedPath, content);
     assert.equal(jsonlLines.value.length, 2);
   });
@@ -126,24 +122,18 @@ describe("useContentDisplay — JSON guards (regression: #517 review)", () => {
 describe("useContentDisplay — mdFrontmatter", () => {
   it("returns parsed frontmatter for markdown with `---` header", () => {
     const selectedPath = ref<string | null>("a.md");
-    const content = ref<FileContent | null>(
-      textContent("a.md", "---\ntitle: Hello\n---\nbody"),
-    );
+    const content = ref<FileContent | null>(textContent("a.md", "---\ntitle: Hello\n---\nbody"));
     const { mdFrontmatter } = useContentDisplay(selectedPath, content);
     assert.ok(mdFrontmatter.value);
     assert.equal(mdFrontmatter.value.body, "body");
-    const titleField = mdFrontmatter.value.fields.find(
-      (field) => field.key === "title",
-    );
+    const titleField = mdFrontmatter.value.fields.find((field) => field.key === "title");
     assert.ok(titleField);
     assert.equal(titleField.value, "Hello");
   });
 
   it("is null for non-markdown files even if the text starts with ---", () => {
     const selectedPath = ref<string | null>("a.txt");
-    const content = ref<FileContent | null>(
-      textContent("a.txt", "---\ntitle: x\n---\nbody"),
-    );
+    const content = ref<FileContent | null>(textContent("a.txt", "---\ntitle: x\n---\nbody"));
     const { mdFrontmatter } = useContentDisplay(selectedPath, content);
     assert.equal(mdFrontmatter.value, null);
   });

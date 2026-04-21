@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import http from "http";
 import express from "express";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
-import {
-  attachChatSocket,
-  CHAT_SOCKET_EVENTS,
-  CHAT_SOCKET_PATH,
-  type ChatSocketHandle,
-} from "../src/socket.js";
+import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, type ChatSocketHandle } from "../src/socket.js";
 import { createPushQueue } from "../src/push-queue.js";
 import type { RelayResult } from "../src/relay.js";
 import type { Logger } from "../src/types.js";
@@ -42,9 +37,7 @@ async function startHarness(): Promise<Harness> {
     logger: silentLogger,
   });
 
-  await new Promise<void>((resolve) =>
-    httpServer.listen(0, "127.0.0.1", () => resolve()),
-  );
+  await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", () => resolve()));
   const address = httpServer.address();
   if (!address || typeof address === "string") {
     throw new Error("Failed to get server address");
@@ -86,22 +79,10 @@ interface PushEvent {
   message: string;
 }
 
-function collectPushes(
-  socket: ClientSocket,
-  count: number,
-  timeoutMs = 1000,
-): Promise<PushEvent[]> {
+function collectPushes(socket: ClientSocket, count: number, timeoutMs = 1000): Promise<PushEvent[]> {
   return new Promise((resolve, reject) => {
     const received: PushEvent[] = [];
-    const timer = setTimeout(
-      () =>
-        reject(
-          new Error(
-            `timed out waiting for ${count} pushes; got ${received.length}`,
-          ),
-        ),
-      timeoutMs,
-    );
+    const timer = setTimeout(() => reject(new Error(`timed out waiting for ${count} pushes; got ${received.length}`)), timeoutMs);
     socket.on(CHAT_SOCKET_EVENTS.push, (ev: PushEvent) => {
       received.push(ev);
       if (received.length >= count) {

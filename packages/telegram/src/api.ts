@@ -78,11 +78,7 @@ export interface TelegramApi {
   /** Send a message and return its message_id (needed for editMessageText). */
   sendMessage(chatId: number, text: string): Promise<number>;
   /** Edit an existing message in place. Used for streaming text updates. */
-  editMessageText(
-    chatId: number,
-    messageId: number,
-    text: string,
-  ): Promise<void>;
+  editMessageText(chatId: number, messageId: number, text: string): Promise<void>;
   /** Download any file by file_id via the Telegram getFile API.
    *  Returns a data URL (`data:<mime>;base64,...`).
    *  Works for photos, documents, audio, etc. */
@@ -107,9 +103,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
 
       const res = await fetchImpl(url, { signal: gu.signal });
       if (!res.ok) {
-        throw new Error(
-          `getUpdates failed: ${res.status} ${await safeText(res)}`,
-        );
+        throw new Error(`getUpdates failed: ${res.status} ${await safeText(res)}`);
       }
       const body = (await res.json()) as {
         ok: boolean;
@@ -117,9 +111,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
         result?: TelegramUpdate[];
       };
       if (!body.ok || !Array.isArray(body.result)) {
-        throw new Error(
-          `getUpdates API error: ${body.description ?? "unknown"}`,
-        );
+        throw new Error(`getUpdates API error: ${body.description ?? "unknown"}`);
       }
       return body.result;
     },
@@ -131,9 +123,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
         body: JSON.stringify({ chat_id: chatId, text }),
       });
       if (!res.ok) {
-        throw new Error(
-          `sendMessage failed: ${res.status} ${await safeText(res)}`,
-        );
+        throw new Error(`sendMessage failed: ${res.status} ${await safeText(res)}`);
       }
       const body = (await res.json()) as {
         ok: boolean;
@@ -141,9 +131,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
         result?: { message_id: number };
       };
       if (!body.ok) {
-        throw new Error(
-          `sendMessage API error: ${body.description ?? "unknown"}`,
-        );
+        throw new Error(`sendMessage API error: ${body.description ?? "unknown"}`);
       }
       return body.result?.message_id ?? 0;
     },
@@ -166,13 +154,9 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
     },
 
     async downloadFile(fileId, fallbackMime = "application/octet-stream") {
-      const getFileRes = await fetchImpl(
-        `${base}/getFile?file_id=${encodeURIComponent(fileId)}`,
-      );
+      const getFileRes = await fetchImpl(`${base}/getFile?file_id=${encodeURIComponent(fileId)}`);
       if (!getFileRes.ok) {
-        throw new Error(
-          `getFile failed: ${getFileRes.status} ${await safeText(getFileRes)}`,
-        );
+        throw new Error(`getFile failed: ${getFileRes.status} ${await safeText(getFileRes)}`);
       }
       const getFileBody = (await getFileRes.json()) as {
         ok: boolean;
@@ -180,9 +164,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
         result?: { file_path?: string };
       };
       if (!getFileBody.ok || !getFileBody.result?.file_path) {
-        throw new Error(
-          `getFile API error: ${getFileBody.description ?? "no file_path"}`,
-        );
+        throw new Error(`getFile API error: ${getFileBody.description ?? "no file_path"}`);
       }
       const fileUrl = `${baseUrl}/file/bot${opts.botToken}/${getFileBody.result.file_path}`;
       const fileRes = await fetchImpl(fileUrl);
@@ -195,10 +177,7 @@ export function createTelegramApi(opts: TelegramApiOptions): TelegramApi {
       // authoritative). Fall back to extension-based inference only
       // when the caller passed the generic default.
       const ext = getFileBody.result.file_path.split(".").pop() ?? "";
-      const mediaType =
-        fallbackMime !== "application/octet-stream"
-          ? fallbackMime
-          : mimeFromExtension(ext, fallbackMime);
+      const mediaType = fallbackMime !== "application/octet-stream" ? fallbackMime : mimeFromExtension(ext, fallbackMime);
       return buildDataUrl(mediaType, b64);
     },
   };

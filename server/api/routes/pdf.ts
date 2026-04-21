@@ -6,10 +6,7 @@ import puppeteer from "puppeteer";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
-import {
-  resolveWithinRoot,
-  readBinarySafeSync,
-} from "../../utils/files/safe.js";
+import { resolveWithinRoot, readBinarySafeSync } from "../../utils/files/safe.js";
 import { resolveWorkspacePath } from "../../utils/files/workspace-io.js";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -72,39 +69,36 @@ const workspaceReal = fs.realpathSync(resolveWorkspacePath(""));
  */
 function inlineImages(html: string): string {
   const baseDir = path.join(workspaceReal, WORKSPACE_DIRS.markdowns);
-  return html.replace(
-    /(<img\s[^>]*src=")([^"]+)(")/g,
-    (_match, before: string, src: string, after: string) => {
-      if (src.startsWith("data:") || src.startsWith("http")) {
-        return _match;
-      }
-      // Resolve the image path relative to markdowns/ but require the
-      // final realpath to stay inside the workspace root. markdowns/
-      // references like "../images/foo.png" are common so we can't
-      // restrict to markdowns/ itself.
-      const unsafeAbs = path.resolve(baseDir, src);
-      // Make unsafeAbs relative to the workspace for the
-      // resolveWithinRoot check (it expects a relative path).
-      const relToWorkspace = path.relative(workspaceReal, unsafeAbs);
-      if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
-        log.warn("pdf", "image path escapes workspace", { src });
-        return _match;
-      }
-      const abs = resolveWithinRoot(workspaceReal, relToWorkspace);
-      if (!abs) {
-        log.warn("pdf", "image path rejected by safe-resolve", { src });
-        return _match;
-      }
-      const buf = readBinarySafeSync(abs);
-      if (!buf) {
-        log.warn("pdf", "could not read image", { abs });
-        return _match;
-      }
-      const ext = path.extname(abs).toLowerCase();
-      const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
-      return `${before}data:${mime};base64,${buf.toString("base64")}${after}`;
-    },
-  );
+  return html.replace(/(<img\s[^>]*src=")([^"]+)(")/g, (_match, before: string, src: string, after: string) => {
+    if (src.startsWith("data:") || src.startsWith("http")) {
+      return _match;
+    }
+    // Resolve the image path relative to markdowns/ but require the
+    // final realpath to stay inside the workspace root. markdowns/
+    // references like "../images/foo.png" are common so we can't
+    // restrict to markdowns/ itself.
+    const unsafeAbs = path.resolve(baseDir, src);
+    // Make unsafeAbs relative to the workspace for the
+    // resolveWithinRoot check (it expects a relative path).
+    const relToWorkspace = path.relative(workspaceReal, unsafeAbs);
+    if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
+      log.warn("pdf", "image path escapes workspace", { src });
+      return _match;
+    }
+    const abs = resolveWithinRoot(workspaceReal, relToWorkspace);
+    if (!abs) {
+      log.warn("pdf", "image path rejected by safe-resolve", { src });
+      return _match;
+    }
+    const buf = readBinarySafeSync(abs);
+    if (!buf) {
+      log.warn("pdf", "could not read image", { abs });
+      return _match;
+    }
+    const ext = path.extname(abs).toLowerCase();
+    const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+    return `${before}data:${mime};base64,${buf.toString("base64")}${after}`;
+  });
 }
 
 function wrapHtml(body: string, css: string): string {
@@ -118,10 +112,7 @@ function wrapHtml(body: string, css: string): string {
 </html>`;
 }
 
-async function renderPdf(
-  fullHtml: string,
-  format: "Letter" | "A4" = "Letter",
-): Promise<Buffer> {
+async function renderPdf(fullHtml: string, format: "Letter" | "A4" = "Letter"): Promise<Buffer> {
   const browser = await puppeteer.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -140,10 +131,7 @@ async function renderPdf(
 function sendPdf(res: Response, buffer: Buffer, filename: string): void {
   const safeFilename = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
-  );
+  res.setHeader("Content-Disposition", `attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`);
   res.send(buffer);
 }
 
@@ -153,26 +141,23 @@ interface PdfMarkdownBody {
   format?: "Letter" | "A4";
 }
 
-router.post(
-  API_ROUTES.pdf.markdown,
-  async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
-    const { markdown, filename = "document.pdf", format = "Letter" } = req.body;
+router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
+  const { markdown, filename = "document.pdf", format = "Letter" } = req.body;
 
-    if (!markdown) {
-      badRequest(res, "markdown is required");
-      return;
-    }
+  if (!markdown) {
+    badRequest(res, "markdown is required");
+    return;
+  }
 
-    try {
-      log.info("pdf", "markdown", { filename, length: markdown.length });
-      const html = inlineImages(await marked.parse(markdown));
-      const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
-      sendPdf(res, buffer, filename);
-    } catch (err) {
-      log.error("pdf", "generation failed", { error: String(err) });
-      serverError(res, `PDF generation failed: ${errorMessage(err)}`);
-    }
-  },
-);
+  try {
+    log.info("pdf", "markdown", { filename, length: markdown.length });
+    const html = inlineImages(await marked.parse(markdown));
+    const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
+    sendPdf(res, buffer, filename);
+  } catch (err) {
+    log.error("pdf", "generation failed", { error: String(err) });
+    serverError(res, `PDF generation failed: ${errorMessage(err)}`);
+  }
+});
 
 export default router;

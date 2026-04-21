@@ -7,8 +7,7 @@ import assert from "node:assert/strict";
 describe("PlatformPlugin registry", () => {
   it("registers and retrieves plugins by path", () => {
     const plugins = new Map<string, { name: string; webhookPath: string }>();
-    const register = (p: { name: string; webhookPath: string }) =>
-      plugins.set(p.webhookPath, p);
+    const register = (p: { name: string; webhookPath: string }) => plugins.set(p.webhookPath, p);
     const getByPath = (path: string) => plugins.get(path);
 
     register({ name: "line", webhookPath: "/webhook/line" });
@@ -21,8 +20,7 @@ describe("PlatformPlugin registry", () => {
 
   it("retrieves plugins by name", () => {
     const plugins = new Map<string, { name: string; webhookPath: string }>();
-    const register = (p: { name: string; webhookPath: string }) =>
-      plugins.set(p.webhookPath, p);
+    const register = (p: { name: string; webhookPath: string }) => plugins.set(p.webhookPath, p);
     const getByName = (name: string) => {
       for (const p of plugins.values()) {
         if (p.name === name) return p;

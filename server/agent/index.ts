@@ -20,27 +20,16 @@ import {
   userServerAllowedToolNames,
 } from "./config.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import {
-  createStreamParser,
-  type AgentEvent,
-  type RawStreamEvent,
-} from "./stream.js";
+import { createStreamParser, type AgentEvent, type RawStreamEvent } from "./stream.js";
 import { log } from "../system/logger/index.js";
 import { EVENT_TYPES } from "../../src/types/events.js";
 import { env } from "../system/env.js";
 import { resolveSandboxAuth } from "./sandboxMounts.js";
-import {
-  getCachedReferenceDirs,
-  referenceDirMountArgs,
-} from "../workspace/reference-dirs.js";
+import { getCachedReferenceDirs, referenceDirMountArgs } from "../workspace/reference-dirs.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
-function spawnClaude(
-  useDocker: boolean,
-  workspacePath: string,
-  cliArgs: string[],
-): ClaudeProc {
+function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[]): ClaudeProc {
   if (!useDocker) {
     return spawn("claude", cliArgs, {
       cwd: workspacePath,
@@ -134,9 +123,7 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
     }
   }
 
-  const exitCode = await new Promise<number>((resolve) =>
-    proc.on("close", resolve),
-  );
+  const exitCode = await new Promise<number>((resolve) => proc.on("close", resolve));
 
   if (stderrBuffer.trim()) log.error("agent-stderr", stderrBuffer);
   log.info("agent", "claude exited", { exitCode });
@@ -225,20 +212,14 @@ export async function* runAgent(
   // Fresh read on every invocation so the Settings UI can change
   // allowedTools / MCP servers without a server restart.
   const settings = loadSettings();
-  const userServerAllowedTools = userServerAllowedToolNames(
-    userServers,
-    useDocker,
-  );
+  const userServerAllowedTools = userServerAllowedToolNames(userServers, useDocker);
 
   const cliArgs = buildCliArgs({
     systemPrompt: fullSystemPrompt,
     activePlugins,
     claudeSessionId,
     mcpConfigPath: hasMcp ? mcpPaths.argPath : undefined,
-    extraAllowedTools: [
-      ...settings.extraAllowedTools,
-      ...userServerAllowedTools,
-    ],
+    extraAllowedTools: [...settings.extraAllowedTools, ...userServerAllowedTools],
   });
 
   // Don't persist raw sessionId into log sinks (esp. the retained

@@ -88,38 +88,24 @@ export function resolveConfig(env: Env): LoggerConfig {
   return {
     sinks: {
       console: {
-        enabled:
-          parseBool(env.LOG_CONSOLE_ENABLED) ??
-          DEFAULT_CONFIG.sinks.console.enabled,
+        enabled: parseBool(env.LOG_CONSOLE_ENABLED) ?? DEFAULT_CONFIG.sinks.console.enabled,
         level: consoleLevel ?? DEFAULT_CONFIG.sinks.console.level,
-        format:
-          parseFormat(env.LOG_CONSOLE_FORMAT) ??
-          DEFAULT_CONFIG.sinks.console.format,
+        format: parseFormat(env.LOG_CONSOLE_FORMAT) ?? DEFAULT_CONFIG.sinks.console.format,
       },
       file: {
-        enabled:
-          parseBool(env.LOG_FILE_ENABLED) ?? DEFAULT_CONFIG.sinks.file.enabled,
+        enabled: parseBool(env.LOG_FILE_ENABLED) ?? DEFAULT_CONFIG.sinks.file.enabled,
         level: fileLevel ?? DEFAULT_CONFIG.sinks.file.level,
-        format:
-          parseFormat(env.LOG_FILE_FORMAT) ?? DEFAULT_CONFIG.sinks.file.format,
+        format: parseFormat(env.LOG_FILE_FORMAT) ?? DEFAULT_CONFIG.sinks.file.format,
         dir: env.LOG_FILE_DIR ?? DEFAULT_CONFIG.sinks.file.dir,
         rotation: {
           kind: "daily",
-          maxFiles:
-            parsePositiveInt(env.LOG_FILE_MAX_FILES) ??
-            DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
+          maxFiles: parsePositiveInt(env.LOG_FILE_MAX_FILES) ?? DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
         },
       },
       telemetry: {
-        enabled:
-          parseBool(env.LOG_TELEMETRY_ENABLED) ??
-          DEFAULT_CONFIG.sinks.telemetry.enabled,
-        level:
-          parseLevel(env.LOG_TELEMETRY_LEVEL) ??
-          DEFAULT_CONFIG.sinks.telemetry.level,
-        format:
-          parseFormat(env.LOG_TELEMETRY_FORMAT) ??
-          DEFAULT_CONFIG.sinks.telemetry.format,
+        enabled: parseBool(env.LOG_TELEMETRY_ENABLED) ?? DEFAULT_CONFIG.sinks.telemetry.enabled,
+        level: parseLevel(env.LOG_TELEMETRY_LEVEL) ?? DEFAULT_CONFIG.sinks.telemetry.level,
+        format: parseFormat(env.LOG_TELEMETRY_FORMAT) ?? DEFAULT_CONFIG.sinks.telemetry.format,
       },
     },
   };

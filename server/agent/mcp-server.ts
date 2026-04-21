@@ -30,8 +30,7 @@ interface JsonRpcMessage {
   params?: ToolCallParams;
 }
 
-const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage =>
-  isRecord(v) && "method" in v;
+const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage => isRecord(v) && "method" in v;
 
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;
@@ -50,9 +49,7 @@ function readSessionToken(): string {
   return readTextSafeSync(WORKSPACE_PATHS.sessionToken)?.trim() ?? "";
 }
 const SESSION_TOKEN = readSessionToken();
-const AUTH_HEADER: Record<string, string> = SESSION_TOKEN
-  ? { Authorization: `Bearer ${SESSION_TOKEN}` }
-  : {};
+const AUTH_HEADER: Record<string, string> = SESSION_TOKEN ? { Authorization: `Bearer ${SESSION_TOKEN}` } : {};
 
 interface ToolDef {
   name: string;
@@ -95,16 +92,10 @@ const mcpToolDefs: Record<string, ToolDef> = Object.fromEntries(
 
 const ALL_TOOLS: Record<string, ToolDef> = {
   ...mcpToolDefs,
-  ...Object.fromEntries(
-    PLUGIN_DEFS.map((def) => [
-      def.name,
-      fromPackage(def, TOOL_ENDPOINTS[def.name]),
-    ]),
-  ),
+  ...Object.fromEntries(PLUGIN_DEFS.map((def) => [def.name, fromPackage(def, TOOL_ENDPOINTS[def.name])])),
   switchRole: {
     name: "switchRole",
-    description:
-      "Switch to a different AI role, resetting the conversation context. Use when the user's request is better served by another role.",
+    description: "Switch to a different AI role, resetting the conversation context. Use when the user's request is better served by another role.",
     inputSchema: {
       type: "object",
       properties: {
@@ -143,11 +134,7 @@ interface PostJsonOpts {
   allowHttpError?: boolean;
 }
 
-async function postJson(
-  path: string,
-  body: unknown,
-  opts: PostJsonOpts = {},
-): Promise<Response> {
+async function postJson(path: string, body: unknown, opts: PostJsonOpts = {}): Promise<Response> {
   // SESSION_ID comes from the parent process env so it's effectively
   // trusted, but encode it anyway — defense in depth against future
   // callers passing unexpected characters (`&`, `#`, newlines, etc.).
@@ -155,14 +142,11 @@ async function postJson(
   // hardcoded literals.
   let res: Response;
   try {
-    res = await fetch(
-      `${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...AUTH_HEADER },
-        body: JSON.stringify(body),
-      },
-    );
+    res = await fetch(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...AUTH_HEADER },
+      body: JSON.stringify(body),
+    });
   } catch (err) {
     throw new Error(`Network error calling ${path}: ${errorMessage(err)}`);
   }
@@ -180,9 +164,7 @@ async function postJson(
 //   - "delete"        : DELETE /api/skills/:name
 // In every case, after a successful mutation we re-fetch the list and
 // push it so the canvas reflects the new state immediately.
-async function handleManageSkills(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkills(args: Record<string, unknown>): Promise<string> {
   const action = typeof args.action === "string" ? args.action : "list";
   if (action === "save") return handleManageSkillsSave(args);
   if (action === "update") return handleManageSkillsUpdate(args);
@@ -230,9 +212,7 @@ async function handleManageSkillsList(): Promise<string> {
   return `Listed ${skills.length} skill${suffix}`;
 }
 
-async function handleManageSkillsSave(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsSave(args: Record<string, unknown>): Promise<string> {
   // Normalize name once up front so log / result messages below never
   // interpolate an accidental object / number into `/${name}`.
   const name = String(args.name ?? "");
@@ -252,9 +232,7 @@ async function handleManageSkillsSave(
   return `Saved skill ${name}. Run with /${name}.`;
 }
 
-async function handleManageSkillsUpdate(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<string> {
   const name = String(args.name ?? "");
   const url = `${BASE_URL}/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
@@ -268,9 +246,7 @@ async function handleManageSkillsUpdate(
       }),
     });
   } catch (err) {
-    throw new Error(
-      `Network error calling PUT /api/skills/${name}: ${errorMessage(err)}`,
-    );
+    throw new Error(`Network error calling PUT /api/skills/${name}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
     return "Error: " + (await extractFetchError(res));
@@ -279,9 +255,7 @@ async function handleManageSkillsUpdate(
   return `Updated skill ${name}. The changes take effect in new sessions.`;
 }
 
-async function handleManageSkillsDelete(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<string> {
   const name = String(args.name ?? "");
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
@@ -291,9 +265,7 @@ async function handleManageSkillsDelete(
       headers: AUTH_HEADER,
     });
   } catch (err) {
-    throw new Error(
-      `Network error calling DELETE ${url}: ${errorMessage(err)}`,
-    );
+    throw new Error(`Network error calling DELETE ${url}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
     return "Error: " + (await extractFetchError(res));
@@ -302,10 +274,7 @@ async function handleManageSkillsDelete(
   return `Deleted skill ${name}.`;
 }
 
-async function handleToolCall(
-  name: string,
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleToolCall(name: string, args: Record<string, unknown>): Promise<string> {
   if (name === "switchRole") {
     await postJson(API_ROUTES.agent.internal.switchRole, {
       roleId: args.roleId,
@@ -341,9 +310,7 @@ async function handleToolCall(
     });
     const json = await res.json();
     if (!res.ok) return `Error: ${json.error ?? res.status}`;
-    return typeof json.result === "string"
-      ? json.result
-      : JSON.stringify(json.result);
+    return typeof json.result === "string" ? json.result : JSON.stringify(json.result);
   }
 
   const tool = tools.find((t) => t.name === name);

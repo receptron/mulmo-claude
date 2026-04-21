@@ -12,21 +12,9 @@ import { log } from "../system/logger/index.js";
 
 export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 
-const BASE_ALLOWED_TOOLS = [
-  "Bash",
-  "Read",
-  "Write",
-  "Edit",
-  "Glob",
-  "Grep",
-  "WebFetch",
-  "WebSearch",
-];
+const BASE_ALLOWED_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch"];
 
-const MCP_PLUGINS = new Set([
-  ...MCP_PLUGIN_NAMES,
-  ...mcpTools.filter(isMcpToolEnabled).map((t) => t.definition.name),
-]);
+const MCP_PLUGINS = new Set([...MCP_PLUGIN_NAMES, ...mcpTools.filter(isMcpToolEnabled).map((t) => t.definition.name)]);
 
 export function getActivePlugins(role: Role): string[] {
   return role.availablePlugins.filter((p) => MCP_PLUGINS.has(p));
@@ -51,21 +39,12 @@ export interface McpConfigParams {
 // `localhost` / `127.0.0.1` — those refer to the container's own
 // loopback interface. Rewriting to `host.docker.internal` keeps
 // user-configured local MCP servers reachable.
-export function rewriteLocalhostForDocker(
-  url: string,
-  useDocker: boolean,
-): string {
+export function rewriteLocalhostForDocker(url: string, useDocker: boolean): string {
   if (!useDocker) return url;
-  return url.replace(
-    /^(https?:\/\/)(localhost|127\.0\.0\.1)(?=[:/]|$)/,
-    "$1host.docker.internal",
-  );
+  return url.replace(/^(https?:\/\/)(localhost|127\.0\.0\.1)(?=[:/]|$)/, "$1host.docker.internal");
 }
 
-function prepareUserHttpServer(
-  spec: Extract<McpServerSpec, { type: "http" }>,
-  useDocker: boolean,
-): McpServerSpec {
+function prepareUserHttpServer(spec: Extract<McpServerSpec, { type: "http" }>, useDocker: boolean): McpServerSpec {
   return {
     ...spec,
     url: rewriteLocalhostForDocker(spec.url, useDocker),
@@ -76,15 +55,9 @@ function prepareUserHttpServer(
 // translated to their container equivalents. Paths outside the
 // workspace are left alone — the caller surfaces a warning in the UI
 // before they get this far.
-function prepareUserStdioServer(
-  spec: Extract<McpServerSpec, { type: "stdio" }>,
-  useDocker: boolean,
-  hostWorkspacePath: string,
-): McpServerSpec {
+function prepareUserStdioServer(spec: Extract<McpServerSpec, { type: "stdio" }>, useDocker: boolean, hostWorkspacePath: string): McpServerSpec {
   if (!useDocker) return spec;
-  const normalisedWs = hostWorkspacePath.endsWith("/")
-    ? hostWorkspacePath
-    : `${hostWorkspacePath}/`;
+  const normalisedWs = hostWorkspacePath.endsWith("/") ? hostWorkspacePath : `${hostWorkspacePath}/`;
   const args = spec.args?.map((arg) => {
     if (arg === hostWorkspacePath) return CONTAINER_WORKSPACE_PATH;
     if (arg.startsWith(normalisedWs)) {
@@ -96,11 +69,7 @@ function prepareUserStdioServer(
   return { ...spec, args };
 }
 
-export function prepareUserServers(
-  userServers: Record<string, McpServerSpec>,
-  useDocker: boolean,
-  hostWorkspacePath: string,
-): Record<string, McpServerSpec> {
+export function prepareUserServers(userServers: Record<string, McpServerSpec>, useDocker: boolean, hostWorkspacePath: string): Record<string, McpServerSpec> {
   const out: Record<string, McpServerSpec> = {};
   for (const [id, spec] of Object.entries(userServers)) {
     if (spec.enabled === false) continue;
@@ -127,21 +96,11 @@ function collectMcpToolSentinelEnv(): Record<string, string> {
   return env;
 }
 
-function buildMulmoclaudeServer(params: {
-  chatSessionId: string;
-  port: number;
-  activePlugins: string[];
-  roleIds: string[];
-  useDocker: boolean;
-}): object {
+function buildMulmoclaudeServer(params: { chatSessionId: string; port: number; activePlugins: string[]; roleIds: string[]; useDocker: boolean }): object {
   const { chatSessionId, port, activePlugins, roleIds, useDocker } = params;
   const projectRoot = process.cwd();
-  const command = useDocker
-    ? "tsx"
-    : join(projectRoot, "node_modules/.bin/tsx");
-  const mcpServerPath = useDocker
-    ? "/app/server/agent/mcp-server.ts"
-    : join(projectRoot, "server/agent/mcp-server.ts");
+  const command = useDocker ? "tsx" : join(projectRoot, "node_modules/.bin/tsx");
+  const mcpServerPath = useDocker ? "/app/server/agent/mcp-server.ts" : join(projectRoot, "server/agent/mcp-server.ts");
 
   const dockerEnv = useDocker
     ? {
@@ -176,9 +135,7 @@ function buildMulmoclaudeServer(params: {
 // even if they pick "mulmoclaude" as the id. Drop the entry silently:
 // the UI already validates ids against the slug pattern, so this is
 // defence-in-depth.
-function excludeReservedKeys(
-  servers: Record<string, McpServerSpec>,
-): Record<string, McpServerSpec> {
+function excludeReservedKeys(servers: Record<string, McpServerSpec>): Record<string, McpServerSpec> {
   const out: Record<string, McpServerSpec> = {};
   for (const [id, spec] of Object.entries(servers)) {
     if (id === "mulmoclaude") continue;
@@ -188,14 +145,7 @@ function excludeReservedKeys(
 }
 
 export function buildMcpConfig(params: McpConfigParams): object {
-  const {
-    chatSessionId,
-    port,
-    activePlugins,
-    roleIds,
-    useDocker = false,
-    userServers = {},
-  } = params;
+  const { chatSessionId, port, activePlugins, roleIds, useDocker = false, userServers = {} } = params;
   return {
     mcpServers: {
       mulmoclaude: buildMulmoclaudeServer({
@@ -213,10 +163,7 @@ export function buildMcpConfig(params: McpConfigParams): object {
 // User-facing `mcp__<server>` wildcard form for --allowedTools. Enabled
 // HTTP servers always participate; stdio servers only participate when
 // we're running natively (since the sandbox image is minimal in Docker).
-export function userServerAllowedToolNames(
-  userServers: Record<string, McpServerSpec>,
-  useDocker: boolean,
-): string[] {
+export function userServerAllowedToolNames(userServers: Record<string, McpServerSpec>, useDocker: boolean): string[] {
   const names: string[] = [];
   for (const [id, spec] of Object.entries(userServers)) {
     if (spec.enabled === false) continue;
@@ -239,20 +186,10 @@ export interface CliArgsParams {
 }
 
 export function buildCliArgs(params: CliArgsParams): string[] {
-  const {
-    systemPrompt,
-    activePlugins,
-    claudeSessionId,
-    mcpConfigPath,
-    extraAllowedTools = [],
-  } = params;
+  const { systemPrompt, activePlugins, claudeSessionId, mcpConfigPath, extraAllowedTools = [] } = params;
 
   const mcpToolNames = activePlugins.map((p) => `mcp__mulmoclaude__${p}`);
-  const allowedTools = [
-    ...BASE_ALLOWED_TOOLS,
-    ...extraAllowedTools,
-    ...mcpToolNames,
-  ];
+  const allowedTools = [...BASE_ALLOWED_TOOLS, ...extraAllowedTools, ...mcpToolNames];
 
   // stream-json input mode: the user message is streamed through
   // stdin (see `writeUserMessage` in server/agent.ts) rather than
@@ -300,10 +237,7 @@ export function buildCliArgs(params: CliArgsParams): string[] {
  *
  *  Without attachments, content is a plain string (smaller,
  *  backward-compatible). */
-export async function buildUserMessageLine(
-  message: string,
-  attachments?: Attachment[],
-): Promise<string> {
+export async function buildUserMessageLine(message: string, attachments?: Attachment[]): Promise<string> {
   const all = attachments ?? [];
   if (all.length === 0) {
     return (
@@ -368,17 +302,9 @@ export interface McpConfigPaths {
   argPath: string;
 }
 
-export function resolveMcpConfigPaths(opts: {
-  workspacePath: string;
-  sessionId: string;
-  useDocker: boolean;
-}): McpConfigPaths {
+export function resolveMcpConfigPaths(opts: { workspacePath: string; sessionId: string; useDocker: boolean }): McpConfigPaths {
   if (opts.useDocker) {
-    const hostPath = join(
-      opts.workspacePath,
-      ".mulmoclaude",
-      `mcp-${opts.sessionId}.json`,
-    );
+    const hostPath = join(opts.workspacePath, ".mulmoclaude", `mcp-${opts.sessionId}.json`);
     const argPath = `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/mcp-${opts.sessionId}.json`;
     return { hostPath, argPath };
   }
@@ -389,18 +315,7 @@ export function resolveMcpConfigPaths(opts: {
 // Mirror NodeJS.Platform — re-declared so the file doesn't need a
 // `NodeJS` global reference, which the no-undef rule doesn't see in
 // type-only positions.
-export type Platform =
-  | "aix"
-  | "android"
-  | "darwin"
-  | "freebsd"
-  | "haiku"
-  | "linux"
-  | "openbsd"
-  | "sunos"
-  | "win32"
-  | "cygwin"
-  | "netbsd";
+export type Platform = "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd";
 
 export interface DockerSpawnArgsParams {
   workspacePath: string;
@@ -437,10 +352,7 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     sshAgentForward = false,
   } = params;
   const toDockerPath = (p: string): string => p.replace(/\\/g, "/");
-  const extraHosts: string[] =
-    platform === "linux"
-      ? ["--add-host", "host.docker.internal:host-gateway"]
-      : [];
+  const extraHosts: string[] = platform === "linux" ? ["--add-host", "host.docker.internal:host-gateway"] : [];
 
   return [
     "run",

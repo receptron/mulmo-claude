@@ -6,9 +6,7 @@
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
-export function deduplicateResults(
-  all: ToolResultComplete[],
-): ToolResultComplete[] {
+export function deduplicateResults(all: ToolResultComplete[]): ToolResultComplete[] {
   return all.filter((r, i) => {
     if (r.toolName === "text-response") return true;
     const next = all[i + 1];

@@ -7,18 +7,12 @@
 // registered with the task-manager at startup. CRUD operations
 // trigger a refresh that unregisters old tasks and registers new ones.
 
-import {
-  loadUserTasks as loadRaw,
-  saveUserTasks,
-} from "../../utils/files/user-tasks-io.js";
+import { loadUserTasks as loadRaw, saveUserTasks } from "../../utils/files/user-tasks-io.js";
 import type { MissedRunPolicy } from "@receptron/task-scheduler";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 import type { TaskSchedule as LocalTaskSchedule } from "../../events/task-manager/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
-import {
-  SESSION_ORIGINS,
-  type SessionOrigin,
-} from "../../../src/types/session.js";
+import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
 import { log } from "../../system/logger/index.js";
 import type { ITaskManager } from "../../events/task-manager/index.js";
 import { isRecord } from "../../utils/types.js";
@@ -61,16 +55,10 @@ function isValidSchedule(s: unknown): s is LocalTaskSchedule {
 }
 
 function isValidMissedRunPolicy(p: unknown): p is MissedRunPolicy {
-  return (
-    p === MISSED_RUN_POLICIES.skip ||
-    p === MISSED_RUN_POLICIES.runOnce ||
-    p === MISSED_RUN_POLICIES.runAll
-  );
+  return p === MISSED_RUN_POLICIES.skip || p === MISSED_RUN_POLICIES.runOnce || p === MISSED_RUN_POLICIES.runAll;
 }
 
-export type ValidateResult =
-  | { kind: "ok"; task: PersistedUserTask }
-  | { kind: "error"; error: string };
+export type ValidateResult = { kind: "ok"; task: PersistedUserTask } | { kind: "error"; error: string };
 
 export function validateAndCreate(input: unknown): ValidateResult {
   if (!isRecord(input)) {
@@ -87,17 +75,14 @@ export function validateAndCreate(input: unknown): ValidateResult {
   if (!isValidSchedule(obj.schedule)) {
     return { kind: "error", error: "valid schedule required" };
   }
-  const missedRunPolicy = isValidMissedRunPolicy(obj.missedRunPolicy)
-    ? obj.missedRunPolicy
-    : MISSED_RUN_POLICIES.runOnce;
+  const missedRunPolicy = isValidMissedRunPolicy(obj.missedRunPolicy) ? obj.missedRunPolicy : MISSED_RUN_POLICIES.runOnce;
   const roleId = typeof obj.roleId === "string" ? obj.roleId : DEFAULT_ROLE_ID;
 
   const now = new Date().toISOString();
   const task: PersistedUserTask = {
     id: crypto.randomUUID(),
     name: obj.name.trim(),
-    description:
-      typeof obj.description === "string" ? obj.description.trim() : "",
+    description: typeof obj.description === "string" ? obj.description.trim() : "",
     schedule: obj.schedule,
     missedRunPolicy,
     enabled: true,
@@ -109,15 +94,9 @@ export function validateAndCreate(input: unknown): ValidateResult {
   return { kind: "ok", task };
 }
 
-export type UpdateResult =
-  | { kind: "ok"; tasks: PersistedUserTask[] }
-  | { kind: "error"; error: string };
+export type UpdateResult = { kind: "ok"; tasks: PersistedUserTask[] } | { kind: "error"; error: string };
 
-export function applyUpdate(
-  tasks: PersistedUserTask[],
-  id: string,
-  patch: unknown,
-): UpdateResult {
+export function applyUpdate(tasks: PersistedUserTask[], id: string, patch: unknown): UpdateResult {
   if (!isRecord(patch)) {
     return { kind: "error", error: "request body required" };
   }
@@ -196,12 +175,7 @@ let userTaskMutex: Promise<number> = Promise.resolve(0);
 
 export interface UserTaskDeps {
   taskManager: ITaskManager;
-  startChat: (params: {
-    message: string;
-    roleId: string;
-    chatSessionId: string;
-    origin?: SessionOrigin;
-  }) => Promise<{ kind: string; error?: string }>;
+  startChat: (params: { message: string; roleId: string; chatSessionId: string; origin?: SessionOrigin }) => Promise<{ kind: string; error?: string }>;
 }
 
 export async function registerUserTasks(deps: UserTaskDeps): Promise<number> {

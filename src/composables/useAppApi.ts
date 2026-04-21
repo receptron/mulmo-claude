@@ -39,9 +39,7 @@ export function provideAppApi(api: AppApi): void {
 export function useAppApi(): AppApi {
   const api = inject<AppApi>(APP_API_KEY);
   if (!api) {
-    throw new Error(
-      "useAppApi() called outside an App.vue subtree — provideAppApi must run first.",
-    );
+    throw new Error("useAppApi() called outside an App.vue subtree — provideAppApi must run first.");
   }
   return api;
 }

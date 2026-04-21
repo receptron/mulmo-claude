@@ -50,9 +50,7 @@ export function buildIndexMarkdown(input: IndexInputs): string {
   ].join("\n");
 }
 
-export function renderTopicsSection(
-  topics: readonly IndexTopicEntry[],
-): string[] {
+export function renderTopicsSection(topics: readonly IndexTopicEntry[]): string[] {
   const lines: string[] = ["## Topics", ""];
   if (topics.length === 0) {
     lines.push("_No topics yet._");
@@ -67,19 +65,14 @@ export function renderTopicsSection(
   return lines;
 }
 
-export function renderRecentDaysSection(
-  days: readonly IndexDailyEntry[],
-  maxRecent: number,
-): string[] {
+export function renderRecentDaysSection(days: readonly IndexDailyEntry[], maxRecent: number): string[] {
   const lines: string[] = ["## Recent days", ""];
   if (days.length === 0) {
     lines.push("_No daily entries yet._");
     return lines;
   }
   // Newest-first by date string (YYYY-MM-DD sorts lexically).
-  const sorted = [...days].sort((a, b) =>
-    a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-  );
+  const sorted = [...days].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const head = sorted.slice(0, maxRecent);
   for (const d of head) {
     lines.push(renderDailyRow(d));
@@ -99,9 +92,7 @@ export function renderArchiveSection(archivedTopicCount: number): string[] {
     return lines;
   }
   const noun = archivedTopicCount === 1 ? "archived topic" : "archived topics";
-  lines.push(
-    `- [Archived topics](archive/topics/) — ${archivedTopicCount} ${noun}`,
-  );
+  lines.push(`- [Archived topics](archive/topics/) — ${archivedTopicCount} ${noun}`);
   return lines;
 }
 
@@ -119,10 +110,7 @@ function compareBySlug(a: IndexTopicEntry, b: IndexTopicEntry): number {
   return 0;
 }
 
-function compareTopicsNewestFirst(
-  a: IndexTopicEntry,
-  b: IndexTopicEntry,
-): number {
+function compareTopicsNewestFirst(a: IndexTopicEntry, b: IndexTopicEntry): number {
   const ak = topicSortKey(a);
   const bk = topicSortKey(b);
   // Both valid timestamps → compare numerically.
@@ -138,9 +126,7 @@ function compareTopicsNewestFirst(
 
 function renderTopicRow(t: IndexTopicEntry): string {
   const label = t.title && t.title.trim().length > 0 ? t.title : t.slug;
-  const stamp = t.lastUpdatedIso
-    ? ` — updated ${isoDateOnly(t.lastUpdatedIso)}`
-    : "";
+  const stamp = t.lastUpdatedIso ? ` — updated ${isoDateOnly(t.lastUpdatedIso)}` : "";
   return `- [${label}](topics/${t.slug}.md)${stamp}`;
 }
 

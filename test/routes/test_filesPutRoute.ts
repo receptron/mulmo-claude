@@ -29,11 +29,7 @@ interface RouterInternals {
   stack: StackFrame[];
 }
 
-function extractRouteHandler(
-  mod: RouteModule,
-  routePath: string,
-  method: string,
-): Handler {
+function extractRouteHandler(mod: RouteModule, routePath: string, method: string): Handler {
   const router = mod.default as unknown as RouterInternals;
   for (const frame of router.stack) {
     if (frame.route?.path !== routePath) continue;
@@ -83,8 +79,7 @@ before(async () => {
   originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
-  const { workspacePath: wp } =
-    await import("../../server/workspace/workspace.js");
+  const { workspacePath: wp } = await import("../../server/workspace/workspace.js");
   workspaceDir = wp;
   fs.mkdirSync(workspaceDir, { recursive: true });
   const routeMod = await import("../../server/api/routes/files.js");
@@ -130,10 +125,7 @@ describe("PUT /api/files/content — happy path", () => {
     assert.equal(typeof body.size, "number");
     assert.equal(typeof body.modifiedMs, "number");
 
-    const onDisk = await fs.promises.readFile(
-      path.join(workspaceDir, rel),
-      "utf-8",
-    );
+    const onDisk = await fs.promises.readFile(path.join(workspaceDir, rel), "utf-8");
     assert.equal(onDisk, "# new\nbody\n");
   });
 
@@ -142,16 +134,10 @@ describe("PUT /api/files/content — happy path", () => {
     await writeFile(path.join(workspaceDir, rel), "old", "utf-8");
 
     const { state, res } = mockRes();
-    await putHandler(
-      req({ path: rel, content: "日本語テスト — em–dash" }),
-      res,
-    );
+    await putHandler(req({ path: rel, content: "日本語テスト — em–dash" }), res);
 
     assert.equal(state.status, 200);
-    const onDisk = await fs.promises.readFile(
-      path.join(workspaceDir, rel),
-      "utf-8",
-    );
+    const onDisk = await fs.promises.readFile(path.join(workspaceDir, rel), "utf-8");
     assert.equal(onDisk, "日本語テスト — em–dash");
   });
 });
@@ -222,10 +208,7 @@ describe("PUT /api/files/content — security", () => {
     await putHandler(req({ path: ".env", content: "SECRET=2" }), res);
     assert.equal(state.status, 400);
     // Verify the original content is unchanged.
-    const onDisk = await fs.promises.readFile(
-      path.join(workspaceDir, ".env"),
-      "utf-8",
-    );
+    const onDisk = await fs.promises.readFile(path.join(workspaceDir, ".env"), "utf-8");
     assert.equal(onDisk, "SECRET=1");
   });
 

@@ -13,10 +13,7 @@ import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../utils/time.js";
 // (systemPrompt, userPrompt) → raw model output as a string.
 // The daily/optimization passes parse JSON out of the string
 // themselves; this layer stays transport-only.
-export type Summarize = (
-  systemPrompt: string,
-  userPrompt: string,
-) => Promise<string>;
+export type Summarize = (systemPrompt: string, userPrompt: string) => Promise<string>;
 
 // Wall-clock cap per CLI invocation. 5 minutes is comfortably above
 // the worst-case summarization run we've seen and still short enough
@@ -37,12 +34,7 @@ export class ClaudeCliFailedError extends Error {
   readonly exitCode: number | null;
   readonly stderr: string;
   constructor(exitCode: number | null, stderr: string) {
-    super(
-      `[journal] \`claude\` CLI exited ${exitCode ?? "(killed)"}: ${stderr.slice(
-        0,
-        500,
-      )}`,
-    );
+    super(`[journal] \`claude\` CLI exited ${exitCode ?? "(killed)"}: ${stderr.slice(0, 500)}`);
     this.name = "ClaudeCliFailedError";
     this.exitCode = exitCode;
     this.stderr = stderr;
@@ -91,12 +83,7 @@ export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
       settled = true;
       clearTimeout(timeout);
       if (timedOut) {
-        reject(
-          new ClaudeCliFailedError(
-            null,
-            `timed out after ${CLI_TIMEOUT_MS}ms\n${stderr}`,
-          ),
-        );
+        reject(new ClaudeCliFailedError(null, `timed out after ${CLI_TIMEOUT_MS}ms\n${stderr}`));
         return;
       }
       if (code === 0) {
@@ -363,9 +350,7 @@ import { isRecord } from "../../utils/types.js";
 
 // Type guards used by callers to validate parsed output. Written as
 // guards rather than `as` casts per project conventions.
-export function isDailyArchivistOutput(
-  value: unknown,
-): value is DailyArchivistOutput {
+export function isDailyArchivistOutput(value: unknown): value is DailyArchivistOutput {
   if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (typeof v.dailySummaryMarkdown !== "string") return false;
@@ -378,14 +363,10 @@ function isTopicUpdate(value: unknown): value is TopicUpdate {
   const v = value as Record<string, unknown>;
   if (typeof v.slug !== "string") return false;
   if (typeof v.content !== "string") return false;
-  return (
-    v.action === "create" || v.action === "append" || v.action === "rewrite"
-  );
+  return v.action === "create" || v.action === "append" || v.action === "rewrite";
 }
 
-export function isOptimizationOutput(
-  value: unknown,
-): value is OptimizationOutput {
+export function isOptimizationOutput(value: unknown): value is OptimizationOutput {
   if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (!Array.isArray(v.merges)) return false;

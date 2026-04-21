@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  EVENT_TYPES,
-  CHAT_SOCKET_EVENTS,
-  CHAT_SOCKET_PATH,
-  CHAT_SERVICE_ROUTES,
-} from "../src/index.js";
+import { EVENT_TYPES, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, CHAT_SERVICE_ROUTES } from "../src/index.js";
 import type { EventType, ChatSocketEvent, Attachment } from "../src/index.js";
 
 describe("@mulmobridge/protocol exports", () => {

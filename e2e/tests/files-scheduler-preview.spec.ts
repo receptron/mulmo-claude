@@ -24,9 +24,7 @@ const SAMPLE_ITEMS = [
 ];
 
 test.describe("Files view — scheduler preview", () => {
-  test("renders SchedulerView (Calendar + Tasks tabs) when opening the items file", async ({
-    page,
-  }) => {
+  test("renders SchedulerView (Calendar + Tasks tabs) when opening the items file", async ({ page }) => {
     await mockAllApis(page);
 
     // Serve the raw JSON body via /api/files/content so the renderer
@@ -46,17 +44,11 @@ test.describe("Files view — scheduler preview", () => {
     await page.goto(SCHEDULER_URL);
 
     // Tabs from SchedulerView (not present in a raw-JSON code view)
-    await expect(
-      page.locator('[data-testid="scheduler-tab-calendar"]'),
-    ).toBeVisible({ timeout: 5000 });
-    await expect(
-      page.locator('[data-testid="scheduler-tab-tasks"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="scheduler-tab-calendar"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="scheduler-tab-tasks"]')).toBeVisible();
   });
 
-  test("falls back to raw JSON rendering when the body is malformed", async ({
-    page,
-  }) => {
+  test("falls back to raw JSON rendering when the body is malformed", async ({ page }) => {
     await mockAllApis(page);
     await page.route("**/api/files/content?**", (route) =>
       route.fulfill({

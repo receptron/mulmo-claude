@@ -4,11 +4,7 @@ import { mkdtemp, readFile, rm } from "fs/promises";
 import { randomBytes } from "crypto";
 import os from "os";
 import path from "path";
-import {
-  createArgsCache,
-  recordToolEvent,
-  type RecordToolEventDeps,
-} from "../../server/workspace/tool-trace/index.js";
+import { createArgsCache, recordToolEvent, type RecordToolEventDeps } from "../../server/workspace/tool-trace/index.js";
 
 const FIXED_NOW = new Date("2026-04-13T05:18:47.123Z");
 const SID = "a821d112";
@@ -73,10 +69,7 @@ describe("recordToolEvent", () => {
   beforeEach(async () => {
     // Crypto-grade random keeps sonarjs/pseudo-random happy;
     // uniqueness only matters so each case gets its own jsonl dir.
-    const subdir = path.join(
-      workspaceRoot,
-      `case-${randomBytes(4).toString("hex")}`,
-    );
+    const subdir = path.join(workspaceRoot, `case-${randomBytes(4).toString("hex")}`);
     h = await makeHarness(subdir);
   });
 
@@ -119,11 +112,7 @@ describe("recordToolEvent", () => {
     const lines = readJsonlLines(await h.readJsonl());
     const resultLine = lines.find((l) => l.type === "tool_call_result");
     assert.ok(resultLine);
-    assert.ok(
-      String(resultLine?.contentRef).startsWith(
-        "conversations/searches/2026-04-13/",
-      ),
-    );
+    assert.ok(String(resultLine?.contentRef).startsWith("conversations/searches/2026-04-13/"));
     assert.equal(resultLine?.content, undefined);
     assert.equal(h.savedSearches.length, 1);
     assert.equal(h.savedSearches[0].query, "foo bar");
@@ -163,10 +152,7 @@ describe("recordToolEvent", () => {
       },
       h.deps,
     );
-    await recordToolEvent(
-      { type: "tool_call_result", toolUseId: "u-bash", content: "hi" },
-      h.deps,
-    );
+    await recordToolEvent({ type: "tool_call_result", toolUseId: "u-bash", content: "hi" }, h.deps);
     const lines = readJsonlLines(await h.readJsonl());
     const resultLine = lines.find((l) => l.type === "tool_call_result");
     assert.equal(resultLine?.content, "hi");
@@ -183,10 +169,7 @@ describe("recordToolEvent", () => {
       },
       h.deps,
     );
-    await recordToolEvent(
-      { type: "tool_call_result", toolUseId: "u-x", content: "ok" },
-      h.deps,
-    );
+    await recordToolEvent({ type: "tool_call_result", toolUseId: "u-x", content: "ok" }, h.deps);
     assert.equal(h.deps.argsCache.size, 0);
   });
 

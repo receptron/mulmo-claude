@@ -137,10 +137,7 @@ function parseDirective(line: string): { name: string; value: string } | null {
 // first match only (old behaviour) let a later Disallow in a
 // duplicate group get ignored, which could silently let a fetcher
 // hit a path the site explicitly blocked.
-export function selectGroup(
-  robots: ParsedRobots,
-  userAgent: string,
-): RobotsGroup | null {
+export function selectGroup(robots: ParsedRobots, userAgent: string): RobotsGroup | null {
   const ua = userAgent.toLowerCase();
   const exacts: RobotsGroup[] = [];
   const stars: RobotsGroup[] = [];
@@ -177,10 +174,7 @@ function mergeGroups(groups: readonly RobotsGroup[]): RobotsGroup {
     rules.push(...g.rules);
     userAgents.push(...g.userAgents);
     if (g.crawlDelaySec !== null) {
-      crawlDelaySec =
-        crawlDelaySec === null
-          ? g.crawlDelaySec
-          : Math.min(crawlDelaySec, g.crawlDelaySec);
+      crawlDelaySec = crawlDelaySec === null ? g.crawlDelaySec : Math.min(crawlDelaySec, g.crawlDelaySec);
     }
   }
   return { userAgents, rules, crawlDelaySec };
@@ -218,11 +212,7 @@ function scoreGroupAgainstAgent(group: RobotsGroup, ua: string): AgentMatch {
 // Rule resolution follows the Google / IETF robots draft:
 // longest-prefix match wins between Allow and Disallow; tie goes
 // to Allow (the more permissive outcome).
-export function isAllowedByRobots(
-  robots: ParsedRobots,
-  userAgent: string,
-  path: string,
-): boolean {
+export function isAllowedByRobots(robots: ParsedRobots, userAgent: string, path: string): boolean {
   const group = selectGroup(robots, userAgent);
   if (!group) return true;
   const { bestAllow, bestDisallow } = scoreRules(group, path);
@@ -236,10 +226,7 @@ export function isAllowedByRobots(
 // Empty patterns (from `Disallow:` with no value) never match in
 // `matchesPattern`, so they correctly fall through to the
 // allow-all default.
-function scoreRules(
-  group: RobotsGroup,
-  path: string,
-): { bestAllow: number; bestDisallow: number } {
+function scoreRules(group: RobotsGroup, path: string): { bestAllow: number; bestDisallow: number } {
   let bestAllow = -1;
   let bestDisallow = -1;
   for (const rule of group.rules) {

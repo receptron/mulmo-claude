@@ -21,15 +21,8 @@ const MAX_QUERY_SLUG_CHARS = 40;
 // from this module. The function is now in utils/date.ts.
 export { toUtcIsoDate as formatSearchDateDir } from "../../utils/date.js";
 
-export function computeSearchHash(
-  query: string,
-  sessionId: string,
-  ts: Date,
-): string {
-  return createHash("sha256")
-    .update(`${query}\n${sessionId}\n${ts.toISOString()}`, "utf-8")
-    .digest("base64url")
-    .slice(0, SEARCH_HASH_LEN);
+export function computeSearchHash(query: string, sessionId: string, ts: Date): string {
+  return createHash("sha256").update(`${query}\n${sessionId}\n${ts.toISOString()}`, "utf-8").digest("base64url").slice(0, SEARCH_HASH_LEN);
 }
 
 export interface SearchPathInputs {
@@ -60,17 +53,7 @@ export interface SearchContentInputs {
 export function buildSearchMarkdown(inputs: SearchContentInputs): string {
   const { query, sessionId, ts, resultBody } = inputs;
   const body = resultBody.endsWith("\n") ? resultBody : `${resultBody}\n`;
-  return [
-    "---",
-    `query: ${jsonStringSafe(query)}`,
-    `sessionId: ${sessionId}`,
-    `ts: ${ts.toISOString()}`,
-    "---",
-    "",
-    `# Search: ${query}`,
-    "",
-    body,
-  ].join("\n");
+  return ["---", `query: ${jsonStringSafe(query)}`, `sessionId: ${sessionId}`, `ts: ${ts.toISOString()}`, "---", "", `# Search: ${query}`, "", body].join("\n");
 }
 
 // Quote a string for YAML only when it could otherwise be
@@ -101,10 +84,7 @@ const defaultDeps: WriteSearchDeps = {
  * Save the search result to disk and return the workspace-relative
  * path that should be used as the jsonl `contentRef`.
  */
-export async function writeSearchResult(
-  inputs: WriteSearchInputs,
-  deps: Partial<WriteSearchDeps> = {},
-): Promise<string> {
+export async function writeSearchResult(inputs: WriteSearchInputs, deps: Partial<WriteSearchDeps> = {}): Promise<string> {
   const d: WriteSearchDeps = { ...defaultDeps, ...deps };
   const relPath = computeSearchRelPath({
     query: inputs.query,

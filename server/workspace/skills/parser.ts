@@ -12,10 +12,7 @@ export interface SkillSchedule {
   /** "daily HH:MM" or "interval Ns/Nm/Nh" */
   raw: string;
   /** Parsed into task-manager-compatible shape */
-  parsed:
-    | { type: typeof SCHEDULE_TYPES.daily; time: string }
-    | { type: typeof SCHEDULE_TYPES.interval; intervalMs: number }
-    | null;
+  parsed: { type: typeof SCHEDULE_TYPES.daily; time: string } | { type: typeof SCHEDULE_TYPES.interval; intervalMs: number } | null;
 }
 
 export interface ParsedSkill {
@@ -36,10 +33,7 @@ export interface ParsedSkill {
 function parseScalar(raw: string): string {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return "";
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
     return trimmed.slice(1, -1);
   }
   return trimmed;
@@ -97,11 +91,7 @@ function parseScheduleValue(raw: string): SkillSchedule["parsed"] {
 // Extract key-value pairs from YAML frontmatter lines. Returns a
 // map of key → scalar value. Keeps parseSkillFrontmatter under the
 // cognitive-complexity threshold.
-function extractFrontmatterFields(
-  lines: string[],
-  startIdx: number,
-  endIdx: number,
-): Map<string, string> {
+function extractFrontmatterFields(lines: string[], startIdx: number, endIdx: number): Map<string, string> {
   const fields = new Map<string, string>();
   for (let i = startIdx; i < endIdx; i++) {
     const line = lines[i];

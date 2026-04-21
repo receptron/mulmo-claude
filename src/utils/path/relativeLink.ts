@@ -19,13 +19,7 @@ export function isExternalHref(href: string): boolean {
   // Protocol-relative (//example.com/foo) → external.
   if (href.startsWith("//")) return true;
   // Fast-path for the common schemes.
-  if (
-    href.startsWith("http://") ||
-    href.startsWith("https://") ||
-    href.startsWith("mailto:") ||
-    href.startsWith("tel:") ||
-    href.startsWith("ftp://")
-  ) {
+  if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("ftp://")) {
     return true;
   }
   // Generic scheme detection: any "scheme:" prefix where the colon
@@ -53,10 +47,7 @@ export function isExternalHref(href: string): boolean {
 //
 // `#fragment` / `?query` suffixes are stripped — the file viewer
 // only navigates by path.
-export function resolveWorkspaceLink(
-  currentFilePath: string,
-  href: string,
-): string | null {
+export function resolveWorkspaceLink(currentFilePath: string, href: string): string | null {
   if (!href) return null;
   if (isExternalHref(href)) return null;
   if (href.startsWith("#")) return null;
@@ -104,10 +95,7 @@ export function extractSessionIdFromPath(resolvedPath: string): string | null {
   const JSONL_SUFFIX = ".jsonl";
   if (!resolvedPath.startsWith(CHAT_PREFIX)) return null;
   if (!resolvedPath.endsWith(JSONL_SUFFIX)) return null;
-  const id = resolvedPath.slice(
-    CHAT_PREFIX.length,
-    resolvedPath.length - JSONL_SUFFIX.length,
-  );
+  const id = resolvedPath.slice(CHAT_PREFIX.length, resolvedPath.length - JSONL_SUFFIX.length);
   if (id.length === 0) return null;
   if (id.includes("/")) return null;
   return id;

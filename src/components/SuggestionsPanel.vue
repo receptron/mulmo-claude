@@ -1,10 +1,6 @@
 <template>
   <div v-if="queries.length > 0" class="border-t border-gray-200">
-    <div
-      v-if="expanded"
-      ref="listRef"
-      class="px-4 pt-2 max-h-64 overflow-y-auto flex flex-col gap-1"
-    >
+    <div v-if="expanded" ref="listRef" class="px-4 pt-2 max-h-64 overflow-y-auto flex flex-col gap-1">
       <button
         v-for="query in queries"
         :key="query"
@@ -13,9 +9,7 @@
       >
         {{ query }}
       </button>
-      <p class="text-center text-[10px] text-gray-400 py-0.5">
-        click to send · shift+click to edit
-      </p>
+      <p class="text-center text-[10px] text-gray-400 py-0.5">click to send · shift+click to edit</p>
     </div>
     <button
       class="w-full flex items-center justify-between px-4 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
@@ -25,11 +19,7 @@
         <span class="material-icons text-sm">lightbulb</span>
         Suggestions
       </span>
-      <span
-        class="material-icons text-sm transition-transform"
-        :class="{ 'rotate-180': !expanded }"
-        >expand_less</span
-      >
+      <span class="material-icons text-sm transition-transform" :class="{ 'rotate-180': !expanded }">expand_less</span>
     </button>
   </div>
 </template>

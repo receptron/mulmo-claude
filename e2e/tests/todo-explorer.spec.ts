@@ -20,9 +20,7 @@ test.describe("Todo Explorer", () => {
     await setupTodoMocks(page);
   });
 
-  test("opens TodoExplorer when selecting data/todos/todos.json in files view", async ({
-    page,
-  }) => {
+  test("opens TodoExplorer when selecting data/todos/todos.json in files view", async ({ page }) => {
     await page.goto(TODOS_URL);
     // Wait for the TodoExplorer to render (it has the "Todo" heading).
     await expect(page.getByText("Todo").first()).toBeVisible({
@@ -37,9 +35,7 @@ test.describe("Todo Explorer", () => {
     });
 
     for (const col of TODO_COLUMNS) {
-      await expect(
-        page.locator(`[data-testid="todo-column-${col.id}"]`),
-      ).toBeVisible();
+      await expect(page.locator(`[data-testid="todo-column-${col.id}"]`)).toBeVisible();
     }
   });
 
@@ -133,9 +129,7 @@ test.describe("Todo Explorer", () => {
     await page.locator('[data-testid="todo-add-btn"]').click();
     await expect(page.getByText("Add Todo")).toBeVisible();
     // The dialog should have a text input and status select
-    await expect(
-      page.locator('input[placeholder="What needs doing?"]'),
-    ).toBeVisible();
+    await expect(page.locator('input[placeholder="What needs doing?"]')).toBeVisible();
   });
 
   test("Escape closes the add dialog", async ({ page }) => {
@@ -187,9 +181,7 @@ test.describe("Todo Explorer", () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test("delete button (✕) is visible on hover in list view", async ({
-    page,
-  }) => {
+  test("delete button (✕) is visible on hover in list view", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
       timeout: 5000,

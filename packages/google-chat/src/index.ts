@@ -25,10 +25,7 @@ const PORT = Number(process.env.GOOGLE_CHAT_BRIDGE_PORT) || 3005;
 
 const projectNumber = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
 if (!projectNumber) {
-  console.error(
-    "GOOGLE_CHAT_PROJECT_NUMBER is required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("GOOGLE_CHAT_PROJECT_NUMBER is required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
@@ -52,8 +49,7 @@ function isObj(v: unknown): v is Record<string, unknown> {
 // iss, aud, and exp claims.
 
 const GOOGLE_CHAT_ISSUER = "chat@system.gserviceaccount.com";
-const JWKS_URL =
-  "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com";
+const JWKS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com";
 const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
 
 interface JwkKey {
@@ -80,13 +76,7 @@ async function fetchJwks(): Promise<JwkKey[]> {
     }
     const data: { keys?: unknown[] } = await res.json();
     if (!Array.isArray(data.keys)) throw new Error("Invalid JWKS response");
-    cachedKeys = data.keys.filter(
-      (k): k is JwkKey =>
-        isObj(k) &&
-        typeof k.kid === "string" &&
-        typeof k.n === "string" &&
-        typeof k.e === "string",
-    );
+    cachedKeys = data.keys.filter((k): k is JwkKey => isObj(k) && typeof k.kid === "string" && typeof k.n === "string" && typeof k.e === "string");
     cacheExpiresAt = Date.now() + JWKS_CACHE_TTL_MS;
     return cachedKeys;
   } catch (err) {
@@ -135,12 +125,7 @@ function buildRsaPublicKey(n: string, e: string): crypto.KeyObject {
   });
 }
 
-function verifyRsaSignature(
-  signatureInput: string,
-  signature: Buffer,
-  key: crypto.KeyObject,
-  alg: string,
-): boolean {
+function verifyRsaSignature(signatureInput: string, signature: Buffer, key: crypto.KeyObject, alg: string): boolean {
   const hashMap: Record<string, string> = {
     RS256: "sha256",
     RS384: "sha384",
@@ -148,15 +133,10 @@ function verifyRsaSignature(
   };
   const hash = hashMap[alg];
   if (!hash) return false;
-  return crypto
-    .createVerify(hash)
-    .update(signatureInput)
-    .verify(key, signature);
+  return crypto.createVerify(hash).update(signatureInput).verify(key, signature);
 }
 
-async function verifyGoogleChatToken(
-  authHeader: string | undefined,
-): Promise<boolean> {
+async function verifyGoogleChatToken(authHeader: string | undefined): Promise<boolean> {
   if (!authHeader) return false;
   const prefix = "Bearer ";
   if (!authHeader.startsWith(prefix)) return false;
@@ -234,10 +214,7 @@ function extractMessage(body: unknown): ParsedMessage | null {
   const space = msg.space;
   if (!isObj(space) || typeof space.name !== "string") return null;
   const sender = msg.sender;
-  const senderName =
-    isObj(sender) && typeof sender.displayName === "string"
-      ? sender.displayName
-      : "unknown";
+  const senderName = isObj(sender) && typeof sender.displayName === "string" ? sender.displayName : "unknown";
   return { spaceName: space.name, senderName, text: msg.text };
 }
 
@@ -249,10 +226,7 @@ app.post("/", async (req: Request, res: Response) => {
   }
 
   // Verify the request is from Google Chat
-  const authHeader =
-    typeof req.headers.authorization === "string"
-      ? req.headers.authorization
-      : undefined;
+  const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
   const verified = await verifyGoogleChatToken(authHeader);
   if (!verified) {
     console.warn("[google-chat] AUTH_FAILED: JWT verification failed");
@@ -280,9 +254,7 @@ app.post("/", async (req: Request, res: Response) => {
 
   const { spaceName, senderName, text } = parsed;
 
-  console.log(
-    `[google-chat] message space=${redactId(spaceName)} sender=${redactId(senderName)} len=${text.length}`,
-  );
+  console.log(`[google-chat] message space=${redactId(spaceName)} sender=${redactId(senderName)} len=${text.length}`);
 
   try {
     const ack = await mulmo.send(spaceName, text.trim());

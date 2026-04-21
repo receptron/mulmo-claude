@@ -14,14 +14,8 @@ export function hasNonAscii(input: string): boolean {
 
 // Deterministic short hash for inputs that can't be represented as an
 // ASCII slug. base64url is URL-safe and denser than hex.
-export function hashSlug(
-  input: string,
-  length: number = NON_ASCII_HASH_LEN,
-): string {
-  return createHash("sha256")
-    .update(input, "utf-8")
-    .digest("base64url")
-    .slice(0, length);
+export function hashSlug(input: string, length: number = NON_ASCII_HASH_LEN): string {
+  return createHash("sha256").update(input, "utf-8").digest("base64url").slice(0, length);
 }
 
 // Validates a slug: lowercase alphanumeric + hyphens, 1–64 chars,
@@ -35,11 +29,7 @@ export function isValidSlug(slug: string): boolean {
   return true;
 }
 
-export function slugify(
-  title: string,
-  defaultSlug = "page",
-  maxLength = 60,
-): string {
+export function slugify(title: string, defaultSlug = "page", maxLength = 60): string {
   const asciiSlug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

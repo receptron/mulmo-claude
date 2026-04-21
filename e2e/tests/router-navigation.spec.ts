@@ -10,15 +10,11 @@ test.beforeEach(async ({ page }) => {
 async function openHistoryWithSessions(page: Page) {
   await page.locator('[data-testid="history-btn"]').click();
   // Wait for sessions to load (fetched async when the panel opens).
-  await page
-    .locator(`[data-testid="session-item-${SESSION_A.id}"]`)
-    .waitFor({ state: "visible", timeout: 5000 });
+  await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).waitFor({ state: "visible", timeout: 5000 });
 }
 
 test.describe("session navigation via URL", () => {
-  test("/ redirects to /chat with a session ID in the URL", async ({
-    page,
-  }) => {
+  test("/ redirects to /chat with a session ID in the URL", async ({ page }) => {
     await page.goto("/");
     await page.waitForURL(/\/chat\//);
     expect(page.url()).toMatch(/\/chat\/[\w-]+/);
@@ -90,9 +86,7 @@ test.describe("session navigation via URL", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
   });
 
-  test("direct URL to a non-existent session falls back to new session", async ({
-    page,
-  }) => {
+  test("direct URL to a non-existent session falls back to new session", async ({ page }) => {
     await page.goto("/chat/nonexistent-session-xyz");
     // App tries loadSession → 404 → createNewSession → replace URL
     await expect(async () => {

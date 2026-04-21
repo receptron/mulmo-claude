@@ -14,11 +14,7 @@
 // does this. In dev, Vite's default SPA fallback handles it.
 
 import { defineComponent, h } from "vue";
-import {
-  createRouter,
-  createWebHistory,
-  type RouteRecordRaw,
-} from "vue-router";
+import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 
 // Stub component that renders nothing. Required by vue-router (every
 // route needs a component) but never actually mounted because App.vue

@@ -36,38 +36,23 @@ describe("isClickOutside", () => {
   });
 
   it("returns false when target is the button itself", () => {
-    assert.equal(
-      isClickOutside(button as unknown as Node, button, popup),
-      false,
-    );
+    assert.equal(isClickOutside(button as unknown as Node, button, popup), false);
   });
 
   it("returns false when target is the popup itself", () => {
-    assert.equal(
-      isClickOutside(popup as unknown as Node, button, popup),
-      false,
-    );
+    assert.equal(isClickOutside(popup as unknown as Node, button, popup), false);
   });
 
   it("returns false when target is inside the button subtree", () => {
-    assert.equal(
-      isClickOutside(buttonChild, buttonWithChild, popupWithChild),
-      false,
-    );
+    assert.equal(isClickOutside(buttonChild, buttonWithChild, popupWithChild), false);
   });
 
   it("returns false when target is inside the popup subtree", () => {
-    assert.equal(
-      isClickOutside(popupChild, buttonWithChild, popupWithChild),
-      false,
-    );
+    assert.equal(isClickOutside(popupChild, buttonWithChild, popupWithChild), false);
   });
 
   it("returns true when target is in neither", () => {
-    assert.equal(
-      isClickOutside(outside, buttonWithChild, popupWithChild),
-      true,
-    );
+    assert.equal(isClickOutside(outside, buttonWithChild, popupWithChild), true);
   });
 
   it("returns true when both refs are null and target is anywhere", () => {

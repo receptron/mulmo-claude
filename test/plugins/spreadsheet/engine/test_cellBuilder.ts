@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildCellFromInput,
-  looksLikeFormula,
-  parseNonStringInput,
-} from "../../../../src/plugins/spreadsheet/engine/cellBuilder.js";
+import { buildCellFromInput, looksLikeFormula, parseNonStringInput } from "../../../../src/plugins/spreadsheet/engine/cellBuilder.js";
 
 describe("looksLikeFormula", () => {
   it("detects function calls at the start", () => {

@@ -15,24 +15,11 @@ import {
   listDailyFiles as listDailyFilesIO,
   countArchivedTopics as countArchivedIO,
 } from "../../utils/files/journal-io.js";
-import {
-  readState,
-  writeState,
-  isDailyDue,
-  isOptimizationDue,
-} from "./state.js";
+import { readState, writeState, isDailyDue, isOptimizationDue } from "./state.js";
 import { runDailyPass } from "./dailyPass.js";
 import { runOptimizationPass } from "./optimizationPass.js";
-import {
-  buildIndexMarkdown,
-  type IndexTopicEntry,
-  type IndexDailyEntry,
-} from "./indexFile.js";
-import {
-  runClaudeCli,
-  ClaudeCliNotFoundError,
-  type Summarize,
-} from "./archivist.js";
+import { buildIndexMarkdown, type IndexTopicEntry, type IndexDailyEntry } from "./indexFile.js";
+import { runClaudeCli, ClaudeCliNotFoundError, type Summarize } from "./archivist.js";
 import { extractFirstH1 } from "../../../src/utils/markdown/extractFirstH1.js";
 import { log } from "../../system/logger/index.js";
 
@@ -62,9 +49,7 @@ export interface MaybeRunJournalOptions {
 // Everything inside swallows its own errors so the promise never
 // rejects in practice, but we still attach a catch at the call
 // site defensively.
-export async function maybeRunJournal(
-  opts: MaybeRunJournalOptions = {},
-): Promise<void> {
+export async function maybeRunJournal(opts: MaybeRunJournalOptions = {}): Promise<void> {
   if (disabled) return;
   if (running) return;
   running = true;
@@ -131,17 +116,13 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
 
   if (optimize) {
     log.info("journal", "running optimization pass");
-    const { nextState: afterOpt, result } = await runOptimizationPass(
-      nextState,
-      { workspaceRoot, summarize },
-    );
+    const { nextState: afterOpt, result } = await runOptimizationPass(nextState, { workspaceRoot, summarize });
     // Same rule as daily: only advance the timestamp when the pass
     // actually ran to completion. A "skipped: too few topics" case
     // is still considered successful — there was simply nothing to
     // do — and we allow it to bump so we don't re-check on every
     // session-end.
-    const optimizationSucceeded =
-      !result.skipped || result.skippedReason === "fewer than 2 topics";
+    const optimizationSucceeded = !result.skipped || result.skippedReason === "fewer than 2 topics";
     nextState = {
       ...afterOpt,
       ...(optimizationSucceeded && {

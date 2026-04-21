@@ -12,11 +12,7 @@
 // `resolveSandboxAuth`. Exposing host paths to the browser is an
 // intentional non-goal (see #329).
 
-import {
-  buildAllowedConfigMounts,
-  resolveMountNames,
-  sshAgentForwardArgs,
-} from "../agent/sandboxMounts.js";
+import { buildAllowedConfigMounts, resolveMountNames, sshAgentForwardArgs } from "../agent/sandboxMounts.js";
 
 export interface SandboxStatus {
   /** True iff the host SSH agent socket is bound into the container. */
@@ -52,19 +48,13 @@ export interface BuildSandboxStatusParams {
  * probes done by `resolveMountNames` (same probes the agent spawner
  * already runs per request).
  */
-export function buildSandboxStatus(
-  params: BuildSandboxStatusParams,
-): SandboxStatus | null {
+export function buildSandboxStatus(params: BuildSandboxStatusParams): SandboxStatus | null {
   if (!params.sandboxEnabled) return null;
 
   const allowed = buildAllowedConfigMounts(params.home);
   const parsed = resolveMountNames(params.configMountNames, allowed);
 
-  const ssh = sshAgentForwardArgs(
-    params.sshAgentForward,
-    params.sshAuthSock,
-    params.platform,
-  );
+  const ssh = sshAgentForwardArgs(params.sshAgentForward, params.sshAuthSock, params.platform);
   const sshAgent = ssh.args.length > 0;
 
   return {

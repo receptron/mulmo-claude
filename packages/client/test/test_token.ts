@@ -57,11 +57,7 @@ afterEach(() => {
 });
 
 function writeTokenFile(home: string, value: string): void {
-  fs.writeFileSync(
-    path.join(home, "mulmoclaude", ".session-token"),
-    value,
-    "utf-8",
-  );
+  fs.writeFileSync(path.join(home, "mulmoclaude", ".session-token"), value, "utf-8");
 }
 
 describe("readBridgeToken — env var wins", () => {
@@ -108,9 +104,6 @@ describe("readBridgeToken — file fallback", () => {
 describe("TOKEN_FILE_PATH", () => {
   it("is <homedir>/mulmoclaude/.session-token", async () => {
     const { TOKEN_FILE_PATH } = await loadFresh();
-    assert.equal(
-      TOKEN_FILE_PATH,
-      path.join(tmpDir, "mulmoclaude", ".session-token"),
-    );
+    assert.equal(TOKEN_FILE_PATH, path.join(tmpDir, "mulmoclaude", ".session-token"));
   });
 });

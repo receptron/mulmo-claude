@@ -28,9 +28,7 @@ const textColorClass = computed(() => {
   }
 });
 
-const renderedMarkdown = computed(() =>
-  marked(previewText.value, { breaks: true, gfm: true }),
-);
+const renderedMarkdown = computed(() => marked(previewText.value, { breaks: true, gfm: true }));
 </script>
 
 <style scoped>

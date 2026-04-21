@@ -15,9 +15,7 @@ import {
 
 const NOW = "2026-04-17T00:00:00.000Z";
 
-function sessionOpts(
-  overrides: Partial<Parameters<typeof getOrCreateSession>[1]> = {},
-) {
+function sessionOpts(overrides: Partial<Parameters<typeof getOrCreateSession>[1]> = {}) {
   return {
     roleId: "general",
     resultsFilePath: "/tmp/fake.jsonl",

@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  isUserTextResponse,
-  extractImageData,
-  makeTextResult,
-} from "../../../src/utils/tools/result.js";
+import { isUserTextResponse, extractImageData, makeTextResult } from "../../../src/utils/tools/result.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 function makeResult(over: Partial<ToolResultComplete>): ToolResultComplete {
@@ -69,10 +65,7 @@ describe("extractImageData", () => {
   });
 
   it("returns undefined when imageData is missing", () => {
-    assert.equal(
-      extractImageData(makeResult({ data: { foo: "bar" } })),
-      undefined,
-    );
+    assert.equal(extractImageData(makeResult({ data: { foo: "bar" } })), undefined);
   });
 
   it("returns undefined when imageData is not a string", () => {

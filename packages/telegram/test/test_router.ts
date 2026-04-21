@@ -26,11 +26,7 @@ function stubApi(): TelegramApi & { sent: SentMessage[] } {
   };
 }
 
-function msg(
-  chatId: number,
-  text: string,
-  username = "alice",
-): TelegramMessage {
+function msg(chatId: number, text: string, username = "alice"): TelegramMessage {
   return {
     message_id: 1,
     chat: { id: chatId, type: "private" },

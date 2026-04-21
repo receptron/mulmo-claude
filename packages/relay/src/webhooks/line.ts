@@ -2,11 +2,7 @@
 
 import { chunkText } from "@mulmobridge/client";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
-import {
-  registerPlatform,
-  CONNECTION_MODES,
-  type PlatformPlugin,
-} from "../platform.js";
+import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 
 interface LineEvent {
   type: string;
@@ -24,19 +20,9 @@ const MAX_LINE_TEXT = 5000;
 
 // ── Signature verification ──────────────────────────────────────
 
-async function verifyLineSignature(
-  secret: string,
-  body: string,
-  signature: string,
-): Promise<boolean> {
+async function verifyLineSignature(secret: string, body: string, signature: string): Promise<boolean> {
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
   const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
@@ -59,17 +45,9 @@ const linePlugin: PlatformPlugin = {
     return !!env.LINE_CHANNEL_SECRET;
   },
 
-  async handleWebhook(
-    request: Request,
-    body: string,
-    env: Env,
-  ): Promise<RelayMessage[]> {
+  async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
     const signature = request.headers.get("x-line-signature") ?? "";
-    const isValid = await verifyLineSignature(
-      String(env.LINE_CHANNEL_SECRET),
-      body,
-      signature,
-    );
+    const isValid = await verifyLineSignature(String(env.LINE_CHANNEL_SECRET), body, signature);
     if (!isValid) {
       throw new Error("LINE signature verification failed");
     }
@@ -81,11 +59,7 @@ const linePlugin: PlatformPlugin = {
       if (event.type !== "message" || event.message?.type !== "text") continue;
       if (!event.message.text) continue;
 
-      const chatId =
-        event.source?.groupId ??
-        event.source?.roomId ??
-        event.source?.userId ??
-        "unknown";
+      const chatId = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId ?? "unknown";
 
       messages.push({
         id: crypto.randomUUID(),
@@ -101,12 +75,7 @@ const linePlugin: PlatformPlugin = {
     return messages;
   },
 
-  async sendResponse(
-    chatId: string,
-    text: string,
-    env: Env,
-    replyToken?: string,
-  ): Promise<void> {
+  async sendResponse(chatId: string, text: string, env: Env, replyToken?: string): Promise<void> {
     const accessToken = env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!accessToken) {
       throw new Error("LINE_CHANNEL_ACCESS_TOKEN not configured");
@@ -115,12 +84,8 @@ const linePlugin: PlatformPlugin = {
     const messages = chunkText(text, MAX_LINE_TEXT)
       .slice(0, MAX_LINE_MESSAGES_PER_REQUEST)
       .map((t) => ({ type: "text", text: t }));
-    const url = replyToken
-      ? "https://api.line.me/v2/bot/message/reply"
-      : "https://api.line.me/v2/bot/message/push";
-    const body = replyToken
-      ? { replyToken, messages }
-      : { to: chatId, messages };
+    const url = replyToken ? "https://api.line.me/v2/bot/message/reply" : "https://api.line.me/v2/bot/message/push";
+    const body = replyToken ? { replyToken, messages } : { to: chatId, messages };
 
     let response: Response;
     try {
@@ -133,9 +98,7 @@ const linePlugin: PlatformPlugin = {
         body: JSON.stringify(body),
       });
     } catch (err) {
-      throw new Error(
-        `LINE API network error: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw new Error(`LINE API network error: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (!response.ok) {
       throw new Error(`LINE API failed: ${response.status}`);

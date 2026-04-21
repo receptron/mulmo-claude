@@ -28,10 +28,7 @@ function urlEndsWith(suffix: string): (url: URL) => boolean {
 //                                    0=connect, 1=disconnect, 2=event
 // So `40` = connect-to-default-namespace, `42["name", arg]` = event
 // emit. We only need open/ping/connect/event handling here.
-async function mockAgentWithPubSub(
-  page: Page,
-  events: readonly unknown[],
-): Promise<void> {
+async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Promise<void> {
   await page.routeWebSocket(
     (url) => url.pathname.startsWith("/ws/pubsub"),
     (ws) => {
@@ -71,11 +68,7 @@ async function mockAgentWithPubSub(
         }
         if (!Array.isArray(parsed)) return;
         const [name, arg] = parsed as [string, unknown];
-        if (
-          name !== "subscribe" ||
-          typeof arg !== "string" ||
-          !arg.startsWith("session.")
-        ) {
+        if (name !== "subscribe" || typeof arg !== "string" || !arg.startsWith("session.")) {
           return;
         }
         const channel = arg;
@@ -83,13 +76,7 @@ async function mockAgentWithPubSub(
           for (const event of events) {
             ws.send("42" + JSON.stringify(["data", { channel, data: event }]));
           }
-          ws.send(
-            "42" +
-              JSON.stringify([
-                "data",
-                { channel, data: { type: "session_finished" } },
-              ]),
-          );
+          ws.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
         }, 50);
       });
     },
@@ -146,9 +133,7 @@ test.describe("session selection", () => {
     await historyBtn.click();
 
     // Session previews from fixtures should appear.
-    await expect(
-      page.locator("text=Hello from session A").first(),
-    ).toBeVisible();
+    await expect(page.locator("text=Hello from session A").first()).toBeVisible();
   });
 });
 
@@ -159,9 +144,7 @@ test.describe("sending a chat message", () => {
     await mockAllApis(page);
   });
 
-  test("streams the assistant's text event into the chat list", async ({
-    page,
-  }) => {
+  test("streams the assistant's text event into the chat list", async ({ page }) => {
     // The happy-path regression: user sends a message, the server
     // returns 202, events arrive via WebSocket pub/sub, and
     // applyAgentEvent pushes them to the session's toolResults.
@@ -174,9 +157,7 @@ test.describe("sending a chat message", () => {
     await page.getByTestId("user-input").fill("ping");
     await page.getByTestId("send-btn").click();
 
-    await expect(
-      page.locator("text=Pong from the server").first(),
-    ).toBeVisible();
+    await expect(page.locator("text=Pong from the server").first()).toBeVisible();
     // The user's own message should also be in the list.
     await expect(page.locator("text=ping").first()).toBeVisible();
   });
@@ -224,9 +205,7 @@ test.describe("sending a chat message", () => {
     await expect(page.locator("text=final message").first()).toBeVisible();
   });
 
-  test("recovers missed events via re-fetch on session_finished (#350)", async ({
-    page,
-  }) => {
+  test("recovers missed events via re-fetch on session_finished (#350)", async ({ page }) => {
     // Simulate an event gap: the mock sends ONLY session_finished
     // (no text events). The client's toolResults stay empty from the
     // pub/sub stream. But session_finished triggers a re-fetch of
@@ -242,9 +221,7 @@ test.describe("sending a chat message", () => {
     // contains the session id (we capture dynamically below).
     let capturedSessionId: string | null = null;
     await page.route(
-      (url) =>
-        url.pathname.startsWith("/api/sessions/") &&
-        url.pathname !== "/api/sessions",
+      (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
       (route) => {
         if (route.request().method() !== "GET") return route.fallback();
         const id = route.request().url().split("/api/sessions/").pop() ?? "";

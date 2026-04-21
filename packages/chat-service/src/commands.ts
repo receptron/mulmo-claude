@@ -15,11 +15,7 @@ export interface CommandResult {
   nextState?: TransportChatState;
 }
 
-export type CommandHandler = (
-  text: string,
-  transportId: string,
-  chatState: TransportChatState,
-) => Promise<CommandResult | null>;
+export type CommandHandler = (text: string, transportId: string, chatState: TransportChatState) => Promise<CommandResult | null>;
 
 // Mirror server/utils/time.ts names but declared locally since
 // the chat-service package must not import from the host app.
@@ -45,10 +41,7 @@ export function createCommandHandler(opts: {
   getRole: (roleId: string) => Role;
   resetChatState: ChatStateStore["resetChatState"];
   connectSession: ChatStateStore["connectSession"];
-  listSessions?: (opts: {
-    limit: number;
-    offset: number;
-  }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+  listSessions?: (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
   getSessionHistory?: (
     sessionId: string,
     opts: { limit: number; offset: number },
@@ -57,14 +50,7 @@ export function createCommandHandler(opts: {
     total: number;
   }>;
 }): CommandHandler {
-  const {
-    loadAllRoles,
-    getRole,
-    resetChatState,
-    connectSession,
-    listSessions,
-    getSessionHistory,
-  } = opts;
+  const { loadAllRoles, getRole, resetChatState, connectSession, listSessions, getSessionHistory } = opts;
 
   // Cache /sessions results per chat so /switch resolves to the correct list.
   // Key: "transportId:externalChatId". Bounded with max entries + TTL.
@@ -77,8 +63,7 @@ export function createCommandHandler(opts: {
     createdAt: number;
   }
   const sessionListCache = new Map<string, CacheEntry>();
-  const cacheKey = (transportId: string, externalChatId: string) =>
-    `${transportId}:${externalChatId}`;
+  const cacheKey = (transportId: string, externalChatId: string) => `${transportId}:${externalChatId}`;
 
   function getCachedSessions(key: string): SessionSummary[] | null {
     const entry = sessionListCache.get(key);
@@ -98,11 +83,7 @@ export function createCommandHandler(opts: {
     sessionListCache.set(key, { sessions, createdAt: Date.now() });
   }
 
-  const getRolesText = (): string =>
-    [
-      "Available roles:",
-      ...loadAllRoles().map((r) => `  ${r.id} — ${r.name}`),
-    ].join("\n");
+  const getRolesText = (): string => ["Available roles:", ...loadAllRoles().map((r) => `  ${r.id} — ${r.name}`)].join("\n");
 
   const getHelpText = (): string =>
     [
@@ -119,26 +100,15 @@ export function createCommandHandler(opts: {
       "Send any other text to chat with the assistant.",
     ].join("\n");
 
-  const handleReset = async (
-    transportId: string,
-    chatState: TransportChatState,
-  ): Promise<CommandResult> => {
-    const nextState = await resetChatState(
-      transportId,
-      chatState.externalChatId,
-      chatState.roleId,
-    );
+  const handleReset = async (transportId: string, chatState: TransportChatState): Promise<CommandResult> => {
+    const nextState = await resetChatState(transportId, chatState.externalChatId, chatState.roleId);
     return {
       reply: `Session reset. Role: ${nextState.roleId}`,
       nextState,
     };
   };
 
-  const handleRole = async (
-    transportId: string,
-    chatState: TransportChatState,
-    requestedRoleId: string | undefined,
-  ): Promise<CommandResult> => {
+  const handleRole = async (transportId: string, chatState: TransportChatState, requestedRoleId: string | undefined): Promise<CommandResult> => {
     if (!requestedRoleId) {
       return { reply: `Usage: /role <id>\n\n${getRolesText()}` };
     }
@@ -146,11 +116,7 @@ export function createCommandHandler(opts: {
     if (!role) {
       return { reply: `Unknown role: ${requestedRoleId}\n\n${getRolesText()}` };
     }
-    const nextState = await resetChatState(
-      transportId,
-      chatState.externalChatId,
-      role.id,
-    );
+    const nextState = await resetChatState(transportId, chatState.externalChatId, role.id);
     return {
       reply: `Switched to ${role.name} (${role.id}). New session started.`,
       nextState,
@@ -160,21 +126,13 @@ export function createCommandHandler(opts: {
   const handleStatus = (chatState: TransportChatState): CommandResult => {
     const role = getRole(chatState.roleId);
     return {
-      reply: [
-        `Role: ${role.name} (${role.id})`,
-        `Session: ${chatState.sessionId}`,
-        `Last activity: ${chatState.updatedAt}`,
-      ].join("\n"),
+      reply: [`Role: ${role.name} (${role.id})`, `Session: ${chatState.sessionId}`, `Last activity: ${chatState.updatedAt}`].join("\n"),
     };
   };
 
   const SESSIONS_PAGE_SIZE = 10;
 
-  const handleSessions = async (
-    transportId: string,
-    chatState: TransportChatState,
-    pageArg: string | undefined,
-  ): Promise<CommandResult> => {
+  const handleSessions = async (transportId: string, chatState: TransportChatState, pageArg: string | undefined): Promise<CommandResult> => {
     if (!listSessions) {
       return { reply: "Session listing is not available." };
     }
@@ -203,8 +161,7 @@ export function createCommandHandler(opts: {
     const totalPages = Math.ceil(total / SESSIONS_PAGE_SIZE);
     const lines = sessions.map((s, i) => {
       const num = offset + i + 1;
-      const preview =
-        s.preview.length > 40 ? s.preview.slice(0, 40) + "..." : s.preview;
+      const preview = s.preview.length > 40 ? s.preview.slice(0, 40) + "..." : s.preview;
       return `  ${num}. [${s.roleId}] ${preview || "(no title)"} — ${formatRelativeTime(s.updatedAt)}`;
     });
     const header = `Sessions (page ${page}/${totalPages}, total ${total}):`;
@@ -216,15 +173,10 @@ export function createCommandHandler(opts: {
     return { reply: parts.join("\n") };
   };
 
-  const handleSwitch = async (
-    transportId: string,
-    chatState: TransportChatState,
-    arg: string | undefined,
-  ): Promise<CommandResult> => {
+  const handleSwitch = async (transportId: string, chatState: TransportChatState, arg: string | undefined): Promise<CommandResult> => {
     if (!arg) {
       return {
-        reply:
-          "Usage: /switch <number|sessionId>\nRun /sessions first to see the list.",
+        reply: "Usage: /switch <number|sessionId>\nRun /sessions first to see the list.",
       };
     }
     const key = cacheKey(transportId, chatState.externalChatId);
@@ -235,10 +187,7 @@ export function createCommandHandler(opts: {
       const index = parseInt(arg, 10);
       if (index < 1 || index > cached.length) {
         return {
-          reply:
-            cached.length > 0
-              ? `Invalid number. Pick 1-${cached.length} from the /sessions list.`
-              : "Run /sessions first to see available sessions.",
+          reply: cached.length > 0 ? `Invalid number. Pick 1-${cached.length} from the /sessions list.` : "Run /sessions first to see available sessions.",
         };
       }
       target = cached[index - 1];
@@ -258,11 +207,7 @@ export function createCommandHandler(opts: {
         };
       }
     }
-    const updated = await connectSession(
-      transportId,
-      chatState.externalChatId,
-      target.id,
-    );
+    const updated = await connectSession(transportId, chatState.externalChatId, target.id);
     if (!updated) {
       return { reply: "Failed to switch session." };
     }
@@ -277,10 +222,7 @@ export function createCommandHandler(opts: {
   const HISTORY_PAGE_SIZE = 5;
   const MAX_MESSAGE_LENGTH = 200;
 
-  const handleHistory = async (
-    chatState: TransportChatState,
-    pageArg: string | undefined,
-  ): Promise<CommandResult> => {
+  const handleHistory = async (chatState: TransportChatState, pageArg: string | undefined): Promise<CommandResult> => {
     if (!getSessionHistory) {
       return { reply: "History is not available." };
     }
@@ -299,10 +241,7 @@ export function createCommandHandler(opts: {
     const totalPages = Math.ceil(total / HISTORY_PAGE_SIZE);
     const lines = messages.map((m) => {
       const label = m.source === "user" ? "You" : "AI";
-      const text =
-        m.text.length > MAX_MESSAGE_LENGTH
-          ? m.text.slice(0, MAX_MESSAGE_LENGTH) + "..."
-          : m.text;
+      const text = m.text.length > MAX_MESSAGE_LENGTH ? m.text.slice(0, MAX_MESSAGE_LENGTH) + "..." : m.text;
       return `[${label}] ${text}`;
     });
     const header = `History (page ${page}/${totalPages}):`;
@@ -313,11 +252,7 @@ export function createCommandHandler(opts: {
     return { reply: parts.join("\n\n") };
   };
 
-  const handleCommand: CommandHandler = async (
-    text,
-    transportId,
-    chatState,
-  ) => {
+  const handleCommand: CommandHandler = async (text, transportId, chatState) => {
     if (!text.startsWith("/")) return null;
     const [command, ...args] = text.split(/\s+/);
 

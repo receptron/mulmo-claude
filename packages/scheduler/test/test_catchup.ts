@@ -1,17 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { computeCatchUpPlan, type CatchUpTask } from "../src/catchup.ts";
-import {
-  emptyState,
-  MISSED_RUN_POLICIES,
-  SCHEDULE_TYPES,
-  TASK_TRIGGERS,
-  type TaskExecutionState,
-} from "../src/types.ts";
+import { emptyState, MISSED_RUN_POLICIES, SCHEDULE_TYPES, TASK_TRIGGERS, type TaskExecutionState } from "../src/types.ts";
 
-function makeTask(
-  overrides: Partial<CatchUpTask> & { id: string },
-): CatchUpTask {
+function makeTask(overrides: Partial<CatchUpTask> & { id: string }): CatchUpTask {
   return {
     name: overrides.id,
     schedule: { type: SCHEDULE_TYPES.daily, time: "08:00" },
@@ -30,12 +22,8 @@ function stateAt(taskId: string, lastRunAt: string): TaskExecutionState {
 
 describe("computeCatchUpPlan — skip policy", () => {
   it("produces no runs and records the skip", () => {
-    const tasks = [
-      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.skip }),
-    ];
-    const states = new Map([
-      ["t", stateAt("t", new Date(apr14_09).toISOString())],
-    ]);
+    const tasks = [makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.skip })];
+    const states = new Map([["t", stateAt("t", new Date(apr14_09).toISOString())]]);
     const plan = computeCatchUpPlan(tasks, states, apr17_10);
 
     assert.equal(plan.runs.length, 0);
@@ -47,12 +35,8 @@ describe("computeCatchUpPlan — skip policy", () => {
 
 describe("computeCatchUpPlan — run-once policy", () => {
   it("produces one run targeting the latest missed window", () => {
-    const tasks = [
-      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce }),
-    ];
-    const states = new Map([
-      ["t", stateAt("t", new Date(apr14_09).toISOString())],
-    ]);
+    const tasks = [makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce })];
+    const states = new Map([["t", stateAt("t", new Date(apr14_09).toISOString())]]);
     const plan = computeCatchUpPlan(tasks, states, apr17_10);
 
     assert.equal(plan.runs.length, 1);
@@ -64,21 +48,15 @@ describe("computeCatchUpPlan — run-once policy", () => {
 
 describe("computeCatchUpPlan — run-all policy", () => {
   it("produces one run per missed window, oldest first", () => {
-    const tasks = [
-      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runAll }),
-    ];
-    const states = new Map([
-      ["t", stateAt("t", new Date(apr14_09).toISOString())],
-    ]);
+    const tasks = [makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runAll })];
+    const states = new Map([["t", stateAt("t", new Date(apr14_09).toISOString())]]);
     const plan = computeCatchUpPlan(tasks, states, apr17_10);
 
     assert.equal(plan.runs.length, 3);
     assert.ok(plan.runs[0].context.scheduledFor.includes("2026-04-15"));
     assert.ok(plan.runs[1].context.scheduledFor.includes("2026-04-16"));
     assert.ok(plan.runs[2].context.scheduledFor.includes("2026-04-17"));
-    plan.runs.forEach((r) =>
-      assert.equal(r.context.trigger, TASK_TRIGGERS.catchUp),
-    );
+    plan.runs.forEach((r) => assert.equal(r.context.trigger, TASK_TRIGGERS.catchUp));
   });
 
   it("caps at maxCatchUp", () => {
@@ -106,9 +84,7 @@ describe("computeCatchUpPlan — edge cases", () => {
   });
 
   it("treats never-run tasks as just registered — no catch-up from epoch", () => {
-    const tasks = [
-      makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce }),
-    ];
+    const tasks = [makeTask({ id: "t", missedRunPolicy: MISSED_RUN_POLICIES.runOnce })];
     const plan = computeCatchUpPlan(tasks, new Map(), apr17_10);
     // Never-run tasks: lastRunMs = nowMs, so no missed windows.
     assert.equal(plan.runs.length, 0);
@@ -123,10 +99,7 @@ describe("computeCatchUpPlan — edge cases", () => {
   });
 
   it("handles multiple tasks independently", () => {
-    const tasks = [
-      makeTask({ id: "a", missedRunPolicy: MISSED_RUN_POLICIES.skip }),
-      makeTask({ id: "b", missedRunPolicy: MISSED_RUN_POLICIES.runAll }),
-    ];
+    const tasks = [makeTask({ id: "a", missedRunPolicy: MISSED_RUN_POLICIES.skip }), makeTask({ id: "b", missedRunPolicy: MISSED_RUN_POLICIES.runAll })];
     const states = new Map([
       ["a", stateAt("a", new Date(apr14_09).toISOString())],
       ["b", stateAt("b", new Date(apr14_09).toISOString())],

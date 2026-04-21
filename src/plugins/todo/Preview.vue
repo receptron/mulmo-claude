@@ -20,11 +20,7 @@
           :class="colorForLabel(label)"
           >{{ label }}</span
         >
-        <span
-          v-if="(item.labels?.length ?? 0) > 2"
-          class="text-[9px] text-gray-400 shrink-0"
-          >+{{ (item.labels?.length ?? 0) - 2 }}</span
-        >
+        <span v-if="(item.labels?.length ?? 0) > 2" class="text-[9px] text-gray-400 shrink-0">+{{ (item.labels?.length ?? 0) - 2 }}</span>
       </template>
     </div>
     <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
@@ -61,9 +57,7 @@ watch(
     void refresh();
   },
 );
-const completedCount = computed(
-  () => items.value.filter((i) => i.completed).length,
-);
+const completedCount = computed(() => items.value.filter((i) => i.completed).length);
 const preview = computed(() => items.value.slice(0, 3));
 const more = computed(() => Math.max(0, items.value.length - 3));
 </script>

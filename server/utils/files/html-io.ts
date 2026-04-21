@@ -15,9 +15,6 @@ export async function readCurrentHtml(r?: string): Promise<string | null> {
   return readTextUnder(root(r), HTML_REL);
 }
 
-export async function writeCurrentHtml(
-  html: string,
-  r?: string,
-): Promise<void> {
+export async function writeCurrentHtml(html: string, r?: string): Promise<void> {
   await writeTextUnder(root(r), HTML_REL, html);
 }

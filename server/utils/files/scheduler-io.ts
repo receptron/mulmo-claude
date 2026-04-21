@@ -12,15 +12,9 @@ import { writeFileAtomicSync } from "./atomic.js";
 const root = (r?: string) => r ?? workspacePath;
 
 export function loadSchedulerItems<T>(fallback: T, r?: string): T {
-  return loadJsonFile(
-    resolvePath(root(r), WORKSPACE_FILES.schedulerItems),
-    fallback,
-  );
+  return loadJsonFile(resolvePath(root(r), WORKSPACE_FILES.schedulerItems), fallback);
 }
 
 export function saveSchedulerItems(items: unknown, r?: string): void {
-  writeFileAtomicSync(
-    resolvePath(root(r), WORKSPACE_FILES.schedulerItems),
-    JSON.stringify(items, null, 2),
-  );
+  writeFileAtomicSync(resolvePath(root(r), WORKSPACE_FILES.schedulerItems), JSON.stringify(items, null, 2));
 }

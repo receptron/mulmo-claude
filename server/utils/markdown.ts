@@ -12,10 +12,7 @@ import path from "node:path";
  * Non-workspace-absolute links (true relative, external URLs,
  * anchors) are left untouched.
  */
-export function rewriteWorkspaceLinks(
-  currentFileWsPath: string,
-  content: string,
-): string {
+export function rewriteWorkspaceLinks(currentFileWsPath: string, content: string): string {
   const currentDir = path.posix.dirname(currentFileWsPath);
   return rewriteMarkdownLinks(content, (href) => {
     if (href.startsWith("//")) return href;
@@ -34,10 +31,7 @@ export function rewriteWorkspaceLinks(
  * it encounters, substituting the returned href. Character-level scan
  * (no regex) to stay lint-clean.
  */
-export function rewriteMarkdownLinks(
-  input: string,
-  rewrite: (href: string) => string,
-): string {
+export function rewriteMarkdownLinks(input: string, rewrite: (href: string) => string): string {
   const parts: string[] = [];
   let i = 0;
   while (i < input.length) {

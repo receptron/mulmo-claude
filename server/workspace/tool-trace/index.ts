@@ -47,13 +47,9 @@ export function createArgsCache(): ArgsCache {
   return new Map<string, CachedCall>();
 }
 
-const defaultAppendLine = (filePath: string, line: string) =>
-  appendFile(filePath, line, "utf-8");
+const defaultAppendLine = (filePath: string, line: string) => appendFile(filePath, line, "utf-8");
 
-export async function recordToolEvent(
-  event: ToolTraceEvent,
-  deps: RecordToolEventDeps,
-): Promise<void> {
+export async function recordToolEvent(event: ToolTraceEvent, deps: RecordToolEventDeps): Promise<void> {
   try {
     if (event.type === EVENT_TYPES.toolCall) {
       await handleToolCall(event, deps);
@@ -69,10 +65,7 @@ export async function recordToolEvent(
   }
 }
 
-async function handleToolCall(
-  event: ToolCallEvent,
-  deps: RecordToolEventDeps,
-): Promise<void> {
+async function handleToolCall(event: ToolCallEvent, deps: RecordToolEventDeps): Promise<void> {
   deps.argsCache.set(event.toolUseId, {
     toolName: event.toolName,
     args: event.args,
@@ -130,9 +123,7 @@ function extractUrl(args: unknown): string | null {
 function logToolCallResult(
   toolName: string,
   event: ToolCallResultEvent,
-  classification:
-    | { kind: "pointer"; contentRef: string }
-    | { kind: "inline"; content: string; truncated: boolean },
+  classification: { kind: "pointer"; contentRef: string } | { kind: "inline"; content: string; truncated: boolean },
   searchContentRef: string | undefined,
 ): void {
   if (toolName === "WebSearch" && searchContentRef) {
@@ -168,10 +159,7 @@ function logToolCallResult(
   });
 }
 
-async function handleToolCallResult(
-  event: ToolCallResultEvent,
-  deps: RecordToolEventDeps,
-): Promise<void> {
+async function handleToolCallResult(event: ToolCallResultEvent, deps: RecordToolEventDeps): Promise<void> {
   const now = (deps.now ?? (() => new Date()))();
   const cached = deps.argsCache.get(event.toolUseId);
   const toolName = cached?.toolName ?? "";
@@ -227,9 +215,7 @@ interface MaybeWriteSearchInputs {
   saveSearch?: typeof writeSearchResult;
 }
 
-async function maybeWriteSearch(
-  inputs: MaybeWriteSearchInputs,
-): Promise<string | undefined> {
+async function maybeWriteSearch(inputs: MaybeWriteSearchInputs): Promise<string | undefined> {
   if (inputs.toolName !== WEB_SEARCH_TOOL_NAME) return undefined;
   const query = extractQuery(inputs.args);
   if (!query) return undefined;
@@ -258,10 +244,7 @@ function extractQuery(args: unknown): string | null {
   return raw;
 }
 
-async function appendRecord(
-  deps: RecordToolEventDeps,
-  record: object,
-): Promise<void> {
+async function appendRecord(deps: RecordToolEventDeps, record: object): Promise<void> {
   const append = deps.appendLine ?? defaultAppendLine;
   await append(deps.resultsFilePath, JSON.stringify(record) + "\n");
 }

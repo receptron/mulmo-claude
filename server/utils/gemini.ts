@@ -54,13 +54,6 @@ export async function generateGeminiImageContent(
 
 // Convenience wrapper for the common "text prompt → image" path.
 // Uses the standard 16:9 image config.
-export async function generateGeminiImageFromPrompt(
-  prompt: string,
-  model?: string,
-): Promise<GeminiImageResult> {
-  return generateGeminiImageContent(
-    [{ text: prompt }],
-    DEFAULT_IMAGE_CONFIG,
-    model,
-  );
+export async function generateGeminiImageFromPrompt(prompt: string, model?: string): Promise<GeminiImageResult> {
+  return generateGeminiImageContent([{ text: prompt }], DEFAULT_IMAGE_CONFIG, model);
 }

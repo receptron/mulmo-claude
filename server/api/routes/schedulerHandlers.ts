@@ -49,10 +49,7 @@ export function handleShow(items: ScheduledItem[]): SchedulerActionResult {
   };
 }
 
-export function handleAdd(
-  items: ScheduledItem[],
-  input: SchedulerActionInput,
-): SchedulerActionResult {
+export function handleAdd(items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
   if (!input.title) {
     return { kind: "error", status: 400, error: "title required" };
   }
@@ -71,10 +68,7 @@ export function handleAdd(
   };
 }
 
-export function handleDelete(
-  items: ScheduledItem[],
-  input: SchedulerActionInput,
-): SchedulerActionResult {
+export function handleDelete(items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
   if (!input.id) {
     return { kind: "error", status: 400, error: "id required" };
   }
@@ -88,10 +82,7 @@ export function handleDelete(
   };
 }
 
-function applyPropPatch(
-  current: ScheduledItem["props"],
-  patch: Record<string, string | number | boolean | null>,
-): ScheduledItem["props"] {
+function applyPropPatch(current: ScheduledItem["props"], patch: Record<string, string | number | boolean | null>): ScheduledItem["props"] {
   const next: ScheduledItem["props"] = { ...current };
   for (const [k, v] of Object.entries(patch)) {
     if (v === null) {
@@ -103,10 +94,7 @@ function applyPropPatch(
   return next;
 }
 
-export function handleUpdate(
-  items: ScheduledItem[],
-  input: SchedulerActionInput,
-): SchedulerActionResult {
+export function handleUpdate(items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
   if (!input.id) {
     return { kind: "error", status: 400, error: "id required" };
   }
@@ -122,10 +110,7 @@ export function handleUpdate(
   const updated: ScheduledItem = {
     ...target,
     title: input.title !== undefined ? input.title : target.title,
-    props:
-      input.props !== undefined
-        ? applyPropPatch(target.props, input.props)
-        : target.props,
+    props: input.props !== undefined ? applyPropPatch(target.props, input.props) : target.props,
   };
   const next = sortItems(items.map((i) => (i.id === input.id ? updated : i)));
   return {
@@ -136,10 +121,7 @@ export function handleUpdate(
   };
 }
 
-export function handleReplace(
-  _items: ScheduledItem[],
-  input: SchedulerActionInput,
-): SchedulerActionResult {
+export function handleReplace(_items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
   if (!Array.isArray(input.items)) {
     return { kind: "error", status: 400, error: "items array required" };
   }
@@ -152,10 +134,7 @@ export function handleReplace(
   };
 }
 
-const HANDLERS: Record<
-  string,
-  (items: ScheduledItem[], input: SchedulerActionInput) => SchedulerActionResult
-> = {
+const HANDLERS: Record<string, (items: ScheduledItem[], input: SchedulerActionInput) => SchedulerActionResult> = {
   show: handleShow,
   add: handleAdd,
   delete: handleDelete,
@@ -163,11 +142,7 @@ const HANDLERS: Record<
   replace: handleReplace,
 };
 
-export function dispatchScheduler(
-  action: string,
-  items: ScheduledItem[],
-  input: SchedulerActionInput,
-): SchedulerActionResult {
+export function dispatchScheduler(action: string, items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
   const handler = HANDLERS[action];
   if (!handler) {
     return { kind: "error", status: 400, error: `Unknown action: ${action}` };

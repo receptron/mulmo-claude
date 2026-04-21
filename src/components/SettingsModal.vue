@@ -1,10 +1,5 @@
 <template>
-  <div
-    v-if="open"
-    class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-    data-testid="settings-modal-backdrop"
-    @click="close"
-  >
+  <div v-if="open" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" data-testid="settings-modal-backdrop" @click="close">
     <div
       class="bg-white rounded-lg shadow-xl w-[36rem] max-h-[85vh] flex flex-col"
       role="dialog"
@@ -13,21 +8,9 @@
       data-testid="settings-modal"
       @click.stop
     >
-      <div
-        class="px-5 py-4 border-b border-gray-200 flex items-center justify-between"
-      >
-        <h2
-          id="settings-modal-title"
-          class="text-base font-semibold text-gray-900"
-        >
-          Settings
-        </h2>
-        <button
-          class="text-gray-400 hover:text-gray-700"
-          title="Close"
-          data-testid="settings-close-btn"
-          @click="close"
-        >
+      <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h2 id="settings-modal-title" class="text-base font-semibold text-gray-900">Settings</h2>
+        <button class="text-gray-400 hover:text-gray-700" title="Close" data-testid="settings-close-btn" @click="close">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -35,11 +18,7 @@
       <div class="flex border-b border-gray-200 px-5">
         <button
           class="px-3 py-2 text-sm border-b-2"
-          :class="
-            activeTab === 'tools'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-800'
-          "
+          :class="activeTab === 'tools' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-tools"
           @click="activeTab = 'tools'"
         >
@@ -47,11 +26,7 @@
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
-          :class="
-            activeTab === 'mcp'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-800'
-          "
+          :class="activeTab === 'mcp' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-mcp"
           @click="activeTab = 'mcp'"
         >
@@ -59,11 +34,7 @@
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
-          :class="
-            activeTab === 'dirs'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-800'
-          "
+          :class="activeTab === 'dirs' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-dirs"
           @click="activeTab = 'dirs'"
         >
@@ -71,11 +42,7 @@
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
-          :class="
-            activeTab === 'refs'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-800'
-          "
+          :class="activeTab === 'refs' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-refs"
           @click="activeTab = 'refs'"
         >
@@ -84,22 +51,15 @@
       </div>
 
       <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4 text-gray-900">
-        <div
-          v-if="loadError"
-          class="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2"
-          role="alert"
-          data-testid="settings-load-error"
-        >
+        <div v-if="loadError" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2" role="alert" data-testid="settings-load-error">
           ⚠ {{ loadError }}
         </div>
 
         <div v-if="activeTab === 'tools'" class="space-y-3">
           <p class="text-xs text-gray-600 leading-relaxed">
             Extra tool names to pass to Claude via
-            <code class="bg-gray-100 px-1 rounded">--allowedTools</code>. One
-            per line. Useful for built-in Claude Code MCP servers like Gmail /
-            Google Calendar after you have authenticated via
-            <code class="bg-gray-100 px-1 rounded">claude mcp</code>.
+            <code class="bg-gray-100 px-1 rounded">--allowedTools</code>. One per line. Useful for built-in Claude Code MCP servers like Gmail / Google Calendar
+            after you have authenticated via <code class="bg-gray-100 px-1 rounded">claude mcp</code>.
           </p>
           <label class="block">
             <span class="text-xs font-semibold text-gray-700">Tool names</span>
@@ -125,8 +85,7 @@
             role="alert"
             data-testid="mcp-tools-error"
           >
-            ⚠ Could not fetch MCP tool status: {{ mcpToolsError }}. Showing all
-            tools regardless of enablement.
+            ⚠ Could not fetch MCP tool status: {{ mcpToolsError }}. Showing all tools regardless of enablement.
           </div>
           <SettingsMcpTab
             ref="mcpTabRef"
@@ -143,36 +102,19 @@
         <SettingsReferenceDirsTab v-else-if="activeTab === 'refs'" />
       </div>
 
-      <div
-        class="px-5 py-3 border-t border-gray-200 flex items-center justify-between gap-3"
-      >
-        <span
-          v-if="statusMessage"
-          class="text-xs"
-          :class="statusError ? 'text-red-600' : 'text-green-600'"
-          data-testid="settings-status"
-        >
+      <div class="px-5 py-3 border-t border-gray-200 flex items-center justify-between gap-3">
+        <span v-if="statusMessage" class="text-xs" :class="statusError ? 'text-red-600' : 'text-green-600'" data-testid="settings-status">
           {{ statusMessage }}
         </span>
-        <span v-else class="text-xs text-gray-500">
-          Changes apply on the next message. No restart needed.
-        </span>
+        <span v-else class="text-xs text-gray-500"> Changes apply on the next message. No restart needed. </span>
         <div class="flex gap-2">
-          <button
-            class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-            data-testid="settings-cancel-btn"
-            @click="close"
-          >
+          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="settings-cancel-btn" @click="close">
             Cancel
           </button>
           <button
             class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
             :disabled="saving || loading || !!loadError"
-            :title="
-              loadError
-                ? 'Cannot save until settings load successfully'
-                : undefined
-            "
+            :title="loadError ? 'Cannot save until settings load successfully' : undefined"
             data-testid="settings-save-btn"
             @click="save"
           >
@@ -239,21 +181,10 @@ const parsedToolNames = computed(() =>
     .filter((s) => s.length > 0),
 );
 
-const invalidToolNames = computed(() =>
-  parsedToolNames.value.filter((n) => !n.startsWith("mcp__") && !isBuiltIn(n)),
-);
+const invalidToolNames = computed(() => parsedToolNames.value.filter((n) => !n.startsWith("mcp__") && !isBuiltIn(n)));
 
 function isBuiltIn(name: string): boolean {
-  return [
-    "Bash",
-    "Read",
-    "Write",
-    "Edit",
-    "Glob",
-    "Grep",
-    "WebFetch",
-    "WebSearch",
-  ].includes(name);
+  return ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch"].includes(name);
 }
 
 async function loadConfig(): Promise<void> {
@@ -268,10 +199,7 @@ async function loadConfig(): Promise<void> {
   // A newer open() has already started another load — drop this one.
   if (token !== loadToken) return;
   if (!response.ok) {
-    loadError.value =
-      response.status === 0
-        ? response.error || "Network error"
-        : `Failed to load settings (HTTP ${response.status})`;
+    loadError.value = response.status === 0 ? response.error || "Network error" : `Failed to load settings (HTTP ${response.status})`;
   } else {
     toolsText.value = response.data.settings.extraAllowedTools.join("\n");
     mcpServers.value = response.data.mcp?.servers ?? [];
@@ -289,8 +217,7 @@ async function save(): Promise<void> {
   // the user can fix it.
   if (mcpTabRef.value && !mcpTabRef.value.flushDraft()) {
     statusError.value = true;
-    statusMessage.value =
-      "Finish or cancel the pending MCP server entry first.";
+    statusMessage.value = "Finish or cancel the pending MCP server entry first.";
     return;
   }
   saving.value = true;

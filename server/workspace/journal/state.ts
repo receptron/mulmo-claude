@@ -68,31 +68,17 @@ export function parseState(raw: unknown): JournalState {
   const d = defaultState();
   return {
     version: JOURNAL_STATE_VERSION,
-    lastDailyRunAt:
-      typeof obj.lastDailyRunAt === "string" ? obj.lastDailyRunAt : null,
-    lastOptimizationRunAt:
-      typeof obj.lastOptimizationRunAt === "string"
-        ? obj.lastOptimizationRunAt
-        : null,
-    dailyIntervalHours:
-      typeof obj.dailyIntervalHours === "number" && obj.dailyIntervalHours > 0
-        ? obj.dailyIntervalHours
-        : d.dailyIntervalHours,
+    lastDailyRunAt: typeof obj.lastDailyRunAt === "string" ? obj.lastDailyRunAt : null,
+    lastOptimizationRunAt: typeof obj.lastOptimizationRunAt === "string" ? obj.lastOptimizationRunAt : null,
+    dailyIntervalHours: typeof obj.dailyIntervalHours === "number" && obj.dailyIntervalHours > 0 ? obj.dailyIntervalHours : d.dailyIntervalHours,
     optimizationIntervalDays:
-      typeof obj.optimizationIntervalDays === "number" &&
-      obj.optimizationIntervalDays > 0
-        ? obj.optimizationIntervalDays
-        : d.optimizationIntervalDays,
+      typeof obj.optimizationIntervalDays === "number" && obj.optimizationIntervalDays > 0 ? obj.optimizationIntervalDays : d.optimizationIntervalDays,
     processedSessions: parseProcessedSessions(obj.processedSessions),
-    knownTopics: Array.isArray(obj.knownTopics)
-      ? obj.knownTopics.filter((t): t is string => typeof t === "string")
-      : [],
+    knownTopics: Array.isArray(obj.knownTopics) ? obj.knownTopics.filter((t): t is string => typeof t === "string") : [],
   };
 }
 
-function parseProcessedSessions(
-  raw: unknown,
-): Record<string, ProcessedSessionRecord> {
+function parseProcessedSessions(raw: unknown): Record<string, ProcessedSessionRecord> {
   if (!isRecord(raw)) return {};
   const out: Record<string, ProcessedSessionRecord> = {};
   for (const [id, rec] of Object.entries(raw as Record<string, unknown>)) {
@@ -130,10 +116,7 @@ export async function readState(workspaceRoot: string): Promise<JournalState> {
   return parseState(raw);
 }
 
-export async function writeState(
-  workspaceRoot: string,
-  state: JournalState,
-): Promise<void> {
+export async function writeState(workspaceRoot: string, state: JournalState): Promise<void> {
   await writeJournalStateRaw(state, workspaceRoot);
 }
 

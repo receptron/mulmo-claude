@@ -4,13 +4,7 @@
  * Handles Excel-style format codes for currency, percentages, decimals, dates, etc.
  */
 
-import {
-  serialToDate,
-  MONTH_NAMES_SHORT,
-  MONTH_NAMES_FULL,
-  DAY_NAMES_SHORT,
-  DAY_NAMES_FULL,
-} from "./date-utils";
+import { serialToDate, MONTH_NAMES_SHORT, MONTH_NAMES_FULL, DAY_NAMES_SHORT, DAY_NAMES_FULL } from "./date-utils";
 
 /**
  * Check if a format code is for dates
@@ -55,14 +49,8 @@ function formatDate(serial: number, format: string): string {
   result = result.replace(/YY/g, (year % 100).toString().padStart(2, "0"));
 
   // Replace month tokens (order matters - do longer patterns first)
-  result = result.replace(
-    /MMMM/g,
-    MONTH_NAMES_FULL[month] || MONTH_NAMES_FULL[0],
-  );
-  result = result.replace(
-    /MMM/g,
-    MONTH_NAMES_SHORT[month] || MONTH_NAMES_SHORT[0],
-  );
+  result = result.replace(/MMMM/g, MONTH_NAMES_FULL[month] || MONTH_NAMES_FULL[0]);
+  result = result.replace(/MMM/g, MONTH_NAMES_SHORT[month] || MONTH_NAMES_SHORT[0]);
   result = result.replace(/MM/g, (month + 1).toString().padStart(2, "0"));
   result = result.replace(/M/g, (month + 1).toString());
 
@@ -71,14 +59,8 @@ function formatDate(serial: number, format: string): string {
   result = result.replace(/D/g, day.toString());
 
   // Replace day of week tokens
-  result = result.replace(
-    /dddd/g,
-    DAY_NAMES_FULL[dayOfWeek] || DAY_NAMES_FULL[0],
-  );
-  result = result.replace(
-    /ddd/g,
-    DAY_NAMES_SHORT[dayOfWeek] || DAY_NAMES_SHORT[0],
-  );
+  result = result.replace(/dddd/g, DAY_NAMES_FULL[dayOfWeek] || DAY_NAMES_FULL[0]);
+  result = result.replace(/ddd/g, DAY_NAMES_SHORT[dayOfWeek] || DAY_NAMES_SHORT[0]);
 
   // Replace time tokens
   // Handle 12-hour format with AM/PM

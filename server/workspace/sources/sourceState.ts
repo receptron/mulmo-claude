@@ -20,10 +20,7 @@ import { isRecord } from "../../utils/types.js";
 // default state (zeroed counters, empty cursor) when the file
 // is missing, malformed, or any required field fails. Never
 // throws.
-export async function readSourceState(
-  workspaceRoot: string,
-  slug: string,
-): Promise<SourceState> {
+export async function readSourceState(workspaceRoot: string, slug: string): Promise<SourceState> {
   if (!isValidSlug(slug)) return defaultSourceState(slug);
   let raw: string;
   try {
@@ -51,16 +48,10 @@ export function validateSourceState(raw: unknown, slug: string): SourceState {
     return defaultSourceState(slug);
   }
   const o = raw as Record<string, unknown>;
-  const lastFetchedAt =
-    typeof o.lastFetchedAt === "string" ? o.lastFetchedAt : null;
-  const nextAttemptAt =
-    typeof o.nextAttemptAt === "string" ? o.nextAttemptAt : null;
+  const lastFetchedAt = typeof o.lastFetchedAt === "string" ? o.lastFetchedAt : null;
+  const nextAttemptAt = typeof o.nextAttemptAt === "string" ? o.nextAttemptAt : null;
   const consecutiveFailures =
-    typeof o.consecutiveFailures === "number" &&
-    Number.isFinite(o.consecutiveFailures) &&
-    o.consecutiveFailures >= 0
-      ? Math.floor(o.consecutiveFailures)
-      : 0;
+    typeof o.consecutiveFailures === "number" && Number.isFinite(o.consecutiveFailures) && o.consecutiveFailures >= 0 ? Math.floor(o.consecutiveFailures) : 0;
   const cursor = validateCursor(o.cursor);
   return {
     slug,
@@ -84,10 +75,7 @@ function validateCursor(raw: unknown): Record<string, string> {
 
 // Atomic write: stage to `.tmp` then rename. Parent directory
 // created as needed.
-export async function writeSourceState(
-  workspaceRoot: string,
-  state: SourceState,
-): Promise<void> {
+export async function writeSourceState(workspaceRoot: string, state: SourceState): Promise<void> {
   if (!isValidSlug(state.slug)) {
     throw new Error(`[sources/state] invalid slug: ${state.slug}`);
   }
@@ -97,14 +85,9 @@ export async function writeSourceState(
 // Convenience: read every state file listed for the given
 // slugs. Used by the pipeline to gather per-source state before
 // the fetch phase.
-export async function readManyStates(
-  workspaceRoot: string,
-  slugs: readonly string[],
-): Promise<Map<string, SourceState>> {
+export async function readManyStates(workspaceRoot: string, slugs: readonly string[]): Promise<Map<string, SourceState>> {
   const out = new Map<string, SourceState>();
-  const reads = await Promise.all(
-    slugs.map((slug) => readSourceState(workspaceRoot, slug)),
-  );
+  const reads = await Promise.all(slugs.map((slug) => readSourceState(workspaceRoot, slug)));
   for (const state of reads) out.set(state.slug, state);
   return out;
 }
@@ -113,10 +96,7 @@ export async function readManyStates(
 // one state write is logged and absorbed — the daily run's
 // summary has already landed on disk, a lost state update just
 // means the next run re-fetches slightly more than needed.
-export async function writeManyStates(
-  workspaceRoot: string,
-  states: readonly SourceState[],
-): Promise<{ written: number; errors: string[] }> {
+export async function writeManyStates(workspaceRoot: string, states: readonly SourceState[]): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   let written = 0;
   for (const state of states) {
@@ -133,10 +113,7 @@ export async function writeManyStates(
 // Delete the state file for a slug. Used by `manageSource
 // delete` so a removed source doesn't leave orphan state.
 // Missing file is fine — returns false rather than throwing.
-export async function deleteSourceState(
-  workspaceRoot: string,
-  slug: string,
-): Promise<boolean> {
+export async function deleteSourceState(workspaceRoot: string, slug: string): Promise<boolean> {
   if (!isValidSlug(slug)) return false;
   try {
     await fsp.unlink(sourceStatePath(workspaceRoot, slug));
@@ -149,9 +126,7 @@ export async function deleteSourceState(
 // Utility: sort outcomes by source slug so results are
 // deterministic regardless of which fetcher finished first.
 // Used by reporting / logging code.
-export function sortBySlug<T extends { sourceSlug?: string; slug?: string }>(
-  items: readonly T[],
-): T[] {
+export function sortBySlug<T extends { sourceSlug?: string; slug?: string }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => {
     const ak = a.sourceSlug ?? a.slug ?? "";
     const bk = b.sourceSlug ?? b.slug ?? "";

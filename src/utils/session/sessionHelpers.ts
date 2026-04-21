@@ -9,19 +9,13 @@ import { makeTextResult } from "../tools/result";
 import { shouldSelectAssistantText } from "../agent/toolCalls";
 
 /** Push a result and record its timestamp in one place. */
-export function pushResult(
-  session: ActiveSession,
-  result: ToolResultComplete,
-): void {
+export function pushResult(session: ActiveSession, result: ToolResultComplete): void {
   session.toolResults.push(result);
   session.resultTimestamps.set(result.uuid, Date.now());
 }
 
 /** Surface a server/transport error as a visible card in the session. */
-export function pushErrorMessage(
-  session: ActiveSession,
-  message: string,
-): void {
+export function pushErrorMessage(session: ActiveSession, message: string): void {
   const text = `[Error] ${message}`;
   const errorResult: ToolResultComplete = {
     uuid: uuidv4(),
@@ -43,10 +37,7 @@ export function beginUserTurn(session: ActiveSession, message: string): void {
 
 /** Append text to the last assistant text-response if one exists.
  *  Returns true if appended, false if a new card is needed. */
-export function appendToLastAssistantText(
-  session: ActiveSession,
-  text: string,
-): boolean {
+export function appendToLastAssistantText(session: ActiveSession, text: string): boolean {
   const last = session.toolResults[session.toolResults.length - 1];
   const lastData = last?.data as { role?: string; text?: string } | undefined;
   if (last?.toolName !== "text-response" || lastData?.role !== "assistant") {
@@ -62,22 +53,14 @@ export function appendToLastAssistantText(
 function isDuplicateUserText(session: ActiveSession, message: string): boolean {
   const last = session.toolResults[session.toolResults.length - 1];
   const lastData = last?.data as { role?: string; text?: string } | undefined;
-  return (
-    last?.toolName === "text-response" &&
-    lastData?.role === "user" &&
-    lastData?.text === message
-  );
+  return last?.toolName === "text-response" && lastData?.role === "user" && lastData?.text === message;
 }
 
 /** Handle an incoming text event (user or assistant) from the
  *  agent's SSE/pubsub stream. Deduplicates user messages,
  *  streams assistant text into the last card, and selects the
  *  result when appropriate. */
-export function applyTextEvent(
-  session: ActiveSession,
-  message: string,
-  source: "user" | "assistant",
-): void {
+export function applyTextEvent(session: ActiveSession, message: string, source: "user" | "assistant"): void {
   if (source === "user") {
     if (!isDuplicateUserText(session, message)) {
       pushResult(session, makeTextResult(message, "user"));
@@ -95,13 +78,8 @@ export function applyTextEvent(
 
 /** In-place update a result that was re-emitted by a plugin view
  *  (e.g. after the user edits a chart config). */
-export function updateResult(
-  session: ActiveSession,
-  updatedResult: ToolResultComplete,
-): void {
-  const index = session.toolResults.findIndex(
-    (r) => r.uuid === updatedResult.uuid,
-  );
+export function updateResult(session: ActiveSession, updatedResult: ToolResultComplete): void {
+  const index = session.toolResults.findIndex((r) => r.uuid === updatedResult.uuid);
   if (index !== -1) {
     Object.assign(session.toolResults[index], updatedResult);
   }
@@ -110,10 +88,7 @@ export function updateResult(
 /** Handle an incoming tool_result event: upsert into the session's
  *  result list. Selects the result only on insert; in-place updates
  *  preserve the user's current selection. */
-export function applyToolResultToSession(
-  session: ActiveSession,
-  result: ToolResultComplete,
-): void {
+export function applyToolResultToSession(session: ActiveSession, result: ToolResultComplete): void {
   const idx = session.toolResults.findIndex((r) => r.uuid === result.uuid);
   if (idx >= 0) {
     session.toolResults[idx] = result;

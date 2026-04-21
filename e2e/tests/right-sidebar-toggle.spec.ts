@@ -11,9 +11,7 @@ test.describe("right sidebar toggle (useRightSidebar)", () => {
     await mockAllApis(page);
   });
 
-  test("clicking the header button shows/hides the sidebar", async ({
-    page,
-  }) => {
+  test("clicking the header button shows/hides the sidebar", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -36,20 +34,14 @@ test.describe("right sidebar toggle (useRightSidebar)", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     await page.getByTitle("Tool call history").click();
-    await expect(
-      page.getByRole("heading", { name: "Tool Call History" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tool Call History" })).toBeVisible();
 
-    const stored = await page.evaluate(() =>
-      localStorage.getItem("right_sidebar_visible"),
-    );
+    const stored = await page.evaluate(() => localStorage.getItem("right_sidebar_visible"));
     expect(stored).toBe("true");
 
     // Close → stored becomes "false".
     await page.getByTitle("Tool call history").click();
-    const stored2 = await page.evaluate(() =>
-      localStorage.getItem("right_sidebar_visible"),
-    );
+    const stored2 = await page.evaluate(() => localStorage.getItem("right_sidebar_visible"));
     expect(stored2).toBe("false");
   });
 });

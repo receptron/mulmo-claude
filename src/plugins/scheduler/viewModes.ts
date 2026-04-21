@@ -6,8 +6,7 @@ export const SCHEDULER_VIEW = {
   month: "month",
 } as const;
 
-export type SchedulerViewMode =
-  (typeof SCHEDULER_VIEW)[keyof typeof SCHEDULER_VIEW];
+export type SchedulerViewMode = (typeof SCHEDULER_VIEW)[keyof typeof SCHEDULER_VIEW];
 
 export const SCHEDULER_VIEW_MODES: {
   key: SchedulerViewMode;

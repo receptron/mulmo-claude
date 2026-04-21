@@ -23,8 +23,7 @@ const fvHandler: FunctionHandler = (args, context) => {
   const nper = toNumber(context.evaluateFormula(args[1]));
   const pmt = toNumber(context.evaluateFormula(args[2]));
   const pv = args.length >= 4 ? toNumber(context.evaluateFormula(args[3])) : 0;
-  const type =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const type = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
 
   if (rate === 0) {
     return -(pv + pmt * nper);
@@ -50,16 +49,14 @@ const pvHandler: FunctionHandler = (args, context) => {
   const nper = toNumber(context.evaluateFormula(args[1]));
   const pmt = toNumber(context.evaluateFormula(args[2]));
   const fv = args.length >= 4 ? toNumber(context.evaluateFormula(args[3])) : 0;
-  const type =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const type = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
 
   if (rate === 0) {
     return -(fv + pmt * nper);
   }
 
   const pvFactor = Math.pow(1 + rate, nper);
-  const pv =
-    (-fv - (pmt * (pvFactor - 1) * (1 + rate * type)) / rate) / pvFactor;
+  const pv = (-fv - (pmt * (pvFactor - 1) * (1 + rate * type)) / rate) / pvFactor;
 
   return pv;
 };
@@ -78,16 +75,14 @@ const pmtHandler: FunctionHandler = (args, context) => {
   const nper = toNumber(context.evaluateFormula(args[1]));
   const pv = toNumber(context.evaluateFormula(args[2]));
   const fv = args.length >= 4 ? toNumber(context.evaluateFormula(args[3])) : 0;
-  const type =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const type = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
 
   if (rate === 0) {
     return -(fv + pv) / nper;
   }
 
   const pvFactor = Math.pow(1 + rate, nper);
-  const pmt =
-    (-rate * (fv + pv * pvFactor)) / ((pvFactor - 1) * (1 + rate * type));
+  const pmt = (-rate * (fv + pv * pvFactor)) / ((pvFactor - 1) * (1 + rate * type));
 
   return pmt;
 };
@@ -106,17 +101,14 @@ const nperHandler: FunctionHandler = (args, context) => {
   const pmt = toNumber(context.evaluateFormula(args[1]));
   const pv = toNumber(context.evaluateFormula(args[2]));
   const fv = args.length >= 4 ? toNumber(context.evaluateFormula(args[3])) : 0;
-  const type =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const type = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
 
   if (rate === 0) {
     return -(fv + pv) / pmt;
   }
 
   const pmtWithType = pmt * (1 + rate * type);
-  const nper =
-    Math.log((pmtWithType - fv * rate) / (pmtWithType + pv * rate)) /
-    Math.log(1 + rate);
+  const nper = Math.log((pmtWithType - fv * rate) / (pmtWithType + pv * rate)) / Math.log(1 + rate);
 
   return nper;
 };
@@ -136,10 +128,8 @@ const rateHandler: FunctionHandler = (args, context) => {
   const pmt = toNumber(context.evaluateFormula(args[1]));
   const pv = toNumber(context.evaluateFormula(args[2]));
   const fv = args.length >= 4 ? toNumber(context.evaluateFormula(args[3])) : 0;
-  const type =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
-  const guess =
-    args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 0.1;
+  const type = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const guess = args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 0.1;
 
   // Use Newton-Raphson method to find rate
   let rate = guess;
@@ -156,11 +146,7 @@ const rateHandler: FunctionHandler = (args, context) => {
 
     const df =
       nper * pv * Math.pow(1 + rate, nper - 1) +
-      (pmt *
-        (1 + rate * type) *
-        (nper * Math.pow(1 + rate, nper - 1) * rate -
-          (Math.pow(1 + rate, nper) - 1))) /
-        (rate * rate) +
+      (pmt * (1 + rate * type) * (nper * Math.pow(1 + rate, nper - 1) * rate - (Math.pow(1 + rate, nper) - 1))) / (rate * rate) +
       pmt * type * ((Math.pow(1 + rate, nper) - 1) / rate);
 
     const newRate = rate - f / df;
@@ -187,36 +173,17 @@ const ipmtHandler: FunctionHandler = (args, context) => {
 
   const rate = toNumber(context.evaluateFormula(args[0]));
   const per = toNumber(context.evaluateFormula(args[1]));
-  const type =
-    args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 0;
+  const type = args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 0;
 
   // Calculate payment first
-  const pmt = pmtHandler(
-    [
-      args[0],
-      args[2],
-      args[3],
-      ...(args.length >= 5 ? [args[4]] : []),
-      ...(args.length >= 6 ? [args[5]] : []),
-    ],
-    context,
-  );
+  const pmt = pmtHandler([args[0], args[2], args[3], ...(args.length >= 5 ? [args[4]] : []), ...(args.length >= 6 ? [args[5]] : [])], context);
 
   if (per === 1 && type === 1) {
     return 0; // No interest in first period when payment is at beginning
   }
 
   // Calculate remaining balance at previous period
-  const fvPrevious = fvHandler(
-    [
-      args[0],
-      String(type === 1 ? per - 2 : per - 1),
-      String(pmt),
-      args[3],
-      ...(args.length >= 6 ? [args[5]] : []),
-    ],
-    context,
-  );
+  const fvPrevious = fvHandler([args[0], String(type === 1 ? per - 2 : per - 1), String(pmt), args[3], ...(args.length >= 6 ? [args[5]] : [])], context);
 
   const ipmt = -fvPrevious * rate;
 
@@ -234,16 +201,7 @@ const ppmtHandler: FunctionHandler = (args, context) => {
   }
 
   // Calculate total payment
-  const pmt = pmtHandler(
-    [
-      args[0],
-      args[2],
-      args[3],
-      ...(args.length >= 5 ? [args[4]] : []),
-      ...(args.length >= 6 ? [args[5]] : []),
-    ],
-    context,
-  );
+  const pmt = pmtHandler([args[0], args[2], args[3], ...(args.length >= 5 ? [args[4]] : []), ...(args.length >= 6 ? [args[5]] : [])], context);
 
   // Calculate interest payment
   const ipmt = ipmtHandler(args, context);
@@ -297,8 +255,7 @@ const irrHandler: FunctionHandler = (args, context) => {
   }
 
   const values = context.getRangeValues(args[0]).map(toNumber);
-  const guess =
-    args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 0.1;
+  const guess = args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 0.1;
 
   if (values.length === 0) {
     throw new Error("IRR requires at least one value");
@@ -345,8 +302,7 @@ functionRegistry.register({
   handler: fvHandler,
   minArgs: 3,
   maxArgs: 5,
-  description:
-    "Calculates the future value of an investment based on periodic, constant payments and a constant interest rate",
+  description: "Calculates the future value of an investment based on periodic, constant payments and a constant interest rate",
   examples: ["FV(0.06/12, 12, -100, -1000, 1)", "FV(A1, A2, A3)"],
   category: "Financial",
 });
@@ -356,8 +312,7 @@ functionRegistry.register({
   handler: pvHandler,
   minArgs: 3,
   maxArgs: 5,
-  description:
-    "Calculates the present value of an investment based on periodic, constant payments and a constant interest rate",
+  description: "Calculates the present value of an investment based on periodic, constant payments and a constant interest rate",
   examples: ["PV(0.08/12, 12*20, 500, 0, 0)", "PV(A1, A2, A3)"],
   category: "Financial",
 });
@@ -367,8 +322,7 @@ functionRegistry.register({
   handler: pmtHandler,
   minArgs: 3,
   maxArgs: 5,
-  description:
-    "Calculates the payment for a loan based on constant payments and a constant interest rate",
+  description: "Calculates the payment for a loan based on constant payments and a constant interest rate",
   examples: ["PMT(0.06/12, 30*12, 250000)", "PMT(A1, A2, A3)"],
   category: "Financial",
 });
@@ -378,8 +332,7 @@ functionRegistry.register({
   handler: nperHandler,
   minArgs: 3,
   maxArgs: 5,
-  description:
-    "Calculates the number of periods for an investment based on periodic, constant payments and a constant interest rate",
+  description: "Calculates the number of periods for an investment based on periodic, constant payments and a constant interest rate",
   examples: ["NPER(0.06/12, -1000, 50000, 0, 0)", "NPER(A1, A2, A3)"],
   category: "Financial",
 });
@@ -389,8 +342,7 @@ functionRegistry.register({
   handler: rateHandler,
   minArgs: 3,
   maxArgs: 6,
-  description:
-    "Calculates the interest rate per period of an annuity using iteration",
+  description: "Calculates the interest rate per period of an annuity using iteration",
   examples: ["RATE(12, -100, 1000, 0, 0, 0.1)", "RATE(A1, A2, A3)"],
   category: "Financial",
 });
@@ -400,8 +352,7 @@ functionRegistry.register({
   handler: ipmtHandler,
   minArgs: 4,
   maxArgs: 6,
-  description:
-    "Calculates the interest payment for a given period for an investment",
+  description: "Calculates the interest payment for a given period for an investment",
   examples: ["IPMT(0.06/12, 1, 30*12, 250000)", "IPMT(A1, A2, A3, A4)"],
   category: "Financial",
 });
@@ -411,8 +362,7 @@ functionRegistry.register({
   handler: ppmtHandler,
   minArgs: 4,
   maxArgs: 6,
-  description:
-    "Calculates the payment on the principal for a given period for an investment",
+  description: "Calculates the payment on the principal for a given period for an investment",
   examples: ["PPMT(0.06/12, 1, 30*12, 250000)", "PPMT(A1, A2, A3, A4)"],
   category: "Financial",
 });
@@ -421,8 +371,7 @@ functionRegistry.register({
   name: "NPV",
   handler: npvHandler,
   minArgs: 2,
-  description:
-    "Calculates the net present value of an investment based on a discount rate and a series of future cash flows",
+  description: "Calculates the net present value of an investment based on a discount rate and a series of future cash flows",
   examples: ["NPV(0.1, -10000, 3000, 4200, 6800)", "NPV(A1, B1:B10)"],
   category: "Financial",
 });
@@ -432,8 +381,7 @@ functionRegistry.register({
   handler: irrHandler,
   minArgs: 1,
   maxArgs: 2,
-  description:
-    "Calculates the internal rate of return for a series of cash flows",
+  description: "Calculates the internal rate of return for a series of cash flows",
   examples: ["IRR(A1:A5, 0.1)", "IRR(B1:B10)"],
   category: "Financial",
 });

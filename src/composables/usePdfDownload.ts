@@ -23,10 +23,7 @@ export function usePdfDownload(): UsePdfDownloadHandle {
   const pdfDownloading = ref(false);
   const pdfError = ref<string | null>(null);
 
-  async function downloadPdf(
-    markdown: string,
-    filename: string,
-  ): Promise<void> {
+  async function downloadPdf(markdown: string, filename: string): Promise<void> {
     pdfError.value = null;
     pdfDownloading.value = true;
     let url: string | null = null;

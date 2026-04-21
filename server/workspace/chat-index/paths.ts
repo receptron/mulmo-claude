@@ -17,24 +17,15 @@ export function indexDirFor(workspaceRoot: string): string {
   return path.join(chatDirFor(workspaceRoot), INDEX_DIR);
 }
 
-export function sessionJsonlPathFor(
-  workspaceRoot: string,
-  sessionId: string,
-): string {
+export function sessionJsonlPathFor(workspaceRoot: string, sessionId: string): string {
   return path.join(chatDirFor(workspaceRoot), `${sessionId}.jsonl`);
 }
 
-export function sessionMetaPathFor(
-  workspaceRoot: string,
-  sessionId: string,
-): string {
+export function sessionMetaPathFor(workspaceRoot: string, sessionId: string): string {
   return path.join(chatDirFor(workspaceRoot), `${sessionId}.json`);
 }
 
-export function indexEntryPathFor(
-  workspaceRoot: string,
-  sessionId: string,
-): string {
+export function indexEntryPathFor(workspaceRoot: string, sessionId: string): string {
   return path.join(indexDirFor(workspaceRoot), `${sessionId}.json`);
 }
 

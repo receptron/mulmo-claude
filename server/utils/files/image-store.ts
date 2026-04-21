@@ -24,10 +24,7 @@ async function safeResolve(relativePath: string): Promise<string> {
   const root = await ensureImagesDir();
   // Strip the leading "images/" prefix so the caller can pass either
   // "images/abc.png" (the stored form) or just "abc.png".
-  const name = relativePath.replace(
-    new RegExp(`^${WORKSPACE_DIRS.images}/`),
-    "",
-  );
+  const name = relativePath.replace(new RegExp(`^${WORKSPACE_DIRS.images}/`), "");
   const result = resolveWithinRoot(root, name);
   if (!result) {
     throw new Error(`path traversal rejected: ${relativePath}`);
@@ -46,10 +43,7 @@ export async function saveImage(base64Data: string): Promise<string> {
 }
 
 /** Overwrite an existing image file. The relativePath must start with "images/". */
-export async function overwriteImage(
-  relativePath: string,
-  base64Data: string,
-): Promise<void> {
+export async function overwriteImage(relativePath: string, base64Data: string): Promise<void> {
   const absPath = await safeResolve(relativePath);
   await fs.writeFile(absPath, Buffer.from(base64Data, "base64"));
 }
@@ -68,7 +62,5 @@ export function stripDataUri(dataUri: string): string {
 
 /** Check if a string is a file reference (not a data URI). */
 export function isImagePath(value: string): boolean {
-  return (
-    value.startsWith(`${WORKSPACE_DIRS.images}/`) && value.endsWith(".png")
-  );
+  return value.startsWith(`${WORKSPACE_DIRS.images}/`) && value.endsWith(".png");
 }

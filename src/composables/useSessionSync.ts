@@ -42,9 +42,7 @@ export function useSessionSync(opts: {
   }
 
   async function markSessionRead(id: string): Promise<void> {
-    const result = await apiPost<{ ok: boolean }>(
-      API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)),
-    );
+    const result = await apiPost<{ ok: boolean }>(API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)));
     if (!result.ok || result.data.ok === false) {
       await refreshSessionStates();
     }

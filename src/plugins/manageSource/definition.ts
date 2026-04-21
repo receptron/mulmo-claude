@@ -23,8 +23,7 @@ const toolDefinition: ToolDefinition = {
       },
       title: {
         type: "string",
-        description:
-          "Human-friendly source name. Required for action='register'.",
+        description: "Human-friendly source name. Required for action='register'.",
       },
       url: {
         type: "string",
@@ -45,14 +44,12 @@ const toolDefinition: ToolDefinition = {
       schedule: {
         type: "string",
         enum: ["daily", "weekly", "manual"],
-        description:
-          "How often the pipeline should fetch this source. Default 'daily'.",
+        description: "How often the pipeline should fetch this source. Default 'daily'.",
       },
       categories: {
         type: "array",
         items: { type: "string" },
-        description:
-          "Optional category override. When omitted the auto-classifier picks from the 25-slug taxonomy.",
+        description: "Optional category override. When omitted the auto-classifier picks from the 25-slug taxonomy.",
       },
       notes: {
         type: "string",
