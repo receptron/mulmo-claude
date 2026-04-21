@@ -72,11 +72,15 @@ function validateSaveInput(input: ManageRolesInput): { role: NonNullable<ManageR
   if (!role) return "role definition required for create/update";
   if (!role.id) return "role.id is required";
 
-  const isRename = Boolean(oldRoleId && oldRoleId !== role.id);
+  // Rename is strictly an update-with-different-id. Gating on
+  // action === "update" means a malformed create payload that
+  // happens to include `oldRoleId` cannot silently delete an
+  // unrelated file via the rename cleanup below.
+  const isRename = Boolean(action === "update" && oldRoleId && oldRoleId !== role.id);
   if (BUILTIN_IDS.has(role.id) && (action === "create" || isRename)) {
     return `ID '${role.id}' is reserved for a built-in role.`;
   }
-  if (isRename && roleExists(role.id)) {
+  if ((action === "create" || isRename) && roleExists(role.id)) {
     return `A role with ID '${role.id}' already exists.`;
   }
   return { role, isRename };

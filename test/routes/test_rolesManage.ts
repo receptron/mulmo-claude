@@ -127,6 +127,47 @@ describe("executeManageRoles — rename (oldRoleId)", () => {
     rolesIo.deleteRole("general_custom");
   });
 
+  it("ignores oldRoleId on a create payload (never runs rename cleanup)", async () => {
+    // Defensive: a malformed create payload that includes oldRoleId
+    // must not trigger the rename-delete path. Rename detection is
+    // gated on action === "update".
+    rolesIo.saveRole("victim", sampleRole("victim"));
+    const result = await rolesRoute.executeManageRoles(
+      {
+        action: "create",
+        role: sampleRole("fresh"),
+        oldRoleId: "victim",
+      },
+      "test-session",
+    );
+    assert.equal(result.success, true, `result: ${JSON.stringify(result)}`);
+    assert.equal(rolesIo.roleExists("fresh"), true, "'fresh' should have been created");
+    assert.equal(rolesIo.roleExists("victim"), true, "'victim' must not be deleted by a create payload");
+    rolesIo.deleteRole("fresh");
+    rolesIo.deleteRole("victim");
+  });
+
+  it("rejects a create whose id collides with an existing custom role", async () => {
+    // Defensive: a direct-API or stale-client `create` must not
+    // silently overwrite an existing custom role. The client-side
+    // validator catches this for the UI path, but the server is the
+    // last line of defence.
+    rolesIo.saveRole("target", { ...sampleRole("target"), name: "Original" });
+    const result = await rolesRoute.executeManageRoles(
+      {
+        action: "create",
+        role: { ...sampleRole("target"), name: "Overwriter" },
+      },
+      "test-session",
+    );
+    assert.equal(result.success, false);
+    assert.match(String(result.error), /already exists/i);
+    // Original content must be intact
+    const onDisk = JSON.parse(fs.readFileSync(path.join(rolesDir, "target.json"), "utf-8")) as { name: string };
+    assert.equal(onDisk.name, "Original", "existing role must not be overwritten");
+    rolesIo.deleteRole("target");
+  });
+
   it("plain update (no oldRoleId) still works and does not delete anything", async () => {
     rolesIo.saveRole("plain", sampleRole("plain"));
     const result = await rolesRoute.executeManageRoles(
