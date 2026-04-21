@@ -1,5 +1,6 @@
 <template>
   <div class="flex items-center gap-2">
+    <img :src="logoUrl" alt="" class="h-[50px] w-auto -my-3.5 -ml-3 rounded object-contain shrink-0" />
     <h1 data-testid="app-title" class="text-sm font-semibold text-gray-800 mr-1" :style="titleStyle">MulmoClaude</h1>
     <div class="flex gap-2">
       <LockStatusPopup
@@ -31,6 +32,7 @@ import LockStatusPopup from "./LockStatusPopup.vue";
 import NotificationBell from "./NotificationBell.vue";
 import { useClickOutside } from "../composables/useClickOutside";
 import type { NotificationPayload } from "../types/notification";
+import logoUrl from "../assets/mulmo_bw.png";
 
 defineProps<{
   sandboxEnabled: boolean;
