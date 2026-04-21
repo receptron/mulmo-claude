@@ -1,4 +1,5 @@
 import { errorMessage } from "../../utils/errors.js";
+import { safeResponseText } from "../../utils/http.js";
 import { env } from "../../system/env.js";
 
 const X_API_BASE = "https://api.twitter.com/2";
@@ -52,8 +53,8 @@ async function fetchX(path: string): Promise<XApiResponse> {
       "X API error 429: Rate limit exceeded. Please wait before retrying.",
     );
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`X API error ${response.status}: ${text}`);
+    const body = await safeResponseText(response);
+    throw new Error(`X API error ${response.status}: ${body}`);
   }
 
   return response.json() as Promise<XApiResponse>;

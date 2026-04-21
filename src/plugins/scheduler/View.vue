@@ -15,34 +15,34 @@
       <button
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
         :class="
-          activeTab === 'calendar'
+          activeTab === SCHEDULER_TAB.calendar
             ? 'border-blue-500 text-blue-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
         "
         data-testid="scheduler-tab-calendar"
-        @click="activeTab = 'calendar'"
+        @click="activeTab = SCHEDULER_TAB.calendar"
       >
         Calendar
       </button>
       <button
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
         :class="
-          activeTab === 'tasks'
+          activeTab === SCHEDULER_TAB.tasks
             ? 'border-blue-500 text-blue-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
         "
         data-testid="scheduler-tab-tasks"
-        @click="activeTab = 'tasks'"
+        @click="activeTab = SCHEDULER_TAB.tasks"
       >
         Tasks
       </button>
     </div>
 
     <!-- Tasks tab -->
-    <TasksTab v-if="activeTab === 'tasks'" />
+    <TasksTab v-if="activeTab === SCHEDULER_TAB.tasks" />
 
     <!-- Calendar tab (existing content) -->
-    <template v-if="activeTab === 'calendar'">
+    <template v-if="activeTab === SCHEDULER_TAB.calendar">
       <!-- Header -->
       <div
         class="flex items-center justify-between px-6 py-3 border-b border-gray-100"
@@ -55,7 +55,7 @@
         </div>
         <div class="flex items-center gap-2">
           <!-- Navigation (calendar modes only) -->
-          <template v-if="viewMode !== 'list'">
+          <template v-if="viewMode !== SCHEDULER_VIEW.list">
             <button
               class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
               title="Previous"
@@ -104,7 +104,10 @@
       </div>
 
       <!-- List view -->
-      <div v-if="viewMode === 'list'" class="flex-1 overflow-y-auto min-h-0">
+      <div
+        v-if="viewMode === SCHEDULER_VIEW.list"
+        class="flex-1 overflow-y-auto min-h-0"
+      >
         <div
           v-if="items.length === 0"
           class="flex items-center justify-center h-full text-gray-400"
@@ -155,7 +158,7 @@
 
       <!-- Week view -->
       <div
-        v-else-if="viewMode === 'week'"
+        v-else-if="viewMode === SCHEDULER_VIEW.week"
         class="flex-1 overflow-y-auto min-h-0"
       >
         <div class="grid grid-cols-7 border-b border-gray-200">
@@ -388,6 +391,7 @@ import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import TasksTab from "./TasksTab.vue";
+import { isToday } from "../../utils/format/date";
 
 type YamlScalar = string | number | boolean | null;
 
@@ -398,7 +402,7 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 
 function detectInitialTab(
   result?: ToolResultComplete<SchedulerData>,
-): "calendar" | "tasks" {
+): SchedulerTab {
   const data = result?.data as Record<string, unknown> | undefined;
   if (
     data &&
@@ -407,14 +411,12 @@ function detectInitialTab(
       "triggered" in data ||
       "deleted" in data)
   ) {
-    return "tasks";
+    return SCHEDULER_TAB.tasks;
   }
-  return "calendar";
+  return SCHEDULER_TAB.calendar;
 }
 
-const activeTab = ref<"calendar" | "tasks">(
-  detectInitialTab(props.selectedResult),
-);
+const activeTab = ref<SchedulerTab>(detectInitialTab(props.selectedResult));
 const items = ref<ScheduledItem[]>(props.selectedResult?.data?.items ?? []);
 
 const { refresh } = useFreshPluginData<ScheduledItem[]>({
@@ -439,18 +441,18 @@ watch(
 
 // ── View mode ──────────────────────────────────────────────────────────────
 
-type ViewMode = "list" | "week" | "month";
-
-const VIEW_MODES: { key: ViewMode; label: string; icon: string }[] = [
-  { key: "month", label: "Month", icon: "calendar_month" },
-  { key: "week", label: "Week", icon: "view_week" },
-  { key: "list", label: "List", icon: "view_list" },
-];
+import {
+  SCHEDULER_VIEW,
+  SCHEDULER_VIEW_MODES as VIEW_MODES,
+  SCHEDULER_TAB,
+  type SchedulerViewMode as ViewMode,
+  type SchedulerTab,
+} from "./viewModes";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_MONTH_ITEMS = 3;
 
-const viewMode = ref<ViewMode>("month");
+const viewMode = ref<ViewMode>(SCHEDULER_VIEW.month);
 const currentDate = ref(new Date());
 
 // ── Calendar utilities ─────────────────────────────────────────────────────
@@ -488,19 +490,6 @@ function getMonthGrid(year: number, month: number): Date[][] {
     weeks.push(week);
   }
   return weeks;
-}
-
-function isToday(date: Date): boolean {
-  const today = new Date();
-  return isSameDay(date, today);
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 function isCurrentMonth(date: Date): boolean {

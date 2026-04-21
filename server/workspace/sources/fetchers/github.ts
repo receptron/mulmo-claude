@@ -11,6 +11,7 @@
 
 import type { HttpFetcherDeps } from "../httpFetcher.js";
 import { fetchPolite } from "../httpFetcher.js";
+import { hasStringProp } from "../../../utils/types.js";
 
 // GitHub REST API base. Factored out so tests / local dev can
 // point at a stub server by patching this module — rare enough
@@ -90,13 +91,8 @@ export async function githubFetchJson(
     let apiMessage: string | null = null;
     try {
       const bodyJson: unknown = await res.json();
-      if (
-        typeof bodyJson === "object" &&
-        bodyJson !== null &&
-        "message" in bodyJson &&
-        typeof (bodyJson as { message: unknown }).message === "string"
-      ) {
-        apiMessage = (bodyJson as { message: string }).message;
+      if (hasStringProp(bodyJson, "message")) {
+        apiMessage = bodyJson.message;
       }
     } catch {
       // Ignore — just means the body wasn't JSON.

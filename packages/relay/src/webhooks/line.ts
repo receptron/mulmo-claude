@@ -1,5 +1,6 @@
 // LINE platform plugin.
 
+import { chunkText } from "@mulmobridge/client";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import {
   registerPlatform,
@@ -45,16 +46,6 @@ async function verifyLineSignature(
     result |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   }
   return result === 0;
-}
-
-// ── Message chunking ────────────────────────────────────────────
-
-function chunkText(text: string): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += MAX_LINE_TEXT) {
-    chunks.push(text.slice(i, i + MAX_LINE_TEXT));
-  }
-  return chunks.slice(0, MAX_LINE_MESSAGES_PER_REQUEST);
 }
 
 // ── Plugin implementation ───────────────────────────────────────
@@ -121,7 +112,9 @@ const linePlugin: PlatformPlugin = {
       throw new Error("LINE_CHANNEL_ACCESS_TOKEN not configured");
     }
 
-    const messages = chunkText(text).map((t) => ({ type: "text", text: t }));
+    const messages = chunkText(text, MAX_LINE_TEXT)
+      .slice(0, MAX_LINE_MESSAGES_PER_REQUEST)
+      .map((t) => ({ type: "text", text: t }));
     const url = replyToken
       ? "https://api.line.me/v2/bot/message/reply"
       : "https://api.line.me/v2/bot/message/push";

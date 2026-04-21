@@ -60,6 +60,14 @@ export type OnSessionEventFn = (
   listener: SessionEventListener,
 ) => () => void;
 
+/** Summary of a chat session — returned by listSessions. */
+export interface SessionSummary {
+  id: string;
+  roleId: string;
+  preview: string;
+  updatedAt: string;
+}
+
 export interface ChatServiceDeps {
   /** Relay a user turn into the agent loop. */
   startChat: StartChatFn;
@@ -81,4 +89,24 @@ export interface ChatServiceDeps {
    * `attachChatSocket` in ./socket.ts.
    */
   tokenProvider?: () => string | null;
+  /**
+   * List recent sessions from the server. Used by /sessions command.
+   * Omit if session listing is not available (command will reply
+   * "not available").
+   */
+  listSessions?: (opts: {
+    limit: number;
+    offset: number;
+  }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+  /**
+   * Get recent messages from a session. Used by /history command.
+   * Returns newest-first array of {source, text} pairs.
+   */
+  getSessionHistory?: (
+    sessionId: string,
+    opts: { limit: number; offset: number },
+  ) => Promise<{
+    messages: Array<{ source: string; text: string }>;
+    total: number;
+  }>;
 }

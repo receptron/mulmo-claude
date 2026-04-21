@@ -8,6 +8,7 @@ import { log } from "../../system/logger/index.js";
 import { WEB_SEARCH_TOOL_NAME, classifyToolResult } from "./classify.js";
 import { writeSearchResult } from "./writeSearch.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
 export interface ToolCallEvent {
   type: typeof EVENT_TYPES.toolCall;
@@ -117,10 +118,10 @@ function logToolCall(event: ToolCallEvent): void {
 }
 
 function extractUrl(args: unknown): string | null {
-  if (!args || typeof args !== "object") return null;
-  const record = args as Record<string, unknown>;
+  if (!isRecord(args)) return null;
+  const record = args;
   const raw = record.url;
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  return isNonEmptyString(raw) ? raw : null;
 }
 
 // Emit progress on the result side. For WebSearch we specifically
@@ -250,8 +251,8 @@ async function maybeWriteSearch(
 }
 
 function extractQuery(args: unknown): string | null {
-  if (!args || typeof args !== "object") return null;
-  const record = args as Record<string, unknown>;
+  if (!isRecord(args)) return null;
+  const record = args;
   const raw = record.query;
   if (typeof raw !== "string" || raw.length === 0) return null;
   return raw;

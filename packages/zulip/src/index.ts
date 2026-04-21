@@ -9,7 +9,7 @@
 //   ZULIP_API_KEY   — Bot API key
 
 import "dotenv/config";
-import { createBridgeClient } from "@mulmobridge/client";
+import { createBridgeClient, chunkText } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "zulip";
 const POLL_TIMEOUT_SEC = 30;
@@ -83,7 +83,7 @@ async function zulipGet(
 async function sendMessage(chatId: string, text: string): Promise<void> {
   // chatId format: "stream:<id>" or "private:<user_id>"
   const MAX = 10000; // Zulip's limit
-  const chunks = text.length === 0 ? ["(empty reply)"] : chunkText(text, MAX);
+  const chunks = chunkText(text, MAX);
 
   for (const chunk of chunks) {
     try {
@@ -106,14 +106,6 @@ async function sendMessage(chatId: string, text: string): Promise<void> {
       console.error(`[zulip] sendMessage error: ${err}`);
     }
   }
-}
-
-function chunkText(text: string, max: number): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += max) {
-    chunks.push(text.slice(i, i + max));
-  }
-  return chunks;
 }
 
 // ── Event polling ───────────────────────────────────────────────

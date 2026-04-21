@@ -1,429 +1,219 @@
 <template>
-  <div class="flex fixed inset-0 bg-gray-900 text-white">
-    <!-- Sidebar -->
-    <div
-      class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
-    >
-      <div
-        ref="headerRef"
-        class="p-4 border-b border-gray-200 flex items-center justify-between"
-      >
-        <div>
-          <h1
-            data-testid="app-title"
-            class="text-lg font-semibold"
-            :style="debugTitleStyle"
-          >
-            MulmoClaude
-          </h1>
-        </div>
-        <div class="flex gap-2">
-          <button
-            ref="historyButtonRef"
-            data-testid="history-btn"
-            class="relative text-gray-400 hover:text-gray-700"
-            :class="{ 'text-blue-500': showHistory }"
-            title="Session history"
-            @click="toggleHistory"
-          >
-            <span class="material-icons">history</span>
-            <!-- Active sessions badge (yellow, left) -->
-            <span
-              v-if="activeSessionCount > 0"
-              class="absolute -top-1.5 -left-1.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
-              >{{ activeSessionCount }}</span
-            >
-            <!-- Unread replies badge (red, right) -->
-            <span
-              v-if="unreadCount > 0"
-              class="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-              :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
-              >{{ unreadCount }}</span
-            >
-          </button>
-          <LockStatusPopup
-            ref="lockPopupRef"
-            :sandbox-enabled="sandboxEnabled"
-            :open="showLockPopup"
-            @update:open="showLockPopup = $event"
-            @test-query="sendMessage"
-          />
-          <NotificationBell
-            :force-close="showLockPopup"
-            @navigate="handleNotificationNavigate"
-            @update:open="onNotificationOpen"
-          />
-          <button
-            class="text-gray-400 hover:text-gray-700"
-            :class="{ 'text-blue-500': showRightSidebar }"
-            title="Tool call history"
-            @click="toggleRightSidebar"
-          >
-            <span class="material-icons">build</span>
-          </button>
-          <button
-            class="text-gray-400 hover:text-gray-700"
-            data-testid="settings-btn"
-            title="Settings"
-            aria-label="Settings"
-            @click="showSettings = true"
-          >
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
-      <!-- History popup -->
-      <SessionHistoryPanel
-        v-if="showHistory"
-        ref="historyPanelRef"
-        :sessions="mergedSessions"
-        :current-session-id="currentSessionId"
-        :roles="roles"
-        :top-offset="headerRef?.offsetHeight"
-        :error-message="historyError"
-        @load-session="loadSession"
-      />
-
-      <!-- Role selector -->
-      <div
-        class="p-4 border-b border-gray-200 flex items-center gap-2 relative"
-      >
-        <span class="text-sm text-gray-500 shrink-0">Role</span>
-        <button
-          ref="roleButtonRef"
-          class="flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 text-left"
-          data-testid="role-selector-btn"
-          @click="showRoleDropdown = !showRoleDropdown"
-        >
-          <span class="material-icons text-base text-gray-500">{{
-            roleIcon(currentRoleId)
-          }}</span>
-          <span class="flex-1 truncate">{{ currentRole.name }}</span>
-          <span class="material-icons text-sm text-gray-400">expand_more</span>
-        </button>
-        <div
-          v-if="showRoleDropdown"
-          ref="roleDropdownRef"
-          class="absolute left-4 right-4 top-full z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-        >
-          <button
-            v-for="role in roles"
-            :key="role.id"
-            :data-testid="`role-option-${role.id}`"
-            class="w-full flex items-center gap-1.5 px-3 py-1 text-sm text-gray-900 hover:bg-gray-50 text-left"
-            @click="
-              currentRoleId = role.id;
-              showRoleDropdown = false;
-              onRoleChange();
-            "
-          >
-            <span class="material-icons text-base text-gray-400">{{
-              roleIcon(role.id)
-            }}</span>
-            {{ role.name }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Session tab bar -->
-      <div class="px-2 py-1 border-b border-gray-200 flex gap-1 items-center">
-        <button
-          class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-          data-testid="new-session-btn"
-          title="New session"
-          aria-label="New session"
-          @click="createNewSession()"
-        >
-          <span class="material-icons text-sm">add</span>
-        </button>
-        <template v-for="i in 6" :key="i">
-          <button
-            v-if="tabSessions[i - 1]"
-            class="flex-1 flex items-center justify-center py-1 rounded transition-colors"
-            :class="
-              tabSessions[i - 1].id === currentSessionId
-                ? 'border border-gray-300 bg-white shadow-sm'
-                : 'hover:bg-gray-100'
-            "
-            :title="
-              tabSessions[i - 1].preview || roleName(tabSessions[i - 1].roleId)
-            "
-            :data-testid="`session-tab-${tabSessions[i - 1].id}`"
-            @click="loadSession(tabSessions[i - 1].id)"
-          >
-            <span
-              class="material-icons text-base"
-              :class="[
-                tabColor(tabSessions[i - 1]),
-                tabSessions[i - 1].isRunning
-                  ? 'animate-spin [animation-duration:3s]'
-                  : '',
-              ]"
-              >{{ roleIcon(tabSessions[i - 1].roleId) }}</span
-            >
-          </button>
-          <div v-else class="flex-1" />
-        </template>
-      </div>
-
-      <!-- Gemini API key warning -->
-      <div
-        v-if="!geminiAvailable && needsGemini(currentRoleId)"
-        class="mx-4 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700"
-      >
-        <span class="material-icons text-xs align-middle mr-1">warning</span>
-        Image generation requires <code class="font-mono">GEMINI_API_KEY</code>.
-        Add it to <code class="font-mono">.env</code> and restart the app.
-      </div>
-
-      <!-- Tool result previews -->
-      <ToolResultsPanel
-        ref="toolResultsPanelRef"
-        :results="sidebarResults"
-        :selected-uuid="selectedResultUuid"
-        :is-running="isRunning"
-        :status-message="statusMessage"
-        :pending-calls="pendingCalls"
-        @select="onSidebarItemClick"
-        @activate="activePane = 'sidebar'"
-      />
-
-      <!-- Sample queries (expandable pane) -->
-      <div v-if="showQueries" class="border-t border-gray-200">
-        <div
-          v-if="queriesExpanded"
-          ref="queriesListRef"
-          class="px-4 pt-2 max-h-64 overflow-y-auto flex flex-col gap-1"
-        >
-          <button
-            v-for="query in currentRole.queries"
-            :key="query"
-            class="text-left text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded px-3 py-1.5 border border-gray-300 transition-colors"
-            @click="onQueryClick($event, query)"
-          >
-            {{ query }}
-          </button>
-          <p class="text-center text-[10px] text-gray-400 py-0.5">
-            click to send · shift+click to edit
-          </p>
-        </div>
-        <button
-          class="w-full flex items-center justify-between px-4 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-          @click="queriesExpanded = !queriesExpanded"
-        >
-          <span class="flex items-center gap-1">
-            <span class="material-icons text-sm">lightbulb</span>
-            Suggestions
-          </span>
-          <span
-            class="material-icons text-sm transition-transform"
-            :class="{ 'rotate-180': !queriesExpanded }"
-            >expand_less</span
-          >
-        </button>
-      </div>
-
-      <!-- Text input -->
-      <div
-        class="p-4 border-t border-gray-200"
-        @dragover.prevent
-        @drop="onDropFile"
-      >
-        <div
-          v-if="fileError"
-          class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5"
-          data-testid="file-error"
-        >
-          {{ fileError }}
-        </div>
-        <ChatAttachmentPreview
-          v-if="pastedFile"
-          :data-url="pastedFile.dataUrl"
-          :filename="pastedFile.name"
-          :mime="pastedFile.mime"
-          @remove="pastedFile = null"
+  <div class="flex flex-col fixed inset-0 bg-gray-900 text-white">
+    <!-- Global top bar — shown in every view mode -->
+    <div ref="topBarRef" class="shrink-0 bg-white text-gray-900">
+      <!-- Row 1: title + plugin launcher -->
+      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-200">
+        <SidebarHeader
+          :sandbox-enabled="sandboxEnabled"
+          :show-right-sidebar="showRightSidebar"
+          :title-style="debugTitleStyle"
+          @test-query="(q) => sendMessage(q)"
+          @notification-navigate="handleNotificationNavigate"
+          @toggle-right-sidebar="toggleRightSidebar"
+          @open-settings="showSettings = true"
         />
-        <div class="flex gap-2" :class="{ 'mt-2': pastedFile }">
-          <textarea
-            ref="textareaRef"
-            v-model="userInput"
-            data-testid="user-input"
-            placeholder="Type a task..."
-            :rows="inputFocused ? 8 : 2"
-            class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-all duration-200"
-            :class="inputFocused ? 'ring-2 ring-blue-300' : ''"
-            :disabled="isRunning"
-            @focus="inputFocused = true"
-            @compositionstart="imeEnter.onCompositionStart"
-            @compositionend="imeEnter.onCompositionEnd"
-            @keydown="imeEnter.onKeydown"
-            @blur="onInputBlur"
-            @paste="onPasteFile"
+        <div class="flex-1 min-w-0">
+          <PluginLauncher
+            :active-tool-name="selectedResult?.toolName ?? null"
+            :active-view-mode="canvasViewMode"
+            @navigate="onPluginNavigate"
           />
-          <div class="flex flex-col gap-1">
-            <button
-              data-testid="send-btn"
-              class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="isRunning"
-              @click="sendMessage()"
-            >
-              <span class="material-icons text-base">send</span>
-            </button>
-            <button
-              data-testid="expand-input-btn"
-              class="text-gray-400 hover:text-gray-600 rounded px-3 py-1 text-sm"
-              title="Expand editor"
-              @click="openExpandedEditor"
-            >
-              <span class="material-icons text-base">open_in_full</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Expanded editor modal -->
-        <div
-          v-if="expandedEditorOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          @click.self="closeExpandedEditor"
-        >
-          <div
-            class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col"
-            style="max-height: 80vh"
-          >
-            <div
-              class="flex items-center justify-between px-4 py-3 border-b border-gray-200"
-            >
-              <h3 class="text-sm font-semibold text-gray-700">
-                Compose message
-              </h3>
-              <button
-                class="text-gray-400 hover:text-gray-600"
-                @click="closeExpandedEditor"
-              >
-                <span class="material-icons text-base">close</span>
-              </button>
-            </div>
-            <textarea
-              ref="expandedTextareaRef"
-              v-model="userInput"
-              data-testid="expanded-input"
-              placeholder="Type a task..."
-              class="flex-1 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none"
-              style="min-height: 300px"
-              @keydown.meta.enter="sendFromExpanded"
-              @keydown.ctrl.enter="sendFromExpanded"
-            ></textarea>
-            <div
-              class="flex items-center justify-between px-4 py-3 border-t border-gray-200"
-            >
-              <p class="text-xs text-gray-400">Cmd+Enter to send</p>
-              <div class="flex gap-2">
-                <button
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-                  @click="closeExpandedEditor"
-                >
-                  Cancel
-                </button>
-                <button
-                  class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
-                  :disabled="isRunning"
-                  data-testid="expanded-send-btn"
-                  @click="sendFromExpanded"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Canvas -->
-    <div
-      class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden"
-    >
-      <div
-        class="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0 gap-2"
-      >
-        <PluginLauncher
-          :active-tool-name="selectedResult?.toolName ?? null"
-          :active-view-mode="canvasViewMode"
-          @navigate="onPluginNavigate"
-        />
+      <!-- Row 2: canvas toggle + role selector + session tabs -->
+      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
         <CanvasViewToggle
           :model-value="canvasViewMode"
           @update:model-value="setCanvasViewMode"
         />
-      </div>
-      <div
-        ref="canvasRef"
-        class="flex-1 overflow-hidden outline-none min-h-0"
-        tabindex="0"
-        @mousedown="activePane = 'main'"
-        @keydown="handleCanvasKeydown"
-      >
-        <!-- Single mode -->
-        <template v-if="canvasViewMode === 'single'">
-          <component
-            :is="getPlugin(selectedResult.toolName)?.viewComponent"
-            v-if="
-              selectedResult &&
-              getPlugin(selectedResult.toolName)?.viewComponent
-            "
-            :selected-result="selectedResult"
-            :send-text-message="sendMessage"
-            @update-result="handleUpdateResult"
-          />
-          <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
-            <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
-              JSON.stringify(selectedResult, null, 2)
-            }}</pre>
-          </div>
-          <div
-            v-else
-            class="flex items-center justify-center h-full text-gray-600"
-          >
-            <p>Start a conversation</p>
-          </div>
-        </template>
-        <!-- Stack mode -->
-        <StackView
-          v-else-if="canvasViewMode === 'stack'"
-          :tool-results="sidebarResults"
-          :selected-result-uuid="selectedResultUuid"
-          :send-text-message="sendMessage"
-          @select="(uuid) => (selectedResultUuid = uuid)"
-          @update-result="handleUpdateResult"
+        <RoleSelector
+          v-model:current-role-id="currentRoleId"
+          :roles="roles"
+          @change="onRoleChange"
         />
-        <!-- Files mode -->
-        <FilesView
-          v-else-if="canvasViewMode === 'files'"
-          :refresh-token="filesRefreshToken"
-          @load-session="onFilesViewLoadSession"
+        <SessionTabBar
+          ref="sessionTabBarRef"
+          :sessions="tabSessions"
+          :current-session-id="displayedCurrentSessionId"
+          :roles="roles"
+          :active-session-count="activeSessionCount"
+          :unread-count="unreadCount"
+          :history-open="showHistory"
+          @new-session="handleNewSessionClick"
+          @load-session="handleSessionSelect"
+          @toggle-history="toggleHistory"
         />
-        <!-- Todos mode -->
-        <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
-        <!-- Scheduler mode -->
-        <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
-        <!-- Wiki mode -->
-        <WikiView v-else-if="canvasViewMode === 'wiki'" />
-        <!-- Skills mode -->
-        <SkillsView v-else-if="canvasViewMode === 'skills'" />
-        <!-- Roles mode -->
-        <RolesView v-else-if="canvasViewMode === 'roles'" />
       </div>
     </div>
-    <!-- Right sidebar: tool call history -->
-    <RightSidebar
-      v-if="showRightSidebar"
-      ref="rightSidebarRef"
-      :tool-call-history="toolCallHistory"
-      :available-tools="availableTools"
-      :role-prompt="currentRole.prompt"
-      :tool-descriptions="toolDescriptions"
+
+    <!-- History popup (all layouts) -->
+    <SessionHistoryPanel
+      v-if="showHistory"
+      ref="historyPanelRef"
+      :sessions="mergedSessions"
+      :current-session-id="currentSessionId"
+      :roles="roles"
+      :top-offset="historyTopOffset"
+      :error-message="historyError"
+      @load-session="handleSessionSelect"
     />
+
+    <!-- Body: sidebar (Single only) + canvas column + right sidebar -->
+    <div class="flex flex-1 min-h-0">
+      <!-- Sidebar (Single layout only) -->
+      <div
+        v-if="!isStackLayout"
+        class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
+      >
+        <!-- Gemini API key warning -->
+        <div
+          v-if="!geminiAvailable && needsGemini(currentRoleId)"
+          class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0"
+        >
+          <span class="material-icons text-xs align-middle mr-1">warning</span>
+          Image generation requires
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
+          <code class="font-mono">.env</code> and restart the app.
+        </div>
+
+        <!-- Tool result previews -->
+        <ToolResultsPanel
+          ref="toolResultsPanelRef"
+          :results="sidebarResults"
+          :selected-uuid="selectedResultUuid"
+          :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
+          :is-running="isRunning"
+          :status-message="statusMessage"
+          :pending-calls="pendingCalls"
+          @select="onSidebarItemClick"
+          @activate="activePane = 'sidebar'"
+        />
+
+        <!-- Sample queries (expandable pane) -->
+        <SuggestionsPanel
+          ref="suggestionsPanelRef"
+          :queries="currentRole.queries ?? []"
+          @send="(q) => sendMessage(q)"
+          @edit="onQueryEdit"
+        />
+
+        <!-- Text input -->
+        <ChatInput
+          ref="chatInputRef"
+          v-model="userInput"
+          v-model:pasted-file="pastedFile"
+          :is-running="isRunning"
+          @send="sendMessage()"
+        />
+      </div>
+
+      <!-- Canvas column -->
+      <div
+        class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden relative"
+      >
+        <!-- Gemini API key warning (Stack layouts — no sidebar to host it) -->
+        <div
+          v-if="isStackLayout && !geminiAvailable && needsGemini(currentRoleId)"
+          class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
+        >
+          <span class="material-icons text-xs align-middle mr-1">warning</span>
+          Image generation requires
+          <code class="font-mono">GEMINI_API_KEY</code>. Add it to
+          <code class="font-mono">.env</code> and restart the app.
+        </div>
+
+        <div
+          ref="canvasRef"
+          class="flex-1 overflow-hidden outline-none min-h-0"
+          tabindex="0"
+          @mousedown="activePane = 'main'"
+          @keydown="handleCanvasKeydown"
+        >
+          <!-- Single mode -->
+          <template v-if="canvasViewMode === 'single'">
+            <component
+              :is="getPlugin(selectedResult.toolName)?.viewComponent"
+              v-if="
+                selectedResult &&
+                getPlugin(selectedResult.toolName)?.viewComponent
+              "
+              :selected-result="selectedResult"
+              :send-text-message="sendMessage"
+              @update-result="handleUpdateResult"
+            />
+            <div v-else-if="selectedResult" class="h-full overflow-auto p-6">
+              <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{
+                JSON.stringify(selectedResult, null, 2)
+              }}</pre>
+            </div>
+            <div
+              v-else
+              class="flex items-center justify-center h-full text-gray-600"
+            >
+              <p>Start a conversation</p>
+            </div>
+          </template>
+          <!-- Stack mode -->
+          <StackView
+            v-else-if="canvasViewMode === 'stack'"
+            :tool-results="sidebarResults"
+            :selected-result-uuid="selectedResultUuid"
+            :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
+            :send-text-message="sendMessage"
+            @select="(uuid) => (selectedResultUuid = uuid)"
+            @update-result="handleUpdateResult"
+          />
+          <!-- Files mode -->
+          <FilesView
+            v-else-if="canvasViewMode === 'files'"
+            :refresh-token="filesRefreshToken"
+            @load-session="handleSessionSelect"
+          />
+          <!-- Todos mode -->
+          <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
+          <!-- Scheduler mode -->
+          <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
+          <!-- Wiki mode -->
+          <WikiView v-else-if="canvasViewMode === 'wiki'" />
+          <!-- Skills mode -->
+          <SkillsView v-else-if="canvasViewMode === 'skills'" />
+          <!-- Roles mode -->
+          <RolesView v-else-if="canvasViewMode === 'roles'" />
+        </div>
+
+        <!-- Bottom bar (Stack chat only — plugin views have no
+             session context, so no chat input is shown) -->
+        <div
+          v-if="canvasViewMode === 'stack'"
+          class="border-t border-gray-200 bg-white shrink-0"
+        >
+          <SuggestionsPanel
+            ref="suggestionsPanelRef"
+            :queries="currentRole.queries ?? []"
+            @send="(q) => sendMessage(q)"
+            @edit="onQueryEdit"
+          />
+          <ChatInput
+            ref="chatInputRef"
+            v-model="userInput"
+            v-model:pasted-file="pastedFile"
+            :is-running="isRunning"
+            @send="sendMessage()"
+          />
+        </div>
+      </div>
+
+      <!-- Right sidebar: tool call history -->
+      <RightSidebar
+        v-if="showRightSidebar"
+        ref="rightSidebarRef"
+        :tool-call-history="toolCallHistory"
+        :available-tools="availableTools"
+        :role-prompt="currentRole.prompt"
+        :tool-descriptions="toolDescriptions"
+      />
+    </div>
 
     <!-- Global settings modal -->
     <SettingsModal
@@ -442,8 +232,12 @@ import { v4 as uuidv4 } from "uuid";
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
+import SidebarHeader from "./components/SidebarHeader.vue";
+import RoleSelector from "./components/RoleSelector.vue";
+import SessionTabBar from "./components/SessionTabBar.vue";
+import SuggestionsPanel from "./components/SuggestionsPanel.vue";
+import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
-import LockStatusPopup from "./components/LockStatusPopup.vue";
 import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import CanvasViewToggle from "./components/CanvasViewToggle.vue";
 import PluginLauncher, {
@@ -458,39 +252,28 @@ import SkillsView from "./plugins/manageSkills/View.vue";
 import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
-import NotificationBell from "./components/NotificationBell.vue";
 import {
   NOTIFICATION_ACTION_TYPES,
   NOTIFICATION_VIEWS,
   type NotificationAction,
 } from "./types/notification";
 import { CANVAS_VIEW } from "./utils/canvas/viewMode";
-import ChatAttachmentPreview from "./components/ChatAttachmentPreview.vue";
-import {
-  useDynamicFavicon,
-  FAVICON_STATES,
-  type FaviconState,
-} from "./composables/useDynamicFavicon";
-import { useNotifications } from "./composables/useNotifications";
 import type { SseEvent } from "./types/sse";
-import {
-  type SessionSummary,
-  type SessionEntry,
-  type ActiveSession,
-} from "./types/session";
-import { EVENT_TYPES } from "./types/events";
+import { type SessionEntry, type ActiveSession } from "./types/session";
+import { EVENT_TYPES, generationKey } from "./types/events";
 import { extractImageData, makeTextResult } from "./utils/tools/result";
-import {
-  roleIcon as roleIconLookup,
-  roleName as roleNameLookup,
-} from "./utils/role/icon";
-import { findScrollableChild } from "./utils/dom/scrollable";
 import { buildAgentRequestBody } from "./utils/agent/request";
+import {
+  pushResult,
+  pushErrorMessage,
+  beginUserTurn,
+  appendToLastAssistantText,
+} from "./utils/session/sessionHelpers";
+import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
 import {
   findPendingToolCall,
   shouldSelectAssistantText,
 } from "./utils/agent/toolCalls";
-import { mergeSessionLists } from "./utils/session/mergeSessions";
 import {
   parseSessionEntries,
   resolveSelectedUuid,
@@ -498,84 +281,33 @@ import {
 } from "./utils/session/sessionEntries";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
+import { useKeyNavigation } from "./composables/useKeyNavigation";
+import { useDebugBeat } from "./composables/useDebugBeat";
+import { useChatScroll } from "./composables/useChatScroll";
+import { useViewLayout } from "./composables/useViewLayout";
+import { useSessionSync } from "./composables/useSessionSync";
+import { useSessionDerived } from "./composables/useSessionDerived";
+import { useFaviconState } from "./composables/useFaviconState";
+import { useMergedSessions } from "./composables/useMergedSessions";
 import { useCanvasViewMode } from "./composables/useCanvasViewMode";
 import { isCanvasViewMode } from "./utils/canvas/viewMode";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
-import { BUILTIN_ROLE_IDS } from "./config/roles";
 import { usePubSub } from "./composables/usePubSub";
-import { PUBSUB_CHANNELS, sessionChannel } from "./config/pubsubChannels";
+import { sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
 import { useSessionHistory } from "./composables/useSessionHistory";
 import { useRightSidebar } from "./composables/useRightSidebar";
-import { useQueriesPanel } from "./composables/useQueriesPanel";
 import { useEventListeners } from "./composables/useEventListeners";
-import { useImeAwareEnter } from "./composables/useImeAwareEnter";
 import { provideAppApi } from "./composables/useAppApi";
+import { provideActiveSession } from "./composables/useActiveSession";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
-import { apiGet, apiPost, apiFetchRaw } from "./utils/api";
+import { apiGet, apiFetchRaw } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
 
-// --- Debug beat (pub/sub) ---
-const debugBeatColor = ref<string | null>(null);
-const debugTitleStyle = computed(() =>
-  debugBeatColor.value ? { color: debugBeatColor.value } : {},
-);
-
-const { subscribe: pubsubSubscribe } = usePubSub();
-pubsubSubscribe(PUBSUB_CHANNELS.debugBeat, (data) => {
-  const msg = data as { count: number; last?: boolean };
-  if (msg.last) {
-    debugBeatColor.value = null;
-  } else {
-    debugBeatColor.value = msg.count % 2 === 0 ? "#3b82f6" : "#ef4444";
-  }
-});
-
-// --- Sessions channel (pub/sub) ---
-// Subscribe to the global `sessions` channel. The server publishes a
-// bare notification (no data) whenever any session's state changes.
-// The client refetches the session list via REST — the server is the
-// single source of truth for isRunning, hasUnread, etc.
-pubsubSubscribe(PUBSUB_CHANNELS.sessions, () => {
-  refreshSessionStates();
-});
-
-async function refreshSessionStates(): Promise<void> {
-  const summaries = await fetchSessions();
-  for (const s of summaries) {
-    const live = sessionMap.get(s.id);
-    if (!live) continue;
-    // Missing fields mean the server has no live entry — reset to defaults.
-    live.isRunning = s.isRunning ?? false;
-    live.statusMessage = s.statusMessage ?? "";
-    const unread = s.hasUnread ?? false;
-    // Don't mark the currently viewed session as unread
-    if (!(unread && s.id === currentSessionId.value)) {
-      live.hasUnread = unread;
-    }
-  }
-}
-
-async function markSessionRead(id: string): Promise<void> {
-  const result = await apiPost<{ ok: boolean }>(
-    API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)),
-  );
-  // The server returns `{ ok: boolean }` — a 200 with `ok: false`
-  // means the endpoint was reached but the flag wasn't actually
-  // cleared (e.g. session not found). Treat that the same as a
-  // transport failure and refetch so the sidebar doesn't go stale.
-  if (!result.ok || result.data.ok === false) {
-    // Server didn't clear the flag — refetch to restore truth.
-    await refreshSessionStates();
-  }
-}
-
-// --- Routing ---
-const route = useRoute();
-const router = useRouter();
-
 // --- Per-session state ---
+// Declared early so that pub/sub callbacks and function declarations
+// below can reference them without forward-reference ambiguity.
 const sessionMap = reactive(new Map<string, ActiveSession>());
 
 // Tracks active pub/sub subscriptions per session. The unsubscribe
@@ -589,12 +321,16 @@ const sessionSubscriptions = new Map<string, () => void>();
 // might run) take effect immediately. The URL is kept in sync via
 // navigateToSession, and external URL changes (back button, typed
 // URL) feed back into the ref via the route watcher below.
-//
-// Earlier attempt used a computed derived from route.params, but
-// router.push is async — the route param doesn't update until the
-// next tick, so any code reading currentSessionId between the push
-// and the tick sees the stale value ("") and drops messages silently.
 const currentSessionId = ref("");
+
+// --- Debug beat (pub/sub) ---
+const { debugTitleStyle } = useDebugBeat();
+
+const { subscribe: pubsubSubscribe } = usePubSub();
+
+// --- Routing ---
+const route = useRoute();
+const router = useRouter();
 
 function navigateToSession(id: string, replace = false): void {
   currentSessionId.value = id;
@@ -621,10 +357,6 @@ function navigateToSession(id: string, replace = false): void {
       console.error("[navigateToSession] push failed:", err);
     }
   });
-}
-
-function onNotificationOpen(isOpen: boolean): void {
-  if (isOpen) showLockPopup.value = false;
 }
 
 function handleNotificationNavigate(action: NotificationAction): void {
@@ -664,7 +396,7 @@ watch(
   () => route.query.role,
   (newRole) => {
     if (typeof newRole !== "string" || newRole === currentRoleId.value) return;
-    const roleExists = roles.value.some((r) => r.id === newRole);
+    const roleExists = roles.value.some((role) => role.id === newRole);
     if (roleExists) currentRoleId.value = newRole;
   },
 );
@@ -684,64 +416,7 @@ watch(
   },
 );
 
-const activeSession = computed(() => sessionMap.get(currentSessionId.value));
-
-const toolResults = computed(() => activeSession.value?.toolResults ?? []);
-
 // Deduplicate consecutive tool results with the same toolName for the
-// sidebar preview list. Tools like manageScheduler / manageTodoList
-// return the full item list on every call, so 4 consecutive scheduler
-// calls produce 4 identical "22 upcoming" previews. We keep only the
-// last one in each consecutive run. text-response is excluded because
-// each user/assistant message is unique content.
-// Deduplicate consecutive tool results that represent "full-state
-// refreshes" of the same collection. Tools like manageScheduler /
-// manageTodoList / manageWiki return the full list on every call
-// and set `updating: true` on the response — that flag is the
-// signal that the previous result is superseded, not a new artifact.
-//
-// Tools that create individual artifacts (generateImage,
-// presentDocument, editImage) DO NOT set `updating`, so consecutive
-// calls stay visible as separate preview cards. This matches the
-// "tennis vs golf docs" case raised in review: two different
-// documents produced in a row must both be shown.
-//
-// text-response is never collapsed because each user/assistant
-// message is unique content.
-const sidebarResults = computed(() => {
-  const all = toolResults.value;
-  return all.filter((r, i) => {
-    if (r.toolName === "text-response") return true;
-    const next = all[i + 1];
-    if (!next) return true;
-    if (next.toolName !== r.toolName) return true;
-    // Same tool as the next item — only collapse when BOTH results
-    // are full-state refreshes (updating: true). Individual-artifact
-    // tools that don't set `updating` stay visible.
-    return !(r.updating === true && next.updating === true);
-  });
-});
-
-// Read running/status from the server session list (single source of
-// truth). Falls back to sessionMap for the brief window before the
-// first fetchSessions completes.
-const currentSummary = computed(() =>
-  sessions.value.find((s) => s.id === currentSessionId.value),
-);
-const isRunning = computed(
-  () =>
-    currentSummary.value?.isRunning ?? activeSession.value?.isRunning ?? false,
-);
-const statusMessage = computed(
-  () =>
-    currentSummary.value?.statusMessage ??
-    activeSession.value?.statusMessage ??
-    "",
-);
-const toolCallHistory = computed(
-  () => activeSession.value?.toolCallHistory ?? [],
-);
-
 const selectedResultUuid = computed({
   get: () => activeSession.value?.selectedResultUuid ?? null,
   set: (val: string | null) => {
@@ -757,179 +432,66 @@ const selectedResultUuid = computed({
   },
 });
 
-const activeSessionCount = computed(
-  () => sessions.value.filter((s) => s.isRunning).length,
-);
-const unreadCount = computed(
-  () => sessions.value.filter((s) => s.hasUnread).length,
-);
-
 // --- Global state ---
 const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
 const userInput = ref("");
-const pastedFile = ref<{ dataUrl: string; name: string; mime: string } | null>(
-  null,
-);
-const fileError = ref<string | null>(null);
+const pastedFile = ref<PastedFile | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
-
-const MAX_ATTACH_BYTES = 30 * 1024 * 1024; // 30 MB
-
-// MIME types accepted by the chat input paste/drop handler. Covers
-// native Claude types (image, PDF) plus server-side convertible
-// types (text, office documents). Must stay aligned with the server's
-// attachmentConverter.ts — don't use a broad prefix like
-// "application/vnd.openxmlformats-officedocument.*" because the
-// server only handles the exact docx/xlsx/pptx variants.
-const ACCEPTED_MIME_PREFIXES = ["image/", "text/"];
-const ACCEPTED_MIME_EXACT = new Set([
-  "application/pdf",
-  "application/json",
-  "application/xml",
-  "application/x-yaml",
-  "application/toml",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-]);
-
-function isAcceptedType(mime: string): boolean {
-  return (
-    ACCEPTED_MIME_PREFIXES.some((p) => mime.startsWith(p)) ||
-    ACCEPTED_MIME_EXACT.has(mime)
-  );
-}
-
-function readAttachmentFile(file: File): void {
-  fileError.value = null;
-  if (!isAcceptedType(file.type)) return;
-  if (file.size > MAX_ATTACH_BYTES) {
-    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-    fileError.value = `File too large (${sizeMB} MB). Maximum is 30 MB.`;
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (typeof reader.result === "string") {
-      pastedFile.value = {
-        dataUrl: reader.result,
-        name: file.name,
-        mime: file.type,
-      };
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function onPasteFile(e: ClipboardEvent): void {
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (isAcceptedType(item.type)) {
-      const file = item.getAsFile();
-      if (file) {
-        e.preventDefault();
-        readAttachmentFile(file);
-        return;
-      }
-    }
-  }
-}
-
-function onDropFile(e: DragEvent): void {
-  e.preventDefault();
-  const file = e.dataTransfer?.files[0];
-  if (file) readAttachmentFile(file);
-}
-
-const imeEnter = useImeAwareEnter(() => sendMessage());
 
 const { sessions, showHistory, historyError, fetchSessions, toggleHistory } =
   useSessionHistory();
+const { markSessionRead } = useSessionSync({
+  sessionMap,
+  currentSessionId,
+  fetchSessions,
+});
 const { geminiAvailable, sandboxEnabled, fetchHealth } = useHealth();
-const showLockPopup = ref(false);
+
+const {
+  activeSession,
+  toolResults,
+  sidebarResults,
+  currentSummary,
+  isRunning,
+  statusMessage,
+  toolCallHistory,
+  activeSessionCount,
+  unreadCount,
+} = useSessionDerived({ sessionMap, currentSessionId, sessions });
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
-const faviconState = computed<FaviconState>(() => {
-  if (isRunning.value) return FAVICON_STATES.running;
-  const hasUnread =
-    currentSummary.value?.hasUnread ?? activeSession.value?.hasUnread ?? false;
-  if (hasUnread) return FAVICON_STATES.done;
-  return FAVICON_STATES.idle;
-});
-
-const { unreadCount: notificationUnreadCount } = useNotifications();
-const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0);
-
-useDynamicFavicon({
-  state: faviconState,
-  hasNotification: hasNotificationBadge,
-});
+useFaviconState({ isRunning, currentSummary, activeSession });
 
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
 const canvasRef = ref<HTMLDivElement | null>(null);
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const expandedTextareaRef = ref<HTMLTextAreaElement | null>(null);
-const inputFocused = ref(false);
-const expandedEditorOpen = ref(false);
+const chatInputRef = ref<{ focus: () => void } | null>(null);
+const topBarRef = ref<HTMLDivElement | null>(null);
+// Measured when the history popup opens — the popup is a direct child
+// of the root, so its absolute `top` must equal the global top bar's
+// full height.
+const historyTopOffset = ref<number | undefined>(undefined);
 
-function onInputBlur(): void {
-  imeEnter.onBlur();
-  // Delay collapsing so a click on send/expand buttons registers first
-  setTimeout(() => {
-    inputFocused.value = false;
-  }, 150);
+function focusChatInput(): void {
+  chatInputRef.value?.focus();
 }
-
-function openExpandedEditor(): void {
-  expandedEditorOpen.value = true;
-  nextTick(() => expandedTextareaRef.value?.focus());
-}
-
-function closeExpandedEditor(): void {
-  expandedEditorOpen.value = false;
-  nextTick(() => textareaRef.value?.focus());
-}
-
-function sendFromExpanded(): void {
-  closeExpandedEditor();
-  sendMessage();
-}
-const historyButtonRef = ref<HTMLButtonElement | null>(null);
+const sessionTabBarRef = ref<{
+  historyButton: HTMLButtonElement | null;
+} | null>(null);
+const historyButtonRef = computed(
+  () => sessionTabBarRef.value?.historyButton ?? null,
+);
 // Exposed `root` from SessionHistoryPanel — the click-outside guard
 // needs the actual popup DOM element (not the component instance).
 const historyPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const historyPopupRef = computed(() => historyPanelRef.value?.root ?? null);
-// Lock popup exposes its button + popup DOM via defineExpose so the
-// click-outside guard has both references without poking the template.
-const lockPopupRef = ref<{
-  button: HTMLButtonElement | null;
-  popup: HTMLDivElement | null;
-} | null>(null);
-const lockButtonRef = computed(() => lockPopupRef.value?.button ?? null);
-const lockPopupElRef = computed(() => lockPopupRef.value?.popup ?? null);
-const headerRef = ref<HTMLDivElement | null>(null);
-const roleButtonRef = ref<HTMLButtonElement | null>(null);
-const roleDropdownRef = ref<HTMLDivElement | null>(null);
-const showRoleDropdown = ref(false);
-
-function scrollChatToBottom() {
-  nextTick(() => {
-    if (chatListRef.value) {
-      chatListRef.value.scrollTop = chatListRef.value.scrollHeight;
-    }
-  });
-}
-
-watch(() => toolResults.value.length, scrollChatToBottom);
-watch(isRunning, (running) => {
-  if (running) {
-    scrollChatToBottom();
-  } else {
-    nextTick(() => textareaRef.value?.focus());
-  }
+const toolResultsLength = computed(() => toolResults.value.length);
+useChatScroll({
+  chatListRef,
+  toolResultsLength,
+  isRunning,
+  focusChatInput,
 });
 
 const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
@@ -942,6 +504,48 @@ const {
   filesRefreshToken,
   handleViewModeShortcut,
 } = useCanvasViewMode({ isRunning });
+
+// The no-sidebar "stack-style" layout (top bar + full-width canvas +
+// bottom bar) is used for every view mode except Single. Clicking a
+// plugin launcher button (Todos / Scheduler / Files / ...) swaps the
+// canvas content without collapsing the frame back to the sidebar
+// layout.
+const { isStackLayout, restoreChatViewForSession, displayedCurrentSessionId } =
+  useViewLayout({
+    canvasViewMode,
+    setCanvasViewMode,
+    currentSessionId,
+    activePane,
+  });
+
+// User-initiated session switches: clicking a session tab, a history
+// row, or a chat link in FilesView. In plugin views (Todos / Files /
+// ...) no chat is active, so the click's purpose is to surface the
+// chat — restore the preferred Single/Stack mode before loading.
+// Not wired into the internal `loadSession` call path because that
+// also fires on initial mount with `?view=plugin` URLs, which must
+// be honoured as-is.
+function handleSessionSelect(id: string): void {
+  restoreChatViewForSession();
+  loadSession(id);
+}
+
+function handleNewSessionClick(): void {
+  restoreChatViewForSession();
+  createNewSession();
+}
+
+// In plugin views (Todos / Files / ...) no chat is active, so the
+// Measure the top bar's height whenever the history popup is about
+// to open. Defer to nextTick so the popup's v-if transition doesn't
+// race the measurement.
+watch(showHistory, (open) => {
+  if (open) {
+    nextTick(() => {
+      historyTopOffset.value = topBarRef.value?.offsetHeight;
+    });
+  }
+});
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
 // Plugin-launcher click: switch canvas to the matching view mode.
@@ -964,7 +568,9 @@ const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
 
 const selectedResult = computed(
   () =>
-    toolResults.value.find((r) => r.uuid === selectedResultUuid.value) ?? null,
+    toolResults.value.find(
+      (result) => result.uuid === selectedResultUuid.value,
+    ) ?? null,
 );
 
 // Type-guard for the user-side branch of a text-response result. Used
@@ -972,28 +578,10 @@ const selectedResult = computed(
 // that haven't been persisted to disk yet.
 // Merged list for the history pane: live sessions in `sessionMap`
 // merged with server-only sessions, sorted newest-first by
-// `updatedAt` (most recently touched floats to the top). `updatedAt`
-// is bumped in `sendMessage` for live sessions and taken from the
-// jsonl file mtime for server-only sessions.
-//
-// When a session exists on the server side (the indexer has produced
-// a title / summary / keywords for it), we prefer those fields over
-// the live-session fallback: a live session that was loaded from a
-// pre-indexed jsonl should keep showing the AI-generated title in
-// the sidebar, not regress to the raw first user message. Without
-// this merge, opening an indexed session immediately clobbered its
-// sidebar row with the first-user-message preview.
-const mergedSessions = computed((): SessionSummary[] =>
-  mergeSessionLists([...sessionMap.values()], sessions.value),
-);
-
-const tabSessions = computed(() => mergedSessions.value.slice(0, 6));
-
-function tabColor(session: SessionSummary): string {
-  if (session.isRunning) return "text-yellow-400";
-  if (session.hasUnread) return "text-gray-900";
-  return "text-gray-400";
-}
+const { mergedSessions, tabSessions } = useMergedSessions({
+  sessionMap,
+  sessions,
+});
 
 // Centralised session-switch handler: subscribe to the current session's
 // pub/sub channel so we receive real-time events even if the session is
@@ -1007,10 +595,17 @@ watch(currentSessionId, (id) => {
   if (session) {
     ensureSessionSubscription(session);
   }
-  // Unsubscribe from the previous session if it's not running
+  // Unsubscribe from the previous session if it's not running and has
+  // no in-flight background generations. Tearing down the subscription
+  // while a generation is still running would orphan its completion
+  // event, leaving the session's busy indicator stuck on.
   if (previousSessionId && previousSessionId !== id) {
     const prevSession = sessionMap.get(previousSessionId);
-    if (prevSession && !prevSession.isRunning) {
+    const prevBusy =
+      !!prevSession &&
+      (prevSession.isRunning ||
+        Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
+    if (prevSession && !prevBusy) {
       unsubscribeSession(previousSessionId);
     }
   }
@@ -1018,7 +613,7 @@ watch(currentSessionId, (id) => {
 
   // Clear unread in both sessionMap and sessions list (for badge count),
   // then tell the server so other tabs see it too.
-  const summary = sessions.value.find((s) => s.id === id);
+  const summary = sessions.value.find((entry) => entry.id === id);
   const wasUnread =
     (session && session.hasUnread) || (summary && summary.hasUnread);
   if (wasUnread) {
@@ -1028,138 +623,39 @@ watch(currentSessionId, (id) => {
   }
 });
 
-const SCROLL_AMOUNT = 60;
-
-function handleCanvasKeydown(e: KeyboardEvent) {
-  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-  if (
-    e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement
-  ) {
-    return;
-  }
-  if (!canvasRef.value) return;
-  const scrollable = findScrollableChild(canvasRef.value);
-  if (!scrollable) return;
-  e.preventDefault();
-  const delta = e.key === "ArrowDown" ? SCROLL_AMOUNT : -SCROLL_AMOUNT;
-  scrollable.scrollBy({ top: delta, behavior: "smooth" });
-}
-
-function handleKeyNavigation(e: KeyboardEvent) {
-  if (activePane.value !== "sidebar") return;
-  if (
-    e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement
-  ) {
-    return;
-  }
-  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-  e.preventDefault();
-  // Navigate the deduplicated sidebar list so duplicates are skipped.
-  const results = sidebarResults.value;
-  if (results.length === 0) return;
-  const currentIndex = results.findIndex(
-    (r) => r.uuid === selectedResultUuid.value,
-  );
-  // If the currently selected UUID is filtered out of sidebarResults
-  // (e.g. an older duplicate that was hidden by dedup), jump to the
-  // edge instead of an arbitrary index. ArrowDown → first item;
-  // ArrowUp → last item.
-  if (currentIndex === -1) {
-    selectedResultUuid.value =
-      e.key === "ArrowDown"
-        ? results[0].uuid
-        : results[results.length - 1].uuid;
-    return;
-  }
-  const nextIndex =
-    e.key === "ArrowUp"
-      ? Math.max(0, currentIndex - 1)
-      : Math.min(results.length - 1, currentIndex + 1);
-  selectedResultUuid.value = results[nextIndex].uuid;
-}
-
-// The sendMessage wrapper defers resolution until call time so the
-// composable can be instantiated here, before sendMessage is
-// declared further down. Function declarations are hoisted so the
-// reference is valid at click time.
-const { queriesExpanded, queriesListRef, onQueryClick } = useQueriesPanel({
-  userInput,
-  textareaRef,
-  sendMessage: (msg) => sendMessage(msg),
+const { handleCanvasKeydown, handleKeyNavigation } = useKeyNavigation({
+  canvasRef,
+  activePane,
+  sidebarResults,
+  selectedResultUuid,
 });
 
-const showQueries = computed(() => !!currentRole.value.queries?.length);
+const suggestionsPanelRef = ref<{ collapse: () => void } | null>(null);
 
-// Local wrappers that thread the reactive `roles.value` into the
-// pure helpers in src/utils/role.ts. Template bindings keep the
-// short names `roleIcon(id)` / `roleName(id)`.
-function roleIcon(roleId: string): string {
-  return roleIconLookup(roles.value, roleId);
-}
-
-function roleName(roleId: string): string {
-  return roleNameLookup(roles.value, roleId);
-}
-
-// Surface a server-side or transport-level error as a card in the
-// session's chat so the user actually sees it. The status-message
-// channel can't be used because `finally` clears it the moment the
-// run ends.
-function pushErrorMessage(session: ActiveSession, message: string): void {
-  const text = `[Error] ${message}`;
-  const errorResult: ToolResultComplete = {
-    uuid: uuidv4(),
-    toolName: "text-response",
-    message: text,
-    title: "Error",
-    data: { text, role: "assistant", transportKind: "text-rest" },
-  };
-  session.toolResults.push(errorResult);
-  session.selectedResultUuid = errorResult.uuid;
+function onQueryEdit(query: string): void {
+  userInput.value = query;
+  nextTick(() => focusChatInput());
 }
 
 function handleUpdateResult(updatedResult: ToolResultComplete) {
   const results = activeSession.value?.toolResults;
   if (!results) return;
-  const index = results.findIndex((r) => r.uuid === updatedResult.uuid);
+  const index = results.findIndex(
+    (result) => result.uuid === updatedResult.uuid,
+  );
   if (index !== -1) {
     Object.assign(results[index], updatedResult);
   }
 }
 
-// When the user clicks an item in the sidebar while the canvas is
-// showing the file explorer, the previously-selected file would
-// otherwise stay on screen and the click would have no visible
-// effect. Auto-switch back to single mode so the clicked item
-// actually shows up in the canvas.
 function onSidebarItemClick(uuid: string) {
   selectedResultUuid.value = uuid;
-  if (canvasViewMode.value === CANVAS_VIEW.files) {
-    setCanvasViewMode(CANVAS_VIEW.single);
-  }
-}
-
-// Bridge from FilesView: a user clicked a markdown link to a chat
-// session (e.g. "[session abc](../../chat/abc-123.jsonl)" inside
-// a journal summary). Switch the active session AND pop the canvas
-// out of files mode, otherwise they'd still be staring at the file
-// tree after the session loaded.
-function onFilesViewLoadSession(sessionId: string): void {
-  // Set view mode BEFORE loading session so that navigateToSession
-  // (called inside loadSession) picks up the updated canvasViewMode
-  // in its query — avoids a race where two router.push calls fight.
-  if (canvasViewMode.value === CANVAS_VIEW.files) {
-    setCanvasViewMode(CANVAS_VIEW.single);
-  }
-  loadSession(sessionId);
 }
 
 const GEMINI_PLUGINS = new Set(["generateImage", "presentDocument"]);
 const needsGemini = (roleId: string) =>
-  (roles.value.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
-    GEMINI_PLUGINS.has(p),
+  (roles.value.find((role) => role.id === roleId)?.availablePlugins ?? []).some(
+    (plugin) => GEMINI_PLUGINS.has(plugin),
   );
 
 // Remove the current session from sessionMap if it's empty (no messages).
@@ -1188,6 +684,7 @@ function createNewSession(roleId?: string): ActiveSession {
     id,
     roleId: rId,
     toolResults: [],
+    resultTimestamps: new Map(),
     isRunning: false,
     statusMessage: "",
     toolCallHistory: [],
@@ -1196,57 +693,23 @@ function createNewSession(roleId?: string): ActiveSession {
     startedAt: now,
     updatedAt: now,
     runStartIndex: 0,
+    pendingGenerations: {},
   };
   sessionMap.set(id, session);
   navigateToSession(id, true);
   currentRoleId.value = rId;
-  queriesExpanded.value = false;
-  nextTick(() => textareaRef.value?.focus());
+  suggestionsPanelRef.value?.collapse();
+  nextTick(() => focusChatInput());
   return sessionMap.get(id)!;
 }
 
 function onRoleChange() {
+  // Covers both the user dropdown click and the agent-triggered role
+  // switch (EVENT_TYPES.switchRole) — either way the user ends up in
+  // a fresh chat session, so a plugin view should yield to chat.
+  restoreChatViewForSession();
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
-}
-
-// Some roles ship with a "default view" that's useful before any
-// chat exchange. Seed a synthetic tool_result so the canvas renders
-// the plugin immediately on role switch, without requiring the user
-// to first ask Claude to list anything. The result is client-only
-// (never persisted server-side) — any subsequent LLM tool call will
-// replace / augment it in the normal way.
-async function maybeSeedRoleDefault(session: ActiveSession): Promise<void> {
-  if (session.roleId !== BUILTIN_ROLE_IDS.sourceManager) return;
-  const response = await apiGet<{ sources?: unknown[] }>(
-    API_ROUTES.sources.list,
-  );
-  if (!response.ok) {
-    // Non-fatal: the Add / Rebuild buttons remain reachable via
-    // chat as soon as the user sends any message. Still surface
-    // a visible hint so the blank canvas isn't a mystery.
-    if (session.toolResults.length === 0) {
-      const detail =
-        response.status === 0 ? response.error : `HTTP ${response.status}`;
-      pushErrorMessage(
-        session,
-        `Could not preload sources (${detail}). Ask Claude to list them, or check the server log.`,
-      );
-    }
-    return;
-  }
-  const result: ToolResultComplete = {
-    uuid: uuidv4(),
-    toolName: "manageSource",
-    message: "Loaded source registry.",
-    title: "Information sources",
-    data: { sources: response.data.sources ?? [] },
-  };
-  // Skip if the user has already produced their own result in the
-  // meantime (fast typer + slow fetch race).
-  if (session.toolResults.length > 0) return;
-  session.toolResults.push(result);
-  session.selectedResultUuid = result.uuid;
 }
 
 async function loadSession(id: string) {
@@ -1278,23 +741,36 @@ async function loadSession(id: string) {
   if (!response.ok) return;
   const entries = response.data;
 
-  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
+  const meta = entries.find((entry) => entry.type === EVENT_TYPES.sessionMeta);
   const roleId = meta?.roleId ?? currentRoleId.value;
   const toolResultsList = parseSessionEntries(entries);
   const urlResult =
     typeof route.query.result === "string" ? route.query.result : null;
   const resolvedSelectedUuid = resolveSelectedUuid(toolResultsList, urlResult);
   // Use server summary for live state (isRunning, etc.) and timestamps
-  const serverSummary = sessions.value.find((s) => s.id === id);
+  const serverSummary = sessions.value.find((session) => session.id === id);
   const { startedAt, updatedAt } = resolveSessionTimestamps(
     serverSummary,
     new Date().toISOString(),
   );
+  // Approximate per-entry timestamps for a loaded session: the JSONL
+  // format doesn't persist them yet, so spread entries evenly between
+  // startedAt and updatedAt. New results pushed in this session via
+  // pushResult() will overwrite with the real Date.now().
+  const loadedTimestamps = new Map<string, number>();
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(updatedAt).getTime();
+  toolResultsList.forEach((result, i) => {
+    const frac =
+      toolResultsList.length > 1 ? i / (toolResultsList.length - 1) : 0;
+    loadedTimestamps.set(result.uuid, startMs + (endMs - startMs) * frac);
+  });
 
   const newSession: ActiveSession = {
     id,
     roleId,
     toolResults: toolResultsList,
+    resultTimestamps: loadedTimestamps,
     isRunning: serverSummary?.isRunning ?? false,
     statusMessage: serverSummary?.statusMessage ?? "",
     toolCallHistory: [],
@@ -1303,6 +779,7 @@ async function loadSession(id: string) {
     startedAt,
     updatedAt,
     runStartIndex: toolResultsList.length,
+    pendingGenerations: {},
   };
   sessionMap.set(id, newSession);
   // Subscribe immediately — the watch(currentSessionId) may have
@@ -1335,22 +812,6 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
   if (serverResults.length > session.toolResults.length) {
     session.toolResults = serverResults;
   }
-}
-
-// Seed the session state for a fresh user turn. Not pure (mutates
-// session), but isolated so sendMessage doesn't have the init
-// pattern inline. Writes `runStartIndex` onto the session — the
-// index into toolResults at which this run's outputs start, used
-// later to decide whether a trailing text response becomes the
-// selected canvas result.
-function beginUserTurn(session: ActiveSession, message: string): void {
-  // Append the user's message so it renders immediately. State like
-  // isRunning / statusMessage is NOT set here — it comes from the
-  // server via the `sessions` channel notification → refetch cycle,
-  // keeping all clients (including the initiator) in sync.
-  session.updatedAt = new Date().toISOString();
-  session.toolResults.push(makeTextResult(message, "user"));
-  session.runStartIndex = session.toolResults.length;
 }
 
 // Subscribe to a session's pub/sub channel so events from the server
@@ -1395,7 +856,13 @@ function ensureSessionSubscription(session: ActiveSession): void {
       if (currentSessionId.value === session.id) {
         markSessionRead(session.id);
       } else {
-        unsubscribeSession(session.id);
+        // Keep the subscription alive if background generations are
+        // still in flight — otherwise their completion events would
+        // be lost and the busy indicator would stay stuck.
+        const live = sessionMap.get(session.id);
+        const hasPending =
+          !!live && Object.keys(live.pendingGenerations ?? {}).length > 0;
+        if (!hasPending) unsubscribeSession(session.id);
       }
       return;
     }
@@ -1432,20 +899,6 @@ interface AgentEventContext {
 // result in the session. Returns true if appended, false if a new
 // result should be created instead. Extracted to keep
 // applyAgentEvent under the cognitive-complexity threshold.
-function appendToLastAssistantText(
-  session: ActiveSession,
-  text: string,
-): boolean {
-  const last = session.toolResults[session.toolResults.length - 1];
-  const lastData = last?.data as { role?: string; text?: string } | undefined;
-  if (last?.toolName !== "text-response" || lastData?.role !== "assistant") {
-    return false;
-  }
-  lastData.text = (lastData.text ?? "") + text;
-  last.message = (last.message ?? "") + text;
-  return true;
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing 15; streaming append adds 1
 async function applyAgentEvent(
   event: SseEvent,
@@ -1499,14 +952,14 @@ async function applyAgentEvent(
           lastData?.text === event.message
         )
           return;
-        session.toolResults.push(makeTextResult(event.message, "user"));
+        pushResult(session, makeTextResult(event.message, "user"));
         return;
       }
       // Streaming: append to the last assistant text-response if one
       // exists, rather than creating a new card per chunk.
       if (appendToLastAssistantText(session, event.message)) return;
       const textResult = makeTextResult(event.message, "assistant");
-      session.toolResults.push(textResult);
+      pushResult(session, textResult);
       if (
         shouldSelectAssistantText(session.toolResults, session.runStartIndex)
       ) {
@@ -1517,12 +970,12 @@ async function applyAgentEvent(
     case EVENT_TYPES.toolResult: {
       const { result } = event;
       const existing = session.toolResults.findIndex(
-        (r) => r.uuid === result.uuid,
+        (existingResult) => existingResult.uuid === result.uuid,
       );
       if (existing >= 0) {
         session.toolResults[existing] = result;
       } else {
-        session.toolResults.push(result);
+        pushResult(session, result);
         session.selectedResultUuid = result.uuid;
       }
       return;
@@ -1534,6 +987,27 @@ async function applyAgentEvent(
     case EVENT_TYPES.sessionFinished:
       // Handled in the subscription callback — no-op here.
       return;
+    case EVENT_TYPES.generationStarted: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      session.pendingGenerations[mapKey] = {
+        kind: event.kind,
+        filePath: event.filePath,
+        key: event.key,
+      };
+      return;
+    }
+    case EVENT_TYPES.generationFinished: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      delete session.pendingGenerations[mapKey];
+      // When the last pending generation drains and the user is
+      // actively viewing this session, clear the unread flag server
+      // set on drain. Mirrors the sessionFinished handler.
+      const drained = Object.keys(session.pendingGenerations).length === 0;
+      if (drained && currentSessionId.value === session.id) {
+        markSessionRead(session.id);
+      }
+      return;
+    }
   }
 }
 
@@ -1549,10 +1023,11 @@ async function sendMessage(text?: string) {
 
   beginUserTurn(session, message);
   const sessionRole =
-    roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
+    roles.value.find((role) => role.id === session.roleId) ?? roles.value[0];
   const selectedRes =
-    session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
-    undefined;
+    session.toolResults.find(
+      (result) => result.uuid === session.selectedResultUuid,
+    ) ?? undefined;
 
   // Subscribe to the session's pub/sub channel BEFORE posting so we
   // don't miss events. The subscription callback dispatches each
@@ -1582,11 +1057,11 @@ async function sendMessage(text?: string) {
       );
       unsubscribeSession(session.id);
     }
-  } catch (e) {
-    console.error("[agent] fetch error:", e);
+  } catch (err) {
+    console.error("[agent] fetch error:", err);
     pushErrorMessage(
       session,
-      e instanceof Error ? e.message : "Connection error.",
+      err instanceof Error ? err.message : "Connection error.",
     );
     unsubscribeSession(session.id);
   }
@@ -1597,29 +1072,20 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
   buttonRef: historyButtonRef,
   popupRef: historyPopupRef,
 });
-const { handler: handleClickOutsideLock } = useClickOutside({
-  isOpen: showLockPopup,
-  buttonRef: lockButtonRef,
-  popupRef: lockPopupElRef,
-});
-const { handler: handleClickOutsideRoleDropdown } = useClickOutside({
-  isOpen: showRoleDropdown,
-  buttonRef: roleButtonRef,
-  popupRef: roleDropdownRef,
-});
 
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
 });
+// Plugin Views that need to tag background work with the current
+// session (e.g. MulmoScript generations) inject this.
+provideActiveSession(activeSession);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,
   onViewModeShortcut: handleViewModeShortcut,
   onClickOutsideHistory: handleClickOutsideHistory,
-  onClickOutsideLock: handleClickOutsideLock,
-  onClickOutsideRoleDropdown: handleClickOutsideRoleDropdown,
   onTeardown: teardownPendingCalls,
 });
 
@@ -1636,7 +1102,7 @@ onMounted(async () => {
   // If the URL specifies a role, apply it before session creation.
   const urlRole =
     typeof route.query.role === "string" ? route.query.role : null;
-  if (urlRole && roles.value.some((r) => r.id === urlRole)) {
+  if (urlRole && roles.value.some((role) => role.id === urlRole)) {
     currentRoleId.value = urlRole;
   }
 

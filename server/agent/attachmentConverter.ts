@@ -22,6 +22,7 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 import type { Attachment } from "@mulmobridge/protocol";
+import { errorMessage } from "../utils/errors.js";
 
 export interface ContentBlock {
   type: string;
@@ -181,7 +182,7 @@ async function tryConvertDocx(att: Attachment): Promise<ConversionResult> {
   } catch (err) {
     return {
       kind: "skipped",
-      reason: `DOCX conversion failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: `DOCX conversion failed: ${errorMessage(err)}`,
     };
   }
 }
@@ -195,7 +196,7 @@ function tryConvertXlsx(att: Attachment): ConversionResult {
   } catch (err) {
     return {
       kind: "skipped",
-      reason: `XLSX conversion failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: `XLSX conversion failed: ${errorMessage(err)}`,
     };
   }
 }

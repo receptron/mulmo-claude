@@ -14,6 +14,7 @@ import { listSources, writeSource } from "./registry.js";
 import { sourcesRoot } from "./paths.js";
 import { workspacePath } from "../paths.js";
 import { log } from "../../system/logger/index.js";
+import { slugify } from "../../utils/slug.js";
 import type { Source } from "./types.js";
 import fs from "fs";
 
@@ -47,12 +48,7 @@ export function buildArxivQuery(keywords: readonly string[]): string {
  */
 export function keywordsToSlug(keywords: readonly string[]): string {
   const latin = keywords
-    .map((kw) =>
-      kw
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, ""),
-    )
+    .map((kw) => slugify(kw, ""))
     .filter((s) => s.length > 0)
     .slice(0, 3)
     .join("-");

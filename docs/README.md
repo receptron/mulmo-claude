@@ -24,6 +24,12 @@ Guides for using MulmoClaude. No programming knowledge required.
 | [Obsidian 連携](tips/obsidian.md) | 日本語 | MulmoClaude のワークスペースを Obsidian で閲覧、既存 vault を Claude に参照させる |
 | [Obsidian Integration](tips/obsidian.en.md) | English | Browse MulmoClaude output in Obsidian, let Claude reference your vault |
 
+## Architecture & Design
+
+| Document | Language | Description |
+|---|---|---|
+| [Bridge Session Design](bridge-session-design.md) | English | Session identification, caching, and multi-user scaling plan |
+
 ## Developers
 
 Code structure, APIs, and build instructions.

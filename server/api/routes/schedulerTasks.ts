@@ -22,6 +22,7 @@ import {
   withUserTaskLock,
 } from "../../workspace/skills/user-tasks.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
+import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
 import { startChat } from "./agent.js";
 
@@ -82,7 +83,7 @@ router.put(
       });
       res.json({ task: updated });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errorMessage(err);
       if (msg.startsWith("task not found") || msg.startsWith("request body")) {
         notFound(res, msg);
         return;
@@ -108,7 +109,7 @@ router.delete(
       });
       res.json({ deleted: id });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errorMessage(err);
       if (msg.startsWith("task not found")) {
         notFound(res, msg);
         return;

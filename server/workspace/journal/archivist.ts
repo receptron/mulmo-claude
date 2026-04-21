@@ -358,12 +358,14 @@ export function buildOptimizationUserPrompt(input: OptimizationInput): string {
 // from this module (dailyPass.ts, optimizationPass.ts).
 export { extractJsonObject, findBalancedBraceBlock } from "../../utils/json.js";
 
+import { isRecord } from "../../utils/types.js";
+
 // Type guards used by callers to validate parsed output. Written as
 // guards rather than `as` casts per project conventions.
 export function isDailyArchivistOutput(
   value: unknown,
 ): value is DailyArchivistOutput {
-  if (typeof value !== "object" || value === null) return false;
+  if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (typeof v.dailySummaryMarkdown !== "string") return false;
   if (!Array.isArray(v.topicUpdates)) return false;
@@ -371,7 +373,7 @@ export function isDailyArchivistOutput(
 }
 
 function isTopicUpdate(value: unknown): value is TopicUpdate {
-  if (typeof value !== "object" || value === null) return false;
+  if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (typeof v.slug !== "string") return false;
   if (typeof v.content !== "string") return false;
@@ -383,7 +385,7 @@ function isTopicUpdate(value: unknown): value is TopicUpdate {
 export function isOptimizationOutput(
   value: unknown,
 ): value is OptimizationOutput {
-  if (typeof value !== "object" || value === null) return false;
+  if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (!Array.isArray(v.merges)) return false;
   if (!Array.isArray(v.archives)) return false;
@@ -392,7 +394,7 @@ export function isOptimizationOutput(
 }
 
 function isTopicMerge(value: unknown): value is TopicMerge {
-  if (typeof value !== "object" || value === null) return false;
+  if (!isRecord(value)) return false;
   const v = value as Record<string, unknown>;
   if (!Array.isArray(v.from)) return false;
   if (!v.from.every((f: unknown) => typeof f === "string")) return false;

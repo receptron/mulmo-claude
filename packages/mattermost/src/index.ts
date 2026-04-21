@@ -12,7 +12,7 @@
 
 import "dotenv/config";
 import WebSocket from "ws";
-import { createBridgeClient } from "@mulmobridge/client";
+import { createBridgeClient, chunkText } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "mattermost";
 
@@ -58,7 +58,7 @@ async function apiGet(path: string): Promise<Record<string, unknown>> {
 
 async function postMessage(channelId: string, text: string): Promise<void> {
   const MAX = 4000;
-  const chunks = text.length === 0 ? ["(empty reply)"] : chunkText(text, MAX);
+  const chunks = chunkText(text, MAX);
   for (const chunk of chunks) {
     try {
       const res = await fetch(`${apiBase}/posts`, {
@@ -80,14 +80,6 @@ async function postMessage(channelId: string, text: string): Promise<void> {
       console.error(`[mattermost] postMessage error: ${err}`);
     }
   }
-}
-
-function chunkText(text: string, max: number): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += max) {
-    chunks.push(text.slice(i, i + max));
-  }
-  return chunks;
 }
 
 // ── WebSocket event stream ──────────────────────────────────────

@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
 import { errorMessage } from "../../utils/errors.js";
 import type { SummaryResult } from "./types.js";
+import { isRecord } from "../../utils/types.js";
 
 const SYSTEM_PROMPT =
   "You summarize a single chat session. Output strict JSON matching the provided schema. " +
@@ -159,7 +160,7 @@ export function formatSpawnError(
 // crashing the indexer — a degraded title is better than a dropped
 // session.
 export function validateSummaryResult(obj: unknown): SummaryResult {
-  if (typeof obj !== "object" || obj === null) {
+  if (!isRecord(obj)) {
     throw new Error("[chat-index] summary result is not an object");
   }
   const o = obj as Record<string, unknown>;

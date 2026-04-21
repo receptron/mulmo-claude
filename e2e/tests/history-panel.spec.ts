@@ -58,8 +58,10 @@ test.describe("history panel (useSessionHistory)", () => {
     const item = page.getByTestId(`session-item-${SESSION_A.id}`);
     await expect(item).toBeVisible();
 
-    // Click somewhere neutral (main chat canvas area, far from the header).
-    await page.locator("body").click({ position: { x: 600, y: 500 } });
+    // Click a neutral element in the top bar — the popup now spans
+    // the full canvas width, so the only clickable "outside" region
+    // is the header itself.
+    await page.getByTestId("app-title").click();
     await expect(item).toBeHidden();
   });
 
@@ -95,5 +97,65 @@ test.describe("history panel (useSessionHistory)", () => {
 
     // One additional fetch should have happened on button click.
     expect(sessionFetchCount).toBeGreaterThan(countAfterMount);
+  });
+
+  test("filter bar is visible with All/Human/Scheduler/Skill/Bridge buttons", async ({
+    page,
+  }) => {
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    await page.getByTestId("history-btn").click();
+
+    const filterBar = page.getByTestId("session-filter-bar");
+    await expect(filterBar).toBeVisible();
+
+    await expect(page.getByTestId("session-filter-all")).toBeVisible();
+    await expect(page.getByTestId("session-filter-human")).toBeVisible();
+    await expect(page.getByTestId("session-filter-scheduler")).toBeVisible();
+    await expect(page.getByTestId("session-filter-skill")).toBeVisible();
+    await expect(page.getByTestId("session-filter-bridge")).toBeVisible();
+  });
+
+  test("clicking a filter hides non-matching sessions", async ({ page }) => {
+    // Override sessions with origin data
+    await page.route(urlEndsWith("/api/sessions"), (route: Route) => {
+      return route.fulfill({
+        json: {
+          sessions: [
+            { ...SESSION_A, origin: "bridge" },
+            { ...SESSION_B }, // no origin = human
+          ],
+          cursor: "v1:0",
+          deletedIds: [],
+        },
+      });
+    });
+
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    await page.getByTestId("history-btn").click();
+    // Both visible initially
+    await expect(
+      page.getByTestId(`session-item-${SESSION_A.id}`),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId(`session-item-${SESSION_B.id}`),
+    ).toBeVisible();
+
+    // Click Bridge filter
+    await page.getByTestId("session-filter-bridge").click();
+    // Only bridge session visible
+    await expect(
+      page.getByTestId(`session-item-${SESSION_A.id}`),
+    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeHidden();
+
+    // Click All to reset
+    await page.getByTestId("session-filter-all").click();
+    await expect(
+      page.getByTestId(`session-item-${SESSION_B.id}`),
+    ).toBeVisible();
   });
 });

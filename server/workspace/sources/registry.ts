@@ -50,6 +50,7 @@ import type { CategorySlug } from "./taxonomy.js";
 import { writeFileAtomic } from "../../utils/files/index.js";
 import { sourceFilePath, sourcesRoot } from "./paths.js";
 import { isValidSlug } from "../../utils/slug.js";
+import { isNonEmptyString } from "../../utils/types.js";
 import { log } from "../../system/logger/index.js";
 
 // --- Frontmatter parsing ------------------------------------------------
@@ -149,7 +150,7 @@ function stringField(
   key: string,
 ): string | null {
   const v = fields.get(key);
-  return typeof v === "string" && v.length > 0 ? v : null;
+  return isNonEmptyString(v) ? v : null;
 }
 
 function numberField(

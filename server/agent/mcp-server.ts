@@ -8,9 +8,11 @@ import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS } from "./plugin-names.js";
 import { errorMessage } from "../utils/errors.js";
+import { isNonEmptyString, isRecord } from "../utils/types.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
 import { extractFetchError } from "../utils/fetch.js";
+import { safeResponseText } from "../utils/http.js";
 import { readTextSafeSync } from "../utils/files/safe.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
 
@@ -29,7 +31,7 @@ interface JsonRpcMessage {
 }
 
 const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage =>
-  typeof v === "object" && v !== null && !Array.isArray(v) && "method" in v;
+  isRecord(v) && "method" in v;
 
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;
@@ -44,7 +46,7 @@ const BASE_URL = `http://${MCP_HOST}:${PORT}`;
 // lifetime. Same resolution order as bridges/cli/token.ts.
 function readSessionToken(): string {
   const fromEnv = process.env.MULMOCLAUDE_AUTH_TOKEN;
-  if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv;
+  if (isNonEmptyString(fromEnv)) return fromEnv;
   return readTextSafeSync(WORKSPACE_PATHS.sessionToken)?.trim() ?? "";
 }
 const SESSION_TOKEN = readSessionToken();
@@ -165,8 +167,8 @@ async function postJson(
     throw new Error(`Network error calling ${path}: ${errorMessage(err)}`);
   }
   if (!opts.allowHttpError && !res.ok) {
-    const text = await res.text().catch(() => "");
-    const detail = text ? `: ${text.slice(0, 500)}` : "";
+    const errBody = await safeResponseText(res, 500);
+    const detail = errBody ? `: ${errBody}` : "";
     throw new Error(`HTTP ${res.status} calling ${path}${detail}`);
   }
   return res;
@@ -197,8 +199,8 @@ async function fetchSkillsList(): Promise<{ name: string }[]> {
     throw new Error(`Network error calling /api/skills: ${errorMessage(err)}`);
   }
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status} calling /api/skills: ${text}`);
+    const body = await safeResponseText(res);
+    throw new Error(`HTTP ${res.status} calling /api/skills: ${body}`);
   }
   const body: { skills: { name: string }[] } = await res.json();
   return body.skills;

@@ -11,6 +11,7 @@ import path from "path";
 import { workspacePath } from "../workspace/workspace.js";
 import { writeFileAtomic } from "../utils/files/atomic.js";
 import { log } from "../system/logger/index.js";
+import { errorMessage } from "../utils/errors.js";
 import { ONE_SECOND_MS } from "../utils/time.js";
 import type { ITaskManager, TaskDefinition } from "./task-manager/index.js";
 import {
@@ -81,6 +82,7 @@ export interface SystemTaskDef {
 
 let stateMap: StateMap = new Map();
 const systemTasks: SystemTaskDef[] = [];
+let taskManagerRef: ITaskManager | null = null;
 
 /**
  * Initialize the scheduler adapter. Call once at server startup
@@ -96,6 +98,7 @@ export async function initScheduler(
   stateMap = await loadState(stateFilePath(), stateDeps);
   systemTasks.length = 0;
   systemTasks.push(...tasks);
+  taskManagerRef = taskManager;
 
   // Run catch-up
   const catchUpTasks: CatchUpTask[] = tasks.map((t) => ({
@@ -149,6 +152,25 @@ export async function initScheduler(
   });
 }
 
+/** Apply a schedule override to a running system task.
+ *  Updates the in-memory task definition, the task-manager, and
+ *  recalculates nextScheduledAt in persisted state. */
+export async function applyScheduleOverride(
+  taskId: string,
+  schedule: SystemTaskDef["schedule"],
+): Promise<boolean> {
+  const task = systemTasks.find((t) => t.id === taskId);
+  if (!task || !taskManagerRef) return false;
+  if (!taskManagerRef.updateSchedule(taskId, schedule)) return false;
+  task.schedule = schedule;
+
+  // Recalculate next window so the UI reflects the new schedule
+  const nextScheduledAt = computeNextScheduled(task);
+  await safeUpdateState(taskId, { nextScheduledAt });
+
+  return true;
+}
+
 /** Query execution logs — used by API routes. */
 export async function getSchedulerLogs(opts: {
   since?: string;
@@ -186,27 +208,20 @@ async function executeAndLog(
 ): Promise<void> {
   const startedAt = new Date().toISOString();
   const startMs = Date.now();
-  let errorMessage: string | null = null;
+  let errMsg: string | null = null;
   try {
     await task.run();
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err);
+    errMsg = errorMessage(err);
     log.error("scheduler", "task failed", {
       taskId: task.id,
-      error: errorMessage,
+      error: errMsg,
     });
   }
   const durationMs = Date.now() - startMs;
   // Persistence is best-effort — never let disk failures propagate
   // to the tick loop or abort startup catch-up.
-  await safePersist(
-    task,
-    scheduledFor,
-    startedAt,
-    durationMs,
-    trigger,
-    errorMessage,
-  );
+  await safePersist(task, scheduledFor, startedAt, durationMs, trigger, errMsg);
 }
 
 /** Best-effort persistence — state and log are independent. A failure
@@ -217,9 +232,9 @@ async function safePersist(
   startedAt: string,
   durationMs: number,
   trigger: TaskTrigger,
-  errorMessage: string | null,
+  errMsg: string | null,
 ): Promise<void> {
-  const isSuccess = errorMessage === null;
+  const isSuccess = errMsg === null;
   const currentState = stateMap.get(task.id);
   try {
     await updateAndSave(
@@ -230,7 +245,7 @@ async function safePersist(
         lastRunAt: scheduledFor,
         lastRunResult: isSuccess ? TASK_RESULTS.success : TASK_RESULTS.error,
         lastRunDurationMs: durationMs,
-        lastErrorMessage: errorMessage,
+        lastErrorMessage: errMsg,
         consecutiveFailures: isSuccess
           ? 0
           : (currentState?.consecutiveFailures ?? 0) + 1,
@@ -257,7 +272,7 @@ async function safePersist(
         result: isSuccess ? TASK_RESULTS.success : TASK_RESULTS.error,
         durationMs,
         trigger,
-        ...(errorMessage !== null && { errorMessage }),
+        ...(errMsg !== null && { errorMessage: errMsg }),
       },
       logDeps,
     );

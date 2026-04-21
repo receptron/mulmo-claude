@@ -12,13 +12,13 @@ import {
 } from "../../../src/config/pubsubChannels.js";
 import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
-import { EVENT_TYPES } from "../../../src/types/events.js";
-import { publishNotification } from "../notifications.js";
 import {
-  NOTIFICATION_KINDS,
-  NOTIFICATION_ACTION_TYPES,
-  NOTIFICATION_VIEWS,
-} from "../../../src/types/notification.js";
+  EVENT_TYPES,
+  GENERATION_KINDS,
+  type GenerationKind,
+  type PendingGeneration,
+  generationKey,
+} from "../../../src/types/events.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -44,6 +44,14 @@ export interface ServerSession {
   updatedAt: string;
   /** Kills the spawned Claude CLI process for this session. */
   abortRun?: () => void;
+  /**
+   * In-flight background generations keyed by `generationKey(kind, filePath, key)`.
+   * The value carries the decomposed (kind, filePath, key) so consumers never
+   * have to parse the opaque composite key back out. Non-empty means the
+   * session has ongoing work even when `isRunning` (agent turn) is false —
+   * used to keep the busy indicator lit across view navigation.
+   */
+  pendingGenerations: Record<string, PendingGeneration>;
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -54,6 +62,14 @@ const EVICTION_CHECK_INTERVAL_MS = 5 * 60 * 1000; // check every 5 min
 // ── Store ──────────────────────────────────────────────────────
 
 const store = new Map<string, ServerSession>();
+/**
+ * Parallel pending-generation tracking for sessions that aren't in the
+ * in-memory store. The MulmoScript view can be opened on a session
+ * whose full ServerSession entry never existed or was evicted after
+ * idle timeout — we still want to mark unread and fire
+ * notifySessionsChanged when the work drains. Cleared on drain.
+ */
+const storelessPending = new Map<string, Set<string>>();
 let pubsub: IPubSub | null = null;
 let evictionTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -97,6 +113,7 @@ export function getOrCreateSession(
     selectedImageData: opts.selectedImageData,
     startedAt: opts.startedAt,
     updatedAt: opts.updatedAt,
+    pendingGenerations: {},
   };
   store.set(chatSessionId, session);
   return session;
@@ -137,22 +154,6 @@ export function endRun(chatSessionId: string): void {
     type: EVENT_TYPES.sessionFinished,
   });
   notifySessionsChanged();
-
-  // P0 trigger: agent completed → notification.
-  // Fires for all sessions (web UI + bridge-initiated). Bridge users
-  // benefit from the bell notification when they later open the web UI
-  // to review agent output. publishNotification is try-catch wrapped,
-  // so failures here never break the session lifecycle.
-  publishNotification({
-    kind: NOTIFICATION_KINDS.agent,
-    title: `Session completed (${session.roleId})`,
-    action: {
-      type: NOTIFICATION_ACTION_TYPES.navigate,
-      view: NOTIFICATION_VIEWS.chat,
-      sessionId: chatSessionId,
-    },
-    sessionId: chatSessionId,
-  });
 }
 
 /** Cancel a running session by killing the child process. */
@@ -188,11 +189,155 @@ export function pushSessionEvent(
   chatSessionId: string,
   event: Record<string, unknown>,
 ): void {
-  const session = store.get(chatSessionId);
-  if (!session) return;
-
   const type = event.type as string;
+  const isGenerationEvent =
+    type === EVENT_TYPES.generationStarted ||
+    type === EVENT_TYPES.generationFinished;
 
+  // Non-generation events keep the pre-existing "store or drop"
+  // behavior: toolCall / toolCallResult / status fire only during a
+  // live agent turn (which always has a store entry), and
+  // rolesUpdated / sessionFinished are equally tied to in-store
+  // sessions. Publishing them for evicted sessions would broaden the
+  // wire contract without a concrete need.
+  //
+  // Generation events are the exception — a plugin view (e.g.
+  // MulmoScript) can kick off work on a session whose store entry
+  // never existed or was evicted after idle timeout, and the client
+  // subscription lives on the channel, not on any server-side
+  // session object. We always deliver those so the UI can update.
+  const session = store.get(chatSessionId);
+  if (!session && !isGenerationEvent) return;
+  publishToSessionChannel(chatSessionId, event);
+
+  const generationDelta = resolveGenerationDelta(chatSessionId, type, event);
+  if (generationDelta === "same") return;
+  if (generationDelta === "started") {
+    notifySessionsChanged();
+    return;
+  }
+
+  // Drained: flag hasUnread, same semantics as endRun(). Clients
+  // viewing the session clear it via markRead.
+  if (session) {
+    session.hasUnread = true;
+    // Store is the source of truth, so the refetch already sees the
+    // flag via `live.hasUnread` — the disk write is just a backstop
+    // across server restarts and can stay fire-and-forget.
+    persistHasUnread(chatSessionId, true).catch(() => {});
+    notifySessionsChanged();
+    return;
+  }
+
+  // Storeless: meta.hasUnread on disk is the ONLY place the flag lives.
+  // If we notified before the write completed, the client's refetch
+  // would read the stale pre-drain value. Sequence: persist, then
+  // notify.
+  persistHasUnread(chatSessionId, true)
+    .catch(() => {})
+    .then(() => notifySessionsChanged());
+}
+
+/**
+ * Dispatch the event to whichever pending tracker the session has.
+ * Returns the empty↔non-empty transition so the caller can decide
+ * whether to flip hasUnread and notify.
+ */
+function resolveGenerationDelta(
+  chatSessionId: string,
+  type: string,
+  event: Record<string, unknown>,
+): GenerationDelta {
+  const session = store.get(chatSessionId);
+  if (session) return applyEventToSession(session, type, event);
+  if (
+    type === EVENT_TYPES.generationStarted ||
+    type === EVENT_TYPES.generationFinished
+  ) {
+    return updateStorelessPending(chatSessionId, type, event);
+  }
+  return "same";
+}
+
+function updateStorelessPending(
+  chatSessionId: string,
+  type: string,
+  event: Record<string, unknown>,
+): GenerationDelta {
+  const payload = parseGenerationPayload(event);
+  if (!payload) {
+    log.warn("session-store", "malformed generation event", {
+      chatSessionId,
+      type,
+    });
+    return "same";
+  }
+  const mapKey = generationKey(payload.kind, payload.filePath, payload.key);
+  const existing = storelessPending.get(chatSessionId);
+  const wasEmpty = !existing || existing.size === 0;
+
+  if (type === EVENT_TYPES.generationStarted) {
+    const set = existing ?? new Set<string>();
+    set.add(mapKey);
+    if (!existing) storelessPending.set(chatSessionId, set);
+  } else if (existing) {
+    existing.delete(mapKey);
+    if (existing.size === 0) storelessPending.delete(chatSessionId);
+  }
+
+  const isEmpty = (storelessPending.get(chatSessionId)?.size ?? 0) === 0;
+  if (wasEmpty === isEmpty) return "same";
+  return isEmpty ? "drained" : "started";
+}
+
+/**
+ * How a generation event affected the session's pendingGenerations set:
+ *
+ * - `started`: empty → non-empty (first generation in a quiet session)
+ * - `drained`: non-empty → empty (last pending generation finished)
+ * - `same`: no transition (parallel starts/finishes within a burst,
+ *   or a non-generation event type)
+ *
+ * Callers use this to decide whether to fire `notifySessionsChanged()`
+ * and whether to flip hasUnread on drain.
+ */
+type GenerationDelta = "started" | "drained" | "same";
+
+/** Fields pulled off a validated generation event. */
+interface GenerationPayload {
+  kind: GenerationKind;
+  filePath: string;
+  key: string;
+}
+
+const GENERATION_KIND_VALUES: ReadonlySet<string> = new Set(
+  Object.values(GENERATION_KINDS),
+);
+
+function isGenerationKind(v: unknown): v is GenerationKind {
+  return typeof v === "string" && GENERATION_KIND_VALUES.has(v);
+}
+
+/**
+ * Narrow an event's generation fields at runtime. The event arrives
+ * as `Record<string, unknown>` so we can't trust its shape — validate
+ * every field before handing back a typed struct. Unknown kinds or
+ * missing fields return null; the caller should log + no-op.
+ */
+function parseGenerationPayload(
+  event: Record<string, unknown>,
+): GenerationPayload | null {
+  const { kind, filePath, key } = event;
+  if (!isGenerationKind(kind)) return null;
+  if (typeof filePath !== "string" || typeof key !== "string") return null;
+  return { kind, filePath, key };
+}
+
+function applyEventToSession(
+  session: ServerSession,
+  type: string,
+  event: Record<string, unknown>,
+): GenerationDelta {
   if (type === EVENT_TYPES.toolCall) {
     session.toolCallHistory.push({
       toolUseId: event.toolUseId as string,
@@ -209,9 +354,67 @@ export function pushSessionEvent(
     session.statusMessage = event.message as string;
     // No notifySessionsChanged() here — status updates are high-frequency
     // and flow to subscribed clients via the session.<id> channel directly.
+  } else if (
+    type === EVENT_TYPES.generationStarted ||
+    type === EVENT_TYPES.generationFinished
+  ) {
+    return updatePendingGenerations(session, type, event);
+  }
+  return "same";
+}
+
+function updatePendingGenerations(
+  session: ServerSession,
+  type: string,
+  event: Record<string, unknown>,
+): GenerationDelta {
+  const payload = parseGenerationPayload(event);
+  if (!payload) {
+    log.warn("session-store", "malformed generation event", {
+      chatSessionId: session.chatSessionId,
+      type,
+    });
+    return "same";
+  }
+  const mapKey = generationKey(payload.kind, payload.filePath, payload.key);
+  const wasEmpty = Object.keys(session.pendingGenerations).length === 0;
+
+  if (type === EVENT_TYPES.generationStarted) {
+    session.pendingGenerations[mapKey] = payload;
+  } else {
+    delete session.pendingGenerations[mapKey];
   }
 
-  publishToSessionChannel(chatSessionId, event);
+  const isEmpty = Object.keys(session.pendingGenerations).length === 0;
+  if (wasEmpty === isEmpty) return "same";
+  return isEmpty ? "drained" : "started";
+}
+
+/**
+ * Convenience wrapper for plugin routes that run long async jobs.
+ * Publishes a generationStarted or generationFinished event on the
+ * session channel. Safely no-ops when chatSessionId is missing — lets
+ * callers that aren't inside a session context use the same routes.
+ */
+export function publishGeneration(
+  chatSessionId: string | undefined,
+  kind: GenerationKind,
+  filePath: string,
+  key: string,
+  finished: boolean,
+  error?: string,
+): void {
+  if (!chatSessionId) return;
+  const event: Record<string, unknown> = {
+    type: finished
+      ? EVENT_TYPES.generationFinished
+      : EVENT_TYPES.generationStarted,
+    kind,
+    filePath,
+    key,
+  };
+  if (error) event.error = error;
+  pushSessionEvent(chatSessionId, event);
 }
 
 export type PushToolResultOutcome =
@@ -334,6 +537,7 @@ function evictIdleSessions(): void {
  */
 export function __resetForTests(): void {
   store.clear();
+  storelessPending.clear();
   pubsub = null;
   if (evictionTimer) {
     clearInterval(evictionTimer);

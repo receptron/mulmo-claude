@@ -9,6 +9,7 @@ import path from "path";
 import { workspacePath, WORKSPACE_DIRS } from "./paths.js";
 import { log } from "../system/logger/index.js";
 import { writeFileAtomicSync } from "../utils/files/atomic.js";
+import { isRecord } from "../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ function sanitizeDescription(raw: string): string {
 }
 
 function validateEntry(raw: unknown): CustomDirEntry | null {
-  if (typeof raw !== "object" || raw === null) return null;
+  if (!isRecord(raw)) return null;
   const obj = raw as Record<string, unknown>;
 
   const validPath = validatePath(String(obj.path ?? ""));
@@ -170,10 +171,9 @@ export function validateCustomDirs(
     if (entry) {
       entries.push(entry);
     } else {
-      const p =
-        typeof item === "object" && item !== null
-          ? String((item as Record<string, unknown>).path ?? "")
-          : "";
+      const p = isRecord(item)
+        ? String((item as Record<string, unknown>).path ?? "")
+        : "";
       errors.push(`entry ${i}: invalid path "${p}"`);
     }
   });

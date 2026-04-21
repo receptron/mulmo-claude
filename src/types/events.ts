@@ -5,4 +5,12 @@
 // New code should import directly from "@mulmobridge/protocol" when
 // it's in a package-eligible module (chat-service, bridges).
 
-export { EVENT_TYPES, type EventType } from "@mulmobridge/protocol";
+export {
+  EVENT_TYPES,
+  type EventType,
+  GENERATION_KINDS,
+  type GenerationKind,
+  type GenerationEvent,
+  type PendingGeneration,
+  generationKey,
+} from "@mulmobridge/protocol";

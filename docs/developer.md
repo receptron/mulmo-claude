@@ -300,6 +300,34 @@ Full motivation + file plan: `plans/feat-notification-push-scaffold.md`. Impleme
 
 ---
 
+## Dynamic favicon (#470)
+
+The browser tab favicon changes color to reflect the agent's state. Implemented via Canvas API — no static icon files.
+
+### States
+
+| State | Color | Condition |
+|---|---|---|
+| **idle** | Gray (`#6B7280`) | No agent running, no unread replies in the **current** session |
+| **running** | Blue (`#3B82F6`) + glow ring | Agent is executing (`isRunning === true`) |
+| **done** | Green (`#22C55E`) | Current session has `hasUnread === true` (agent finished, user hasn't viewed) |
+| **error** | Red (`#EF4444`) | (Reserved — not currently wired to any state) |
+
+A notification badge (orange dot, top-right) appears when the notification composable's `unreadCount > 0` (independent of session state).
+
+### Scope / known limitation
+
+The favicon reflects the **current session only**. If another session has unread replies but the user is viewing a different (read) session, the favicon shows idle (gray). This matches the original implementation (#470). Cross-session unread indication is tracked in the notification center (#144).
+
+### Files
+
+| File | Role |
+|---|---|
+| `src/composables/useDynamicFavicon.ts` | Canvas rendering + `<link rel="icon">` injection |
+| `src/composables/useFaviconState.ts` | State derivation (isRunning / hasUnread / notification badge) |
+
+---
+
 ## Centralized constants (`as const` modules)
 
 Cross-module string literals (endpoint paths, tool names, role IDs, etc.) are defined once and imported everywhere. A typo in an import key fails typecheck; a typo in a raw string literal silently produces a runtime 404 or broken channel.

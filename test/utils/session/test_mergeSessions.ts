@@ -20,6 +20,7 @@ function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
     id: "live-1",
     roleId: "general",
     toolResults: [],
+    resultTimestamps: new Map(),
     isRunning: false,
     statusMessage: "",
     toolCallHistory: [],
@@ -28,6 +29,7 @@ function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
     startedAt: "2026-04-10T10:00:00.000Z",
     updatedAt: "2026-04-10T10:05:00.000Z",
     runStartIndex: 0,
+    pendingGenerations: {},
     ...overrides,
   };
 }

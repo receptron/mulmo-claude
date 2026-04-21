@@ -28,7 +28,7 @@
         </button>
         <!-- Add column button (kanban only) -->
         <button
-          v-if="viewMode === 'kanban'"
+          v-if="viewMode === TODO_VIEW.kanban"
           data-testid="todo-column-add-btn"
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
@@ -106,7 +106,7 @@
       </div>
       <template v-else>
         <TodoKanbanView
-          v-if="viewMode === 'kanban'"
+          v-if="viewMode === TODO_VIEW.kanban"
           :filtered-items="filteredItems"
           :columns="columns"
           @move="onMove"
@@ -119,7 +119,7 @@
           @reorder-columns="onReorderColumns"
         />
         <TodoTableView
-          v-else-if="viewMode === 'table'"
+          v-else-if="viewMode === TODO_VIEW.table"
           :filtered-items="filteredItems"
           :columns="columns"
           @patch="onPatchItem"
@@ -225,19 +225,11 @@ import TodoListView from "./todo/TodoListView.vue";
 import TodoAddDialog from "./todo/TodoAddDialog.vue";
 import TodoEditDialog from "./todo/TodoEditDialog.vue";
 
-type ViewMode = "kanban" | "table" | "list";
-
-interface ViewModeOption {
-  key: ViewMode;
-  label: string;
-  icon: string;
-}
-
-const VIEW_MODES: ViewModeOption[] = [
-  { key: "kanban", label: "Kanban", icon: "view_kanban" },
-  { key: "table", label: "Table", icon: "table_rows" },
-  { key: "list", label: "List", icon: "view_list" },
-];
+import {
+  TODO_VIEW,
+  TODO_VIEW_MODES as VIEW_MODES,
+  type TodoViewMode as ViewMode,
+} from "../plugins/todo/viewModes";
 
 const VIEW_MODE_KEY = "todo_explorer_view_mode";
 
@@ -277,15 +269,17 @@ watch(
 
 // ── View mode (persisted in localStorage) ───────────────────────
 
-const viewMode = ref<ViewMode>(loadViewMode());
+const VALID_VIEW_MODES: ReadonlySet<string> = new Set(Object.values(TODO_VIEW));
 
 function loadViewMode(): ViewMode {
   const stored = localStorage.getItem(VIEW_MODE_KEY);
-  if (stored === "kanban" || stored === "table" || stored === "list") {
-    return stored;
+  if (stored && VALID_VIEW_MODES.has(stored)) {
+    return stored as ViewMode;
   }
-  return "kanban";
+  return TODO_VIEW.kanban;
 }
+
+const viewMode = ref<ViewMode>(loadViewMode());
 
 function setViewMode(next: ViewMode): void {
   viewMode.value = next;

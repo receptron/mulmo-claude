@@ -15,6 +15,7 @@ import { log } from "./logger/index.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
 import { writeFileAtomicSync } from "../utils/files/atomic.js";
 import { readTextSafeSync } from "../utils/files/safe.js";
+import { isRecord, isStringArray, isStringRecord } from "../utils/types.js";
 
 export interface AppSettings {
   // Extra tool names appended to BASE_ALLOWED_TOOLS in
@@ -44,16 +45,6 @@ export function mcpConfigPath(): string {
 
 export function ensureConfigsDir(): void {
   fs.mkdirSync(configsDir(), { recursive: true });
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((entry) => typeof entry === "string")
-  );
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 export function isAppSettings(value: unknown): value is AppSettings {
@@ -147,13 +138,6 @@ const DEFAULT_MCP: McpConfigFile = { mcpServers: {} };
 // the sandbox image (see #162), not here.
 const STDIO_COMMAND_ALLOWLIST = new Set(["npx", "node", "tsx"]);
 
-function isStringRecord(value: unknown): value is Record<string, string> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-  return Object.values(value).every((v) => typeof v === "string");
-}
-
 // Accept only http: / https: URLs. Rejects malformed strings, other
 // protocols (ftp:, file:, javascript:, ...), and empty values so bad
 // endpoints can't be persisted even if a client bypasses the UI.
@@ -185,10 +169,7 @@ export function isMcpStdioSpec(value: unknown): value is McpStdioSpec {
   if (typeof value.command !== "string" || value.command.length === 0)
     return false;
   if (!STDIO_COMMAND_ALLOWLIST.has(value.command)) return false;
-  if (value.args !== undefined) {
-    if (!Array.isArray(value.args)) return false;
-    if (!value.args.every((a) => typeof a === "string")) return false;
-  }
+  if (value.args !== undefined && !isStringArray(value.args)) return false;
   if (value.env !== undefined && !isStringRecord(value.env)) return false;
   if (value.enabled !== undefined && typeof value.enabled !== "boolean")
     return false;
@@ -211,8 +192,7 @@ export function isMcpConfigFile(value: unknown): value is McpConfigFile {
   if (!isRecord(value)) return false;
 
   const servers = value.mcpServers;
-  if (typeof servers !== "object" || servers === null) return false;
-  if (Array.isArray(servers)) return false;
+  if (!isRecord(servers)) return false;
   for (const [id, spec] of Object.entries(servers)) {
     if (!isMcpServerId(id)) return false;
     if (!isMcpServerSpec(spec)) return false;

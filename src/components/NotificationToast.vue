@@ -4,6 +4,7 @@ import { useNotifications } from "../composables/useNotifications";
 import { NOTIFICATION_ICONS } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 import { ONE_SECOND_MS } from "../../server/utils/time";
+import { formatSmartTime } from "../utils/format/date";
 
 const AUTO_HIDE_MS = 5 * ONE_SECOND_MS;
 
@@ -30,17 +31,6 @@ function dismiss(): void {
 function iconName(n: NotificationPayload): string {
   return n.icon ?? NOTIFICATION_ICONS[n.kind] ?? "notifications";
 }
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 </script>
 
 <template>
@@ -62,7 +52,7 @@ function formatTime(iso: string): string {
           {{ visible.body }}
         </p>
         <p class="mt-1 text-xs text-slate-400">
-          {{ formatTime(visible.firedAt) }}
+          {{ formatSmartTime(visible.firedAt) }}
         </p>
       </div>
       <button

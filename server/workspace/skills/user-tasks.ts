@@ -21,6 +21,7 @@ import {
 } from "../../../src/types/session.js";
 import { log } from "../../system/logger/index.js";
 import type { ITaskManager } from "../../events/task-manager/index.js";
+import { isRecord } from "../../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ function isValidDailyTime(value: string): boolean {
 }
 
 function isValidSchedule(s: unknown): s is LocalTaskSchedule {
-  if (typeof s !== "object" || s === null) return false;
+  if (!isRecord(s)) return false;
   const obj = s as Record<string, unknown>;
   if (obj.type === SCHEDULE_TYPES.interval) {
     return typeof obj.intervalMs === "number" && obj.intervalMs > 0;
@@ -72,7 +73,7 @@ export type ValidateResult =
   | { kind: "error"; error: string };
 
 export function validateAndCreate(input: unknown): ValidateResult {
-  if (typeof input !== "object" || input === null) {
+  if (!isRecord(input)) {
     return { kind: "error", error: "request body required" };
   }
   const obj = input as Record<string, unknown>;
@@ -117,7 +118,7 @@ export function applyUpdate(
   id: string,
   patch: unknown,
 ): UpdateResult {
-  if (typeof patch !== "object" || patch === null) {
+  if (!isRecord(patch)) {
     return { kind: "error", error: "request body required" };
   }
   const idx = tasks.findIndex((t) => t.id === id);

@@ -9,6 +9,7 @@ import {
   readSessionMeta as readSessionMetaIO,
   readSessionJsonl,
   sessionJsonlAbsPath,
+  sessionMetaAbsPath,
 } from "../../utils/files/session-io.js";
 import { readManifest } from "../../workspace/chat-index/indexer.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
@@ -58,7 +59,7 @@ async function readSessionMeta(
   return null;
 }
 
-interface SessionSummary {
+export interface SessionSummary {
   id: string;
   roleId: string;
   startedAt: string;
@@ -109,7 +110,7 @@ const WINDOW_MS = env.sessionsListWindowDays * 86_400_000;
 // `changeMs` — the later of the jsonl mtime and the chat-index
 // `indexedAt` — so the handler can filter against `?since=` and
 // compute the new cursor without re-statting anything.
-async function loadAllSessions(): Promise<
+export async function loadAllSessions(): Promise<
   { summary: SessionSummary; changeMs: number }[]
 > {
   const chatDir = WORKSPACE_PATHS.chat;
@@ -130,6 +131,15 @@ async function loadAllSessions(): Promise<
 
         const meta = await readSessionMeta(chatDir, id);
         if (!meta) return null;
+
+        // The meta sidecar bumps its mtime on hasUnread / origin
+        // writes — feed it into changeMs so cursor-based refetches
+        // pick up drains of background generations (which only touch
+        // meta, not the jsonl). Missing stat (brand-new session
+        // before its first meta write) contributes 0.
+        const metaMtimeMs = await stat(sessionMetaAbsPath(id))
+          .then((s) => s.mtimeMs)
+          .catch(() => 0);
 
         const indexEntry = indexById.get(id);
         // Prefer AI title → meta.firstUserMessage → empty.
@@ -153,12 +163,20 @@ async function loadAllSessions(): Promise<
         if (indexEntry?.keywords !== undefined)
           summary.keywords = indexEntry.keywords;
         if (live) {
-          summary.isRunning = live.isRunning;
+          // Background generations (image/audio/movie) keep the session
+          // "busy" even when the agent turn has ended, so the sidebar
+          // indicator stays lit across view navigation.
+          summary.isRunning =
+            live.isRunning || Object.keys(live.pendingGenerations).length > 0;
           summary.statusMessage = live.statusMessage;
         }
         return {
           summary,
-          changeMs: sessionChangeMs(fileStat.mtimeMs, indexEntry?.indexedAt),
+          changeMs: sessionChangeMs(
+            fileStat.mtimeMs,
+            indexEntry?.indexedAt,
+            metaMtimeMs,
+          ),
         };
       } catch {
         return null;

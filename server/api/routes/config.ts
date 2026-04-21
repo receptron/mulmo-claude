@@ -12,6 +12,7 @@ import {
   type McpServerEntry,
 } from "../../system/config.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
+import { isRecord } from "../../utils/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import {
   loadCustomDirs,
@@ -49,14 +50,11 @@ function buildFullResponse(): ConfigResponse {
 }
 
 function isMcpPutBody(value: unknown): value is { servers: McpServerEntry[] } {
-  if (typeof value !== "object" || value === null) return false;
-  const c = value as Record<string, unknown>;
-  if (!Array.isArray(c.servers)) return false;
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.servers)) return false;
   // Full shape validation happens inside fromMcpEntries (throws on
   // anything malformed). Here we just confirm the envelope.
-  return c.servers.every(
-    (e) => typeof e === "object" && e !== null && "id" in e && "spec" in e,
-  );
+  return value.servers.every((e) => isRecord(e) && "id" in e && "spec" in e);
 }
 
 // Parse an MCP payload through `fromMcpEntries` (which does the full
@@ -111,9 +109,8 @@ interface PutConfigBody {
 }
 
 function isPutConfigBody(value: unknown): value is PutConfigBody {
-  if (typeof value !== "object" || value === null) return false;
-  const c = value as Record<string, unknown>;
-  return isAppSettings(c.settings) && isMcpPutBody(c.mcp);
+  if (!isRecord(value)) return false;
+  return isAppSettings(value.settings) && isMcpPutBody(value.mcp);
 }
 
 router.put(
@@ -209,11 +206,11 @@ router.put(
     res: Response<{ dirs: CustomDirEntry[] } | ConfigErrorResponse>,
   ) => {
     const body = req.body;
-    if (typeof body !== "object" || body === null || !("dirs" in body)) {
+    if (!isRecord(body) || !("dirs" in body)) {
       badRequest(res, "expected { dirs: [...] }");
       return;
     }
-    const result = validateCustomDirs((body as Record<string, unknown>).dirs);
+    const result = validateCustomDirs(body.dirs);
     if ("error" in result) {
       badRequest(res, result.error);
       return;
@@ -244,13 +241,11 @@ router.put(
     res: Response<{ dirs: ReferenceDirEntry[] } | ConfigErrorResponse>,
   ) => {
     const body = req.body;
-    if (typeof body !== "object" || body === null || !("dirs" in body)) {
+    if (!isRecord(body) || !("dirs" in body)) {
       badRequest(res, "expected { dirs: [...] }");
       return;
     }
-    const result = validateReferenceDirs(
-      (body as Record<string, unknown>).dirs,
-    );
+    const result = validateReferenceDirs(body.dirs);
     if ("error" in result) {
       badRequest(res, result.error);
       return;
@@ -258,6 +253,69 @@ router.put(
     try {
       saveReferenceDirs(result.entries);
       res.json({ dirs: result.entries });
+    } catch (err) {
+      serverError(res, err instanceof Error ? err.message : "save failed");
+    }
+  },
+);
+
+// ── Scheduler overrides (#493) ──────────────────────────────────
+
+import {
+  loadSchedulerOverrides,
+  saveSchedulerOverrides,
+  UTC_HH_MM_RE,
+  type ScheduleOverrides,
+} from "../../utils/files/scheduler-overrides-io.js";
+import { applyScheduleOverride } from "../../events/scheduler-adapter.js";
+import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
+
+router.get(
+  API_ROUTES.config.schedulerOverrides,
+  (_req: Request, res: Response<{ overrides: ScheduleOverrides }>) => {
+    res.json({ overrides: loadSchedulerOverrides() });
+  },
+);
+
+router.put(
+  API_ROUTES.config.schedulerOverrides,
+  async (
+    req: Request<unknown, unknown, { overrides: unknown }>,
+    res: Response<{ overrides: ScheduleOverrides } | ConfigErrorResponse>,
+  ) => {
+    const body = req.body;
+    if (!isRecord(body) || !("overrides" in body)) {
+      badRequest(res, "expected { overrides: { ... } }");
+      return;
+    }
+    const raw = body.overrides;
+    if (!isRecord(raw)) {
+      badRequest(res, "overrides must be an object");
+      return;
+    }
+    const overrides = raw as ScheduleOverrides;
+    try {
+      saveSchedulerOverrides(overrides);
+
+      // Apply to running task-manager immediately
+      for (const [taskId, ovr] of Object.entries(overrides)) {
+        if (typeof ovr.intervalMs === "number" && ovr.intervalMs > 0) {
+          await applyScheduleOverride(taskId, {
+            type: SCHEDULE_TYPES.interval,
+            intervalMs: ovr.intervalMs,
+          });
+        } else if (
+          typeof ovr.time === "string" &&
+          UTC_HH_MM_RE.test(ovr.time)
+        ) {
+          await applyScheduleOverride(taskId, {
+            type: SCHEDULE_TYPES.daily,
+            time: ovr.time,
+          });
+        }
+      }
+
+      res.json({ overrides: loadSchedulerOverrides() });
     } catch (err) {
       serverError(res, err instanceof Error ? err.message : "save failed");
     }

@@ -14,7 +14,7 @@
 import "dotenv/config";
 import crypto from "crypto";
 import express, { type Request, type Response } from "express";
-import { createBridgeClient } from "@mulmobridge/client";
+import { createBridgeClient, chunkText } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "messenger";
 const PORT = Number(process.env.MESSENGER_BRIDGE_PORT) || 3004;
@@ -45,7 +45,7 @@ async function sendTextMessage(
   text: string,
 ): Promise<void> {
   const MAX = 2000; // Messenger's message limit
-  const chunks = text.length === 0 ? ["(empty reply)"] : chunkText(text, MAX);
+  const chunks = chunkText(text, MAX);
 
   for (const chunk of chunks) {
     try {
@@ -71,14 +71,6 @@ async function sendTextMessage(
       console.error(`[messenger] send error: ${err}`);
     }
   }
-}
-
-function chunkText(text: string, max: number): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += max) {
-    chunks.push(text.slice(i, i + max));
-  }
-  return chunks;
 }
 
 // ── Signature verification ──────────────────────────────────────

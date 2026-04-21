@@ -3,6 +3,7 @@ import { getSessionQuery } from "../../utils/request.js";
 import {
   createSessionMeta,
   backfillFirstUserMessage as backfillMeta,
+  backfillOrigin,
   readSessionMetaFull,
   readSessionMeta,
   setClaudeSessionId as setClaudeId,
@@ -40,6 +41,7 @@ import {
 } from "../../workspace/tool-trace/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
+import { isSessionOrigin } from "../../../src/types/session.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "@mulmobridge/client";
@@ -195,16 +197,22 @@ export async function startChat(
   // other tabs) see the turn. Metadata first — it powers the sidebar
   // title cache; the append follows so the jsonl is always a
   // superset of what metadata advertised.
+  const validOrigin = isSessionOrigin(params.origin)
+    ? params.origin
+    : undefined;
   if (isFirstTurn) {
     await createSessionMeta(
       chatSessionId,
       roleId,
       message,
       undefined,
-      params.origin,
+      validOrigin,
     );
   } else {
     await backfillMeta(chatSessionId, message);
+    if (validOrigin) {
+      await backfillOrigin(chatSessionId, validOrigin);
+    }
   }
 
   // Append user message for this turn

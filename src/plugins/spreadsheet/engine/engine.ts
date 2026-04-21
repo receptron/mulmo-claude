@@ -11,6 +11,7 @@ import type {
   EngineOptions,
   SpreadsheetCell,
 } from "./types";
+import { isObj } from "../../../utils/types";
 
 /**
  * SpreadsheetEngine - Main calculation engine class
@@ -154,7 +155,7 @@ export class SpreadsheetEngine {
       name,
       data: data.map((row) =>
         row.map((cell) => {
-          if (typeof cell === "object" && cell !== null && "v" in cell) {
+          if (isObj(cell) && "v" in cell) {
             return cell as SpreadsheetCell;
           }
           return { v: cell };

@@ -30,6 +30,7 @@
 //   - interceptors could go here for logging, retry, metrics
 
 import { errorMessage } from "./errors";
+import { hasStringProp } from "./types";
 
 // ── Auth token (populated by bootstrap; consumed by every call) ─────
 
@@ -109,12 +110,7 @@ async function extractError(
   // without any type assertion.
   try {
     const body: unknown = await res.clone().json();
-    if (
-      body !== null &&
-      typeof body === "object" &&
-      "error" in body &&
-      typeof body.error === "string"
-    ) {
+    if (hasStringProp(body, "error")) {
       return { error: body.error, status };
     }
   } catch {

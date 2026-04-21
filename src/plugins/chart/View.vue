@@ -55,6 +55,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as echarts from "echarts";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ChartEntry, PresentChartData } from "./index";
+import { isRecord } from "../../utils/types";
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentChartData>;
@@ -91,9 +92,9 @@ function disableWheelZoom(
   const dz = option.dataZoom;
   if (dz === undefined || dz === null) return option;
   const normalise = (entry: unknown): unknown => {
-    if (typeof entry !== "object" || entry === null) return entry;
+    if (!isRecord(entry)) return entry;
     return {
-      ...(entry as Record<string, unknown>),
+      ...entry,
       zoomOnMouseWheel: false,
       moveOnMouseWheel: false,
     };
@@ -112,7 +113,6 @@ function renderAll(): void {
     try {
       instance.setOption(disableWheelZoom(chart.option));
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(`[chart] setOption failed for chart ${i}`, err);
     }
     instances[i] = instance;

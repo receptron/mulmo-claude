@@ -27,7 +27,7 @@ import {
   defaultHttpFetcherDeps,
   type RobotsProvider,
 } from "../../workspace/sources/httpFetcher.js";
-import { isValidSlug } from "../../utils/slug.js";
+import { isValidSlug, slugify } from "../../utils/slug.js";
 import {
   FETCHER_KINDS,
   SOURCE_SCHEDULES,
@@ -50,6 +50,7 @@ import {
   serverError,
 } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
 const router = Router();
 
@@ -455,7 +456,7 @@ export function validateSchedule(
 // missing entirely.
 export function validateFetcherParams(raw: unknown): FetcherParams | null {
   if (raw === undefined) return {};
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     return null;
   }
   const out: FetcherParams = {};
@@ -476,7 +477,7 @@ export function validateFetcherParams(raw: unknown): FetcherParams | null {
 // English sources registrable even when they can't produce an
 // ASCII-meaningful slug.
 export function resolveSlug(rawSlug: unknown, title: string): string | null {
-  if (typeof rawSlug === "string" && rawSlug.trim().length > 0) {
+  if (isNonEmptyString(rawSlug)) {
     const candidate = rawSlug.trim();
     return isValidSlug(candidate) ? candidate : null;
   }
@@ -484,12 +485,7 @@ export function resolveSlug(rawSlug: unknown, title: string): string | null {
 }
 
 export function deriveSourceSlug(title: string): string {
-  const ascii = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
+  const ascii = slugify(title, "", 60);
   if (ascii.length > 0 && isValidSlug(ascii)) return ascii;
   // Fallback: sha256 prefix. Base-16 so we only emit [0-9a-f]
   // — matches the isValidSlug charset without needing base64url

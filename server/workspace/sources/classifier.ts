@@ -27,6 +27,7 @@ import {
   type CategorySlug,
 } from "./taxonomy.js";
 import { errorMessage } from "../../utils/errors.js";
+import { isRecord } from "../../utils/types.js";
 
 // Structured input passed to the classifier. Kept small (not the
 // full source content) so the prompt stays cheap — a couple of
@@ -170,7 +171,7 @@ export function validateClassifyResult(obj: unknown): ClassifyResult {
   // Arrays are `typeof === "object"` but aren't a valid
   // structured_output shape — reject them explicitly so the
   // error message stays accurate.
-  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
+  if (!isRecord(obj)) {
     throw new Error("[sources/classifier] output is not an object");
   }
   const o = obj as Record<string, unknown>;

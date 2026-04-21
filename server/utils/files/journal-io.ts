@@ -28,24 +28,27 @@ import {
 
 import fs from "node:fs";
 
-const root = (r?: string) => r ?? workspacePath;
+const root = (rootOverride?: string) => rootOverride ?? workspacePath;
 
 // ── State ───────────────────────────────────────────────────────
 
-export function journalStateExists(r?: string): boolean {
-  const p = path.join(summariesRoot(root(r)), STATE_FILE);
+export function journalStateExists(rootOverride?: string): boolean {
+  const filePath = path.join(summariesRoot(root(rootOverride)), STATE_FILE);
   try {
-    fs.statSync(p);
+    fs.statSync(filePath);
     return true;
   } catch {
     return false;
   }
 }
 
-export async function readJournalState<T>(fallback: T, r?: string): Promise<T> {
-  const p = path.join(summariesRoot(root(r)), STATE_FILE);
+export async function readJournalState<T>(
+  fallback: T,
+  rootOverride?: string,
+): Promise<T> {
+  const filePath = path.join(summariesRoot(root(rootOverride)), STATE_FILE);
   try {
-    return JSON.parse(await fsp.readFile(p, "utf-8")) as T;
+    return JSON.parse(await fsp.readFile(filePath, "utf-8")) as T;
   } catch (err) {
     if (isEnoent(err)) return fallback;
     log.error("journal-io", "readJournalState failed", { error: String(err) });
@@ -55,27 +58,30 @@ export async function readJournalState<T>(fallback: T, r?: string): Promise<T> {
 
 export async function writeJournalState(
   state: unknown,
-  r?: string,
+  rootOverride?: string,
 ): Promise<void> {
-  const p = path.join(summariesRoot(root(r)), STATE_FILE);
-  await writeFileAtomic(p, JSON.stringify(state, null, 2));
+  const filePath = path.join(summariesRoot(root(rootOverride)), STATE_FILE);
+  await writeFileAtomic(filePath, JSON.stringify(state, null, 2));
 }
 
 // ── Index ───────────────────────────────────────────────────────
 
-export async function writeJournalIndex(md: string, r?: string): Promise<void> {
-  const p = path.join(summariesRoot(root(r)), INDEX_FILE);
-  await writeFileAtomic(p, md);
+export async function writeJournalIndex(
+  md: string,
+  rootOverride?: string,
+): Promise<void> {
+  const filePath = path.join(summariesRoot(root(rootOverride)), INDEX_FILE);
+  await writeFileAtomic(filePath, md);
 }
 
 // ── Daily summaries ─────────────────────────────────────────────
 
 export async function readDailySummary(
   date: string,
-  r?: string,
+  rootOverride?: string,
 ): Promise<string | null> {
   try {
-    return await fsp.readFile(dailyPathFor(root(r), date), "utf-8");
+    return await fsp.readFile(dailyPathFor(root(rootOverride), date), "utf-8");
   } catch (err) {
     if (isEnoent(err)) return null;
     log.error("journal-io", `readDailySummary(${date}) failed`, {
@@ -88,19 +94,19 @@ export async function readDailySummary(
 export async function writeDailySummary(
   date: string,
   content: string,
-  r?: string,
+  rootOverride?: string,
 ): Promise<void> {
-  await writeFileAtomic(dailyPathFor(root(r), date), content);
+  await writeFileAtomic(dailyPathFor(root(rootOverride), date), content);
 }
 
 // ── Topics ──────────────────────────────────────────────────────
 
 export async function readTopicFile(
   slug: string,
-  r?: string,
+  rootOverride?: string,
 ): Promise<string | null> {
   try {
-    return await fsp.readFile(topicPathFor(root(r), slug), "utf-8");
+    return await fsp.readFile(topicPathFor(root(rootOverride), slug), "utf-8");
   } catch (err) {
     if (isEnoent(err)) return null;
     // EACCES/EPERM must propagate — swallowing them would cause
@@ -112,34 +118,38 @@ export async function readTopicFile(
 export async function writeTopicFile(
   slug: string,
   content: string,
-  r?: string,
+  rootOverride?: string,
 ): Promise<void> {
-  await writeFileAtomic(topicPathFor(root(r), slug), content);
+  await writeFileAtomic(topicPathFor(root(rootOverride), slug), content);
 }
 
 /** Append content to an existing topic, or create a new file. */
 export async function appendOrCreateTopic(
   slug: string,
   content: string,
-  r?: string,
+  rootOverride?: string,
 ): Promise<"created" | "updated"> {
-  const existing = await readTopicFile(slug, r);
+  const existing = await readTopicFile(slug, rootOverride);
   if (existing === null) {
-    await writeTopicFile(slug, content, r);
+    await writeTopicFile(slug, content, rootOverride);
     return "created";
   }
-  await writeTopicFile(slug, `${existing.trimEnd()}\n\n${content}\n`, r);
+  await writeTopicFile(
+    slug,
+    `${existing.trimEnd()}\n\n${content}\n`,
+    rootOverride,
+  );
   return "updated";
 }
 
 /** List topic slugs (filenames without .md). */
-export async function listTopicSlugs(r?: string): Promise<string[]> {
-  const dir = path.join(summariesRoot(root(r)), TOPICS_DIR);
+export async function listTopicSlugs(rootOverride?: string): Promise<string[]> {
+  const dir = path.join(summariesRoot(root(rootOverride)), TOPICS_DIR);
   try {
     const files = await fsp.readdir(dir);
     return files
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => f.replace(/\.md$/, ""));
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => file.replace(/\.md$/, ""));
   } catch (err) {
     if (isEnoent(err)) return [];
     log.error("journal-io", "listTopicSlugs failed", { error: String(err) });
@@ -149,9 +159,9 @@ export async function listTopicSlugs(r?: string): Promise<string[]> {
 
 /** Read all topic files at once. Returns slug→content map. */
 export async function readAllTopicFiles(
-  r?: string,
+  rootOverride?: string,
 ): Promise<Map<string, string>> {
-  const dir = path.join(summariesRoot(root(r)), TOPICS_DIR);
+  const dir = path.join(summariesRoot(root(rootOverride)), TOPICS_DIR);
   const out = new Map<string, string>();
   let files: string[];
   try {
@@ -159,11 +169,11 @@ export async function readAllTopicFiles(
   } catch {
     return out;
   }
-  for (const f of files) {
-    if (!f.endsWith(".md")) continue;
+  for (const file of files) {
+    if (!file.endsWith(".md")) continue;
     try {
-      const content = await fsp.readFile(path.join(dir, f), "utf-8");
-      out.set(f.replace(/\.md$/, ""), content);
+      const content = await fsp.readFile(path.join(dir, file), "utf-8");
+      out.set(file.replace(/\.md$/, ""), content);
     } catch {
       // skip unreadable files
     }
@@ -173,10 +183,13 @@ export async function readAllTopicFiles(
 
 /** Move a topic to the archive directory. Returns false if the
  *  source doesn't exist or the move fails. */
-export async function archiveTopic(slug: string, r?: string): Promise<boolean> {
-  const src = topicPathFor(root(r), slug);
+export async function archiveTopic(
+  slug: string,
+  rootOverride?: string,
+): Promise<boolean> {
+  const src = topicPathFor(root(rootOverride), slug);
   const dst = path.join(
-    summariesRoot(root(r)),
+    summariesRoot(root(rootOverride)),
     ARCHIVE_DIR,
     TOPICS_DIR,
     `${slug}.md`,
@@ -201,12 +214,14 @@ export interface DailyFileEntry {
   day: string;
 }
 
-export async function listDailyFiles(r?: string): Promise<DailyFileEntry[]> {
-  const dailyRoot = path.join(summariesRoot(root(r)), DAILY_DIR);
+export async function listDailyFiles(
+  rootOverride?: string,
+): Promise<DailyFileEntry[]> {
+  const dailyRoot = path.join(summariesRoot(root(rootOverride)), DAILY_DIR);
   const years = await safeReaddir(dailyRoot);
   const out: DailyFileEntry[] = [];
-  for (const y of years.filter(isYearDir)) {
-    const entries = await listDaysForYear(dailyRoot, y);
+  for (const year of years.filter(isYearDir)) {
+    const entries = await listDaysForYear(dailyRoot, year);
     out.push(...entries);
   }
   return out;
@@ -223,11 +238,11 @@ async function listDaysForYear(
 ): Promise<DailyFileEntry[]> {
   const months = await safeReaddir(path.join(dailyRoot, year));
   const out: DailyFileEntry[] = [];
-  for (const m of months.filter(isMonthDir)) {
-    const dayFiles = await safeReaddir(path.join(dailyRoot, year, m));
-    for (const d of dayFiles) {
-      if (d.endsWith(".md")) {
-        out.push({ year, month: m, day: d.replace(/\.md$/, "") });
+  for (const month of months.filter(isMonthDir)) {
+    const dayFiles = await safeReaddir(path.join(dailyRoot, year, month));
+    for (const dayFile of dayFiles) {
+      if (dayFile.endsWith(".md")) {
+        out.push({ year, month, day: dayFile.replace(/\.md$/, "") });
       }
     }
   }
@@ -244,11 +259,17 @@ async function safeReaddir(dir: string): Promise<string[]> {
 
 // ── Archived topic count ────────────────────────────────────────
 
-export async function countArchivedTopics(r?: string): Promise<number> {
-  const dir = path.join(summariesRoot(root(r)), ARCHIVE_DIR, TOPICS_DIR);
+export async function countArchivedTopics(
+  rootOverride?: string,
+): Promise<number> {
+  const dir = path.join(
+    summariesRoot(root(rootOverride)),
+    ARCHIVE_DIR,
+    TOPICS_DIR,
+  );
   try {
     const files = await fsp.readdir(dir);
-    return files.filter((f) => f.endsWith(".md")).length;
+    return files.filter((file) => file.endsWith(".md")).length;
   } catch {
     return 0;
   }

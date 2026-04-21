@@ -2,7 +2,7 @@
 // returned by the server's session routes.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import { EVENT_TYPES } from "./events";
+import { EVENT_TYPES, type PendingGeneration } from "./events";
 import type { ToolCallHistoryItem } from "./toolCallHistory";
 
 // ── Session origin (#486) ───────────────────────────────────
@@ -16,6 +16,14 @@ export const SESSION_ORIGINS = {
 
 export type SessionOrigin =
   (typeof SESSION_ORIGINS)[keyof typeof SESSION_ORIGINS];
+
+const VALID_ORIGINS: ReadonlySet<string> = new Set(
+  Object.values(SESSION_ORIGINS),
+);
+
+export function isSessionOrigin(value: unknown): value is SessionOrigin {
+  return typeof value === "string" && VALID_ORIGINS.has(value);
+}
 
 // Server `/api/sessions` summary. Optional `summary` and `keywords`
 // are populated by the chat indexer (#123) when present.
@@ -82,6 +90,12 @@ export interface ActiveSession {
   id: string;
   roleId: string;
   toolResults: ToolResultComplete[];
+  /** UUID → epoch ms. Recorded when each result is added to the
+   *  session — either from a real-time pubsub event or from
+   *  loading a saved session. For saved sessions, the session's
+   *  `startedAt` is used as a baseline (individual per-entry
+   *  timestamps aren't persisted in the JSONL yet). */
+  resultTimestamps: Map<string, number>;
   isRunning: boolean;
   statusMessage: string;
   toolCallHistory: ToolCallHistoryItem[];
@@ -99,4 +113,12 @@ export interface ActiveSession {
   // session (not on the subscription closure) so updates on turn N+1
   // are visible to the reused subscription callback.
   runStartIndex: number;
+  /**
+   * In-flight background generations triggered by a plugin view (e.g.
+   * MulmoScript image/audio/movie renders). Keyed by
+   * `generationKey(kind, filePath, key)` (opaque identity, not parsed
+   * back); the value carries the decomposed (kind, filePath, key) so
+   * views read those fields directly. Empty map = no background work.
+   */
+  pendingGenerations: Record<string, PendingGeneration>;
 }
