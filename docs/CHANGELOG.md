@@ -62,7 +62,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Packages published during this cycle
 
-- `mulmoclaude@0.1.2` (new, initial npm publish — port fallback, ready banner, tsx runtime)
+- `mulmoclaude@0.3.0` (aligned to app version — initial npm publish with port fallback, ready banner, tsx runtime)
 - `@mulmobridge/protocol@0.1.3` (adds `GENERATION_KINDS` export chain)
 - `@mulmobridge/chat-service@0.1.1` (catches up with protocol 0.1.3)
 - `@mulmobridge/relay@0.1.0` (new)
