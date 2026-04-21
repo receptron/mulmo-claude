@@ -202,7 +202,7 @@ export async function* runAgent(
       chatSessionId: sessionId,
       port,
       activePlugins,
-      roleIds: loadAllRoles().map((r) => r.id),
+      roleIds: loadAllRoles().map((loadedRole) => loadedRole.id),
       useDocker,
       userServers,
     });

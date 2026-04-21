@@ -525,8 +525,8 @@ async function resolveCategories(parsed: ParsedRegisterBody): Promise<{ categori
 
 function isHttpUrl(raw: string): boolean {
   try {
-    const u = new URL(raw);
-    return u.protocol === "http:" || u.protocol === "https:";
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }

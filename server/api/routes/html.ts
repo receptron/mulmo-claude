@@ -7,8 +7,8 @@ import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 const router = Router();
 
 async function callGemini(prompt: string): Promise<string> {
-  const ai = getGeminiClient();
-  const response = await ai.models.generateContent({
+  const client = getGeminiClient();
+  const response = await client.models.generateContent({
     model: "gemini-2.0-flash",
     contents: [{ text: prompt }],
   });

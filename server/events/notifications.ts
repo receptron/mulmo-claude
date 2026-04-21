@@ -32,8 +32,8 @@ export interface NotificationDeps {
 
 let deps: NotificationDeps | null = null;
 
-export function initNotifications(d: NotificationDeps): void {
-  deps = d;
+export function initNotifications(injected: NotificationDeps): void {
+  deps = injected;
 }
 
 // ── In-memory store ─────────────────────────────────────────────
@@ -97,10 +97,10 @@ export function publishNotification(opts: PublishNotificationOpts): void {
   }
 }
 
-function formatBridgeMessage(p: NotificationPayload): string {
-  const icon = p.kind === NOTIFICATION_KINDS.agent ? "\u2705" : "\u{1F514}";
-  const parts = [icon, p.title];
-  if (p.body) parts.push(p.body);
+function formatBridgeMessage(payload: NotificationPayload): string {
+  const icon = payload.kind === NOTIFICATION_KINDS.agent ? "\u2705" : "\u{1F514}";
+  const parts = [icon, payload.title];
+  if (payload.body) parts.push(payload.body);
   return parts.join(" ");
 }
 

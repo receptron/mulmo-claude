@@ -181,8 +181,8 @@ export function isMcpConfigFile(value: unknown): value is McpConfigFile {
 
   const servers = value.mcpServers;
   if (!isRecord(servers)) return false;
-  for (const [id, spec] of Object.entries(servers)) {
-    if (!isMcpServerId(id)) return false;
+  for (const [serverId, spec] of Object.entries(servers)) {
+    if (!isMcpServerId(serverId)) return false;
     if (!isMcpServerSpec(spec)) return false;
   }
   return true;
@@ -220,7 +220,7 @@ export function saveMcpConfig(cfg: McpConfigFile): void {
 
 // Flatten storage form to UI-friendly array.
 export function toMcpEntries(cfg: McpConfigFile): McpServerEntry[] {
-  return Object.entries(cfg.mcpServers).map(([id, spec]) => ({ id, spec }));
+  return Object.entries(cfg.mcpServers).map(([serverId, spec]) => ({ id: serverId, spec }));
 }
 
 // Re-inflate UI-friendly array to storage form. Duplicate ids are

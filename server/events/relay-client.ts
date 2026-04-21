@@ -6,7 +6,7 @@
 //
 // NOTE: packages/relay/src/client.ts is a parallel implementation
 // for browser/edge environments using the global WebSocket API.
-// This module uses the `ws` npm package for Node.js. If you change
+// This module uses the `socket` npm package for Node.js. If you change
 // reconnection logic or URL handling here, check the other file too.
 
 import WebSocket from "ws";
@@ -87,7 +87,7 @@ function isRelayMessage(value: unknown): value is RelayMessage {
 export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
   const { relayUrl, relayToken, relay, logger } = deps;
 
-  let ws: WebSocket | null = null;
+  let socket: WebSocket | null = null;
   let reconnectMs = MIN_RECONNECT_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
@@ -103,7 +103,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
     if (stopped) return;
 
     try {
-      ws = new WebSocket(buildUrl());
+      socket = new WebSocket(buildUrl());
     } catch (err) {
       logger.error(LOG_PREFIX, "failed to create WebSocket", {
         error: err instanceof Error ? err.message : String(err),
@@ -112,18 +112,18 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
       return;
     }
 
-    ws.on("open", () => {
+    socket.on("open", () => {
       logger.info(LOG_PREFIX, "connected", { url: relayUrl });
       reconnectMs = MIN_RECONNECT_MS;
       flushResponseQueue();
     });
 
-    ws.on("message", (data) => {
+    socket.on("message", (data) => {
       handleMessage(String(data));
     });
 
-    ws.on("close", (code, reason) => {
-      ws = null;
+    socket.on("close", (code, reason) => {
+      socket = null;
       if (TERMINAL_CLOSE_CODES.has(code)) {
         logger.error(LOG_PREFIX, "terminal close, not reconnecting", {
           code,
@@ -138,7 +138,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
       scheduleReconnect();
     });
 
-    ws.on("error", (err) => {
+    socket.on("error", (err) => {
       logger.warn(LOG_PREFIX, "connection error", {
         error: err.message,
       });
@@ -227,9 +227,9 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
   }
 
   function trySend(response: RelayResponse): boolean {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
     try {
-      ws.send(JSON.stringify(response), (err) => {
+      socket.send(JSON.stringify(response), (err) => {
         if (err && !stopped) {
           logger.warn(LOG_PREFIX, "send failed, requeueing", {
             platform: response.platform,
@@ -261,7 +261,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
       count: responseQueue.length,
     });
     while (responseQueue.length > 0) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) break;
+      if (!socket || socket.readyState !== WebSocket.OPEN) break;
       const response = responseQueue[0]!;
       if (!trySend(response)) break;
       responseQueue.shift();
@@ -274,9 +274,9 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
-    if (ws) {
-      ws.close(1000, "shutdown");
-      ws = null;
+    if (socket) {
+      socket.close(1000, "shutdown");
+      socket = null;
     }
     logger.info(LOG_PREFIX, "stopped");
   }

@@ -77,12 +77,12 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
       continue;
     }
     if (!isRecord(entry)) continue;
-    const o = entry;
-    if (o.type !== EVENT_TYPES.text) continue;
-    if (o.source !== "user" && o.source !== "assistant") continue;
-    const message = o.message;
+    const record = entry;
+    if (record.type !== EVENT_TYPES.text) continue;
+    if (record.source !== "user" && record.source !== "assistant") continue;
+    const message = record.message;
     if (typeof message !== "string" || message.length === 0) continue;
-    out.push({ source: o.source, text: message });
+    out.push({ source: record.source, text: message });
   }
   return out;
 }

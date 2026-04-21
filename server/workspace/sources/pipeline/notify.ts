@@ -30,7 +30,7 @@ export function runNotifyPhase(items: readonly SourceItem[], workspaceRoot?: str
 }
 
 function formatSingleBody(item: SourceItem): string {
-  const suffix = item.summary ? " \u2014 " + item.summary : "";
+  const suffix = item.summary ? " — " + item.summary : "";
   return "From " + item.sourceSlug + suffix;
 }
 
@@ -52,12 +52,12 @@ function publishBatchNotification(scored: readonly ScoredItem[]): void {
 
   const bullets = scored
     .slice(0, 5)
-    .map((s) => `\u2022 ${s.item.title} (${s.item.sourceSlug})`)
+    .map((row) => `• ${row.item.title} (${row.item.sourceSlug})`)
     .join("\n");
   const extra = scored.length > 5 ? `\n+${scored.length - 5} more` : "";
 
   // Preserve high priority if any item in the batch is critical
-  const hasCritical = scored.some((s) => s.item.severity === "critical");
+  const hasCritical = scored.some((row) => row.item.severity === "critical");
 
   publishNotification({
     kind: NOTIFICATION_KINDS.push,

@@ -80,7 +80,7 @@ export function normalizeUrl(raw: string): string | null {
   // Sort remaining params for deterministic ordering. Preserve
   // multi-value params by iterating all entries.
   const entries = Array.from(url.searchParams.entries());
-  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  entries.sort(([leftKey], [rightKey]) => (leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0));
   // Clear and reinsert.
   for (const name of Array.from(url.searchParams.keys())) {
     url.searchParams.delete(name);

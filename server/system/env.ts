@@ -19,11 +19,11 @@
 
 function asInt(value: string | undefined, fallback: number, opts: { min?: number; max?: number } = {}): number {
   if (value === undefined || value === "") return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n)) return fallback;
-  if (opts.min !== undefined && n < opts.min) return fallback;
-  if (opts.max !== undefined && n > opts.max) return fallback;
-  return n;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  if (opts.min !== undefined && parsed < opts.min) return fallback;
+  if (opts.max !== undefined && parsed > opts.max) return fallback;
+  return parsed;
 }
 
 function asFlag(value: string | undefined): boolean {

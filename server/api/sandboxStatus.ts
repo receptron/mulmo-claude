@@ -59,6 +59,6 @@ export function buildSandboxStatus(params: BuildSandboxStatusParams): SandboxSta
 
   return {
     sshAgent,
-    mounts: parsed.resolved.map((m) => m.name),
+    mounts: parsed.resolved.map((mount) => mount.name),
   };
 }

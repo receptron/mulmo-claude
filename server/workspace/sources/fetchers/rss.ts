@@ -74,7 +74,7 @@ function entryToSourceItem(entry: ParsedFeedItem, source: Source, lastSeenTs: nu
   // Use the feed's own id as a hint, but always derive the
   // SourceItem.id from the normalized URL so cross-source dedup
   // (see #188 Q3) lines up regardless of feed conventions.
-  const id = stableItemId(normalizedUrl);
+  const itemId = stableItemId(normalizedUrl);
   const publishedAt =
     entry.publishedAt ??
     // Synthesize a fetch-time timestamp when the feed didn't
@@ -85,7 +85,7 @@ function entryToSourceItem(entry: ParsedFeedItem, source: Source, lastSeenTs: nu
   // carry `undefined` fields that break exactOptionalPropertyTypes
   // on the server tsconfig.
   return {
-    id,
+    id: itemId,
     title: entry.title,
     url: normalizedUrl,
     publishedAt,
@@ -107,9 +107,9 @@ export function updateCursor(current: Record<string, string>, feed: ParsedFeed):
   let newest: number | null = null;
   for (const entry of feed.items) {
     if (!entry.publishedAt) continue;
-    const ts = Date.parse(entry.publishedAt);
-    if (!Number.isFinite(ts)) continue;
-    if (newest === null || ts > newest) newest = ts;
+    const publishedMs = Date.parse(entry.publishedAt);
+    if (!Number.isFinite(publishedMs)) continue;
+    if (newest === null || publishedMs > newest) newest = publishedMs;
   }
   if (newest === null) return current;
   // Only advance forwards. A feed whose newest item is older

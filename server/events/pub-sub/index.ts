@@ -13,7 +13,7 @@ export interface IPubSub {
 // itself, which is why we switched off raw ws.
 
 export function createPubSub(server: http.Server): IPubSub {
-  const io = new IOServer(server, {
+  const ioServer = new IOServer(server, {
     path: "/ws/pubsub",
     // Server binds to 127.0.0.1 only, so CORS is moot — but
     // socket.io defaults to rejecting cross-origin upgrade
@@ -28,7 +28,7 @@ export function createPubSub(server: http.Server): IPubSub {
     transports: ["websocket"],
   });
 
-  io.on("connection", (socket) => {
+  ioServer.on("connection", (socket) => {
     socket.on("subscribe", (channel: unknown) => {
       if (typeof channel === "string") socket.join(channel);
     });
@@ -39,7 +39,7 @@ export function createPubSub(server: http.Server): IPubSub {
 
   return {
     publish(channel: string, data: unknown): void {
-      io.to(channel).emit("data", { channel, data });
+      ioServer.to(channel).emit("data", { channel, data });
     },
   };
 }
