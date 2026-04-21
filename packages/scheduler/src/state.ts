@@ -18,10 +18,7 @@ export interface StateDeps {
 export type StateMap = Map<string, TaskExecutionState>;
 
 /** Load state.json → Map. Returns empty map on missing / corrupt file. */
-export async function loadState(
-  filePath: string,
-  deps: StateDeps,
-): Promise<StateMap> {
+export async function loadState(filePath: string, deps: StateDeps): Promise<StateMap> {
   if (!deps.exists(filePath)) return new Map();
   try {
     const raw = await deps.readFile(filePath);
@@ -44,11 +41,7 @@ export async function loadState(
 }
 
 /** Save Map → state.json (atomic). */
-export async function saveState(
-  filePath: string,
-  states: ReadonlyMap<string, TaskExecutionState>,
-  deps: StateDeps,
-): Promise<void> {
+export async function saveState(filePath: string, states: ReadonlyMap<string, TaskExecutionState>, deps: StateDeps): Promise<void> {
   const obj: Record<string, TaskExecutionState> = {};
   for (const [id, s] of states) {
     obj[id] = s;
@@ -57,13 +50,7 @@ export async function saveState(
 }
 
 /** Update a single task's state in the map and persist. */
-export async function updateAndSave(
-  filePath: string,
-  states: StateMap,
-  taskId: string,
-  patch: Partial<TaskExecutionState>,
-  deps: StateDeps,
-): Promise<void> {
+export async function updateAndSave(filePath: string, states: StateMap, taskId: string, patch: Partial<TaskExecutionState>, deps: StateDeps): Promise<void> {
   const current = states.get(taskId) ?? emptyState(taskId);
   states.set(taskId, { ...current, ...patch });
   await saveState(filePath, states, deps);

@@ -9,10 +9,7 @@ import { writeFile, rename, unlink, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
-export async function writeFileAtomic(
-  filePath: string,
-  content: string,
-): Promise<void> {
+export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
   const tmp = `${filePath}.${randomUUID()}.tmp`;
   await mkdir(path.dirname(filePath), { recursive: true });
   try {

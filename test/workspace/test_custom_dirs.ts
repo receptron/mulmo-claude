@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import path from "path";
 import os from "os";
-import {
-  loadCustomDirs,
-  ensureCustomDirs,
-  buildCustomDirsPrompt,
-  DIR_STRUCTURES,
-} from "../../server/workspace/custom-dirs.ts";
+import { loadCustomDirs, ensureCustomDirs, buildCustomDirsPrompt, DIR_STRUCTURES } from "../../server/workspace/custom-dirs.ts";
 
 function tmpRoot(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "custom-dirs-"));
@@ -17,10 +12,7 @@ function tmpRoot(): string {
 }
 
 function writeConfig(root: string, data: unknown): void {
-  writeFileSync(
-    path.join(root, "config", "workspace-dirs.json"),
-    JSON.stringify(data),
-  );
+  writeFileSync(path.join(root, "config", "workspace-dirs.json"), JSON.stringify(data));
 }
 
 describe("loadCustomDirs", () => {
@@ -52,17 +44,13 @@ describe("loadCustomDirs", () => {
 
   it("rejects path traversal (..)", () => {
     const root = tmpRoot();
-    writeConfig(root, [
-      { path: "data/../etc/passwd", description: "evil", structure: "flat" },
-    ]);
+    writeConfig(root, [{ path: "data/../etc/passwd", description: "evil", structure: "flat" }]);
     assert.deepEqual(loadCustomDirs(root), []);
   });
 
   it("rejects absolute paths", () => {
     const root = tmpRoot();
-    writeConfig(root, [
-      { path: "/etc/shadow", description: "evil", structure: "flat" },
-    ]);
+    writeConfig(root, [{ path: "/etc/shadow", description: "evil", structure: "flat" }]);
     assert.deepEqual(loadCustomDirs(root), []);
   });
 
@@ -107,9 +95,7 @@ describe("loadCustomDirs", () => {
 
   it("allows non-reserved data/ subdirectories", () => {
     const root = tmpRoot();
-    writeConfig(root, [
-      { path: "data/books", description: "Reading notes", structure: "flat" },
-    ]);
+    writeConfig(root, [{ path: "data/books", description: "Reading notes", structure: "flat" }]);
     const entries = loadCustomDirs(root);
     assert.equal(entries.length, 1);
     assert.equal(entries[0].path, "data/books");
@@ -118,9 +104,7 @@ describe("loadCustomDirs", () => {
   it("truncates long descriptions", () => {
     const root = tmpRoot();
     const longDesc = "x".repeat(500);
-    writeConfig(root, [
-      { path: "data/test", description: longDesc, structure: "flat" },
-    ]);
+    writeConfig(root, [{ path: "data/test", description: longDesc, structure: "flat" }]);
     const entries = loadCustomDirs(root);
     assert.equal(entries[0].description.length, 200);
   });
@@ -141,9 +125,7 @@ describe("loadCustomDirs", () => {
 
   it("defaults structure to flat for invalid values", () => {
     const root = tmpRoot();
-    writeConfig(root, [
-      { path: "data/test", description: "test", structure: "invalid" },
-    ]);
+    writeConfig(root, [{ path: "data/test", description: "test", structure: "invalid" }]);
     const entries = loadCustomDirs(root);
     assert.equal(entries[0].structure, DIR_STRUCTURES.flat);
   });
@@ -162,20 +144,14 @@ describe("loadCustomDirs", () => {
 
   it("returns empty for corrupted JSON", () => {
     const root = tmpRoot();
-    writeFileSync(
-      path.join(root, "config", "workspace-dirs.json"),
-      "not json {{{",
-    );
+    writeFileSync(path.join(root, "config", "workspace-dirs.json"), "not json {{{");
     assert.deepEqual(loadCustomDirs(root), []);
   });
 
   it("rejects paths with control characters", () => {
     const root = tmpRoot();
     // Write raw JSON with a tab character in the path
-    writeFileSync(
-      path.join(root, "config", "workspace-dirs.json"),
-      '[{"path":"data/foo\\tbar","description":"ctrl","structure":"flat"}]',
-    );
+    writeFileSync(path.join(root, "config", "workspace-dirs.json"), '[{"path":"data/foo\\tbar","description":"ctrl","structure":"flat"}]');
     assert.deepEqual(loadCustomDirs(root), []);
   });
 });

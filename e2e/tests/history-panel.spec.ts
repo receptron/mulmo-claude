@@ -21,9 +21,7 @@ test.describe("history panel (useSessionHistory)", () => {
     await mockAllApis(page);
   });
 
-  test("clicking the history button opens the panel with server sessions", async ({
-    page,
-  }) => {
+  test("clicking the history button opens the panel with server sessions", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -32,12 +30,8 @@ test.describe("history panel (useSessionHistory)", () => {
 
     await page.getByTestId("history-btn").click();
 
-    await expect(
-      page.getByTestId(`session-item-${SESSION_A.id}`),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId(`session-item-${SESSION_B.id}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeVisible();
   });
 
   test("clicking a session navigates to /chat/:id", async ({ page }) => {
@@ -65,9 +59,7 @@ test.describe("history panel (useSessionHistory)", () => {
     await expect(item).toBeHidden();
   });
 
-  test("button click triggers a fresh /api/sessions fetch", async ({
-    page,
-  }) => {
+  test("button click triggers a fresh /api/sessions fetch", async ({ page }) => {
     // Count /api/sessions GETs so we can verify the button fires a
     // lazy fetch (not just the onMount one).
     let sessionFetchCount = 0;
@@ -91,17 +83,13 @@ test.describe("history panel (useSessionHistory)", () => {
     const countAfterMount = sessionFetchCount;
 
     await page.getByTestId("history-btn").click();
-    await expect(
-      page.getByTestId(`session-item-${SESSION_A.id}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
 
     // One additional fetch should have happened on button click.
     expect(sessionFetchCount).toBeGreaterThan(countAfterMount);
   });
 
-  test("filter bar is visible with All/Human/Scheduler/Skill/Bridge buttons", async ({
-    page,
-  }) => {
+  test("filter bar is visible with All/Human/Scheduler/Skill/Bridge buttons", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -137,25 +125,17 @@ test.describe("history panel (useSessionHistory)", () => {
 
     await page.getByTestId("history-btn").click();
     // Both visible initially
-    await expect(
-      page.getByTestId(`session-item-${SESSION_A.id}`),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId(`session-item-${SESSION_B.id}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeVisible();
 
     // Click Bridge filter
     await page.getByTestId("session-filter-bridge").click();
     // Only bridge session visible
-    await expect(
-      page.getByTestId(`session-item-${SESSION_A.id}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
     await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeHidden();
 
     // Click All to reset
     await page.getByTestId("session-filter-all").click();
-    await expect(
-      page.getByTestId(`session-item-${SESSION_B.id}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeVisible();
   });
 });

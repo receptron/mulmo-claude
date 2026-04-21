@@ -35,14 +35,7 @@ import type { CategorySlug } from "./taxonomy.js";
 //   "arxiv"              — arXiv query API
 //   "web-fetch"          — one-shot page fetch via Claude's web_fetch
 //   "web-search"         — ad-hoc query via Claude's web_search
-export const FETCHER_KINDS = [
-  "rss",
-  "github-releases",
-  "github-issues",
-  "arxiv",
-  "web-fetch",
-  "web-search",
-] as const;
+export const FETCHER_KINDS = ["rss", "github-releases", "github-issues", "arxiv", "web-fetch", "web-search"] as const;
 
 export type FetcherKind = (typeof FETCHER_KINDS)[number];
 
@@ -56,12 +49,7 @@ export function isFetcherKind(value: unknown): value is FetcherKind {
 // `on-demand` sources are never auto-fetched; they only respond to
 // the `manageSource fetch` action or the on-demand research
 // workflow.
-export const SOURCE_SCHEDULES = [
-  "hourly",
-  "daily",
-  "weekly",
-  "on-demand",
-] as const;
+export const SOURCE_SCHEDULES = ["hourly", "daily", "weekly", "on-demand"] as const;
 
 export type SourceSchedule = (typeof SOURCE_SCHEDULES)[number];
 

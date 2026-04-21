@@ -20,9 +20,7 @@ export const HTML_PREVIEW_CSP_ALLOWED_CDNS: readonly string[] = [
  * Build the CSP string. Split from the wrapper so tests can exercise
  * the policy without HTML-template noise.
  */
-export function buildHtmlPreviewCsp(
-  cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS,
-): string {
+export function buildHtmlPreviewCsp(cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS): string {
   const cdnList = cdns.join(" ");
   return [
     "default-src 'none'",

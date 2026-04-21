@@ -3,34 +3,34 @@ import type { Formatter, LogRecord } from "./types.js";
 function formatData(data: Record<string, unknown> | undefined): string {
   if (!data) return "";
   const parts: string[] = [];
-  for (const [k, v] of Object.entries(data)) {
-    parts.push(`${k}=${stringifyScalar(v)}`);
+  for (const [key, val] of Object.entries(data)) {
+    parts.push(`${key}=${stringifyScalar(val)}`);
   }
   return parts.length ? ` ${parts.join(" ")}` : "";
 }
 
-function stringifyScalar(v: unknown): string {
-  if (v === null) return "null";
-  if (v === undefined) return "undefined";
-  if (typeof v === "string") {
-    return /\s/.test(v) ? JSON.stringify(v) : v;
+function stringifyScalar(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "string") {
+    return /\s/.test(value) ? JSON.stringify(value) : value;
   }
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
   try {
-    return JSON.stringify(v);
+    return JSON.stringify(value);
   } catch {
-    return String(v);
+    return String(value);
   }
 }
 
 export const formatText: Formatter = (record: LogRecord): string => {
   const level = record.level.toUpperCase().padEnd(5);
-  return `${record.ts} ${level} [${record.prefix}] ${record.message}${formatData(record.data)}`;
+  return `${record.time} ${level} [${record.prefix}] ${record.message}${formatData(record.data)}`;
 };
 
 export const formatJson: Formatter = (record: LogRecord): string => {
   const payload: Record<string, unknown> = {
-    ts: record.ts,
+    time: record.time,
     level: record.level,
     prefix: record.prefix,
     message: record.message,

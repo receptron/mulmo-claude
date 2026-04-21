@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  validateUpdateBeatBody,
-  validateUpdateScriptBody,
-} from "../../server/api/routes/mulmoScriptValidate.js";
+import { validateUpdateBeatBody, validateUpdateScriptBody } from "../../server/api/routes/mulmoScriptValidate.js";
 
 // Minimal script / beat objects that satisfy the zod schemas from
 // `@mulmocast/types`. If `@mulmocast/types` tightens its schemas, the

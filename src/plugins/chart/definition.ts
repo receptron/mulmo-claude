@@ -17,20 +17,17 @@ const toolDefinition: ToolDefinition = {
         properties: {
           title: {
             type: "string",
-            description:
-              "Optional human-friendly title for the whole document. Used to derive the file slug and as the preview label.",
+            description: "Optional human-friendly title for the whole document. Used to derive the file slug and as the preview label.",
           },
           charts: {
             type: "array",
-            description:
-              "List of charts to render, in order. Each charts[i].option is passed as-is to ECharts' setOption().",
+            description: "List of charts to render, in order. Each charts[i].option is passed as-is to ECharts' setOption().",
             items: {
               type: "object",
               properties: {
                 title: {
                   type: "string",
-                  description:
-                    "Optional short label for this specific chart (shown above it in the UI).",
+                  description: "Optional short label for this specific chart (shown above it in the UI).",
                 },
                 type: {
                   type: "string",
@@ -51,8 +48,7 @@ const toolDefinition: ToolDefinition = {
       },
       title: {
         type: "string",
-        description:
-          "Short label shown in the canvas preview sidebar. Defaults to document.title, or 'Chart' when both are blank.",
+        description: "Short label shown in the canvas preview sidebar. Defaults to document.title, or 'Chart' when both are blank.",
       },
     },
     required: ["document"],

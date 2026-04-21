@@ -4,10 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  saveProjectSkill,
-  deleteProjectSkill,
-} from "../../server/workspace/skills/writer.js";
+import { saveProjectSkill, deleteProjectSkill } from "../../server/workspace/skills/writer.js";
 import { projectSkillPath } from "../../server/workspace/skills/paths.js";
 
 let workspace: string;
@@ -38,10 +35,7 @@ describe("saveProjectSkill — happy path", () => {
     const expected = projectSkillPath(workspace, "fix-ci");
     assert.equal(result.path, expected);
     const written = await readFile(expected, "utf-8");
-    assert.match(
-      written,
-      /^---\ndescription: Fix CI failures and rerun\n---\n\n## Steps/,
-    );
+    assert.match(written, /^---\ndescription: Fix CI failures and rerun\n---\n\n## Steps/);
     assert.ok(written.endsWith("\n"));
   });
 
@@ -169,13 +163,13 @@ describe("deleteProjectSkill", () => {
     assert.deepEqual(result, { kind: "deleted", name: "removable" });
 
     // Re-saving the same slug should now succeed.
-    const re = await saveProjectSkill({
+    const reSave = await saveProjectSkill({
       workspaceRoot: workspace,
       name: "removable",
       description: "fresh",
       body: "fresh body",
     });
-    assert.equal(re.kind, "saved");
+    assert.equal(reSave.kind, "saved");
   });
 
   it("returns not-found when the skill does not exist", async () => {

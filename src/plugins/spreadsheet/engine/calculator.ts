@@ -8,14 +8,7 @@ import { formatNumber } from "./formatter";
 import { columnToIndex } from "./parser";
 import { evaluateFormula as evaluateFormulaFn } from "./evaluator";
 import { parseDate, getDefaultDateFormat } from "./date-parser";
-import type {
-  SheetData,
-  CellValue,
-  CalculatedSheet,
-  CalculationError,
-  FormulaInfo,
-  SpreadsheetCell,
-} from "./types";
+import type { SheetData, CellValue, CalculatedSheet, CalculationError, FormulaInfo, SpreadsheetCell } from "./types";
 import { isObj } from "../../../utils/types";
 
 /**
@@ -108,10 +101,7 @@ function preprocessDates(data: SpreadsheetCell[][]): SpreadsheetCell[][] {
  * @param allSheets - All sheets for cross-sheet references
  * @returns Calculated sheet with formulas evaluated
  */
-export function calculateSheet(
-  sheet: SheetData,
-  allSheets?: SheetData[],
-): CalculatedSheet {
+export function calculateSheet(sheet: SheetData, allSheets?: SheetData[]): CalculatedSheet {
   // Normalize malformed data structures first
   const normalizedData = normalizeData(sheet.data);
 
@@ -186,9 +176,7 @@ export function calculateSheet(
 
           // Check for circular reference
           if (calculating.has(cellKey)) {
-            console.warn(
-              `Circular reference detected at row ${row}, col ${col}`,
-            );
+            console.warn(`Circular reference detected at row ${row}, col ${col}`);
             errors.push({
               cell: { row, col },
               formula: value,
@@ -217,10 +205,7 @@ export function calculateSheet(
             return result;
           } catch (error) {
             calculating.delete(cellKey);
-            console.error(
-              `Error evaluating formula at row ${row}, col ${col}:`,
-              error,
-            );
+            console.error(`Error evaluating formula at row ${row}, col ${col}:`, error);
             errors.push({
               cell: { row, col },
               formula: value,
@@ -265,9 +250,7 @@ export function calculateSheet(
         sheetData = sheetsCache.get(targetSheetName)!;
       } else {
         // Find the sheet in all sheets
-        const targetSheet = processedAllSheets?.find(
-          (s) => s.name === targetSheetName,
-        );
+        const targetSheet = processedAllSheets?.find((s) => s.name === targetSheetName);
         if (targetSheet && targetSheet.data) {
           // Calculate formulas for the target sheet with cache
           const targetCalculated = targetSheet.data.map((row) => [...row]);
@@ -291,28 +274,16 @@ export function calculateSheet(
     const col = columnToIndex(match[1]); // A=0, B=1, ..., Z=25, AA=26, etc.
     const row = parseInt(match[2]) - 1; // 1-indexed to 0-indexed
 
-    if (
-      row < 0 ||
-      row >= sheetData.length ||
-      col < 0 ||
-      col >= sheetData[row].length
-    ) {
+    if (row < 0 || row >= sheetData.length || col < 0 || col >= sheetData[row].length) {
       return 0;
     }
 
     const cell = sheetData[row][col];
     // Pass row/col only if this is the current sheet (for recursive evaluation)
-    return getRawValue(
-      cell,
-      isCurrentSheet ? row : undefined,
-      isCurrentSheet ? col : undefined,
-    );
+    return getRawValue(cell, isCurrentSheet ? row : undefined, isCurrentSheet ? col : undefined);
   };
 
-  const collectRangeValues = (
-    range: string,
-    options: { numericOnly: boolean },
-  ): CellValue[] => {
+  const collectRangeValues = (range: string, options: { numericOnly: boolean }): CellValue[] => {
     let sheetData: any[][] = calculated;
     let rangeRef = range;
     let isCurrentSheet = true;
@@ -329,9 +300,7 @@ export function calculateSheet(
         sheetData = sheetsCache.get(targetSheetName)!;
       } else {
         // Find and calculate the target sheet
-        const targetSheet = processedAllSheets?.find(
-          (s) => s.name === targetSheetName,
-        );
+        const targetSheet = processedAllSheets?.find((s) => s.name === targetSheetName);
         if (targetSheet && targetSheet.data) {
           const targetCalculated = targetSheet.data.map((row) => [...row]);
           sheetsCache.set(targetSheetName, targetCalculated);
@@ -357,19 +326,10 @@ export function calculateSheet(
     const values: CellValue[] = [];
     for (let row = startRow; row <= endRow; row++) {
       for (let col = startCol; col <= endCol; col++) {
-        if (
-          row >= 0 &&
-          row < sheetData.length &&
-          col >= 0 &&
-          col < sheetData[row].length
-        ) {
+        if (row >= 0 && row < sheetData.length && col >= 0 && col < sheetData[row].length) {
           const cell = sheetData[row][col];
           // Pass row/col only if current sheet (for recursive evaluation)
-          const rawValue = getRawValue(
-            cell,
-            isCurrentSheet ? row : undefined,
-            isCurrentSheet ? col : undefined,
-          );
+          const rawValue = getRawValue(cell, isCurrentSheet ? row : undefined, isCurrentSheet ? col : undefined);
 
           if (options.numericOnly) {
             if (!isNaN(rawValue as number)) {
@@ -385,12 +345,10 @@ export function calculateSheet(
   };
 
   // Helper to get numeric-only range values (legacy behavior)
-  const getRangeValues = (range: string): CellValue[] =>
-    collectRangeValues(range, { numericOnly: true });
+  const getRangeValues = (range: string): CellValue[] => collectRangeValues(range, { numericOnly: true });
 
   // Helper to get raw range values including text
-  const getRangeValuesRaw = (range: string): CellValue[] =>
-    collectRangeValues(range, { numericOnly: false });
+  const getRangeValuesRaw = (range: string): CellValue[] => collectRangeValues(range, { numericOnly: false });
 
   // Evaluate a formula with context
   const evaluateFormula = (formula: string): CellValue => {
@@ -409,11 +367,7 @@ export function calculateSheet(
       const calculatedCell = calculated[rowIdx][colIdx];
 
       // Skip if cell was already calculated recursively
-      if (
-        typeof calculatedCell === "number" &&
-        isObj(originalCell) &&
-        "f" in originalCell
-      ) {
+      if (typeof calculatedCell === "number" && isObj(originalCell) && "f" in originalCell) {
         // Cell was already evaluated - keep it as number for now
         // Formatting will be applied at the end
         continue;
@@ -460,19 +414,11 @@ export function calculateSheet(
       const calculatedValue = calculated[rowIdx][colIdx];
 
       if (isObj(originalCell) && "v" in originalCell) {
-        const isFormula =
-          typeof originalCell.v === "string" && originalCell.v.startsWith("=");
+        const isFormula = typeof originalCell.v === "string" && originalCell.v.startsWith("=");
 
         // Apply formatting if cell has a format code and calculated value is a number
-        if (
-          "f" in originalCell &&
-          originalCell.f &&
-          typeof calculatedValue === "number"
-        ) {
-          calculated[rowIdx][colIdx] = formatNumber(
-            calculatedValue,
-            originalCell.f,
-          );
+        if ("f" in originalCell && originalCell.f && typeof calculatedValue === "number") {
+          calculated[rowIdx][colIdx] = formatNumber(calculatedValue, originalCell.f);
         }
         // Auto-format date serial numbers from formulas without explicit format
         else if (
@@ -488,10 +434,7 @@ export function calculateSheet(
           // Must be integer (dates without time component)
           // Avoids formatting calculated averages/sums as dates
           // Apply default date format
-          calculated[rowIdx][colIdx] = formatNumber(
-            calculatedValue,
-            "MM/DD/YYYY",
-          );
+          calculated[rowIdx][colIdx] = formatNumber(calculatedValue, "MM/DD/YYYY");
         }
       }
     }

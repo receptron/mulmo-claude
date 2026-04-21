@@ -52,16 +52,16 @@ function logsDir(root = workspacePath): string {
 // ── I/O deps (real filesystem) ───────────────────────────────────
 
 const stateDeps: StateDeps = {
-  readFile: (p: string) => readFile(p, "utf-8"),
-  writeFileAtomic: (p: string, content: string) => writeFileAtomic(p, content),
+  readFile: (filePath: string) => readFile(filePath, "utf-8"),
+  writeFileAtomic: (filePath: string, content: string) => writeFileAtomic(filePath, content),
   exists: existsSync,
 };
 
 const logDeps: LogDeps = {
-  appendFile: (p: string, content: string) => appendFile(p, content),
-  readFile: (p: string) => readFile(p, "utf-8"),
+  appendFile: (filePath: string, content: string) => appendFile(filePath, content),
+  readFile: (filePath: string) => readFile(filePath, "utf-8"),
   exists: existsSync,
-  ensureDir: (p: string) => mkdir(p, { recursive: true }).then(() => {}),
+  ensureDir: (directoryPath: string) => mkdir(directoryPath, { recursive: true }).then(() => {}),
 };
 
 // ── System task registry ─────────────────────────────────────────
@@ -71,10 +71,7 @@ export interface SystemTaskDef {
   name: string;
   description: string;
   schedule: TaskDefinition["schedule"];
-  missedRunPolicy:
-    | typeof MISSED_RUN_POLICIES.skip
-    | typeof MISSED_RUN_POLICIES.runOnce
-    | typeof MISSED_RUN_POLICIES.runAll;
+  missedRunPolicy: typeof MISSED_RUN_POLICIES.skip | typeof MISSED_RUN_POLICIES.runOnce | typeof MISSED_RUN_POLICIES.runAll;
   run: () => Promise<void>;
 }
 
@@ -88,10 +85,7 @@ let taskManagerRef: ITaskManager | null = null;
  * Initialize the scheduler adapter. Call once at server startup
  * AFTER the task-manager is created but BEFORE `taskManager.start()`.
  */
-export async function initScheduler(
-  taskManager: ITaskManager,
-  tasks: SystemTaskDef[],
-): Promise<void> {
+export async function initScheduler(taskManager: ITaskManager, tasks: SystemTaskDef[]): Promise<void> {
   await mkdir(path.dirname(stateFilePath()), { recursive: true });
   await mkdir(logsDir(), { recursive: true });
 
@@ -101,11 +95,11 @@ export async function initScheduler(
   taskManagerRef = taskManager;
 
   // Run catch-up
-  const catchUpTasks: CatchUpTask[] = tasks.map((t) => ({
-    id: t.id,
-    name: t.name,
-    schedule: toCoreSchedule(t.schedule),
-    missedRunPolicy: t.missedRunPolicy,
+  const catchUpTasks: CatchUpTask[] = tasks.map((taskDef) => ({
+    id: taskDef.id,
+    name: taskDef.name,
+    schedule: toCoreSchedule(taskDef.schedule),
+    missedRunPolicy: taskDef.missedRunPolicy,
     enabled: true,
   }));
   const plan = computeCatchUpPlan(catchUpTasks, stateMap, Date.now());
@@ -123,13 +117,9 @@ export async function initScheduler(
       runs: plan.runs.length,
     });
     for (const run of plan.runs) {
-      const task = tasks.find((t) => t.id === run.taskId);
+      const task = tasks.find((taskDef) => taskDef.id === run.taskId);
       if (!task) continue;
-      await executeAndLog(
-        task,
-        run.context.scheduledFor,
-        TASK_TRIGGERS.catchUp,
-      );
+      await executeAndLog(task, run.context.scheduledFor, TASK_TRIGGERS.catchUp);
     }
   }
 
@@ -147,7 +137,7 @@ export async function initScheduler(
   }
 
   log.info("scheduler", "initialized", {
-    tasks: tasks.map((t) => t.id),
+    tasks: tasks.map((taskDef) => taskDef.id),
     stateEntries: stateMap.size,
   });
 }
@@ -155,11 +145,8 @@ export async function initScheduler(
 /** Apply a schedule override to a running system task.
  *  Updates the in-memory task definition, the task-manager, and
  *  recalculates nextScheduledAt in persisted state. */
-export async function applyScheduleOverride(
-  taskId: string,
-  schedule: SystemTaskDef["schedule"],
-): Promise<boolean> {
-  const task = systemTasks.find((t) => t.id === taskId);
+export async function applyScheduleOverride(taskId: string, schedule: SystemTaskDef["schedule"]): Promise<boolean> {
+  const task = systemTasks.find((taskDef) => taskDef.id === taskId);
   if (!task || !taskManagerRef) return false;
   if (!taskManagerRef.updateSchedule(taskId, schedule)) return false;
   task.schedule = schedule;
@@ -172,11 +159,7 @@ export async function applyScheduleOverride(
 }
 
 /** Query execution logs — used by API routes. */
-export async function getSchedulerLogs(opts: {
-  since?: string;
-  taskId?: string;
-  limit?: number;
-}): Promise<TaskLogEntry[]> {
+export async function getSchedulerLogs(opts: { since?: string; taskId?: string; limit?: number }): Promise<TaskLogEntry[]> {
   return queryLog(logsDir(), opts, logDeps);
 }
 
@@ -189,23 +172,19 @@ export function getSchedulerTasks(): Array<{
   missedRunPolicy: string;
   state: TaskExecutionState;
 }> {
-  return systemTasks.map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-    schedule: t.schedule,
-    missedRunPolicy: t.missedRunPolicy,
-    state: stateMap.get(t.id) ?? emptyState(t.id),
+  return systemTasks.map((taskDef) => ({
+    id: taskDef.id,
+    name: taskDef.name,
+    description: taskDef.description,
+    schedule: taskDef.schedule,
+    missedRunPolicy: taskDef.missedRunPolicy,
+    state: stateMap.get(taskDef.id) ?? emptyState(taskDef.id),
   }));
 }
 
 // ── Internal ─────────────────────────────────────────────────────
 
-async function executeAndLog(
-  task: SystemTaskDef,
-  scheduledFor: string,
-  trigger: TaskTrigger,
-): Promise<void> {
+async function executeAndLog(task: SystemTaskDef, scheduledFor: string, trigger: TaskTrigger): Promise<void> {
   const startedAt = new Date().toISOString();
   const startMs = Date.now();
   let errMsg: string | null = null;
@@ -246,9 +225,7 @@ async function safePersist(
         lastRunResult: isSuccess ? TASK_RESULTS.success : TASK_RESULTS.error,
         lastRunDurationMs: durationMs,
         lastErrorMessage: errMsg,
-        consecutiveFailures: isSuccess
-          ? 0
-          : (currentState?.consecutiveFailures ?? 0) + 1,
+        consecutiveFailures: isSuccess ? 0 : (currentState?.consecutiveFailures ?? 0) + 1,
         totalRuns: (currentState?.totalRuns ?? 0) + 1,
         nextScheduledAt: computeNextScheduled(task),
       },
@@ -285,10 +262,7 @@ async function safePersist(
 }
 
 /** Safe state update — swallows errors. */
-async function safeUpdateState(
-  taskId: string,
-  patch: Partial<TaskExecutionState>,
-): Promise<void> {
+async function safeUpdateState(taskId: string, patch: Partial<TaskExecutionState>): Promise<void> {
   try {
     await updateAndSave(stateFilePath(), stateMap, taskId, patch, stateDeps);
   } catch (err) {
@@ -307,16 +281,8 @@ function computeCurrentWindow(task: SystemTaskDef): string {
   const coreSchedule = toCoreSchedule(task.schedule);
   // The window that just fired is the latest one at or before now.
   const nowMs = Date.now();
-  const windowMs = nextWindowAfter(
-    coreSchedule,
-    nowMs -
-      (coreSchedule.type === "interval"
-        ? coreSchedule.intervalSec * ONE_SECOND_MS
-        : 0),
-  );
-  return windowMs !== null && windowMs <= nowMs
-    ? new Date(windowMs).toISOString()
-    : new Date(nowMs).toISOString();
+  const windowMs = nextWindowAfter(coreSchedule, nowMs - (coreSchedule.type === SCHEDULE_TYPES.interval ? coreSchedule.intervalSec * ONE_SECOND_MS : 0));
+  return windowMs !== null && windowMs <= nowMs ? new Date(windowMs).toISOString() : new Date(nowMs).toISOString();
 }
 
 function computeNextScheduled(task: SystemTaskDef): string | null {

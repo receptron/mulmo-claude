@@ -18,10 +18,7 @@ import path from "path";
 import os from "os";
 import type { Request, Response, NextFunction } from "express";
 import { bearerAuth } from "../../server/api/auth/bearerAuth.js";
-import {
-  __resetForTests,
-  generateAndWriteToken,
-} from "../../server/api/auth/token.js";
+import { __resetForTests, generateAndWriteToken } from "../../server/api/auth/token.js";
 
 interface FakeReq {
   headers: { authorization?: string };
@@ -55,10 +52,7 @@ function makeRes(): FakeRes {
   return res;
 }
 
-function run(
-  req: FakeReq,
-  res: FakeRes,
-): { nextCalled: boolean; statusCode: number; body: unknown } {
+function run(req: FakeReq, res: FakeRes): { nextCalled: boolean; statusCode: number; body: unknown } {
   let nextCalled = false;
   const next: NextFunction = () => {
     nextCalled = true;
@@ -88,10 +82,7 @@ beforeEach(async () => {
 
 describe("bearerAuth — accepts matching Bearer token", () => {
   it("calls next() when Authorization is exact match", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq(`Bearer ${validToken}`),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq(`Bearer ${validToken}`), makeRes());
     assert.equal(nextCalled, true);
     assert.equal(statusCode, 200);
   });
@@ -114,10 +105,7 @@ describe("bearerAuth — rejects missing header", () => {
 
 describe("bearerAuth — rejects wrong scheme / prefix", () => {
   it("returns 401 for Basic auth even if token looks like ours", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq(`Basic ${validToken}`),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq(`Basic ${validToken}`), makeRes());
     assert.equal(nextCalled, false);
     assert.equal(statusCode, 401);
   });
@@ -129,10 +117,7 @@ describe("bearerAuth — rejects wrong scheme / prefix", () => {
   });
 
   it("returns 401 for lowercase 'bearer ' (prefix is case-sensitive)", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq(`bearer ${validToken}`),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq(`bearer ${validToken}`), makeRes());
     assert.equal(nextCalled, false);
     assert.equal(statusCode, 401);
   });
@@ -140,10 +125,7 @@ describe("bearerAuth — rejects wrong scheme / prefix", () => {
 
 describe("bearerAuth — rejects mismatched token", () => {
   it("returns 401 when the token is wrong", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq("Bearer not-the-right-token"),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq("Bearer not-the-right-token"), makeRes());
     assert.equal(nextCalled, false);
     assert.equal(statusCode, 401);
   });
@@ -158,10 +140,7 @@ describe("bearerAuth — rejects mismatched token", () => {
 describe("bearerAuth — defends against pre-bootstrap calls", () => {
   it("returns 401 if no token has been generated yet", () => {
     __resetForTests();
-    const { nextCalled, statusCode } = run(
-      makeReq(`Bearer ${validToken}`),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq(`Bearer ${validToken}`), makeRes());
     assert.equal(nextCalled, false);
     assert.equal(statusCode, 401);
   });

@@ -12,11 +12,7 @@ test.beforeEach(async ({ page }) => {
   await mockAllApis(page);
 });
 
-async function clickLauncherAndAssertView(
-  page: Page,
-  key: string,
-  expectedView: string,
-): Promise<void> {
+async function clickLauncherAndAssertView(page: Page, key: string, expectedView: string): Promise<void> {
   await page.goto("/chat");
   await page.waitForURL(/\/chat\//);
 
@@ -31,9 +27,7 @@ test.describe("plugin launcher — view path", () => {
     await clickLauncherAndAssertView(page, "todos", "todos");
   });
 
-  test("Scheduler button switches canvas to scheduler view", async ({
-    page,
-  }) => {
+  test("Scheduler button switches canvas to scheduler view", async ({ page }) => {
     await clickLauncherAndAssertView(page, "scheduler", "scheduler");
   });
 

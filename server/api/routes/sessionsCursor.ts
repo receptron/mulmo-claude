@@ -21,9 +21,8 @@ const CURSOR_PREFIX = "v1:";
  * fall back to when an incoming cursor is malformed.
  */
 export function encodeCursor(changeMs: number): string {
-  const ms =
-    Number.isFinite(changeMs) && changeMs > 0 ? Math.floor(changeMs) : 0;
-  return `${CURSOR_PREFIX}${ms}`;
+  const floored = Number.isFinite(changeMs) && changeMs > 0 ? Math.floor(changeMs) : 0;
+  return `${CURSOR_PREFIX}${floored}`;
 }
 
 /**
@@ -37,8 +36,8 @@ export function encodeCursor(changeMs: number): string {
 export function parseCursor(raw: unknown): number {
   if (typeof raw !== "string") return 0;
   if (!raw.startsWith(CURSOR_PREFIX)) return 0;
-  const n = Number(raw.slice(CURSOR_PREFIX.length));
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const parsed = Number(raw.slice(CURSOR_PREFIX.length));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 /**
@@ -52,17 +51,9 @@ export function parseCursor(raw: unknown): number {
  * Missing / malformed `indexedAt` or `metaMtimeMs` contributes 0 so
  * they don't pull the timestamp backward.
  */
-export function sessionChangeMs(
-  jsonlMtimeMs: number,
-  indexedAtIso: string | undefined,
-  metaMtimeMs: number | undefined = undefined,
-): number {
-  const indexedAtMs =
-    indexedAtIso !== undefined ? new Date(indexedAtIso).getTime() : NaN;
+export function sessionChangeMs(jsonlMtimeMs: number, indexedAtIso: string | undefined, metaMtimeMs: number | undefined = undefined): number {
+  const indexedAtMs = indexedAtIso !== undefined ? new Date(indexedAtIso).getTime() : NaN;
   const safeIndexed = Number.isFinite(indexedAtMs) ? indexedAtMs : 0;
-  const safeMeta =
-    typeof metaMtimeMs === "number" && Number.isFinite(metaMtimeMs)
-      ? metaMtimeMs
-      : 0;
+  const safeMeta = typeof metaMtimeMs === "number" && Number.isFinite(metaMtimeMs) ? metaMtimeMs : 0;
   return Math.max(jsonlMtimeMs, safeIndexed, safeMeta);
 }

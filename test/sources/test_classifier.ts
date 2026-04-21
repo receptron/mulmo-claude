@@ -73,12 +73,7 @@ describe("buildClassifyPrompt — shape", () => {
     const prompt = buildClassifyPrompt({
       title: "t",
       url: "https://x.com",
-      sampleSummaries: [
-        "Line one.\n\nLine two (should collapse).",
-        "Another\t\twith tabs",
-        "Third",
-        "Fourth (should be cut)",
-      ],
+      sampleSummaries: ["Line one.\n\nLine two (should collapse).", "Another\t\twith tabs", "Third", "Fourth (should be cut)"],
     });
     assert.match(prompt, /RECENT ITEM SUMMARIES:/);
     // Multi-line summary should be collapsed to single line.
@@ -166,10 +161,7 @@ describe("validateClassifyResult — error cases", () => {
   });
 
   it("throws when categories is missing", () => {
-    assert.throws(
-      () => validateClassifyResult({ rationale: "r" }),
-      /no valid categories/,
-    );
+    assert.throws(() => validateClassifyResult({ rationale: "r" }), /no valid categories/);
   });
 
   it("throws when every category is invalid (no hallucinated slugs survive)", () => {
@@ -184,10 +176,7 @@ describe("validateClassifyResult — error cases", () => {
   });
 
   it("throws when categories is not an array", () => {
-    assert.throws(
-      () => validateClassifyResult({ categories: "ai", rationale: "" }),
-      /no valid categories/,
-    );
+    assert.throws(() => validateClassifyResult({ categories: "ai", rationale: "" }), /no valid categories/);
   });
 });
 
@@ -214,10 +203,7 @@ describe("parseClassifyOutput", () => {
   });
 
   it("throws on unparseable stdout", () => {
-    assert.throws(
-      () => parseClassifyOutput("{ not json"),
-      /failed to parse claude json/,
-    );
+    assert.throws(() => parseClassifyOutput("{ not json"), /failed to parse claude json/);
   });
 
   it("throws when structured_output has no valid categories", () => {
@@ -264,9 +250,6 @@ describe("classifySource — injection wrapper", () => {
     const classify: ClassifyFn = async () => {
       throw new Error("claude unreachable");
     };
-    await assert.rejects(
-      () => classifySource({ title: "t", url: "https://x.com" }, classify),
-      /claude unreachable/,
-    );
+    await assert.rejects(() => classifySource({ title: "t", url: "https://x.com" }, classify), /claude unreachable/);
   });
 });

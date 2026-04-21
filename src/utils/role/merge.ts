@@ -5,6 +5,6 @@
 import type { Role } from "../../config/roles";
 
 export function mergeRoles(builtin: Role[], custom: Role[]): Role[] {
-  const customIds = new Set(custom.map((r) => r.id));
-  return [...builtin.filter((r) => !customIds.has(r.id)), ...custom];
+  const customIds = new Set(custom.map((role) => role.id));
+  return [...builtin.filter((role) => !customIds.has(role.id)), ...custom];
 }

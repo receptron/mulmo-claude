@@ -21,9 +21,7 @@ const manageSkillsPlugin: ToolPlugin<ManageSkillsData> = {
     // Claude invokes this tool to show the user their skills list.
     // The server exposes GET /api/skills (discovery + merge); we just
     // shape it for the View component.
-    const result = await apiGet<{ skills: SkillSummary[] }>(
-      API_ROUTES.skills.list,
-    );
+    const result = await apiGet<{ skills: SkillSummary[] }>(API_ROUTES.skills.list);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

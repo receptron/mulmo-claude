@@ -31,7 +31,7 @@ export interface RelayClient {
 }
 
 export function createRelayClient(opts: RelayClientOptions): RelayClient {
-  let ws: WebSocket | null = null;
+  let webSocket: WebSocket | null = null;
   let backoffMs = INITIAL_BACKOFF_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let intentionalClose = false;
@@ -45,14 +45,14 @@ export function createRelayClient(opts: RelayClientOptions): RelayClient {
   function connect(): void {
     intentionalClose = false;
     try {
-      ws = new WebSocket(buildUrl());
+      webSocket = new WebSocket(buildUrl());
 
-      ws.onopen = () => {
+      webSocket.onopen = () => {
         backoffMs = INITIAL_BACKOFF_MS;
         opts.onConnect?.();
       };
 
-      ws.onmessage = (event: MessageEvent) => {
+      webSocket.onmessage = (event: MessageEvent) => {
         if (typeof event.data !== "string") return;
         try {
           const msg: RelayMessage = JSON.parse(event.data);
@@ -62,13 +62,13 @@ export function createRelayClient(opts: RelayClientOptions): RelayClient {
         }
       };
 
-      ws.onclose = () => {
-        ws = null;
+      webSocket.onclose = () => {
+        webSocket = null;
         opts.onDisconnect?.();
         if (!intentionalClose) scheduleReconnect();
       };
 
-      ws.onerror = () => {
+      webSocket.onerror = () => {
         opts.onError?.(new Error("WebSocket error"));
       };
     } catch (err) {
@@ -87,11 +87,11 @@ export function createRelayClient(opts: RelayClientOptions): RelayClient {
   }
 
   function send(response: RelayResponse): void {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       opts.onError?.(new Error("not connected"));
       return;
     }
-    ws.send(JSON.stringify(response));
+    webSocket.send(JSON.stringify(response));
   }
 
   function disconnect(): void {
@@ -100,9 +100,9 @@ export function createRelayClient(opts: RelayClientOptions): RelayClient {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
-    if (ws) {
-      ws.close(1000, "client disconnect");
-      ws = null;
+    if (webSocket) {
+      webSocket.close(1000, "client disconnect");
+      webSocket = null;
     }
   }
 
@@ -111,7 +111,7 @@ export function createRelayClient(opts: RelayClientOptions): RelayClient {
     send,
     disconnect,
     get connected() {
-      return ws !== null && ws.readyState === WebSocket.OPEN;
+      return webSocket !== null && webSocket.readyState === WebSocket.OPEN;
     },
   };
 }

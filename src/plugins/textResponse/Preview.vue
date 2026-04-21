@@ -28,9 +28,7 @@ const textColorClass = computed(() => {
   }
 });
 
-const renderedMarkdown = computed(() =>
-  marked(previewText.value, { breaks: true, gfm: true }),
-);
+const renderedMarkdown = computed(() => marked(previewText.value, { breaks: true, gfm: true }));
 </script>
 
 <style scoped>
@@ -39,6 +37,9 @@ const renderedMarkdown = computed(() =>
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
+  /* Links inside v-html would otherwise hijack the row-level
+     select click and navigate to the article URL. */
+  pointer-events: none;
 }
 
 .preview-markdown :deep(p) {

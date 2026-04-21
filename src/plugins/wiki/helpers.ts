@@ -43,11 +43,11 @@ export function renderWikiLinks(content: string): string {
  * immediately after `from` (zero-length page name, which the old
  * regex rejected via the `+` quantifier).
  */
-function findNextCloseBrackets(s: string, from: number): number {
+function findNextCloseBrackets(str: string, from: number): number {
   let j = from;
-  while (j < s.length) {
-    if (s[j] === "]") {
-      if (s[j + 1] === "]" && j > from) return j;
+  while (j < str.length) {
+    if (str[j] === "]") {
+      if (str[j + 1] === "]" && j > from) return j;
       // Bare `]` inside the page-name span — old regex would not
       // match here, so we bail and let the caller emit the `[[`
       // as literal text.

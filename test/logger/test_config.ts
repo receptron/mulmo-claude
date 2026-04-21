@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  DEFAULT_CONFIG,
-  resolveConfig,
-} from "../../server/system/logger/config.js";
+import { DEFAULT_CONFIG, resolveConfig } from "../../server/system/logger/config.js";
 
 describe("resolveConfig", () => {
   it("returns defaults when env is empty", () => {
@@ -28,10 +25,7 @@ describe("resolveConfig", () => {
 
   it("ignores invalid level and falls back to default", () => {
     const config = resolveConfig({ LOG_LEVEL: "chatty" });
-    assert.equal(
-      config.sinks.console.level,
-      DEFAULT_CONFIG.sinks.console.level,
-    );
+    assert.equal(config.sinks.console.level, DEFAULT_CONFIG.sinks.console.level);
   });
 
   it("accepts format overrides per sink", () => {
@@ -45,29 +39,14 @@ describe("resolveConfig", () => {
 
   it("ignores invalid format and keeps default", () => {
     const config = resolveConfig({ LOG_CONSOLE_FORMAT: "xml" });
-    assert.equal(
-      config.sinks.console.format,
-      DEFAULT_CONFIG.sinks.console.format,
-    );
+    assert.equal(config.sinks.console.format, DEFAULT_CONFIG.sinks.console.format);
   });
 
   it("parses enabled flags (true/false/1/0/yes/no)", () => {
-    assert.equal(
-      resolveConfig({ LOG_FILE_ENABLED: "false" }).sinks.file.enabled,
-      false,
-    );
-    assert.equal(
-      resolveConfig({ LOG_FILE_ENABLED: "0" }).sinks.file.enabled,
-      false,
-    );
-    assert.equal(
-      resolveConfig({ LOG_CONSOLE_ENABLED: "no" }).sinks.console.enabled,
-      false,
-    );
-    assert.equal(
-      resolveConfig({ LOG_CONSOLE_ENABLED: "yes" }).sinks.console.enabled,
-      true,
-    );
+    assert.equal(resolveConfig({ LOG_FILE_ENABLED: "false" }).sinks.file.enabled, false);
+    assert.equal(resolveConfig({ LOG_FILE_ENABLED: "0" }).sinks.file.enabled, false);
+    assert.equal(resolveConfig({ LOG_CONSOLE_ENABLED: "no" }).sinks.console.enabled, false);
+    assert.equal(resolveConfig({ LOG_CONSOLE_ENABLED: "yes" }).sinks.console.enabled, true);
   });
 
   it("ignores invalid enabled flag and keeps default", () => {
@@ -86,18 +65,9 @@ describe("resolveConfig", () => {
   });
 
   it("ignores non-positive or non-integer maxFiles", () => {
-    assert.equal(
-      resolveConfig({ LOG_FILE_MAX_FILES: "0" }).sinks.file.rotation.maxFiles,
-      DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
-    );
-    assert.equal(
-      resolveConfig({ LOG_FILE_MAX_FILES: "-3" }).sinks.file.rotation.maxFiles,
-      DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
-    );
-    assert.equal(
-      resolveConfig({ LOG_FILE_MAX_FILES: "abc" }).sinks.file.rotation.maxFiles,
-      DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
-    );
+    assert.equal(resolveConfig({ LOG_FILE_MAX_FILES: "0" }).sinks.file.rotation.maxFiles, DEFAULT_CONFIG.sinks.file.rotation.maxFiles);
+    assert.equal(resolveConfig({ LOG_FILE_MAX_FILES: "-3" }).sinks.file.rotation.maxFiles, DEFAULT_CONFIG.sinks.file.rotation.maxFiles);
+    assert.equal(resolveConfig({ LOG_FILE_MAX_FILES: "abc" }).sinks.file.rotation.maxFiles, DEFAULT_CONFIG.sinks.file.rotation.maxFiles);
   });
 
   it("supports telemetry enabled + level override", () => {

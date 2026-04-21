@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  availableToolsFor,
-  toolDescriptionsFor,
-} from "../../../src/utils/tools/mcp.js";
+import { availableToolsFor, toolDescriptionsFor } from "../../../src/utils/tools/mcp.js";
 
 describe("availableToolsFor", () => {
   it("returns the role's plugins unchanged when nothing is disabled", () => {
@@ -17,10 +14,7 @@ describe("availableToolsFor", () => {
   });
 
   it("preserves order", () => {
-    const out = availableToolsFor(
-      ["first", "second", "third", "fourth"],
-      new Set(["second"]),
-    );
+    const out = availableToolsFor(["first", "second", "third", "fourth"], new Set(["second"]));
     assert.deepEqual(out, ["first", "third", "fourth"]);
   });
 

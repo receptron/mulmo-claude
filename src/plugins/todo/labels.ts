@@ -67,10 +67,7 @@ export function colorForLabel(label: string): string {
 //
 // Items whose `labels` is `undefined` or `[]` are excluded when
 // `filterLabels` is non-empty, since they have nothing to match.
-export function filterByLabels<T extends { labels?: string[] }>(
-  items: readonly T[],
-  filterLabels: readonly string[],
-): T[] {
+export function filterByLabels<T extends { labels?: string[] }>(items: readonly T[], filterLabels: readonly string[]): T[] {
   if (filterLabels.length === 0) return [...items];
   const wanted = new Set(
     filterLabels
@@ -98,9 +95,7 @@ export function filterByLabels<T extends { labels?: string[] }>(
 //
 // Sorted by count desc, then by the displayed label asc (case-
 // insensitive) for deterministic output.
-export function listLabelsWithCount(
-  items: readonly { labels?: string[] }[],
-): Array<{ label: string; count: number }> {
+export function listLabelsWithCount(items: readonly { labels?: string[] }[]): Array<{ label: string; count: number }> {
   const groups = new Map<string, { label: string; count: number }>();
   for (const item of items) {
     const seenInItem = new Set<string>();
@@ -122,11 +117,7 @@ export function listLabelsWithCount(
   }
   return [...groups.values()].sort((left, right) => {
     if (right.count !== left.count) return right.count - left.count;
-    return left.label.toLowerCase() < right.label.toLowerCase()
-      ? -1
-      : left.label.toLowerCase() > right.label.toLowerCase()
-        ? 1
-        : 0;
+    return left.label.toLowerCase() < right.label.toLowerCase() ? -1 : left.label.toLowerCase() > right.label.toLowerCase() ? 1 : 0;
   });
 }
 
@@ -136,10 +127,7 @@ export function listLabelsWithCount(
 // Preserves the order of `existing`, then appends newly-introduced
 // labels in the order they appear in `adding`. Normalises both
 // sides (trim/collapse) before comparison and storage.
-export function mergeLabels(
-  existing: readonly string[],
-  adding: readonly string[],
-): string[] {
+export function mergeLabels(existing: readonly string[], adding: readonly string[]): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
   const push = (label: string): void => {
@@ -158,10 +146,7 @@ export function mergeLabels(
 // Remove `removing` labels from `existing`, case-insensitively.
 // Removing a label that isn't present is a no-op. The order of
 // surviving labels is preserved. Normalises both sides first.
-export function subtractLabels(
-  existing: readonly string[],
-  removing: readonly string[],
-): string[] {
+export function subtractLabels(existing: readonly string[], removing: readonly string[]): string[] {
   const toRemove = new Set(
     removing
       .map(normalizeLabel)
@@ -169,9 +154,7 @@ export function subtractLabels(
       .map((label) => label.toLowerCase()),
   );
   if (toRemove.size === 0) {
-    return existing
-      .map(normalizeLabel)
-      .filter((label): label is string => label !== null);
+    return existing.map(normalizeLabel).filter((label): label is string => label !== null);
   }
   return existing
     .map(normalizeLabel)

@@ -48,8 +48,7 @@ export type TaskSchedule =
 // ── Missed-run policy ────────────────────────────────────────────
 
 /** What to do when the scheduler discovers missed windows. */
-export type MissedRunPolicy =
-  (typeof MISSED_RUN_POLICIES)[keyof typeof MISSED_RUN_POLICIES];
+export type MissedRunPolicy = (typeof MISSED_RUN_POLICIES)[keyof typeof MISSED_RUN_POLICIES];
 
 // ── Task origin ──────────────────────────────────────────────────
 

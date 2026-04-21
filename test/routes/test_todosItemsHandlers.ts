@@ -1,17 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  handleCreate,
-  handleDeleteItem,
-  handleMove,
-  handlePatch,
-  migrateItems,
-} from "../../server/api/routes/todosItemsHandlers.js";
+import { handleCreate, handleDeleteItem, handleMove, handlePatch, migrateItems } from "../../server/api/routes/todosItemsHandlers.js";
 import { DEFAULT_COLUMNS } from "../../server/api/routes/todosColumnsHandlers.js";
 import type { TodoItem } from "../../server/api/routes/todos.js";
 
 function cols() {
-  return DEFAULT_COLUMNS.map((c) => ({ ...c }));
+  return DEFAULT_COLUMNS.map((col) => ({ ...col }));
 }
 
 function makeItem(overrides: Partial<TodoItem> = {}): TodoItem {
@@ -43,14 +37,14 @@ describe("migrateItems", () => {
       },
     ];
     const result = migrateItems(legacy, cols());
-    const a = result.find((i) => i.id === "a");
-    const b = result.find((i) => i.id === "b");
-    assert.equal(a?.status, "done");
-    assert.equal(a?.completed, true);
-    assert.equal(b?.status, "backlog");
-    assert.equal(b?.completed, false);
-    assert.equal(typeof a?.order, "number");
-    assert.equal(typeof b?.order, "number");
+    const itemA = result.find((i) => i.id === "a");
+    const itemB = result.find((i) => i.id === "b");
+    assert.equal(itemA?.status, "done");
+    assert.equal(itemA?.completed, true);
+    assert.equal(itemB?.status, "backlog");
+    assert.equal(itemB?.completed, false);
+    assert.equal(typeof itemA?.order, "number");
+    assert.equal(typeof itemB?.order, "number");
   });
 
   it("reassigns items pointing at unknown columns", () => {
@@ -219,10 +213,7 @@ describe("handleCreate", () => {
   });
 
   it("places new items at the end of their column", () => {
-    const items = [
-      makeItem({ id: "a", status: "todo", order: 1000 }),
-      makeItem({ id: "b", status: "todo", order: 2500 }),
-    ];
+    const items = [makeItem({ id: "a", status: "todo", order: 1000 }), makeItem({ id: "b", status: "todo", order: 2500 })];
     const result = handleCreate(items, cols(), { text: "z", status: "todo" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
@@ -315,9 +306,7 @@ describe("handleMove", () => {
   });
 
   it("moves an item across columns and updates completed", () => {
-    const items = [
-      makeItem({ id: "a", status: "todo", order: 1000, completed: false }),
-    ];
+    const items = [makeItem({ id: "a", status: "todo", order: 1000, completed: false })];
     const result = handleMove(items, cols(), "a", {
       status: "done",
       position: 0,
@@ -341,9 +330,7 @@ describe("handleMove", () => {
     });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const todoItems = result.items
-      .filter((i) => i.status === "todo")
-      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    const todoItems = result.items.filter((i) => i.status === "todo").sort((itemX, itemY) => (itemX.order ?? 0) - (itemY.order ?? 0));
     assert.deepEqual(
       todoItems.map((i) => i.id),
       ["b", "c", "a"],
@@ -351,19 +338,14 @@ describe("handleMove", () => {
   });
 
   it("clamps a position past the end", () => {
-    const items = [
-      makeItem({ id: "a", status: "todo", order: 1000 }),
-      makeItem({ id: "b", status: "todo", order: 2000 }),
-    ];
+    const items = [makeItem({ id: "a", status: "todo", order: 1000 }), makeItem({ id: "b", status: "todo", order: 2000 })];
     const result = handleMove(items, cols(), "a", {
       status: "todo",
       position: 999,
     });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const todoItems = result.items
-      .filter((i) => i.status === "todo")
-      .sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    const todoItems = result.items.filter((i) => i.status === "todo").sort((itemX, itemY) => (itemX.order ?? 0) - (itemY.order ?? 0));
     assert.deepEqual(
       todoItems.map((i) => i.id),
       ["b", "a"],

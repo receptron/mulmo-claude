@@ -9,10 +9,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Request, Response, NextFunction } from "express";
-import {
-  isLocalhostOrigin,
-  requireSameOrigin,
-} from "../../server/api/csrfGuard.js";
+import { isLocalhostOrigin, requireSameOrigin } from "../../server/api/csrfGuard.js";
 
 // --- isLocalhostOrigin: the pure check --------------------------
 
@@ -65,10 +62,7 @@ describe("isLocalhostOrigin — rejects everything else", () => {
   });
 
   it("rejects a URL that only contains `localhost` in the path", () => {
-    assert.equal(
-      isLocalhostOrigin("http://attacker.com/path?host=localhost"),
-      false,
-    );
+    assert.equal(isLocalhostOrigin("http://attacker.com/path?host=localhost"), false);
   });
 
   it("rejects the string `null`", () => {
@@ -149,10 +143,7 @@ function makeRes(): FakeRes {
   return res;
 }
 
-function run(
-  req: FakeReq,
-  res: FakeRes,
-): { nextCalled: boolean; statusCode: number; body: unknown } {
+function run(req: FakeReq, res: FakeRes): { nextCalled: boolean; statusCode: number; body: unknown } {
   let nextCalled = false;
   const next: NextFunction = () => {
     nextCalled = true;
@@ -160,11 +151,7 @@ function run(
   // The types differ slightly from real Express — cast through
   // `unknown` since the middleware only touches `method`,
   // `headers`, `status`, `json`.
-  requireSameOrigin(
-    req as unknown as Request,
-    res as unknown as Response,
-    next,
-  );
+  requireSameOrigin(req as unknown as Request, res as unknown as Response, next);
   return {
     nextCalled,
     statusCode: res.statusCode,
@@ -174,12 +161,7 @@ function run(
 
 describe("requireSameOrigin — safe methods pass through", () => {
   it("lets GET through regardless of Origin", () => {
-    for (const origin of [
-      undefined,
-      "http://localhost",
-      "http://example.com",
-      "null",
-    ]) {
+    for (const origin of [undefined, "http://localhost", "http://example.com", "null"]) {
       const { nextCalled, statusCode } = run(makeReq("GET", origin), makeRes());
       assert.equal(nextCalled, true, `expected next() for Origin=${origin}`);
       assert.equal(statusCode, 200);
@@ -187,18 +169,12 @@ describe("requireSameOrigin — safe methods pass through", () => {
   });
 
   it("lets HEAD through regardless of Origin", () => {
-    const { nextCalled } = run(
-      makeReq("HEAD", "http://example.com"),
-      makeRes(),
-    );
+    const { nextCalled } = run(makeReq("HEAD", "http://example.com"), makeRes());
     assert.equal(nextCalled, true);
   });
 
   it("lets OPTIONS through (CORS preflight shouldn't be CSRF-checked)", () => {
-    const { nextCalled } = run(
-      makeReq("OPTIONS", "http://example.com"),
-      makeRes(),
-    );
+    const { nextCalled } = run(makeReq("OPTIONS", "http://example.com"), makeRes());
     assert.equal(nextCalled, true);
   });
 });
@@ -224,26 +200,17 @@ describe("requireSameOrigin — state-changing methods, missing Origin", () => {
 
 describe("requireSameOrigin — state-changing methods, localhost Origin", () => {
   it("allows POST from http://localhost:5173 (Vite dev)", () => {
-    const { nextCalled } = run(
-      makeReq("POST", "http://localhost:5173"),
-      makeRes(),
-    );
+    const { nextCalled } = run(makeReq("POST", "http://localhost:5173"), makeRes());
     assert.equal(nextCalled, true);
   });
 
   it("allows POST from http://localhost:3001 (production Express)", () => {
-    const { nextCalled } = run(
-      makeReq("POST", "http://localhost:3001"),
-      makeRes(),
-    );
+    const { nextCalled } = run(makeReq("POST", "http://localhost:3001"), makeRes());
     assert.equal(nextCalled, true);
   });
 
   it("allows POST from http://127.0.0.1 variants", () => {
-    const { nextCalled } = run(
-      makeReq("POST", "http://127.0.0.1:5173"),
-      makeRes(),
-    );
+    const { nextCalled } = run(makeReq("POST", "http://127.0.0.1:5173"), makeRes());
     assert.equal(nextCalled, true);
   });
 
@@ -255,20 +222,10 @@ describe("requireSameOrigin — state-changing methods, localhost Origin", () =>
 
 describe("requireSameOrigin — state-changing methods, foreign Origin (blocked)", () => {
   function assertBlocked(method: string, origin: string) {
-    const { nextCalled, statusCode, body } = run(
-      makeReq(method, origin),
-      makeRes(),
-    );
-    assert.equal(
-      nextCalled,
-      false,
-      `${method} from ${origin} should be blocked`,
-    );
+    const { nextCalled, statusCode, body } = run(makeReq(method, origin), makeRes());
+    assert.equal(nextCalled, false, `${method} from ${origin} should be blocked`);
     assert.equal(statusCode, 403);
-    assert.ok(
-      body && typeof body === "object" && "error" in body,
-      "response body should include an error field",
-    );
+    assert.ok(body && typeof body === "object" && "error" in body, "response body should include an error field");
   }
 
   it("blocks POST from an arbitrary foreign origin", () => {

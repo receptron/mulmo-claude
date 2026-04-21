@@ -1,15 +1,8 @@
 <template>
-  <div
-    v-if="selectedPath"
-    class="px-4 py-2 border-b border-gray-200 text-xs text-gray-500 font-mono shrink-0 flex items-center gap-2"
-  >
+  <div v-if="selectedPath" class="px-4 py-2 border-b border-gray-200 text-xs text-gray-500 font-mono shrink-0 flex items-center gap-2">
     <span class="truncate min-w-0">{{ selectedPath }}</span>
-    <span v-if="size !== null" class="text-gray-400 shrink-0"
-      >· {{ formatBytes(size) }}</span
-    >
-    <span v-if="modifiedMs !== null" class="text-gray-400 shrink-0"
-      >· {{ formatDateTime(modifiedMs) }}</span
-    >
+    <span v-if="size !== null" class="text-gray-400 shrink-0">· {{ formatBytes(size) }}</span>
+    <span v-if="modifiedMs !== null" class="text-gray-400 shrink-0">· {{ formatDateTime(modifiedMs) }}</span>
     <button
       v-if="isMarkdown"
       class="ml-auto shrink-0 px-2 py-0.5 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 font-sans"

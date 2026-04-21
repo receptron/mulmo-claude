@@ -9,10 +9,7 @@ export interface ToolDefinitionMetadata {
 
 // Filter a role's plugin list down to the tools that are still
 // enabled — i.e. not in the disabled set.
-export function availableToolsFor(
-  rolePlugins: string[],
-  disabled: Set<string>,
-): string[] {
+export function availableToolsFor(rolePlugins: string[], disabled: Set<string>): string[] {
   return rolePlugins.filter((name) => !disabled.has(name));
 }
 

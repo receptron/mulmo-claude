@@ -1,10 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Response } from "express";
-import {
-  respondWithDispatchResult,
-  type DispatchResult,
-} from "../../server/api/routes/dispatchResponse.js";
+import { respondWithDispatchResult, type DispatchResult } from "../../server/api/routes/dispatchResponse.js";
 
 // Minimal Response mock that records the status + JSON body the
 // helper writes. We don't pull in supertest because the helper is a

@@ -11,13 +11,11 @@ const toolDefinition: ToolDefinition = {
       action: {
         type: "string",
         enum: ["index", "page", "log", "lint_report"],
-        description:
-          "'index' = show the page catalog, 'page' = show a single page, 'log' = show activity log, 'lint_report' = run health check.",
+        description: "'index' = show the page catalog, 'page' = show a single page, 'log' = show activity log, 'lint_report' = run health check.",
       },
       pageName: {
         type: "string",
-        description:
-          "For 'page' action: the page title or filename slug to display.",
+        description: "For 'page' action: the page title or filename slug to display.",
       },
     },
     required: ["action"],

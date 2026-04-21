@@ -9,11 +9,7 @@
 // and saving JSON to disk.
 
 import type { TodoItem, TodoPriority } from "./todos.js";
-import {
-  type StatusColumn,
-  defaultStatusId,
-  doneColumnId,
-} from "./todosColumnsHandlers.js";
+import { type StatusColumn, defaultStatusId, doneColumnId } from "./todosColumnsHandlers.js";
 import { mergeLabels } from "../../../src/plugins/todo/labels.js";
 import { makeId } from "../../utils/id.js";
 
@@ -22,9 +18,7 @@ const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
 
 // ── Result type ───────────────────────────────────────────────────
 
-export type ItemsActionResult =
-  | { kind: "error"; status: number; error: string }
-  | { kind: "success"; items: TodoItem[]; item?: TodoItem };
+export type ItemsActionResult = { kind: "error"; status: number; error: string } | { kind: "success"; items: TodoItem[]; item?: TodoItem };
 
 // ── Migration ─────────────────────────────────────────────────────
 
@@ -39,13 +33,10 @@ export type ItemsActionResult =
 // just use createdAt as the order key because it's a milliseconds
 // number which makes hand-editing painful and conflicts with the
 // 1000-step convention drag-drop uses for new items.
-export function migrateItems(
-  rawItems: TodoItem[],
-  columns: StatusColumn[],
-): TodoItem[] {
+export function migrateItems(rawItems: TodoItem[], columns: StatusColumn[]): TodoItem[] {
   const doneId = doneColumnId(columns);
   const openId = defaultStatusId(columns);
-  const validStatusIds = new Set(columns.map((c) => c.id));
+  const validStatusIds = new Set(columns.map((column) => column.id));
 
   // First pass: backfill status. Items pointing at a column that no
   // longer exists are reassigned to the default open or done column
@@ -59,60 +50,55 @@ export function migrateItems(
   // fields as independent at the storage layer leaves both the REST
   // PATCH path (which keeps them in sync explicitly) and the legacy
   // MCP actions (which only touch `completed`) working correctly.
-  const withStatus = rawItems.map((it): TodoItem => {
-    const hasValidStatus =
-      typeof it.status === "string" && validStatusIds.has(it.status);
-    if (hasValidStatus) return it;
-    const status = it.completed ? doneId : openId;
-    return { ...it, status };
+  const withStatus = rawItems.map((item): TodoItem => {
+    const hasValidStatus = typeof item.status === "string" && validStatusIds.has(item.status);
+    if (hasValidStatus) return item;
+    const status = item.completed ? doneId : openId;
+    return { ...item, status };
   });
 
   // Second pass: backfill order per column. Items that already have
-  // an order keep it untouched — only items missing order get one
+  // an order keep item untouched — only items missing order get one
   // assigned, and they go after the column's current max so they
   // sort to the bottom in createdAt order. This preserves any
   // hand-managed ordering even when a column is a mix of legacy
   // and kanban-aware items.
   const byStatus = new Map<string, TodoItem[]>();
-  for (const it of withStatus) {
-    const key = it.status ?? openId;
+  for (const item of withStatus) {
+    const key = item.status ?? openId;
     if (!byStatus.has(key)) byStatus.set(key, []);
-    byStatus.get(key)!.push(it);
+    byStatus.get(key)!.push(item);
   }
   const orderById = new Map<string, number>();
   for (const [, group] of byStatus) {
-    const missing = group.filter((it) => typeof it.order !== "number");
+    const missing = group.filter((item) => typeof item.order !== "number");
     if (missing.length === 0) continue;
-    const existingMax = group
-      .filter((it) => typeof it.order === "number")
-      .reduce((acc, it) => Math.max(acc, it.order!), 0);
-    const sorted = [...missing].sort((a, b) => a.createdAt - b.createdAt);
-    sorted.forEach((it, i) => {
-      orderById.set(it.id, existingMax + (i + 1) * ORDER_STEP);
+    const existingMax = group.filter((item) => typeof item.order === "number").reduce((acc, item) => Math.max(acc, item.order!), 0);
+    const sorted = [...missing].sort((left, right) => left.createdAt - right.createdAt);
+    sorted.forEach((item, i) => {
+      orderById.set(item.id, existingMax + (i + 1) * ORDER_STEP);
     });
   }
-  return withStatus.map((it): TodoItem => {
-    const next = orderById.get(it.id);
-    if (next === undefined) return it;
-    return { ...it, order: next };
+  return withStatus.map((item): TodoItem => {
+    const next = orderById.get(item.id);
+    if (next === undefined) return item;
+    return { ...item, order: next };
   });
 }
 
 // ── Validators ────────────────────────────────────────────────────
 
-function isPriority(v: unknown): v is TodoPriority {
-  return typeof v === "string" && PRIORITIES.includes(v as TodoPriority);
+function isPriority(value: unknown): value is TodoPriority {
+  return typeof value === "string" && PRIORITIES.includes(value as TodoPriority);
 }
 
-// YYYY-MM-DD only — keep it boring so the column is sortable as text.
-function isDueDate(v: unknown): v is string {
-  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+// YYYY-MM-DD only — keep item boring so the column is sortable as text.
+function isDueDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function nextOrder(items: TodoItem[], statusId: string): number {
-  const inColumn = items
-    .filter((i) => i.status === statusId)
-    .map((i) => i.order ?? 0);
+  const inColumn = items.filter((item) => item.status === statusId).map((item) => item.order ?? 0);
   if (inColumn.length === 0) return ORDER_STEP;
   return Math.max(...inColumn) + ORDER_STEP;
 }
@@ -130,18 +116,13 @@ export interface CreateInput {
 
 // Resolve the status field from input, validating against known
 // columns. Returns the resolved column id or an error result.
-type ResolveStatusResult =
-  | { kind: "ok"; status: string }
-  | { kind: "error"; status: number; error: string };
+type ResolveStatusResult = { kind: "ok"; status: string } | { kind: "error"; status: number; error: string };
 
-function resolveStatus(
-  input: CreateInput,
-  columns: StatusColumn[],
-): ResolveStatusResult {
+function resolveStatus(input: CreateInput, columns: StatusColumn[]): ResolveStatusResult {
   if (input.status === undefined || input.status === "") {
     return { kind: "ok", status: defaultStatusId(columns) };
   }
-  const validStatusIds = new Set(columns.map((c) => c.id));
+  const validStatusIds = new Set(columns.map((column) => column.id));
   if (validStatusIds.has(input.status)) {
     return { kind: "ok", status: input.status };
   }
@@ -154,10 +135,7 @@ function resolveStatus(
 
 // Apply optional priority + dueDate to an item, returning an error
 // result on validation failure.
-function applyOptionalFields(
-  item: TodoItem,
-  input: CreateInput,
-): ItemsActionResult | null {
+function applyOptionalFields(item: TodoItem, input: CreateInput): ItemsActionResult | null {
   if (input.priority !== undefined && input.priority !== "") {
     if (!isPriority(input.priority)) {
       return { kind: "error", status: 400, error: "invalid priority" };
@@ -177,11 +155,7 @@ function applyOptionalFields(
   return null;
 }
 
-export function handleCreate(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: CreateInput,
-): ItemsActionResult {
+export function handleCreate(items: TodoItem[], columns: StatusColumn[], input: CreateInput): ItemsActionResult {
   if (!input.text || input.text.trim().length === 0) {
     return { kind: "error", status: 400, error: "text required" };
   }
@@ -221,14 +195,11 @@ export interface PatchInput {
 
 // Each `applyXxx` helper mutates `updated` in place and returns either
 // `null` (success) or an error result. Splitting them out keeps the
-// top-level `handlePatch` linear so it stays under the cognitive
+// top-level `handlePatch` linear so item stays under the cognitive
 // complexity threshold and so each field's edit semantics live in one
 // obvious place.
 
-function applyTextPatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyTextPatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (typeof input.text !== "string") return null;
   if (input.text.trim().length === 0) {
     return { kind: "error", status: 400, error: "text cannot be empty" };
@@ -252,10 +223,7 @@ function applyLabelsPatch(updated: TodoItem, input: PatchInput): void {
   else delete updated.labels;
 }
 
-function applyPriorityPatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyPriorityPatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (input.priority === null || input.priority === "") {
     delete updated.priority;
     return null;
@@ -268,10 +236,7 @@ function applyPriorityPatch(
   return null;
 }
 
-function applyDueDatePatch(
-  updated: TodoItem,
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyDueDatePatch(updated: TodoItem, input: PatchInput): ItemsActionResult | null {
   if (input.dueDate === null || input.dueDate === "") {
     delete updated.dueDate;
     return null;
@@ -284,17 +249,11 @@ function applyDueDatePatch(
   return null;
 }
 
-function applyStatusPatch(
-  updated: TodoItem,
-  target: TodoItem,
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: PatchInput,
-): ItemsActionResult | null {
+function applyStatusPatch(updated: TodoItem, target: TodoItem, items: TodoItem[], columns: StatusColumn[], input: PatchInput): ItemsActionResult | null {
   if (typeof input.status !== "string" || input.status === target.status) {
     return null;
   }
-  const validStatusIds = new Set(columns.map((c) => c.id));
+  const validStatusIds = new Set(columns.map((column) => column.id));
   if (!validStatusIds.has(input.status)) {
     return {
       kind: "error",
@@ -309,35 +268,23 @@ function applyStatusPatch(
 }
 
 // Explicit `completed` toggle without changing status: lets the user
-// check / uncheck a card and have it move between the done column and
+// check / uncheck a card and have item move between the done column and
 // a default open column the obvious way.
-function applyCompletedPatch(
-  updated: TodoItem,
-  items: TodoItem[],
-  columns: StatusColumn[],
-  input: PatchInput,
-): void {
+function applyCompletedPatch(updated: TodoItem, items: TodoItem[], columns: StatusColumn[], input: PatchInput): void {
   if (typeof input.completed !== "boolean") return;
   if (input.completed === updated.completed) return;
   updated.completed = input.completed;
-  const targetStatus = input.completed
-    ? doneColumnId(columns)
-    : defaultStatusId(columns);
+  const targetStatus = input.completed ? doneColumnId(columns) : defaultStatusId(columns);
   if (targetStatus !== updated.status) {
     updated.status = targetStatus;
     updated.order = nextOrder(items, targetStatus);
   }
 }
 
-export function handlePatch(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  id: string,
-  input: PatchInput,
-): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handlePatch(items: TodoItem[], columns: StatusColumn[], itemId: string, input: PatchInput): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
   const updated: TodoItem = { ...target };
 
@@ -358,7 +305,7 @@ export function handlePatch(
     if (err) return err;
   }
 
-  const next = items.map((it) => (it.id === id ? updated : it));
+  const next = items.map((item) => (item.id === itemId ? updated : item));
   return { kind: "success", items: next, item: updated };
 }
 
@@ -376,17 +323,12 @@ export interface MoveInput {
   position?: number;
 }
 
-export function handleMove(
-  items: TodoItem[],
-  columns: StatusColumn[],
-  id: string,
-  input: MoveInput,
-): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handleMove(items: TodoItem[], columns: StatusColumn[], itemId: string, input: MoveInput): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
-  const validStatusIds = new Set(columns.map((c) => c.id));
+  const validStatusIds = new Set(columns.map((column) => column.id));
   const newStatus = input.status ?? target.status ?? defaultStatusId(columns);
   if (!validStatusIds.has(newStatus)) {
     return {
@@ -402,29 +344,27 @@ export function handleMove(
     completed: isDone,
   };
   // Re-collect the items in the target column with the moving item
-  // pulled out, then splice it back in at `position`.
-  const others = items
-    .filter((it) => it.id !== id && it.status === newStatus)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // pulled out, then splice item back in at `position`.
+  const others = items.filter((item) => item.id !== itemId && item.status === newStatus).sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
   const insertAt = clampPosition(input.position, others.length);
   const reordered = [...others];
   reordered.splice(insertAt, 0, updatedSelf);
   // Reassign order values 1000 / 2000 / 3000 ...
   const reorderedById = new Map<string, number>();
-  reordered.forEach((it, i) => reorderedById.set(it.id, (i + 1) * ORDER_STEP));
-  const nextItems = items.map((it): TodoItem => {
-    const newOrder = reorderedById.get(it.id);
-    if (it.id === id) {
+  reordered.forEach((item, i) => reorderedById.set(item.id, (i + 1) * ORDER_STEP));
+  const nextItems = items.map((item): TodoItem => {
+    const newOrder = reorderedById.get(item.id);
+    if (item.id === itemId) {
       const out: TodoItem = {
         ...updatedSelf,
         order: newOrder ?? updatedSelf.order ?? ORDER_STEP,
       };
       return out;
     }
-    if (newOrder !== undefined) return { ...it, order: newOrder };
-    return it;
+    if (newOrder !== undefined) return { ...item, order: newOrder };
+    return item;
   });
-  const finalSelf = nextItems.find((it) => it.id === id)!;
+  const finalSelf = nextItems.find((item) => item.id === itemId)!;
   return { kind: "success", items: nextItems, item: finalSelf };
 }
 
@@ -437,13 +377,10 @@ function clampPosition(raw: number | undefined, max: number): number {
 
 // ── Delete ────────────────────────────────────────────────────────
 
-export function handleDeleteItem(
-  items: TodoItem[],
-  id: string,
-): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handleDeleteItem(items: TodoItem[], itemId: string): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
-  return { kind: "success", items: items.filter((it) => it.id !== id) };
+  return { kind: "success", items: items.filter((item) => item.id !== itemId) };
 }

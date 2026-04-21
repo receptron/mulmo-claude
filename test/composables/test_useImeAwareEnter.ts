@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  useImeAwareEnter,
-  SAFARI_IME_RACE_WINDOW_MS,
-} from "../../src/composables/useImeAwareEnter.ts";
+import { useImeAwareEnter, SAFARI_IME_RACE_WINDOW_MS } from "../../src/composables/useImeAwareEnter.ts";
 
 // Minimal KeyboardEvent stub so tests can run under node:test without
 // jsdom. Only the surface the composable touches is modelled.
@@ -15,21 +12,17 @@ interface TestKeyboardEvent {
   defaultPrevented: boolean;
 }
 
-function fakeKeydown(opts: {
-  key: string;
-  shiftKey?: boolean;
-  isComposing?: boolean;
-}): TestKeyboardEvent {
-  const ev: TestKeyboardEvent = {
+function fakeKeydown(opts: { key: string; shiftKey?: boolean; isComposing?: boolean }): TestKeyboardEvent {
+  const evt: TestKeyboardEvent = {
     key: opts.key,
     shiftKey: opts.shiftKey ?? false,
     isComposing: opts.isComposing ?? false,
     defaultPrevented: false,
     preventDefault() {
-      ev.defaultPrevented = true;
+      evt.defaultPrevented = true;
     },
   };
-  return ev;
+  return evt;
 }
 
 function setup() {
@@ -56,26 +49,26 @@ function setup() {
 describe("useImeAwareEnter", () => {
   it("plain Enter sends and prevents default newline", () => {
     const { handlers, sends } = setup();
-    const ev = fakeKeydown({ key: "Enter" });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "Enter" });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 1);
-    assert.equal(ev.defaultPrevented, true);
+    assert.equal(keyEvent.defaultPrevented, true);
   });
 
   it("Shift+Enter does not send and allows default newline", () => {
     const { handlers, sends } = setup();
-    const ev = fakeKeydown({ key: "Enter", shiftKey: true });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "Enter", shiftKey: true });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 0);
-    assert.equal(ev.defaultPrevented, false);
+    assert.equal(keyEvent.defaultPrevented, false);
   });
 
   it("non-Enter keys are ignored", () => {
     const { handlers, sends } = setup();
-    const ev = fakeKeydown({ key: "a" });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "a" });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 0);
-    assert.equal(ev.defaultPrevented, false);
+    assert.equal(keyEvent.defaultPrevented, false);
   });
 
   it("Chrome-order: keydown with isComposing=true does not send", () => {
@@ -133,18 +126,18 @@ describe("useImeAwareEnter", () => {
     // composition without isComposing=true, our internal flag catches it.
     const { handlers, sends } = setup();
     handlers.onCompositionStart();
-    const ev = fakeKeydown({ key: "Enter", isComposing: false });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "Enter", isComposing: false });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 0);
-    assert.equal(ev.defaultPrevented, true);
+    assert.equal(keyEvent.defaultPrevented, true);
   });
 
   it("onBlur clears state so a stale composition doesn't wedge the textarea", () => {
     const { handlers, sends } = setup();
     handlers.onCompositionStart();
     handlers.onBlur();
-    const ev = fakeKeydown({ key: "Enter" });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "Enter" });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 1);
   });
 
@@ -155,8 +148,8 @@ describe("useImeAwareEnter", () => {
     handlers.onBlur();
     // If the timestamp weren't cleared, this Enter would still be
     // within the race window and get suppressed.
-    const ev = fakeKeydown({ key: "Enter" });
-    handlers.onKeydown(ev as unknown as KeyboardEvent);
+    const keyEvent = fakeKeydown({ key: "Enter" });
+    handlers.onKeydown(keyEvent as unknown as KeyboardEvent);
     assert.equal(sends.length, 1);
   });
 });

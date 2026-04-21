@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  DEFAULT_TRANSCRIPT_MAX_CHARS,
-  buildTranscriptPreamble,
-  isStaleSessionError,
-} from "../../server/agent/resumeFailover.ts";
+import { DEFAULT_TRANSCRIPT_MAX_CHARS, buildTranscriptPreamble, isStaleSessionError } from "../../server/agent/resumeFailover.ts";
 import { EVENT_TYPES } from "../../src/types/events.ts";
 
 // Shape matches what `server/api/routes/agent.ts` appends to the session
@@ -14,22 +10,18 @@ function jsonlLine(source: "user" | "assistant", message: string): string {
   return JSON.stringify({ source, type: EVENT_TYPES.text, message });
 }
 
-function jsonlFrom(
-  entries: { source: "user" | "assistant"; message: string }[],
-): string {
-  return entries.map((e) => jsonlLine(e.source, e.message)).join("\n") + "\n";
+function jsonlFrom(entries: { source: "user" | "assistant"; message: string }[]): string {
+  return entries.map((entry) => jsonlLine(entry.source, entry.message)).join("\n") + "\n";
 }
 
 describe("isStaleSessionError", () => {
   it("matches the CLI's stderr phrase exactly", () => {
-    const line =
-      "No conversation found with session ID: cf40e522-19e5-4ad7-aa35-cd85d6b88331";
+    const line = "No conversation found with session ID: cf40e522-19e5-4ad7-aa35-cd85d6b88331";
     assert.equal(isStaleSessionError(line), true);
   });
 
   it("matches even when wrapped by other stderr output", () => {
-    const msg =
-      "Error: no resume\nNo conversation found with session ID: abc\nmore context";
+    const msg = "Error: no resume\nNo conversation found with session ID: abc\nmore context";
     assert.equal(isStaleSessionError(msg), true);
   });
 
@@ -116,13 +108,7 @@ describe("buildTranscriptPreamble — filtering", () => {
   });
 
   it("skips malformed lines without throwing", () => {
-    const jsonl =
-      "not json\n" +
-      jsonlLine("user", "still works") +
-      "\n" +
-      "{also broken\n" +
-      jsonlLine("assistant", "reply") +
-      "\n";
+    const jsonl = "not json\n" + jsonlLine("user", "still works") + "\n" + "{also broken\n" + jsonlLine("assistant", "reply") + "\n";
     const preamble = buildTranscriptPreamble(jsonl);
     assert.match(preamble, /User: still works/);
     assert.match(preamble, /Assistant: reply/);

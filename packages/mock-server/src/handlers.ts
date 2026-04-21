@@ -35,10 +35,7 @@ const ROLES_TEXT = `Available roles:
   office — Office Guide & Tutor
   artist — Artist`;
 
-function handleSlashCommand(
-  text: string,
-  payload: MessagePayload,
-): MessageAck | null {
+function handleSlashCommand(text: string, payload: MessagePayload): MessageAck | null {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) return null;
 
@@ -89,10 +86,7 @@ function buildEchoReply(payload: MessagePayload): string {
 
 // ── Public ────────────────────────────────────────────────────────
 
-export function handleMessage(
-  payload: MessagePayload,
-  opts: MockServerOptions,
-): MessageAck {
+export function handleMessage(payload: MessagePayload, opts: MockServerOptions): MessageAck {
   if (opts.alwaysError) {
     return { ok: false, error: "simulated error", status: 500 };
   }

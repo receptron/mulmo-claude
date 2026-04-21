@@ -14,9 +14,9 @@ describe("makeId", () => {
     const parts = id.split("_");
     // Format: prefix_timestamp_hex
     assert.equal(parts.length, 3);
-    const ts = Number(parts[1]);
-    assert.ok(Number.isFinite(ts));
-    assert.ok(ts > 1_700_000_000_000, "timestamp should be recent epoch ms");
+    const timestamp = Number(parts[1]);
+    assert.ok(Number.isFinite(timestamp));
+    assert.ok(timestamp > 1_700_000_000_000, "timestamp should be recent epoch ms");
   });
 
   it("ends with 6 hex characters", () => {

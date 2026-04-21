@@ -7,11 +7,7 @@ import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 
-function createUploadedImageResult(
-  imageData: string,
-  fileName: string,
-  prompt: string,
-): ToolResult<ImageToolData, never> {
+function createUploadedImageResult(imageData: string, fileName: string, prompt: string): ToolResult<ImageToolData, never> {
   return {
     toolName: TOOL_NAME,
     data: { imageData, prompt },
@@ -24,10 +20,7 @@ const generateImagePlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<ImageToolData>>(
-      API_ROUTES.image.generate,
-      args,
-    );
+    const result = await apiPost<ToolResult<ImageToolData>>(API_ROUTES.image.generate, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,
@@ -48,13 +41,11 @@ const generateImagePlugin: ToolPlugin<ImageToolData> = {
     {
       type: "file",
       acceptedTypes: ["image/png", "image/jpeg"],
-      handleInput: (fileData: string, fileName: string) =>
-        createUploadedImageResult(fileData, fileName, ""),
+      handleInput: (fileData: string, fileName: string) => createUploadedImageResult(fileData, fileName, ""),
     },
     {
       type: "clipboard-image",
-      handleInput: (imageData: string) =>
-        createUploadedImageResult(imageData, "clipboard-image.png", ""),
+      handleInput: (imageData: string) => createUploadedImageResult(imageData, "clipboard-image.png", ""),
     },
   ],
   viewComponent: View,

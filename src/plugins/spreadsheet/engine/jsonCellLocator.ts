@@ -19,11 +19,7 @@
 // opening `[` after `startPos` (counting from -1 so the first `[`
 // encountered is index 0). Returns the position just after that
 // opening bracket, or -1 if we ran off the end.
-function findRowOpenBracket(
-  text: string,
-  startPos: number,
-  rowIndex: number,
-): number {
+function findRowOpenBracket(text: string, startPos: number, rowIndex: number): number {
   let currentRow = -1;
   let inString = false;
   for (let i = startPos; i < text.length; i++) {
@@ -48,11 +44,7 @@ function findRowOpenBracket(
 // the `colIndex`-th cell. Tracks string/object/bracket state so
 // commas inside cell objects don't miscounted as cell separators.
 // Returns -1 if the row ends before we reach colIndex.
-function findCellStartWithinRow(
-  text: string,
-  rowStart: number,
-  colIndex: number,
-): number {
+function findCellStartWithinRow(text: string, rowStart: number, colIndex: number): number {
   let currentCol = 0;
   let inString = false;
   let inObject = 0;
@@ -100,12 +92,7 @@ function findCellStartWithinRow(
  * Returns -1 if the sheet isn't found or the (row, col) is out of
  * range. Never throws.
  */
-export function findCellJsonPosition(
-  editorText: string,
-  sheetName: string,
-  rowIndex: number,
-  colIndex: number,
-): number {
+export function findCellJsonPosition(editorText: string, sheetName: string, rowIndex: number, colIndex: number): number {
   // JSON.stringify escapes embedded quotes/backslashes so the marker
   // matches the way the sheet name actually appears in editorText.
   const sheetStartMarker = `"name": ${JSON.stringify(sheetName)}`;
@@ -117,11 +104,7 @@ export function findCellJsonPosition(
   const dataPos = editorText.indexOf(dataStartMarker, sheetPos);
   if (dataPos === -1) return -1;
 
-  const rowStart = findRowOpenBracket(
-    editorText,
-    dataPos + dataStartMarker.length,
-    rowIndex,
-  );
+  const rowStart = findRowOpenBracket(editorText, dataPos + dataStartMarker.length, rowIndex);
   if (rowStart === -1) return -1;
 
   return findCellStartWithinRow(editorText, rowStart, colIndex);

@@ -25,11 +25,6 @@
     // compiler.
     "jsx": "preserve"
   },
-  "include": [
-    "**/*.ts",
-    "../src/**/*.ts",
-    "../server/**/*.ts",
-    "../packages/*/src/**/*.ts"
-  ],
+  "include": ["**/*.ts", "../src/**/*.ts", "../server/**/*.ts", "../packages/*/src/**/*.ts"],
   "exclude": ["../node_modules", "../dist", "../packages/relay"]
 }

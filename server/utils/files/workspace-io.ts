@@ -42,9 +42,7 @@ export function resolveWorkspacePath(relPath: string): string {
  * Read a text file under the workspace. Returns null on ENOENT;
  * logs and re-throws unexpected errors (EACCES, EPERM, etc.).
  */
-export async function readWorkspaceText(
-  relPath: string,
-): Promise<string | null> {
+export async function readWorkspaceText(relPath: string): Promise<string | null> {
   try {
     return await fs.promises.readFile(resolveWorkspacePath(relPath), "utf-8");
   } catch (err) {
@@ -65,10 +63,7 @@ export function readWorkspaceTextSync(relPath: string): string | null {
  * Read and parse a JSON file under the workspace. Returns
  * `fallback` if the file is missing, unreadable, or malformed.
  */
-export async function readWorkspaceJson<T>(
-  relPath: string,
-  fallback: T,
-): Promise<T> {
+export async function readWorkspaceJson<T>(relPath: string, fallback: T): Promise<T> {
   const text = await readWorkspaceText(relPath);
   if (text === null) return fallback;
   try {
@@ -95,20 +90,12 @@ export function readWorkspaceJsonSync<T>(relPath: string, fallback: T): T {
  * Write a text file under the workspace atomically.
  * Parent directories are created if missing.
  */
-export async function writeWorkspaceText(
-  relPath: string,
-  content: string,
-  opts?: { mode?: number },
-): Promise<void> {
+export async function writeWorkspaceText(relPath: string, content: string, opts?: { mode?: number }): Promise<void> {
   await writeFileAtomic(resolveWorkspacePath(relPath), content, opts);
 }
 
 /** Sync variant for startup / init paths. */
-export function writeWorkspaceTextSync(
-  relPath: string,
-  content: string,
-  opts?: { mode?: number },
-): void {
+export function writeWorkspaceTextSync(relPath: string, content: string, opts?: { mode?: number }): void {
   writeFileAtomicSync(resolveWorkspacePath(relPath), content, opts);
 }
 
@@ -116,16 +103,8 @@ export function writeWorkspaceTextSync(
  * Write a JSON value under the workspace atomically.
  * Pretty-printed with 2-space indent.
  */
-export async function writeWorkspaceJson(
-  relPath: string,
-  data: unknown,
-  opts?: { mode?: number },
-): Promise<void> {
-  await writeFileAtomic(
-    resolveWorkspacePath(relPath),
-    JSON.stringify(data, null, 2),
-    opts,
-  );
+export async function writeWorkspaceJson(relPath: string, data: unknown, opts?: { mode?: number }): Promise<void> {
+  await writeFileAtomic(resolveWorkspacePath(relPath), JSON.stringify(data, null, 2), opts);
 }
 
 // ── Rooted variants (for DI / testable modules) ────────────────
@@ -152,10 +131,7 @@ export function resolvePath(root: string, relPath: string): string {
 
 /** Read text under an arbitrary root. Null on ENOENT; rethrows
  *  unexpected errors. */
-export async function readTextUnder(
-  root: string,
-  relPath: string,
-): Promise<string | null> {
+export async function readTextUnder(root: string, relPath: string): Promise<string | null> {
   try {
     return await fs.promises.readFile(path.join(root, relPath), "utf-8");
   } catch (err) {
@@ -164,19 +140,12 @@ export async function readTextUnder(
 }
 
 /** Write atomically under an arbitrary root. */
-export async function writeTextUnder(
-  root: string,
-  relPath: string,
-  content: string,
-): Promise<void> {
+export async function writeTextUnder(root: string, relPath: string, content: string): Promise<void> {
   await writeFileAtomic(path.join(root, relPath), content);
 }
 
 /** Sync read text under a root. Null on ENOENT. */
-export function readTextUnderSync(
-  root: string,
-  relPath: string,
-): string | null {
+export function readTextUnderSync(root: string, relPath: string): string | null {
   try {
     return fs.readFileSync(path.join(root, relPath), "utf-8");
   } catch (err) {
@@ -198,10 +167,7 @@ export function readdirUnderSync(root: string, relPath: string): string[] {
 }
 
 /** Readdir under a root. Empty on ENOENT; rethrows unexpected. */
-export async function readdirUnder(
-  root: string,
-  relPath: string,
-): Promise<string[]> {
+export async function readdirUnder(root: string, relPath: string): Promise<string[]> {
   try {
     return await fs.promises.readdir(path.join(root, relPath));
   } catch (err) {
@@ -214,10 +180,7 @@ export async function readdirUnder(
 }
 
 /** Stat under a root. Null on ENOENT; rethrows unexpected. */
-export async function statUnder(
-  root: string,
-  relPath: string,
-): Promise<fs.Stats | null> {
+export async function statUnder(root: string, relPath: string): Promise<fs.Stats | null> {
   try {
     return await fs.promises.stat(path.join(root, relPath));
   } catch (err) {
@@ -226,10 +189,7 @@ export async function statUnder(
 }
 
 /** Ensure a directory exists under a root. */
-export async function ensureDirUnder(
-  root: string,
-  relPath: string,
-): Promise<void> {
+export async function ensureDirUnder(root: string, relPath: string): Promise<void> {
   await fs.promises.mkdir(path.join(root, relPath), { recursive: true });
 }
 

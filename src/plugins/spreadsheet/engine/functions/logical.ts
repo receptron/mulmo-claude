@@ -21,8 +21,7 @@ const ifHandler: FunctionHandler = (args, context) => {
   } else if (typeof conditionValue === "number") {
     conditionResult = conditionValue !== 0;
   } else if (typeof conditionValue === "string") {
-    conditionResult =
-      conditionValue.toLowerCase() === "true" || conditionValue !== "";
+    conditionResult = conditionValue.toLowerCase() === "true" || conditionValue !== "";
   } else {
     conditionResult = !!conditionValue;
   }
@@ -43,17 +42,12 @@ const ifHandler: FunctionHandler = (args, context) => {
   // Otherwise evaluate as expression
   let expr = resultValue;
 
-  const refs = resultValue.match(
-    /(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g,
-  );
+  const refs = resultValue.match(/(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g);
   if (refs) {
     for (const ref of refs) {
       const value = context.getCellValue(ref);
       const escapedRef = ref.replace(/\$/g, "\\$").replace(/'/g, "\\'");
-      expr = expr.replace(
-        new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-        String(value),
-      );
+      expr = expr.replace(new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), String(value));
     }
   }
 
@@ -102,11 +96,7 @@ const iferrorHandler: FunctionHandler = (args, context) => {
   try {
     const result = context.evaluateFormula(args[0]);
     // Check if result is an error (NaN, Infinity, etc.)
-    if (
-      result === null ||
-      result === undefined ||
-      (typeof result === "number" && (isNaN(result) || !isFinite(result)))
-    ) {
+    if (result === null || result === undefined || (typeof result === "number" && (isNaN(result) || !isFinite(result)))) {
       return context.evaluateFormula(args[1]);
     }
     return result;
@@ -129,9 +119,7 @@ const ifnaHandler: FunctionHandler = (args, context) => {
 
 const ifsHandler: FunctionHandler = (args, context) => {
   if (args.length < 2 || args.length % 2 !== 0) {
-    throw new Error(
-      "IFS requires an even number of arguments (condition-value pairs)",
-    );
+    throw new Error("IFS requires an even number of arguments (condition-value pairs)");
   }
 
   // Iterate through condition-value pairs
@@ -142,17 +130,12 @@ const ifsHandler: FunctionHandler = (args, context) => {
     // Evaluate condition
     let condExpr = condition;
 
-    const cellRefs = condition.match(
-      /(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g,
-    );
+    const cellRefs = condition.match(/(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g);
     if (cellRefs) {
       for (const ref of cellRefs) {
         const cellValue = context.getCellValue(ref);
         const escapedRef = ref.replace(/\$/g, "\\$").replace(/'/g, "\\'");
-        condExpr = condExpr.replace(
-          new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-          String(cellValue),
-        );
+        condExpr = condExpr.replace(new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), String(cellValue));
       }
     }
 
@@ -234,12 +217,8 @@ functionRegistry.register({
   handler: iferrorHandler,
   minArgs: 2,
   maxArgs: 2,
-  description:
-    "Returns a value if expression is an error, otherwise returns the expression",
-  examples: [
-    "IFERROR(A1/B1, 0)",
-    'IFERROR(VLOOKUP(A1, B1:C10, 2), "Not found")',
-  ],
+  description: "Returns a value if expression is an error, otherwise returns the expression",
+  examples: ["IFERROR(A1/B1, 0)", 'IFERROR(VLOOKUP(A1, B1:C10, 2), "Not found")'],
   category: "Logical",
 });
 
@@ -248,8 +227,7 @@ functionRegistry.register({
   handler: ifnaHandler,
   minArgs: 2,
   maxArgs: 2,
-  description:
-    "Returns a value if expression is #N/A, otherwise returns the expression",
+  description: "Returns a value if expression is #N/A, otherwise returns the expression",
   examples: ['IFNA(A1, "N/A")', "IFNA(MATCH(A1, B1:B10), 0)"],
   category: "Logical",
 });
@@ -259,10 +237,7 @@ functionRegistry.register({
   handler: ifsHandler,
   minArgs: 2,
   description: "Checks multiple conditions and returns the first true result",
-  examples: [
-    'IFS(A1>90, "A", A1>80, "B", A1>70, "C")',
-    'IFS(B1="Yes", 1, B1="No", 0)',
-  ],
+  examples: ['IFS(A1>90, "A", A1>80, "B", A1>70, "C")', 'IFS(B1="Yes", 1, B1="No", 0)'],
   category: "Logical",
 });
 

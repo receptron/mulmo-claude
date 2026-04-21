@@ -23,10 +23,7 @@ export function usePdfDownload(): UsePdfDownloadHandle {
   const pdfDownloading = ref(false);
   const pdfError = ref<string | null>(null);
 
-  async function downloadPdf(
-    markdown: string,
-    filename: string,
-  ): Promise<void> {
+  async function downloadPdf(markdown: string, filename: string): Promise<void> {
     pdfError.value = null;
     pdfDownloading.value = true;
     let url: string | null = null;
@@ -45,10 +42,10 @@ export function usePdfDownload(): UsePdfDownloadHandle {
       }
       const blob = await response.blob();
       url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
     } catch (err) {
       pdfError.value = errorMessage(err);
     } finally {

@@ -2,12 +2,7 @@
  * Lookup and Reference Functions
  */
 
-import {
-  functionRegistry,
-  toNumber,
-  parseCriteria,
-  type FunctionHandler,
-} from "../registry";
+import { functionRegistry, toNumber, parseCriteria, type FunctionHandler } from "../registry";
 import type { CellValue } from "../types";
 
 // Helper to convert Excel column letters to 0-based index (A=0, Z=25, AA=26, etc.)
@@ -46,10 +41,7 @@ const findMatchIndex = (
   // Exact match
   if (matchType === 0) {
     // Handle wildcards for strings if it's an exact match request
-    if (
-      typeof lookupValue === "string" &&
-      (lookupValue.includes("*") || lookupValue.includes("?"))
-    ) {
+    if (typeof lookupValue === "string" && (lookupValue.includes("*") || lookupValue.includes("?"))) {
       const criteriaFn = parseCriteria(lookupValue);
 
       if (searchMode === 1) {
@@ -117,14 +109,12 @@ const vlookupHandler: FunctionHandler = (args, context) => {
   const lookupValue = context.evaluateFormula(args[0]);
   const tableArrayRange = args[1];
   const colIndexNum = toNumber(context.evaluateFormula(args[2]));
-  const rangeLookup =
-    args.length === 4 ? context.evaluateFormula(args[3]) : true;
+  const rangeLookup = args.length === 4 ? context.evaluateFormula(args[3]) : true;
 
   // Convert rangeLookup to boolean/number logic
   // TRUE/1/omitted = approximate match (default)
   // FALSE/0 = exact match
-  const isApprox =
-    rangeLookup === true || rangeLookup === 1 || rangeLookup === "1";
+  const isApprox = rangeLookup === true || rangeLookup === 1 || rangeLookup === "1";
   const matchType = isApprox ? 1 : 0;
 
   // Get the full table data
@@ -192,11 +182,9 @@ const hlookupHandler: FunctionHandler = (args, context) => {
   const lookupValue = context.evaluateFormula(args[0]);
   const tableArrayRange = args[1];
   const rowIndexNum = toNumber(context.evaluateFormula(args[2]));
-  const rangeLookup =
-    args.length === 4 ? context.evaluateFormula(args[3]) : true;
+  const rangeLookup = args.length === 4 ? context.evaluateFormula(args[3]) : true;
 
-  const isApprox =
-    rangeLookup === true || rangeLookup === 1 || rangeLookup === "1";
+  const isApprox = rangeLookup === true || rangeLookup === 1 || rangeLookup === "1";
   const matchType = isApprox ? 1 : 0;
 
   // Extract sheet name if present
@@ -246,8 +234,7 @@ const matchHandler: FunctionHandler = (args, context) => {
 
   const lookupValue = context.evaluateFormula(args[0]);
   const lookupArrayRange = args[1];
-  const matchType =
-    args.length === 3 ? toNumber(context.evaluateFormula(args[2])) : 1;
+  const matchType = args.length === 3 ? toNumber(context.evaluateFormula(args[2])) : 1;
 
   const lookupArray = context.getRangeValues(lookupArrayRange);
 
@@ -263,8 +250,7 @@ const indexHandler: FunctionHandler = (args, context) => {
 
   const arrayRange = args[0];
   const rowNum = toNumber(context.evaluateFormula(args[1]));
-  const colNum =
-    args.length >= 3 ? toNumber(context.evaluateFormula(args[2])) : 1; // Default to 1 if omitted (for 1D arrays)
+  const colNum = args.length >= 3 ? toNumber(context.evaluateFormula(args[2])) : 1; // Default to 1 if omitted (for 1D arrays)
 
   // Parse range to find the specific cell
   let sheetName = "";
@@ -301,12 +287,9 @@ const xlookupHandler: FunctionHandler = (args, context) => {
   const lookupValue = context.evaluateFormula(args[0]);
   const lookupArrayRange = args[1];
   const returnArrayRange = args[2];
-  const ifNotFound =
-    args.length >= 4 ? context.evaluateFormula(args[3]) : "#N/A";
-  const matchMode =
-    args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
-  const searchMode =
-    args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 1;
+  const ifNotFound = args.length >= 4 ? context.evaluateFormula(args[3]) : "#N/A";
+  const matchMode = args.length >= 5 ? toNumber(context.evaluateFormula(args[4])) : 0;
+  const searchMode = args.length >= 6 ? toNumber(context.evaluateFormula(args[5])) : 1;
 
   const lookupArray = context.getRangeValues(lookupArrayRange);
   const returnArray = context.getRangeValues(returnArrayRange);
@@ -371,8 +354,7 @@ functionRegistry.register({
   handler: vlookupHandler,
   minArgs: 3,
   maxArgs: 4,
-  description:
-    "Looks for a value in the leftmost column of a table, and then returns a value in the same row from a column you specify",
+  description: "Looks for a value in the leftmost column of a table, and then returns a value in the same row from a column you specify",
   examples: ["VLOOKUP(105, A2:C10, 2)", 'VLOOKUP("Smith", A2:E10, 5, FALSE)'],
   category: "Lookup & Reference",
 });
@@ -382,8 +364,7 @@ functionRegistry.register({
   handler: hlookupHandler,
   minArgs: 3,
   maxArgs: 4,
-  description:
-    "Looks for a value in the top row of a table, and then returns a value in the same column from a row you specify",
+  description: "Looks for a value in the top row of a table, and then returns a value in the same column from a row you specify",
   examples: ['HLOOKUP("Axles", A1:C10, 2, TRUE)'],
   category: "Lookup & Reference",
 });
@@ -393,8 +374,7 @@ functionRegistry.register({
   handler: matchHandler,
   minArgs: 2,
   maxArgs: 3,
-  description:
-    "Returns the relative position of an item in an array that matches a specified value",
+  description: "Returns the relative position of an item in an array that matches a specified value",
   examples: ["MATCH(25, A1:A10, 0)", 'MATCH("b", A1:A5, 0)'],
   category: "Lookup & Reference",
 });
@@ -404,8 +384,7 @@ functionRegistry.register({
   handler: indexHandler,
   minArgs: 2,
   maxArgs: 4,
-  description:
-    "Returns the value of an element in a table or an array, selected by the row and column number indexes",
+  description: "Returns the value of an element in a table or an array, selected by the row and column number indexes",
   examples: ["INDEX(A1:B5, 2, 2)", "INDEX(A1:A10, 5)"],
   category: "Lookup & Reference",
 });
@@ -415,11 +394,7 @@ functionRegistry.register({
   handler: xlookupHandler,
   minArgs: 3,
   maxArgs: 6,
-  description:
-    "Searches a range or an array, and returns an item corresponding to the first match it finds",
-  examples: [
-    "XLOOKUP(A1, B1:B10, C1:C10)",
-    'XLOOKUP("USA", Countries, Populations)',
-  ],
+  description: "Searches a range or an array, and returns an item corresponding to the first match it finds",
+  examples: ["XLOOKUP(A1, B1:B10, C1:C10)", 'XLOOKUP("USA", Countries, Populations)'],
   category: "Lookup & Reference",
 });

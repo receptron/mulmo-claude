@@ -46,10 +46,7 @@ export function useSessionHistory(): {
   async function fetchSessions(): Promise<SessionSummary[]> {
     const query: Record<string, string> = {};
     if (cursor !== null) query.since = cursor;
-    const result = await apiGet<SessionsResponse>(
-      API_ROUTES.sessions.list,
-      query,
-    );
+    const result = await apiGet<SessionsResponse>(API_ROUTES.sessions.list, query);
     if (!result.ok) {
       historyError.value = result.error;
       // Intentionally preserve `sessions.value` — callers keep showing
@@ -63,11 +60,7 @@ export function useSessionHistory(): {
       // full list; seed the cache directly.
       sessions.value = body.sessions;
     } else {
-      sessions.value = applySessionDiff(
-        sessions.value,
-        body.sessions,
-        body.deletedIds,
-      );
+      sessions.value = applySessionDiff(sessions.value, body.sessions, body.deletedIds);
     }
     cursor = body.cursor;
     return sessions.value;

@@ -72,7 +72,4 @@ export const PLUGIN_DEFS = [
  * Set of plugin names that have MCP tool definitions.
  * Includes all GUI plugins + "switchRole" (handled specially).
  */
-export const MCP_PLUGIN_NAMES = new Set([
-  ...Object.keys(TOOL_ENDPOINTS),
-  "switchRole",
-]);
+export const MCP_PLUGIN_NAMES = new Set([...Object.keys(TOOL_ENDPOINTS), "switchRole"]);

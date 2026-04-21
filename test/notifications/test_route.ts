@@ -19,8 +19,7 @@ import {
 function createSpyDeps(): NotificationDeps & {
   pushCalls: { transportId: string; chatId: string; message: string }[];
 } {
-  const pushCalls: { transportId: string; chatId: string; message: string }[] =
-    [];
+  const pushCalls: { transportId: string; chatId: string; message: string }[] = [];
   const deps: NotificationDeps & { pushCalls: typeof pushCalls } = {
     pushCalls,
     publish: () => {},
@@ -42,8 +41,8 @@ afterEach(() => {
 describe("notification route — body validation via scheduleTestNotification", () => {
   it("uses defaults when body is empty", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({}, deps);
-    assert.equal(s.delaySeconds, 60);
+    const scheduled = scheduleTestNotification({}, deps);
+    assert.equal(scheduled.delaySeconds, 60);
     mock.timers.tick(60_000);
     assert.deepEqual(deps.pushCalls, [
       {
@@ -71,34 +70,31 @@ describe("notification route — body validation via scheduleTestNotification", 
 
   it("accepts a valid numeric delaySeconds", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({ delaySeconds: 10 }, deps);
-    assert.equal(s.delaySeconds, 10);
+    const scheduled = scheduleTestNotification({ delaySeconds: 10 }, deps);
+    assert.equal(scheduled.delaySeconds, 10);
   });
 
   it("clamps invalid delay (Infinity) to default", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({ delaySeconds: Infinity }, deps);
-    assert.equal(s.delaySeconds, 60);
+    const scheduled = scheduleTestNotification({ delaySeconds: Infinity }, deps);
+    assert.equal(scheduled.delaySeconds, 60);
   });
 
   it("caps delay at 3600 seconds", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({ delaySeconds: 10_000 }, deps);
-    assert.equal(s.delaySeconds, 3_600);
+    const scheduled = scheduleTestNotification({ delaySeconds: 10_000 }, deps);
+    assert.equal(scheduled.delaySeconds, 3_600);
   });
 
   it("clamps negative delay to 0", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({ delaySeconds: -5 }, deps);
-    assert.equal(s.delaySeconds, 0);
+    const scheduled = scheduleTestNotification({ delaySeconds: -5 }, deps);
+    assert.equal(scheduled.delaySeconds, 0);
   });
 
   it("accepts custom transportId and chatId", () => {
     const deps = createSpyDeps();
-    scheduleTestNotification(
-      { transportId: "slack", chatId: "general", delaySeconds: 0 },
-      deps,
-    );
+    scheduleTestNotification({ transportId: "slack", chatId: "general", delaySeconds: 0 }, deps);
     mock.timers.tick(0);
     assert.equal(deps.pushCalls[0].transportId, "slack");
     assert.equal(deps.pushCalls[0].chatId, "general");
@@ -106,7 +102,7 @@ describe("notification route — body validation via scheduleTestNotification", 
 
   it("returns a valid ISO8601 firesAt timestamp", () => {
     const deps = createSpyDeps();
-    const s = scheduleTestNotification({ delaySeconds: 5 }, deps);
-    assert.match(s.firesAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    const scheduled = scheduleTestNotification({ delaySeconds: 5 }, deps);
+    assert.match(scheduled.firesAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 });

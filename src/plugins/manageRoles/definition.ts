@@ -5,16 +5,14 @@ export const TOOL_NAME = "manageRoles";
 const toolDefinition: ToolDefinition = {
   type: "function",
   name: TOOL_NAME,
-  description:
-    "Create, update, or delete a custom user role stored in ~/mulmoclaude/roles/. After success, the frontend role list refreshes automatically.",
+  description: "Create, update, or delete a custom user role stored in ~/mulmoclaude/roles/. After success, the frontend role list refreshes automatically.",
   parameters: {
     type: "object",
     properties: {
       action: {
         type: "string",
         enum: ["create", "update", "delete", "list"],
-        description:
-          "The action to perform. Use 'list' to display all custom roles in the canvas.",
+        description: "The action to perform. Use 'list' to display all custom roles in the canvas.",
       },
       role: {
         type: "object",

@@ -20,9 +20,7 @@ export function createLogger(verbose: boolean, logFile?: string): MockLogger {
     } catch (err) {
       if (!warnedLogFileFailure) {
         warnedLogFileFailure = true;
-        console.error(
-          `[mock] warning: cannot write to log file ${logFile}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        console.error(`[mock] warning: cannot write to log file ${logFile}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }

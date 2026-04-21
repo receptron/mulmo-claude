@@ -33,20 +33,14 @@ describe("buildSummarizePromptBody", () => {
   });
 
   it("excludes the `content` field (keeps prompt compact)", () => {
-    const body = buildSummarizePromptBody(
-      [makeItem({ content: "huge body ".repeat(1000) })],
-      "2026-04-13",
-    );
+    const body = buildSummarizePromptBody([makeItem({ content: "huge body ".repeat(1000) })], "2026-04-13");
     const jsonStart = body.indexOf("[");
     const items = JSON.parse(body.slice(jsonStart));
     assert.equal(items[0].content, undefined);
   });
 
   it("truncates `summary` to 200 chars", () => {
-    const body = buildSummarizePromptBody(
-      [makeItem({ summary: "x".repeat(500) })],
-      "2026-04-13",
-    );
+    const body = buildSummarizePromptBody([makeItem({ summary: "x".repeat(500) })], "2026-04-13");
     const jsonStart = body.indexOf("[");
     const items = JSON.parse(body.slice(jsonStart));
     assert.equal(items[0].summary.length, 200);
@@ -60,10 +54,7 @@ describe("buildSummarizePromptBody", () => {
   });
 
   it("includes `severity` when present", () => {
-    const body = buildSummarizePromptBody(
-      [makeItem({ severity: "critical" })],
-      "2026-04-13",
-    );
+    const body = buildSummarizePromptBody([makeItem({ severity: "critical" })], "2026-04-13");
     const jsonStart = body.indexOf("[");
     const items = JSON.parse(body.slice(jsonStart));
     assert.equal(items[0].severity, "critical");
@@ -93,10 +84,7 @@ describe("parseSummarizeOutput", () => {
       is_error: true,
       errors: ["budget blown", "more context"],
     });
-    assert.throws(
-      () => parseSummarizeOutput(stdout),
-      /budget blown; more context/,
-    );
+    assert.throws(() => parseSummarizeOutput(stdout), /budget blown; more context/);
   });
 
   it("falls back to result field on error envelope without errors[]", () => {
@@ -105,23 +93,14 @@ describe("parseSummarizeOutput", () => {
   });
 
   it("throws on unparseable stdout", () => {
-    assert.throws(
-      () => parseSummarizeOutput("not json at all"),
-      /failed to parse claude json/,
-    );
+    assert.throws(() => parseSummarizeOutput("not json at all"), /failed to parse claude json/);
   });
 
   it("throws when result field is missing or empty", () => {
     const emptyResult = JSON.stringify({ result: "" });
-    assert.throws(
-      () => parseSummarizeOutput(emptyResult),
-      /empty \/ missing result/,
-    );
+    assert.throws(() => parseSummarizeOutput(emptyResult), /empty \/ missing result/);
     const missingResult = JSON.stringify({ type: "result" });
-    assert.throws(
-      () => parseSummarizeOutput(missingResult),
-      /empty \/ missing result/,
-    );
+    assert.throws(() => parseSummarizeOutput(missingResult), /empty \/ missing result/);
   });
 });
 

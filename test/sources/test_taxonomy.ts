@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  CATEGORY_SLUGS,
-  isCategorySlug,
-  normalizeCategories,
-} from "../../server/workspace/sources/taxonomy.js";
+import { CATEGORY_SLUGS, isCategorySlug, normalizeCategories } from "../../server/workspace/sources/taxonomy.js";
 
 describe("CATEGORY_SLUGS — shape pin", () => {
   it("contains the phase-1 taxonomy with no duplicates", () => {
@@ -88,11 +84,7 @@ describe("normalizeCategories", () => {
   it("preserves input order on the first occurrence of each", () => {
     // A sort-based dedup would fail this test; explicit order
     // preservation matches what the classifier prompt asks for.
-    assert.deepEqual(normalizeCategories(["security", "ai", "papers"]), [
-      "security",
-      "ai",
-      "papers",
-    ]);
+    assert.deepEqual(normalizeCategories(["security", "ai", "papers"]), ["security", "ai", "papers"]);
   });
 
   it("returns [] for non-array inputs", () => {

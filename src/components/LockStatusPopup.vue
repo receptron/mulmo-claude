@@ -3,91 +3,41 @@
     <button
       ref="button"
       data-testid="sandbox-lock-button"
-      :class="
-        sandboxEnabled
-          ? 'text-gray-400 hover:text-gray-700'
-          : 'text-amber-400 hover:text-amber-500'
-      "
-      :title="
-        sandboxEnabled
-          ? 'Sandbox enabled (Docker)'
-          : 'No sandbox (Docker not found)'
-      "
+      :class="sandboxEnabled ? 'text-gray-400 hover:text-gray-700' : 'text-amber-400 hover:text-amber-500'"
+      :title="sandboxEnabled ? 'Sandbox enabled (Docker)' : 'No sandbox (Docker not found)'"
       @click="emit('update:open', !open)"
     >
-      <span class="material-icons">{{
-        sandboxEnabled ? "lock" : "lock_open"
-      }}</span>
+      <span class="material-icons">{{ sandboxEnabled ? "lock" : "lock_open" }}</span>
     </button>
-    <div
-      v-if="open"
-      ref="popup"
-      class="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs"
-    >
-      <p
-        class="mb-2"
-        :class="sandboxEnabled ? 'text-green-800' : 'text-amber-500'"
-      >
+    <div v-if="open" ref="popup" class="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-xs">
+      <p class="mb-2" :class="sandboxEnabled ? 'text-green-800' : 'text-amber-500'">
         <template v-if="sandboxEnabled">
           <span class="material-icons text-xs align-middle mr-1">lock</span>
-          <strong>Sandbox enabled:</strong> Docker is running. Filesystem access
-          is isolated.
+          <strong>Sandbox enabled:</strong> Docker is running. Filesystem access is isolated.
         </template>
         <template v-else>
           <span class="material-icons text-xs align-middle mr-1">warning</span>
-          <strong>No sandbox:</strong> Claude can access all files on your
-          machine. Install
-          <a
-            href="https://www.docker.com/products/docker-desktop/"
-            target="_blank"
-            class="underline"
-            >Docker Desktop</a
-          >
+          <strong>No sandbox:</strong> Claude can access all files on your machine. Install
+          <a href="https://www.docker.com/products/docker-desktop/" target="_blank" class="underline">Docker Desktop</a>
           to enable filesystem isolation.
         </template>
       </p>
-      <div
-        v-if="sandboxEnabled"
-        data-testid="sandbox-credentials-block"
-        class="mb-2 border-t border-gray-100 pt-2"
-      >
+      <div v-if="sandboxEnabled" data-testid="sandbox-credentials-block" class="mb-2 border-t border-gray-100 pt-2">
         <p class="text-gray-400 mb-1">Host credentials attached:</p>
-        <p
-          v-if="sandboxStatus === null"
-          class="text-gray-400 italic"
-          data-testid="sandbox-credentials-loading"
-        >
-          loading…
-        </p>
+        <p v-if="sandboxStatus === null" class="text-gray-400 italic" data-testid="sandbox-credentials-loading">loading…</p>
         <template v-else>
           <p data-testid="sandbox-credentials-ssh">
             <span class="mr-1">🔑</span>
             <span class="text-gray-500">SSH agent:</span>
-            <span
-              :class="
-                sandboxStatus.sshAgent ? 'text-green-700' : 'text-gray-400'
-              "
-              class="ml-1"
-            >
+            <span :class="sandboxStatus.sshAgent ? 'text-green-700' : 'text-gray-400'" class="ml-1">
               {{ sandboxStatus.sshAgent ? "forwarded" : "not forwarded" }}
             </span>
           </p>
           <p data-testid="sandbox-credentials-mounts">
             <span class="mr-1">📁</span>
             <span class="text-gray-500">Mounted configs:</span>
-            <span
-              :class="
-                sandboxStatus.mounts.length > 0
-                  ? 'text-green-700'
-                  : 'text-gray-400'
-              "
-              class="ml-1"
-            >
-              {{
-                sandboxStatus.mounts.length > 0
-                  ? sandboxStatus.mounts.join(", ")
-                  : "none"
-              }}
+            <span :class="sandboxStatus.mounts.length > 0 ? 'text-green-700' : 'text-gray-400'" class="ml-1">
+              {{ sandboxStatus.mounts.length > 0 ? sandboxStatus.mounts.join(", ") : "none" }}
             </span>
           </p>
         </template>
@@ -154,8 +104,8 @@ watch(
   },
 );
 
-function onTestQuery(q: string): void {
+function onTestQuery(query: string): void {
   emit("update:open", false);
-  emit("testQuery", q);
+  emit("testQuery", query);
 }
 </script>

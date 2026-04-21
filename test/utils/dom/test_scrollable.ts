@@ -28,10 +28,10 @@ afterEach(() => {
 
 function fakeContainer(children: MockElement[]) {
   const elements = children.map(
-    (c) =>
+    (child) =>
       ({
-        scrollHeight: c.scrollHeight,
-        clientHeight: c.clientHeight,
+        scrollHeight: child.scrollHeight,
+        clientHeight: child.clientHeight,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }) as any,
   );
@@ -40,17 +40,15 @@ function fakeContainer(children: MockElement[]) {
   // sees the overflow we configured per fake child. The afterEach
   // hook above restores the original implementation.
   const styles = new Map<unknown, { overflow: string; overflowY: string }>();
-  children.forEach((c, i) => {
+  children.forEach((child, i) => {
     styles.set(elements[i], {
-      overflowY: c.overflowY ?? "visible",
-      overflow: c.overflow ?? "visible",
+      overflowY: child.overflowY ?? "visible",
+      overflow: child.overflow ?? "visible",
     });
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).getComputedStyle = (
-    el: unknown,
-  ): { overflow: string; overflowY: string } =>
-    styles.get(el) ?? { overflow: "visible", overflowY: "visible" };
+  (globalThis as any).getComputedStyle = (element: unknown): { overflow: string; overflowY: string } =>
+    styles.get(element) ?? { overflow: "visible", overflowY: "visible" };
 
   return {
     querySelectorAll: () => elements,
@@ -60,44 +58,38 @@ function fakeContainer(children: MockElement[]) {
 
 describe("findScrollableChild", () => {
   it("returns null when no descendant overflows", () => {
-    const c = fakeContainer([
+    const container = fakeContainer([
       { scrollHeight: 100, clientHeight: 100 },
       { scrollHeight: 50, clientHeight: 200 },
     ]);
-    assert.equal(findScrollableChild(c), null);
+    assert.equal(findScrollableChild(container), null);
   });
 
   it("returns null when a descendant overflows but has visible overflow", () => {
-    const c = fakeContainer([
-      { scrollHeight: 500, clientHeight: 100, overflow: "visible" },
-    ]);
-    assert.equal(findScrollableChild(c), null);
+    const container = fakeContainer([{ scrollHeight: 500, clientHeight: 100, overflow: "visible" }]);
+    assert.equal(findScrollableChild(container), null);
   });
 
   it("returns the first descendant that overflows AND is overflow-y: auto", () => {
-    const c = fakeContainer([
+    const container = fakeContainer([
       { scrollHeight: 100, clientHeight: 100 }, // not scrollable
       { scrollHeight: 500, clientHeight: 100, overflowY: "auto" }, // ✓
       { scrollHeight: 500, clientHeight: 100, overflowY: "scroll" }, // also ✓ but later
     ]);
-    const found = findScrollableChild(c);
+    const found = findScrollableChild(container);
     assert.ok(found);
     assert.equal(found?.scrollHeight, 500);
   });
 
   it("recognizes overflow: scroll on the shorthand property", () => {
-    const c = fakeContainer([
-      { scrollHeight: 500, clientHeight: 100, overflow: "scroll" },
-    ]);
-    const found = findScrollableChild(c);
+    const container = fakeContainer([{ scrollHeight: 500, clientHeight: 100, overflow: "scroll" }]);
+    const found = findScrollableChild(container);
     assert.ok(found);
   });
 
   it("recognizes overflow-y: scroll", () => {
-    const c = fakeContainer([
-      { scrollHeight: 500, clientHeight: 100, overflowY: "scroll" },
-    ]);
-    const found = findScrollableChild(c);
+    const container = fakeContainer([{ scrollHeight: 500, clientHeight: 100, overflowY: "scroll" }]);
+    const found = findScrollableChild(container);
     assert.ok(found);
   });
 });

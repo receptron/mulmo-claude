@@ -14,12 +14,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": [
-    "**/*.ts",
-    "../src/config/roles.ts",
-    "../src/config/workspacePaths.ts",
-    "../src/plugins/*/definition.ts",
-    "../packages/*/src/**/*.ts"
-  ],
-  "exclude": ["node_modules", "../dist", "../packages/relay"]
+  "include": ["**/*.ts", "../src/config/roles.ts", "../src/config/workspacePaths.ts", "../src/plugins/*/definition.ts", "../packages/*/src/**/*.ts"],
+  "exclude": ["node_modules", "../dist", "../packages/relay", "../packages/mulmoclaude"]
 }

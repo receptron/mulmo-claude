@@ -22,11 +22,7 @@ export function logFilePathFor(logsDir: string, date: Date): string {
 }
 
 /** Append a log entry to today's JSONL file. */
-export async function appendLogEntry(
-  logsDir: string,
-  entry: TaskLogEntry,
-  deps: LogDeps,
-): Promise<void> {
+export async function appendLogEntry(logsDir: string, entry: TaskLogEntry, deps: LogDeps): Promise<void> {
   await deps.ensureDir(logsDir);
   const filePath = logFilePathFor(logsDir, new Date(entry.startedAt));
   await deps.appendFile(filePath, JSON.stringify(entry) + "\n");

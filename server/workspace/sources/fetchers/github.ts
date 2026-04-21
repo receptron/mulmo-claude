@@ -80,10 +80,7 @@ export class GithubFetcherError extends Error {
 // GitHub API responses always include an `X-GitHub-Request-Id` and
 // many include a `message` body field on errors. We include the
 // body message in the thrown error for easier log reading.
-export async function githubFetchJson(
-  url: string,
-  http: HttpFetcherDeps,
-): Promise<unknown> {
+export async function githubFetchJson(url: string, http: HttpFetcherDeps): Promise<unknown> {
   const res = await fetchPolite(url, http);
   if (!res.ok) {
     // Body may or may not be JSON — try both. Not throwing on

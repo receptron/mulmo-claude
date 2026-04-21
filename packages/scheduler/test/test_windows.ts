@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  nextWindowAfter,
-  listMissedWindows,
-  isDueAt,
-  parseTimeToMs,
-} from "../src/windows.ts";
+import { nextWindowAfter, listMissedWindows, isDueAt, parseTimeToMs } from "../src/windows.ts";
 
 const hour = (h: number, m = 0) => Date.UTC(2026, 3, 17, h, m, 0); // 2026-04-17 HH:MM UTC
 

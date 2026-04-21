@@ -1,12 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  loadState,
-  saveState,
-  updateAndSave,
-  type StateDeps,
-  type StateMap,
-} from "../src/state.ts";
+import { loadState, saveState, updateAndSave, type StateDeps, type StateMap } from "../src/state.ts";
 import { emptyState } from "../src/types.ts";
 
 function inMemoryDeps(): StateDeps & { store: Map<string, string> } {

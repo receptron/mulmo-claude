@@ -2,13 +2,7 @@
 // syntax coloring. Keeps itself dependency-free so it can be reused
 // and unit-tested without pulling in Vue or Tailwind.
 
-export type JsonTokenType =
-  | "key"
-  | "string"
-  | "number"
-  | "keyword"
-  | "punct"
-  | "whitespace";
+export type JsonTokenType = "key" | "string" | "number" | "keyword" | "punct" | "whitespace";
 
 export interface JsonToken {
   type: JsonTokenType;
@@ -35,18 +29,18 @@ const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 const WS_RE = /^\s+/;
 const PUNCT_RE = /^[{}[\]:,]/;
 
-const MATCHERS: { type: JsonTokenType; re: RegExp }[] = [
-  { type: "string", re: STRING_RE },
-  { type: "keyword", re: KEYWORD_RE },
-  { type: "number", re: NUMBER_RE },
-  { type: "whitespace", re: WS_RE },
-  { type: "punct", re: PUNCT_RE },
+const MATCHERS: { type: JsonTokenType; pattern: RegExp }[] = [
+  { type: "string", pattern: STRING_RE },
+  { type: "keyword", pattern: KEYWORD_RE },
+  { type: "number", pattern: NUMBER_RE },
+  { type: "whitespace", pattern: WS_RE },
+  { type: "punct", pattern: PUNCT_RE },
 ];
 
 function nextToken(slice: string): JsonToken | null {
-  for (const { type, re } of MATCHERS) {
-    const m = re.exec(slice);
-    if (m) return { type, value: m[0] };
+  for (const { type, pattern } of MATCHERS) {
+    const match = pattern.exec(slice);
+    if (match) return { type, value: match[0] };
   }
   return null;
 }
@@ -76,11 +70,7 @@ function markKeys(tokens: JsonToken[]): void {
     if (tokens[i].type !== "string") continue;
     let j = i + 1;
     while (j < tokens.length && tokens[j].type === "whitespace") j++;
-    if (
-      j < tokens.length &&
-      tokens[j].type === "punct" &&
-      tokens[j].value === ":"
-    ) {
+    if (j < tokens.length && tokens[j].type === "punct" && tokens[j].value === ":") {
       tokens[i] = { type: "key", value: tokens[i].value };
     }
   }

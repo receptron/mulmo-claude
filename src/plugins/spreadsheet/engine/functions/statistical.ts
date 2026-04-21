@@ -2,13 +2,7 @@
  * Statistical Functions
  */
 
-import {
-  functionRegistry,
-  toNumber,
-  parseCriteria,
-  type FunctionContext,
-  type FunctionHandler,
-} from "../registry";
+import { functionRegistry, toNumber, parseCriteria, type FunctionContext, type FunctionHandler } from "../registry";
 
 const isLetter = (char: string): boolean => /[A-Z]/i.test(char);
 
@@ -40,10 +34,7 @@ const isRangeReference = (value: string): boolean => {
   return isCellReference(start) && isCellReference(end);
 };
 
-const collectNumericValues = (
-  args: string[],
-  context: FunctionContext,
-): number[] => {
+const collectNumericValues = (args: string[], context: FunctionContext): number[] => {
   const values: number[] = [];
 
   for (const rawArg of args) {
@@ -107,9 +98,7 @@ const medianHandler: FunctionHandler = (args, context) => {
 
   if (values.length === 0) return 0;
   const mid = Math.floor(values.length / 2);
-  return values.length % 2 === 0
-    ? (values[mid - 1] + values[mid]) / 2
-    : values[mid];
+  return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
 };
 
 const modeHandler: FunctionHandler = (args, context) => {
@@ -145,8 +134,7 @@ const stdevHandler: FunctionHandler = (args, context) => {
 
   const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
   const squaredDiffs = values.map((val) => Math.pow(val - mean, 2));
-  const variance =
-    squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
+  const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
   return Math.sqrt(variance);
 };
 
@@ -163,16 +151,14 @@ const varHandler: FunctionHandler = (args, context) => {
 
 const countaHandler: FunctionHandler = (args, context) => {
   if (args.length !== 1) throw new Error("COUNTA requires 1 argument");
-  const values =
-    context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
+  const values = context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
   // Count non-empty cells
   return values.filter((v) => v !== null && v !== undefined && v !== "").length;
 };
 
 const countifHandler: FunctionHandler = (args, context) => {
   if (args.length !== 2) throw new Error("COUNTIF requires 2 arguments");
-  const values =
-    context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
+  const values = context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
   const criteria = args[1].trim();
   const compareFn = parseCriteria(criteria);
   return values.filter(compareFn).length;
@@ -183,13 +169,9 @@ const sumifHandler: FunctionHandler = (args, context) => {
     throw new Error("SUMIF requires 2 or 3 arguments");
   }
 
-  const criteriaRange =
-    context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
+  const criteriaRange = context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
   const criteria = args[1].trim();
-  const sumRange =
-    args.length === 3
-      ? context.getRangeValues(args[2])
-      : context.getRangeValues(args[0]);
+  const sumRange = args.length === 3 ? context.getRangeValues(args[2]) : context.getRangeValues(args[0]);
 
   const compareFn = parseCriteria(criteria);
 
@@ -208,13 +190,9 @@ const averageifHandler: FunctionHandler = (args, context) => {
     throw new Error("AVERAGEIF requires 2 or 3 arguments");
   }
 
-  const criteriaRange =
-    context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
+  const criteriaRange = context.getRangeValuesRaw?.(args[0]) ?? context.getRangeValues(args[0]);
   const criteria = args[1].trim();
-  const avgRange =
-    args.length === 3
-      ? context.getRangeValues(args[2])
-      : context.getRangeValues(args[0]);
+  const avgRange = args.length === 3 ? context.getRangeValues(args[2]) : context.getRangeValues(args[0]);
 
   const compareFn = parseCriteria(criteria);
 

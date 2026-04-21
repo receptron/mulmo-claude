@@ -108,16 +108,16 @@ describe("env coercion", () => {
 
   it("treats DISABLE_SANDBOX=1 as true; anything else as false", async () => {
     process.env.DISABLE_SANDBOX = "1";
-    const a = await loadEnvFresh();
-    assert.equal(a.env.disableSandbox, true);
+    const envA = await loadEnvFresh();
+    assert.equal(envA.env.disableSandbox, true);
 
     process.env.DISABLE_SANDBOX = "true";
-    const b = await loadEnvFresh();
-    assert.equal(b.env.disableSandbox, false, "string 'true' should not flip");
+    const envB = await loadEnvFresh();
+    assert.equal(envB.env.disableSandbox, false, "string 'true' should not flip");
 
     process.env.DISABLE_SANDBOX = "0";
-    const c = await loadEnvFresh();
-    assert.equal(c.env.disableSandbox, false);
+    const envC = await loadEnvFresh();
+    assert.equal(envC.env.disableSandbox, false);
   });
 
   it("isProduction reflects NODE_ENV=production", async () => {

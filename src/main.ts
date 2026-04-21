@@ -2,18 +2,13 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router/index";
 import { installGuards } from "./router/guards";
+import i18n from "./lib/vue-i18n";
 import { setAuthToken } from "./utils/api";
 import { readAuthTokenFromMeta } from "./utils/dom/authTokenMeta";
 import "./index.css";
 import "material-icons/iconfont/material-icons.css";
 
-import.meta.glob(
-  [
-    "../node_modules/@gui-chat-plugin/*/dist/style.css",
-    "../node_modules/@mulmochat-plugin/*/dist/style.css",
-  ],
-  { eager: true },
-);
+import.meta.glob(["../node_modules/@gui-chat-plugin/*/dist/style.css", "../node_modules/@mulmochat-plugin/*/dist/style.css"], { eager: true });
 
 // Bearer auth bootstrap (#272). The server embeds the per-startup
 // token into `<meta name="mulmoclaude-auth" content="...">` when it
@@ -28,4 +23,5 @@ installGuards(router);
 
 const app = createApp(App);
 app.use(router);
+app.use(i18n);
 app.mount("#app");

@@ -30,9 +30,7 @@ export interface HighlightableContainer {
   // result strongly typed without casting.
   querySelector(selector: "#spreadsheet-table"): HighlightableTable | null;
   querySelector(selector: string): HighlightableElement | null;
-  querySelectorAll(
-    selector: string,
-  ): ArrayLike<HighlightableElement> & Iterable<HighlightableElement>;
+  querySelectorAll(selector: string): ArrayLike<HighlightableElement> & Iterable<HighlightableElement>;
 }
 
 export interface CellCoord {
@@ -44,9 +42,7 @@ const CELL_EDITING = "cell-editing";
 const CELL_REFERENCED = "cell-referenced";
 
 /** Remove both kinds of highlight classes from the container. */
-export function clearCellHighlights(
-  container: HighlightableContainer | null | undefined,
-): void {
+export function clearCellHighlights(container: HighlightableContainer | null | undefined): void {
   if (!container) return;
   container.querySelector(`.${CELL_EDITING}`)?.classList.remove(CELL_EDITING);
   for (const cell of container.querySelectorAll(`.${CELL_REFERENCED}`)) {
@@ -56,11 +52,7 @@ export function clearCellHighlights(
 
 /** Add `className` to the <td> at (row, col) of the given table.
  *  No-op if the row or cell doesn't exist. */
-export function highlightCell(
-  table: HighlightableTable | null | undefined,
-  coord: CellCoord,
-  className: string,
-): void {
+export function highlightCell(table: HighlightableTable | null | undefined, coord: CellCoord, className: string): void {
   if (!table) return;
   const rows = table.querySelectorAll("tr");
   const row = rows[coord.row];

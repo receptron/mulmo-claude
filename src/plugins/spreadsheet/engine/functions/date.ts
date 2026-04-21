@@ -4,12 +4,7 @@
  * January 1, 1900 is serial number 1.
  */
 
-import {
-  functionRegistry,
-  toNumber,
-  toString,
-  type FunctionHandler,
-} from "../registry";
+import { functionRegistry, toNumber, toString, type FunctionHandler } from "../registry";
 import { dateToSerial, serialToDate } from "../date-utils";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -21,25 +16,14 @@ const nowHandler: FunctionHandler = (args) => {
   // But for simplicity we'll use local time converted to serial
   const now = new Date();
   // Create a UTC date that matches the local time components
-  const localAsUtc = new Date(
-    Date.UTC(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      now.getHours(),
-      now.getMinutes(),
-      now.getSeconds(),
-    ),
-  );
+  const localAsUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()));
   return dateToSerial(localAsUtc);
 };
 
 const todayHandler: FunctionHandler = (args) => {
   if (args.length !== 0) throw new Error("TODAY requires 0 arguments");
   const now = new Date();
-  const today = new Date(
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
-  );
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
   return dateToSerial(today);
 };
 
@@ -171,9 +155,7 @@ const datedifHandler: FunctionHandler = (args, context) => {
       if (endD >= startD) return endD - startD;
 
       // Need to borrow days from previous month
-      const prevMonthDate = new Date(
-        Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 0),
-      );
+      const prevMonthDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 0));
       return prevMonthDate.getUTCDate() - startD + endD;
     }
 
@@ -311,8 +293,7 @@ functionRegistry.register({
   handler: datedifHandler,
   minArgs: 3,
   maxArgs: 3,
-  description:
-    "Calculates the number of days, months, or years between two dates",
+  description: "Calculates the number of days, months, or years between two dates",
   examples: ['DATEDIF(A1, B1, "Y")', 'DATEDIF(DATE(2020,1,1), TODAY(), "D")'],
   category: "Date & Time",
 });

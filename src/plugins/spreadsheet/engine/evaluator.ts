@@ -84,17 +84,13 @@ export function parseFunctionArgs(argsStr: string): string[] {
  * @param context - Evaluation context with cell/range accessors
  * @returns Evaluated result (number or string)
  */
-export function evaluateFormula(
-  formula: string,
-  context: EvaluatorContext,
-): CellValue {
+export function evaluateFormula(formula: string, context: EvaluatorContext): CellValue {
   try {
     // Handle string literals - remove surrounding quotes
     // But NOT string concatenations (which contain & operators)
     const trimmed = formula.trim();
     if (
-      ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-        (trimmed.startsWith("'") && trimmed.endsWith("'"))) &&
+      ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) &&
       !trimmed.includes("&") // Exclude string concatenations
     ) {
       const stringValue = trimmed.slice(1, -1); // Remove first and last character (quotes)
@@ -140,14 +136,10 @@ export function evaluateFormula(
 
         // Validate argument count
         if (func.minArgs !== undefined && args.length < func.minArgs) {
-          throw new Error(
-            `${normalizedFuncName} requires at least ${func.minArgs} argument${func.minArgs !== 1 ? "s" : ""}`,
-          );
+          throw new Error(`${normalizedFuncName} requires at least ${func.minArgs} argument${func.minArgs !== 1 ? "s" : ""}`);
         }
         if (func.maxArgs !== undefined && args.length > func.maxArgs) {
-          throw new Error(
-            `${normalizedFuncName} accepts at most ${func.maxArgs} argument${func.maxArgs !== 1 ? "s" : ""}`,
-          );
+          throw new Error(`${normalizedFuncName} accepts at most ${func.maxArgs} argument${func.maxArgs !== 1 ? "s" : ""}`);
         }
 
         // Execute function with context
@@ -218,12 +210,8 @@ export function evaluateFormula(
         const fullMatch = expr.substring(funcStartIndex, argsEndIndex);
         const result = context.evaluateFormula(fullMatch);
         // For string results, wrap in quotes; for numbers, wrap in parentheses
-        const replacement =
-          typeof result === "string" ? `"${result}"` : `(${result})`;
-        expr =
-          expr.substring(0, funcStartIndex) +
-          replacement +
-          expr.substring(argsEndIndex);
+        const replacement = typeof result === "string" ? `"${result}"` : `(${result})`;
+        expr = expr.substring(0, funcStartIndex) + replacement + expr.substring(argsEndIndex);
         // Continue from after the replacement
         searchIndex = funcStartIndex + replacement.length;
       } else {
@@ -242,9 +230,7 @@ export function evaluateFormula(
         // Quoted sheet name
         const endQuote = expr.indexOf("'", i + 1);
         if (endQuote !== -1 && expr[endQuote + 1] === "!") {
-          const cellPart = expr
-            .substring(endQuote + 2)
-            .match(/^(\$?[A-Z]+\$?\d+)/);
+          const cellPart = expr.substring(endQuote + 2).match(/^(\$?[A-Z]+\$?\d+)/);
           if (cellPart) {
             ref = expr.substring(i, endQuote + 2 + cellPart[0].length);
             cellRefs.push(ref);
@@ -256,9 +242,7 @@ export function evaluateFormula(
         // Unquoted sheet name or simple cell ref
         const sheetMatch = expr.substring(i).match(/^([A-Z][A-Z0-9]*)!/i);
         if (sheetMatch) {
-          const cellPart = expr
-            .substring(i + sheetMatch[0].length)
-            .match(/^(\$?[A-Z]+\$?\d+)/);
+          const cellPart = expr.substring(i + sheetMatch[0].length).match(/^(\$?[A-Z]+\$?\d+)/);
           if (cellPart) {
             ref = sheetMatch[0] + cellPart[0];
             cellRefs.push(ref);
@@ -354,10 +338,7 @@ export function evaluateFormula(
           return evalResult;
         }
       } catch (error) {
-        console.error(
-          `Failed to evaluate string concatenation: ${expr}`,
-          error,
-        );
+        console.error(`Failed to evaluate string concatenation: ${expr}`, error);
         return formula;
       }
     }
@@ -397,10 +378,7 @@ export function evaluateFormula(
 
     // If the final expression is a quoted string literal, unwrap it
     const trimmedExpr = expr.trim();
-    if (
-      (trimmedExpr.startsWith('"') && trimmedExpr.endsWith('"')) ||
-      (trimmedExpr.startsWith("'") && trimmedExpr.endsWith("'"))
-    ) {
+    if ((trimmedExpr.startsWith('"') && trimmedExpr.endsWith('"')) || (trimmedExpr.startsWith("'") && trimmedExpr.endsWith("'"))) {
       return trimmedExpr.slice(1, -1); // Remove quotes
     }
 

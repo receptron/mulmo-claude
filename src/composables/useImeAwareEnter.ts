@@ -24,10 +24,7 @@ export interface ImeAwareEnterHandlers {
   onBlur: () => void;
 }
 
-export function useImeAwareEnter(
-  onSend: () => void,
-  now: () => number = () => performance.now(),
-): ImeAwareEnterHandlers {
+export function useImeAwareEnter(onSend: () => void, now: () => number = () => performance.now()): ImeAwareEnterHandlers {
   let isImeComposing = false;
   let lastCompositionEndAt = 0;
 

@@ -39,8 +39,7 @@ export interface RateLimiterDeps {
 export function defaultRateLimiterDeps(): RateLimiterDeps {
   return {
     now: () => Date.now(),
-    sleep: (ms: number) =>
-      new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    sleep: (millis: number) => new Promise<void>((resolve) => setTimeout(resolve, millis)),
   };
 }
 
@@ -76,11 +75,7 @@ export class HostRateLimiter {
   // `minDelayMs` is the minimum ms between the END of the previous
   // request to this host and the START of this one. Defaults to
   // DEFAULT_MIN_DELAY_MS.
-  run<T>(
-    host: string,
-    task: () => Promise<T>,
-    minDelayMs: number = DEFAULT_MIN_DELAY_MS,
-  ): Promise<T> {
+  run<T>(host: string, task: () => Promise<T>, minDelayMs: number = DEFAULT_MIN_DELAY_MS): Promise<T> {
     const key = host.toLowerCase();
     const state: HostState = this.hosts.get(key) ?? {
       tail: Promise.resolve(),
@@ -101,10 +96,7 @@ export class HostRateLimiter {
     return (async () => {
       try {
         await prev;
-        const wait =
-          state.lastFinishedAt === null
-            ? 0
-            : minDelayMs - (this.deps.now() - state.lastFinishedAt);
+        const wait = state.lastFinishedAt === null ? 0 : minDelayMs - (this.deps.now() - state.lastFinishedAt);
         if (wait > 0) await this.deps.sleep(wait);
         try {
           return await task();

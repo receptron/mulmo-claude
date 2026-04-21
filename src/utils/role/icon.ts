@@ -11,10 +11,10 @@ import type { Role } from "../../config/roles";
 const MATERIAL_ICON_RE = /^[a-z_]+$/;
 
 export function roleIcon(roles: Role[], roleId: string): string {
-  const icon = roles.find((r) => r.id === roleId)?.icon ?? "star";
+  const icon = roles.find((role) => role.id === roleId)?.icon ?? "star";
   return MATERIAL_ICON_RE.test(icon) ? icon : "smart_toy";
 }
 
 export function roleName(roles: Role[], roleId: string): string {
-  return roles.find((r) => r.id === roleId)?.name ?? roleId;
+  return roles.find((role) => role.id === roleId)?.name ?? roleId;
 }

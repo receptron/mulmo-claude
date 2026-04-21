@@ -12,18 +12,8 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";
-import {
-  writeDailySummary,
-  readDailySummary,
-  readTopicFile,
-  writeTopicFile,
-  appendOrCreateTopic,
-  readAllTopicFiles,
-} from "../../utils/files/journal-io.js";
-import {
-  readSessionMeta as readSessionMetaIO,
-  readSessionJsonl as readSessionJsonlIO,
-} from "../../utils/files/session-io.js";
+import { writeDailySummary, readDailySummary, readTopicFile, writeTopicFile, appendOrCreateTopic, readAllTopicFiles } from "../../utils/files/journal-io.js";
+import { readSessionMeta as readSessionMetaIO, readSessionJsonl as readSessionJsonlIO } from "../../utils/files/session-io.js";
 import { statUnder } from "../../utils/files/workspace-io.js";
 import {
   type Summarize,
@@ -40,11 +30,7 @@ import {
   ClaudeCliNotFoundError,
 } from "./archivist.js";
 import { toIsoDate, slugify } from "./paths.js";
-import {
-  findDirtySessions,
-  applyProcessed,
-  type SessionFileMeta,
-} from "./diff.js";
+import { findDirtySessions, applyProcessed, type SessionFileMeta } from "./diff.js";
 import { rewriteWorkspaceLinks } from "./linkRewrite.js";
 import { writeState, type JournalState } from "./state.js";
 import { log } from "../../system/logger/index.js";
@@ -83,10 +69,7 @@ export interface DailyPassResult {
   skipped: Array<{ date: string; reason: string }>;
 }
 
-export async function runDailyPass(
-  state: JournalState,
-  deps: DailyPassDeps,
-): Promise<{ nextState: JournalState; result: DailyPassResult }> {
+export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Promise<{ nextState: JournalState; result: DailyPassResult }> {
   const workspaceRoot = deps.workspaceRoot ?? defaultWorkspacePath;
   const chatDir = path.join(workspaceRoot, WORKSPACE_DIRS.chat);
   const result: DailyPassResult = {
@@ -98,17 +81,11 @@ export async function runDailyPass(
   };
 
   // --- Phase 1: figure out what work there is to do ------------------
-  const eligible = (await listSessionMetas(chatDir)).filter(
-    (m) => !deps.activeSessionIds.has(m.id),
-  );
+  const eligible = (await listSessionMetas(chatDir)).filter((sessionMeta) => !deps.activeSessionIds.has(sessionMeta.id));
   const { dirty } = findDirtySessions(eligible, state.processedSessions);
   if (dirty.length === 0) return { nextState: { ...state }, result };
 
-  const perSessionExcerpts = await loadDirtySessionExcerpts(
-    chatDir,
-    dirty,
-    workspaceRoot,
-  );
+  const perSessionExcerpts = await loadDirtySessionExcerpts(chatDir, dirty, workspaceRoot);
   const { dayBuckets, sessionToDays } = buildDayBuckets(perSessionExcerpts);
 
   // Note: we intentionally do NOT early-return when `dayBuckets` is
@@ -133,7 +110,7 @@ export async function runDailyPass(
     ...state,
     knownTopics: [...newTopicsSeen].sort(),
   };
-  const dirtyMetaById = new Map(eligible.map((m) => [m.id, m]));
+  const dirtyMetaById = new Map(eligible.map((sessionMeta) => [sessionMeta.id, sessionMeta]));
   // Process days in chronological order so topic state accumulates
   // naturally: an earlier day's update is visible to the next day.
   const orderedDays = [...dayBuckets.keys()].sort();
@@ -198,17 +175,9 @@ type ProcessDayOutput =
       nextState: JournalState;
     };
 
-async function processDayAndAdvance(
-  input: ProcessDayInput,
-): Promise<ProcessDayOutput> {
+async function processDayAndAdvance(input: ProcessDayInput): Promise<ProcessDayOutput> {
   const excerpts = input.dayBuckets.get(input.date) ?? [];
-  const dayOutcome = await processOneDay(
-    input.workspaceRoot,
-    input.date,
-    excerpts,
-    input.existingTopics,
-    input.summarize,
-  );
+  const dayOutcome = await processOneDay(input.workspaceRoot, input.date, excerpts, input.existingTopics, input.summarize);
   if (dayOutcome.kind === "skipped") {
     return {
       kind: "skipped",
@@ -221,18 +190,9 @@ async function processDayAndAdvance(
     input.newTopicsSeen.add(slug);
   }
 
-  const justCompleted = computeJustCompletedSessions(
-    input.date,
-    excerpts,
-    input.sessionToDays,
-    input.dirtyMetaById,
-  );
-  const sessionsIngested = justCompleted.map((m) => m.id);
-  const nextState = advanceJournalState(
-    input.nextState,
-    justCompleted,
-    input.newTopicsSeen,
-  );
+  const justCompleted = computeJustCompletedSessions(input.date, excerpts, input.sessionToDays, input.dirtyMetaById);
+  const sessionsIngested = justCompleted.map((sessionMeta) => sessionMeta.id);
+  const nextState = advanceJournalState(input.nextState, justCompleted, input.newTopicsSeen);
   await persistStateAfterDay(input.workspaceRoot, nextState, input.date);
 
   return {
@@ -259,8 +219,8 @@ async function maybeExtractMemory(
   for (const [, byDate] of perSessionExcerpts) {
     for (const [, excerpt] of byDate) {
       const userLines = excerpt.events
-        .filter((e: SessionEventExcerpt) => e.source === "user")
-        .map((e: SessionEventExcerpt) => `[user] ${e.content}`);
+        .filter((eventExcerpt: SessionEventExcerpt) => eventExcerpt.source === "user")
+        .map((eventExcerpt: SessionEventExcerpt) => `[user] ${eventExcerpt.content}`);
       if (userLines.length > 0) excerptLines.push(userLines.join("\n"));
     }
   }
@@ -323,17 +283,9 @@ async function processOneDay(
     return { kind: "skipped", reason: "unusable archivist JSON" };
   }
 
-  await writeDailySummaryForDate(
-    workspaceRoot,
-    date,
-    parsed.dailySummaryMarkdown,
-  );
+  await writeDailySummaryForDate(workspaceRoot, date, parsed.dailySummaryMarkdown);
 
-  const topicOutcome = await processTopicUpdatesForDay(
-    workspaceRoot,
-    parsed.topicUpdates,
-    existingTopics,
-  );
+  const topicOutcome = await processTopicUpdatesForDay(workspaceRoot, parsed.topicUpdates, existingTopics);
 
   return {
     kind: "processed",
@@ -347,11 +299,7 @@ async function processOneDay(
 // Returns null on recoverable failures (logged + skipped), throws
 // only for `ClaudeCliNotFoundError` which the outer runner uses to
 // disable the whole journal feature for the process lifetime.
-async function callSummarizeForDay(
-  date: string,
-  input: DailyArchivistInput,
-  summarize: Summarize,
-): Promise<string | null> {
+async function callSummarizeForDay(date: string, input: DailyArchivistInput, summarize: Summarize): Promise<string | null> {
   try {
     return await summarize(DAILY_SYSTEM_PROMPT, buildDailyUserPrompt(input));
   } catch (err) {
@@ -368,22 +316,12 @@ async function callSummarizeForDay(
 // archivist output relative to the daily summary's own location,
 // then write the file to disk. Factored out so the main loop's
 // body no longer contains path-math and I/O intermixed.
-async function writeDailySummaryForDate(
-  workspaceRoot: string,
-  date: string,
-  rawMarkdown: string,
-): Promise<void> {
+async function writeDailySummaryForDate(workspaceRoot: string, date: string, rawMarkdown: string): Promise<void> {
   // Rewrite any /workspace-absolute links in the archivist's output
   // into true-relative links from the daily summary's location
   // before writing to disk. Same treatment below for topic files.
   const [yearPart, monthPart, dayPart] = date.split("-");
-  const dailyFileWsPath = path.posix.join(
-    WORKSPACE_DIRS.summaries,
-    "daily",
-    yearPart,
-    monthPart,
-    `${dayPart}.md`,
-  );
+  const dailyFileWsPath = path.posix.join(WORKSPACE_DIRS.summaries, "daily", yearPart, monthPart, `${dayPart}.md`);
   const content = rewriteWorkspaceLinks(dailyFileWsPath, rawMarkdown);
   await writeDailySummary(date, content, workspaceRoot);
 }
@@ -408,11 +346,7 @@ async function processTopicUpdatesForDay(
       const outcome = await applyTopicUpdate(workspaceRoot, normalized);
       if (outcome === "created") created.push(normalized.slug);
       else if (outcome === "updated") updated.push(normalized.slug);
-      await refreshTopicSnapshot(
-        workspaceRoot,
-        normalized.slug,
-        existingTopics,
-      );
+      await refreshTopicSnapshot(workspaceRoot, normalized.slug, existingTopics);
     } catch (err) {
       log.warn("journal", "failed to apply topic update", {
         slug: normalized.slug,
@@ -426,15 +360,11 @@ async function processTopicUpdatesForDay(
 // Re-read the topic file fresh and upsert its snapshot into the
 // in-memory `existingTopics` list so the next day's archivist
 // call sees the latest content.
-async function refreshTopicSnapshot(
-  workspaceRoot: string,
-  slug: string,
-  existingTopics: ExistingTopicSnapshot[],
-): Promise<void> {
+async function refreshTopicSnapshot(workspaceRoot: string, slug: string, existingTopics: ExistingTopicSnapshot[]): Promise<void> {
   const newBody = await readTopicFile(slug, workspaceRoot);
   if (newBody === null) return;
   const snapshot: ExistingTopicSnapshot = { slug, content: newBody };
-  const idx = existingTopics.findIndex((t) => t.slug === slug);
+  const idx = existingTopics.findIndex((topic) => topic.slug === slug);
   if (idx === -1) existingTopics.push(snapshot);
   else existingTopics[idx] = snapshot;
 }
@@ -444,11 +374,7 @@ async function refreshTopicSnapshot(
 // checkpoint. Write failures are logged but don't fail the pass —
 // the day's markdown is already on disk and the next run will
 // catch up.
-async function persistStateAfterDay(
-  workspaceRoot: string,
-  state: JournalState,
-  date: string,
-): Promise<void> {
+async function persistStateAfterDay(workspaceRoot: string, state: JournalState, date: string): Promise<void> {
   try {
     await writeState(workspaceRoot, state);
   } catch (err) {
@@ -475,9 +401,7 @@ export interface DayBucketsPlan {
   sessionToDays: Map<string, Set<string>>;
 }
 
-export function buildDayBuckets(
-  perSessionExcerpts: ReadonlyMap<string, ReadonlyMap<string, SessionExcerpt>>,
-): DayBucketsPlan {
+export function buildDayBuckets(perSessionExcerpts: ReadonlyMap<string, ReadonlyMap<string, SessionExcerpt>>): DayBucketsPlan {
   const dayBuckets = new Map<string, SessionExcerpt[]>();
   const sessionToDays = new Map<string, Set<string>>();
   for (const [sessionId, byDate] of perSessionExcerpts) {
@@ -503,17 +427,10 @@ export function buildDayBuckets(
 // whole class of LLM mistakes without needing a schema rejection.
 // Also rewrites any workspace-absolute links in the body relative
 // to the target topic file's location.
-export function normalizeTopicAction(
-  update: TopicUpdate,
-  existingTopics: readonly ExistingTopicSnapshot[],
-): TopicUpdate {
+export function normalizeTopicAction(update: TopicUpdate, existingTopics: readonly ExistingTopicSnapshot[]): TopicUpdate {
   const canonicalSlug = slugify(update.slug);
-  const exists = existingTopics.some((t) => t.slug === canonicalSlug);
-  const topicFileWsPath = path.posix.join(
-    WORKSPACE_DIRS.summaries,
-    "topics",
-    `${canonicalSlug}.md`,
-  );
+  const exists = existingTopics.some((topic) => topic.slug === canonicalSlug);
+  const topicFileWsPath = path.posix.join(WORKSPACE_DIRS.summaries, "topics", `${canonicalSlug}.md`);
   return {
     slug: canonicalSlug,
     action: !exists && update.action === "append" ? "create" : update.action,
@@ -527,9 +444,7 @@ export function normalizeTopicAction(
 // as a skip reason without needing a separate `isValid` check.
 // Pure — combines `extractJsonObject` + `isDailyArchivistOutput`
 // behind a single gate.
-export function parseArchivistOutput(
-  rawOutput: string,
-): DailyArchivistOutput | null {
+export function parseArchivistOutput(rawOutput: string): DailyArchivistOutput | null {
   const parsed = extractJsonObject(rawOutput);
   if (!isDailyArchivistOutput(parsed)) return null;
   return parsed;
@@ -571,16 +486,10 @@ export function computeJustCompletedSessions(
 // topics. Tiny pure wrapper so the day loop has one place to
 // advance state instead of five-line spread literals scattered
 // through it.
-export function advanceJournalState(
-  prev: JournalState,
-  justCompleted: readonly SessionFileMeta[],
-  newTopicsSeen: ReadonlySet<string>,
-): JournalState {
+export function advanceJournalState(prev: JournalState, justCompleted: readonly SessionFileMeta[], newTopicsSeen: ReadonlySet<string>): JournalState {
   return {
     ...prev,
-    processedSessions: applyProcessed(prev.processedSessions, [
-      ...justCompleted,
-    ]),
+    processedSessions: applyProcessed(prev.processedSessions, [...justCompleted]),
     knownTopics: [...newTopicsSeen].sort(),
   };
 }
@@ -592,19 +501,11 @@ export function advanceJournalState(
 // excerpt>>. Malformed sessions are logged and skipped so one
 // bad jsonl can't crash the pass. Returned shape is exactly what
 // `buildDayBuckets` wants as input.
-async function loadDirtySessionExcerpts(
-  chatDir: string,
-  dirty: readonly string[],
-  workspaceRoot: string,
-): Promise<Map<string, Map<string, SessionExcerpt>>> {
+async function loadDirtySessionExcerpts(chatDir: string, dirty: readonly string[], workspaceRoot: string): Promise<Map<string, Map<string, SessionExcerpt>>> {
   const perSession = new Map<string, Map<string, SessionExcerpt>>();
   for (const sessionId of dirty) {
     try {
-      const excerpts = await loadSessionExcerptsByDate(
-        chatDir,
-        sessionId,
-        workspaceRoot,
-      );
+      const excerpts = await loadSessionExcerptsByDate(chatDir, sessionId, workspaceRoot);
       if (excerpts.size > 0) perSession.set(sessionId, excerpts);
     } catch (err) {
       log.warn("journal", "failed to load session", {
@@ -628,10 +529,10 @@ async function listSessionMetas(chatDir: string): Promise<SessionFileMeta[]> {
     if (!name.endsWith(".jsonl")) continue;
     const full = path.join(chatDir, name);
     try {
-      const st = await fsp.stat(full);
+      const stats = await fsp.stat(full);
       out.push({
         id: name.replace(/\.jsonl$/, ""),
-        mtimeMs: st.mtimeMs,
+        mtimeMs: stats.mtimeMs,
       });
     } catch {
       // file vanished between readdir and stat — ignore
@@ -640,19 +541,12 @@ async function listSessionMetas(chatDir: string): Promise<SessionFileMeta[]> {
   return out;
 }
 
-async function loadSessionExcerptsByDate(
-  chatDir: string,
-  sessionId: string,
-  workspaceRoot: string,
-): Promise<Map<string, SessionExcerpt>> {
+async function loadSessionExcerptsByDate(chatDir: string, sessionId: string, workspaceRoot: string): Promise<Map<string, SessionExcerpt>> {
   const roleId = await readRoleIdFromMeta(sessionId, workspaceRoot);
   const raw = await readSessionJsonlIO(sessionId, workspaceRoot);
   if (!raw) return new Map();
 
-  const stat = await statUnder(
-    workspaceRoot,
-    path.posix.join(WORKSPACE_DIRS.chat, `${sessionId}.jsonl`),
-  );
+  const stat = await statUnder(workspaceRoot, path.posix.join(WORKSPACE_DIRS.chat, `${sessionId}.jsonl`));
   const fallbackDate = toIsoDate(stat?.mtimeMs ?? Date.now());
 
   const parsedEvents = parseJsonlEvents(raw, MAX_EVENTS_PER_SESSION);
@@ -663,10 +557,7 @@ async function loadSessionExcerptsByDate(
 // ready for bucketing. Skips blank lines, malformed JSON,
 // metadata entries, and anything `parseEntry` rejects. Pure —
 // exported so tests can exercise it with fabricated jsonl strings.
-export function parseJsonlEvents(
-  raw: string,
-  maxEvents: number,
-): ParsedEntry[] {
+export function parseJsonlEvents(raw: string, maxEvents: number): ParsedEntry[] {
   const events: ParsedEntry[] = [];
   for (const line of raw.split("\n")) {
     if (events.length >= maxEvents) break;
@@ -702,22 +593,14 @@ function parseJsonlLine(line: string): Record<string, unknown> | null {
 }
 
 function isMetadataEntry(entry: Record<string, unknown>): boolean {
-  return (
-    entry.type === EVENT_TYPES.sessionMeta ||
-    entry.type === EVENT_TYPES.claudeSessionId
-  );
+  return entry.type === EVENT_TYPES.sessionMeta || entry.type === EVENT_TYPES.claudeSessionId;
 }
 
 // Collect parsed events into per-date buckets using `fallbackDate`
 // for every event, since the legacy jsonl format has no per-event
 // timestamps. Extracted so the I/O-free bucket-building can be
 // reasoned about and unit-tested without a real jsonl file.
-export function bucketParsedEvents(
-  events: readonly ParsedEntry[],
-  sessionId: string,
-  roleId: string,
-  fallbackDate: string,
-): Map<string, SessionExcerpt> {
+export function bucketParsedEvents(events: readonly ParsedEntry[], sessionId: string, roleId: string, fallbackDate: string): Map<string, SessionExcerpt> {
   const buckets = new Map<string, SessionExcerpt>();
   for (const parsed of events) {
     let bucket = buckets.get(fallbackDate);
@@ -726,17 +609,14 @@ export function bucketParsedEvents(
       buckets.set(fallbackDate, bucket);
     }
     bucket.events.push(parsed.excerpt);
-    for (const p of parsed.artifactPaths) {
-      if (!bucket.artifactPaths.includes(p)) bucket.artifactPaths.push(p);
+    for (const artifactPath of parsed.artifactPaths) {
+      if (!bucket.artifactPaths.includes(artifactPath)) bucket.artifactPaths.push(artifactPath);
     }
   }
   return buckets;
 }
 
-async function readRoleIdFromMeta(
-  sessionId: string,
-  workspaceRoot: string,
-): Promise<string> {
+async function readRoleIdFromMeta(sessionId: string, workspaceRoot: string): Promise<string> {
   try {
     const meta = await readSessionMetaIO(sessionId, workspaceRoot);
     if (meta && typeof meta.roleId === "string") return meta.roleId;
@@ -767,9 +647,7 @@ export function parseEntry(entry: Record<string, unknown>): ParsedEntry | null {
 
 // Legacy single-purpose form used by the existing unit tests.
 // Prefer `parseEntry` for code that also wants artifact paths.
-export function entryToExcerpt(
-  entry: Record<string, unknown>,
-): SessionEventExcerpt | null {
+export function entryToExcerpt(entry: Record<string, unknown>): SessionEventExcerpt | null {
   const source = typeof entry.source === "string" ? entry.source : "unknown";
   const type = typeof entry.type === "string" ? entry.type : "unknown";
 
@@ -786,12 +664,10 @@ export function entryToExcerpt(
   // to avoid a NullPointerException-style crash when accessing
   // r.toolName below.
   if (type === EVENT_TYPES.toolResult && isRecord(entry.result)) {
-    const r = entry.result as Record<string, unknown>;
-    const toolName = typeof r.toolName === "string" ? r.toolName : "tool";
+    const resultRecord = entry.result as Record<string, unknown>;
+    const toolName = typeof resultRecord.toolName === "string" ? resultRecord.toolName : "tool";
     const label =
-      (typeof r.title === "string" && r.title) ||
-      (typeof r.message === "string" && r.message) ||
-      "(no message)";
+      (typeof resultRecord.title === "string" && resultRecord.title) || (typeof resultRecord.message === "string" && resultRecord.message) || "(no message)";
     return {
       source,
       type,
@@ -809,23 +685,23 @@ export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
   if (entry.type !== "tool_result") return [];
   const result = entry.result;
   if (!isRecord(result)) return [];
-  const r = result as Record<string, unknown>;
-  const data = r.data;
+  const resultRecord = result as Record<string, unknown>;
+  const data = resultRecord.data;
   if (!isRecord(data)) return [];
-  const d = data as Record<string, unknown>;
+  const dataRecord = data as Record<string, unknown>;
   const paths: string[] = [];
 
   // Direct `filePath: string` — presentMulmoScript, presentHtml.
-  if (typeof d.filePath === "string" && d.filePath.length > 0) {
-    paths.push(d.filePath);
+  if (typeof dataRecord.filePath === "string" && dataRecord.filePath.length > 0) {
+    paths.push(dataRecord.filePath);
   }
 
   // Wiki uses `pageName: string` and stores the page at
   // `wiki/pages/<pageName>.md`. The plugin itself doesn't surface
   // the full path in the result, so we synthesise it from the
   // convention established in server/routes/wiki.ts.
-  if (r.toolName === "manageWiki" && typeof d.pageName === "string") {
-    paths.push(`wiki/pages/${d.pageName}.md`);
+  if (resultRecord.toolName === "manageWiki" && typeof dataRecord.pageName === "string") {
+    paths.push(`wiki/pages/${dataRecord.pageName}.md`);
   }
 
   // Paths must be workspace-relative (not absolute, no escape).
@@ -836,23 +712,21 @@ export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
 // Defensive: refuse absolute paths, parent-escapes, or scheme-like
 // strings. Protects against a malformed tool result wedging a
 // filesystem-absolute path into the archivist prompt.
-function isSafeWorkspacePath(p: string): boolean {
-  if (!p) return false;
-  if (p.startsWith("/")) return false;
-  if (p.startsWith("..")) return false;
-  if (p.includes("://")) return false;
+function isSafeWorkspacePath(candidatePath: string): boolean {
+  if (!candidatePath) return false;
+  if (candidatePath.startsWith("/")) return false;
+  if (candidatePath.startsWith("..")) return false;
+  if (candidatePath.includes("://")) return false;
   return true;
 }
 
-function truncate(s: string, max: number): string {
+function truncate(text: string, max: number): string {
   if (max <= 0) return "";
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
 }
 
-async function readAllTopics(
-  workspaceRoot: string,
-): Promise<ExistingTopicSnapshot[]> {
+async function readAllTopics(workspaceRoot: string): Promise<ExistingTopicSnapshot[]> {
   const topicMap = await readAllTopicFiles(workspaceRoot);
   const out: ExistingTopicSnapshot[] = [];
   for (const [slug, content] of topicMap) {
@@ -861,10 +735,7 @@ async function readAllTopics(
   return out;
 }
 
-async function applyTopicUpdate(
-  workspaceRoot: string,
-  update: TopicUpdate,
-): Promise<"created" | "updated"> {
+async function applyTopicUpdate(workspaceRoot: string, update: TopicUpdate): Promise<"created" | "updated"> {
   if (update.action === "create" || update.action === "append") {
     return appendOrCreateTopic(update.slug, update.content, workspaceRoot);
   }

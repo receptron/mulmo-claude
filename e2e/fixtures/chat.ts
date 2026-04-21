@@ -55,10 +55,7 @@ export async function openSessionHistory(page: Page): Promise<void> {
 }
 
 /** Click an existing session tab by id (appears after opening a session). */
-export async function selectSessionTab(
-  page: Page,
-  sessionId: string,
-): Promise<void> {
+export async function selectSessionTab(page: Page, sessionId: string): Promise<void> {
   await page.getByTestId(`session-tab-${sessionId}`).click();
 }
 

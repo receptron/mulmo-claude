@@ -1,14 +1,10 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <!-- Header -->
-    <div
-      class="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0 gap-3"
-    >
+    <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0 gap-3">
       <div class="flex items-center gap-3 min-w-0">
         <h2 class="text-base font-semibold text-gray-800 shrink-0">Todo</h2>
-        <span class="text-xs text-gray-500 shrink-0"
-          >{{ completedCount }}/{{ items.length }} done</span
-        >
+        <span class="text-xs text-gray-500 shrink-0">{{ completedCount }}/{{ items.length }} done</span>
         <input
           v-model="search"
           data-testid="todo-search"
@@ -19,13 +15,7 @@
       </div>
       <div class="flex items-center gap-2">
         <!-- Add button -->
-        <button
-          data-testid="todo-add-btn"
-          class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600"
-          @click="addOpen = true"
-        >
-          + Add
-        </button>
+        <button data-testid="todo-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">+ Add</button>
         <!-- Add column button (kanban only) -->
         <button
           v-if="viewMode === TODO_VIEW.kanban"
@@ -36,18 +26,12 @@
           + Column
         </button>
         <!-- View mode toggle -->
-        <div
-          class="flex border border-gray-300 rounded overflow-hidden text-xs"
-        >
+        <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
           <button
             v-for="mode in VIEW_MODES"
             :key="mode.key"
             class="px-2.5 py-1"
-            :class="
-              viewMode === mode.key
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            "
+            :class="viewMode === mode.key ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
             :data-testid="`todo-view-${mode.key}`"
             :title="mode.label"
             @click="setViewMode(mode.key)"
@@ -59,10 +43,7 @@
     </div>
 
     <!-- Label filter chips -->
-    <div
-      v-if="labelInventory.length > 0"
-      class="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 shrink-0"
-    >
+    <div v-if="labelInventory.length > 0" class="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 shrink-0">
       <span class="text-[11px] text-gray-500 mr-1">Labels:</span>
       <button
         v-for="entry in labelInventory"
@@ -78,32 +59,19 @@
         {{ entry.label }}
         <span class="opacity-60">{{ entry.count }}</span>
       </button>
-      <button
-        v-if="activeFilters.size > 0"
-        class="ml-auto text-[11px] text-gray-500 hover:text-gray-700"
-        title="Clear label filters"
-        @click="clearFilters"
-      >
+      <button v-if="activeFilters.size > 0" class="ml-auto text-[11px] text-gray-500 hover:text-gray-700" title="Clear label filters" @click="clearFilters">
         Clear ✕
       </button>
     </div>
 
     <!-- Error banner -->
-    <div
-      v-if="error"
-      class="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100 shrink-0"
-    >
+    <div v-if="error" class="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100 shrink-0">
       {{ error }}
     </div>
 
     <!-- Body -->
     <div class="flex-1 min-h-0">
-      <div
-        v-if="items.length === 0"
-        class="h-full flex items-center justify-center text-gray-400 text-sm"
-      >
-        No todo items yet. Click "+ Add" to create one.
-      </div>
+      <div v-if="items.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">No todo items yet. Click "+ Add" to create one.</div>
       <template v-else>
         <TodoKanbanView
           v-if="viewMode === TODO_VIEW.kanban"
@@ -138,13 +106,7 @@
     </div>
 
     <!-- Add item dialog -->
-    <TodoAddDialog
-      v-if="addOpen"
-      :columns="columns"
-      :default-status="addDefaultStatus"
-      @cancel="addOpen = false"
-      @create="onCreateItem"
-    />
+    <TodoAddDialog v-if="addOpen" :columns="columns" :default-status="addDefaultStatus" @cancel="addOpen = false" @create="onCreateItem" />
 
     <!-- Edit item dialog (used by kanban click; list/table use the
          inline edit panel and don't need to open this) -->
@@ -158,24 +120,9 @@
     />
 
     <!-- Add column dialog -->
-    <div
-      v-if="addColumnOpen"
-      class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center"
-      @click="addColumnOpen = false"
-    >
-      <div
-        class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="todo-add-column-title"
-        @click.stop
-      >
-        <h3
-          id="todo-add-column-title"
-          class="text-base font-semibold text-gray-800"
-        >
-          Add Column
-        </h3>
+    <div v-if="addColumnOpen" class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" @click="addColumnOpen = false">
+      <div class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="todo-add-column-title" @click.stop>
+        <h3 id="todo-add-column-title" class="text-base font-semibold text-gray-800">Add Column</h3>
         <label class="block text-xs text-gray-600">
           Label
           <input
@@ -187,18 +134,8 @@
           />
         </label>
         <div class="flex justify-end gap-2 pt-1">
-          <button
-            class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-            @click="addColumnOpen = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-            @click="commitNewColumn"
-          >
-            Add
-          </button>
+          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="addColumnOpen = false">Cancel</button>
+          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="commitNewColumn">Add</button>
         </div>
       </div>
     </div>
@@ -209,27 +146,15 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "../plugins/todo/index";
-import {
-  colorForLabel,
-  filterByLabels,
-  listLabelsWithCount,
-} from "../plugins/todo/labels";
-import {
-  useTodos,
-  type CreateItemInput,
-  type PatchItemInput,
-} from "../plugins/todo/composables/useTodos";
+import { colorForLabel, filterByLabels, listLabelsWithCount } from "../plugins/todo/labels";
+import { useTodos, type CreateItemInput, type PatchItemInput } from "../plugins/todo/composables/useTodos";
 import TodoKanbanView from "./todo/TodoKanbanView.vue";
 import TodoTableView from "./todo/TodoTableView.vue";
 import TodoListView from "./todo/TodoListView.vue";
 import TodoAddDialog from "./todo/TodoAddDialog.vue";
 import TodoEditDialog from "./todo/TodoEditDialog.vue";
 
-import {
-  TODO_VIEW,
-  TODO_VIEW_MODES as VIEW_MODES,
-  type TodoViewMode as ViewMode,
-} from "../plugins/todo/viewModes";
+import { TODO_VIEW, TODO_VIEW_MODES as VIEW_MODES, type TodoViewMode as ViewMode } from "../plugins/todo/viewModes";
 
 const VIEW_MODE_KEY = "todo_explorer_view_mode";
 
@@ -237,20 +162,7 @@ const props = defineProps<{
   selectedResult?: ToolResultComplete<TodoData>;
 }>();
 
-const {
-  items,
-  columns,
-  error,
-  refresh,
-  createItem,
-  patchItem,
-  moveItem,
-  deleteItem,
-  addColumn,
-  patchColumn,
-  deleteColumn,
-  reorderColumns,
-} = useTodos(
+const { items, columns, error, refresh, createItem, patchItem, moveItem, deleteItem, addColumn, patchColumn, deleteColumn, reorderColumns } = useTodos(
   props.selectedResult?.data?.items ?? [],
   props.selectedResult?.data?.columns ?? [],
 );
@@ -307,18 +219,16 @@ function clearFilters(): void {
 
 const filteredItems = computed(() => {
   const byLabels = filterByLabels(items.value, [...activeFilters.value]);
-  const q = search.value.trim().toLowerCase();
-  if (q.length === 0) return byLabels;
+  const query = search.value.trim().toLowerCase();
+  if (query.length === 0) return byLabels;
   return byLabels.filter((item) => {
-    if (item.text.toLowerCase().includes(q)) return true;
-    if (item.note?.toLowerCase().includes(q)) return true;
+    if (item.text.toLowerCase().includes(query)) return true;
+    if (item.note?.toLowerCase().includes(query)) return true;
     return false;
   });
 });
 
-const completedCount = computed(
-  () => items.value.filter((i) => i.completed).length,
-);
+const completedCount = computed(() => items.value.filter((i) => i.completed).length);
 
 // ── Add dialog ─────────────────────────────────────────────────
 
@@ -331,8 +241,8 @@ function quickAddInColumn(statusId: string): void {
 }
 
 async function onCreateItem(input: CreateItemInput): Promise<void> {
-  const ok = await createItem(input);
-  if (ok) {
+  const created = await createItem(input);
+  if (created) {
     addOpen.value = false;
     addDefaultStatus.value = undefined;
   }
@@ -346,8 +256,8 @@ const newColumnLabel = ref("");
 async function commitNewColumn(): Promise<void> {
   const label = newColumnLabel.value.trim();
   if (label.length === 0) return;
-  const ok = await addColumn({ label });
-  if (ok) {
+  const added = await addColumn({ label });
+  if (added) {
     addColumnOpen.value = false;
     newColumnLabel.value = "";
   }
@@ -367,33 +277,33 @@ onUnmounted(() => document.removeEventListener("keydown", onExplorerKeydown));
 
 // ── Item handlers ──────────────────────────────────────────────
 
-function onPatchItem(id: string, input: PatchItemInput): void {
-  void patchItem(id, input);
+function onPatchItem(itemId: string, input: PatchItemInput): void {
+  void patchItem(itemId, input);
 }
 
 // Single confirm gate for every item deletion path: row "✕" buttons
 // in list/table, the kanban edit dialog's delete button, anything
 // else that wants to remove an item. Centralised so we never
 // accidentally bypass the confirm in a future caller.
-function confirmAndDelete(id: string): boolean {
-  const item = items.value.find((i) => i.id === id);
+function confirmAndDelete(itemId: string): boolean {
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return false;
-  const ok = window.confirm(`Delete "${item.text}"?`);
-  if (!ok) return false;
-  void deleteItem(id);
+  const confirmed = window.confirm(`Delete "${item.text}"?`);
+  if (!confirmed) return false;
+  void deleteItem(itemId);
   return true;
 }
 
-function onDeleteItem(id: string): void {
-  confirmAndDelete(id);
+function onDeleteItem(itemId: string): void {
+  confirmAndDelete(itemId);
 }
 
 function onToggleComplete(item: TodoItem): void {
   void patchItem(item.id, { completed: !item.completed });
 }
 
-function onMove(id: string, statusId: string, position: number): void {
-  void moveItem(id, { status: statusId, position });
+function onMove(itemId: string, statusId: string, position: number): void {
+  void moveItem(itemId, { status: statusId, position });
 }
 
 // ── Edit dialog (kanban click) ─────────────────────────────────
@@ -409,39 +319,37 @@ function onOpenItem(item: TodoItem): void {
 async function onEditDialogSave(input: PatchItemInput): Promise<void> {
   const target = editingItem.value;
   if (!target) return;
-  const ok = await patchItem(target.id, input);
-  if (ok) editingItem.value = null;
+  const saved = await patchItem(target.id, input);
+  if (saved) editingItem.value = null;
 }
 
-function onEditDialogDelete(id: string): void {
+function onEditDialogDelete(itemId: string): void {
   // Funnel through the same confirm gate as the inline ✕ buttons.
   // The dialog only closes if the user confirmed; if they cancelled
   // the confirm, the dialog stays open so they can keep editing.
-  if (confirmAndDelete(id)) editingItem.value = null;
+  if (confirmAndDelete(itemId)) editingItem.value = null;
 }
 
 // ── Column handlers ────────────────────────────────────────────
 
-function onRenameColumn(id: string, label: string): void {
-  void patchColumn(id, { label });
+function onRenameColumn(columnId: string, label: string): void {
+  void patchColumn(columnId, { label });
 }
 
-function onDeleteColumn(id: string): void {
+function onDeleteColumn(columnId: string): void {
   // Use a native confirm dialog: deleting a column reassigns its
   // items, which is reversible but worth a beat. The other column
   // operations (rename, mark-done) are inexpensive enough not to need
   // confirmation.
-  const col = columns.value.find((c) => c.id === id);
+  const col = columns.value.find((column) => column.id === columnId);
   if (!col) return;
-  const ok = window.confirm(
-    `Delete column "${col.label}"? Items in this column will be moved to another column.`,
-  );
-  if (!ok) return;
-  void deleteColumn(id);
+  const confirmed = window.confirm(`Delete column "${col.label}"? Items in this column will be moved to another column.`);
+  if (!confirmed) return;
+  void deleteColumn(columnId);
 }
 
-function onMarkDone(id: string): void {
-  void patchColumn(id, { isDone: true });
+function onMarkDone(columnId: string): void {
+  void patchColumn(columnId, { isDone: true });
 }
 
 function onReorderColumns(ids: string[]): void {

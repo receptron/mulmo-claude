@@ -9,18 +9,8 @@
 // ~/mulmoclaude.
 
 import { readdir, readFile } from "node:fs/promises";
-import {
-  defaultSummarize,
-  loadJsonlInput,
-  type SummarizeFn,
-} from "./summarizer.js";
-import {
-  chatDirFor,
-  indexEntryPathFor,
-  manifestPathFor,
-  sessionJsonlPathFor,
-  sessionMetaPathFor,
-} from "./paths.js";
+import { defaultSummarize, loadJsonlInput, type SummarizeFn } from "./summarizer.js";
+import { chatDirFor, indexEntryPathFor, manifestPathFor, sessionJsonlPathFor, sessionMetaPathFor } from "./paths.js";
 import type { ChatIndexEntry, ChatIndexManifest } from "./types.js";
 import { writeJsonAtomic } from "../../utils/files/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
@@ -48,9 +38,7 @@ export interface IndexerDeps {
 
 // --- manifest I/O ---------------------------------------------------
 
-export async function readManifest(
-  workspaceRoot: string,
-): Promise<ChatIndexManifest> {
+export async function readManifest(workspaceRoot: string): Promise<ChatIndexManifest> {
   try {
     const raw = await readFile(manifestPathFor(workspaceRoot), "utf-8");
     const parsed: unknown = JSON.parse(raw);
@@ -63,8 +51,8 @@ export async function readManifest(
 
 function isManifest(raw: unknown): raw is ChatIndexManifest {
   if (!isRecord(raw)) return false;
-  const o = raw as Record<string, unknown>;
-  return o.version === 1 && Array.isArray(o.entries);
+  const manifestRecord = raw as Record<string, unknown>;
+  return manifestRecord.version === 1 && Array.isArray(manifestRecord.entries);
 }
 
 // In-process mutex serializing the read-modify-write sequence on
@@ -75,7 +63,7 @@ function isManifest(raw: unknown): raw is ChatIndexManifest {
 // this module's single-process assumption.
 let manifestMutex: Promise<void> = Promise.resolve();
 
-async function withManifestLock<T>(fn: () => Promise<T>): Promise<T> {
+async function withManifestLock<T>(lockedFn: () => Promise<T>): Promise<T> {
   const prev = manifestMutex;
   let release: () => void = () => {};
   manifestMutex = new Promise<void>((resolve) => {
@@ -83,7 +71,7 @@ async function withManifestLock<T>(fn: () => Promise<T>): Promise<T> {
   });
   try {
     await prev;
-    return await fn();
+    return await lockedFn();
   } finally {
     release();
   }
@@ -94,25 +82,19 @@ async function withManifestLock<T>(fn: () => Promise<T>): Promise<T> {
 // already serializes callers within this process, but a unique
 // name means the rename can't collide even if a stray .tmp file
 // is left behind by a previous crashed run.
-async function writeManifestAtomic(
-  workspaceRoot: string,
-  m: ChatIndexManifest,
-): Promise<void> {
+async function writeManifestAtomic(workspaceRoot: string, manifest: ChatIndexManifest): Promise<void> {
   // `uniqueTmp` belt-and-suspenders: the in-process mutex above
   // already serializes callers, but a unique tmp name means the
   // rename can't collide even if a stray .tmp file is left behind
   // by a previous crashed run.
-  await writeJsonAtomic(manifestPathFor(workspaceRoot), m, {
+  await writeJsonAtomic(manifestPathFor(workspaceRoot), manifest, {
     uniqueTmp: true,
   });
 }
 
 // Read, mutate, and write the manifest under the in-process lock
 // so concurrent callers cannot lose each other's updates.
-export async function updateManifest(
-  workspaceRoot: string,
-  mutator: (m: ChatIndexManifest) => ChatIndexManifest,
-): Promise<ChatIndexManifest> {
+export async function updateManifest(workspaceRoot: string, mutator: (m: ChatIndexManifest) => ChatIndexManifest): Promise<ChatIndexManifest> {
   return withManifestLock(async () => {
     const current = await readManifest(workspaceRoot);
     const next = mutator(current);
@@ -127,24 +109,16 @@ export async function updateManifest(
 // was written less than `minIntervalMs` ago. Fresh sessions are
 // skipped so a long conversation doesn't spam the CLI on every
 // turn.
-export async function isFresh(
-  workspaceRoot: string,
-  sessionId: string,
-  now: number,
-  minIntervalMs: number,
-): Promise<boolean> {
+export async function isFresh(workspaceRoot: string, sessionId: string, now: number, minIntervalMs: number): Promise<boolean> {
   try {
-    const raw = await readFile(
-      indexEntryPathFor(workspaceRoot, sessionId),
-      "utf-8",
-    );
+    const raw = await readFile(indexEntryPathFor(workspaceRoot, sessionId), "utf-8");
     const entry: unknown = JSON.parse(raw);
     if (!isRecord(entry)) return false;
     const indexedAt = (entry as Record<string, unknown>).indexedAt;
     if (typeof indexedAt !== "string") return false;
-    const ts = Date.parse(indexedAt);
-    if (Number.isNaN(ts)) return false;
-    return now - ts < minIntervalMs;
+    const indexedTimestamp = Date.parse(indexedAt);
+    if (Number.isNaN(indexedTimestamp)) return false;
+    return now - indexedTimestamp < minIntervalMs;
   } catch {
     return false;
   }
@@ -157,21 +131,15 @@ interface SessionMeta {
   startedAt?: string;
 }
 
-async function readSessionMeta(
-  workspaceRoot: string,
-  sessionId: string,
-): Promise<SessionMeta> {
+async function readSessionMeta(workspaceRoot: string, sessionId: string): Promise<SessionMeta> {
   try {
-    const raw = await readFile(
-      sessionMetaPathFor(workspaceRoot, sessionId),
-      "utf-8",
-    );
+    const raw = await readFile(sessionMetaPathFor(workspaceRoot, sessionId), "utf-8");
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return {};
-    const o = parsed as Record<string, unknown>;
+    const metaRecord = parsed as Record<string, unknown>;
     return {
-      roleId: typeof o.roleId === "string" ? o.roleId : undefined,
-      startedAt: typeof o.startedAt === "string" ? o.startedAt : undefined,
+      roleId: typeof metaRecord.roleId === "string" ? metaRecord.roleId : undefined,
+      startedAt: typeof metaRecord.startedAt === "string" ? metaRecord.startedAt : undefined,
     };
   } catch {
     return {};
@@ -183,9 +151,7 @@ async function readSessionMeta(
 export async function listSessionIds(workspaceRoot: string): Promise<string[]> {
   try {
     const files = await readdir(chatDirFor(workspaceRoot));
-    return files
-      .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => f.slice(0, -".jsonl".length));
+    return files.filter((fileName) => fileName.endsWith(".jsonl")).map((fileName) => fileName.slice(0, -".jsonl".length));
   } catch {
     return [];
   }
@@ -198,11 +164,7 @@ export async function listSessionIds(workspaceRoot: string): Promise<string[]> {
 // missing). The only exception that escapes is
 // `ClaudeCliNotFoundError` — the caller uses it to disable the
 // module for the rest of the process lifetime.
-export async function indexSession(
-  workspaceRoot: string,
-  sessionId: string,
-  deps: IndexerDeps = {},
-): Promise<ChatIndexEntry | null> {
+export async function indexSession(workspaceRoot: string, sessionId: string, deps: IndexerDeps = {}): Promise<ChatIndexEntry | null> {
   const summarize = deps.summarize ?? defaultSummarize;
   const now = (deps.now ?? Date.now)();
   const minInterval = deps.minIntervalMs ?? MIN_INDEX_INTERVAL_MS;
@@ -212,9 +174,7 @@ export async function indexSession(
     return null;
   }
 
-  const input = await loadJsonlInput(
-    sessionJsonlPathFor(workspaceRoot, sessionId),
-  );
+  const input = await loadJsonlInput(sessionJsonlPathFor(workspaceRoot, sessionId));
   if (!input.trim()) return null;
 
   const summary = await summarize(input);
@@ -238,9 +198,9 @@ export async function indexSession(
   // Upsert into manifest under the in-process lock: replace any
   // prior entry with the same id, sort newest-first by startedAt.
   await updateManifest(workspaceRoot, (current) => {
-    const filtered = current.entries.filter((e) => e.id !== sessionId);
+    const filtered = current.entries.filter((entryItem) => entryItem.id !== sessionId);
     filtered.push(entry);
-    filtered.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+    filtered.sort((leftEntry, rightEntry) => Date.parse(rightEntry.startedAt) - Date.parse(leftEntry.startedAt));
     return { version: 1, entries: filtered };
   });
 

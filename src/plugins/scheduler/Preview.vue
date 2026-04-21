@@ -4,14 +4,8 @@
       <span>📅</span>
       <span>{{ upcomingItems.length }} upcoming</span>
     </div>
-    <div
-      v-for="item in preview"
-      :key="item.id"
-      class="text-xs truncate text-gray-600"
-    >
-      <span v-if="item.props.date" class="text-gray-400 mr-1">{{
-        item.props.date
-      }}</span>
+    <div v-for="item in preview" :key="item.id" class="text-xs truncate text-gray-600">
+      <span v-if="item.props.date" class="text-gray-400 mr-1">{{ item.props.date }}</span>
       {{ item.title }}
     </div>
     <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
@@ -32,8 +26,8 @@ const items = ref<ScheduledItem[]>(props.result.data?.items ?? []);
 const { refresh } = useFreshPluginData<ScheduledItem[]>({
   endpoint: () => API_ROUTES.scheduler.base,
   extract: (json) => {
-    const v = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
-    return Array.isArray(v) ? v : null;
+    const extracted = (json as { data?: { items?: ScheduledItem[] } }).data?.items;
+    return Array.isArray(extracted) ? extracted : null;
   },
   apply: (data) => {
     items.value = data;
@@ -55,17 +49,15 @@ const upcomingItems = computed(() => {
   const noDate: ScheduledItem[] = [];
 
   for (const item of items.value) {
-    const d = item.props.date;
-    if (typeof d === "string") {
-      if (d >= today) withDate.push(item);
+    const dateVal = item.props.date;
+    if (typeof dateVal === "string") {
+      if (dateVal >= today) withDate.push(item);
     } else {
       noDate.push(item);
     }
   }
 
-  withDate.sort((a, b) =>
-    String(a.props.date) < String(b.props.date) ? -1 : 1,
-  );
+  withDate.sort((itemA, itemB) => (String(itemA.props.date) < String(itemB.props.date) ? -1 : 1));
 
   return [...withDate, ...noDate];
 });

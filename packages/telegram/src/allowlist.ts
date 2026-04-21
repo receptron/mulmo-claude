@@ -28,9 +28,7 @@ export function parseAllowlist(raw: string | undefined): Allowlist {
       if (trimmed.length === 0) continue;
       const n = Number(trimmed);
       if (!Number.isInteger(n)) {
-        throw new Error(
-          `TELEGRAM_ALLOWED_CHAT_IDS: "${trimmed}" is not an integer chat id`,
-        );
+        throw new Error(`TELEGRAM_ALLOWED_CHAT_IDS: "${trimmed}" is not an integer chat id`);
       }
       ids.add(n);
     }

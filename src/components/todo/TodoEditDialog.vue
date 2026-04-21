@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center"
-    @click="emit('cancel')"
-  >
+  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" @click="emit('cancel')">
     <div
       class="bg-white rounded-lg shadow-xl w-[28rem] max-w-[92vw] overflow-hidden"
       role="dialog"
@@ -10,29 +7,11 @@
       aria-labelledby="todo-edit-dialog-title"
       @click.stop
     >
-      <div
-        class="flex items-center justify-between px-4 py-2 border-b border-gray-100"
-      >
-        <h3
-          id="todo-edit-dialog-title"
-          class="text-base font-semibold text-gray-800"
-        >
-          Edit Todo
-        </h3>
-        <button
-          class="text-gray-400 hover:text-red-500 text-xs px-2 py-0.5"
-          title="Delete this item"
-          @click="emit('delete', item.id)"
-        >
-          Delete
-        </button>
+      <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+        <h3 id="todo-edit-dialog-title" class="text-base font-semibold text-gray-800">Edit Todo</h3>
+        <button class="text-gray-400 hover:text-red-500 text-xs px-2 py-0.5" title="Delete this item" @click="emit('delete', item.id)">Delete</button>
       </div>
-      <TodoEditPanel
-        :item="item"
-        :columns="columns"
-        @save="(input) => emit('save', input)"
-        @cancel="emit('cancel')"
-      />
+      <TodoEditPanel :item="item" :columns="columns" @save="(input) => emit('save', input)" @cancel="emit('cancel')" />
     </div>
   </div>
 </template>

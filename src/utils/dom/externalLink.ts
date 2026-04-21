@@ -19,10 +19,7 @@
 //   - same-origin URLs (including hash anchors resolved against the
 //     current page, which `anchor.href` normalises to a full URL)
 //   - malformed input that `URL` can't parse
-export function isCrossOriginHttpUrl(
-  href: string,
-  currentOrigin: string,
-): boolean {
+export function isCrossOriginHttpUrl(href: string, currentOrigin: string): boolean {
   if (!href.startsWith("http://") && !href.startsWith("https://")) {
     return false;
   }

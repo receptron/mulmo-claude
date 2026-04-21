@@ -1,8 +1,8 @@
 import { timingSafeEqual } from "crypto";
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+function safeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(Buffer.from(left), Buffer.from(right));
 }
 
 // Bearer token middleware (#272). Reject any `/api/*` request whose
@@ -37,11 +37,7 @@ import { unauthorized } from "../../utils/httpError.js";
 
 const BEARER_PREFIX = "Bearer ";
 
-export function bearerAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function bearerAuth(req: Request, res: Response, next: NextFunction): void {
   const expected = getCurrentToken();
   if (expected === null) {
     // Server hasn't finished bootstrap. This can only happen if a

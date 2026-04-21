@@ -88,6 +88,14 @@ The structured logger (`server/system/logger/`) reads its config fresh at proces
 | `LOG_FILE_MAX_FILES`                       | `14`                 | Retention count.                                                                                    |
 | `LOG_TELEMETRY_*`                          | —                    | Telemetry sink stub for a future remote shipper. No-op today.                                       |
 
+### Client (Vite)
+
+Client-side env vars use the `VITE_` prefix so Vite exposes them to the bundled frontend via `import.meta.env`. They're baked at build/dev time — restart `yarn dev` or rerun `yarn build` after changing.
+
+| Variable      | Default | Effect                                                                                                                                   |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_LOCALE` | `en`    | Locale passed to vue-i18n (`src/lib/vue-i18n.ts`). Currently supports `en` / `ja`. Missing keys fall back to English. See [i18n](#i18n-vue-i18n). |
+
 ### Container-only env (auto-set)
 
 You never set these by hand; the server constructs them when spawning Claude inside the Docker sandbox (`server/agent/config.ts` and `server/agent/mcp-server.ts`). They're listed here so log lines / failures involving them are decodable.
@@ -343,6 +351,44 @@ Cross-module string literals (endpoint paths, tool names, role IDs, etc.) are de
 | `EVENT_TYPES` / `EventType`            | `src/types/events.ts`          | SSE event type discriminants in agent loop, session store, and frontend dispatch                                                                     |
 
 **Convention**: add new entries to the appropriate module before writing the first consumer. Keep the `as const` assertion so TypeScript infers literal types, not `string`.
+
+---
+
+## i18n (vue-i18n)
+
+CLAUDE.md mandates `$t()` / `useI18n()` for all template strings — never hardcode. The infrastructure lives in three places:
+
+| File                   | Purpose                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `src/lib/vue-i18n.ts`  | `createI18n({ legacy: false, locale, fallbackLocale: "en", messages })`. Locale comes from `VITE_LOCALE`.     |
+| `src/lang/en.ts`       | English dictionary — the **source of truth** for key shape. Missing keys in other locales fall back here.    |
+| `src/lang/ja.ts`       | Japanese dictionary. Mirror the tree shape of `en.ts`; any missing key silently falls back.                  |
+
+### Adding a string
+
+1. Add the key to `src/lang/en.ts` first, grouped by feature area (e.g. `common.*`, `chat.*`, `session.*`). Keep nested objects over flat `dot.keys` strings so related entries stay together.
+2. Mirror in `src/lang/ja.ts` — if you don't have a translation yet, either leave the key out (falls back to English) or add a TODO-style placeholder; don't duplicate the English string.
+3. In a component:
+
+   ```vue
+   <script setup lang="ts">
+   import { useI18n } from "vue-i18n";
+   const { t } = useI18n();
+   </script>
+
+   <template>
+     <button>{{ t("common.save") }}</button>
+     <!-- or in a template without setup:  {{ $t("common.save") }} -->
+   </template>
+   ```
+
+### Changing the running locale
+
+Set `VITE_LOCALE=ja` (or `en`) in `.env` and restart `yarn dev`. Vite inlines env vars at build time, so the app must be re-bundled for a new locale — there's no runtime selector.
+
+### Scope today vs. plans
+
+`src/lang/*.ts` currently holds only a seed (`common.save` / `common.cancel`). Existing hard-coded strings across `src/**/*.vue` will be extracted incrementally in follow-up PRs. See `plans/feat-vue-i18n-setup.md` for the rationale and [issue #559](https://github.com/receptron/mulmoclaude/issues/559).
 
 ---
 

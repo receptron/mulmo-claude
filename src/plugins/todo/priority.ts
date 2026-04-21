@@ -41,23 +41,15 @@ export const PRIORITY_BORDER: Record<TodoPriority, string> = {
   urgent: "border-l-red-500",
 };
 
-export const PRIORITIES: readonly TodoPriority[] = [
-  "low",
-  "medium",
-  "high",
-  "urgent",
-];
+export const PRIORITIES: readonly TodoPriority[] = ["low", "medium", "high", "urgent"];
 
-export function isPriority(v: unknown): v is TodoPriority {
+export function isPriority(value: unknown): value is TodoPriority {
   // Use hasOwnProperty rather than the `in` operator: `in` walks the
   // prototype chain, so `"toString" in PRIORITY_ORDER` would return
   // true and incorrectly narrow `"toString"` to TodoPriority. We use
   // the .call form (rather than Object.hasOwn) because the project's
   // client tsconfig targets ES2021, and Object.hasOwn is ES2022.
-  return (
-    typeof v === "string" &&
-    Object.prototype.hasOwnProperty.call(PRIORITY_ORDER, v)
-  );
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PRIORITY_ORDER, value);
 }
 
 // ── due date helpers ─────────────────────────────────────────────
@@ -71,11 +63,9 @@ export function dueDateClasses(dueDate: string | undefined): string {
   if (dueDate < today) return "bg-red-100 text-red-700";
   if (dueDate === today) return "bg-orange-100 text-orange-700";
   // Within 3 days?
-  const t = new Date(today);
-  const d = new Date(dueDate);
-  const diffDays = Math.round(
-    (d.getTime() - t.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const todayDate = new Date(today);
+  const dueDateObj = new Date(dueDate);
+  const diffDays = Math.round((dueDateObj.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays <= 3) return "bg-yellow-100 text-yellow-700";
   return "bg-gray-100 text-gray-600";
 }
@@ -87,20 +77,20 @@ export function dueDateClasses(dueDate: string | undefined): string {
 export function todayISO(): string {
   const now = new Date();
   const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${month}-${day}`;
 }
 
 // Pretty short label for the kanban card badges. "2026-04-12" →
 // "Apr 12". Year is omitted unless it differs from the current one.
 export function formatDueLabel(dueDate: string | undefined): string {
   if (!dueDate) return "";
-  const d = new Date(`${dueDate}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dueDate;
+  const date = new Date(`${dueDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dueDate;
   const today = new Date();
-  const sameYear = d.getFullYear() === today.getFullYear();
-  return d.toLocaleDateString(undefined, {
+  const sameYear = date.getFullYear() === today.getFullYear();
+  return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),

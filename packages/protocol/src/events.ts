@@ -37,8 +37,7 @@ export const GENERATION_KINDS = {
   movie: "movie",
 } as const;
 
-export type GenerationKind =
-  (typeof GENERATION_KINDS)[keyof typeof GENERATION_KINDS];
+export type GenerationKind = (typeof GENERATION_KINDS)[keyof typeof GENERATION_KINDS];
 
 export interface GenerationEvent {
   type: "generation_started" | "generation_finished";
@@ -75,10 +74,6 @@ export interface PendingGeneration {
  * to recover the fields — store the decomposed `PendingGeneration`
  * object as the map value instead.
  */
-export function generationKey(
-  kind: GenerationKind,
-  filePath: string,
-  key: string,
-): string {
+export function generationKey(kind: GenerationKind, filePath: string, key: string): string {
   return `${kind}\u001f${filePath}\u001f${key}`;
 }

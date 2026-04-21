@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import {
-  __resetForTests,
-  deleteTokenFile,
-  generateAndWriteToken,
-  getCurrentToken,
-} from "../../server/api/auth/token.js";
+import { __resetForTests, deleteTokenFile, generateAndWriteToken, getCurrentToken } from "../../server/api/auth/token.js";
 
 let tmpDir = "";
 let tokenPath = "";

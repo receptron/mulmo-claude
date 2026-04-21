@@ -54,28 +54,28 @@ export const DEFAULT_CONFIG: LoggerConfig = {
 
 function parseLevel(raw: string | undefined): LogLevel | undefined {
   if (!raw) return undefined;
-  const v = raw.toLowerCase();
-  return v in LEVEL_PRIORITY ? (v as LogLevel) : undefined;
+  const normalized = raw.toLowerCase();
+  return normalized in LEVEL_PRIORITY ? (normalized as LogLevel) : undefined;
 }
 
 function parseFormat(raw: string | undefined): LogFormat | undefined {
   if (!raw) return undefined;
-  const v = raw.toLowerCase();
-  return v === "text" || v === "json" ? v : undefined;
+  const normalized = raw.toLowerCase();
+  return normalized === "text" || normalized === "json" ? normalized : undefined;
 }
 
 function parseBool(raw: string | undefined): boolean | undefined {
   if (raw === undefined) return undefined;
-  const v = raw.toLowerCase();
-  if (v === "true" || v === "1" || v === "yes") return true;
-  if (v === "false" || v === "0" || v === "no") return false;
+  const normalized = raw.toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
   return undefined;
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
-  const n = Number(raw);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
+  const num = Number(raw);
+  return Number.isInteger(num) && num > 0 ? num : undefined;
 }
 
 export type Env = Partial<Record<string, string>>;
@@ -88,38 +88,24 @@ export function resolveConfig(env: Env): LoggerConfig {
   return {
     sinks: {
       console: {
-        enabled:
-          parseBool(env.LOG_CONSOLE_ENABLED) ??
-          DEFAULT_CONFIG.sinks.console.enabled,
+        enabled: parseBool(env.LOG_CONSOLE_ENABLED) ?? DEFAULT_CONFIG.sinks.console.enabled,
         level: consoleLevel ?? DEFAULT_CONFIG.sinks.console.level,
-        format:
-          parseFormat(env.LOG_CONSOLE_FORMAT) ??
-          DEFAULT_CONFIG.sinks.console.format,
+        format: parseFormat(env.LOG_CONSOLE_FORMAT) ?? DEFAULT_CONFIG.sinks.console.format,
       },
       file: {
-        enabled:
-          parseBool(env.LOG_FILE_ENABLED) ?? DEFAULT_CONFIG.sinks.file.enabled,
+        enabled: parseBool(env.LOG_FILE_ENABLED) ?? DEFAULT_CONFIG.sinks.file.enabled,
         level: fileLevel ?? DEFAULT_CONFIG.sinks.file.level,
-        format:
-          parseFormat(env.LOG_FILE_FORMAT) ?? DEFAULT_CONFIG.sinks.file.format,
+        format: parseFormat(env.LOG_FILE_FORMAT) ?? DEFAULT_CONFIG.sinks.file.format,
         dir: env.LOG_FILE_DIR ?? DEFAULT_CONFIG.sinks.file.dir,
         rotation: {
           kind: "daily",
-          maxFiles:
-            parsePositiveInt(env.LOG_FILE_MAX_FILES) ??
-            DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
+          maxFiles: parsePositiveInt(env.LOG_FILE_MAX_FILES) ?? DEFAULT_CONFIG.sinks.file.rotation.maxFiles,
         },
       },
       telemetry: {
-        enabled:
-          parseBool(env.LOG_TELEMETRY_ENABLED) ??
-          DEFAULT_CONFIG.sinks.telemetry.enabled,
-        level:
-          parseLevel(env.LOG_TELEMETRY_LEVEL) ??
-          DEFAULT_CONFIG.sinks.telemetry.level,
-        format:
-          parseFormat(env.LOG_TELEMETRY_FORMAT) ??
-          DEFAULT_CONFIG.sinks.telemetry.format,
+        enabled: parseBool(env.LOG_TELEMETRY_ENABLED) ?? DEFAULT_CONFIG.sinks.telemetry.enabled,
+        level: parseLevel(env.LOG_TELEMETRY_LEVEL) ?? DEFAULT_CONFIG.sinks.telemetry.level,
+        format: parseFormat(env.LOG_TELEMETRY_FORMAT) ?? DEFAULT_CONFIG.sinks.telemetry.format,
       },
     },
   };

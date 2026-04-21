@@ -3,11 +3,7 @@
 // chat session loader. Extracted from FilesView.vue (#507 step 8).
 
 import type { Ref } from "vue";
-import {
-  isExternalHref,
-  resolveWorkspaceLink,
-  extractSessionIdFromPath,
-} from "../utils/path/relativeLink";
+import { isExternalHref, resolveWorkspaceLink, extractSessionIdFromPath } from "../utils/path/relativeLink";
 
 interface MarkdownLinkHandlers {
   /** Invoked when a link resolves to a workspace file path. */
@@ -16,10 +12,7 @@ interface MarkdownLinkHandlers {
   onLoadSession: (sessionId: string) => void;
 }
 
-export function useMarkdownLinkHandler(
-  selectedPath: Ref<string | null>,
-  handlers: MarkdownLinkHandlers,
-) {
+export function useMarkdownLinkHandler(selectedPath: Ref<string | null>, handlers: MarkdownLinkHandlers) {
   function handleMarkdownLinkClick(event: MouseEvent): void {
     if (event.button !== 0) return;
     if (event.ctrlKey || event.metaKey || event.shiftKey) return;

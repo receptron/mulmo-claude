@@ -17,17 +17,13 @@
 
 // ── Type coercion helpers ───────────────────────────────────────────
 
-function asInt(
-  value: string | undefined,
-  fallback: number,
-  opts: { min?: number; max?: number } = {},
-): number {
+function asInt(value: string | undefined, fallback: number, opts: { min?: number; max?: number } = {}): number {
   if (value === undefined || value === "") return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n)) return fallback;
-  if (opts.min !== undefined && n < opts.min) return fallback;
-  if (opts.max !== undefined && n > opts.max) return fallback;
-  return n;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  if (opts.min !== undefined && parsed < opts.min) return fallback;
+  if (opts.max !== undefined && parsed > opts.max) return fallback;
+  return parsed;
 }
 
 function asFlag(value: string | undefined): boolean {
@@ -88,9 +84,12 @@ export const env = Object.freeze({
   // immediate run on startup instead of waiting for the scheduled
   // interval.
   journalForceRunOnStartup: asFlag(process.env.JOURNAL_FORCE_RUN_ON_STARTUP),
-  chatIndexForceRunOnStartup: asFlag(
-    process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP,
-  ),
+  chatIndexForceRunOnStartup: asFlag(process.env.CHAT_INDEX_FORCE_RUN_ON_STARTUP),
+
+  // MulmoBridge Relay (#520). Optional — when both are set the server
+  // connects to the Relay via WebSocket and forwards bridge messages.
+  relayUrl: process.env.RELAY_URL,
+  relayToken: process.env.RELAY_TOKEN,
 
   // MCP subprocess: set by the parent server when spawning
   // mcp-server.ts. The MCP process reads them via this same module —

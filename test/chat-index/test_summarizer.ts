@@ -1,12 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  extractText,
-  truncate,
-  parseClaudeJsonResult,
-  validateSummaryResult,
-  formatSpawnError,
-} from "../../server/workspace/chat-index/summarizer.js";
+import { extractText, truncate, parseClaudeJsonResult, validateSummaryResult, formatSpawnError } from "../../server/workspace/chat-index/summarizer.js";
 
 describe("extractText", () => {
   it("keeps user and assistant text turns", () => {
@@ -34,11 +28,7 @@ describe("extractText", () => {
   });
 
   it("tolerates malformed lines without throwing", () => {
-    const jsonl = [
-      "not json at all",
-      JSON.stringify({ source: "user", type: "text", message: "good" }),
-      "{ bad json",
-    ].join("\n");
+    const jsonl = ["not json at all", JSON.stringify({ source: "user", type: "text", message: "good" }), "{ bad json"].join("\n");
     const out = extractText(jsonl);
     assert.match(out, /good/);
   });
@@ -78,8 +68,8 @@ describe("extractText", () => {
 
 describe("truncate", () => {
   it("passes short input through unchanged", () => {
-    const s = "hello world";
-    assert.equal(truncate(s), s);
+    const str = "hello world";
+    assert.equal(truncate(str), str);
   });
 
   it("keeps head + tail for long input", () => {
@@ -121,10 +111,7 @@ describe("parseClaudeJsonResult", () => {
   });
 
   it("throws on malformed json", () => {
-    assert.throws(
-      () => parseClaudeJsonResult("{ not json"),
-      /failed to parse claude json output/,
-    );
+    assert.throws(() => parseClaudeJsonResult("{ not json"), /failed to parse claude json output/);
   });
 });
 

@@ -2,11 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractFetchError } from "../../server/utils/fetch.js";
 
-function mockResponse(
-  status: number,
-  body: unknown,
-  jsonThrows = false,
-): Response {
+function mockResponse(status: number, body: unknown, jsonThrows = false): Response {
   return {
     status,
     ok: status >= 200 && status < 300,
@@ -20,9 +16,7 @@ function mockResponse(
 
 describe("extractFetchError", () => {
   it("extracts the error field from a JSON { error } body", async () => {
-    const msg = await extractFetchError(
-      mockResponse(400, { error: "bad request" }),
-    );
+    const msg = await extractFetchError(mockResponse(400, { error: "bad request" }));
     assert.equal(msg, "bad request");
   });
 

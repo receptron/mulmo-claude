@@ -30,8 +30,8 @@ export function extractFirstH1(markdown: string): string | null {
   return null;
 }
 
-function splitLines(s: string): string[] {
-  return s.split(/\r\n|\r|\n/);
+function splitLines(str: string): string[] {
+  return str.split(/\r\n|\r|\n/);
 }
 
 function isInlineSpace(code: number): boolean {

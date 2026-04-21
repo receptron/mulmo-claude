@@ -11,18 +11,12 @@
           v-for="f in FILTERS"
           :key="f.value"
           class="px-2 py-0.5 text-[10px] rounded-full border transition-colors"
-          :class="
-            activeFilter === f.value
-              ? 'bg-blue-500 text-white border-blue-500'
-              : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
-          "
+          :class="activeFilter === f.value ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'"
           :data-testid="`session-filter-${f.value}`"
           @click="activeFilter = f.value"
         >
           {{ f.label }}
-          <span v-if="f.value !== 'all'" class="ml-0.5 opacity-70">{{
-            countByOrigin(f.value)
-          }}</span>
+          <span v-if="f.value !== 'all'" class="ml-0.5 opacity-70">{{ countByOrigin(f.value) }}</span>
         </button>
       </div>
 
@@ -36,9 +30,7 @@
         <span v-if="sessions.length > 0"> — showing last known list.</span>
       </div>
       <p v-if="filteredSessions.length === 0" class="text-xs text-gray-400 p-2">
-        {{
-          activeFilter === "all" ? "No sessions yet." : "No matching sessions."
-        }}
+        {{ activeFilter === "all" ? "No sessions yet." : "No matching sessions." }}
       </p>
       <div
         v-for="session in filteredSessions"
@@ -49,9 +41,7 @@
         @click="emit('loadSession', session.id)"
       >
         <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
-          <span class="material-icons text-xs">{{
-            roleIconFor(session.roleId)
-          }}</span>
+          <span class="material-icons text-xs">{{ roleIconFor(session.roleId) }}</span>
           <span>{{ roleNameFor(session.roleId) }}</span>
           <span
             v-if="originOf(session) !== 'human'"
@@ -61,21 +51,11 @@
             >{{ originIcon(originOf(session)) }}</span
           >
           <span class="ml-auto flex items-center gap-1.5">
-            <span
-              v-if="isSessionRunning(session)"
-              class="flex items-center gap-0.5 text-yellow-600 font-medium"
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"
-              />
+            <span v-if="isSessionRunning(session)" class="flex items-center gap-0.5 text-yellow-600 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
               Running
             </span>
-            <span
-              v-else-if="isSessionUnread(session)"
-              class="flex items-center gap-0.5 text-gray-900 font-bold"
-            >
-              Unread
-            </span>
+            <span v-else-if="isSessionUnread(session)" class="flex items-center gap-0.5 text-gray-900 font-bold"> Unread </span>
             <span v-else>{{ formatDate(session.updatedAt) }}</span>
           </span>
         </div>
@@ -148,12 +128,12 @@ function originOf(session: SessionSummary): SessionOrigin {
 
 const filteredSessions = computed(() => {
   if (activeFilter.value === "all") return props.sessions;
-  return props.sessions.filter((s) => originOf(s) === activeFilter.value);
+  return props.sessions.filter((session) => originOf(session) === activeFilter.value);
 });
 
 function countByOrigin(origin: string): number {
   if (origin === "all") return props.sessions.length;
-  return props.sessions.filter((s) => originOf(s) === origin).length;
+  return props.sessions.filter((session) => originOf(session) === origin).length;
 }
 
 function originIcon(origin: string): string {
@@ -166,11 +146,11 @@ function originColor(origin: string): string {
 
 // ── Role helpers ────────────────────────────────────────────
 
-function roleIconFor(id: string): string {
-  return roleIcon(props.roles, id);
+function roleIconFor(roleId: string): string {
+  return roleIcon(props.roles, roleId);
 }
-function roleNameFor(id: string): string {
-  return roleName(props.roles, id);
+function roleNameFor(roleId: string): string {
+  return roleName(props.roles, roleId);
 }
 
 function isSessionRunning(session: SessionSummary): boolean {
@@ -182,12 +162,9 @@ function isSessionUnread(session: SessionSummary): boolean {
 }
 
 function rowClasses(session: SessionSummary): string {
-  if (isSessionRunning(session))
-    return "border-yellow-400 bg-yellow-50 hover:bg-yellow-100";
-  if (isSessionUnread(session))
-    return "border-sky-300 bg-sky-50 hover:bg-sky-100";
-  if (session.id === props.currentSessionId)
-    return "border-blue-400 bg-blue-50 hover:bg-blue-100";
+  if (isSessionRunning(session)) return "border-yellow-400 bg-yellow-50 hover:bg-yellow-100";
+  if (isSessionUnread(session)) return "border-sky-300 bg-sky-50 hover:bg-sky-100";
+  if (session.id === props.currentSessionId) return "border-blue-400 bg-blue-50 hover:bg-blue-100";
   return "border-gray-200 hover:bg-gray-50";
 }
 

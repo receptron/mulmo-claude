@@ -58,29 +58,19 @@ function validateInterests(raw: unknown): InterestsProfile | null {
   const obj = raw as Record<string, unknown>;
 
   // Filter out blank/whitespace-only keywords — "" matches every title
-  const keywords = Array.isArray(obj.keywords)
-    ? obj.keywords.filter((k): k is string => isNonEmptyString(k))
-    : [];
+  const keywords = Array.isArray(obj.keywords) ? obj.keywords.filter((keyword): keyword is string => isNonEmptyString(keyword)) : [];
 
-  const categories = Array.isArray(obj.categories)
-    ? obj.categories.filter((c): c is CategorySlug => isCategorySlug(c))
-    : [];
+  const categories = Array.isArray(obj.categories) ? obj.categories.filter((category): category is CategorySlug => isCategorySlug(category)) : [];
 
   if (keywords.length === 0 && categories.length === 0) return null;
 
   // Clamp minRelevance to [0, 1] — values > 1 would make notifications
   // impossible since scores are clamped to 1.0
-  const rawMin =
-    typeof obj.minRelevance === "number"
-      ? obj.minRelevance
-      : DEFAULT_MIN_RELEVANCE;
+  const rawMin = typeof obj.minRelevance === "number" ? obj.minRelevance : DEFAULT_MIN_RELEVANCE;
   const minRelevance = Math.max(0, Math.min(1, rawMin));
 
   // Floor to integer, minimum 1
-  const rawMax =
-    typeof obj.maxNotificationsPerRun === "number"
-      ? obj.maxNotificationsPerRun
-      : DEFAULT_MAX_NOTIFICATIONS;
+  const rawMax = typeof obj.maxNotificationsPerRun === "number" ? obj.maxNotificationsPerRun : DEFAULT_MAX_NOTIFICATIONS;
   const maxNotificationsPerRun = Math.max(1, Math.floor(rawMax));
 
   return { keywords, categories, minRelevance, maxNotificationsPerRun };
@@ -98,18 +88,16 @@ export function scoreItem(item: SourceItem, profile: InterestsProfile): number {
   const titleLower = item.title.toLowerCase();
   const summaryLower = (item.summary ?? "").toLowerCase();
 
-  for (const kw of profile.keywords) {
-    const kwLower = kw.toLowerCase();
-    if (titleLower.includes(kwLower)) {
+  for (const keyword of profile.keywords) {
+    const keywordLower = keyword.toLowerCase();
+    if (titleLower.includes(keywordLower)) {
       score += KEYWORD_TITLE_WEIGHT;
-    } else if (summaryLower.includes(kwLower)) {
+    } else if (summaryLower.includes(keywordLower)) {
       score += KEYWORD_SUMMARY_WEIGHT;
     }
   }
 
-  const hasCategory = item.categories.some((c) =>
-    profile.categories.includes(c),
-  );
+  const hasCategory = item.categories.some((category) => profile.categories.includes(category));
   if (hasCategory) {
     score += CATEGORY_MATCH_WEIGHT;
   }
@@ -123,13 +111,10 @@ export function scoreItem(item: SourceItem, profile: InterestsProfile): number {
   return Math.min(score, 1.0);
 }
 
-export function scoreAndFilter(
-  items: readonly SourceItem[],
-  profile: InterestsProfile,
-): ScoredItem[] {
+export function scoreAndFilter(items: readonly SourceItem[], profile: InterestsProfile): ScoredItem[] {
   return items
     .map((item) => ({ item, score: scoreItem(item, profile) }))
-    .filter((s) => s.score >= profile.minRelevance)
-    .sort((a, b) => b.score - a.score)
+    .filter((scoredItem) => scoredItem.score >= profile.minRelevance)
+    .sort((leftItem, rightItem) => rightItem.score - leftItem.score)
     .slice(0, profile.maxNotificationsPerRun);
 }

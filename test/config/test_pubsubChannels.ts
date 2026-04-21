@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  PUBSUB_CHANNELS,
-  sessionChannel,
-} from "../../src/config/pubsubChannels.js";
+import { PUBSUB_CHANNELS, sessionChannel } from "../../src/config/pubsubChannels.js";
 
 describe("sessionChannel", () => {
   it("prefixes the session id with `session.`", () => {
@@ -13,14 +10,8 @@ describe("sessionChannel", () => {
   it("passes the id through verbatim (no encoding / sanitisation)", () => {
     // chatSessionId is already filesystem-safe upstream; the
     // factory's job is strictly to prepend the prefix.
-    assert.equal(
-      sessionChannel("my-session-12345"),
-      "session.my-session-12345",
-    );
-    assert.equal(
-      sessionChannel("telegram-999-1713100000"),
-      "session.telegram-999-1713100000",
-    );
+    assert.equal(sessionChannel("my-session-12345"), "session.my-session-12345");
+    assert.equal(sessionChannel("telegram-999-1713100000"), "session.telegram-999-1713100000");
   });
 
   it("works on an empty id (produces the bare prefix)", () => {
@@ -44,11 +35,7 @@ describe("PUBSUB_CHANNELS", () => {
     // it could be confused for a per-session one on the subscriber
     // side. Keep them disjoint.
     for (const value of Object.values(PUBSUB_CHANNELS)) {
-      assert.equal(
-        value.startsWith("session."),
-        false,
-        `static channel "${value}" must not reuse the session. prefix`,
-      );
+      assert.equal(value.startsWith("session."), false, `static channel "${value}" must not reuse the session. prefix`);
     }
   });
 });

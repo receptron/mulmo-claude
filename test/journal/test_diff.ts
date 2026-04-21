@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  findDirtySessions,
-  applyProcessed,
-  type SessionFileMeta,
-} from "../../server/workspace/journal/diff.js";
+import { findDirtySessions, applyProcessed, type SessionFileMeta } from "../../server/workspace/journal/diff.js";
 
 describe("findDirtySessions", () => {
   it("treats every session as dirty when processed state is empty", () => {
@@ -82,16 +78,12 @@ describe("applyProcessed", () => {
   });
 
   it("overwrites mtime for already-known sessions", () => {
-    const result = applyProcessed({ a: { lastMtimeMs: 500 } }, [
-      { id: "a", mtimeMs: 2000 },
-    ]);
+    const result = applyProcessed({ a: { lastMtimeMs: 500 } }, [{ id: "a", mtimeMs: 2000 }]);
     assert.deepEqual(result, { a: { lastMtimeMs: 2000 } });
   });
 
   it("preserves records for sessions not in the just-processed list", () => {
-    const result = applyProcessed({ kept: { lastMtimeMs: 111 } }, [
-      { id: "new", mtimeMs: 222 },
-    ]);
+    const result = applyProcessed({ kept: { lastMtimeMs: 111 } }, [{ id: "new", mtimeMs: 222 }]);
     assert.deepEqual(result, {
       kept: { lastMtimeMs: 111 },
       new: { lastMtimeMs: 222 },

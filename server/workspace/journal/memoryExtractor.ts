@@ -50,13 +50,9 @@ export interface MemoryExtractionDeps {
  * Extract new user facts from chat excerpts and append to memory.md.
  * Returns the number of facts appended (0 if none found or on error).
  */
-export async function extractAndAppendMemory(
-  deps: MemoryExtractionDeps,
-): Promise<number> {
+export async function extractAndAppendMemory(deps: MemoryExtractionDeps): Promise<number> {
   const memoryPath = path.join(deps.workspaceRoot, WORKSPACE_FILES.memory);
-  const existingMemory = existsSync(memoryPath)
-    ? readFileSync(memoryPath, "utf-8")
-    : "";
+  const existingMemory = existsSync(memoryPath) ? readFileSync(memoryPath, "utf-8") : "";
 
   const userPrompt = buildUserPrompt(existingMemory, deps.excerpts);
   let raw: string;
@@ -85,18 +81,13 @@ export async function extractAndAppendMemory(
 }
 
 /** Build the user prompt with existing memory + new excerpts. */
-export function buildUserPrompt(
-  existingMemory: string,
-  excerpts: string,
-): string {
+export function buildUserPrompt(existingMemory: string, excerpts: string): string {
   const parts: string[] = [];
   if (existingMemory.trim()) {
     parts.push("## Already known (do NOT repeat these):\n\n" + existingMemory);
   }
   parts.push("## New chat excerpts:\n\n" + excerpts);
-  parts.push(
-    "\nExtract any NEW user facts not already in the 'Already known' section above. If none, output: NONE",
-  );
+  parts.push("\nExtract any NEW user facts not already in the 'Already known' section above. If none, output: NONE");
   return parts.join("\n\n");
 }
 
@@ -116,10 +107,7 @@ function normalizeFact(fact: string): string {
 }
 
 /** Remove facts that already exist in the current memory content. */
-export function filterNewFacts(
-  existingMemory: string,
-  facts: readonly string[],
-): string[] {
+export function filterNewFacts(existingMemory: string, facts: readonly string[]): string[] {
   const seen = new Set(parseExtractedFacts(existingMemory).map(normalizeFact));
   const out: string[] = [];
   for (const fact of facts) {

@@ -1,10 +1,5 @@
 <template>
-  <ImageView
-    v-if="selectedResult"
-    :selected-result="selectedResult"
-    alt="Edited image"
-    prompt-label="Edit prompt"
-  />
+  <ImageView v-if="selectedResult" :selected-result="selectedResult" alt="Edited image" prompt-label="Edit prompt" />
 </template>
 
 <script setup lang="ts">

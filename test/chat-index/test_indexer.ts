@@ -4,16 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  indexSession,
-  readManifest,
-  isFresh,
-  MIN_INDEX_INTERVAL_MS,
-} from "../../server/workspace/chat-index/indexer.js";
-import {
-  indexEntryPathFor,
-  manifestPathFor,
-} from "../../server/workspace/chat-index/paths.js";
+import { indexSession, readManifest, isFresh, MIN_INDEX_INTERVAL_MS } from "../../server/workspace/chat-index/indexer.js";
+import { indexEntryPathFor, manifestPathFor } from "../../server/workspace/chat-index/paths.js";
 import type { SummaryResult } from "../../server/workspace/chat-index/types.js";
 
 let workspace: string;
@@ -45,16 +37,9 @@ function seedSession(
     assistantMessages = ["Sure — tell me what it's about."],
   } = opts;
   const chatDir = join(workspace, "chat");
-  writeFileSync(
-    join(chatDir, `${id}.json`),
-    JSON.stringify({ roleId, startedAt }),
-  );
+  writeFileSync(join(chatDir, `${id}.json`), JSON.stringify({ roleId, startedAt }));
   const lines: string[] = [];
-  for (
-    let i = 0;
-    i < Math.max(userMessages.length, assistantMessages.length);
-    i++
-  ) {
+  for (let i = 0; i < Math.max(userMessages.length, assistantMessages.length); i++) {
     if (userMessages[i] !== undefined) {
       lines.push(
         JSON.stringify({
@@ -118,9 +103,7 @@ describe("indexSession — happy path", () => {
     assert.equal(entry!.startedAt, "2026-04-12T10:00:00.000Z");
 
     // Per-session file exists.
-    const perSession = JSON.parse(
-      await readFile(indexEntryPathFor(workspace, "sess-A"), "utf-8"),
-    );
+    const perSession = JSON.parse(await readFile(indexEntryPathFor(workspace, "sess-A"), "utf-8"));
     assert.equal(perSession.title, "Plan a project");
 
     // Manifest upserted.
@@ -253,11 +236,7 @@ describe("indexSession — skip conditions", () => {
         startedAt: "2026-04-12T10:00:00.000Z",
       }),
     );
-    writeFileSync(
-      join(chatDir, "sess-F.jsonl"),
-      JSON.stringify({ source: "tool", type: "tool_result", message: "x" }) +
-        "\n",
-    );
+    writeFileSync(join(chatDir, "sess-F.jsonl"), JSON.stringify({ source: "tool", type: "tool_result", message: "x" }) + "\n");
     const stub = makeStubSummarize();
     const result = await indexSession(workspace, "sess-F", {
       summarize: stub.fn,
@@ -318,7 +297,7 @@ describe("indexSession — manifest upsert and ordering", () => {
 
     const manifest = await readManifest(workspace);
     assert.deepEqual(
-      manifest.entries.map((e) => e.id),
+      manifest.entries.map((entry) => entry.id),
       ["newest", "middle", "oldest"],
     );
   });
@@ -343,9 +322,7 @@ describe("indexSession — error propagation", () => {
     const manifest = await readManifest(workspace);
     assert.equal(manifest.entries.length, 0);
 
-    await assert.rejects(() =>
-      readFile(indexEntryPathFor(workspace, "sess-H"), "utf-8"),
-    );
+    await assert.rejects(() => readFile(indexEntryPathFor(workspace, "sess-H"), "utf-8"));
   });
 });
 
@@ -364,10 +341,7 @@ describe("readManifest", () => {
 
   it("returns an empty manifest for a version mismatch", async () => {
     mkdirSync(join(workspace, "chat", "index"), { recursive: true });
-    writeFileSync(
-      manifestPathFor(workspace),
-      JSON.stringify({ version: 99, entries: [] }),
-    );
+    writeFileSync(manifestPathFor(workspace), JSON.stringify({ version: 99, entries: [] }));
     const manifest = await readManifest(workspace);
     assert.deepEqual(manifest, { version: 1, entries: [] });
   });
@@ -381,26 +355,15 @@ describe("isFresh", () => {
 
   it("returns true when the entry is within the window", async () => {
     mkdirSync(join(workspace, "chat", "index"), { recursive: true });
-    writeFileSync(
-      indexEntryPathFor(workspace, "x"),
-      JSON.stringify({ indexedAt: new Date(0).toISOString() }),
-    );
+    writeFileSync(indexEntryPathFor(workspace, "x"), JSON.stringify({ indexedAt: new Date(0).toISOString() }));
     const out = await isFresh(workspace, "x", 5000, MIN_INDEX_INTERVAL_MS);
     assert.equal(out, true);
   });
 
   it("returns false when the entry is outside the window", async () => {
     mkdirSync(join(workspace, "chat", "index"), { recursive: true });
-    writeFileSync(
-      indexEntryPathFor(workspace, "x"),
-      JSON.stringify({ indexedAt: new Date(0).toISOString() }),
-    );
-    const out = await isFresh(
-      workspace,
-      "x",
-      MIN_INDEX_INTERVAL_MS + 1,
-      MIN_INDEX_INTERVAL_MS,
-    );
+    writeFileSync(indexEntryPathFor(workspace, "x"), JSON.stringify({ indexedAt: new Date(0).toISOString() }));
+    const out = await isFresh(workspace, "x", MIN_INDEX_INTERVAL_MS + 1, MIN_INDEX_INTERVAL_MS);
     assert.equal(out, false);
   });
 });

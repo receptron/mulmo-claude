@@ -5,17 +5,11 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  findPendingToolCall,
-  shouldSelectAssistantText,
-} from "../../../src/utils/agent/toolCalls.js";
+import { findPendingToolCall, shouldSelectAssistantText } from "../../../src/utils/agent/toolCalls.js";
 import type { ToolCallHistoryItem } from "../../../src/types/toolCallHistory.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
-function makeHistoryEntry(
-  toolUseId: string,
-  overrides: Partial<ToolCallHistoryItem> = {},
-): ToolCallHistoryItem {
+function makeHistoryEntry(toolUseId: string, overrides: Partial<ToolCallHistoryItem> = {}): ToolCallHistoryItem {
   return {
     toolUseId,
     toolName: "test",
@@ -101,20 +95,14 @@ describe("shouldSelectAssistantText — returns true when run is text-only", () 
   });
 
   it("true when every result in the run is text-response", () => {
-    const results = [
-      makeToolResult("u1", "text-response"),
-      makeToolResult("u2", "text-response"),
-    ];
+    const results = [makeToolResult("u1", "text-response"), makeToolResult("u2", "text-response")];
     assert.equal(shouldSelectAssistantText(results, 0), true);
   });
 
   it("true when plugin results exist but predate the run (ignored)", () => {
     // Two text-response results after runStartIndex, a plugin
     // result before it — the pre-run result is irrelevant.
-    const results = [
-      makeToolResult("prev", "generateImage"),
-      makeToolResult("u1", "text-response"),
-    ];
+    const results = [makeToolResult("prev", "generateImage"), makeToolResult("u1", "text-response")];
     assert.equal(shouldSelectAssistantText(results, 1), true);
   });
 });
@@ -126,18 +114,12 @@ describe("shouldSelectAssistantText — returns false when a plugin result is in
   });
 
   it("false when a plugin result comes after a text-response", () => {
-    const results = [
-      makeToolResult("u1", "text-response"),
-      makeToolResult("u2", "generateImage"),
-    ];
+    const results = [makeToolResult("u1", "text-response"), makeToolResult("u2", "generateImage")];
     assert.equal(shouldSelectAssistantText(results, 0), false);
   });
 
   it("false when a plugin result comes before a text-response", () => {
-    const results = [
-      makeToolResult("u1", "generateImage"),
-      makeToolResult("u2", "text-response"),
-    ];
+    const results = [makeToolResult("u1", "generateImage"), makeToolResult("u2", "text-response")];
     assert.equal(shouldSelectAssistantText(results, 0), false);
   });
 });

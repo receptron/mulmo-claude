@@ -29,22 +29,20 @@ export function useSessionSync(opts: {
       console.warn("[session-sync] failed to fetch sessions:", err);
       return;
     }
-    for (const s of summaries) {
-      const live = sessionMap.get(s.id);
+    for (const summary of summaries) {
+      const live = sessionMap.get(summary.id);
       if (!live) continue;
-      live.isRunning = s.isRunning ?? false;
-      live.statusMessage = s.statusMessage ?? "";
-      const unread = s.hasUnread ?? false;
-      if (!(unread && s.id === currentSessionId.value)) {
+      live.isRunning = summary.isRunning ?? false;
+      live.statusMessage = summary.statusMessage ?? "";
+      const unread = summary.hasUnread ?? false;
+      if (!(unread && summary.id === currentSessionId.value)) {
         live.hasUnread = unread;
       }
     }
   }
 
-  async function markSessionRead(id: string): Promise<void> {
-    const result = await apiPost<{ ok: boolean }>(
-      API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(id)),
-    );
+  async function markSessionRead(sessionId: string): Promise<void> {
+    const result = await apiPost<{ ok: boolean }>(API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(sessionId)));
     if (!result.ok || result.data.ok === false) {
       await refreshSessionStates();
     }

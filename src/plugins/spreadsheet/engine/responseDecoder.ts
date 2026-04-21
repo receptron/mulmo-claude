@@ -21,9 +21,7 @@ export interface FilesContentResponseLike {
   message?: string;
 }
 
-export type DecodeResult =
-  | { kind: "ok"; sheets: SheetData[] }
-  | { kind: "error"; message: string };
+export type DecodeResult = { kind: "ok"; sheets: SheetData[] } | { kind: "error"; message: string };
 
 /**
  * Turn a parsed `/files/content` body into an OK/error decision:
@@ -37,9 +35,7 @@ export type DecodeResult =
  *   return a non-array but the guard protects downstream render).
  * - Otherwise → ok with the sheets array.
  */
-export function decodeSpreadsheetResponse(
-  body: FilesContentResponseLike,
-): DecodeResult {
+export function decodeSpreadsheetResponse(body: FilesContentResponseLike): DecodeResult {
   if (body.kind && body.kind !== "text") {
     return {
       kind: "error",

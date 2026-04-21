@@ -1,39 +1,34 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  toLocalIsoDate,
-  toUtcIsoDate,
-  isoDateOnly,
-  isValidIsoDate,
-} from "../../server/utils/date.js";
+import { toLocalIsoDate, toUtcIsoDate, isoDateOnly, isValidIsoDate } from "../../server/utils/date.js";
 
 describe("toLocalIsoDate", () => {
   it("formats a Date to YYYY-MM-DD in local time", () => {
     // Use a date where local and UTC differ to verify local is used.
-    const d = new Date(2026, 3, 17); // April 17, 2026 in local tz
-    assert.equal(toLocalIsoDate(d), "2026-04-17");
+    const date = new Date(2026, 3, 17); // April 17, 2026 in local tz
+    assert.equal(toLocalIsoDate(date), "2026-04-17");
   });
 
   it("accepts a ms timestamp", () => {
-    const d = new Date(2026, 0, 1);
-    assert.equal(toLocalIsoDate(d.getTime()), "2026-01-01");
+    const date = new Date(2026, 0, 1);
+    assert.equal(toLocalIsoDate(date.getTime()), "2026-01-01");
   });
 
   it("zero-pads single-digit months and days", () => {
-    const d = new Date(2026, 0, 5); // Jan 5
-    assert.equal(toLocalIsoDate(d), "2026-01-05");
+    const date = new Date(2026, 0, 5); // Jan 5
+    assert.equal(toLocalIsoDate(date), "2026-01-05");
   });
 });
 
 describe("toUtcIsoDate", () => {
   it("formats a Date to YYYY-MM-DD in UTC", () => {
-    const d = new Date("2026-04-17T23:30:00Z");
-    assert.equal(toUtcIsoDate(d), "2026-04-17");
+    const date = new Date("2026-04-17T23:30:00Z");
+    assert.equal(toUtcIsoDate(date), "2026-04-17");
   });
 
   it("zero-pads single-digit months and days", () => {
-    const d = new Date("2026-01-05T00:00:00Z");
-    assert.equal(toUtcIsoDate(d), "2026-01-05");
+    const date = new Date("2026-01-05T00:00:00Z");
+    assert.equal(toUtcIsoDate(date), "2026-01-05");
   });
 });
 

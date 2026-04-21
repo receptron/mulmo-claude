@@ -14,6 +14,7 @@ import {
   VIEW_MODE_STORAGE_KEY,
   parseStoredViewMode,
   viewModeForShortcutKey,
+  isCanvasViewMode,
 } from "../utils/canvas/viewMode";
 import type { LocationQuery } from "vue-router";
 
@@ -28,10 +29,7 @@ interface UseCanvasViewModeOptions {
  * "single" (the default) omits `?view=` for cleaner URLs;
  * other modes set it explicitly.
  */
-function applyViewToQuery(
-  currentQuery: LocationQuery,
-  mode: CanvasViewMode,
-): LocationQuery {
+function applyViewToQuery(currentQuery: LocationQuery, mode: CanvasViewMode): LocationQuery {
   const rest: LocationQuery = { ...currentQuery };
   delete rest.view;
   // Remove ?path= when leaving the files view — it's only meaningful
@@ -47,29 +45,25 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
   buildViewQuery: () => LocationQuery;
   filesRefreshToken: Ref<number>;
   handleViewModeShortcut: (e: KeyboardEvent) => void;
+  onPluginNavigate: (target: { key: string }) => void;
 } {
   const route = useRoute();
   const router = useRouter();
 
   // Initialise from URL if ?view= is present, otherwise fall back to
   // localStorage (the user's last-chosen mode), then to "single".
-  const urlView =
-    typeof route.query.view === "string" ? route.query.view : null;
-  const canvasViewMode = ref<CanvasViewMode>(
-    parseStoredViewMode(urlView ?? localStorage.getItem(VIEW_MODE_STORAGE_KEY)),
-  );
+  const urlView = typeof route.query.view === "string" ? route.query.view : null;
+  const canvasViewMode = ref<CanvasViewMode>(parseStoredViewMode(urlView ?? localStorage.getItem(VIEW_MODE_STORAGE_KEY)));
   const filesRefreshToken = ref(0);
 
   function setCanvasViewMode(mode: CanvasViewMode): void {
     canvasViewMode.value = mode;
     localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
-    router
-      .push({ query: applyViewToQuery(route.query, mode) })
-      .catch((err: unknown) => {
-        if (!isNavigationFailure(err)) {
-          console.error("[setCanvasViewMode] navigation failed:", err);
-        }
-      });
+    router.push({ query: applyViewToQuery(route.query, mode) }).catch((err: unknown) => {
+      if (!isNavigationFailure(err)) {
+        console.error("[setCanvasViewMode] navigation failed:", err);
+      }
+    });
   }
 
   /** Return a query object with the current view mode applied.
@@ -84,9 +78,7 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
   watch(
     () => route.query.view,
     (newView) => {
-      const parsed = parseStoredViewMode(
-        typeof newView === "string" ? newView : null,
-      );
+      const parsed = parseStoredViewMode(typeof newView === "string" ? newView : null);
       if (parsed !== canvasViewMode.value) {
         canvasViewMode.value = parsed;
         localStorage.setItem(VIEW_MODE_STORAGE_KEY, parsed);
@@ -102,13 +94,20 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
     }
   });
 
-  function handleViewModeShortcut(e: KeyboardEvent): void {
-    if (!(e.metaKey || e.ctrlKey)) return;
-    if (e.altKey || e.shiftKey) return;
-    const target = viewModeForShortcutKey(e.key);
+  function handleViewModeShortcut(event: KeyboardEvent): void {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    if (event.altKey || event.shiftKey) return;
+    const target = viewModeForShortcutKey(event.key);
     if (target === null) return;
     setCanvasViewMode(target);
-    e.preventDefault();
+    event.preventDefault();
+  }
+
+  /** Plugin-launcher click: switch canvas to the matching view mode. */
+  function onPluginNavigate(target: { key: string }): void {
+    if (isCanvasViewMode(target.key)) {
+      setCanvasViewMode(target.key);
+    }
   }
 
   return {
@@ -117,5 +116,6 @@ export function useCanvasViewMode(opts: UseCanvasViewModeOptions): {
     buildViewQuery,
     filesRefreshToken,
     handleViewModeShortcut,
+    onPluginNavigate,
   };
 }

@@ -1,11 +1,6 @@
 <template>
   <div class="min-h-24 flex items-center justify-center">
-    <img
-      v-if="resolvedSrc"
-      :src="resolvedSrc"
-      class="max-w-full h-auto rounded"
-      :alt="alt"
-    />
+    <img v-if="resolvedSrc" :src="resolvedSrc" class="max-w-full h-auto rounded" :alt="alt" />
     <div v-else class="text-gray-400 text-sm">No image yet</div>
   </div>
 </template>
@@ -24,9 +19,5 @@ const props = withDefaults(
   { alt: "Image" },
 );
 
-const resolvedSrc = computed(() =>
-  props.result.data?.imageData
-    ? resolveImageSrc(props.result.data.imageData)
-    : "",
-);
+const resolvedSrc = computed(() => (props.result.data?.imageData ? resolveImageSrc(props.result.data.imageData) : ""));
 </script>

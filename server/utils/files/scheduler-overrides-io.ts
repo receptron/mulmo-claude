@@ -28,14 +28,8 @@ export const UTC_HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 function isScheduleOverride(value: unknown): value is ScheduleOverride {
   if (!isRecord(value)) return false;
   const obj = value;
-  const hasInterval =
-    "intervalMs" in obj &&
-    typeof obj.intervalMs === "number" &&
-    obj.intervalMs > 0;
-  const hasTime =
-    "time" in obj &&
-    typeof obj.time === "string" &&
-    UTC_HH_MM_RE.test(obj.time);
+  const hasInterval = "intervalMs" in obj && typeof obj.intervalMs === "number" && obj.intervalMs > 0;
+  const hasTime = "time" in obj && typeof obj.time === "string" && UTC_HH_MM_RE.test(obj.time);
   // At least one valid field required
   return hasInterval || hasTime;
 }
@@ -63,10 +57,7 @@ export function loadSchedulerOverrides(root?: string): ScheduleOverrides {
 }
 
 /** Save schedule overrides atomically. Creates directory if needed. */
-export function saveSchedulerOverrides(
-  overrides: ScheduleOverrides,
-  root?: string,
-): void {
+export function saveSchedulerOverrides(overrides: ScheduleOverrides, root?: string): void {
   const filePath = overridesPath(root);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileAtomicSync(filePath, JSON.stringify(overrides, null, 2));

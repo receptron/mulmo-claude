@@ -14,11 +14,7 @@ import type { Skill, SkillSource } from "./types.js";
 // not a valid skill (no SKILL.md, malformed frontmatter, I/O error).
 // Errors are logged at warn, not thrown — a single broken skill
 // shouldn't take down the whole list.
-async function readSkillDir(
-  skillDir: string,
-  name: string,
-  source: SkillSource,
-): Promise<Skill | null> {
+async function readSkillDir(skillDir: string, name: string, source: SkillSource): Promise<Skill | null> {
   const skillPath = join(skillDir, SKILL_FILE);
   try {
     // Follow symlinks: stat rather than lstat so a user's
@@ -63,10 +59,7 @@ async function readSkillDir(
  * — we just return an empty list (a workspace with no .claude/skills/
  * is the common case).
  */
-export async function collectSkillsFromDir(
-  root: string,
-  source: SkillSource,
-): Promise<Skill[]> {
+export async function collectSkillsFromDir(root: string, source: SkillSource): Promise<Skill[]> {
   let entries: string[];
   try {
     entries = await readdir(root);
@@ -97,7 +90,7 @@ export async function collectSkillsFromDir(
     if (skill) results.push(skill);
   }
   // Stable alphabetical order for the UI.
-  results.sort((a, b) => a.name.localeCompare(b.name));
+  results.sort((leftSkill, rightSkill) => leftSkill.name.localeCompare(rightSkill.name));
   return results;
 }
 
@@ -116,24 +109,17 @@ export interface DiscoverSkillsOptions {
  * skills (under `<workspace>/.claude/skills/`) override user-level
  * skills of the same name.
  */
-export async function discoverSkills(
-  opts: DiscoverSkillsOptions = {},
-): Promise<Skill[]> {
+export async function discoverSkills(opts: DiscoverSkillsOptions = {}): Promise<Skill[]> {
   const userDir = opts.userDir ?? USER_SKILLS_DIR;
   const userSkills = await collectSkillsFromDir(userDir, "user");
 
-  const projectSkills = opts.workspaceRoot
-    ? await collectSkillsFromDir(
-        projectSkillsDir(opts.workspaceRoot),
-        "project",
-      )
-    : [];
+  const projectSkills = opts.workspaceRoot ? await collectSkillsFromDir(projectSkillsDir(opts.workspaceRoot), "project") : [];
 
   // Project overrides user on name collision. Merge by building a
   // map keyed by name, starting with user, overwriting with project.
   const merged = new Map<string, Skill>();
-  for (const s of userSkills) merged.set(s.name, s);
-  for (const s of projectSkills) merged.set(s.name, s);
+  for (const skill of userSkills) merged.set(skill.name, skill);
+  for (const skill of projectSkills) merged.set(skill.name, skill);
 
-  return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...merged.values()].sort((leftSkill, rightSkill) => leftSkill.name.localeCompare(rightSkill.name));
 }

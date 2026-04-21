@@ -25,10 +25,7 @@ function assertClaudeFiles(): void {
       process.exit(1);
     }
   } catch {
-    log.error(
-      "sandbox",
-      `${claudeDir} not found. Run 'claude' once to initialize.`,
-    );
+    log.error("sandbox", `${claudeDir} not found. Run 'claude' once to initialize.`);
     process.exit(1);
   }
 
@@ -38,10 +35,7 @@ function assertClaudeFiles(): void {
       process.exit(1);
     }
   } catch {
-    log.error(
-      "sandbox",
-      `${claudeJson} not found. Run 'claude' once to initialize.`,
-    );
+    log.error("sandbox", `${claudeJson} not found. Run 'claude' once to initialize.`);
     process.exit(1);
   }
 }
@@ -66,21 +60,10 @@ function getDockerfileSha256(): string {
 
 async function buildImage(sha: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(
-      "docker",
-      [
-        "build",
-        "-t",
-        IMAGE_NAME,
-        "--label",
-        `${LABEL_KEY}=${sha}`,
-        "-f",
-        DOCKERFILE,
-        "--load",
-        ".",
-      ],
-      { cwd: process.cwd(), stdio: ["ignore", "inherit", "inherit"] },
-    );
+    const proc = spawn("docker", ["build", "-t", IMAGE_NAME, "--label", `${LABEL_KEY}=${sha}`, "-f", DOCKERFILE, "--load", "."], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "inherit", "inherit"],
+    });
     proc.on("error", reject);
     proc.on("close", (code) => {
       if (code === 0) resolve();
@@ -94,25 +77,13 @@ export async function ensureSandboxImage(): Promise<void> {
 
   let needsBuild = false;
   try {
-    const { stdout } = await execFileAsync("docker", [
-      "image",
-      "inspect",
-      IMAGE_NAME,
-      "--format",
-      `{{index .Config.Labels "${LABEL_KEY}"}}`,
-    ]);
+    const { stdout } = await execFileAsync("docker", ["image", "inspect", IMAGE_NAME, "--format", `{{index .Config.Labels "${LABEL_KEY}"}}`]);
     if (stdout.trim() !== expectedSha) {
-      log.info(
-        "sandbox",
-        "Dockerfile.sandbox changed, rebuilding sandbox image...",
-      );
+      log.info("sandbox", "Dockerfile.sandbox changed, rebuilding sandbox image...");
       needsBuild = true;
     }
   } catch {
-    log.info(
-      "sandbox",
-      "Building sandbox image (first time only, may take a minute)...",
-    );
+    log.info("sandbox", "Building sandbox image (first time only, may take a minute)...");
     needsBuild = true;
   }
 
@@ -135,13 +106,7 @@ export async function ensureSandboxImage(): Promise<void> {
  */
 export async function getDockerBridgeIp(): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync("docker", [
-      "network",
-      "inspect",
-      "bridge",
-      "-f",
-      "{{(index .IPAM.Config 0).Gateway}}",
-    ]);
+    const { stdout } = await execFileAsync("docker", ["network", "inspect", "bridge", "-f", "{{(index .IPAM.Config 0).Gateway}}"]);
     const ip = stdout.trim();
     // Sanity-check: must look like an IPv4 address
     return /^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip : null;

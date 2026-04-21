@@ -15,9 +15,7 @@ const WIKI_PAGE = {
   action: "page",
   title: "Onboarding",
   pageName: "onboarding",
-  content:
-    "# Onboarding\n\nSee the [[setup]] guide.\n\n" +
-    "![flow](../images/flow.png)\n",
+  content: "# Onboarding\n\nSee the [[setup]] guide.\n\n" + "![flow](../images/flow.png)\n",
 };
 
 test.describe("wiki plugin — rendering", () => {
@@ -37,9 +35,7 @@ test.describe("wiki plugin — rendering", () => {
     // Session transcript with a manageWiki tool result whose data
     // includes a page with a relative-up image ref.
     await page.route(
-      (url) =>
-        url.pathname.startsWith("/api/sessions/") &&
-        url.pathname !== "/api/sessions",
+      (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
       (route) =>
         route.fulfill({
           json: [

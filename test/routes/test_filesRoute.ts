@@ -23,12 +23,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseRange,
-  classify,
-  isSensitivePath,
-  RAW_SECURITY_HEADERS,
-} from "../../server/api/routes/files.js";
+import { parseRange, classify, isSensitivePath, RAW_SECURITY_HEADERS } from "../../server/api/routes/files.js";
 
 describe("parseRange — happy path", () => {
   it("parses a basic start-end range", () => {
@@ -147,18 +142,8 @@ describe("parseRange — zero-byte file (regression: PR #134 review)", () => {
   });
 
   it("rejects any range on a zero-byte file uniformly", () => {
-    for (const header of [
-      "bytes=0-0",
-      "bytes=0-",
-      "bytes=-1",
-      "bytes=-100",
-      "bytes=0-99",
-    ]) {
-      assert.equal(
-        parseRange(header, 0),
-        null,
-        `expected null for ${header} on empty file`,
-      );
+    for (const header of ["bytes=0-0", "bytes=0-", "bytes=-1", "bytes=-100", "bytes=0-99"]) {
+      assert.equal(parseRange(header, 0), null, `expected null for ${header} on empty file`);
     }
   });
 });
@@ -179,27 +164,13 @@ describe("parseRange — integer / precision boundaries", () => {
 
 describe("classify", () => {
   it("classifies common audio extensions", () => {
-    for (const name of [
-      "foo.mp3",
-      "foo.wav",
-      "foo.m4a",
-      "foo.ogg",
-      "foo.oga",
-      "foo.flac",
-      "foo.aac",
-    ]) {
+    for (const name of ["foo.mp3", "foo.wav", "foo.m4a", "foo.ogg", "foo.oga", "foo.flac", "foo.aac"]) {
       assert.equal(classify(name), "audio", `expected audio for ${name}`);
     }
   });
 
   it("classifies common video extensions", () => {
-    for (const name of [
-      "foo.mp4",
-      "foo.webm",
-      "foo.mov",
-      "foo.m4v",
-      "foo.ogv",
-    ]) {
+    for (const name of ["foo.mp4", "foo.webm", "foo.mov", "foo.m4v", "foo.ogv"]) {
       assert.equal(classify(name), "video", `expected video for ${name}`);
     }
   });
@@ -215,27 +186,13 @@ describe("classify", () => {
   });
 
   it("classifies images", () => {
-    for (const name of [
-      "a.png",
-      "a.jpg",
-      "a.jpeg",
-      "a.gif",
-      "a.webp",
-      "a.svg",
-    ]) {
+    for (const name of ["a.png", "a.jpg", "a.jpeg", "a.gif", "a.webp", "a.svg"]) {
       assert.equal(classify(name), "image");
     }
   });
 
   it("classifies common text extensions", () => {
-    for (const name of [
-      "README.md",
-      "notes.txt",
-      "data.json",
-      "config.yaml",
-      "index.ts",
-      "app.vue",
-    ]) {
+    for (const name of ["README.md", "notes.txt", "data.json", "config.yaml", "index.ts", "app.vue"]) {
       assert.equal(classify(name), "text");
     }
   });
@@ -288,14 +245,8 @@ describe("RAW_SECURITY_HEADERS", () => {
   it("does not set any allow-listing header that would defeat sandbox", () => {
     // Guardrails: if someone adds a future header that opens the
     // sandbox back up, this catches it early.
-    assert.equal(
-      RAW_SECURITY_HEADERS["Access-Control-Allow-Origin"],
-      undefined,
-    );
-    assert.equal(
-      RAW_SECURITY_HEADERS["Cross-Origin-Resource-Policy"],
-      undefined,
-    );
+    assert.equal(RAW_SECURITY_HEADERS["Access-Control-Allow-Origin"], undefined);
+    assert.equal(RAW_SECURITY_HEADERS["Cross-Origin-Resource-Policy"], undefined);
   });
 });
 
@@ -305,13 +256,7 @@ describe("isSensitivePath — blocks secret files", () => {
   });
 
   it("blocks .env.<variant> files", () => {
-    for (const name of [
-      ".env.local",
-      ".env.production",
-      ".env.development",
-      ".env.staging",
-      ".env.test",
-    ]) {
+    for (const name of [".env.local", ".env.production", ".env.development", ".env.staging", ".env.test"]) {
       assert.equal(isSensitivePath(name), true, `expected ${name} blocked`);
     }
   });

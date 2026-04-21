@@ -1,15 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  PRIORITIES,
-  PRIORITY_LABELS,
-  isPriority,
-} from "../../../src/plugins/todo/priority.js";
+import { PRIORITIES, PRIORITY_LABELS, isPriority } from "../../../src/plugins/todo/priority.js";
 
 describe("isPriority", () => {
   it("accepts every value in PRIORITIES", () => {
-    for (const p of PRIORITIES) {
-      assert.equal(isPriority(p), true);
+    for (const priority of PRIORITIES) {
+      assert.equal(isPriority(priority), true);
     }
   });
 
@@ -42,9 +38,9 @@ describe("isPriority", () => {
 
 describe("PRIORITY_LABELS", () => {
   it("has a label for every priority", () => {
-    for (const p of PRIORITIES) {
-      assert.equal(typeof PRIORITY_LABELS[p], "string");
-      assert.ok(PRIORITY_LABELS[p].length > 0);
+    for (const priority of PRIORITIES) {
+      assert.equal(typeof PRIORITY_LABELS[priority], "string");
+      assert.ok(PRIORITY_LABELS[priority].length > 0);
     }
   });
 });

@@ -6,6 +6,69 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [0.3.0] - 2026-04-22
+
+### Highlights
+
+- **`npx mulmoclaude` one-command launch (#533, #535)** — self-contained npm package that ships server TypeScript + Vite client; runs via `tsx`, opens the browser, auto-falls back to the next free port if 3001 is busy. Prints a ready banner once the HTTP endpoint actually responds.
+- **MulmoBridge Relay (#456)** — Cloudflare Workers + Durable Object webhook proxy; server-side WebSocket client with hibernation recovery. `/setup-relay` skill for interactive deploy.
+- **Bridge session switching (#489)** — `/sessions`, `/switch`, and `/history` commands from inside a bridge. Session list scales to 200 with pagination.
+- **Session origin tracking (#486)** — sessions tagged `human` / `scheduler` / `skill` / `bridge`; origin icons + filter UI in the history sidebar.
+- **Scheduler Phase 3+** — task dependencies (`dependsOn` for ordered execution, #465 Phase 3), system task schedule overrides via config file (#493), live-update API for overrides.
+- **Source auto-discovery (#469)** — arXiv pipeline keyed off user interests; news notification + concierge prompt (#466).
+
+### Added
+
+- `npx mulmoclaude` launcher: port fallback, ready-banner probe, graceful shutdown, `--port` validation
+- `/publish-mulmoclaude` skill: dep audit + workspace drift check + tarball test + cascade publish flow
+- `/setup-relay` skill: interactive Cloudflare Workers deploy + MulmoClaude connection
+- `/setup-wizard` skill (#474): conversational automation setup via manageScheduler / manageSkills / manageSource
+- `@mulmobridge/relay` package: Workers webhook proxy with platform plugin architecture (LINE / Telegram)
+- Bridge commands: `/sessions`, `/switch`, `/history`, bridge session pagination
+- Session origin field + isSessionOrigin guard; origin icons + history filter UI
+- Dynamic favicon reflecting agent state (#470)
+- MulmoClaude logo in top-left header
+- Canvas entry timestamps (time-only for today, date+time otherwise)
+- File tree Name/Recent sort toggle
+- Browse reference directories in file explorer (#472)
+- User-configurable read-only reference directories (#455)
+- manageSource tool in General + Office roles
+- Background generation for MulmoScript image / audio / movie
+- Create + rename custom roles directly from the manageRoles view
+- `presentDocument` requires sanitized filenamePrefix
+- `/history` command; session list limit raised to 200
+
+### Changed
+
+- App.vue split into 10+ composables (`useChatScroll`, `useSessionSync`, `useSessionDerived`, `useMergedSessions`, `useFaviconState`, `useViewLayout`, `useDebugBeat`, `useFileTree`, `useFileSelection`, `useMarkdownMode`, `useContentDisplay`, `useMarkdownLinkHandler`)
+- 50+ inline type checks migrated to shared guards in `src/utils/types.ts` (#504)
+- FilesView extracted into `FileTreePane` + `FileContentHeader` + `FileContentRenderer` (#507)
+- id-length lint enabled as warn repo-wide; short identifiers renamed across src / server / packages
+- Defer new session tab creation until first message (#533 et al.)
+- `mulmoclaude` npm package layout: ships `server/` TS + `client/` dist + `src/` shared; `prepublishOnly` hook runs `prepare-dist.js`
+- CI: Windows runner pinned to `windows-2022`, node_modules caching enabled, job-level timeouts
+
+### Fixed
+
+- Express 5 wildcard route (`app.get("*")` → `/{*splat}`) — previously crashed only in NODE_ENV=production
+- Session-store: gate storeless publish to generation events only; type-guard generation payloads; await persistHasUnread in storeless drain
+- StackView auto-scroll during assistant text streaming
+- Role selector reverting to prior session's role on tab switch
+- manageRoles rename now deletes the built-in-id override file
+- manageRoles hardened against two hostile payload shapes
+- Relay client: survive Durable Object hibernation via `getWebSockets()`; response queue + URL builder hardening; try/catch around dispatch
+- Generation map key collision fix (delimiter hardening)
+- Merge sessions: OR `live.isRunning` into merged summary so active bridge sessions surface correctly
+
+### Packages published during this cycle
+
+- `mulmoclaude@0.3.0` (aligned to app version — initial npm publish with port fallback, ready banner, tsx runtime)
+- `@mulmobridge/protocol@0.1.3` (adds `GENERATION_KINDS` export chain)
+- `@mulmobridge/chat-service@0.1.1` (catches up with protocol 0.1.3)
+- `@mulmobridge/relay@0.1.0` (new)
+
+---
+
 ## [0.2.0] - 2026-04-20
 
 ### Highlights

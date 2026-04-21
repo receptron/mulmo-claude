@@ -7,10 +7,7 @@ const STORAGE_KEY = "files_md_raw_mode";
 // Minimal localStorage stub — useMarkdownMode only calls getItem/setItem.
 const storage = new Map<string, string>();
 
-const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(
-  globalThis,
-  "localStorage",
-);
+const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
 function installStubStorage(): void {
   storage.clear();
@@ -32,11 +29,7 @@ function installStubStorage(): void {
 
 function restoreStorage(): void {
   if (originalLocalStorageDescriptor) {
-    Object.defineProperty(
-      globalThis,
-      "localStorage",
-      originalLocalStorageDescriptor,
-    );
+    Object.defineProperty(globalThis, "localStorage", originalLocalStorageDescriptor);
   } else {
     delete (globalThis as { localStorage?: unknown }).localStorage;
   }

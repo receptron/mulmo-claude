@@ -18,23 +18,19 @@ const toolDefinition: ToolDefinition = {
       action: {
         type: "string",
         enum: Object.values(SCHEDULER_ACTIONS),
-        description:
-          "Action to perform. show/add/delete/update for calendar items. createTask/listTasks/deleteTask/runTask for automated tasks.",
+        description: "Action to perform. show/add/delete/update for calendar items. createTask/listTasks/deleteTask/runTask for automated tasks.",
       },
       title: {
         type: "string",
-        description:
-          "For 'add': the item title. For 'update': new title (optional).",
+        description: "For 'add': the item title. For 'update': new title (optional).",
       },
       id: {
         type: "string",
-        description:
-          "For 'delete', 'update', 'deleteTask', 'runTask': the item/task id.",
+        description: "For 'delete', 'update', 'deleteTask', 'runTask': the item/task id.",
       },
       props: {
         type: "object",
-        description:
-          "For 'add': initial properties (e.g. { date, time, location }). For 'update': properties to merge in; set a key to null to remove it.",
+        description: "For 'add': initial properties (e.g. { date, time, location }). For 'update': properties to merge in; set a key to null to remove it.",
         additionalProperties: true,
       },
       name: {
@@ -43,13 +39,11 @@ const toolDefinition: ToolDefinition = {
       },
       prompt: {
         type: "string",
-        description:
-          "For 'createTask': the prompt message sent to the agent when the task fires.",
+        description: "For 'createTask': the prompt message sent to the agent when the task fires.",
       },
       schedule: {
         type: "object",
-        description:
-          "For 'createTask': { type: 'daily', time: 'HH:MM' } or { type: 'interval', intervalMs: number }. Times are UTC.",
+        description: "For 'createTask': { type: 'daily', time: 'HH:MM' } or { type: 'interval', intervalMs: number }. Times are UTC.",
       },
       roleId: {
         type: "string",

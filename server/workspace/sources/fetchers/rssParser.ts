@@ -178,10 +178,9 @@ function parseAtom(feed: Record<string, unknown>): ParsedFeed | null {
 
 function parseAtomEntry(raw: Record<string, unknown>): ParsedFeedItem | null {
   const title = readString(raw.title);
-  const id = readString(raw.id);
+  const entryId = readString(raw.id);
   const link = resolveAtomLink(raw.link);
-  const published =
-    readString(raw.published) ?? readString(raw.updated) ?? null;
+  const published = readString(raw.published) ?? readString(raw.updated) ?? null;
   const publishedAt = published ? normalizeDate(published) : null;
   // Same fallback story as RSS 2.0: content-only Atom entries
   // (e.g. GitHub-generated feeds) should still surface in the
@@ -190,7 +189,7 @@ function parseAtomEntry(raw: Record<string, unknown>): ParsedFeedItem | null {
   const summary = readString(raw.summary) ?? content;
   if (!title) return null;
   return {
-    feedId: id ?? link ?? null,
+    feedId: entryId ?? link ?? null,
     title,
     link,
     publishedAt,
@@ -226,10 +225,7 @@ function resolveAtomLink(raw: unknown): string | null {
   return fallback;
 }
 
-type AtomLinkOutcome =
-  | { kind: "alternate"; href: string }
-  | { kind: "fallback"; href: string }
-  | { kind: "skip" };
+type AtomLinkOutcome = { kind: "alternate"; href: string } | { kind: "fallback"; href: string } | { kind: "skip" };
 
 // Inspect one candidate from Atom's `<link>` list (which may be a
 // plain string or an object carrying `@_href` / `@_rel` attrs)
@@ -293,7 +289,7 @@ function stripBom(text: string): string {
 // date is more useful to the pipeline than a null.
 function normalizeDate(raw: string | null): string | null {
   if (!raw) return null;
-  const ts = Date.parse(raw);
-  if (Number.isFinite(ts)) return new Date(ts).toISOString();
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
   return raw;
 }

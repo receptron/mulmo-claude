@@ -24,48 +24,42 @@ const PORT = Number(process.env.LINE_BRIDGE_PORT) || 3002;
 const channelSecret = process.env.LINE_CHANNEL_SECRET;
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 if (!channelSecret || !channelAccessToken) {
-  console.error(
-    "LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
 const client = createBridgeClient({ transportId: TRANSPORT_ID });
 
-client.onPush((ev) => {
-  pushMessage(ev.chatId, ev.message).catch((err) =>
-    console.error(`[line] push send failed: ${err}`),
-  );
+client.onPush((pushEvent) => {
+  pushMessage(pushEvent.chatId, pushEvent.message).catch((err) => console.error(`[line] push send failed: ${err}`));
 });
 
 // ── LINE API helpers ────────────────────────────────────────────
 
 async function pushMessage(userId: string, text: string): Promise<void> {
-  const messages = chunkText(text, 5000).map((t) => ({
+  const messages = chunkText(text, 5000).map((messageText) => ({
     type: "text",
-    text: t,
+    text: messageText,
   }));
   // LINE allows max 5 messages per push
   for (let i = 0; i < messages.length; i += 5) {
     try {
+      const requestBody = {
+        to: userId,
+        messages: messages.slice(i, i + 5),
+      };
       const res = await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${channelAccessToken}`,
         },
-        body: JSON.stringify({
-          to: userId,
-          messages: messages.slice(i, i + 5),
-        }),
+        body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error(
-          `[line] pushMessage failed: ${res.status} ${body.slice(0, 200)}`,
-        );
+        console.error(`[line] pushMessage failed: ${res.status} ${body.slice(0, 200)}`);
       }
     } catch (err) {
       console.error(`[line] pushMessage network error: ${err}`);
@@ -76,10 +70,7 @@ async function pushMessage(userId: string, text: string): Promise<void> {
 // ── Signature verification ──────────────────────────────────────
 
 function verifySignature(body: string, signature: string): boolean {
-  const expected = crypto
-    .createHmac("SHA256", channelSecret!)
-    .update(body)
-    .digest("base64");
+  const expected = crypto.createHmac("SHA256", channelSecret!).update(body).digest("base64");
   if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }

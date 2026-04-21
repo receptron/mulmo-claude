@@ -37,8 +37,7 @@ const TABLE_SEPARATOR_PATTERN = /^\|[\s|:-]+\|$/;
 // derive the slug from the file name instead of re-slugifying the
 // title. This matters for non-ASCII titles like "さくらインターネット"
 // where `wikiSlugify` returns "" and the slug would otherwise be lost.
-const BULLET_LINK_PATTERN =
-  /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
+const BULLET_LINK_PATTERN = /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
 const BULLET_WIKI_LINK_PATTERN = /^[-*]\s+\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?/;
 
 // Each parser returns the entry it produced (if any). The parent
@@ -47,7 +46,7 @@ function parseTableRow(trimmed: string): WikiPageEntry | null {
   const cols = trimmed
     .split("|")
     .slice(1, -1)
-    .map((c) => c.trim().replace(/^`|`$/g, ""));
+    .map((column) => column.trim().replace(/^`|`$/g, ""));
   if (cols.length < 2) return null;
   const slug = cols[0];
   const title = cols[1] || slug;
@@ -71,11 +70,11 @@ export function extractSlugFromBulletHref(rawHref: string): string {
 }
 
 function parseBulletLinkRow(trimmed: string): WikiPageEntry | null {
-  const m = BULLET_LINK_PATTERN.exec(trimmed);
-  if (!m) return null;
-  const title = m[1].trim();
-  const href = m[2] ?? "";
-  const desc = m[3]?.trim() ?? "";
+  const match = BULLET_LINK_PATTERN.exec(trimmed);
+  if (!match) return null;
+  const title = match[1].trim();
+  const href = match[2] ?? "";
+  const desc = match[3]?.trim() ?? "";
   // Prefer the slug embedded in the href so non-ASCII titles keep
   // a navigable slug. Fall back to slugifying the title only when
   // the href has no recognisable slug (rare — usually means the
@@ -85,10 +84,10 @@ function parseBulletLinkRow(trimmed: string): WikiPageEntry | null {
 }
 
 function parseBulletWikiLinkRow(trimmed: string): WikiPageEntry | null {
-  const m = BULLET_WIKI_LINK_PATTERN.exec(trimmed);
-  if (!m) return null;
-  const title = m[1].trim();
-  const desc = m[2]?.trim() ?? "";
+  const match = BULLET_WIKI_LINK_PATTERN.exec(trimmed);
+  if (!match) return null;
+  const title = match[1].trim();
+  const desc = match[2]?.trim() ?? "";
   return { title, slug: wikiSlugify(title), description: desc };
 }
 
@@ -117,8 +116,7 @@ export function parseIndexEntries(content: string): WikiPageEntry[] {
 
     inTable = false;
 
-    const bullet =
-      parseBulletLinkRow(trimmed) ?? parseBulletWikiLinkRow(trimmed);
+    const bullet = parseBulletLinkRow(trimmed) ?? parseBulletWikiLinkRow(trimmed);
     if (bullet) entries.push(bullet);
   }
   return entries;
@@ -147,45 +145,37 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
   return null;
 }
 
-router.get(
-  API_ROUTES.wiki.base,
-  async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
-    const slug =
-      typeof req.query.slug === "string" ? req.query.slug : undefined;
-    if (slug) {
-      const filePath = await resolvePagePath(slug);
-      const content = filePath ? readFileOrEmpty(filePath) : "";
-      const resolvedTitle = filePath ? path.basename(filePath, ".md") : slug;
-      res.json({
-        data: {
-          action: "page",
-          title: resolvedTitle,
-          content,
-          pageName: resolvedTitle,
-          error: content ? undefined : `Page not found: ${slug}`,
-        },
-        message: content
-          ? `Showing page: ${resolvedTitle}`
-          : `Page not found: ${slug}`,
+router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
+  const slug = typeof req.query.slug === "string" ? req.query.slug : undefined;
+  if (slug) {
+    const filePath = await resolvePagePath(slug);
+    const content = filePath ? readFileOrEmpty(filePath) : "";
+    const resolvedTitle = filePath ? path.basename(filePath, ".md") : slug;
+    res.json({
+      data: {
+        action: "page",
         title: resolvedTitle,
-        instructions: "The wiki page is now displayed on the canvas.",
-        updating: true,
-      });
-    } else {
-      const content = readFileOrEmpty(indexFile());
-      const pageEntries = parseIndexEntries(content);
-      res.json({
-        data: { action: "index", title: "Wiki Index", content, pageEntries },
-        message: content
-          ? `Wiki index — ${pageEntries.length} page(s)`
-          : "Wiki index is empty.",
-        title: "Wiki Index",
-        instructions: "The wiki index is now displayed on the canvas.",
-        updating: true,
-      });
-    }
-  },
-);
+        content,
+        pageName: resolvedTitle,
+        error: content ? undefined : `Page not found: ${slug}`,
+      },
+      message: content ? `Showing page: ${resolvedTitle}` : `Page not found: ${slug}`,
+      title: resolvedTitle,
+      instructions: "The wiki page is now displayed on the canvas.",
+      updating: true,
+    });
+  } else {
+    const content = readFileOrEmpty(indexFile());
+    const pageEntries = parseIndexEntries(content);
+    res.json({
+      data: { action: "index", title: "Wiki Index", content, pageEntries },
+      message: content ? `Wiki index — ${pageEntries.length} page(s)` : "Wiki index is empty.",
+      title: "Wiki Index",
+      instructions: "The wiki index is now displayed on the canvas.",
+      updating: true,
+    });
+  }
+});
 
 interface WikiBody {
   action: string;
@@ -218,19 +208,14 @@ function buildIndexResponse(action: string): WikiResponse {
   const pageEntries = parseIndexEntries(content);
   return {
     data: { action, title: "Wiki Index", content, pageEntries },
-    message: content
-      ? `Wiki index — ${pageEntries.length} page(s)`
-      : "Wiki index is empty.",
+    message: content ? `Wiki index — ${pageEntries.length} page(s)` : "Wiki index is empty.",
     title: "Wiki Index",
     instructions: "The wiki index is now displayed on the canvas.",
     updating: true,
   };
 }
 
-async function buildPageResponse(
-  action: string,
-  pageName: string,
-): Promise<WikiResponse> {
+async function buildPageResponse(action: string, pageName: string): Promise<WikiResponse> {
   const filePath = await resolvePagePath(pageName);
   const content = filePath ? readFileOrEmpty(filePath) : "";
   const resolvedTitle = filePath ? path.basename(filePath, ".md") : pageName;
@@ -243,9 +228,7 @@ async function buildPageResponse(
       pageName: resolvedTitle,
       error: found ? undefined : `Page not found: ${pageName}`,
     },
-    message: found
-      ? `Showing page: ${resolvedTitle}`
-      : `Page not found: ${pageName}`,
+    message: found ? `Showing page: ${resolvedTitle}` : `Page not found: ${pageName}`,
     title: resolvedTitle,
     instructions: found
       ? "The wiki page is now displayed on the canvas."
@@ -271,49 +254,33 @@ const WIKI_LINK_PATTERN = /\[\[([^\][\r\n]{1,200})\]\]/g;
 // need as plain inputs so each rule can be unit-tested without
 // touching the filesystem.
 
-export function findOrphanPages(
-  fileSlugs: ReadonlySet<string>,
-  indexedSlugs: ReadonlySet<string>,
-): string[] {
+export function findOrphanPages(fileSlugs: ReadonlySet<string>, indexedSlugs: ReadonlySet<string>): string[] {
   const issues: string[] = [];
   for (const slug of fileSlugs) {
     if (!indexedSlugs.has(slug)) {
-      issues.push(
-        `- **Orphan page**: \`${slug}.md\` exists but is missing from index.md`,
-      );
+      issues.push(`- **Orphan page**: \`${slug}.md\` exists but is missing from index.md`);
     }
   }
   return issues;
 }
 
-export function findMissingFiles(
-  pageEntries: readonly WikiPageEntry[],
-  fileSlugs: ReadonlySet<string>,
-): string[] {
+export function findMissingFiles(pageEntries: readonly WikiPageEntry[], fileSlugs: ReadonlySet<string>): string[] {
   const issues: string[] = [];
   for (const entry of pageEntries) {
     if (!fileSlugs.has(entry.slug)) {
-      issues.push(
-        `- **Missing file**: index.md references \`${entry.slug}\` but the file does not exist`,
-      );
+      issues.push(`- **Missing file**: index.md references \`${entry.slug}\` but the file does not exist`);
     }
   }
   return issues;
 }
 
-export function findBrokenLinksInPage(
-  fileName: string,
-  content: string,
-  fileSlugs: ReadonlySet<string>,
-): string[] {
+export function findBrokenLinksInPage(fileName: string, content: string, fileSlugs: ReadonlySet<string>): string[] {
   const issues: string[] = [];
-  const wikiLinks = [...content.matchAll(WIKI_LINK_PATTERN)].map((m) => m[1]);
+  const wikiLinks = [...content.matchAll(WIKI_LINK_PATTERN)].map((match) => match[1]);
   for (const link of wikiLinks) {
     const linkSlug = wikiSlugify(link);
     if (!fileSlugs.has(linkSlug)) {
-      issues.push(
-        `- **Broken link** in \`${fileName}\`: [[${link}]] → \`${linkSlug}.md\` not found`,
-      );
+      issues.push(`- **Broken link** in \`${fileName}\`: [[${link}]] → \`${linkSlug}.md\` not found`);
     }
   }
   return issues;
@@ -331,13 +298,11 @@ async function collectLintIssues(): Promise<string[]> {
   const dir = pagesDir();
   const { slugs } = await getPageIndex(dir);
   if (slugs.size === 0) {
-    return [
-      "- Wiki `pages/` directory does not exist yet. Start ingesting sources.",
-    ];
+    return ["- Wiki `pages/` directory does not exist yet. Start ingesting sources."];
   }
   const indexContent = readFileOrEmpty(indexFile());
   const pageEntries = parseIndexEntries(indexContent);
-  const indexedSlugs = new Set(pageEntries.map((e) => e.slug));
+  const indexedSlugs = new Set(pageEntries.map((entry) => entry.slug));
   const pageFiles = [...slugs.values()];
   const fileSlugs = new Set(slugs.keys());
 
@@ -347,8 +312,8 @@ async function collectLintIssues(): Promise<string[]> {
   // Parallel read: N small markdown files, ~50 KB each. Bounded by
   // the number of wiki pages, not by CPU.
   const contents = await Promise.all(
-    pageFiles.map(async (f) => {
-      const content = await readTextSafe(path.join(dir, f));
+    pageFiles.map(async (fileName) => {
+      const content = await readTextSafe(path.join(dir, fileName));
       return content ?? "";
     }),
   );
@@ -366,41 +331,33 @@ async function buildLintReportResponse(action: string): Promise<WikiResponse> {
     data: { action, title: "Wiki Lint Report", content: report },
     message: healthy ? "Wiki is healthy" : `${issues.length} issue(s) found`,
     title: "Wiki Lint Report",
-    instructions: healthy
-      ? "Wiki is healthy — no issues found."
-      : `${issues.length} issue(s) found that need fixing:\n${issues.join("\n")}`,
+    instructions: healthy ? "Wiki is healthy — no issues found." : `${issues.length} issue(s) found that need fixing:\n${issues.join("\n")}`,
     updating: true,
   };
 }
 
-router.post(
-  API_ROUTES.wiki.base,
-  async (
-    req: Request<object, unknown, WikiBody>,
-    res: Response<WikiResponse | ErrorResponse>,
-  ) => {
-    const { action, pageName } = req.body;
-    switch (action) {
-      case "index":
-        res.json(buildIndexResponse(action));
+router.post(API_ROUTES.wiki.base, async (req: Request<object, unknown, WikiBody>, res: Response<WikiResponse | ErrorResponse>) => {
+  const { action, pageName } = req.body;
+  switch (action) {
+    case "index":
+      res.json(buildIndexResponse(action));
+      return;
+    case "page":
+      if (!pageName) {
+        badRequest(res, "pageName required for page action");
         return;
-      case "page":
-        if (!pageName) {
-          badRequest(res, "pageName required for page action");
-          return;
-        }
-        res.json(await buildPageResponse(action, pageName));
-        return;
-      case "log":
-        res.json(buildLogResponse(action));
-        return;
-      case "lint_report":
-        res.json(await buildLintReportResponse(action));
-        return;
-      default:
-        badRequest(res, `Unknown action: ${action}`);
-    }
-  },
-);
+      }
+      res.json(await buildPageResponse(action, pageName));
+      return;
+    case "log":
+      res.json(buildLogResponse(action));
+      return;
+    case "lint_report":
+      res.json(await buildLintReportResponse(action));
+      return;
+    default:
+      badRequest(res, `Unknown action: ${action}`);
+  }
+});
 
 export default router;

@@ -14,8 +14,7 @@ export const SCHEDULER_ACTIONS = {
   runTask: "runTask",
 } as const;
 
-export type SchedulerAction =
-  (typeof SCHEDULER_ACTIONS)[keyof typeof SCHEDULER_ACTIONS];
+export type SchedulerAction = (typeof SCHEDULER_ACTIONS)[keyof typeof SCHEDULER_ACTIONS];
 
 /** Task-specific actions that route to user-task subsystem. */
 export const TASK_ACTIONS: ReadonlySet<string> = new Set([

@@ -37,10 +37,7 @@ const todoPlugin: ToolPlugin<TodoData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<TodoData>>(
-      API_ROUTES.todos.dispatch,
-      args,
-    );
+    const result = await apiPost<ToolResult<TodoData>>(API_ROUTES.todos.dispatch, args);
     if (!result.ok) {
       return {
         toolName: "manageTodoList",

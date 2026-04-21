@@ -4,15 +4,8 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  mergeSessionLists,
-  applySessionDiff,
-  compareSessionsByRecency,
-} from "../../../src/utils/session/mergeSessions.js";
-import type {
-  ActiveSession,
-  SessionSummary,
-} from "../../../src/types/session.js";
+import { mergeSessionLists, applySessionDiff, compareSessionsByRecency } from "../../../src/utils/session/mergeSessions.js";
+import type { ActiveSession, SessionSummary } from "../../../src/types/session.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 function makeActive(overrides: Partial<ActiveSession> = {}): ActiveSession {
@@ -60,34 +53,34 @@ function makeUserTextResult(message: string): ToolResultComplete {
 
 describe("compareSessionsByRecency", () => {
   it("returns negative when a is more recently updated", () => {
-    const a = makeSummary({ updatedAt: "2026-04-12T10:00:00.000Z" });
-    const b = makeSummary({ updatedAt: "2026-04-10T10:00:00.000Z" });
-    assert.ok(compareSessionsByRecency(a, b) < 0);
+    const sessA = makeSummary({ updatedAt: "2026-04-12T10:00:00.000Z" });
+    const sessB = makeSummary({ updatedAt: "2026-04-10T10:00:00.000Z" });
+    assert.ok(compareSessionsByRecency(sessA, sessB) < 0);
   });
 
   it("returns positive when b is more recently updated", () => {
-    const a = makeSummary({ updatedAt: "2026-04-10T10:00:00.000Z" });
-    const b = makeSummary({ updatedAt: "2026-04-12T10:00:00.000Z" });
-    assert.ok(compareSessionsByRecency(a, b) > 0);
+    const sessA = makeSummary({ updatedAt: "2026-04-10T10:00:00.000Z" });
+    const sessB = makeSummary({ updatedAt: "2026-04-12T10:00:00.000Z" });
+    assert.ok(compareSessionsByRecency(sessA, sessB) > 0);
   });
 
   it("falls back to startedAt on updatedAt tie", () => {
-    const a = makeSummary({
+    const sessA = makeSummary({
       updatedAt: "2026-04-10T10:00:00.000Z",
       startedAt: "2026-04-08T10:00:00.000Z",
     });
-    const b = makeSummary({
+    const sessB = makeSummary({
       updatedAt: "2026-04-10T10:00:00.000Z",
       startedAt: "2026-04-09T10:00:00.000Z",
     });
-    // b has newer startedAt, so b should come first
-    assert.ok(compareSessionsByRecency(a, b) > 0);
+    // sessB has newer startedAt, so sessB should come first
+    assert.ok(compareSessionsByRecency(sessA, sessB) > 0);
   });
 
   it("returns 0 when both updatedAt and startedAt match", () => {
-    const a = makeSummary({ id: "a" });
-    const b = makeSummary({ id: "b" });
-    assert.equal(compareSessionsByRecency(a, b), 0);
+    const sessA = makeSummary({ id: "a" });
+    const sessB = makeSummary({ id: "b" });
+    assert.equal(compareSessionsByRecency(sessA, sessB), 0);
   });
 });
 
@@ -174,7 +167,7 @@ describe("mergeSessionLists — server-only entries", () => {
     const live = makeActive({ id: "live-only" });
     const server = makeSummary({ id: "srv-only" });
     const result = mergeSessionLists([live], [server]);
-    const serverEntry = result.find((s) => s.id === "srv-only");
+    const serverEntry = result.find((sess) => sess.id === "srv-only");
     assert.equal(serverEntry, server);
   });
 
@@ -198,7 +191,7 @@ describe("mergeSessionLists — sort order", () => {
     });
     const result = mergeSessionLists([], [older, recent]);
     assert.deepEqual(
-      result.map((s) => s.id),
+      result.map((sess) => sess.id),
       ["recent", "older"],
     );
   });
@@ -215,26 +208,26 @@ describe("mergeSessionLists — sort order", () => {
     const result = mergeSessionLists([live], [server]);
     // srv is newer → comes first
     assert.deepEqual(
-      result.map((s) => s.id),
+      result.map((sess) => sess.id),
       ["srv", "live"],
     );
   });
 
   it("breaks updatedAt ties with startedAt", () => {
-    const a = makeSummary({
+    const sessA = makeSummary({
       id: "a",
       updatedAt: "2026-04-10T10:00:00.000Z",
       startedAt: "2026-04-08T10:00:00.000Z",
     });
-    const b = makeSummary({
+    const sessB = makeSummary({
       id: "b",
       updatedAt: "2026-04-10T10:00:00.000Z",
       startedAt: "2026-04-09T10:00:00.000Z",
     });
-    const result = mergeSessionLists([], [a, b]);
-    // b has newer startedAt → b first
+    const result = mergeSessionLists([], [sessA, sessB]);
+    // sessB has newer startedAt → sessB first
     assert.deepEqual(
-      result.map((s) => s.id),
+      result.map((sess) => sess.id),
       ["b", "a"],
     );
   });
@@ -261,41 +254,34 @@ describe("mergeSessionLists — does not mutate inputs", () => {
 // row with the same id, new ids prepend, and deletedIds remove.
 describe("applySessionDiff — upsert", () => {
   it("replaces the cached row when a diff row shares its id", () => {
-    const cache = [
-      makeSummary({ id: "a", preview: "old" }),
-      makeSummary({ id: "b" }),
-    ];
+    const cache = [makeSummary({ id: "a", preview: "old" }), makeSummary({ id: "b" })];
     const diff = [makeSummary({ id: "a", preview: "new" })];
     const out = applySessionDiff(cache, diff, []);
-    const a = out.find((s) => s.id === "a");
-    assert.equal(a?.preview, "new");
-    const b = out.find((s) => s.id === "b");
-    assert.ok(b, "untouched cache rows survive");
+    const sessA = out.find((sess) => sess.id === "a");
+    assert.equal(sessA?.preview, "new");
+    const sessB = out.find((sess) => sess.id === "b");
+    assert.ok(sessB, "untouched cache rows survive");
   });
 
   it("adds rows whose ids are new to the cache", () => {
     const cache = [makeSummary({ id: "a" })];
     const diff = [makeSummary({ id: "b" })];
     const out = applySessionDiff(cache, diff, []);
-    assert.deepEqual(out.map((s) => s.id).sort(), ["a", "b"]);
+    assert.deepEqual(out.map((sess) => sess.id).sort(), ["a", "b"]);
   });
 
   it("is a no-op when diff and deletedIds are both empty", () => {
     const cache = [makeSummary({ id: "a" }), makeSummary({ id: "b" })];
     const out = applySessionDiff(cache, [], []);
-    assert.deepEqual(out.map((s) => s.id).sort(), ["a", "b"]);
+    assert.deepEqual(out.map((sess) => sess.id).sort(), ["a", "b"]);
   });
 });
 
 describe("applySessionDiff — deletedIds", () => {
   it("removes cached rows whose id is in deletedIds", () => {
-    const cache = [
-      makeSummary({ id: "a" }),
-      makeSummary({ id: "b" }),
-      makeSummary({ id: "c" }),
-    ];
+    const cache = [makeSummary({ id: "a" }), makeSummary({ id: "b" }), makeSummary({ id: "c" })];
     const out = applySessionDiff(cache, [], ["b"]);
-    assert.deepEqual(out.map((s) => s.id).sort(), ["a", "c"]);
+    assert.deepEqual(out.map((sess) => sess.id).sort(), ["a", "c"]);
   });
 
   it("removes before applying the diff (id in both → removed)", () => {
@@ -309,20 +295,16 @@ describe("applySessionDiff — deletedIds", () => {
     // *cache* pass; that matches the server's contract ("these
     // rows changed, these rows are gone") where every diff row
     // is authoritative.
-    const a = out.find((s) => s.id === "a");
-    assert.equal(a?.preview, "updated");
+    const sessA = out.find((sess) => sess.id === "a");
+    assert.equal(sessA?.preview, "updated");
     assert.equal(out.length, 1);
   });
 });
 
 describe("applySessionDiff — sort + immutability", () => {
   it("returns the merged list sorted by updatedAt desc", () => {
-    const cache = [
-      makeSummary({ id: "old", updatedAt: "2026-04-10T00:00:00.000Z" }),
-    ];
-    const diff = [
-      makeSummary({ id: "new", updatedAt: "2026-04-17T00:00:00.000Z" }),
-    ];
+    const cache = [makeSummary({ id: "old", updatedAt: "2026-04-10T00:00:00.000Z" })];
+    const diff = [makeSummary({ id: "new", updatedAt: "2026-04-17T00:00:00.000Z" })];
     const out = applySessionDiff(cache, diff, []);
     assert.equal(out[0].id, "new");
     assert.equal(out[1].id, "old");

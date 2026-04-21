@@ -24,10 +24,7 @@ describe("extractFirstH1", () => {
   });
 
   it("skips intermediate non-H1 lines before finding the H1", () => {
-    assert.equal(
-      extractFirstH1("Intro paragraph\n## Section\n# Real Title\nbody"),
-      "Real Title",
-    );
+    assert.equal(extractFirstH1("Intro paragraph\n## Section\n# Real Title\nbody"), "Real Title");
   });
 
   it("trims surrounding whitespace from the heading text", () => {

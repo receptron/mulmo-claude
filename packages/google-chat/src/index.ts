@@ -25,23 +25,20 @@ const PORT = Number(process.env.GOOGLE_CHAT_BRIDGE_PORT) || 3005;
 
 const projectNumber = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
 if (!projectNumber) {
-  console.error(
-    "GOOGLE_CHAT_PROJECT_NUMBER is required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("GOOGLE_CHAT_PROJECT_NUMBER is required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
-mulmo.onPush((ev) => {
+mulmo.onPush((pushEvent) => {
   // Async push requires Chat API with service account — not
   // available in synchronous webhook mode. Log for now.
-  console.log(`[google-chat] push (not delivered): ${ev.chatId} ${ev.message}`);
+  console.log(`[google-chat] push (not delivered): ${pushEvent.chatId} ${pushEvent.message}`);
 });
 
-function isObj(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
+function isObj(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 // ── JWT verification (Google Chat OIDC) ────────────────────────
@@ -52,8 +49,7 @@ function isObj(v: unknown): v is Record<string, unknown> {
 // iss, aud, and exp claims.
 
 const GOOGLE_CHAT_ISSUER = "chat@system.gserviceaccount.com";
-const JWKS_URL =
-  "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com";
+const JWKS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com";
 const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
 
 interface JwkKey {
@@ -81,11 +77,8 @@ async function fetchJwks(): Promise<JwkKey[]> {
     const data: { keys?: unknown[] } = await res.json();
     if (!Array.isArray(data.keys)) throw new Error("Invalid JWKS response");
     cachedKeys = data.keys.filter(
-      (k): k is JwkKey =>
-        isObj(k) &&
-        typeof k.kid === "string" &&
-        typeof k.n === "string" &&
-        typeof k.e === "string",
+      (keyCandidate): keyCandidate is JwkKey =>
+        isObj(keyCandidate) && typeof keyCandidate.kid === "string" && typeof keyCandidate.n === "string" && typeof keyCandidate.e === "string",
     );
     cacheExpiresAt = Date.now() + JWKS_CACHE_TTL_MS;
     return cachedKeys;
@@ -125,22 +118,21 @@ function parseJwtParts(token: string): JwtParts | null {
   }
 }
 
-function buildRsaPublicKey(n: string, e: string): crypto.KeyObject {
+function buildRsaPublicKey(modulus: string, exponent: string): crypto.KeyObject {
   // Convert JWK RSA components to a PEM-encoded public key
-  const nBuf = base64UrlDecode(n);
-  const eBuf = base64UrlDecode(e);
+  const modulusBuffer = base64UrlDecode(modulus);
+  const exponentBuffer = base64UrlDecode(exponent);
   return crypto.createPublicKey({
-    key: { kty: "RSA", n: nBuf.toString("base64"), e: eBuf.toString("base64") },
+    key: {
+      kty: "RSA",
+      n: modulusBuffer.toString("base64"),
+      e: exponentBuffer.toString("base64"),
+    },
     format: "jwk",
   });
 }
 
-function verifyRsaSignature(
-  signatureInput: string,
-  signature: Buffer,
-  key: crypto.KeyObject,
-  alg: string,
-): boolean {
+function verifyRsaSignature(signatureInput: string, signature: Buffer, key: crypto.KeyObject, alg: string): boolean {
   const hashMap: Record<string, string> = {
     RS256: "sha256",
     RS384: "sha384",
@@ -148,15 +140,10 @@ function verifyRsaSignature(
   };
   const hash = hashMap[alg];
   if (!hash) return false;
-  return crypto
-    .createVerify(hash)
-    .update(signatureInput)
-    .verify(key, signature);
+  return crypto.createVerify(hash).update(signatureInput).verify(key, signature);
 }
 
-async function verifyGoogleChatToken(
-  authHeader: string | undefined,
-): Promise<boolean> {
+async function verifyGoogleChatToken(authHeader: string | undefined): Promise<boolean> {
   if (!authHeader) return false;
   const prefix = "Bearer ";
   if (!authHeader.startsWith(prefix)) return false;
@@ -175,14 +162,16 @@ async function verifyGoogleChatToken(
   }
 
   // Find matching key
-  const kid = typeof header.kid === "string" ? header.kid : "";
+  const keyId = typeof header.kid === "string" ? header.kid : "";
   const alg = typeof header.alg === "string" ? header.alg : "RS256";
   const keys = await fetchJwks();
-  const jwk = keys.find((k) => k.kid === kid);
+  const jwk = keys.find((keyEntry) => keyEntry.kid === keyId);
   if (!jwk) return false;
 
   try {
-    const pubKey = buildRsaPublicKey(jwk.n, jwk.e);
+    const modulus = jwk["n"];
+    const exponent = jwk["e"];
+    const pubKey = buildRsaPublicKey(modulus, exponent);
     return verifyRsaSignature(jwt.signatureInput, jwt.signature, pubKey, alg);
   } catch {
     return false;
@@ -196,19 +185,19 @@ const RATE_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 120;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
-function rateLimitCheck(ip: string): boolean {
+function rateLimitCheck(clientIp: string): boolean {
   const now = Date.now();
-  const entry = requestCounts.get(ip);
+  const entry = requestCounts.get(clientIp);
   if (!entry || now >= entry.resetAt) {
-    requestCounts.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    requestCounts.set(clientIp, { count: 1, resetAt: now + RATE_WINDOW_MS });
     return true;
   }
   entry.count += 1;
   return entry.count <= MAX_REQUESTS_PER_WINDOW;
 }
 
-function redactId(id: string): string {
-  return id.length > 6 ? `${id.slice(0, 3)}***${id.slice(-3)}` : "***";
+function redactId(resourceId: string): string {
+  return resourceId.length > 6 ? `${resourceId.slice(0, 3)}***${resourceId.slice(-3)}` : "***";
 }
 
 const app = express();
@@ -234,10 +223,7 @@ function extractMessage(body: unknown): ParsedMessage | null {
   const space = msg.space;
   if (!isObj(space) || typeof space.name !== "string") return null;
   const sender = msg.sender;
-  const senderName =
-    isObj(sender) && typeof sender.displayName === "string"
-      ? sender.displayName
-      : "unknown";
+  const senderName = isObj(sender) && typeof sender.displayName === "string" ? sender.displayName : "unknown";
   return { spaceName: space.name, senderName, text: msg.text };
 }
 
@@ -249,10 +235,7 @@ app.post("/", async (req: Request, res: Response) => {
   }
 
   // Verify the request is from Google Chat
-  const authHeader =
-    typeof req.headers.authorization === "string"
-      ? req.headers.authorization
-      : undefined;
+  const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
   const verified = await verifyGoogleChatToken(authHeader);
   if (!verified) {
     console.warn("[google-chat] AUTH_FAILED: JWT verification failed");
@@ -280,9 +263,7 @@ app.post("/", async (req: Request, res: Response) => {
 
   const { spaceName, senderName, text } = parsed;
 
-  console.log(
-    `[google-chat] message space=${redactId(spaceName)} sender=${redactId(senderName)} len=${text.length}`,
-  );
+  console.log(`[google-chat] message space=${redactId(spaceName)} sender=${redactId(senderName)} len=${text.length}`);
 
   try {
     const ack = await mulmo.send(spaceName, text.trim());

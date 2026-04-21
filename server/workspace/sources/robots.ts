@@ -105,8 +105,8 @@ function applyRule(group: RobotsGroup, name: string, value: string): void {
   } else if (name === "allow") {
     group.rules.push({ kind: "allow", pattern: value });
   } else if (name === "crawl-delay") {
-    const n = Number(value);
-    if (Number.isFinite(n) && n >= 0) group.crawlDelaySec = n;
+    const seconds = Number(value);
+    if (Number.isFinite(seconds) && seconds >= 0) group.crawlDelaySec = seconds;
   }
   // Any other directive: ignored.
 }
@@ -137,17 +137,14 @@ function parseDirective(line: string): { name: string; value: string } | null {
 // first match only (old behaviour) let a later Disallow in a
 // duplicate group get ignored, which could silently let a fetcher
 // hit a path the site explicitly blocked.
-export function selectGroup(
-  robots: ParsedRobots,
-  userAgent: string,
-): RobotsGroup | null {
-  const ua = userAgent.toLowerCase();
+export function selectGroup(robots: ParsedRobots, userAgent: string): RobotsGroup | null {
+  const agent = userAgent.toLowerCase();
   const exacts: RobotsGroup[] = [];
   const stars: RobotsGroup[] = [];
   let bestPrefixScore = -1;
   let prefixMatches: RobotsGroup[] = [];
   for (const group of robots.groups) {
-    const outcome = scoreGroupAgainstAgent(group, ua);
+    const outcome = scoreGroupAgainstAgent(group, agent);
     if (outcome.kind === "exact") exacts.push(outcome.group);
     else if (outcome.kind === "star") stars.push(outcome.group);
     else if (outcome.kind === "prefix") {
@@ -173,14 +170,11 @@ function mergeGroups(groups: readonly RobotsGroup[]): RobotsGroup {
   const rules: RobotsRule[] = [];
   const userAgents: string[] = [];
   let crawlDelaySec: number | null = null;
-  for (const g of groups) {
-    rules.push(...g.rules);
-    userAgents.push(...g.userAgents);
-    if (g.crawlDelaySec !== null) {
-      crawlDelaySec =
-        crawlDelaySec === null
-          ? g.crawlDelaySec
-          : Math.min(crawlDelaySec, g.crawlDelaySec);
+  for (const group of groups) {
+    rules.push(...group.rules);
+    userAgents.push(...group.userAgents);
+    if (group.crawlDelaySec !== null) {
+      crawlDelaySec = crawlDelaySec === null ? group.crawlDelaySec : Math.min(crawlDelaySec, group.crawlDelaySec);
     }
   }
   return { userAgents, rules, crawlDelaySec };
@@ -192,7 +186,7 @@ type AgentMatch =
   | { kind: "star"; group: RobotsGroup }
   | { kind: "none" };
 
-function scoreGroupAgainstAgent(group: RobotsGroup, ua: string): AgentMatch {
+function scoreGroupAgainstAgent(group: RobotsGroup, agent: string): AgentMatch {
   let bestPrefix = -1;
   let hasStar = false;
   for (const listed of group.userAgents) {
@@ -200,8 +194,8 @@ function scoreGroupAgainstAgent(group: RobotsGroup, ua: string): AgentMatch {
       hasStar = true;
       continue;
     }
-    if (listed === ua) return { kind: "exact", group };
-    if (ua.startsWith(listed) && listed.length > bestPrefix) {
+    if (listed === agent) return { kind: "exact", group };
+    if (agent.startsWith(listed) && listed.length > bestPrefix) {
       bestPrefix = listed.length;
     }
   }
@@ -218,11 +212,7 @@ function scoreGroupAgainstAgent(group: RobotsGroup, ua: string): AgentMatch {
 // Rule resolution follows the Google / IETF robots draft:
 // longest-prefix match wins between Allow and Disallow; tie goes
 // to Allow (the more permissive outcome).
-export function isAllowedByRobots(
-  robots: ParsedRobots,
-  userAgent: string,
-  path: string,
-): boolean {
+export function isAllowedByRobots(robots: ParsedRobots, userAgent: string, path: string): boolean {
   const group = selectGroup(robots, userAgent);
   if (!group) return true;
   const { bestAllow, bestDisallow } = scoreRules(group, path);
@@ -236,10 +226,7 @@ export function isAllowedByRobots(
 // Empty patterns (from `Disallow:` with no value) never match in
 // `matchesPattern`, so they correctly fall through to the
 // allow-all default.
-function scoreRules(
-  group: RobotsGroup,
-  path: string,
-): { bestAllow: number; bestDisallow: number } {
+function scoreRules(group: RobotsGroup, path: string): { bestAllow: number; bestDisallow: number } {
   let bestAllow = -1;
   let bestDisallow = -1;
   for (const rule of group.rules) {
@@ -279,6 +266,6 @@ export function matchesPattern(pattern: string, path: string): number {
     .split("*")
     .map((chunk) => chunk.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join(".*");
-  const re = new RegExp("^" + regexBody + (endAnchored ? "$" : ""));
-  return re.test(path) ? pattern.length : -1;
+  const regex = new RegExp("^" + regexBody + (endAnchored ? "$" : ""));
+  return regex.test(path) ? pattern.length : -1;
 }

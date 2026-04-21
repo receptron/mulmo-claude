@@ -25,10 +25,7 @@ async function safeResolve(relativePath: string): Promise<string> {
   const root = await ensureSpreadsheetsDir();
   // Strip the leading "spreadsheets/" prefix so callers can pass either
   // the stored form or just the filename.
-  const name = relativePath.replace(
-    new RegExp(`^${WORKSPACE_DIRS.spreadsheets}/`),
-    "",
-  );
+  const name = relativePath.replace(new RegExp(`^${WORKSPACE_DIRS.spreadsheets}/`), "");
   const result = resolveWithinRoot(root, name);
   if (!result) {
     throw new Error(`path traversal rejected: ${relativePath}`);
@@ -39,21 +36,14 @@ async function safeResolve(relativePath: string): Promise<string> {
 /** Save sheets array as a JSON file. Returns the workspace-relative path. */
 export async function saveSpreadsheet(sheets: unknown[]): Promise<string> {
   await ensureSpreadsheetsDir();
-  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const filename = `${id}.json`;
-  await fs.writeFile(
-    path.join(SPREADSHEETS_DIR, filename),
-    JSON.stringify(sheets),
-    "utf-8",
-  );
+  const sheetId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const filename = `${sheetId}.json`;
+  await fs.writeFile(path.join(SPREADSHEETS_DIR, filename), JSON.stringify(sheets), "utf-8");
   return path.posix.join(WORKSPACE_DIRS.spreadsheets, filename);
 }
 
 /** Overwrite an existing spreadsheet file. */
-export async function overwriteSpreadsheet(
-  relativePath: string,
-  sheets: unknown[],
-): Promise<void> {
+export async function overwriteSpreadsheet(relativePath: string, sheets: unknown[]): Promise<void> {
   const absPath = await safeResolve(relativePath);
   await fs.writeFile(absPath, JSON.stringify(sheets), "utf-8");
 }

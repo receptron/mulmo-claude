@@ -4,11 +4,7 @@ import { mkdtemp, readFile, rm } from "fs/promises";
 import { randomBytes } from "crypto";
 import os from "os";
 import path from "path";
-import {
-  createArgsCache,
-  recordToolEvent,
-  type RecordToolEventDeps,
-} from "../../server/workspace/tool-trace/index.js";
+import { createArgsCache, recordToolEvent, type RecordToolEventDeps } from "../../server/workspace/tool-trace/index.js";
 
 const FIXED_NOW = new Date("2026-04-13T05:18:47.123Z");
 const SID = "a821d112";
@@ -69,15 +65,12 @@ describe("recordToolEvent", () => {
 
   // Isolate each test with its own harness so argsCache / jsonl don't
   // leak between cases.
-  let h: Harness;
+  let harness: Harness;
   beforeEach(async () => {
     // Crypto-grade random keeps sonarjs/pseudo-random happy;
     // uniqueness only matters so each case gets its own jsonl dir.
-    const subdir = path.join(
-      workspaceRoot,
-      `case-${randomBytes(4).toString("hex")}`,
-    );
-    h = await makeHarness(subdir);
+    const subdir = path.join(workspaceRoot, `case-${randomBytes(4).toString("hex")}`);
+    harness = await makeHarness(subdir);
   });
 
   it("writes a tool_call record and caches args", async () => {
@@ -88,14 +81,14 @@ describe("recordToolEvent", () => {
         toolName: "Bash",
         args: { command: "ls" },
       },
-      h.deps,
+      harness.deps,
     );
-    const lines = readJsonlLines(await h.readJsonl());
+    const lines = readJsonlLines(await harness.readJsonl());
     assert.equal(lines.length, 1);
     assert.equal(lines[0].type, "tool_call");
     assert.equal(lines[0].toolName, "Bash");
     assert.deepEqual(lines[0].args, { command: "ls" });
-    assert.equal(h.deps.argsCache.size, 1);
+    assert.equal(harness.deps.argsCache.size, 1);
   });
 
   it("matching tool_call_result for WebSearch writes a pointer record", async () => {
@@ -106,7 +99,7 @@ describe("recordToolEvent", () => {
         toolName: "WebSearch",
         args: { query: "foo bar" },
       },
-      h.deps,
+      harness.deps,
     );
     await recordToolEvent(
       {
@@ -114,19 +107,15 @@ describe("recordToolEvent", () => {
         toolUseId: "u-ws",
         content: "top result body",
       },
-      h.deps,
+      harness.deps,
     );
-    const lines = readJsonlLines(await h.readJsonl());
-    const resultLine = lines.find((l) => l.type === "tool_call_result");
+    const lines = readJsonlLines(await harness.readJsonl());
+    const resultLine = lines.find((line) => line.type === "tool_call_result");
     assert.ok(resultLine);
-    assert.ok(
-      String(resultLine?.contentRef).startsWith(
-        "conversations/searches/2026-04-13/",
-      ),
-    );
+    assert.ok(String(resultLine?.contentRef).startsWith("conversations/searches/2026-04-13/"));
     assert.equal(resultLine?.content, undefined);
-    assert.equal(h.savedSearches.length, 1);
-    assert.equal(h.savedSearches[0].query, "foo bar");
+    assert.equal(harness.savedSearches.length, 1);
+    assert.equal(harness.savedSearches[0].query, "foo bar");
   });
 
   it("Read tool_call_result records a pointer to args.file_path", async () => {
@@ -137,7 +126,7 @@ describe("recordToolEvent", () => {
         toolName: "Read",
         args: { file_path: "wiki/pages/foo.md" },
       },
-      h.deps,
+      harness.deps,
     );
     await recordToolEvent(
       {
@@ -145,10 +134,10 @@ describe("recordToolEvent", () => {
         toolUseId: "u-read",
         content: "file content bytes",
       },
-      h.deps,
+      harness.deps,
     );
-    const lines = readJsonlLines(await h.readJsonl());
-    const resultLine = lines.find((l) => l.type === "tool_call_result");
+    const lines = readJsonlLines(await harness.readJsonl());
+    const resultLine = lines.find((line) => line.type === "tool_call_result");
     assert.equal(resultLine?.contentRef, "wiki/pages/foo.md");
     assert.equal(resultLine?.content, undefined);
   });
@@ -161,14 +150,11 @@ describe("recordToolEvent", () => {
         toolName: "Bash",
         args: { command: "echo hi" },
       },
-      h.deps,
+      harness.deps,
     );
-    await recordToolEvent(
-      { type: "tool_call_result", toolUseId: "u-bash", content: "hi" },
-      h.deps,
-    );
-    const lines = readJsonlLines(await h.readJsonl());
-    const resultLine = lines.find((l) => l.type === "tool_call_result");
+    await recordToolEvent({ type: "tool_call_result", toolUseId: "u-bash", content: "hi" }, harness.deps);
+    const lines = readJsonlLines(await harness.readJsonl());
+    const resultLine = lines.find((line) => line.type === "tool_call_result");
     assert.equal(resultLine?.content, "hi");
     assert.equal(resultLine?.truncated, false);
   });
@@ -181,13 +167,10 @@ describe("recordToolEvent", () => {
         toolName: "Bash",
         args: { command: "ls" },
       },
-      h.deps,
+      harness.deps,
     );
-    await recordToolEvent(
-      { type: "tool_call_result", toolUseId: "u-x", content: "ok" },
-      h.deps,
-    );
-    assert.equal(h.deps.argsCache.size, 0);
+    await recordToolEvent({ type: "tool_call_result", toolUseId: "u-x", content: "ok" }, harness.deps);
+    assert.equal(harness.deps.argsCache.size, 0);
   });
 
   it("orphan tool_call_result (no prior call) still writes a best-effort inline record", async () => {
@@ -197,9 +180,9 @@ describe("recordToolEvent", () => {
         toolUseId: "u-orphan",
         content: "mystery output",
       },
-      h.deps,
+      harness.deps,
     );
-    const lines = readJsonlLines(await h.readJsonl());
+    const lines = readJsonlLines(await harness.readJsonl());
     assert.equal(lines.length, 1);
     assert.equal(lines[0].type, "tool_call_result");
     assert.equal(lines[0].content, "mystery output");
@@ -208,7 +191,7 @@ describe("recordToolEvent", () => {
 
   it("saveSearch throwing falls back to inline content (never kills the turn)", async () => {
     const failingDeps: RecordToolEventDeps = {
-      ...h.deps,
+      ...harness.deps,
       saveSearch: async () => {
         throw new Error("disk full");
       },
@@ -230,8 +213,8 @@ describe("recordToolEvent", () => {
       },
       failingDeps,
     );
-    const lines = readJsonlLines(await h.readJsonl());
-    const resultLine = lines.find((l) => l.type === "tool_call_result");
+    const lines = readJsonlLines(await harness.readJsonl());
+    const resultLine = lines.find((line) => line.type === "tool_call_result");
     assert.equal(resultLine?.content, "raw result");
     assert.equal(resultLine?.contentRef, undefined);
   });

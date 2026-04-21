@@ -21,16 +21,16 @@ let socket: Socket | null = null;
 
 const listeners = new Map<string, Set<Callback>>();
 
-function resendSubscriptions(s: Socket): void {
+function resendSubscriptions(sock: Socket): void {
   for (const channel of listeners.keys()) {
-    s.emit("subscribe", channel);
+    sock.emit("subscribe", channel);
   }
 }
 
 function connect(): Socket {
   if (socket) return socket;
 
-  const s = io({
+  const sock = io({
     path: "/ws/pubsub",
     // Match the server. Long-polling is fine as a fallback but
     // the server refuses it, so don't negotiate it here either —
@@ -38,17 +38,17 @@ function connect(): Socket {
     transports: ["websocket"],
   });
 
-  s.on("connect", () => resendSubscriptions(s));
+  sock.on("connect", () => resendSubscriptions(sock));
 
-  s.on("data", (msg: PubSubMessage) => {
+  sock.on("data", (msg: PubSubMessage) => {
     const cbs = listeners.get(msg.channel);
     if (cbs) {
-      for (const cb of cbs) cb(msg.data);
+      for (const handler of cbs) handler(msg.data);
     }
   });
 
-  socket = s;
-  return s;
+  socket = sock;
+  return sock;
 }
 
 function maybeDisconnect(): void {
@@ -63,8 +63,8 @@ export function usePubSub() {
     if (!listeners.has(channel)) listeners.set(channel, new Set());
     listeners.get(channel)!.add(callback);
 
-    const s = connect();
-    if (s.connected) s.emit("subscribe", channel);
+    const sock = connect();
+    if (sock.connected) sock.emit("subscribe", channel);
     // If not yet connected, the "connect" handler replays every
     // listener's subscription, so newly-added channels are
     // covered without extra bookkeeping.

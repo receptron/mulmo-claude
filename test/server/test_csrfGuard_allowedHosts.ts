@@ -8,11 +8,7 @@ import type { Request, Response, NextFunction } from "express";
 
 // Module references populated in before().
 let isAllowedOrigin: (origin: string) => boolean;
-let requireSameOrigin: (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => void;
+let requireSameOrigin: (req: Request, res: Response, next: NextFunction) => void;
 
 before(async () => {
   process.env.ALLOWED_ORIGINS = "https://exact.example.com:5173";
@@ -54,10 +50,7 @@ describe("isAllowedOrigin \u2014 hostname match via ALLOWED_HOSTS", () => {
   });
 
   it("rejects subdomain spoofing", () => {
-    assert.equal(
-      isAllowedOrigin("https://sub.wildcard.example.com:5173"),
-      false,
-    );
+    assert.equal(isAllowedOrigin("https://sub.wildcard.example.com:5173"), false);
   });
 
   it("rejects empty and malformed inputs", () => {
@@ -104,37 +97,24 @@ function makeRes(): FakeRes {
   return res;
 }
 
-function run(
-  req: FakeReq,
-  res: FakeRes,
-): { nextCalled: boolean; statusCode: number; body: unknown } {
+function run(req: FakeReq, res: FakeRes): { nextCalled: boolean; statusCode: number; body: unknown } {
   let nextCalled = false;
   const next: NextFunction = () => {
     nextCalled = true;
   };
-  requireSameOrigin(
-    req as unknown as Request,
-    res as unknown as Response,
-    next,
-  );
+  requireSameOrigin(req as unknown as Request, res as unknown as Response, next);
   return { nextCalled, statusCode: res.statusCode, body: res.body };
 }
 
 describe("requireSameOrigin \u2014 ALLOWED_HOSTS integration", () => {
   it("allows POST from any port on an ALLOWED_HOSTS hostname", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq("POST", "https://wildcard.example.com:9999"),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq("POST", "https://wildcard.example.com:9999"), makeRes());
     assert.equal(nextCalled, true);
     assert.equal(statusCode, 200);
   });
 
   it("blocks POST from an unlisted hostname", () => {
-    const { nextCalled, statusCode } = run(
-      makeReq("POST", "https://evil.example.com:5173"),
-      makeRes(),
-    );
+    const { nextCalled, statusCode } = run(makeReq("POST", "https://evil.example.com:5173"), makeRes());
     assert.equal(nextCalled, false);
     assert.equal(statusCode, 403);
   });

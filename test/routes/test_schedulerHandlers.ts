@@ -1,14 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  dispatchScheduler,
-  handleAdd,
-  handleDelete,
-  handleReplace,
-  handleShow,
-  handleUpdate,
-  sortItems,
-} from "../../server/api/routes/schedulerHandlers.js";
+import { dispatchScheduler, handleAdd, handleDelete, handleReplace, handleShow, handleUpdate, sortItems } from "../../server/api/routes/schedulerHandlers.js";
 import type { ScheduledItem } from "../../server/api/routes/scheduler.js";
 
 function makeItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
@@ -144,9 +136,9 @@ describe("handleDelete", () => {
   });
 
   it("removes the matching item", () => {
-    const a = makeItem({ id: "a" });
-    const b = makeItem({ id: "b" });
-    const result = handleDelete([a, b], { id: "a" });
+    const itemA = makeItem({ id: "a" });
+    const itemB = makeItem({ id: "b" });
+    const result = handleDelete([itemA, itemB], { id: "a" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.equal(result.items.length, 1);
@@ -177,8 +169,8 @@ describe("handleUpdate", () => {
   });
 
   it("reports not found without mutating when id doesn't match", () => {
-    const a = makeItem({ id: "a", title: "Original" });
-    const result = handleUpdate([a], { id: "missing", title: "x" });
+    const itemA = makeItem({ id: "a", title: "Original" });
+    const result = handleUpdate([itemA], { id: "missing", title: "x" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     assert.match(result.message, /Item not found/);
@@ -186,8 +178,8 @@ describe("handleUpdate", () => {
   });
 
   it("updates the title when provided", () => {
-    const a = makeItem({ id: "a", title: "Old" });
-    const result = handleUpdate([a], { id: "a", title: "New" });
+    const itemA = makeItem({ id: "a", title: "Old" });
+    const result = handleUpdate([itemA], { id: "a", title: "New" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     const updated = result.items.find((i) => i.id === "a");
@@ -195,11 +187,11 @@ describe("handleUpdate", () => {
   });
 
   it("merges props patches by key", () => {
-    const a = makeItem({
+    const itemA = makeItem({
       id: "a",
       props: { date: "2026-01-01", note: "old" },
     });
-    const result = handleUpdate([a], {
+    const result = handleUpdate([itemA], {
       id: "a",
       props: { note: "new" },
     });
@@ -211,11 +203,11 @@ describe("handleUpdate", () => {
   });
 
   it("removes a prop when its patch value is null", () => {
-    const a = makeItem({
+    const itemA = makeItem({
       id: "a",
       props: { date: "2026-01-01", note: "x" },
     });
-    const result = handleUpdate([a], { id: "a", props: { note: null } });
+    const result = handleUpdate([itemA], { id: "a", props: { note: null } });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     const updated = result.items.find((i) => i.id === "a");
@@ -224,10 +216,10 @@ describe("handleUpdate", () => {
   });
 
   it("does not mutate the input items array", () => {
-    const a = makeItem({ id: "a", title: "Old", props: { x: 1 } });
-    const items = [a];
+    const itemA = makeItem({ id: "a", title: "Old", props: { x: 1 } });
+    const items = [itemA];
     handleUpdate(items, { id: "a", title: "New" });
-    assert.equal(a.title, "Old");
+    assert.equal(itemA.title, "Old");
     assert.equal(items[0]?.title, "Old");
   });
 });
@@ -298,11 +290,7 @@ describe("dispatchScheduler", () => {
   });
 
   it("dispatches update", () => {
-    const result = dispatchScheduler(
-      "update",
-      [makeItem({ id: "a", title: "Old" })],
-      { id: "a", title: "New" },
-    );
+    const result = dispatchScheduler("update", [makeItem({ id: "a", title: "Old" })], { id: "a", title: "New" });
     assert.equal(result.kind, "success");
   });
 

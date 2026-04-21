@@ -2,10 +2,10 @@ import { mkdir, readdir, unlink } from "fs/promises";
 import path from "path";
 
 export function dailyFileName(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `server-${y}-${m}-${d}.log`;
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `server-${year}-${month}-${day}.log`;
 }
 
 const LOG_FILENAME_RE = /^server-\d{4}-\d{2}-\d{2}\.log$/;
@@ -24,19 +24,14 @@ export async function listLogFiles(dir: string): Promise<string[]> {
     return [];
   }
   return entries
-    .filter((e) => LOG_FILENAME_RE.test(e))
+    .filter((fileName) => LOG_FILENAME_RE.test(fileName))
     .sort()
     .reverse();
 }
 
-export async function enforceMaxFiles(
-  dir: string,
-  maxFiles: number,
-): Promise<void> {
+export async function enforceMaxFiles(dir: string, maxFiles: number): Promise<void> {
   if (maxFiles <= 0) return;
   const files = await listLogFiles(dir);
   const toDelete = files.slice(maxFiles);
-  await Promise.all(
-    toDelete.map((f) => unlink(path.join(dir, f)).catch(() => {})),
-  );
+  await Promise.all(toDelete.map((fileName) => unlink(path.join(dir, fileName)).catch(() => {})));
 }

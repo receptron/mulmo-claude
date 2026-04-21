@@ -24,8 +24,7 @@ export const TOOL_DEFINITION: ToolDefinition = {
       },
       transportKind: {
         type: "string",
-        description:
-          "Identifier for the transport or provider that produced the message.",
+        description: "Identifier for the transport or provider that produced the message.",
       },
     },
     required: ["text"],

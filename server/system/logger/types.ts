@@ -11,7 +11,7 @@ export const LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 export interface LogRecord {
-  ts: string;
+  time: string;
   level: LogLevel;
   prefix: string;
   message: string;

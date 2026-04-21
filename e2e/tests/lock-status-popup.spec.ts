@@ -60,9 +60,7 @@ test.describe("LockStatusPopup", () => {
     await expect(firstQuery).toBeHidden();
   });
 
-  test("credential block renders live /api/sandbox state when enabled", async ({
-    page,
-  }) => {
+  test("credential block renders live /api/sandbox state when enabled", async ({ page }) => {
     // Override /api/health so the popup takes the sandbox-on branch,
     // and /api/sandbox so the credential block gets data to render.
     // Registered BEFORE mockAllApis below so Playwright's

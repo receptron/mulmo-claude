@@ -61,10 +61,7 @@ interface PromptItem {
 // the exact shape the CLI sees, and so a future "generate a
 // test brief without summarizing" workflow can use the same
 // input format.
-export function buildSummarizePromptBody(
-  items: readonly SourceItem[],
-  isoDate: string,
-): string {
+export function buildSummarizePromptBody(items: readonly SourceItem[], isoDate: string): string {
   const compactItems: PromptItem[] = items.map((item) => {
     const base: PromptItem = {
       title: item.title,
@@ -77,12 +74,7 @@ export function buildSummarizePromptBody(
     if (item.severity) base.severity = item.severity;
     return base;
   });
-  return [
-    `DATE: ${isoDate}`,
-    "",
-    "ITEMS (JSON):",
-    JSON.stringify(compactItems, null, 2),
-  ].join("\n");
+  return [`DATE: ${isoDate}`, "", "ITEMS (JSON):", JSON.stringify(compactItems, null, 2)].join("\n");
 }
 
 // Fallback markdown when there are zero new items today.
@@ -103,32 +95,22 @@ export function parseSummarizeOutput(stdout: string): string {
   try {
     parsed = JSON.parse(stdout.trim());
   } catch (err) {
-    throw new Error(
-      `[sources/summarize] failed to parse claude json: ${errorMessage(err)}`,
-    );
+    throw new Error(`[sources/summarize] failed to parse claude json: ${errorMessage(err)}`);
   }
   if (parsed.is_error) {
-    const msg =
-      Array.isArray(parsed.errors) && parsed.errors.length > 0
-        ? parsed.errors.join("; ")
-        : (parsed.result ?? "unknown");
+    const msg = Array.isArray(parsed.errors) && parsed.errors.length > 0 ? parsed.errors.join("; ") : (parsed.result ?? "unknown");
     throw new Error(`[sources/summarize] claude error: ${msg}`);
   }
   const result = typeof parsed.result === "string" ? parsed.result : "";
   if (!result) {
-    throw new Error(
-      "[sources/summarize] claude returned empty / missing result",
-    );
+    throw new Error("[sources/summarize] claude returned empty / missing result");
   }
   return result;
 }
 
 // --- spawn layer --------------------------------------------------------
 
-function spawnClaudeSummarize(
-  userPrompt: string,
-  timeoutMs: number,
-): Promise<string> {
+function spawnClaudeSummarize(userPrompt: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     // `--output-format json` returns a result envelope containing
     // the model's text response as `.result` — we don't use
@@ -162,9 +144,7 @@ function spawnClaudeSummarize(
       if (settled) return;
       settled = true;
       proc.kill("SIGKILL");
-      reject(
-        new Error(`[sources/summarize] claude timed out after ${timeoutMs}ms`),
-      );
+      reject(new Error(`[sources/summarize] claude timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.stdout.on("data", (chunk: Buffer) => {
@@ -188,11 +168,7 @@ function spawnClaudeSummarize(
       settled = true;
       clearTimeout(timer);
       if (code !== 0) {
-        reject(
-          new Error(
-            formatSpawnFailure("[sources/summarize]", code, stdout, stderr),
-          ),
-        );
+        reject(new Error(formatSpawnFailure("[sources/summarize]", code, stdout, stderr)));
         return;
       }
       resolve(stdout);
@@ -203,10 +179,7 @@ function spawnClaudeSummarize(
 // Build the production SummarizeFn. `isoDate` is captured once
 // per pipeline run so every call in that run uses the same date
 // header (even if the run crosses midnight).
-export function makeDefaultSummarize(
-  isoDate: string,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
-): SummarizeFn {
+export function makeDefaultSummarize(isoDate: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): SummarizeFn {
   return async (items) => {
     if (items.length === 0) return buildEmptyDayMarkdown(isoDate);
     const prompt = buildSummarizePromptBody(items, isoDate);

@@ -12,5 +12,4 @@ export const CHAT_SOCKET_EVENTS = {
   textChunk: "textChunk",
 } as const;
 
-export type ChatSocketEvent =
-  (typeof CHAT_SOCKET_EVENTS)[keyof typeof CHAT_SOCKET_EVENTS];
+export type ChatSocketEvent = (typeof CHAT_SOCKET_EVENTS)[keyof typeof CHAT_SOCKET_EVENTS];

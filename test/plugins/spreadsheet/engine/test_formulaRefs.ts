@@ -15,12 +15,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  stripFormulaPrefix,
-  expandRange,
-  parseSingleCellRef,
-  extractCellReferences,
-} from "../../../../src/plugins/spreadsheet/engine/formulaRefs.js";
+import { stripFormulaPrefix, expandRange, parseSingleCellRef, extractCellReferences } from "../../../../src/plugins/spreadsheet/engine/formulaRefs.js";
 
 describe("stripFormulaPrefix", () => {
   it("strips a leading =", () => {
@@ -336,10 +331,7 @@ describe("extractCellReferences — boundary / precision", () => {
 
 // --- helpers ---
 
-function cmpCoord(
-  a: { row: number; col: number },
-  b: { row: number; col: number },
-): number {
-  if (a.row !== b.row) return a.row - b.row;
-  return a.col - b.col;
+function cmpCoord(coordA: { row: number; col: number }, coordB: { row: number; col: number }): number {
+  if (coordA.row !== coordB.row) return coordA.row - coordB.row;
+  return coordA.col - coordB.col;
 }

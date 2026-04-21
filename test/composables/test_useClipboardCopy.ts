@@ -15,10 +15,7 @@ interface NavigatorStub {
 
 // Node exposes `navigator` as a getter-only property from v24+, so
 // a plain assignment throws. `Object.defineProperty` overrides that.
-const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(
-  globalThis,
-  "navigator",
-);
+const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
 
 let clipboardWrites: string[] = [];
 let clipboardShouldFail = false;

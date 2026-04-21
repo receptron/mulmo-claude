@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import path from "node:path";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 const MCP_SERVER = path.join(PROJECT_ROOT, "server/agent/mcp-server.ts");
 // Use npx tsx so the shell resolves .cmd wrappers on Windows.
@@ -30,10 +31,7 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
-function sendAndReceive(
-  lines: string[],
-  env: Record<string, string>,
-): Promise<JsonRpcResponse[]> {
+function sendAndReceive(lines: string[], env: Record<string, string>): Promise<JsonRpcResponse[]> {
   return new Promise((resolve, reject) => {
     // shell: true so Windows resolves .cmd wrappers in node_modules/.bin/.
     // Pass args as a single command string to avoid DEP0190 warning.
@@ -63,36 +61,28 @@ function sendAndReceive(
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
       reject(new Error(`MCP server timed out. stderr: ${stderr}`));
-    }, 15_000);
+    }, 15 * ONE_SECOND_MS);
 
     child.on("close", (code) => {
       clearTimeout(timer);
       const responses: JsonRpcResponse[] = stdout
         .split("\n")
-        .filter((l) => l.trim())
-        .map((l) => {
+        .filter((line) => line.trim())
+        .map((line) => {
           try {
-            return JSON.parse(l) as JsonRpcResponse;
+            return JSON.parse(line) as JsonRpcResponse;
           } catch {
             return null;
           }
         })
-        .filter((r): r is JsonRpcResponse => r !== null);
+        .filter((resp): resp is JsonRpcResponse => resp !== null);
 
       if (code !== 0) {
-        reject(
-          new Error(
-            `MCP server exited with code ${code}. stderr: ${stderr.slice(0, 500)}`,
-          ),
-        );
+        reject(new Error(`MCP server exited with code ${code}. stderr: ${stderr.slice(0, 500)}`));
         return;
       }
       if (responses.length === 0) {
-        reject(
-          new Error(
-            `MCP server produced no valid JSON-RPC responses. stdout: ${stdout.slice(0, 500)}`,
-          ),
-        );
+        reject(new Error(`MCP server produced no valid JSON-RPC responses. stdout: ${stdout.slice(0, 500)}`));
         return;
       }
       resolve(responses);
@@ -132,44 +122,27 @@ describe("MCP server subprocess smoke test", () => {
     );
 
     // Should get exactly 2 responses (initialize + tools/list).
-    assert.ok(
-      responses.length >= 2,
-      `Expected >= 2 responses, got ${responses.length}: ${JSON.stringify(responses)}`,
-    );
+    assert.ok(responses.length >= 2, `Expected >= 2 responses, got ${responses.length}: ${JSON.stringify(responses)}`);
 
     // Initialize response
-    const initResp = responses.find((r) => r.id === 1);
+    const initResp = responses.find((resp) => resp.id === 1);
     assert.ok(initResp, "Missing initialize response");
     assert.ok(initResp.result, "Initialize response has no result");
     assert.equal(initResp.result.serverInfo?.name, "mulmoclaude");
 
     // tools/list response
-    const toolsResp = responses.find((r) => r.id === 2);
+    const toolsResp = responses.find((resp) => resp.id === 2);
     assert.ok(toolsResp, "Missing tools/list response");
     assert.ok(toolsResp.result?.tools, "tools/list has no tools array");
     assert.ok(Array.isArray(toolsResp.result.tools), "tools is not an array");
 
     // The tools we requested via PLUGIN_NAMES should be present.
-    const toolNames = toolsResp.result.tools.map(
-      (t: { name: string }) => t.name,
-    );
-    assert.ok(
-      toolNames.includes("manageTodoList"),
-      `manageTodoList not in tools: ${toolNames.join(", ")}`,
-    );
-    assert.ok(
-      toolNames.includes("presentMulmoScript"),
-      `presentMulmoScript not in tools: ${toolNames.join(", ")}`,
-    );
-    assert.ok(
-      toolNames.includes("manageWiki"),
-      `manageWiki not in tools: ${toolNames.join(", ")}`,
-    );
+    const toolNames = toolsResp.result.tools.map((tool: { name: string }) => tool.name);
+    assert.ok(toolNames.includes("manageTodoList"), `manageTodoList not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes("presentMulmoScript"), `presentMulmoScript not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes("manageWiki"), `manageWiki not in tools: ${toolNames.join(", ")}`);
 
     // switchRole should always be included.
-    assert.ok(
-      toolNames.includes("switchRole"),
-      `switchRole not in tools: ${toolNames.join(", ")}`,
-    );
+    assert.ok(toolNames.includes("switchRole"), `switchRole not in tools: ${toolNames.join(", ")}`);
   });
 });

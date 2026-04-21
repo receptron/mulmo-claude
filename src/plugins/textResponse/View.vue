@@ -1,98 +1,41 @@
 <template>
   <div class="h-full flex flex-col">
-    <div
-      v-if="isAssistant"
-      class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0"
-    >
+    <div v-if="isAssistant" class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
       <div class="button-group">
-        <button
-          class="download-btn download-btn-green"
-          :disabled="pdfDownloading"
-          @click="downloadPdf"
-        >
-          <span class="material-icons">{{
-            pdfDownloading ? "hourglass_empty" : "download"
-          }}</span>
+        <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
+          <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
           PDF
         </button>
       </div>
-      <span
-        v-if="pdfError"
-        class="text-xs text-red-500 self-center ml-2"
-        :title="pdfError"
-        >⚠ PDF failed</span
-      >
+      <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
     </div>
-    <div
-      class="flex-1 overflow-hidden relative"
-      @click.capture="openLinksInNewTab"
-    >
+    <div class="flex-1 overflow-hidden relative" @click.capture="openLinksInNewTab">
       <div class="text-response-container">
         <div class="text-response-content-wrapper">
           <div class="p-6">
             <div class="max-w-3xl mx-auto space-y-4">
-              <div
-                class="rounded-lg border border-gray-300 bg-white shadow-sm p-5"
-                :class="roleTheme"
-              >
-                <div
-                  class="flex justify-between items-start mb-2 text-sm text-gray-500"
-                >
-                  <span class="font-medium text-gray-700">{{
-                    speakerLabel
-                  }}</span>
-                  <span v-if="transportKind" class="italic">{{
-                    transportKind
-                  }}</span>
+              <div class="rounded-lg border border-gray-300 bg-white shadow-sm p-5" :class="roleTheme">
+                <div class="flex justify-between items-start mb-2 text-sm text-gray-500">
+                  <span class="font-medium text-gray-700">{{ speakerLabel }}</span>
+                  <span v-if="transportKind" class="italic">{{ transportKind }}</span>
                 </div>
-                <div
-                  class="markdown-content prose prose-slate max-w-none leading-relaxed text-gray-900"
-                  v-html="renderedHtml"
-                ></div>
+                <div class="markdown-content prose prose-slate max-w-none leading-relaxed text-gray-900" v-html="renderedHtml"></div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Collapsible Editor -->
-        <details
-          v-if="editable"
-          ref="detailsEl"
-          class="text-response-source"
-          data-testid="text-response-edit"
-        >
-          <summary data-testid="text-response-edit-summary">
-            Edit Text Content
-          </summary>
-          <textarea
-            v-model="editedText"
-            class="text-response-editor"
-            spellcheck="false"
-            data-testid="text-response-edit-textarea"
-          ></textarea>
-          <button
-            class="apply-btn"
-            :disabled="!hasChanges"
-            data-testid="text-response-apply-btn"
-            @click="applyChanges"
-          >
-            Apply Changes
-          </button>
+        <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
+          <summary data-testid="text-response-edit-summary">Edit Text Content</summary>
+          <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
+          <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">Apply Changes</button>
         </details>
       </div>
-      <button
-        v-show="!editing"
-        class="copy-btn"
-        :title="copied ? 'Copied!' : 'Copy'"
-        @click="copyText"
-      >
-        <span class="material-icons">{{
-          copied ? "check" : "content_copy"
-        }}</span>
+      <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
+        <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
       </button>
-      <button v-show="editing" class="cancel-btn" @click="cancelEdit">
-        Cancel
-      </button>
+      <button v-show="editing" class="cancel-btn" @click="cancelEdit">Cancel</button>
     </div>
   </div>
 </template>
@@ -131,21 +74,15 @@ const messageText = computed(() => props.selectedResult.data?.text ?? "");
 // Source fed into the editor. When the parent passes `editableSource`
 // it wins; otherwise we edit the displayed text, matching the
 // component's original (chat-message) behaviour.
-const editorSource = computed(() =>
-  props.editableSource !== undefined ? props.editableSource : messageText.value,
-);
+const editorSource = computed(() => (props.editableSource !== undefined ? props.editableSource : messageText.value));
 const editedText = ref(editorSource.value);
 
 watch(editorSource, (next) => {
   editedText.value = next;
 });
 
-const messageRole = computed(
-  () => props.selectedResult.data?.role ?? "assistant",
-);
-const transportKind = computed(
-  () => props.selectedResult.data?.transportKind ?? "",
-);
+const messageRole = computed(() => props.selectedResult.data?.role ?? "assistant");
+const transportKind = computed(() => props.selectedResult.data?.transportKind ?? "");
 
 const renderedHtml = computed(() => {
   if (!messageText.value) return "";
@@ -154,10 +91,7 @@ const renderedHtml = computed(() => {
 
   // Detect and wrap JSON content in code fences
   const trimmedText = processedText.trim();
-  if (
-    (trimmedText.startsWith("{") && trimmedText.endsWith("}")) ||
-    (trimmedText.startsWith("[") && trimmedText.endsWith("]"))
-  ) {
+  if ((trimmedText.startsWith("{") && trimmedText.endsWith("}")) || (trimmedText.startsWith("[") && trimmedText.endsWith("]"))) {
     try {
       JSON.parse(trimmedText);
       processedText = "```json\n" + trimmedText + "\n```";
@@ -167,13 +101,10 @@ const renderedHtml = computed(() => {
   }
 
   // Process <think> blocks to make them grey
-  processedText = processedText.replace(
-    /<think>([\s\S]*?)<\/think>/g,
-    (_, content) => {
-      const thinkContent = marked(content.trim());
-      return `<div class="think-block">${thinkContent}</div>`;
-    },
-  );
+  processedText = processedText.replace(/<think>([\s\S]*?)<\/think>/g, (_, content) => {
+    const thinkContent = marked(content.trim());
+    return `<div class="think-block">${thinkContent}</div>`;
+  });
 
   return marked(processedText, { breaks: true, gfm: true });
 });
@@ -226,25 +157,19 @@ function applyChanges() {
 
 // --- Local customizations: PDF, copy, edit toggle, external links ---
 
-const isAssistant = computed(
-  () => (props.selectedResult.data?.role ?? "assistant") === "assistant",
-);
+const isAssistant = computed(() => (props.selectedResult.data?.role ?? "assistant") === "assistant");
 
 function openLinksInNewTab(event: MouseEvent): void {
   handleExternalLinkClick(event);
 }
 
-const {
-  pdfDownloading,
-  pdfError,
-  downloadPdf: rawDownloadPdf,
-} = usePdfDownload();
+const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
 
 const detailsEl = ref<HTMLDetailsElement>();
 const editing = ref(false);
 
-function onDetailsToggle(e: Event) {
-  editing.value = (e.target as HTMLDetailsElement).open;
+function onDetailsToggle(event: Event) {
+  editing.value = (event.target as HTMLDetailsElement).open;
 }
 
 onMounted(() => {

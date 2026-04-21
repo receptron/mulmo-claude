@@ -17,9 +17,7 @@ import type { PresentChartData } from "./index";
 const props = defineProps<{ result: ToolResultComplete<PresentChartData> }>();
 
 const data = computed(() => props.result.data);
-const title = computed(
-  () => data.value?.title ?? data.value?.document?.title ?? "Chart",
-);
+const title = computed(() => data.value?.title ?? data.value?.document?.title ?? "Chart");
 
 // Condensed "n charts: line, bar, …" hint derived from the document
 // so the preview card tells the user what's inside without opening.
@@ -27,8 +25,8 @@ const hint = computed(() => {
   const charts = data.value?.document?.charts ?? [];
   if (charts.length === 0) return "";
   const types = charts
-    .map((c) => c.type ?? inferTypeFromOption(c.option))
-    .filter((t): t is string => Boolean(t))
+    .map((chart) => chart.type ?? inferTypeFromOption(chart.option))
+    .filter((chartType): chartType is string => Boolean(chartType))
     .slice(0, 3);
   const suffix = charts.length > types.length ? ", …" : "";
   const typeList = types.join(", ");
@@ -43,8 +41,8 @@ function inferTypeFromOption(option: Record<string, unknown>): string | null {
     const first = series[0] as { type?: unknown };
     if (typeof first.type === "string") return first.type;
   } else if (series && typeof series === "object") {
-    const t = (series as { type?: unknown }).type;
-    if (typeof t === "string") return t;
+    const seriesType = (series as { type?: unknown }).type;
+    if (typeof seriesType === "string") return seriesType;
   }
   return null;
 }

@@ -1,23 +1,16 @@
 <template>
   <div class="h-full bg-white flex flex-col overflow-hidden">
     <!-- Header -->
-    <div
-      class="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0"
-    >
+    <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div class="min-w-0 flex-1">
         <h2 class="text-lg font-semibold text-gray-800 truncate">
           {{ script.title || "Untitled Script" }}
         </h2>
-        <p
-          v-if="script.description"
-          class="text-sm text-gray-500 mt-0.5 truncate"
-        >
+        <p v-if="script.description" class="text-sm text-gray-500 mt-0.5 truncate">
           {{ script.description }}
         </p>
         <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
-          <span
-            >{{ beats.length }} beat{{ beats.length !== 1 ? "s" : "" }}</span
-          >
+          <span>{{ beats.length }} beat{{ beats.length !== 1 ? "s" : "" }}</span>
           <span v-if="script.lang">{{ script.lang }}</span>
           <span v-if="filePath" class="truncate">{{ filePath }}</span>
         </div>
@@ -39,25 +32,9 @@
           :disabled="movieGenerating"
           @click="generateMovie"
         >
-          <svg
-            v-if="movieGenerating"
-            class="animate-spin w-3 h-3 shrink-0"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            />
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v8H4z"
-            />
+          <svg v-if="movieGenerating" class="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
           <span v-if="movieGenerating">Generating…</span>
           <template v-else>
@@ -69,41 +46,23 @@
     </div>
 
     <!-- Characters section -->
-    <div
-      v-if="characterKeys.length > 0"
-      class="border-b border-gray-100 shrink-0 px-4 py-3"
-    >
+    <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-3">
       <div class="flex items-center justify-between mb-2">
-        <span
-          class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-          >Characters</span
-        >
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Characters</span>
         <button
           class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-          :disabled="
-            movieGenerating ||
-            anyBeatRendering ||
-            characterKeys.every((k) => charRenderState[k] === 'rendering')
-          "
+          :disabled="movieGenerating || anyBeatRendering || characterKeys.every((key) => charRenderState[key] === 'rendering')"
           @click="generateAllCharacters"
         >
           Generate All
         </button>
       </div>
       <div class="flex gap-3 flex-wrap">
-        <div
-          v-for="key in characterKeys"
-          :key="key"
-          class="flex flex-col items-center gap-1 w-36"
-        >
+        <div v-for="key in characterKeys" :key="key" class="flex flex-col items-center gap-1 w-36">
           <!-- Character thumbnail -->
           <div
             class="relative w-36 h-36 rounded-lg border overflow-hidden bg-gray-50 flex items-center justify-center transition-colors"
-            :class="
-              charDragOver[key]
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-200'
-            "
+            :class="charDragOver[key] ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
             @dragover="onCharDragOver($event, key)"
             @dragleave="onCharDragLeave(key)"
             @drop="onCharDrop($event, key)"
@@ -116,49 +75,23 @@
               @click="openCharacterLightbox(key)"
             />
             <template v-else-if="charRenderState[key] === 'rendering'">
-              <svg
-                class="animate-spin w-4 h-4 text-green-400"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8H4z"
-                />
+              <svg class="animate-spin w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
             </template>
             <template v-else-if="charRenderState[key] === 'error'">
-              <span class="text-xs text-red-400 text-center px-1">{{
-                charErrors[key]
-              }}</span>
+              <span class="text-xs text-red-400 text-center px-1">{{ charErrors[key] }}</span>
             </template>
             <template v-else>
-              <span
-                class="text-xs text-gray-300 text-center px-1 leading-tight"
-                >{{ characterPrompt(key) }}</span
-              >
+              <span class="text-xs text-gray-300 text-center px-1 leading-tight">{{ characterPrompt(key) }}</span>
             </template>
             <!-- Permanent drop hint -->
-            <div
-              v-if="!charDragOver[key]"
-              class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
-            >
+            <div v-if="!charDragOver[key]" class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none">
               or drop image
             </div>
             <!-- Drop overlay -->
-            <div
-              v-if="charDragOver[key]"
-              class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none"
-            >
+            <div v-if="charDragOver[key]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
               <span class="text-xs text-blue-500 font-medium">Drop</span>
             </div>
             <!-- Regenerate button -->
@@ -166,71 +99,39 @@
               v-if="charImages[key] && charRenderState[key] !== 'rendering'"
               class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
               :class="
-                movieGenerating || anyBeatRendering
-                  ? 'border-yellow-400 text-yellow-500 cursor-not-allowed'
-                  : 'border-gray-400 text-gray-600 hover:bg-gray-50'
+                movieGenerating || anyBeatRendering ? 'border-yellow-400 text-yellow-500 cursor-not-allowed' : 'border-gray-400 text-gray-600 hover:bg-gray-50'
               "
               :disabled="movieGenerating || anyBeatRendering"
               @click.stop="renderCharacter(key, true)"
             >
-              <span
-                v-if="movieGenerating || anyBeatRendering"
-                class="inline-block animate-spin"
-                >↺</span
-              >
+              <span v-if="movieGenerating || anyBeatRendering" class="inline-block animate-spin">↺</span>
               <span v-else>↺</span>
             </button>
             <!-- Generate button -->
             <button
-              v-else-if="
-                !charImages[key] && charRenderState[key] !== 'rendering'
-              "
+              v-else-if="!charImages[key] && charRenderState[key] !== 'rendering'"
               class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
               :class="
-                movieGenerating || anyBeatRendering
-                  ? 'border-yellow-400 text-yellow-500 cursor-not-allowed'
-                  : 'border-blue-400 text-blue-600 hover:bg-blue-50'
+                movieGenerating || anyBeatRendering ? 'border-yellow-400 text-yellow-500 cursor-not-allowed' : 'border-blue-400 text-blue-600 hover:bg-blue-50'
               "
               :disabled="movieGenerating || anyBeatRendering"
               @click.stop="renderCharacter(key, false)"
             >
-              <svg
-                v-if="movieGenerating || anyBeatRendering"
-                class="animate-spin w-3 h-3"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8H4z"
-                />
+              <svg v-if="movieGenerating || anyBeatRendering" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               <span v-else>Gen</span>
             </button>
           </div>
-          <span class="text-xs text-gray-600 text-center truncate w-full">{{
-            key
-          }}</span>
+          <span class="text-xs text-gray-600 text-center truncate w-full">{{ key }}</span>
         </div>
       </div>
     </div>
 
     <!-- Beat list -->
     <div ref="beatListEl" class="flex-1 overflow-y-auto p-2 space-y-1.5">
-      <div
-        v-for="(beat, index) in beats"
-        :key="index"
-        class="rounded-lg border border-gray-200 overflow-hidden"
-      >
+      <div v-for="(beat, index) in beats" :key="index" class="rounded-lg border border-gray-200 overflow-hidden">
         <!-- Beat body: thumbnail + narration side by side -->
         <div class="flex gap-3 items-stretch">
           <!-- Thumbnail -->
@@ -256,78 +157,37 @@
             >
               ↺
             </button>
-            <div
-              v-else-if="!renderedImages[index]"
-              class="w-full aspect-video flex flex-col items-center justify-center gap-1 p-2"
-            >
-              <template
-                v-if="
-                  renderState[index] === 'rendering' ||
-                  (movieGenerating &&
-                    !renderedImages[index] &&
-                    effectiveBeat(index).imagePrompt)
-                "
-              >
-                <svg
-                  class="animate-spin w-4 h-4 text-green-400"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  />
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8H4z"
-                  />
+            <div v-else-if="!renderedImages[index]" class="w-full aspect-video flex flex-col items-center justify-center gap-1 p-2">
+              <template v-if="renderState[index] === 'rendering' || (movieGenerating && !renderedImages[index] && effectiveBeat(index).imagePrompt)">
+                <svg class="animate-spin w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
                 <span class="text-xs text-green-500">Rendering…</span>
               </template>
               <template v-else-if="renderState[index] === 'error'">
-                <span class="text-xs text-red-400 text-center">{{
-                  renderErrors[index]
-                }}</span>
+                <span class="text-xs text-red-400 text-center">{{ renderErrors[index] }}</span>
               </template>
               <template v-else>
-                <span
-                  v-if="effectiveBeat(index).imagePrompt"
-                  class="text-xs text-gray-400 text-center italic leading-relaxed px-1"
-                  >{{ effectiveBeat(index).imagePrompt }}</span
-                >
-                <span v-else class="text-xs text-gray-300">{{
-                  beat.image?.type ?? "—"
+                <span v-if="effectiveBeat(index).imagePrompt" class="text-xs text-gray-400 text-center italic leading-relaxed px-1">{{
+                  effectiveBeat(index).imagePrompt
                 }}</span>
+                <span v-else class="text-xs text-gray-300">{{ beat.image?.type ?? "—" }}</span>
               </template>
             </div>
             <!-- Beat drop hint / overlay -->
-            <div
-              v-if="beatDragOver[index]"
-              class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none"
-            >
+            <div v-if="beatDragOver[index]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
               <span class="text-xs text-blue-500 font-medium">Drop</span>
             </div>
             <div
-              v-else-if="
-                !renderedImages[index] && renderState[index] !== 'rendering'
-              "
+              v-else-if="!renderedImages[index] && renderState[index] !== 'rendering'"
               class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
             >
               or drop image
             </div>
             <!-- Generate button for imagePrompt beats -->
             <button
-              v-if="
-                effectiveBeat(index).imagePrompt &&
-                !renderedImages[index] &&
-                renderState[index] !== 'rendering' &&
-                !movieGenerating
-              "
+              v-if="effectiveBeat(index).imagePrompt && !renderedImages[index] && renderState[index] !== 'rendering' && !movieGenerating"
               class="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50"
               @click="renderBeat(index)"
             >
@@ -337,56 +197,26 @@
 
           <!-- Narration text -->
           <div class="flex flex-col flex-1 min-w-0 px-2 py-1.5">
-            <span class="text-sm text-gray-800 leading-relaxed">{{
-              effectiveBeat(index).text
-            }}</span>
+            <span class="text-sm text-gray-800 leading-relaxed">{{ effectiveBeat(index).text }}</span>
             <div class="flex justify-between mt-auto pt-1">
               <!-- Audio controls -->
               <div class="flex items-center gap-1">
-                <template
-                  v-if="
-                    audioState[index] === 'generating' ||
-                    (movieGenerating &&
-                      !beatAudios[index] &&
-                      effectiveBeat(index).text)
-                  "
-                >
-                  <svg
-                    class="animate-spin w-3 h-3 text-green-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    />
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8H4z"
-                    />
+                <template v-if="audioState[index] === 'generating' || (movieGenerating && !beatAudios[index] && effectiveBeat(index).text)">
+                  <svg class="animate-spin w-3 h-3 text-green-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
                 </template>
                 <button
                   v-else-if="beatAudios[index]"
                   class="text-xs px-2 py-0.5 rounded border"
-                  :class="
-                    playingAudio?.index === index
-                      ? 'border-red-400 text-red-600 hover:bg-red-50'
-                      : 'border-green-400 text-green-600 hover:bg-green-50'
-                  "
+                  :class="playingAudio?.index === index ? 'border-red-400 text-red-600 hover:bg-red-50' : 'border-green-400 text-green-600 hover:bg-green-50'"
                   @click="playAudio(index)"
                 >
                   {{ playingAudio?.index === index ? "■ Stop" : "▶ Play" }}
                 </button>
                 <template v-else-if="audioErrors[index]">
-                  <span class="text-xs text-red-400" :title="audioErrors[index]"
-                    >⚠ Error</span
-                  >
+                  <span class="text-xs text-red-400" :title="audioErrors[index]">⚠ Error</span>
                   <button
                     v-if="effectiveBeat(index).text"
                     class="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
@@ -404,11 +234,7 @@
                   ♪ Generate
                 </button>
               </div>
-              <button
-                class="text-gray-400 hover:text-gray-600"
-                :title="sourceOpen[index] ? 'Hide source' : 'Show source'"
-                @click="toggleSource(index)"
-              >
+              <button class="text-gray-400 hover:text-gray-600" :title="sourceOpen[index] ? 'Hide source' : 'Show source'" @click="toggleSource(index)">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="w-3.5 h-3.5"
@@ -432,21 +258,12 @@
           <textarea
             v-model="sourceText[index]"
             class="w-full text-xs text-gray-600 bg-gray-50 p-2 font-mono resize-none"
-            :class="
-              isValidBeat(index)
-                ? 'outline-none'
-                : 'outline outline-2 outline-red-400'
-            "
+            :class="isValidBeat(index) ? 'outline-none' : 'outline outline-2 outline-red-400'"
             rows="8"
             spellcheck="false"
           />
           <div class="flex items-center justify-end gap-2 px-2 pb-2">
-            <span
-              v-if="beatSaveErrors[index]"
-              class="text-xs text-red-600"
-              role="alert"
-              >⚠ {{ beatSaveErrors[index] }}</span
-            >
+            <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">⚠ {{ beatSaveErrors[index] }}</span>
             <button
               class="px-2 py-1 text-xs rounded border"
               :class="
@@ -463,21 +280,12 @@
         </div>
       </div>
 
-      <div
-        v-if="beats.length === 0"
-        class="flex items-center justify-center h-32 text-gray-400 text-sm"
-      >
-        No beats found in script
-      </div>
+      <div v-if="beats.length === 0" class="flex items-center justify-center h-32 text-gray-400 text-sm">No beats found in script</div>
     </div>
 
     <!-- Bottom bar: Edit Script Source + Copy -->
     <div class="bottom-bar-wrapper">
-      <details
-        ref="sourceDetails"
-        class="script-source"
-        @toggle="onSourceToggle(($event.target as HTMLDetailsElement).open)"
-      >
+      <details ref="sourceDetails" class="script-source" @toggle="onSourceToggle(($event.target as HTMLDetailsElement).open)">
         <summary>Edit Script Source</summary>
         <textarea
           v-model="editableSource"
@@ -486,34 +294,17 @@
           spellcheck="false"
         ></textarea>
         <div class="editor-actions">
-          <button
-            class="apply-btn"
-            :disabled="!sourceChanged || !sourceValid"
-            @click="applySource"
-          >
-            Apply Changes
-          </button>
+          <button class="apply-btn" :disabled="!sourceChanged || !sourceValid" @click="applySource">Apply Changes</button>
           <button class="cancel-btn" @click="cancelSourceEdit">Cancel</button>
         </div>
       </details>
-      <button
-        v-show="!editing"
-        class="copy-btn"
-        :title="copied ? 'Copied!' : 'Copy'"
-        @click="copyText"
-      >
-        <span class="material-icons">{{
-          copied ? "check" : "content_copy"
-        }}</span>
+      <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
+        <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
       </button>
     </div>
 
     <!-- Lightbox -->
-    <div
-      v-if="lightbox"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      @click="lightbox = null"
-    >
+    <div v-if="lightbox" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80" @click="lightbox = null">
       <div class="flex items-center gap-4" @click.stop>
         <button
           v-if="!lightbox.isCharacter"
@@ -524,24 +315,16 @@
           ‹
         </button>
         <div class="flex flex-col items-center gap-3">
-          <img
-            :src="lightbox.src"
-            class="max-w-[80vw] max-h-[80vh] object-contain rounded shadow-2xl"
-          />
+          <img :src="lightbox.src" class="max-w-[80vw] max-h-[80vh] object-contain rounded shadow-2xl" />
           <div class="flex items-center gap-4">
-            <p
-              v-if="lightbox.text"
-              class="max-w-[80vw] text-center text-white text-2xl leading-relaxed"
-            >
+            <p v-if="lightbox.text" class="max-w-[80vw] text-center text-white text-2xl leading-relaxed">
               {{ lightbox.text }}
             </p>
             <button
               v-if="beatAudios[lightbox.index]"
               class="shrink-0 text-sm px-3 py-1 rounded border"
               :class="
-                playingAudio?.index === lightbox.index
-                  ? 'border-red-400 text-red-400 hover:bg-red-400/20'
-                  : 'border-white/60 text-white/60 hover:bg-white/20'
+                playingAudio?.index === lightbox.index ? 'border-red-400 text-red-400 hover:bg-red-400/20' : 'border-white/60 text-white/60 hover:bg-white/20'
               "
               @click="playAudio(lightbox.index)"
             >
@@ -567,13 +350,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { MulmoScriptData } from "./index";
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
-import {
-  extractErrorMessage,
-  getMissingCharacterKeys,
-  shouldAutoRenderBeat,
-  streamMovieEvents,
-  validateBeatJSON,
-} from "./helpers";
+import { extractErrorMessage, getMissingCharacterKeys, shouldAutoRenderBeat, streamMovieEvents, validateBeatJSON } from "./helpers";
 import { apiGet, apiPost, apiFetchRaw } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
@@ -636,13 +413,9 @@ const localOverrides = reactive<Record<number, Beat>>({});
 const movieGenerating = ref(false);
 const moviePath = ref<string | null>(null);
 const beatAudios = reactive<Record<number, string>>({});
-const audioState = reactive<Record<number, "generating" | "done" | "error">>(
-  {},
-);
+const audioState = reactive<Record<number, "generating" | "done" | "error">>({});
 const audioErrors = reactive<Record<number, string>>({});
-const playingAudio = ref<{ index: number; audio: HTMLAudioElement } | null>(
-  null,
-);
+const playingAudio = ref<{ index: number; audio: HTMLAudioElement } | null>(null);
 const beatListEl = ref<HTMLElement | null>(null);
 const lightbox = ref<{
   src: string;
@@ -658,13 +431,11 @@ const charErrors = reactive<Record<string, string>>({});
 const charDragOver = reactive<Record<string, boolean>>({});
 const beatDragOver = reactive<Record<number, boolean>>({});
 
-const anyBeatRendering = computed(() =>
-  Object.values(renderState).some((s) => s === "rendering"),
-);
+const anyBeatRendering = computed(() => Object.values(renderState).some((state) => state === "rendering"));
 
 const characterKeys = computed(() => {
   const imgs = script.value.imageParams?.images ?? {};
-  return Object.keys(imgs).filter((k) => imgs[k]?.type === "imagePrompt");
+  return Object.keys(imgs).filter((key) => imgs[key]?.type === "imagePrompt");
 });
 
 // Session-scoped pending generations — lets spinners survive view
@@ -676,10 +447,10 @@ const chatSessionId = computed(() => activeSessionRef?.value?.id);
 const pendingForThisScript = computed(() => {
   const out: Record<string, PendingGeneration> = {};
   const pending = activeSessionRef?.value?.pendingGenerations ?? {};
-  const fp = filePath.value;
-  if (!fp) return out;
+  const currentPath = filePath.value;
+  if (!currentPath) return out;
   for (const [mapKey, entry] of Object.entries(pending)) {
-    if (entry.filePath === fp) out[mapKey] = entry;
+    if (entry.filePath === currentPath) out[mapKey] = entry;
   }
   return out;
 });
@@ -746,13 +517,9 @@ const effectiveScript = computed<MulmoScript>(() => ({
   ...script.value,
   beats: beats.value.map((beat, i) => localOverrides[i] ?? beat),
 }));
-const scriptSourceText = computed(() =>
-  JSON.stringify(effectiveScript.value, null, 2),
-);
+const scriptSourceText = computed(() => JSON.stringify(effectiveScript.value, null, 2));
 const loadedSource = ref("");
-const sourceChanged = computed(
-  () => editableSource.value !== loadedSource.value,
-);
+const sourceChanged = computed(() => editableSource.value !== loadedSource.value);
 const sourceValid = computed(() => {
   try {
     const parsed = JSON.parse(editableSource.value);
@@ -768,10 +535,7 @@ async function onSourceToggle(open: boolean) {
     let text = scriptSourceText.value;
     // Read the current file from disk so beat-level edits are reflected
     if (filePath.value) {
-      const response = await apiGet<{ content?: string }>(
-        API_ROUTES.files.content,
-        { path: filePath.value },
-      );
+      const response = await apiGet<{ content?: string }>(API_ROUTES.files.content, { path: filePath.value });
       if (response.ok && response.data.content) {
         text = response.data.content;
       }
@@ -871,14 +635,11 @@ async function updateBeat(index: number) {
 
 async function renderBeat(index: number) {
   renderState[index] = "rendering";
-  const response = await apiPost<{ image?: string; error?: string }>(
-    API_ROUTES.mulmoScript.renderBeat,
-    {
-      filePath: filePath.value,
-      beatIndex: index,
-      chatSessionId: chatSessionId.value,
-    },
-  );
+  const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.renderBeat, {
+    filePath: filePath.value,
+    beatIndex: index,
+    chatSessionId: chatSessionId.value,
+  });
   if (!response.ok) {
     renderErrors[index] = response.error || "Render failed";
     renderState[index] = "error";
@@ -897,15 +658,12 @@ async function renderBeat(index: number) {
 async function regenerateBeat(index: number) {
   delete renderedImages[index];
   renderState[index] = "rendering";
-  const response = await apiPost<{ image?: string; error?: string }>(
-    API_ROUTES.mulmoScript.renderBeat,
-    {
-      filePath: filePath.value,
-      beatIndex: index,
-      force: true,
-      chatSessionId: chatSessionId.value,
-    },
-  );
+  const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.renderBeat, {
+    filePath: filePath.value,
+    beatIndex: index,
+    force: true,
+    chatSessionId: chatSessionId.value,
+  });
   if (!response.ok) {
     renderErrors[index] = response.error || "Render failed";
     renderState[index] = "error";
@@ -921,10 +679,7 @@ async function regenerateBeat(index: number) {
 }
 
 async function loadExistingBeatImage(index: number) {
-  const response = await apiGet<{ image?: string }>(
-    API_ROUTES.mulmoScript.beatImage,
-    { filePath: filePath.value, beatIndex: String(index) },
-  );
+  const response = await apiGet<{ image?: string }>(API_ROUTES.mulmoScript.beatImage, { filePath: filePath.value, beatIndex: String(index) });
   // silently ignore errors — image simply hasn't been generated yet
   if (response.ok && response.data.image) {
     renderedImages[index] = response.data.image;
@@ -933,10 +688,7 @@ async function loadExistingBeatImage(index: number) {
 }
 
 async function loadExistingBeatAudio(index: number) {
-  const response = await apiGet<{ audio?: string }>(
-    API_ROUTES.mulmoScript.beatAudio,
-    { filePath: filePath.value, beatIndex: String(index) },
-  );
+  const response = await apiGet<{ audio?: string }>(API_ROUTES.mulmoScript.beatAudio, { filePath: filePath.value, beatIndex: String(index) });
   // silently ignore errors
   if (response.ok && response.data.audio) {
     beatAudios[index] = response.data.audio;
@@ -947,14 +699,11 @@ async function loadExistingBeatAudio(index: number) {
 async function generateAudio(index: number) {
   audioState[index] = "generating";
   delete audioErrors[index];
-  const response = await apiPost<{ audio?: string; error?: string }>(
-    API_ROUTES.mulmoScript.generateBeatAudio,
-    {
-      filePath: filePath.value,
-      beatIndex: index,
-      chatSessionId: chatSessionId.value,
-    },
-  );
+  const response = await apiPost<{ audio?: string; error?: string }>(API_ROUTES.mulmoScript.generateBeatAudio, {
+    filePath: filePath.value,
+    beatIndex: index,
+    chatSessionId: chatSessionId.value,
+  });
   if (!response.ok) {
     audioErrors[index] = response.error || "Audio generation failed";
     audioState[index] = "error";
@@ -986,11 +735,7 @@ function playAudio(index: number) {
     if (lightbox.value?.index === index) {
       lightboxMove(1);
       const nextIndex = lightbox.value?.index;
-      if (
-        nextIndex !== undefined &&
-        nextIndex !== index &&
-        beatAudios[nextIndex]
-      ) {
+      if (nextIndex !== undefined && nextIndex !== index && beatAudios[nextIndex]) {
         playAudio(nextIndex);
       }
     }
@@ -1029,10 +774,11 @@ async function onBeatDrop(event: DragEvent, index: number) {
     renderState[index] = "error";
     return;
   }
-  const response = await apiPost<{ image?: string; error?: string }>(
-    API_ROUTES.mulmoScript.uploadBeatImage,
-    { filePath: filePath.value, beatIndex: index, imageData },
-  );
+  const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.uploadBeatImage, {
+    filePath: filePath.value,
+    beatIndex: index,
+    imageData,
+  });
   if (!response.ok) {
     renderErrors[index] = response.error || "Upload failed";
     renderState[index] = "error";
@@ -1078,10 +824,7 @@ async function onCharDrop(event: DragEvent, key: string) {
     charRenderState[key] = "error";
     return;
   }
-  const response = await apiPost<{ image?: string; error?: string }>(
-    API_ROUTES.mulmoScript.uploadCharacterImage,
-    { filePath: filePath.value, key, imageData },
-  );
+  const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.uploadCharacterImage, { filePath: filePath.value, key, imageData });
   if (!response.ok) {
     charErrors[key] = response.error || "Upload failed";
     charRenderState[key] = "error";
@@ -1110,10 +853,7 @@ function openCharacterLightbox(key: string) {
 }
 
 async function loadExistingCharacterImage(key: string) {
-  const response = await apiGet<{ image?: string }>(
-    API_ROUTES.mulmoScript.characterImage,
-    { filePath: filePath.value, key },
-  );
+  const response = await apiGet<{ image?: string }>(API_ROUTES.mulmoScript.characterImage, { filePath: filePath.value, key });
   // silently ignore errors
   if (response.ok && response.data.image) {
     charImages[key] = response.data.image;
@@ -1122,25 +862,18 @@ async function loadExistingCharacterImage(key: string) {
 }
 
 function refreshMissingCharacterImages() {
-  getMissingCharacterKeys(
-    characterKeys.value,
-    charImages,
-    charRenderState,
-  ).forEach((k) => loadExistingCharacterImage(k));
+  getMissingCharacterKeys(characterKeys.value, charImages, charRenderState).forEach((key) => loadExistingCharacterImage(key));
 }
 
 async function renderCharacter(key: string, force: boolean) {
   charRenderState[key] = "rendering";
   delete charErrors[key];
-  const response = await apiPost<{ image?: string; error?: string }>(
-    API_ROUTES.mulmoScript.renderCharacter,
-    {
-      filePath: filePath.value,
-      key,
-      force,
-      chatSessionId: chatSessionId.value,
-    },
-  );
+  const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.renderCharacter, {
+    filePath: filePath.value,
+    key,
+    force,
+    chatSessionId: chatSessionId.value,
+  });
   if (!response.ok) {
     charErrors[key] = response.error || "Render failed";
     charRenderState[key] = "error";
@@ -1156,42 +889,32 @@ async function renderCharacter(key: string, force: boolean) {
 }
 
 async function generateAllCharacters() {
-  await Promise.all(
-    characterKeys.value
-      .filter((k) => charRenderState[k] !== "rendering")
-      .map((k) => renderCharacter(k, false)),
-  );
+  await Promise.all(characterKeys.value.filter((key) => charRenderState[key] !== "rendering").map((key) => renderCharacter(key, false)));
 }
 
 async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
-  Object.keys(renderState).forEach((k) => delete renderState[+k]);
-  Object.keys(renderedImages).forEach((k) => delete renderedImages[+k]);
-  Object.keys(renderErrors).forEach((k) => delete renderErrors[+k]);
-  Object.keys(sourceOpen).forEach((k) => delete sourceOpen[+k]);
-  Object.keys(sourceText).forEach((k) => delete sourceText[+k]);
-  Object.keys(beatSaveErrors).forEach((k) => delete beatSaveErrors[+k]);
-  Object.keys(beatSaving).forEach((k) => delete beatSaving[+k]);
-  Object.keys(localOverrides).forEach((k) => delete localOverrides[+k]);
-  Object.keys(beatAudios).forEach((k) => delete beatAudios[+k]);
-  Object.keys(audioState).forEach((k) => delete audioState[+k]);
-  Object.keys(audioErrors).forEach((k) => delete audioErrors[+k]);
-  Object.keys(charRenderState).forEach((k) => delete charRenderState[k]);
-  Object.keys(charImages).forEach((k) => delete charImages[k]);
-  Object.keys(charErrors).forEach((k) => delete charErrors[k]);
-  Object.keys(beatDragOver).forEach((k) => delete beatDragOver[+k]);
+  Object.keys(renderState).forEach((key) => delete renderState[+key]);
+  Object.keys(renderedImages).forEach((key) => delete renderedImages[+key]);
+  Object.keys(renderErrors).forEach((key) => delete renderErrors[+key]);
+  Object.keys(sourceOpen).forEach((key) => delete sourceOpen[+key]);
+  Object.keys(sourceText).forEach((key) => delete sourceText[+key]);
+  Object.keys(beatSaveErrors).forEach((key) => delete beatSaveErrors[+key]);
+  Object.keys(beatSaving).forEach((key) => delete beatSaving[+key]);
+  Object.keys(localOverrides).forEach((key) => delete localOverrides[+key]);
+  Object.keys(beatAudios).forEach((key) => delete beatAudios[+key]);
+  Object.keys(audioState).forEach((key) => delete audioState[+key]);
+  Object.keys(audioErrors).forEach((key) => delete audioErrors[+key]);
+  Object.keys(charRenderState).forEach((key) => delete charRenderState[key]);
+  Object.keys(charImages).forEach((key) => delete charImages[key]);
+  Object.keys(charErrors).forEach((key) => delete charErrors[key]);
+  Object.keys(beatDragOver).forEach((key) => delete beatDragOver[+key]);
   moviePath.value = null;
   if (sourceDetails.value) sourceDetails.value.open = false;
 
-  const AUTO_RENDER_TYPES = [
-    "textSlide",
-    "markdown",
-    "chart",
-    "mermaid",
-    "html_tailwind",
-  ] as const;
+  const AUTO_RENDER_TYPES = ["textSlide", "markdown", "chart", "mermaid", "html_tailwind"] as const;
   const hasCharacters = characterKeys.value.length > 0;
   beats.value.forEach((beat, index) => {
     if (shouldAutoRenderBeat(beat, hasCharacters, AUTO_RENDER_TYPES)) {
@@ -1205,10 +928,7 @@ async function initializeScript() {
   characterKeys.value.forEach((key) => loadExistingCharacterImage(key));
 
   if (filePath.value) {
-    const response = await apiGet<{ moviePath?: string }>(
-      API_ROUTES.mulmoScript.movieStatus,
-      { filePath: filePath.value },
-    );
+    const response = await apiGet<{ moviePath?: string }>(API_ROUTES.mulmoScript.movieStatus, { filePath: filePath.value });
     if (response.ok && response.data.moviePath) {
       moviePath.value = response.data.moviePath;
     }
@@ -1260,9 +980,7 @@ function reflectGenerationStart(entry: PendingGeneration): void {
   }
 }
 
-async function reflectGenerationFinish(
-  entry: PendingGeneration,
-): Promise<void> {
+async function reflectGenerationFinish(entry: PendingGeneration): Promise<void> {
   if (entry.kind === GENERATION_KINDS.beatImage) {
     const idx = Number(entry.key);
     await loadExistingBeatImage(idx);
@@ -1284,10 +1002,7 @@ async function reflectGenerationFinish(
 
 async function refreshMoviePath(): Promise<void> {
   if (!filePath.value) return;
-  const response = await apiGet<{ moviePath?: string }>(
-    API_ROUTES.mulmoScript.movieStatus,
-    { filePath: filePath.value },
-  );
+  const response = await apiGet<{ moviePath?: string }>(API_ROUTES.mulmoScript.movieStatus, { filePath: filePath.value });
   if (response.ok && response.data.moviePath) {
     moviePath.value = response.data.moviePath;
   }

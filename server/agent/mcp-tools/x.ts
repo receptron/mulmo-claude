@@ -3,8 +3,7 @@ import { safeResponseText } from "../../utils/http.js";
 import { env } from "../../system/env.js";
 
 const X_API_BASE = "https://api.twitter.com/2";
-const TWEET_FIELDS =
-  "tweet.fields=created_at,author_id,public_metrics,entities";
+const TWEET_FIELDS = "tweet.fields=created_at,author_id,public_metrics,entities";
 const EXPANSIONS = "expansions=author_id";
 const USER_FIELDS = "user.fields=name,username";
 
@@ -46,12 +45,8 @@ async function fetchX(path: string): Promise<XApiResponse> {
     throw new Error(`Network error calling X API: ${errorMessage(err)}`);
   }
 
-  if (response.status === 401)
-    throw new Error("X API error 401: Invalid or expired Bearer Token.");
-  if (response.status === 429)
-    throw new Error(
-      "X API error 429: Rate limit exceeded. Please wait before retrying.",
-    );
+  if (response.status === 401) throw new Error("X API error 401: Invalid or expired Bearer Token.");
+  if (response.status === 429) throw new Error("X API error 429: Rate limit exceeded. Please wait before retrying.");
   if (!response.ok) {
     const body = await safeResponseText(response);
     throw new Error(`X API error ${response.status}: ${body}`);
@@ -61,19 +56,15 @@ async function fetchX(path: string): Promise<XApiResponse> {
 }
 
 function formatTweet(tweet: XTweet, author?: XUser, url?: string): string {
-  const date = tweet.created_at
-    ? new Date(tweet.created_at).toISOString().split("T")[0]
-    : "";
+  const date = tweet.created_at ? new Date(tweet.created_at).toISOString().split("T")[0] : "";
   const dateSuffix = date ? ` · ${date}` : "";
-  const byline = author
-    ? `@${author.username} (${author.name})${dateSuffix}`
-    : date;
+  const byline = author ? `@${author.username} (${author.name})${dateSuffix}` : date;
   const metrics = tweet.public_metrics
     ? `Likes: ${tweet.public_metrics.like_count} | Retweets: ${tweet.public_metrics.retweet_count} | Replies: ${tweet.public_metrics.reply_count}`
     : "";
   const link = url ?? "";
   return [byline, "", tweet.text, "", metrics, link]
-    .filter((l) => l !== undefined)
+    .filter((line) => line !== undefined)
     .join("\n")
     .trimEnd();
 }
@@ -83,15 +74,13 @@ function formatTweet(tweet: XTweet, author?: XUser, url?: string): string {
 export const readXPost = {
   definition: {
     name: "readXPost",
-    description:
-      "Fetch the content of a single X (Twitter) post by URL or tweet ID. Returns the author, text, and engagement metrics.",
+    description: "Fetch the content of a single X (Twitter) post by URL or tweet ID. Returns the author, text, and engagement metrics.",
     inputSchema: {
       type: "object",
       properties: {
         url: {
           type: "string",
-          description:
-            "Full X post URL (https://x.com/user/status/ID) or bare tweet ID.",
+          description: "Full X post URL (https://x.com/user/status/ID) or bare tweet ID.",
         },
       },
       required: ["url"],
@@ -100,35 +89,28 @@ export const readXPost = {
 
   requiredEnv: ["X_BEARER_TOKEN"],
 
-  prompt:
-    "Use the readXPost tool whenever the user shares a URL from x.com or twitter.com.",
+  prompt: "Use the readXPost tool whenever the user shares a URL from x.com or twitter.com.",
 
   async handler(args: Record<string, unknown>): Promise<string> {
     const url = String(args.url ?? "");
     const match = url.match(/status\/(\d+)/);
     const tweetId = match ? match[1] : /^\d+$/.test(url) ? url : null;
-    if (!tweetId)
-      return `Could not extract a tweet ID from: ${url}. Provide a full x.com URL or a numeric tweet ID.`;
+    if (!tweetId) return `Could not extract a tweet ID from: ${url}. Provide a full x.com URL or a numeric tweet ID.`;
 
     let data: XApiResponse;
     try {
-      data = await fetchX(
-        `/tweets/${tweetId}?${TWEET_FIELDS}&${EXPANSIONS}&${USER_FIELDS}`,
-      );
+      data = await fetchX(`/tweets/${tweetId}?${TWEET_FIELDS}&${EXPANSIONS}&${USER_FIELDS}`);
     } catch (err) {
       return errorMessage(err);
     }
 
-    if (data.errors?.length)
-      return `X API error: ${data.errors.map((e) => e.detail).join("; ")}`;
+    if (data.errors?.length) return `X API error: ${data.errors.map((err) => err.detail).join("; ")}`;
 
     const tweet = data.data as XTweet | undefined;
     if (!tweet) return "Tweet not found.";
 
-    const author = data.includes?.users?.find((u) => u.id === tweet.author_id);
-    const canonicalUrl = author
-      ? `https://x.com/${author.username}/status/${tweet.id}`
-      : undefined;
+    const author = data.includes?.users?.find((user) => user.id === tweet.author_id);
+    const canonicalUrl = author ? `https://x.com/${author.username}/status/${tweet.id}` : undefined;
     return formatTweet(tweet, author, canonicalUrl);
   },
 };
@@ -138,15 +120,13 @@ export const readXPost = {
 export const searchX = {
   definition: {
     name: "searchX",
-    description:
-      "Search recent X (Twitter) posts by keyword or query. Returns up to max_results posts (default 10, max 100).",
+    description: "Search recent X (Twitter) posts by keyword or query. Returns up to max_results posts (default 10, max 100).",
     inputSchema: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description:
-            "X search query. Supports operators like from:user, #hashtag, -excludeword.",
+          description: "X search query. Supports operators like from:user, #hashtag, -excludeword.",
         },
         max_results: {
           type: "number",
@@ -155,8 +135,7 @@ export const searchX = {
         sort_order: {
           type: "string",
           enum: ["recency", "relevancy"],
-          description:
-            "'recency' = latest tweets first (default). 'relevancy' = most relevant (Top) first.",
+          description: "'recency' = latest tweets first (default). 'relevancy' = most relevant (Top) first.",
         },
       },
       required: ["query"],
@@ -171,15 +150,11 @@ export const searchX = {
     const query = String(args.query ?? "").trim();
     if (!query) return "A search query is required.";
 
-    const maxResults = Math.min(
-      100,
-      Math.max(10, Number(args.max_results ?? 10)),
-    );
+    const maxResults = Math.min(100, Math.max(10, Number(args.max_results ?? 10)));
 
     let data: XApiResponse;
     try {
-      const sortOrder =
-        args.sort_order === "relevancy" ? "relevancy" : "recency";
+      const sortOrder = args.sort_order === "relevancy" ? "relevancy" : "recency";
       const params = new URLSearchParams({
         query,
         max_results: String(maxResults),
@@ -193,19 +168,15 @@ export const searchX = {
       return errorMessage(err);
     }
 
-    if (data.errors?.length)
-      return `X API error: ${data.errors.map((e) => e.detail).join("; ")}`;
+    if (data.errors?.length) return `X API error: ${data.errors.map((err) => err.detail).join("; ")}`;
 
     const tweets = Array.isArray(data.data) ? data.data : [];
     if (tweets.length === 0) return `No recent posts found for: "${query}"`;
 
     const users = data.includes?.users ?? [];
-    const userMap = new Map(users.map((u) => [u.id, u]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
 
-    const lines: string[] = [
-      `Search: "${query}" — ${tweets.length} result${tweets.length !== 1 ? "s" : ""}`,
-      "",
-    ];
+    const lines: string[] = [`Search: "${query}" — ${tweets.length} result${tweets.length !== 1 ? "s" : ""}`, ""];
     tweets.forEach((tweet, i) => {
       const author = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
       lines.push(`${i + 1}. ${formatTweet(tweet, author)}`);

@@ -67,17 +67,14 @@ describe("colorForLabel", () => {
   it("always returns a value from LABEL_PALETTE", () => {
     for (const input of ["Work", "", "abc", "ZZZZZZ", "仕事", "1"]) {
       const color = colorForLabel(input);
-      assert.ok(
-        LABEL_PALETTE.includes(color),
-        `expected palette entry, got "${color}" for "${input}"`,
-      );
+      assert.ok(LABEL_PALETTE.includes(color), `expected palette entry, got "${color}" for "${input}"`);
     }
   });
 
   it("is deterministic for the same input", () => {
-    const a = colorForLabel("Urgent");
-    const b = colorForLabel("Urgent");
-    assert.equal(a, b);
+    const colorA = colorForLabel("Urgent");
+    const colorB = colorForLabel("Urgent");
+    assert.equal(colorA, colorB);
   });
 
   it("is case-insensitive", () => {
@@ -88,19 +85,9 @@ describe("colorForLabel", () => {
   it("maps visibly different labels to varied colours (spot check)", () => {
     // Not required to be unique, but a handful of common labels
     // shouldn't all collide on the same slot.
-    const samples = [
-      "Work",
-      "Personal",
-      "Urgent",
-      "Groceries",
-      "Shopping",
-      "Books",
-    ];
+    const samples = ["Work", "Personal", "Urgent", "Groceries", "Shopping", "Books"];
     const colors = new Set(samples.map(colorForLabel));
-    assert.ok(
-      colors.size >= 3,
-      `expected at least 3 distinct colours from ${samples.length} samples, got ${colors.size}`,
-    );
+    assert.ok(colors.size >= 3, `expected at least 3 distinct colours from ${samples.length} samples, got ${colors.size}`);
   });
 });
 
@@ -176,11 +163,7 @@ describe("listLabelsWithCount", () => {
   });
 
   it("counts labels across items", () => {
-    const items = [
-      { labels: ["Work", "Urgent"] },
-      { labels: ["Work"] },
-      { labels: ["Personal"] },
-    ];
+    const items = [{ labels: ["Work", "Urgent"] }, { labels: ["Work"] }, { labels: ["Personal"] }];
     const result = listLabelsWithCount(items);
     // Sorted by count desc, then label asc
     assert.deepEqual(result, [
@@ -191,11 +174,7 @@ describe("listLabelsWithCount", () => {
   });
 
   it("groups case-insensitively", () => {
-    const items = [
-      { labels: ["Work"] },
-      { labels: ["work"] },
-      { labels: ["WORK"] },
-    ];
+    const items = [{ labels: ["Work"] }, { labels: ["work"] }, { labels: ["WORK"] }];
     const result = listLabelsWithCount(items);
     assert.equal(result.length, 1);
     assert.equal(result[0].count, 3);
@@ -212,14 +191,10 @@ describe("listLabelsWithCount", () => {
   });
 
   it("sorts alphabetically (case-insensitive) when counts are equal", () => {
-    const items = [
-      { labels: ["Zebra"] },
-      { labels: ["apple"] },
-      { labels: ["Mango"] },
-    ];
+    const items = [{ labels: ["Zebra"] }, { labels: ["apple"] }, { labels: ["Mango"] }];
     const result = listLabelsWithCount(items);
     assert.deepEqual(
-      result.map((r) => r.label),
+      result.map((item) => item.label),
       ["apple", "Mango", "Zebra"],
     );
   });
@@ -235,11 +210,7 @@ describe("mergeLabels", () => {
   });
 
   it("appends new labels without disturbing existing order", () => {
-    assert.deepEqual(mergeLabels(["Work", "Personal"], ["Urgent"]), [
-      "Work",
-      "Personal",
-      "Urgent",
-    ]);
+    assert.deepEqual(mergeLabels(["Work", "Personal"], ["Urgent"]), ["Work", "Personal", "Urgent"]);
   });
 
   it("de-duplicates case-insensitively", () => {
@@ -252,10 +223,7 @@ describe("mergeLabels", () => {
   });
 
   it("normalises whitespace on both sides", () => {
-    assert.deepEqual(mergeLabels(["  Work  "], [" Urgent "]), [
-      "Work",
-      "Urgent",
-    ]);
+    assert.deepEqual(mergeLabels(["  Work  "], [" Urgent "]), ["Work", "Urgent"]);
   });
 
   it("rejects empty additions silently", () => {
@@ -265,10 +233,7 @@ describe("mergeLabels", () => {
 
 describe("subtractLabels", () => {
   it("removes matching labels (case-insensitive)", () => {
-    assert.deepEqual(subtractLabels(["Work", "Urgent", "Personal"], ["work"]), [
-      "Urgent",
-      "Personal",
-    ]);
+    assert.deepEqual(subtractLabels(["Work", "Urgent", "Personal"], ["work"]), ["Urgent", "Personal"]);
   });
 
   it("is a no-op when removing a label that isn't there", () => {
@@ -276,30 +241,18 @@ describe("subtractLabels", () => {
   });
 
   it("preserves the order of surviving labels", () => {
-    assert.deepEqual(subtractLabels(["A", "B", "C", "D"], ["B", "D"]), [
-      "A",
-      "C",
-    ]);
+    assert.deepEqual(subtractLabels(["A", "B", "C", "D"], ["B", "D"]), ["A", "C"]);
   });
 
   it("returns existing set unchanged when removing empty list", () => {
-    assert.deepEqual(subtractLabels(["Work", "Urgent"], []), [
-      "Work",
-      "Urgent",
-    ]);
+    assert.deepEqual(subtractLabels(["Work", "Urgent"], []), ["Work", "Urgent"]);
   });
 
   it("normalises whitespace on existing entries even when not removing", () => {
-    assert.deepEqual(subtractLabels(["  Work  ", "Urgent"], []), [
-      "Work",
-      "Urgent",
-    ]);
+    assert.deepEqual(subtractLabels(["  Work  ", "Urgent"], []), ["Work", "Urgent"]);
   });
 
   it("drops invalid entries from existing side", () => {
-    assert.deepEqual(subtractLabels(["Work", "", "   ", "Urgent"], []), [
-      "Work",
-      "Urgent",
-    ]);
+    assert.deepEqual(subtractLabels(["Work", "", "   ", "Urgent"], []), ["Work", "Urgent"]);
   });
 });

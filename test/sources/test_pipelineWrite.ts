@@ -13,10 +13,7 @@ import {
   groupItemsForArchive,
   appendItemsToArchives,
 } from "../../server/workspace/sources/pipeline/write.js";
-import {
-  archivePath,
-  dailyNewsPath,
-} from "../../server/workspace/sources/paths.js";
+import { archivePath, dailyNewsPath } from "../../server/workspace/sources/paths.js";
 import type { SourceItem } from "../../server/workspace/sources/types.js";
 
 function makeItem(over: Partial<SourceItem> = {}): SourceItem {
@@ -145,9 +142,7 @@ describe("groupItemsForArchive", () => {
   });
 
   it("uses the fallback month for items with malformed publishedAt", () => {
-    const items = [
-      makeItem({ id: "1", sourceSlug: "hn", publishedAt: "bogus" }),
-    ];
+    const items = [makeItem({ id: "1", sourceSlug: "hn", publishedAt: "bogus" })];
     const groups = groupItemsForArchive(items, "2026-04");
     assert.equal(groups.get("hn::2026-04")!.length, 1);
   });
@@ -157,9 +152,7 @@ describe("groupItemsForArchive", () => {
 
 describe("renderItemForArchive", () => {
   it("renders title, metadata, summary and the trailing separator", () => {
-    const md = renderItemForArchive(
-      makeItem({ title: "Cool thing", summary: "It's cool" }),
-    );
+    const md = renderItemForArchive(makeItem({ title: "Cool thing", summary: "It's cool" }));
     assert.match(md, /^## Cool thing/);
     assert.match(md, /\*\*Published:\*\* 2026-04-13T10:00:00Z/);
     assert.match(md, /\*\*Source:\*\* hn/);
@@ -171,9 +164,7 @@ describe("renderItemForArchive", () => {
   });
 
   it("omits content when identical to summary (no repetition)", () => {
-    const md = renderItemForArchive(
-      makeItem({ summary: "same text", content: "same text" }),
-    );
+    const md = renderItemForArchive(makeItem({ summary: "same text", content: "same text" }));
     // summary appears once, not twice.
     const matches = md.match(/same text/g) ?? [];
     assert.equal(matches.length, 1);
@@ -204,9 +195,7 @@ afterEach(() => {
 
 describe("writeDailyFile", () => {
   it("writes the daily file atomically and creates parent dirs", async () => {
-    const target = await writeDailyFile(workspace, "2026-04-13", "# brief\n", [
-      makeItem(),
-    ]);
+    const target = await writeDailyFile(workspace, "2026-04-13", "# brief\n", [makeItem()]);
     assert.equal(target, dailyNewsPath(workspace, "2026-04-13"));
     const raw = await readFile(target, "utf-8");
     assert.match(raw, /# brief/);
@@ -242,33 +231,16 @@ describe("appendItemsToArchives", () => {
     assert.equal(out.errors.length, 0);
     assert.equal(out.writtenPaths.length, 2);
 
-    const hnArchive = await readFile(
-      archivePath(workspace, "hn", "2026-04"),
-      "utf-8",
-    );
+    const hnArchive = await readFile(archivePath(workspace, "hn", "2026-04"), "utf-8");
     assert.match(hnArchive, /## HN item/);
-    const redditArchive = await readFile(
-      archivePath(workspace, "reddit", "2026-04"),
-      "utf-8",
-    );
+    const redditArchive = await readFile(archivePath(workspace, "reddit", "2026-04"), "utf-8");
     assert.match(redditArchive, /## Reddit item/);
   });
 
   it("appends across runs rather than overwriting", async () => {
-    await appendItemsToArchives(
-      workspace,
-      [makeItem({ id: "1", title: "First" })],
-      "2026-04",
-    );
-    await appendItemsToArchives(
-      workspace,
-      [makeItem({ id: "2", title: "Second" })],
-      "2026-04",
-    );
-    const archive = await readFile(
-      archivePath(workspace, "hn", "2026-04"),
-      "utf-8",
-    );
+    await appendItemsToArchives(workspace, [makeItem({ id: "1", title: "First" })], "2026-04");
+    await appendItemsToArchives(workspace, [makeItem({ id: "2", title: "Second" })], "2026-04");
+    const archive = await readFile(archivePath(workspace, "hn", "2026-04"), "utf-8");
     assert.match(archive, /## First/);
     assert.match(archive, /## Second/);
   });
@@ -293,14 +265,8 @@ describe("appendItemsToArchives", () => {
       }),
     ];
     await appendItemsToArchives(workspace, items, "2026-04");
-    const aprArchive = await readFile(
-      archivePath(workspace, "hn", "2026-04"),
-      "utf-8",
-    );
-    const mayArchive = await readFile(
-      archivePath(workspace, "hn", "2026-05"),
-      "utf-8",
-    );
+    const aprArchive = await readFile(archivePath(workspace, "hn", "2026-04"), "utf-8");
+    const mayArchive = await readFile(archivePath(workspace, "hn", "2026-05"), "utf-8");
     assert.match(aprArchive, /April item/);
     assert.doesNotMatch(aprArchive, /May item/);
     assert.match(mayArchive, /May item/);

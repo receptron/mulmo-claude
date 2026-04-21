@@ -31,31 +31,19 @@ describe("parseSSEEventLine", () => {
   });
 
   it("parses beat_image_done with beatIndex", () => {
-    assert.deepEqual(
-      parseSSEEventLine('data: {"type":"beat_image_done","beatIndex":3}'),
-      { type: "beat_image_done", beatIndex: 3 },
-    );
+    assert.deepEqual(parseSSEEventLine('data: {"type":"beat_image_done","beatIndex":3}'), { type: "beat_image_done", beatIndex: 3 });
   });
 
   it("parses beat_audio_done with beatIndex", () => {
-    assert.deepEqual(
-      parseSSEEventLine('data: {"type":"beat_audio_done","beatIndex":0}'),
-      { type: "beat_audio_done", beatIndex: 0 },
-    );
+    assert.deepEqual(parseSSEEventLine('data: {"type":"beat_audio_done","beatIndex":0}'), { type: "beat_audio_done", beatIndex: 0 });
   });
 
   it("parses done with moviePath", () => {
-    assert.deepEqual(
-      parseSSEEventLine('data: {"type":"done","moviePath":"/tmp/out.mp4"}'),
-      { type: "done", moviePath: "/tmp/out.mp4" },
-    );
+    assert.deepEqual(parseSSEEventLine('data: {"type":"done","moviePath":"/tmp/out.mp4"}'), { type: "done", moviePath: "/tmp/out.mp4" });
   });
 
   it("parses error with message", () => {
-    assert.deepEqual(
-      parseSSEEventLine('data: {"type":"error","message":"boom"}'),
-      { type: "error", message: "boom" },
-    );
+    assert.deepEqual(parseSSEEventLine('data: {"type":"error","message":"boom"}'), { type: "error", message: "boom" });
   });
 
   it("returns unknown for recognised shape but missing/ill-typed fields", () => {
@@ -64,10 +52,7 @@ describe("parseSSEEventLine", () => {
       type: "unknown",
     });
     // beatIndex wrong type
-    assert.deepEqual(
-      parseSSEEventLine('data: {"type":"beat_image_done","beatIndex":"3"}'),
-      { type: "unknown" },
-    );
+    assert.deepEqual(parseSSEEventLine('data: {"type":"beat_image_done","beatIndex":"3"}'), { type: "unknown" });
     // unknown type
     assert.deepEqual(parseSSEEventLine('data: {"type":"progress"}'), {
       type: "unknown",
@@ -81,28 +66,15 @@ describe("shouldAutoRenderBeat", () => {
   const autoTypes = ["textSlide", "markdown", "chart"] as const;
 
   it("returns false when the script has characters, regardless of type", () => {
-    assert.equal(
-      shouldAutoRenderBeat({ image: { type: "textSlide" } }, true, autoTypes),
-      false,
-    );
+    assert.equal(shouldAutoRenderBeat({ image: { type: "textSlide" } }, true, autoTypes), false);
   });
 
   it("returns true for an auto-render type when no characters", () => {
-    assert.equal(
-      shouldAutoRenderBeat({ image: { type: "markdown" } }, false, autoTypes),
-      true,
-    );
+    assert.equal(shouldAutoRenderBeat({ image: { type: "markdown" } }, false, autoTypes), true);
   });
 
   it("returns false for a type outside the whitelist", () => {
-    assert.equal(
-      shouldAutoRenderBeat(
-        { image: { type: "imagePrompt" } },
-        false,
-        autoTypes,
-      ),
-      false,
-    );
+    assert.equal(shouldAutoRenderBeat({ image: { type: "imagePrompt" } }, false, autoTypes), false);
   });
 
   it("returns false when beat has no image", () => {
@@ -116,11 +88,7 @@ describe("shouldAutoRenderBeat", () => {
 
 describe("getMissingCharacterKeys", () => {
   it("returns keys with no image and no 'rendering' state", () => {
-    const result = getMissingCharacterKeys(
-      ["alice", "bob", "carol"],
-      { alice: "data:..." },
-      { bob: "rendering" },
-    );
+    const result = getMissingCharacterKeys(["alice", "bob", "carol"], { alice: "data:..." }, { bob: "rendering" });
     assert.deepEqual(result, ["carol"]);
   });
 
@@ -214,11 +182,7 @@ describe("extractErrorMessage", () => {
 // checks per case.
 interface HandlerSpy {
   handlers: MovieEventHandlers;
-  calls: Array<
-    | { name: "onBeatImageDone"; beatIndex: number }
-    | { name: "onBeatAudioDone"; beatIndex: number }
-    | { name: "onDone"; moviePath: string }
-  >;
+  calls: Array<{ name: "onBeatImageDone"; beatIndex: number } | { name: "onBeatAudioDone"; beatIndex: number } | { name: "onDone"; moviePath: string }>;
 }
 
 function makeSpy(): HandlerSpy {
@@ -254,25 +218,13 @@ describe("applyMovieEvent", () => {
 
   it("routes done to onDone with the movie path", () => {
     const spy = makeSpy();
-    applyMovieEvent(
-      { type: "done", moviePath: "movies/final.mp4" },
-      spy.handlers,
-    );
-    assert.deepEqual(spy.calls, [
-      { name: "onDone", moviePath: "movies/final.mp4" },
-    ]);
+    applyMovieEvent({ type: "done", moviePath: "movies/final.mp4" }, spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onDone", moviePath: "movies/final.mp4" }]);
   });
 
   it("throws on error events with the server-provided message", () => {
     const spy = makeSpy();
-    assert.throws(
-      () =>
-        applyMovieEvent(
-          { type: "error", message: "ffmpeg boom" },
-          spy.handlers,
-        ),
-      /ffmpeg boom/,
-    );
+    assert.throws(() => applyMovieEvent({ type: "error", message: "ffmpeg boom" }, spy.handlers), /ffmpeg boom/);
     // No handler called for the error path.
     assert.equal(spy.calls.length, 0);
   });
@@ -307,9 +259,7 @@ describe("applyMovieEvent", () => {
 // Build a ReadableStream<Uint8Array> from an array of string chunks
 // — the caller's byte stream boundary is what exercises the
 // internal buffer-remainder handling.
-function streamFromChunks(
-  chunks: readonly string[],
-): ReadableStream<Uint8Array> {
+function streamFromChunks(chunks: readonly string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   let i = 0;
   return new ReadableStream<Uint8Array>({
@@ -350,23 +300,12 @@ describe("streamMovieEvents", () => {
     })}\n`;
     const mid = Math.floor(payload.length / 2);
     const spy = makeSpy();
-    await streamMovieEvents(
-      streamFromChunks([payload.slice(0, mid), payload.slice(mid)]),
-      spy.handlers,
-    );
-    assert.deepEqual(spy.calls, [
-      { name: "onDone", moviePath: "boundary.mp4" },
-    ]);
+    await streamMovieEvents(streamFromChunks([payload.slice(0, mid), payload.slice(mid)]), spy.handlers);
+    assert.deepEqual(spy.calls, [{ name: "onDone", moviePath: "boundary.mp4" }]);
   });
 
   it("skips comment / blank / malformed lines", async () => {
-    const chunks = [
-      ":keepalive\n" +
-        "\n" +
-        "not a data line\n" +
-        "data: { not json\n" +
-        `data: ${JSON.stringify({ type: "done", moviePath: "ok.mp4" })}\n`,
-    ];
+    const chunks = [":keepalive\n" + "\n" + "not a data line\n" + "data: { not json\n" + `data: ${JSON.stringify({ type: "done", moviePath: "ok.mp4" })}\n`];
     const spy = makeSpy();
     await streamMovieEvents(streamFromChunks(chunks), spy.handlers);
     assert.deepEqual(spy.calls, [{ name: "onDone", moviePath: "ok.mp4" }]);
@@ -380,10 +319,7 @@ describe("streamMovieEvents", () => {
         `data: ${JSON.stringify({ type: "done", moviePath: "unreachable" })}\n`,
     ];
     const spy = makeSpy();
-    await assert.rejects(
-      () => streamMovieEvents(streamFromChunks(chunks), spy.handlers),
-      /server exploded/,
-    );
+    await assert.rejects(() => streamMovieEvents(streamFromChunks(chunks), spy.handlers), /server exploded/);
     // Only the first (pre-error) event was dispatched.
     assert.deepEqual(spy.calls, [{ name: "onBeatImageDone", beatIndex: 0 }]);
   });

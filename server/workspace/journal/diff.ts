@@ -35,10 +35,7 @@ export interface DirtySessionDecision {
 // The caller may additionally exclude currently-active sessions
 // (whose jsonl could be mid-write); that's a separate concern and
 // kept out of the pure diff.
-export function findDirtySessions(
-  current: readonly SessionFileMeta[],
-  processed: Record<string, ProcessedSessionRecord>,
-): DirtySessionDecision {
+export function findDirtySessions(current: readonly SessionFileMeta[], processed: Record<string, ProcessedSessionRecord>): DirtySessionDecision {
   const dirty: string[] = [];
   const seenNow = new Set<string>();
 
@@ -55,8 +52,8 @@ export function findDirtySessions(
   }
 
   const missing: string[] = [];
-  for (const id of Object.keys(processed)) {
-    if (!seenNow.has(id)) missing.push(id);
+  for (const sessionId of Object.keys(processed)) {
+    if (!seenNow.has(sessionId)) missing.push(sessionId);
   }
 
   return { dirty, missing };
@@ -65,10 +62,7 @@ export function findDirtySessions(
 // Produce the next processedSessions map after a successful ingest
 // of the given dirty ids. Pure — doesn't mutate input. Sessions not
 // in the dirty list keep their existing record.
-export function applyProcessed(
-  previous: JournalState["processedSessions"],
-  justProcessed: readonly SessionFileMeta[],
-): JournalState["processedSessions"] {
+export function applyProcessed(previous: JournalState["processedSessions"], justProcessed: readonly SessionFileMeta[]): JournalState["processedSessions"] {
   const next: JournalState["processedSessions"] = { ...previous };
   for (const meta of justProcessed) {
     next[meta.id] = { lastMtimeMs: meta.mtimeMs };

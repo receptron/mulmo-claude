@@ -45,12 +45,8 @@ const CONTROL_CHAR_RE_G = /[\x00-\x1f]/g;
 
 // ── Validation ──────────────────────────────────────────────────
 
-function isValidStructure(v: unknown): v is DirStructure {
-  return (
-    v === DIR_STRUCTURES.flat ||
-    v === DIR_STRUCTURES.byName ||
-    v === DIR_STRUCTURES.byDate
-  );
+function isValidStructure(value: unknown): value is DirStructure {
+  return value === DIR_STRUCTURES.flat || value === DIR_STRUCTURES.byName || value === DIR_STRUCTURES.byDate;
 }
 
 function validatePath(rawPath: string): string | null {
@@ -59,7 +55,7 @@ function validatePath(rawPath: string): string | null {
   const normalized = path.posix.normalize(rawPath);
 
   // Must start with allowed prefix
-  if (!ALLOWED_PREFIXES.some((p) => normalized.startsWith(p))) return null;
+  if (!ALLOWED_PREFIXES.some((prefix) => normalized.startsWith(prefix))) return null;
 
   // No path traversal
   if (normalized.includes("..")) return null;
@@ -68,11 +64,7 @@ function validatePath(rawPath: string): string | null {
   if (path.isAbsolute(normalized)) return null;
 
   // Not a reserved system directory
-  if (
-    RESERVED_DIRS.some(
-      (r) => normalized === r || normalized.startsWith(r + "/"),
-    )
-  ) {
+  if (RESERVED_DIRS.some((reservedDir) => normalized === reservedDir || normalized.startsWith(reservedDir + "/"))) {
     return null;
   }
 
@@ -85,10 +77,7 @@ function validatePath(rawPath: string): string | null {
 function sanitizeDescription(raw: string): string {
   if (typeof raw !== "string") return "";
   // Remove control characters and newlines
-  return raw
-    .replace(CONTROL_CHAR_RE_G, " ")
-    .trim()
-    .slice(0, MAX_DESCRIPTION_LENGTH);
+  return raw.replace(CONTROL_CHAR_RE_G, " ").trim().slice(0, MAX_DESCRIPTION_LENGTH);
 }
 
 function validateEntry(raw: unknown): CustomDirEntry | null {
@@ -98,9 +87,7 @@ function validateEntry(raw: unknown): CustomDirEntry | null {
   const validPath = validatePath(String(obj.path ?? ""));
   if (!validPath) return null;
 
-  const structure = isValidStructure(obj.structure)
-    ? obj.structure
-    : DIR_STRUCTURES.flat;
+  const structure = isValidStructure(obj.structure) ? obj.structure : DIR_STRUCTURES.flat;
 
   return {
     path: validPath,
@@ -125,7 +112,7 @@ export function loadCustomDirs(root?: string): CustomDirEntry[] {
     const entries = parsed
       .slice(0, MAX_ENTRIES)
       .map(validateEntry)
-      .filter((e): e is CustomDirEntry => e !== null);
+      .filter((entry): entry is CustomDirEntry => entry !== null);
 
     const skipped = parsed.length - entries.length;
     if (skipped > 0) {
@@ -142,10 +129,7 @@ export function loadCustomDirs(root?: string): CustomDirEntry[] {
 
 // ── Save ────────────────────────────────────────────────────────
 
-export function saveCustomDirs(
-  entries: readonly CustomDirEntry[],
-  root?: string,
-): void {
+export function saveCustomDirs(entries: readonly CustomDirEntry[], root?: string): void {
   const base = root ?? workspacePath;
   const filePath = path.join(base, CONFIG_FILE);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -155,9 +139,7 @@ export function saveCustomDirs(
 
 // ── Validate input array (for API) ─────────────────────────────
 
-export function validateCustomDirs(
-  raw: unknown,
-): { entries: CustomDirEntry[] } | { error: string } {
+export function validateCustomDirs(raw: unknown): { entries: CustomDirEntry[] } | { error: string } {
   if (!Array.isArray(raw)) {
     return { error: "expected an array" };
   }
@@ -171,10 +153,8 @@ export function validateCustomDirs(
     if (entry) {
       entries.push(entry);
     } else {
-      const p = isRecord(item)
-        ? String((item as Record<string, unknown>).path ?? "")
-        : "";
-      errors.push(`entry ${i}: invalid path "${p}"`);
+      const itemPath = isRecord(item) ? String((item as Record<string, unknown>).path ?? "") : "";
+      errors.push(`entry ${i}: invalid path "${itemPath}"`);
     }
   });
   if (errors.length > 0) {
@@ -202,10 +182,7 @@ function invalidateCache(): void {
 
 // ── Create directories ──────────────────────────────────────────
 
-export function ensureCustomDirs(
-  entries: readonly CustomDirEntry[],
-  root?: string,
-): void {
+export function ensureCustomDirs(entries: readonly CustomDirEntry[], root?: string): void {
   const base = root ?? workspacePath;
   for (const entry of entries) {
     const dirPath = path.join(base, entry.path);
@@ -215,9 +192,7 @@ export function ensureCustomDirs(
 
 // ── System prompt snippet ───────────────────────────────────────
 
-export function buildCustomDirsPrompt(
-  entries: readonly CustomDirEntry[],
-): string {
+export function buildCustomDirsPrompt(entries: readonly CustomDirEntry[]): string {
   if (entries.length === 0) return "";
 
   const lines = [
@@ -230,14 +205,14 @@ export function buildCustomDirsPrompt(
     "",
   ];
 
-  for (const e of entries) {
+  for (const entry of entries) {
     const structureHint =
-      e.structure === DIR_STRUCTURES.byName
+      entry.structure === DIR_STRUCTURES.byName
         ? " (organize by name in subfolders)"
-        : e.structure === DIR_STRUCTURES.byDate
+        : entry.structure === DIR_STRUCTURES.byDate
           ? " (organize by date: YYYY/MM/DD/)"
           : "";
-    lines.push(`- \`${e.path}/\`${structureHint} — ${e.description}`);
+    lines.push(`- \`${entry.path}/\`${structureHint} — ${entry.description}`);
   }
 
   lines.push("");

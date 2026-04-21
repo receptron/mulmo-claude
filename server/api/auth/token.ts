@@ -57,10 +57,7 @@ export function getCurrentToken(): string | null {
  *   `env.authTokenOverride` from `server/env.ts`. When non-empty the
  *   override is used verbatim instead of generating random bytes.
  */
-export async function generateAndWriteToken(
-  tokenPath: string = WORKSPACE_PATHS.sessionToken,
-  override?: string,
-): Promise<string> {
+export async function generateAndWriteToken(tokenPath: string = WORKSPACE_PATHS.sessionToken, override?: string): Promise<string> {
   const token = resolveToken(override);
   currentToken = token;
   await writeFileAtomic(tokenPath, token, { mode: 0o600 });
@@ -72,11 +69,7 @@ function resolveToken(override: string | undefined): string {
     if (override.length < MIN_RECOMMENDED_CHARS) {
       // Visible on startup so a half-typed override doesn't silently
       // become a security hole in dev.
-      log.warn(
-        "auth",
-        "MULMOCLAUDE_AUTH_TOKEN is shorter than the recommended 32 characters",
-        { length: override.length },
-      );
+      log.warn("auth", "MULMOCLAUDE_AUTH_TOKEN is shorter than the recommended 32 characters", { length: override.length });
     }
     return override;
   }
@@ -88,9 +81,7 @@ function resolveToken(override: string | undefined): string {
  * is a success for our purposes (nothing to clean up). Caller is
  * responsible for not using the in-memory token after calling this.
  */
-export async function deleteTokenFile(
-  tokenPath: string = WORKSPACE_PATHS.sessionToken,
-): Promise<void> {
+export async function deleteTokenFile(tokenPath: string = WORKSPACE_PATHS.sessionToken): Promise<void> {
   try {
     await fs.promises.unlink(tokenPath);
   } catch {

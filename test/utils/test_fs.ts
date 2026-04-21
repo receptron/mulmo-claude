@@ -3,12 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  statSafe,
-  readDirSafe,
-  readTextOrNull,
-  resolveWithinRoot,
-} from "../../server/utils/files/safe.js";
+import { statSafe, readDirSafe, readTextOrNull, resolveWithinRoot } from "../../server/utils/files/safe.js";
 
 // Each test gets its own scratch dir so they can run in parallel and
 // don't have to clean up after each other. We realpath the dir up
@@ -20,7 +15,7 @@ function makeScratch(prefix: string): string {
   return fs.realpathSync(dir);
 }
 
-function rm(dir: string): void {
+function removeScratch(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
@@ -31,18 +26,18 @@ describe("statSafe", () => {
     fs.writeFileSync(path.join(scratch, "file.txt"), "hi");
     fs.mkdirSync(path.join(scratch, "subdir"));
   });
-  after(() => rm(scratch));
+  after(() => removeScratch(scratch));
 
   it("returns Stats for an existing file", () => {
-    const s = statSafe(path.join(scratch, "file.txt"));
-    assert.ok(s);
-    assert.ok(s!.isFile());
+    const stats = statSafe(path.join(scratch, "file.txt"));
+    assert.ok(stats);
+    assert.ok(stats!.isFile());
   });
 
   it("returns Stats for an existing directory", () => {
-    const s = statSafe(path.join(scratch, "subdir"));
-    assert.ok(s);
-    assert.ok(s!.isDirectory());
+    const stats = statSafe(path.join(scratch, "subdir"));
+    assert.ok(stats);
+    assert.ok(stats!.isDirectory());
   });
 
   it("returns null for a missing path (ENOENT)", () => {
@@ -62,11 +57,11 @@ describe("readDirSafe", () => {
     fs.writeFileSync(path.join(scratch, "b.txt"), "");
     fs.mkdirSync(path.join(scratch, "sub"));
   });
-  after(() => rm(scratch));
+  after(() => removeScratch(scratch));
 
   it("returns the directory entries with file types", () => {
     const entries = readDirSafe(scratch)
-      .map((e) => e.name)
+      .map((entry) => entry.name)
       .sort();
     assert.deepEqual(entries, ["a.txt", "b.txt", "sub"]);
   });
@@ -92,13 +87,10 @@ describe("readTextOrNull", () => {
     scratch = makeScratch("readTextOrNull");
     fs.writeFileSync(path.join(scratch, "hi.txt"), "hello world");
   });
-  after(() => rm(scratch));
+  after(() => removeScratch(scratch));
 
   it("returns the file contents as a string", async () => {
-    assert.equal(
-      await readTextOrNull(path.join(scratch, "hi.txt")),
-      "hello world",
-    );
+    assert.equal(await readTextOrNull(path.join(scratch, "hi.txt")), "hello world");
   });
 
   it("returns null for a missing file", async () => {
@@ -118,7 +110,7 @@ describe("resolveWithinRoot — happy path", () => {
     fs.mkdirSync(path.join(scratch, "sub"));
     fs.writeFileSync(path.join(scratch, "sub", "nested.txt"), "");
   });
-  after(() => rm(scratch));
+  after(() => removeScratch(scratch));
 
   it("resolves a top-level file under the root", () => {
     const out = resolveWithinRoot(scratch, "file.txt");
@@ -139,10 +131,7 @@ describe("resolveWithinRoot — happy path", () => {
   });
 
   it("normalizes redundant separators and ./", () => {
-    assert.equal(
-      resolveWithinRoot(scratch, "./sub/./nested.txt"),
-      path.join(scratch, "sub", "nested.txt"),
-    );
+    assert.equal(resolveWithinRoot(scratch, "./sub/./nested.txt"), path.join(scratch, "sub", "nested.txt"));
   });
 });
 
@@ -159,7 +148,7 @@ describe("resolveWithinRoot — security: traversal", () => {
   });
   after(() => {
     fs.rmSync(outsideFile, { force: true });
-    rm(scratch);
+    removeScratch(scratch);
   });
 
   it("rejects ../ traversal that lands outside the root", () => {
@@ -206,17 +195,14 @@ describe("resolveWithinRoot — security: symlinks", () => {
     // Symlink inside scratch pointing to another file inside scratch
     // — a legitimate symlink that should resolve normally.
     try {
-      fs.symlinkSync(
-        path.join(scratch, "real.txt"),
-        path.join(scratch, "alias.txt"),
-      );
+      fs.symlinkSync(path.join(scratch, "real.txt"), path.join(scratch, "alias.txt"));
     } catch {
       /* ignore */
     }
   });
   after(() => {
     fs.rmSync(outsideFile, { force: true });
-    rm(scratch);
+    removeScratch(scratch);
   });
 
   it("rejects a symlink that resolves outside the root", () => {
@@ -229,10 +215,7 @@ describe("resolveWithinRoot — security: symlinks", () => {
     const aliasLink = path.join(scratch, "alias.txt");
     if (!fs.existsSync(aliasLink)) return; // platform skip
     // The alias is followed to its target — both are inside scratch.
-    assert.equal(
-      resolveWithinRoot(scratch, "alias.txt"),
-      path.join(scratch, "real.txt"),
-    );
+    assert.equal(resolveWithinRoot(scratch, "alias.txt"), path.join(scratch, "real.txt"));
   });
 });
 
@@ -267,7 +250,7 @@ describe("resolveWithinRoot — symlinked root directory (A1 regression)", () =>
         /* ignore */
       }
     }
-    rm(realRoot);
+    removeScratch(realRoot);
   });
 
   it("resolves child paths against the realpath of a symlinked root", () => {
@@ -299,7 +282,7 @@ describe("resolveWithinRoot — missing files and edge cases", () => {
   before(() => {
     scratch = makeScratch("resolveWithinRoot-missing");
   });
-  after(() => rm(scratch));
+  after(() => removeScratch(scratch));
 
   it("returns null for a non-existent leaf path", () => {
     assert.equal(resolveWithinRoot(scratch, "nope.txt"), null);

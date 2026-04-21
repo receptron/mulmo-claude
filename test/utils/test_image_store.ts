@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  stripDataUri,
-  isImagePath,
-} from "../../server/utils/files/image-store.js";
+import { stripDataUri, isImagePath } from "../../server/utils/files/image-store.js";
 
 describe("stripDataUri", () => {
   it("strips a standard PNG data URI prefix", () => {

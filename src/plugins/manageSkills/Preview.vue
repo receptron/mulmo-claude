@@ -4,16 +4,10 @@
       <span class="material-icons" style="font-size: 14px">auto_awesome</span>
       <span>{{ skills.length }} skill{{ skills.length !== 1 ? "s" : "" }}</span>
     </div>
-    <div
-      v-for="skill in skills.slice(0, 6)"
-      :key="skill.name"
-      class="text-xs text-gray-600 truncate"
-    >
+    <div v-for="skill in skills.slice(0, 6)" :key="skill.name" class="text-xs text-gray-600 truncate">
       {{ skill.name }}
     </div>
-    <div v-if="skills.length > 6" class="text-xs text-gray-400 italic">
-      +{{ skills.length - 6 }} more
-    </div>
+    <div v-if="skills.length > 6" class="text-xs text-gray-400 italic">+{{ skills.length - 6 }} more</div>
   </div>
 </template>
 

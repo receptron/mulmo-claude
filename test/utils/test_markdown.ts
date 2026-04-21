@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  rewriteWorkspaceLinks,
-  rewriteMarkdownLinks,
-  splitFragmentAndQuery,
-} from "../../server/utils/markdown.js";
+import { rewriteWorkspaceLinks, rewriteMarkdownLinks, splitFragmentAndQuery } from "../../server/utils/markdown.js";
 
 describe("splitFragmentAndQuery", () => {
   it("splits a hash fragment", () => {
@@ -39,7 +35,7 @@ describe("splitFragmentAndQuery", () => {
 describe("rewriteMarkdownLinks", () => {
   it("rewrites the href of every markdown link", () => {
     const input = "See [foo](old) and [bar](old2).";
-    const result = rewriteMarkdownLinks(input, (h) => h.toUpperCase());
+    const result = rewriteMarkdownLinks(input, (href) => href.toUpperCase());
     assert.equal(result, "See [foo](OLD) and [bar](OLD2).");
   });
 
@@ -51,7 +47,7 @@ describe("rewriteMarkdownLinks", () => {
 
   it("handles adjacent links", () => {
     const input = "[a](1)[b](2)";
-    const result = rewriteMarkdownLinks(input, (h) => `_${h}_`);
+    const result = rewriteMarkdownLinks(input, (href) => `_${href}_`);
     assert.equal(result, "[a](_1_)[b](_2_)");
   });
 });
@@ -59,14 +55,8 @@ describe("rewriteMarkdownLinks", () => {
 describe("rewriteWorkspaceLinks", () => {
   it("rewrites absolute workspace paths to relative", () => {
     const content = "See [wiki](/wiki/pages/foo.md) for details.";
-    const result = rewriteWorkspaceLinks(
-      "summaries/daily/2026/04/17.md",
-      content,
-    );
-    assert.equal(
-      result,
-      "See [wiki](../../../../wiki/pages/foo.md) for details.",
-    );
+    const result = rewriteWorkspaceLinks("summaries/daily/2026/04/17.md", content);
+    assert.equal(result, "See [wiki](../../../../wiki/pages/foo.md) for details.");
   });
 
   it("leaves external URLs untouched", () => {

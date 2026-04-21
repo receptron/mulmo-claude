@@ -1,32 +1,18 @@
 import path from "path";
 import { Router, Request, Response } from "express";
 import { executeMindMap } from "@gui-chat-plugin/mindmap";
-import {
-  executeSpreadsheet,
-  type SpreadsheetArgs,
-} from "../../../src/plugins/spreadsheet/definition.js";
+import { executeSpreadsheet, type SpreadsheetArgs } from "../../../src/plugins/spreadsheet/definition.js";
 import { executeQuiz } from "@mulmochat-plugin/quiz";
 import { executeForm } from "@mulmochat-plugin/form";
 import { executeOpenCanvas } from "../../../src/plugins/canvas/definition.js";
 import { executePresent3D } from "@gui-chat-plugin/present3d";
-import {
-  generateGeminiImageFromPrompt,
-  isGeminiAvailable,
-} from "../../utils/gemini.js";
+import { generateGeminiImageFromPrompt, isGeminiAvailable } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { log } from "../../system/logger/index.js";
 import { saveImage } from "../../utils/files/image-store.js";
-import {
-  saveMarkdown,
-  overwriteMarkdown,
-  isMarkdownPath,
-} from "../../utils/files/markdown-store.js";
-import {
-  saveSpreadsheet,
-  overwriteSpreadsheet,
-  isSpreadsheetPath,
-} from "../../utils/files/spreadsheet-store.js";
+import { saveMarkdown, overwriteMarkdown, isMarkdownPath } from "../../utils/files/markdown-store.js";
+import { saveSpreadsheet, overwriteSpreadsheet, isSpreadsheetPath } from "../../utils/files/spreadsheet-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 
@@ -49,10 +35,7 @@ interface PluginErrorResponse {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function wrapPluginExecute<TBody = any, TResult = unknown>(
   execute: (req: Request<object, unknown, TBody>) => Promise<TResult>,
-): (
-  req: Request<object, unknown, TBody>,
-  res: Response<TResult | PluginErrorResponse>,
-) => Promise<void> {
+): (req: Request<object, unknown, TBody>, res: Response<TResult | PluginErrorResponse>) => Promise<void> {
   return async (req, res) => {
     try {
       const result = await execute(req);
@@ -93,18 +76,14 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
   // document.
   const geminiOk = isGeminiAvailable();
   if (!geminiOk) {
-    log.warn(
-      "present-document",
-      "GEMINI_API_KEY not set — image placeholders will render as text markers",
-      { placeholderCount: matches.length },
-    );
+    log.warn("present-document", "GEMINI_API_KEY not set — image placeholders will render as text markers", { placeholderCount: matches.length });
   }
 
   const results = await Promise.all(
-    matches.map(async (m) => ({
-      full: m[0],
-      prompt: m[1],
-      url: geminiOk ? await generateImageFile(m[1]) : null,
+    matches.map(async (match) => ({
+      full: match[0],
+      prompt: match[1],
+      url: geminiOk ? await generateImageFile(match[1]) : null,
     })),
   );
 
@@ -112,7 +91,7 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
   // success rate even when most calls go through. The per-call
   // error already lands at warn from generateImageFile's catch.
   if (geminiOk) {
-    const failed = results.filter((r) => !r.url).length;
+    const failed = results.filter((result) => !result.url).length;
     if (failed > 0) {
       log.warn("present-document", "image generation had failures", {
         failed,
@@ -133,9 +112,7 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
       // The document lives at "artifacts/documents/yyy.md". Compute a
       // relative path from the document's directory so the markdown
       // image reference resolves correctly.
-      url
-        ? `![${prompt}](${path.posix.relative(WORKSPACE_DIRS.markdowns, url)})`
-        : `*🖼️ Image: ${prompt}*`,
+      url ? `![${prompt}](${path.posix.relative(WORKSPACE_DIRS.markdowns, url)})` : `*🖼️ Image: ${prompt}*`,
     );
   }
   return filled;
@@ -145,28 +122,33 @@ async function fillImagePlaceholders(markdown: string): Promise<string> {
 interface PresentDocumentBody {
   title: string;
   markdown: string;
-  filenameHint?: string;
+  filenamePrefix: string;
 }
 
-interface PresentDocumentResponse {
+interface PresentDocumentSuccess {
   message: string;
   title: string;
-  data: { markdown: string; filenameHint?: string };
+  data: { markdown: string; filenamePrefix: string };
+}
+
+interface PresentDocumentError {
+  error: string;
 }
 
 router.post(
   API_ROUTES.plugins.presentDocument,
-  async (
-    req: Request<object, unknown, PresentDocumentBody>,
-    res: Response<PresentDocumentResponse>,
-  ) => {
-    const { title, markdown, filenameHint } = req.body;
+  async (req: Request<object, unknown, PresentDocumentBody>, res: Response<PresentDocumentSuccess | PresentDocumentError>) => {
+    const { title, markdown, filenamePrefix } = req.body;
+    if (typeof filenamePrefix !== "string" || filenamePrefix.trim().length === 0) {
+      badRequest(res, "filenamePrefix is required");
+      return;
+    }
     const filledMarkdown = await fillImagePlaceholders(markdown);
-    const markdownPath = await saveMarkdown(filledMarkdown);
+    const markdownPath = await saveMarkdown(filledMarkdown, filenamePrefix);
     res.json({
       message: `Document "${title}" is ready.`,
       title,
-      data: { markdown: markdownPath, filenameHint },
+      data: { markdown: markdownPath, filenamePrefix },
     });
   },
 );
@@ -186,10 +168,7 @@ interface UpdateMarkdownError {
 
 router.put(
   API_ROUTES.plugins.updateMarkdown,
-  async (
-    req: Request<{ filename: string }, unknown, UpdateMarkdownBody>,
-    res: Response<UpdateMarkdownResponse | UpdateMarkdownError>,
-  ) => {
+  async (req: Request<{ filename: string }, unknown, UpdateMarkdownBody>, res: Response<UpdateMarkdownResponse | UpdateMarkdownError>) => {
     const relativePath = `${WORKSPACE_DIRS.markdowns}/${req.params.filename}`;
     const { markdown } = req.body;
     if (!markdown) {
@@ -244,10 +223,7 @@ interface UpdateSpreadsheetError {
 
 router.put(
   API_ROUTES.plugins.updateSpreadsheet,
-  async (
-    req: Request<{ filename: string }, unknown, UpdateSpreadsheetBody>,
-    res: Response<UpdateSpreadsheetResponse | UpdateSpreadsheetError>,
-  ) => {
+  async (req: Request<{ filename: string }, unknown, UpdateSpreadsheetBody>, res: Response<UpdateSpreadsheetResponse | UpdateSpreadsheetError>) => {
     const relativePath = `${WORKSPACE_DIRS.spreadsheets}/${req.params.filename}`;
     const { sheets } = req.body;
     if (!Array.isArray(sheets)) {

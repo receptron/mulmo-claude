@@ -10,29 +10,16 @@
       @end="onColumnDragEnd"
     >
       <template #item="{ element: col }: { element: StatusColumn }">
-        <div
-          :data-testid="`todo-column-${col.id}`"
-          class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg"
-        >
+        <div :data-testid="`todo-column-${col.id}`" class="w-72 shrink-0 flex flex-col bg-gray-100 rounded-lg">
           <!-- Column header. The whole header is the drag handle —
              clicking the menu button still works because the menu
              button has its own @click handler that doesn't kick off
              a drag, but pressing-and-holding anywhere on the header
              starts a column drag. -->
-          <div
-            class="flex items-center justify-between px-3 py-2 border-b border-gray-200 col-handle cursor-grab active:cursor-grabbing"
-          >
+          <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 col-handle cursor-grab active:cursor-grabbing">
             <div class="flex items-center gap-2 min-w-0">
-              <span
-                class="w-2 h-2 rounded-full shrink-0"
-                :class="col.isDone ? 'bg-green-500' : 'bg-gray-400'"
-              />
-              <span
-                v-if="renamingId !== col.id"
-                class="font-semibold text-sm text-gray-700 truncate"
-                :title="col.label"
-                >{{ col.label }}</span
-              >
+              <span class="w-2 h-2 rounded-full shrink-0" :class="col.isDone ? 'bg-green-500' : 'bg-gray-400'" />
+              <span v-if="renamingId !== col.id" class="font-semibold text-sm text-gray-700 truncate" :title="col.label">{{ col.label }}</span>
               <input
                 v-else
                 ref="renameInput"
@@ -42,16 +29,10 @@
                 @keydown.escape="renamingId = null"
                 @blur="commitRename(col.id)"
               />
-              <span class="text-xs text-gray-500 shrink-0">{{
-                itemsByColumn(col.id).length
-              }}</span>
+              <span class="text-xs text-gray-500 shrink-0">{{ itemsByColumn(col.id).length }}</span>
             </div>
             <div class="relative">
-              <button
-                class="text-gray-400 hover:text-gray-600 px-1"
-                title="Column actions"
-                @click="toggleMenu(col.id)"
-              >
+              <button class="text-gray-400 hover:text-gray-600 px-1" title="Column actions" @click="toggleMenu(col.id)">
                 <span class="material-icons text-base">more_horiz</span>
               </button>
               <div
@@ -59,26 +40,11 @@
                 class="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded shadow-md text-xs w-40 py-1"
                 @click.stop
               >
-                <button
-                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                  @click="startRename(col)"
-                >
-                  Rename
+                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="startRename(col)">Rename</button>
+                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="markAsDone(col.id)">
+                  {{ col.isDone ? "Already done column" : "Mark as done column" }}
                 </button>
-                <button
-                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                  @click="markAsDone(col.id)"
-                >
-                  {{
-                    col.isDone ? "Already done column" : "Mark as done column"
-                  }}
-                </button>
-                <button
-                  class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
-                  @click="deleteColumn(col.id)"
-                >
-                  Delete column
-                </button>
+                <button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50" @click="deleteColumn(col.id)">Delete column</button>
               </div>
             </div>
           </div>
@@ -96,11 +62,7 @@
               <div
                 :data-testid="`todo-card-${element.id}`"
                 class="bg-white border border-l-4 border-gray-200 rounded shadow-sm p-2 cursor-grab hover:shadow active:cursor-grabbing"
-                :class="
-                  element.priority
-                    ? PRIORITY_BORDER[element.priority]
-                    : 'border-l-gray-200'
-                "
+                :class="element.priority ? PRIORITY_BORDER[element.priority] : 'border-l-gray-200'"
                 @click="emit('open', element)"
               >
                 <div class="flex items-start gap-2">
@@ -112,42 +74,19 @@
                     @change="emit('toggleComplete', element)"
                   />
                   <div class="flex-1 min-w-0">
-                    <div
-                      class="text-sm"
-                      :class="
-                        element.completed
-                          ? 'line-through text-gray-400'
-                          : 'text-gray-800'
-                      "
-                    >
+                    <div class="text-sm" :class="element.completed ? 'line-through text-gray-400' : 'text-gray-800'">
                       {{ element.text }}
                     </div>
-                    <div
-                      v-if="element.note"
-                      class="text-[11px] text-gray-400 mt-0.5 line-clamp-2"
-                    >
+                    <div v-if="element.note" class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">
                       {{ element.note }}
                     </div>
-                    <div
-                      v-if="
-                        (element.labels && element.labels.length > 0) ||
-                        element.priority ||
-                        element.dueDate
-                      "
-                      class="flex flex-wrap gap-1 mt-1.5"
-                    >
-                      <span
-                        v-if="element.priority"
-                        class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                        :class="PRIORITY_CLASSES[element.priority]"
-                        >{{ PRIORITY_LABELS[element.priority] }}</span
-                      >
-                      <span
-                        v-if="element.dueDate"
-                        class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                        :class="dueDateClasses(element.dueDate)"
-                        >{{ formatDueLabel(element.dueDate) }}</span
-                      >
+                    <div v-if="(element.labels && element.labels.length > 0) || element.priority || element.dueDate" class="flex flex-wrap gap-1 mt-1.5">
+                      <span v-if="element.priority" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="PRIORITY_CLASSES[element.priority]">{{
+                        PRIORITY_LABELS[element.priority]
+                      }}</span>
+                      <span v-if="element.dueDate" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium" :class="dueDateClasses(element.dueDate)">{{
+                        formatDueLabel(element.dueDate)
+                      }}</span>
                       <span
                         v-for="label in element.labels ?? []"
                         :key="label"
@@ -163,10 +102,7 @@
           </draggable>
 
           <!-- Add card stub -->
-          <button
-            class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors"
-            @click="emit('quickAdd', col.id)"
-          >
+          <button class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors" @click="emit('quickAdd', col.id)">
             + Add card
           </button>
         </div>
@@ -180,13 +116,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import draggable from "vuedraggable";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import { colorForLabel } from "../../plugins/todo/labels";
-import {
-  PRIORITY_BORDER,
-  PRIORITY_CLASSES,
-  PRIORITY_LABELS,
-  dueDateClasses,
-  formatDueLabel,
-} from "../../plugins/todo/priority";
+import { PRIORITY_BORDER, PRIORITY_CLASSES, PRIORITY_LABELS, dueDateClasses, formatDueLabel } from "../../plugins/todo/priority";
 
 // vuedraggable @change event shape. The library emits one of these
 // three keys depending on whether the move was within the same list,
@@ -233,14 +163,11 @@ watch(
 );
 
 function onColumnDragEnd(): void {
-  const before = props.columns.map((c) => c.id);
-  const after = columnsLocal.value.map((c) => c.id);
+  const before = props.columns.map((column) => column.id);
+  const after = columnsLocal.value.map((column) => column.id);
   // No-op drops: avoid an unnecessary network round-trip when the
   // drop position equals the original.
-  if (
-    before.length === after.length &&
-    before.every((id, i) => id === after[i])
-  ) {
+  if (before.length === after.length && before.every((columnId, i) => columnId === after[i])) {
     return;
   }
   emit("reorderColumns", after);
@@ -252,19 +179,19 @@ const itemsByStatus = computed(() => {
   const map = new Map<string, TodoItem[]>();
   for (const col of props.columns) map.set(col.id, []);
   for (const item of props.filteredItems) {
-    const id = item.status ?? props.columns[0]?.id;
-    if (!id) continue;
-    if (!map.has(id)) map.set(id, []);
-    map.get(id)!.push(item);
+    const columnId = item.status ?? props.columns[0]?.id;
+    if (!columnId) continue;
+    if (!map.has(columnId)) map.set(columnId, []);
+    map.get(columnId)!.push(item);
   }
   for (const list of map.values()) {
-    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    list.sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
   }
   return map;
 });
 
-function itemsByColumn(id: string): TodoItem[] {
-  return itemsByStatus.value.get(id) ?? [];
+function itemsByColumn(columnId: string): TodoItem[] {
+  return itemsByStatus.value.get(columnId) ?? [];
 }
 
 function onDragChange(columnId: string, event: DragChangeEvent): void {
@@ -284,8 +211,8 @@ const renamingId = ref<string | null>(null);
 const renameDraft = ref("");
 const renameInput = ref<HTMLInputElement[] | HTMLInputElement | null>(null);
 
-function toggleMenu(id: string): void {
-  menuOpenId.value = menuOpenId.value === id ? null : id;
+function toggleMenu(columnId: string): void {
+  menuOpenId.value = menuOpenId.value === columnId ? null : columnId;
 }
 
 function startRename(col: StatusColumn): void {
@@ -294,29 +221,29 @@ function startRename(col: StatusColumn): void {
   renameDraft.value = col.label;
   void nextTick(() => {
     const inputRef = renameInput.value;
-    const el = Array.isArray(inputRef) ? inputRef[0] : inputRef;
-    el?.focus();
-    el?.select();
+    const input = Array.isArray(inputRef) ? inputRef[0] : inputRef;
+    input?.focus();
+    input?.select();
   });
 }
 
-function commitRename(id: string): void {
-  if (renamingId.value !== id) return;
+function commitRename(columnId: string): void {
+  if (renamingId.value !== columnId) return;
   const next = renameDraft.value.trim();
   renamingId.value = null;
   if (next.length === 0) return;
-  const current = props.columns.find((c) => c.id === id);
+  const current = props.columns.find((column) => column.id === columnId);
   if (!current || current.label === next) return;
-  emit("renameColumn", id, next);
+  emit("renameColumn", columnId, next);
 }
 
-function deleteColumn(id: string): void {
+function deleteColumn(columnId: string): void {
   menuOpenId.value = null;
-  emit("deleteColumn", id);
+  emit("deleteColumn", columnId);
 }
 
-function markAsDone(id: string): void {
+function markAsDone(columnId: string): void {
   menuOpenId.value = null;
-  emit("markDone", id);
+  emit("markDone", columnId);
 }
 </script>

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // Mount a session where the sidebar holds a presentSpreadsheet tool
 // result. The spreadsheet View.vue renders when the user clicks the
 // sidebar entry, so asserting against the rendered table exercises
@@ -13,10 +14,7 @@ interface SpreadsheetResultOptions {
   title?: string;
 }
 
-async function setupSpreadsheetSession(
-  page: Page,
-  opts: SpreadsheetResultOptions,
-) {
+async function setupSpreadsheetSession(page: Page, opts: SpreadsheetResultOptions) {
   const sessionId = opts.sessionId ?? "sheet-session";
   await mockAllApis(page, {
     sessions: [
@@ -31,9 +29,7 @@ async function setupSpreadsheetSession(
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) =>
       route.fulfill({
         json: [
@@ -55,32 +51,22 @@ async function setupSpreadsheetSession(
   );
 }
 
-async function mockFileContent(
-  page: Page,
-  path: string,
-  body: { kind?: string; content?: string; message?: string },
-) {
+async function mockFileContent(page: Page, path: string, body: { kind?: string; content?: string; message?: string }) {
   await page.route(
-    (url) =>
-      url.pathname === "/api/files/content" &&
-      url.searchParams.get("path") === path,
+    (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === path,
     (route) => route.fulfill({ json: body }),
   );
 }
 
 // Shared helper: open the session and click the sidebar entry so the
 // View mounts. Returns only after the View is visible.
-async function openSpreadsheetView(
-  page: Page,
-  sessionId = "sheet-session",
-  sidebarTitle = "Test Sheet",
-) {
+async function openSpreadsheetView(page: Page, sessionId = "sheet-session", sidebarTitle = "Test Sheet") {
   await page.goto(`/chat/${sessionId}`);
   await expect(page.getByText("MulmoClaude")).toBeVisible();
   // Wait for the actual sidebar item rather than a fixed sleep —
   // page ready-state + element visibility is more reliable.
   const item = page.getByText(sidebarTitle).first();
-  await expect(item).toBeVisible({ timeout: 5000 });
+  await expect(item).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   await item.click();
 }
 
@@ -105,7 +91,7 @@ test.describe("spreadsheet — rendering", () => {
 
     await openSpreadsheetView(page);
     await expect(page.getByText("Apples").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await expect(page.getByText("Bananas").first()).toBeVisible();
     await expect(page.locator("text=100").first()).toBeVisible();
@@ -116,24 +102,20 @@ test.describe("spreadsheet — rendering", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.getByText("Legacy").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
-  test("title from tool result is displayed in the header", async ({
-    page,
-  }) => {
+  test("title from tool result is displayed in the header", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets, title: "Q1 Revenue" });
     await page.goto("/chat/sheet-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     const item = page.getByText("Q1 Revenue").first();
-    await expect(item).toBeVisible({ timeout: 5000 });
+    await expect(item).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
     await item.click();
-    await expect(
-      page.locator("h1.title", { hasText: "Q1 Revenue" }),
-    ).toBeVisible({
-      timeout: 5000,
+    await expect(page.locator("h1.title", { hasText: "Q1 Revenue" })).toBeVisible({
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -142,15 +124,13 @@ test.describe("spreadsheet — rendering", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     const btn = page.locator("button.download-btn");
-    await expect(btn).toBeVisible({ timeout: 5000 });
+    await expect(btn).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
     await expect(btn).toBeEnabled();
   });
 });
 
 test.describe("spreadsheet — multi-sheet", () => {
-  test("sheet tabs appear only when there is more than one sheet", async ({
-    page,
-  }) => {
+  test("sheet tabs appear only when there is more than one sheet", async ({ page }) => {
     const sheets = [{ name: "Single", data: [[{ v: "only" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -158,9 +138,7 @@ test.describe("spreadsheet — multi-sheet", () => {
     await expect(page.locator(".sheet-tabs")).toHaveCount(0);
   });
 
-  test("multiple sheets show tabs and switching changes the rendered data", async ({
-    page,
-  }) => {
+  test("multiple sheets show tabs and switching changes the rendered data", async ({ page }) => {
     const sheets = [
       { name: "Q1", data: [[{ v: "January-Q1" }]] },
       { name: "Q2", data: [[{ v: "April-Q2" }]] },
@@ -195,7 +173,7 @@ test.describe("spreadsheet — formula & format", () => {
     await openSpreadsheetView(page);
     // Sum of 10 + 20 + 30 = 60 should appear in the rendered table.
     await expect(page.locator("text=60").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -209,13 +187,11 @@ test.describe("spreadsheet — formula & format", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.locator("text=42").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
-  test("currency format renders with dollar sign and comma separators", async ({
-    page,
-  }) => {
+  test("currency format renders with dollar sign and comma separators", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",
@@ -225,7 +201,7 @@ test.describe("spreadsheet — formula & format", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.locator("text=$1,234.50").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -239,15 +215,13 @@ test.describe("spreadsheet — formula & format", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.locator("text=25.00%").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 });
 
 test.describe("spreadsheet — mini editor", () => {
-  test("clicking a cell opens the mini editor with the correct cell ref label", async ({
-    page,
-  }) => {
+  test("clicking a cell opens the mini editor with the correct cell ref label", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",
@@ -266,7 +240,7 @@ test.describe("spreadsheet — mini editor", () => {
     // We target by text to keep the test robust.
     await page.locator("td", { hasText: "B2" }).first().click();
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     // The cell-ref label should match the position we clicked.
     await expect(page.locator(".cell-ref")).toBeVisible();
@@ -278,14 +252,10 @@ test.describe("spreadsheet — mini editor", () => {
     await openSpreadsheetView(page);
     await page.locator("td", { hasText: "hi" }).first().click();
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
-    await expect(
-      page.locator(".radio-option", { hasText: "String" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(".radio-option", { hasText: "Formula" }),
-    ).toBeVisible();
+    await expect(page.locator(".radio-option", { hasText: "String" })).toBeVisible();
+    await expect(page.locator(".radio-option", { hasText: "Formula" })).toBeVisible();
   });
 
   test("mini editor close button (✕) closes the panel", async ({ page }) => {
@@ -294,47 +264,37 @@ test.describe("spreadsheet — mini editor", () => {
     await openSpreadsheetView(page);
     await page.locator("td", { hasText: "hi" }).first().click();
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await page.locator("button.cancel-btn").click();
     await expect(page.locator(".mini-editor-panel")).toHaveCount(0);
   });
 
-  test("formula mode shows a second input for format code", async ({
-    page,
-  }) => {
+  test("formula mode shows a second input for format code", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "hi" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await page.locator("td", { hasText: "hi" }).first().click();
     await expect(page.locator(".mini-editor-panel")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     // Switch to Formula mode
     await page.locator(".radio-option", { hasText: "Formula" }).click();
     // Two inputs: value/formula + format
-    await expect(
-      page.locator('input[placeholder^="Value or Formula"]'),
-    ).toBeVisible();
+    await expect(page.locator('input[placeholder^="Value or Formula"]')).toBeVisible();
     await expect(page.locator('input[placeholder^="Format"]')).toBeVisible();
   });
 });
 
 test.describe("spreadsheet — source editor", () => {
-  test("Details section 'Edit Spreadsheet Data' is present", async ({
-    page,
-  }) => {
+  test("Details section 'Edit Spreadsheet Data' is present", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
-    await expect(
-      page.locator("summary", { hasText: "Edit Spreadsheet Data" }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("summary", { hasText: "Edit Spreadsheet Data" })).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 
-  test("Apply Changes button is disabled when textarea matches state", async ({
-    page,
-  }) => {
+  test("Apply Changes button is disabled when textarea matches state", async ({ page }) => {
     const sheets = [{ name: "Sheet1", data: [[{ v: "x" }]] }];
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
@@ -365,18 +325,16 @@ test.describe("spreadsheet — error handling", () => {
     });
     await openSpreadsheetView(page);
     await expect(page.getByText("File exceeds size limit")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
-  test("binary file shows the default 'Cannot load' message", async ({
-    page,
-  }) => {
+  test("binary file shows the default 'Cannot load' message", async ({ page }) => {
     const path = "spreadsheets/blob.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, { kind: "binary" });
     await openSpreadsheetView(page);
-    await expect(page.getByText(/binary/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/binary/i)).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("malformed JSON shows a parse error message", async ({ page }) => {
@@ -387,7 +345,7 @@ test.describe("spreadsheet — error handling", () => {
       content: "{not valid json",
     });
     await openSpreadsheetView(page);
-    await expect(page.getByText(/malformed/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/malformed/i)).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("non-array content shows a shape error", async ({ page }) => {
@@ -399,7 +357,7 @@ test.describe("spreadsheet — error handling", () => {
     });
     await openSpreadsheetView(page);
     await expect(page.getByText(/not an array/i)).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -408,16 +366,14 @@ test.describe("spreadsheet — error handling", () => {
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, { kind: "text" });
     await openSpreadsheetView(page);
-    await expect(page.getByText(/no content/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/no content/i)).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("HTTP failure shows a statusText error", async ({ page }) => {
     const path = "spreadsheets/404.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await page.route(
-      (url) =>
-        url.pathname === "/api/files/content" &&
-        url.searchParams.get("path") === path,
+      (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === path,
       (route) =>
         route.fulfill({
           status: 404,
@@ -426,25 +382,21 @@ test.describe("spreadsheet — error handling", () => {
     );
     await openSpreadsheetView(page);
     await expect(page.getByText(/Failed to load spreadsheet/i)).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 });
 
 test.describe("spreadsheet — edge cases", () => {
-  test("empty spreadsheet array shows 'No spreadsheet data available'", async ({
-    page,
-  }) => {
+  test("empty spreadsheet array shows 'No spreadsheet data available'", async ({ page }) => {
     await setupSpreadsheetSession(page, { sheets: [] });
     await openSpreadsheetView(page);
     await expect(page.getByText("No spreadsheet data available")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
-  test("cells with special characters (commas, quotes) render safely", async ({
-    page,
-  }) => {
+  test("cells with special characters (commas, quotes) render safely", async ({ page }) => {
     const sheets = [
       {
         name: "Sheet1",
@@ -457,7 +409,7 @@ test.describe("spreadsheet — edge cases", () => {
     await setupSpreadsheetSession(page, { sheets });
     await openSpreadsheetView(page);
     await expect(page.getByText("has, comma").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await expect(page.getByText(/has "quote"/).first()).toBeVisible();
   });
@@ -473,7 +425,7 @@ test.describe("spreadsheet — edge cases", () => {
     await openSpreadsheetView(page);
     // Accept either case; the engine may normalize.
     await expect(page.locator("td", { hasText: /true/i }).first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -485,7 +437,7 @@ test.describe("spreadsheet — edge cases", () => {
     await openSpreadsheetView(page);
     // First and last row values should both be present.
     await expect(page.locator("td", { hasText: "0" }).first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await expect(page.locator("td", { hasText: "49" }).first()).toBeVisible();
   });

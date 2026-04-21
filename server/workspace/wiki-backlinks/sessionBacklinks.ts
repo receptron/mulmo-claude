@@ -31,11 +31,7 @@ const SESSION_ID_SHORT_LEN = 8;
  * content. If it exists and already lists `sessionId` the content is
  * returned unchanged (idempotent).
  */
-export function updateSessionBacklinks(
-  existingContent: string,
-  sessionId: string,
-  linkHref: string,
-): string {
+export function updateSessionBacklinks(existingContent: string, sessionId: string, linkHref: string): string {
   if (!sessionId) return existingContent;
 
   const markerIdx = existingContent.indexOf(BACKLINKS_MARKER);
@@ -58,11 +54,7 @@ function buildBullet(sessionId: string, linkHref: string): string {
   return `- [session ${short}](${linkHref})`;
 }
 
-function appendFreshAppendix(
-  body: string,
-  sessionId: string,
-  linkHref: string,
-): string {
+function appendFreshAppendix(body: string, sessionId: string, linkHref: string): string {
   const bullet = buildBullet(sessionId, linkHref);
   const separator = body.length === 0 || body.endsWith("\n") ? "" : "\n";
   const leadingBlank = body.length === 0 ? "" : "\n";
@@ -81,8 +73,8 @@ function extractSessionIdsFromAppendix(appendix: string): Set<string> {
     if (!line.startsWith("- ") && !line.startsWith("* ")) continue;
     const href = extractHrefFromBullet(line);
     if (!href) continue;
-    const id = extractSessionIdFromHref(href);
-    if (id) ids.add(id);
+    const sessionId = extractSessionIdFromHref(href);
+    if (sessionId) ids.add(sessionId);
   }
   return ids;
 }
@@ -113,28 +105,25 @@ function extractSessionIdFromHref(href: string): string | null {
   if (lastSlash === -1) return null;
   const parentSegment = findPrecedingSegment(cleanHref, lastSlash);
   if (parentSegment !== "chat") return null;
-  const id = cleanHref.slice(
-    lastSlash + 1,
-    cleanHref.length - JSONL_SUFFIX.length,
-  );
-  if (id.length === 0 || id.includes("/")) return null;
-  return id;
+  const sessionId = cleanHref.slice(lastSlash + 1, cleanHref.length - JSONL_SUFFIX.length);
+  if (sessionId.length === 0 || sessionId.includes("/")) return null;
+  return sessionId;
 }
 
-function stripFragmentAndQuery(s: string): string {
-  let end = s.length;
-  const hash = s.indexOf("#");
+function stripFragmentAndQuery(href: string): string {
+  let end = href.length;
+  const hash = href.indexOf("#");
   if (hash !== -1) end = hash;
-  const query = s.indexOf("?");
+  const query = href.indexOf("?");
   if (query !== -1 && query < end) end = query;
-  return s.slice(0, end);
+  return href.slice(0, end);
 }
 
 // Given `.../chat/abc.jsonl` and the index of the last `/`, return
 // the segment immediately before the filename (here: `"chat"`).
-function findPrecedingSegment(s: string, lastSlash: number): string {
-  const prevSlash = s.lastIndexOf("/", lastSlash - 1);
-  return s.slice(prevSlash + 1, lastSlash);
+function findPrecedingSegment(href: string, lastSlash: number): string {
+  const prevSlash = href.lastIndexOf("/", lastSlash - 1);
+  return href.slice(prevSlash + 1, lastSlash);
 }
 
 // Insert `newBullet` at the end of the History list inside the
@@ -146,9 +135,9 @@ function appendBulletToAppendix(appendix: string, newBullet: string): string {
   // Hand-rolled rtrim so sonarjs/slow-regex stays quiet.
   let end = appendix.length;
   while (end > 0) {
-    const ch = appendix.charCodeAt(end - 1);
+    const charCode = appendix.charCodeAt(end - 1);
     // Whitespace codepoints we expect here: \n, \r, \t, space.
-    if (ch !== 10 && ch !== 13 && ch !== 9 && ch !== 32) break;
+    if (charCode !== 10 && charCode !== 13 && charCode !== 9 && charCode !== 32) break;
     end--;
   }
   return `${appendix.slice(0, end)}\n${newBullet}\n`;

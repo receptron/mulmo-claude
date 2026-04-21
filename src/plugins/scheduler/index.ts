@@ -21,10 +21,7 @@ const schedulerPlugin: ToolPlugin<SchedulerData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<SchedulerData>>(
-      API_ROUTES.scheduler.base,
-      args,
-    );
+    const result = await apiPost<ToolResult<SchedulerData>>(API_ROUTES.scheduler.base, args);
     if (!result.ok) {
       return {
         toolName: "manageScheduler",

@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  extractClaudeErrorMessage,
-  formatSpawnFailure,
-} from "../../server/utils/spawn.js";
+import { extractClaudeErrorMessage, formatSpawnFailure } from "../../server/utils/spawn.js";
 
 describe("extractClaudeErrorMessage", () => {
   it("returns null for empty/blank stdout", () => {
@@ -16,16 +13,8 @@ describe("extractClaudeErrorMessage", () => {
   });
 
   it("returns null when is_error is not true", () => {
-    assert.equal(
-      extractClaudeErrorMessage(JSON.stringify({ result: "ok" })),
-      null,
-    );
-    assert.equal(
-      extractClaudeErrorMessage(
-        JSON.stringify({ is_error: false, errors: ["oops"] }),
-      ),
-      null,
-    );
+    assert.equal(extractClaudeErrorMessage(JSON.stringify({ result: "ok" })), null);
+    assert.equal(extractClaudeErrorMessage(JSON.stringify({ is_error: false, errors: ["oops"] })), null);
   });
 
   it("extracts errors[] when present", () => {
@@ -50,35 +39,23 @@ describe("extractClaudeErrorMessage", () => {
   });
 
   it("returns subtype alone when result is missing", () => {
-    const msg = extractClaudeErrorMessage(
-      JSON.stringify({ is_error: true, subtype: "auth_failure" }),
-    );
+    const msg = extractClaudeErrorMessage(JSON.stringify({ is_error: true, subtype: "auth_failure" }));
     assert.equal(msg, "auth_failure");
   });
 
   it("returns result alone when subtype is missing", () => {
-    const msg = extractClaudeErrorMessage(
-      JSON.stringify({ is_error: true, result: "Something went wrong" }),
-    );
+    const msg = extractClaudeErrorMessage(JSON.stringify({ is_error: true, result: "Something went wrong" }));
     assert.equal(msg, "Something went wrong");
   });
 
   it("returns null when is_error but no usable fields", () => {
-    assert.equal(
-      extractClaudeErrorMessage(JSON.stringify({ is_error: true })),
-      null,
-    );
+    assert.equal(extractClaudeErrorMessage(JSON.stringify({ is_error: true })), null);
   });
 });
 
 describe("formatSpawnFailure", () => {
   it("uses structured error from stdout when available", () => {
-    const msg = formatSpawnFailure(
-      "[test]",
-      1,
-      JSON.stringify({ is_error: true, errors: ["budget gone"] }),
-      "",
-    );
+    const msg = formatSpawnFailure("[test]", 1, JSON.stringify({ is_error: true, errors: ["budget gone"] }), "");
     assert.match(msg, /\[test\].*budget gone/);
   });
 

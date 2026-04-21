@@ -42,10 +42,7 @@ export interface ManageSourceData {
 const manageSourcePlugin: ToolPlugin<ManageSourceData> = {
   toolDefinition,
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<ManageSourceData>>(
-      API_ROUTES.sources.manage,
-      args,
-    );
+    const result = await apiPost<ToolResult<ManageSourceData>>(API_ROUTES.sources.manage, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

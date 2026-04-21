@@ -18,22 +18,16 @@ const zulipUrl = process.env.ZULIP_URL;
 const email = process.env.ZULIP_EMAIL;
 const apiKey = process.env.ZULIP_API_KEY;
 if (!zulipUrl || !email || !apiKey) {
-  console.error(
-    "ZULIP_URL, ZULIP_EMAIL, and ZULIP_API_KEY are required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("ZULIP_URL, ZULIP_EMAIL, and ZULIP_API_KEY are required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 const apiBase = `${zulipUrl.replace(/\/$/, "")}/api/v1`;
-const authHeader =
-  "Basic " + Buffer.from(`${email}:${apiKey}`).toString("base64");
+const authHeader = "Basic " + Buffer.from(`${email}:${apiKey}`).toString("base64");
 
-mulmo.onPush((ev) => {
-  sendMessage(ev.chatId, ev.message).catch((err) =>
-    console.error(`[zulip] push send failed: ${err}`),
-  );
+mulmo.onPush((pushEvent) => {
+  sendMessage(pushEvent.chatId, pushEvent.message).catch((err) => console.error(`[zulip] push send failed: ${err}`));
 });
 
 // ── Zulip API helpers ───────────────────────────────────────────
@@ -41,10 +35,7 @@ mulmo.onPush((ev) => {
 // fetch helpers — return Record<string, unknown> to avoid `as` casts on JSON.parse
 type JsonRecord = Record<string, unknown>;
 
-async function zulipPost(
-  path: string,
-  params: Record<string, string>,
-): Promise<JsonRecord> {
+async function zulipPost(path: string, params: Record<string, string>): Promise<JsonRecord> {
   const body = new URLSearchParams(params);
   const res = await fetch(`${apiBase}${path}`, {
     method: "POST",
@@ -63,12 +54,9 @@ async function zulipPost(
   return json;
 }
 
-async function zulipGet(
-  path: string,
-  params?: Record<string, string>,
-): Promise<JsonRecord> {
-  const qs = params ? `?${new URLSearchParams(params).toString()}` : "";
-  const res = await fetch(`${apiBase}${path}${qs}`, {
+async function zulipGet(path: string, params?: Record<string, string>): Promise<JsonRecord> {
+  const queryString = params ? `?${new URLSearchParams(params).toString()}` : "";
+  const res = await fetch(`${apiBase}${path}${queryString}`, {
     headers: { Authorization: authHeader },
     signal: AbortSignal.timeout((POLL_TIMEOUT_SEC + 10) * 1000),
   });
@@ -110,8 +98,8 @@ async function sendMessage(chatId: string, text: string): Promise<void> {
 
 // ── Event polling ───────────────────────────────────────────────
 
-function isObj(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
+function isObj(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 async function registerQueue(): Promise<{
@@ -122,8 +110,7 @@ async function registerQueue(): Promise<{
     event_types: JSON.stringify(["message"]),
   });
   const queue_id = typeof result.queue_id === "string" ? result.queue_id : "";
-  const last_event_id =
-    typeof result.last_event_id === "number" ? result.last_event_id : -1;
+  const last_event_id = typeof result.last_event_id === "number" ? result.last_event_id : -1;
   return { queue_id, last_event_id };
 }
 
@@ -159,15 +146,14 @@ async function pollLoop(): Promise<void> {
         last_event_id = reg.last_event_id;
       } catch (regErr) {
         console.error(`[zulip] re-register failed: ${regErr}`);
-        await new Promise((r) => setTimeout(r, 5000));
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 5000));
       }
     }
   }
 }
 
 async function handleMessage(msg: Record<string, unknown>): Promise<void> {
-  const senderEmail =
-    typeof msg.sender_email === "string" ? msg.sender_email : "";
+  const senderEmail = typeof msg.sender_email === "string" ? msg.sender_email : "";
   // Ignore own messages
   if (senderEmail === email) return;
   const content = typeof msg.content === "string" ? msg.content : "";
@@ -178,14 +164,9 @@ async function handleMessage(msg: Record<string, unknown>): Promise<void> {
   const msgType = typeof msg.type === "string" ? msg.type : "";
   const streamId = typeof msg.stream_id === "number" ? msg.stream_id : null;
   const subject = typeof msg.subject === "string" ? msg.subject : "MulmoClaude";
-  const chatId =
-    msgType === "stream" && streamId
-      ? `stream:${streamId}:${subject}`
-      : `private:${senderEmail}`;
+  const chatId = msgType === "stream" && streamId ? `stream:${streamId}:${subject}` : `private:${senderEmail}`;
 
-  console.log(
-    `[zulip] message type=${msgType} from=${senderEmail} len=${text.length}`,
-  );
+  console.log(`[zulip] message type=${msgType} from=${senderEmail} len=${text.length}`);
 
   try {
     const ack = await mulmo.send(chatId, text);

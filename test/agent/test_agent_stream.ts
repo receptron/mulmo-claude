@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  blockToEvent,
-  parseStreamEvent,
-  type ClaudeContentBlock,
-  type RawStreamEvent,
-} from "../../server/agent/stream.js";
+import { blockToEvent, parseStreamEvent, type ClaudeContentBlock, type RawStreamEvent } from "../../server/agent/stream.js";
 
 describe("blockToEvent", () => {
   it("converts tool_use block to tool_call event", () => {

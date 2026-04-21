@@ -18,47 +18,43 @@ import { VALID_VIEW_MODES } from "../utils/canvas/viewMode";
 // doesn't exist on the server" gracefully.
 const SESSION_ID_RE = /^[\w-]{1,128}$/;
 
-function isValidSessionId(id: unknown): boolean {
-  return typeof id === "string" && SESSION_ID_RE.test(id);
+function isValidSessionId(value: unknown): boolean {
+  return typeof value === "string" && SESSION_ID_RE.test(value);
 }
 
 export function installGuards(router: Router): void {
-  router.beforeEach((to) => {
+  router.beforeEach((dest) => {
     // Only run guards on the chat route — other routes (redirect, etc.)
     // don't carry parameters that need sanitizing.
-    if (to.name !== "chat") return;
+    if (dest.name !== "chat") return;
 
     // ── sessionId format check ───────────────────────────────────
-    const sessionId = to.params.sessionId;
-    if (
-      typeof sessionId === "string" &&
-      sessionId.length > 0 &&
-      !isValidSessionId(sessionId)
-    ) {
+    const sessionId = dest.params.sessionId;
+    if (typeof sessionId === "string" && sessionId.length > 0 && !isValidSessionId(sessionId)) {
       // Garbage sessionId → strip it and go to /chat (new session).
       return { name: "chat", params: {}, query: {}, replace: true };
     }
 
     // ── view mode whitelist ──────────────────────────────────────
-    const view = to.query.view;
+    const view = dest.query.view;
     if (typeof view === "string" && !VALID_VIEW_MODES.has(view)) {
-      const cleaned = { ...to.query };
+      const cleaned = { ...dest.query };
       delete cleaned.view;
-      return { ...to, query: cleaned, replace: true };
+      return { ...dest, query: cleaned, replace: true };
     }
 
     // ── file path traversal check ────────────────────────────────
-    const filePath = to.query.path;
+    const filePath = dest.query.path;
     if (typeof filePath === "string") {
       if (filePath.includes("..") || filePath.startsWith("/")) {
-        const cleaned = { ...to.query };
+        const cleaned = { ...dest.query };
         delete cleaned.path;
-        return { ...to, query: cleaned, replace: true };
+        return { ...dest, query: cleaned, replace: true };
       }
 
       // ?path= without ?view=files → auto-add view=files so FilesView mounts.
       if (view !== "files") {
-        return { ...to, query: { ...to.query, view: "files" }, replace: true };
+        return { ...dest, query: { ...dest.query, view: "files" }, replace: true };
       }
     }
   });

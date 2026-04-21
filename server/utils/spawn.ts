@@ -28,9 +28,7 @@ export function extractClaudeErrorMessage(stdout: string): string | null {
   if (!isRecord(parsed)) return null;
   if (parsed.is_error !== true) return null;
   if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
-    const joined = parsed.errors
-      .filter((e): e is string => typeof e === "string")
-      .join("; ");
+    const joined = parsed.errors.filter((err): err is string => typeof err === "string").join("; ");
     if (joined.length > 0) return joined;
   }
   const subtype = typeof parsed.subtype === "string" ? parsed.subtype : "";
@@ -47,12 +45,7 @@ export function extractClaudeErrorMessage(stdout: string): string | null {
  * prepended for log-grep-ability (e.g. `"[chat-index]"`,
  * `"[sources/classifier]"`).
  */
-export function formatSpawnFailure(
-  prefix: string,
-  code: number | null,
-  stdout: string,
-  stderr: string,
-): string {
+export function formatSpawnFailure(prefix: string, code: number | null, stdout: string, stderr: string): string {
   const structured = extractClaudeErrorMessage(stdout);
   if (structured) {
     return `${prefix} claude exited ${code}: ${structured}`;

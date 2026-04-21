@@ -13,27 +13,14 @@
       <button
         v-if="sessions[i - 1]"
         class="flex-1 flex items-center justify-center py-1 rounded transition-colors"
-        :class="
-          sessions[i - 1].id === currentSessionId
-            ? 'border border-gray-300 bg-white shadow-sm'
-            : 'hover:bg-gray-100'
-        "
-        :title="
-          sessions[i - 1].preview || roleName(roles, sessions[i - 1].roleId)
-        "
+        :class="sessions[i - 1].id === currentSessionId ? 'border border-gray-300 bg-white shadow-sm' : 'hover:bg-gray-100'"
+        :title="sessions[i - 1].preview || roleName(roles, sessions[i - 1].roleId)"
         :data-testid="`session-tab-${sessions[i - 1].id}`"
         @click="emit('loadSession', sessions[i - 1].id)"
       >
-        <span
-          class="material-icons text-base"
-          :class="[
-            tabColor(sessions[i - 1]),
-            sessions[i - 1].isRunning
-              ? 'animate-spin [animation-duration:3s]'
-              : '',
-          ]"
-          >{{ roleIcon(roles, sessions[i - 1].roleId) }}</span
-        >
+        <span class="material-icons text-base" :class="[tabColor(sessions[i - 1]), sessions[i - 1].isRunning ? 'animate-spin [animation-duration:3s]' : '']">{{
+          roleIcon(roles, sessions[i - 1].roleId)
+        }}</span>
       </button>
       <div v-else class="flex-1" />
     </template>

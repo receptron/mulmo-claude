@@ -10,9 +10,7 @@ afterEach(() => {
   (globalThis as any).fetch = originalFetch;
 });
 
-function stubFetch(
-  impl: (input: unknown, init?: unknown) => Promise<Response>,
-): void {
+function stubFetch(impl: (input: unknown, init?: unknown) => Promise<Response>): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).fetch = impl;
 }
@@ -34,9 +32,7 @@ describe("useSandboxStatus", () => {
   });
 
   it("populates status from a successful /api/sandbox response", async () => {
-    stubFetch(async () =>
-      mockJsonResponse(200, { sshAgent: true, mounts: ["gh", "gitconfig"] }),
-    );
+    stubFetch(async () => mockJsonResponse(200, { sshAgent: true, mounts: ["gh", "gitconfig"] }));
     const { status, ensureLoaded } = useSandboxStatus();
     await ensureLoaded();
     assert.deepEqual(status.value, {
@@ -88,9 +84,7 @@ describe("useSandboxStatus", () => {
   });
 
   it("rejects malformed payloads (missing fields, wrong types)", async () => {
-    stubFetch(async () =>
-      mockJsonResponse(200, { sshAgent: "yes", mounts: [1, 2, 3] }),
-    );
+    stubFetch(async () => mockJsonResponse(200, { sshAgent: "yes", mounts: [1, 2, 3] }));
     const { status, ensureLoaded } = useSandboxStatus();
     await ensureLoaded();
     // Validator should drop the payload rather than letting bad types

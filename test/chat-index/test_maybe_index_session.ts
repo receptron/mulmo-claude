@@ -4,11 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  maybeIndexSession,
-  backfillAllSessions,
-  __resetForTests,
-} from "../../server/workspace/chat-index/index.js";
+import { maybeIndexSession, backfillAllSessions, __resetForTests } from "../../server/workspace/chat-index/index.js";
 import { indexEntryPathFor } from "../../server/workspace/chat-index/paths.js";
 import { ClaudeCliNotFoundError } from "../../server/workspace/journal/archivist.js";
 import type { SummaryResult } from "../../server/workspace/chat-index/types.js";
@@ -34,10 +30,7 @@ function seedSession(id: string): void {
       startedAt: "2026-04-12T10:00:00.000Z",
     }),
   );
-  writeFileSync(
-    join(chatDir, `${id}.jsonl`),
-    JSON.stringify({ source: "user", type: "text", message: "hello" }) + "\n",
-  );
+  writeFileSync(join(chatDir, `${id}.jsonl`), JSON.stringify({ source: "user", type: "text", message: "hello" }) + "\n");
 }
 
 function stubSummarize(
@@ -72,9 +65,7 @@ describe("maybeIndexSession — active session guard", () => {
     });
 
     assert.equal(stub.calls, 0);
-    await assert.rejects(() =>
-      readFile(indexEntryPathFor(workspace, "live-sess"), "utf-8"),
-    );
+    await assert.rejects(() => readFile(indexEntryPathFor(workspace, "live-sess"), "utf-8"));
   });
 
   it("runs when the session is NOT in activeSessionIds", async () => {
@@ -89,10 +80,7 @@ describe("maybeIndexSession — active session guard", () => {
     });
 
     assert.equal(stub.calls, 1);
-    const raw = await readFile(
-      indexEntryPathFor(workspace, "done-sess"),
-      "utf-8",
-    );
+    const raw = await readFile(indexEntryPathFor(workspace, "done-sess"), "utf-8");
     assert.match(raw, /"title": "t"/);
   });
 });

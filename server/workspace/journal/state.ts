@@ -64,41 +64,27 @@ export function parseState(raw: unknown): JournalState {
   // Version mismatch → throw it all out. Cheap to rebuild.
   if (obj.version !== JOURNAL_STATE_VERSION) return defaultState();
 
-  const d = defaultState();
+  const fallback = defaultState();
   return {
     version: JOURNAL_STATE_VERSION,
-    lastDailyRunAt:
-      typeof obj.lastDailyRunAt === "string" ? obj.lastDailyRunAt : null,
-    lastOptimizationRunAt:
-      typeof obj.lastOptimizationRunAt === "string"
-        ? obj.lastOptimizationRunAt
-        : null,
-    dailyIntervalHours:
-      typeof obj.dailyIntervalHours === "number" && obj.dailyIntervalHours > 0
-        ? obj.dailyIntervalHours
-        : d.dailyIntervalHours,
+    lastDailyRunAt: typeof obj.lastDailyRunAt === "string" ? obj.lastDailyRunAt : null,
+    lastOptimizationRunAt: typeof obj.lastOptimizationRunAt === "string" ? obj.lastOptimizationRunAt : null,
+    dailyIntervalHours: typeof obj.dailyIntervalHours === "number" && obj.dailyIntervalHours > 0 ? obj.dailyIntervalHours : fallback.dailyIntervalHours,
     optimizationIntervalDays:
-      typeof obj.optimizationIntervalDays === "number" &&
-      obj.optimizationIntervalDays > 0
-        ? obj.optimizationIntervalDays
-        : d.optimizationIntervalDays,
+      typeof obj.optimizationIntervalDays === "number" && obj.optimizationIntervalDays > 0 ? obj.optimizationIntervalDays : fallback.optimizationIntervalDays,
     processedSessions: parseProcessedSessions(obj.processedSessions),
-    knownTopics: Array.isArray(obj.knownTopics)
-      ? obj.knownTopics.filter((t): t is string => typeof t === "string")
-      : [],
+    knownTopics: Array.isArray(obj.knownTopics) ? obj.knownTopics.filter((topic): topic is string => typeof topic === "string") : [],
   };
 }
 
-function parseProcessedSessions(
-  raw: unknown,
-): Record<string, ProcessedSessionRecord> {
+function parseProcessedSessions(raw: unknown): Record<string, ProcessedSessionRecord> {
   if (!isRecord(raw)) return {};
   const out: Record<string, ProcessedSessionRecord> = {};
-  for (const [id, rec] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [sessionId, rec] of Object.entries(raw as Record<string, unknown>)) {
     if (!isRecord(rec)) continue;
     const mtime = (rec as Record<string, unknown>).lastMtimeMs;
     if (typeof mtime === "number" && mtime >= 0) {
-      out[id] = { lastMtimeMs: mtime };
+      out[sessionId] = { lastMtimeMs: mtime };
     }
   }
   return out;
@@ -129,10 +115,7 @@ export async function readState(workspaceRoot: string): Promise<JournalState> {
   return parseState(raw);
 }
 
-export async function writeState(
-  workspaceRoot: string,
-  state: JournalState,
-): Promise<void> {
+export async function writeState(workspaceRoot: string, state: JournalState): Promise<void> {
   await writeJournalStateRaw(state, workspaceRoot);
 }
 

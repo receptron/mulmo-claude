@@ -3,10 +3,7 @@
 // plugin's calendar view. Extracted from FilesView.vue (#507 step 8).
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import type {
-  SchedulerData,
-  ScheduledItem,
-} from "../../plugins/scheduler/index";
+import type { SchedulerData, ScheduledItem } from "../../plugins/scheduler/index";
 import { WORKSPACE_FILES } from "../../config/workspacePaths";
 import { isRecord } from "../types";
 
@@ -21,10 +18,7 @@ function isScheduledItemArray(value: unknown): value is ScheduledItem[] {
   return Array.isArray(value) && value.every(isScheduledItem);
 }
 
-export function toSchedulerResult(
-  selectedPath: string | null,
-  rawText: string | null,
-): ToolResultComplete<SchedulerData> | null {
+export function toSchedulerResult(selectedPath: string | null, rawText: string | null): ToolResultComplete<SchedulerData> | null {
   if (selectedPath !== WORKSPACE_FILES.schedulerItems) return null;
   if (rawText === null) return null;
   let parsed: unknown;

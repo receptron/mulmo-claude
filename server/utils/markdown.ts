@@ -12,10 +12,7 @@ import path from "node:path";
  * Non-workspace-absolute links (true relative, external URLs,
  * anchors) are left untouched.
  */
-export function rewriteWorkspaceLinks(
-  currentFileWsPath: string,
-  content: string,
-): string {
+export function rewriteWorkspaceLinks(currentFileWsPath: string, content: string): string {
   const currentDir = path.posix.dirname(currentFileWsPath);
   return rewriteMarkdownLinks(content, (href) => {
     if (href.startsWith("//")) return href;
@@ -34,10 +31,7 @@ export function rewriteWorkspaceLinks(
  * it encounters, substituting the returned href. Character-level scan
  * (no regex) to stay lint-clean.
  */
-export function rewriteMarkdownLinks(
-  input: string,
-  rewrite: (href: string) => string,
-): string {
+export function rewriteMarkdownLinks(input: string, rewrite: (href: string) => string): string {
   const parts: string[] = [];
   let i = 0;
   while (i < input.length) {
@@ -74,15 +68,15 @@ export function rewriteMarkdownLinks(
  * Split a trailing `#fragment` or `?query` off a path so the caller
  * can rewrite the path portion and concatenate the suffix back.
  */
-export function splitFragmentAndQuery(s: string): {
+export function splitFragmentAndQuery(href: string): {
   pathPart: string;
   suffix: string;
 } {
-  const hashIdx = s.indexOf("#");
-  const queryIdx = s.indexOf("?");
+  const hashIdx = href.indexOf("#");
+  const queryIdx = href.indexOf("?");
   let cut = -1;
   if (hashIdx !== -1) cut = hashIdx;
   if (queryIdx !== -1 && (cut === -1 || queryIdx < cut)) cut = queryIdx;
-  if (cut === -1) return { pathPart: s, suffix: "" };
-  return { pathPart: s.slice(0, cut), suffix: s.slice(cut) };
+  if (cut === -1) return { pathPart: href, suffix: "" };
+  return { pathPart: href.slice(0, cut), suffix: href.slice(cut) };
 }

@@ -20,76 +20,73 @@ describe("formatSearchDateDir", () => {
   });
 
   it("zero-pads single-digit months and days", () => {
-    assert.equal(
-      formatSearchDateDir(new Date("2026-01-02T00:00:00Z")),
-      "2026-01-02",
-    );
+    assert.equal(formatSearchDateDir(new Date("2026-01-02T00:00:00Z")), "2026-01-02");
   });
 });
 
 describe("computeSearchHash", () => {
   it("is deterministic for the same inputs", () => {
-    const a = computeSearchHash("foo", SID, FIXED_TS);
-    const b = computeSearchHash("foo", SID, FIXED_TS);
-    assert.equal(a, b);
+    const hash1 = computeSearchHash("foo", SID, FIXED_TS);
+    const hash2 = computeSearchHash("foo", SID, FIXED_TS);
+    assert.equal(hash1, hash2);
   });
 
   it("differs when query changes", () => {
-    const a = computeSearchHash("foo", SID, FIXED_TS);
-    const b = computeSearchHash("bar", SID, FIXED_TS);
-    assert.notEqual(a, b);
+    const hash1 = computeSearchHash("foo", SID, FIXED_TS);
+    const hash2 = computeSearchHash("bar", SID, FIXED_TS);
+    assert.notEqual(hash1, hash2);
   });
 
   it("differs when sessionId changes", () => {
-    const a = computeSearchHash("foo", "session-A", FIXED_TS);
-    const b = computeSearchHash("foo", "session-B", FIXED_TS);
-    assert.notEqual(a, b);
+    const hash1 = computeSearchHash("foo", "session-A", FIXED_TS);
+    const hash2 = computeSearchHash("foo", "session-B", FIXED_TS);
+    assert.notEqual(hash1, hash2);
   });
 
   it("returns an 8-char base64url-ish string", () => {
-    const h = computeSearchHash("foo", SID, FIXED_TS);
-    assert.equal(h.length, 8);
-    assert.match(h, /^[A-Za-z0-9_-]+$/);
+    const hash = computeSearchHash("foo", SID, FIXED_TS);
+    assert.equal(hash.length, 8);
+    assert.match(hash, /^[A-Za-z0-9_-]+$/);
   });
 });
 
 describe("computeSearchRelPath", () => {
   it("builds conversations/searches/YYYY-MM-DD/<slug>-<hash>.md", () => {
-    const p = computeSearchRelPath({
+    const relPath = computeSearchRelPath({
       query: "熊本地震 2016",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
     });
-    assert.ok(p.startsWith("conversations/searches/2026-04-13/"));
-    assert.ok(p.endsWith(".md"));
+    assert.ok(relPath.startsWith("conversations/searches/2026-04-13/"));
+    assert.ok(relPath.endsWith(".md"));
   });
 
   it("produces stable path for identical inputs", () => {
-    const a = computeSearchRelPath({
+    const path1 = computeSearchRelPath({
       query: "claude code",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
     });
-    const b = computeSearchRelPath({
+    const path2 = computeSearchRelPath({
       query: "claude code",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
     });
-    assert.equal(a, b);
+    assert.equal(path1, path2);
   });
 
   it("produces different paths for different queries", () => {
-    const a = computeSearchRelPath({
+    const path1 = computeSearchRelPath({
       query: "foo",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
     });
-    const b = computeSearchRelPath({
+    const path2 = computeSearchRelPath({
       query: "bar",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
     });
-    assert.notEqual(a, b);
+    assert.notEqual(path1, path2);
   });
 });
 
@@ -98,7 +95,7 @@ describe("buildSearchMarkdown", () => {
     const md = buildSearchMarkdown({
       query: "foo",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "- result 1\n- result 2",
     });
     assert.ok(md.startsWith("---\n"));
@@ -114,7 +111,7 @@ describe("buildSearchMarkdown", () => {
     const md = buildSearchMarkdown({
       query: "a:b",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "body",
     });
     assert.ok(md.includes('query: "a:b"'));
@@ -124,7 +121,7 @@ describe("buildSearchMarkdown", () => {
     const md = buildSearchMarkdown({
       query: "熊本地震",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "body",
     });
     assert.ok(md.includes("# Search: 熊本地震"));
@@ -147,7 +144,7 @@ describe("writeSearchResult (I/O)", () => {
       workspaceRoot,
       query: "foo query",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "top result",
     });
     assert.ok(rel.startsWith("conversations/searches/2026-04-13/"));
@@ -161,23 +158,18 @@ describe("writeSearchResult (I/O)", () => {
       workspaceRoot,
       query: "alpha",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "a",
     });
     await writeSearchResult({
       workspaceRoot,
       query: "beta",
       sessionId: SID,
-      ts: FIXED_TS,
+      timestamp: FIXED_TS,
       resultBody: "b",
     });
-    const dir = path.join(
-      workspaceRoot,
-      "conversations",
-      "searches",
-      "2026-04-13",
-    );
-    const files = (await readdir(dir)).filter((n) => n.endsWith(".md"));
+    const dir = path.join(workspaceRoot, "conversations", "searches", "2026-04-13");
+    const files = (await readdir(dir)).filter((name) => name.endsWith(".md"));
     // At least two files (prior test in this block wrote one too).
     assert.ok(files.length >= 2);
   });

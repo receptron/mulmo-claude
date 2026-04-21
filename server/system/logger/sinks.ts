@@ -1,10 +1,6 @@
 import { appendFile } from "fs/promises";
 import path from "path";
-import type {
-  ConsoleSinkConfig,
-  FileSinkConfig,
-  TelemetrySinkConfig,
-} from "./config.js";
+import type { ConsoleSinkConfig, FileSinkConfig, TelemetrySinkConfig } from "./config.js";
 import { formatJson, formatText } from "./formatters.js";
 import { dailyFileName, enforceMaxFiles, ensureDir } from "./rotation.js";
 import type { Formatter, LogRecord, Sink } from "./types.js";
@@ -20,10 +16,7 @@ export function createConsoleSink(config: ConsoleSinkConfig): Sink {
     level: config.level,
     write(record: LogRecord) {
       const line = fmt(record) + "\n";
-      const stream =
-        record.level === "error" || record.level === "warn"
-          ? process.stderr
-          : process.stdout;
+      const stream = record.level === "error" || record.level === "warn" ? process.stderr : process.stdout;
       stream.write(line);
     },
   };
@@ -37,14 +30,9 @@ export interface FileSinkDeps {
 
 // Factory for the rotating file sink. `deps` is only used by tests to
 // inject a fake clock and an in-memory writer.
-export function createFileSink(
-  config: FileSinkConfig,
-  deps: FileSinkDeps = {},
-): Sink {
+export function createFileSink(config: FileSinkConfig, deps: FileSinkDeps = {}): Sink {
   const now = deps.now ?? (() => new Date());
-  const writeLine =
-    deps.writeLine ??
-    ((p: string, line: string) => appendFile(p, line, "utf-8"));
+  const writeLine = deps.writeLine ?? ((filePath: string, line: string) => appendFile(filePath, line, "utf-8"));
   const onError =
     deps.onError ??
     ((err: unknown) => {
@@ -59,19 +47,19 @@ export function createFileSink(
   // interleave with a previous write.
   let queue: Promise<void> = Promise.resolve();
 
-  function enqueue(op: () => Promise<void>): void {
-    queue = queue.then(op).catch(onError);
+  function enqueue(operation: () => Promise<void>): void {
+    queue = queue.then(operation).catch(onError);
   }
 
-  function dateKey(d: Date): string {
-    return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+  function dateKey(date: Date): string {
+    return `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
   }
 
-  function maybeRotate(ts: Date): boolean {
-    const key = dateKey(ts);
+  function maybeRotate(currentDate: Date): boolean {
+    const key = dateKey(currentDate);
     if (key === currentDateKey) return false;
     currentDateKey = key;
-    currentPath = path.join(config.dir, dailyFileName(ts));
+    currentPath = path.join(config.dir, dailyFileName(currentDate));
     enqueue(async () => {
       await ensureDir(config.dir);
     });
@@ -82,8 +70,8 @@ export function createFileSink(
     name: "file",
     level: config.level,
     write(record: LogRecord) {
-      const ts = now();
-      const rotated = maybeRotate(ts);
+      const nowDate = now();
+      const rotated = maybeRotate(nowDate);
       const line = fmt(record) + "\n";
       const filePath = currentPath;
       enqueue(() => writeLine(filePath, line));

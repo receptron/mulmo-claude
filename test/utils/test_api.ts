@@ -1,13 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import {
-  apiCall,
-  apiGet,
-  apiPost,
-  apiPut,
-  apiDelete,
-  setAuthToken,
-} from "../../src/utils/api.ts";
+import { apiCall, apiGet, apiPost, apiPut, apiDelete, setAuthToken } from "../../src/utils/api.ts";
 
 // fetch mocking. Capture the URL + init passed by the api module, and
 // reply with a pre-scripted response. Each test installs its own mock

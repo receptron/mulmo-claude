@@ -22,17 +22,14 @@ const TRANSPORT_ID = "slack";
 const botToken = process.env.SLACK_BOT_TOKEN;
 const appToken = process.env.SLACK_APP_TOKEN;
 if (!botToken || !appToken) {
-  console.error(
-    "SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.\n" +
-      "See README for setup instructions.",
-  );
+  console.error("SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.\n" + "See README for setup instructions.");
   process.exit(1);
 }
 
 const allowedChannels = new Set(
   (process.env.SLACK_ALLOWED_CHANNELS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((channelId) => channelId.trim())
     .filter(Boolean),
 );
 const allowAll = allowedChannels.size === 0;
@@ -45,10 +42,8 @@ const client = createBridgeClient({ transportId: TRANSPORT_ID });
 // Resolve the bot's own user ID so we can ignore our own messages
 let botUserId: string | null = null;
 
-client.onPush((ev) => {
-  web.chat
-    .postMessage({ channel: ev.chatId, text: ev.message })
-    .catch((err) => console.error(`[slack] push send failed: ${err}`));
+client.onPush((pushEvent) => {
+  web.chat.postMessage({ channel: pushEvent.chatId, text: pushEvent.message }).catch((err) => console.error(`[slack] push send failed: ${err}`));
 });
 
 socketMode.on("message", async ({ event, ack }) => {
@@ -68,9 +63,7 @@ socketMode.on("message", async ({ event, ack }) => {
     return;
   }
 
-  console.log(
-    `[slack] message channel=${channelId} user=${event.user} len=${text.length}`,
-  );
+  console.log(`[slack] message channel=${channelId} user=${event.user} len=${text.length}`);
 
   try {
     const ackResult = await client.send(channelId, text);
@@ -83,9 +76,7 @@ socketMode.on("message", async ({ event, ack }) => {
           channel: channelId,
           text: `Error${status}: ${ackResult.error ?? "unknown"}`,
         })
-        .catch((err) =>
-          console.error(`[slack] error notification failed: ${err}`),
-        );
+        .catch((err) => console.error(`[slack] error notification failed: ${err}`));
     }
   } catch (err) {
     console.error(`[slack] message handling failed: ${err}`);
@@ -115,9 +106,7 @@ async function main(): Promise<void> {
   botUserId = typeof rawUserId === "string" ? rawUserId : null;
 
   console.log("MulmoClaude Slack bridge");
-  console.log(
-    `Channels: ${allowAll ? "(all)" : [...allowedChannels].join(", ")}`,
-  );
+  console.log(`Channels: ${allowAll ? "(all)" : [...allowedChannels].join(", ")}`);
 
   await socketMode.start();
   console.log("Connected to Slack (Socket Mode).");

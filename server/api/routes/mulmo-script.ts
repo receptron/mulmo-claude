@@ -27,10 +27,7 @@ import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
 import { log } from "../../system/logger/index.js";
-import {
-  validateUpdateBeatBody,
-  validateUpdateScriptBody,
-} from "./mulmoScriptValidate.js";
+import { validateUpdateBeatBody, validateUpdateScriptBody } from "./mulmoScriptValidate.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { publishGeneration } from "../../events/session-store/index.js";
 import { GENERATION_KINDS } from "../../../src/types/events.js";
@@ -99,148 +96,124 @@ interface FilePathQuery {
   filePath?: string;
 }
 
-router.post(
-  API_ROUTES.mulmoScript.save,
-  (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
-    const { script, filename } = req.body;
+router.post(API_ROUTES.mulmoScript.save, (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
+  const { script, filename } = req.body;
 
-    if (!script || !Array.isArray(script.beats)) {
-      badRequest(res, "script with beats array is required");
+  if (!script || !Array.isArray(script.beats)) {
+    badRequest(res, "script with beats array is required");
+    return;
+  }
+
+  fs.mkdirSync(storiesDir, { recursive: true });
+
+  const title = script.title || "untitled";
+  const slug = filename ? filename.replace(/\.json$/, "") : slugify(title);
+  const fname = `${slug}-${Date.now()}.json`;
+  const filePath = path.join(storiesDir, fname);
+
+  fs.writeFileSync(filePath, JSON.stringify(script, null, 2));
+
+  res.json({
+    data: { script, filePath: `stories/${fname}` },
+    message: `Saved MulmoScript to stories/${fname}`,
+    instructions: "Display the storyboard to the user.",
+  });
+});
+
+router.post(API_ROUTES.mulmoScript.updateBeat, (req: Request<object, object, unknown>, res: Response) => {
+  const validation = validateUpdateBeatBody(req.body);
+  if (!validation.ok) {
+    badRequest(res, validation.error);
+    return;
+  }
+  const { filePath, beatIndex, beat } = validation.value;
+
+  const absoluteFilePath = resolveStoryPath(filePath, res);
+  if (!absoluteFilePath) return;
+
+  const script: MulmoScript = JSON.parse(fs.readFileSync(absoluteFilePath, "utf-8"));
+
+  if (!Array.isArray(script.beats) || beatIndex >= script.beats.length) {
+    badRequest(res, "Invalid beatIndex");
+    return;
+  }
+
+  script.beats[beatIndex] = beat as MulmoBeat;
+  fs.writeFileSync(absoluteFilePath, JSON.stringify(script, null, 2));
+
+  res.json({ ok: true });
+});
+
+router.post(API_ROUTES.mulmoScript.updateScript, (req: Request<object, object, unknown>, res: Response) => {
+  const validation = validateUpdateScriptBody(req.body);
+  if (!validation.ok) {
+    badRequest(res, validation.error);
+    return;
+  }
+  const { filePath, script: updatedScript } = validation.value;
+
+  const absoluteFilePath = resolveStoryPath(filePath, res);
+  if (!absoluteFilePath) return;
+
+  fs.writeFileSync(absoluteFilePath, JSON.stringify(updatedScript, null, 2));
+  res.json({ ok: true });
+});
+
+router.get(API_ROUTES.mulmoScript.beatImage, async (req: Request<object, BeatImageResponse, object, BeatQuery>, res: Response<BeatImageResponse>) => {
+  const { filePath, beatIndex: beatIndexStr } = req.query;
+  const beatIndex = beatIndexStr !== undefined ? parseInt(beatIndexStr, 10) : undefined;
+
+  if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
+    badRequest(res, "filePath and beatIndex are required");
+    return;
+  }
+
+  await withStoryContext(res, filePath, {}, async ({ context }) => {
+    const { imagePath } = getBeatPngImagePath(context, beatIndex);
+    if (!fs.existsSync(imagePath)) {
+      res.json({ image: null });
+      return;
+    }
+    res.json({ image: fileToDataUri(imagePath, "image/png") });
+  });
+});
+
+router.get(API_ROUTES.mulmoScript.movieStatus, async (req: Request<object, MovieStatusResponse, object, FilePathQuery>, res: Response<MovieStatusResponse>) => {
+  const { filePath } = req.query;
+
+  if (!filePath) {
+    badRequest(res, "filePath is required");
+    return;
+  }
+
+  const absoluteFilePath = resolveStoryPath(filePath, res);
+  if (!absoluteFilePath) return;
+
+  try {
+    const context = await buildContext(absoluteFilePath);
+    if (!context) {
+      res.json({ moviePath: null });
       return;
     }
 
-    fs.mkdirSync(storiesDir, { recursive: true });
-
-    const title = script.title || "untitled";
-    const slug = filename ? filename.replace(/\.json$/, "") : slugify(title);
-    const fname = `${slug}-${Date.now()}.json`;
-    const filePath = path.join(storiesDir, fname);
-
-    fs.writeFileSync(filePath, JSON.stringify(script, null, 2));
-
-    res.json({
-      data: { script, filePath: `stories/${fname}` },
-      message: `Saved MulmoScript to stories/${fname}`,
-      instructions: "Display the storyboard to the user.",
-    });
-  },
-);
-
-router.post(
-  API_ROUTES.mulmoScript.updateBeat,
-  (req: Request<object, object, unknown>, res: Response) => {
-    const validation = validateUpdateBeatBody(req.body);
-    if (!validation.ok) {
-      badRequest(res, validation.error);
-      return;
-    }
-    const { filePath, beatIndex, beat } = validation.value;
-
-    const absoluteFilePath = resolveStoryPath(filePath, res);
-    if (!absoluteFilePath) return;
-
-    const script: MulmoScript = JSON.parse(
-      fs.readFileSync(absoluteFilePath, "utf-8"),
-    );
-
-    if (!Array.isArray(script.beats) || beatIndex >= script.beats.length) {
-      badRequest(res, "Invalid beatIndex");
+    const outputPath = movieFilePath(context);
+    if (!fs.existsSync(outputPath)) {
+      res.json({ moviePath: null });
       return;
     }
 
-    script.beats[beatIndex] = beat as MulmoBeat;
-    fs.writeFileSync(absoluteFilePath, JSON.stringify(script, null, 2));
-
-    res.json({ ok: true });
-  },
-);
-
-router.post(
-  API_ROUTES.mulmoScript.updateScript,
-  (req: Request<object, object, unknown>, res: Response) => {
-    const validation = validateUpdateScriptBody(req.body);
-    if (!validation.ok) {
-      badRequest(res, validation.error);
-      return;
-    }
-    const { filePath, script: updatedScript } = validation.value;
-
-    const absoluteFilePath = resolveStoryPath(filePath, res);
-    if (!absoluteFilePath) return;
-
-    fs.writeFileSync(absoluteFilePath, JSON.stringify(updatedScript, null, 2));
-    res.json({ ok: true });
-  },
-);
-
-router.get(
-  API_ROUTES.mulmoScript.beatImage,
-  async (
-    req: Request<object, BeatImageResponse, object, BeatQuery>,
-    res: Response<BeatImageResponse>,
-  ) => {
-    const { filePath, beatIndex: beatIndexStr } = req.query;
-    const beatIndex =
-      beatIndexStr !== undefined ? parseInt(beatIndexStr, 10) : undefined;
-
-    if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
-      badRequest(res, "filePath and beatIndex are required");
+    const movieMtime = fs.statSync(outputPath).mtimeMs;
+    const sourceMtime = fs.statSync(absoluteFilePath).mtimeMs;
+    if (movieMtime < sourceMtime) {
+      res.json({ moviePath: null });
       return;
     }
 
-    await withStoryContext(res, filePath, {}, async ({ context }) => {
-      const { imagePath } = getBeatPngImagePath(context, beatIndex);
-      if (!fs.existsSync(imagePath)) {
-        res.json({ image: null });
-        return;
-      }
-      res.json({ image: fileToDataUri(imagePath, "image/png") });
-    });
-  },
-);
-
-router.get(
-  API_ROUTES.mulmoScript.movieStatus,
-  async (
-    req: Request<object, MovieStatusResponse, object, FilePathQuery>,
-    res: Response<MovieStatusResponse>,
-  ) => {
-    const { filePath } = req.query;
-
-    if (!filePath) {
-      badRequest(res, "filePath is required");
-      return;
-    }
-
-    const absoluteFilePath = resolveStoryPath(filePath, res);
-    if (!absoluteFilePath) return;
-
-    try {
-      const context = await buildContext(absoluteFilePath);
-      if (!context) {
-        res.json({ moviePath: null });
-        return;
-      }
-
-      const outputPath = movieFilePath(context);
-      if (!fs.existsSync(outputPath)) {
-        res.json({ moviePath: null });
-        return;
-      }
-
-      const movieMtime = fs.statSync(outputPath).mtimeMs;
-      const sourceMtime = fs.statSync(absoluteFilePath).mtimeMs;
-      if (movieMtime < sourceMtime) {
-        res.json({ moviePath: null });
-        return;
-      }
-
-      res.json({ moviePath: toStoryRef(outputPath) });
-    } catch (err) {
-      serverError(res, errorMessage(err));
-    }
-  },
-);
+    res.json({ moviePath: toStoryRef(outputPath) });
+  } catch (err) {
+    serverError(res, errorMessage(err));
+  }
+});
 
 function fileToDataUri(filePath: string, mimeType: string): string {
   const data = fs.readFileSync(filePath);
@@ -277,11 +250,7 @@ function resolveStoryPath(filePath: string, res: Response): string | null {
   // canonical caller convention) and bare "foo.json".
   const STORIES_PREFIX = "stories" + path.sep;
   const relFromStories =
-    filePath === "stories"
-      ? ""
-      : filePath.startsWith(STORIES_PREFIX) || filePath.startsWith("stories/")
-        ? filePath.slice("stories/".length)
-        : filePath;
+    filePath === "stories" ? "" : filePath.startsWith(STORIES_PREFIX) || filePath.startsWith("stories/") ? filePath.slice("stories/".length) : filePath;
   // resolveWithinRoot enforces both the realpath boundary AND
   // existence; ENOENT and traversal both produce null. Distinguish
   // them via a follow-up existsSync so 404 vs 400 stays accurate.
@@ -314,10 +283,7 @@ type StoryContext = NonNullable<Awaited<ReturnType<typeof buildContext>>>;
 
 interface WithStoryContextDeps {
   resolveStoryPath?: (filePath: string, res: Response) => string | null;
-  buildContext?: (
-    absoluteFilePath: string,
-    force?: boolean,
-  ) => Promise<StoryContext | undefined>;
+  buildContext?: (absoluteFilePath: string, force?: boolean) => Promise<StoryContext | undefined>;
 }
 
 // Shared scaffolding for mulmo-script handlers. Each handler resolves
@@ -351,10 +317,7 @@ export async function withStoryContext(
   res: Response,
   filePath: string,
   options: WithStoryContextOptions,
-  handler: (ctx: {
-    absoluteFilePath: string;
-    context: StoryContext;
-  }) => Promise<void>,
+  handler: (ctx: { absoluteFilePath: string; context: StoryContext }) => Promise<void>,
   deps: WithStoryContextDeps = {},
 ): Promise<void> {
   const resolver = deps.resolveStoryPath ?? resolveStoryPath;
@@ -392,49 +355,37 @@ export async function withStoryContext(
   }
 }
 
-router.get(
-  API_ROUTES.mulmoScript.beatAudio,
-  async (
-    req: Request<object, BeatAudioResponse, object, BeatQuery>,
-    res: Response<BeatAudioResponse>,
-  ) => {
-    const { filePath, beatIndex: beatIndexStr } = req.query;
-    const beatIndex =
-      beatIndexStr !== undefined ? parseInt(beatIndexStr, 10) : undefined;
+router.get(API_ROUTES.mulmoScript.beatAudio, async (req: Request<object, BeatAudioResponse, object, BeatQuery>, res: Response<BeatAudioResponse>) => {
+  const { filePath, beatIndex: beatIndexStr } = req.query;
+  const beatIndex = beatIndexStr !== undefined ? parseInt(beatIndexStr, 10) : undefined;
 
-    if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
-      badRequest(res, "filePath and beatIndex are required");
-      return;
-    }
+  if (!filePath || beatIndex === undefined || isNaN(beatIndex)) {
+    badRequest(res, "filePath and beatIndex are required");
+    return;
+  }
 
-    // GET /beat-audio is a probe — the frontend polls it expecting a
-    // 200 with `{ audio: null }` when nothing has been generated yet.
-    // Override the helper's default 500-on-context-missing so the
-    // soft-fail contract is preserved.
-    await withStoryContext(
-      res,
-      filePath,
-      {
-        operation: "beat-audio",
-        onContextMissing: (r) => r.json({ audio: null }),
-      },
-      async ({ context }) => {
-        const beat = context.studio.script.beats[beatIndex];
-        const audioPath = getBeatAudioPathOrUrl(
-          beat.text ?? "",
-          context,
-          beat,
-          context.lang,
-        );
-        if (!audioPath || !fs.existsSync(audioPath)) {
-          res.json({ audio: null });
-          return;
-        }
-        res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
-      },
-    );
-  },
-);
+  // GET /beat-audio is a probe — the frontend polls it expecting a
+  // 200 with `{ audio: null }` when nothing has been generated yet.
+  // Override the helper's default 500-on-context-missing so the
+  // soft-fail contract is preserved.
+  await withStoryContext(
+    res,
+    filePath,
+    {
+      operation: "beat-audio",
+      onContextMissing: (response) => response.json({ audio: null }),
+    },
+    async ({ context }) => {
+      const beat = context.studio.script.beats[beatIndex];
+      const audioPath = getBeatAudioPathOrUrl(beat.text ?? "", context, beat, context.lang);
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        res.json({ audio: null });
+        return;
+      }
+      res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
+    },
+  );
+});
 
 router.post(
   API_ROUTES.mulmoScript.generateBeatAudio,
@@ -459,230 +410,157 @@ router.post(
     }
 
     const key = String(beatIndex);
-    publishGeneration(
-      chatSessionId,
-      GENERATION_KINDS.beatAudio,
-      filePath,
-      key,
-      false,
-    );
+    publishGeneration(chatSessionId, GENERATION_KINDS.beatAudio, filePath, key, false);
     let genError: string | undefined;
     try {
-      await withStoryContext(
-        res,
-        filePath,
-        { force, operation: "generate-beat-audio" },
-        async ({ context }) => {
-          try {
-            await generateBeatAudio(beatIndex, context, {
-              settings: process.env as Record<string, string>,
-            } as Parameters<typeof generateBeatAudio>[2]);
-
-            const beat = context.studio.script.beats[beatIndex];
-            const audioPath =
-              context.studio.beats[beatIndex]?.audioFile ??
-              getBeatAudioPathOrUrl(
-                beat.text ?? "",
-                context,
-                beat,
-                context.lang,
-              );
-
-            if (!audioPath || !fs.existsSync(audioPath)) {
-              // Logic-flow failure (not an exception) — emit a targeted
-              // log. Don't write raw `beat.text` into persistent logs —
-              // it's free-form user content and can contain sensitive
-              // data.
-              log.error("generate-beat-audio", "audio was not generated", {
-                beatIndex,
-                audioPath,
-                exists: audioPath ? fs.existsSync(audioPath) : false,
-                beatTextLength:
-                  typeof beat?.text === "string" ? beat.text.length : 0,
-                audioFilePresent: Boolean(
-                  context.studio.beats[beatIndex]?.audioFile,
-                ),
-              });
-              genError = "Audio was not generated";
-              serverError(res, genError);
-              return;
-            }
-
-            res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
-          } catch (err) {
-            genError = errorMessage(err);
-            throw err;
-          }
-        },
-      );
-    } finally {
-      publishGeneration(
-        chatSessionId,
-        GENERATION_KINDS.beatAudio,
-        filePath,
-        key,
-        true,
-        genError,
-      );
-    }
-  },
-);
-
-router.post(
-  API_ROUTES.mulmoScript.renderBeat,
-  async (req: Request<object, object, RenderBeatBody>, res: Response) => {
-    const { filePath, beatIndex, force, chatSessionId } = req.body;
-
-    if (!filePath || beatIndex === undefined) {
-      badRequest(res, "filePath and beatIndex are required");
-      return;
-    }
-
-    const key = String(beatIndex);
-    publishGeneration(
-      chatSessionId,
-      GENERATION_KINDS.beatImage,
-      filePath,
-      key,
-      false,
-    );
-    // withStoryContext swallows errors and responds with 500, so we
-    // track failure via a local flag / message rather than try/catch
-    // around the outer call.
-    let genError: string | undefined;
-    try {
-      await withStoryContext(res, filePath, { force }, async ({ context }) => {
+      await withStoryContext(res, filePath, { force, operation: "generate-beat-audio" }, async ({ context }) => {
         try {
-          await generateBeatImage({
-            index: beatIndex,
-            context,
-            args: force ? { forceImage: true } : undefined,
-          });
+          await generateBeatAudio(beatIndex, context, {
+            settings: process.env as Record<string, string>,
+          } as Parameters<typeof generateBeatAudio>[2]);
 
-          const { imagePath } = getBeatPngImagePath(context, beatIndex);
-          if (!fs.existsSync(imagePath)) {
-            genError = "Image was not generated";
+          const beat = context.studio.script.beats[beatIndex];
+          const audioPath = context.studio.beats[beatIndex]?.audioFile ?? getBeatAudioPathOrUrl(beat.text ?? "", context, beat, context.lang);
+
+          if (!audioPath || !fs.existsSync(audioPath)) {
+            // Logic-flow failure (not an exception) — emit a targeted
+            // log. Don't write raw `beat.text` into persistent logs —
+            // it's free-form user content and can contain sensitive
+            // data.
+            log.error("generate-beat-audio", "audio was not generated", {
+              beatIndex,
+              audioPath,
+              exists: audioPath ? fs.existsSync(audioPath) : false,
+              beatTextLength: typeof beat?.text === "string" ? beat.text.length : 0,
+              audioFilePresent: Boolean(context.studio.beats[beatIndex]?.audioFile),
+            });
+            genError = "Audio was not generated";
             serverError(res, genError);
             return;
           }
-          res.json({ image: fileToDataUri(imagePath, "image/png") });
+
+          res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
         } catch (err) {
           genError = errorMessage(err);
           throw err;
         }
       });
     } finally {
-      publishGeneration(
-        chatSessionId,
-        GENERATION_KINDS.beatImage,
-        filePath,
-        key,
-        true,
-        genError,
-      );
+      publishGeneration(chatSessionId, GENERATION_KINDS.beatAudio, filePath, key, true, genError);
     }
   },
 );
 
-router.post(
-  API_ROUTES.mulmoScript.generateMovie,
-  async (
-    req: Request<object, object, { filePath: string; chatSessionId?: string }>,
-    res: Response,
-  ) => {
-    const { filePath, chatSessionId } = req.body;
+router.post(API_ROUTES.mulmoScript.renderBeat, async (req: Request<object, object, RenderBeatBody>, res: Response) => {
+  const { filePath, beatIndex, force, chatSessionId } = req.body;
 
-    if (!filePath) {
-      badRequest(res, "filePath is required");
+  if (!filePath || beatIndex === undefined) {
+    badRequest(res, "filePath and beatIndex are required");
+    return;
+  }
+
+  const key = String(beatIndex);
+  publishGeneration(chatSessionId, GENERATION_KINDS.beatImage, filePath, key, false);
+  // withStoryContext swallows errors and responds with 500, so we
+  // track failure via a local flag / message rather than try/catch
+  // around the outer call.
+  let genError: string | undefined;
+  try {
+    await withStoryContext(res, filePath, { force }, async ({ context }) => {
+      try {
+        await generateBeatImage({
+          index: beatIndex,
+          context,
+          args: force ? { forceImage: true } : undefined,
+        });
+
+        const { imagePath } = getBeatPngImagePath(context, beatIndex);
+        if (!fs.existsSync(imagePath)) {
+          genError = "Image was not generated";
+          serverError(res, genError);
+          return;
+        }
+        res.json({ image: fileToDataUri(imagePath, "image/png") });
+      } catch (err) {
+        genError = errorMessage(err);
+        throw err;
+      }
+    });
+  } finally {
+    publishGeneration(chatSessionId, GENERATION_KINDS.beatImage, filePath, key, true, genError);
+  }
+});
+
+router.post(API_ROUTES.mulmoScript.generateMovie, async (req: Request<object, object, { filePath: string; chatSessionId?: string }>, res: Response) => {
+  const { filePath, chatSessionId } = req.body;
+
+  if (!filePath) {
+    badRequest(res, "filePath is required");
+    return;
+  }
+
+  const absoluteFilePath = resolveStoryPath(filePath, res);
+  if (!absoluteFilePath) return;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  const send = (data: unknown) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+  publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", false);
+  let genError: string | undefined;
+  try {
+    const context = await buildContext(absoluteFilePath);
+    if (!context) {
+      genError = "Failed to initialize mulmo context";
+      send({ type: "error", message: genError });
+      res.end();
       return;
     }
 
-    const absoluteFilePath = resolveStoryPath(filePath, res);
-    if (!absoluteFilePath) return;
+    // Build id → beatIndex map for the progress callback
+    const idToIndex = new Map<string, number>();
+    (context.studio.script.beats as MulmoBeat[]).forEach((beat, index) => {
+      const key = beat.id ?? `__index__${index}`;
+      idToIndex.set(key, index);
+    });
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
+    const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
+      if (event.kind === "beat" && !event.inSession && event.id !== undefined) {
+        const beatIndex = idToIndex.get(event.id);
+        if (beatIndex !== undefined) {
+          send({ type: `beat_${event.sessionType}_done`, beatIndex });
+        }
+      }
+    };
 
-    const send = (data: unknown) =>
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-
-    publishGeneration(
-      chatSessionId,
-      GENERATION_KINDS.movie,
-      filePath,
-      "",
-      false,
-    );
-    let genError: string | undefined;
+    addSessionProgressCallback(onProgress);
     try {
-      const context = await buildContext(absoluteFilePath);
-      if (!context) {
-        genError = "Failed to initialize mulmo context";
+      const imagesContext = await images(context);
+      const audioContext = await audio(imagesContext);
+      await movie(audioContext);
+
+      const outputPath = movieFilePath(audioContext);
+      if (!fs.existsSync(outputPath)) {
+        genError = "Movie was not generated";
         send({ type: "error", message: genError });
         res.end();
         return;
       }
 
-      // Build id → beatIndex map for the progress callback
-      const idToIndex = new Map<string, number>();
-      (context.studio.script.beats as MulmoBeat[]).forEach((beat, index) => {
-        const key = beat.id ?? `__index__${index}`;
-        idToIndex.set(key, index);
-      });
-
-      const onProgress = (event: {
-        kind: string;
-        sessionType: string;
-        id?: string;
-        inSession: boolean;
-      }) => {
-        if (
-          event.kind === "beat" &&
-          !event.inSession &&
-          event.id !== undefined
-        ) {
-          const beatIndex = idToIndex.get(event.id);
-          if (beatIndex !== undefined) {
-            send({ type: `beat_${event.sessionType}_done`, beatIndex });
-          }
-        }
-      };
-
-      addSessionProgressCallback(onProgress);
-      try {
-        const imagesContext = await images(context);
-        const audioContext = await audio(imagesContext);
-        await movie(audioContext);
-
-        const outputPath = movieFilePath(audioContext);
-        if (!fs.existsSync(outputPath)) {
-          genError = "Movie was not generated";
-          send({ type: "error", message: genError });
-          res.end();
-          return;
-        }
-
-        send({ type: "done", moviePath: toStoryRef(outputPath) });
-      } finally {
-        removeSessionProgressCallback(onProgress);
-      }
-    } catch (err) {
-      genError = errorMessage(err);
-      send({ type: "error", message: genError });
+      send({ type: "done", moviePath: toStoryRef(outputPath) });
     } finally {
-      publishGeneration(
-        chatSessionId,
-        GENERATION_KINDS.movie,
-        filePath,
-        "",
-        true,
-        genError,
-      );
-      res.end();
+      removeSessionProgressCallback(onProgress);
     }
-  },
-);
+  } catch (err) {
+    genError = errorMessage(err);
+    send({ type: "error", message: genError });
+  } finally {
+    publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", true, genError);
+    res.end();
+  }
+});
 
 interface CharacterImageQuery {
   filePath?: string;
@@ -706,10 +584,7 @@ type CharacterImageResponse = { image: string | null } | ErrorResponse;
 
 router.get(
   API_ROUTES.mulmoScript.characterImage,
-  async (
-    req: Request<object, CharacterImageResponse, object, CharacterImageQuery>,
-    res: Response<CharacterImageResponse>,
-  ) => {
+  async (req: Request<object, CharacterImageResponse, object, CharacterImageQuery>, res: Response<CharacterImageResponse>) => {
     const { filePath, key } = req.query;
 
     if (!filePath || !key) {
@@ -728,37 +603,28 @@ router.get(
   },
 );
 
-router.post(
-  API_ROUTES.mulmoScript.uploadBeatImage,
-  async (
-    req: Request<object, BeatImageResponse, UploadBeatImageBody>,
-    res: Response<BeatImageResponse>,
-  ) => {
-    const { filePath, beatIndex, imageData } = req.body;
+router.post(API_ROUTES.mulmoScript.uploadBeatImage, async (req: Request<object, BeatImageResponse, UploadBeatImageBody>, res: Response<BeatImageResponse>) => {
+  const { filePath, beatIndex, imageData } = req.body;
 
-    if (!filePath || beatIndex === undefined || !imageData) {
-      badRequest(res, "filePath, beatIndex, and imageData are required");
-      return;
-    }
+  if (!filePath || beatIndex === undefined || !imageData) {
+    badRequest(res, "filePath, beatIndex, and imageData are required");
+    return;
+  }
 
-    await withStoryContext(res, filePath, {}, async ({ context }) => {
-      const { imagePath } = getBeatPngImagePath(context, beatIndex);
-      fs.mkdirSync(path.dirname(imagePath), { recursive: true });
+  await withStoryContext(res, filePath, {}, async ({ context }) => {
+    const { imagePath } = getBeatPngImagePath(context, beatIndex);
+    fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-      const base64 = stripDataUri(imageData);
-      fs.writeFileSync(imagePath, Buffer.from(base64, "base64"));
+    const base64 = stripDataUri(imageData);
+    fs.writeFileSync(imagePath, Buffer.from(base64, "base64"));
 
-      res.json({ image: fileToDataUri(imagePath, "image/png") });
-    });
-  },
-);
+    res.json({ image: fileToDataUri(imagePath, "image/png") });
+  });
+});
 
 router.post(
   API_ROUTES.mulmoScript.renderCharacter,
-  async (
-    req: Request<object, CharacterImageResponse, RenderCharacterBody>,
-    res: Response<CharacterImageResponse>,
-  ) => {
+  async (req: Request<object, CharacterImageResponse, RenderCharacterBody>, res: Response<CharacterImageResponse>) => {
     const { filePath, key, force, chatSessionId } = req.body;
 
     if (!filePath || !key) {
@@ -766,13 +632,7 @@ router.post(
       return;
     }
 
-    publishGeneration(
-      chatSessionId,
-      GENERATION_KINDS.characterImage,
-      filePath,
-      key,
-      false,
-    );
+    publishGeneration(chatSessionId, GENERATION_KINDS.characterImage, filePath, key, false);
     let genError: string | undefined;
     try {
       await withStoryContext(res, filePath, { force }, async ({ context }) => {
@@ -808,24 +668,14 @@ router.post(
         }
       });
     } finally {
-      publishGeneration(
-        chatSessionId,
-        GENERATION_KINDS.characterImage,
-        filePath,
-        key,
-        true,
-        genError,
-      );
+      publishGeneration(chatSessionId, GENERATION_KINDS.characterImage, filePath, key, true, genError);
     }
   },
 );
 
 router.post(
   API_ROUTES.mulmoScript.uploadCharacterImage,
-  async (
-    req: Request<object, CharacterImageResponse, UploadCharacterImageBody>,
-    res: Response<CharacterImageResponse>,
-  ) => {
+  async (req: Request<object, CharacterImageResponse, UploadCharacterImageBody>, res: Response<CharacterImageResponse>) => {
     const { filePath, key, imageData } = req.body;
 
     if (!filePath || !key || !imageData) {
@@ -845,22 +695,18 @@ router.post(
   },
 );
 
-router.get(
-  API_ROUTES.mulmoScript.downloadMovie,
-  (req: Request, res: Response) => {
-    const moviePath =
-      typeof req.query.moviePath === "string" ? req.query.moviePath : undefined;
+router.get(API_ROUTES.mulmoScript.downloadMovie, (req: Request, res: Response) => {
+  const moviePath = typeof req.query.moviePath === "string" ? req.query.moviePath : undefined;
 
-    if (!moviePath) {
-      badRequest(res, "moviePath is required");
-      return;
-    }
+  if (!moviePath) {
+    badRequest(res, "moviePath is required");
+    return;
+  }
 
-    const absolutePath = resolveStoryPath(moviePath, res);
-    if (!absolutePath) return;
+  const absolutePath = resolveStoryPath(moviePath, res);
+  if (!absolutePath) return;
 
-    res.download(absolutePath);
-  },
-);
+  res.download(absolutePath);
+});
 
 export default router;

@@ -6,14 +6,12 @@
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
-export function deduplicateResults(
-  all: ToolResultComplete[],
-): ToolResultComplete[] {
-  return all.filter((r, i) => {
-    if (r.toolName === "text-response") return true;
+export function deduplicateResults(all: ToolResultComplete[]): ToolResultComplete[] {
+  return all.filter((result, i) => {
+    if (result.toolName === "text-response") return true;
     const next = all[i + 1];
     if (!next) return true;
-    if (next.toolName !== r.toolName) return true;
-    return !(r.updating === true && next.updating === true);
+    if (next.toolName !== result.toolName) return true;
+    return !(result.updating === true && next.updating === true);
   });
 }

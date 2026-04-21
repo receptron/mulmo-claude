@@ -9,9 +9,7 @@ const roles = [
   { id: "office", name: "Office" },
 ];
 
-function makeState(
-  overrides?: Partial<TransportChatState>,
-): TransportChatState {
+function makeState(overrides?: Partial<TransportChatState>): TransportChatState {
   return {
     externalChatId: "test-chat",
     sessionId: "sess-1",
@@ -128,17 +126,9 @@ describe("/switch command", () => {
       }),
     });
     // User A populates cache
-    await handler(
-      "/sessions",
-      "telegram",
-      makeState({ externalChatId: "userA" }),
-    );
+    await handler("/sessions", "telegram", makeState({ externalChatId: "userA" }));
     // User B has NOT called /sessions — /switch should fail
-    const result = await handler(
-      "/switch 1",
-      "telegram",
-      makeState({ externalChatId: "userB" }),
-    );
+    const result = await handler("/switch 1", "telegram", makeState({ externalChatId: "userB" }));
     assert.ok(result);
     assert.ok(result.reply.includes("/sessions first"));
   });

@@ -11,9 +11,7 @@
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
 import { isRecord } from "../../utils/types.js";
 
-export type ValidationResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string };
+export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function formatZodIssues(
   // Zod's `$ZodIssue.path` is `PropertyKey[]` (includes `symbol`).
@@ -25,10 +23,7 @@ function formatZodIssues(
   const head = issues
     .slice(0, 3)
     .map((i) => {
-      const pathStr =
-        i.path.length > 0
-          ? i.path.map((seg) => String(seg)).join(".")
-          : "<root>";
+      const pathStr = i.path.length > 0 ? i.path.map((seg) => String(seg)).join(".") : "<root>";
       return `${pathStr}: ${i.message}`;
     })
     .join("; ");
@@ -82,11 +77,7 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   if (typeof body.filePath !== "string" || body.filePath === "") {
     return { ok: false, error: "filePath must be a non-empty string" };
   }
-  if (
-    typeof body.beatIndex !== "number" ||
-    !Number.isInteger(body.beatIndex) ||
-    body.beatIndex < 0
-  ) {
+  if (typeof body.beatIndex !== "number" || !Number.isInteger(body.beatIndex) || body.beatIndex < 0) {
     return { ok: false, error: "beatIndex must be a non-negative integer" };
   }
   if (body.beat === undefined) {

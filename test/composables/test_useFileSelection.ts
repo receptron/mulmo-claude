@@ -8,15 +8,7 @@ import { isValidFilePath } from "../../src/composables/useFileSelection.ts";
 
 describe("isValidFilePath", () => {
   it("accepts ordinary workspace-relative paths", () => {
-    for (const path of [
-      "a",
-      "a.md",
-      "notes/a.md",
-      "deep/nested/path/file.json",
-      "with-dashes_and.dots/file.txt",
-      "spaces are fine.md",
-      "unicode/日本語.md",
-    ]) {
+    for (const path of ["a", "a.md", "notes/a.md", "deep/nested/path/file.json", "with-dashes_and.dots/file.txt", "spaces are fine.md", "unicode/日本語.md"]) {
       assert.equal(isValidFilePath(path), true, `path=${path}`);
     }
   });

@@ -3,6 +3,7 @@ import { mockAllApis } from "../fixtures/api";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 import { API_ROUTES } from "../../src/config/apiRoutes";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // Override the lazy-expand endpoint with a small fixture tree. Each
 // directory returns its immediate children only — recursion is
 // emulated by the client via subsequent fetches on expand.
@@ -10,8 +11,7 @@ async function mockFileTree(page: Page) {
   await page.route(
     (url) => url.pathname === API_ROUTES.files.dir,
     (route) => {
-      const path =
-        new URL(route.request().url()).searchParams.get("path") ?? "";
+      const path = new URL(route.request().url()).searchParams.get("path") ?? "";
       if (path === "") {
         return route.fulfill({
           json: {
@@ -77,9 +77,7 @@ async function mockFileTree(page: Page) {
 
   // Mock file content for wiki/hello.md
   await page.route(
-    (url) =>
-      url.pathname === API_ROUTES.files.content &&
-      url.searchParams.get("path") === "wiki/hello.md",
+    (url) => url.pathname === API_ROUTES.files.content && url.searchParams.get("path") === "wiki/hello.md",
     (route) =>
       route.fulfill({
         json: {
@@ -106,24 +104,20 @@ test.describe("file explorer path in URL", () => {
     // Wait for the root dir's shallow listing to land — with lazy
     // expand (#200 phase 2), the tree only renders children after
     // `/api/files/dir?path=` resolves.
-    await expect(
-      page.locator('[data-testid="file-tree-dir-wiki"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-dir-wiki"]')).toBeVisible();
 
     // Expand the wiki dir and click hello.md. FileTree dirs start
     // collapsed; click toggles expand + triggers a lazy-fetch of
     // wiki's children (resolved by the mockFileTree dispatcher).
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
-    await expect(
-      page.locator('[data-testid="file-tree-file-hello.md"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="file-tree-file-hello.md"]')).toBeVisible();
     await page.locator('[data-testid="file-tree-file-hello.md"]').click();
 
     // URL should now contain ?path=wiki/hello.md
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBe("wiki/hello.md");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("direct URL with ?path= opens the file", async ({ page }) => {
@@ -132,13 +126,11 @@ test.describe("file explorer path in URL", () => {
 
     // The file content should be visible
     await expect(page.getByText("This is a test.")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
-  test("?path= with traversal attempt is stripped by guard", async ({
-    page,
-  }) => {
+  test("?path= with traversal attempt is stripped by guard", async ({ page }) => {
     await page.goto("/chat?view=files&path=../../../etc/passwd");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -146,7 +138,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("?path= with absolute path is stripped by guard", async ({ page }) => {
@@ -156,12 +148,10 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
-  test("editing a markdown file via the rendered-mode editor saves via PUT /api/files/content", async ({
-    page,
-  }) => {
+  test("editing a markdown file via the rendered-mode editor saves via PUT /api/files/content", async ({ page }) => {
     // Capture the PUT request body so we can assert on exactly what
     // the editor sent to the server.
     const putRequests: Array<{ path: string; content: string }> = [];
@@ -195,7 +185,7 @@ test.describe("file explorer path in URL", () => {
     // on-disk source (not the rewritten display text), so edits
     // round-trip through PUT /api/files/content unmodified.
     const summary = page.getByTestId("text-response-edit-summary");
-    await expect(summary).toBeVisible({ timeout: 5000 });
+    await expect(summary).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
     await summary.click();
 
     const textarea = page.getByTestId("text-response-edit-textarea");
@@ -212,18 +202,18 @@ test.describe("file explorer path in URL", () => {
       expect(putRequests).toHaveLength(1);
       expect(putRequests[0].path).toBe("wiki/hello.md");
       expect(putRequests[0].content).toBe("# Hello\n\nEdited by the test.");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("closing a file removes ?path= from URL", async ({ page }) => {
     await page.goto("/chat?view=files&path=wiki/hello.md");
     await expect(page.getByText("This is a test.")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Click the close button
     await expect(page.getByTestId("close-file-btn")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await page.getByTestId("close-file-btn").click();
 
@@ -231,7 +221,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
 
     // "Select a file" placeholder should be visible
     await expect(page.getByText("Select a file")).toBeVisible();

@@ -12,10 +12,7 @@ describe("isMarkdownPath", () => {
   });
 
   it("accepts a UUID-like filename", () => {
-    assert.equal(
-      isMarkdownPath("artifacts/documents/a1b2c3d4e5f6g7h8.md"),
-      true,
-    );
+    assert.equal(isMarkdownPath("artifacts/documents/a1b2c3d4e5f6g7h8.md"), true);
   });
 
   it("accepts a path with nested subdirectory", () => {

@@ -16,11 +16,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-export const TOKEN_FILE_PATH = path.join(
-  os.homedir(),
-  "mulmoclaude",
-  ".session-token",
-);
+export const TOKEN_FILE_PATH = path.join(os.homedir(), "mulmoclaude", ".session-token");
 
 export function readBridgeToken(): string | null {
   const fromEnv = process.env.MULMOCLAUDE_AUTH_TOKEN;

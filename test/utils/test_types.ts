@@ -1,15 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  isRecord,
-  isObj,
-  isNonEmptyString,
-  isStringRecord,
-  isStringArray,
-  isErrorWithCode,
-  hasStringProp,
-  hasNumberProp,
-} from "../../server/utils/types.js";
+import { isRecord, isObj, isNonEmptyString, isStringRecord, isStringArray, isErrorWithCode, hasStringProp, hasNumberProp } from "../../server/utils/types.js";
 
 // ── isRecord ────────────────────────────────────────────────────
 

@@ -1,20 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "crypto";
-import {
-  hasNonAscii,
-  hashSlug,
-  isValidSlug,
-  slugify,
-} from "../../server/utils/slug.js";
+import { hasNonAscii, hashSlug, isValidSlug, slugify } from "../../server/utils/slug.js";
 
 const HASH_LEN = 16;
 
 function expectedHash(input: string, len = HASH_LEN): string {
-  return createHash("sha256")
-    .update(input, "utf-8")
-    .digest("base64url")
-    .slice(0, len);
+  return createHash("sha256").update(input, "utf-8").digest("base64url").slice(0, len);
 }
 
 describe("hasNonAscii", () => {
@@ -80,11 +72,11 @@ describe("slugify (non-ASCII fallback)", () => {
   });
 
   it("gives different ids to labels differing only in suffix", () => {
-    const a = slugify("プロジェクトA");
-    const b = slugify("プロジェクトB");
-    assert.notEqual(a, b);
-    assert.equal(a.length, HASH_LEN);
-    assert.equal(b.length, HASH_LEN);
+    const slugA = slugify("プロジェクトA");
+    const slugB = slugify("プロジェクトB");
+    assert.notEqual(slugA, slugB);
+    assert.equal(slugA.length, HASH_LEN);
+    assert.equal(slugB.length, HASH_LEN);
   });
 
   it("keeps an ASCII prefix when ≥3 chars survive", () => {

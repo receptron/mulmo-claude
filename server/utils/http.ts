@@ -5,10 +5,7 @@
  * on any error (network reset, invalid encoding, etc.).
  * Replaces the repeated `.text().catch(() => "")` pattern.
  */
-export async function safeResponseText(
-  res: Response,
-  maxLength = 200,
-): Promise<string> {
+export async function safeResponseText(res: Response, maxLength = 200): Promise<string> {
   try {
     const text = await res.text();
     return text.slice(0, maxLength);

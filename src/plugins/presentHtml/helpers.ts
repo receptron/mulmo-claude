@@ -25,8 +25,8 @@ export function stripHtmlToPreview(html: string, maxLength: number): string {
   };
   let i = 0;
   while (i < html.length) {
-    const c = html[i];
-    if (c === "<") {
+    const char = html[i];
+    if (char === "<") {
       const close = html.indexOf(">", i + 1);
       if (close !== -1) {
         // Real tag span `<...>` — skip it, emit a separator.
@@ -36,7 +36,7 @@ export function stripHtmlToPreview(html: string, maxLength: number): string {
       }
       // No closing `>` anywhere after — treat as literal.
     }
-    emitChar(state, c);
+    emitChar(state, char);
     i++;
   }
   trimTrailingSpace(state.out);
@@ -48,12 +48,12 @@ interface WalkerState {
   lastWasSpace: boolean;
 }
 
-function emitChar(state: WalkerState, c: string): void {
-  if (isWhitespace(c)) {
+function emitChar(state: WalkerState, char: string): void {
+  if (isWhitespace(char)) {
     emitSeparator(state);
     return;
   }
-  state.out.push(c);
+  state.out.push(char);
   state.lastWasSpace = false;
 }
 
@@ -67,13 +67,6 @@ function trimTrailingSpace(out: string[]): void {
   if (out.length > 0 && out[out.length - 1] === " ") out.pop();
 }
 
-function isWhitespace(c: string): boolean {
-  return (
-    c === " " ||
-    c === "\t" ||
-    c === "\n" ||
-    c === "\r" ||
-    c === "\v" ||
-    c === "\f"
-  );
+function isWhitespace(char: string): boolean {
+  return char === " " || char === "\t" || char === "\n" || char === "\r" || char === "\v" || char === "\f";
 }

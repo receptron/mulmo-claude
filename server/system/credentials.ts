@@ -31,12 +31,7 @@ interface CredentialsJson {
  */
 async function readFromKeychain(): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync("security", [
-      "find-generic-password",
-      "-s",
-      KEYCHAIN_SERVICE,
-      "-w",
-    ]);
+    const { stdout } = await execFileAsync("security", ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"]);
     const credentials = stdout.trim();
     return credentials || null;
   } catch {
@@ -100,10 +95,7 @@ async function renewTokenViaPty(): Promise<boolean> {
     };
 
     const timeout = setTimeout(() => {
-      log.error(
-        "credentials",
-        `Token renewal timed out after ${PTY_TIMEOUT_MS / 1000}s`,
-      );
+      log.error("credentials", `Token renewal timed out after ${PTY_TIMEOUT_MS / ONE_SECOND_MS}s`);
       finish(false);
     }, PTY_TIMEOUT_MS);
 
@@ -129,22 +121,19 @@ async function renewTokenViaPty(): Promise<boolean> {
       buffer += data;
 
       if (!responded) {
-        const m = ECHO_RE.exec(buffer);
-        if (m) {
+        const match = ECHO_RE.exec(buffer);
+        if (match) {
           // Claude echoed our "hi" — remember where the response
           // window starts so the success check looks only at bytes
           // that arrived AFTER the echo.
           responded = true;
-          echoEndIdx = m.index + m[0].length;
+          echoEndIdx = match.index + match[0].length;
         }
         return;
       }
 
       const response = buffer.slice(echoEndIdx);
-      if (
-        response.length >= MIN_RESPONSE_CHARS &&
-        RESPONSE_PATTERN_RE.test(response)
-      ) {
+      if (response.length >= MIN_RESPONSE_CHARS && RESPONSE_PATTERN_RE.test(response)) {
         finish(true);
       }
     });
@@ -183,15 +172,9 @@ export async function refreshCredentials(): Promise<boolean> {
       try {
         const creds: CredentialsJson = JSON.parse(credentials);
         const expiresAt = creds.claudeAiOauth?.expiresAt ?? "unknown";
-        log.warn(
-          "credentials",
-          `Access token expired at ${expiresAt}, launching claude CLI to renew...`,
-        );
+        log.warn("credentials", `Access token expired at ${expiresAt}, launching claude CLI to renew...`);
       } catch {
-        log.warn(
-          "credentials",
-          "Access token expired (could not parse expiry), launching claude CLI to renew...",
-        );
+        log.warn("credentials", "Access token expired (could not parse expiry), launching claude CLI to renew...");
       }
 
       const renewed = await renewTokenViaPty();
@@ -205,40 +188,28 @@ export async function refreshCredentials(): Promise<boolean> {
       // Re-read the now-fresh credentials from Keychain
       credentials = await readFromKeychain();
       if (!credentials) {
-        log.error(
-          "credentials",
-          "No credentials in Keychain after renewal — unexpected",
-        );
+        log.error("credentials", "No credentials in Keychain after renewal — unexpected");
         return false;
       }
       // Guard against writing a still-expired token as "fresh": the PTY
       // echo check is a proxy for "Claude responded", not proof that the
       // Keychain entry was actually refreshed.
       if (isTokenExpired(credentials)) {
-        log.error(
-          "credentials",
-          "Token still expired after renewal — Keychain was not refreshed",
-        );
+        log.error("credentials", "Token still expired after renewal — Keychain was not refreshed");
         return false;
       }
     } else {
       try {
         const creds: CredentialsJson = JSON.parse(credentials);
         const expiresAt = creds.claudeAiOauth?.expiresAt ?? "unknown";
-        log.info(
-          "credentials",
-          `Access token is valid, expires at ${expiresAt}`,
-        );
+        log.info("credentials", `Access token is valid, expires at ${expiresAt}`);
       } catch {
         log.info("credentials", "Access token appears valid");
       }
     }
 
     await writeFile(CREDENTIALS_PATH, credentials + "\n", { mode: 0o600 });
-    log.info(
-      "credentials",
-      "Fresh credentials written to ~/.claude/.credentials.json",
-    );
+    log.info("credentials", "Fresh credentials written to ~/.claude/.credentials.json");
     return true;
   } catch (err) {
     log.error("credentials", "Failed to refresh credentials from Keychain", {

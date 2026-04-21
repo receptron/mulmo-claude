@@ -16,15 +16,9 @@ interface UseClickOutsideOptions {
 export function useClickOutside(opts: UseClickOutsideOptions): {
   handler: (e: MouseEvent) => void;
 } {
-  function handler(e: MouseEvent): void {
+  function handler(event: MouseEvent): void {
     if (!opts.isOpen.value) return;
-    if (
-      isClickOutside(
-        e.target as Node | null,
-        opts.buttonRef.value,
-        opts.popupRef.value,
-      )
-    ) {
+    if (isClickOutside(event.target as Node | null, opts.buttonRef.value, opts.popupRef.value)) {
       opts.isOpen.value = false;
     }
   }

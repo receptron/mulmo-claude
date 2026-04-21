@@ -21,21 +21,13 @@ import type { FetcherKind } from "../../server/workspace/sources/types.js";
 // side placeholders (web-fetch, web-search) that aren't registered
 // at the Node side, so we pin this list explicitly rather than
 // iterating FETCHER_KINDS and letting those placeholders fail.
-const EXPECTED_REGISTERED: readonly FetcherKind[] = [
-  "rss",
-  "github-releases",
-  "github-issues",
-  "arxiv",
-];
+const EXPECTED_REGISTERED: readonly FetcherKind[] = ["rss", "github-releases", "github-issues", "arxiv"];
 
 describe("fetcher registration (production bootstrap)", () => {
   for (const kind of EXPECTED_REGISTERED) {
     it(`has a registered fetcher for kind="${kind}"`, () => {
       const fetcher = getFetcher(kind);
-      assert.ok(
-        fetcher,
-        `no fetcher registered for "${kind}" — did you forget to import it from server/workspace/sources/fetchers/registerAll.ts?`,
-      );
+      assert.ok(fetcher, `no fetcher registered for "${kind}" — did you forget to import it from server/workspace/sources/fetchers/registerAll.ts?`);
       assert.equal(fetcher!.kind, kind);
       assert.equal(typeof fetcher!.fetch, "function");
     });

@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  createStreamParser,
-  blockToEvent,
-  type RawStreamEvent,
-} from "../../server/agent/stream.ts";
+import { createStreamParser, blockToEvent, type RawStreamEvent } from "../../server/agent/stream.ts";
 import { EVENT_TYPES } from "../../src/types/events.ts";
 
 describe("blockToEvent", () => {
@@ -60,9 +56,9 @@ describe("createStreamParser — delta streaming", () => {
       message: { content: [{ type: "text", text: "streamed" }] },
     });
     // Should have status but NO text (filtered as duplicate)
-    const textEvents = events.filter((e) => e.type === EVENT_TYPES.text);
+    const textEvents = events.filter((evt) => evt.type === EVENT_TYPES.text);
     assert.equal(textEvents.length, 0);
-    assert.ok(events.some((e) => e.type === EVENT_TYPES.status));
+    assert.ok(events.some((evt) => evt.type === EVENT_TYPES.status));
   });
 
   it("suppresses result text after deltas were streamed", () => {
@@ -93,7 +89,7 @@ describe("createStreamParser — no deltas (fallback)", () => {
       type: "assistant",
       message: { content: [{ type: "text", text: "direct reply" }] },
     });
-    const textEvents = events.filter((e) => e.type === EVENT_TYPES.text);
+    const textEvents = events.filter((evt) => evt.type === EVENT_TYPES.text);
     assert.equal(textEvents.length, 1);
     assert.equal(textEvents[0].message, "direct reply");
   });
@@ -109,7 +105,7 @@ describe("createStreamParser — no deltas (fallback)", () => {
       result: "from block",
     });
     // No text event from result (already emitted via assistant)
-    const textEvents = events.filter((e) => e.type === EVENT_TYPES.text);
+    const textEvents = events.filter((evt) => evt.type === EVENT_TYPES.text);
     assert.equal(textEvents.length, 0);
   });
 
@@ -148,7 +144,7 @@ describe("createStreamParser — multi-turn reset", () => {
       type: "assistant",
       message: { content: [{ type: "text", text: "turn2" }] },
     });
-    const textEvents = events.filter((e) => e.type === EVENT_TYPES.text);
+    const textEvents = events.filter((evt) => evt.type === EVENT_TYPES.text);
     assert.equal(textEvents.length, 1);
     assert.equal(textEvents[0].message, "turn2");
   });

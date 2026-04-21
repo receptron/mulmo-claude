@@ -39,9 +39,7 @@ describe("handleMessage — echo mode", () => {
     const msg: MessagePayload = {
       externalChatId: "c1",
       text: "file",
-      attachments: [
-        { mimeType: "application/pdf", data: "AAAA", filename: "doc.pdf" },
-      ],
+      attachments: [{ mimeType: "application/pdf", data: "AAAA", filename: "doc.pdf" }],
     };
     const ack = handleMessage(msg, defaultOpts);
     assert.ok(ack.reply?.includes("doc.pdf"));

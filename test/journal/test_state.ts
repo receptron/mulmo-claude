@@ -13,17 +13,14 @@ import {
 
 describe("defaultState", () => {
   it("produces a valid fresh state with the current schema version", () => {
-    const s = defaultState();
-    assert.equal(s.version, JOURNAL_STATE_VERSION);
-    assert.equal(s.lastDailyRunAt, null);
-    assert.equal(s.lastOptimizationRunAt, null);
-    assert.equal(s.dailyIntervalHours, DEFAULT_DAILY_INTERVAL_HOURS);
-    assert.equal(
-      s.optimizationIntervalDays,
-      DEFAULT_OPTIMIZATION_INTERVAL_DAYS,
-    );
-    assert.deepEqual(s.processedSessions, {});
-    assert.deepEqual(s.knownTopics, []);
+    const state = defaultState();
+    assert.equal(state.version, JOURNAL_STATE_VERSION);
+    assert.equal(state.lastDailyRunAt, null);
+    assert.equal(state.lastOptimizationRunAt, null);
+    assert.equal(state.dailyIntervalHours, DEFAULT_DAILY_INTERVAL_HOURS);
+    assert.equal(state.optimizationIntervalDays, DEFAULT_OPTIMIZATION_INTERVAL_DAYS);
+    assert.deepEqual(state.processedSessions, {});
+    assert.deepEqual(state.knownTopics, []);
   });
 });
 
@@ -40,7 +37,7 @@ describe("parseState", () => {
   });
 
   it("round-trips a well-formed state", () => {
-    const s: JournalState = {
+    const state: JournalState = {
       version: JOURNAL_STATE_VERSION,
       lastDailyRunAt: "2026-04-11T09:00:00.000Z",
       lastOptimizationRunAt: "2026-04-05T09:00:00.000Z",
@@ -49,7 +46,7 @@ describe("parseState", () => {
       processedSessions: { "abc-123": { lastMtimeMs: 1710000000000 } },
       knownTopics: ["refactoring", "video-generation"],
     };
-    assert.deepEqual(parseState(s), s);
+    assert.deepEqual(parseState(state), state);
   });
 
   it("restores default intervals when stored values are non-positive", () => {
@@ -59,10 +56,7 @@ describe("parseState", () => {
       optimizationIntervalDays: -3,
     });
     assert.equal(parsed.dailyIntervalHours, DEFAULT_DAILY_INTERVAL_HOURS);
-    assert.equal(
-      parsed.optimizationIntervalDays,
-      DEFAULT_OPTIMIZATION_INTERVAL_DAYS,
-    );
+    assert.equal(parsed.optimizationIntervalDays, DEFAULT_OPTIMIZATION_INTERVAL_DAYS);
   });
 
   it("drops processedSessions entries with invalid mtime", () => {
@@ -99,39 +93,39 @@ describe("isDailyDue", () => {
   });
 
   it("is true when an unparseable string is stored", () => {
-    const s = { ...base, lastDailyRunAt: "not a date" };
-    assert.equal(isDailyDue(s, Date.now()), true);
+    const state = { ...base, lastDailyRunAt: "not a date" };
+    assert.equal(isDailyDue(state, Date.now()), true);
   });
 
   it("is false when less than one interval has elapsed", () => {
     const anchor = new Date("2026-04-11T09:00:00Z");
-    const s = { ...base, lastDailyRunAt: anchor.toISOString() };
-    assert.equal(isDailyDue(s, anchor.getTime() + 30 * 60 * 1000), false);
+    const state = { ...base, lastDailyRunAt: anchor.toISOString() };
+    assert.equal(isDailyDue(state, anchor.getTime() + 30 * 60 * 1000), false);
   });
 
   it("is true at exactly one interval elapsed", () => {
     const anchor = new Date("2026-04-11T09:00:00Z");
-    const s = { ...base, lastDailyRunAt: anchor.toISOString() };
-    assert.equal(isDailyDue(s, anchor.getTime() + HOUR), true);
+    const state = { ...base, lastDailyRunAt: anchor.toISOString() };
+    assert.equal(isDailyDue(state, anchor.getTime() + HOUR), true);
   });
 
   it("is true after more than one interval", () => {
     const anchor = new Date("2026-04-11T09:00:00Z");
-    const s = { ...base, lastDailyRunAt: anchor.toISOString() };
-    assert.equal(isDailyDue(s, anchor.getTime() + 2 * HOUR), true);
+    const state = { ...base, lastDailyRunAt: anchor.toISOString() };
+    assert.equal(isDailyDue(state, anchor.getTime() + 2 * HOUR), true);
   });
 
   it("respects a custom interval stored in state", () => {
     const anchor = new Date("2026-04-11T09:00:00Z");
-    const s = {
+    const state = {
       ...base,
       dailyIntervalHours: 6,
       lastDailyRunAt: anchor.toISOString(),
     };
     // 3 hours later — not due with a 6h interval
-    assert.equal(isDailyDue(s, anchor.getTime() + 3 * HOUR), false);
+    assert.equal(isDailyDue(state, anchor.getTime() + 3 * HOUR), false);
     // 6 hours later — exactly due
-    assert.equal(isDailyDue(s, anchor.getTime() + 6 * HOUR), true);
+    assert.equal(isDailyDue(state, anchor.getTime() + 6 * HOUR), true);
   });
 });
 
@@ -145,13 +139,13 @@ describe("isOptimizationDue", () => {
 
   it("is false until the full interval has passed", () => {
     const anchor = new Date("2026-04-01T00:00:00Z");
-    const s = { ...base, lastOptimizationRunAt: anchor.toISOString() };
-    assert.equal(isOptimizationDue(s, anchor.getTime() + 6 * DAY), false);
+    const state = { ...base, lastOptimizationRunAt: anchor.toISOString() };
+    assert.equal(isOptimizationDue(state, anchor.getTime() + 6 * DAY), false);
   });
 
   it("is true exactly at the interval boundary", () => {
     const anchor = new Date("2026-04-01T00:00:00Z");
-    const s = { ...base, lastOptimizationRunAt: anchor.toISOString() };
-    assert.equal(isOptimizationDue(s, anchor.getTime() + 7 * DAY), true);
+    const state = { ...base, lastOptimizationRunAt: anchor.toISOString() };
+    assert.equal(isOptimizationDue(state, anchor.getTime() + 7 * DAY), true);
   });
 });

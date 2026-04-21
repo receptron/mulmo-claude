@@ -43,45 +43,30 @@ describe("indexDirFor", () => {
 
 describe("sessionJsonlPathFor", () => {
   it("returns workspace/chat/<sessionId>.jsonl", () => {
-    assert.equal(
-      sessionJsonlPathFor(workspace, "sess-abc"),
-      path.join(workspace, "chat", "sess-abc.jsonl"),
-    );
+    assert.equal(sessionJsonlPathFor(workspace, "sess-abc"), path.join(workspace, "chat", "sess-abc.jsonl"));
   });
 
   it("handles UUID-style session IDs", () => {
     const id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-    assert.equal(
-      sessionJsonlPathFor(workspace, id),
-      path.join(workspace, "chat", `${id}.jsonl`),
-    );
+    assert.equal(sessionJsonlPathFor(workspace, id), path.join(workspace, "chat", `${id}.jsonl`));
   });
 });
 
 describe("sessionMetaPathFor", () => {
   it("returns workspace/chat/<sessionId>.json", () => {
-    assert.equal(
-      sessionMetaPathFor(workspace, "sess-abc"),
-      path.join(workspace, "chat", "sess-abc.json"),
-    );
+    assert.equal(sessionMetaPathFor(workspace, "sess-abc"), path.join(workspace, "chat", "sess-abc.json"));
   });
 });
 
 describe("indexEntryPathFor", () => {
   it("returns workspace/chat/index/<sessionId>.json", () => {
-    assert.equal(
-      indexEntryPathFor(workspace, "sess-abc"),
-      path.join(workspace, "chat", "index", "sess-abc.json"),
-    );
+    assert.equal(indexEntryPathFor(workspace, "sess-abc"), path.join(workspace, "chat", "index", "sess-abc.json"));
   });
 });
 
 describe("manifestPathFor", () => {
   it("returns workspace/chat/index/manifest.json", () => {
-    assert.equal(
-      manifestPathFor(workspace),
-      path.join(workspace, "chat", "index", "manifest.json"),
-    );
+    assert.equal(manifestPathFor(workspace), path.join(workspace, "chat", "index", "manifest.json"));
   });
 });
 

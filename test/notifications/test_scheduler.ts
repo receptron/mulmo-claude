@@ -13,8 +13,8 @@ import { PUBSUB_CHANNELS } from "../../src/config/pubsubChannels.ts";
 
 function isNotificationPayload(value: unknown): value is NotificationPayload {
   if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.id === "string" && typeof v.title === "string";
+  const rec = value as Record<string, unknown>;
+  return typeof rec.id === "string" && typeof rec.title === "string";
 }
 
 interface SpyDeps extends NotificationDeps {
@@ -50,10 +50,7 @@ describe("scheduleTestNotification — fires once after the delay", () => {
     const deps = createSpyDeps();
     // Init notification system so publishNotification has deps
     initNotifications(deps);
-    const scheduled = scheduleTestNotification(
-      { message: "hello", delaySeconds: 5 },
-      deps,
-    );
+    const scheduled = scheduleTestNotification({ message: "hello", delaySeconds: 5 }, deps);
     assert.equal(deps.publishCalls.length, 0);
     assert.equal(deps.pushCalls.length, 0);
     mock.timers.tick(4_999);
@@ -64,10 +61,7 @@ describe("scheduleTestNotification — fires once after the delay", () => {
     // Legacy bridge push + no transportId in opts → only bridge push from legacy
     assert.equal(deps.pushCalls.length, 1);
     assert.equal(scheduled.delaySeconds, 5);
-    assert.match(
-      scheduled.firesAt,
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-    );
+    assert.match(scheduled.firesAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
   it("passes the message + channel + bridge identifiers through verbatim", () => {
@@ -90,9 +84,7 @@ describe("scheduleTestNotification — fires once after the delay", () => {
     assert.ok(isNotificationPayload(payload));
     assert.equal(payload.title, "my-msg");
     // Legacy bridge push uses custom transport/chat
-    assert.deepEqual(deps.pushCalls, [
-      { transportId: "telegram", chatId: "chat-42", message: "my-msg" },
-    ]);
+    assert.deepEqual(deps.pushCalls, [{ transportId: "telegram", chatId: "chat-42", message: "my-msg" }]);
   });
 
   it("does not fire twice — single setTimeout only", () => {
@@ -130,15 +122,15 @@ describe("scheduleTestNotification — delay clamping", () => {
   it("caps delays above the 1-hour ceiling at 3600s", () => {
     const deps = createSpyDeps();
     initNotifications(deps);
-    const s = scheduleTestNotification({ delaySeconds: 99999 }, deps);
-    assert.equal(s.delaySeconds, 3600);
+    const scheduled = scheduleTestNotification({ delaySeconds: 99999 }, deps);
+    assert.equal(scheduled.delaySeconds, 3600);
   });
 
   it("clamps negative delays to 0 and fires on the next tick", () => {
     const deps = createSpyDeps();
     initNotifications(deps);
-    const s = scheduleTestNotification({ delaySeconds: -10 }, deps);
-    assert.equal(s.delaySeconds, 0);
+    const scheduled = scheduleTestNotification({ delaySeconds: -10 }, deps);
+    assert.equal(scheduled.delaySeconds, 0);
     mock.timers.tick(0);
     assert.equal(deps.publishCalls.length, 1);
   });
@@ -146,15 +138,15 @@ describe("scheduleTestNotification — delay clamping", () => {
   it("floors fractional delays (1.9 → 1)", () => {
     const deps = createSpyDeps();
     initNotifications(deps);
-    const s = scheduleTestNotification({ delaySeconds: 1.9 }, deps);
-    assert.equal(s.delaySeconds, 1);
+    const scheduled = scheduleTestNotification({ delaySeconds: 1.9 }, deps);
+    assert.equal(scheduled.delaySeconds, 1);
   });
 
   it("cancel() prevents the push from firing", () => {
     const deps = createSpyDeps();
     initNotifications(deps);
-    const s = scheduleTestNotification({ delaySeconds: 10 }, deps);
-    s.cancel();
+    const scheduled = scheduleTestNotification({ delaySeconds: 10 }, deps);
+    scheduled.cancel();
     mock.timers.tick(20_000);
     assert.equal(deps.publishCalls.length, 0);
     assert.equal(deps.pushCalls.length, 0);

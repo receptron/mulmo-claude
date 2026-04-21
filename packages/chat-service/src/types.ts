@@ -47,18 +47,13 @@ export interface StartChatParams {
   origin?: string;
 }
 
-export type StartChatResult =
-  | { kind: "started"; chatSessionId: string }
-  | { kind: "error"; error: string; status?: number };
+export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };
 
 export type StartChatFn = (params: StartChatParams) => Promise<StartChatResult>;
 
 export type SessionEventListener = (event: Record<string, unknown>) => void;
 
-export type OnSessionEventFn = (
-  sessionId: string,
-  listener: SessionEventListener,
-) => () => void;
+export type OnSessionEventFn = (sessionId: string, listener: SessionEventListener) => () => void;
 
 /** Summary of a chat session — returned by listSessions. */
 export interface SessionSummary {
@@ -94,10 +89,7 @@ export interface ChatServiceDeps {
    * Omit if session listing is not available (command will reply
    * "not available").
    */
-  listSessions?: (opts: {
-    limit: number;
-    offset: number;
-  }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+  listSessions?: (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
   /**
    * Get recent messages from a session. Used by /history command.
    * Returns newest-first array of {source, text} pairs.

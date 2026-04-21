@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  EXPANDED_DIRS_STORAGE_KEY,
-  parseStoredExpandedDirs,
-  serializeExpandedDirs,
-} from "../../../src/utils/files/expandedDirs.js";
+import { EXPANDED_DIRS_STORAGE_KEY, parseStoredExpandedDirs, serializeExpandedDirs } from "../../../src/utils/files/expandedDirs.js";
 
 describe("parseStoredExpandedDirs", () => {
   it("returns the default (root only) when the value is null", () => {

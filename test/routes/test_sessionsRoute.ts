@@ -43,15 +43,11 @@ interface RouterInternals {
   stack: StackFrame[];
 }
 
-function extractRouteHandler(
-  mod: RouteModule,
-  routePath: string,
-  method: string,
-): Handler {
+function extractRouteHandler(mod: RouteModule, routePath: string, method: string): Handler {
   const router = mod.default as unknown as RouterInternals;
   for (const frame of router.stack) {
     if (frame.route?.path !== routePath) continue;
-    const layer = frame.route.stack.find((s) => s.method === method);
+    const layer = frame.route.stack.find((stackLayer) => stackLayer.method === method);
     if (layer) return layer.handle;
   }
   throw new Error(`route ${method.toUpperCase()} ${routePath} not registered`);
@@ -123,8 +119,7 @@ async function writeSession(
     const manifestPath = path.join(manifestDir, "manifest.json");
     let entries: unknown[] = [];
     try {
-      entries =
-        JSON.parse(fs.readFileSync(manifestPath, "utf-8")).entries ?? [];
+      entries = JSON.parse(fs.readFileSync(manifestPath, "utf-8")).entries ?? [];
     } catch {
       /* first write */
     }
@@ -162,21 +157,15 @@ before(async () => {
   // modules — they may differ (e.g. `conversations/chat` for session
   // files, `chat/index` for the manifest after #284).
   const { WORKSPACE_PATHS } = await import("../../server/workspace/paths.js");
-  const { indexDirFor } =
-    await import("../../server/workspace/chat-index/paths.js");
-  const { workspacePath: wp } =
-    await import("../../server/workspace/workspace.js");
+  const { indexDirFor } = await import("../../server/workspace/chat-index/paths.js");
+  const { workspacePath: workspacePth } = await import("../../server/workspace/workspace.js");
   chatDir = WORKSPACE_PATHS.chat;
-  manifestDir = indexDirFor(wp);
+  manifestDir = indexDirFor(workspacePth);
   fs.mkdirSync(chatDir, { recursive: true });
   fs.mkdirSync(manifestDir, { recursive: true });
   const routeMod = await import("../../server/api/routes/sessions.js");
   getHandler = extractRouteHandler(routeMod, "/api/sessions", "get");
-  markReadHandler = extractRouteHandler(
-    routeMod,
-    "/api/sessions/:id/mark-read",
-    "post",
-  );
+  markReadHandler = extractRouteHandler(routeMod, "/api/sessions/:id/mark-read", "post");
 });
 
 after(async () => {
@@ -203,10 +192,7 @@ describe("GET /api/sessions — full fetch (no ?since=)", () => {
     const body = state.body!;
     assert.equal(body.sessions.length, 2);
     assert.deepEqual(body.deletedIds, [], "deletedIds is always [] today");
-    assert.ok(
-      body.cursor.startsWith("v1:"),
-      `opaque cursor, got: ${body.cursor}`,
-    );
+    assert.ok(body.cursor.startsWith("v1:"), `opaque cursor, got: ${body.cursor}`);
     assert.equal(body.cursor, encodeCursor(BASE_MS + 100_000_000));
   });
 
@@ -216,7 +202,7 @@ describe("GET /api/sessions — full fetch (no ?since=)", () => {
 
     const { state, res } = mockRes();
     await getHandler({ query: {} } as unknown as Request, res);
-    const ids = state.body!.sessions.map((s) => s.id);
+    const ids = state.body!.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["newer", "older"]);
   });
 });
@@ -233,7 +219,7 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
       } as unknown as Request,
       res,
     );
-    const ids = state.body!.sessions.map((s) => s.id);
+    const ids = state.body!.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["new"]);
   });
 
@@ -250,7 +236,7 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
       } as unknown as Request,
       res,
     );
-    const ids = state.body!.sessions.map((s) => s.id);
+    const ids = state.body!.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["summarised"]);
     // The returned cursor must advance to the indexedAt time, not
     // just the mtime, so the next call won't re-fetch this row.
@@ -279,10 +265,7 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
     await writeSession("b", { mtimeMs: BASE_MS + 100_000_000 });
 
     const { state, res } = mockRes();
-    await getHandler(
-      { query: { since: "not-a-cursor" } } as unknown as Request,
-      res,
-    );
+    await getHandler({ query: { since: "not-a-cursor" } } as unknown as Request, res);
     assert.equal(state.body!.sessions.length, 2);
   });
 
@@ -294,10 +277,7 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
     const cursor = first.state.body!.cursor;
 
     const second = mockRes();
-    await getHandler(
-      { query: { since: cursor } } as unknown as Request,
-      second.res,
-    );
+    await getHandler({ query: { since: cursor } } as unknown as Request, second.res);
     assert.deepEqual(second.state.body!.sessions, []);
   });
 });
@@ -333,10 +313,7 @@ describe("POST /api/sessions/:id/mark-read", () => {
 
   it("succeeds even when no session file exists (graceful no-op)", async () => {
     const { state, res } = mockMarkReadRes();
-    await markReadHandler(
-      { params: { id: "nonexistent" } } as unknown as Request,
-      res,
-    );
+    await markReadHandler({ params: { id: "nonexistent" } } as unknown as Request, res);
     assert.equal(state.status, 200);
     assert.deepEqual(state.body, { ok: true });
   });
@@ -344,10 +321,7 @@ describe("POST /api/sessions/:id/mark-read", () => {
   it("persists hasUnread=false to the meta .json file", async () => {
     // Write a meta with hasUnread=true
     const metaPath = path.join(chatDir, "s1.json");
-    await writeFile(
-      metaPath,
-      JSON.stringify({ roleId: "general", hasUnread: true }),
-    );
+    await writeFile(metaPath, JSON.stringify({ roleId: "general", hasUnread: true }));
     await writeFile(path.join(chatDir, "s1.jsonl"), "");
 
     const { res } = mockMarkReadRes();

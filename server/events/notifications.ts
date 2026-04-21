@@ -32,8 +32,8 @@ export interface NotificationDeps {
 
 let deps: NotificationDeps | null = null;
 
-export function initNotifications(d: NotificationDeps): void {
-  deps = d;
+export function initNotifications(injected: NotificationDeps): void {
+  deps = injected;
 }
 
 // ── In-memory store ─────────────────────────────────────────────
@@ -83,11 +83,7 @@ export function publishNotification(opts: PublishNotificationOpts): void {
 
     // Push to bridge (Telegram/CLI)
     if (deps && opts.transportId) {
-      deps.pushToBridge(
-        opts.transportId,
-        "notifications",
-        formatBridgeMessage(payload),
-      );
+      deps.pushToBridge(opts.transportId, "notifications", formatBridgeMessage(payload));
     }
 
     log.info("notifications", "published", {
@@ -101,10 +97,10 @@ export function publishNotification(opts: PublishNotificationOpts): void {
   }
 }
 
-function formatBridgeMessage(p: NotificationPayload): string {
-  const icon = p.kind === NOTIFICATION_KINDS.agent ? "\u2705" : "\u{1F514}";
-  const parts = [icon, p.title];
-  if (p.body) parts.push(p.body);
+function formatBridgeMessage(payload: NotificationPayload): string {
+  const icon = payload.kind === NOTIFICATION_KINDS.agent ? "\u2705" : "\u{1F514}";
+  const parts = [icon, payload.title];
+  if (payload.body) parts.push(payload.body);
   return parts.join(" ");
 }
 
@@ -127,10 +123,7 @@ export interface ScheduledNotification {
   cancel: () => void;
 }
 
-export function scheduleTestNotification(
-  opts: ScheduleNotificationOptions,
-  legacyDeps: NotificationDeps,
-): ScheduledNotification {
+export function scheduleTestNotification(opts: ScheduleNotificationOptions, legacyDeps: NotificationDeps): ScheduledNotification {
   const message = opts.message ?? DEFAULT_NOTIFICATION_MESSAGE;
   const transportId = opts.transportId ?? DEFAULT_NOTIFICATION_TRANSPORT_ID;
   const chatId = opts.chatId ?? DEFAULT_NOTIFICATION_CHAT_ID;

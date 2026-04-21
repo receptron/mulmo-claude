@@ -27,18 +27,10 @@ export function summariesRoot(workspaceRoot: string): string {
 // downstream.
 export function dailyPathFor(workspaceRoot: string, isoDate: string): string {
   if (!isValidIsoDate(isoDate)) {
-    throw new Error(
-      `[journal] dailyPathFor: expected YYYY-MM-DD, got "${isoDate}"`,
-    );
+    throw new Error(`[journal] dailyPathFor: expected YYYY-MM-DD, got "${isoDate}"`);
   }
   const [year, month, day] = isoDate.split("-");
-  return path.join(
-    summariesRoot(workspaceRoot),
-    DAILY_DIR,
-    year,
-    month,
-    `${day}.md`,
-  );
+  return path.join(summariesRoot(workspaceRoot), DAILY_DIR, year, month, `${day}.md`);
 }
 
 // summaries/topics/<slug>.md
@@ -48,16 +40,8 @@ export function topicPathFor(workspaceRoot: string, slug: string): string {
 
 // summaries/archive/topics/<slug>.md — where the optimizer moves
 // merged or stale topic files.
-export function archivedTopicPathFor(
-  workspaceRoot: string,
-  slug: string,
-): string {
-  return path.join(
-    summariesRoot(workspaceRoot),
-    ARCHIVE_DIR,
-    TOPICS_DIR,
-    `${slug}.md`,
-  );
+export function archivedTopicPathFor(workspaceRoot: string, slug: string): string {
+  return path.join(summariesRoot(workspaceRoot), ARCHIVE_DIR, TOPICS_DIR, `${slug}.md`);
 }
 
 // Re-export for backwards compatibility — callers that import

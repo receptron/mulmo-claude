@@ -125,26 +125,19 @@ describe("RoleSchema", () => {
       unknownField: "should be stripped",
     };
     const result = RoleSchema.parse(withExtra);
-    assert.strictEqual(
-      "unknownField" in result,
-      false,
-      "unknown field should be stripped",
-    );
+    assert.strictEqual("unknownField" in result, false, "unknown field should be stripped");
   });
 });
 
 describe("BUILTIN_ROLES", () => {
   it("all built-in roles pass schema validation", () => {
     BUILTIN_ROLES.forEach((role) => {
-      assert.doesNotThrow(
-        () => RoleSchema.parse(role),
-        `Built-in role "${role.id}" failed validation`,
-      );
+      assert.doesNotThrow(() => RoleSchema.parse(role), `Built-in role "${role.id}" failed validation`);
     });
   });
 
   it("all built-in roles have unique ids", () => {
-    const ids = BUILTIN_ROLES.map((r) => r.id);
+    const ids = BUILTIN_ROLES.map((role) => role.id);
     const uniqueIds = new Set(ids);
     assert.strictEqual(ids.length, uniqueIds.size, "Role ids must be unique");
   });

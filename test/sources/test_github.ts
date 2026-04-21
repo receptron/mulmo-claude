@@ -1,19 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseRepoSlug,
-  GithubFetcherError,
-  githubFetchJson,
-} from "../../server/workspace/sources/fetchers/github.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-  type RobotsProvider,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { parseRepoSlug, GithubFetcherError, githubFetchJson } from "../../server/workspace/sources/fetchers/github.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps, type RobotsProvider } from "../../server/workspace/sources/httpFetcher.js";
 
 // --- parseRepoSlug ------------------------------------------------------
 
@@ -136,10 +125,7 @@ function controllableClock(start = 0): {
   };
 }
 
-function makeHttpDeps(
-  fetchImpl: typeof fetch,
-  robots: RobotsProvider = async () => null,
-): HttpFetcherDeps {
+function makeHttpDeps(fetchImpl: typeof fetch, robots: RobotsProvider = async () => null): HttpFetcherDeps {
   const clock = controllableClock();
   return {
     fetchImpl,
@@ -159,10 +145,7 @@ describe("githubFetchJson — happy path", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    const body = await githubFetchJson(
-      "https://api.github.com/repos/x/y/releases",
-      makeHttpDeps(fetchImpl),
-    );
+    const body = await githubFetchJson("https://api.github.com/repos/x/y/releases", makeHttpDeps(fetchImpl));
     assert.deepEqual(body, [{ id: 1 }, { id: 2 }]);
   });
 
@@ -173,10 +156,7 @@ describe("githubFetchJson — happy path", () => {
       new Response(JSON.stringify({ message: "ok", data: 42 }), {
         status: 200,
       });
-    const body = await githubFetchJson(
-      "https://api.github.com/x",
-      makeHttpDeps(fetchImpl),
-    );
+    const body = await githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl));
     assert.deepEqual(body, { message: "ok", data: 42 });
   });
 });
@@ -188,11 +168,7 @@ describe("githubFetchJson — non-2xx → GithubFetcherError", () => {
         status: 404,
       });
     await assert.rejects(
-      () =>
-        githubFetchJson(
-          "https://api.github.com/repos/x/y/releases",
-          makeHttpDeps(fetchImpl),
-        ),
+      () => githubFetchJson("https://api.github.com/repos/x/y/releases", makeHttpDeps(fetchImpl)),
       (err: unknown) => {
         if (!(err instanceof GithubFetcherError)) return false;
         return err.status === 404 && err.apiMessage === "Not Found";
@@ -209,51 +185,30 @@ describe("githubFetchJson — non-2xx → GithubFetcherError", () => {
         { status: 403 },
       );
     await assert.rejects(
-      () =>
-        githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
-      (err: unknown) =>
-        err instanceof GithubFetcherError &&
-        err.status === 403 &&
-        /rate limit/i.test(err.apiMessage ?? ""),
+      () => githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
+      (err: unknown) => err instanceof GithubFetcherError && err.status === 403 && /rate limit/i.test(err.apiMessage ?? ""),
     );
   });
 
   it("throws with null apiMessage when the body isn't JSON", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("<html>not json</html>", { status: 500 });
+    const fetchImpl: typeof fetch = async () => new Response("<html>not json</html>", { status: 500 });
     await assert.rejects(
-      () =>
-        githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
-      (err: unknown) =>
-        err instanceof GithubFetcherError &&
-        err.status === 500 &&
-        err.apiMessage === null,
+      () => githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
+      (err: unknown) => err instanceof GithubFetcherError && err.status === 500 && err.apiMessage === null,
     );
   });
 
   it("throws with null apiMessage when the JSON has no `message` field", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(JSON.stringify({ code: "oops" }), { status: 500 });
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ code: "oops" }), { status: 500 });
     await assert.rejects(
-      () =>
-        githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
-      (err: unknown) =>
-        err instanceof GithubFetcherError && err.apiMessage === null,
+      () => githubFetchJson("https://api.github.com/x", makeHttpDeps(fetchImpl)),
+      (err: unknown) => err instanceof GithubFetcherError && err.apiMessage === null,
     );
   });
 
   it("propagates RobotsDisallowedError from fetchPolite untouched", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response("[]", { status: 200 });
-    const robots: RobotsProvider = async () =>
-      "User-agent: *\nDisallow: /repos\n";
-    await assert.rejects(
-      () =>
-        githubFetchJson(
-          "https://api.github.com/repos/x/y/releases",
-          makeHttpDeps(fetchImpl, robots),
-        ),
-      /robots\.txt disallows/,
-    );
+    const fetchImpl: typeof fetch = async () => new Response("[]", { status: 200 });
+    const robots: RobotsProvider = async () => "User-agent: *\nDisallow: /repos\n";
+    await assert.rejects(() => githubFetchJson("https://api.github.com/repos/x/y/releases", makeHttpDeps(fetchImpl, robots)), /robots\.txt disallows/);
   });
 });

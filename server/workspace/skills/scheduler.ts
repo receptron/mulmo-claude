@@ -9,18 +9,12 @@
 
 import { discoverSkills } from "./discovery.js";
 import type { Skill } from "./types.js";
-import type {
-  ITaskManager,
-  TaskSchedule,
-} from "../../events/task-manager/index.js";
+import type { ITaskManager, TaskSchedule } from "../../events/task-manager/index.js";
 import { parseSkillFrontmatter } from "./parser.js";
 import { log } from "../../system/logger/index.js";
 import { readFileSync } from "fs";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
-import {
-  SESSION_ORIGINS,
-  type SessionOrigin,
-} from "../../../src/types/session.js";
+import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
 
 interface SkillScheduleInfo {
   schedule: TaskSchedule;
@@ -36,12 +30,7 @@ interface StartChatResult {
 export interface SkillSchedulerDeps {
   taskManager: ITaskManager;
   workspaceRoot: string;
-  startChat: (params: {
-    message: string;
-    roleId: string;
-    chatSessionId: string;
-    origin?: SessionOrigin;
-  }) => Promise<StartChatResult>;
+  startChat: (params: { message: string; roleId: string; chatSessionId: string; origin?: SessionOrigin }) => Promise<StartChatResult>;
 }
 
 const SKILL_TASK_PREFIX = "skill.";
@@ -54,9 +43,7 @@ let cachedDeps: SkillSchedulerDeps | null = null;
 // API calls don't interleave register/unregister and corrupt state.
 let refreshMutex: Promise<number> = Promise.resolve(0);
 
-export async function registerScheduledSkills(
-  deps: SkillSchedulerDeps,
-): Promise<number> {
+export async function registerScheduledSkills(deps: SkillSchedulerDeps): Promise<number> {
   cachedDeps = deps;
   return serializedRefresh(deps);
 }
@@ -121,9 +108,7 @@ async function doRegister(deps: SkillSchedulerDeps): Promise<number> {
           origin: SESSION_ORIGINS.skill,
         });
         if (result.kind === "error") {
-          throw new Error(
-            `scheduled skill failed: ${result.error ?? "unknown"}`,
-          );
+          throw new Error(`scheduled skill failed: ${result.error ?? "unknown"}`);
         }
         log.info("skills", "scheduled skill completed", {
           name: skill.name,
@@ -152,10 +137,10 @@ function readSkillScheduleInfo(skill: Skill): SkillScheduleInfo | null {
   try {
     const raw = readFileSync(skill.path, "utf-8");
     const parsed = parseSkillFrontmatter(raw);
-    const s = parsed?.schedule?.parsed;
-    if (!s) return null;
+    const schedule = parsed?.schedule?.parsed;
+    if (!schedule) return null;
     return {
-      schedule: s,
+      schedule,
       roleId: parsed?.roleId ?? DEFAULT_ROLE_ID,
     };
   } catch {

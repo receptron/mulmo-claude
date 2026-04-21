@@ -24,7 +24,7 @@ const hint = computed(() => {
   if (sources.length === 0) return "No sources registered yet.";
   const names = sources
     .slice(0, 3)
-    .map((s: Source) => s.slug)
+    .map((source: Source) => source.slug)
     .join(", ");
   const tail = sources.length > 3 ? ", …" : "";
   const plural = sources.length === 1 ? "" : "s";

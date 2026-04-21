@@ -22,10 +22,7 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 import type { Attachment } from "@mulmobridge/protocol";
-import {
-  SUBPROCESS_PROBE_TIMEOUT_MS,
-  SUBPROCESS_WORK_TIMEOUT_MS,
-} from "../utils/time.js";
+import { SUBPROCESS_PROBE_TIMEOUT_MS, SUBPROCESS_WORK_TIMEOUT_MS } from "../utils/time.js";
 import { errorMessage } from "../utils/errors.js";
 
 export interface ContentBlock {
@@ -59,8 +56,7 @@ function decodeBase64Text(data: string): string {
 
 // ── DOCX ──────────────────────────────────────────────────────
 
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 async function convertDocx(data: string): Promise<string> {
   const buf = Buffer.from(data, "base64");
@@ -70,8 +66,7 @@ async function convertDocx(data: string): Promise<string> {
 
 // ── XLSX ──────────────────────────────────────────────────────
 
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function convertXlsx(data: string): string {
   const buf = Buffer.from(data, "base64");
@@ -91,8 +86,7 @@ function convertXlsx(data: string): string {
 
 // ── PPTX (Docker/libreoffice only) ───────────────────────────
 
-const PPTX_MIME =
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 // LibreOffice runs inside the Docker sandbox image, not on the host.
 // We spin up a temporary container to do the conversion, mounting a
@@ -131,11 +125,7 @@ async function convertPptxToPdf(data: string): Promise<Buffer | null> {
 
     if (await tryNativeLibreOffice()) {
       // Host has libreoffice installed natively
-      await execFileAsync(
-        "libreoffice",
-        ["--headless", "--convert-to", "pdf", "--outdir", tmpDir, inputPath],
-        { timeout: SUBPROCESS_WORK_TIMEOUT_MS },
-      );
+      await execFileAsync("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", tmpDir, inputPath], { timeout: SUBPROCESS_WORK_TIMEOUT_MS });
     } else if (await tryDockerLibreOffice()) {
       // Use the sandbox Docker image for conversion
       await execFileAsync(
@@ -170,9 +160,7 @@ async function convertPptxToPdf(data: string): Promise<Buffer | null> {
 
 // ── Public API ────────────────────────────────────────────────
 
-export type ConversionResult =
-  | { kind: "converted"; blocks: ContentBlock[] }
-  | { kind: "skipped"; reason: string };
+export type ConversionResult = { kind: "converted"; blocks: ContentBlock[] } | { kind: "skipped"; reason: string };
 
 function textBlocks(att: Attachment, content: string): ContentBlock[] {
   const label = att.filename ? `[File: ${att.filename}]\n\n` : "";
@@ -243,9 +231,7 @@ async function tryConvertPptx(att: Attachment): Promise<ConversionResult> {
  * MIME type is not convertible — so the caller can distinguish
  * "unsupported type" from "conversion error" in logs.
  */
-export async function convertAttachment(
-  att: Attachment,
-): Promise<ConversionResult> {
+export async function convertAttachment(att: Attachment): Promise<ConversionResult> {
   if (isTextMime(att.mimeType)) {
     return {
       kind: "converted",
@@ -280,10 +266,5 @@ export const CONVERTIBLE_MIME_TYPES = [
 ] as const;
 
 export function isConvertibleMime(mime: string): boolean {
-  return (
-    isTextMime(mime) ||
-    mime === DOCX_MIME ||
-    mime === XLSX_MIME ||
-    mime === PPTX_MIME
-  );
+  return isTextMime(mime) || mime === DOCX_MIME || mime === XLSX_MIME || mime === PPTX_MIME;
 }

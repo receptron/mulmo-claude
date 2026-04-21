@@ -38,8 +38,7 @@ async function main(): Promise<void> {
     input: process.stdin,
     output: process.stdout,
   });
-  const askOnce = (): Promise<string> =>
-    new Promise((resolve) => rl.question("You: ", resolve));
+  const askOnce = (): Promise<string> => new Promise((resolve) => rl.question("You: ", resolve));
 
   for (;;) {
     const line = (await askOnce()).trim();

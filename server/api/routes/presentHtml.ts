@@ -23,40 +23,26 @@ interface PresentHtmlErrorResponse {
   error: string;
 }
 
-type PresentHtmlResponse =
-  | PresentHtmlSuccessResponse
-  | PresentHtmlErrorResponse;
+type PresentHtmlResponse = PresentHtmlSuccessResponse | PresentHtmlErrorResponse;
 
-router.post(
-  API_ROUTES.html.present,
-  async (
-    req: Request<object, unknown, PresentHtmlBody>,
-    res: Response<PresentHtmlResponse>,
-  ) => {
-    const { html, title } = req.body;
-    if (!html) {
-      badRequest(res, "html is required");
-      return;
-    }
+router.post(API_ROUTES.html.present, async (req: Request<object, unknown, PresentHtmlBody>, res: Response<PresentHtmlResponse>) => {
+  const { html, title } = req.body;
+  if (!html) {
+    badRequest(res, "html is required");
+    return;
+  }
 
-    try {
-      const filePath = buildArtifactPath(
-        WORKSPACE_DIRS.htmls,
-        title,
-        ".html",
-        "page",
-      );
-      await writeWorkspaceText(filePath, html);
-      res.json({
-        message: `Saved HTML to ${filePath}`,
-        instructions:
-          "Acknowledge that the HTML page has been presented to the user.",
-        data: { html, title, filePath },
-      });
-    } catch (err) {
-      serverError(res, errorMessage(err));
-    }
-  },
-);
+  try {
+    const filePath = buildArtifactPath(WORKSPACE_DIRS.htmls, title, ".html", "page");
+    await writeWorkspaceText(filePath, html);
+    res.json({
+      message: `Saved HTML to ${filePath}`,
+      instructions: "Acknowledge that the HTML page has been presented to the user.",
+      data: { html, title, filePath },
+    });
+  } catch (err) {
+    serverError(res, errorMessage(err));
+  }
+});
 
 export default router;

@@ -21,11 +21,8 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist.js";
 import { formatSpawnFailure } from "../../utils/spawn.js";
-import {
-  CATEGORY_SLUGS,
-  normalizeCategories,
-  type CategorySlug,
-} from "./taxonomy.js";
+import { ONE_MINUTE_MS } from "../../utils/time.js";
+import { CATEGORY_SLUGS, normalizeCategories, type CategorySlug } from "./taxonomy.js";
 import { errorMessage } from "../../utils/errors.js";
 import { isRecord } from "../../utils/types.js";
 
@@ -67,7 +64,7 @@ export type ClassifyFn = (input: ClassifyInput) => Promise<ClassifyResult>;
 // Max time we let `claude` run during registration. Registration
 // is a foreground user action, so anything longer than 2 min is
 // effectively broken anyway.
-export const DEFAULT_TIMEOUT_MS = 120_000;
+export const DEFAULT_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
 
 // Budget cap. Classification is one small call per source (once
 // at registration, rarely re-classified) so $0.05 is fine — we
@@ -118,18 +115,18 @@ export function buildClassifyPrompt(input: ClassifyInput): string {
   if (titles.length > 0) {
     lines.push("");
     lines.push("RECENT ITEM TITLES:");
-    for (const t of titles.slice(0, 5)) {
-      lines.push(`- ${t}`);
+    for (const title of titles.slice(0, 5)) {
+      lines.push(`- ${title}`);
     }
   }
   const summaries = input.sampleSummaries ?? [];
   if (summaries.length > 0) {
     lines.push("");
     lines.push("RECENT ITEM SUMMARIES:");
-    for (const s of summaries.slice(0, 3)) {
+    for (const summary of summaries.slice(0, 3)) {
       // One-line truncation so a single long abstract doesn't
       // dominate the prompt budget.
-      lines.push(`- ${s.replace(/\s+/g, " ").slice(0, 200)}`);
+      lines.push(`- ${summary.replace(/\s+/g, " ").slice(0, 200)}`);
     }
   }
   return lines.join("\n");
@@ -150,14 +147,10 @@ export function parseClassifyOutput(stdout: string): ClassifyResult {
   try {
     parsed = JSON.parse(stdout.trim());
   } catch (err) {
-    throw new Error(
-      `[sources/classifier] failed to parse claude json: ${errorMessage(err)}`,
-    );
+    throw new Error(`[sources/classifier] failed to parse claude json: ${errorMessage(err)}`);
   }
   if (parsed.is_error) {
-    throw new Error(
-      `[sources/classifier] claude returned error: ${parsed.result ?? "unknown"}`,
-    );
+    throw new Error(`[sources/classifier] claude returned error: ${parsed.result ?? "unknown"}`);
   }
   return validateClassifyResult(parsed.structured_output);
 }
@@ -174,8 +167,8 @@ export function validateClassifyResult(obj: unknown): ClassifyResult {
   if (!isRecord(obj)) {
     throw new Error("[sources/classifier] output is not an object");
   }
-  const o = obj as Record<string, unknown>;
-  const categories = normalizeCategories(o.categories);
+  const record = obj as Record<string, unknown>;
+  const categories = normalizeCategories(record.categories);
   if (categories.length === 0) {
     // The model is required to pick at least one (min_items=1 in
     // the schema). If we end up here, something went wrong upstream
@@ -183,21 +176,15 @@ export function validateClassifyResult(obj: unknown): ClassifyResult {
     // filtered every slug as invalid. Throw so the caller treats
     // the registration as failed rather than registering a source
     // with no categories.
-    throw new Error(
-      "[sources/classifier] output has no valid categories from the taxonomy",
-    );
+    throw new Error("[sources/classifier] output has no valid categories from the taxonomy");
   }
-  const rationale =
-    typeof o.rationale === "string" ? o.rationale.slice(0, 400) : "";
+  const rationale = typeof record.rationale === "string" ? record.rationale.slice(0, 400) : "";
   return { categories, rationale };
 }
 
 // --- spawn layer --------------------------------------------------------
 
-function spawnClaudeClassify(
-  userPrompt: string,
-  timeoutMs: number,
-): Promise<string> {
+function spawnClaudeClassify(userPrompt: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       "--print",
@@ -230,9 +217,7 @@ function spawnClaudeClassify(
       if (settled) return;
       settled = true;
       proc.kill("SIGKILL");
-      reject(
-        new Error(`[sources/classifier] claude timed out after ${timeoutMs}ms`),
-      );
+      reject(new Error(`[sources/classifier] claude timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.stdout.on("data", (chunk: Buffer) => {
@@ -260,11 +245,7 @@ function spawnClaudeClassify(
         // error_max_budget_usd) to STDOUT in JSON form — same
         // lesson we learned in chat-index/summarizer. Prefer the
         // structured message when we can parse it.
-        reject(
-          new Error(
-            formatSpawnFailure("[sources/classifier]", code, stdout, stderr),
-          ),
-        );
+        reject(new Error(formatSpawnFailure("[sources/classifier]", code, stdout, stderr)));
         return;
       }
       resolve(stdout);
@@ -282,9 +263,6 @@ export const defaultClassify: ClassifyFn = async (input) => {
 // Public entry. Thin wrapper so tests can inject a ClassifyFn
 // without reaching into spawn internals, and the call site in
 // the manageSource plugin / pipeline stays a single symbol.
-export async function classifySource(
-  input: ClassifyInput,
-  classify: ClassifyFn = defaultClassify,
-): Promise<ClassifyResult> {
+export async function classifySource(input: ClassifyInput, classify: ClassifyFn = defaultClassify): Promise<ClassifyResult> {
   return classify(input);
 }

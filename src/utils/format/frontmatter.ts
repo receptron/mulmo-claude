@@ -66,18 +66,15 @@ function parseValue(raw: string): FrontmatterValue {
   if (arrayMatch) {
     return arrayMatch[1]
       .split(",")
-      .map((s) => unquote(s.trim()))
-      .filter((s) => s.length > 0);
+      .map((item) => unquote(item.trim()))
+      .filter((item) => item.length > 0);
   }
   return unquote(raw);
 }
 
-function unquote(s: string): string {
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
-    return s.slice(1, -1);
+function unquote(str: string): string {
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
   }
-  return s;
+  return str;
 }

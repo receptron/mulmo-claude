@@ -82,8 +82,7 @@ const truncHandler: FunctionHandler = (args, context) => {
     throw new Error("TRUNC requires 1 or 2 arguments");
   }
   const number = toNumber(context.evaluateFormula(args[0]));
-  const digits =
-    args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 0;
+  const digits = args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 0;
   const multiplier = Math.pow(10, digits);
   return Math.trunc(number * multiplier) / multiplier;
 };
@@ -116,8 +115,7 @@ const logHandler: FunctionHandler = (args, context) => {
     throw new Error("LOG requires 1 or 2 arguments");
   }
   const number = toNumber(context.evaluateFormula(args[0]));
-  const base =
-    args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 10;
+  const base = args.length === 2 ? toNumber(context.evaluateFormula(args[1])) : 10;
   return Math.log(number) / Math.log(base);
 };
 

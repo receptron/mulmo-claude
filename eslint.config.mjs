@@ -16,7 +16,16 @@ export default [
     ],
   },
   {
-    ignores: ["lib", "src/plugins/spreadsheet/engine", "packages/*/dist"],
+    ignores: [
+      "lib",
+      "src/plugins/spreadsheet/engine",
+      "packages/*/dist",
+      // mulmoclaude launcher copies server/client/shared src here at
+      // publish time. Original sources are linted at their real paths.
+      "packages/mulmoclaude/client",
+      "packages/mulmoclaude/server",
+      "packages/mulmoclaude/src",
+    ],
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,
@@ -57,9 +66,18 @@ export default [
         "warn",
         {
           min: 3,
+          // Don't flag object property keys — external API payloads
+          // legitimately use short keys like `id`, `to`, `n`, `e`.
+          properties: "never",
           exceptions: [
+            "_",
             "i",
             "j",
+            "id",
+            "ok",
+            "md",
+            "ms",
+            "it",
             "fs",
             "os"
           ],

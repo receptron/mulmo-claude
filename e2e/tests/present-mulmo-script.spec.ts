@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 const SCRIPT_TITLE = "Test Mulmo Script";
 const SCRIPT_DESCRIPTION = "A short test script used by the smoke test.";
 
@@ -42,9 +43,7 @@ async function setupScriptSession(page: Page) {
 
   // Session transcript with a presentMulmoScript tool result.
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) => {
       return route.fulfill({
         json: [
@@ -97,9 +96,7 @@ test.describe("presentMulmoScript plugin", () => {
     await expect(page.getByText(SCRIPT_TITLE).first()).toBeVisible();
   });
 
-  test("View renders script title, description and beat count when selected", async ({
-    page,
-  }) => {
+  test("View renders script title, description and beat count when selected", async ({ page }) => {
     await page.goto("/chat/mulmo-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
@@ -109,18 +106,12 @@ test.describe("presentMulmoScript plugin", () => {
 
     // View header: title, description (as a <p>, not the sidebar's
     // <div>), and "N beats" live text.
-    await expect(
-      page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("paragraph").filter({ hasText: SCRIPT_DESCRIPTION }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
+    await expect(page.getByRole("paragraph").filter({ hasText: SCRIPT_DESCRIPTION })).toBeVisible();
     await expect(page.getByText("2 beats")).toBeVisible();
   });
 
-  test("View does not crash when the mulmo-script API endpoints return empty", async ({
-    page,
-  }) => {
+  test("View does not crash when the mulmo-script API endpoints return empty", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (err) => errors.push(err.message));
 
@@ -129,11 +120,9 @@ test.describe("presentMulmoScript plugin", () => {
     await page.getByText(SCRIPT_TITLE).first().click();
 
     // Give the View a beat to mount and kick off its fetches.
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(ONE_SECOND_MS / 2);
     // Title should be rendered; no uncaught exceptions should fire.
-    await expect(
-      page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -142,12 +131,9 @@ test.describe("presentMulmoScript plugin", () => {
   // success. The View reads exactly those shapes, so the frontend
   // wiring is the regression net for the refactor.
 
-  test("render-beat success: mocked image surfaces in the View", async ({
-    page,
-  }) => {
+  test("render-beat success: mocked image surfaces in the View", async ({ page }) => {
     // 1×1 transparent PNG.
-    const PNG_1X1 =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAeImBZsAAAAASUVORK5CYII=";
+    const PNG_1X1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAeImBZsAAAAASUVORK5CYII=";
 
     const renderBeatCalls: unknown[] = [];
     await page.route(
@@ -161,9 +147,7 @@ test.describe("presentMulmoScript plugin", () => {
     await page.goto("/chat/mulmo-session");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     await page.getByText(SCRIPT_TITLE).first().click();
-    await expect(
-      page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
 
     // Beat 0 is a textSlide → auto-rendered on mount via renderBeat,
     // which hits /api/mulmo-script/render-beat. Wait for the mocked
@@ -172,12 +156,10 @@ test.describe("presentMulmoScript plugin", () => {
     // the withStoryContext refactor.
     await page.waitForFunction(
       () => {
-        return Array.from(document.querySelectorAll("img")).some((img) =>
-          img.src.startsWith("data:image/png;base64,iVBOR"),
-        );
+        return Array.from(document.querySelectorAll("img")).some((img) => img.src.startsWith("data:image/png;base64,iVBOR"));
       },
       undefined,
-      { timeout: 5000 },
+      { timeout: 5 * ONE_SECOND_MS },
     );
 
     expect(renderBeatCalls.length).toBeGreaterThan(0);
@@ -189,9 +171,7 @@ test.describe("presentMulmoScript plugin", () => {
     }
   });
 
-  test("render-beat error: mocked { error } surfaces to the UI", async ({
-    page,
-  }) => {
+  test("render-beat error: mocked { error } surfaces to the UI", async ({ page }) => {
     await page.route(
       (url) => url.pathname === "/api/mulmo-script/render-beat",
       (route) =>
@@ -203,9 +183,7 @@ test.describe("presentMulmoScript plugin", () => {
 
     await page.goto("/chat/mulmo-session");
     await page.getByText(SCRIPT_TITLE).first().click();
-    await expect(
-      page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
 
     // Auto-render on mount hits render-beat for textSlide beats,
     // which now returns 500 { error }. The View renders the error

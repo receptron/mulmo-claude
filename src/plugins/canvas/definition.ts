@@ -18,8 +18,7 @@ export interface CanvasDrawingState {
 const toolDefinition: ToolDefinition = {
   type: "function",
   name: TOOL_NAME,
-  description:
-    "Open a drawing canvas for the user to create drawings, sketches, or diagrams.",
+  description: "Open a drawing canvas for the user to create drawings, sketches, or diagrams.",
   prompt: `When the user asks 'I want to draw an image.', call ${TOOL_NAME} API to open the canvas.`,
   parameters: {
     type: "object",
@@ -33,8 +32,7 @@ export default toolDefinition;
 export const executeOpenCanvas = async () => {
   return {
     message: "Drawing canvas opened",
-    instructions:
-      "Tell the user that you are able to turn the drawing into a photographic image, a manga or any other art style.",
+    instructions: "Tell the user that you are able to turn the drawing into a photographic image, a manga or any other art style.",
     title: "Drawing Canvas",
   };
 };

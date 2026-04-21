@@ -2,20 +2,16 @@
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useNotifications } from "../composables/useNotifications";
 import { formatRelativeTime } from "../utils/format/date";
-import {
-  NOTIFICATION_ICONS,
-  NOTIFICATION_ACTION_TYPES,
-  NOTIFICATION_PRIORITIES,
-} from "../types/notification";
+import { NOTIFICATION_ICONS, NOTIFICATION_ACTION_TYPES, NOTIFICATION_PRIORITIES } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 
 const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
 
-function onDocumentClick(e: MouseEvent): void {
+function onDocumentClick(event: MouseEvent): void {
   if (!open.value || !rootRef.value) return;
-  if (!rootRef.value.contains(e.target as Node)) {
+  if (!rootRef.value.contains(event.target as Node)) {
     close();
   }
 }
@@ -34,8 +30,8 @@ const emit = defineEmits<{
 
 watch(
   () => props.forceClose,
-  (v) => {
-    if (v && open.value) close();
+  (shouldClose) => {
+    if (shouldClose && open.value) close();
   },
 );
 
@@ -50,36 +46,31 @@ function close(): void {
   emit("update:open", false);
 }
 
-function iconName(n: NotificationPayload): string {
-  return n.icon ?? NOTIFICATION_ICONS[n.kind] ?? "notifications";
+function iconName(notification: NotificationPayload): string {
+  return notification.icon ?? NOTIFICATION_ICONS[notification.kind] ?? "notifications";
 }
 
 function formatTime(iso: string): string {
   return formatRelativeTime(iso);
 }
 
-function handleClick(n: NotificationPayload): void {
-  if (n.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
-    emit("navigate", n.action);
+function handleClick(notification: NotificationPayload): void {
+  if (notification.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
+    emit("navigate", notification.action);
     close();
   }
 }
 
-function handleDismiss(e: Event, id: string): void {
-  e.stopPropagation();
-  dismiss(id);
+function handleDismiss(event: Event, notificationId: string): void {
+  event.stopPropagation();
+  dismiss(notificationId);
 }
 </script>
 
 <template>
   <div ref="rootRef" class="relative">
     <!-- Bell button -->
-    <button
-      class="relative text-gray-400 hover:text-gray-700"
-      data-testid="notification-bell"
-      aria-label="Notifications"
-      @click="toggle"
-    >
+    <button class="relative text-gray-400 hover:text-gray-700" data-testid="notification-bell" aria-label="Notifications" @click="toggle">
       <span class="material-icons">notifications</span>
       <span
         v-if="unreadCount > 0"
@@ -97,26 +88,13 @@ function handleDismiss(e: Event, id: string): void {
       data-testid="notification-panel"
     >
       <!-- Header -->
-      <div
-        class="flex items-center justify-between px-4 py-2 border-b border-gray-100"
-      >
+      <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
         <span class="text-sm font-semibold text-gray-700">Notifications</span>
-        <button
-          class="text-xs text-blue-500 hover:text-blue-700"
-          data-testid="notification-mark-all-read"
-          @click="markAllRead"
-        >
-          Mark all read
-        </button>
+        <button class="text-xs text-blue-500 hover:text-blue-700" data-testid="notification-mark-all-read" @click="markAllRead">Mark all read</button>
       </div>
 
       <!-- Empty state -->
-      <div
-        v-if="notifications.length === 0"
-        class="py-8 text-center text-sm text-gray-400"
-      >
-        No notifications
-      </div>
+      <div v-if="notifications.length === 0" class="py-8 text-center text-sm text-gray-400">No notifications</div>
 
       <!-- Items -->
       <div v-else>
@@ -131,14 +109,7 @@ function handleDismiss(e: Event, id: string): void {
           @click="handleClick(n)"
           @keydown.enter="handleClick(n)"
         >
-          <span
-            class="material-icons text-lg mt-0.5 shrink-0"
-            :class="
-              n.priority === NOTIFICATION_PRIORITIES.high
-                ? 'text-red-500'
-                : 'text-gray-400'
-            "
-          >
+          <span class="material-icons text-lg mt-0.5 shrink-0" :class="n.priority === NOTIFICATION_PRIORITIES.high ? 'text-red-500' : 'text-gray-400'">
             {{ iconName(n) }}
           </span>
           <div class="flex-1 min-w-0">
@@ -150,11 +121,7 @@ function handleDismiss(e: Event, id: string): void {
               {{ formatTime(n.firedAt) }}
             </p>
           </div>
-          <button
-            class="text-gray-300 hover:text-gray-500 shrink-0 mt-0.5"
-            aria-label="Dismiss"
-            @click="handleDismiss($event, n.id)"
-          >
+          <button class="text-gray-300 hover:text-gray-500 shrink-0 mt-0.5" aria-label="Dismiss" @click="handleDismiss($event, n.id)">
             <span class="material-icons text-sm">close</span>
           </button>
         </div>

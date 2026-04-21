@@ -20,11 +20,7 @@ describe("stripHtmlToPreview", () => {
   });
 
   it("trims away a leading or trailing tag cleanly", () => {
-    assert.equal(
-      stripHtmlToPreview("<p>hello</p>", 60),
-      "hello",
-      "leading+trailing tags should not leave stray spaces",
-    );
+    assert.equal(stripHtmlToPreview("<p>hello</p>", 60), "hello", "leading+trailing tags should not leave stray spaces");
   });
 
   it("collapses empty tag pairs to an empty string", () => {
@@ -61,10 +57,7 @@ describe("stripHtmlToPreview", () => {
   it("keeps an unterminated tag fragment as literal text", () => {
     // `"hello<unterminated"` has no closing `>`; the old regex
     // would not match it, so the literal chars survive.
-    assert.equal(
-      stripHtmlToPreview("hello<unterminated", 60),
-      "hello<unterminated",
-    );
+    assert.equal(stripHtmlToPreview("hello<unterminated", 60), "hello<unterminated");
   });
 
   it("strips only the real tag when mixed with a later bare `<`", () => {
@@ -74,10 +67,7 @@ describe("stripHtmlToPreview", () => {
   });
 
   it("handles tags with attributes containing whitespace", () => {
-    assert.equal(
-      stripHtmlToPreview('<a href="x" target="_blank">click</a> here', 60),
-      "click here",
-    );
+    assert.equal(stripHtmlToPreview('<a href="x" target="_blank">click</a> here', 60), "click here");
   });
 
   it("does not expand entities (raw characters pass through)", () => {

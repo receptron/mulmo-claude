@@ -10,9 +10,7 @@
                 :key="size"
                 :class="[
                   'w-8 h-8 rounded border-2 transition-colors',
-                  brushSize === size
-                    ? 'border-blue-500 bg-blue-100'
-                    : 'border-gray-300 bg-white hover:bg-gray-50',
+                  brushSize === size ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-white hover:bg-gray-50',
                 ]"
                 @click="brushSize = size"
               >
@@ -28,34 +26,18 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <input
-              v-model="brushColor"
-              type="color"
-              class="w-12 h-8 rounded border border-gray-300"
-            />
+            <input v-model="brushColor" type="color" class="w-12 h-8 rounded border border-gray-300" />
           </div>
         </div>
 
         <div class="flex items-center gap-1">
-          <button
-            class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
-            title="Undo"
-            @click="undo"
-          >
+          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50" title="Undo" @click="undo">
             <span class="material-icons text-sm">undo</span>
           </button>
-          <button
-            class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
-            title="Redo"
-            @click="redo"
-          >
+          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50" title="Redo" @click="redo">
             <span class="material-icons text-sm">redo</span>
           </button>
-          <button
-            class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50"
-            title="Clear"
-            @click="clear"
-          >
+          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50" title="Clear" @click="clear">
             <span class="material-icons text-sm">delete</span>
           </button>
         </div>
@@ -140,9 +122,7 @@ const applyStyle = async (style: { id: string; label: string }) => {
   const saved = await saveDrawingState();
   if (!saved) return;
   if (props.sendTextMessage) {
-    props.sendTextMessage(
-      `Turn my drawing on the canvas into a ${style.label} style image.`,
-    );
+    props.sendTextMessage(`Turn my drawing on the canvas into a ${style.label} style image.`);
   }
 };
 
@@ -159,18 +139,14 @@ const canvasRenderKey = ref(0);
 // Track the server-side image path for this canvas instance.
 // Initialized from existing result data (if reopening a saved canvas).
 const imagePath = ref(
-  props.selectedResult?.data?.imageData &&
-    !props.selectedResult.data.imageData.startsWith("data:")
-    ? props.selectedResult.data.imageData
-    : "",
+  props.selectedResult?.data?.imageData && !props.selectedResult.data.imageData.startsWith("data:") ? props.selectedResult.data.imageData : "",
 );
 let uploadInFlight = false;
 let pendingSave = false;
 
 const restoreDrawingState = () => {
   if (props.selectedResult?.viewState?.drawingState) {
-    const state = props.selectedResult.viewState
-      .drawingState as CanvasDrawingState;
+    const state = props.selectedResult.viewState.drawingState as CanvasDrawingState;
 
     brushSize.value = state.brushSize || 5;
     brushColor.value = state.brushColor || "#000000";
@@ -188,10 +164,7 @@ const restoreDrawingState = () => {
   // Reinitialise imagePath from the incoming result so autosaves
   // after a selectedResult change don't upload against the old path.
   imagePath.value =
-    props.selectedResult?.data?.imageData &&
-    !props.selectedResult.data.imageData.startsWith("data:")
-      ? props.selectedResult.data.imageData
-      : "";
+    props.selectedResult?.data?.imageData && !props.selectedResult.data.imageData.startsWith("data:") ? props.selectedResult.data.imageData : "";
 };
 restoreDrawingState();
 
@@ -271,20 +244,14 @@ const saveDrawingState = async (): Promise<boolean> => {
     const savedPath = boundImagePath
       ? await (async () => {
           const filename = boundImagePath.replace(/^images\//, "");
-          const result = await apiPut<{ path: string }>(
-            API_ROUTES.image.update.replace(":filename", filename),
-            { imageData: imageDataUri },
-          );
+          const result = await apiPut<{ path: string }>(API_ROUTES.image.update.replace(":filename", filename), { imageData: imageDataUri });
           if (!result.ok) throw new Error(`PUT failed: ${result.error}`);
           return result.data.path;
         })()
       : await (async () => {
-          const result = await apiPost<{ path: string }>(
-            API_ROUTES.image.upload,
-            {
-              imageData: imageDataUri,
-            },
-          );
+          const result = await apiPost<{ path: string }>(API_ROUTES.image.upload, {
+            imageData: imageDataUri,
+          });
           if (!result.ok) throw new Error(`POST failed: ${result.error}`);
           return result.data.path;
         })();

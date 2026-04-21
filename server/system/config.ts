@@ -67,11 +67,7 @@ export function loadSettings(): AppSettings {
     return { ...DEFAULT_SETTINGS };
   }
   if (!isAppSettings(parsed)) {
-    log.warn(
-      "config",
-      "settings.json does not match AppSettings schema — using defaults",
-      { file },
-    );
+    log.warn("config", "settings.json does not match AppSettings schema — using defaults", { file });
     return { ...DEFAULT_SETTINGS };
   }
   // Defensive copy — callers shouldn't be able to mutate the file on
@@ -84,11 +80,7 @@ export function saveSettings(settings: AppSettings): void {
     throw new Error("saveSettings: invalid AppSettings shape");
   }
   ensureConfigsDir();
-  const serialised = JSON.stringify(
-    { extraAllowedTools: [...settings.extraAllowedTools] },
-    null,
-    2,
-  );
+  const serialised = JSON.stringify({ extraAllowedTools: [...settings.extraAllowedTools] }, null, 2);
   writeFileAtomicSync(settingsPath(), `${serialised}\n`, { mode: 0o600 });
 }
 
@@ -155,10 +147,8 @@ export function isMcpHttpSpec(value: unknown): value is McpHttpSpec {
 
   if (value.type !== "http") return false;
   if (typeof value.url !== "string" || !isHttpUrl(value.url)) return false;
-  if (value.headers !== undefined && !isStringRecord(value.headers))
-    return false;
-  if (value.enabled !== undefined && typeof value.enabled !== "boolean")
-    return false;
+  if (value.headers !== undefined && !isStringRecord(value.headers)) return false;
+  if (value.enabled !== undefined && typeof value.enabled !== "boolean") return false;
   return true;
 }
 
@@ -166,13 +156,11 @@ export function isMcpStdioSpec(value: unknown): value is McpStdioSpec {
   if (!isRecord(value)) return false;
 
   if (value.type !== "stdio") return false;
-  if (typeof value.command !== "string" || value.command.length === 0)
-    return false;
+  if (typeof value.command !== "string" || value.command.length === 0) return false;
   if (!STDIO_COMMAND_ALLOWLIST.has(value.command)) return false;
   if (value.args !== undefined && !isStringArray(value.args)) return false;
   if (value.env !== undefined && !isStringRecord(value.env)) return false;
-  if (value.enabled !== undefined && typeof value.enabled !== "boolean")
-    return false;
+  if (value.enabled !== undefined && typeof value.enabled !== "boolean") return false;
   return true;
 }
 
@@ -193,8 +181,8 @@ export function isMcpConfigFile(value: unknown): value is McpConfigFile {
 
   const servers = value.mcpServers;
   if (!isRecord(servers)) return false;
-  for (const [id, spec] of Object.entries(servers)) {
-    if (!isMcpServerId(id)) return false;
+  for (const [serverId, spec] of Object.entries(servers)) {
+    if (!isMcpServerId(serverId)) return false;
     if (!isMcpServerSpec(spec)) return false;
   }
   return true;
@@ -215,11 +203,7 @@ export function loadMcpConfig(): McpConfigFile {
     return { mcpServers: {} };
   }
   if (!isMcpConfigFile(parsed)) {
-    log.warn(
-      "config",
-      "mcp.json does not match McpConfigFile schema — using defaults",
-      { file },
-    );
+    log.warn("config", "mcp.json does not match McpConfigFile schema — using defaults", { file });
     return { mcpServers: {} };
   }
   return parsed;
@@ -236,7 +220,7 @@ export function saveMcpConfig(cfg: McpConfigFile): void {
 
 // Flatten storage form to UI-friendly array.
 export function toMcpEntries(cfg: McpConfigFile): McpServerEntry[] {
-  return Object.entries(cfg.mcpServers).map(([id, spec]) => ({ id, spec }));
+  return Object.entries(cfg.mcpServers).map(([serverId, spec]) => ({ id: serverId, spec }));
 }
 
 // Re-inflate UI-friendly array to storage form. Duplicate ids are

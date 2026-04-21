@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  HostRateLimiter,
-  DEFAULT_MIN_DELAY_MS,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
+import { HostRateLimiter, DEFAULT_MIN_DELAY_MS, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
 
 // Controllable clock + sleep for deterministic tests. Returns a
 // deps object plus direct state access so tests can advance time
@@ -77,8 +73,8 @@ describe("HostRateLimiter — serialization per host", () => {
       "example.com",
       async () => {
         events.push("first:start");
-        await new Promise<void>((r) => {
-          releaseFirst = r;
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
         });
         events.push("first:end");
         return 1;
@@ -99,9 +95,9 @@ describe("HostRateLimiter — serialization per host", () => {
     // Second hasn't started yet.
     assert.deepEqual(events, ["first:start"]);
     releaseFirst();
-    const [a, b] = await Promise.all([first, second]);
-    assert.equal(a, 1);
-    assert.equal(b, 2);
+    const [resA, resB] = await Promise.all([first, second]);
+    assert.equal(resA, 1);
+    assert.equal(resB, 2);
     assert.deepEqual(events, ["first:start", "first:end", "second:start"]);
   });
 
@@ -110,19 +106,19 @@ describe("HostRateLimiter — serialization per host", () => {
     const lim = new HostRateLimiter(deps);
     const events: string[] = [];
     let releaseA: () => void = () => {};
-    const a = lim.run(
+    const runA = lim.run(
       "a.com",
       async () => {
         events.push("a:start");
-        await new Promise<void>((r) => {
-          releaseA = r;
+        await new Promise<void>((resolve) => {
+          releaseA = resolve;
         });
         events.push("a:end");
         return "a";
       },
       0,
     );
-    const b = lim.run(
+    const runB = lim.run(
       "b.com",
       async () => {
         events.push("b:start");
@@ -132,13 +128,13 @@ describe("HostRateLimiter — serialization per host", () => {
     );
     // Let both tasks schedule. a is still awaiting; b should
     // have completed.
-    const bResult = await b;
+    const bResult = await runB;
     assert.equal(bResult, "b");
     // b:start must have happened BEFORE a finishes — distinct
     // hosts don't serialize.
     assert.deepEqual(events, ["a:start", "b:start"]);
     releaseA();
-    await a;
+    await runA;
   });
 });
 
@@ -174,10 +170,7 @@ describe("HostRateLimiter — minimum delay enforcement", () => {
     await lim.run("a.com", async () => "first");
     const before = clock.read();
     await lim.run("a.com", async () => "second");
-    assert.ok(
-      clock.read() - before >= DEFAULT_MIN_DELAY_MS,
-      `expected default ${DEFAULT_MIN_DELAY_MS}ms delay, got ${clock.read() - before}`,
-    );
+    assert.ok(clock.read() - before >= DEFAULT_MIN_DELAY_MS, `expected default ${DEFAULT_MIN_DELAY_MS}ms delay, got ${clock.read() - before}`);
   });
 
   it("marks finishedAt even on error so the next retry waits", async () => {

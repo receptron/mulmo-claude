@@ -23,10 +23,7 @@ export interface ManageRolesData {
 const manageRolesPlugin: ToolPlugin = {
   toolDefinition,
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<ManageRolesData>>(
-      API_ROUTES.roles.manage,
-      args,
-    );
+    const result = await apiPost<ToolResult<ManageRolesData>>(API_ROUTES.roles.manage, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

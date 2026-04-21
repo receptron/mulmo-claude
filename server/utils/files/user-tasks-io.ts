@@ -11,18 +11,15 @@ import { resolvePath } from "./workspace-io.js";
 import { loadJsonFile } from "./json.js";
 import { writeFileAtomic } from "./atomic.js";
 
-const root = (r?: string) => r ?? workspacePath;
+const root = (workspaceRoot?: string) => workspaceRoot ?? workspacePath;
 
-export function loadUserTasks<T>(r?: string): T[] {
-  const tasks = loadJsonFile<T[]>(
-    resolvePath(root(r), WORKSPACE_FILES.schedulerUserTasks),
-    [],
-  );
+export function loadUserTasks<T>(workspaceRoot?: string): T[] {
+  const tasks = loadJsonFile<T[]>(resolvePath(root(workspaceRoot), WORKSPACE_FILES.schedulerUserTasks), []);
   return Array.isArray(tasks) ? tasks : [];
 }
 
-export async function saveUserTasks<T>(tasks: T[], r?: string): Promise<void> {
-  const filePath = resolvePath(root(r), WORKSPACE_FILES.schedulerUserTasks);
+export async function saveUserTasks<T>(tasks: T[], workspaceRoot?: string): Promise<void> {
+  const filePath = resolvePath(root(workspaceRoot), WORKSPACE_FILES.schedulerUserTasks);
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFileAtomic(filePath, JSON.stringify(tasks, null, 2));
 }

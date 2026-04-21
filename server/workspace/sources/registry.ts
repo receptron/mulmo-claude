@@ -37,14 +37,7 @@
 // doesn't rewrite the user's notes.
 
 import fsp from "node:fs/promises";
-import {
-  isFetcherKind,
-  isSourceSchedule,
-  type Source,
-  type FetcherParams,
-  type FetcherKind,
-  type SourceSchedule,
-} from "./types.js";
+import { isFetcherKind, isSourceSchedule, type Source, type FetcherParams, type FetcherKind, type SourceSchedule } from "./types.js";
 import { normalizeCategories } from "./taxonomy.js";
 import type { CategorySlug } from "./taxonomy.js";
 import { writeFileAtomic } from "../../utils/files/index.js";
@@ -59,16 +52,7 @@ import { log } from "../../system/logger/index.js";
 // in the frontmatter ends up in `fetcherParams` so a fetcher kind
 // that needs extra config can read it without us adding yet
 // another typed field for every new fetcher.
-const RESERVED_KEYS = new Set([
-  "slug",
-  "title",
-  "url",
-  "fetcher_kind",
-  "schedule",
-  "categories",
-  "max_items_per_fetch",
-  "added_at",
-]);
+const RESERVED_KEYS = new Set(["slug", "title", "url", "fetcher_kind", "schedule", "categories", "max_items_per_fetch", "added_at"]);
 
 const FRONTMATTER_OPEN = /^---\r?\n/;
 const FRONTMATTER_CLOSE = /\r?\n---\s*(\r?\n|$)/;
@@ -100,9 +84,7 @@ function parseFields(fmText: string): Map<string, string | string[]> {
   return fields;
 }
 
-function parseLine(
-  line: string,
-): { key: string; value: string | string[] } | null {
+function parseLine(line: string): { key: string; value: string | string[] } | null {
   if (!line.trim() || line.trimStart().startsWith("#")) return null;
   const colonIdx = line.indexOf(":");
   if (colonIdx <= 0) return null;
@@ -118,50 +100,43 @@ function parseValue(raw: string): string | string[] {
   if (arrayMatch) {
     return arrayMatch[1]
       .split(",")
-      .map((s) => unquote(s.trim()))
-      .filter((s) => s.length > 0);
+      .map((segment) => unquote(segment.trim()))
+      .filter((segment) => segment.length > 0);
   }
   return unquote(raw);
 }
 
-function unquote(s: string): string {
+function unquote(input: string): string {
   // Double-quoted strings: yamlScalar writes JSON-compatible escape
   // sequences (\\ for \, \" for "), so JSON.parse reverses them in
   // one shot. Fall back to a plain strip if the string is
   // double-quoted but somehow malformed.
-  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+  if (input.length >= 2 && input.startsWith('"') && input.endsWith('"')) {
     try {
-      return JSON.parse(s);
+      return JSON.parse(input);
     } catch {
-      return s.slice(1, -1);
+      return input.slice(1, -1);
     }
   }
   // Single-quoted scalars follow YAML's doubling convention: '' → '.
-  if (s.length >= 2 && s.startsWith("'") && s.endsWith("'")) {
-    return s.slice(1, -1).replace(/''/g, "'");
+  if (input.length >= 2 && input.startsWith("'") && input.endsWith("'")) {
+    return input.slice(1, -1).replace(/''/g, "'");
   }
-  return s;
+  return input;
 }
 
 // --- Source validation / construction -----------------------------------
 
-function stringField(
-  fields: Map<string, string | string[]>,
-  key: string,
-): string | null {
-  const v = fields.get(key);
-  return isNonEmptyString(v) ? v : null;
+function stringField(fields: Map<string, string | string[]>, key: string): string | null {
+  const value = fields.get(key);
+  return isNonEmptyString(value) ? value : null;
 }
 
-function numberField(
-  fields: Map<string, string | string[]>,
-  key: string,
-  defaultValue: number,
-): number {
-  const v = fields.get(key);
-  if (typeof v !== "string") return defaultValue;
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : defaultValue;
+function numberField(fields: Map<string, string | string[]>, key: string, defaultValue: number): number {
+  const value = fields.get(key);
+  if (typeof value !== "string") return defaultValue;
+  const parsedNumber = Number(value);
+  return Number.isFinite(parsedNumber) && parsedNumber > 0 ? Math.floor(parsedNumber) : defaultValue;
 }
 
 // Default per-fetch cap. Fetchers treat it as a hint — if the
@@ -172,10 +147,7 @@ export const DEFAULT_MAX_ITEMS_PER_FETCH = 30;
 // Construct a Source from parsed frontmatter fields. Returns null
 // on required-field validation failure. The `body` arg is inlined
 // into the Source as `notes`.
-export function buildSource(
-  fields: Map<string, string | string[]>,
-  body: string,
-): Source | null {
+export function buildSource(fields: Map<string, string | string[]>, body: string): Source | null {
   const slug = stringField(fields, "slug");
   if (!slug || !isValidSlug(slug)) return null;
 
@@ -196,11 +168,7 @@ export function buildSource(
   const categoriesRaw = fields.get("categories");
   const categories: CategorySlug[] = normalizeCategories(categoriesRaw);
 
-  const maxItemsPerFetch = numberField(
-    fields,
-    "max_items_per_fetch",
-    DEFAULT_MAX_ITEMS_PER_FETCH,
-  );
+  const maxItemsPerFetch = numberField(fields, "max_items_per_fetch", DEFAULT_MAX_ITEMS_PER_FETCH);
 
   const addedAt = stringField(fields, "added_at") ?? new Date(0).toISOString();
 
@@ -279,9 +247,7 @@ export function serializeSource(source: Source): string {
   // emit exactly one newline after the closing fence; otherwise
   // append the notes verbatim.
   if (source.notes.length > 0) {
-    lines.push(
-      source.notes.endsWith("\n") ? source.notes : `${source.notes}\n`,
-    );
+    lines.push(source.notes.endsWith("\n") ? source.notes : `${source.notes}\n`);
   } else {
     lines.push("");
   }
@@ -293,10 +259,7 @@ export function serializeSource(source: Source): string {
 // Load one source by slug. Returns null if missing, malformed, or
 // fails required-field validation. Never throws — consumer code
 // just skips null entries.
-export async function readSource(
-  workspaceRoot: string,
-  slug: string,
-): Promise<Source | null> {
+export async function readSource(workspaceRoot: string, slug: string): Promise<Source | null> {
   if (!isValidSlug(slug)) return null;
   let raw: string;
   try {
@@ -339,29 +302,20 @@ export async function listSources(workspaceRoot: string): Promise<Source[]> {
     }
   }
   // Deterministic sort by slug so callers can rely on stable order.
-  out.sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+  out.sort((leftSource, rightSource) => (leftSource.slug < rightSource.slug ? -1 : leftSource.slug > rightSource.slug ? 1 : 0));
   return out;
 }
 
 // Atomic write: stage to a sibling `.tmp` file then rename. Crash
 // mid-write cannot leave a half-written source file behind.
-export async function writeSource(
-  workspaceRoot: string,
-  source: Source,
-): Promise<void> {
+export async function writeSource(workspaceRoot: string, source: Source): Promise<void> {
   if (!isValidSlug(source.slug)) {
     throw new Error(`[sources] invalid slug: ${source.slug}`);
   }
-  await writeFileAtomic(
-    sourceFilePath(workspaceRoot, source.slug),
-    serializeSource(source),
-  );
+  await writeFileAtomic(sourceFilePath(workspaceRoot, source.slug), serializeSource(source));
 }
 
-export async function deleteSource(
-  workspaceRoot: string,
-  slug: string,
-): Promise<boolean> {
+export async function deleteSource(workspaceRoot: string, slug: string): Promise<boolean> {
   if (!isValidSlug(slug)) return false;
   try {
     await fsp.unlink(sourceFilePath(workspaceRoot, slug));

@@ -10,19 +10,10 @@ import {
   RELEASES_CURSOR_KEY,
 } from "../../server/workspace/sources/fetchers/githubReleases.js";
 import { GithubFetcherError } from "../../server/workspace/sources/fetchers/github.js";
-import type {
-  Source,
-  SourceState,
-} from "../../server/workspace/sources/types.js";
+import type { Source, SourceState } from "../../server/workspace/sources/types.js";
 import type { FetcherDeps } from "../../server/workspace/sources/fetchers/index.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
 
 // --- helpers -------------------------------------------------------------
 
@@ -100,18 +91,15 @@ function makeRelease(over: Partial<Record<string, unknown>> = {}) {
 
 describe("parseGithubRelease", () => {
   it("extracts the fields we actually consume", () => {
-    const r = parseGithubRelease(makeRelease());
-    assert.ok(r);
-    assert.equal(r!.id, 12345);
-    assert.equal(r!.tagName, "v1.2.3");
-    assert.equal(r!.name, "1.2.3 — Spring release");
-    assert.equal(
-      r!.htmlUrl,
-      "https://github.com/anthropics/claude-code/releases/tag/v1.2.3",
-    );
-    assert.equal(r!.publishedAt, "2026-04-10T10:00:00Z");
-    assert.equal(r!.draft, false);
-    assert.equal(r!.prerelease, false);
+    const release = parseGithubRelease(makeRelease());
+    assert.ok(release);
+    assert.equal(release!.id, 12345);
+    assert.equal(release!.tagName, "v1.2.3");
+    assert.equal(release!.name, "1.2.3 — Spring release");
+    assert.equal(release!.htmlUrl, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
+    assert.equal(release!.publishedAt, "2026-04-10T10:00:00Z");
+    assert.equal(release!.draft, false);
+    assert.equal(release!.prerelease, false);
   });
 
   it("returns null for non-objects", () => {
@@ -121,20 +109,20 @@ describe("parseGithubRelease", () => {
   });
 
   it("coerces missing fields to null without failing the whole parse", () => {
-    const r = parseGithubRelease({});
-    assert.ok(r);
-    assert.equal(r!.id, null);
-    assert.equal(r!.name, null);
-    assert.equal(r!.htmlUrl, null);
-    assert.equal(r!.publishedAt, null);
-    assert.equal(r!.draft, false);
-    assert.equal(r!.prerelease, false);
+    const release = parseGithubRelease({});
+    assert.ok(release);
+    assert.equal(release!.id, null);
+    assert.equal(release!.name, null);
+    assert.equal(release!.htmlUrl, null);
+    assert.equal(release!.publishedAt, null);
+    assert.equal(release!.draft, false);
+    assert.equal(release!.prerelease, false);
   });
 
   it("treats missing `draft` / `prerelease` as false (default)", () => {
-    const r = parseGithubRelease({ id: 1 });
-    assert.equal(r!.draft, false);
-    assert.equal(r!.prerelease, false);
+    const release = parseGithubRelease({ id: 1 });
+    assert.equal(release!.draft, false);
+    assert.equal(release!.prerelease, false);
   });
 });
 
@@ -142,10 +130,7 @@ describe("parseGithubRelease", () => {
 
 describe("firstParagraph", () => {
   it("returns everything up to the first blank line", () => {
-    assert.equal(
-      firstParagraph("First line.\nStill first.\n\nSecond paragraph."),
-      "First line.\nStill first.",
-    );
+    assert.equal(firstParagraph("First line.\nStill first.\n\nSecond paragraph."), "First line.\nStill first.");
   });
 
   it("returns the whole body when there's no blank line", () => {
@@ -159,10 +144,7 @@ describe("firstParagraph", () => {
   });
 
   it("trims leading whitespace before computing the first paragraph", () => {
-    assert.equal(
-      firstParagraph("\n\n  \n\nactual first paragraph"),
-      "actual first paragraph",
-    );
+    assert.equal(firstParagraph("\n\n  \n\nactual first paragraph"), "actual first paragraph");
   });
 });
 
@@ -174,15 +156,9 @@ describe("releaseToSourceItem — happy path", () => {
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.ok(item);
     assert.equal(item!.title, "1.2.3 — Spring release");
-    assert.equal(
-      item!.url,
-      "https://github.com/anthropics/claude-code/releases/tag/v1.2.3",
-    );
+    assert.equal(item!.url, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
     assert.equal(item!.summary, "First paragraph summary.");
-    assert.equal(
-      item!.content,
-      "First paragraph summary.\n\nSecond paragraph with more detail.",
-    );
+    assert.equal(item!.content, "First paragraph summary.\n\nSecond paragraph with more detail.");
     assert.deepEqual(item!.categories, ["dependencies", "ai"]);
     assert.equal(item!.sourceSlug, "anthropic-releases");
   });
@@ -194,9 +170,7 @@ describe("releaseToSourceItem — happy path", () => {
   });
 
   it("uses a default title when both name and tag_name are missing", () => {
-    const release = parseGithubRelease(
-      makeRelease({ name: null, tag_name: null }),
-    )!;
+    const release = parseGithubRelease(makeRelease({ name: null, tag_name: null }))!;
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.equal(item!.title, "Release");
   });
@@ -234,34 +208,18 @@ describe("releaseToSourceItem — drops", () => {
   });
 
   it("drops releases at or older than the cursor", () => {
-    const release = parseGithubRelease(
-      makeRelease({ published_at: "2026-04-10T10:00:00Z" }),
-    )!;
+    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-10T10:00:00Z" }))!;
     // Cursor at the exact same instant → drop.
-    const atCursor = releaseToSourceItem(
-      release,
-      makeSource(),
-      Date.parse("2026-04-10T10:00:00Z"),
-    );
+    const atCursor = releaseToSourceItem(release, makeSource(), Date.parse("2026-04-10T10:00:00Z"));
     assert.equal(atCursor, null);
     // Cursor newer than publish → drop.
-    const afterCursor = releaseToSourceItem(
-      release,
-      makeSource(),
-      Date.parse("2026-04-11T10:00:00Z"),
-    );
+    const afterCursor = releaseToSourceItem(release, makeSource(), Date.parse("2026-04-11T10:00:00Z"));
     assert.equal(afterCursor, null);
   });
 
   it("keeps releases strictly newer than the cursor", () => {
-    const release = parseGithubRelease(
-      makeRelease({ published_at: "2026-04-11T10:00:00Z" }),
-    )!;
-    const item = releaseToSourceItem(
-      release,
-      makeSource(),
-      Date.parse("2026-04-10T10:00:00Z"),
-    );
+    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-11T10:00:00Z" }))!;
+    const item = releaseToSourceItem(release, makeSource(), Date.parse("2026-04-10T10:00:00Z"));
     assert.ok(item);
   });
 });
@@ -274,11 +232,7 @@ describe("updateReleasesCursor", () => {
   }
 
   it("advances to the newest publishedAt across all non-draft releases", () => {
-    const releases = [
-      parsed("2026-04-10T10:00:00Z"),
-      parsed("2026-04-13T10:00:00Z"),
-      parsed("2026-04-11T10:00:00Z"),
-    ];
+    const releases = [parsed("2026-04-10T10:00:00Z"), parsed("2026-04-13T10:00:00Z"), parsed("2026-04-11T10:00:00Z")];
     const cursor = updateReleasesCursor({}, releases);
     assert.equal(cursor[RELEASES_CURSOR_KEY], "2026-04-13T10:00:00.000Z");
   });
@@ -341,19 +295,12 @@ describe("processReleasesResponse", () => {
     assert.equal(result.items[0].title, "1.2.3 — Spring release");
     // Cursor advances to v2's publishedAt, even though v1 was
     // dropped as old.
-    assert.equal(
-      result.cursor[RELEASES_CURSOR_KEY],
-      "2026-04-13T10:00:00.000Z",
-    );
+    assert.equal(result.cursor[RELEASES_CURSOR_KEY], "2026-04-13T10:00:00.000Z");
   });
 
   it("returns empty items + unchanged cursor on a non-array body", () => {
     const cursor = { [RELEASES_CURSOR_KEY]: "2026-04-10T10:00:00Z" };
-    const result = processReleasesResponse(
-      { message: "Not Found" },
-      makeSource(),
-      cursor,
-    );
+    const result = processReleasesResponse({ message: "Not Found" }, makeSource(), cursor);
     assert.deepEqual(result.items, []);
     assert.equal(result.cursor[RELEASES_CURSOR_KEY], "2026-04-10T10:00:00Z");
   });
@@ -373,16 +320,10 @@ describe("processReleasesResponse", () => {
       makeRelease({
         id: i,
         html_url: `https://github.com/x/y/releases/tag/v${i}`,
-        published_at: new Date(
-          Date.UTC(2026, 3, 1 + (i % 28), 10, 0, 0),
-        ).toISOString(),
+        published_at: new Date(Date.UTC(2026, 3, 1 + (i % 28), 10, 0, 0)).toISOString(),
       }),
     );
-    const result = processReleasesResponse(
-      body,
-      makeSource({ maxItemsPerFetch: 10 }),
-      {},
-    );
+    const result = processReleasesResponse(body, makeSource({ maxItemsPerFetch: 10 }), {});
     assert.equal(result.items.length, 10);
   });
 });
@@ -395,27 +336,17 @@ describe("githubReleasesFetcher.fetch", () => {
   it("fetches, parses, and returns SourceItems", async () => {
     const fetchImpl: typeof fetch = async (input) => {
       // Sanity-check the URL our fetcher built.
-      assert.match(
-        String(input),
-        /^https:\/\/api\.github\.com\/repos\/anthropics\/claude-code\/releases$/,
-      );
+      assert.match(String(input), /^https:\/\/api\.github\.com\/repos\/anthropics\/claude-code\/releases$/);
       return new Response(JSON.stringify(RELEASES_BODY_OK), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     };
-    const result = await githubReleasesFetcher.fetch(
-      makeSource(),
-      makeState(),
-      makeFetcherDeps(fetchImpl),
-    );
+    const result = await githubReleasesFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl));
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].sourceSlug, "anthropic-releases");
     assert.deepEqual(result.items[0].categories, ["dependencies", "ai"]);
-    assert.equal(
-      result.cursor[RELEASES_CURSOR_KEY],
-      "2026-04-10T10:00:00.000Z",
-    );
+    assert.equal(result.cursor[RELEASES_CURSOR_KEY], "2026-04-10T10:00:00.000Z");
   });
 
   it("rejects when github_repo param is missing", async () => {
@@ -424,15 +355,8 @@ describe("githubReleasesFetcher.fetch", () => {
     };
     const source = makeSource({ fetcherParams: {} });
     await assert.rejects(
-      () =>
-        githubReleasesFetcher.fetch(
-          source,
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
-      (err: unknown) =>
-        err instanceof GithubFetcherError &&
-        /github_repo param is required/.test(err.message),
+      () => githubReleasesFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)),
+      (err: unknown) => err instanceof GithubFetcherError && /github_repo param is required/.test(err.message),
     );
   });
 
@@ -441,34 +365,19 @@ describe("githubReleasesFetcher.fetch", () => {
       throw new Error("should not fetch");
     };
     const source = makeSource({ fetcherParams: { github_repo: "../etc" } });
-    await assert.rejects(
-      () =>
-        githubReleasesFetcher.fetch(
-          source,
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
-      GithubFetcherError,
-    );
+    await assert.rejects(() => githubReleasesFetcher.fetch(source, makeState(), makeFetcherDeps(fetchImpl)), GithubFetcherError);
   });
 
   it("surfaces a 404 from the API as GithubFetcherError(status=404)", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(JSON.stringify({ message: "Not Found" }), { status: 404 });
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ message: "Not Found" }), { status: 404 });
     await assert.rejects(
-      () =>
-        githubReleasesFetcher.fetch(
-          makeSource(),
-          makeState(),
-          makeFetcherDeps(fetchImpl),
-        ),
+      () => githubReleasesFetcher.fetch(makeSource(), makeState(), makeFetcherDeps(fetchImpl)),
       (err: unknown) => err instanceof GithubFetcherError && err.status === 404,
     );
   });
 
   it("registers itself as the `github-releases` fetcher on import", async () => {
-    const { getFetcher } =
-      await import("../../server/workspace/sources/fetchers/index.js");
+    const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("github-releases");
     assert.ok(fetcher);
     assert.equal(fetcher!.kind, "github-releases");

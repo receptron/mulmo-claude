@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync } from "fs";
 import path from "path";
 import os from "os";
-import {
-  createSessionMeta,
-  backfillOrigin,
-  readSessionMeta,
-} from "../../../server/utils/files/session-io.ts";
+import { createSessionMeta, backfillOrigin, readSessionMeta } from "../../../server/utils/files/session-io.ts";
 
 function tmpRoot(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "session-origin-"));

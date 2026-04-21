@@ -24,9 +24,7 @@ describe("TelegramApi.getUpdates", () => {
     calls = [];
   });
 
-  const fetchStub = (
-    script: (call: FakeCall) => Response | Promise<Response>,
-  ): typeof fetch =>
+  const fetchStub = (script: (call: FakeCall) => Response | Promise<Response>): typeof fetch =>
     (async (input, init) => {
       const call: FakeCall = {
         url: typeof input === "string" ? input : input.toString(),
@@ -85,9 +83,7 @@ describe("TelegramApi.getUpdates", () => {
   it("throws when the API response has ok=false", async () => {
     const api = createTelegramApi({
       botToken: "TKN",
-      fetchImpl: fetchStub(() =>
-        jsonResponse({ ok: false, description: "Unauthorized" }),
-      ),
+      fetchImpl: fetchStub(() => jsonResponse({ ok: false, description: "Unauthorized" })),
     });
     await assert.rejects(api.getUpdates(), /Unauthorized/);
   });

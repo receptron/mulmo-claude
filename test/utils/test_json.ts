@@ -1,10 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  extractJsonObject,
-  findBalancedBraceBlock,
-  findFencedJsonBody,
-} from "../../server/utils/json.js";
+import { extractJsonObject, findBalancedBraceBlock, findFencedJsonBody } from "../../server/utils/json.js";
 
 describe("findFencedJsonBody", () => {
   it("extracts the body of a fenced json block", () => {

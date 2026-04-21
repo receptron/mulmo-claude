@@ -4,10 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { mkdir, writeFile, symlink, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  collectSkillsFromDir,
-  discoverSkills,
-} from "../../server/workspace/skills/discovery.js";
+import { collectSkillsFromDir, discoverSkills } from "../../server/workspace/skills/discovery.js";
 
 let root: string;
 
@@ -19,12 +16,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-async function writeSkill(
-  parent: string,
-  name: string,
-  description: string,
-  body = "",
-): Promise<string> {
+async function writeSkill(parent: string, name: string, description: string, body = ""): Promise<string> {
   const dir = join(parent, name);
   await mkdir(dir, { recursive: true });
   const path = join(dir, "SKILL.md");
@@ -35,10 +27,7 @@ async function writeSkill(
 
 describe("collectSkillsFromDir", () => {
   it("returns an empty list when the root does not exist", async () => {
-    const skills = await collectSkillsFromDir(
-      join(root, "does-not-exist"),
-      "user",
-    );
+    const skills = await collectSkillsFromDir(join(root, "does-not-exist"), "user");
     assert.deepEqual(skills, []);
   });
 
@@ -108,7 +97,7 @@ describe("collectSkillsFromDir", () => {
     await writeSkill(root, "mango", "M");
     const skills = await collectSkillsFromDir(root, "user");
     assert.deepEqual(
-      skills.map((s) => s.name),
+      skills.map((skill) => skill.name),
       ["apple", "mango", "zebra"],
     );
   });
@@ -157,7 +146,7 @@ describe("discoverSkills", () => {
     const skills = await discoverSkills({ userDir: root });
     assert.equal(skills.length, 2);
     assert.deepEqual(
-      skills.map((s) => [s.name, s.source]),
+      skills.map((skill) => [skill.name, skill.source]),
       [
         ["u1", "user"],
         ["u2", "user"],
@@ -182,7 +171,7 @@ describe("discoverSkills", () => {
       });
       // Alphabetical: only_project, only_user, shared
       assert.deepEqual(
-        skills.map((s) => [s.name, s.source, s.description]),
+        skills.map((skill) => [skill.name, skill.source, skill.description]),
         [
           ["only_project", "project", "Project only"],
           ["only_user", "user", "User only"],

@@ -47,9 +47,7 @@ export function setAuthToken(token: string | null): void {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string; status: number };
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
 
 export type ApiQuery = Record<string, string | number | boolean | undefined>;
 
@@ -80,17 +78,12 @@ function buildQueryString(query: ApiQuery | undefined): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined) continue;
-    parts.push(
-      `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
-    );
+    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
   }
   return parts.length === 0 ? "" : `?${parts.join("&")}`;
 }
 
-function buildHeaders(
-  opts: { headers?: Record<string, string> },
-  hasBody: boolean,
-): Record<string, string> {
+function buildHeaders(opts: { headers?: Record<string, string> }, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
   if (hasBody && headers["Content-Type"] === undefined) {
     headers["Content-Type"] = "application/json";
@@ -101,9 +94,7 @@ function buildHeaders(
   return headers;
 }
 
-async function extractError(
-  res: Response,
-): Promise<{ error: string; status: number }> {
+async function extractError(res: Response): Promise<{ error: string; status: number }> {
   const status = res.status;
   // Try to parse a `{ error: string }` body first — that's the server's
   // standard error shape. `in` narrowing lets us read `body.error`
@@ -131,10 +122,7 @@ async function extractError(
  * MulmoClaude `/api/*` endpoints return JSON on success); use
  * `apiFetchRaw` for binary / streaming / non-JSON responses.
  */
-export async function apiCall<T = unknown>(
-  path: string,
-  opts: ApiOptions = {},
-): Promise<ApiResult<T>> {
+export async function apiCall<T = unknown>(path: string, opts: ApiOptions = {}): Promise<ApiResult<T>> {
   const method = opts.method ?? "GET";
   const hasBody = opts.body !== undefined;
   const url = `${path}${buildQueryString(opts.query)}`;
@@ -180,43 +168,23 @@ export async function apiCall<T = unknown>(
 
 // ── Convenience verbs ───────────────────────────────────────────────
 
-export function apiGet<T = unknown>(
-  path: string,
-  query?: ApiQuery,
-  extra: Omit<ApiOptions, "method" | "body" | "query"> = {},
-): Promise<ApiResult<T>> {
+export function apiGet<T = unknown>(path: string, query?: ApiQuery, extra: Omit<ApiOptions, "method" | "body" | "query"> = {}): Promise<ApiResult<T>> {
   return apiCall<T>(path, { ...extra, method: "GET", query });
 }
 
-export function apiPost<T = unknown>(
-  path: string,
-  body?: unknown,
-  extra: Omit<ApiOptions, "method" | "body"> = {},
-): Promise<ApiResult<T>> {
+export function apiPost<T = unknown>(path: string, body?: unknown, extra: Omit<ApiOptions, "method" | "body"> = {}): Promise<ApiResult<T>> {
   return apiCall<T>(path, { ...extra, method: "POST", body });
 }
 
-export function apiPut<T = unknown>(
-  path: string,
-  body?: unknown,
-  extra: Omit<ApiOptions, "method" | "body"> = {},
-): Promise<ApiResult<T>> {
+export function apiPut<T = unknown>(path: string, body?: unknown, extra: Omit<ApiOptions, "method" | "body"> = {}): Promise<ApiResult<T>> {
   return apiCall<T>(path, { ...extra, method: "PUT", body });
 }
 
-export function apiPatch<T = unknown>(
-  path: string,
-  body?: unknown,
-  extra: Omit<ApiOptions, "method" | "body"> = {},
-): Promise<ApiResult<T>> {
+export function apiPatch<T = unknown>(path: string, body?: unknown, extra: Omit<ApiOptions, "method" | "body"> = {}): Promise<ApiResult<T>> {
   return apiCall<T>(path, { ...extra, method: "PATCH", body });
 }
 
-export function apiDelete<T = unknown>(
-  path: string,
-  body?: unknown,
-  extra: Omit<ApiOptions, "method" | "body"> = {},
-): Promise<ApiResult<T>> {
+export function apiDelete<T = unknown>(path: string, body?: unknown, extra: Omit<ApiOptions, "method" | "body"> = {}): Promise<ApiResult<T>> {
   return apiCall<T>(path, { ...extra, method: "DELETE", body });
 }
 
@@ -238,10 +206,7 @@ export interface RawOptions {
  *
  * Throws on network errors. Does NOT check `res.ok`.
  */
-export async function apiFetchRaw(
-  path: string,
-  opts: RawOptions = {},
-): Promise<Response> {
+export async function apiFetchRaw(path: string, opts: RawOptions = {}): Promise<Response> {
   const url = `${path}${buildQueryString(opts.query)}`;
   const init: FetchInit = {
     method: opts.method ?? "GET",

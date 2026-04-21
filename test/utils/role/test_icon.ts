@@ -42,7 +42,7 @@ describe("roleIcon", () => {
   });
 
   it("accepts only lowercase letters and underscores as valid icons", () => {
-    const r: Role[] = [
+    const testRoles: Role[] = [
       {
         id: "a",
         name: "",
@@ -72,10 +72,10 @@ describe("roleIcon", () => {
         availablePlugins: [],
       },
     ];
-    assert.equal(roleIcon(r, "a"), "valid_name");
-    assert.equal(roleIcon(r, "b"), "smart_toy");
-    assert.equal(roleIcon(r, "c"), "smart_toy");
-    assert.equal(roleIcon(r, "d"), "smart_toy");
+    assert.equal(roleIcon(testRoles, "a"), "valid_name");
+    assert.equal(roleIcon(testRoles, "b"), "smart_toy");
+    assert.equal(roleIcon(testRoles, "c"), "smart_toy");
+    assert.equal(roleIcon(testRoles, "d"), "smart_toy");
   });
 });
 

@@ -6,7 +6,19 @@
 // in #175.
 
 import type { ToolCallHistoryItem } from "../../types/toolCallHistory";
+import type { SseToolCall } from "../../types/sse";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+// Convert an SSE tool_call event into a ToolCallHistoryItem ready
+// to push onto a session's toolCallHistory. Pure.
+export function toToolCallEntry(event: SseToolCall): ToolCallHistoryItem {
+  return {
+    toolUseId: event.toolUseId,
+    toolName: event.toolName,
+    args: event.args,
+    timestamp: Date.now(),
+  };
+}
 
 // When an SSE `tool_call_result` event arrives, the server tells
 // us which tool call it belongs to via `toolUseId`. Find the most
@@ -21,17 +33,10 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 //
 // Returns `undefined` when no pending call matches (race / retry /
 // late-arriving event). Pure.
-export function findPendingToolCall(
-  history: readonly ToolCallHistoryItem[],
-  toolUseId: string,
-): ToolCallHistoryItem | undefined {
+export function findPendingToolCall(history: readonly ToolCallHistoryItem[], toolUseId: string): ToolCallHistoryItem | undefined {
   for (let i = history.length - 1; i >= 0; i--) {
     const entry = history[i];
-    if (
-      entry.toolUseId === toolUseId &&
-      entry.result === undefined &&
-      entry.error === undefined
-    ) {
+    if (entry.toolUseId === toolUseId && entry.result === undefined && entry.error === undefined) {
       return entry;
     }
   }
@@ -49,10 +54,7 @@ export function findPendingToolCall(
 // to previous turns and don't count.
 //
 // Pure — returns a boolean for the caller to act on.
-export function shouldSelectAssistantText(
-  toolResults: readonly ToolResultComplete[],
-  runStartIndex: number,
-): boolean {
+export function shouldSelectAssistantText(toolResults: readonly ToolResultComplete[], runStartIndex: number): boolean {
   for (let i = runStartIndex; i < toolResults.length; i++) {
     if (toolResults[i].toolName !== "text-response") return false;
   }

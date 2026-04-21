@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseRobots,
-  selectGroup,
-  isAllowedByRobots,
-  matchesPattern,
-} from "../../server/workspace/sources/robots.js";
+import { parseRobots, selectGroup, isAllowedByRobots, matchesPattern } from "../../server/workspace/sources/robots.js";
 
 // --- parseRobots -----------------------------------------------------------
 
@@ -168,9 +163,9 @@ Disallow: /private
 `);
     const merged = selectGroup(duplicateGroupsRobots, "Googlebot");
     assert.ok(merged);
-    const kinds = merged!.rules.map((r) => ({
-      kind: r.kind,
-      pattern: r.pattern,
+    const kinds = merged!.rules.map((rule) => ({
+      kind: rule.kind,
+      pattern: rule.pattern,
     }));
     assert.deepEqual(kinds, [
       { kind: "allow", pattern: "/public" },
@@ -189,14 +184,8 @@ Allow: /
 User-agent: Googlebot
 Disallow: /private
 `);
-    assert.equal(
-      isAllowedByRobots(duplicateGroupsRobots, "Googlebot", "/private/page"),
-      false,
-    );
-    assert.equal(
-      isAllowedByRobots(duplicateGroupsRobots, "Googlebot", "/public"),
-      true,
-    );
+    assert.equal(isAllowedByRobots(duplicateGroupsRobots, "Googlebot", "/private/page"), false);
+    assert.equal(isAllowedByRobots(duplicateGroupsRobots, "Googlebot", "/public"), true);
   });
 });
 

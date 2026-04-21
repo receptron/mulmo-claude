@@ -37,9 +37,7 @@ export function useFileSelection() {
   const router = useRouter();
 
   const urlPath = route.query.path;
-  const selectedPath = ref<string | null>(
-    isValidFilePath(urlPath) ? urlPath : null,
-  );
+  const selectedPath = ref<string | null>(isValidFilePath(urlPath) ? urlPath : null);
   const content = ref<FileContent | null>(null);
   const contentLoading = ref(false);
   const contentError = ref<string | null>(null);
@@ -55,11 +53,7 @@ export function useFileSelection() {
     contentError.value = null;
     content.value = null;
     try {
-      const result = await apiGet<FileContent>(
-        API_ROUTES.files.content,
-        { path: filePath },
-        { signal: controller.signal },
-      );
+      const result = await apiGet<FileContent>(API_ROUTES.files.content, { path: filePath }, { signal: controller.signal });
       if (controller.signal.aborted) return;
       if (!result.ok) {
         contentError.value = result.error;
@@ -78,15 +72,13 @@ export function useFileSelection() {
     selectedPath.value = filePath;
     loadContent(filePath);
     const { path: __path, ...restQuery } = route.query;
-    router
-      .push({ query: { ...restQuery, path: filePath } })
-      .catch((err: unknown) => {
-        if (!isNavigationFailure(err)) {
-          // Frontend composable — server logger not available.
-          // console.error is the standard pattern in Vue composables.
-          console.error("[selectFile] navigation failed:", err);
-        }
-      });
+    router.push({ query: { ...restQuery, path: filePath } }).catch((err: unknown) => {
+      if (!isNavigationFailure(err)) {
+        // Frontend composable — server logger not available.
+        // console.error is the standard pattern in Vue composables.
+        console.error("[selectFile] navigation failed:", err);
+      }
+    });
   }
 
   function deselectFile(): void {

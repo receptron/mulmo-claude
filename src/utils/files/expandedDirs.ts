@@ -13,7 +13,7 @@ export function parseStoredExpandedDirs(raw: string | null): Set<string> {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set(DEFAULT_EXPANDED);
-    const strings = parsed.filter((v): v is string => typeof v === "string");
+    const strings = parsed.filter((val): val is string => typeof val === "string");
     return new Set(strings);
   } catch {
     return new Set(DEFAULT_EXPANDED);

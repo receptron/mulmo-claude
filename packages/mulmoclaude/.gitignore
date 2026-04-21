@@ -1,0 +1,10 @@
+# Build artifacts copied by bin/prepare-dist.js before `npm publish`.
+# Not tracked in git — regenerate with `node bin/prepare-dist.js`.
+client/
+server/
+src/
+node_modules/
+
+# npm pack output + accidental tarball expansions during local tests.
+*.tgz
+package/

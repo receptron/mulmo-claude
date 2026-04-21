@@ -1,80 +1,35 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import {
-  summariesRoot,
-  dailyPathFor,
-  topicPathFor,
-  archivedTopicPathFor,
-  toIsoDate,
-  slugify,
-} from "../../server/workspace/journal/paths.js";
+import { summariesRoot, dailyPathFor, topicPathFor, archivedTopicPathFor, toIsoDate, slugify } from "../../server/workspace/journal/paths.js";
 
-const WS = "/fake/workspace";
+const WORKSPACE = "/fake/workspace";
 
 describe("summariesRoot", () => {
   it("joins workspace root with the summaries dir", () => {
-    assert.equal(
-      summariesRoot(WS),
-      path.join(WS, "conversations", "summaries"),
-    );
+    assert.equal(summariesRoot(WORKSPACE), path.join(WORKSPACE, "conversations", "summaries"));
   });
 });
 
 describe("dailyPathFor", () => {
   it("builds summaries/daily/YYYY/MM/DD.md", () => {
-    assert.equal(
-      dailyPathFor(WS, "2026-04-11"),
-      path.join(
-        WS,
-        "conversations",
-        "summaries",
-        "daily",
-        "2026",
-        "04",
-        "11.md",
-      ),
-    );
+    assert.equal(dailyPathFor(WORKSPACE, "2026-04-11"), path.join(WORKSPACE, "conversations", "summaries", "daily", "2026", "04", "11.md"));
   });
 
   it("preserves leading zeros", () => {
-    assert.equal(
-      dailyPathFor(WS, "2026-01-03"),
-      path.join(
-        WS,
-        "conversations",
-        "summaries",
-        "daily",
-        "2026",
-        "01",
-        "03.md",
-      ),
-    );
+    assert.equal(dailyPathFor(WORKSPACE, "2026-01-03"), path.join(WORKSPACE, "conversations", "summaries", "daily", "2026", "01", "03.md"));
   });
 });
 
 describe("topicPathFor", () => {
   it("builds summaries/topics/<slug>.md", () => {
-    assert.equal(
-      topicPathFor(WS, "refactoring"),
-      path.join(WS, "conversations", "summaries", "topics", "refactoring.md"),
-    );
+    assert.equal(topicPathFor(WORKSPACE, "refactoring"), path.join(WORKSPACE, "conversations", "summaries", "topics", "refactoring.md"));
   });
 });
 
 describe("archivedTopicPathFor", () => {
   it("builds summaries/archive/topics/<slug>.md", () => {
-    assert.equal(
-      archivedTopicPathFor(WS, "old-topic"),
-      path.join(
-        WS,
-        "conversations",
-        "summaries",
-        "archive",
-        "topics",
-        "old-topic.md",
-      ),
-    );
+    assert.equal(archivedTopicPathFor(WORKSPACE, "old-topic"), path.join(WORKSPACE, "conversations", "summaries", "archive", "topics", "old-topic.md"));
   });
 });
 
@@ -83,18 +38,18 @@ describe("toIsoDate", () => {
     // Pick a date in the middle of a month to avoid timezone edge
     // cases flipping the result. April 15 at noon local is April 15
     // in every timezone on Earth.
-    const d = new Date(2026, 3, 15, 12, 0, 0); // month is 0-indexed
-    assert.equal(toIsoDate(d), "2026-04-15");
+    const date = new Date(2026, 3, 15, 12, 0, 0); // month is 0-indexed
+    assert.equal(toIsoDate(date), "2026-04-15");
   });
 
   it("pads single-digit months and days", () => {
-    const d = new Date(2026, 0, 3, 12, 0, 0);
-    assert.equal(toIsoDate(d), "2026-01-03");
+    const date = new Date(2026, 0, 3, 12, 0, 0);
+    assert.equal(toIsoDate(date), "2026-01-03");
   });
 
   it("accepts a ms timestamp", () => {
-    const d = new Date(2026, 5, 20, 12, 0, 0);
-    assert.equal(toIsoDate(d.getTime()), "2026-06-20");
+    const date = new Date(2026, 5, 20, 12, 0, 0);
+    assert.equal(toIsoDate(date.getTime()), "2026-06-20");
   });
 });
 

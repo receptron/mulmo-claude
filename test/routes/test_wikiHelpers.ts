@@ -40,10 +40,7 @@ describe("wikiSlugify", () => {
 
 describe("extractSlugFromBulletHref", () => {
   it("extracts slug from pages/<slug>.md", () => {
-    assert.equal(
-      extractSlugFromBulletHref("pages/sakura-internet.md"),
-      "sakura-internet",
-    );
+    assert.equal(extractSlugFromBulletHref("pages/sakura-internet.md"), "sakura-internet");
   });
 
   it("handles leading ./ and deeper prefixes", () => {
@@ -96,9 +93,7 @@ describe("parseIndexEntries", () => {
   });
 
   it("falls back to slug as title when title is empty", () => {
-    const md = ["| slug | title |", "|------|-------|", "| `bare` |  |"].join(
-      "\n",
-    );
+    const md = ["| slug | title |", "|------|-------|", "| `bare` |  |"].join("\n");
     const entries = parseIndexEntries(md);
     assert.equal(entries[0]?.title, "bare");
   });
@@ -118,8 +113,7 @@ describe("parseIndexEntries", () => {
     // `wikiSlugify(title)` which stripped every non-ASCII character
     // and returned "", breaking in-canvas navigation. The slug must
     // now come from the href segment.
-    const md =
-      "- [さくらインターネット](pages/sakura-internet.md) — クラウド事業者";
+    const md = "- [さくらインターネット](pages/sakura-internet.md) — クラウド事業者";
     const entries = parseIndexEntries(md);
     assert.deepEqual(entries[0], {
       title: "さくらインターネット",
@@ -183,13 +177,7 @@ describe("parseIndexEntries", () => {
   });
 
   it("handles a mix of table and bullet entries", () => {
-    const md = [
-      "| slug | title |",
-      "|------|-------|",
-      "| `t1` | Topic 1 |",
-      "",
-      "- [[Topic 2]]",
-    ].join("\n");
+    const md = ["| slug | title |", "|------|-------|", "| `t1` | Topic 1 |", "", "- [[Topic 2]]"].join("\n");
     const entries = parseIndexEntries(md);
     assert.equal(entries.length, 2);
     assert.equal(entries[0]?.slug, "t1");
@@ -243,10 +231,7 @@ describe("findBrokenLinksInPage", () => {
   it("returns no issues when every wiki link resolves", () => {
     const content = "See [[Topic A]] and [[Topic B]] for details.";
     const fileSlugs = new Set(["topic-a", "topic-b"]);
-    assert.deepEqual(
-      findBrokenLinksInPage("source.md", content, fileSlugs),
-      [],
-    );
+    assert.deepEqual(findBrokenLinksInPage("source.md", content, fileSlugs), []);
   });
 
   it("flags a broken link", () => {
@@ -261,19 +246,13 @@ describe("findBrokenLinksInPage", () => {
   it("ignores non-wiki-link bracket sequences", () => {
     const content = "Plain text with [normal](link) references.";
     const fileSlugs = new Set<string>();
-    assert.deepEqual(
-      findBrokenLinksInPage("source.md", content, fileSlugs),
-      [],
-    );
+    assert.deepEqual(findBrokenLinksInPage("source.md", content, fileSlugs), []);
   });
 
   it("flags multiple broken links in the same page", () => {
     const content = "[[A]] and [[B]] and [[C]]";
     const fileSlugs = new Set<string>();
-    assert.equal(
-      findBrokenLinksInPage("source.md", content, fileSlugs).length,
-      3,
-    );
+    assert.equal(findBrokenLinksInPage("source.md", content, fileSlugs).length, 3);
   });
 });
 

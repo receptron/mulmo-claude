@@ -11,11 +11,7 @@
 // cursor persistence) is factored into `computeNextState` so the
 // state-update policy is unit-testable without touching HTTP.
 
-import type {
-  FetcherDeps,
-  FetchResult,
-  SourceFetcher,
-} from "../fetchers/index.js";
+import type { FetcherDeps, FetchResult, SourceFetcher } from "../fetchers/index.js";
 import type { FetcherKind, Source, SourceState } from "../types.js";
 import { defaultSourceState } from "../types.js";
 import { errorMessage } from "../../../utils/errors.js";
@@ -53,18 +49,9 @@ export interface FetchPhaseResult {
 // inside `HostRateLimiter` via the fetchers' `fetchPolite`
 // calls. A single-source error never throws out of here;
 // failures are captured in `FetchOutcome.kind === "error"`.
-export async function runFetchPhase(
-  input: FetchPhaseInput,
-): Promise<FetchPhaseResult> {
+export async function runFetchPhase(input: FetchPhaseInput): Promise<FetchPhaseResult> {
   const outcomes = await Promise.all(
-    input.sources.map((source) =>
-      fetchOneSource(
-        source,
-        input.statesBySlug.get(source.slug) ?? defaultSourceState(source.slug),
-        input.deps,
-        input.getFetcher,
-      ),
-    ),
+    input.sources.map((source) => fetchOneSource(source, input.statesBySlug.get(source.slug) ?? defaultSourceState(source.slug), input.deps, input.getFetcher)),
   );
   return { outcomes };
 }
@@ -111,8 +98,8 @@ export function backoffDelayMs(consecutiveFailures: number): number {
   if (consecutiveFailures <= 0) return 0;
   // 1m, 2m, 4m, 8m, 16m, ..., capped at 24h.
   const base = ONE_MINUTE_MS;
-  const ms = base * 2 ** Math.min(consecutiveFailures - 1, 20);
-  return Math.min(ms, BACKOFF_MAX_MS);
+  const delayMs = base * 2 ** Math.min(consecutiveFailures - 1, 20);
+  return Math.min(delayMs, BACKOFF_MAX_MS);
 }
 
 // Compute the next per-source state given the outcome. Pure.
@@ -128,11 +115,7 @@ export function backoffDelayMs(consecutiveFailures: number): number {
 //   - cursor unchanged
 //   - consecutiveFailures += 1
 //   - nextAttemptAt = now + backoffDelayMs(newCount)
-export function computeNextState(
-  prev: SourceState,
-  outcome: FetchOutcome,
-  nowMs: number,
-): SourceState {
+export function computeNextState(prev: SourceState, outcome: FetchOutcome, nowMs: number): SourceState {
   if (outcome.kind === "success") {
     return {
       slug: prev.slug,

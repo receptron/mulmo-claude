@@ -19,11 +19,27 @@ const QUEUE_KEY_PREFIX = "q:";
 export class RelayDurableObject implements DurableObject {
   private state: DurableObjectState;
   private env: Env;
-  private ws: WebSocket | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
+  }
+
+  /** Return the live OPEN WebSocket, surviving Durable Object
+   *  hibernation. Filters out CLOSING/CLOSED sockets and closes
+   *  any extras from reconnect races. */
+  private getSocket(): WebSocket | null {
+    const sockets = this.state.getWebSockets().filter((socket) => socket.readyState === WebSocket.READY_STATE_OPEN);
+    if (sockets.length === 0) return null;
+    // Enforce single connection: close extras from reconnect races
+    for (let i = 1; i < sockets.length; i++) {
+      try {
+        sockets[i].close(1000, "duplicate connection");
+      } catch {
+        /* already closing */
+      }
+    }
+    return sockets[0];
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -53,30 +69,25 @@ export class RelayDurableObject implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    if (this.ws) {
+    for (const existing of this.state.getWebSockets()) {
       try {
-        this.ws.close(1000, "replaced by new connection");
+        existing.close(1000, "replaced by new connection");
       } catch {
         /* already closed */
       }
-      this.ws = null;
     }
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
 
     this.state.acceptWebSocket(server);
-    this.ws = server;
 
     this.flushQueue().catch(() => {});
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  async webSocketMessage(
-    __ws: WebSocket,
-    message: string | ArrayBuffer,
-  ): Promise<void> {
+  async webSocketMessage(__ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== "string") return;
 
     let response: RelayResponse;
@@ -90,7 +101,8 @@ export class RelayDurableObject implements DurableObject {
       await this.handleResponse(response);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.ws?.send(
+      const webSocket = this.getSocket();
+      webSocket?.send(
         JSON.stringify({
           type: "error",
           platform: response.platform,
@@ -101,17 +113,13 @@ export class RelayDurableObject implements DurableObject {
     }
   }
 
-  async webSocketClose(
-    __ws: WebSocket,
-    __code: number,
-    __reason: string,
-    __wasClean: boolean,
-  ): Promise<void> {
-    this.ws = null;
+  async webSocketClose(__ws: WebSocket, __code: number, __reason: string, __wasClean: boolean): Promise<void> {
+    // No-op: getSocket() derives state from the runtime, not an
+    // instance field, so there is nothing to clear.
   }
 
   async webSocketError(__ws: WebSocket, __error: unknown): Promise<void> {
-    this.ws = null;
+    // No-op: same as webSocketClose.
   }
 
   // ── Message enqueue ────────────────────────────────────────
@@ -119,12 +127,13 @@ export class RelayDurableObject implements DurableObject {
   private async handleEnqueue(request: Request): Promise<Response> {
     const msg: RelayMessage = await request.json();
 
-    if (this.ws) {
+    const webSocket = this.getSocket();
+    if (webSocket) {
       try {
-        this.ws.send(JSON.stringify(msg));
+        webSocket.send(JSON.stringify(msg));
         return new Response("forwarded", { status: 200 });
       } catch {
-        this.ws = null;
+        // Socket broken — fall through to queue.
       }
     }
 
@@ -144,15 +153,16 @@ export class RelayDurableObject implements DurableObject {
   }
 
   private async flushQueue(): Promise<void> {
-    if (!this.ws) return;
+    const webSocket = this.getSocket();
+    if (!webSocket) return;
 
     const keys = await this.listQueueKeys();
     for (const key of keys) {
       const raw = await this.state.storage.get<string>(key);
-      if (!raw || !this.ws) break;
+      if (!raw) break;
 
       try {
-        this.ws.send(raw);
+        webSocket.send(raw);
         await this.state.storage.delete(key);
       } catch {
         break;
@@ -172,11 +182,6 @@ export class RelayDurableObject implements DurableObject {
     if (!plugin) {
       throw new Error(`unknown platform: ${response.platform}`);
     }
-    await plugin.sendResponse(
-      response.chatId,
-      response.text,
-      this.env,
-      response.replyToken,
-    );
+    await plugin.sendResponse(response.chatId, response.text, this.env, response.replyToken);
   }
 }

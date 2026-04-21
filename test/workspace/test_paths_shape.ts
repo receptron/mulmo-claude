@@ -2,13 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import os from "node:os";
-import {
-  WORKSPACE_DIRS,
-  WORKSPACE_PATHS,
-  WORKSPACE_FILES,
-  EAGER_WORKSPACE_DIRS,
-  workspacePath,
-} from "../../server/workspace/paths.js";
+import { WORKSPACE_DIRS, WORKSPACE_PATHS, WORKSPACE_FILES, EAGER_WORKSPACE_DIRS, workspacePath } from "../../server/workspace/paths.js";
 
 const expectedWorkspacePath = path.join(os.homedir(), "mulmoclaude");
 
@@ -78,10 +72,7 @@ describe("WORKSPACE_PATHS mirrors WORKSPACE_DIRS + WORKSPACE_FILES", () => {
   it("WORKSPACE_PATHS values are absolute paths under workspacePath", () => {
     Object.entries(WORKSPACE_PATHS).forEach(([key, absPath]) => {
       assert.equal(typeof absPath, "string", `${key} should be a string`);
-      assert.ok(
-        absPath.startsWith(workspacePath),
-        `${key}: ${absPath} should start with ${workspacePath}`,
-      );
+      assert.ok(absPath.startsWith(workspacePath), `${key}: ${absPath} should start with ${workspacePath}`);
     });
   });
 });

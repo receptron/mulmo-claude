@@ -42,5 +42,4 @@ export const PUBSUB_CHANNELS = {
   notifications: "notifications",
 } as const;
 
-export type StaticPubSubChannel =
-  (typeof PUBSUB_CHANNELS)[keyof typeof PUBSUB_CHANNELS];
+export type StaticPubSubChannel = (typeof PUBSUB_CHANNELS)[keyof typeof PUBSUB_CHANNELS];

@@ -30,8 +30,7 @@ interface JsonRpcMessage {
   params?: ToolCallParams;
 }
 
-const isJsonRpcMessage = (v: unknown): v is JsonRpcMessage =>
-  isRecord(v) && "method" in v;
+const isJsonRpcMessage = (value: unknown): value is JsonRpcMessage => isRecord(value) && "method" in value;
 
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;
@@ -50,9 +49,7 @@ function readSessionToken(): string {
   return readTextSafeSync(WORKSPACE_PATHS.sessionToken)?.trim() ?? "";
 }
 const SESSION_TOKEN = readSessionToken();
-const AUTH_HEADER: Record<string, string> = SESSION_TOKEN
-  ? { Authorization: `Bearer ${SESSION_TOKEN}` }
-  : {};
+const AUTH_HEADER: Record<string, string> = SESSION_TOKEN ? { Authorization: `Bearer ${SESSION_TOKEN}` } : {};
 
 interface ToolDef {
   name: string;
@@ -83,28 +80,22 @@ function fromPackage(def: ToolDefinition, endpoint: string): ToolDef {
 
 // Pure MCP tools (no GUI) — auto-registered from server/mcp-tools/
 const mcpToolDefs: Record<string, ToolDef> = Object.fromEntries(
-  mcpTools.filter(isMcpToolEnabled).map((t) => [
-    t.definition.name,
+  mcpTools.filter(isMcpToolEnabled).map((toolDef) => [
+    toolDef.definition.name,
     {
-      name: t.definition.name,
-      description: t.definition.description,
-      inputSchema: t.definition.inputSchema,
+      name: toolDef.definition.name,
+      description: toolDef.definition.description,
+      inputSchema: toolDef.definition.inputSchema,
     },
   ]),
 );
 
 const ALL_TOOLS: Record<string, ToolDef> = {
   ...mcpToolDefs,
-  ...Object.fromEntries(
-    PLUGIN_DEFS.map((def) => [
-      def.name,
-      fromPackage(def, TOOL_ENDPOINTS[def.name]),
-    ]),
-  ),
+  ...Object.fromEntries(PLUGIN_DEFS.map((def) => [def.name, fromPackage(def, TOOL_ENDPOINTS[def.name])])),
   switchRole: {
     name: "switchRole",
-    description:
-      "Switch to a different AI role, resetting the conversation context. Use when the user's request is better served by another role.",
+    description: "Switch to a different AI role, resetting the conversation context. Use when the user's request is better served by another role.",
     inputSchema: {
       type: "object",
       properties: {
@@ -143,11 +134,7 @@ interface PostJsonOpts {
   allowHttpError?: boolean;
 }
 
-async function postJson(
-  path: string,
-  body: unknown,
-  opts: PostJsonOpts = {},
-): Promise<Response> {
+async function postJson(path: string, body: unknown, opts: PostJsonOpts = {}): Promise<Response> {
   // SESSION_ID comes from the parent process env so it's effectively
   // trusted, but encode it anyway — defense in depth against future
   // callers passing unexpected characters (`&`, `#`, newlines, etc.).
@@ -155,14 +142,11 @@ async function postJson(
   // hardcoded literals.
   let res: Response;
   try {
-    res = await fetch(
-      `${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...AUTH_HEADER },
-        body: JSON.stringify(body),
-      },
-    );
+    res = await fetch(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...AUTH_HEADER },
+      body: JSON.stringify(body),
+    });
   } catch (err) {
     throw new Error(`Network error calling ${path}: ${errorMessage(err)}`);
   }
@@ -180,9 +164,7 @@ async function postJson(
 //   - "delete"        : DELETE /api/skills/:name
 // In every case, after a successful mutation we re-fetch the list and
 // push it so the canvas reflects the new state immediately.
-async function handleManageSkills(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkills(args: Record<string, unknown>): Promise<string> {
   const action = typeof args.action === "string" ? args.action : "list";
   if (action === "save") return handleManageSkillsSave(args);
   if (action === "update") return handleManageSkillsUpdate(args);
@@ -230,9 +212,7 @@ async function handleManageSkillsList(): Promise<string> {
   return `Listed ${skills.length} skill${suffix}`;
 }
 
-async function handleManageSkillsSave(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsSave(args: Record<string, unknown>): Promise<string> {
   // Normalize name once up front so log / result messages below never
   // interpolate an accidental object / number into `/${name}`.
   const name = String(args.name ?? "");
@@ -252,9 +232,7 @@ async function handleManageSkillsSave(
   return `Saved skill ${name}. Run with /${name}.`;
 }
 
-async function handleManageSkillsUpdate(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<string> {
   const name = String(args.name ?? "");
   const url = `${BASE_URL}/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
@@ -268,9 +246,7 @@ async function handleManageSkillsUpdate(
       }),
     });
   } catch (err) {
-    throw new Error(
-      `Network error calling PUT /api/skills/${name}: ${errorMessage(err)}`,
-    );
+    throw new Error(`Network error calling PUT /api/skills/${name}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
     return "Error: " + (await extractFetchError(res));
@@ -279,9 +255,7 @@ async function handleManageSkillsUpdate(
   return `Updated skill ${name}. The changes take effect in new sessions.`;
 }
 
-async function handleManageSkillsDelete(
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<string> {
   const name = String(args.name ?? "");
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
@@ -291,9 +265,7 @@ async function handleManageSkillsDelete(
       headers: AUTH_HEADER,
     });
   } catch (err) {
-    throw new Error(
-      `Network error calling DELETE ${url}: ${errorMessage(err)}`,
-    );
+    throw new Error(`Network error calling DELETE ${url}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
     return "Error: " + (await extractFetchError(res));
@@ -302,10 +274,7 @@ async function handleManageSkillsDelete(
   return `Deleted skill ${name}.`;
 }
 
-async function handleToolCall(
-  name: string,
-  args: Record<string, unknown>,
-): Promise<string> {
+async function handleToolCall(name: string, args: Record<string, unknown>): Promise<string> {
   if (name === "switchRole") {
     await postJson(API_ROUTES.agent.internal.switchRole, {
       roleId: args.roleId,
@@ -334,19 +303,17 @@ async function handleToolCall(
   // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly
   // (no frontend push). Opt out of postJson's HTTP error throw because
   // we want to surface the JSON error body to the caller as a string.
-  const mcpTool = mcpTools.find((t) => t.definition.name === name);
+  const mcpTool = mcpTools.find((toolDef) => toolDef.definition.name === name);
   if (mcpTool) {
     const res = await postJson(`/api/mcp-tools/${name}`, args, {
       allowHttpError: true,
     });
     const json = await res.json();
     if (!res.ok) return `Error: ${json.error ?? res.status}`;
-    return typeof json.result === "string"
-      ? json.result
-      : JSON.stringify(json.result);
+    return typeof json.result === "string" ? json.result : JSON.stringify(json.result);
   }
 
-  const tool = tools.find((t) => t.name === name);
+  const tool = tools.find((toolDef) => toolDef.name === name);
   if (!tool) throw new Error(`Unknown tool: ${name}`);
 
   const res = await postJson(tool.endpoint!, args);
@@ -380,12 +347,12 @@ process.stdin.on("data", (chunk: Buffer) => {
     }
     if (!isJsonRpcMessage(msg)) continue;
 
-    const { id, method, params } = msg;
+    const { id: requestId, method, params } = msg;
 
     if (method === "initialize") {
       respond({
         jsonrpc: "2.0",
-        id,
+        id: requestId,
         result: {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
@@ -395,12 +362,12 @@ process.stdin.on("data", (chunk: Buffer) => {
     } else if (method === "tools/list") {
       respond({
         jsonrpc: "2.0",
-        id,
+        id: requestId,
         result: {
-          tools: tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
+          tools: tools.map((toolDef) => ({
+            name: toolDef.name,
+            description: toolDef.description,
+            inputSchema: toolDef.inputSchema,
           })),
         },
       });
@@ -408,7 +375,7 @@ process.stdin.on("data", (chunk: Buffer) => {
       if (!params?.name) {
         respond({
           jsonrpc: "2.0",
-          id,
+          id: requestId,
           error: {
             code: -32602,
             message: "Invalid params: tools/call requires params.name",
@@ -421,14 +388,14 @@ process.stdin.on("data", (chunk: Buffer) => {
         .then((text) => {
           respond({
             jsonrpc: "2.0",
-            id,
+            id: requestId,
             result: { content: [{ type: "text", text }] },
           });
         })
         .catch((err: unknown) => {
           respond({
             jsonrpc: "2.0",
-            id,
+            id: requestId,
             result: {
               content: [{ type: "text", text: String(err) }],
               isError: true,
@@ -436,7 +403,7 @@ process.stdin.on("data", (chunk: Buffer) => {
           });
         });
     } else if (method === "ping") {
-      respond({ jsonrpc: "2.0", id, result: {} });
+      respond({ jsonrpc: "2.0", id: requestId, result: {} });
     }
     // notifications/initialized and other notifications: no response needed
   }

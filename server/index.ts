@@ -22,10 +22,7 @@ import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
-import {
-  type NotificationDeps,
-  initNotifications,
-} from "./events/notifications.js";
+import { type NotificationDeps, initNotifications } from "./events/notifications.js";
 import { createChatService } from "@mulmobridge/chat-service";
 import { loadAllSessions } from "./api/routes/sessions.js";
 import { readSessionJsonl } from "./utils/files/session-io.js";
@@ -33,45 +30,28 @@ import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
 import { serverError } from "./utils/httpError.js";
-import {
-  mcpToolsRouter,
-  mcpTools,
-  isMcpToolEnabled,
-} from "./agent/mcp-tools/index.js";
+import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
 import fs from "fs";
 import os from "os";
-import {
-  isDockerAvailable,
-  ensureSandboxImage,
-  getDockerBridgeIp,
-} from "./system/docker.js";
+import { isDockerAvailable, ensureSandboxImage, getDockerBridgeIp } from "./system/docker.js";
 import { maybeRunJournal } from "./workspace/journal/index.js";
 import { backfillAllSessions } from "./workspace/chat-index/index.js";
 import { createPubSub } from "./events/pub-sub/index.js";
 import { PUBSUB_CHANNELS } from "../src/config/pubsubChannels.js";
 import { createTaskManager } from "./events/task-manager/index.js";
 import type { ITaskManager } from "./events/task-manager/index.js";
-import {
-  initScheduler,
-  type SystemTaskDef,
-} from "./events/scheduler-adapter.js";
+import { initScheduler, type SystemTaskDef } from "./events/scheduler-adapter.js";
 import schedulerTasksRoutes from "./api/routes/schedulerTasks.js";
-import {
-  loadSchedulerOverrides,
-  UTC_HH_MM_RE,
-} from "./utils/files/scheduler-overrides-io.js";
+import { loadSchedulerOverrides, UTC_HH_MM_RE } from "./utils/files/scheduler-overrides-io.js";
 import type { IPubSub } from "./events/pub-sub/index.js";
 import { initSessionStore } from "./events/session-store/index.js";
+import { connectRelay } from "./events/relay-client.js";
 import { requireSameOrigin } from "./api/csrfGuard.js";
 import { bearerAuth } from "./api/auth/bearerAuth.js";
-import {
-  deleteTokenFile,
-  generateAndWriteToken,
-  getCurrentToken,
-} from "./api/auth/token.js";
+import { deleteTokenFile, generateAndWriteToken, getCurrentToken } from "./api/auth/token.js";
 import { log } from "./system/logger/index.js";
 import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
@@ -177,22 +157,17 @@ app.use(configRoutes);
 app.use(skillsRoutes);
 async function listSessionsForBridge(opts: { limit: number; offset: number }) {
   const rows = await loadAllSessions();
-  const sorted = rows.sort((a, b) => b.changeMs - a.changeMs);
+  const sorted = rows.sort((leftSession, rightSession) => rightSession.changeMs - leftSession.changeMs);
   const total = sorted.length;
-  const sessions = sorted
-    .slice(opts.offset, opts.offset + opts.limit)
-    .map((r) => ({
-      id: r.summary.id,
-      roleId: r.summary.roleId,
-      preview: r.summary.preview,
-      updatedAt: r.summary.updatedAt,
-    }));
+  const sessions = sorted.slice(opts.offset, opts.offset + opts.limit).map((row) => ({
+    id: row.summary.id,
+    roleId: row.summary.roleId,
+    preview: row.summary.preview,
+    updatedAt: row.summary.updatedAt,
+  }));
   return { sessions, total };
 }
-async function getSessionHistoryForBridge(
-  sessionId: string,
-  opts: { limit: number; offset: number },
-) {
+async function getSessionHistoryForBridge(sessionId: string, opts: { limit: number; offset: number }) {
   const content = await readSessionJsonl(sessionId);
   if (!content) return { messages: [], total: 0 };
   const allMessages: Array<{ source: string; text: string }> = [];
@@ -201,10 +176,7 @@ async function getSessionHistoryForBridge(
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (
-        entry.type === EVENT_TYPES.text &&
-        typeof entry.message === "string"
-      ) {
+      if (entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
         allMessages.push({
           source: entry.source ?? "unknown",
           text: entry.message,
@@ -256,10 +228,10 @@ if (env.isProduction) {
   // `{ index: false }` so express.static doesn't intercept `GET /`
   // with the built index.html. We need our own handler that reads
   // the file and substitutes the bearer token placeholder on each
-  // request — see the `app.get("*")` fallback below.
+  // request — see the wildcard fallback below.
   app.use(express.static(path.join(__dirname, "../client"), { index: false }));
   const indexHtmlPath = path.join(__dirname, "../client/index.html");
-  app.get("*", (_req: Request, res: Response) => {
+  app.get("/{*splat}", (_req: Request, res: Response) => {
     let html: string;
     try {
       html = fs.readFileSync(indexHtmlPath, "utf-8");
@@ -298,36 +270,23 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 async function ensureCredentialsAvailable(): Promise<void> {
-  const credentialsPath = path.join(
-    os.homedir(),
-    ".claude",
-    ".credentials.json",
-  );
+  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
   if (fs.existsSync(credentialsPath)) return;
 
   if (process.platform === "darwin") {
     const { refreshCredentials } = await import("./system/credentials.js");
-    const ok = await refreshCredentials();
-    if (ok) return;
-    log.error(
-      "sandbox",
-      "Failed to export credentials from macOS Keychain. Run `npm run sandbox:login` manually.",
-    );
+    const refreshSucceeded = await refreshCredentials();
+    if (refreshSucceeded) return;
+    log.error("sandbox", "Failed to export credentials from macOS Keychain. Run `npm run sandbox:login` manually.");
     process.exit(1);
   }
-  log.error(
-    "sandbox",
-    "Missing credentials file at ~/.claude/.credentials.json. Run `claude auth login` to authenticate Claude Code.",
-  );
+  log.error("sandbox", "Missing credentials file at ~/.claude/.credentials.json. Run `claude auth login` to authenticate Claude Code.");
   process.exit(1);
 }
 
 async function setupSandbox(): Promise<boolean> {
   if (env.disableSandbox) {
-    log.info(
-      "sandbox",
-      "DISABLE_SANDBOX=1 — running unrestricted (debug mode)",
-    );
+    log.info("sandbox", "DISABLE_SANDBOX=1 — running unrestricted (debug mode)");
     return false;
   }
   try {
@@ -351,19 +310,14 @@ async function setupSandbox(): Promise<boolean> {
 
 function logMcpStatus(): void {
   const enabledMcpTools = mcpTools.filter(isMcpToolEnabled);
-  const disabledMcpTools = mcpTools.filter((t) => !isMcpToolEnabled(t));
+  const disabledMcpTools = mcpTools.filter((toolDef) => !isMcpToolEnabled(toolDef));
   if (enabledMcpTools.length > 0) {
     log.info("mcp", "Available", {
-      tools: enabledMcpTools.map((t) => t.definition.name).join(", "),
+      tools: enabledMcpTools.map((toolDef) => toolDef.definition.name).join(", "),
     });
   }
   if (disabledMcpTools.length > 0) {
-    const names = disabledMcpTools
-      .map(
-        (t) =>
-          t.definition.name + " (" + (t.requiredEnv ?? []).join(", ") + ")",
-      )
-      .join(", ");
+    const names = disabledMcpTools.map((toolDef) => toolDef.definition.name + " (" + (toolDef.requiredEnv ?? []).join(", ") + ")").join(", ");
     log.info("mcp", "Unavailable (missing env)", { tools: names });
   }
 }
@@ -409,8 +363,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   const pubsub = createPubSub(httpServer);
   // Back-fill the notifications router with the live publisher (see
   // module-scope placeholder above).
-  notificationDeps.publish = (channel, payload) =>
-    pubsub.publish(channel, payload);
+  notificationDeps.publish = (channel, payload) => pubsub.publish(channel, payload);
 
   // --- Notification system (#144) ---
   initNotifications({
@@ -420,6 +373,16 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
 
   // --- Chat socket transport (Phase A of #268) ---
   chatService.attachSocket(httpServer);
+
+  // --- Relay WebSocket client ---
+  if (env.relayUrl && env.relayToken) {
+    connectRelay({
+      relayUrl: env.relayUrl,
+      relayToken: env.relayToken,
+      relay: chatService.relay,
+      logger: log,
+    });
+  }
 
   // --- Session Store ---
   initSessionStore(pubsub);
@@ -461,32 +424,24 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
   // are silently ignored — the hardcoded defaults above remain.
   const overrides = loadSchedulerOverrides();
   for (const task of systemTasks) {
-    const ovr = overrides[task.id];
-    if (!ovr) continue;
-    if (
-      task.schedule.type === SCHEDULE_TYPES.interval &&
-      typeof ovr.intervalMs === "number" &&
-      ovr.intervalMs > 0
-    ) {
+    const override = overrides[task.id];
+    if (!override) continue;
+    if (task.schedule.type === SCHEDULE_TYPES.interval && typeof override.intervalMs === "number" && override.intervalMs > 0) {
       log.info("scheduler", "applying override", {
         id: task.id,
-        intervalMs: ovr.intervalMs,
+        intervalMs: override.intervalMs,
       });
       task.schedule = {
         type: SCHEDULE_TYPES.interval,
-        intervalMs: ovr.intervalMs,
+        intervalMs: override.intervalMs,
       };
     }
-    if (
-      task.schedule.type === SCHEDULE_TYPES.daily &&
-      typeof ovr.time === "string" &&
-      UTC_HH_MM_RE.test(ovr.time)
-    ) {
+    if (task.schedule.type === SCHEDULE_TYPES.daily && typeof override.time === "string" && UTC_HH_MM_RE.test(override.time)) {
       log.info("scheduler", "applying override", {
         id: task.id,
-        time: ovr.time,
+        time: override.time,
       });
-      task.schedule = { type: SCHEDULE_TYPES.daily, time: ovr.time };
+      task.schedule = { type: SCHEDULE_TYPES.daily, time: override.time };
     }
   }
 
@@ -557,10 +512,7 @@ process.on("SIGTERM", () => {
 (async () => {
   const portFree = await isPortFree(PORT);
   if (!portFree) {
-    log.error(
-      "server",
-      `Port ${PORT} is already in use. Stop the other process and try again.`,
-    );
+    log.error("server", `Port ${PORT} is already in use. Stop the other process and try again.`);
     process.exit(1);
   }
 
@@ -599,9 +551,7 @@ process.on("SIGTERM", () => {
     const bridgeIp = await getDockerBridgeIp();
     if (bridgeIp) {
       app.listen(PORT, bridgeIp, () => {
-        console.log(
-          `[sandbox] Also listening on ${bridgeIp}:${PORT} for Docker MCP bridge`,
-        );
+        console.log(`[sandbox] Also listening on ${bridgeIp}:${PORT} for Docker MCP bridge`);
       });
     }
   }
@@ -612,8 +562,7 @@ function registerDebugTasks(taskManager: ITaskManager, pubsub: IPubSub) {
 
   taskManager.registerTask({
     id: "debug.auto-chat",
-    description:
-      "Debug — toggles title color 10 times then starts a General-mode chat, then self-removes",
+    description: "Debug — toggles title color 10 times then starts a General-mode chat, then self-removes",
     schedule: { type: SCHEDULE_TYPES.interval, intervalMs: ONE_SECOND_MS },
     run: async () => {
       tick++;

@@ -26,8 +26,7 @@ const toolDefinition: ToolDefinition = {
       action: {
         type: "string",
         enum: ["list", "save", "update", "delete"],
-        description:
-          "The operation to perform. Default: list (show all skills).",
+        description: "The operation to perform. Default: list (show all skills).",
       },
       name: {
         type: "string",
@@ -36,13 +35,11 @@ const toolDefinition: ToolDefinition = {
       },
       description: {
         type: "string",
-        description:
-          "One-line summary for the YAML frontmatter. Required for save.",
+        description: "One-line summary for the YAML frontmatter. Required for save.",
       },
       body: {
         type: "string",
-        description:
-          "Markdown body of the skill (instructions for Claude to follow). Required for save. May be multi-line.",
+        description: "Markdown body of the skill (instructions for Claude to follow). Required for save. May be multi-line.",
       },
     },
     required: ["action"],

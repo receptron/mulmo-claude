@@ -7,18 +7,12 @@
 // registered with the task-manager at startup. CRUD operations
 // trigger a refresh that unregisters old tasks and registers new ones.
 
-import {
-  loadUserTasks as loadRaw,
-  saveUserTasks,
-} from "../../utils/files/user-tasks-io.js";
+import { loadUserTasks as loadRaw, saveUserTasks } from "../../utils/files/user-tasks-io.js";
 import type { MissedRunPolicy } from "@receptron/task-scheduler";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 import type { TaskSchedule as LocalTaskSchedule } from "../../events/task-manager/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
-import {
-  SESSION_ORIGINS,
-  type SessionOrigin,
-} from "../../../src/types/session.js";
+import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
 import { log } from "../../system/logger/index.js";
 import type { ITaskManager } from "../../events/task-manager/index.js";
 import { isRecord } from "../../utils/types.js";
@@ -38,8 +32,8 @@ export interface PersistedUserTask {
   updatedAt: string;
 }
 
-export function loadUserTasks(r?: string): PersistedUserTask[] {
-  return loadRaw<PersistedUserTask>(r);
+export function loadUserTasks(workspaceRoot?: string): PersistedUserTask[] {
+  return loadRaw<PersistedUserTask>(workspaceRoot);
 }
 
 // ── Validation ──────────────────────────────────────────────────
@@ -48,29 +42,23 @@ function isValidDailyTime(value: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
 }
 
-function isValidSchedule(s: unknown): s is LocalTaskSchedule {
-  if (!isRecord(s)) return false;
-  const obj = s as Record<string, unknown>;
-  if (obj.type === SCHEDULE_TYPES.interval) {
-    return typeof obj.intervalMs === "number" && obj.intervalMs > 0;
+function isValidSchedule(scheduleValue: unknown): scheduleValue is LocalTaskSchedule {
+  if (!isRecord(scheduleValue)) return false;
+  const scheduleRecord = scheduleValue as Record<string, unknown>;
+  if (scheduleRecord.type === SCHEDULE_TYPES.interval) {
+    return typeof scheduleRecord.intervalMs === "number" && scheduleRecord.intervalMs > 0;
   }
-  if (obj.type === SCHEDULE_TYPES.daily) {
-    return typeof obj.time === "string" && isValidDailyTime(obj.time);
+  if (scheduleRecord.type === SCHEDULE_TYPES.daily) {
+    return typeof scheduleRecord.time === "string" && isValidDailyTime(scheduleRecord.time);
   }
   return false;
 }
 
-function isValidMissedRunPolicy(p: unknown): p is MissedRunPolicy {
-  return (
-    p === MISSED_RUN_POLICIES.skip ||
-    p === MISSED_RUN_POLICIES.runOnce ||
-    p === MISSED_RUN_POLICIES.runAll
-  );
+function isValidMissedRunPolicy(policy: unknown): policy is MissedRunPolicy {
+  return policy === MISSED_RUN_POLICIES.skip || policy === MISSED_RUN_POLICIES.runOnce || policy === MISSED_RUN_POLICIES.runAll;
 }
 
-export type ValidateResult =
-  | { kind: "ok"; task: PersistedUserTask }
-  | { kind: "error"; error: string };
+export type ValidateResult = { kind: "ok"; task: PersistedUserTask } | { kind: "error"; error: string };
 
 export function validateAndCreate(input: unknown): ValidateResult {
   if (!isRecord(input)) {
@@ -87,17 +75,14 @@ export function validateAndCreate(input: unknown): ValidateResult {
   if (!isValidSchedule(obj.schedule)) {
     return { kind: "error", error: "valid schedule required" };
   }
-  const missedRunPolicy = isValidMissedRunPolicy(obj.missedRunPolicy)
-    ? obj.missedRunPolicy
-    : MISSED_RUN_POLICIES.runOnce;
+  const missedRunPolicy = isValidMissedRunPolicy(obj.missedRunPolicy) ? obj.missedRunPolicy : MISSED_RUN_POLICIES.runOnce;
   const roleId = typeof obj.roleId === "string" ? obj.roleId : DEFAULT_ROLE_ID;
 
   const now = new Date().toISOString();
   const task: PersistedUserTask = {
     id: crypto.randomUUID(),
     name: obj.name.trim(),
-    description:
-      typeof obj.description === "string" ? obj.description.trim() : "",
+    description: typeof obj.description === "string" ? obj.description.trim() : "",
     schedule: obj.schedule,
     missedRunPolicy,
     enabled: true,
@@ -109,52 +94,46 @@ export function validateAndCreate(input: unknown): ValidateResult {
   return { kind: "ok", task };
 }
 
-export type UpdateResult =
-  | { kind: "ok"; tasks: PersistedUserTask[] }
-  | { kind: "error"; error: string };
+export type UpdateResult = { kind: "ok"; tasks: PersistedUserTask[] } | { kind: "error"; error: string };
 
-export function applyUpdate(
-  tasks: PersistedUserTask[],
-  id: string,
-  patch: unknown,
-): UpdateResult {
+export function applyUpdate(tasks: PersistedUserTask[], taskId: string, patch: unknown): UpdateResult {
   if (!isRecord(patch)) {
     return { kind: "error", error: "request body required" };
   }
-  const idx = tasks.findIndex((t) => t.id === id);
-  if (idx === -1) {
-    return { kind: "error", error: `task not found: ${id}` };
+  const index = tasks.findIndex((task) => task.id === taskId);
+  if (index === -1) {
+    return { kind: "error", error: `task not found: ${taskId}` };
   }
-  const existing = tasks[idx];
+  const existing = tasks[index];
   const updated: PersistedUserTask = { ...existing };
   // patch is validated as non-null object above; spread into Record
-  const p: Record<string, unknown> = { ...patch };
+  const patchRecord: Record<string, unknown> = { ...patch };
 
-  if (typeof p.name === "string" && p.name.trim().length > 0) {
-    updated.name = p.name.trim();
+  if (typeof patchRecord.name === "string" && patchRecord.name.trim().length > 0) {
+    updated.name = patchRecord.name.trim();
   }
-  if (typeof p.description === "string") {
-    updated.description = p.description.trim();
+  if (typeof patchRecord.description === "string") {
+    updated.description = patchRecord.description.trim();
   }
-  if (isValidSchedule(p.schedule)) {
-    updated.schedule = p.schedule;
+  if (isValidSchedule(patchRecord.schedule)) {
+    updated.schedule = patchRecord.schedule;
   }
-  if (isValidMissedRunPolicy(p.missedRunPolicy)) {
-    updated.missedRunPolicy = p.missedRunPolicy;
+  if (isValidMissedRunPolicy(patchRecord.missedRunPolicy)) {
+    updated.missedRunPolicy = patchRecord.missedRunPolicy;
   }
-  if (typeof p.enabled === "boolean") {
-    updated.enabled = p.enabled;
+  if (typeof patchRecord.enabled === "boolean") {
+    updated.enabled = patchRecord.enabled;
   }
-  if (typeof p.roleId === "string") {
-    updated.roleId = p.roleId;
+  if (typeof patchRecord.roleId === "string") {
+    updated.roleId = patchRecord.roleId;
   }
-  if (typeof p.prompt === "string" && p.prompt.trim().length > 0) {
-    updated.prompt = p.prompt.trim();
+  if (typeof patchRecord.prompt === "string" && patchRecord.prompt.trim().length > 0) {
+    updated.prompt = patchRecord.prompt.trim();
   }
   updated.updatedAt = new Date().toISOString();
 
   const next = [...tasks];
-  next[idx] = updated;
+  next[index] = updated;
   return { kind: "ok", tasks: next };
 }
 
@@ -165,7 +144,7 @@ export function applyUpdate(
 let crudMutex: Promise<void> = Promise.resolve();
 
 export async function withUserTaskLock<T>(
-  fn: (tasks: PersistedUserTask[]) => Promise<{
+  lockFn: (tasks: PersistedUserTask[]) => Promise<{
     tasks: PersistedUserTask[];
     result: T;
   }>,
@@ -178,7 +157,7 @@ export async function withUserTaskLock<T>(
   try {
     await prev;
     const current = loadUserTasks();
-    const { tasks: next, result } = await fn(current);
+    const { tasks: next, result } = await lockFn(current);
     await saveUserTasks(next);
     await refreshUserTasks();
     return result;
@@ -196,12 +175,7 @@ let userTaskMutex: Promise<number> = Promise.resolve(0);
 
 export interface UserTaskDeps {
   taskManager: ITaskManager;
-  startChat: (params: {
-    message: string;
-    roleId: string;
-    chatSessionId: string;
-    origin?: SessionOrigin;
-  }) => Promise<{ kind: string; error?: string }>;
+  startChat: (params: { message: string; roleId: string; chatSessionId: string; origin?: SessionOrigin }) => Promise<{ kind: string; error?: string }>;
 }
 
 export async function registerUserTasks(deps: UserTaskDeps): Promise<number> {

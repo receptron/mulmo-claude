@@ -6,11 +6,7 @@
 
 declare module "*.vue" {
   import type { DefineComponent } from "vue";
-  const component: DefineComponent<
-    Record<string, never>,
-    Record<string, never>,
-    unknown
-  >;
+  const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>;
   export default component;
 }
 
@@ -19,8 +15,5 @@ declare module "*.scss";
 declare module "material-icons/iconfont/material-icons.css";
 
 interface ImportMeta {
-  glob(
-    pattern: string | readonly string[],
-    options?: { eager?: boolean },
-  ): Record<string, unknown>;
+  glob(pattern: string | readonly string[], options?: { eager?: boolean }): Record<string, unknown>;
 }

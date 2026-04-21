@@ -52,12 +52,7 @@ export class ArxivFetcherError extends Error {
 // Build the arXiv query URL. Validates and defaults sort / order
 // so a typo in a source file falls back to a safe configuration
 // rather than 400-ing from the API.
-export function arxivUrl(
-  query: string,
-  sort: string,
-  order: string,
-  maxResults: number,
-): string {
+export function arxivUrl(query: string, sort: string, order: string, maxResults: number): string {
   const safeSort = ALLOWED_SORT.has(sort) ? sort : "submittedDate";
   const safeOrder = ALLOWED_ORDER.has(order) ? order : "descending";
   // arXiv caps at 2000 items per response; our maxItemsPerFetch
@@ -78,11 +73,7 @@ export function arxivUrl(
 // `source.maxItemsPerFetch`. arXiv's feed items carry ISO
 // publishedAt so the same comparison semantics as RSS apply —
 // items at-or-older than the cursor are dropped.
-export function normalizeArxivFeed(
-  feed: ParsedFeed,
-  source: Source,
-  cursor: Record<string, string>,
-): SourceItem[] {
+export function normalizeArxivFeed(feed: ParsedFeed, source: Source, cursor: Record<string, string>): SourceItem[] {
   const lastSeenTs = parseCursorTs(cursor);
   const items: SourceItem[] = [];
   for (const entry of feed.items) {
@@ -99,8 +90,8 @@ export function normalizeArxivFeed(
 function parseCursorTs(cursor: Record<string, string>): number | null {
   const raw = cursor[ARXIV_CURSOR_KEY];
   if (!raw) return null;
-  const ts = Date.parse(raw);
-  return Number.isFinite(ts) ? ts : null;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 // Decide whether one ParsedFeedItem produces a SourceItem given
@@ -108,17 +99,13 @@ function parseCursorTs(cursor: Record<string, string>): number | null {
 // (missing link, unparseable URL, at-or-older than cursor).
 // Extracted so `normalizeArxivFeed` stays under the cognitive-
 // complexity threshold.
-function feedItemToSourceItem(
-  entry: ParsedFeed["items"][number],
-  source: Source,
-  lastSeenTs: number | null,
-): SourceItem | null {
+function feedItemToSourceItem(entry: ParsedFeed["items"][number], source: Source, lastSeenTs: number | null): SourceItem | null {
   if (!entry.link) return null;
   const normalizedUrl = normalizeUrl(entry.link);
   if (!normalizedUrl) return null;
   if (entry.publishedAt && lastSeenTs !== null) {
-    const ts = Date.parse(entry.publishedAt);
-    if (Number.isFinite(ts) && ts <= lastSeenTs) return null;
+    const publishedMs = Date.parse(entry.publishedAt);
+    if (Number.isFinite(publishedMs) && publishedMs <= lastSeenTs) return null;
   }
   const publishedAt = entry.publishedAt ?? new Date().toISOString();
   return {
@@ -137,21 +124,16 @@ function feedItemToSourceItem(
 // feed (not just the emitted items), same pattern as the RSS /
 // GitHub fetchers so a quiet arXiv query doesn't keep re-emitting
 // the same papers after a one-off republish.
-export function updateArxivCursor(
-  current: Record<string, string>,
-  feed: ParsedFeed,
-): Record<string, string> {
+export function updateArxivCursor(current: Record<string, string>, feed: ParsedFeed): Record<string, string> {
   let newest: number | null = null;
   for (const entry of feed.items) {
     if (!entry.publishedAt) continue;
-    const ts = Date.parse(entry.publishedAt);
-    if (!Number.isFinite(ts)) continue;
-    if (newest === null || ts > newest) newest = ts;
+    const publishedMs = Date.parse(entry.publishedAt);
+    if (!Number.isFinite(publishedMs)) continue;
+    if (newest === null || publishedMs > newest) newest = publishedMs;
   }
   if (newest === null) return current;
-  const currentTs = current[ARXIV_CURSOR_KEY]
-    ? Date.parse(current[ARXIV_CURSOR_KEY])
-    : -Infinity;
+  const currentTs = current[ARXIV_CURSOR_KEY] ? Date.parse(current[ARXIV_CURSOR_KEY]) : -Infinity;
   if (newest <= currentTs) return current;
   return {
     ...current,
@@ -161,38 +143,22 @@ export function updateArxivCursor(
 
 export const arxivFetcher: SourceFetcher = {
   kind: "arxiv",
-  async fetch(
-    source: Source,
-    state: SourceState,
-    deps: FetcherDeps,
-  ): Promise<FetchResult> {
+  async fetch(source: Source, state: SourceState, deps: FetcherDeps): Promise<FetchResult> {
     const query = source.fetcherParams["arxiv_query"];
     if (typeof query !== "string" || query.trim().length === 0) {
-      throw new ArxivFetcherError(
-        source.url,
-        null,
-        "arxiv_query param is required",
-      );
+      throw new ArxivFetcherError(source.url, null, "arxiv_query param is required");
     }
     const sort = source.fetcherParams["arxiv_sort"] ?? "submittedDate";
     const order = source.fetcherParams["arxiv_order"] ?? "descending";
     const url = arxivUrl(query, sort, order, source.maxItemsPerFetch);
     const res = await fetchPolite(url, deps.http);
     if (!res.ok) {
-      throw new ArxivFetcherError(
-        url,
-        res.status,
-        `arXiv fetch failed with HTTP ${res.status}`,
-      );
+      throw new ArxivFetcherError(url, res.status, `arXiv fetch failed with HTTP ${res.status}`);
     }
     const body = await res.text();
     const feed = parseFeed(body);
     if (!feed) {
-      throw new ArxivFetcherError(
-        url,
-        res.status,
-        `arXiv response did not parse as Atom / RSS`,
-      );
+      throw new ArxivFetcherError(url, res.status, `arXiv response did not parse as Atom / RSS`);
     }
     return {
       items: normalizeArxivFeed(feed, source, state.cursor),

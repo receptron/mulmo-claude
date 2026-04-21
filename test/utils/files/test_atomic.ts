@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  writeFileAtomic,
-  writeFileAtomicSync,
-} from "../../../server/utils/files/atomic.js";
+import { writeFileAtomic, writeFileAtomicSync } from "../../../server/utils/files/atomic.js";
 
 let tmpDir: string;
 
@@ -45,7 +42,7 @@ describe("writeFileAtomic", () => {
     await assert.rejects(() => writeFileAtomic(dir, "content"));
     // No .tmp file should be left behind
     const siblings = fs.readdirSync(path.dirname(dir));
-    const tmps = siblings.filter((f) => f.endsWith(".tmp"));
+    const tmps = siblings.filter((file) => file.endsWith(".tmp"));
     assert.equal(tmps.length, 0);
   });
 
@@ -60,10 +57,7 @@ describe("writeFileAtomic", () => {
   it("uses unique tmp filenames when uniqueTmp is set", async () => {
     const file = path.join(tmpDir, "unique.txt");
     // Two concurrent writes should both succeed without collision
-    await Promise.all([
-      writeFileAtomic(file, "a", { uniqueTmp: true }),
-      writeFileAtomic(file, "b", { uniqueTmp: true }),
-    ]);
+    await Promise.all([writeFileAtomic(file, "a", { uniqueTmp: true }), writeFileAtomic(file, "b", { uniqueTmp: true })]);
     const content = fs.readFileSync(file, "utf-8");
     assert.ok(content === "a" || content === "b");
   });
@@ -87,6 +81,6 @@ describe("writeFileAtomicSync", () => {
     fs.mkdirSync(dir, { recursive: true });
     assert.throws(() => writeFileAtomicSync(dir, "content"));
     const siblings = fs.readdirSync(path.dirname(dir));
-    assert.equal(siblings.filter((f) => f.endsWith(".tmp")).length, 0);
+    assert.equal(siblings.filter((file) => file.endsWith(".tmp")).length, 0);
   });
 });

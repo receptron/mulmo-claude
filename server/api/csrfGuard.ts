@@ -101,11 +101,7 @@ export function isAllowedOrigin(origin: string): boolean {
 // we no longer advertise CORS, browsers still issue the preflight
 // before some requests). Non-safe requests need an Origin header
 // that resolves to localhost OR no Origin header at all.
-export function requireSameOrigin(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function requireSameOrigin(req: Request, res: Response, next: NextFunction): void {
   if (SAFE_METHODS.has(req.method)) {
     next();
     return;

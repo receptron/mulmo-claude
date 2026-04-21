@@ -9,9 +9,9 @@ import { isRecord } from "../types";
 // Type guard: a text-response entry whose `data.role` is `"user"`.
 // Used by App.vue to find the first user message in a live session
 // when building the merged history list.
-export function isUserTextResponse(r: ToolResultComplete): boolean {
-  if (r.toolName !== "text-response") return false;
-  const data = r.data;
+export function isUserTextResponse(res: ToolResultComplete): boolean {
+  if (res.toolName !== "text-response") return false;
+  const data = res.data;
   if (!isRecord(data)) return false;
   return data.role === "user";
 }
@@ -19,9 +19,7 @@ export function isUserTextResponse(r: ToolResultComplete): boolean {
 // Pull out the optional base64 image attached to a tool result, if
 // any. Returns `undefined` for results that have no `data.imageData`
 // or where it isn't a string.
-export function extractImageData(
-  result: ToolResultComplete | undefined,
-): string | undefined {
+export function extractImageData(result: ToolResultComplete | undefined): string | undefined {
   const data = result?.data;
   if (isRecord(data) && typeof data.imageData === "string") {
     return data.imageData;
@@ -31,10 +29,7 @@ export function extractImageData(
 
 // Build a synthetic text-response result for either a user or
 // assistant turn. Used by sendMessage and the chat history UI.
-export function makeTextResult(
-  text: string,
-  role: "user" | "assistant",
-): ToolResultComplete {
+export function makeTextResult(text: string, role: "user" | "assistant"): ToolResultComplete {
   return {
     uuid: uuidv4(),
     toolName: "text-response",

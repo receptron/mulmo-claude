@@ -15,10 +15,7 @@ describe("isMarkdownPath", () => {
   });
 
   it("accepts a UUID-like filename", () => {
-    assert.equal(
-      isMarkdownPath("artifacts/documents/a1b2c3d4e5f67890.md"),
-      true,
-    );
+    assert.equal(isMarkdownPath("artifacts/documents/a1b2c3d4e5f67890.md"), true);
   });
 
   it("rejects non-markdown prefixes", () => {
@@ -48,17 +45,11 @@ describe("isMarkdownPath", () => {
 // confirms the two functions have different strictness levels.
 describe("isSpreadsheetPath vs isMarkdownPath — traversal awareness", () => {
   it("isSpreadsheetPath rejects path-normalized traversal", () => {
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/../spreadsheets/f.json"),
-      false,
-    );
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/../spreadsheets/f.json"), false);
   });
 
   it("isSpreadsheetPath rejects double-dot segments", () => {
-    assert.equal(
-      isSpreadsheetPath("artifacts/spreadsheets/../../etc/passwd.json"),
-      false,
-    );
+    assert.equal(isSpreadsheetPath("artifacts/spreadsheets/../../etc/passwd.json"), false);
   });
 
   it("isMarkdownPath accepts prefix+suffix but relies on server-side safeResolve for traversal", () => {

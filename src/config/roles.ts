@@ -8,9 +8,7 @@ import { ALL_TOOL_NAMES, type ToolName } from "./toolNames";
 // Compile time: roles.ts static definitions below get typed as
 // `ToolName[]` via RoleSchema's zod inference, so `presentHTML` vs
 // `presentHtml` kind of typos are caught immediately.
-const toolNameEnum = z.enum(
-  ALL_TOOL_NAMES as readonly [ToolName, ...ToolName[]],
-);
+const toolNameEnum = z.enum(ALL_TOOL_NAMES as readonly [ToolName, ...ToolName[]]);
 
 export const RoleSchema = z.object({
   id: z.string(),
@@ -127,13 +125,7 @@ export const ROLES: Role[] = [
       "   - Answer follow-up questions\n" +
       "   - Adjust the plan based on feedback\n\n" +
       "TONE: Be warm, enthusiastic, and encouraging. Adapt your language to the user's experience level.",
-    availablePlugins: [
-      "presentForm",
-      "presentDocument",
-      "generateImage",
-      "presentChart",
-      "switchRole",
-    ],
+    availablePlugins: ["presentForm", "presentDocument", "generateImage", "presentChart", "switchRole"],
     queries: [
       "Give me the recipe for omelette",
       "I want to plan a trip to Paris",
@@ -150,14 +142,7 @@ export const ROLES: Role[] = [
       "You are a creative visual artist assistant. Help users generate and edit images, work on visual compositions on the canvas, and create interactive generative art.\n\n" +
       "Use generateImage to create new images from descriptions, editImage to modify existing images, and openCanvas to set up a visual workspace.\n\n" +
       'Use presentHtml for interactive and generative art — p5.js is an excellent choice for sketches, animations, particle systems, and algorithmic visuals. Load it via CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>. Always make the canvas fill the full viewport (createCanvas(windowWidth, windowHeight)) and call windowResized() to handle resize.',
-    availablePlugins: [
-      "generateImage",
-      "editImage",
-      "openCanvas",
-      "present3D",
-      "presentHtml",
-      "switchRole",
-    ],
+    availablePlugins: ["generateImage", "editImage", "openCanvas", "present3D", "presentHtml", "switchRole"],
     queries: [
       "Open canvas",
       "Turn this drawing into Ghibli style image",
@@ -171,16 +156,7 @@ export const ROLES: Role[] = [
     icon: "school",
     prompt:
       "You are an experienced tutor who adapts to each student's level. Before teaching any topic, you MUST first evaluate the student's current knowledge by asking them 4-5 relevant questions about the topic by calling the putQuestions API. Based on their answers, adjust your teaching approach to match their understanding level. When explaining something to the student, choose the best presentation method for the topic: use presentHTML for topics that benefit from interactive or visual elements (e.g. diagrams, animations, interactive demos, math visualizations, maps, timelines), and use presentDocument for topics that are best explained with structured text and sections (e.g. definitions, historical facts, step-by-step processes). Use generateImage to create visual aids when appropriate. Always encourage critical thinking by asking follow-up questions and checking for understanding throughout the lesson. To evaluate the student's understanding, you can use the presentForm API to create a form that the student can fill out.",
-    availablePlugins: [
-      "putQuestions",
-      "presentDocument",
-      "presentForm",
-      "generateImage",
-      "presentHtml",
-      "presentChart",
-      "manageSkills",
-      "switchRole",
-    ],
+    availablePlugins: ["putQuestions", "presentDocument", "presentForm", "generateImage", "presentHtml", "presentChart", "manageSkills", "switchRole"],
     queries: [
       "I want to learn about Humpback whales",
       "Teach me how the solar system works",
@@ -350,11 +326,10 @@ export const BUILTIN_ROLE_IDS = {
   sourceManager: "sourceManager",
 } as const;
 
-export type BuiltInRoleId =
-  (typeof BUILTIN_ROLE_IDS)[keyof typeof BUILTIN_ROLE_IDS];
+export type BuiltInRoleId = (typeof BUILTIN_ROLE_IDS)[keyof typeof BUILTIN_ROLE_IDS];
 
 export const DEFAULT_ROLE_ID: BuiltInRoleId = BUILTIN_ROLE_IDS.general;
 
-export function getRole(id: string): Role {
-  return ROLES.find((r) => r.id === id) ?? ROLES[0];
+export function getRole(roleId: string): Role {
+  return ROLES.find((role) => role.id === roleId) ?? ROLES[0];
 }

@@ -1,10 +1,6 @@
 import type { LoggerConfig } from "./config.js";
 import { resolveConfig } from "./config.js";
-import {
-  createConsoleSink,
-  createFileSink,
-  createTelemetrySink,
-} from "./sinks.js";
+import { createConsoleSink, createFileSink, createTelemetrySink } from "./sinks.js";
 import type { LogLevel, LogRecord, Sink } from "./types.js";
 import { LEVEL_PRIORITY } from "./types.js";
 
@@ -21,20 +17,13 @@ export interface Logger {
 
 export function createLogger(config: LoggerConfig): Logger {
   const sinks: Sink[] = [];
-  if (config.sinks.console.enabled)
-    sinks.push(createConsoleSink(config.sinks.console));
+  if (config.sinks.console.enabled) sinks.push(createConsoleSink(config.sinks.console));
   if (config.sinks.file.enabled) sinks.push(createFileSink(config.sinks.file));
-  if (config.sinks.telemetry.enabled)
-    sinks.push(createTelemetrySink(config.sinks.telemetry));
+  if (config.sinks.telemetry.enabled) sinks.push(createTelemetrySink(config.sinks.telemetry));
 
-  function emit(
-    level: LogLevel,
-    prefix: string,
-    message: string,
-    data?: Record<string, unknown>,
-  ): void {
+  function emit(level: LogLevel, prefix: string, message: string, data?: Record<string, unknown>): void {
     const record: LogRecord = {
-      ts: new Date().toISOString(),
+      time: new Date().toISOString(),
       level,
       prefix,
       message,
@@ -53,10 +42,10 @@ export function createLogger(config: LoggerConfig): Logger {
   }
 
   return {
-    error: (p, m, d) => emit("error", p, m, d),
-    warn: (p, m, d) => emit("warn", p, m, d),
-    info: (p, m, d) => emit("info", p, m, d),
-    debug: (p, m, d) => emit("debug", p, m, d),
+    error: (prefix, message, data) => emit("error", prefix, message, data),
+    warn: (prefix, message, data) => emit("warn", prefix, message, data),
+    info: (prefix, message, data) => emit("info", prefix, message, data),
+    debug: (prefix, message, data) => emit("debug", prefix, message, data),
   };
 }
 

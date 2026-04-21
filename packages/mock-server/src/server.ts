@@ -49,9 +49,7 @@ export function createMockServer(opts: MockServerOptions): void {
       return next(new Error("token is required"));
     }
     if (token !== opts.token) {
-      log.verbose(
-        `  auth: REJECTED (token mismatch: got "${token.slice(0, 8)}…")`,
-      );
+      log.verbose(`  auth: REJECTED (token mismatch: got "${token.slice(0, 8)}…")`);
       return next(new Error("invalid token"));
     }
     log.verbose(`  auth: { transportId: "${transportId}", token: valid }`);
@@ -67,28 +65,21 @@ export function createMockServer(opts: MockServerOptions): void {
 
     log.info(`CONNECT  sid=${socket.id} transportId=${transportId}`);
 
-    socket.on(
-      CHAT_SOCKET_EVENTS.message,
-      async (payload: MessagePayload, ack: (response: unknown) => void) => {
-        log.info(
-          `← MESSAGE  sid=${socket.id} chat=${payload.externalChatId} len=${(payload.text ?? "").length}${formatAttachmentSummary(payload)}`,
-        );
-        log.verbose(`  payload: ${JSON.stringify(sanitizePayload(payload))}`);
+    socket.on(CHAT_SOCKET_EVENTS.message, async (payload: MessagePayload, ack: (response: unknown) => void) => {
+      log.info(`← MESSAGE  sid=${socket.id} chat=${payload.externalChatId} len=${(payload.text ?? "").length}${formatAttachmentSummary(payload)}`);
+      log.verbose(`  payload: ${JSON.stringify(sanitizePayload(payload))}`);
 
-        if (opts.slowMs > 0) {
-          await new Promise((r) => setTimeout(r, opts.slowMs));
-        }
+      if (opts.slowMs > 0) {
+        await new Promise((r) => setTimeout(r, opts.slowMs));
+      }
 
-        const response = handleMessage(payload, opts);
-        const ackDetail = response.ok
-          ? `reply="${truncate(response.reply ?? "", 60)}"`
-          : `error="${response.error}"`;
-        log.info(`→ ACK  sid=${socket.id} ok=${response.ok} ${ackDetail}`);
-        log.verbose(`  ack: ${JSON.stringify(response)}`);
+      const response = handleMessage(payload, opts);
+      const ackDetail = response.ok ? `reply="${truncate(response.reply ?? "", 60)}"` : `error="${response.error}"`;
+      log.info(`→ ACK  sid=${socket.id} ok=${response.ok} ${ackDetail}`);
+      log.verbose(`  ack: ${JSON.stringify(response)}`);
 
-        ack(response);
-      },
-    );
+      ack(response);
+    });
 
     socket.on("disconnect", (reason) => {
       log.info(`DISCONNECT  sid=${socket.id} reason=${reason}`);
@@ -104,18 +95,14 @@ export function createMockServer(opts: MockServerOptions): void {
       message?: string;
     };
     if (!transportId || !chatId || !message) {
-      res
-        .status(400)
-        .json({ error: "transportId, chatId, and message are required" });
+      res.status(400).json({ error: "transportId, chatId, and message are required" });
       return;
     }
     io.to(`bridge:${transportId}`).emit(CHAT_SOCKET_EVENTS.push, {
       chatId,
       message,
     });
-    log.info(
-      `→ PUSH  transportId=${transportId} chatId=${chatId} message="${truncate(message, 60)}"`,
-    );
+    log.info(`→ PUSH  transportId=${transportId} chatId=${chatId} message="${truncate(message, 60)}"`);
     res.json({ ok: true });
   });
 
@@ -182,9 +169,7 @@ function formatBytes(bytes: number): string {
 function printBanner(opts: MockServerOptions, log: MockLogger): void {
   log.raw("══════════════════════════════════════════════════════");
   log.raw("@mulmobridge/mock-server v0.1.0");
-  log.raw(
-    `node: ${process.version} | os: ${process.platform} ${process.arch} | socket.io: 4.x`,
-  );
+  log.raw(`node: ${process.version} | os: ${process.platform} ${process.arch} | socket.io: 4.x`);
   log.raw(`token: ${opts.token}`);
   const modeParts = ["echo"];
   if (opts.alwaysError) modeParts.push("error");

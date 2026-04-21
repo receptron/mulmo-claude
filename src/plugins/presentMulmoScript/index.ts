@@ -16,10 +16,7 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
   toolDefinition,
 
   async execute(_context, args) {
-    const result = await apiPost<ToolResult<MulmoScriptData>>(
-      API_ROUTES.mulmoScript.save,
-      args,
-    );
+    const result = await apiPost<ToolResult<MulmoScriptData>>(API_ROUTES.mulmoScript.save, args);
     if (!result.ok) {
       return {
         toolName: TOOL_NAME,

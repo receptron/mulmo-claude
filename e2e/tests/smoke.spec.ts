@@ -16,9 +16,7 @@ test("send button and input are visible and enabled", async ({ page }) => {
   await expect(page.getByTestId("send-btn")).toBeEnabled();
 });
 
-test("unknown route still shows the app (catch-all redirect)", async ({
-  page,
-}) => {
+test("unknown route still shows the app (catch-all redirect)", async ({ page }) => {
   await page.goto("/some/random/path");
   await expect(page.getByTestId("app-title")).toBeVisible();
 });

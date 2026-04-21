@@ -1,12 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  formatDate,
-  formatDateTime,
-  formatTime,
-  formatShortTime,
-  formatShortDate,
-} from "../../../src/utils/format/date.js";
+import { formatDate, formatDateTime, formatTime, formatShortTime, formatShortDate } from "../../../src/utils/format/date.js";
 
 describe("formatDate", () => {
   it("returns a non-empty string for a valid ISO date", () => {
@@ -35,9 +29,9 @@ describe("formatDate", () => {
   });
 
   it("differs across days at the same time", () => {
-    const a = formatDate("2026-01-01T12:00:00Z");
-    const b = formatDate("2026-12-31T12:00:00Z");
-    assert.notEqual(a, b);
+    const dateJan = formatDate("2026-01-01T12:00:00Z");
+    const dateDec = formatDate("2026-12-31T12:00:00Z");
+    assert.notEqual(dateJan, dateDec);
   });
 });
 

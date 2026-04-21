@@ -20,9 +20,7 @@ async function setupSourceSession(page: Page) {
   });
 
   await page.route(
-    (url) =>
-      url.pathname.startsWith("/api/sessions/") &&
-      url.pathname !== "/api/sessions",
+    (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
     (route) =>
       route.fulfill({
         json: [
@@ -94,9 +92,7 @@ test.describe("manageSource plugin", () => {
     await page.getByText("Information sources").first().click();
 
     await expect(page.locator('[data-testid="source-row-hn"]')).toBeVisible();
-    await expect(
-      page.locator('[data-testid="source-row-claude-code"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="source-row-claude-code"]')).toBeVisible();
     await expect(page.getByText("Hacker News")).toBeVisible();
     await expect(page.getByText("Claude Code releases")).toBeVisible();
   });
@@ -115,8 +111,7 @@ test.describe("manageSource plugin", () => {
     );
     // After delete, the View calls GET /api/sources to refresh.
     await page.route(
-      (url) =>
-        url.pathname === "/api/sources" && !url.pathname.endsWith("/manage"),
+      (url) => url.pathname === "/api/sources" && !url.pathname.endsWith("/manage"),
       (route) => {
         if (route.request().method() !== "GET") return route.fallback();
         return route.fulfill({
@@ -147,15 +142,11 @@ test.describe("manageSource plugin", () => {
     await page.locator('[data-testid="source-remove-hn"]').click();
 
     await expect(page.locator('[data-testid="source-row-hn"]')).toHaveCount(0);
-    await expect(
-      page.locator('[data-testid="source-row-claude-code"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="source-row-claude-code"]')).toBeVisible();
     expect(deleted).toBe(true);
   });
 
-  test("Rebuild button hits POST /api/sources/rebuild and shows summary", async ({
-    page,
-  }) => {
+  test("Rebuild button hits POST /api/sources/rebuild and shows summary", async ({ page }) => {
     let rebuilt = false;
     await page.route(
       (url) => url.pathname === "/api/sources/rebuild",
@@ -174,8 +165,7 @@ test.describe("manageSource plugin", () => {
       },
     );
     await page.route(
-      (url) =>
-        url.pathname === "/api/sources" && !url.pathname.endsWith("/manage"),
+      (url) => url.pathname === "/api/sources" && !url.pathname.endsWith("/manage"),
       (route) => {
         if (route.request().method() !== "GET") return route.fallback();
         return route.fulfill({ json: { sources: [] } });
@@ -187,12 +177,8 @@ test.describe("manageSource plugin", () => {
 
     await page.locator('[data-testid="sources-rebuild-btn"]').click();
 
-    await expect(
-      page.locator('[data-testid="sources-rebuild-summary"]'),
-    ).toContainText("17");
-    await expect(
-      page.locator('[data-testid="sources-rebuild-summary"]'),
-    ).toContainText("2");
+    await expect(page.locator('[data-testid="sources-rebuild-summary"]')).toContainText("17");
+    await expect(page.locator('[data-testid="sources-rebuild-summary"]')).toContainText("2");
     expect(rebuilt).toBe(true);
   });
 });

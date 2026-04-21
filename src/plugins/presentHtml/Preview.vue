@@ -21,7 +21,5 @@ const props = defineProps<{ result: ToolResultComplete<PresentHtmlData> }>();
 
 const data = computed(() => props.result.data);
 const title = computed(() => data.value?.title ?? "HTML Page");
-const hint = computed(() =>
-  stripHtmlToPreview(data.value?.html ?? "", HINT_MAX_LENGTH),
-);
+const hint = computed(() => stripHtmlToPreview(data.value?.html ?? "", HINT_MAX_LENGTH));
 </script>

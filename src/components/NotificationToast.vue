@@ -28,8 +28,8 @@ function dismiss(): void {
   visible.value = null;
 }
 
-function iconName(n: NotificationPayload): string {
-  return n.icon ?? NOTIFICATION_ICONS[n.kind] ?? "notifications";
+function iconName(notif: NotificationPayload): string {
+  return notif.icon ?? NOTIFICATION_ICONS[notif.kind] ?? "notifications";
 }
 </script>
 
@@ -45,22 +45,14 @@ function iconName(n: NotificationPayload): string {
       </span>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium break-words">{{ visible.title }}</p>
-        <p
-          v-if="visible.body"
-          class="mt-0.5 text-xs text-slate-300 break-words"
-        >
+        <p v-if="visible.body" class="mt-0.5 text-xs text-slate-300 break-words">
           {{ visible.body }}
         </p>
         <p class="mt-1 text-xs text-slate-400">
           {{ formatSmartTime(visible.firedAt) }}
         </p>
       </div>
-      <button
-        type="button"
-        class="text-slate-400 hover:text-white"
-        aria-label="Dismiss"
-        @click="dismiss"
-      >
+      <button type="button" class="text-slate-400 hover:text-white" aria-label="Dismiss" @click="dismiss">
         <span class="material-icons text-base">close</span>
       </button>
     </div>

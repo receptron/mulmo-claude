@@ -10,11 +10,7 @@ import { createHash } from "crypto";
 import path from "path";
 import os from "os";
 import { log } from "../system/logger/index.js";
-import {
-  readReferenceDirsJson,
-  writeReferenceDirsJson,
-  isExistingDirectory,
-} from "../utils/files/reference-dirs-io.js";
+import { readReferenceDirsJson, writeReferenceDirsJson, isExistingDirectory } from "../utils/files/reference-dirs-io.js";
 import { isRecord } from "../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -33,39 +29,21 @@ const MAX_LABEL_LENGTH = 100;
 const CONTAINER_MOUNT_ROOT = "/mnt/readonly";
 
 /** Home-relative directories that must never be mounted. */
-const HOME_RELATIVE_BLOCKED = [
-  ".ssh",
-  ".aws",
-  ".gnupg",
-  ".config/gh",
-  ".kube",
-  ".docker",
-];
+const HOME_RELATIVE_BLOCKED = [".ssh", ".aws", ".gnupg", ".config/gh", ".kube", ".docker"];
 
 /** Absolute system paths that must never be mounted. */
-const SYSTEM_BLOCKED_PREFIXES = [
-  "/etc",
-  "/root",
-  "/var",
-  "/proc",
-  "/sys",
-  "/boot",
-  "/private/etc",
-  "/private/var",
-  "/System",
-  "/Library",
-];
+const SYSTEM_BLOCKED_PREFIXES = ["/etc", "/root", "/var", "/proc", "/sys", "/boot", "/private/etc", "/private/var", "/System", "/Library"];
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHAR_RE_G = /[\x00-\x1f]/g;
 
 // ── Validation ──────────────────────────────────────────────────
 
-function expandHome(p: string): string {
-  if (p.startsWith("~/")) {
-    return path.join(os.homedir(), p.slice(2));
+function expandHome(inputPath: string): string {
+  if (inputPath.startsWith("~/")) {
+    return path.join(os.homedir(), inputPath.slice(2));
   }
-  return p;
+  return inputPath;
 }
 
 function isSensitivePath(absPath: string): boolean {
@@ -81,8 +59,8 @@ function isSensitivePath(absPath: string): boolean {
 
   // Block home-relative sensitive dirs
   if (
-    HOME_RELATIVE_BLOCKED.some((bp) => {
-      const full = path.join(home, bp);
+    HOME_RELATIVE_BLOCKED.some((blockedPath) => {
+      const full = path.join(home, blockedPath);
       return normalized === full || normalized.startsWith(full + path.sep);
     })
   ) {
@@ -90,9 +68,7 @@ function isSensitivePath(absPath: string): boolean {
   }
 
   // Block system directories
-  return SYSTEM_BLOCKED_PREFIXES.some(
-    (p) => normalized === p || normalized.startsWith(p + path.sep),
-  );
+  return SYSTEM_BLOCKED_PREFIXES.some((blockedPrefix) => normalized === blockedPrefix || normalized.startsWith(blockedPrefix + path.sep));
 }
 
 function sanitizeLabel(raw: string): string {
@@ -100,8 +76,8 @@ function sanitizeLabel(raw: string): string {
   return raw.replace(CONTROL_CHAR_RE_G, " ").trim().slice(0, MAX_LABEL_LENGTH);
 }
 
-function hasTraversalSegment(p: string): boolean {
-  return p.split(path.sep).some((seg) => seg === "..");
+function hasTraversalSegment(inputPath: string): boolean {
+  return inputPath.split(path.sep).some((segment) => segment === "..");
 }
 
 function validateEntry(raw: unknown): ReferenceDirEntry | null {
@@ -141,11 +117,11 @@ export function loadReferenceDirs(root?: string): ReferenceDirEntry[] {
   const entries = parsed
     .slice(0, MAX_ENTRIES)
     .map(validateEntry)
-    .filter((e): e is ReferenceDirEntry => {
-      if (!e) return false;
+    .filter((entry): entry is ReferenceDirEntry => {
+      if (!entry) return false;
       // Deduplicate labels — first entry wins
-      if (seenLabels.has(e.label)) return false;
-      seenLabels.add(e.label);
+      if (seenLabels.has(entry.label)) return false;
+      seenLabels.add(entry.label);
       return true;
     });
 
@@ -158,19 +134,14 @@ export function loadReferenceDirs(root?: string): ReferenceDirEntry[] {
 
 // ── Save ────────────────────────────────────────────────────────
 
-export function saveReferenceDirs(
-  entries: readonly ReferenceDirEntry[],
-  root?: string,
-): void {
+export function saveReferenceDirs(entries: readonly ReferenceDirEntry[], root?: string): void {
   writeReferenceDirsJson(entries, root);
   invalidateCache();
 }
 
 // ── Validate input array (for API) ─────────────────────────────
 
-export function validateReferenceDirs(
-  raw: unknown,
-): { entries: ReferenceDirEntry[] } | { error: string } {
+export function validateReferenceDirs(raw: unknown): { entries: ReferenceDirEntry[] } | { error: string } {
   if (!Array.isArray(raw)) {
     return { error: "expected an array" };
   }
@@ -184,10 +155,8 @@ export function validateReferenceDirs(
     if (entry) {
       entries.push(entry);
     } else {
-      const p = isRecord(item)
-        ? String((item as Record<string, unknown>).hostPath ?? "")
-        : "";
-      errors.push(`entry ${i}: invalid or blocked path "${p}"`);
+      const hostPath = isRecord(item) ? String((item as Record<string, unknown>).hostPath ?? "") : "";
+      errors.push(`entry ${i}: invalid or blocked path "${hostPath}"`);
     }
   });
   if (errors.length > 0) {
@@ -227,10 +196,7 @@ function invalidateCache(): void {
  *  when different host paths share the same basename. */
 export function containerPath(entry: ReferenceDirEntry): string {
   const basename = path.basename(entry.hostPath);
-  const hash = createHash("sha256")
-    .update(entry.hostPath)
-    .digest("hex")
-    .slice(0, 8);
+  const hash = createHash("sha256").update(entry.hostPath).digest("hex").slice(0, 8);
   return path.posix.join(CONTAINER_MOUNT_ROOT, `${basename}-${hash}`);
 }
 
@@ -238,9 +204,7 @@ export function containerPath(entry: ReferenceDirEntry): string {
  * Return Docker `-v` args for read-only reference directory mounts.
  * Skips entries whose host path doesn't exist.
  */
-export function referenceDirMountArgs(
-  entries: readonly ReferenceDirEntry[],
-): string[] {
+export function referenceDirMountArgs(entries: readonly ReferenceDirEntry[]): string[] {
   const args: string[] = [];
   for (const entry of entries) {
     if (!isExistingDirectory(entry.hostPath)) {
@@ -257,10 +221,7 @@ export function referenceDirMountArgs(
 
 // ── System prompt snippet ───────────────────────────────────────
 
-export function buildReferenceDirsPrompt(
-  entries: readonly ReferenceDirEntry[],
-  useDocker: boolean,
-): string {
+export function buildReferenceDirsPrompt(entries: readonly ReferenceDirEntry[], useDocker: boolean): string {
   if (entries.length === 0) return "";
 
   const lines = [
@@ -272,9 +233,9 @@ export function buildReferenceDirsPrompt(
     "",
   ];
 
-  for (const e of entries) {
-    const mountPath = useDocker ? containerPath(e) : e.hostPath;
-    lines.push(`- \`${mountPath}\` — ${e.label}`);
+  for (const entry of entries) {
+    const mountPath = useDocker ? containerPath(entry) : entry.hostPath;
+    lines.push(`- \`${mountPath}\` — ${entry.label}`);
   }
 
   if (!useDocker) {

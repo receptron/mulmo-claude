@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import {
-  __resetForTests as resetTokenState,
-  generateAndWriteToken,
-} from "../../server/api/auth/token.js";
+import { __resetForTests as resetTokenState, generateAndWriteToken } from "../../server/api/auth/token.js";
 import {
   buildCliArgs,
   buildDockerSpawnArgs,
@@ -71,11 +68,7 @@ describe("buildCliArgs", () => {
     assert.ok(args.includes("--output-format"));
     assert.ok(args.includes("--input-format"));
     // stream-json is used for both input and output formats.
-    assert.equal(
-      args.filter((a) => a === "stream-json").length,
-      2,
-      "stream-json should appear twice (input + output format)",
-    );
+    assert.equal(args.filter((arg) => arg === "stream-json").length, 2, "stream-json should appear twice (input + output format)");
     assert.ok(args.includes("--verbose"));
     assert.ok(args.includes("--system-prompt"));
     assert.ok(args.includes("You are helpful"));
@@ -173,10 +166,7 @@ describe("resolveMcpConfigPaths", () => {
       useDocker: true,
     });
     assert.equal(paths.hostPath, join("/ws", ".mulmoclaude", "mcp-abc.json"));
-    assert.equal(
-      paths.argPath,
-      `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/mcp-abc.json`,
-    );
+    assert.equal(paths.argPath, `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/mcp-abc.json`);
   });
 
   it("docker hostPath and argPath differ", async () => {
@@ -284,7 +274,7 @@ describe("buildDockerSpawnArgs", () => {
       workspacePath: "C:\\Users\\me\\ws",
     });
     assert.ok(
-      args.some((a) => a.startsWith("C:/Users/me/ws:")),
+      args.some((arg) => arg.startsWith("C:/Users/me/ws:")),
       "expected forward-slash conversion",
     );
   });
@@ -307,44 +297,29 @@ describe("buildDockerSpawnArgs", () => {
 
   it("defaults to no sandbox auth args when omitted", async () => {
     const args = buildDockerSpawnArgs(baseParams());
-    assert.ok(!args.some((a) => a.includes(".config/gh")));
-    assert.ok(!args.some((a) => a.includes("SSH_AUTH_SOCK")));
+    assert.ok(!args.some((arg) => arg.includes(".config/gh")));
+    assert.ok(!args.some((arg) => arg.includes("SSH_AUTH_SOCK")));
   });
 });
 
 describe("rewriteLocalhostForDocker", () => {
   it("leaves urls untouched when docker mode is off", async () => {
-    assert.equal(
-      rewriteLocalhostForDocker("http://localhost:9000/foo", false),
-      "http://localhost:9000/foo",
-    );
+    assert.equal(rewriteLocalhostForDocker("http://localhost:9000/foo", false), "http://localhost:9000/foo");
   });
 
   it("rewrites localhost and 127.0.0.1 under docker", async () => {
-    assert.equal(
-      rewriteLocalhostForDocker("http://localhost:9000", true),
-      "http://host.docker.internal:9000",
-    );
-    assert.equal(
-      rewriteLocalhostForDocker("https://127.0.0.1:443/mcp", true),
-      "https://host.docker.internal:443/mcp",
-    );
+    assert.equal(rewriteLocalhostForDocker("http://localhost:9000", true), "http://host.docker.internal:9000");
+    assert.equal(rewriteLocalhostForDocker("https://127.0.0.1:443/mcp", true), "https://host.docker.internal:443/mcp");
   });
 
   it("leaves non-loopback urls alone", async () => {
-    assert.equal(
-      rewriteLocalhostForDocker("https://example.com/mcp", true),
-      "https://example.com/mcp",
-    );
+    assert.equal(rewriteLocalhostForDocker("https://example.com/mcp", true), "https://example.com/mcp");
   });
 
   it("does not match mid-url substrings", async () => {
     // `localhost.example.com` must not trigger; the boundary check is
     // critical so we don't break legitimate domains.
-    assert.equal(
-      rewriteLocalhostForDocker("https://localhost.example.com", true),
-      "https://localhost.example.com",
-    );
+    assert.equal(rewriteLocalhostForDocker("https://localhost.example.com", true), "https://localhost.example.com");
   });
 });
 
@@ -379,21 +354,13 @@ describe("prepareUserServers", () => {
       fs: {
         type: "stdio",
         command: "npx",
-        args: [
-          "-y",
-          "@modelcontextprotocol/server-filesystem",
-          `${hostWs}/docs`,
-        ],
+        args: ["-y", "@modelcontextprotocol/server-filesystem", `${hostWs}/docs`],
       },
     };
     const out = prepareUserServers(servers, true, hostWs);
     const fs = out.fs;
     assert.ok(fs && fs.type === "stdio");
-    assert.deepEqual(fs.args, [
-      "-y",
-      "@modelcontextprotocol/server-filesystem",
-      `${CONTAINER_WORKSPACE_PATH}/docs`,
-    ]);
+    assert.deepEqual(fs.args, ["-y", "@modelcontextprotocol/server-filesystem", `${CONTAINER_WORKSPACE_PATH}/docs`]);
   });
 
   it("leaves non-workspace stdio args untouched (caller warns in UI)", async () => {
@@ -424,9 +391,7 @@ describe("userServerAllowedToolNames", () => {
       },
     };
     const prepared = prepareUserServers(servers, false, hostWs);
-    assert.deepEqual(userServerAllowedToolNames(prepared, false), [
-      "mcp__gmail",
-    ]);
+    assert.deepEqual(userServerAllowedToolNames(prepared, false), ["mcp__gmail"]);
   });
 
   it("emits mcp__<id> for stdio servers when not in docker mode", async () => {
@@ -451,9 +416,7 @@ describe("userServerAllowedToolNames", () => {
       },
     };
     const prepared = prepareUserServers(servers, true, hostWs);
-    assert.deepEqual(userServerAllowedToolNames(prepared, true), [
-      "mcp__gmail",
-    ]);
+    assert.deepEqual(userServerAllowedToolNames(prepared, true), ["mcp__gmail"]);
   });
 });
 
@@ -531,9 +494,7 @@ describe("buildUserMessageLine", () => {
   });
 
   it("sends content blocks when image attachments are provided", async () => {
-    const line = await buildUserMessageLine("what is this?", [
-      { mimeType: "image/png", data: "iVBORw0KGgo=" },
-    ]);
+    const line = await buildUserMessageLine("what is this?", [{ mimeType: "image/png", data: "iVBORw0KGgo=" }]);
     const parsed = JSON.parse(line.trimEnd());
     assert.ok(Array.isArray(parsed.message.content));
     const blocks = parsed.message.content;
@@ -572,9 +533,7 @@ describe("buildUserMessageLine", () => {
   });
 
   it("sends PDF as a document content block", async () => {
-    const line = await buildUserMessageLine("read this", [
-      { mimeType: "application/pdf", data: "JVBERi0x" },
-    ]);
+    const line = await buildUserMessageLine("read this", [{ mimeType: "application/pdf", data: "JVBERi0x" }]);
     const parsed = JSON.parse(line.trimEnd());
     const blocks = parsed.message.content;
     assert.equal(blocks.length, 2);
@@ -590,8 +549,7 @@ describe("buildUserMessageLine", () => {
       { mimeType: "image/jpeg", data: "/9j/4AAQ" },
       { mimeType: "application/pdf", data: "JVBERi0x" },
       {
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         data: "UEs=",
       },
     ]);
@@ -612,10 +570,7 @@ describe("buildCliArgs — extraAllowedTools", () => {
     const args = buildCliArgs({
       systemPrompt: "s",
       activePlugins: [],
-      extraAllowedTools: [
-        "mcp__claude_ai_Gmail",
-        "mcp__claude_ai_Google_Calendar",
-      ],
+      extraAllowedTools: ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar"],
     });
     const idx = args.indexOf("--allowedTools");
     const list = args[idx + 1];

@@ -14,28 +14,19 @@ import { mockAllApis } from "../fixtures/api";
 import { chatInput, fillChatInput } from "../fixtures/chat";
 
 // Dispatch a composition event on the textarea.
-async function dispatchComposition(
-  textarea: ReturnType<typeof chatInput>,
-  type: "compositionstart" | "compositionend",
-) {
-  await textarea.evaluate(
-    (el, t) => el.dispatchEvent(new CompositionEvent(t, { bubbles: true })),
-    type,
-  );
+async function dispatchComposition(textarea: ReturnType<typeof chatInput>, type: "compositionstart" | "compositionend") {
+  await textarea.evaluate((elem, eventType) => elem.dispatchEvent(new CompositionEvent(eventType, { bubbles: true })), type);
 }
 
 // Dispatch a keydown Enter on the textarea.
-async function dispatchEnterKeydown(
-  textarea: ReturnType<typeof chatInput>,
-  opts: { isComposing?: boolean } = {},
-) {
+async function dispatchEnterKeydown(textarea: ReturnType<typeof chatInput>, opts: { isComposing?: boolean } = {}) {
   await textarea.evaluate(
-    (el, o) =>
-      el.dispatchEvent(
+    (elem, options) =>
+      elem.dispatchEvent(
         new KeyboardEvent("keydown", {
           key: "Enter",
           code: "Enter",
-          isComposing: o.isComposing ?? false,
+          isComposing: options.isComposing ?? false,
           bubbles: true,
           cancelable: true,
         }),
@@ -45,11 +36,9 @@ async function dispatchEnterKeydown(
 }
 
 // Dispatch a Shift+Enter keydown on the textarea.
-async function dispatchShiftEnterKeydown(
-  textarea: ReturnType<typeof chatInput>,
-) {
-  await textarea.evaluate((el) =>
-    el.dispatchEvent(
+async function dispatchShiftEnterKeydown(textarea: ReturnType<typeof chatInput>) {
+  await textarea.evaluate((elem) =>
+    elem.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "Enter",
         code: "Enter",
@@ -87,9 +76,7 @@ test.describe("IME Enter handling", () => {
     await expect(page.getByTestId("user-input")).toBeVisible();
   });
 
-  test("Chrome IME: compositionstart → keydown(isComposing) → compositionend does not send", async ({
-    page,
-  }) => {
+  test("Chrome IME: compositionstart → keydown(isComposing) → compositionend does not send", async ({ page }) => {
     const input = chatInput(page);
     await fillChatInput(page, "テスト");
 
@@ -103,9 +90,7 @@ test.describe("IME Enter handling", () => {
     expect(agentCalls).toHaveLength(0);
   });
 
-  test("Safari IME: compositionstart → compositionend → keydown(isComposing=false) does not send", async ({
-    page,
-  }) => {
+  test("Safari IME: compositionstart → compositionend → keydown(isComposing=false) does not send", async ({ page }) => {
     const input = chatInput(page);
     await fillChatInput(page, "テスト");
 
@@ -113,12 +98,8 @@ test.describe("IME Enter handling", () => {
     // Dispatch atomically in one evaluate() to avoid CDP round-trip latency
     // inflating the gap beyond SAFARI_IME_RACE_WINDOW_MS (30ms).
     await input.evaluate((el) => {
-      el.dispatchEvent(
-        new CompositionEvent("compositionstart", { bubbles: true }),
-      );
-      el.dispatchEvent(
-        new CompositionEvent("compositionend", { bubbles: true }),
-      );
+      el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
       el.dispatchEvent(
         new KeyboardEvent("keydown", {
           key: "Enter",
@@ -134,20 +115,14 @@ test.describe("IME Enter handling", () => {
     expect(agentCalls).toHaveLength(0);
   });
 
-  test("normal Enter after IME confirmation sends the message", async ({
-    page,
-  }) => {
+  test("normal Enter after IME confirmation sends the message", async ({ page }) => {
     const input = chatInput(page);
     await fillChatInput(page, "テスト");
 
     // Complete an IME sequence first (Safari order) — atomic to avoid CDP latency.
     await input.evaluate((el) => {
-      el.dispatchEvent(
-        new CompositionEvent("compositionstart", { bubbles: true }),
-      );
-      el.dispatchEvent(
-        new CompositionEvent("compositionend", { bubbles: true }),
-      );
+      el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
       el.dispatchEvent(
         new KeyboardEvent("keydown", {
           key: "Enter",

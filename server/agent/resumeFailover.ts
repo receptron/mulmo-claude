@@ -55,10 +55,7 @@ export interface BuildPreambleOptions {
  * Returns "" when no replayable turns exist (no transcript, or every
  * entry was a tool call / non-text event).
  */
-export function buildTranscriptPreamble(
-  jsonlContent: string,
-  opts: BuildPreambleOptions = {},
-): string {
+export function buildTranscriptPreamble(jsonlContent: string, opts: BuildPreambleOptions = {}): string {
   const entries = parseTranscriptEntries(jsonlContent);
   if (entries.length === 0) return "";
 
@@ -80,12 +77,12 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
       continue;
     }
     if (!isRecord(entry)) continue;
-    const o = entry;
-    if (o.type !== EVENT_TYPES.text) continue;
-    if (o.source !== "user" && o.source !== "assistant") continue;
-    const message = o.message;
+    const record = entry;
+    if (record.type !== EVENT_TYPES.text) continue;
+    if (record.source !== "user" && record.source !== "assistant") continue;
+    const message = record.message;
     if (typeof message !== "string" || message.length === 0) continue;
-    out.push({ source: o.source, text: message });
+    out.push({ source: record.source, text: message });
   }
   return out;
 }
@@ -95,10 +92,7 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
 // preamble is chronological. The `truncated` flag lets the caller
 // tell Claude "earlier turns were dropped" instead of silently
 // showing a partial history.
-function selectMostRecent(
-  entries: TranscriptEntry[],
-  maxChars: number,
-): { kept: TranscriptEntry[]; truncated: boolean } {
+function selectMostRecent(entries: TranscriptEntry[], maxChars: number): { kept: TranscriptEntry[]; truncated: boolean } {
   const picked: TranscriptEntry[] = [];
   let size = 0;
   for (let i = entries.length - 1; i >= 0; i--) {
@@ -113,10 +107,7 @@ function selectMostRecent(
   return { kept: picked.reverse(), truncated: false };
 }
 
-function formatPreamble(
-  entries: TranscriptEntry[],
-  truncated: boolean,
-): string {
+function formatPreamble(entries: TranscriptEntry[], truncated: boolean): string {
   const lines: string[] = [];
   lines.push(
     "[Continuing from an earlier session. The original Claude CLI " +

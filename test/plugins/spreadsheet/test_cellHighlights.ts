@@ -17,11 +17,11 @@ function makeCell(): HighlightableElement & { classes: Set<string> } {
   return {
     classes,
     classList: {
-      add: (c: string) => {
-        classes.add(c);
+      add: (cls: string) => {
+        classes.add(cls);
       },
-      remove: (c: string) => {
-        classes.delete(c);
+      remove: (cls: string) => {
+        classes.delete(cls);
       },
     },
   };
@@ -45,7 +45,7 @@ function makeTable(rowsAndCols: number[][]): {
   const rows = rowsAndCols.map((cols) => makeRow(cols.length));
   return {
     rows,
-    table: { querySelectorAll: () => rows.map((r) => r.row) },
+    table: { querySelectorAll: () => rows.map((rowItem) => rowItem.row) },
   };
 }
 
@@ -53,17 +53,15 @@ function makeTable(rowsAndCols: number[][]): {
 // querySelectorAll responses. Arrays are already iterable so we can
 // return them directly.
 function makeContainer(opts: {
-  onQuerySelector?: (
-    sel: string,
-  ) => HighlightableElement | HighlightableTable | null;
+  onQuerySelector?: (sel: string) => HighlightableElement | HighlightableTable | null;
   onQueryAll?: (sel: string) => HighlightableElement[];
 }): HighlightableContainer {
   // The `querySelector` overloaded signature can't be satisfied by
   // a single closure, so we cast the callable to the interface
   // slot — the test itself validates runtime behaviour.
-  const qs = opts.onQuerySelector ?? (() => null);
+  const queryFn = opts.onQuerySelector ?? (() => null);
   return {
-    querySelector: qs as HighlightableContainer["querySelector"],
+    querySelector: queryFn as HighlightableContainer["querySelector"],
     querySelectorAll: (sel) => opts.onQueryAll?.(sel) ?? [],
   };
 }

@@ -9,8 +9,7 @@ export const NOTIFICATION_KINDS = {
   bridge: "bridge",
 } as const;
 
-export type NotificationKind =
-  (typeof NOTIFICATION_KINDS)[keyof typeof NOTIFICATION_KINDS];
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[keyof typeof NOTIFICATION_KINDS];
 
 export const NOTIFICATION_ICONS: Record<NotificationKind, string> = {
   todo: "check_circle",
@@ -26,8 +25,7 @@ export const NOTIFICATION_ACTION_TYPES = {
   none: "none",
 } as const;
 
-export type NotificationActionType =
-  (typeof NOTIFICATION_ACTION_TYPES)[keyof typeof NOTIFICATION_ACTION_TYPES];
+export type NotificationActionType = (typeof NOTIFICATION_ACTION_TYPES)[keyof typeof NOTIFICATION_ACTION_TYPES];
 
 export const NOTIFICATION_VIEWS = {
   todos: "todos",
@@ -36,16 +34,14 @@ export const NOTIFICATION_VIEWS = {
   chat: "chat",
 } as const;
 
-export type NotificationView =
-  (typeof NOTIFICATION_VIEWS)[keyof typeof NOTIFICATION_VIEWS];
+export type NotificationView = (typeof NOTIFICATION_VIEWS)[keyof typeof NOTIFICATION_VIEWS];
 
 export const NOTIFICATION_PRIORITIES = {
   normal: "normal",
   high: "high",
 } as const;
 
-export type NotificationPriority =
-  (typeof NOTIFICATION_PRIORITIES)[keyof typeof NOTIFICATION_PRIORITIES];
+export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[keyof typeof NOTIFICATION_PRIORITIES];
 
 export type NotificationAction =
   | {

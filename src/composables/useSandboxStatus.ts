@@ -29,7 +29,7 @@ function isSandboxStatus(raw: RawResponse): raw is {
 } {
   if (typeof raw.sshAgent !== "boolean") return false;
   if (!Array.isArray(raw.mounts)) return false;
-  return raw.mounts.every((m) => typeof m === "string");
+  return raw.mounts.every((mount) => typeof mount === "string");
 }
 
 export interface UseSandboxStatusHandle {

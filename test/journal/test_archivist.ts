@@ -11,9 +11,7 @@ import {
 } from "../../server/workspace/journal/archivist.js";
 
 describe("buildDailyUserPrompt", () => {
-  const baseInput = (
-    over: Partial<DailyArchivistInput> = {},
-  ): DailyArchivistInput => ({
+  const baseInput = (over: Partial<DailyArchivistInput> = {}): DailyArchivistInput => ({
     date: "2026-04-11",
     existingDailySummary: null,
     existingTopicSummaries: [],
@@ -32,9 +30,7 @@ describe("buildDailyUserPrompt", () => {
   });
 
   it("includes the existing-summary block when provided", () => {
-    const out = buildDailyUserPrompt(
-      baseInput({ existingDailySummary: "# old summary" }),
-    );
+    const out = buildDailyUserPrompt(baseInput({ existingDailySummary: "# old summary" }));
     assert.match(out, /EXISTING DAILY SUMMARY/);
     assert.match(out, /# old summary/);
   });
@@ -178,10 +174,7 @@ describe("extractJsonObject", () => {
 
 describe("isDailyArchivistOutput", () => {
   it("accepts a valid minimal output", () => {
-    assert.equal(
-      isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: [] }),
-      true,
-    );
+    assert.equal(isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: [] }), true);
   });
 
   it("accepts topic updates with each valid action", () => {
@@ -201,10 +194,7 @@ describe("isDailyArchivistOutput", () => {
   });
 
   it("rejects non-array topicUpdates", () => {
-    assert.equal(
-      isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: {} }),
-      false,
-    );
+    assert.equal(isDailyArchivistOutput({ dailySummaryMarkdown: "x", topicUpdates: {} }), false);
   });
 
   it("rejects topic updates with an unknown action", () => {

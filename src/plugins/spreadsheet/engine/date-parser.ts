@@ -4,11 +4,7 @@
  * Parse various date string formats into Excel serial numbers.
  */
 
-import {
-  dateToSerial,
-  MONTH_NAMES_SHORT,
-  MONTH_NAMES_FULL,
-} from "./date-utils";
+import { dateToSerial, MONTH_NAMES_SHORT, MONTH_NAMES_FULL } from "./date-utils";
 
 /**
  * Check if a string looks like a date
@@ -52,15 +48,11 @@ function parseMonthName(monthStr: string): number | null {
   const month = monthStr.toLowerCase();
 
   // Try short names
-  const shortIndex = MONTH_NAMES_SHORT.findIndex(
-    (m) => m.toLowerCase() === month,
-  );
+  const shortIndex = MONTH_NAMES_SHORT.findIndex((m) => m.toLowerCase() === month);
   if (shortIndex !== -1) return shortIndex + 1;
 
   // Try full names
-  const fullIndex = MONTH_NAMES_FULL.findIndex(
-    (m) => m.toLowerCase() === month,
-  );
+  const fullIndex = MONTH_NAMES_FULL.findIndex((m) => m.toLowerCase() === month);
   if (fullIndex !== -1) return fullIndex + 1;
 
   return null;
@@ -80,10 +72,7 @@ function parseMonthName(monthStr: string): number | null {
  * @param preferDDMMYYYY - Prefer DD/MM/YYYY over MM/DD/YYYY for ambiguous dates (default: false)
  * @returns Serial number or null if not a valid date
  */
-export function parseDate(
-  dateStr: string,
-  preferDDMMYYYY: boolean = false,
-): number | null {
+export function parseDate(dateStr: string, preferDDMMYYYY: boolean = false): number | null {
   if (!isDateLike(dateStr)) return null;
 
   const trimmed = dateStr.trim();
@@ -167,8 +156,7 @@ export function parseDate(
     // Determine if it's MM/DD/YYYY or DD/MM/YYYY
     // If first > 12, it must be DD/MM; if second > 12, it must be MM/DD
     // Otherwise use preference (default to MM/DD for US format)
-    const isDayFirst =
-      first > 12 || (second <= 12 && first <= 12 && preferDDMMYYYY);
+    const isDayFirst = first > 12 || (second <= 12 && first <= 12 && preferDDMMYYYY);
     const month = isDayFirst ? second : first;
     const day = isDayFirst ? first : second;
 
@@ -195,11 +183,7 @@ function isValidDate(year: number, month: number, day: number): boolean {
   const date = new Date(Date.UTC(year, month - 1, day));
 
   // If the date rolls over to the next month, it's invalid
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 /**

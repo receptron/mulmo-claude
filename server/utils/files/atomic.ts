@@ -39,12 +39,7 @@ const IS_WINDOWS = process.platform === "win32";
 const RENAME_RETRY_DELAYS_MS = [30, 100, 300] as const;
 
 function hasErrnoCode(err: unknown): err is { code: string } {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    typeof (err as { code: unknown }).code === "string"
-  );
+  return typeof err === "object" && err !== null && "code" in err && typeof (err as { code: unknown }).code === "string";
 }
 
 function isTransientRenameError(err: unknown): boolean {
@@ -52,18 +47,18 @@ function isTransientRenameError(err: unknown): boolean {
   return err.code === "EPERM" || err.code === "EBUSY" || err.code === "EACCES";
 }
 
-async function renameWithWindowsRetry(from: string, to: string): Promise<void> {
+async function renameWithWindowsRetry(fromPath: string, toPath: string): Promise<void> {
   for (const delayMs of RENAME_RETRY_DELAYS_MS) {
     try {
-      await fs.promises.rename(from, to);
+      await fs.promises.rename(fromPath, toPath);
       return;
     } catch (err) {
       if (!isTransientRenameError(err)) throw err;
-      await new Promise((r) => setTimeout(r, delayMs));
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
   // Final attempt — let any error propagate.
-  await fs.promises.rename(from, to);
+  await fs.promises.rename(fromPath, toPath);
 }
 
 // Sync sleep that parks the thread instead of burning CPU. Only
@@ -71,21 +66,21 @@ async function renameWithWindowsRetry(from: string, to: string): Promise<void> {
 // case block is the sum of RENAME_RETRY_DELAYS_MS (~430ms) and only
 // triggers under AV/indexer contention.
 const SYNC_SLEEP_BUF = new Int32Array(new SharedArrayBuffer(4));
-function sleepSync(ms: number): void {
-  Atomics.wait(SYNC_SLEEP_BUF, 0, 0, ms);
+function sleepSync(millis: number): void {
+  Atomics.wait(SYNC_SLEEP_BUF, 0, 0, millis);
 }
 
-function renameSyncWithWindowsRetry(from: string, to: string): void {
+function renameSyncWithWindowsRetry(fromPath: string, toPath: string): void {
   for (const delayMs of RENAME_RETRY_DELAYS_MS) {
     try {
-      fs.renameSync(from, to);
+      fs.renameSync(fromPath, toPath);
       return;
     } catch (err) {
       if (!isTransientRenameError(err)) throw err;
       sleepSync(delayMs);
     }
   }
-  fs.renameSync(from, to);
+  fs.renameSync(fromPath, toPath);
 }
 
 /**
@@ -93,14 +88,8 @@ function renameSyncWithWindowsRetry(from: string, to: string): void {
  * created if missing. The tmp file is cleaned up on failure so a
  * crashed partial write can't wedge the next try.
  */
-export async function writeFileAtomic(
-  filePath: string,
-  content: string,
-  opts: WriteAtomicOptions = {},
-): Promise<void> {
-  const tmp = opts.uniqueTmp
-    ? `${filePath}.${randomUUID()}.tmp`
-    : `${filePath}.tmp`;
+export async function writeFileAtomic(filePath: string, content: string, opts: WriteAtomicOptions = {}): Promise<void> {
+  const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await fs.promises.writeFile(tmp, content, {
@@ -119,14 +108,8 @@ export async function writeFileAtomic(
  * startup, config saves that must complete before the next line).
  * Same contract as `writeFileAtomic` but blocking.
  */
-export function writeFileAtomicSync(
-  filePath: string,
-  content: string,
-  opts: WriteAtomicOptions = {},
-): void {
-  const tmp = opts.uniqueTmp
-    ? `${filePath}.${randomUUID()}.tmp`
-    : `${filePath}.tmp`;
+export function writeFileAtomicSync(filePath: string, content: string, opts: WriteAtomicOptions = {}): void {
+  const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   try {
     fs.writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });

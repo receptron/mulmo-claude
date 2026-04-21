@@ -13,12 +13,7 @@ import assert from "node:assert/strict";
 import http from "http";
 import express from "express";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
-import {
-  attachChatSocket,
-  CHAT_SOCKET_EVENTS,
-  CHAT_SOCKET_PATH,
-  type ChatSocketHandle,
-} from "../src/socket.js";
+import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, type ChatSocketHandle } from "../src/socket.js";
 import { createPushQueue } from "../src/push-queue.js";
 import type { RelayParams, RelayResult } from "../src/relay.js";
 import type { Logger } from "../src/types.js";
@@ -47,9 +42,7 @@ async function startHarness(relay: RelayFn): Promise<Harness> {
     logger: silentLogger,
   });
 
-  await new Promise<void>((resolve) =>
-    httpServer.listen(0, "127.0.0.1", () => resolve()),
-  );
+  await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", () => resolve()));
   const address = httpServer.address();
   if (!address || typeof address === "string") {
     throw new Error("Failed to get server address");
@@ -117,13 +110,9 @@ describe("text streaming (Phase C)", () => {
     }>((resolve) => {
       client
         .timeout(5000)
-        .emit(
-          CHAT_SOCKET_EVENTS.message,
-          { externalChatId: "test-chat", text: "hello" },
-          (_err: Error | null, response: { ok: boolean; reply?: string }) => {
-            resolve(response);
-          },
-        );
+        .emit(CHAT_SOCKET_EVENTS.message, { externalChatId: "test-chat", text: "hello" }, (_err: Error | null, response: { ok: boolean; reply?: string }) => {
+          resolve(response);
+        });
     });
 
     // Verify chunks arrived
@@ -153,13 +142,9 @@ describe("text streaming (Phase C)", () => {
     }>((resolve) => {
       client
         .timeout(5000)
-        .emit(
-          CHAT_SOCKET_EVENTS.message,
-          { externalChatId: "test-chat", text: "hi" },
-          (_err: Error | null, response: { ok: boolean; reply?: string }) => {
-            resolve(response);
-          },
-        );
+        .emit(CHAT_SOCKET_EVENTS.message, { externalChatId: "test-chat", text: "hi" }, (_err: Error | null, response: { ok: boolean; reply?: string }) => {
+          resolve(response);
+        });
     });
 
     // No chunks emitted
@@ -192,10 +177,7 @@ describe("text streaming (Phase C)", () => {
         .emit(
           CHAT_SOCKET_EVENTS.message,
           { externalChatId: "test-chat", text: "fail" },
-          (
-            _err: Error | null,
-            response: { ok: boolean; error?: string; status?: number },
-          ) => {
+          (_err: Error | null, response: { ok: boolean; error?: string; status?: number }) => {
             resolve(response);
           },
         );
@@ -229,13 +211,7 @@ describe("text streaming (Phase C)", () => {
 
     // Only clientA sends a message
     await new Promise<void>((resolve) => {
-      clientA
-        .timeout(5000)
-        .emit(
-          CHAT_SOCKET_EVENTS.message,
-          { externalChatId: "chat", text: "test" },
-          () => resolve(),
-        );
+      clientA.timeout(5000).emit(CHAT_SOCKET_EVENTS.message, { externalChatId: "chat", text: "test" }, () => resolve());
     });
 
     // Only clientA should get chunks

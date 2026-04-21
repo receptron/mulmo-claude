@@ -16,29 +16,15 @@ import {
 import { getRole } from "../../workspace/roles.js";
 import { runAgent } from "../../agent/index.js";
 import { prependJournalPointer } from "../../agent/prompt.js";
-import {
-  buildTranscriptPreamble,
-  isStaleSessionError,
-} from "../../agent/resumeFailover.js";
-import {
-  getOrCreateSession,
-  beginRun,
-  endRun,
-  cancelRun,
-  pushSessionEvent,
-  pushToolResult,
-  getActiveSessionIds,
-} from "../../events/session-store/index.js";
+import { buildTranscriptPreamble, isStaleSessionError } from "../../agent/resumeFailover.js";
+import { getOrCreateSession, beginRun, endRun, cancelRun, pushSessionEvent, pushToolResult, getActiveSessionIds } from "../../events/session-store/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { maybeRunJournal } from "../../workspace/journal/index.js";
 import { maybeIndexSession } from "../../workspace/chat-index/index.js";
 import { maybeAppendWikiBacklinks } from "../../workspace/wiki-backlinks/index.js";
 import { log } from "../../system/logger/index.js";
 import { logBackgroundError } from "../../utils/logBackgroundError.js";
-import {
-  createArgsCache,
-  recordToolEvent,
-} from "../../workspace/tool-trace/index.js";
+import { createArgsCache, recordToolEvent } from "../../workspace/tool-trace/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { isSessionOrigin } from "../../../src/types/session.js";
@@ -62,9 +48,7 @@ function previewJson(value: unknown): string {
     return "[unserialisable]";
   }
   if (serialised === undefined) return "";
-  return serialised.length > TOOL_ARGS_LOG_PREVIEW_MAX
-    ? `${serialised.slice(0, TOOL_ARGS_LOG_PREVIEW_MAX)}…`
-    : serialised;
+  return serialised.length > TOOL_ARGS_LOG_PREVIEW_MAX ? `${serialised.slice(0, TOOL_ARGS_LOG_PREVIEW_MAX)}…` : serialised;
 }
 
 // Called by the MCP server to push a ToolResult into the active session.
@@ -72,55 +56,40 @@ interface OkResponse {
   ok: boolean;
 }
 
-router.post(
-  API_ROUTES.agent.internal.toolResult,
-  async (
-    req: Request<object, unknown, Record<string, unknown>>,
-    res: Response<OkResponse>,
-  ) => {
-    const chatSessionId = getSessionQuery(req);
-    const outcome = await pushToolResult(chatSessionId, req.body);
-    res.json({ ok: outcome.kind === "processed" });
-  },
-);
+router.post(API_ROUTES.agent.internal.toolResult, async (req: Request<object, unknown, Record<string, unknown>>, res: Response<OkResponse>) => {
+  const chatSessionId = getSessionQuery(req);
+  const outcome = await pushToolResult(chatSessionId, req.body);
+  res.json({ ok: outcome.kind === "processed" });
+});
 
 // Called by the MCP server to trigger a role switch on the frontend
 interface SwitchRoleBody {
   roleId: string;
 }
 
-router.post(
-  API_ROUTES.agent.internal.switchRole,
-  async (
-    req: Request<object, unknown, SwitchRoleBody>,
-    res: Response<OkResponse>,
-  ) => {
-    const chatSessionId = getSessionQuery(req);
-    pushSessionEvent(chatSessionId, {
-      type: EVENT_TYPES.switchRole,
-      roleId: req.body.roleId,
-    });
-    res.json({ ok: true });
-  },
-);
+router.post(API_ROUTES.agent.internal.switchRole, async (req: Request<object, unknown, SwitchRoleBody>, res: Response<OkResponse>) => {
+  const chatSessionId = getSessionQuery(req);
+  pushSessionEvent(chatSessionId, {
+    type: EVENT_TYPES.switchRole,
+    roleId: req.body.roleId,
+  });
+  res.json({ ok: true });
+});
 
 // Cancel a running agent session by killing the Claude CLI process.
 interface CancelBody {
   chatSessionId: string;
 }
 
-router.post(
-  API_ROUTES.agent.cancel,
-  (req: Request<object, unknown, CancelBody>, res: Response<OkResponse>) => {
-    const { chatSessionId } = req.body;
-    if (!chatSessionId) {
-      res.json({ ok: false });
-      return;
-    }
-    const ok = cancelRun(chatSessionId);
-    res.json({ ok });
-  },
-);
+router.post(API_ROUTES.agent.cancel, (req: Request<object, unknown, CancelBody>, res: Response<OkResponse>) => {
+  const { chatSessionId } = req.body;
+  if (!chatSessionId) {
+    res.json({ ok: false });
+    return;
+  }
+  const ok = cancelRun(chatSessionId);
+  res.json({ ok });
+});
 
 // ── Internal API: startChat ─────────────────────────────────────────
 //
@@ -138,15 +107,10 @@ export interface StartChatParams {
   origin?: string;
 }
 
-export type StartChatResult =
-  | { kind: "started"; chatSessionId: string }
-  | { kind: "error"; error: string; status?: number };
+export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };
 
-export async function startChat(
-  params: StartChatParams,
-): Promise<StartChatResult> {
-  const { message, roleId, chatSessionId, selectedImageData, attachments } =
-    params;
+export async function startChat(params: StartChatParams): Promise<StartChatResult> {
+  const { message, roleId, chatSessionId, selectedImageData, attachments } = params;
 
   if (!message || !roleId || !chatSessionId) {
     return {
@@ -167,10 +131,7 @@ export async function startChat(
       chatSessionId,
     });
   }
-  const persistedHasUnread =
-    metaResult.kind === "ok" && metaResult.meta.hasUnread === true
-      ? true
-      : undefined;
+  const persistedHasUnread = metaResult.kind === "ok" && metaResult.meta.hasUnread === true ? true : undefined;
 
   const now = new Date().toISOString();
   getOrCreateSession(chatSessionId, {
@@ -197,17 +158,9 @@ export async function startChat(
   // other tabs) see the turn. Metadata first — it powers the sidebar
   // title cache; the append follows so the jsonl is always a
   // superset of what metadata advertised.
-  const validOrigin = isSessionOrigin(params.origin)
-    ? params.origin
-    : undefined;
+  const validOrigin = isSessionOrigin(params.origin) ? params.origin : undefined;
   if (isFirstTurn) {
-    await createSessionMeta(
-      chatSessionId,
-      roleId,
-      message,
-      undefined,
-      validOrigin,
-    );
+    await createSessionMeta(chatSessionId, roleId, message, undefined, validOrigin);
   } else {
     await backfillMeta(chatSessionId, message);
     if (validOrigin) {
@@ -216,10 +169,7 @@ export async function startChat(
   }
 
   // Append user message for this turn
-  await appendSessionLine(
-    chatSessionId,
-    JSON.stringify({ source: "user", type: EVENT_TYPES.text, message }),
-  );
+  await appendSessionLine(chatSessionId, JSON.stringify({ source: "user", type: EVENT_TYPES.text, message }));
 
   // Broadcast the user message so other tabs viewing this session
   // see the input in real time. Runs AFTER beginRun so a 409 never
@@ -241,9 +191,7 @@ export async function startChat(
     resumed: Boolean(claudeSessionId),
   });
 
-  const decoratedMessage = claudeSessionId
-    ? message
-    : prependJournalPointer(message, workspacePath);
+  const decoratedMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
 
   runAgentInBackground({
     decoratedMessage,
@@ -266,10 +214,7 @@ export async function startChat(
  *  the generic Attachment format, then merge with any explicitly-
  *  provided attachments from the bridge protocol. Returns undefined
  *  when there's nothing to attach. */
-function mergeAttachments(
-  selectedImageData: string | undefined,
-  explicit: Attachment[] | undefined,
-): Attachment[] | undefined {
+function mergeAttachments(selectedImageData: string | undefined, explicit: Attachment[] | undefined): Attachment[] | undefined {
   const result: Attachment[] = [];
   if (selectedImageData) {
     const parsed = parseDataUrl(selectedImageData);
@@ -304,20 +249,14 @@ interface AcceptedResponse {
   chatSessionId: string;
 }
 
-router.post(
-  API_ROUTES.agent.run,
-  async (
-    req: Request<object, unknown, AgentBody>,
-    res: Response<ErrorResponse | AcceptedResponse>,
-  ) => {
-    const result = await startChat(req.body);
-    if (result.kind === "error") {
-      res.status(result.status ?? 500).json({ error: result.error });
-      return;
-    }
-    res.status(202).json({ chatSessionId: result.chatSessionId });
-  },
-);
+router.post(API_ROUTES.agent.run, async (req: Request<object, unknown, AgentBody>, res: Response<ErrorResponse | AcceptedResponse>) => {
+  const result = await startChat(req.body);
+  if (result.kind === "error") {
+    res.status(result.status ?? 500).json({ error: result.error });
+    return;
+  }
+  res.status(202).json({ chatSessionId: result.chatSessionId });
+});
 
 // Runs the agent loop as a detached async task. Events are published
 // to the session's pub/sub channel. When the loop ends, `endRun` is
@@ -350,12 +289,7 @@ interface EventContext {
 // events fall into that bucket — they update meta and are otherwise
 // invisible to clients. Everything else is treated as "normal flow":
 // broadcast + optional jsonl append + optional tool-trace side effect.
-async function handleAgentEvent(
-  event: Awaited<ReturnType<typeof runAgent>> extends AsyncGenerator<infer E>
-    ? E
-    : never,
-  ctx: EventContext,
-): Promise<void> {
+async function handleAgentEvent(event: Awaited<ReturnType<typeof runAgent>> extends AsyncGenerator<infer E> ? E : never, ctx: EventContext): Promise<void> {
   if (event.type === EVENT_TYPES.claudeSessionId) {
     await flushTextAccumulator(ctx);
     await setClaudeId(ctx.chatSessionId, event.id);
@@ -423,20 +357,8 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
   );
 }
 
-async function runAgentInBackground(
-  params: BackgroundRunParams,
-): Promise<void> {
-  const {
-    decoratedMessage,
-    role,
-    chatSessionId,
-    claudeSessionId,
-    abortSignal,
-    resultsFilePath,
-    requestStartedAt,
-    toolArgsCache,
-    attachments,
-  } = params;
+async function runAgentInBackground(params: BackgroundRunParams): Promise<void> {
+  const { decoratedMessage, role, chatSessionId, claudeSessionId, abortSignal, resultsFilePath, requestStartedAt, toolArgsCache, attachments } = params;
 
   const eventCtx: EventContext = {
     chatSessionId,
@@ -456,22 +378,8 @@ async function runAgentInBackground(
   try {
     while (true) {
       let staleSessionDetected = false;
-      for await (const event of runAgent(
-        currentMessage,
-        role,
-        workspacePath,
-        chatSessionId,
-        PORT,
-        currentClaudeSessionId,
-        abortSignal,
-        attachments,
-      )) {
-        if (
-          failoverAttemptsRemaining > 0 &&
-          event.type === EVENT_TYPES.error &&
-          typeof event.message === "string" &&
-          isStaleSessionError(event.message)
-        ) {
+      for await (const event of runAgent(currentMessage, role, workspacePath, chatSessionId, PORT, currentClaudeSessionId, abortSignal, attachments)) {
+        if (failoverAttemptsRemaining > 0 && event.type === EVENT_TYPES.error && typeof event.message === "string" && isStaleSessionError(event.message)) {
           // Swallow the error — we're about to recover. `break`
           // abandons the current generator; since the event is only
           // yielded after the CLI has already exited non-zero, the
@@ -495,14 +403,11 @@ async function runAgentInBackground(
       });
       await clearClaudeId(chatSessionId);
       const preamble = await readTranscriptPreamble(chatSessionId);
-      currentMessage = preamble
-        ? `${preamble}${decoratedMessage}`
-        : decoratedMessage;
+      currentMessage = preamble ? `${preamble}${decoratedMessage}` : decoratedMessage;
       currentClaudeSessionId = undefined;
       pushSessionEvent(chatSessionId, {
         type: EVENT_TYPES.status,
-        message:
-          "Previous session unavailable — continuing with local transcript.",
+        message: "Previous session unavailable — continuing with local transcript.",
       });
     }
     // Flush any accumulated streaming text as a single consolidated
@@ -527,9 +432,7 @@ async function runAgentInBackground(
   } finally {
     endRun(chatSessionId);
     // Fire-and-forget: journal + chat-index post-processing
-    maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(
-      logBackgroundError("journal"),
-    );
+    maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(logBackgroundError("journal"));
     maybeIndexSession({
       sessionId: chatSessionId,
       activeSessionIds: getActiveSessionIds(),
@@ -546,9 +449,7 @@ async function runAgentInBackground(
 }
 
 // Read claudeSessionId from meta (primary) or jsonl (legacy fallback).
-async function readClaudeSessionIdFromSession(
-  chatSessionId: string,
-): Promise<string | undefined> {
+async function readClaudeSessionIdFromSession(chatSessionId: string): Promise<string | undefined> {
   const meta = await readSessionMeta(chatSessionId);
   if (meta?.claudeSessionId) return meta.claudeSessionId as string;
   // Legacy scan: search jsonl lines backwards for a claudeSessionId event
@@ -558,8 +459,7 @@ async function readClaudeSessionIdFromSession(
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (entry.type === EVENT_TYPES.claudeSessionId && entry.id)
-        return entry.id;
+      if (entry.type === EVENT_TYPES.claudeSessionId && entry.id) return entry.id;
     } catch {
       // skip malformed lines
     }

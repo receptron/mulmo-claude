@@ -1,12 +1,7 @@
 <template>
   <div class="flex items-center gap-2">
-    <h1
-      data-testid="app-title"
-      class="text-sm font-semibold text-gray-800 mr-1"
-      :style="titleStyle"
-    >
-      MulmoClaude
-    </h1>
+    <img :src="logoUrl" alt="" class="h-[50px] w-auto -my-3.5 -ml-3 rounded object-contain shrink-0" />
+    <h1 data-testid="app-title" class="text-sm font-semibold text-gray-800 mr-1" :style="titleStyle">MulmoClaude</h1>
     <div class="flex gap-2">
       <LockStatusPopup
         ref="lockPopup"
@@ -15,11 +10,7 @@
         @update:open="lockPopupOpen = $event"
         @test-query="(q) => emit('testQuery', q)"
       />
-      <NotificationBell
-        :force-close="lockPopupOpen"
-        @navigate="(action) => emit('notificationNavigate', action)"
-        @update:open="onNotificationOpen"
-      />
+      <NotificationBell :force-close="lockPopupOpen" @navigate="(action) => emit('notificationNavigate', action)" @update:open="onNotificationOpen" />
       <button
         class="text-gray-400 hover:text-gray-700"
         :class="{ 'text-blue-500': showRightSidebar }"
@@ -28,13 +19,7 @@
       >
         <span class="material-icons">build</span>
       </button>
-      <button
-        class="text-gray-400 hover:text-gray-700"
-        data-testid="settings-btn"
-        title="Settings"
-        aria-label="Settings"
-        @click="emit('openSettings')"
-      >
+      <button class="text-gray-400 hover:text-gray-700" data-testid="settings-btn" title="Settings" aria-label="Settings" @click="emit('openSettings')">
         <span class="material-icons">settings</span>
       </button>
     </div>
@@ -42,17 +27,12 @@
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  type CSSProperties,
-} from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, type CSSProperties } from "vue";
 import LockStatusPopup from "./LockStatusPopup.vue";
 import NotificationBell from "./NotificationBell.vue";
 import { useClickOutside } from "../composables/useClickOutside";
 import type { NotificationPayload } from "../types/notification";
+import logoUrl from "../assets/mulmo_bw.png";
 
 defineProps<{
   sandboxEnabled: boolean;

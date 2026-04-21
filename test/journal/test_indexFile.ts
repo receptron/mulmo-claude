@@ -48,11 +48,7 @@ describe("buildIndexMarkdown", () => {
   it("sorts topics with no timestamp after timestamped ones, alphabetically", () => {
     const out = buildIndexMarkdown(
       baseInput({
-        topics: [
-          { slug: "zebra" },
-          { slug: "alpha" },
-          { slug: "dated", lastUpdatedIso: "2026-04-01T00:00:00Z" },
-        ],
+        topics: [{ slug: "zebra" }, { slug: "alpha" }, { slug: "dated", lastUpdatedIso: "2026-04-01T00:00:00Z" }],
       }),
     );
     const datedIdx = out.indexOf("dated");
@@ -65,10 +61,7 @@ describe("buildIndexMarkdown", () => {
   it("uses the topic title when present and falls back to slug otherwise", () => {
     const out = buildIndexMarkdown(
       baseInput({
-        topics: [
-          { slug: "video-generation", title: "Video Generation" },
-          { slug: "bare-slug" },
-        ],
+        topics: [{ slug: "video-generation", title: "Video Generation" }, { slug: "bare-slug" }],
       }),
     );
     assert.match(out, /\[Video Generation\]\(topics\/video-generation\.md\)/);
@@ -78,11 +71,7 @@ describe("buildIndexMarkdown", () => {
   it("sorts daily entries newest-first", () => {
     const out = buildIndexMarkdown(
       baseInput({
-        days: [
-          { date: "2026-04-09" },
-          { date: "2026-04-11" },
-          { date: "2026-04-10" },
-        ],
+        days: [{ date: "2026-04-09" }, { date: "2026-04-11" }, { date: "2026-04-10" }],
       }),
     );
     const d11 = out.indexOf("2026-04-11");
@@ -120,9 +109,7 @@ describe("buildIndexMarkdown", () => {
   });
 
   it("renders daily row with nested YYYY/MM/DD path", () => {
-    const out = buildIndexMarkdown(
-      baseInput({ days: [{ date: "2026-04-11" }] }),
-    );
+    const out = buildIndexMarkdown(baseInput({ days: [{ date: "2026-04-11" }] }));
     assert.match(out, /\[2026-04-11\]\(daily\/2026\/04\/11\.md\)/);
   });
 });
@@ -160,9 +147,9 @@ describe("renderRecentDaysSection", () => {
       date: `2026-01-0${i + 1}`,
     }));
     const lines = renderRecentDaysSection(days, 3);
-    const rows = lines.filter((l) => l.startsWith("- ["));
+    const rows = lines.filter((line) => line.startsWith("- ["));
     assert.equal(rows.length, 3);
-    assert.ok(lines.some((l) => /…and 2 earlier days\./.test(l)));
+    assert.ok(lines.some((line) => /…and 2 earlier days\./.test(line)));
   });
 
   it("uses singular 'day' when exactly one is collapsed", () => {
@@ -170,13 +157,13 @@ describe("renderRecentDaysSection", () => {
       date: `2026-01-0${i + 1}`,
     }));
     const lines = renderRecentDaysSection(days, 3);
-    assert.ok(lines.some((l) => /…and 1 earlier day\./.test(l)));
+    assert.ok(lines.some((line) => /…and 1 earlier day\./.test(line)));
   });
 
   it("omits the collapsed-count footer when nothing is collapsed", () => {
     const days = [{ date: "2026-04-11" }];
     const lines = renderRecentDaysSection(days, 14);
-    assert.ok(!lines.some((l) => /earlier day/.test(l)));
+    assert.ok(!lines.some((line) => /earlier day/.test(line)));
   });
 });
 

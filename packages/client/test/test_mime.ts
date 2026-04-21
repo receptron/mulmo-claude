@@ -2,14 +2,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  mimeFromExtension,
-  isImageMime,
-  isPdfMime,
-  isSupportedAttachmentMime,
-  parseDataUrl,
-  buildDataUrl,
-} from "../src/index.ts";
+import { mimeFromExtension, isImageMime, isPdfMime, isSupportedAttachmentMime, parseDataUrl, buildDataUrl } from "../src/index.ts";
 
 describe("mimeFromExtension", () => {
   it("returns known MIME types for common extensions", () => {

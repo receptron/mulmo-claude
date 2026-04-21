@@ -15,9 +15,7 @@ import {
 
 const NOW = "2026-04-17T00:00:00.000Z";
 
-function sessionOpts(
-  overrides: Partial<Parameters<typeof getOrCreateSession>[1]> = {},
-) {
+function sessionOpts(overrides: Partial<Parameters<typeof getOrCreateSession>[1]> = {}) {
   return {
     roleId: "general",
     resultsFilePath: "/tmp/fake.jsonl",
@@ -52,33 +50,33 @@ describe("getSession / getOrCreateSession", () => {
   });
 
   it("creates a session on first call and returns it on subsequent calls", () => {
-    const a = getOrCreateSession("s1", sessionOpts());
-    assert.equal(a.chatSessionId, "s1");
-    assert.equal(a.roleId, "general");
-    assert.equal(a.isRunning, false);
-    assert.equal(a.hasUnread, false);
+    const session = getOrCreateSession("s1", sessionOpts());
+    assert.equal(session.chatSessionId, "s1");
+    assert.equal(session.roleId, "general");
+    assert.equal(session.isRunning, false);
+    assert.equal(session.hasUnread, false);
 
-    const b = getOrCreateSession("s1", sessionOpts({ roleId: "coder" }));
-    assert.strictEqual(a, b); // same object
-    assert.equal(b.roleId, "general"); // not overwritten
+    const sessionB = getOrCreateSession("s1", sessionOpts({ roleId: "coder" }));
+    assert.strictEqual(session, sessionB); // same object
+    assert.equal(sessionB.roleId, "general"); // not overwritten
   });
 
   it("updates selectedImageData and updatedAt on re-access", () => {
     getOrCreateSession("s1", sessionOpts());
-    const b = getOrCreateSession(
+    const updated = getOrCreateSession(
       "s1",
       sessionOpts({
         selectedImageData: "base64...",
         updatedAt: "2026-04-17T01:00:00Z",
       }),
     );
-    assert.equal(b.selectedImageData, "base64...");
-    assert.equal(b.updatedAt, "2026-04-17T01:00:00Z");
+    assert.equal(updated.selectedImageData, "base64...");
+    assert.equal(updated.updatedAt, "2026-04-17T01:00:00Z");
   });
 
   it("honours hasUnread option on creation", () => {
-    const s = getOrCreateSession("s1", sessionOpts({ hasUnread: true }));
-    assert.equal(s.hasUnread, true);
+    const sess = getOrCreateSession("s1", sessionOpts({ hasUnread: true }));
+    assert.equal(sess.hasUnread, true);
   });
 });
 
@@ -112,9 +110,9 @@ describe("beginRun / endRun / cancelRun", () => {
     // initSessionStore is needed for endRun to publish
     initSessionStore(stubPubSub());
     endRun("s1");
-    const s = getSession("s1")!;
-    assert.equal(s.isRunning, false);
-    assert.equal(s.hasUnread, true);
+    const sess = getSession("s1")!;
+    assert.equal(sess.isRunning, false);
+    assert.equal(sess.hasUnread, true);
   });
 
   it("cancelRun invokes the abort callback and returns true", () => {
@@ -140,28 +138,28 @@ describe("beginRun / endRun / cancelRun", () => {
 describe("markRead", () => {
   it("clears hasUnread on an in-memory session", async () => {
     initSessionStore(stubPubSub());
-    const s = getOrCreateSession("s1", sessionOpts({ hasUnread: true }));
-    assert.equal(s.hasUnread, true);
+    const sess = getOrCreateSession("s1", sessionOpts({ hasUnread: true }));
+    assert.equal(sess.hasUnread, true);
     await markRead("s1");
-    assert.equal(s.hasUnread, false);
+    assert.equal(sess.hasUnread, false);
   });
 
   it("is a no-op when hasUnread is already false (no redundant work)", async () => {
-    const ps = stubPubSub();
-    initSessionStore(ps);
+    const pubSub = stubPubSub();
+    initSessionStore(pubSub);
     getOrCreateSession("s1", sessionOpts({ hasUnread: false }));
     await markRead("s1");
     // No sessions-changed notification should fire for a no-op
-    const sessionChanges = ps.published.filter((p) => p.channel === "sessions");
+    const sessionChanges = pubSub.published.filter((pub) => pub.channel === "sessions");
     assert.equal(sessionChanges.length, 0);
   });
 
   it("publishes a sessions-changed notification when clearing the flag", async () => {
-    const ps = stubPubSub();
-    initSessionStore(ps);
+    const pubSub = stubPubSub();
+    initSessionStore(pubSub);
     getOrCreateSession("s1", sessionOpts({ hasUnread: true }));
     await markRead("s1");
-    const sessionChanges = ps.published.filter((p) => p.channel === "sessions");
+    const sessionChanges = pubSub.published.filter((pub) => pub.channel === "sessions");
     assert.ok(sessionChanges.length > 0);
   });
 

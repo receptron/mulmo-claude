@@ -28,19 +28,9 @@ import { join } from "node:path";
 // the realistic HTTP routing even runs.
 import { runSourcesPipeline } from "../../server/workspace/sources/pipeline/index.js";
 import { writeSource } from "../../server/workspace/sources/registry.js";
-import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  type HttpFetcherDeps,
-} from "../../server/workspace/sources/httpFetcher.js";
-import {
-  HostRateLimiter,
-  type RateLimiterDeps,
-} from "../../server/workspace/sources/rateLimiter.js";
-import type {
-  FetcherKind,
-  Source,
-  SourceItem,
-} from "../../server/workspace/sources/types.js";
+import { DEFAULT_FETCH_TIMEOUT_MS, type HttpFetcherDeps } from "../../server/workspace/sources/httpFetcher.js";
+import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
+import type { FetcherKind, Source, SourceItem } from "../../server/workspace/sources/types.js";
 
 let workspace: string;
 
@@ -88,15 +78,11 @@ function makeSource(over: Partial<Source> & Pick<Source, "slug">): Source {
 // Minimal HTTP deps with a URL-keyed response table. Any URL not in
 // the table fails the test immediately (better than silently fetching
 // the real network).
-function makeHttpDeps(
-  routes: Array<{ url: RegExp | string; body: string; contentType?: string }>,
-): HttpFetcherDeps {
+function makeHttpDeps(routes: Array<{ url: RegExp | string; body: string; contentType?: string }>): HttpFetcherDeps {
   const clock = controllableClock();
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
-    const match = routes.find((r) =>
-      typeof r.url === "string" ? url === r.url : r.url.test(url),
-    );
+    const match = routes.find((route) => (typeof route.url === "string" ? url === route.url : route.url.test(url)));
     if (!match) {
       throw new Error(`test: unexpected fetch ${url}`);
     }
@@ -272,23 +258,23 @@ const CASES: FixtureCase[] = [
 ];
 
 describe("pipeline integration with real fetchers", () => {
-  for (const c of CASES) {
-    it(`${c.kind} source produces items end-to-end`, async () => {
+  for (const testCase of CASES) {
+    it(`${testCase.kind} source produces items end-to-end`, async () => {
       await writeSource(
         workspace,
         makeSource({
-          slug: c.slug,
-          title: c.slug,
-          url: c.url,
-          fetcherKind: c.kind,
-          fetcherParams: c.fetcherParams,
+          slug: testCase.slug,
+          title: testCase.slug,
+          url: testCase.url,
+          fetcherKind: testCase.kind,
+          fetcherParams: testCase.fetcherParams,
         }),
       );
       const result = await runSourcesPipeline({
         workspaceRoot: workspace,
         scheduleType: "daily",
         fetcherDeps: {
-          http: makeHttpDeps([c.httpRoute]),
+          http: makeHttpDeps([testCase.httpRoute]),
           now: () => Date.now(),
         },
         // Skip the real claude CLI call — the pipeline doesn't need
@@ -298,37 +284,34 @@ describe("pipeline integration with real fetchers", () => {
       });
       assert.equal(result.plannedCount, 1);
       assert.ok(
-        result.items.length >= c.expectedMinItems,
-        `expected at least ${c.expectedMinItems} items for ${c.kind}, got ${result.items.length}`,
+        result.items.length >= testCase.expectedMinItems,
+        `expected at least ${testCase.expectedMinItems} items for ${testCase.kind}, got ${result.items.length}`,
       );
       assert.ok(
-        result.items.some((i) => i.title?.includes(c.expectedTitleFragment)),
-        `expected an item titled ~"${c.expectedTitleFragment}" for ${c.kind}; got titles: ${result.items.map((i) => i.title).join(", ")}`,
+        result.items.some((i) => i.title?.includes(testCase.expectedTitleFragment)),
+        `expected an item titled ~"${testCase.expectedTitleFragment}" for ${testCase.kind}; got titles: ${result.items.map((i) => i.title).join(", ")}`,
       );
       // Daily file actually contains the items we fetched.
       const daily = await readFile(result.dailyPath, "utf-8");
-      assert.ok(
-        daily.includes(c.expectedTitleFragment),
-        `daily file should mention "${c.expectedTitleFragment}"`,
-      );
+      assert.ok(daily.includes(testCase.expectedTitleFragment), `daily file should mention "${testCase.expectedTitleFragment}"`);
     });
   }
 
   it("runs all four kinds together in one pass (cross-source)", async () => {
     // Write one source per kind so the pipeline plans them all.
-    for (const c of CASES) {
+    for (const testCase of CASES) {
       await writeSource(
         workspace,
         makeSource({
-          slug: c.slug,
-          title: c.slug,
-          url: c.url,
-          fetcherKind: c.kind,
-          fetcherParams: c.fetcherParams,
+          slug: testCase.slug,
+          title: testCase.slug,
+          url: testCase.url,
+          fetcherKind: testCase.kind,
+          fetcherParams: testCase.fetcherParams,
         }),
       );
     }
-    const http = makeHttpDeps(CASES.map((c) => c.httpRoute));
+    const http = makeHttpDeps(CASES.map((testCase) => testCase.httpRoute));
     const result = await runSourcesPipeline({
       workspaceRoot: workspace,
       scheduleType: "daily",
@@ -338,10 +321,10 @@ describe("pipeline integration with real fetchers", () => {
     });
     assert.equal(result.plannedCount, CASES.length);
     // Every kind contributes at least one item.
-    for (const c of CASES) {
+    for (const testCase of CASES) {
       assert.ok(
-        result.items.some((i) => i.sourceSlug === c.slug),
-        `expected at least one item from ${c.kind} (slug="${c.slug}")`,
+        result.items.some((i) => i.sourceSlug === testCase.slug),
+        `expected at least one item from ${testCase.kind} (slug="${testCase.slug}")`,
       );
     }
     // Per-source archive file written for each kind.

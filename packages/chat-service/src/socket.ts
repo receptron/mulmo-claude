@@ -53,14 +53,9 @@ export const CHAT_SOCKET_EVENTS = {
   /** server → bridge streaming text chunk (Phase C of #268). */
   textChunk: "textChunk",
 } as const;
-export type ChatSocketEvent =
-  (typeof CHAT_SOCKET_EVENTS)[keyof typeof CHAT_SOCKET_EVENTS];
+export type ChatSocketEvent = (typeof CHAT_SOCKET_EVENTS)[keyof typeof CHAT_SOCKET_EVENTS];
 
-export type PushFn = (
-  transportId: string,
-  chatId: string,
-  message: string,
-) => void;
+export type PushFn = (transportId: string, chatId: string, message: string) => void;
 
 export interface ChatSocketDeps {
   relay: RelayFn;
@@ -91,9 +86,7 @@ interface MessagePayload {
   attachments?: unknown;
 }
 
-type MessageAck =
-  | { ok: true; reply: string }
-  | { ok: false; error: string; status?: number };
+type MessageAck = { ok: true; reply: string } | { ok: false; error: string; status?: number };
 
 type ParsedMessage =
   | {
@@ -104,18 +97,13 @@ type ParsedMessage =
     }
   | { ok: false; error: string };
 
-type HandshakeResult =
-  | { ok: true; transportId: string }
-  | { ok: false; error: string };
+type HandshakeResult = { ok: true; transportId: string } | { ok: false; error: string };
 
 export function bridgeRoom(transportId: string): string {
   return `bridge:${transportId}`;
 }
 
-export function attachChatSocket(
-  server: http.Server,
-  deps: ChatSocketDeps,
-): ChatSocketHandle {
+export function attachChatSocket(server: http.Server, deps: ChatSocketDeps): ChatSocketHandle {
   const { relay, queue, logger, tokenProvider } = deps;
 
   const io = new SocketServer(server, {
@@ -172,43 +160,40 @@ export function attachChatSocket(
       });
     });
 
-    socket.on(
-      CHAT_SOCKET_EVENTS.message,
-      async (payload: MessagePayload, ack?: (reply: MessageAck) => void) => {
-        if (typeof ack !== "function") {
-          logger.warn("chat-service", "socket message missing ack", {
-            socketId: socket.id,
-            transportId,
-          });
-          return;
-        }
-
-        const parsed = parseMessagePayload(payload);
-        if (!parsed.ok) {
-          ack({ ok: false, error: parsed.error, status: 400 });
-          return;
-        }
-
-        const result = await relay({
+    socket.on(CHAT_SOCKET_EVENTS.message, async (payload: MessagePayload, ack?: (reply: MessageAck) => void) => {
+      if (typeof ack !== "function") {
+        logger.warn("chat-service", "socket message missing ack", {
+          socketId: socket.id,
           transportId,
-          externalChatId: parsed.externalChatId,
-          text: parsed.text,
-          attachments: parsed.attachments,
-          // Stream text chunks to this bridge socket in real time
-          // (Phase C of #268). The ack still returns the full text
-          // for backward compatibility.
-          onChunk: (text) => {
-            socket.emit(CHAT_SOCKET_EVENTS.textChunk, { text });
-          },
         });
+        return;
+      }
 
-        if (result.kind === "ok") {
-          ack({ ok: true, reply: result.reply });
-        } else {
-          ack({ ok: false, error: result.message, status: result.status });
-        }
-      },
-    );
+      const parsed = parseMessagePayload(payload);
+      if (!parsed.ok) {
+        ack({ ok: false, error: parsed.error, status: 400 });
+        return;
+      }
+
+      const result = await relay({
+        transportId,
+        externalChatId: parsed.externalChatId,
+        text: parsed.text,
+        attachments: parsed.attachments,
+        // Stream text chunks to this bridge socket in real time
+        // (Phase C of #268). The ack still returns the full text
+        // for backward compatibility.
+        onChunk: (text) => {
+          socket.emit(CHAT_SOCKET_EVENTS.textChunk, { text });
+        },
+      });
+
+      if (result.kind === "ok") {
+        ack({ ok: true, reply: result.reply });
+      } else {
+        ack({ ok: false, error: result.message, status: result.status });
+      }
+    });
   });
 
   const pushToBridge: PushFn = (transportId, chatId, message) => {
@@ -233,18 +218,12 @@ export function attachChatSocket(
   return { io, pushToBridge };
 }
 
-function validateHandshake(
-  auth: unknown,
-  tokenProvider: (() => string | null) | undefined,
-): HandshakeResult {
+function validateHandshake(auth: unknown, tokenProvider: (() => string | null) | undefined): HandshakeResult {
   if (!auth || typeof auth !== "object") {
     return { ok: false, error: "handshake auth is required" };
   }
   const transportIdRaw = (auth as HandshakeAuth).transportId;
-  if (
-    typeof transportIdRaw !== "string" ||
-    transportIdRaw.trim().length === 0
-  ) {
+  if (typeof transportIdRaw !== "string" || transportIdRaw.trim().length === 0) {
     return { ok: false, error: "transportId is required" };
   }
   const transportId = transportIdRaw.trim();
@@ -274,10 +253,7 @@ function parseMessagePayload(payload: MessagePayload): ParsedMessage {
   if (!payload || typeof payload !== "object") {
     return { ok: false, error: "payload must be an object" };
   }
-  const externalChatId =
-    typeof payload.externalChatId === "string"
-      ? payload.externalChatId.trim()
-      : "";
+  const externalChatId = typeof payload.externalChatId === "string" ? payload.externalChatId.trim() : "";
   const text = typeof payload.text === "string" ? payload.text.trim() : "";
   if (!externalChatId) {
     return { ok: false, error: "externalChatId is required" };

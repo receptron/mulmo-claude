@@ -8,9 +8,7 @@
 
 import { isRecord } from "../../utils/types.js";
 
-export type Classification =
-  | { kind: "pointer"; contentRef: string }
-  | { kind: "inline"; content: string; truncated: boolean };
+export type Classification = { kind: "pointer"; contentRef: string } | { kind: "inline"; content: string; truncated: boolean };
 
 // Max characters kept when content is stored inline in the jsonl.
 // Picked to keep per-turn jsonl size sane while still capturing
@@ -98,10 +96,10 @@ function imagePointerFromContent(content: string): string | null {
 // regardless of how the tool happened to quote it. Leave "../"
 // prefixes alone — a relative escape is a bug and we want it visible
 // rather than silently fixed up.
-function normalizeWorkspacePath(p: string): string {
-  if (p.startsWith("./")) return p.slice(2);
-  if (p.startsWith("/")) return p.slice(1);
-  return p;
+function normalizeWorkspacePath(candidatePath: string): string {
+  if (candidatePath.startsWith("./")) return candidatePath.slice(2);
+  if (candidatePath.startsWith("/")) return candidatePath.slice(1);
+  return candidatePath;
 }
 
 function inlineWithTruncation(content: string): Classification {

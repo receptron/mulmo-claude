@@ -1,13 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  sendError,
-  badRequest,
-  forbidden,
-  notFound,
-  conflict,
-  serverError,
-} from "../../server/utils/httpError.ts";
+import { sendError, badRequest, forbidden, notFound, conflict, serverError } from "../../server/utils/httpError.ts";
 
 // Minimal mock of the Express `Response` shape that our helpers
 // actually touch (status + json). Record what was received so

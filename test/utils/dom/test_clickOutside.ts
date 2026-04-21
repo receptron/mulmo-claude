@@ -4,16 +4,16 @@ import { isClickOutside } from "../../../src/utils/dom/clickOutside.js";
 
 // Minimal Element-shaped fakes. The function only needs `contains`.
 function fakeEl(name: string, descendants: Node[] = []): HTMLElement {
-  const el = {
+  const element = {
     __name: name,
-    contains: (n: Node | null) => {
-      if (!n) return false;
-      if (n === (el as unknown as Node)) return true;
-      return descendants.includes(n);
+    contains: (node: Node | null) => {
+      if (!node) return false;
+      if (node === (element as unknown as Node)) return true;
+      return descendants.includes(node);
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
-  return el as HTMLElement;
+  return element as HTMLElement;
 }
 
 function fakeNode(name: string): Node {
@@ -36,38 +36,23 @@ describe("isClickOutside", () => {
   });
 
   it("returns false when target is the button itself", () => {
-    assert.equal(
-      isClickOutside(button as unknown as Node, button, popup),
-      false,
-    );
+    assert.equal(isClickOutside(button as unknown as Node, button, popup), false);
   });
 
   it("returns false when target is the popup itself", () => {
-    assert.equal(
-      isClickOutside(popup as unknown as Node, button, popup),
-      false,
-    );
+    assert.equal(isClickOutside(popup as unknown as Node, button, popup), false);
   });
 
   it("returns false when target is inside the button subtree", () => {
-    assert.equal(
-      isClickOutside(buttonChild, buttonWithChild, popupWithChild),
-      false,
-    );
+    assert.equal(isClickOutside(buttonChild, buttonWithChild, popupWithChild), false);
   });
 
   it("returns false when target is inside the popup subtree", () => {
-    assert.equal(
-      isClickOutside(popupChild, buttonWithChild, popupWithChild),
-      false,
-    );
+    assert.equal(isClickOutside(popupChild, buttonWithChild, popupWithChild), false);
   });
 
   it("returns true when target is in neither", () => {
-    assert.equal(
-      isClickOutside(outside, buttonWithChild, popupWithChild),
-      true,
-    );
+    assert.equal(isClickOutside(outside, buttonWithChild, popupWithChild), true);
   });
 
   it("returns true when both refs are null and target is anywhere", () => {
