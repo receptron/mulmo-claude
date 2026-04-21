@@ -613,7 +613,7 @@ watch(currentSessionId, (id) => {
 
   // Clear unread in both sessionMap and sessions list (for badge count),
   // then tell the server so other tabs see it too.
-  const summary = sessions.value.find((session) => session.id === id);
+  const summary = sessions.value.find((entry) => entry.id === id);
   const wasUnread =
     (session && session.hasUnread) || (summary && summary.hasUnread);
   if (wasUnread) {
