@@ -20,11 +20,11 @@ export function normalizeLabel(raw: string): string | null {
 
 // Case-insensitive label equality. Both inputs are normalised first
 // so `" Work "` and `"work"` compare equal.
-export function labelsEqual(a: string, b: string): boolean {
-  const na = normalizeLabel(a);
-  const nb = normalizeLabel(b);
-  if (na === null || nb === null) return false;
-  return na.toLowerCase() === nb.toLowerCase();
+export function labelsEqual(left: string, right: string): boolean {
+  const normLeft = normalizeLabel(left);
+  const normRight = normalizeLabel(right);
+  if (normLeft === null || normRight === null) return false;
+  return normLeft.toLowerCase() === normRight.toLowerCase();
 }
 
 // ── Colour assignment ─────────────────────────────────────────────
@@ -75,15 +75,15 @@ export function filterByLabels<T extends { labels?: string[] }>(
   const wanted = new Set(
     filterLabels
       .map(normalizeLabel)
-      .filter((l): l is string => l !== null)
-      .map((l) => l.toLowerCase()),
+      .filter((label): label is string => label !== null)
+      .map((label) => label.toLowerCase()),
   );
   if (wanted.size === 0) return [...items];
   return items.filter((item) => {
     const itemLabels = item.labels ?? [];
-    return itemLabels.some((l) => {
-      const n = normalizeLabel(l);
-      return n !== null && wanted.has(n.toLowerCase());
+    return itemLabels.some((label) => {
+      const normalized = normalizeLabel(label);
+      return normalized !== null && wanted.has(normalized.toLowerCase());
     });
   });
 }
@@ -120,11 +120,11 @@ export function listLabelsWithCount(
       }
     }
   }
-  return [...groups.values()].sort((a, b) => {
-    if (b.count !== a.count) return b.count - a.count;
-    return a.label.toLowerCase() < b.label.toLowerCase()
+  return [...groups.values()].sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return left.label.toLowerCase() < right.label.toLowerCase()
       ? -1
-      : a.label.toLowerCase() > b.label.toLowerCase()
+      : left.label.toLowerCase() > right.label.toLowerCase()
         ? 1
         : 0;
   });
@@ -165,14 +165,16 @@ export function subtractLabels(
   const toRemove = new Set(
     removing
       .map(normalizeLabel)
-      .filter((l): l is string => l !== null)
-      .map((l) => l.toLowerCase()),
+      .filter((label): label is string => label !== null)
+      .map((label) => label.toLowerCase()),
   );
   if (toRemove.size === 0) {
-    return existing.map(normalizeLabel).filter((l): l is string => l !== null);
+    return existing
+      .map(normalizeLabel)
+      .filter((label): label is string => label !== null);
   }
   return existing
     .map(normalizeLabel)
-    .filter((l): l is string => l !== null)
-    .filter((l) => !toRemove.has(l.toLowerCase()));
+    .filter((label): label is string => label !== null)
+    .filter((label) => !toRemove.has(label.toLowerCase()));
 }

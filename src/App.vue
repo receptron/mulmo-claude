@@ -396,7 +396,7 @@ watch(
   () => route.query.role,
   (newRole) => {
     if (typeof newRole !== "string" || newRole === currentRoleId.value) return;
-    const roleExists = roles.value.some((r) => r.id === newRole);
+    const roleExists = roles.value.some((role) => role.id === newRole);
     if (roleExists) currentRoleId.value = newRole;
   },
 );
@@ -568,7 +568,9 @@ const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
 
 const selectedResult = computed(
   () =>
-    toolResults.value.find((r) => r.uuid === selectedResultUuid.value) ?? null,
+    toolResults.value.find(
+      (result) => result.uuid === selectedResultUuid.value,
+    ) ?? null,
 );
 
 // Type-guard for the user-side branch of a text-response result. Used
@@ -611,7 +613,7 @@ watch(currentSessionId, (id) => {
 
   // Clear unread in both sessionMap and sessions list (for badge count),
   // then tell the server so other tabs see it too.
-  const summary = sessions.value.find((s) => s.id === id);
+  const summary = sessions.value.find((session) => session.id === id);
   const wasUnread =
     (session && session.hasUnread) || (summary && summary.hasUnread);
   if (wasUnread) {
@@ -638,7 +640,9 @@ function onQueryEdit(query: string): void {
 function handleUpdateResult(updatedResult: ToolResultComplete) {
   const results = activeSession.value?.toolResults;
   if (!results) return;
-  const index = results.findIndex((r) => r.uuid === updatedResult.uuid);
+  const index = results.findIndex(
+    (result) => result.uuid === updatedResult.uuid,
+  );
   if (index !== -1) {
     Object.assign(results[index], updatedResult);
   }
@@ -650,8 +654,8 @@ function onSidebarItemClick(uuid: string) {
 
 const GEMINI_PLUGINS = new Set(["generateImage", "presentDocument"]);
 const needsGemini = (roleId: string) =>
-  (roles.value.find((r) => r.id === roleId)?.availablePlugins ?? []).some((p) =>
-    GEMINI_PLUGINS.has(p),
+  (roles.value.find((role) => role.id === roleId)?.availablePlugins ?? []).some(
+    (plugin) => GEMINI_PLUGINS.has(plugin),
   );
 
 // Remove the current session from sessionMap if it's empty (no messages).
@@ -737,14 +741,14 @@ async function loadSession(id: string) {
   if (!response.ok) return;
   const entries = response.data;
 
-  const meta = entries.find((e) => e.type === EVENT_TYPES.sessionMeta);
+  const meta = entries.find((entry) => entry.type === EVENT_TYPES.sessionMeta);
   const roleId = meta?.roleId ?? currentRoleId.value;
   const toolResultsList = parseSessionEntries(entries);
   const urlResult =
     typeof route.query.result === "string" ? route.query.result : null;
   const resolvedSelectedUuid = resolveSelectedUuid(toolResultsList, urlResult);
   // Use server summary for live state (isRunning, etc.) and timestamps
-  const serverSummary = sessions.value.find((s) => s.id === id);
+  const serverSummary = sessions.value.find((session) => session.id === id);
   const { startedAt, updatedAt } = resolveSessionTimestamps(
     serverSummary,
     new Date().toISOString(),
@@ -754,12 +758,12 @@ async function loadSession(id: string) {
   // startedAt and updatedAt. New results pushed in this session via
   // pushResult() will overwrite with the real Date.now().
   const loadedTimestamps = new Map<string, number>();
-  const t0 = new Date(startedAt).getTime();
-  const t1 = new Date(updatedAt).getTime();
-  toolResultsList.forEach((r, i) => {
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(updatedAt).getTime();
+  toolResultsList.forEach((result, i) => {
     const frac =
       toolResultsList.length > 1 ? i / (toolResultsList.length - 1) : 0;
-    loadedTimestamps.set(r.uuid, t0 + (t1 - t0) * frac);
+    loadedTimestamps.set(result.uuid, startMs + (endMs - startMs) * frac);
   });
 
   const newSession: ActiveSession = {
@@ -966,7 +970,7 @@ async function applyAgentEvent(
     case EVENT_TYPES.toolResult: {
       const { result } = event;
       const existing = session.toolResults.findIndex(
-        (r) => r.uuid === result.uuid,
+        (existingResult) => existingResult.uuid === result.uuid,
       );
       if (existing >= 0) {
         session.toolResults[existing] = result;
@@ -1019,10 +1023,11 @@ async function sendMessage(text?: string) {
 
   beginUserTurn(session, message);
   const sessionRole =
-    roles.value.find((r) => r.id === session.roleId) ?? roles.value[0];
+    roles.value.find((role) => role.id === session.roleId) ?? roles.value[0];
   const selectedRes =
-    session.toolResults.find((r) => r.uuid === session.selectedResultUuid) ??
-    undefined;
+    session.toolResults.find(
+      (result) => result.uuid === session.selectedResultUuid,
+    ) ?? undefined;
 
   // Subscribe to the session's pub/sub channel BEFORE posting so we
   // don't miss events. The subscription callback dispatches each
@@ -1052,11 +1057,11 @@ async function sendMessage(text?: string) {
       );
       unsubscribeSession(session.id);
     }
-  } catch (e) {
-    console.error("[agent] fetch error:", e);
+  } catch (err) {
+    console.error("[agent] fetch error:", err);
     pushErrorMessage(
       session,
-      e instanceof Error ? e.message : "Connection error.",
+      err instanceof Error ? err.message : "Connection error.",
     );
     unsubscribeSession(session.id);
   }
@@ -1097,7 +1102,7 @@ onMounted(async () => {
   // If the URL specifies a role, apply it before session creation.
   const urlRole =
     typeof route.query.role === "string" ? route.query.role : null;
-  if (urlRole && roles.value.some((r) => r.id === urlRole)) {
+  if (urlRole && roles.value.some((role) => role.id === urlRole)) {
     currentRoleId.value = urlRole;
   }
 
