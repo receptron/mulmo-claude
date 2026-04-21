@@ -10,23 +10,20 @@
       <div class="text-gray-500">No markdown content available</div>
     </div>
     <template v-else>
+      <div class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
+        <div class="button-group">
+          <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
+            <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+            PDF
+          </button>
+        </div>
+        <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
+      </div>
       <div v-if="loadError" class="load-error-banner" role="alert">
         ⚠ Failed to refresh document: {{ loadError }} — showing last successfully loaded content.
       </div>
       <div class="markdown-content-wrapper">
         <div class="p-4">
-          <div class="header-row">
-            <h1 class="document-title">
-              {{ selectedResult.title || "Document" }}
-            </h1>
-            <div class="button-group">
-              <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
-                <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-                PDF
-              </button>
-            </div>
-            <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
-          </div>
           <div class="markdown-content prose prose-slate max-w-none" v-html="renderedHtml"></div>
         </div>
       </div>
@@ -243,18 +240,6 @@ watch(
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-}
-
-.header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1em;
-}
-
-.document-title {
-  font-size: 2em;
-  margin: 0;
 }
 
 .button-group {
