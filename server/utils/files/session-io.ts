@@ -152,6 +152,16 @@ export function sessionJsonlAbsPath(id: string, r?: string): string {
   return resolvePath(root(r), jsonlRel(id));
 }
 
+/**
+ * Resolve the absolute path of a session's metadata JSON file. The
+ * jsonl variant is the event log; this one is the sidecar that holds
+ * `hasUnread`, `roleId`, `startedAt`, `origin`, etc. Its mtime bumps
+ * whenever any of those fields change via `writeSessionMeta`.
+ */
+export function sessionMetaAbsPath(id: string, r?: string): string {
+  return resolvePath(root(r), metaRel(id));
+}
+
 export async function readSessionJsonl(
   id: string,
   r?: string,

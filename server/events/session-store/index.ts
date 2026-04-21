@@ -214,7 +214,7 @@ export function pushSessionEvent(
     // Store is the source of truth, so the refetch already sees the
     // flag via `live.hasUnread` — the disk write is just a backstop
     // across server restarts and can stay fire-and-forget.
-    void persistHasUnread(chatSessionId, true);
+    persistHasUnread(chatSessionId, true).catch(() => {});
     notifySessionsChanged();
     return;
   }
@@ -223,7 +223,9 @@ export function pushSessionEvent(
   // If we notified before the write completed, the client's refetch
   // would read the stale pre-drain value. Sequence: persist, then
   // notify.
-  void persistHasUnread(chatSessionId, true).then(notifySessionsChanged);
+  persistHasUnread(chatSessionId, true)
+    .catch(() => {})
+    .then(() => notifySessionsChanged());
 }
 
 /**
