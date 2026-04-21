@@ -22,7 +22,7 @@
     "server:debug": "tsx server/index.ts --debug",
     "cli": "tsx packages/cli/src/index.ts",
     "telegram": "tsx packages/telegram/src/index.ts",
-    "lint": "eslint src server test e2e packages",
+    "lint": "eslint src server test e2e packages --cache --cache-location node_modules/.cache/eslint/",
     "format": "prettier --write '{src,server,test,e2e,packages}/**/*.{ts,json,yaml,vue}'",
     "typecheck": "yarn typecheck:vue && yarn typecheck:server && yarn typecheck:test && yarn typecheck:e2e && yarn typecheck:packages",
     "typecheck:packages": "yarn workspaces run typecheck",
