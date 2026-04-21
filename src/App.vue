@@ -296,6 +296,7 @@ import { useSessionHistory } from "./composables/useSessionHistory";
 import { useRightSidebar } from "./composables/useRightSidebar";
 import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
+import { provideActiveSession } from "./composables/useActiveSession";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import { apiGet } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
@@ -574,10 +575,17 @@ watch(currentSessionId, (id) => {
   if (session) {
     ensureSessionSubscription(session);
   }
-  // Unsubscribe from the previous session if it's not running
+  // Unsubscribe from the previous session if it's not running and has
+  // no in-flight background generations. Tearing down the subscription
+  // while a generation is still running would orphan its completion
+  // event, leaving the session's busy indicator stuck on.
   if (previousSessionId && previousSessionId !== id) {
     const prevSession = sessionMap.get(previousSessionId);
-    if (prevSession && !prevSession.isRunning) {
+    const prevBusy =
+      !!prevSession &&
+      (prevSession.isRunning ||
+        Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
+    if (prevSession && !prevBusy) {
       unsubscribeSession(previousSessionId);
     }
   }
@@ -731,14 +739,24 @@ function buildAgentEventContext(session: ActiveSession): AgentEventContext {
     onRoleChange,
     refreshRoles,
     scrollSidebarToBottom: () => rightSidebarRef.value?.scrollToBottom(),
+    onGenerationsDrained: () => {
+      if (currentSessionId.value === sessionId) {
+        markSessionRead(sessionId);
+      }
+    },
   };
+}
+
+function hasPendingGenerations(sessionId: string): boolean {
+  const live = sessionMap.get(sessionId);
+  return !!live && Object.keys(live.pendingGenerations).length > 0;
 }
 
 function handleSessionFinished(sessionId: string): void {
   refreshSessionTranscript(sessionId);
   if (currentSessionId.value === sessionId) {
     markSessionRead(sessionId);
-  } else {
+  } else if (!hasPendingGenerations(sessionId)) {
     unsubscribeSession(sessionId);
   }
 }
@@ -818,6 +836,9 @@ provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
 });
+// Plugin Views that need to tag background work with the current
+// session (e.g. MulmoScript generations) inject this.
+provideActiveSession(activeSession);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,

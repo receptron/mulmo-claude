@@ -141,5 +141,6 @@ export function buildLoadedSession(opts: {
     startedAt,
     updatedAt,
     runStartIndex: toolResults.length,
+    pendingGenerations: {},
   };
 }

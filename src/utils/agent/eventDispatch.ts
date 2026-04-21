@@ -3,7 +3,7 @@
 
 import type { ActiveSession } from "../../types/session";
 import type { SseEvent } from "../../types/sse";
-import { EVENT_TYPES } from "../../types/events";
+import { EVENT_TYPES, generationKey } from "../../types/events";
 import { findPendingToolCall, toToolCallEntry } from "./toolCalls";
 import {
   pushErrorMessage,
@@ -17,6 +17,7 @@ export interface AgentEventContext {
   onRoleChange: () => void;
   refreshRoles: () => Promise<void>;
   scrollSidebarToBottom: () => void;
+  onGenerationsDrained: () => void;
 }
 
 export async function applyAgentEvent(
@@ -62,5 +63,22 @@ export async function applyAgentEvent(
       return;
     case EVENT_TYPES.sessionFinished:
       return;
+    case EVENT_TYPES.generationStarted: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      session.pendingGenerations[mapKey] = {
+        kind: event.kind,
+        filePath: event.filePath,
+        key: event.key,
+      };
+      return;
+    }
+    case EVENT_TYPES.generationFinished: {
+      const mapKey = generationKey(event.kind, event.filePath, event.key);
+      delete session.pendingGenerations[mapKey];
+      if (Object.keys(session.pendingGenerations).length === 0) {
+        ctx.onGenerationsDrained();
+      }
+      return;
+    }
   }
 }

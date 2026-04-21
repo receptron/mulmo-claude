@@ -17,5 +17,6 @@ export function createEmptySession(id: string, roleId: string): ActiveSession {
     startedAt: now,
     updatedAt: now,
     runStartIndex: 0,
+    pendingGenerations: {},
   };
 }

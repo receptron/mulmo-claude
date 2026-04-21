@@ -32,6 +32,8 @@ import {
   validateUpdateScriptBody,
 } from "./mulmoScriptValidate.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { publishGeneration } from "../../events/session-store/index.js";
+import { GENERATION_KINDS } from "../../../src/types/events.js";
 
 const router = Router();
 const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
@@ -72,6 +74,7 @@ interface RenderBeatBody {
   filePath: string;
   beatIndex: number;
   force?: boolean;
+  chatSessionId?: string;
 }
 
 interface UploadBeatImageBody {
@@ -439,90 +442,155 @@ router.post(
     req: Request<
       object,
       object,
-      { filePath: string; beatIndex: number; force?: boolean }
+      {
+        filePath: string;
+        beatIndex: number;
+        force?: boolean;
+        chatSessionId?: string;
+      }
     >,
     res: Response<GenerateBeatAudioResponse>,
   ) => {
-    const { filePath, beatIndex, force } = req.body;
+    const { filePath, beatIndex, force, chatSessionId } = req.body;
 
     if (!filePath || beatIndex === undefined) {
       badRequest(res, "filePath and beatIndex are required");
       return;
     }
 
-    await withStoryContext(
-      res,
+    const key = String(beatIndex);
+    publishGeneration(
+      chatSessionId,
+      GENERATION_KINDS.beatAudio,
       filePath,
-      { force, operation: "generate-beat-audio" },
-      async ({ context }) => {
-        // Thrown errors bubble up to withStoryContext which logs +
-        // returns 500. No inner try/catch needed.
-        await generateBeatAudio(beatIndex, context, {
-          settings: process.env as Record<string, string>,
-        } as Parameters<typeof generateBeatAudio>[2]);
-
-        const beat = context.studio.script.beats[beatIndex];
-        const audioPath =
-          context.studio.beats[beatIndex]?.audioFile ??
-          getBeatAudioPathOrUrl(beat.text ?? "", context, beat, context.lang);
-
-        if (!audioPath || !fs.existsSync(audioPath)) {
-          // Logic-flow failure (not an exception) — emit a targeted log
-          // with the diagnostic payload before responding. The helper's
-          // catch-all log.warn wouldn't fire for this non-throw path.
-          // Don't write raw `beat.text` into persistent logs — it's
-          // free-form user content and can contain sensitive data.
-          log.error("generate-beat-audio", "audio was not generated", {
-            beatIndex,
-            audioPath,
-            exists: audioPath ? fs.existsSync(audioPath) : false,
-            beatTextLength:
-              typeof beat?.text === "string" ? beat.text.length : 0,
-            audioFilePresent: Boolean(
-              context.studio.beats[beatIndex]?.audioFile,
-            ),
-          });
-          serverError(res, "Audio was not generated");
-          return;
-        }
-
-        res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
-      },
+      key,
+      false,
     );
+    let genError: string | undefined;
+    try {
+      await withStoryContext(
+        res,
+        filePath,
+        { force, operation: "generate-beat-audio" },
+        async ({ context }) => {
+          try {
+            await generateBeatAudio(beatIndex, context, {
+              settings: process.env as Record<string, string>,
+            } as Parameters<typeof generateBeatAudio>[2]);
+
+            const beat = context.studio.script.beats[beatIndex];
+            const audioPath =
+              context.studio.beats[beatIndex]?.audioFile ??
+              getBeatAudioPathOrUrl(
+                beat.text ?? "",
+                context,
+                beat,
+                context.lang,
+              );
+
+            if (!audioPath || !fs.existsSync(audioPath)) {
+              // Logic-flow failure (not an exception) — emit a targeted
+              // log. Don't write raw `beat.text` into persistent logs —
+              // it's free-form user content and can contain sensitive
+              // data.
+              log.error("generate-beat-audio", "audio was not generated", {
+                beatIndex,
+                audioPath,
+                exists: audioPath ? fs.existsSync(audioPath) : false,
+                beatTextLength:
+                  typeof beat?.text === "string" ? beat.text.length : 0,
+                audioFilePresent: Boolean(
+                  context.studio.beats[beatIndex]?.audioFile,
+                ),
+              });
+              genError = "Audio was not generated";
+              serverError(res, genError);
+              return;
+            }
+
+            res.json({ audio: fileToDataUri(audioPath, "audio/mpeg") });
+          } catch (err) {
+            genError = errorMessage(err);
+            throw err;
+          }
+        },
+      );
+    } finally {
+      publishGeneration(
+        chatSessionId,
+        GENERATION_KINDS.beatAudio,
+        filePath,
+        key,
+        true,
+        genError,
+      );
+    }
   },
 );
 
 router.post(
   API_ROUTES.mulmoScript.renderBeat,
   async (req: Request<object, object, RenderBeatBody>, res: Response) => {
-    const { filePath, beatIndex, force } = req.body;
+    const { filePath, beatIndex, force, chatSessionId } = req.body;
 
     if (!filePath || beatIndex === undefined) {
       badRequest(res, "filePath and beatIndex are required");
       return;
     }
 
-    await withStoryContext(res, filePath, { force }, async ({ context }) => {
-      await generateBeatImage({
-        index: beatIndex,
-        context,
-        args: force ? { forceImage: true } : undefined,
-      });
+    const key = String(beatIndex);
+    publishGeneration(
+      chatSessionId,
+      GENERATION_KINDS.beatImage,
+      filePath,
+      key,
+      false,
+    );
+    // withStoryContext swallows errors and responds with 500, so we
+    // track failure via a local flag / message rather than try/catch
+    // around the outer call.
+    let genError: string | undefined;
+    try {
+      await withStoryContext(res, filePath, { force }, async ({ context }) => {
+        try {
+          await generateBeatImage({
+            index: beatIndex,
+            context,
+            args: force ? { forceImage: true } : undefined,
+          });
 
-      const { imagePath } = getBeatPngImagePath(context, beatIndex);
-      if (!fs.existsSync(imagePath)) {
-        serverError(res, "Image was not generated");
-        return;
-      }
-      res.json({ image: fileToDataUri(imagePath, "image/png") });
-    });
+          const { imagePath } = getBeatPngImagePath(context, beatIndex);
+          if (!fs.existsSync(imagePath)) {
+            genError = "Image was not generated";
+            serverError(res, genError);
+            return;
+          }
+          res.json({ image: fileToDataUri(imagePath, "image/png") });
+        } catch (err) {
+          genError = errorMessage(err);
+          throw err;
+        }
+      });
+    } finally {
+      publishGeneration(
+        chatSessionId,
+        GENERATION_KINDS.beatImage,
+        filePath,
+        key,
+        true,
+        genError,
+      );
+    }
   },
 );
 
 router.post(
   API_ROUTES.mulmoScript.generateMovie,
-  async (req: Request<object, object, { filePath: string }>, res: Response) => {
-    const { filePath } = req.body;
+  async (
+    req: Request<object, object, { filePath: string; chatSessionId?: string }>,
+    res: Response,
+  ) => {
+    const { filePath, chatSessionId } = req.body;
 
     if (!filePath) {
       badRequest(res, "filePath is required");
@@ -539,10 +607,19 @@ router.post(
     const send = (data: unknown) =>
       res.write(`data: ${JSON.stringify(data)}\n\n`);
 
+    publishGeneration(
+      chatSessionId,
+      GENERATION_KINDS.movie,
+      filePath,
+      "",
+      false,
+    );
+    let genError: string | undefined;
     try {
       const context = await buildContext(absoluteFilePath);
       if (!context) {
-        send({ type: "error", message: "Failed to initialize mulmo context" });
+        genError = "Failed to initialize mulmo context";
+        send({ type: "error", message: genError });
         res.end();
         return;
       }
@@ -580,7 +657,8 @@ router.post(
 
         const outputPath = movieFilePath(audioContext);
         if (!fs.existsSync(outputPath)) {
-          send({ type: "error", message: "Movie was not generated" });
+          genError = "Movie was not generated";
+          send({ type: "error", message: genError });
           res.end();
           return;
         }
@@ -590,8 +668,17 @@ router.post(
         removeSessionProgressCallback(onProgress);
       }
     } catch (err) {
-      send({ type: "error", message: errorMessage(err) });
+      genError = errorMessage(err);
+      send({ type: "error", message: genError });
     } finally {
+      publishGeneration(
+        chatSessionId,
+        GENERATION_KINDS.movie,
+        filePath,
+        "",
+        true,
+        genError,
+      );
       res.end();
     }
   },
@@ -606,6 +693,7 @@ interface RenderCharacterBody {
   filePath: string;
   key: string;
   force?: boolean;
+  chatSessionId?: string;
 }
 
 interface UploadCharacterImageBody {
@@ -671,38 +759,64 @@ router.post(
     req: Request<object, CharacterImageResponse, RenderCharacterBody>,
     res: Response<CharacterImageResponse>,
   ) => {
-    const { filePath, key, force } = req.body;
+    const { filePath, key, force, chatSessionId } = req.body;
 
     if (!filePath || !key) {
       badRequest(res, "filePath and key are required");
       return;
     }
 
-    await withStoryContext(res, filePath, { force }, async ({ context }) => {
-      const images = context.studio.script.imageParams?.images ?? {};
-      const imageEntry = images[key];
-      if (!imageEntry || imageEntry.type !== "imagePrompt") {
-        badRequest(res, `No imagePrompt entry for key: ${key}`);
-        return;
-      }
+    publishGeneration(
+      chatSessionId,
+      GENERATION_KINDS.characterImage,
+      filePath,
+      key,
+      false,
+    );
+    let genError: string | undefined;
+    try {
+      await withStoryContext(res, filePath, { force }, async ({ context }) => {
+        try {
+          const images = context.studio.script.imageParams?.images ?? {};
+          const imageEntry = images[key];
+          if (!imageEntry || imageEntry.type !== "imagePrompt") {
+            genError = `No imagePrompt entry for key: ${key}`;
+            badRequest(res, genError);
+            return;
+          }
 
-      const index = Object.keys(images).indexOf(key);
-      const imagePath = getReferenceImagePath(context, key, "png");
-      fs.mkdirSync(path.dirname(imagePath), { recursive: true });
+          const index = Object.keys(images).indexOf(key);
+          const imagePath = getReferenceImagePath(context, key, "png");
+          fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-      await generateReferenceImage({
-        context,
-        key,
-        index,
-        image: imageEntry as MulmoImagePromptMedia,
-        force,
+          await generateReferenceImage({
+            context,
+            key,
+            index,
+            image: imageEntry as MulmoImagePromptMedia,
+            force,
+          });
+          if (!fs.existsSync(imagePath)) {
+            genError = "Character image was not generated";
+            serverError(res, genError);
+            return;
+          }
+          res.json({ image: fileToDataUri(imagePath, "image/png") });
+        } catch (err) {
+          genError = errorMessage(err);
+          throw err;
+        }
       });
-      if (!fs.existsSync(imagePath)) {
-        serverError(res, "Character image was not generated");
-        return;
-      }
-      res.json({ image: fileToDataUri(imagePath, "image/png") });
-    });
+    } finally {
+      publishGeneration(
+        chatSessionId,
+        GENERATION_KINDS.characterImage,
+        filePath,
+        key,
+        true,
+        genError,
+      );
+    }
   },
 );
 

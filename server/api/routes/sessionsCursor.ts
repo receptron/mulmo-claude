@@ -42,18 +42,27 @@ export function parseCursor(raw: unknown): number {
 }
 
 /**
- * Compute the per-session "change timestamp" in ms — the later of
- * the jsonl mtime (new user/assistant turn) and the chat-index
- * `indexedAt` (AI-generated title / summary updated in the
- * background and doesn't touch the jsonl). Missing / malformed
- * `indexedAt` falls back to the mtime alone.
+ * Compute the per-session "change timestamp" in ms — the latest of:
+ *   - jsonl mtime (new user/assistant turn)
+ *   - chat-index `indexedAt` (AI-generated title / summary, updated in
+ *     the background and doesn't touch the jsonl)
+ *   - meta json mtime (hasUnread flip, origin update — also sidecar
+ *     to the jsonl)
+ *
+ * Missing / malformed `indexedAt` or `metaMtimeMs` contributes 0 so
+ * they don't pull the timestamp backward.
  */
 export function sessionChangeMs(
   jsonlMtimeMs: number,
   indexedAtIso: string | undefined,
+  metaMtimeMs: number | undefined = undefined,
 ): number {
   const indexedAtMs =
     indexedAtIso !== undefined ? new Date(indexedAtIso).getTime() : NaN;
   const safeIndexed = Number.isFinite(indexedAtMs) ? indexedAtMs : 0;
-  return Math.max(jsonlMtimeMs, safeIndexed);
+  const safeMeta =
+    typeof metaMtimeMs === "number" && Number.isFinite(metaMtimeMs)
+      ? metaMtimeMs
+      : 0;
+  return Math.max(jsonlMtimeMs, safeIndexed, safeMeta);
 }

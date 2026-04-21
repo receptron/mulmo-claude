@@ -8,11 +8,12 @@ import type {
   ScheduledItem,
 } from "../../plugins/scheduler/index";
 import { WORKSPACE_FILES } from "../../config/workspacePaths";
+import { isRecord } from "../types";
 
 function isScheduledItem(x: unknown): x is ScheduledItem {
-  if (typeof x !== "object" || x === null) return false;
-  if (!("id" in x) || typeof x.id !== "string") return false;
-  if (!("title" in x) || typeof x.title !== "string") return false;
+  if (!isRecord(x)) return false;
+  if (typeof x.id !== "string") return false;
+  if (typeof x.title !== "string") return false;
   return true;
 }
 

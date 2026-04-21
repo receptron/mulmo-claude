@@ -111,9 +111,13 @@ async function writeSession(
   await writeFile(path.join(chatDir, `${id}.json`), JSON.stringify(meta));
   await writeFile(path.join(chatDir, `${id}.jsonl`), "");
   // Set both atime and mtime so the handler's stat.mtimeMs reads
-  // what the test intends.
+  // what the test intends. Back-date the .json meta too — the cursor
+  // derivation reads it alongside the .jsonl mtime (hasUnread writes
+  // bump meta but not jsonl), so a freshly-written meta at "now"
+  // would otherwise dominate the computed changeMs.
   const secs = opts.mtimeMs / 1000;
   await utimes(path.join(chatDir, `${id}.jsonl`), secs, secs);
+  await utimes(path.join(chatDir, `${id}.json`), secs, secs);
 
   if (opts.indexedAtMs !== undefined) {
     const manifestPath = path.join(manifestDir, "manifest.json");

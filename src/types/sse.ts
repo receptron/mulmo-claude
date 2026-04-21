@@ -3,7 +3,7 @@
 // session's state.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-import { EVENT_TYPES } from "./events";
+import { EVENT_TYPES, type GenerationKind } from "./events";
 
 export interface SseToolCall {
   type: typeof EVENT_TYPES.toolCall;
@@ -53,6 +53,29 @@ export interface SseSessionFinished {
   type: typeof EVENT_TYPES.sessionFinished;
 }
 
+/**
+ * Plugin-initiated background work (e.g. MulmoScript image / audio /
+ * movie render) started. The client records this in
+ * `session.pendingGenerations` so the sidebar busy indicator stays
+ * lit even when the originating view isn't mounted.
+ */
+export interface SseGenerationStarted {
+  type: typeof EVENT_TYPES.generationStarted;
+  kind: GenerationKind;
+  filePath: string;
+  key: string;
+}
+
+/** Companion event to `SseGenerationStarted` — the work completed
+ *  (or failed; `error` populated). */
+export interface SseGenerationFinished {
+  type: typeof EVENT_TYPES.generationFinished;
+  kind: GenerationKind;
+  filePath: string;
+  key: string;
+  error?: string;
+}
+
 export type SseEvent =
   | SseToolCall
   | SseToolCallResult
@@ -62,4 +85,6 @@ export type SseEvent =
   | SseToolResult
   | SseRolesUpdated
   | SseError
-  | SseSessionFinished;
+  | SseSessionFinished
+  | SseGenerationStarted
+  | SseGenerationFinished;
