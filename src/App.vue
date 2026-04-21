@@ -764,11 +764,11 @@ function handleSessionFinished(sessionId: string): void {
   }
 }
 
-function ensureSessionSubscription(session: ActiveSession): void {
-  if (sessionSubscriptions.has(session.id)) return;
-  const ctx = buildAgentEventContext(session);
-  const channel = sessionChannel(session.id);
-  const unsub = pubsubSubscribe(channel, (data) => {
+function createSessionEventHandler(
+  session: ActiveSession,
+  ctx: AgentEventContext,
+): (data: unknown) => void {
+  return (data: unknown) => {
     const event = data as SseEvent;
     if (!event || typeof event !== "object") return;
     if (event.type === EVENT_TYPES.sessionFinished) {
@@ -776,7 +776,14 @@ function ensureSessionSubscription(session: ActiveSession): void {
       return;
     }
     applyAgentEvent(event, ctx);
-  });
+  };
+}
+
+function ensureSessionSubscription(session: ActiveSession): void {
+  if (sessionSubscriptions.has(session.id)) return;
+  const ctx = buildAgentEventContext(session);
+  const handler = createSessionEventHandler(session, ctx);
+  const unsub = pubsubSubscribe(sessionChannel(session.id), handler);
   sessionSubscriptions.set(session.id, unsub);
 }
 
