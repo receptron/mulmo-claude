@@ -109,11 +109,26 @@ test.describe("IME Enter handling", () => {
     const input = chatInput(page);
     await fillChatInput(page, "テスト");
 
-    // Safari order: compositionstart → compositionend → keydown(Enter, isComposing=false)
-    // The keydown follows compositionend synchronously (within the 30ms race window).
-    await dispatchComposition(input, "compositionstart");
-    await dispatchComposition(input, "compositionend");
-    await dispatchEnterKeydown(input, { isComposing: false });
+    // Safari fires all three events synchronously in the same microtask.
+    // Dispatch atomically in one evaluate() to avoid CDP round-trip latency
+    // inflating the gap beyond SAFARI_IME_RACE_WINDOW_MS (30ms).
+    await input.evaluate((el) => {
+      el.dispatchEvent(
+        new CompositionEvent("compositionstart", { bubbles: true }),
+      );
+      el.dispatchEvent(
+        new CompositionEvent("compositionend", { bubbles: true }),
+      );
+      el.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          isComposing: false,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
 
     await page.waitForTimeout(100);
     expect(agentCalls).toHaveLength(0);
@@ -125,10 +140,24 @@ test.describe("IME Enter handling", () => {
     const input = chatInput(page);
     await fillChatInput(page, "テスト");
 
-    // Complete an IME sequence first (Safari order).
-    await dispatchComposition(input, "compositionstart");
-    await dispatchComposition(input, "compositionend");
-    await dispatchEnterKeydown(input, { isComposing: false });
+    // Complete an IME sequence first (Safari order) — atomic to avoid CDP latency.
+    await input.evaluate((el) => {
+      el.dispatchEvent(
+        new CompositionEvent("compositionstart", { bubbles: true }),
+      );
+      el.dispatchEvent(
+        new CompositionEvent("compositionend", { bubbles: true }),
+      );
+      el.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          isComposing: false,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
 
     // Wait past the 30ms race window, then send a real Enter.
     await page.waitForTimeout(100);
