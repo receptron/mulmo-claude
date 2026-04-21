@@ -93,7 +93,8 @@ export function applyTextEvent(
 }
 
 /** Handle an incoming tool_result event: upsert into the session's
- *  result list and select it. */
+ *  result list. Selects the result only on insert; in-place updates
+ *  preserve the user's current selection. */
 export function applyToolResultToSession(
   session: ActiveSession,
   result: ToolResultComplete,

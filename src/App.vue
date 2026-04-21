@@ -332,7 +332,7 @@ const router = useRouter();
 // Omit ?role= for the default role to keep URLs clean.
 function buildRoleQuery(): Record<string, string> {
   const id = currentRoleId.value;
-  if (!id || id === roles.value[0]?.id) return {};
+  if (!id || roles.value.length === 0 || id === roles.value[0]?.id) return {};
   return { role: id };
 }
 
@@ -724,9 +724,6 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
   }
 }
 
-// Subscribe to a session's pub/sub channel so events from the server
-// (tool_call, text, tool_result, session_finished, etc.) arrive via
-// WebSocket and are dispatched into the session's reactive state.
 function buildAgentEventContext(session: ActiveSession): AgentEventContext {
   const sessionId = session.id;
   return {
@@ -753,7 +750,9 @@ function hasPendingGenerations(sessionId: string): boolean {
 }
 
 function handleSessionFinished(sessionId: string): void {
-  refreshSessionTranscript(sessionId);
+  refreshSessionTranscript(sessionId).catch((err) => {
+    console.error("[handleSessionFinished] refresh failed:", err);
+  });
   if (currentSessionId.value === sessionId) {
     markSessionRead(sessionId);
   } else if (!hasPendingGenerations(sessionId)) {
