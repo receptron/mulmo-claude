@@ -9,22 +9,18 @@
     <div
       v-for="result in results"
       :key="result.uuid"
-      class="cursor-pointer rounded border border-gray-300 p-2 text-sm text-gray-900 hover:opacity-75 transition-opacity"
+      class="relative cursor-pointer rounded border border-gray-300 p-2 text-sm text-gray-900 hover:opacity-75 transition-opacity"
       :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
       @click="emit('select', result.uuid)"
     >
-      <div class="flex items-center gap-1">
-        <component
-          :is="getPlugin(result.toolName)?.previewComponent"
-          v-if="getPlugin(result.toolName)?.previewComponent"
-          :result="result"
-          class="flex-1 min-w-0"
-        />
-        <span v-else class="flex-1 min-w-0 truncate">{{ result.title || result.toolName }}</span>
-        <span v-if="resultTimestamps.get(result.uuid)" class="text-[10px] text-gray-400 shrink-0">{{
-          formatSmartTime(resultTimestamps.get(result.uuid)!)
-        }}</span>
-      </div>
+      <span
+        v-if="resultTimestamps.get(result.uuid)"
+        class="absolute top-0 right-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none"
+      >
+        {{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}
+      </span>
+      <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
+      <span v-else class="block truncate">{{ result.title || result.toolName }}</span>
     </div>
 
     <!-- Thinking indicator -->

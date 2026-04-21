@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 border-t border-gray-200" @dragover.prevent @drop="onDropFile">
+  <div class="p-2 border-t border-gray-200" @dragover.prevent @drop="onDropFile">
     <div v-if="fileError" class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5" data-testid="file-error">
       {{ fileError }}
     </div>
@@ -16,34 +16,32 @@
         :value="modelValue"
         data-testid="user-input"
         :placeholder="t('chatInput.placeholder')"
-        :rows="inputFocused ? 8 : 2"
-        class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-all duration-200"
-        :class="inputFocused ? 'ring-2 ring-blue-300' : ''"
+        rows="2"
+        class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
         :disabled="isRunning"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
-        @focus="inputFocused = true"
         @compositionstart="imeEnter.onCompositionStart"
         @compositionend="imeEnter.onCompositionEnd"
         @keydown="imeEnter.onKeydown"
-        @blur="onInputBlur"
+        @blur="imeEnter.onBlur"
         @paste="onPasteFile"
       />
       <div class="flex flex-col gap-1">
         <button
           data-testid="send-btn"
-          class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="isRunning"
           @click="emit('send')"
         >
-          <span class="material-icons text-base">send</span>
+          <span class="material-icons text-base leading-none">send</span>
         </button>
         <button
           data-testid="expand-input-btn"
-          class="text-gray-400 hover:text-gray-600 rounded px-3 py-1 text-sm"
+          class="text-gray-400 hover:text-gray-600 rounded w-8 h-8 flex items-center justify-center"
           :title="t('chatInput.expandEditor')"
           @click="openExpandedEditor"
         >
-          <span class="material-icons text-base">open_in_full</span>
+          <span class="material-icons text-base leading-none">open_in_full</span>
         </button>
       </div>
     </div>
@@ -116,7 +114,6 @@ const emit = defineEmits<{
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
 const expandedTextarea = ref<HTMLTextAreaElement | null>(null);
-const inputFocused = ref(false);
 const expandedEditorOpen = ref(false);
 const fileError = ref<string | null>(null);
 
@@ -181,13 +178,6 @@ function onDropFile(event: DragEvent): void {
 }
 
 const imeEnter = useImeAwareEnter(() => emit("send"));
-
-function onInputBlur(): void {
-  imeEnter.onBlur();
-  setTimeout(() => {
-    inputFocused.value = false;
-  }, 150);
-}
 
 function openExpandedEditor(): void {
   expandedEditorOpen.value = true;
