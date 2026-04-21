@@ -26,12 +26,20 @@ export function useSessionDerived(opts: {
     sessions.value.find((s) => s.id === currentSessionId.value),
   );
 
-  const isRunning = computed(
-    () =>
-      currentSummary.value?.isRunning ??
-      activeSession.value?.isRunning ??
-      false,
-  );
+  // The server-side summary already merges pendingGenerations into
+  // `isRunning` (see server/api/routes/sessions.ts), but pub/sub events
+  // for background generations arrive faster than the next sessions
+  // refetch — fold the in-memory map in so ChatInput reflects the new
+  // state immediately.
+  const isRunning = computed(() => {
+    const active = activeSession.value;
+    const pending = active
+      ? Object.keys(active.pendingGenerations).length > 0
+      : false;
+    return (
+      currentSummary.value?.isRunning || active?.isRunning || pending || false
+    );
+  });
 
   const statusMessage = computed(
     () =>

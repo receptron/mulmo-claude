@@ -69,4 +69,16 @@ describe("sessionChangeMs", () => {
   it("falls back to mtime alone when indexedAt is malformed", () => {
     assert.equal(sessionChangeMs(100, "not a date"), 100);
   });
+  it("folds meta mtime into the max", () => {
+    const mtime = 1_700_000_000_000;
+    assert.equal(
+      sessionChangeMs(mtime, undefined, mtime + 9_000),
+      mtime + 9_000,
+    );
+    assert.equal(sessionChangeMs(mtime, undefined, mtime - 9_000), mtime);
+  });
+  it("ignores an undefined or non-finite meta mtime", () => {
+    assert.equal(sessionChangeMs(100, undefined, undefined), 100);
+    assert.equal(sessionChangeMs(100, undefined, Number.NaN), 100);
+  });
 });
