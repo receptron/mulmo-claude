@@ -7,6 +7,7 @@
 
 import { execSync, spawn } from "child_process";
 import { existsSync } from "fs";
+import { get as httpGet } from "http";
 import { createRequire } from "module";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -41,6 +42,44 @@ function pickOpenCommand() {
   if (process.platform === "darwin") return "open";
   if (process.platform === "win32") return "start";
   return "xdg-open";
+}
+
+// Poll the server until it answers an HTTP request, then call `onReady`.
+// Gives up after ~15s so the launcher doesn't hang forever on a crash loop.
+function waitUntilReady(portNum, onReady) {
+  const startedAt = Date.now();
+  const timeoutMs = 15000;
+  const intervalMs = 300;
+
+  const attempt = () => {
+    const req = httpGet({ host: "127.0.0.1", port: portNum, path: "/", timeout: 1000 }, (res) => {
+      res.resume();
+      onReady();
+    });
+    req.on("error", retry);
+    req.on("timeout", () => {
+      req.destroy();
+      retry();
+    });
+  };
+
+  const retry = () => {
+    if (Date.now() - startedAt > timeoutMs) return;
+    setTimeout(attempt, intervalMs);
+  };
+
+  attempt();
+}
+
+function printReadyBanner(url) {
+  const bar = "─".repeat(50);
+  console.log("");
+  console.log(`\x1b[32m${bar}\x1b[0m`);
+  console.log(`\x1b[32m  ✓ MulmoClaude is ready\x1b[0m`);
+  console.log(`\x1b[32m  → ${url}\x1b[0m`);
+  console.log(`\x1b[32m  Press Ctrl+C to stop.\x1b[0m`);
+  console.log(`\x1b[32m${bar}\x1b[0m`);
+  console.log("");
 }
 
 // ── Parse args ──────────────────────────────────────────────
@@ -115,21 +154,22 @@ const server = spawn(process.execPath, [tsxCli, SERVER_ENTRY], {
   stdio: "inherit",
 });
 
-// Open browser after a short delay
-if (!noOpen) {
-  setTimeout(() => {
-    const url = `http://localhost:${port}`;
-    log(`Opening ${url}`);
-    const openCmd = pickOpenCommand();
-    try {
-      // openCmd is a hard-coded literal; url is http://localhost:<numeric-port>.
-      // eslint-disable-next-line sonarjs/os-command
-      execSync(`${openCmd} ${url}`, { stdio: "pipe" });
-    } catch {
-      log(`Open your browser: ${url}`);
-    }
-  }, 3000);
-}
+// Print a ready banner + optionally open the browser once the server
+// actually responds — not a fixed-delay timer, so the banner appears
+// right when the UI is reachable.
+const url = `http://localhost:${port}`;
+waitUntilReady(port, () => {
+  printReadyBanner(url);
+  if (noOpen) return;
+  const openCmd = pickOpenCommand();
+  try {
+    // openCmd is a hard-coded literal; url is http://localhost:<numeric-port>.
+    // eslint-disable-next-line sonarjs/os-command
+    execSync(`${openCmd} ${url}`, { stdio: "pipe" });
+  } catch {
+    log(`Open your browser: ${url}`);
+  }
+});
 
 // Graceful shutdown
 process.on("SIGINT", () => {
