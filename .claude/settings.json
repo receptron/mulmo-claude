@@ -5,7 +5,8 @@
       "Bash(yarn lint 2>&1 *)",
       "Bash(yarn typecheck)",
       "Bash(yarn typecheck 2>&1 *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(gh run view *)"
     ]
   },
   "hooks": {
