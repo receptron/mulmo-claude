@@ -1,0 +1,30 @@
+{
+  "name": "mulmoclaude",
+  "version": "0.2.0",
+  "description": "MulmoClaude — GUI-chat with Claude Code + long-term memory. One command to start.",
+  "type": "module",
+  "bin": {
+    "mulmoclaude": "./bin/mulmoclaude.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "dependencies": {},
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/receptron/mulmoclaude.git",
+    "directory": "packages/mulmoclaude"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "agent",
+    "chat",
+    "gui",
+    "mulmoclaude"
+  ]
+}
