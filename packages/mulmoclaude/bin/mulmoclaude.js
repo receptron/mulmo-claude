@@ -2,17 +2,17 @@
 
 // MulmoClaude launcher — `npx mulmoclaude` entry point.
 //
-// Strategy: clone (or update) the repo into ~/.mulmoclaude-app/,
-// install dependencies, build, and start the server in production
-// mode. This avoids shipping the entire monorepo as an npm package.
+// The npm package ships with pre-built server + client in dist/.
+// This script starts the Express server in production mode.
 
-import { execSync, spawn } from "child_process";
-import { existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { execSync, fork } from "child_process";
+import { existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
-const REPO_URL = "https://github.com/receptron/mulmoclaude.git";
-const APP_DIR = join(homedir(), ".mulmoclaude-app");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST_SERVER = join(__dirname, "..", "dist", "server", "server", "index.js");
+const DIST_CLIENT = join(__dirname, "..", "dist", "client");
 const DEFAULT_PORT = 3001;
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -23,10 +23,6 @@ function log(msg) {
 
 function error(msg) {
   console.error(`\x1b[31m[mulmoclaude]\x1b[0m ${msg}`);
-}
-
-function run(cmd, opts = {}) {
-  execSync(cmd, { stdio: "inherit", cwd: APP_DIR, ...opts });
 }
 
 function checkClaude() {
@@ -48,7 +44,6 @@ Usage: npx mulmoclaude [options]
 Options:
   --port <number>   Server port (default: ${DEFAULT_PORT})
   --no-open         Don't open browser automatically
-  --update          Force git pull + rebuild
   --version         Show version
   --help            Show this help
 `);
@@ -63,7 +58,6 @@ if (args.includes("--version")) {
 const portIdx = args.indexOf("--port");
 const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : DEFAULT_PORT;
 const noOpen = args.includes("--no-open");
-const forceUpdate = args.includes("--update");
 
 // ── Pre-flight checks ───────────────────────────────────────
 
@@ -80,35 +74,15 @@ if (!checkClaude()) {
 
 log("Claude Code CLI ✓");
 
-// ── Clone or update ─────────────────────────────────────────
-
-if (!existsSync(APP_DIR)) {
-  log("First run — cloning MulmoClaude...");
-  mkdirSync(APP_DIR, { recursive: true });
-  execSync(`git clone --depth 1 ${REPO_URL} "${APP_DIR}"`, {
-    stdio: "inherit",
-  });
-  log("Installing dependencies...");
-  run("yarn install --frozen-lockfile --network-timeout 120000");
-  log("Building...");
-  run("yarn build");
-} else if (forceUpdate) {
-  log("Updating MulmoClaude...");
-  run("git pull origin main");
-  run("yarn install --frozen-lockfile --network-timeout 120000");
-  run("yarn build");
-} else {
-  // Quick check if build exists
-  if (!existsSync(join(APP_DIR, "dist", "client"))) {
-    log("Building...");
-    run("yarn install --frozen-lockfile --network-timeout 120000");
-    run("yarn build");
-  }
+if (!existsSync(DIST_SERVER)) {
+  error(`Server dist not found at ${DIST_SERVER}`);
+  error("The package may be corrupted. Try: npm cache clean --force && npx mulmoclaude");
+  process.exit(1);
 }
 
-log("Starting MulmoClaude...");
-
 // ── Start server ────────────────────────────────────────────
+
+log(`Starting MulmoClaude on port ${port}...`);
 
 const env = {
   ...process.env,
@@ -116,11 +90,10 @@ const env = {
   PORT: String(port),
 };
 
-const server = spawn("npx", ["tsx", "server/index.ts"], {
-  cwd: APP_DIR,
+const server = fork(DIST_SERVER, [], {
+  cwd: join(__dirname, ".."),
   env,
   stdio: "inherit",
-  shell: true,
 });
 
 // Open browser after a short delay
@@ -139,7 +112,7 @@ if (!noOpen) {
     } catch {
       log(`Open your browser: ${url}`);
     }
-  }, 3000);
+  }, 2000);
 }
 
 // Graceful shutdown

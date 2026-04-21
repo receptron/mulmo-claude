@@ -15,41 +15,32 @@ npx mulmoclaude
 
 Your browser opens to `http://localhost:3001`. That's it.
 
-## What happens on first run
-
-1. Clones the MulmoClaude repo to `~/.mulmoclaude-app/`
-2. Installs dependencies + builds
-3. Starts the server in production mode
-4. Opens your browser
-
-Subsequent runs skip the clone and build — startup is instant.
-
 ## Options
 
 ```
 npx mulmoclaude              # Default (port 3001, opens browser)
 npx mulmoclaude --port 8080  # Custom port
 npx mulmoclaude --no-open    # Don't open browser
-npx mulmoclaude --update     # Pull latest + rebuild
 npx mulmoclaude --version    # Show version
 ```
 
-## Updating
+## How it works
+
+The npm package ships with pre-built server and client. No cloning, no building — `npx` downloads and starts the Express server in production mode.
+
+Your data lives in `~/mulmoclaude/` (created on first run).
+
+## For developers
+
+To prepare dist for publishing:
 
 ```bash
-npx mulmoclaude --update
+# From repo root
+yarn build                              # Build client + server
+npx tsc -p server/tsconfig.json         # Build server JS
+node packages/mulmoclaude/bin/prepare-dist.js  # Copy to package
+cd packages/mulmoclaude && npm publish --access public
 ```
-
-Or manually:
-```bash
-cd ~/.mulmoclaude-app
-git pull origin main
-yarn build
-```
-
-## Data
-
-All your data lives in `~/mulmoclaude/` (the workspace). The app code lives separately in `~/.mulmoclaude-app/`. Uninstalling the app doesn't touch your data.
 
 ## License
 
