@@ -98,7 +98,7 @@ export default [
       "sonarjs/no-ignored-exceptions": "error",
       "sonarjs/todo-tag": "off",
       "sonarjs/no-commented-code": "off",
-      "sonarjs/no-nested-conditional": "off",
+      "sonarjs/no-nested-conditional": "warn",
       "sonarjs/cognitive-complexity": "error",
       // `@typescript-eslint/no-unused-vars` already covers this and
       // honours the `^__` ignore pattern (see its options above); the
