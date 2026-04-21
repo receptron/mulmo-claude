@@ -152,10 +152,10 @@ export function validateSummaryResult(obj: unknown): SummaryResult {
   if (!isRecord(obj)) {
     throw new Error("[chat-index] summary result is not an object");
   }
-  const o = obj as Record<string, unknown>;
-  const title = typeof o.title === "string" ? o.title : "";
-  const summary = typeof o.summary === "string" ? o.summary : "";
-  const keywords = Array.isArray(o.keywords) ? o.keywords.filter((k): k is string => typeof k === "string") : [];
+  const record = obj as Record<string, unknown>;
+  const title = typeof record.title === "string" ? record.title : "";
+  const summary = typeof record.summary === "string" ? record.summary : "";
+  const keywords = Array.isArray(record.keywords) ? record.keywords.filter((keyword): keyword is string => typeof keyword === "string") : [];
   return { title, summary, keywords };
 }
 

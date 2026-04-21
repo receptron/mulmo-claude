@@ -23,12 +23,12 @@ export function isNonEmptyString(value: unknown): value is string {
 /** Record whose values are all strings. */
 export function isStringRecord(value: unknown): value is Record<string, string> {
   if (!isRecord(value)) return false;
-  return Object.values(value).every((v) => typeof v === "string");
+  return Object.values(value).every((val) => typeof val === "string");
 }
 
 /** String array (every element is a string). */
 export function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === "string");
+  return Array.isArray(value) && value.every((val) => typeof val === "string");
 }
 
 /** Error-like object with a `code` property (e.g. Node.js fs errors). */

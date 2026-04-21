@@ -52,8 +52,8 @@ export function findDirtySessions(current: readonly SessionFileMeta[], processed
   }
 
   const missing: string[] = [];
-  for (const id of Object.keys(processed)) {
-    if (!seenNow.has(id)) missing.push(id);
+  for (const sessionId of Object.keys(processed)) {
+    if (!seenNow.has(sessionId)) missing.push(sessionId);
   }
 
   return { dirty, missing };

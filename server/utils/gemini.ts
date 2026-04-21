@@ -37,8 +37,8 @@ export async function generateGeminiImageContent(
   config?: GenerateContentParameters["config"],
   model: string = DEFAULT_IMAGE_MODEL,
 ): Promise<GeminiImageResult> {
-  const ai = getGeminiClient();
-  const response = await ai.models.generateContent({
+  const client = getGeminiClient();
+  const response = await client.models.generateContent({
     model,
     contents,
     ...(config && { config }),

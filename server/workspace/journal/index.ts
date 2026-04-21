@@ -150,17 +150,17 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
 async function rebuildIndex(workspaceRoot: string): Promise<void> {
   const topics = await walkTopics(workspaceRoot);
   const dailyEntries = await listDailyFilesIO(workspaceRoot);
-  const days: IndexDailyEntry[] = dailyEntries.map((e) => ({
-    date: `${e.year}-${e.month}-${e.day}`,
+  const days: IndexDailyEntry[] = dailyEntries.map((entry) => ({
+    date: `${entry.year}-${entry.month}-${entry.day}`,
   }));
   const archivedCount = await countArchivedIO(workspaceRoot);
-  const md = buildIndexMarkdown({
+  const markdown = buildIndexMarkdown({
     topics,
     days,
     archivedTopicCount: archivedCount,
     builtAtIso: new Date().toISOString(),
   });
-  await writeJournalIndex(md, workspaceRoot);
+  await writeJournalIndex(markdown, workspaceRoot);
 }
 
 async function walkTopics(workspaceRoot: string): Promise<IndexTopicEntry[]> {

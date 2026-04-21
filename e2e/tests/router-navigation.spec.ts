@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 import { SESSION_A, SESSION_B } from "../fixtures/sessions";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 test.beforeEach(async ({ page }) => {
   await mockAllApis(page);
 });
@@ -10,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 async function openHistoryWithSessions(page: Page) {
   await page.locator('[data-testid="history-btn"]').click();
   // Wait for sessions to load (fetched async when the panel opens).
-  await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).waitFor({ state: "visible", timeout: 5000 });
+  await page.locator(`[data-testid="session-item-${SESSION_A.id}"]`).waitFor({ state: "visible", timeout: 5 * ONE_SECOND_MS });
 }
 
 test.describe("session navigation via URL", () => {
@@ -91,7 +92,7 @@ test.describe("session navigation via URL", () => {
     // App tries loadSession → 404 → createNewSession → replace URL
     await expect(async () => {
       expect(page.url()).not.toContain("nonexistent-session-xyz");
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10 * ONE_SECOND_MS });
     await expect(page.getByText("MulmoClaude")).toBeVisible();
   });
 

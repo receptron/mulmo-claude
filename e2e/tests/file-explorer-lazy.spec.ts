@@ -14,6 +14,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 interface CountingMock {
   counts: Map<string, number>;
   reset(): void;
@@ -142,8 +143,8 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
 
     // Both `wiki` and `wiki/pages` should have been fetched so the
     // tree can reveal the selection.
-    await expect.poll(() => mock.counts.get("wiki") ?? 0, { timeout: 3000 }).toBeGreaterThan(0);
-    await expect.poll(() => mock.counts.get("wiki/pages") ?? 0, { timeout: 3000 }).toBeGreaterThan(0);
+    await expect.poll(() => mock.counts.get("wiki") ?? 0, { timeout: 3 * ONE_SECOND_MS }).toBeGreaterThan(0);
+    await expect.poll(() => mock.counts.get("wiki/pages") ?? 0, { timeout: 3 * ONE_SECOND_MS }).toBeGreaterThan(0);
 
     // The selected file's content loads.
     await expect(page.getByText("stub content")).toBeVisible();

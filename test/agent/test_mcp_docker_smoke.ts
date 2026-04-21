@@ -18,11 +18,12 @@ import assert from "node:assert/strict";
 import { execSync, spawn } from "node:child_process";
 import path from "node:path";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 
 function isDockerAvailable(): boolean {
   try {
-    execSync("docker info", { stdio: "ignore", timeout: 5000 });
+    execSync("docker info", { stdio: "ignore", timeout: 5 * ONE_SECOND_MS });
     return true;
   } catch {
     return false;
@@ -33,7 +34,7 @@ function isSandboxImageAvailable(): boolean {
   try {
     const out = execSync("docker images -q mulmoclaude-sandbox", {
       encoding: "utf-8",
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     return out.trim().length > 0;
   } catch {
@@ -126,7 +127,7 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
       const timer = setTimeout(() => {
         child.kill("SIGTERM");
         reject(new Error(`Docker MCP server timed out. stderr: ${stderr}`));
-      }, 30_000);
+      }, 30 * ONE_SECOND_MS);
 
       child.on("close", (code) => {
         clearTimeout(timer);

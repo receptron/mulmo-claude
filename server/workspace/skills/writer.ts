@@ -54,7 +54,7 @@ export async function saveProjectSkill(input: SaveSkillInput): Promise<SaveResul
   // user-scope skill with the same name (project would silently
   // override it via the precedence rule).
   const existing = await discoverSkills({ workspaceRoot });
-  if (existing.some((s) => s.name === name)) {
+  if (existing.some((skill) => skill.name === name)) {
     return { kind: "exists", name };
   }
 
@@ -98,7 +98,7 @@ export async function updateProjectSkill(input: SaveSkillInput): Promise<UpdateR
   }
 
   const existing = await discoverSkills({ workspaceRoot });
-  const skill = existing.find((s) => s.name === name);
+  const skill = existing.find((candidate) => candidate.name === name);
   if (!skill) return { kind: "not-found", name };
   if (skill.source === "user") return { kind: "user-scope", name };
 
@@ -139,7 +139,7 @@ export async function deleteProjectSkill(input: DeleteSkillInput): Promise<Delet
   // Look up the skill's effective source via discovery — if the
   // matching name is user-scope, we refuse.
   const all = await discoverSkills({ workspaceRoot });
-  const skill = all.find((s) => s.name === name);
+  const skill = all.find((candidate) => candidate.name === name);
   if (!skill) return { kind: "not-found", name };
   if (skill.source === "user") return { kind: "user-scope", name };
 

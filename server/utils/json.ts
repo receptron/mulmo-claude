@@ -44,22 +44,22 @@ export function findBalancedBraceBlock(raw: string): string | null {
   let inString = false;
   let escape = false;
   for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
+    const char = raw[i];
     if (escape) {
       escape = false;
       continue;
     }
-    if (ch === "\\") {
+    if (char === "\\") {
       escape = true;
       continue;
     }
-    if (ch === '"') {
+    if (char === '"') {
       inString = !inString;
       continue;
     }
     if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}" && --depth === 0) return raw.slice(start, i + 1);
+    if (char === "{") depth++;
+    if (char === "}" && --depth === 0) return raw.slice(start, i + 1);
   }
   return null;
 }

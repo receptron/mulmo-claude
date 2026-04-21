@@ -43,7 +43,7 @@ function isMcpPutBody(value: unknown): value is { servers: McpServerEntry[] } {
   if (!Array.isArray(value.servers)) return false;
   // Full shape validation happens inside fromMcpEntries (throws on
   // anything malformed). Here we just confirm the envelope.
-  return value.servers.every((e) => isRecord(e) && "id" in e && "spec" in e);
+  return value.servers.every((entry) => isRecord(entry) && "id" in entry && "spec" in entry);
 }
 
 // Parse an MCP payload through `fromMcpEntries` (which does the full

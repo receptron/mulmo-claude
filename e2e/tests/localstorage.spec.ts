@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 test.beforeEach(async ({ page }) => {
   await mockAllApis(page);
 });
@@ -16,7 +17,7 @@ test.describe("localStorage state restoration", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("view")).toBe("files");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("canvas_view_mode=stack → starts in stack view", async ({ page }) => {
@@ -27,7 +28,7 @@ test.describe("localStorage state restoration", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("view")).toBe("stack");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("canvas_view_mode with invalid value → defaults to single", async ({ page }) => {
@@ -39,7 +40,7 @@ test.describe("localStorage state restoration", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("view")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("right_sidebar_visible is preserved across reloads", async ({ page }) => {

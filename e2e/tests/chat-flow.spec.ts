@@ -11,6 +11,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 import { SESSION_A, SESSION_B } from "../fixtures/sessions";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }
@@ -104,10 +105,10 @@ test.describe("session selection", () => {
 
     // The fixture's user message from makeSessionEntries should render.
     await expect(page.locator("text=Hello").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await expect(page.locator("text=Hi there!").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -115,13 +116,13 @@ test.describe("session selection", () => {
     await page.goto(`/chat/${SESSION_A.id}`);
     // Session A entries loaded.
     await expect(page.locator("text=Hi there!").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Navigate to session B via the URL directly (same entries fixture).
     await page.goto(`/chat/${SESSION_B.id}`);
     await expect(page.locator("text=Hi there!").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -265,7 +266,7 @@ test.describe("creating a new session", () => {
     await page.goto(`/chat/${SESSION_A.id}`);
     // Ensure the session loaded.
     await expect(page.locator("text=Hi there!").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Click new session.

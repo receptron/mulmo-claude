@@ -4,6 +4,7 @@ import { setupMutableTodoMocks } from "../fixtures/todos-mutable";
 import { TODO_COLUMNS } from "../fixtures/todos";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 const TODOS_URL = `/chat?view=files&path=${WORKSPACE_FILES.todosItems}`;
 
 // Read-only TodoExplorer spec — the kanban / list / search / add-dialog
@@ -24,14 +25,14 @@ test.describe("Todo Explorer", () => {
     await page.goto(TODOS_URL);
     // Wait for the TodoExplorer to render (it has the "Todo" heading).
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
   test("kanban view shows 4 status columns", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     for (const col of TODO_COLUMNS) {
@@ -42,7 +43,7 @@ test.describe("Todo Explorer", () => {
   test("kanban view shows todo cards with text", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Check some card texts are visible
@@ -54,7 +55,7 @@ test.describe("Todo Explorer", () => {
   test("switching to table view shows a table", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-view-table"]').click();
@@ -66,7 +67,7 @@ test.describe("Todo Explorer", () => {
   test("switching to list view shows a flat list", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-view-list"]').click();
@@ -78,7 +79,7 @@ test.describe("Todo Explorer", () => {
   test("search filters items", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Switch to list view for simpler checking
@@ -93,7 +94,7 @@ test.describe("Todo Explorer", () => {
   test("label filter chips are shown when labels exist", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Labels bar should show the label names. Use locator with
@@ -105,7 +106,7 @@ test.describe("Todo Explorer", () => {
   test("priority badges are displayed on cards", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Priority badges — use locator since getByText with exact
@@ -117,13 +118,13 @@ test.describe("Todo Explorer", () => {
   test("completed count is shown in the header", async ({ page }) => {
     await page.goto(TODOS_URL);
     // "1/5 done" — 1 completed out of 5
-    await expect(page.getByText("1/5 done")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("1/5 done")).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("+ Add button opens the add dialog", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-add-btn"]').click();
@@ -135,7 +136,7 @@ test.describe("Todo Explorer", () => {
   test("Escape closes the add dialog", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-add-btn"]').click();
@@ -147,7 +148,7 @@ test.describe("Todo Explorer", () => {
   test("clicking a kanban card opens the edit dialog", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Click the first card
@@ -158,7 +159,7 @@ test.describe("Todo Explorer", () => {
   test("Escape closes the edit dialog", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-card-todo_a"]').click();
@@ -170,7 +171,7 @@ test.describe("Todo Explorer", () => {
   test("checkbox is rendered for each item in list view", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-view-list"]').click();
@@ -178,13 +179,13 @@ test.describe("Todo Explorer", () => {
     const checkboxes = page.locator('input[type="checkbox"]');
     await expect(async () => {
       expect(await checkboxes.count()).toBeGreaterThanOrEqual(5);
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("delete button (✕) is visible on hover in list view", async ({ page }) => {
     await page.goto(TODOS_URL);
     await expect(page.getByText("Todo").first()).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await page.locator('[data-testid="todo-view-list"]').click();

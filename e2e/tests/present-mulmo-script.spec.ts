@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 const SCRIPT_TITLE = "Test Mulmo Script";
 const SCRIPT_DESCRIPTION = "A short test script used by the smoke test.";
 
@@ -119,7 +120,7 @@ test.describe("presentMulmoScript plugin", () => {
     await page.getByText(SCRIPT_TITLE).first().click();
 
     // Give the View a beat to mount and kick off its fetches.
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(ONE_SECOND_MS / 2);
     // Title should be rendered; no uncaught exceptions should fire.
     await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
     expect(errors).toEqual([]);
@@ -158,7 +159,7 @@ test.describe("presentMulmoScript plugin", () => {
         return Array.from(document.querySelectorAll("img")).some((img) => img.src.startsWith("data:image/png;base64,iVBOR"));
       },
       undefined,
-      { timeout: 5000 },
+      { timeout: 5 * ONE_SECOND_MS },
     );
 
     expect(renderBeatCalls.length).toBeGreaterThan(0);

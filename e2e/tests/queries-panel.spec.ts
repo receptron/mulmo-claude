@@ -5,6 +5,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }
@@ -64,7 +65,7 @@ test.describe("queries panel (useQueriesPanel)", () => {
     await query.click();
 
     // sendMessage posts to /api/agent with the query text in the body.
-    await expect.poll(() => captured.getBody(), { timeout: 3000 }).not.toBeNull();
+    await expect.poll(() => captured.getBody(), { timeout: 3 * ONE_SECOND_MS }).not.toBeNull();
     const body = captured.getBody();
     expect(body).toContain("Tell me about this app, MulmoClaude.");
 

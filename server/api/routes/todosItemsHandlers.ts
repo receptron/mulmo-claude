@@ -281,10 +281,10 @@ function applyCompletedPatch(updated: TodoItem, items: TodoItem[], columns: Stat
   }
 }
 
-export function handlePatch(items: TodoItem[], columns: StatusColumn[], id: string, input: PatchInput): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handlePatch(items: TodoItem[], columns: StatusColumn[], itemId: string, input: PatchInput): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
   const updated: TodoItem = { ...target };
 
@@ -305,7 +305,7 @@ export function handlePatch(items: TodoItem[], columns: StatusColumn[], id: stri
     if (err) return err;
   }
 
-  const next = items.map((item) => (item.id === id ? updated : item));
+  const next = items.map((item) => (item.id === itemId ? updated : item));
   return { kind: "success", items: next, item: updated };
 }
 
@@ -323,10 +323,10 @@ export interface MoveInput {
   position?: number;
 }
 
-export function handleMove(items: TodoItem[], columns: StatusColumn[], id: string, input: MoveInput): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handleMove(items: TodoItem[], columns: StatusColumn[], itemId: string, input: MoveInput): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
   const validStatusIds = new Set(columns.map((column) => column.id));
   const newStatus = input.status ?? target.status ?? defaultStatusId(columns);
@@ -345,7 +345,7 @@ export function handleMove(items: TodoItem[], columns: StatusColumn[], id: strin
   };
   // Re-collect the items in the target column with the moving item
   // pulled out, then splice item back in at `position`.
-  const others = items.filter((item) => item.id !== id && item.status === newStatus).sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+  const others = items.filter((item) => item.id !== itemId && item.status === newStatus).sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
   const insertAt = clampPosition(input.position, others.length);
   const reordered = [...others];
   reordered.splice(insertAt, 0, updatedSelf);
@@ -354,7 +354,7 @@ export function handleMove(items: TodoItem[], columns: StatusColumn[], id: strin
   reordered.forEach((item, i) => reorderedById.set(item.id, (i + 1) * ORDER_STEP));
   const nextItems = items.map((item): TodoItem => {
     const newOrder = reorderedById.get(item.id);
-    if (item.id === id) {
+    if (item.id === itemId) {
       const out: TodoItem = {
         ...updatedSelf,
         order: newOrder ?? updatedSelf.order ?? ORDER_STEP,
@@ -364,7 +364,7 @@ export function handleMove(items: TodoItem[], columns: StatusColumn[], id: strin
     if (newOrder !== undefined) return { ...item, order: newOrder };
     return item;
   });
-  const finalSelf = nextItems.find((item) => item.id === id)!;
+  const finalSelf = nextItems.find((item) => item.id === itemId)!;
   return { kind: "success", items: nextItems, item: finalSelf };
 }
 
@@ -377,10 +377,10 @@ function clampPosition(raw: number | undefined, max: number): number {
 
 // ── Delete ────────────────────────────────────────────────────────
 
-export function handleDeleteItem(items: TodoItem[], id: string): ItemsActionResult {
-  const target = items.find((i) => i.id === id);
+export function handleDeleteItem(items: TodoItem[], itemId: string): ItemsActionResult {
+  const target = items.find((item) => item.id === itemId);
   if (!target) {
-    return { kind: "error", status: 404, error: `item not found: ${id}` };
+    return { kind: "error", status: 404, error: `item not found: ${itemId}` };
   }
-  return { kind: "success", items: items.filter((item) => item.id !== id) };
+  return { kind: "success", items: items.filter((item) => item.id !== itemId) };
 }

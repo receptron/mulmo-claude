@@ -373,7 +373,7 @@ router.get(API_ROUTES.mulmoScript.beatAudio, async (req: Request<object, BeatAud
     filePath,
     {
       operation: "beat-audio",
-      onContextMissing: (r) => r.json({ audio: null }),
+      onContextMissing: (response) => response.json({ audio: null }),
     },
     async ({ context }) => {
       const beat = context.studio.script.beats[beatIndex];

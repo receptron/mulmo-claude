@@ -121,13 +121,13 @@ async function renewTokenViaPty(): Promise<boolean> {
       buffer += data;
 
       if (!responded) {
-        const m = ECHO_RE.exec(buffer);
-        if (m) {
+        const match = ECHO_RE.exec(buffer);
+        if (match) {
           // Claude echoed our "hi" — remember where the response
           // window starts so the success check looks only at bytes
           // that arrived AFTER the echo.
           responded = true;
-          echoEndIdx = m.index + m[0].length;
+          echoEndIdx = match.index + match[0].length;
         }
         return;
       }

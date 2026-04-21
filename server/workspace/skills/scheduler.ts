@@ -137,10 +137,10 @@ function readSkillScheduleInfo(skill: Skill): SkillScheduleInfo | null {
   try {
     const raw = readFileSync(skill.path, "utf-8");
     const parsed = parseSkillFrontmatter(raw);
-    const s = parsed?.schedule?.parsed;
-    if (!s) return null;
+    const schedule = parsed?.schedule?.parsed;
+    if (!schedule) return null;
     return {
-      schedule: s,
+      schedule,
       roleId: parsed?.roleId ?? DEFAULT_ROLE_ID,
     };
   } catch {

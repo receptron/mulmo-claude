@@ -7,7 +7,7 @@ import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { roleExists, deleteRole, saveRole } from "../../utils/files/roles-io.js";
 
-const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((r) => r.id));
+const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((role) => role.id));
 
 const router = Router();
 
@@ -98,7 +98,7 @@ function saveRoleResult(input: ManageRolesInput, sessionId: string): Record<stri
   const pluginsToSave = role.availablePlugins ?? [];
   const roleToSave = {
     ...role,
-    availablePlugins: pluginsToSave.filter((p) => p !== "switchRole"),
+    availablePlugins: pluginsToSave.filter((plugin) => plugin !== "switchRole"),
   };
 
   saveRole(role.id, roleToSave);

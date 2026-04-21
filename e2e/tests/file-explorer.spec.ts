@@ -3,6 +3,7 @@ import { mockAllApis } from "../fixtures/api";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 import { API_ROUTES } from "../../src/config/apiRoutes";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // Override the lazy-expand endpoint with a small fixture tree. Each
 // directory returns its immediate children only — recursion is
 // emulated by the client via subsequent fetches on expand.
@@ -116,7 +117,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBe("wiki/hello.md");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("direct URL with ?path= opens the file", async ({ page }) => {
@@ -125,7 +126,7 @@ test.describe("file explorer path in URL", () => {
 
     // The file content should be visible
     await expect(page.getByText("This is a test.")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
   });
 
@@ -137,7 +138,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("?path= with absolute path is stripped by guard", async ({ page }) => {
@@ -147,7 +148,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("editing a markdown file via the rendered-mode editor saves via PUT /api/files/content", async ({ page }) => {
@@ -184,7 +185,7 @@ test.describe("file explorer path in URL", () => {
     // on-disk source (not the rewritten display text), so edits
     // round-trip through PUT /api/files/content unmodified.
     const summary = page.getByTestId("text-response-edit-summary");
-    await expect(summary).toBeVisible({ timeout: 5000 });
+    await expect(summary).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
     await summary.click();
 
     const textarea = page.getByTestId("text-response-edit-textarea");
@@ -201,18 +202,18 @@ test.describe("file explorer path in URL", () => {
       expect(putRequests).toHaveLength(1);
       expect(putRequests[0].path).toBe("wiki/hello.md");
       expect(putRequests[0].content).toBe("# Hello\n\nEdited by the test.");
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
   test("closing a file removes ?path= from URL", async ({ page }) => {
     await page.goto("/chat?view=files&path=wiki/hello.md");
     await expect(page.getByText("This is a test.")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     // Click the close button
     await expect(page.getByTestId("close-file-btn")).toBeVisible({
-      timeout: 5000,
+      timeout: 5 * ONE_SECOND_MS,
     });
     await page.getByTestId("close-file-btn").click();
 
@@ -220,7 +221,7 @@ test.describe("file explorer path in URL", () => {
     await expect(async () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
 
     // "Select a file" placeholder should be visible
     await expect(page.getByText("Select a file")).toBeVisible();

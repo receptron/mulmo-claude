@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // Opening data/scheduler/items.json in the Files view should render
 // the scheduler plugin's calendar/tasks view instead of a raw JSON
 // blob. This covers `toSchedulerResult` + the FileContentRenderer
@@ -44,7 +45,7 @@ test.describe("Files view — scheduler preview", () => {
     await page.goto(SCHEDULER_URL);
 
     // Tabs from SchedulerView (not present in a raw-JSON code view)
-    await expect(page.locator('[data-testid="scheduler-tab-calendar"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="scheduler-tab-calendar"]')).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
     await expect(page.locator('[data-testid="scheduler-tab-tasks"]')).toBeVisible();
   });
 

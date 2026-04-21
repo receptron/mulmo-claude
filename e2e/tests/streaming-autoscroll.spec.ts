@@ -16,6 +16,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }
@@ -139,7 +140,7 @@ test.describe("assistant text streaming — auto-scroll follows the stream", () 
     await page.getByTestId("send-btn").click();
 
     await expect(page.locator("text=Streaming chunk").first()).toBeVisible({
-      timeout: 5_000,
+      timeout: 5 * ONE_SECOND_MS,
     });
 
     await waitForScrollHeightStable(page, "stack-scroll");

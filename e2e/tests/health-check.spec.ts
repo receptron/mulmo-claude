@@ -7,6 +7,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }
@@ -27,7 +28,7 @@ test.describe("health check (useHealth)", () => {
 
     const lockBtn = page.getByTestId("sandbox-lock-button");
     await expect(lockBtn).toHaveAttribute("title", "Sandbox enabled (Docker)", {
-      timeout: 3000,
+      timeout: 3 * ONE_SECOND_MS,
     });
   });
 
@@ -37,7 +38,7 @@ test.describe("health check (useHealth)", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     const lockBtn = page.getByTestId("sandbox-lock-button");
-    await expect(lockBtn).toHaveAttribute("title", "No sandbox (Docker not found)", { timeout: 3000 });
+    await expect(lockBtn).toHaveAttribute("title", "No sandbox (Docker not found)", { timeout: 3 * ONE_SECOND_MS });
   });
 
   test("fetch failure defaults gemini off + keeps sandbox displayed", async ({ page }) => {
