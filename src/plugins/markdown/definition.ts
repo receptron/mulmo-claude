@@ -5,7 +5,7 @@ export const TOOL_NAME = "presentDocument";
 export interface MarkdownToolData {
   markdown: string;
   pdfPath?: string;
-  filenameHint?: string;
+  filenamePrefix?: string;
 }
 
 /** True when the `markdown` field is a workspace-relative file path
@@ -37,13 +37,13 @@ const toolDefinition: ToolDefinition = {
         description:
           "The markdown content to display. Describe embedded images in the following format: ![Detailed image prompt](__too_be_replaced_image_path__). IMPORTANT: For embedded images, you MUST use the EXACT placeholder path '__too_be_replaced_image_path__'.",
       },
-      filenameHint: {
+      filenamePrefix: {
         type: "string",
         description:
-          "Short English filename for download (without extension). Use lowercase with hyphens, e.g. 'project-summary'. Required when the title is not in ASCII.",
+          "Short English filename prefix (without extension). Use lowercase with hyphens, e.g. 'project-summary'. The server sanitizes the value and appends a random id to prevent collisions.",
       },
     },
-    required: ["title", "markdown"],
+    required: ["title", "markdown", "filenamePrefix"],
   },
 };
 
