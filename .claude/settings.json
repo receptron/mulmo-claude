@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(yarn lint)",
+      "Bash(yarn lint 2>&1 *)",
+      "Bash(yarn typecheck)",
+      "Bash(yarn typecheck 2>&1 *)",
+      "Bash(git fetch *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
