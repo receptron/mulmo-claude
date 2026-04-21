@@ -254,11 +254,7 @@ import SkillsView from "./plugins/manageSkills/View.vue";
 import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
-import {
-  NOTIFICATION_ACTION_TYPES,
-  NOTIFICATION_VIEWS,
-  type NotificationAction,
-} from "./types/notification";
+import type { NotificationAction } from "./types/notification";
 import { CANVAS_VIEW } from "./utils/canvas/viewMode";
 import type { SseEvent } from "./types/sse";
 import { type SessionEntry, type ActiveSession } from "./types/session";
@@ -266,17 +262,20 @@ import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import {
+  applyAgentEvent,
+  type AgentEventContext,
+} from "./utils/agent/eventDispatch";
+import {
   pushErrorMessage,
   beginUserTurn,
-  applyTextEvent,
-  applyToolResultToSession,
 } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
-import { findPendingToolCall, toToolCallEntry } from "./utils/agent/toolCalls";
+import { createEmptySession } from "./utils/session/sessionFactory";
 import {
   buildLoadedSession,
   parseSessionEntries,
 } from "./utils/session/sessionEntries";
+import { resolveNotificationTarget } from "./utils/notification/dispatch";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useClickOutside } from "./composables/useClickOutside";
 import { useKeyNavigation } from "./composables/useKeyNavigation";
@@ -351,15 +350,12 @@ function navigateToSession(id: string, replace = false): void {
 }
 
 function handleNotificationNavigate(action: NotificationAction): void {
-  if (action.type !== NOTIFICATION_ACTION_TYPES.navigate) return;
-  if (action.view === NOTIFICATION_VIEWS.chat) {
-    if (action.sessionId) navigateToSession(action.sessionId);
-  } else if (action.view === NOTIFICATION_VIEWS.todos) {
-    setCanvasViewMode(CANVAS_VIEW.todos);
-  } else if (action.view === NOTIFICATION_VIEWS.scheduler) {
-    setCanvasViewMode(CANVAS_VIEW.scheduler);
-  } else if (action.view === NOTIFICATION_VIEWS.files) {
-    setCanvasViewMode(CANVAS_VIEW.files);
+  const target = resolveNotificationTarget(action);
+  if (!target) return;
+  if (target.kind === "session") {
+    navigateToSession(target.sessionId);
+  } else {
+    setCanvasViewMode(CANVAS_VIEW[target.view]);
   }
 }
 
@@ -644,32 +640,15 @@ function removeCurrentIfEmpty(): boolean {
 }
 
 function createNewSession(roleId?: string): ActiveSession {
-  // Remove the current session if it's empty (no messages exchanged).
   removeCurrentIfEmpty();
-
-  const id = uuidv4();
   const rId = roleId ?? currentRoleId.value;
-  const now = new Date().toISOString();
-  const session: ActiveSession = {
-    id,
-    roleId: rId,
-    toolResults: [],
-    resultTimestamps: new Map(),
-    isRunning: false,
-    statusMessage: "",
-    toolCallHistory: [],
-    selectedResultUuid: null,
-    hasUnread: false,
-    startedAt: now,
-    updatedAt: now,
-    runStartIndex: 0,
-  };
-  sessionMap.set(id, session);
-  navigateToSession(id, true);
+  const session = createEmptySession(uuidv4(), rId);
+  sessionMap.set(session.id, session);
+  navigateToSession(session.id, true);
   currentRoleId.value = rId;
   suggestionsPanelRef.value?.collapse();
   nextTick(() => focusChatInput());
-  return sessionMap.get(id)!;
+  return sessionMap.get(session.id)!;
 }
 
 function onRoleChange() {
@@ -792,67 +771,6 @@ function unsubscribeSession(chatSessionId: string): void {
   if (unsub) {
     unsub();
     sessionSubscriptions.delete(chatSessionId);
-  }
-}
-
-// Dispatch a single event from the agent pub/sub channel against an
-// active session. Hoisted so its switch counts toward its own
-// cognitive-complexity budget rather than ballooning the caller's
-// score. Reactive refs / callbacks that live in the setup scope are
-// passed via `ctx` — this keeps the handler a regular named function
-// with a clear signature.
-interface AgentEventContext {
-  session: ActiveSession;
-  setCurrentRoleId: (roleId: string) => void;
-  onRoleChange: () => void;
-  refreshRoles: () => Promise<void>;
-  scrollSidebarToBottom: () => void;
-}
-
-async function applyAgentEvent(
-  event: SseEvent,
-  ctx: AgentEventContext,
-): Promise<void> {
-  const { session } = ctx;
-  switch (event.type) {
-    case EVENT_TYPES.toolCall:
-      session.toolCallHistory.push(toToolCallEntry(event));
-      ctx.scrollSidebarToBottom();
-      return;
-    case EVENT_TYPES.toolCallResult: {
-      const entry = findPendingToolCall(
-        session.toolCallHistory,
-        event.toolUseId,
-      );
-      if (entry) entry.result = event.content;
-      ctx.scrollSidebarToBottom();
-      return;
-    }
-    case EVENT_TYPES.status:
-      session.statusMessage = event.message;
-      return;
-    case EVENT_TYPES.switchRole:
-      setTimeout(() => {
-        ctx.setCurrentRoleId(event.roleId);
-        ctx.onRoleChange();
-      }, 0);
-      return;
-    case EVENT_TYPES.rolesUpdated:
-      await ctx.refreshRoles();
-      return;
-    case EVENT_TYPES.text:
-      applyTextEvent(session, event.message, event.source ?? "assistant");
-      return;
-    case EVENT_TYPES.toolResult:
-      applyToolResultToSession(session, event.result);
-      return;
-    case EVENT_TYPES.error:
-      console.error("[agent] error event:", event.message);
-      pushErrorMessage(session, event.message);
-      return;
-    case EVENT_TYPES.sessionFinished:
-      // Handled in the subscription callback — no-op here.
-      return;
   }
 }
 
