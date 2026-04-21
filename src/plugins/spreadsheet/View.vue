@@ -148,6 +148,7 @@ import "./engine/functions";
 import { apiGet, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import type { FilesContentResponseLike } from "./engine/responseDecoder";
+import { isObj, isRecord } from "../../utils/types";
 
 /**
  * Normalize malformed data structures
@@ -179,7 +180,7 @@ function normalizeSheetData(data: any): any[][] {
 
   // If data is a flat array of cell objects, convert to 2D by pairing cells
   // Pattern: [cell1, cell2, cell3, cell4] -> [[cell1, cell2], [cell3, cell4]]
-  if (typeof data[0] === "object" && data[0] !== null) {
+  if (isObj(data[0])) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[][] = [];
     for (let i = 0; i < data.length; i += 2) {
@@ -441,13 +442,9 @@ function openMiniEditor(rowIndex: number, colIndex: number) {
     const cellValue = normalizedData[rowIndex][colIndex];
 
     // Determine cell type and extract values (new format: {v, f})
-    if (
-      typeof cellValue === "object" &&
-      cellValue !== null &&
-      "v" in cellValue
-    ) {
+    if (isRecord(cellValue) && "v" in cellValue) {
       const value = cellValue.v;
-      const format = cellValue.f ?? "";
+      const format = typeof cellValue.f === "string" ? cellValue.f : "";
 
       // Check if it's a formula (value starts with "=")
       if (typeof value === "string" && value.startsWith("=")) {

@@ -11,26 +11,26 @@ import { PUBSUB_CHANNELS } from "../config/pubsubChannels";
 import { usePubSub } from "./usePubSub";
 import { NOTIFICATION_KINDS } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
+import { isRecord } from "../utils/types";
 
 const MAX_RECENT = 50;
 
 const VALID_KINDS = new Set<string>(Object.values(NOTIFICATION_KINDS));
 
 function isNotificationPayload(value: unknown): value is NotificationPayload {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  if (typeof v.id !== "string") return false;
-  if (typeof v.kind !== "string" || !VALID_KINDS.has(v.kind)) return false;
-  if (typeof v.title !== "string") return false;
-  if (typeof v.firedAt !== "string") return false;
-  if (!isValidAction(v.action)) return false;
+  if (!isRecord(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (typeof value.kind !== "string" || !VALID_KINDS.has(value.kind))
+    return false;
+  if (typeof value.title !== "string") return false;
+  if (typeof value.firedAt !== "string") return false;
+  if (!isValidAction(value.action)) return false;
   return true;
 }
 
 function isValidAction(action: unknown): boolean {
-  if (action === null || typeof action !== "object") return false;
-  const a = action as Record<string, unknown>;
-  return typeof a.type === "string";
+  if (!isRecord(action)) return false;
+  return typeof action.type === "string";
 }
 
 // Module-level state so all components share the same list.
