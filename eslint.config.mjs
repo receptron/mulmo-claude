@@ -60,15 +60,8 @@ export default [
           exceptions: [
             "i",
             "j",
-            "_",
-            "id",
-            "ok",
             "fs",
-            "os",
-            "ts",
-            "ms",
-            "md",
-            "it",
+            "os"
           ],
         },
       ],
