@@ -137,7 +137,7 @@ export function buildLoadedSession(opts: {
     statusMessage: serverSummary?.statusMessage ?? "",
     toolCallHistory: [],
     selectedResultUuid,
-    hasUnread: false,
+    hasUnread: serverSummary?.hasUnread ?? false,
     startedAt,
     updatedAt,
     runStartIndex: toolResults.length,

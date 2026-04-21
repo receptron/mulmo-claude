@@ -81,6 +81,7 @@ export function applyTextEvent(
   if (source === "user") {
     if (!isDuplicateUserText(session, message)) {
       pushResult(session, makeTextResult(message, "user"));
+      session.runStartIndex = session.toolResults.length;
     }
     return;
   }

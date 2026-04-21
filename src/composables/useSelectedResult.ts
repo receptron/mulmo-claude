@@ -41,6 +41,8 @@ export function useSelectedResult(opts: {
     (newResult) => {
       const session = opts.sessionMap.get(opts.currentSessionId.value);
       if (!session) return;
+      // Ignore malformed (array) values rather than clobbering state.
+      if (Array.isArray(newResult)) return;
       const resultId = typeof newResult === "string" ? newResult : null;
       if (resultId !== session.selectedResultUuid) {
         session.selectedResultUuid = resultId;

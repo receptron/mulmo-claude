@@ -14,7 +14,13 @@ export function useChatScroll(opts: {
   const { toolResultsPanelRef, toolResults, isRunning, chatInputRef } = opts;
 
   const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
-  const toolResultsLength = computed(() => toolResults.value.length);
+  // Key that changes both on new results AND on streaming updates to
+  // the last text card (which appends in place, leaving length stable).
+  const latestResultScrollKey = computed(() => {
+    const list = toolResults.value;
+    const last = list[list.length - 1];
+    return `${list.length}:${last?.uuid ?? ""}:${last?.message ?? ""}`;
+  });
 
   function scrollChatToBottom(): void {
     nextTick(() => {
@@ -28,7 +34,7 @@ export function useChatScroll(opts: {
     chatInputRef.value?.focus();
   }
 
-  watch(toolResultsLength, scrollChatToBottom);
+  watch(latestResultScrollKey, scrollChatToBottom);
   watch(isRunning, (running) => {
     if (running) {
       scrollChatToBottom();
