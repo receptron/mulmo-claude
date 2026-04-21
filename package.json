@@ -1,6 +1,6 @@
 {
   "name": "mulmoclaude",
-  "private": true,
+  "private": false,
   "version": "0.2.0",
   "type": "module",
   "author": "snakajima",
@@ -107,5 +107,8 @@
     "vite": "^8.0.8",
     "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^3.2.7"
+  },
+  "bin": {
+    "mulmoclaude": "scripts/mulmoclaude.mjs"
   }
 }

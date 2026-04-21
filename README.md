@@ -8,6 +8,19 @@ Chat with Claude Code and get back not just text but **interactive visual output
 
 ## Quick Start
 
+### Option A: Run directly with npx
+
+```bash
+npx mulmoclaude
+```
+
+This starts both services for local use:
+
+- Vue client: `http://localhost:5173`
+- Express server: `http://localhost:3001`
+
+### Option B: Clone and run from source
+
 ```bash
 # 1. Clone and install
 git clone git@github.com:receptron/mulmoclaude.git
