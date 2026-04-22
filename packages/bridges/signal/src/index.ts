@@ -49,7 +49,12 @@ mulmo.onPush((pushEvent) => {
 
 // ── Send ────────────────────────────────────────────────────────
 
-async function sendSignal(recipientNumber: string, text: string): Promise<void> {
+// Chat-id encoding mirrors signal-cli-rest-api recipient conventions:
+//   - 1:1 DM:   E.164 number (e.g. "+81901234567")
+//   - Group v2: "group.<base64-id>" — signal-cli accepts this as a
+//               recipient on /v2/send, so there's nothing to decode
+//               on the send path, we just pass chatId through.
+async function sendSignal(chatId: string, text: string): Promise<void> {
   const chunks = chunkText(text, MAX_SIGNAL_TEXT);
   for (const chunk of chunks) {
     let res: Response;
@@ -60,7 +65,7 @@ async function sendSignal(recipientNumber: string, text: string): Promise<void> 
         body: JSON.stringify({
           message: chunk,
           number: botNumber,
-          recipients: [recipientNumber],
+          recipients: [chatId],
         }),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -85,7 +90,27 @@ function isObj(value: unknown): value is JsonRecord {
 
 interface IncomingSignal {
   sourceNumber: string;
+  /** Stable conversation id. For DMs = sourceNumber; for groups =
+   *  "group.<base64-id>" so signal-cli-rest-api can route replies
+   *  back to the group on /v2/send. This is also what MulmoClaude
+   *  keys its session on, so DM and group threads stay separate. */
+  chatId: string;
+  /** True iff the message arrived in a group conversation. */
+  isGroup: boolean;
   text: string;
+}
+
+function extractGroupId(dataMessage: JsonRecord): string {
+  // Signal envelopes from signal-cli-rest-api surface groups in one of
+  // two shapes depending on daemon version:
+  //   - v2: dataMessage.groupInfo.groupId (base64)
+  //   - new: dataMessage.groupV2.id (also base64)
+  // Either form is accepted as a recipient prefix.
+  const groupV2 = isObj(dataMessage.groupV2) ? dataMessage.groupV2 : null;
+  if (groupV2 && typeof groupV2.id === "string" && groupV2.id.length > 0) return groupV2.id;
+  const info = isObj(dataMessage.groupInfo) ? dataMessage.groupInfo : null;
+  if (info && typeof info.groupId === "string" && info.groupId.length > 0) return info.groupId;
+  return "";
 }
 
 function parseEnvelope(raw: string): IncomingSignal | null {
@@ -108,8 +133,11 @@ function parseEnvelope(raw: string): IncomingSignal | null {
   const sourceNumber = typeof envelope.sourceNumber === "string" && E164_PHONE.test(envelope.sourceNumber) ? envelope.sourceNumber : "";
   const dataMessage = isObj(envelope.dataMessage) ? envelope.dataMessage : null;
   const text = dataMessage && typeof dataMessage.message === "string" ? dataMessage.message.trim() : "";
-  if (!sourceNumber || !text) return null;
-  return { sourceNumber, text };
+  if (!sourceNumber || !text || !dataMessage) return null;
+
+  const groupId = extractGroupId(dataMessage);
+  const chatId = groupId ? `group.${groupId}` : sourceNumber;
+  return { sourceNumber, chatId, isGroup: Boolean(groupId), text };
 }
 
 // E.164: `+` followed by 1-15 digits, first digit non-zero. Signal
@@ -121,20 +149,26 @@ async function handleEnvelope(raw: string): Promise<void> {
   const msg = parseEnvelope(raw);
   if (!msg) return;
 
+  // Allowlist still checks the HUMAN sender — a group chat where only
+  // one user is whitelisted should still only respond to that user.
   if (!allowAll && !allowedNumbers.has(msg.sourceNumber)) {
     console.log(`[signal] denied from=${msg.sourceNumber}`);
     return;
   }
 
-  console.log(`[signal] message from=${msg.sourceNumber} len=${msg.text.length}`);
+  const kind = msg.isGroup ? "group" : "dm";
+  console.log(`[signal] ${kind} message from=${msg.sourceNumber} chatId=${msg.chatId} len=${msg.text.length}`);
 
   try {
-    const ack = await mulmo.send(msg.sourceNumber, msg.text);
+    // chatId keeps group threads separate from the sender's DM thread
+    // on the MulmoClaude side. Replies go to the same conversation
+    // the message came from (group → group, DM → sender).
+    const ack = await mulmo.send(msg.chatId, msg.text);
     if (ack.ok) {
-      await sendSignal(msg.sourceNumber, ack.reply ?? "");
+      await sendSignal(msg.chatId, ack.reply ?? "");
     } else {
       const status = ack.status ? ` (${ack.status})` : "";
-      await sendSignal(msg.sourceNumber, `Error${status}: ${ack.error ?? "unknown"}`);
+      await sendSignal(msg.chatId, `Error${status}: ${ack.error ?? "unknown"}`);
     }
   } catch (err) {
     console.error(`[signal] handleEnvelope error: ${err}`);
@@ -143,12 +177,11 @@ async function handleEnvelope(raw: string): Promise<void> {
 
 // ── WebSocket loop ──────────────────────────────────────────────
 
-// Module-scoped so the backoff survives across `connect()` calls. A
-// previous version declared this inside `connect()`, which reset it
-// to RECONNECT_BASE_MS on every reconnect — so a daemon flapping in
-// a tight close loop would reconnect every ~1s forever instead of
-// backing off. Reset to the base on successful `open`; double (capped
-// at RECONNECT_MAX_MS) on each close.
+// Reconnect delay lives at module scope so each new connect() call
+// sees the value accumulated across previous failures. Previously
+// `let backoffMs` inside connect() meant every reconnect reset to
+// RECONNECT_BASE_MS — the "exponential backoff" was in practice a
+// 1 s retry loop while the daemon was down.
 let backoffMs = RECONNECT_BASE_MS;
 
 function connect(): void {
@@ -168,10 +201,10 @@ function connect(): void {
   });
 
   socket.on("close", (code, reason) => {
-    const wait = backoffMs;
+    const delayMs = backoffMs;
     backoffMs = Math.min(backoffMs * 2, RECONNECT_MAX_MS);
-    console.warn(`[signal] stream closed code=${code} reason=${reason.toString().slice(0, 100)}; reconnecting in ${wait}ms`);
-    setTimeout(connect, wait);
+    console.warn(`[signal] stream closed code=${code} reason=${reason.toString().slice(0, 100)}; reconnecting in ${delayMs}ms (next ${backoffMs}ms)`);
+    setTimeout(() => connect(), delayMs);
   });
 }
 

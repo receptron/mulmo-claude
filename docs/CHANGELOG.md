@@ -16,6 +16,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 - `@mulmobridge/xmpp` (v0.1.0) — XMPP / Jabber bridge. Connects with JID + password to any XMPP server over TLS, handles `type=chat` message stanzas.
 - `@mulmobridge/rocketchat` (v0.1.0) — Rocket.Chat bridge. Polls the bot's DM rooms via REST with personal access token auth; chunked replies.
 - `@mulmobridge/signal` (v0.1.0) — Signal bridge. Talks to a locally running [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) daemon over WebSocket (receive) + REST (send); number-based allowlist.
+- `@mulmobridge/teams` (v0.1.0) — Microsoft Teams bridge via Bot Framework (`botbuilder` SDK). Webhook receiver + Azure AD JWT validation; conversation-reference cache for push delivery; AAD object-id allowlist. **Requires a public URL** — Teams endpoint validation is strict.
 
 ---
 

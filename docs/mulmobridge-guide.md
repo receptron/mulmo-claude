@@ -100,6 +100,7 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
 | **XMPP / Jabber** | [@mulmobridge/xmpp](https://www.npmjs.com/package/@mulmobridge/xmpp) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/xmpp/README.md) |
 | **Rocket.Chat** | [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/rocketchat/README.md) |
 | **Signal** | [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/signal/README.md) |
+| **Microsoft Teams** | [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/teams/README.md) |
 
 > **「実験的」とは？** テストが十分でなく、バグがある可能性があります。フィードバックをお待ちしています！
 
@@ -235,6 +236,7 @@ if (ack.ok) {
 | [@mulmobridge/xmpp](https://www.npmjs.com/package/@mulmobridge/xmpp) | XMPP / Jabber ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/xmpp) |
 | [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | Rocket.Chat ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/rocketchat) |
 | [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | Signal ブリッジ (signal-cli-rest-api 経由) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/signal) |
+| [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | Microsoft Teams ブリッジ (Bot Framework) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/teams) |
 
 ### 汎用ツール（@receptron スコープ）
 
