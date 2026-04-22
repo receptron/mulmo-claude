@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, isNavigationFailure, type LocationQuery } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { marked } from "marked";
@@ -119,7 +119,7 @@ const title = ref(props.selectedResult?.data?.title ?? "Wiki");
 const content = ref(props.selectedResult?.data?.content ?? "");
 const pageEntries = ref<WikiPageEntry[]>(props.selectedResult?.data?.pageEntries ?? []);
 
-const { refresh } = useFreshPluginData<WikiData>({
+const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
   // fetch that page by slug; otherwise fetch the index.
   endpoint: () => {
@@ -133,6 +133,15 @@ const { refresh } = useFreshPluginData<WikiData>({
     content.value = data.content ?? "";
     pageEntries.value = data.pageEntries ?? [];
   },
+});
+
+onMounted(() => {
+  // On /wiki, the route watcher below fires with `immediate: true` and
+  // is the source of truth for the initial fetch (via POST callApi).
+  // useFreshPluginData's mount fetch is GET-only and always returns
+  // the index payload — if it resolves last, it clobbers log / lint /
+  // page state. Cancel it here so the two can't race.
+  if (route.name === PAGE_ROUTES.wiki) abortFreshFetch();
 });
 
 watch(
