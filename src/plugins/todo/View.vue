@@ -27,7 +27,12 @@
         {{ entry.label }}
         <span class="opacity-60">{{ entry.count }}</span>
       </button>
-      <button v-if="activeFilters.size > 0" class="ml-auto text-xs text-gray-500 hover:text-gray-700" title="Clear all filters" @click="clearFilters">
+      <button
+        v-if="activeFilters.size > 0"
+        class="ml-auto text-xs text-gray-500 hover:text-gray-700"
+        :title="t('pluginTodo.clearFilters')"
+        @click="clearFilters"
+      >
         Clear ✕
       </button>
     </div>
@@ -62,7 +67,7 @@
           </div>
           <button
             class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 shrink-0"
-            title="Delete item"
+            :title="t('pluginTodo.deleteItem')"
             @click.stop="remove(item)"
           >
             ✕
@@ -94,12 +99,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { colorForLabel, filterByLabels, listLabelsWithCount, subtractLabels } from "./labels";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TodoData>;

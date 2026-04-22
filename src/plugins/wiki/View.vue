@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-3">
-        <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" title="Back to index" @click="navigate('index')">
+        <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" :title="t('pluginWiki.backToIndex')" @click="navigate('index')">
           <span class="material-icons text-base">arrow_back</span>
         </button>
         <h2 class="text-lg font-semibold text-gray-800">{{ title }}</h2>
@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
@@ -93,6 +94,8 @@ import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImage
 import { apiPost, apiFetchRaw } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult?: ToolResultComplete<WikiData>;

@@ -194,6 +194,40 @@ const enMessages = {
     errIdExists: 'Server id "{id}" already exists.',
     errBadHttpUrl: "HTTP URL must start with http:// or https://",
   },
+  pluginScheduler: {
+    prev: "Previous",
+    today: "Today",
+    goToday: "Go to today",
+    next: "Next",
+    deleteItem: "Delete item",
+    closeEditor: "Close editor",
+  },
+  pluginCanvas: {
+    undo: "Undo",
+    redo: "Redo",
+    clear: "Clear",
+  },
+  pluginTodo: {
+    clearFilters: "Clear all filters",
+    deleteItem: "Delete item",
+  },
+  pluginWiki: {
+    backToIndex: "Back to index",
+  },
+  pluginPresentHtml: {
+    saveAsPdf: "Save as PDF (opens print dialog)",
+  },
+  pluginManageSource: {
+    titlePlaceholder: "Title (optional)",
+  },
+  pluginManageSkills: {
+    deleteProjectSkill: "Delete this project-scope skill",
+  },
+  pluginSpreadsheet: {
+    valuePlaceholder: "Value",
+    valueOrFormulaPlaceholder: "Value or Formula (e.g., 100 or SUM(B2:B11))",
+    formatPlaceholder: "Format (e.g., $#,##0.00)",
+  },
 };
 
 export default enMessages;

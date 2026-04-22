@@ -46,7 +46,7 @@
         <input
           v-model="draft.title"
           class="w-40 text-xs border border-gray-300 rounded px-2 py-1"
-          placeholder="Title (optional)"
+          :placeholder="t('pluginManageSource.titlePlaceholder')"
           data-testid="sources-draft-title"
           @keydown.enter="commitAdd"
         />
@@ -188,12 +188,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSourceData, RebuildSummary, Source } from "./index";
 import { apiGet, apiPost, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<ManageSourceData>;

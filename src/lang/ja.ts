@@ -185,6 +185,40 @@ const jaMessages = {
     errIdExists: "サーバ ID「{id}」は既に存在します。",
     errBadHttpUrl: "HTTP URL は http:// または https:// で始める必要があります",
   },
+  pluginScheduler: {
+    prev: "前へ",
+    today: "今日",
+    goToday: "今日へ移動",
+    next: "次へ",
+    deleteItem: "項目を削除",
+    closeEditor: "エディタを閉じる",
+  },
+  pluginCanvas: {
+    undo: "元に戻す",
+    redo: "やり直し",
+    clear: "クリア",
+  },
+  pluginTodo: {
+    clearFilters: "すべてのフィルタをクリア",
+    deleteItem: "項目を削除",
+  },
+  pluginWiki: {
+    backToIndex: "インデックスに戻る",
+  },
+  pluginPresentHtml: {
+    saveAsPdf: "PDF として保存（印刷ダイアログを開きます）",
+  },
+  pluginManageSource: {
+    titlePlaceholder: "タイトル（省略可）",
+  },
+  pluginManageSkills: {
+    deleteProjectSkill: "このプロジェクト限定スキルを削除",
+  },
+  pluginSpreadsheet: {
+    valuePlaceholder: "値",
+    valueOrFormulaPlaceholder: "値または数式（例: 100, SUM(B2:B11)）",
+    formatPlaceholder: "書式（例: $#,##0.00）",
+  },
 };
 
 export default jaMessages;

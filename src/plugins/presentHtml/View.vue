@@ -5,7 +5,7 @@
       <div class="flex items-center gap-2">
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
-          title="Save as PDF (opens print dialog)"
+          :title="t('pluginPresentHtml.saveAsPdf')"
           @click="printToPdf"
         >
           <span class="material-icons text-sm align-middle">picture_as_pdf</span>
@@ -25,8 +25,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentHtmlData>;
