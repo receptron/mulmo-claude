@@ -118,12 +118,8 @@ const artStyles = [
   { id: "pixelart", label: "Pixel Art" },
 ];
 
-const applyStyle = async (style: { id: string; label: string }) => {
-  const saved = await saveDrawingState();
-  if (!saved) return;
-  if (props.sendTextMessage) {
-    props.sendTextMessage(`Turn my drawing on the canvas into a ${style.label} style image.`);
-  }
+const applyStyle = (style: { id: string; label: string }) => {
+  props.sendTextMessage?.(`Turn my drawing on the canvas into a ${style.label} style image.`);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
