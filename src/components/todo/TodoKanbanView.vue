@@ -32,7 +32,7 @@
               <span class="text-xs text-gray-500 shrink-0">{{ itemsByColumn(col.id).length }}</span>
             </div>
             <div class="relative">
-              <button class="text-gray-400 hover:text-gray-600 px-1" title="Column actions" @click="toggleMenu(col.id)">
+              <button class="text-gray-400 hover:text-gray-600 px-1" :title="t('todoKanban.columnActions')" @click="toggleMenu(col.id)">
                 <span class="material-icons text-base">more_horiz</span>
               </button>
               <div
@@ -40,11 +40,13 @@
                 class="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded shadow-md text-xs w-40 py-1"
                 @click.stop
               >
-                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="startRename(col)">Rename</button>
+                <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="startRename(col)">{{ t("todoKanban.rename") }}</button>
                 <button class="w-full text-left px-3 py-1.5 hover:bg-gray-50" @click="markAsDone(col.id)">
-                  {{ col.isDone ? "Already done column" : "Mark as done column" }}
+                  {{ col.isDone ? t("todoKanban.alreadyDoneColumn") : t("todoKanban.markAsDoneColumn") }}
                 </button>
-                <button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50" @click="deleteColumn(col.id)">Delete column</button>
+                <button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50" @click="deleteColumn(col.id)">
+                  {{ t("todoKanban.deleteColumn") }}
+                </button>
               </div>
             </div>
           </div>
@@ -103,7 +105,7 @@
 
           <!-- Add card stub -->
           <button class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors" @click="emit('quickAdd', col.id)">
-            + Add card
+            {{ t("todoKanban.addCard") }}
           </button>
         </div>
       </template>
@@ -113,10 +115,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import draggable from "vuedraggable";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import { colorForLabel } from "../../plugins/todo/labels";
 import { PRIORITY_BORDER, PRIORITY_CLASSES, PRIORITY_LABELS, dueDateClasses, formatDueLabel } from "../../plugins/todo/priority";
+
+const { t } = useI18n();
 
 // vuedraggable @change event shape. The library emits one of these
 // three keys depending on whether the move was within the same list,

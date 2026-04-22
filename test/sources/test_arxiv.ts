@@ -39,6 +39,8 @@ function makeState(over: Partial<SourceState> = {}): SourceState {
     cursor: {},
     consecutiveFailures: 0,
     nextAttemptAt: null,
+    consecutiveEmptyFetches: 0,
+    emptyBackoffUntil: null,
     ...over,
   };
 }
@@ -47,8 +49,8 @@ function controllableClock(): RateLimiterDeps {
   const state = { t: 0 };
   return {
     now: () => state.t,
-    sleep: (ms) => {
-      state.t += ms;
+    sleep: (delayMs) => {
+      state.t += delayMs;
       return Promise.resolve();
     },
   };

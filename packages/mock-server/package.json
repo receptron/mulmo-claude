@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/mock-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mock MulmoClaude server for testing MulmoBridge bridges — no Claude API key needed",
   "type": "module",
   "main": "./dist/index.js",

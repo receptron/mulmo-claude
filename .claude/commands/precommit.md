@@ -117,7 +117,12 @@ Run `git diff --stat` and `git diff` first, then check every item below against 
 - [ ] **No `eslint-disable-line` or `eslint-disable-next-line`.** If the lint rule fires, fix the code — don't suppress. The only exception is `@typescript-eslint/no-explicit-any` in test mocks where the mock intentionally returns `as any` to satisfy a type constraint that doesn't matter for the test.
 - [ ] No `@ts-ignore` or `@ts-expect-error`.
 
-## 14. Dependencies
+## 14. Workspace Package Exports (Docker)
+
+- [ ] Every workspace package `package.json` with an `"exports"` field, including `packages/*` and `packages/bridges/*`, includes `"require"` and `"default"` conditions (not just `"import"`). Missing `"require"` silently breaks the MCP server in the Docker sandbox.
+- [ ] If Docker volume mounts in `server/agent/config.ts` changed, or package exports changed, run `npx tsx --test test/agent/test_mcp_docker_smoke.ts` locally to verify.
+
+## 15. Dependencies
 
 - [ ] **No unnecessary npm packages.** If the functionality can be implemented in <50 lines of pure code, do that instead of adding a dependency.
 - [ ] Prefer **mature, mainstream packages** with large user bases, stable APIs, and infrequent breaking changes (e.g., `express`, `marked`, `zod`, `uuid`).

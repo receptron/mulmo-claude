@@ -7,14 +7,6 @@ export interface ImageToolData {
   prompt: string;
 }
 
-export interface CanvasDrawingState {
-  brushSize?: number;
-  brushColor?: string;
-  canvasWidth?: number;
-  canvasHeight?: number;
-  strokes?: unknown[];
-}
-
 const toolDefinition: ToolDefinition = {
   type: "function",
   name: TOOL_NAME,

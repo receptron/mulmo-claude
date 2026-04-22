@@ -1,25 +1,25 @@
 <template>
   <div class="spreadsheet-container">
     <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">Loading spreadsheet...</div>
+      <div class="text-gray-500">{{ t("pluginSpreadsheet.loading") }}</div>
     </div>
     <div v-else-if="errorMessage" class="min-h-full p-8 flex items-center justify-center">
       <div class="error">{{ errorMessage }}</div>
     </div>
     <div v-else-if="!resolvedSheets || resolvedSheets.length === 0" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">No spreadsheet data available</div>
+      <div class="text-gray-500">{{ t("pluginSpreadsheet.noData") }}</div>
     </div>
     <template v-else>
       <div class="spreadsheet-content-wrapper">
         <div class="p-4">
           <div class="header">
             <h1 class="title">
-              {{ selectedResult.title || "Spreadsheet" }}
+              {{ selectedResult.title || t("pluginSpreadsheet.untitled") }}
             </h1>
             <div class="button-group">
               <button class="download-btn excel-btn" @click="downloadExcel">
                 <span class="material-icons">download</span>
-                Excel
+                {{ t("pluginSpreadsheet.excel") }}
               </button>
             </div>
           </div>
@@ -43,9 +43,9 @@
 
       <!-- Collapsible Editor -->
       <details v-if="!miniEditorOpen" ref="editorDetails" class="spreadsheet-source">
-        <summary>Edit Spreadsheet Data</summary>
+        <summary>{{ t("pluginSpreadsheet.editData") }}</summary>
         <textarea ref="editorTextarea" v-model="editableData" class="spreadsheet-editor" spellcheck="false" @input="handleDataEdit"></textarea>
-        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">Apply Changes</button>
+        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">{{ t("pluginSpreadsheet.applyChanges") }}</button>
       </details>
 
       <!-- Mini Editor at Bottom -->
@@ -57,11 +57,11 @@
           <div class="radio-group">
             <label class="radio-option">
               <input v-model="miniEditorType" type="radio" value="string" />
-              String
+              {{ t("pluginSpreadsheet.stringType") }}
             </label>
             <label class="radio-option">
               <input v-model="miniEditorType" type="radio" value="object" />
-              Formula
+              {{ t("pluginSpreadsheet.formulaType") }}
             </label>
           </div>
 
@@ -71,7 +71,7 @@
             v-model="miniEditorValue"
             type="text"
             class="form-input"
-            placeholder="Value"
+            :placeholder="t('pluginSpreadsheet.valuePlaceholder')"
             @keyup.enter="saveMiniEditor"
           />
 
@@ -81,13 +81,19 @@
               v-model="miniEditorFormula"
               type="text"
               class="form-input"
-              placeholder="Value or Formula (e.g., 100 or SUM(B2:B11))"
+              :placeholder="t('pluginSpreadsheet.valueOrFormulaPlaceholder')"
               @keyup.enter="saveMiniEditor"
             />
-            <input v-model="miniEditorFormat" type="text" class="form-input" placeholder="Format (e.g., $#,##0.00)" @keyup.enter="saveMiniEditor" />
+            <input
+              v-model="miniEditorFormat"
+              type="text"
+              class="form-input"
+              :placeholder="t('pluginSpreadsheet.formatPlaceholder')"
+              @keyup.enter="saveMiniEditor"
+            />
           </template>
 
-          <button class="save-btn" @click="saveMiniEditor">Update</button>
+          <button class="save-btn" @click="saveMiniEditor">{{ t("pluginSpreadsheet.update") }}</button>
           <button class="cancel-btn" @click="closeMiniEditor">✕</button>
         </div>
       </div>
@@ -97,6 +103,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import * as XLSX from "xlsx";
 import type { ToolResult } from "gui-chat-protocol";
 import type { SpreadsheetToolData, SpreadsheetSheet } from "./definition";
@@ -118,6 +125,8 @@ import { apiGet, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import type { FilesContentResponseLike } from "./engine/responseDecoder";
 import { isObj, isRecord } from "../../utils/types";
+
+const { t } = useI18n();
 
 /**
  * Normalize malformed data structures

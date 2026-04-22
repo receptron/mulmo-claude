@@ -6,17 +6,17 @@
     <button
       v-if="isMarkdown"
       class="ml-auto shrink-0 px-2 py-0.5 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 font-sans"
-      :title="mdRawMode ? 'Show rendered Markdown' : 'Show raw source'"
+      :title="mdRawMode ? t('fileContentHeader.showRendered') : t('fileContentHeader.showRaw')"
       @click="emit('toggleMdRaw')"
     >
-      {{ mdRawMode ? "Rendered" : "Raw" }}
+      {{ mdRawMode ? t("fileContentHeader.rendered") : t("fileContentHeader.raw") }}
     </button>
     <button
       type="button"
       class="shrink-0 px-1 py-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
       :class="{ 'ml-auto': !isMarkdown }"
-      title="Close file"
-      aria-label="Close file"
+      :title="t('fileContentHeader.closeFile')"
+      :aria-label="t('fileContentHeader.closeFile')"
       data-testid="close-file-btn"
       @click="emit('deselect')"
     >
@@ -26,7 +26,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { formatDateTime } from "../utils/format/date";
+
+const { t } = useI18n();
 
 defineProps<{
   selectedPath: string | null;

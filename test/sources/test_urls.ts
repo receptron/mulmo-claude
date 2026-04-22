@@ -117,9 +117,9 @@ describe("stableItemId", () => {
 
   it("is always 16 hex chars (SHA-256 truncated to 64 bits)", () => {
     for (const input of ["", "x", "https://example.com/a", "https://example.com/" + "x".repeat(1000)]) {
-      const id = stableItemId(input);
-      assert.equal(id.length, 16);
-      assert.match(id, /^[0-9a-f]{16}$/);
+      const itemId = stableItemId(input);
+      assert.equal(itemId.length, 16);
+      assert.match(itemId, /^[0-9a-f]{16}$/);
     }
   });
 

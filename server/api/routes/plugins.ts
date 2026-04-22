@@ -261,10 +261,20 @@ router.post(
   wrapPluginExecute((req) => executeForm(null as never, req.body)),
 );
 
+// 1×1 transparent PNG. Used as a placeholder so the canvas tool
+// result can carry a stable file path from the moment the canvas
+// is opened — client autosaves PUT-overwrite this same file, so the
+// drawing survives page reload with zero client→server sync.
+const BLANK_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
+
 // openCanvas — drawing canvas
 router.post(
   API_ROUTES.plugins.canvas,
-  wrapPluginExecute(() => executeOpenCanvas()),
+  wrapPluginExecute(async () => {
+    const imagePath = await saveImage(BLANK_PNG_BASE64);
+    const base = await executeOpenCanvas();
+    return { ...base, data: { imageData: imagePath, prompt: "" } };
+  }),
 );
 
 // present3d — 3D visualization

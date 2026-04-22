@@ -34,6 +34,7 @@ import { listSources } from "../registry.js";
 import { readManyStates, writeManyStates } from "../sourceState.js";
 import { dailyNewsPath } from "../paths.js";
 import { getFetcher as registryGetFetcher, type FetcherDeps, type SourceFetcher } from "../fetchers/index.js";
+import { defaultSourceState } from "../types.js";
 import type { FetcherKind, Source, SourceItem, SourceState, SourceSchedule } from "../types.js";
 import { planEligibleSources } from "./plan.js";
 import { runFetchPhase, computeNextState, type FetchOutcome } from "./fetch.js";
@@ -234,13 +235,7 @@ function buildNextStates(
   }
   const nextStates: SourceState[] = [];
   for (const source of eligible) {
-    const prev = statesBySlug.get(source.slug) ?? {
-      slug: source.slug,
-      lastFetchedAt: null,
-      cursor: {},
-      consecutiveFailures: 0,
-      nextAttemptAt: null,
-    };
+    const prev = statesBySlug.get(source.slug) ?? defaultSourceState(source.slug);
     const outcome = outcomeBySlug.get(source.slug);
     if (!outcome) continue; // unreachable in practice; defensive
     nextStates.push(computeNextState(prev, outcome, nowMs));

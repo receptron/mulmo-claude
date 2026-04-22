@@ -2,9 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { scoreItem, scoreAndFilter, loadInterests, type InterestsProfile } from "../../server/workspace/sources/interests.js";
 import type { SourceItem } from "../../server/workspace/sources/types.js";
-import fs from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 
 function makeItem(overrides: Partial<SourceItem> = {}): SourceItem {
   return {
@@ -163,17 +163,17 @@ describe("scoreAndFilter", () => {
 
 describe("loadInterests", () => {
   it("returns null when file doesn't exist", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const result = loadInterests(tmpDir);
     assert.equal(result, null);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 
   it("loads valid interests file", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
       path.join(configDir, "interests.json"),
       JSON.stringify({
         keywords: ["AI", "ML"],
@@ -188,46 +188,46 @@ describe("loadInterests", () => {
     assert.deepEqual(result!.categories, ["ai"]);
     assert.equal(result!.minRelevance, 0.3);
     assert.equal(result!.maxNotificationsPerRun, 10);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 
   it("returns null for empty keywords and categories", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: [], categories: [] }));
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: [], categories: [] }));
     const result = loadInterests(tmpDir);
     assert.equal(result, null);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 
   it("returns null for invalid JSON", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(path.join(configDir, "interests.json"), "not json");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(path.join(configDir, "interests.json"), "not json");
     const result = loadInterests(tmpDir);
     assert.equal(result, null);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 
   it("uses defaults for missing optional fields", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: ["test"] }));
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: ["test"] }));
     const result = loadInterests(tmpDir);
     assert.notEqual(result, null);
     assert.equal(result!.minRelevance, 0.5);
     assert.equal(result!.maxNotificationsPerRun, 5);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 
   it("filters invalid category slugs", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interests-"));
+    const tmpDir = mkdtempSync(path.join(tmpdir(), "interests-"));
     const configDir = path.join(tmpDir, "config");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
       path.join(configDir, "interests.json"),
       JSON.stringify({
         keywords: ["test"],
@@ -237,6 +237,6 @@ describe("loadInterests", () => {
     const result = loadInterests(tmpDir);
     assert.notEqual(result, null);
     assert.deepEqual(result!.categories, ["ai", "security"]);
-    fs.rmSync(tmpDir, { recursive: true });
+    rmSync(tmpDir, { recursive: true });
   });
 });

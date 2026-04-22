@@ -20,7 +20,7 @@
 ## Step 3: ブリッジ起動
 
 ```bash
-node packages/line/dist/index.js
+node packages/bridges/line/dist/index.js
 ```
 
 - `npx @mulmobridge/line` はモノレポ内では動かない（yarn workspaces が bin のシンボリックリンクを作らないため）

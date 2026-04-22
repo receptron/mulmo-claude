@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import os from "node:os";
+import { homedir } from "node:os";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS, WORKSPACE_FILES, EAGER_WORKSPACE_DIRS, workspacePath } from "../../server/workspace/paths.js";
 
-const expectedWorkspacePath = path.join(os.homedir(), "mulmoclaude");
+const expectedWorkspacePath = path.join(homedir(), "mulmoclaude");
 
 describe("workspacePath", () => {
   it("points to ~/mulmoclaude", () => {

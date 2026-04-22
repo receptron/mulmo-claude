@@ -131,6 +131,13 @@ export interface SourceState {
   // Timestamp after which the next attempt is allowed, so backoff
   // survives server restarts.
   nextAttemptAt: string | null;
+  // Consecutive empty-success count (fetcher returned 0 items).
+  // Reset to 0 when items are found. Drives adaptive empty backoff.
+  consecutiveEmptyFetches: number;
+  // Timestamp after which the next attempt is allowed following
+  // repeated empty fetches. Separate from nextAttemptAt (error
+  // backoff) so the two policies don't interfere.
+  emptyBackoffUntil: string | null;
 }
 
 export function defaultSourceState(slug: string): SourceState {
@@ -140,5 +147,7 @@ export function defaultSourceState(slug: string): SourceState {
     cursor: {},
     consecutiveFailures: 0,
     nextAttemptAt: null,
+    consecutiveEmptyFetches: 0,
+    emptyBackoffUntil: null,
   };
 }

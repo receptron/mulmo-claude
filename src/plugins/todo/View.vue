@@ -3,16 +3,16 @@
     <!-- API error banner — surfaces POST /api/todos failures so a
          silent add/remove/toggle becomes diagnosable. -->
     <div v-if="todoApiError" class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700" role="alert" data-testid="todo-api-error">
-      ⚠ Failed to update todos: {{ todoApiError }}
+      {{ t("pluginTodo.apiError", { error: todoApiError }) }}
     </div>
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-      <h2 class="text-lg font-semibold text-gray-800">Todo List</h2>
-      <span class="text-sm text-gray-500">{{ completedCount }}/{{ items.length }} completed</span>
+      <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginTodo.heading") }}</h2>
+      <span class="text-sm text-gray-500">{{ t("pluginTodo.completedRatio", { done: completedCount, total: items.length }) }}</span>
     </div>
 
     <!-- Filter bar: only shown when at least one label is in use. -->
     <div v-if="labelInventory.length > 0" class="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-gray-100 bg-gray-50">
-      <span class="text-xs text-gray-500 mr-1">Filter:</span>
+      <span class="text-xs text-gray-500 mr-1">{{ t("pluginTodo.filter") }}</span>
       <button
         v-for="entry in labelInventory"
         :key="entry.label"
@@ -27,14 +27,21 @@
         {{ entry.label }}
         <span class="opacity-60">{{ entry.count }}</span>
       </button>
-      <button v-if="activeFilters.size > 0" class="ml-auto text-xs text-gray-500 hover:text-gray-700" title="Clear all filters" @click="clearFilters">
-        Clear ✕
+      <button
+        v-if="activeFilters.size > 0"
+        class="ml-auto text-xs text-gray-500 hover:text-gray-700"
+        :title="t('pluginTodo.clearFilters')"
+        @click="clearFilters"
+      >
+        {{ t("pluginTodo.clearButton") }}
       </button>
     </div>
 
-    <div v-if="items.length === 0" class="flex-1 flex items-center justify-center text-gray-400">No todo items yet</div>
+    <div v-if="items.length === 0" class="flex-1 flex items-center justify-center text-gray-400">{{ t("pluginTodo.noItems") }}</div>
 
-    <div v-else-if="filteredItems.length === 0" class="flex-1 flex items-center justify-center text-gray-400 text-sm">No items match the active filter</div>
+    <div v-else-if="filteredItems.length === 0" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
+      {{ t("pluginTodo.noMatchingFilter") }}
+    </div>
 
     <ul v-else class="flex-1 overflow-y-auto p-4 space-y-2">
       <li v-for="item in filteredItems" :key="item.id" class="rounded-lg border" :class="selectedId === item.id ? 'border-blue-400' : 'border-gray-200'">
@@ -62,10 +69,10 @@
           </div>
           <button
             class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 shrink-0"
-            title="Delete item"
+            :title="t('pluginTodo.deleteItem')"
             @click.stop="remove(item)"
           >
-            ✕
+            {{ t("pluginTodo.deleteSymbol") }}
           </button>
           <span class="material-icons text-gray-400 text-sm" :title="selectedId === item.id ? 'Collapse' : 'Expand'">
             {{ selectedId === item.id ? "expand_less" : "expand_more" }}
@@ -80,26 +87,33 @@
             spellcheck="false"
           />
           <div class="flex items-center gap-2">
-            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">Update</button>
-            <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">Cancel</button>
+            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">{{ t("pluginTodo.update") }}</button>
+            <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">
+              {{ t("common.cancel") }}
+            </button>
             <span v-if="yamlError" class="text-xs text-red-500">{{ yamlError }}</span>
           </div>
         </div>
       </li>
     </ul>
 
-    <button v-if="hasCompleted" class="mx-6 mb-2 text-sm text-gray-500 hover:text-gray-700 self-start" @click="clearCompleted">Clear completed</button>
+    <button v-if="hasCompleted" class="mx-6 mb-2 text-sm text-gray-500 hover:text-gray-700 self-start" @click="clearCompleted">
+      {{ t("pluginTodo.clearCompleted") }}
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { colorForLabel, filterByLabels, listLabelsWithCount, subtractLabels } from "./labels";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<TodoData>;

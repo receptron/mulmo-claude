@@ -12,6 +12,7 @@ export const PLATFORMS = {
   matrix: "matrix",
   irc: "irc",
   googleChat: "google-chat",
+  teams: "teams",
 } as const;
 
 export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];

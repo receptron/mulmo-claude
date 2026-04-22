@@ -130,8 +130,8 @@ describe("handleAddColumn", () => {
     const result = handleAddColumn(cols(), [], { label: "Doing (進行中)" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const id = result.columns[result.columns.length - 1]?.id;
-    assert.ok(id?.startsWith("doing_"));
+    const columnId = result.columns[result.columns.length - 1]?.id;
+    assert.ok(columnId?.startsWith("doing_"));
   });
 
   it("is deterministic — same label always yields the same id", () => {

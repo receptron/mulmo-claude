@@ -14,12 +14,12 @@
           @open-settings="showSettings = true"
         />
         <div class="flex-1 min-w-0">
-          <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="canvasViewMode" @navigate="onPluginNavigate" />
+          <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
       </div>
       <!-- Row 2: canvas toggle + role selector + session tabs -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
-        <CanvasViewToggle :model-value="canvasViewMode" @update:model-value="setCanvasViewMode" />
+        <CanvasViewToggle v-if="isChatPage" :model-value="layoutMode" @update:model-value="setLayoutMode" />
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           ref="sessionTabBarRef"
@@ -58,8 +58,10 @@
           class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
-          Image generation requires
-          <code class="font-mono">GEMINI_API_KEY</code>. Add it to <code class="font-mono">.env</code> and restart the app.
+          <i18n-t keypath="app.geminiRequired" tag="span">
+            <template #envKey><code class="font-mono">GEMINI_API_KEY</code></template>
+            <template #envFile><code class="font-mono">.env</code></template>
+          </i18n-t>
         </div>
 
         <!-- Tool result previews -->
@@ -90,13 +92,15 @@
           class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
-          Image generation requires
-          <code class="font-mono">GEMINI_API_KEY</code>. Add it to <code class="font-mono">.env</code> and restart the app.
+          <i18n-t keypath="app.geminiRequired" tag="span">
+            <template #envKey><code class="font-mono">GEMINI_API_KEY</code></template>
+            <template #envFile><code class="font-mono">.env</code></template>
+          </i18n-t>
         </div>
 
         <div ref="canvasRef" class="flex-1 overflow-hidden outline-none min-h-0" tabindex="0" @mousedown="activePane = 'main'" @keydown="handleCanvasKeydown">
-          <!-- Single mode -->
-          <template v-if="canvasViewMode === 'single'">
+          <!-- Chat page: single or stack layout -->
+          <template v-if="isChatPage && layoutMode === 'single'">
             <component
               :is="getPlugin(selectedResult.toolName)?.viewComponent"
               v-if="selectedResult && getPlugin(selectedResult.toolName)?.viewComponent"
@@ -108,12 +112,11 @@
               <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{ JSON.stringify(selectedResult, null, 2) }}</pre>
             </div>
             <div v-else class="flex items-center justify-center h-full text-gray-600">
-              <p>Start a conversation</p>
+              <p>{{ t("app.startConversation") }}</p>
             </div>
           </template>
-          <!-- Stack mode -->
           <StackView
-            v-else-if="canvasViewMode === 'stack'"
+            v-else-if="isChatPage && layoutMode === 'stack'"
             :tool-results="sidebarResults"
             :selected-result-uuid="selectedResultUuid"
             :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
@@ -121,23 +124,18 @@
             @select="(uuid) => (selectedResultUuid = uuid)"
             @update-result="handleUpdateResult"
           />
-          <!-- Files mode -->
-          <FilesView v-else-if="canvasViewMode === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
-          <!-- Todos mode -->
-          <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
-          <!-- Scheduler mode -->
-          <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
-          <!-- Wiki mode -->
-          <WikiView v-else-if="canvasViewMode === 'wiki'" />
-          <!-- Skills mode -->
-          <SkillsView v-else-if="canvasViewMode === 'skills'" />
-          <!-- Roles mode -->
-          <RolesView v-else-if="canvasViewMode === 'roles'" />
+          <!-- Distinct pages -->
+          <FilesView v-else-if="currentPage === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
+          <TodoExplorer v-else-if="currentPage === 'todos'" />
+          <SchedulerView v-else-if="currentPage === 'scheduler'" />
+          <WikiView v-else-if="currentPage === 'wiki'" />
+          <SkillsView v-else-if="currentPage === 'skills'" />
+          <RolesView v-else-if="currentPage === 'roles'" />
         </div>
 
         <!-- Bottom bar (Stack chat only — plugin views have no
              session context, so no chat input is shown) -->
-        <div v-if="canvasViewMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
+        <div v-if="isChatPage && layoutMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
           <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
           <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="isRunning" @send="sendMessage()" />
         </div>
@@ -162,7 +160,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, reactive } from "vue";
+import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
+
+const { t } = useI18n();
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
@@ -185,7 +186,7 @@ import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
 import type { NotificationAction } from "./types/notification";
-import { CANVAS_VIEW } from "./utils/canvas/viewMode";
+import { PAGE_ROUTES, type PageRouteName } from "./router";
 import type { SseEvent } from "./types/sse";
 import { type SessionEntry, type ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
@@ -207,7 +208,7 @@ import { useSessionSync } from "./composables/useSessionSync";
 import { useSessionDerived } from "./composables/useSessionDerived";
 import { useFaviconState } from "./composables/useFaviconState";
 import { useMergedSessions } from "./composables/useMergedSessions";
-import { useCanvasViewMode } from "./composables/useCanvasViewMode";
+import { useLayoutMode } from "./composables/useLayoutMode";
 import { useSelectedResult } from "./composables/useSelectedResult";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
@@ -223,6 +224,7 @@ import { useRoute, useRouter } from "vue-router";
 import { apiGet } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
 import { needsGemini } from "./utils/role/plugins";
+import { classifyWorkspacePath } from "./utils/path/workspaceLinkRouter";
 
 // --- Per-session state ---
 // Declared early so that pub/sub callbacks and function declarations
@@ -262,9 +264,9 @@ function navigateToSession(sessionId: string, replace = false): void {
   currentSessionId.value = sessionId;
   const method = replace ? router.replace : router.push;
   method({
-    name: "chat",
+    name: PAGE_ROUTES.chat,
     params: { sessionId },
-    query: { ...buildViewQuery(), ...buildRoleQuery() },
+    query: buildRoleQuery(),
   }).catch((err) => {
     if (err?.type !== 16) {
       console.error("[navigateToSession] push failed:", err);
@@ -278,7 +280,7 @@ function handleNotificationNavigate(action: NotificationAction): void {
   if (target.kind === "session") {
     navigateToSession(target.sessionId);
   } else {
-    setCanvasViewMode(CANVAS_VIEW[target.view]);
+    router.push({ name: target.view }).catch(() => {});
   }
 }
 
@@ -361,34 +363,80 @@ const { focusChatInput } = useChatScroll({
 const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
 const showSettings = ref(false);
 
-const { canvasViewMode, setCanvasViewMode, buildViewQuery, filesRefreshToken, handleViewModeShortcut, onPluginNavigate } = useCanvasViewMode({ isRunning });
+const { layoutMode, setLayoutMode, toggleLayoutMode } = useLayoutMode();
 
-// The no-sidebar "stack-style" layout (top bar + full-width canvas +
-// bottom bar) is used for every view mode except Single. Clicking a
-// plugin launcher button (Todos / Scheduler / Files / ...) swaps the
-// canvas content without collapsing the frame back to the sidebar
-// layout.
-const { isStackLayout, restoreChatViewForSession, displayedCurrentSessionId } = useViewLayout({
-  canvasViewMode,
-  setCanvasViewMode,
+// Current page derives from the route. The chat page has a layout
+// preference on top (single vs. stack); other pages are distinct
+// full-width views.
+const isChatPage = computed(() => route.name === PAGE_ROUTES.chat);
+const currentPage = computed<PageRouteName | null>(() => {
+  const name = route.name;
+  return typeof name === "string" && isPageRouteName(name) ? name : null;
+});
+
+// Refresh the files tree after each agent run so newly written files
+// appear without a manual reload.
+const filesRefreshToken = ref(0);
+watch(isRunning, (running, prev) => {
+  if (prev && !running) filesRefreshToken.value++;
+});
+
+// Cmd/Ctrl + 1 toggles layout when on /chat; on any other page it
+// navigates to /chat (layout flip requires a second press). Cmd+2–7
+// navigate directly to the matching page.
+const PAGE_SHORTCUT_KEYS: Record<string, PageRouteName> = {
+  "2": PAGE_ROUTES.files,
+  "3": PAGE_ROUTES.todos,
+  "4": PAGE_ROUTES.scheduler,
+  "5": PAGE_ROUTES.wiki,
+  "6": PAGE_ROUTES.skills,
+  "7": PAGE_ROUTES.roles,
+};
+
+function handleViewModeShortcut(event: KeyboardEvent): void {
+  if (!(event.metaKey || event.ctrlKey)) return;
+  if (event.altKey || event.shiftKey) return;
+
+  if (event.key === "1") {
+    event.preventDefault();
+    if (route.name === PAGE_ROUTES.chat) {
+      toggleLayoutMode();
+    } else {
+      resumeOrCreateChatSession().catch((err) => console.error("[Cmd+1] resume failed:", err));
+    }
+    return;
+  }
+
+  const page = PAGE_SHORTCUT_KEYS[event.key];
+  if (page) {
+    event.preventDefault();
+    router.push({ name: page }).catch(() => {});
+  }
+}
+
+function onPluginNavigate(target: { key: string }): void {
+  if (isPageRouteName(target.key)) {
+    router.push({ name: target.key }).catch(() => {});
+  }
+}
+
+function isPageRouteName(value: string): value is PageRouteName {
+  return Object.values(PAGE_ROUTES).includes(value as PageRouteName);
+}
+
+// Layout only matters on /chat; other pages are full-width by design.
+const { isStackLayout, displayedCurrentSessionId } = useViewLayout({
+  layoutMode,
+  isChatPage,
   currentSessionId,
   activePane,
 });
 
-// User-initiated session switches: clicking a session tab, a history
-// row, or a chat link in FilesView. In plugin views (Todos / Files /
-// ...) no chat is active, so the click's purpose is to surface the
-// chat — restore the preferred Single/Stack mode before loading.
-// Not wired into the internal `loadSession` call path because that
-// also fires on initial mount with `?view=plugin` URLs, which must
-// be honoured as-is.
 function handleSessionSelect(sessionId: string): void {
-  restoreChatViewForSession();
   loadSession(sessionId);
 }
 
 function handleNewSessionClick(): void {
-  restoreChatViewForSession();
   createNewSession();
 }
 
@@ -494,25 +542,62 @@ function removeCurrentIfEmpty(): boolean {
   return false;
 }
 
+// Replace vs push is derived from state, not chosen by the caller:
+// replace only when we just discarded an empty session AND we're
+// currently on that same /chat/:emptyId URL — otherwise there's
+// something worth keeping in history (a real chat transcript, or
+// a non-chat page like /wiki the user came from).
 function createNewSession(roleId?: string): ActiveSession {
-  removeCurrentIfEmpty();
+  const removedEmpty = removeCurrentIfEmpty();
+  const replace = removedEmpty && isChatPage.value;
   const rId = roleId ?? currentRoleId.value;
   const session = createEmptySession(uuidv4(), rId);
   sessionMap.set(session.id, session);
   currentRoleId.value = rId;
-  navigateToSession(session.id, true);
+  navigateToSession(session.id, replace);
   suggestionsPanelRef.value?.collapse();
   nextTick(() => focusChatInput());
   return sessionMap.get(session.id)!;
 }
 
 function onRoleChange() {
-  // Covers both the user dropdown click and the agent-triggered role
-  // switch (EVENT_TYPES.switchRole) — either way the user ends up in
-  // a fresh chat session, so a plugin view should yield to chat.
-  restoreChatViewForSession();
+  // On non-chat pages (wiki, files, etc.) the user is just picking
+  // the role that future new-chat actions should use — don't yank
+  // them onto /chat by creating a session here. currentRoleId is
+  // already updated by RoleSelector's v-model, so future "+" clicks
+  // or composer sends will pick it up. Agent-triggered role switches
+  // (EVENT_TYPES.switchRole) always fire during an active run on
+  // /chat, so the guard doesn't affect them.
+  if (!isChatPage.value) return;
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
+}
+
+// Land on /chat with no specific session in mind (initial load, Cmd+1
+// from another page). Prefer the most-recent session so the user
+// resumes where they left off; only create a fresh session when they
+// have no chat history at all. Explicit "+" clicks and role switches
+// still create a new session via createNewSession() directly.
+async function resumeOrCreateChatSession(): Promise<void> {
+  const topId = mergedSessions.value[0]?.id;
+  if (!topId) {
+    createNewSession();
+    return;
+  }
+  if (sessionMap.has(topId)) {
+    // Already in memory — navigate explicitly. loadSession would
+    // early-return here if topId === currentSessionId, skipping the
+    // URL push we need when arriving from a non-chat page.
+    navigateToSession(topId);
+    return;
+  }
+  await loadSession(topId);
+  // loadSession silently returns on fetch failure (stale summary,
+  // transient API error). Without a fallback, /chat is left with no
+  // active session and sendMessage becomes a no-op.
+  if (!sessionMap.has(topId)) {
+    createNewSession();
+  }
 }
 
 function activateSession(sessionId: string, roleId: string, replace: boolean): void {
@@ -527,7 +612,13 @@ function activateSession(sessionId: string, roleId: string, replace: boolean): v
 }
 
 async function loadSession(sessionId: string) {
-  if (sessionId === currentSessionId.value && sessionMap.has(sessionId)) return;
+  // currentSessionId tracks "last active chat session" and is NOT
+  // reset when the user navigates to a non-chat page (/wiki, /files,
+  // …). Also checking the URL ensures that clicking the same session
+  // in the tab bar from /wiki still triggers a /chat navigation
+  // instead of silently no-opping.
+  const alreadyOnThatChat = sessionId === currentSessionId.value && sessionMap.has(sessionId) && route.params.sessionId === sessionId;
+  if (alreadyOnThatChat) return;
   const replaced = removeCurrentIfEmpty();
 
   const live = sessionMap.get(sessionId);
@@ -671,10 +762,44 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
   popupRef: historyPopupRef,
 });
 
+// Route workspace-internal links (wiki pages, files, sessions) to the
+// appropriate page. Called from plugin Views via AppApi.
+function navigateToWorkspacePath(href: string): void {
+  const target = classifyWorkspacePath(href);
+  if (!target) return;
+
+  switch (target.kind) {
+    case "wiki":
+      router.push({ name: PAGE_ROUTES.wiki, query: { page: target.slug } }).catch(() => {});
+      break;
+    case "file":
+      // Path-based files URL (see plans/feat-files-path-url.md) — pass
+      // segments as an array so each piece is url-encoded independently
+      // and slashes stay as path separators.
+      router.push({ name: PAGE_ROUTES.files, params: { pathMatch: target.path.split("/") } }).catch(() => {});
+      break;
+    case "session":
+      handleSessionSelect(target.sessionId);
+      break;
+  }
+}
+
+function startNewChat(message: string): void {
+  // createNewSession sets currentSessionId synchronously (see the
+  // comment on its declaration), so the follow-up sendMessage lands
+  // in the new session rather than whatever was previously active.
+  // Cross-route push behaviour (so browser Back returns to /wiki)
+  // is now handled inside createNewSession via the isChatPage check.
+  createNewSession(currentRoleId.value);
+  void sendMessage(message);
+}
+
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
+  startNewChat: (message: string) => startNewChat(message),
+  navigateToWorkspacePath: (href: string) => navigateToWorkspacePath(href),
 });
 // Plugin Views that need to tag background work with the current
 // session (e.g. MulmoScript generations) inject this.
@@ -691,7 +816,9 @@ onMounted(async () => {
   // Fire-and-forget side fetches.
   fetchHealth();
   fetchMcpToolsStatus();
-  fetchSessions();
+  // Awaited below before resuming the top session, so we know the
+  // sessions list is populated when we pick which one to land on.
+  const sessionsReady = fetchSessions();
   // Roles must be loaded before the first session is created, so
   // createNewSession() picks a roleId that exists in the merged
   // role list (built-in + custom).
@@ -703,18 +830,31 @@ onMounted(async () => {
     currentRoleId.value = urlRole;
   }
 
-  // If the URL already names a session (e.g. a bookmarked link or a
-  // page reload), try to load it. Otherwise create a fresh one.
-  const initialSessionId = currentSessionId.value;
-  if (initialSessionId) {
-    await loadSession(initialSessionId);
-    // loadSession is a no-op when the server returns 404 — in that
-    // case sessionMap won't have the id, so fall through to create.
-    if (!sessionMap.has(initialSessionId)) {
-      createNewSession();
+  // Session bootstrap only applies on /chat. On /files, /todos, /wiki,
+  // etc. we must not create or load a chat session — doing so would
+  // replace the URL with /chat/<new-id> and pull the user off the page
+  // they actually loaded.
+  //
+  // Read the URL's sessionId directly rather than through
+  // currentSessionId.value — the route-param watcher isn't `immediate`,
+  // so on a hard load of /chat/<id> the ref may still be "" when we
+  // reach this code and we'd mistakenly resume the top session.
+  if (route.name === PAGE_ROUTES.chat) {
+    const urlSessionId = typeof route.params.sessionId === "string" ? route.params.sessionId : "";
+    if (urlSessionId) {
+      if (currentSessionId.value !== urlSessionId) {
+        currentSessionId.value = urlSessionId;
+      }
+      await loadSession(urlSessionId);
+      // loadSession is a no-op when the server returns 404 — in that
+      // case sessionMap won't have the id, so fall through to create.
+      if (!sessionMap.has(urlSessionId)) {
+        createNewSession();
+      }
+    } else {
+      await sessionsReady;
+      await resumeOrCreateChatSession();
     }
-  } else {
-    createNewSession();
   }
 });
 </script>

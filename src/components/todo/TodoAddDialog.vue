@@ -7,20 +7,20 @@
       aria-labelledby="todo-add-dialog-title"
       @click.stop
     >
-      <h3 id="todo-add-dialog-title" class="text-base font-semibold text-gray-800">Add Todo</h3>
+      <h3 id="todo-add-dialog-title" class="text-base font-semibold text-gray-800">{{ t("todoDialogs.addTitle") }}</h3>
       <label class="block text-xs text-gray-600">
-        Text
+        {{ t("todoDialogs.fieldText") }}
         <input
           ref="textInput"
           v-model="text"
           type="text"
-          placeholder="What needs doing?"
+          :placeholder="t('todoDialogs.textPlaceholder')"
           class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
           @keydown.enter="submit"
         />
       </label>
       <label class="block text-xs text-gray-600">
-        Note
+        {{ t("todoDialogs.fieldNote") }}
         <textarea
           v-model="note"
           rows="2"
@@ -29,7 +29,7 @@
       </label>
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-xs text-gray-600">
-          Status
+          {{ t("todoDialogs.fieldStatus") }}
           <select v-model="status" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
             <option v-for="col in columns" :key="col.id" :value="col.id">
               {{ col.label }}
@@ -37,16 +37,16 @@
           </select>
         </label>
         <label class="block text-xs text-gray-600">
-          Priority
+          {{ t("todoDialogs.fieldPriority") }}
           <select v-model="priority" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
-            <option value="">— None —</option>
+            <option value="">{{ t("todoDialogs.noneOption") }}</option>
             <option v-for="p in PRIORITIES" :key="p" :value="p">
               {{ PRIORITY_LABELS[p] }}
             </option>
           </select>
         </label>
         <label class="block text-xs text-gray-600">
-          Due date
+          {{ t("todoDialogs.fieldDueDate") }}
           <input
             v-model="dueDate"
             type="date"
@@ -54,18 +54,20 @@
           />
         </label>
         <label class="block text-xs text-gray-600">
-          Labels
+          {{ t("todoDialogs.fieldLabels") }}
           <input
             v-model="labelsText"
             type="text"
-            placeholder="work, urgent"
+            :placeholder="t('todoDialogs.labelsPlaceholder')"
             class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
           />
         </label>
       </div>
       <div class="flex justify-end gap-2 pt-1">
-        <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">Cancel</button>
-        <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="submit">Add</button>
+        <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">
+          {{ t("common.cancel") }}
+        </button>
+        <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="submit">{{ t("common.add") }}</button>
       </div>
     </div>
   </div>
@@ -73,9 +75,12 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { StatusColumn } from "../../plugins/todo/index";
 import { PRIORITIES, PRIORITY_LABELS } from "../../plugins/todo/priority";
 import type { CreateItemInput } from "../../plugins/todo/composables/useTodos";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   columns: StatusColumn[];

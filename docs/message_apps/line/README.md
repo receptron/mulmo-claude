@@ -102,7 +102,7 @@ LINE_CHANNEL_SECRET=xxxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxxx
 ```
 
-Full variable reference: [packages/line/README.md](../../../packages/line/README.md).
+Full variable reference: [packages/bridges/line/README.md](../../../packages/bridges/line/README.md).
 
 ---
 
@@ -123,10 +123,10 @@ ngrok http 3002
 ```
 
 In terminal C, start the LINE bridge (`yarn dev` automatically builds
-`packages/line/dist/` via the `predev` script, so no manual build needed):
+`packages/bridges/line/dist/` via the `predev` script, so no manual build needed):
 
 ```bash
-node packages/line/dist/index.js
+node packages/bridges/line/dist/index.js
 ```
 
 > **Note**: `npx @mulmobridge/line` does not work inside the monorepo
@@ -148,7 +148,7 @@ to add the bot. Send a message — MulmoClaude replies.
 | ngrok shows `POST / 404 Not Found` | Webhook URL missing `/webhook` | Add `/webhook` to the URL in LINE Console |
 | Bot sends double replies | LINE auto-reply is ON | LINE Official Account settings, Auto-reply messages, OFF |
 | `LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required` | Env vars not loaded | Add to `.env` or export them |
-| `sh: mulmobridge-line: command not found` | `npx` can't find the bin in the monorepo | Use `node packages/line/dist/index.js` |
+| `sh: mulmobridge-line: command not found` | `npx` can't find the bin in the monorepo | Use `node packages/bridges/line/dist/index.js` |
 | `Connect error: bearer token rejected` | MulmoClaude server restarted, token changed | Restart the LINE bridge |
 | No reply, no error | `yarn dev` is not running | Check the MulmoClaude server |
 

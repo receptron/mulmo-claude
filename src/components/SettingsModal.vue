@@ -9,8 +9,8 @@
       @click.stop
     >
       <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h2 id="settings-modal-title" class="text-base font-semibold text-gray-900">Settings</h2>
-        <button class="text-gray-400 hover:text-gray-700" title="Close" data-testid="settings-close-btn" @click="close">
+        <h2 id="settings-modal-title" class="text-base font-semibold text-gray-900">{{ t("settingsModal.title") }}</h2>
+        <button class="text-gray-400 hover:text-gray-700" :title="t('common.close')" data-testid="settings-close-btn" @click="close">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -22,7 +22,7 @@
           data-testid="settings-tab-tools"
           @click="activeTab = 'tools'"
         >
-          Allowed Tools
+          {{ t("settingsModal.tabs.tools") }}
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
@@ -30,7 +30,7 @@
           data-testid="settings-tab-mcp"
           @click="activeTab = 'mcp'"
         >
-          MCP Servers
+          {{ t("settingsModal.tabs.mcp") }}
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
@@ -38,7 +38,7 @@
           data-testid="settings-tab-dirs"
           @click="activeTab = 'dirs'"
         >
-          Directories
+          {{ t("settingsModal.tabs.dirs") }}
         </button>
         <button
           class="px-3 py-2 text-sm border-b-2"
@@ -46,7 +46,7 @@
           data-testid="settings-tab-refs"
           @click="activeTab = 'refs'"
         >
-          Reference Dirs
+          {{ t("settingsModal.tabs.refs") }}
         </button>
       </div>
 
@@ -56,13 +56,12 @@
         </div>
 
         <div v-if="activeTab === 'tools'" class="space-y-3">
-          <p class="text-xs text-gray-600 leading-relaxed">
-            Extra tool names to pass to Claude via
-            <code class="bg-gray-100 px-1 rounded">--allowedTools</code>. One per line. Useful for built-in Claude Code MCP servers like Gmail / Google Calendar
-            after you have authenticated via <code class="bg-gray-100 px-1 rounded">claude mcp</code>.
-          </p>
+          <i18n-t keypath="settingsToolsTab.explanation" tag="p" class="text-xs text-gray-600 leading-relaxed">
+            <template #allowedTools><code class="bg-gray-100 px-1 rounded">--allowedTools</code></template>
+            <template #claudeMcp><code class="bg-gray-100 px-1 rounded">claude mcp</code></template>
+          </i18n-t>
           <label class="block">
-            <span class="text-xs font-semibold text-gray-700">Tool names</span>
+            <span class="text-xs font-semibold text-gray-700">{{ t("settingsModal.toolNamesLabel") }}</span>
             <textarea
               v-model="toolsText"
               class="mt-1 w-full h-48 px-2 py-1.5 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:border-blue-400"
@@ -72,8 +71,8 @@
             ></textarea>
           </label>
           <p v-if="invalidToolNames.length > 0" class="text-xs text-amber-700">
-            These look non-standard (expected prefix
-            <code class="bg-gray-100 px-1 rounded">mcp__</code>):
+            {{ t("settingsModal.invalidToolNamesPrefix") }}
+            <code class="bg-gray-100 px-1 rounded">mcp__</code>{{ t("settingsModal.invalidToolNamesSuffix") }}
             {{ invalidToolNames.join(", ") }}
           </p>
         </div>
@@ -85,7 +84,7 @@
             role="alert"
             data-testid="mcp-tools-error"
           >
-            ⚠ Could not fetch MCP tool status: {{ mcpToolsError }}. Showing all tools regardless of enablement.
+            {{ t("settingsModal.mcpToolsError", { error: mcpToolsError }) }}
           </div>
           <SettingsMcpTab
             ref="mcpTabRef"
@@ -106,19 +105,19 @@
         <span v-if="statusMessage" class="text-xs" :class="statusError ? 'text-red-600' : 'text-green-600'" data-testid="settings-status">
           {{ statusMessage }}
         </span>
-        <span v-else class="text-xs text-gray-500"> Changes apply on the next message. No restart needed. </span>
+        <span v-else class="text-xs text-gray-500"> {{ t("settingsModal.changesHint") }} </span>
         <div class="flex gap-2">
           <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="settings-cancel-btn" @click="close">
-            Cancel
+            {{ t("common.cancel") }}
           </button>
           <button
             class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
             :disabled="saving || loading || !!loadError"
-            :title="loadError ? 'Cannot save until settings load successfully' : undefined"
+            :title="loadError ? t('settingsModal.cannotSaveTooltip') : undefined"
             data-testid="settings-save-btn"
             @click="save"
           >
-            {{ saving ? "Saving…" : loading ? "Loading…" : "Save" }}
+            {{ saving ? t("settingsModal.saving") : loading ? t("settingsModal.loadingLabel") : t("common.save") }}
           </button>
         </div>
       </div>
@@ -128,12 +127,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import SettingsMcpTab from "./SettingsMcpTab.vue";
 import SettingsWorkspaceDirsTab from "./SettingsWorkspaceDirsTab.vue";
 import SettingsReferenceDirsTab from "./SettingsReferenceDirsTab.vue";
 import type { McpServerEntry } from "./SettingsMcpTab.vue";
 import { apiGet, apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+
+const { t } = useI18n();
 
 interface Props {
   open: boolean;

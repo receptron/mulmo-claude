@@ -1,11 +1,11 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 
 // workspace-io imports workspacePath at module load. We override
-// HOME/USERPROFILE so os.homedir() → our temp root, then dynamic-
+// HOME/USERPROFILE so homedir() → our temp root, then dynamic-
 // import so the module picks up the overridden HOME.
 let tmpRoot: string;
 let originalHome: string | undefined;
@@ -15,13 +15,13 @@ type WsIo = typeof import("../../../server/utils/files/workspace-io.js");
 let mod: WsIo;
 
 before(async () => {
-  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ws-io-test-"));
+  tmpRoot = mkdtempSync(path.join(tmpdir(), "ws-io-test-"));
   originalHome = process.env.HOME;
   originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
   // Pre-create the workspace root that paths.ts expects.
-  fs.mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
+  mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
   mod = await import("../../../server/utils/files/workspace-io.js");
 });
 
@@ -30,7 +30,7 @@ after(() => {
   else process.env.HOME = originalHome;
   if (originalUserProfile === undefined) delete process.env.USERPROFILE;
   else process.env.USERPROFILE = originalUserProfile;
-  fs.rmSync(tmpRoot, { recursive: true, force: true });
+  rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 function wsRoot(): string {
@@ -61,13 +61,13 @@ describe("readWorkspaceText / writeWorkspaceText", () => {
 
   it("write is atomic — no .tmp leftover on success", async () => {
     await mod.writeWorkspaceText("test-atomic/clean.txt", "ok");
-    const entries = fs.readdirSync(path.join(wsRoot(), "test-atomic"));
+    const entries = readdirSync(path.join(wsRoot(), "test-atomic"));
     assert.equal(entries.filter((file) => file.endsWith(".tmp")).length, 0);
   });
 
   it("creates parent directories on write", async () => {
     await mod.writeWorkspaceText("deep/nested/dir/file.md", "content");
-    assert.equal(fs.readFileSync(path.join(wsRoot(), "deep", "nested", "dir", "file.md"), "utf-8"), "content");
+    assert.equal(readFileSync(path.join(wsRoot(), "deep", "nested", "dir", "file.md"), "utf-8"), "content");
   });
 });
 
@@ -131,13 +131,13 @@ describe("ensureWorkspaceDir", () => {
   it("creates a nested directory", () => {
     mod.ensureWorkspaceDir("test-ensure/a/b/c");
     const abs = path.join(wsRoot(), "test-ensure", "a", "b", "c");
-    assert.ok(fs.statSync(abs).isDirectory());
+    assert.ok(statSync(abs).isDirectory());
   });
 
   it("is idempotent", () => {
     mod.ensureWorkspaceDir("test-ensure/idem");
     mod.ensureWorkspaceDir("test-ensure/idem");
     const abs = path.join(wsRoot(), "test-ensure", "idem");
-    assert.ok(fs.statSync(abs).isDirectory());
+    assert.ok(statSync(abs).isDirectory());
   });
 });

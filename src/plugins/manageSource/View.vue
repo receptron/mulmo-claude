@@ -1,9 +1,9 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
-      <span class="text-sm font-medium text-gray-700 truncate"> Information sources </span>
+      <span class="text-sm font-medium text-gray-700 truncate"> {{ t("pluginManageSource.heading") }} </span>
       <div class="flex items-center gap-2 shrink-0">
-        <span class="text-xs text-gray-500"> {{ sources.length }} source{{ sources.length === 1 ? "" : "s" }} </span>
+        <span class="text-xs text-gray-500"> {{ t("pluginManageSource.sourceCount", sources.length, { named: { count: sources.length } }) }} </span>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="adding || busy === 'rebuild'"
@@ -11,7 +11,7 @@
           @click="startAdd"
         >
           <span class="material-icons text-sm align-middle">add</span>
-          Add
+          {{ t("pluginManageSource.addButton") }}
         </button>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
@@ -20,7 +20,7 @@
           @click="rebuild"
         >
           <span class="material-icons text-sm align-middle">refresh</span>
-          {{ busy === "rebuild" ? "Rebuilding…" : "Rebuild now" }}
+          {{ busy === "rebuild" ? t("pluginManageSource.rebuilding") : t("pluginManageSource.rebuildNow") }}
         </button>
       </div>
     </div>
@@ -28,12 +28,12 @@
     <div v-if="adding" class="px-4 py-3 border-b border-blue-200 bg-blue-50/50 shrink-0 space-y-2" data-testid="sources-add-form">
       <div class="flex flex-wrap items-center gap-2">
         <label class="text-xs text-gray-700">
-          Type
+          {{ t("pluginManageSource.typeField") }}
           <select v-model="draft.kind" class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5" data-testid="sources-draft-kind" @change="onKindChange">
-            <option value="rss">RSS</option>
-            <option value="github-releases">GitHub releases</option>
-            <option value="github-issues">GitHub issues</option>
-            <option value="arxiv">arXiv</option>
+            <option value="rss">{{ t("pluginManageSource.kindRss") }}</option>
+            <option value="github-releases">{{ t("pluginManageSource.kindGithubReleases") }}</option>
+            <option value="github-issues">{{ t("pluginManageSource.kindGithubIssues") }}</option>
+            <option value="arxiv">{{ t("pluginManageSource.kindArxiv") }}</option>
           </select>
         </label>
         <input
@@ -46,7 +46,7 @@
         <input
           v-model="draft.title"
           class="w-40 text-xs border border-gray-300 rounded px-2 py-1"
-          placeholder="Title (optional)"
+          :placeholder="t('pluginManageSource.titlePlaceholder')"
           data-testid="sources-draft-title"
           @keydown.enter="commitAdd"
         />
@@ -57,7 +57,7 @@
         </span>
         <div class="flex gap-2">
           <button class="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="sources-draft-cancel" @click="cancelAdd">
-            Cancel
+            {{ t("common.cancel") }}
           </button>
           <button
             class="px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
@@ -65,7 +65,7 @@
             data-testid="sources-draft-add"
             @click="commitAdd"
           >
-            {{ busy === "add" ? "Adding…" : "Add + Rebuild" }}
+            {{ busy === "add" ? t("pluginManageSource.addingLabel") : t("pluginManageSource.addAndRebuild") }}
           </button>
         </div>
       </div>
@@ -85,10 +85,11 @@
 
     <div class="flex-1 overflow-y-auto">
       <div v-if="sources.length === 0" class="flex flex-col items-center justify-center h-full p-6 gap-4" data-testid="sources-empty">
-        <p class="text-sm text-gray-500 italic text-center max-w-md">
-          No sources registered yet. Pick a starter pack below, click
-          <strong>+ Add</strong> above, or ask Claude to register one.
-        </p>
+        <i18n-t keypath="pluginManageSource.emptyPickPack" tag="p" class="text-sm text-gray-500 italic text-center max-w-md">
+          <template #addBold>
+            <strong>{{ t("pluginManageSource.emptyAddStrong") }}</strong>
+          </template>
+        </i18n-t>
         <div class="w-full max-w-md space-y-2" data-testid="sources-presets">
           <button
             v-for="preset in PRESETS"
@@ -102,12 +103,14 @@
               <span class="text-sm font-medium text-gray-800">
                 {{ preset.label }}
               </span>
-              <span class="text-[11px] text-gray-500 shrink-0"> {{ preset.entries.length }} source{{ preset.entries.length === 1 ? "" : "s" }} </span>
+              <span class="text-[11px] text-gray-500 shrink-0">
+                {{ t("pluginManageSource.sourceCount", preset.entries.length, { named: { count: preset.entries.length } }) }}
+              </span>
             </div>
             <div class="text-xs text-gray-500 mt-1">
               {{ preset.description }}
             </div>
-            <div v-if="busy === 'preset-' + preset.id" class="text-xs text-blue-600 mt-1 italic">Registering + fetching…</div>
+            <div v-if="busy === 'preset-' + preset.id" class="text-xs text-blue-600 mt-1 italic">{{ t("pluginManageSource.registering") }}</div>
           </button>
         </div>
       </div>
@@ -151,7 +154,7 @@
             :data-testid="`source-remove-${source.slug}`"
             @click="remove(source.slug)"
           >
-            {{ busy === source.slug ? "Removing…" : "Remove" }}
+            {{ busy === source.slug ? t("pluginManageSource.removingLabel") : t("pluginManageSource.removeLabel") }}
           </button>
         </li>
       </ul>
@@ -162,14 +165,14 @@
       <div v-if="sources.length > 0 && (briefLoading || briefHtml || briefError)" class="p-4" data-testid="sources-brief">
         <div class="flex items-baseline justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-800">
-            Today's brief
-            <span v-if="briefDate" class="text-xs text-gray-400 font-normal"> ({{ briefDate }}) </span>
+            {{ t("pluginManageSource.todaysBrief") }}
+            <span v-if="briefDate" class="text-xs text-gray-400 font-normal"> {{ t("pluginManageSource.briefDateLabel", { date: briefDate }) }} </span>
           </h3>
           <button v-if="briefFilePath" class="text-[11px] text-gray-500 hover:text-gray-700" :title="briefFilePath">
             {{ briefFilePath }}
           </button>
         </div>
-        <div v-if="briefLoading" class="text-xs text-gray-500 italic">Loading today's brief…</div>
+        <div v-if="briefLoading" class="text-xs text-gray-500 italic">{{ t("pluginManageSource.todaysBriefLoading") }}</div>
         <div v-else-if="briefError" class="text-xs text-gray-500 italic" data-testid="sources-brief-empty">
           {{ briefError }}
         </div>
@@ -179,21 +182,32 @@
     </div>
 
     <div v-if="lastRebuild" class="px-4 py-2 border-t border-gray-100 shrink-0 text-xs text-gray-600" data-testid="sources-rebuild-summary">
-      Last rebuild ({{ lastRebuild.isoDate }}): <strong>{{ lastRebuild.itemCount }}</strong> items from <strong>{{ lastRebuild.plannedCount }}</strong> sources,
-      <strong>{{ lastRebuild.duplicateCount }}</strong> duplicates dropped.
-      <span v-if="lastRebuild.archiveErrors.length > 0" class="text-red-600"> ({{ lastRebuild.archiveErrors.length }} archive errors) </span>
+      {{
+        t("pluginManageSource.lastRebuildSummary", {
+          date: lastRebuild.isoDate,
+          itemCount: lastRebuild.itemCount,
+          planned: lastRebuild.plannedCount,
+          duplicates: lastRebuild.duplicateCount,
+        })
+      }}
+      <span v-if="lastRebuild.archiveErrors.length > 0" class="text-red-600">
+        {{ t("pluginManageSource.archiveErrorsSuffix", { count: lastRebuild.archiveErrors.length }) }}
+      </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSourceData, RebuildSummary, Source } from "./index";
 import { apiGet, apiPost, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<ManageSourceData>;
@@ -245,12 +259,12 @@ function onKindChange(): void {
 const primaryPlaceholder = computed(() => {
   switch (draft.value.kind) {
     case "rss":
-      return "https://news.ycombinator.com/rss";
+      return t("pluginManageSource.primaryRssPlaceholder");
     case "github-releases":
     case "github-issues":
-      return "https://github.com/owner/repo  (or owner/repo)";
+      return t("pluginManageSource.primaryGithubPlaceholder");
     case "arxiv":
-      return "cat:cs.CL";
+      return t("pluginManageSource.primaryArxivPlaceholder");
   }
   return "";
 });
@@ -258,13 +272,13 @@ const primaryPlaceholder = computed(() => {
 const primaryHint = computed(() => {
   switch (draft.value.kind) {
     case "rss":
-      return "Feed URL (RSS 2.0 / Atom / RDF)";
+      return t("pluginManageSource.primaryRssHint");
     case "github-releases":
-      return "GitHub repo URL or owner/repo — fetches releases";
+      return t("pluginManageSource.primaryGithubRelHint");
     case "github-issues":
-      return "GitHub repo URL or owner/repo — fetches issues";
+      return t("pluginManageSource.primaryGithubIssHint");
     case "arxiv":
-      return "arXiv search query (e.g. cat:cs.CL or au:hinton)";
+      return t("pluginManageSource.primaryArxivHint");
   }
   return "";
 });
@@ -351,11 +365,11 @@ async function commitAdd(): Promise<void> {
   busy.value = "add";
   const response = await apiPost<unknown>(API_ROUTES.sources.create, payload);
   if (!response.ok) {
-    draftError.value = response.error || "Failed to register source";
+    draftError.value = response.error || t("pluginManageSource.flashRegisterFailed");
     busy.value = null;
     return;
   }
-  flash(`Registered. Fetching new items…`);
+  flash(t("pluginManageSource.flashRegistered"));
   adding.value = false;
   await refreshList();
   // C: auto-rebuild so the user sees items without an extra click.
@@ -443,7 +457,7 @@ async function installPreset(preset: Preset): Promise<void> {
   const alreadyHave = new Set(sources.value.map((source) => source.slug));
   const toRegister = preset.entries.filter((entry) => !alreadyHave.has(entry.slug));
   if (toRegister.length === 0) {
-    flash(`All sources in "${preset.label}" are already registered.`);
+    flash(t("pluginManageSource.flashPresetAlreadyRegistered", { label: preset.label }));
     busy.value = null;
     return;
   }
@@ -465,9 +479,16 @@ async function installPreset(preset: Preset): Promise<void> {
     }
   }
   if (failures.length > 0) {
-    flash(`Registered ${toRegister.length - failures.length}/${toRegister.length}. Errors: ${failures.join("; ")}`, true);
+    flash(
+      t("pluginManageSource.flashPresetPartial", {
+        ok: toRegister.length - failures.length,
+        total: toRegister.length,
+        errors: failures.join("; "),
+      }),
+      true,
+    );
   } else {
-    flash(`Registered ${toRegister.length} source${toRegister.length === 1 ? "" : "s"} from "${preset.label}". Fetching…`);
+    flash(t("pluginManageSource.flashPresetRegistered", toRegister.length, { named: { count: toRegister.length, label: preset.label } }));
   }
   await refreshList();
   await rebuildInline();
@@ -479,12 +500,12 @@ async function installPreset(preset: Preset): Promise<void> {
 async function rebuildInline(): Promise<void> {
   const response = await apiPost<RebuildSummary>(API_ROUTES.sources.rebuild);
   if (!response.ok) {
-    flash(`Register succeeded but rebuild failed: ${response.error}`, true);
+    flash(t("pluginManageSource.flashRegisterSucceededRebuildFailed", { error: response.error }), true);
     return;
   }
   const summary = response.data;
   lastRebuild.value = summary;
-  flash(`Ready: ${summary.itemCount} items from ${summary.plannedCount} source${summary.plannedCount === 1 ? "" : "s"}.`);
+  flash(t("pluginManageSource.flashRebuildReady", summary.plannedCount, { named: { itemCount: summary.itemCount, planned: summary.plannedCount } }));
   await loadBrief(summary.isoDate);
 }
 
@@ -525,13 +546,13 @@ watch(
 function kindLabel(kind: Source["fetcherKind"]): string {
   switch (kind) {
     case "rss":
-      return "RSS";
+      return t("pluginManageSource.kindRss");
     case "github-releases":
-      return "GitHub rel";
+      return t("pluginManageSource.kindGithubRel");
     case "github-issues":
-      return "GitHub iss";
+      return t("pluginManageSource.kindGithubIss");
     case "arxiv":
-      return "arXiv";
+      return t("pluginManageSource.kindArxiv");
   }
 }
 
@@ -559,22 +580,22 @@ function flash(message: string, isError = false): void {
 async function refreshList(): Promise<void> {
   const response = await apiGet<{ sources: Source[] }>(API_ROUTES.sources.list);
   if (!response.ok) {
-    flash(`Failed to refresh sources: ${response.error}`, true);
+    flash(t("pluginManageSource.flashRefreshListFailed", { error: response.error }), true);
     return;
   }
   localSources.value = response.data.sources;
 }
 
 async function remove(slug: string): Promise<void> {
-  if (!confirm(`Remove source "${slug}"?`)) return;
+  if (!confirm(t("pluginManageSource.confirmRemove", { slug }))) return;
   busy.value = slug;
   const response = await apiDelete<unknown>(API_ROUTES.sources.remove.replace(":slug", encodeURIComponent(slug)));
   busy.value = null;
   if (!response.ok) {
-    flash(`Remove failed: ${response.error}`, true);
+    flash(t("pluginManageSource.flashRemoveFailed", { error: response.error }), true);
     return;
   }
-  flash(`Removed "${slug}".`);
+  flash(t("pluginManageSource.flashRemoved", { slug }));
   await refreshList();
 }
 
@@ -582,13 +603,13 @@ async function rebuild(): Promise<void> {
   busy.value = "rebuild";
   const response = await apiPost<RebuildSummary>(API_ROUTES.sources.rebuild);
   if (!response.ok) {
-    flash(`Rebuild failed: ${response.error}`, true);
+    flash(t("pluginManageSource.flashRebuildFailed", { error: response.error }), true);
     busy.value = null;
     return;
   }
   const summary = response.data;
   lastRebuild.value = summary;
-  flash(`Rebuild complete: ${summary.itemCount} items from ${summary.plannedCount} sources.`);
+  flash(t("pluginManageSource.flashRebuildComplete", { itemCount: summary.itemCount, planned: summary.plannedCount }));
   await Promise.all([refreshList(), loadBrief(summary.isoDate)]);
   busy.value = null;
 }
@@ -638,16 +659,16 @@ async function loadBrief(isoDate: string): Promise<void> {
   if (!response.ok) {
     if (response.status === 404) {
       briefMarkdown.value = "";
-      briefError.value = "No brief written for this date yet. Click Rebuild now.";
+      briefError.value = t("pluginManageSource.briefNone");
     } else {
-      briefError.value = response.error || "Failed to load brief";
+      briefError.value = response.error || t("pluginManageSource.briefLoadFailed");
     }
     briefLoading.value = false;
     return;
   }
   briefMarkdown.value = response.data.content ?? "";
   if (!briefMarkdown.value.trim()) {
-    briefError.value = "Today's brief is empty.";
+    briefError.value = t("pluginManageSource.briefEmpty");
   }
   briefLoading.value = false;
 }

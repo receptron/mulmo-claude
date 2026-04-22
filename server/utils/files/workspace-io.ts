@@ -11,7 +11,7 @@
 // All reads swallow ENOENT and return null / fallback so callers can
 // do `if (!content)` instead of try/catch.
 
-import fs from "fs";
+import { Stats, mkdirSync, promises, readFileSync, readdirSync, statSync } from "fs";
 import path from "path";
 import { workspacePath } from "../../workspace/paths.js";
 import { writeFileAtomic, writeFileAtomicSync } from "./atomic.js";
@@ -44,7 +44,7 @@ export function resolveWorkspacePath(relPath: string): string {
  */
 export async function readWorkspaceText(relPath: string): Promise<string | null> {
   try {
-    return await fs.promises.readFile(resolveWorkspacePath(relPath), "utf-8");
+    return await promises.readFile(resolveWorkspacePath(relPath), "utf-8");
   } catch (err) {
     return rethrowUnexpected(err, `readWorkspaceText(${relPath})`);
   }
@@ -53,7 +53,7 @@ export async function readWorkspaceText(relPath: string): Promise<string | null>
 /** Sync variant. Same ENOENT-only swallow contract. */
 export function readWorkspaceTextSync(relPath: string): string | null {
   try {
-    return fs.readFileSync(resolveWorkspacePath(relPath), "utf-8");
+    return readFileSync(resolveWorkspacePath(relPath), "utf-8");
   } catch (err) {
     return rethrowUnexpected(err, `readWorkspaceTextSync(${relPath})`);
   }
@@ -133,7 +133,7 @@ export function resolvePath(root: string, relPath: string): string {
  *  unexpected errors. */
 export async function readTextUnder(root: string, relPath: string): Promise<string | null> {
   try {
-    return await fs.promises.readFile(path.join(root, relPath), "utf-8");
+    return await promises.readFile(path.join(root, relPath), "utf-8");
   } catch (err) {
     return rethrowUnexpected(err, `readTextUnder(${relPath})`);
   }
@@ -147,7 +147,7 @@ export async function writeTextUnder(root: string, relPath: string, content: str
 /** Sync read text under a root. Null on ENOENT. */
 export function readTextUnderSync(root: string, relPath: string): string | null {
   try {
-    return fs.readFileSync(path.join(root, relPath), "utf-8");
+    return readFileSync(path.join(root, relPath), "utf-8");
   } catch (err) {
     return rethrowUnexpected(err, `readTextUnderSync(${relPath})`);
   }
@@ -156,7 +156,7 @@ export function readTextUnderSync(root: string, relPath: string): string | null 
 /** Sync readdir under a root. Empty on ENOENT. */
 export function readdirUnderSync(root: string, relPath: string): string[] {
   try {
-    return fs.readdirSync(path.join(root, relPath));
+    return readdirSync(path.join(root, relPath));
   } catch (err) {
     if (isEnoent(err)) return [];
     log.error("workspace-io", `readdirUnderSync(${relPath})`, {
@@ -169,7 +169,7 @@ export function readdirUnderSync(root: string, relPath: string): string[] {
 /** Readdir under a root. Empty on ENOENT; rethrows unexpected. */
 export async function readdirUnder(root: string, relPath: string): Promise<string[]> {
   try {
-    return await fs.promises.readdir(path.join(root, relPath));
+    return await promises.readdir(path.join(root, relPath));
   } catch (err) {
     if (isEnoent(err)) return [];
     log.error("workspace-io", `readdirUnder(${relPath})`, {
@@ -180,9 +180,9 @@ export async function readdirUnder(root: string, relPath: string): Promise<strin
 }
 
 /** Stat under a root. Null on ENOENT; rethrows unexpected. */
-export async function statUnder(root: string, relPath: string): Promise<fs.Stats | null> {
+export async function statUnder(root: string, relPath: string): Promise<Stats | null> {
   try {
-    return await fs.promises.stat(path.join(root, relPath));
+    return await promises.stat(path.join(root, relPath));
   } catch (err) {
     return rethrowUnexpected(err, `statUnder(${relPath})`);
   }
@@ -190,7 +190,7 @@ export async function statUnder(root: string, relPath: string): Promise<fs.Stats
 
 /** Ensure a directory exists under a root. */
 export async function ensureDirUnder(root: string, relPath: string): Promise<void> {
-  await fs.promises.mkdir(path.join(root, relPath), { recursive: true });
+  await promises.mkdir(path.join(root, relPath), { recursive: true });
 }
 
 // ── Existence ───────────────────────────────────────────────────
@@ -201,7 +201,7 @@ export async function ensureDirUnder(root: string, relPath: string): Promise<voi
  */
 export function existsInWorkspace(relPath: string): boolean {
   try {
-    fs.statSync(resolveWorkspacePath(relPath));
+    statSync(resolveWorkspacePath(relPath));
     return true;
   } catch (err) {
     if (isEnoent(err)) return false;
@@ -217,5 +217,5 @@ export function existsInWorkspace(relPath: string): boolean {
  * (including parents) if missing. Idempotent.
  */
 export function ensureWorkspaceDir(relPath: string): void {
-  fs.mkdirSync(resolveWorkspacePath(relPath), { recursive: true });
+  mkdirSync(resolveWorkspacePath(relPath), { recursive: true });
 }

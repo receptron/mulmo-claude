@@ -97,8 +97,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("file explorer path in URL", () => {
-  test("selecting a file puts ?path= in the URL", async ({ page }) => {
-    await page.goto("/chat?view=files");
+  test("selecting a file pushes /files/<path> onto the URL", async ({ page }) => {
+    await page.goto("/files");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Wait for the root dir's shallow listing to land — with lazy
@@ -113,15 +113,16 @@ test.describe("file explorer path in URL", () => {
     await expect(page.locator('[data-testid="file-tree-file-hello.md"]')).toBeVisible();
     await page.locator('[data-testid="file-tree-file-hello.md"]').click();
 
-    // URL should now contain ?path=wiki/hello.md
+    // URL should now be `/files/wiki/hello.md` (path form, PR #633).
     await expect(async () => {
       const url = new URL(page.url());
-      expect(url.searchParams.get("path")).toBe("wiki/hello.md");
+      expect(url.pathname).toBe("/files/wiki/hello.md");
+      expect(url.searchParams.get("path")).toBeNull();
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
-  test("direct URL with ?path= opens the file", async ({ page }) => {
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+  test("direct URL /files/<path> opens the file", async ({ page }) => {
+    await page.goto("/files/wiki/hello.md");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // The file content should be visible
@@ -130,24 +131,51 @@ test.describe("file explorer path in URL", () => {
     });
   });
 
-  test("?path= with traversal attempt is stripped by guard", async ({ page }) => {
-    await page.goto("/chat?view=files&path=../../../etc/passwd");
-    await expect(page.getByText("MulmoClaude")).toBeVisible();
-
-    // The path param should be stripped
+  test("legacy /files?path= is redirected to /files/<path>", async ({ page }) => {
+    await page.goto("/files?path=wiki/hello.md");
+    await expect(page.getByText("This is a test.")).toBeVisible({
+      timeout: 5 * ONE_SECOND_MS,
+    });
+    // Guard rewrites to the canonical form.
     await expect(async () => {
       const url = new URL(page.url());
+      expect(url.pathname).toBe("/files/wiki/hello.md");
       expect(url.searchParams.get("path")).toBeNull();
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
-  test("?path= with absolute path is stripped by guard", async ({ page }) => {
-    await page.goto("/chat?view=files&path=/etc/passwd");
+  test("encoded-traversal attempt is stripped by guard", async ({ page }) => {
+    // Raw `../` segments are browser-normalised before the request
+    // leaves, so they never reach our guard. Percent-encoded `..`
+    // survives the browser and is decoded by the router, which is
+    // when our `.includes("..")` check fires.
+    await page.goto("/files/..%2F..%2Fetc%2Fpasswd");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
+    // Guard redirects to /files (empty pathMatch).
     await expect(async () => {
       const url = new URL(page.url());
+      expect(url.pathname).toMatch(/^\/files\/?$/);
       expect(url.searchParams.get("path")).toBeNull();
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
+  });
+
+  test("legacy ?path= with traversal is stripped by guard", async ({ page }) => {
+    await page.goto("/files?path=../../../etc/passwd");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.pathname).toMatch(/^\/files\/?$/);
+      expect(url.searchParams.get("path")).toBeNull();
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
+  });
+
+  test("absolute path attempt is stripped by guard", async ({ page }) => {
+    await page.goto("/files//etc/passwd");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.pathname).toMatch(/^\/files\/?$/);
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
@@ -178,7 +206,7 @@ test.describe("file explorer path in URL", () => {
       },
     );
 
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+    await page.goto("/files/wiki/hello.md");
 
     // Open the collapsible editor — it hangs off the bottom of the
     // rendered markdown pane. The textarea is seeded with the raw
@@ -205,8 +233,8 @@ test.describe("file explorer path in URL", () => {
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
   });
 
-  test("closing a file removes ?path= from URL", async ({ page }) => {
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+  test("closing a file drops the path segment from the URL", async ({ page }) => {
+    await page.goto("/files/wiki/hello.md");
     await expect(page.getByText("This is a test.")).toBeVisible({
       timeout: 5 * ONE_SECOND_MS,
     });
@@ -217,9 +245,10 @@ test.describe("file explorer path in URL", () => {
     });
     await page.getByTestId("close-file-btn").click();
 
-    // ?path= should be removed
+    // URL should collapse to /files (no selected file in the path).
     await expect(async () => {
       const url = new URL(page.url());
+      expect(url.pathname).toMatch(/^\/files\/?$/);
       expect(url.searchParams.get("path")).toBeNull();
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
 

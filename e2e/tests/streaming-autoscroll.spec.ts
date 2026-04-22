@@ -135,7 +135,10 @@ test.describe("assistant text streaming — auto-scroll follows the stream", () 
     const chunk = "Streaming chunk with enough text to matter. ".repeat(5);
     await mockAgentWithPubSub(page, buildStreamingEvents(40, chunk));
 
-    await page.goto("/?view=stack");
+    // Stack layout is a localStorage preference on /chat. Set it
+    // before navigating so the first render is already in stack mode.
+    await page.addInitScript(() => localStorage.setItem("canvas_layout_mode", "stack"));
+    await page.goto("/chat");
     await page.getByTestId("user-input").fill("stream me in stack");
     await page.getByTestId("send-btn").click();
 

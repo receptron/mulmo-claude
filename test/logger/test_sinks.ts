@@ -1,7 +1,7 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import { createFileSink } from "../../server/system/logger/sinks.js";
 import type { LogRecord } from "../../server/system/logger/types.js";
@@ -20,7 +20,7 @@ describe("createFileSink", () => {
   let dir: string;
 
   before(async () => {
-    dir = await mkdtemp(path.join(os.tmpdir(), "log-sink-"));
+    dir = await mkdtemp(path.join(tmpdir(), "log-sink-"));
   });
 
   after(async () => {
@@ -51,7 +51,7 @@ describe("createFileSink", () => {
   });
 
   it("rotates to a new file when the UTC day changes", async () => {
-    const rotDir = await mkdtemp(path.join(os.tmpdir(), "log-rot-"));
+    const rotDir = await mkdtemp(path.join(tmpdir(), "log-rot-"));
     let fake = new Date("2026-05-01T10:00:00Z");
     const sink = createFileSink(
       {
@@ -79,7 +79,7 @@ describe("createFileSink", () => {
   });
 
   it("enforces maxFiles retention on rotation", async () => {
-    const retDir = await mkdtemp(path.join(os.tmpdir(), "log-ret-"));
+    const retDir = await mkdtemp(path.join(tmpdir(), "log-ret-"));
     // Pre-create 3 old files
     await writeFile(path.join(retDir, "server-2026-01-01.log"), "a");
     await writeFile(path.join(retDir, "server-2026-01-02.log"), "b");

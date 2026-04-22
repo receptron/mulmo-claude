@@ -13,9 +13,9 @@
 
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { mkdtempSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import type { Request, Response, NextFunction } from "express";
 import { bearerAuth } from "../../server/api/auth/bearerAuth.js";
 import { __resetForTests, generateAndWriteToken } from "../../server/api/auth/token.js";
@@ -74,7 +74,7 @@ let tokenPath = "";
 let validToken = "";
 
 beforeEach(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmo-auth-test-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "mulmo-auth-test-"));
   tokenPath = path.join(tmpDir, ".session-token");
   __resetForTests();
   validToken = await generateAndWriteToken(tokenPath);

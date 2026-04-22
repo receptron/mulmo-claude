@@ -70,8 +70,8 @@ describe("buildDailyJsonIndex", () => {
 
 describe("assembleDailyFile", () => {
   it("appends a ```json fenced block with the structured index", () => {
-    const md = "# Daily brief\n\n## AI\n- foo\n";
-    const file = assembleDailyFile(md, [makeItem()]);
+    const markdown = "# Daily brief\n\n## AI\n- foo\n";
+    const file = assembleDailyFile(markdown, [makeItem()]);
     assert.match(file, /# Daily brief/);
     assert.match(file, /```json/);
     // JSON block must parse.
@@ -152,32 +152,32 @@ describe("groupItemsForArchive", () => {
 
 describe("renderItemForArchive", () => {
   it("renders title, metadata, summary and the trailing separator", () => {
-    const md = renderItemForArchive(makeItem({ title: "Cool thing", summary: "It's cool" }));
-    assert.match(md, /^## Cool thing/);
-    assert.match(md, /\*\*Published:\*\* 2026-04-13T10:00:00Z/);
-    assert.match(md, /\*\*Source:\*\* hn/);
-    assert.match(md, /\*\*URL:\*\* https:\/\/example\.com\/a/);
-    assert.match(md, /\*\*Categories:\*\* tech-news, ai/);
-    assert.match(md, /It's cool/);
+    const markdown = renderItemForArchive(makeItem({ title: "Cool thing", summary: "It's cool" }));
+    assert.match(markdown, /^## Cool thing/);
+    assert.match(markdown, /\*\*Published:\*\* 2026-04-13T10:00:00Z/);
+    assert.match(markdown, /\*\*Source:\*\* hn/);
+    assert.match(markdown, /\*\*URL:\*\* https:\/\/example\.com\/a/);
+    assert.match(markdown, /\*\*Categories:\*\* tech-news, ai/);
+    assert.match(markdown, /It's cool/);
     // Ends with the separator line (blank + --- + final newline).
-    assert.match(md, /---\n$/);
+    assert.match(markdown, /---\n$/);
   });
 
   it("omits content when identical to summary (no repetition)", () => {
-    const md = renderItemForArchive(makeItem({ summary: "same text", content: "same text" }));
+    const markdown = renderItemForArchive(makeItem({ summary: "same text", content: "same text" }));
     // summary appears once, not twice.
-    const matches = md.match(/same text/g) ?? [];
+    const matches = markdown.match(/same text/g) ?? [];
     assert.equal(matches.length, 1);
   });
 
   it("includes severity line when set", () => {
-    const md = renderItemForArchive(makeItem({ severity: "critical" }));
-    assert.match(md, /\*\*Severity:\*\* critical/);
+    const markdown = renderItemForArchive(makeItem({ severity: "critical" }));
+    assert.match(markdown, /\*\*Severity:\*\* critical/);
   });
 
   it("omits Categories line when categories is empty", () => {
-    const md = renderItemForArchive(makeItem({ categories: [] }));
-    assert.doesNotMatch(md, /\*\*Categories:\*\*/);
+    const markdown = renderItemForArchive(makeItem({ categories: [] }));
+    assert.doesNotMatch(markdown, /\*\*Categories:\*\*/);
   });
 });
 

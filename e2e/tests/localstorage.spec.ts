@@ -7,40 +7,48 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("localStorage state restoration", () => {
-  test("canvas_view_mode=files → starts in files view", async ({ page }) => {
-    // Set localStorage BEFORE navigating so the app picks it up on init.
+  test("canvas_layout_mode=stack persists across reload", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("canvas_layout_mode", "stack"));
+    await page.reload();
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await expect(async () => {
+      const stored = await page.evaluate(() => localStorage.getItem("canvas_layout_mode"));
+      expect(stored).toBe("stack");
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
+  });
+
+  test("canvas_layout_mode=single persists across reload", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("canvas_layout_mode", "single"));
+    await page.reload();
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await expect(async () => {
+      const stored = await page.evaluate(() => localStorage.getItem("canvas_layout_mode"));
+      expect(stored).toBe("single");
+    }).toPass({ timeout: 5 * ONE_SECOND_MS });
+  });
+
+  test("canvas_layout_mode with invalid value → defaults to single", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("canvas_layout_mode", "<script>alert(1)</script>"));
+    await page.reload();
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    // Layout silently falls back to single; no URL param is written.
+    await expect(page).toHaveURL(/\/chat/);
+  });
+
+  test("legacy canvas_view_mode key is deleted on first load (no migration)", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("canvas_view_mode", "files"));
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    // URL should reflect files view
     await expect(async () => {
-      const url = new URL(page.url());
-      expect(url.searchParams.get("view")).toBe("files");
+      const legacy = await page.evaluate(() => localStorage.getItem("canvas_view_mode"));
+      expect(legacy).toBeNull();
     }).toPass({ timeout: 5 * ONE_SECOND_MS });
-  });
-
-  test("canvas_view_mode=stack → starts in stack view", async ({ page }) => {
-    await page.goto("/");
-    await page.evaluate(() => localStorage.setItem("canvas_view_mode", "stack"));
-    await page.reload();
-    await expect(page.getByText("MulmoClaude")).toBeVisible();
-    await expect(async () => {
-      const url = new URL(page.url());
-      expect(url.searchParams.get("view")).toBe("stack");
-    }).toPass({ timeout: 5 * ONE_SECOND_MS });
-  });
-
-  test("canvas_view_mode with invalid value → defaults to single", async ({ page }) => {
-    await page.goto("/");
-    await page.evaluate(() => localStorage.setItem("canvas_view_mode", "<script>alert(1)</script>"));
-    await page.reload();
-    await expect(page.getByText("MulmoClaude")).toBeVisible();
-    // "single" is the default — no ?view= param in the URL
-    await expect(async () => {
-      const url = new URL(page.url());
-      expect(url.searchParams.get("view")).toBeNull();
-    }).toPass({ timeout: 5 * ONE_SECOND_MS });
+    // And the URL stays on /chat — the old value is not migrated to a route.
+    await expect(page).toHaveURL(/\/chat/);
   });
 
   test("right_sidebar_visible is preserved across reloads", async ({ page }) => {
@@ -56,7 +64,7 @@ test.describe("localStorage state restoration", () => {
   test("corrupted localStorage values don't crash the app", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      localStorage.setItem("canvas_view_mode", '{"__proto__":{"x":1}}');
+      localStorage.setItem("canvas_layout_mode", '{"__proto__":{"x":1}}');
       localStorage.setItem("right_sidebar_visible", "maybe");
       localStorage.setItem("files_expanded_dirs", "not-json");
       localStorage.setItem("todo_explorer_view_mode", "");

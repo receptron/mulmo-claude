@@ -1,10 +1,11 @@
 import { Router, Request, Response } from "express";
-import fs from "fs";
+import { ReadStream, Stats, createReadStream, readFileSync, realpathSync } from "fs";
 import path from "path";
 import { workspacePath } from "../../workspace/workspace.js";
 import { statSafe, statSafeAsync, readDirSafeAsync, resolveWithinRoot, writeFileAtomic } from "../../utils/files/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, sendError, serverError } from "../../utils/httpError.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
 import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
@@ -187,7 +188,7 @@ export function classify(filename: string): ContentKind {
 // Cached realpath of the workspace. Computed once at module load so
 // every request avoids the syscall. resolveWithinRoot needs an
 // already-realpath'd root.
-const workspaceReal = fs.realpathSync(workspacePath);
+const workspaceReal = realpathSync(workspacePath);
 
 // Wraps the shared resolveWithinRoot helper with the additional
 // hidden-dir traversal check (e.g. `.git/config`). `buildTreeAsync`
@@ -235,7 +236,7 @@ function resolveRefPath(prefixedPath: string): string | null {
 
   let rootReal: string;
   try {
-    rootReal = fs.realpathSync(entry.hostPath);
+    rootReal = realpathSync(entry.hostPath);
   } catch {
     return null;
   }
@@ -276,7 +277,7 @@ export function parseRange(header: string, size: number): ByteRange | null {
   // RFC 7233 §2.1: "A Range request on a representation whose current
   // length is 0 cannot be satisfied". We also need this guard at the
   // top because the naive suffix-range math below produces `end = -1`
-  // for zero-byte files, which then crashes `fs.createReadStream`
+  // for zero-byte files, which then crashes `createReadStream`
   // with `ERR_OUT_OF_RANGE`.
   if (size <= 0) return null;
   const match = /^bytes=(\d*)-(\d*)$/i.exec(header.trim());
@@ -325,7 +326,7 @@ function applyRawSecurityHeaders(res: Response): void {
 // If the read stream errors mid-flight (file deleted, disk error,
 // permissions changed), surface a clean failure to the client instead
 // of leaving the connection hanging.
-function pipeWithErrorHandling(stream: fs.ReadStream, res: Response<ErrorResponse>): void {
+function pipeWithErrorHandling(stream: ReadStream, res: Response<ErrorResponse>): void {
   stream.on("error", (err) => {
     if (res.headersSent) {
       res.destroy(err);
@@ -340,7 +341,7 @@ function pipeWithErrorHandling(stream: fs.ReadStream, res: Response<ErrorRespons
 // the same security filters as the original sync implementation
 // (hidden dirs, sensitive files, symlinks all rejected) and the same
 // ordering (dirs before files, alphabetical within type). Uses
-// `fs.promises` throughout so the walk never blocks the event loop,
+// `promises` throughout so the walk never blocks the event loop,
 // and fans out each directory's children in parallel via
 // `Promise.all`.
 //
@@ -493,7 +494,7 @@ router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown,
 // (no recursion) so the client can render the tree incrementally.
 // `path` is optional; empty / missing = workspace root.
 router.get(API_ROUTES.files.dir, async (req: Request<object, unknown, unknown, PathQuery>, res: Response<TreeNode | ErrorResponse>) => {
-  const relPath = typeof req.query.path === "string" ? req.query.path : "";
+  const relPath = getOptionalStringQuery(req, "path") ?? "";
 
   // Reference directory branch — resolve against the registered ref dir
   if (isRefPath(relPath)) {
@@ -567,8 +568,8 @@ interface PathQuery {
 function resolveAndStatFile<T>(
   req: Request<object, unknown, unknown, PathQuery>,
   res: Response<T | ErrorResponse>,
-): { relPath: string; absPath: string; stat: fs.Stats } | null {
-  const relPath = typeof req.query.path === "string" ? req.query.path : "";
+): { relPath: string; absPath: string; stat: Stats } | null {
+  const relPath = getOptionalStringQuery(req, "path") ?? "";
   if (!relPath) {
     badRequest(res, "path required");
     return null;
@@ -668,7 +669,7 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
   }
   let content: string;
   try {
-    content = fs.readFileSync(absPath, "utf-8");
+    content = readFileSync(absPath, "utf-8");
   } catch (err) {
     res.status(500).json({ error: `Failed to read file: ${errorMessage(err)}` });
     return;
@@ -779,12 +780,12 @@ router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQue
     res.status(206);
     res.setHeader("Content-Range", `bytes ${range.start}-${range.end}/${stat.size}`);
     res.setHeader("Content-Length", String(range.end - range.start + 1));
-    pipeWithErrorHandling(fs.createReadStream(absPath, { start: range.start, end: range.end }), res);
+    pipeWithErrorHandling(createReadStream(absPath, { start: range.start, end: range.end }), res);
     return;
   }
 
   res.setHeader("Content-Length", String(stat.size));
-  pipeWithErrorHandling(fs.createReadStream(absPath), res);
+  pipeWithErrorHandling(createReadStream(absPath), res);
 });
 
 // ── Reference directory roots ───────────────────────────────────

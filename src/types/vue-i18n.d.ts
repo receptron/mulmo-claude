@@ -8,11 +8,11 @@
 // site may still compile. Autocomplete is the main value; strict
 // rejection of unknown keys would require a bespoke wrapper.
 
-import en from "../lang/en";
+import enMessages from "../lang/en";
 
 // Alias so `extends` has an interface-shaped base (typeof in extends
 // position is a syntax error).
-type EnMessages = typeof en;
+type EnMessages = typeof enMessages;
 
 declare module "vue-i18n" {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type

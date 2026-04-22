@@ -1,18 +1,18 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between">
-      <span class="text-sm font-medium text-gray-700 truncate">{{ title ?? "HTML Page" }}</span>
+      <span class="text-sm font-medium text-gray-700 truncate">{{ title ?? t("pluginPresentHtml.untitled") }}</span>
       <div class="flex items-center gap-2">
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
-          title="Save as PDF (opens print dialog)"
+          :title="t('pluginPresentHtml.saveAsPdf')"
           @click="printToPdf"
         >
           <span class="material-icons text-sm align-middle">picture_as_pdf</span>
-          PDF
+          {{ t("pluginPresentHtml.pdf") }}
         </button>
         <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0" @click="sourceOpen = !sourceOpen">
-          {{ sourceOpen ? "Hide Source <>" : "Show Source <>" }}
+          {{ sourceOpen ? t("pluginPresentHtml.hideSource") : t("pluginPresentHtml.showSource") }}
         </button>
       </div>
     </div>
@@ -25,8 +25,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentHtmlData>;

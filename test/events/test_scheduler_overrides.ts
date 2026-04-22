@@ -2,11 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { loadSchedulerOverrides } from "../../server/utils/files/scheduler-overrides-io.js";
 
 function makeTmpDir(): string {
-  return mkdtempSync(path.join(os.tmpdir(), "sched-override-test-"));
+  return mkdtempSync(path.join(tmpdir(), "sched-override-test-"));
 }
 
 describe("loadSchedulerOverrides", () => {

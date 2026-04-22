@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import {
   buildAllowedConfigMounts,
   resolveMountNames,
@@ -15,14 +15,14 @@ import {
 // the developer running CI actually has ~/.config/gh or a ~/.gitconfig.
 
 function makeFixtureHome(opts: { gh?: boolean; gitconfig?: boolean }): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-mounts-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "sandbox-mounts-"));
   if (opts.gh) {
     const ghDir = path.join(dir, ".config", "gh");
-    fs.mkdirSync(ghDir, { recursive: true });
-    fs.writeFileSync(path.join(ghDir, "hosts.yml"), "github.com:\n");
+    mkdirSync(ghDir, { recursive: true });
+    writeFileSync(path.join(ghDir, "hosts.yml"), "github.com:\n");
   }
   if (opts.gitconfig) {
-    fs.writeFileSync(path.join(dir, ".gitconfig"), "[user]\n  name = t\n");
+    writeFileSync(path.join(dir, ".gitconfig"), "[user]\n  name = t\n");
   }
   return dir;
 }
@@ -81,8 +81,8 @@ describe("resolveMountNames", () => {
   it("rejects dir when host path is a file and vice versa", () => {
     const home = makeFixtureHome({ gh: false, gitconfig: false });
     // Place a FILE where gh expects a DIR.
-    fs.mkdirSync(path.join(home, ".config"), { recursive: true });
-    fs.writeFileSync(path.join(home, ".config", "gh"), "oops");
+    mkdirSync(path.join(home, ".config"), { recursive: true });
+    writeFileSync(path.join(home, ".config", "gh"), "oops");
     const out = resolveMountNames(["gh"], buildAllowedConfigMounts(home));
     assert.equal(out.resolved.length, 0);
     assert.equal(out.missing.length, 1);
@@ -146,8 +146,8 @@ describe("sshAgentForwardArgs", () => {
   });
 
   it("binds socket and sets SSH_AUTH_SOCK when sock exists (Linux)", () => {
-    const fake = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sock-")), "agent.sock");
-    fs.writeFileSync(fake, "");
+    const fake = path.join(mkdtempSync(path.join(tmpdir(), "sock-")), "agent.sock");
+    writeFileSync(fake, "");
     const result = sshAgentForwardArgs(true, fake, "linux");
     assert.equal(result.skippedReason, null);
     const expectedHostPath = fake.replace(/\\/g, "/");

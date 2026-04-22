@@ -1,6 +1,6 @@
 <template>
   <div class="h-full overflow-auto">
-    <div v-if="filteredItems.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">No items match the current filter</div>
+    <div v-if="filteredItems.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">{{ t("todoTableList.noMatchingFilter") }}</div>
     <table v-else class="min-w-full text-sm">
       <thead class="bg-gray-50 sticky top-0 z-10">
         <tr class="text-left text-xs font-medium text-gray-500 uppercase">
@@ -53,7 +53,7 @@
               {{ formatShortDate(item.createdAt) }}
             </td>
             <td class="px-3 py-2 text-right">
-              <button class="text-gray-300 hover:text-red-500 text-xs" title="Delete item" @click="emit('delete', item.id)">✕</button>
+              <button class="text-gray-300 hover:text-red-500 text-xs" :title="t('pluginTodo.deleteItem')" @click="emit('delete', item.id)">✕</button>
             </td>
           </tr>
           <tr v-if="expandedId === item.id">
@@ -69,12 +69,15 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import { colorForLabel } from "../../plugins/todo/labels";
 import { PRIORITY_CLASSES, PRIORITY_LABELS, PRIORITY_ORDER, dueDateClasses, formatDueLabel } from "../../plugins/todo/priority";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 import TodoEditPanel from "./TodoEditPanel.vue";
 import { formatShortDate } from "../../utils/format/date";
+
+const { t } = useI18n();
 
 type SortKey = "completed" | "text" | "status" | "priority" | "labels" | "dueDate" | "createdAt";
 type SortDir = "asc" | "desc";

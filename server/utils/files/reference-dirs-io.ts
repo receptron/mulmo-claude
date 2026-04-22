@@ -4,7 +4,7 @@
 // All fs access is funneled through shared helpers so path changes
 // propagate from a single constant.
 
-import fs from "fs";
+import { mkdirSync, statSync } from "fs";
 import path from "path";
 import { WORKSPACE_DIRS, workspacePath } from "../../workspace/paths.js";
 import { loadJsonFile } from "./json.js";
@@ -31,14 +31,14 @@ export function readReferenceDirsJson(root?: string): unknown[] {
 /** Write reference-dirs.json atomically. Creates config/ if needed. */
 export function writeReferenceDirsJson(entries: readonly unknown[], root?: string): void {
   const filePath = configPath(root ?? workspacePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileAtomicSync(filePath, JSON.stringify(entries, null, 2));
 }
 
 /** Check whether a host path exists and is a directory. */
 export function isExistingDirectory(hostPath: string): boolean {
   try {
-    return fs.statSync(hostPath).isDirectory();
+    return statSync(hostPath).isDirectory();
   } catch {
     return false;
   }

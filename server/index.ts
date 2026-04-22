@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import agentRoutes from "./api/routes/agent.js";
@@ -34,8 +33,8 @@ import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/in
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
-import fs from "fs";
-import os from "os";
+import { existsSync, readFileSync } from "fs";
+import { homedir } from "os";
 import { isDockerAvailable, ensureSandboxImage, getDockerBridgeIp } from "./system/docker.js";
 import { maybeRunJournal } from "./workspace/journal/index.js";
 import { backfillAllSessions } from "./workspace/chat-index/index.js";
@@ -53,6 +52,7 @@ import { requireSameOrigin } from "./api/csrfGuard.js";
 import { bearerAuth } from "./api/auth/bearerAuth.js";
 import { deleteTokenFile, generateAndWriteToken, getCurrentToken } from "./api/auth/token.js";
 import { log } from "./system/logger/index.js";
+import { logBackgroundError } from "./utils/logBackgroundError.js";
 import { startChat } from "./api/routes/agent.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
 import { registerUserTasks } from "./workspace/skills/user-tasks.js";
@@ -60,6 +60,7 @@ import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../src/types/events.js";
 import { SESSION_ORIGINS } from "../src/types/session.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
+import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "./utils/port.mjs";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 
 const HTML_TOKEN_PLACEHOLDER = "__MULMOCLAUDE_AUTH_TOKEN__";
@@ -74,7 +75,6 @@ initWorkspace();
 let sandboxEnabled = false;
 
 const app = express();
-const PORT = env.port;
 
 app.disable("x-powered-by");
 // No `cors()` middleware. The Vite dev proxy forwards `/api/*`
@@ -234,7 +234,7 @@ if (env.isProduction) {
   app.get("/{*splat}", (_req: Request, res: Response) => {
     let html: string;
     try {
-      html = fs.readFileSync(indexHtmlPath, "utf-8");
+      html = readFileSync(indexHtmlPath, "utf-8");
     } catch (err) {
       log.error("server", "failed to read index.html", { error: String(err) });
       serverError(res, "Internal Server Error");
@@ -255,23 +255,35 @@ app.use((err: Error, _req: Request, res: Response, __next: NextFunction) => {
   serverError(res, "Internal Server Error");
 });
 
-function isPortFree(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
-    });
-    // Probe the same interface we'll actually bind to so a port
-    // held by a different process on a different interface doesn't
-    // give us a false "free" reading.
-    server.listen(port, "127.0.0.1");
-  });
+// True iff the user set `PORT` explicitly; empty string counts as "not
+// set". We use this to decide between "walk forward when busy" (friendly
+// dev behaviour) and "fail loudly" (respect the user's choice).
+const portExplicit = typeof process.env.PORT === "string" && process.env.PORT.trim() !== "";
+
+// Resolve the port we'll actually bind to. Default PORT (3001) + busy
+// walks forward so a stale `yarn dev` or a parallel test run doesn't
+// crash the launch. Explicit PORT + busy exits — matches the launcher's
+// `--port` semantics so `PORT=3099 yarn dev` behaves the same as
+// `npx mulmoclaude --port 3099`.
+async function resolvePort(): Promise<number> {
+  const requested = env.port;
+  if (await isPortFree(requested)) return requested;
+  if (portExplicit) {
+    log.error("server", `Port ${requested} is already in use. Stop the other process or pick a different PORT.`);
+    process.exit(1);
+  }
+  const fallback = await findAvailablePort(requested + 1);
+  if (fallback === null) {
+    log.error("server", `Port ${requested} is in use and no free port found in ${requested}..${requested + MAX_PORT_PROBES - 1}.`);
+    process.exit(1);
+  }
+  log.info("server", `Port ${requested} busy → using ${fallback} instead`);
+  return fallback;
 }
 
 async function ensureCredentialsAvailable(): Promise<void> {
-  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
-  if (fs.existsSync(credentialsPath)) return;
+  const credentialsPath = path.join(homedir(), ".claude", ".credentials.json");
+  if (existsSync(credentialsPath)) return;
 
   if (process.platform === "darwin") {
     const { refreshCredentials } = await import("./system/credentials.js");
@@ -329,9 +341,7 @@ function maybeForceJournalRun(): void {
   // propagate out of maybeRunJournal.
   if (!env.journalForceRunOnStartup) return;
   log.info("journal", "JOURNAL_FORCE_RUN_ON_STARTUP=1 — running now");
-  maybeRunJournal({ force: true }).catch((err) => {
-    log.warn("journal", "forced startup run failed", { error: String(err) });
-  });
+  maybeRunJournal({ force: true }).catch(logBackgroundError("journal", "forced startup run failed"));
 }
 
 function maybeForceChatIndexBackfill(): void {
@@ -349,15 +359,11 @@ function maybeForceChatIndexBackfill(): void {
         skipped: result.skipped,
       });
     })
-    .catch((err) => {
-      log.warn("chat-index", "forced startup backfill failed", {
-        error: String(err),
-      });
-    });
+    .catch(logBackgroundError("chat-index", "forced startup backfill failed"));
 }
 
-function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
-  log.info("server", "listening", { port: PORT });
+function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: number): void {
+  log.info("server", "listening", { port });
 
   // --- Pub/Sub ---
   const pubsub = createPubSub(httpServer);
@@ -464,11 +470,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
         log.info("skills", "scheduled skills registered", { count });
       }
     })
-    .catch((err) => {
-      log.warn("skills", "failed to register scheduled skills", {
-        error: String(err),
-      });
-    });
+    .catch(logBackgroundError("skills", "failed to register scheduled skills"));
 
   // Register user-created scheduled tasks from tasks.json.
   registerUserTasks({ taskManager, startChat })
@@ -477,11 +479,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
         log.info("user-tasks", "user tasks registered", { count });
       }
     })
-    .catch((err) => {
-      log.warn("user-tasks", "failed to register user tasks", {
-        error: String(err),
-      });
-    });
+    .catch(logBackgroundError("user-tasks", "failed to register user tasks"));
 
   taskManager.start();
 
@@ -510,11 +508,7 @@ process.on("SIGTERM", () => {
 });
 
 (async () => {
-  const portFree = await isPortFree(PORT);
-  if (!portFree) {
-    log.error("server", `Port ${PORT} is already in use. Stop the other process and try again.`);
-    process.exit(1);
-  }
+  const port = await resolvePort();
 
   // Generate the bearer token before `app.listen` so the first
   // request cannot race an uninitialised `getCurrentToken()`. The
@@ -535,8 +529,8 @@ process.on("SIGTERM", () => {
   // `http://<laptop-ip>:3001/api/*`), which combined with the
   // workspace file API is a credential-theft risk. Personal dev
   // tool — localhost is the right default.
-  const httpServer = app.listen(PORT, "127.0.0.1", () => {
-    startRuntimeServices(httpServer);
+  const httpServer = app.listen(port, "127.0.0.1", () => {
+    startRuntimeServices(httpServer, port);
   });
 
   // When Docker sandbox is active, the MCP server subprocess runs
@@ -550,8 +544,8 @@ process.on("SIGTERM", () => {
   if (sandboxEnabled) {
     const bridgeIp = await getDockerBridgeIp();
     if (bridgeIp) {
-      app.listen(PORT, bridgeIp, () => {
-        console.log(`[sandbox] Also listening on ${bridgeIp}:${PORT} for Docker MCP bridge`);
+      app.listen(port, bridgeIp, () => {
+        log.info("sandbox", `Also listening on ${bridgeIp}:${port} for Docker MCP bridge`);
       });
     }
   }

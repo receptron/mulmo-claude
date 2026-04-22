@@ -107,9 +107,9 @@ export async function ensureSandboxImage(): Promise<void> {
 export async function getDockerBridgeIp(): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync("docker", ["network", "inspect", "bridge", "-f", "{{(index .IPAM.Config 0).Gateway}}"]);
-    const ip = stdout.trim();
+    const ipAddr = stdout.trim();
     // Sanity-check: must look like an IPv4 address
-    return /^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip : null;
+    return /^\d+\.\d+\.\d+\.\d+$/.test(ipAddr) ? ipAddr : null;
   } catch {
     return null;
   }

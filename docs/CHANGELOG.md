@@ -6,6 +6,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- `@mulmobridge/mastodon` (v0.1.0) — Mastodon bridge. Subscribes to the user notification stream (WebSocket), handles DMs and optionally public mentions, inherits visibility on reply, forwards image attachments.
+- `@mulmobridge/bluesky` (v0.1.0) — Bluesky bridge. Polls `chat.bsky.convo.getLog` via the atproto-proxy header, forwards DMs, auto-refreshes the session JWT on 401.
+- `@mulmobridge/chatwork` (v0.1.0) — Chatwork bridge (Japanese business chat). Polls unread messages per room via REST, sends replies back, strips Chatwork markup before forwarding.
+- `@mulmobridge/xmpp` (v0.1.0) — XMPP / Jabber bridge. Connects with JID + password to any XMPP server over TLS, handles `type=chat` message stanzas.
+- `@mulmobridge/rocketchat` (v0.1.0) — Rocket.Chat bridge. Polls the bot's DM rooms via REST with personal access token auth; chunked replies.
+- `@mulmobridge/signal` (v0.1.0) — Signal bridge. Talks to a locally running [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) daemon over WebSocket (receive) + REST (send); number-based allowlist.
+- `@mulmobridge/teams` (v0.1.0) — Microsoft Teams bridge via Bot Framework (`botbuilder` SDK). Webhook receiver + Azure AD JWT validation; conversation-reference cache for push delivery; AAD object-id allowlist. **Requires a public URL** — Teams endpoint validation is strict.
+- `@mulmobridge/webhook` (v0.1.0) — Generic HTTP webhook bridge. POST JSON to `/webhook`, get the AI reply in the response body. Optional `x-webhook-secret` header for auth. Developer glue for cron jobs, Zapier / n8n, Home Assistant, etc.
+- `@mulmobridge/twilio-sms` (v0.1.0) — SMS bridge via Twilio Programmable Messaging. Inbound webhook with `X-Twilio-Signature` HMAC-SHA1 verification; outbound via Twilio REST API. Number-based allowlist.
+- `@mulmobridge/email` (v0.1.0) — Email bridge. IMAP poll for unread mail, SMTP reply with threading preserved (`In-Reply-To` + `References`). Uses `imapflow` + `mailparser` + `nodemailer`. Sender allowlist.
+- `@mulmobridge/line-works` (v0.1.0) — LINE Works (enterprise LINE) bridge. Service-account JWT → OAuth access token (auto-refresh); webhook signature verification via bot secret; sends via Bot Message API. Separate from consumer LINE.
+- `@mulmobridge/nostr` (v0.1.0) — Nostr encrypted DM bridge. Subscribes to kind=4 events tagged to the bot pubkey on multiple relays; NIP-04 decrypt + sign-and-broadcast replies. Hex / nsec key input; pubkey allowlist.
+- `@mulmobridge/viber` (v0.1.0) — Viber Public Account bot bridge. Inbound webhook with `X-Viber-Content-Signature` HMAC-SHA256; outbound via Viber REST. Swapped in for KakaoTalk (deferred due to 5 s sync webhook timeout).
+
+### Changed
+
+- `@mulmobridge/client` (v0.1.1 → **v0.1.2**) — Patch release that exports the shared `chunkText` helper from `./text`. Required by every new bridge (mastodon, bluesky, chatwork, xmpp, rocketchat, signal, teams, webhook, twilio-sms, email, line-works, nostr, viber); without it, their `npx` invocations fail at runtime because they depend on `^0.1.0`.
+- `@mulmobridge/mock-server` (v0.1.0 → **v0.1.1**) — Patch release. Internal refactor of `handlers.ts` / `server.ts` + README catch-up listing all supported platforms.
+- `@mulmobridge/relay` (v0.1.0 → **v0.2.0**) — Minor release adding four new platform plugins:
+  - **WhatsApp** (HMAC-SHA256 webhook, Cloud API send)
+  - **Messenger** (Meta HMAC-SHA256 webhook, Messenger Send API)
+  - **Google Chat** (JWT/OIDC inbound, optional service-account async reply)
+  - **Microsoft Teams** (Bot Framework inbound with SSRF-hardened auth verification, `adapter.continueConversationAsync` for push)
+  Plus Durable Object hibernation recovery, subpath exports, CoderRabbit / Sourcery review fixes, extracted time constants.
+
+### Packages published during this cycle
+
+- `@mulmobridge/client@0.1.2`
+- `@mulmobridge/mock-server@0.1.1`
+- `@mulmobridge/relay@0.2.0`
+- `@mulmobridge/mastodon@0.1.0`
+- `@mulmobridge/bluesky@0.1.0`
+- `@mulmobridge/chatwork@0.1.0`
+- `@mulmobridge/xmpp@0.1.0`
+- `@mulmobridge/rocketchat@0.1.0`
+- `@mulmobridge/signal@0.1.0`
+- `@mulmobridge/teams@0.1.0`
+- `@mulmobridge/webhook@0.1.0`
+- `@mulmobridge/twilio-sms@0.1.0`
+- `@mulmobridge/email@0.1.0`
+- `@mulmobridge/line-works@0.1.0`
+- `@mulmobridge/nostr@0.1.0`
+- `@mulmobridge/viber@0.1.0`
+
+---
+
 ## [0.3.0] - 2026-04-22
 
 ### Highlights

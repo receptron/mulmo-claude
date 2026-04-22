@@ -366,8 +366,8 @@ describe("parseArchivistOutput", () => {
 });
 
 describe("computeJustCompletedSessions", () => {
-  function makeMeta(id: string, mtimeMs = 100): SessionFileMeta {
-    return { id, mtimeMs };
+  function makeMeta(sessionId: string, mtimeMs = 100): SessionFileMeta {
+    return { id: sessionId, mtimeMs };
   }
 
   it("marks a session complete when this day is its only remaining one", () => {

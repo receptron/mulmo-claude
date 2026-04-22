@@ -3,19 +3,21 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0 gap-3">
       <div class="flex items-center gap-3 min-w-0">
-        <h2 class="text-base font-semibold text-gray-800 shrink-0">Todo</h2>
-        <span class="text-xs text-gray-500 shrink-0">{{ completedCount }}/{{ items.length }} done</span>
+        <h2 class="text-base font-semibold text-gray-800 shrink-0">{{ t("todoExplorer.heading") }}</h2>
+        <span class="text-xs text-gray-500 shrink-0">{{ t("todoExplorer.doneRatio", { done: completedCount, total: items.length }) }}</span>
         <input
           v-model="search"
           data-testid="todo-search"
           type="text"
-          placeholder="Search..."
+          :placeholder="t('todoExplorer.searchPlaceholder')"
           class="px-2 py-1 text-xs border border-gray-200 rounded w-44 focus:outline-none focus:border-blue-400"
         />
       </div>
       <div class="flex items-center gap-2">
         <!-- Add button -->
-        <button data-testid="todo-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">+ Add</button>
+        <button data-testid="todo-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">
+          {{ t("todoExplorer.addButton") }}
+        </button>
         <!-- Add column button (kanban only) -->
         <button
           v-if="viewMode === TODO_VIEW.kanban"
@@ -23,7 +25,7 @@
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
         >
-          + Column
+          {{ t("todoExplorer.addColumnButton") }}
         </button>
         <!-- View mode toggle -->
         <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
@@ -44,7 +46,7 @@
 
     <!-- Label filter chips -->
     <div v-if="labelInventory.length > 0" class="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 shrink-0">
-      <span class="text-[11px] text-gray-500 mr-1">Labels:</span>
+      <span class="text-[11px] text-gray-500 mr-1">{{ t("todoExplorer.labels") }}</span>
       <button
         v-for="entry in labelInventory"
         :key="entry.label"
@@ -59,8 +61,13 @@
         {{ entry.label }}
         <span class="opacity-60">{{ entry.count }}</span>
       </button>
-      <button v-if="activeFilters.size > 0" class="ml-auto text-[11px] text-gray-500 hover:text-gray-700" title="Clear label filters" @click="clearFilters">
-        Clear ✕
+      <button
+        v-if="activeFilters.size > 0"
+        class="ml-auto text-[11px] text-gray-500 hover:text-gray-700"
+        :title="t('todoExplorer.clearFiltersTitle')"
+        @click="clearFilters"
+      >
+        {{ t("todoExplorer.clearButton") }}
       </button>
     </div>
 
@@ -71,7 +78,7 @@
 
     <!-- Body -->
     <div class="flex-1 min-h-0">
-      <div v-if="items.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">No todo items yet. Click "+ Add" to create one.</div>
+      <div v-if="items.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">{{ t("todoExplorer.emptyHint") }}</div>
       <template v-else>
         <TodoKanbanView
           v-if="viewMode === TODO_VIEW.kanban"
@@ -122,20 +129,22 @@
     <!-- Add column dialog -->
     <div v-if="addColumnOpen" class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" @click="addColumnOpen = false">
       <div class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="todo-add-column-title" @click.stop>
-        <h3 id="todo-add-column-title" class="text-base font-semibold text-gray-800">Add Column</h3>
+        <h3 id="todo-add-column-title" class="text-base font-semibold text-gray-800">{{ t("todoExplorer.addColumn") }}</h3>
         <label class="block text-xs text-gray-600">
-          Label
+          {{ t("todoExplorer.newColumnLabelField") }}
           <input
             v-model="newColumnLabel"
             type="text"
-            placeholder="Review"
+            :placeholder="t('todoExplorer.newColumnPlaceholder')"
             class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
             @keydown.enter="commitNewColumn"
           />
         </label>
         <div class="flex justify-end gap-2 pt-1">
-          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="addColumnOpen = false">Cancel</button>
-          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="commitNewColumn">Add</button>
+          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="addColumnOpen = false">
+            {{ t("common.cancel") }}
+          </button>
+          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="commitNewColumn">{{ t("common.add") }}</button>
         </div>
       </div>
     </div>
@@ -144,6 +153,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "../plugins/todo/index";
 import { colorForLabel, filterByLabels, listLabelsWithCount } from "../plugins/todo/labels";
@@ -153,8 +163,9 @@ import TodoTableView from "./todo/TodoTableView.vue";
 import TodoListView from "./todo/TodoListView.vue";
 import TodoAddDialog from "./todo/TodoAddDialog.vue";
 import TodoEditDialog from "./todo/TodoEditDialog.vue";
-
 import { TODO_VIEW, TODO_VIEW_MODES as VIEW_MODES, type TodoViewMode as ViewMode } from "../plugins/todo/viewModes";
+
+const { t } = useI18n();
 
 const VIEW_MODE_KEY = "todo_explorer_view_mode";
 

@@ -1,8 +1,8 @@
 <template>
-  <div class="text-sm">
+  <div class="p-2 text-sm">
     <div class="flex items-center gap-1 font-medium text-gray-700 mb-1">
-      <span>☑</span>
-      <span>{{ completedCount }}/{{ items.length }} completed</span>
+      <span aria-hidden="true">{{ t("todoPreview.headerIcon") }}</span>
+      <span>{{ t("todoPreview.completedRatio", { done: completedCount, total: items.length }) }}</span>
     </div>
     <div
       v-for="item in preview"
@@ -10,7 +10,7 @@
       class="text-xs truncate flex items-center gap-1"
       :class="item.completed ? 'line-through text-gray-400' : 'text-gray-600'"
     >
-      <span class="shrink-0">{{ item.completed ? "✓" : "○" }}</span>
+      <span class="shrink-0">{{ item.completed ? t("todoPreview.doneIcon") : t("todoPreview.pendingIcon") }}</span>
       <span class="truncate">{{ item.text }}</span>
       <template v-if="(item.labels?.length ?? 0) > 0">
         <span
@@ -20,16 +20,21 @@
           :class="colorForLabel(label)"
           >{{ label }}</span
         >
-        <span v-if="(item.labels?.length ?? 0) > 2" class="text-[9px] text-gray-400 shrink-0">+{{ (item.labels?.length ?? 0) - 2 }}</span>
+        <span v-if="(item.labels?.length ?? 0) > 2" class="text-[9px] text-gray-400 shrink-0">{{
+          t("todoPreview.moreLabels", { count: (item.labels?.length ?? 0) - 2 })
+        }}</span>
       </template>
     </div>
-    <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
+    <div v-if="more > 0" class="text-xs text-gray-400">{{ t("todoPreview.moreItems", { count: more }) }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+const { t } = useI18n();
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { API_ROUTES } from "../../config/apiRoutes";

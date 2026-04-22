@@ -17,7 +17,7 @@ import { isEnoent } from "./safe.js";
 import { log } from "../../system/logger/index.js";
 import { summariesRoot, dailyPathFor, topicPathFor, TOPICS_DIR, INDEX_FILE, STATE_FILE, DAILY_DIR, ARCHIVE_DIR } from "../../workspace/journal/paths.js";
 
-import fs from "node:fs";
+import { statSync } from "node:fs";
 
 const root = (rootOverride?: string) => rootOverride ?? workspacePath;
 
@@ -26,7 +26,7 @@ const root = (rootOverride?: string) => rootOverride ?? workspacePath;
 export function journalStateExists(rootOverride?: string): boolean {
   const filePath = path.join(summariesRoot(root(rootOverride)), STATE_FILE);
   try {
-    fs.statSync(filePath);
+    statSync(filePath);
     return true;
   } catch {
     return false;

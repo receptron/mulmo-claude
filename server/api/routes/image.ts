@@ -4,7 +4,7 @@ import { getSessionImageData } from "../../events/session-store/index.js";
 import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
-import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
+import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath, imagePathFromFilename } from "../../utils/files/image-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -148,14 +148,14 @@ router.post(API_ROUTES.image.upload, async (req: Request<object, unknown, Canvas
 router.put(
   API_ROUTES.image.update,
   async (req: Request<{ filename: string }, unknown, CanvasImageBody>, res: Response<CanvasImageResponse | CanvasImageError>) => {
-    const relativePath = `images/${req.params.filename}`;
-    const { imageData } = req.body;
-    if (!imageData || !relativePath) {
-      badRequest(res, "imageData and path are required");
+    const relativePath = imagePathFromFilename(req.params.filename);
+    if (!relativePath) {
+      badRequest(res, "invalid image filename");
       return;
     }
-    if (!isImagePath(relativePath)) {
-      badRequest(res, "invalid image path");
+    const { imageData } = req.body;
+    if (!imageData) {
+      badRequest(res, "imageData is required");
       return;
     }
     const base64 = stripDataUri(imageData);
