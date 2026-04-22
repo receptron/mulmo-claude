@@ -11,6 +11,7 @@
       :key="result.uuid"
       class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
       :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
+      :data-testid="`tool-result-${result.uuid}`"
       @click="emit('select', result.uuid)"
     >
       <span class="absolute top-0 left-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none">
@@ -27,9 +28,9 @@
     </div>
 
     <!-- Thinking indicator -->
-    <div v-if="isRunning" class="px-2 py-1 text-sm">
+    <div v-if="isRunning" class="px-2 py-1 text-sm" data-testid="thinking-indicator">
       <div class="flex items-center gap-2 text-gray-500">
-        <span class="text-xs">{{ statusMessage }}</span>
+        <span class="text-xs" data-testid="status-message">{{ statusMessage }}</span>
         <span class="flex gap-1">
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms" />
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms" />
@@ -37,7 +38,12 @@
         </span>
       </div>
       <div v-if="pendingCalls.length > 0" class="mt-1 space-y-0.5">
-        <div v-for="call in pendingCalls" :key="call.toolUseId" class="flex items-center gap-1.5 text-xs text-gray-400">
+        <div
+          v-for="call in pendingCalls"
+          :key="call.toolUseId"
+          class="flex items-center gap-1.5 text-xs text-gray-400"
+          :data-testid="`pending-call-${call.toolUseId}`"
+        >
           <span class="w-1.5 h-1.5 rounded-full bg-blue-300 shrink-0 animate-pulse" />
           <span class="font-mono truncate">{{ call.toolName }}</span>
         </div>

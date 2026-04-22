@@ -56,6 +56,7 @@
         <div
           v-if="!geminiAvailable && needsGeminiForRole(currentRoleId)"
           class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0"
+          data-testid="gemini-warning"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
           Image generation requires
@@ -88,6 +89,7 @@
         <div
           v-if="isStackLayout && !geminiAvailable && needsGeminiForRole(currentRoleId)"
           class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0"
+          data-testid="gemini-warning-stack"
         >
           <span class="material-icons text-xs align-middle mr-1">warning</span>
           Image generation requires
