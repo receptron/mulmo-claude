@@ -8,14 +8,18 @@
 //   SLACK_APP_TOKEN     — xapp-... (App-Level Token with connections:write)
 //
 // Optional:
-//   SLACK_ALLOWED_CHANNELS — CSV of channel IDs (empty = allow all)
-//   MULMOCLAUDE_API_URL    — default http://localhost:3001
-//   MULMOCLAUDE_AUTH_TOKEN — bearer token (or read from workspace)
+//   SLACK_ALLOWED_CHANNELS     — CSV of channel IDs (empty = allow all)
+//   SLACK_SESSION_GRANULARITY  — "channel" (default) | "thread" | "auto"
+//                                Controls how a single Slack channel is split
+//                                into MulmoClaude sessions. See README.md.
+//   MULMOCLAUDE_API_URL        — default http://localhost:3001
+//   MULMOCLAUDE_AUTH_TOKEN     — bearer token (or read from workspace)
 
 import "dotenv/config";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { createBridgeClient } from "@mulmobridge/client";
+import { buildExternalChatId, parseExternalChatId, parseGranularity } from "./sessionId.js";
 
 const TRANSPORT_ID = "slack";
 
@@ -34,6 +38,15 @@ const allowedChannels = new Set(
 );
 const allowAll = allowedChannels.size === 0;
 
+const granularity = (() => {
+  try {
+    return parseGranularity(process.env.SLACK_SESSION_GRANULARITY);
+  } catch (err) {
+    console.error(`[slack] ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+})();
+
 const web = new WebClient(botToken);
 const socketMode = new SocketModeClient({ appToken });
 
@@ -43,7 +56,14 @@ const client = createBridgeClient({ transportId: TRANSPORT_ID });
 let botUserId: string | null = null;
 
 client.onPush((pushEvent) => {
-  web.chat.postMessage({ channel: pushEvent.chatId, text: pushEvent.message }).catch((err) => console.error(`[slack] push send failed: ${err}`));
+  const { channel, threadTs } = parseExternalChatId(pushEvent.chatId);
+  web.chat
+    .postMessage({
+      channel,
+      text: pushEvent.message,
+      ...(threadTs ? { thread_ts: threadTs } : {}),
+    })
+    .catch((err) => console.error(`[slack] push send failed: ${err}`));
 });
 
 socketMode.on("message", async ({ event, ack }) => {
@@ -55,6 +75,7 @@ socketMode.on("message", async ({ event, ack }) => {
   if (botUserId && event.user === botUserId) return;
 
   const channelId: string = event.channel;
+  const threadTs: string | undefined = typeof event.thread_ts === "string" ? event.thread_ts : undefined;
   const text: string = event.text ?? "";
   if (!text.trim()) return;
 
@@ -63,18 +84,20 @@ socketMode.on("message", async ({ event, ack }) => {
     return;
   }
 
-  console.log(`[slack] message channel=${channelId} user=${event.user} len=${text.length}`);
+  const externalChatId = buildExternalChatId(channelId, threadTs, granularity);
+  console.log(`[slack] message channel=${channelId} thread_ts=${threadTs ?? "-"} session=${externalChatId} user=${event.user} len=${text.length}`);
 
   try {
-    const ackResult = await client.send(channelId, text);
+    const ackResult = await client.send(externalChatId, text);
     if (ackResult.ok) {
-      await sendChunked(channelId, ackResult.reply ?? "");
+      await sendChunked(channelId, threadTs, ackResult.reply ?? "");
     } else {
       const status = ackResult.status ? ` (${ackResult.status})` : "";
       await web.chat
         .postMessage({
           channel: channelId,
           text: `Error${status}: ${ackResult.error ?? "unknown"}`,
+          ...(threadTs ? { thread_ts: threadTs } : {}),
         })
         .catch((err) => console.error(`[slack] error notification failed: ${err}`));
     }
@@ -83,17 +106,18 @@ socketMode.on("message", async ({ event, ack }) => {
   }
 });
 
-async function sendChunked(channel: string, text: string): Promise<void> {
+async function sendChunked(channel: string, threadTs: string | undefined, text: string): Promise<void> {
   // Slack's max message length is ~40,000 chars but we chunk at 4000
   // for readability (matching Telegram's approach).
   const MAX = 4000;
+  const baseArgs = threadTs ? { channel, thread_ts: threadTs } : { channel };
   if (text.length === 0) {
-    await web.chat.postMessage({ channel, text: "(empty reply)" });
+    await web.chat.postMessage({ ...baseArgs, text: "(empty reply)" });
     return;
   }
   for (let i = 0; i < text.length; i += MAX) {
     await web.chat.postMessage({
-      channel,
+      ...baseArgs,
       text: text.slice(i, i + MAX),
     });
   }
@@ -107,6 +131,7 @@ async function main(): Promise<void> {
 
   console.log("MulmoClaude Slack bridge");
   console.log(`Channels: ${allowAll ? "(all)" : [...allowedChannels].join(", ")}`);
+  console.log(`Session granularity: ${granularity}`);
 
   await socketMode.start();
   console.log("Connected to Slack (Socket Mode).");
