@@ -34,6 +34,7 @@ const frMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "Toutes",
+      unread: "Non lues",
       human: "Humain",
       scheduler: "Planificateur",
       skill: "Skill",
@@ -389,7 +390,7 @@ const frMessages = {
     heading: "Skills",
     previewCount: "{count} skill | {count} skills",
     previewMore: "+{count} de plus",
-    subheading: '{count} disponibles · cliquez pour afficher · "Run" l\'invoque comme /<name>',
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} disponibles · cliquez pour afficher · "Run" l'invoque comme /<name>`,
     emptyWithPath: "Aucune skill trouvée. Ajoutez des dossiers de skills sous {path}.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "Sélectionnez une skill à gauche pour afficher son SKILL.md.",

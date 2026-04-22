@@ -34,6 +34,7 @@ const ptBRMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "Todas",
+      unread: "Não lidas",
       human: "Pessoa",
       scheduler: "Agendador",
       skill: "Skill",
@@ -387,7 +388,7 @@ const ptBRMessages = {
     heading: "Skills",
     previewCount: "{count} skill | {count} skills",
     previewMore: "+{count} mais",
-    subheading: '{count} disponíveis · clique para visualizar · "Run" invoca como /<name>',
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} disponíveis · clique para visualizar · "Run" invoca como /<name>`,
     emptyWithPath: "Nenhuma skill encontrada. Adicione pastas de skills em {path}.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "Selecione uma skill à esquerda para ver seu SKILL.md.",

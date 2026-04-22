@@ -34,6 +34,7 @@ const deMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "Alle",
+      unread: "Ungelesen",
       human: "Mensch",
       scheduler: "Scheduler",
       skill: "Skill",
@@ -389,7 +390,7 @@ const deMessages = {
     heading: "Skills",
     previewCount: "{count} Skill | {count} Skills",
     previewMore: "+{count} weitere",
-    subheading: '{count} verfügbar · zum Anzeigen klicken · "Run" ruft sie als /<name> auf',
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} verfügbar · zum Anzeigen klicken · "Run" ruft sie als /<name> auf`,
     emptyWithPath: "Keine Skills gefunden. Fügen Sie Skill-Ordner unter {path} hinzu.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "Wählen Sie links eine Skill aus, um ihre SKILL.md anzuzeigen.",
