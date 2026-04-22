@@ -570,8 +570,9 @@ test.describe("12. background generation indicators", () => {
     await mockAllApis(page);
   });
 
-  test("thinking indicator shows during agent run", async ({ page }) => {
-    // Set up a slow agent that sends status but doesn't finish quickly
+  test("status message and pending tool call appear during agent run", async ({ page }) => {
+    // Stream events with delays so the thinking indicator is visible
+    // between the status event and session_finished.
     await page.routeWebSocket(
       (url) => url.pathname.startsWith("/ws/pubsub"),
       (webSocket) => {
@@ -591,19 +592,23 @@ test.describe("12. background generation indicators", () => {
           const [name, arg] = parsed as [string, unknown];
           if (name !== "subscribe" || typeof arg !== "string" || !arg.startsWith("session.")) return;
           const channel = arg;
-          // Send status but delay session_finished
-          setTimeout(() => {
-            webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "status", message: "Generating image..." } }]));
-            webSocket.send(
-              "42" +
-                JSON.stringify(["data", { channel, data: { type: "tool_call", toolUseId: "tc-gen", toolName: "generateImage", args: { prompt: "sunset" } } }]),
-            );
-          }, 50);
-          // Finish after 3 seconds
-          setTimeout(() => {
-            webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "text", message: "Done generating" } }]));
-            webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
-          }, 3000);
+          const send = (data: unknown) => webSocket.send("42" + JSON.stringify(["data", { channel, data }]));
+          // Stagger events so the UI has time to render intermediate state.
+          // generation_started makes pendingGenerations non-empty which
+          // sets the computed isRunning to true.
+          void (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            send({ type: "generation_started", kind: "image", filePath: "sunset.png", key: "gen-1" });
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            send({ type: "status", message: "Generating image..." });
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            send({ type: "tool_call", toolUseId: "tc-gen", toolName: "generateImage", args: { prompt: "sunset" } });
+            // Hold the running state for 4 seconds before finishing
+            await new Promise((resolve) => setTimeout(resolve, 4000));
+            send({ type: "generation_finished", kind: "image", filePath: "sunset.png", key: "gen-1" });
+            send({ type: "text", message: "Done generating" });
+            send({ type: "session_finished" });
+          })();
         });
       },
     );
@@ -615,12 +620,12 @@ test.describe("12. background generation indicators", () => {
     await page.goto("/");
     await sendChatMessage(page, "generate an image");
 
-    // Thinking indicator should appear
+    // Thinking indicator should appear while agent is running
     await expect(page.getByTestId("thinking-indicator")).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
-    await expect(page.getByTestId("status-message")).toContainText("Generating image");
-
-    // Pending call should appear
-    await expect(page.getByTestId("pending-call-tc-gen")).toBeVisible();
+    // Status message should show the generation status
+    await expect(page.getByTestId("status-message")).toContainText("Generating image", { timeout: 5 * ONE_SECOND_MS });
+    // Pending call should show the tool being run
+    await expect(page.getByTestId("pending-call-tc-gen")).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
 });
 
