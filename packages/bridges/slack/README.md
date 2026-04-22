@@ -4,6 +4,8 @@
 
 Slack bridge for [MulmoClaude](https://github.com/receptron/mulmoclaude). Uses **Socket Mode** — no public URL or ngrok needed.
 
+日本語: [`README.ja.md`](README.ja.md)
+
 ## Setup
 
 ### 1. Create a Slack App
