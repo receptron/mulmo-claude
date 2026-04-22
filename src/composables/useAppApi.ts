@@ -20,6 +20,13 @@ export interface AppApi {
   refreshRoles: () => void | Promise<void>;
   /** Send a chat message through App.vue's normal sendMessage pipeline. */
   sendMessage: (message: string) => void;
+  /**
+   * Open a fresh chat session (using the currently selected role) and
+   * send `message` as its first turn. Used by plugin views that want
+   * to kick off a new conversation instead of threading into whatever
+   * session happens to be active.
+   */
+  startNewChat: (message: string) => void;
   /** Navigate to a workspace-internal link (wiki page, file, session). */
   navigateToWorkspacePath: (href: string) => void;
 }
