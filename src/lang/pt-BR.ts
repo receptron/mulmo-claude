@@ -54,6 +54,7 @@ const ptBRMessages = {
     dismiss: "Dispensar",
   },
   sidebarHeader: {
+    home: "Ir para o chat mais recente",
     toolCallHistory: "Histórico de chamadas de ferramentas",
     settings: "Configurações",
   },

@@ -12,6 +12,7 @@
           @notification-navigate="handleNotificationNavigate"
           @toggle-right-sidebar="toggleRightSidebar"
           @open-settings="showSettings = true"
+          @home="handleHomeClick"
         />
         <div class="flex-1 min-w-0">
           <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
@@ -438,6 +439,10 @@ function handleSessionSelect(sessionId: string): void {
 
 function handleNewSessionClick(): void {
   createNewSession();
+}
+
+function handleHomeClick(): void {
+  resumeOrCreateChatSession().catch((err) => console.error("[home] resume failed:", err));
 }
 
 // Measure the top bar's height when the history popup opens.

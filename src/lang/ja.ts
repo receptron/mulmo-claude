@@ -56,6 +56,7 @@ const jaMessages = {
     dismiss: "閉じる",
   },
   sidebarHeader: {
+    home: "最新のチャットに移動",
     toolCallHistory: "ツール呼び出し履歴",
     settings: "設定",
   },
