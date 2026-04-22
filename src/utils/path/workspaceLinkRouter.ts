@@ -55,18 +55,18 @@ export function classifyWorkspacePath(href: string): WorkspaceLinkTarget | null 
   return { kind: "file", path: normalized };
 }
 
-function stripFragmentAndQuery(s: string): string {
-  const hashIdx = s.indexOf("#");
-  const queryIdx = s.indexOf("?");
-  let end = s.length;
+function stripFragmentAndQuery(str: string): string {
+  const hashIdx = str.indexOf("#");
+  const queryIdx = str.indexOf("?");
+  let end = str.length;
   if (hashIdx !== -1 && hashIdx < end) end = hashIdx;
   if (queryIdx !== -1 && queryIdx < end) end = queryIdx;
-  return s.slice(0, end);
+  return str.slice(0, end);
 }
 
-function normalizePath(p: string): string | null {
-  if (p.length === 0) return null;
-  const parts = p.split("/");
+function normalizePath(raw: string): string | null {
+  if (raw.length === 0) return null;
+  const parts = raw.split("/");
   const stack: string[] = [];
   for (const part of parts) {
     if (part === "" || part === ".") continue;
