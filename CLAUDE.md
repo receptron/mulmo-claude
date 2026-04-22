@@ -55,6 +55,19 @@ NEVER use raw `fs.readFile` / `fs.writeFile` in route handlers. Use `server/util
 
 NEVER escape backticks with `\`` in `gh` commands. Use single-quoted heredoc (`<<'EOF'`).
 
+### i18n — all 8 locales in lockstep
+
+Supported UI locales live under `src/lang/`: `en.ts`, `ja.ts`, `zh.ts`, `ko.ts`, `es.ts`, `pt-BR.ts`, `fr.ts`, `de.ts`. `src/lang/en.ts` is the schema source of truth; `typeof enMessages` is threaded through `createI18n` in `src/lib/vue-i18n.ts`, so `vue-tsc` treats every missing or extra key as a type error.
+
+When adding, renaming, or removing any i18n key:
+
+- MUST update **all 8** locale files in the same PR — NEVER land a change that only touches `en.ts` and defers the other locales "for later" (this breaks CI and every downstream branch)
+- MUST keep the key order consistent across locales so diffs stay readable
+- MUST translate the new string properly in each locale (do not just copy the English value) — placeholders like `{count}` / `{error}` / `{sizeMB}` stay verbatim
+- Product / brand / role names stay in English (Claude, MulmoClaude, Docker, General, Office, etc.)
+- When registering a new locale, update `SUPPORTED_LOCALES`, the `Locale` union, and the `messages` map in `src/lib/vue-i18n.ts` together
+- When introducing a new UI string, extract it to `src/lang/en.ts` first (do NOT hardcode in templates) — `$t()` / `useI18n().t` is the only acceptable source
+
 ## Releases
 
 See `/release-app` skill for app releases. See `/publish` skill for npm packages.
