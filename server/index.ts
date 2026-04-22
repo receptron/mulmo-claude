@@ -34,8 +34,8 @@ import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/in
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
-import fs from "fs";
-import os from "os";
+import { existsSync, readFileSync } from "fs";
+import { homedir } from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./system/docker.js";
 import { maybeRunJournal } from "./workspace/journal/index.js";
 import { backfillAllSessions } from "./workspace/chat-index/index.js";
@@ -234,7 +234,7 @@ if (env.isProduction) {
   app.get("/{*splat}", (_req: Request, res: Response) => {
     let html: string;
     try {
-      html = fs.readFileSync(indexHtmlPath, "utf-8");
+      html = readFileSync(indexHtmlPath, "utf-8");
     } catch (err) {
       log.error("server", "failed to read index.html", { error: String(err) });
       serverError(res, "Internal Server Error");
@@ -270,8 +270,8 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 async function ensureCredentialsAvailable(): Promise<void> {
-  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
-  if (fs.existsSync(credentialsPath)) return;
+  const credentialsPath = path.join(homedir(), ".claude", ".credentials.json");
+  if (existsSync(credentialsPath)) return;
 
   if (process.platform === "darwin") {
     const { refreshCredentials } = await import("./system/credentials.js");

@@ -4,7 +4,7 @@
 // directories under `data/` and `artifacts/` for organizing files.
 // Claude sees these in the system prompt and routes saves accordingly.
 
-import fs from "fs";
+import { existsSync, mkdirSync, readFileSync } from "fs";
 import path from "path";
 import { workspacePath, WORKSPACE_DIRS } from "./paths.js";
 import { log } from "../system/logger/index.js";
@@ -102,8 +102,8 @@ export function loadCustomDirs(root?: string): CustomDirEntry[] {
   const base = root ?? workspacePath;
   const filePath = path.join(base, CONFIG_FILE);
   try {
-    if (!fs.existsSync(filePath)) return [];
-    const raw = fs.readFileSync(filePath, "utf-8");
+    if (!existsSync(filePath)) return [];
+    const raw = readFileSync(filePath, "utf-8");
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
       log.warn("custom-dirs", "workspace-dirs.json is not an array");
@@ -132,7 +132,7 @@ export function loadCustomDirs(root?: string): CustomDirEntry[] {
 export function saveCustomDirs(entries: readonly CustomDirEntry[], root?: string): void {
   const base = root ?? workspacePath;
   const filePath = path.join(base, CONFIG_FILE);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileAtomicSync(filePath, JSON.stringify(entries, null, 2));
   invalidateCache();
 }
@@ -186,7 +186,7 @@ export function ensureCustomDirs(entries: readonly CustomDirEntry[], root?: stri
   const base = root ?? workspacePath;
   for (const entry of entries) {
     const dirPath = path.join(base, entry.path);
-    fs.mkdirSync(dirPath, { recursive: true });
+    mkdirSync(dirPath, { recursive: true });
   }
 }
 

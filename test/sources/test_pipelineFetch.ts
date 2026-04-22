@@ -1,6 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { runFetchPhase, computeNextState, backoffDelayMs, BACKOFF_MAX_MS } from "../../server/workspace/sources/pipeline/fetch.js";
+import {
+  runFetchPhase,
+  computeNextState,
+  backoffDelayMs,
+  emptyBackoffDelayMs,
+  BACKOFF_MAX_MS,
+  EMPTY_FETCH_THRESHOLD,
+  EMPTY_BACKOFF_MAX_MS,
+} from "../../server/workspace/sources/pipeline/fetch.js";
 import type { FetcherDeps, FetchResult, SourceFetcher } from "../../server/workspace/sources/fetchers/index.js";
 import type { FetcherKind, Source, SourceState } from "../../server/workspace/sources/types.js";
 import { HostRateLimiter, type RateLimiterDeps } from "../../server/workspace/sources/rateLimiter.js";
@@ -31,6 +39,8 @@ function makeState(over: Partial<SourceState> = {}): SourceState {
     cursor: {},
     consecutiveFailures: 0,
     nextAttemptAt: null,
+    consecutiveEmptyFetches: 0,
+    emptyBackoffUntil: null,
     ...over,
   };
 }
@@ -39,8 +49,8 @@ function controllableClock(): RateLimiterDeps {
   const state = { t: 0 };
   return {
     now: () => state.t,
-    sleep: (ms) => {
-      state.t += ms;
+    sleep: (delayMs) => {
+      state.t += delayMs;
       return Promise.resolve();
     },
   };
@@ -286,5 +296,70 @@ describe("computeNextState — on failure", () => {
     const next = computeNextState(prev, outcome, now);
     const gap = Date.parse(next.nextAttemptAt!) - now;
     assert.equal(gap, BACKOFF_MAX_MS);
+  });
+
+  it("preserves consecutiveEmptyFetches on failure", () => {
+    const prev = makeState({ slug: "s", consecutiveEmptyFetches: 2 });
+    const outcome = { kind: "error" as const, sourceSlug: "s", error: "boom" };
+    const next = computeNextState(prev, outcome, now);
+    assert.equal(next.consecutiveEmptyFetches, 2);
+  });
+});
+
+describe("emptyBackoffDelayMs — adaptive empty-fetch backoff", () => {
+  it("returns 0 below the threshold", () => {
+    assert.equal(emptyBackoffDelayMs(0), 0);
+    assert.equal(emptyBackoffDelayMs(EMPTY_FETCH_THRESHOLD - 1), 0);
+  });
+
+  it("returns 1h at the threshold", () => {
+    assert.equal(emptyBackoffDelayMs(EMPTY_FETCH_THRESHOLD), 3_600_000);
+  });
+
+  it("doubles each step beyond the threshold", () => {
+    assert.equal(emptyBackoffDelayMs(EMPTY_FETCH_THRESHOLD + 1), 7_200_000);
+    assert.equal(emptyBackoffDelayMs(EMPTY_FETCH_THRESHOLD + 2), 14_400_000);
+  });
+
+  it("caps at EMPTY_BACKOFF_MAX_MS", () => {
+    assert.equal(emptyBackoffDelayMs(EMPTY_FETCH_THRESHOLD + 100), EMPTY_BACKOFF_MAX_MS);
+  });
+});
+
+describe("computeNextState — empty-success adaptive backoff", () => {
+  const now = Date.parse("2026-04-13T10:00:00Z");
+
+  it("increments consecutiveEmptyFetches when items array is empty", () => {
+    const prev = makeState({ slug: "s", consecutiveEmptyFetches: 0 });
+    const outcome = { kind: "success" as const, sourceSlug: "s", items: [], cursor: {} };
+    const next = computeNextState(prev, outcome, now);
+    assert.equal(next.consecutiveEmptyFetches, 1);
+    assert.equal(next.emptyBackoffUntil, null); // below threshold
+  });
+
+  it("sets emptyBackoffUntil once threshold is reached", () => {
+    const prev = makeState({ slug: "s", consecutiveEmptyFetches: EMPTY_FETCH_THRESHOLD - 1 });
+    const outcome = { kind: "success" as const, sourceSlug: "s", items: [], cursor: {} };
+    const next = computeNextState(prev, outcome, now);
+    assert.equal(next.consecutiveEmptyFetches, EMPTY_FETCH_THRESHOLD);
+    assert.ok(next.emptyBackoffUntil, "emptyBackoffUntil should be set at threshold");
+    const gap = Date.parse(next.emptyBackoffUntil!) - now;
+    assert.equal(gap, 3_600_000); // 1h
+  });
+
+  it("resets empty counters when items are found", () => {
+    const fakeItem = {
+      id: "x",
+      title: "t",
+      url: "https://x.com",
+      publishedAt: new Date(now).toISOString(),
+      categories: [] as import("../../server/workspace/sources/taxonomy.js").CategorySlug[],
+      sourceSlug: "s",
+    };
+    const prev = makeState({ slug: "s", consecutiveEmptyFetches: 5, emptyBackoffUntil: "2026-04-14T10:00:00Z" });
+    const outcome = { kind: "success" as const, sourceSlug: "s", items: [fakeItem], cursor: {} };
+    const next = computeNextState(prev, outcome, now);
+    assert.equal(next.consecutiveEmptyFetches, 0);
+    assert.equal(next.emptyBackoffUntil, null);
   });
 });

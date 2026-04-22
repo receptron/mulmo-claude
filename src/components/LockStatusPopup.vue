@@ -4,7 +4,7 @@
       ref="button"
       data-testid="sandbox-lock-button"
       :class="sandboxEnabled ? 'text-gray-400 hover:text-gray-700' : 'text-amber-400 hover:text-amber-500'"
-      :title="sandboxEnabled ? 'Sandbox enabled (Docker)' : 'No sandbox (Docker not found)'"
+      :title="sandboxEnabled ? t('lockStatusPopup.sandboxEnabledTooltip') : t('lockStatusPopup.noSandboxTooltip')"
       @click="emit('update:open', !open)"
     >
       <span class="material-icons">{{ sandboxEnabled ? "lock" : "lock_open" }}</span>
@@ -13,36 +13,36 @@
       <p class="mb-2" :class="sandboxEnabled ? 'text-green-800' : 'text-amber-500'">
         <template v-if="sandboxEnabled">
           <span class="material-icons text-xs align-middle mr-1">lock</span>
-          <strong>Sandbox enabled:</strong> Docker is running. Filesystem access is isolated.
+          <strong>{{ t("lockStatusPopup.sandboxEnabledLabel") }}</strong> {{ t("lockStatusPopup.sandboxEnabledBody") }}
         </template>
         <template v-else>
           <span class="material-icons text-xs align-middle mr-1">warning</span>
-          <strong>No sandbox:</strong> Claude can access all files on your machine. Install
-          <a href="https://www.docker.com/products/docker-desktop/" target="_blank" class="underline">Docker Desktop</a>
-          to enable filesystem isolation.
+          <strong>{{ t("lockStatusPopup.noSandboxLabel") }}</strong> {{ t("lockStatusPopup.noSandboxBodyPrefix") }}
+          <a href="https://www.docker.com/products/docker-desktop/" target="_blank" class="underline">{{ t("lockStatusPopup.dockerDesktop") }}</a>
+          {{ t("lockStatusPopup.noSandboxBodySuffix") }}
         </template>
       </p>
       <div v-if="sandboxEnabled" data-testid="sandbox-credentials-block" class="mb-2 border-t border-gray-100 pt-2">
-        <p class="text-gray-400 mb-1">Host credentials attached:</p>
-        <p v-if="sandboxStatus === null" class="text-gray-400 italic" data-testid="sandbox-credentials-loading">loading…</p>
+        <p class="text-gray-400 mb-1">{{ t("lockStatusPopup.hostCredentials") }}</p>
+        <p v-if="sandboxStatus === null" class="text-gray-400 italic" data-testid="sandbox-credentials-loading">{{ t("lockStatusPopup.credsLoading") }}</p>
         <template v-else>
           <p data-testid="sandbox-credentials-ssh">
             <span class="mr-1">🔑</span>
-            <span class="text-gray-500">SSH agent:</span>
+            <span class="text-gray-500">{{ t("lockStatusPopup.sshAgent") }}</span>
             <span :class="sandboxStatus.sshAgent ? 'text-green-700' : 'text-gray-400'" class="ml-1">
-              {{ sandboxStatus.sshAgent ? "forwarded" : "not forwarded" }}
+              {{ sandboxStatus.sshAgent ? t("lockStatusPopup.forwarded") : t("lockStatusPopup.notForwarded") }}
             </span>
           </p>
           <p data-testid="sandbox-credentials-mounts">
             <span class="mr-1">📁</span>
-            <span class="text-gray-500">Mounted configs:</span>
+            <span class="text-gray-500">{{ t("lockStatusPopup.mountedConfigs") }}</span>
             <span :class="sandboxStatus.mounts.length > 0 ? 'text-green-700' : 'text-gray-400'" class="ml-1">
-              {{ sandboxStatus.mounts.length > 0 ? sandboxStatus.mounts.join(", ") : "none" }}
+              {{ sandboxStatus.mounts.length > 0 ? sandboxStatus.mounts.join(", ") : t("lockStatusPopup.none") }}
             </span>
           </p>
         </template>
       </div>
-      <p class="text-gray-400 mb-1">Test sandbox isolation:</p>
+      <p class="text-gray-400 mb-1">{{ t("lockStatusPopup.testIsolation") }}</p>
       <div class="flex flex-col gap-1">
         <button
           v-for="q in SANDBOX_TEST_QUERIES"
@@ -60,7 +60,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useSandboxStatus } from "../composables/useSandboxStatus";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   sandboxEnabled: boolean;

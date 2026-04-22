@@ -54,16 +54,14 @@ export default [
     },
     rules: {
       indent: ["error", 2],
-      // Loop iterators (i/j), throwaway (_), and domain-standard
-      // 2-char idioms exempted. `id` covers every record-with-id
-      // in the codebase. `fs`/`os`/`path` are Node-module imports.
-      // `ok` is the Result-pattern discriminator. `ms`/`ts` are
-      // unit-suffixed time values. `md` is markdown. `it` is
-      // node:test's `it()`.
-      // Enabled as `warn` so existing short names across the repo
-      // don't block CI — we migrate incrementally.
+      // Loop iterators (i/j), throwaway (_), and the Result-pattern
+      // discriminator (ok) are the only exempted short names. Everything
+      // else — fs/os namespace imports, id/md/ms abbreviations, etc. —
+      // must be ≥3 chars. Use named imports (e.g. `{ readFileSync }`
+      // from "fs") and descriptive locals (`markdown`, `delayMs`,
+      // `itemId`) instead.
       "id-length": [
-        "warn",
+        "error",
         {
           min: 3,
           // Don't flag object property keys — external API payloads
@@ -73,13 +71,7 @@ export default [
             "_",
             "i",
             "j",
-            "id",
-            "ok",
-            "md",
-            "ms",
-            "it",
-            "fs",
-            "os"
+            "ok"
           ],
         },
       ],
@@ -109,7 +101,10 @@ export default [
       "sonarjs/no-ignored-exceptions": "error",
       "sonarjs/todo-tag": "off",
       "sonarjs/no-commented-code": "off",
-      "sonarjs/no-nested-conditional": "warn",
+      // The rule has no depth option — it flags any nested ternary.
+      // In practice most of our `a ? b : c ? d : e` chains are clean
+      // option tables, not obfuscation. Disable rather than warn.
+      "sonarjs/no-nested-conditional": "off",
       "sonarjs/cognitive-complexity": "error",
       // `@typescript-eslint/no-unused-vars` already covers this and
       // honours the `^__` ignore pattern (see its options above); the

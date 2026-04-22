@@ -21,7 +21,7 @@
 // `WORKSPACE_DIRS` record below. The absolute path is derived
 // automatically via `WORKSPACE_PATHS`.
 
-import os from "os";
+import { homedir } from "os";
 import path from "path";
 
 // Workspace root. Hard-coded to `~/mulmoclaude` — there is no
@@ -29,7 +29,7 @@ import path from "path";
 // requires a code edit or a symlink. Re-exported by
 // `server/workspace.ts` for backwards compatibility of existing
 // callers that `import { workspacePath } from "./workspace.js"`.
-export const workspacePath = path.join(os.homedir(), "mulmoclaude");
+export const workspacePath = path.join(homedir(), "mulmoclaude");
 
 // Workspace-relative paths. Keys are the stable code-side identifiers
 // (e.g. `markdowns` — unchanged for call-site compatibility); values
@@ -90,7 +90,7 @@ import { WORKSPACE_FILES } from "../../src/config/workspacePaths.js";
 export { WORKSPACE_FILES };
 
 // Absolute paths, built once at module load from `workspacePath`.
-// The `workspacePath` const is itself fixed (reads `os.homedir()`
+// The `workspacePath` const is itself fixed (reads `homedir()`
 // at process start — no env override, see `server/workspace.ts`),
 // so freezing these paths is safe.
 export const WORKSPACE_PATHS = {

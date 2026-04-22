@@ -358,9 +358,9 @@ describe("prepareUserServers", () => {
       },
     };
     const out = prepareUserServers(servers, true, hostWs);
-    const fs = out.fs;
-    assert.ok(fs && fs.type === "stdio");
-    assert.deepEqual(fs.args, ["-y", "@modelcontextprotocol/server-filesystem", `${CONTAINER_WORKSPACE_PATH}/docs`]);
+    const fsSpec = out.fs;
+    assert.ok(fsSpec && fsSpec.type === "stdio");
+    assert.deepEqual(fsSpec.args, ["-y", "@modelcontextprotocol/server-filesystem", `${CONTAINER_WORKSPACE_PATH}/docs`]);
   });
 
   it("leaves non-workspace stdio args untouched (caller warns in UI)", async () => {

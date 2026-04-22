@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mergeRoles } from "../../../src/utils/role/merge.js";
 import type { Role } from "../../../src/config/roles";
 
-function role(id: string, name = id): Role {
+function role(roleId: string, name = roleId): Role {
   return {
-    id,
+    id: roleId,
     name,
     icon: "star",
     prompt: "",

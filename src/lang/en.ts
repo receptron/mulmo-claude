@@ -8,11 +8,17 @@
 // reads `typeof en` to feed `DefineLocaleMessage`, and readonly literal
 // types would conflict with vue-i18n's writable message interface.
 
-const en = {
+const enMessages = {
   common: {
     save: "Save",
     cancel: "Cancel",
     loading: "Loading...",
+    close: "Close",
+    dismiss: "Dismiss",
+    add: "Add",
+    remove: "Remove",
+    saving: "Saving...",
+    saved: "Saved",
   },
   sessionTabBar: {
     newSession: "New session",
@@ -79,6 +85,71 @@ const en = {
     // badge next to the Reference label.
     readOnlyBadge: "RO",
   },
+  fileTree: {
+    workspace: "(workspace)",
+    recentlyChanged: "Recently changed",
+  },
+  lockStatusPopup: {
+    sandboxEnabledTooltip: "Sandbox enabled (Docker)",
+    noSandboxTooltip: "No sandbox (Docker not found)",
+    sandboxEnabledLabel: "Sandbox enabled:",
+    sandboxEnabledBody: "Docker is running. Filesystem access is isolated.",
+    noSandboxLabel: "No sandbox:",
+    noSandboxBodyPrefix: "Claude can access all files on your machine. Install",
+    noSandboxBodySuffix: "to enable filesystem isolation.",
+    dockerDesktop: "Docker Desktop",
+    hostCredentials: "Host credentials attached:",
+    credsLoading: "loading…",
+    sshAgent: "SSH agent:",
+    forwarded: "forwarded",
+    notForwarded: "not forwarded",
+    mountedConfigs: "Mounted configs:",
+    none: "none",
+    testIsolation: "Test sandbox isolation:",
+  },
+  settingsModal: {
+    title: "Settings",
+    tabs: {
+      tools: "Allowed Tools",
+      mcp: "MCP Servers",
+      dirs: "Directories",
+      refs: "Reference Dirs",
+    },
+    toolNamesLabel: "Tool names",
+    invalidToolNamesPrefix: "These look non-standard (expected prefix",
+    invalidToolNamesSuffix: "):",
+    mcpToolsError: "⚠ Could not fetch MCP tool status: {error}. Showing all tools regardless of enablement.",
+    changesHint: "Changes apply on the next message. No restart needed.",
+    cannotSaveTooltip: "Cannot save until settings load successfully",
+    saving: "Saving…",
+    loadingLabel: "Loading…",
+  },
+  canvasViewToggle: {
+    stackViewTooltip: "Stack view · click to switch to Single (⌘1)",
+    singleViewTooltip: "Single view · click to switch to Stack (⌘2)",
+    switchToSingle: "Switch to Single view",
+    switchToStack: "Switch to Stack view",
+  },
+  settingsWorkspaceDirs: {
+    noEntries: "No custom directories configured.",
+    addDirTitle: "Add directory",
+    pathPlaceholder: "data/clients or artifacts/reports",
+    descPlaceholder: "Description (what goes in this folder)",
+    errPathRequired: "Path required",
+    errMustStartWith: "Must start with data/ or artifacts/",
+    errAlreadyExists: "Already exists",
+  },
+  settingsReferenceDirs: {
+    noEntries: "No reference directories configured.",
+    addDirTitle: "Add reference directory",
+    pathPlaceholder: "/Users/me/ObsidianVault or ~/Documents/notes",
+    labelPlaceholder: "Label (optional — defaults to folder name)",
+    readOnlyBadge: "read-only",
+    errPathRequired: "Path required",
+    errMustBeAbsolute: "Must be an absolute path or start with ~/",
+    errAlreadyExists: "Already exists",
+    errLabelConflict: 'Label "{label}" already exists',
+  },
 };
 
-export default en;
+export default enMessages;

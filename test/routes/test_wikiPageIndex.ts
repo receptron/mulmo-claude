@@ -1,7 +1,7 @@
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { __resetPageIndexCache, getPageIndex } from "../../server/api/routes/wiki/pageIndex.js";
 
@@ -17,7 +17,7 @@ describe("getPageIndex", () => {
   let dir: string;
 
   before(async () => {
-    dir = await mkdtemp(path.join(os.tmpdir(), "wiki-pages-"));
+    dir = await mkdtemp(path.join(tmpdir(), "wiki-pages-"));
   });
 
   after(async () => {

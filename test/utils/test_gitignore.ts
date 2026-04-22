@@ -1,18 +1,18 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { GitignoreFilter, createRootFilter } from "../../server/utils/gitignore.ts";
 
 let tmpDir = "";
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmo-gitignore-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "mulmo-gitignore-"));
 });
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 describe("GitignoreFilter", () => {
@@ -40,7 +40,7 @@ describe("GitignoreFilter.childForDir", () => {
   it("inherits parent rules", () => {
     const parent = new GitignoreFilter("*.tmp\n");
     const childDir = path.join(tmpDir, "sub");
-    fs.mkdirSync(childDir);
+    mkdirSync(childDir);
     // No .gitignore in childDir
     const child = parent.childForDir(childDir);
     assert.equal(child.ignores("foo.tmp"), true);
@@ -50,8 +50,8 @@ describe("GitignoreFilter.childForDir", () => {
   it("adds local .gitignore rules on top of parent", () => {
     const parent = new GitignoreFilter("*.tmp\n");
     const childDir = path.join(tmpDir, "sub");
-    fs.mkdirSync(childDir);
-    fs.writeFileSync(path.join(childDir, ".gitignore"), "node_modules/\n");
+    mkdirSync(childDir);
+    writeFileSync(path.join(childDir, ".gitignore"), "node_modules/\n");
     const child = parent.childForDir(childDir);
     // Parent rule
     assert.equal(child.ignores("foo.tmp"), true);
@@ -69,7 +69,7 @@ describe("createRootFilter", () => {
   });
 
   it("reads the root .gitignore", () => {
-    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "github/\n.session-token\n");
+    writeFileSync(path.join(tmpDir, ".gitignore"), "github/\n.session-token\n");
     const filter = createRootFilter(tmpDir);
     assert.equal(filter.ignores("github/"), true);
     assert.equal(filter.ignores("github/repo/file.ts"), true);

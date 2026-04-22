@@ -1,4 +1,4 @@
-import fs from "fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
@@ -12,8 +12,8 @@ let imagesDirReal: string | null = null;
 
 async function ensureImagesDir(): Promise<string> {
   if (imagesDirReal) return imagesDirReal;
-  await fs.mkdir(IMAGES_DIR, { recursive: true });
-  imagesDirReal = await fs.realpath(IMAGES_DIR);
+  await mkdir(IMAGES_DIR, { recursive: true });
+  imagesDirReal = await realpath(IMAGES_DIR);
   return imagesDirReal;
 }
 
@@ -38,20 +38,20 @@ export async function saveImage(base64Data: string): Promise<string> {
   const imageId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const filename = `${imageId}.png`;
   const absPath = path.join(IMAGES_DIR, filename);
-  await fs.writeFile(absPath, Buffer.from(base64Data, "base64"));
+  await writeFile(absPath, Buffer.from(base64Data, "base64"));
   return path.posix.join(WORKSPACE_DIRS.images, filename);
 }
 
 /** Overwrite an existing image file. The relativePath must start with "images/". */
 export async function overwriteImage(relativePath: string, base64Data: string): Promise<void> {
   const absPath = await safeResolve(relativePath);
-  await fs.writeFile(absPath, Buffer.from(base64Data, "base64"));
+  await writeFile(absPath, Buffer.from(base64Data, "base64"));
 }
 
 /** Read an image file and return raw base64 (no data URI prefix). */
 export async function loadImageBase64(relativePath: string): Promise<string> {
   const absPath = await safeResolve(relativePath);
-  const buf = await fs.readFile(absPath);
+  const buf = await readFile(absPath);
   return buf.toString("base64");
 }
 

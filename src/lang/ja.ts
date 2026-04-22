@@ -1,11 +1,17 @@
 // Japanese dictionary. Mirror the shape of src/lang/en.ts —
 // missing keys fall back to English per createI18n's fallbackLocale.
 
-const ja = {
+const jaMessages = {
   common: {
     save: "保存",
     cancel: "キャンセル",
     loading: "読み込み中...",
+    close: "閉じる",
+    dismiss: "閉じる",
+    add: "追加",
+    remove: "削除",
+    saving: "保存中...",
+    saved: "保存しました",
   },
   sessionTabBar: {
     newSession: "新しいセッション",
@@ -70,6 +76,71 @@ const ja = {
     reference: "参照",
     readOnlyBadge: "RO",
   },
+  fileTree: {
+    workspace: "（ワークスペース）",
+    recentlyChanged: "最近変更されました",
+  },
+  lockStatusPopup: {
+    sandboxEnabledTooltip: "サンドボックス有効 (Docker)",
+    noSandboxTooltip: "サンドボックスなし (Docker 未検出)",
+    sandboxEnabledLabel: "サンドボックス有効:",
+    sandboxEnabledBody: "Docker が動作中です。ファイルシステムアクセスは隔離されています。",
+    noSandboxLabel: "サンドボックスなし:",
+    noSandboxBodyPrefix: "Claude はこのマシンの全ファイルにアクセスできます。",
+    noSandboxBodySuffix: "をインストールしてファイルシステムを隔離してください。",
+    dockerDesktop: "Docker Desktop",
+    hostCredentials: "ホスト認証情報の接続状況:",
+    credsLoading: "読み込み中…",
+    sshAgent: "SSH エージェント:",
+    forwarded: "転送中",
+    notForwarded: "転送なし",
+    mountedConfigs: "マウント設定:",
+    none: "なし",
+    testIsolation: "サンドボックス隔離をテスト:",
+  },
+  settingsModal: {
+    title: "設定",
+    tabs: {
+      tools: "許可ツール",
+      mcp: "MCP サーバ",
+      dirs: "ディレクトリ",
+      refs: "参照ディレクトリ",
+    },
+    toolNamesLabel: "ツール名",
+    invalidToolNamesPrefix: "次の項目は標準的ではないようです（期待される接頭辞",
+    invalidToolNamesSuffix: "）:",
+    mcpToolsError: "⚠ MCP ツール状態の取得に失敗しました: {error}。有効/無効にかかわらず全ツールを表示しています。",
+    changesHint: "次回のメッセージから反映されます。再起動は不要です。",
+    cannotSaveTooltip: "設定の読み込みに成功するまで保存できません",
+    saving: "保存中…",
+    loadingLabel: "読み込み中…",
+  },
+  canvasViewToggle: {
+    stackViewTooltip: "スタック表示・クリックで Single に切替 (⌘1)",
+    singleViewTooltip: "Single 表示・クリックで Stack に切替 (⌘2)",
+    switchToSingle: "Single 表示に切替",
+    switchToStack: "Stack 表示に切替",
+  },
+  settingsWorkspaceDirs: {
+    noEntries: "カスタムディレクトリは未設定です。",
+    addDirTitle: "ディレクトリを追加",
+    pathPlaceholder: "data/clients または artifacts/reports",
+    descPlaceholder: "説明（このフォルダに入れるもの）",
+    errPathRequired: "パスを入力してください",
+    errMustStartWith: "data/ または artifacts/ で始める必要があります",
+    errAlreadyExists: "既に登録されています",
+  },
+  settingsReferenceDirs: {
+    noEntries: "参照ディレクトリは未設定です。",
+    addDirTitle: "参照ディレクトリを追加",
+    pathPlaceholder: "/Users/me/ObsidianVault または ~/Documents/notes",
+    labelPlaceholder: "ラベル（省略時はフォルダ名）",
+    readOnlyBadge: "読み取り専用",
+    errPathRequired: "パスを入力してください",
+    errMustBeAbsolute: "絶対パスまたは ~/ で始まる必要があります",
+    errAlreadyExists: "既に登録されています",
+    errLabelConflict: "ラベル「{label}」は既に使用されています",
+  },
 };
 
-export default ja;
+export default jaMessages;

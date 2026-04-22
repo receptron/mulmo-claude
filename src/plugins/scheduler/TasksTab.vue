@@ -13,8 +13,27 @@
       {{ error }}
     </div>
 
-    <!-- Task list -->
+    <!-- Task list + frequency hints -->
     <div v-else>
+      <!-- Frequency hints reference -->
+      <details class="mb-4 border border-gray-200 rounded-lg text-sm" data-testid="scheduler-frequency-hints">
+        <summary class="px-3 py-2 cursor-pointer text-gray-600 font-medium select-none hover:bg-gray-50 rounded-lg">Recommended Frequencies</summary>
+        <table class="w-full mt-1 mb-2 text-xs text-gray-500">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="px-3 py-1 text-left font-medium text-gray-600">Task type</th>
+              <th class="px-3 py-1 text-left font-medium text-gray-600">Suggested schedule</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="hint in FREQUENCY_HINTS" :key="hint.label" class="border-b border-gray-50 last:border-0">
+              <td class="px-3 py-1">{{ hint.label }}</td>
+              <td class="px-3 py-1 font-mono text-gray-700">{{ hint.schedule }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
+
       <div v-if="tasks.length === 0" class="flex items-center justify-center h-32 text-gray-400">No scheduled tasks</div>
 
       <div v-else class="space-y-2">
@@ -120,6 +139,14 @@ interface SchedulerTask {
   enabled?: boolean;
   state?: TaskState;
 }
+
+const FREQUENCY_HINTS = [
+  { label: "News / RSS fetch", schedule: "Every 1h" },
+  { label: "Journal daily pass", schedule: "Daily 23:00 UTC" },
+  { label: "Wiki maintenance", schedule: "Daily 02:00 UTC" },
+  { label: "Memory extraction", schedule: "Daily 00:00 UTC" },
+  { label: "Calendar / contact sync", schedule: "Every 4h" },
+] as const;
 
 const tasks = ref<SchedulerTask[]>([]);
 const loading = ref(true);

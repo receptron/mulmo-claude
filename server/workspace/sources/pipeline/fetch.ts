@@ -15,7 +15,7 @@ import type { FetcherDeps, FetchResult, SourceFetcher } from "../fetchers/index.
 import type { FetcherKind, Source, SourceState } from "../types.js";
 import { defaultSourceState } from "../types.js";
 import { errorMessage } from "../../../utils/errors.js";
-import { ONE_MINUTE_MS, ONE_DAY_MS } from "../../../utils/time.js";
+import { ONE_MINUTE_MS, ONE_HOUR_MS, ONE_DAY_MS } from "../../../utils/time.js";
 
 // Outcome of one source's fetch attempt.
 export type FetchOutcome =
@@ -102,27 +102,48 @@ export function backoffDelayMs(consecutiveFailures: number): number {
   return Math.min(delayMs, BACKOFF_MAX_MS);
 }
 
+// Number of consecutive empty fetches before adaptive backoff kicks in.
+export const EMPTY_FETCH_THRESHOLD = 3;
+export const EMPTY_BACKOFF_MAX_MS = ONE_DAY_MS;
+
+// Exponential backoff (in ms) for Nth consecutive empty-success fetch.
+// Returns 0 when below the threshold so callers can use it as a guard.
+// Starts at 1h after threshold, doubling each time up to 24h.
+export function emptyBackoffDelayMs(consecutiveEmptyFetches: number): number {
+  if (consecutiveEmptyFetches < EMPTY_FETCH_THRESHOLD) return 0;
+  const steps = consecutiveEmptyFetches - EMPTY_FETCH_THRESHOLD;
+  const delayMs = ONE_HOUR_MS * 2 ** Math.min(steps, 10);
+  return Math.min(delayMs, EMPTY_BACKOFF_MAX_MS);
+}
+
 // Compute the next per-source state given the outcome. Pure.
 //
-// On success:
-//   - lastFetchedAt = now
-//   - cursor = outcome.cursor (replace wholesale — fetchers
-//     return the merged cursor map)
-//   - consecutiveFailures = 0
-//   - nextAttemptAt = null
+// On success with items:
+//   - lastFetchedAt = now, cursor updated
+//   - consecutiveFailures = 0, nextAttemptAt = null
+//   - consecutiveEmptyFetches = 0, emptyBackoffUntil = null
+// On success with 0 items:
+//   - lastFetchedAt = now, cursor updated
+//   - consecutiveFailures = 0, nextAttemptAt = null
+//   - consecutiveEmptyFetches += 1
+//   - emptyBackoffUntil = now + emptyBackoffDelayMs(newCount) if above threshold
 // On any non-success:
-//   - lastFetchedAt unchanged (we didn't successfully fetch)
-//   - cursor unchanged
-//   - consecutiveFailures += 1
-//   - nextAttemptAt = now + backoffDelayMs(newCount)
+//   - lastFetchedAt/cursor unchanged
+//   - consecutiveFailures += 1, nextAttemptAt = now + backoffDelayMs(newCount)
+//   - consecutiveEmptyFetches/emptyBackoffUntil unchanged
 export function computeNextState(prev: SourceState, outcome: FetchOutcome, nowMs: number): SourceState {
   if (outcome.kind === "success") {
+    const hasItems = outcome.items.length > 0;
+    const emptyCount = hasItems ? 0 : prev.consecutiveEmptyFetches + 1;
+    const emptyDelayMs = emptyBackoffDelayMs(emptyCount);
     return {
       slug: prev.slug,
       lastFetchedAt: new Date(nowMs).toISOString(),
       cursor: outcome.cursor,
       consecutiveFailures: 0,
       nextAttemptAt: null,
+      consecutiveEmptyFetches: emptyCount,
+      emptyBackoffUntil: emptyDelayMs > 0 ? new Date(nowMs + emptyDelayMs).toISOString() : null,
     };
   }
   const failures = prev.consecutiveFailures + 1;
@@ -132,5 +153,7 @@ export function computeNextState(prev: SourceState, outcome: FetchOutcome, nowMs
     cursor: prev.cursor,
     consecutiveFailures: failures,
     nextAttemptAt: new Date(nowMs + backoffDelayMs(failures)).toISOString(),
+    consecutiveEmptyFetches: prev.consecutiveEmptyFetches,
+    emptyBackoffUntil: prev.emptyBackoffUntil,
   };
 }

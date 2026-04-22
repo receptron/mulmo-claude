@@ -1,7 +1,7 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import {
   buildSearchMarkdown,
@@ -92,39 +92,39 @@ describe("computeSearchRelPath", () => {
 
 describe("buildSearchMarkdown", () => {
   it("includes YAML frontmatter + heading + body", () => {
-    const md = buildSearchMarkdown({
+    const markdown = buildSearchMarkdown({
       query: "foo",
       sessionId: SID,
       timestamp: FIXED_TS,
       resultBody: "- result 1\n- result 2",
     });
-    assert.ok(md.startsWith("---\n"));
-    assert.ok(md.includes(`query: foo`));
-    assert.ok(md.includes(`sessionId: ${SID}`));
-    assert.ok(md.includes(`ts: 2026-04-13T05:18:47.123Z`));
-    assert.ok(md.includes("# Search: foo"));
-    assert.ok(md.includes("- result 1"));
-    assert.ok(md.endsWith("\n"), "should end with a trailing newline");
+    assert.ok(markdown.startsWith("---\n"));
+    assert.ok(markdown.includes(`query: foo`));
+    assert.ok(markdown.includes(`sessionId: ${SID}`));
+    assert.ok(markdown.includes(`ts: 2026-04-13T05:18:47.123Z`));
+    assert.ok(markdown.includes("# Search: foo"));
+    assert.ok(markdown.includes("- result 1"));
+    assert.ok(markdown.endsWith("\n"), "should end with a trailing newline");
   });
 
   it("quotes query when it contains a colon", () => {
-    const md = buildSearchMarkdown({
+    const markdown = buildSearchMarkdown({
       query: "a:b",
       sessionId: SID,
       timestamp: FIXED_TS,
       resultBody: "body",
     });
-    assert.ok(md.includes('query: "a:b"'));
+    assert.ok(markdown.includes('query: "a:b"'));
   });
 
   it("passes through unicode queries unchanged in the heading", () => {
-    const md = buildSearchMarkdown({
+    const markdown = buildSearchMarkdown({
       query: "熊本地震",
       sessionId: SID,
       timestamp: FIXED_TS,
       resultBody: "body",
     });
-    assert.ok(md.includes("# Search: 熊本地震"));
+    assert.ok(markdown.includes("# Search: 熊本地震"));
   });
 });
 
@@ -132,7 +132,7 @@ describe("writeSearchResult (I/O)", () => {
   let workspaceRoot: string;
 
   before(async () => {
-    workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "tool-trace-"));
+    workspaceRoot = await mkdtemp(path.join(tmpdir(), "tool-trace-"));
   });
 
   after(async () => {

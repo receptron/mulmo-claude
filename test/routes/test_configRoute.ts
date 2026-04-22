@@ -13,9 +13,9 @@
 
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { mkdirSync, rmSync } from "fs";
 import { mkdtemp, rm } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import type { Request, Response } from "express";
 
@@ -79,13 +79,13 @@ function mockRes() {
 }
 
 before(async () => {
-  tmpRoot = await mkdtemp(path.join(os.tmpdir(), "mulmo-config-route-"));
+  tmpRoot = await mkdtemp(path.join(tmpdir(), "mulmo-config-route-"));
   originalHome = process.env.HOME;
   originalUserProfile = process.env.USERPROFILE;
-  // os.homedir() uses HOME on POSIX and USERPROFILE on Windows.
+  // homedir() uses HOME on POSIX and USERPROFILE on Windows.
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
-  fs.mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
+  mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
   configMod = await import("../../server/system/config.js");
   routeMod = await import("../../server/api/routes/config.js");
   getHandler = extractRouteHandler(routeMod, "/api/config", "get");
@@ -103,7 +103,7 @@ after(async () => {
 
 describe("GET /config", () => {
   beforeEach(() => {
-    fs.rmSync(configMod.configsDir(), { recursive: true, force: true });
+    rmSync(configMod.configsDir(), { recursive: true, force: true });
   });
 
   it("returns defaults when nothing is on disk", () => {
@@ -131,7 +131,7 @@ describe("GET /config", () => {
 
 describe("PUT /config/settings", () => {
   beforeEach(() => {
-    fs.rmSync(configMod.configsDir(), { recursive: true, force: true });
+    rmSync(configMod.configsDir(), { recursive: true, force: true });
   });
 
   it("persists a well-formed payload and echoes the re-read state", () => {
@@ -174,7 +174,7 @@ describe("PUT /config/settings", () => {
 
 describe("PUT /config (atomic)", () => {
   beforeEach(() => {
-    fs.rmSync(configMod.configsDir(), { recursive: true, force: true });
+    rmSync(configMod.configsDir(), { recursive: true, force: true });
   });
 
   it("persists settings and mcp together in a single call", () => {

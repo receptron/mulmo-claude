@@ -15,7 +15,7 @@
 // the workspace scale (~hundreds of dirs) this is negligible. If
 // profiling shows otherwise, cache the parsed ignore instances.
 
-import fs from "fs";
+import { readFileSync } from "fs";
 import path from "path";
 import ignore, { type Ignore } from "ignore";
 
@@ -44,7 +44,7 @@ export class GitignoreFilter {
     // Add local .gitignore if present
     const gitignorePath = path.join(dirAbsPath, ".gitignore");
     try {
-      const content = fs.readFileSync(gitignorePath, "utf-8");
+      const content = readFileSync(gitignorePath, "utf-8");
       child.rules.add(content);
     } catch {
       // No .gitignore in this directory — just inherit parent
@@ -61,7 +61,7 @@ export class GitignoreFilter {
 export function createRootFilter(workspaceRoot: string): GitignoreFilter {
   const gitignorePath = path.join(workspaceRoot, ".gitignore");
   try {
-    const content = fs.readFileSync(gitignorePath, "utf-8");
+    const content = readFileSync(gitignorePath, "utf-8");
     return new GitignoreFilter(content);
   } catch {
     return new GitignoreFilter();

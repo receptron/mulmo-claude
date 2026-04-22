@@ -225,8 +225,8 @@ test.describe("sending a chat message", () => {
       (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
       (route) => {
         if (route.request().method() !== "GET") return route.fallback();
-        const id = route.request().url().split("/api/sessions/").pop() ?? "";
-        capturedSessionId = id.split("?")[0]; // strip query
+        const sessionId = route.request().url().split("/api/sessions/").pop() ?? "";
+        capturedSessionId = sessionId.split("?")[0]; // strip query
         return route.fulfill({
           json: [
             {

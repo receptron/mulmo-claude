@@ -4,14 +4,14 @@
 // We drive the handler with plain Request / Response mocks so we
 // don't pay for an Express + supertest harness, mirroring the pattern
 // established in test_sessionsRoute.ts. The workspace path is resolved
-// from os.homedir() at module load, so HOME is redirected to a tmp
+// from homedir() at module load, so HOME is redirected to a tmp
 // dir BEFORE the route module is imported.
 
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { mkdirSync, promises, readdirSync } from "fs";
 import { mkdtemp, rm, writeFile } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import type { Request, Response } from "express";
 
@@ -74,14 +74,14 @@ let originalUserProfile: string | undefined;
 let putHandler: Handler;
 
 before(async () => {
-  tmpRoot = await mkdtemp(path.join(os.tmpdir(), "mulmo-files-put-route-"));
+  tmpRoot = await mkdtemp(path.join(tmpdir(), "mulmo-files-put-route-"));
   originalHome = process.env.HOME;
   originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
   const { workspacePath: workspacePth } = await import("../../server/workspace/workspace.js");
   workspaceDir = workspacePth;
-  fs.mkdirSync(workspaceDir, { recursive: true });
+  mkdirSync(workspaceDir, { recursive: true });
   const routeMod = await import("../../server/api/routes/files.js");
   putHandler = extractRouteHandler(routeMod, "/api/files/content", "put");
 });
@@ -98,7 +98,7 @@ async function resetWorkspace(): Promise<void> {
   // Clean workspace contents but keep the directory — files.ts
   // captured its realpath at module load, so rm'ing the whole thing
   // would leave the handler with a dangling reference.
-  for (const entry of fs.readdirSync(workspaceDir)) {
+  for (const entry of readdirSync(workspaceDir)) {
     await rm(path.join(workspaceDir, entry), { recursive: true, force: true });
   }
 }
@@ -125,7 +125,7 @@ describe("PUT /api/files/content — happy path", () => {
     assert.equal(typeof body.size, "number");
     assert.equal(typeof body.modifiedMs, "number");
 
-    const onDisk = await fs.promises.readFile(path.join(workspaceDir, rel), "utf-8");
+    const onDisk = await promises.readFile(path.join(workspaceDir, rel), "utf-8");
     assert.equal(onDisk, "# new\nbody\n");
   });
 
@@ -137,7 +137,7 @@ describe("PUT /api/files/content — happy path", () => {
     await putHandler(req({ path: rel, content: "日本語テスト — em–dash" }), res);
 
     assert.equal(state.status, 200);
-    const onDisk = await fs.promises.readFile(path.join(workspaceDir, rel), "utf-8");
+    const onDisk = await promises.readFile(path.join(workspaceDir, rel), "utf-8");
     assert.equal(onDisk, "日本語テスト — em–dash");
   });
 });
@@ -208,7 +208,7 @@ describe("PUT /api/files/content — security", () => {
     await putHandler(req({ path: ".env", content: "SECRET=2" }), res);
     assert.equal(state.status, 400);
     // Verify the original content is unchanged.
-    const onDisk = await fs.promises.readFile(path.join(workspaceDir, ".env"), "utf-8");
+    const onDisk = await promises.readFile(path.join(workspaceDir, ".env"), "utf-8");
     assert.equal(onDisk, "SECRET=1");
   });
 
@@ -231,7 +231,7 @@ describe("PUT /api/files/content — missing targets", () => {
   });
 
   it("returns 400 when the target is a directory", async () => {
-    fs.mkdirSync(path.join(workspaceDir, "adir"));
+    mkdirSync(path.join(workspaceDir, "adir"));
     const { state, res } = mockRes();
     await putHandler(req({ path: "adir", content: "x" }), res);
     assert.equal(state.status, 400);

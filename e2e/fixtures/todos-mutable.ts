@@ -122,9 +122,9 @@ export async function setupMutableTodoMocks(page: Page, options: MutableTodoOpti
     (route: Route) => {
       const method = route.request().method();
       const url = new URL(route.request().url());
-      const id = url.pathname.replace(/^\/api\/todos\/columns\/?/, "") || null;
+      const columnId = url.pathname.replace(/^\/api\/todos\/columns\/?/, "") || null;
       const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
-      const outcome = options.dispatchColumn?.(method, id, body, state) ?? undefined;
+      const outcome = options.dispatchColumn?.(method, columnId, body, state) ?? undefined;
       if (outcome?.items) state.items = outcome.items;
       if (outcome?.columns) state.columns = outcome.columns;
       return route.fulfill({ json: buildResponse(outcome?.extra) });

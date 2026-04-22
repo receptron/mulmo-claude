@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useNotifications } from "../composables/useNotifications";
+
+const { t } = useI18n();
 import { NOTIFICATION_ICONS } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 import { ONE_SECOND_MS } from "../../server/utils/time";
@@ -52,7 +55,7 @@ function iconName(notif: NotificationPayload): string {
           {{ formatSmartTime(visible.firedAt) }}
         </p>
       </div>
-      <button type="button" class="text-slate-400 hover:text-white" aria-label="Dismiss" @click="dismiss">
+      <button type="button" class="text-slate-400 hover:text-white" :aria-label="t('common.dismiss')" @click="dismiss">
         <span class="material-icons text-base">close</span>
       </button>
     </div>

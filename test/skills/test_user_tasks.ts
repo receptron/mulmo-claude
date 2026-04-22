@@ -2,14 +2,14 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { loadUserTasks, validateAndCreate, applyUpdate } from "../../server/workspace/skills/user-tasks.ts";
 import { saveUserTasks } from "../../server/utils/files/user-tasks-io.ts";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 import { ONE_MINUTE_MS, ONE_HOUR_MS } from "../../server/utils/time.ts";
 
 function tmpRoot(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "user-tasks-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "user-tasks-"));
   mkdirSync(path.join(dir, "config", "scheduler"), { recursive: true });
   return dir;
 }

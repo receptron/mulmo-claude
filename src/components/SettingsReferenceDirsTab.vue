@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { apiGet, apiPut } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+
+const { t } = useI18n();
 
 interface RefDirEntry {
   hostPath: string;
   label: string;
 }
 
+// See note in SettingsWorkspaceDirsTab — mirrored here.
+type SaveStatus = { kind: "ok" } | { kind: "error"; message: string };
+
 const dirs = ref<RefDirEntry[]>([]);
 const loading = ref(true);
 const error = ref("");
 const saving = ref(false);
-const saveStatus = ref("");
+const saveStatus = ref<SaveStatus | null>(null);
 
 const draftPath = ref("");
 const draftLabel = ref("");
@@ -32,17 +38,17 @@ async function load(): Promise<void> {
 
 async function save(): Promise<void> {
   saving.value = true;
-  saveStatus.value = "";
+  saveStatus.value = null;
   const result = await apiPut<{ dirs: RefDirEntry[] }>(API_ROUTES.config.referenceDirs, { dirs: dirs.value });
   saving.value = false;
   if (!result.ok) {
-    saveStatus.value = result.error;
+    saveStatus.value = { kind: "error", message: result.error };
     return;
   }
   dirs.value = result.data.dirs;
-  saveStatus.value = "Saved";
+  saveStatus.value = { kind: "ok" };
   setTimeout(() => {
-    saveStatus.value = "";
+    saveStatus.value = null;
   }, 2000);
 }
 
@@ -50,11 +56,11 @@ function addEntry(): void {
   draftError.value = "";
   const path = draftPath.value.trim();
   if (!path) {
-    draftError.value = "Path required";
+    draftError.value = t("settingsReferenceDirs.errPathRequired");
     return;
   }
   if (!path.startsWith("/") && !path.startsWith("~/")) {
-    draftError.value = "Must be an absolute path or start with ~/";
+    draftError.value = t("settingsReferenceDirs.errMustBeAbsolute");
     return;
   }
   // Normalize: trim trailing slashes for consistent comparison
@@ -68,14 +74,14 @@ function addEntry(): void {
     return cleaned;
   };
   if (dirs.value.some((dir) => stripSlash(dir.hostPath) === normalized)) {
-    draftError.value = "Already exists";
+    draftError.value = t("settingsReferenceDirs.errAlreadyExists");
     return;
   }
   const lastSeg = normalized.split("/").pop();
   const label = draftLabel.value.trim() || lastSeg || normalized;
   // Reject duplicate labels — @ref/<label> routing requires uniqueness
   if (dirs.value.some((dir) => dir.label === label)) {
-    draftError.value = `Label "${label}" already exists`;
+    draftError.value = t("settingsReferenceDirs.errLabelConflict", { label });
     return;
   }
   dirs.value.push({ hostPath: normalized, label });
@@ -98,14 +104,14 @@ onMounted(load);
     </p>
 
     <!-- Loading -->
-    <div v-if="loading" class="text-sm text-gray-400">Loading...</div>
+    <div v-if="loading" class="text-sm text-gray-400">{{ t("common.loading") }}</div>
     <div v-else-if="error" class="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
       {{ error }}
     </div>
 
     <template v-else>
       <!-- Existing entries -->
-      <div v-if="dirs.length === 0" class="text-sm text-gray-400">No reference directories configured.</div>
+      <div v-if="dirs.length === 0" class="text-sm text-gray-400">{{ t("settingsReferenceDirs.noEntries") }}</div>
       <div v-else class="space-y-1.5">
         <div
           v-for="(dir, i) in dirs"
@@ -122,8 +128,8 @@ onMounted(load);
               {{ dir.label }}
             </div>
           </div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 shrink-0"> read-only </span>
-          <button class="text-gray-300 hover:text-red-500 shrink-0" title="Remove" data-testid="reference-dir-remove-btn" @click="removeEntry(i)">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 shrink-0">{{ t("settingsReferenceDirs.readOnlyBadge") }}</span>
+          <button class="text-gray-300 hover:text-red-500 shrink-0" :title="t('common.remove')" data-testid="reference-dir-remove-btn" @click="removeEntry(i)">
             <span class="material-icons text-sm">close</span>
           </button>
         </div>
@@ -131,11 +137,11 @@ onMounted(load);
 
       <!-- Add new -->
       <div class="border border-gray-200 rounded p-2 space-y-2">
-        <div class="text-xs font-semibold text-gray-600">Add reference directory</div>
+        <div class="text-xs font-semibold text-gray-600">{{ t("settingsReferenceDirs.addDirTitle") }}</div>
         <input
           v-model="draftPath"
           class="w-full px-2 py-1 text-xs font-mono border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          placeholder="/Users/me/ObsidianVault or ~/Documents/notes"
+          :placeholder="t('settingsReferenceDirs.pathPlaceholder')"
           data-testid="reference-dir-path-input"
           @keydown.enter="addEntry"
           @keydown.stop
@@ -143,13 +149,15 @@ onMounted(load);
         <input
           v-model="draftLabel"
           class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          placeholder="Label (optional — defaults to folder name)"
+          :placeholder="t('settingsReferenceDirs.labelPlaceholder')"
           data-testid="reference-dir-label-input"
           @keydown.enter="addEntry"
           @keydown.stop
         />
         <div class="flex items-center gap-2">
-          <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="reference-dir-add-btn" @click="addEntry">Add</button>
+          <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="reference-dir-add-btn" @click="addEntry">
+            {{ t("common.add") }}
+          </button>
           <span v-if="draftError" class="text-xs text-red-500">{{ draftError }}</span>
         </div>
       </div>
@@ -162,10 +170,10 @@ onMounted(load);
           data-testid="reference-dirs-save-btn"
           @click="save"
         >
-          {{ saving ? "Saving..." : "Save" }}
+          {{ saving ? t("common.saving") : t("common.save") }}
         </button>
-        <span v-if="saveStatus" class="text-xs" :class="saveStatus === 'Saved' ? 'text-green-600' : 'text-red-600'">
-          {{ saveStatus }}
+        <span v-if="saveStatus" class="text-xs" :class="saveStatus.kind === 'ok' ? 'text-green-600' : 'text-red-600'">
+          {{ saveStatus.kind === "ok" ? t("common.saved") : saveStatus.message }}
         </span>
       </div>
     </template>

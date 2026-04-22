@@ -98,6 +98,8 @@ function makeState(over: Partial<SourceState> = {}): SourceState {
     cursor: { k: "v" },
     consecutiveFailures: 1,
     nextAttemptAt: null,
+    consecutiveEmptyFetches: 0,
+    emptyBackoffUntil: null,
     ...over,
   };
 }

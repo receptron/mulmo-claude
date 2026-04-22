@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { buildArxivQuery, keywordsToSlug, discoverAndRegister } from "../../server/workspace/sources/arxivDiscovery.js";
 
 describe("buildArxivQuery", () => {
@@ -68,14 +68,14 @@ describe("keywordsToSlug", () => {
 
 describe("discoverAndRegister", () => {
   function makeTmpWorkspace(interests: Record<string, unknown> | null): string {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "arxiv-disc-"));
+    const tmp = mkdtempSync(path.join(tmpdir(), "arxiv-disc-"));
     const configDir = path.join(tmp, "config");
-    fs.mkdirSync(configDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
     if (interests) {
-      fs.writeFileSync(path.join(configDir, "interests.json"), JSON.stringify(interests));
+      writeFileSync(path.join(configDir, "interests.json"), JSON.stringify(interests));
     }
     // Create sources directory
-    fs.mkdirSync(path.join(tmp, "sources"), { recursive: true });
+    mkdirSync(path.join(tmp, "sources"), { recursive: true });
     return tmp;
   }
 
@@ -84,14 +84,14 @@ describe("discoverAndRegister", () => {
     const result = await discoverAndRegister(tmp);
     assert.equal(result.reason, "no keywords in interests");
     assert.equal(result.registered.length, 0);
-    fs.rmSync(tmp, { recursive: true });
+    rmSync(tmp, { recursive: true });
   });
 
   it("skips when no keywords", async () => {
     const tmp = makeTmpWorkspace({ keywords: [], categories: ["ai"] });
     const result = await discoverAndRegister(tmp);
     assert.equal(result.reason, "no keywords in interests");
-    fs.rmSync(tmp, { recursive: true });
+    rmSync(tmp, { recursive: true });
   });
 
   it("registers arXiv source for keywords", async () => {
@@ -105,12 +105,12 @@ describe("discoverAndRegister", () => {
 
     // Verify source file was created
     const sourceFile = path.join(tmp, "sources", result.registered[0] + ".md");
-    assert.ok(fs.existsSync(sourceFile));
-    const content = fs.readFileSync(sourceFile, "utf-8");
+    assert.ok(existsSync(sourceFile));
+    const content = readFileSync(sourceFile, "utf-8");
     assert.ok(content.includes("arxiv_query"));
     assert.ok(content.includes("transformer"));
 
-    fs.rmSync(tmp, { recursive: true });
+    rmSync(tmp, { recursive: true });
   });
 
   it("skips existing sources", async () => {
@@ -124,7 +124,7 @@ describe("discoverAndRegister", () => {
     const result = await discoverAndRegister(tmp);
     assert.equal(result.registered.length, 0);
     assert.equal(result.skipped.length, 1);
-    fs.rmSync(tmp, { recursive: true });
+    rmSync(tmp, { recursive: true });
   });
 
   it("chunks keywords into groups of 5", async () => {
@@ -135,7 +135,7 @@ describe("discoverAndRegister", () => {
     // categories empty but keywords present — needs at least one to pass
     // Actually with empty categories, loadInterests returns null...
     // Let's add a category
-    fs.writeFileSync(
+    writeFileSync(
       path.join(tmp, "config", "interests.json"),
       JSON.stringify({
         keywords: ["a", "b", "c", "d", "e", "f", "g"],
@@ -144,6 +144,6 @@ describe("discoverAndRegister", () => {
     );
     const result = await discoverAndRegister(tmp);
     assert.equal(result.registered.length, 2); // [a,b,c,d,e] + [f,g]
-    fs.rmSync(tmp, { recursive: true });
+    rmSync(tmp, { recursive: true });
   });
 });

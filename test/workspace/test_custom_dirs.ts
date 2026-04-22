@@ -2,11 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { loadCustomDirs, ensureCustomDirs, buildCustomDirsPrompt, DIR_STRUCTURES } from "../../server/workspace/custom-dirs.ts";
 
 function tmpRoot(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "custom-dirs-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "custom-dirs-"));
   mkdirSync(path.join(dir, "config"), { recursive: true });
   return dir;
 }

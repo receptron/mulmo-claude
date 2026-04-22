@@ -1,21 +1,21 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { __resetForTests, deleteTokenFile, generateAndWriteToken, getCurrentToken } from "../../server/api/auth/token.js";
 
 let tmpDir = "";
 let tokenPath = "";
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmo-token-test-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "mulmo-token-test-"));
   tokenPath = path.join(tmpDir, ".session-token");
   __resetForTests();
 });
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 describe("generateAndWriteToken", () => {
@@ -27,7 +27,7 @@ describe("generateAndWriteToken", () => {
 
   it("writes the token to the given path", async () => {
     const token = await generateAndWriteToken(tokenPath);
-    const onDisk = fs.readFileSync(tokenPath, "utf-8");
+    const onDisk = readFileSync(tokenPath, "utf-8");
     assert.equal(onDisk, token);
   });
 
@@ -42,20 +42,20 @@ describe("generateAndWriteToken", () => {
     const second = await generateAndWriteToken(tokenPath);
     assert.notEqual(first, second);
     assert.equal(getCurrentToken(), second);
-    assert.equal(fs.readFileSync(tokenPath, "utf-8"), second);
+    assert.equal(readFileSync(tokenPath, "utf-8"), second);
   });
 
   it("writes with mode 0600 on POSIX", async () => {
     if (process.platform === "win32") return; // chmod 0600 is a no-op on Windows
     await generateAndWriteToken(tokenPath);
-    const mode = fs.statSync(tokenPath).mode & 0o777;
+    const mode = statSync(tokenPath).mode & 0o777;
     assert.equal(mode, 0o600);
   });
 
   it("creates the parent directory if it doesn't exist", async () => {
     const nested = path.join(tmpDir, "nested", "deep", ".session-token");
     await generateAndWriteToken(nested);
-    assert.ok(fs.existsSync(nested));
+    assert.ok(existsSync(nested));
   });
 });
 
@@ -65,7 +65,7 @@ describe("generateAndWriteToken — env override (#316)", () => {
     const token = await generateAndWriteToken(tokenPath, override);
     assert.equal(token, override);
     assert.equal(getCurrentToken(), override);
-    assert.equal(fs.readFileSync(tokenPath, "utf-8"), override);
+    assert.equal(readFileSync(tokenPath, "utf-8"), override);
   });
 
   it("does not rotate — repeated calls with the same override return it each time", async () => {
@@ -97,15 +97,15 @@ describe("generateAndWriteToken — env override (#316)", () => {
 describe("deleteTokenFile", () => {
   it("removes the token file", async () => {
     await generateAndWriteToken(tokenPath);
-    assert.ok(fs.existsSync(tokenPath));
+    assert.ok(existsSync(tokenPath));
     await deleteTokenFile(tokenPath);
-    assert.ok(!fs.existsSync(tokenPath));
+    assert.ok(!existsSync(tokenPath));
   });
 
   it("is a no-op when the file is already missing", async () => {
-    assert.ok(!fs.existsSync(tokenPath));
+    assert.ok(!existsSync(tokenPath));
     await deleteTokenFile(tokenPath); // must not throw
-    assert.ok(!fs.existsSync(tokenPath));
+    assert.ok(!existsSync(tokenPath));
   });
 
   it("does not touch the in-memory token (caller's responsibility)", async () => {
