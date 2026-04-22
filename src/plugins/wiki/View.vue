@@ -118,6 +118,12 @@ const action = ref(props.selectedResult?.data?.action ?? "index");
 const title = ref(props.selectedResult?.data?.title ?? "Wiki");
 const content = ref(props.selectedResult?.data?.content ?? "");
 const pageEntries = ref<WikiPageEntry[]>(props.selectedResult?.data?.pageEntries ?? []);
+// Declared up here — not next to callApi — because the URL watcher
+// below fires with `immediate: true`, which invokes callApi
+// synchronously during setup. If this ref were declared after the
+// watcher, callApi's `navError.value = null` would hit the TDZ on
+// direct loads of /wiki and the fetch would never run.
+const navError = ref<string | null>(null);
 
 const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
@@ -191,7 +197,6 @@ const renderedContent = computed(() => {
   return marked.parse(renderWikiLinks(withImages)) as string;
 });
 
-const navError = ref<string | null>(null);
 const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
 
 async function downloadPdf() {
