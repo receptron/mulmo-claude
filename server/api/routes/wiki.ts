@@ -4,6 +4,7 @@ import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { readTextSafeSync, readTextSafe } from "../../utils/files/safe.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
 import { badRequest } from "../../utils/httpError.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -159,7 +160,7 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 }
 
 router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
-  const slug = typeof req.query.slug === "string" ? req.query.slug : undefined;
+  const slug = getOptionalStringQuery(req, "slug");
   if (slug) {
     const filePath = await resolvePagePath(slug);
     const content = filePath ? readFileOrEmpty(filePath) : "";

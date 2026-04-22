@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessByStdio } from "child_process";
-import { mkdir, writeFile, unlink } from "fs/promises";
+import { mkdir, unlink } from "fs/promises";
+import { writeJsonAtomic } from "../utils/files/json.js";
 import { dirname } from "path";
 import type { Readable, Writable } from "stream";
 import { isDockerAvailable } from "../system/docker.js";
@@ -206,7 +207,10 @@ export async function* runAgent(
       useDocker,
       userServers,
     });
-    await writeFile(mcpPaths.hostPath, JSON.stringify(mcpConfig, null, 2));
+    // Write atomically so a partially-written file can't be picked
+    // up by a concurrent claude spawn (they share the --mcp-config
+    // path under the session dir).
+    await writeJsonAtomic(mcpPaths.hostPath, mcpConfig);
   }
 
   // Fresh read on every invocation so the Settings UI can change
