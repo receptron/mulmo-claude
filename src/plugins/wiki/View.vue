@@ -18,27 +18,38 @@
           </div>
           <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">{{ t("pluginWiki.pdfFailed") }}</span>
         </template>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'index' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('index')"
-        >
-          {{ t("pluginWiki.tabIndex") }}
-        </button>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'log' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('log')"
-        >
-          {{ t("pluginWiki.tabLog") }}
-        </button>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'lint_report' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('lint_report')"
-        >
-          {{ t("pluginWiki.tabLint") }}
-        </button>
+        <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'index' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('index')"
+          >
+            <span class="material-icons text-sm">list</span>
+            <span>{{ t("pluginWiki.tabIndex") }}</span>
+          </button>
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'log' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('log')"
+          >
+            <span class="material-icons text-sm">history</span>
+            <span>{{ t("pluginWiki.tabLog") }}</span>
+          </button>
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'lint_report' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('lint_report')"
+          >
+            <span class="material-icons text-sm">rule</span>
+            <span>{{ t("pluginWiki.tabLint") }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
