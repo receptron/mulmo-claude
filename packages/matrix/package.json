@@ -24,7 +24,7 @@
     "@mulmobridge/client": "^0.1.0",
     "@mulmobridge/protocol": "^0.1.0",
     "dotenv": "^17.0.0",
-    "matrix-js-sdk": "^41.3.0"
+    "matrix-js-sdk": "^41.4.0-rc.0"
   },
   "devDependencies": {
     "@types/matrix-js-sdk": "^11.1.0",
