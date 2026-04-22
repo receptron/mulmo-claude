@@ -6,7 +6,7 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center h-32 text-gray-400">Loading...</div>
+    <div v-if="loading" class="flex items-center justify-center h-32 text-gray-400">{{ t("common.loading") }}</div>
 
     <!-- Error -->
     <div v-else-if="error" class="px-4 py-2 bg-red-50 text-red-700 rounded text-sm">
@@ -17,12 +17,14 @@
     <div v-else>
       <!-- Frequency hints reference -->
       <details class="mb-4 border border-gray-200 rounded-lg text-sm" data-testid="scheduler-frequency-hints">
-        <summary class="px-3 py-2 cursor-pointer text-gray-600 font-medium select-none hover:bg-gray-50 rounded-lg">Recommended Frequencies</summary>
+        <summary class="px-3 py-2 cursor-pointer text-gray-600 font-medium select-none hover:bg-gray-50 rounded-lg">
+          {{ t("pluginSchedulerTasks.recommendedFrequencies") }}
+        </summary>
         <table class="w-full mt-1 mb-2 text-xs text-gray-500">
           <thead>
             <tr class="border-b border-gray-100">
-              <th class="px-3 py-1 text-left font-medium text-gray-600">Task type</th>
-              <th class="px-3 py-1 text-left font-medium text-gray-600">Suggested schedule</th>
+              <th class="px-3 py-1 text-left font-medium text-gray-600">{{ t("pluginSchedulerTasks.tableTaskType") }}</th>
+              <th class="px-3 py-1 text-left font-medium text-gray-600">{{ t("pluginSchedulerTasks.tableSuggestedSchedule") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -34,7 +36,7 @@
         </table>
       </details>
 
-      <div v-if="tasks.length === 0" class="flex items-center justify-center h-32 text-gray-400">No scheduled tasks</div>
+      <div v-if="tasks.length === 0" class="flex items-center justify-center h-32 text-gray-400">{{ t("pluginSchedulerTasks.noTasks") }}</div>
 
       <div v-else class="space-y-2">
         <div
@@ -59,8 +61,8 @@
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
-                title="Run now"
-                aria-label="Run now"
+                :title="t('pluginSchedulerTasks.runNow')"
+                :aria-label="t('pluginSchedulerTasks.runNow')"
                 data-testid="scheduler-task-run"
                 @click="runTask(task.id)"
               >
@@ -71,7 +73,7 @@
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs rounded"
                 :class="task.enabled !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'"
-                :title="task.enabled !== false ? 'Disable' : 'Enable'"
+                :title="task.enabled !== false ? t('pluginSchedulerTasks.disable') : t('pluginSchedulerTasks.enable')"
                 @click="toggleEnabled(task)"
               >
                 <span class="material-icons text-sm">
@@ -82,8 +84,8 @@
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
-                title="Delete"
-                aria-label="Delete"
+                :title="t('pluginSchedulerTasks.delete')"
+                :aria-label="t('pluginSchedulerTasks.delete')"
                 data-testid="scheduler-task-delete"
                 @click="deleteTask(task.id)"
               >
@@ -99,7 +101,7 @@
               <span class="inline-block w-2 h-2 rounded-full" :class="resultDotClass(task.state.lastRunResult)"></span>
               {{ task.state.lastRunResult }}
             </span>
-            <span v-if="task.state?.nextScheduledAt"> Next: {{ formatShortTime(task.state.nextScheduledAt) }} </span>
+            <span v-if="task.state?.nextScheduledAt">{{ t("pluginSchedulerTasks.nextRun", { time: formatShortTime(task.state.nextScheduledAt) }) }}</span>
           </div>
 
           <!-- Description -->
@@ -114,9 +116,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { formatShortTime } from "../../utils/format/date";
+
+const { t } = useI18n();
 
 interface TaskSchedule {
   type: string;
@@ -166,9 +171,9 @@ async function fetchTasks(): Promise<void> {
 }
 
 function originLabel(origin: string): string {
-  if (origin === "system") return "System";
-  if (origin === "user") return "User";
-  return "Skill";
+  if (origin === "system") return t("pluginSchedulerTasks.originSystem");
+  if (origin === "user") return t("pluginSchedulerTasks.originUser");
+  return t("pluginSchedulerTasks.originSkill");
 }
 
 function originClass(origin: string): string {
@@ -200,7 +205,7 @@ async function runTask(taskId: string): Promise<void> {
   const url = API_ROUTES.scheduler.taskRun.replace(":id", taskId);
   const result = await apiPost(url, {});
   if (!result.ok) {
-    mutationError.value = `Run failed: ${result.error}`;
+    mutationError.value = t("pluginSchedulerTasks.runFailed", { error: result.error });
     return;
   }
   await fetchTasks();
@@ -211,7 +216,7 @@ async function toggleEnabled(task: SchedulerTask): Promise<void> {
   const url = API_ROUTES.scheduler.task.replace(":id", task.id);
   const result = await apiPut(url, { enabled: task.enabled === false });
   if (!result.ok) {
-    mutationError.value = `Toggle failed: ${result.error}`;
+    mutationError.value = t("pluginSchedulerTasks.toggleFailed", { error: result.error });
     return;
   }
   await fetchTasks();
@@ -222,7 +227,7 @@ async function deleteTask(taskId: string): Promise<void> {
   const url = API_ROUTES.scheduler.task.replace(":id", taskId);
   const result = await apiDelete(url);
   if (!result.ok) {
-    mutationError.value = `Delete failed: ${result.error}`;
+    mutationError.value = t("pluginSchedulerTasks.deleteFailed", { error: result.error });
     return;
   }
   await fetchTasks();
