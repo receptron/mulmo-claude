@@ -43,6 +43,16 @@ async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<As
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
       const mod = await import("@xenova/transformers");
+      // Force remote-only model loading. By default Transformers.js
+      // tries to fetch `/models/<name>/...` from the page origin
+      // first; under Vite (and most SPA dev servers) that path hits
+      // the index.html fallback and returns HTML, which the library
+      // then tries to JSON.parse — producing
+      //   "Unexpected token '<', \"<!DOCTYPE\"... is not valid JSON".
+      // Disabling local lookup sends every request straight to
+      // huggingface.co, which does return the real config.json.
+      mod.env.allowLocalModels = false;
+      mod.env.allowRemoteModels = true;
       // Returns a callable pipeline; the cast is a seam between the
       // library's any-leaning types and our strict shape above.
       const pipeline = (await mod.pipeline("automatic-speech-recognition", WHISPER_MODEL, {
