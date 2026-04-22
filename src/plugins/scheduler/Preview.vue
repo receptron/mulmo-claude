@@ -1,5 +1,5 @@
 <template>
-  <div class="text-sm">
+  <div class="p-2 text-sm">
     <div class="flex items-center gap-1 font-medium text-gray-700 mb-1">
       <span>📅</span>
       <span>{{ upcomingItems.length }} upcoming</span>

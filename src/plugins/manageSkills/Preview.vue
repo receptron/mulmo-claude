@@ -1,5 +1,5 @@
 <template>
-  <div class="text-sm">
+  <div class="p-2 text-sm">
     <div class="flex items-center gap-1 font-medium text-gray-700 mb-1">
       <span class="material-icons" style="font-size: 14px">auto_awesome</span>
       <span>{{ skills.length }} skill{{ skills.length !== 1 ? "s" : "" }}</span>

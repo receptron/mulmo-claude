@@ -1,5 +1,5 @@
 <template>
-  <div class="preview-text text-sm leading-snug" :class="textColorClass">{{ previewText }}</div>
+  <div class="preview-text p-2 text-sm leading-snug" :class="textColorClass">{{ previewText }}</div>
 </template>
 
 <script setup lang="ts">

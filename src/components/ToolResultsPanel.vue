@@ -9,10 +9,13 @@
     <div
       v-for="result in results"
       :key="result.uuid"
-      class="relative cursor-pointer rounded border border-gray-300 p-2 text-sm text-gray-900 hover:opacity-75 transition-opacity"
+      class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
       :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
       @click="emit('select', result.uuid)"
     >
+      <span class="absolute top-0 left-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none">
+        {{ sourceLabel(result) }}
+      </span>
       <span
         v-if="resultTimestamps.get(result.uuid)"
         class="absolute top-0 right-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none"
@@ -20,7 +23,7 @@
         {{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}
       </span>
       <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
-      <span v-else class="block truncate">{{ result.title || result.toolName }}</span>
+      <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
     </div>
 
     <!-- Thinking indicator -->
@@ -48,6 +51,11 @@ import { ref } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
 import { formatSmartTime } from "../utils/format/date";
+
+function sourceLabel(result: ToolResultComplete): string {
+  if (result.toolName === "text-response") return result.title ?? "Assistant";
+  return result.toolName;
+}
 
 interface PendingCall {
   toolUseId: string;
