@@ -5,6 +5,28 @@
 
 export type SessionGranularity = "channel" | "thread" | "auto";
 
+/** Pick the effective `thread_ts` for an incoming Slack message.
+ *
+ *  - If the message is already in a thread, use that thread's `thread_ts`.
+ *  - Otherwise, in `thread` mode on a channel (NOT a DM), synthesise the
+ *    thread root from the message's own `ts`. Posting the reply with
+ *    `thread_ts = event.ts` causes Slack to promote the original post
+ *    into a thread root and thread the reply under it — which is the
+ *    whole point of thread mode (each top-level post = one topic =
+ *    one thread).
+ *  - DMs (`channel_type === "im"`) are intentionally left alone —
+ *    threading in a 1:1 conversation is meaningless UI noise.
+ *  - `channel` / `auto` modes do not synthesise: a top-level post stays
+ *    top-level and users can still opt into threading manually. */
+export function effectiveThreadTs(event: { thread_ts?: unknown; ts?: unknown; channel_type?: unknown }, mode: SessionGranularity): string | undefined {
+  if (typeof event.thread_ts === "string" && event.thread_ts.length > 0) {
+    return event.thread_ts;
+  }
+  if (mode !== "thread") return undefined;
+  if (event.channel_type === "im") return undefined;
+  return typeof event.ts === "string" && event.ts.length > 0 ? event.ts : undefined;
+}
+
 /** Parse the SLACK_SESSION_GRANULARITY env var into a safe enum value.
  *  Unset falls back to "channel" — the pre-feature default.
  *  Any explicit invalid value is rejected so operators notice the

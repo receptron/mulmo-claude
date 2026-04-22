@@ -19,7 +19,7 @@ import "dotenv/config";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { createBridgeClient } from "@mulmobridge/client";
-import { buildExternalChatId, parseExternalChatId, parseGranularity } from "./sessionId.js";
+import { buildExternalChatId, effectiveThreadTs, parseExternalChatId, parseGranularity } from "./sessionId.js";
 import { redactUser } from "./redactUser.js";
 
 const TRANSPORT_ID = "slack";
@@ -76,7 +76,7 @@ socketMode.on("message", async ({ event, ack }) => {
   if (botUserId && event.user === botUserId) return;
 
   const channelId: string = event.channel;
-  const threadTs: string | undefined = typeof event.thread_ts === "string" ? event.thread_ts : undefined;
+  const threadTs = effectiveThreadTs(event, granularity);
   const text: string = event.text ?? "";
   if (!text.trim()) return;
 

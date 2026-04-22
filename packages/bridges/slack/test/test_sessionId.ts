@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildExternalChatId, parseExternalChatId, parseGranularity } from "../src/sessionId.ts";
+import { buildExternalChatId, effectiveThreadTs, parseExternalChatId, parseGranularity } from "../src/sessionId.ts";
 
 describe("parseGranularity", () => {
   it("defaults to 'channel' when env var is unset", () => {
@@ -55,6 +55,47 @@ describe("buildExternalChatId", () => {
 
   it("treats empty-string threadTs as 'no thread'", () => {
     assert.equal(buildExternalChatId(channelId, "", "thread"), channelId);
+  });
+});
+
+describe("effectiveThreadTs", () => {
+  const eventTs = "1800000000.000100";
+  const existingThread = "1799999999.000000";
+
+  it("channel mode: top-level post → undefined (reply stays top-level)", () => {
+    assert.equal(effectiveThreadTs({ ts: eventTs, channel_type: "channel" }, "channel"), undefined);
+  });
+
+  it("channel mode: in-thread post → existing thread_ts passes through", () => {
+    assert.equal(effectiveThreadTs({ thread_ts: existingThread, ts: eventTs, channel_type: "channel" }, "channel"), existingThread);
+  });
+
+  it("thread mode: top-level channel post → synthesises thread_ts from event.ts", () => {
+    assert.equal(effectiveThreadTs({ ts: eventTs, channel_type: "channel" }, "thread"), eventTs);
+  });
+
+  it("thread mode: in-thread post → existing thread_ts passes through (not overwritten by event.ts)", () => {
+    assert.equal(effectiveThreadTs({ thread_ts: existingThread, ts: eventTs, channel_type: "channel" }, "thread"), existingThread);
+  });
+
+  it("thread mode: DM (channel_type='im') → undefined (no threading in DMs)", () => {
+    assert.equal(effectiveThreadTs({ ts: eventTs, channel_type: "im" }, "thread"), undefined);
+  });
+
+  it("auto mode: top-level post → undefined (no auto-threading, same as channel mode)", () => {
+    assert.equal(effectiveThreadTs({ ts: eventTs, channel_type: "channel" }, "auto"), undefined);
+  });
+
+  it("auto mode: in-thread post → existing thread_ts passes through", () => {
+    assert.equal(effectiveThreadTs({ thread_ts: existingThread, ts: eventTs, channel_type: "channel" }, "auto"), existingThread);
+  });
+
+  it("thread mode: missing ts on a top-level channel post → undefined (defensive — shouldn't happen in practice)", () => {
+    assert.equal(effectiveThreadTs({ channel_type: "channel" }, "thread"), undefined);
+  });
+
+  it("thread mode: empty-string thread_ts is ignored and falls back to synthesis", () => {
+    assert.equal(effectiveThreadTs({ thread_ts: "", ts: eventTs, channel_type: "channel" }, "thread"), eventTs);
   });
 });
 
