@@ -323,6 +323,8 @@ const frMessages = {
     tabLint: "Lint",
     empty: "Le wiki est vide. Demandez au Wiki Manager d'ingérer une source.",
     previewMore: "+ {count} de plus…",
+    chatPlaceholder: "Posez une question sur cette page…",
+    chatSend: "Démarrer une nouvelle conversation sur cette page",
   },
   pluginPresentHtml: {
     saveAsPdf: "Enregistrer en PDF (ouvre la boîte de dialogue d'impression)",

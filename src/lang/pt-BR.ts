@@ -322,6 +322,8 @@ const ptBRMessages = {
     tabLint: "Lint",
     empty: "O wiki está vazio. Peça ao Wiki Manager para ingerir uma fonte.",
     previewMore: "+ {count} mais…",
+    chatPlaceholder: "Pergunte sobre esta página…",
+    chatSend: "Iniciar um novo chat sobre esta página",
   },
   pluginPresentHtml: {
     saveAsPdf: "Salvar como PDF (abre o diálogo de impressão)",
