@@ -12,6 +12,7 @@
       />
       <NotificationBell :force-close="lockPopupOpen" @navigate="(action) => emit('notificationNavigate', action)" @update:open="onNotificationOpen" />
       <button
+        v-if="isChatPage"
         class="text-gray-400 hover:text-gray-700"
         :class="{ 'text-blue-500': showRightSidebar }"
         :title="t('sidebarHeader.toolCallHistory')"
@@ -46,6 +47,7 @@ const { t } = useI18n();
 defineProps<{
   sandboxEnabled: boolean;
   showRightSidebar: boolean;
+  isChatPage: boolean;
   titleStyle?: CSSProperties;
 }>();
 

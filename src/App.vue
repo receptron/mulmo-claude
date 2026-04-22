@@ -7,6 +7,7 @@
         <SidebarHeader
           :sandbox-enabled="sandboxEnabled"
           :show-right-sidebar="showRightSidebar"
+          :is-chat-page="isChatPage"
           :title-style="debugTitleStyle"
           @test-query="(q) => sendMessage(q)"
           @notification-navigate="handleNotificationNavigate"
@@ -141,9 +142,11 @@
         </div>
       </div>
 
-      <!-- Right sidebar: tool call history -->
+      <!-- Right sidebar: tool call history. Only shown on the chat
+           page — system prompt / tools / tool-call history are all
+           agent-context and have no meaning on plugin views. -->
       <RightSidebar
-        v-if="showRightSidebar"
+        v-if="showRightSidebar && isChatPage"
         ref="rightSidebarRef"
         :tool-call-history="toolCallHistory"
         :available-tools="availableTools"
