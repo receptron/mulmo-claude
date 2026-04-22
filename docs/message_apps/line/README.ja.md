@@ -103,7 +103,7 @@ LINE_CHANNEL_SECRET=xxxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxxx
 ```
 
-全環境変数の一覧は [packages/line/README.md](../../../packages/line/README.md) を参照。
+全環境変数の一覧は [packages/bridges/line/README.md](../../../packages/bridges/line/README.md) を参照。
 
 ---
 
@@ -124,10 +124,10 @@ ngrok http 3002
 ```
 
 ターミナル C で LINE ブリッジを起動（`yarn dev` が `predev` スクリプト経由で
-`packages/line/dist/` を自動ビルドするので、手動ビルドは不要）:
+`packages/bridges/line/dist/` を自動ビルドするので、手動ビルドは不要）:
 
 ```bash
-node packages/line/dist/index.js
+node packages/bridges/line/dist/index.js
 ```
 
 > **注意**: `npx @mulmobridge/line` はモノレポ内では動きません（yarn
@@ -151,7 +151,7 @@ LINE Developers Console → **Messaging API** タブの QR コードを
 | ngrok に `POST / 404 Not Found` | Webhook URL に `/webhook` が付いていない | LINE Console で URL 末尾に `/webhook` を追加 |
 | bot が二重に返信する | LINE の応答メッセージが ON | LINE 公式アカウント設定 → 応答メッセージ → OFF |
 | `LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required` | 環境変数が読めていない | `.env` に設定するか、環境変数として export |
-| `sh: mulmobridge-line: command not found` | `npx` がモノレポ内で bin を見つけられない | `node packages/line/dist/index.js` を使う |
+| `sh: mulmobridge-line: command not found` | `npx` がモノレポ内で bin を見つけられない | `node packages/bridges/line/dist/index.js` を使う |
 | ブリッジに `Connect error: bearer token rejected` | MulmoClaude サーバを再起動して token が変わった | LINE ブリッジを再起動 |
 | 返信が来ない（エラーなし） | `yarn dev` が止まっている | MulmoClaude サーバの状態を確認 |
 

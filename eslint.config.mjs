@@ -21,6 +21,7 @@ export default [
       "lib",
       "src/plugins/spreadsheet/engine",
       "packages/*/dist",
+      "packages/bridges/*/dist",
       // mulmoclaude launcher copies server/client/shared src here at
       // publish time. Original sources are linted at their real paths.
       "packages/mulmoclaude/client",

@@ -543,18 +543,18 @@ Shared code is extracted into publishable npm packages under `packages/`:
 | `@mulmobridge/protocol` | Shared types and constants | [npm](https://www.npmjs.com/package/@mulmobridge/protocol) / [source](packages/protocol/) |
 | `@mulmobridge/client` | Socket.io client library | [npm](https://www.npmjs.com/package/@mulmobridge/client) / [source](packages/client/) |
 | `@mulmobridge/chat-service` | Server-side chat service (DI factory) | [npm](https://www.npmjs.com/package/@mulmobridge/chat-service) / [source](packages/chat-service/) |
-| `@mulmobridge/cli` | Terminal bridge | [npm](https://www.npmjs.com/package/@mulmobridge/cli) / [source](packages/cli/) |
-| `@mulmobridge/telegram` | Telegram bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/telegram) / [source](packages/telegram/) |
-| `@mulmobridge/slack` | Slack bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/slack) / [source](packages/slack/) |
-| `@mulmobridge/discord` | Discord bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/discord) / [source](packages/discord/) |
-| `@mulmobridge/line` | LINE bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/line) / [source](packages/line/) |
-| `@mulmobridge/whatsapp` | WhatsApp bridge | [npm](https://www.npmjs.com/package/@mulmobridge/whatsapp) / [source](packages/whatsapp/) |
-| `@mulmobridge/matrix` | Matrix bridge | [npm](https://www.npmjs.com/package/@mulmobridge/matrix) / [source](packages/matrix/) |
-| `@mulmobridge/irc` | IRC bridge | [npm](https://www.npmjs.com/package/@mulmobridge/irc) / [source](packages/irc/) |
-| `@mulmobridge/mattermost` | Mattermost bridge | [npm](https://www.npmjs.com/package/@mulmobridge/mattermost) / [source](packages/mattermost/) |
-| `@mulmobridge/zulip` | Zulip bridge | [npm](https://www.npmjs.com/package/@mulmobridge/zulip) / [source](packages/zulip/) |
-| `@mulmobridge/messenger` | Facebook Messenger bridge | [npm](https://www.npmjs.com/package/@mulmobridge/messenger) / [source](packages/messenger/) |
-| `@mulmobridge/google-chat` | Google Chat bridge | [npm](https://www.npmjs.com/package/@mulmobridge/google-chat) / [source](packages/google-chat/) |
+| `@mulmobridge/cli` | Terminal bridge | [npm](https://www.npmjs.com/package/@mulmobridge/cli) / [source](packages/bridges/cli/) |
+| `@mulmobridge/telegram` | Telegram bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/telegram) / [source](packages/bridges/telegram/) |
+| `@mulmobridge/slack` | Slack bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/slack) / [source](packages/bridges/slack/) |
+| `@mulmobridge/discord` | Discord bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/discord) / [source](packages/bridges/discord/) |
+| `@mulmobridge/line` | LINE bot bridge | [npm](https://www.npmjs.com/package/@mulmobridge/line) / [source](packages/bridges/line/) |
+| `@mulmobridge/whatsapp` | WhatsApp bridge | [npm](https://www.npmjs.com/package/@mulmobridge/whatsapp) / [source](packages/bridges/whatsapp/) |
+| `@mulmobridge/matrix` | Matrix bridge | [npm](https://www.npmjs.com/package/@mulmobridge/matrix) / [source](packages/bridges/matrix/) |
+| `@mulmobridge/irc` | IRC bridge | [npm](https://www.npmjs.com/package/@mulmobridge/irc) / [source](packages/bridges/irc/) |
+| `@mulmobridge/mattermost` | Mattermost bridge | [npm](https://www.npmjs.com/package/@mulmobridge/mattermost) / [source](packages/bridges/mattermost/) |
+| `@mulmobridge/zulip` | Zulip bridge | [npm](https://www.npmjs.com/package/@mulmobridge/zulip) / [source](packages/bridges/zulip/) |
+| `@mulmobridge/messenger` | Facebook Messenger bridge | [npm](https://www.npmjs.com/package/@mulmobridge/messenger) / [source](packages/bridges/messenger/) |
+| `@mulmobridge/google-chat` | Google Chat bridge | [npm](https://www.npmjs.com/package/@mulmobridge/google-chat) / [source](packages/bridges/google-chat/) |
 | `@mulmobridge/mock-server` | Mock server for testing | [npm](https://www.npmjs.com/package/@mulmobridge/mock-server) / [source](packages/mock-server/) |
 | `@receptron/task-scheduler` | Persistent task scheduler | [npm](https://www.npmjs.com/package/@receptron/task-scheduler) / [source](packages/scheduler/) |
 

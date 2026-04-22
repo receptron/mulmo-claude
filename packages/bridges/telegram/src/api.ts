@@ -11,7 +11,7 @@ import { mimeFromExtension, buildDataUrl } from "@mulmobridge/client";
 //
 // Message-length handling (4096 char cap, markdown mode, media
 // uploads) is deliberately out of scope for this file — the caller
-// in `packages/telegram/src/index.ts` decides how to chunk long replies.
+// in `packages/bridges/telegram/src/index.ts` decides how to chunk long replies.
 
 export interface TelegramUpdate {
   update_id: number;

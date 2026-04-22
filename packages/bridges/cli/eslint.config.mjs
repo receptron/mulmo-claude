@@ -1,4 +1,4 @@
-import eslintBase from "../../config/eslint.packages.mjs";
+import eslintBase from "../../../config/eslint.packages.mjs";
 
 const packageTsFiles = ["{src,test}/**/*.ts"];
 
