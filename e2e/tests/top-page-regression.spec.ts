@@ -940,10 +940,8 @@ test.describe("15. arrow key navigation", () => {
 
     const firstResult = new URL(page.url()).searchParams.get("result")!;
 
-    // Focus the sidebar results panel (sets activePane to "sidebar")
-    const sidebar = page.getByTestId("tool-results-scroll");
-    await sidebar.click();
-
+    // The result card click already set activePane to "sidebar"
+    // (mousedown bubbles to ToolResultsPanel's @mousedown="emit('activate')").
     // Press ArrowDown — should move to the next result
     await page.keyboard.press("ArrowDown");
     await expect(async () => {
