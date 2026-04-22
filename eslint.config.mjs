@@ -53,7 +53,7 @@ export default [
       // translatable content. Filter them out centrally so real
       // translatable strings remain visible in the lint output.
       "@intlify/vue-i18n/no-raw-text": [
-        "warn",
+        "error",
         {
           ignoreNodes: ["code", "kbd", "pre", "tt", "v-pre"],
           ignorePattern:
