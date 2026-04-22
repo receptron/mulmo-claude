@@ -70,7 +70,7 @@ You pick the behaviour via the `SLACK_SESSION_GRANULARITY` environment variable.
 
 Everything posted in `#ai-help` counts as **one long conversation**, no matter who posts or whether they use threads.
 
-```
+```text
 #ai-help
 ├── Alice: "Summarize yesterday's standup"          ┐
 ├── Alice: "Translate that to Japanese"             │  ← One session.
@@ -88,7 +88,7 @@ Everything posted in `#ai-help` counts as **one long conversation**, no matter w
 
 Posts in the root of the channel still share one session (as in `channel` mode), but **replies inside a thread get their own isolated session**.
 
-```
+```text
 #ai-help
 ├── Alice: "Summarize yesterday's standup"          ┐
 ├── Alice: "Translate that to Japanese"             │  ← Channel session
