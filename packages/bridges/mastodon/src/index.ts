@@ -67,7 +67,7 @@ interface PostStatusOptions {
   visibility: string;
 }
 
-async function postOneStatus(chunk: string, opts: PostStatusOptions): Promise<void> {
+async function postOneStatus(chunk: string, opts: PostStatusOptions): Promise<string | null> {
   const body: JsonRecord = { status: chunk, visibility: opts.visibility };
   if (opts.inReplyTo) body.in_reply_to_id = opts.inReplyTo;
   let res: Response;
@@ -85,12 +85,19 @@ async function postOneStatus(chunk: string, opts: PostStatusOptions): Promise<vo
     const detail = await res.text().catch(() => "");
     throw new Error(`Mastodon status POST failed: ${res.status} ${detail.slice(0, 200)}`);
   }
+  const payload: unknown = await res.json().catch(() => null);
+  if (isObj(payload) && typeof payload.id === "string") return payload.id;
+  return null;
 }
 
 async function postStatus(__chatId: string, text: string, inReplyTo: string | null, visibility: string): Promise<void> {
+  // Thread chunk 2+ onto the previous chunk so clients render them as a
+  // readable reply chain rather than N parallel replies to the original.
   const chunks = chunkText(text, MAX_STATUS_LEN);
+  let prevId: string | null = inReplyTo;
   for (const chunk of chunks) {
-    await postOneStatus(chunk, { inReplyTo, visibility });
+    const postedId = await postOneStatus(chunk, { inReplyTo: prevId, visibility });
+    if (postedId) prevId = postedId;
   }
 }
 
@@ -203,9 +210,11 @@ async function handleNotification(raw: string): Promise<void> {
     console.log(`[mastodon] denied from=${parsed.senderAcct}`);
     return;
   }
-  if (!parsed.text) return;
 
+  // Collect attachments first so image-only DMs (no caption) still flow through.
   const attachments = await collectImageAttachments(parsed.media);
+  if (!parsed.text && attachments.length === 0) return;
+
   console.log(`[mastodon] message from=${parsed.senderAcct} len=${parsed.text.length} attachments=${attachments.length}`);
 
   try {
