@@ -17,6 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 - `@mulmobridge/rocketchat` (v0.1.0) — Rocket.Chat bridge. Polls the bot's DM rooms via REST with personal access token auth; chunked replies.
 - `@mulmobridge/signal` (v0.1.0) — Signal bridge. Talks to a locally running [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) daemon over WebSocket (receive) + REST (send); number-based allowlist.
 - `@mulmobridge/teams` (v0.1.0) — Microsoft Teams bridge via Bot Framework (`botbuilder` SDK). Webhook receiver + Azure AD JWT validation; conversation-reference cache for push delivery; AAD object-id allowlist. **Requires a public URL** — Teams endpoint validation is strict.
+- `@mulmobridge/webhook` (v0.1.0) — Generic HTTP webhook bridge. POST JSON to `/webhook`, get the AI reply in the response body. Optional `x-webhook-secret` header for auth. Developer glue for cron jobs, Zapier / n8n, Home Assistant, etc.
+- `@mulmobridge/twilio-sms` (v0.1.0) — SMS bridge via Twilio Programmable Messaging. Inbound webhook with `X-Twilio-Signature` HMAC-SHA1 verification; outbound via Twilio REST API. Number-based allowlist.
+- `@mulmobridge/email` (v0.1.0) — Email bridge. IMAP poll for unread mail, SMTP reply with threading preserved (`In-Reply-To` + `References`). Uses `imapflow` + `mailparser` + `nodemailer`. Sender allowlist.
 
 ---
 

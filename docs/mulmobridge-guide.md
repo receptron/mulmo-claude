@@ -101,6 +101,9 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
 | **Rocket.Chat** | [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/rocketchat/README.md) |
 | **Signal** | [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/signal/README.md) |
 | **Microsoft Teams** | [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/teams/README.md) |
+| **Webhook (汎用 HTTP)** | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/webhook/README.md) |
+| **SMS (Twilio)** | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/twilio-sms/README.md) |
+| **Email (IMAP+SMTP)** | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/email/README.md) |
 
 > **「実験的」とは？** テストが十分でなく、バグがある可能性があります。フィードバックをお待ちしています！
 
@@ -237,6 +240,9 @@ if (ack.ok) {
 | [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | Rocket.Chat ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/rocketchat) |
 | [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | Signal ブリッジ (signal-cli-rest-api 経由) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/signal) |
 | [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | Microsoft Teams ブリッジ (Bot Framework) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/teams) |
+| [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 汎用 HTTP webhook ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/webhook) |
+| [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | SMS (Twilio) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/twilio-sms) |
+| [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | Email (IMAP+SMTP) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/email) |
 
 ### 汎用ツール（@receptron スコープ）
 
