@@ -26,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Changed
 
+- `@mulmobridge/slack` (v0.2.0 → **v0.3.0**) — `SLACK_SESSION_GRANULARITY=thread` now auto-creates a Slack thread on the first bot reply to a top-level channel post. Users firing off multiple unrelated top-level messages get one thread per topic — replies no longer interleave at channel level. `channel` (default) and `auto` modes are unchanged. DMs are intentionally unaffected. Operators already on `thread` mode will see more threading on upgrade (#661, closes #658).
 - `@mulmobridge/client` (v0.1.1 → **v0.1.2**) — Patch release that exports the shared `chunkText` helper from `./text`. Required by every new bridge (mastodon, bluesky, chatwork, xmpp, rocketchat, signal, teams, webhook, twilio-sms, email, line-works, nostr, viber); without it, their `npx` invocations fail at runtime because they depend on `^0.1.0`.
 - `@mulmobridge/mock-server` (v0.1.0 → **v0.1.1**) — Patch release. Internal refactor of `handlers.ts` / `server.ts` + README catch-up listing all supported platforms.
 - `@mulmobridge/relay` (v0.1.0 → **v0.2.0**) — Minor release adding four new platform plugins:
@@ -53,6 +54,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 - `@mulmobridge/line-works@0.1.0`
 - `@mulmobridge/nostr@0.1.0`
 - `@mulmobridge/viber@0.1.0`
+- `@mulmobridge/slack@0.3.0`
 
 ---
 
