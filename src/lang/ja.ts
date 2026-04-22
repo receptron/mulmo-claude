@@ -6,6 +6,8 @@ const ja = {
     save: "保存",
     cancel: "キャンセル",
     loading: "読み込み中...",
+    close: "閉じる",
+    dismiss: "閉じる",
   },
   sessionTabBar: {
     newSession: "新しいセッション",
@@ -91,6 +93,29 @@ const ja = {
     mountedConfigs: "マウント設定:",
     none: "なし",
     testIsolation: "サンドボックス隔離をテスト:",
+  },
+  settingsModal: {
+    title: "設定",
+    tabs: {
+      tools: "許可ツール",
+      mcp: "MCP サーバ",
+      dirs: "ディレクトリ",
+      refs: "参照ディレクトリ",
+    },
+    toolNamesLabel: "ツール名",
+    invalidToolNamesPrefix: "次の項目は標準的ではないようです（期待される接頭辞",
+    invalidToolNamesSuffix: "）:",
+    mcpToolsError: "⚠ MCP ツール状態の取得に失敗しました: {error}。有効/無効にかかわらず全ツールを表示しています。",
+    changesHint: "次回のメッセージから反映されます。再起動は不要です。",
+    cannotSaveTooltip: "設定の読み込みに成功するまで保存できません",
+    saving: "保存中…",
+    loadingLabel: "読み込み中…",
+  },
+  canvasViewToggle: {
+    stackViewTooltip: "スタック表示・クリックで Single に切替 (⌘1)",
+    singleViewTooltip: "Single 表示・クリックで Stack に切替 (⌘2)",
+    switchToSingle: "Single 表示に切替",
+    switchToStack: "Stack 表示に切替",
   },
 };
 

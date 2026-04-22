@@ -13,6 +13,8 @@ const en = {
     save: "Save",
     cancel: "Cancel",
     loading: "Loading...",
+    close: "Close",
+    dismiss: "Dismiss",
   },
   sessionTabBar: {
     newSession: "New session",
@@ -100,6 +102,29 @@ const en = {
     mountedConfigs: "Mounted configs:",
     none: "none",
     testIsolation: "Test sandbox isolation:",
+  },
+  settingsModal: {
+    title: "Settings",
+    tabs: {
+      tools: "Allowed Tools",
+      mcp: "MCP Servers",
+      dirs: "Directories",
+      refs: "Reference Dirs",
+    },
+    toolNamesLabel: "Tool names",
+    invalidToolNamesPrefix: "These look non-standard (expected prefix",
+    invalidToolNamesSuffix: "):",
+    mcpToolsError: "⚠ Could not fetch MCP tool status: {error}. Showing all tools regardless of enablement.",
+    changesHint: "Changes apply on the next message. No restart needed.",
+    cannotSaveTooltip: "Cannot save until settings load successfully",
+    saving: "Saving…",
+    loadingLabel: "Loading…",
+  },
+  canvasViewToggle: {
+    stackViewTooltip: "Stack view · click to switch to Single (⌘1)",
+    singleViewTooltip: "Single view · click to switch to Stack (⌘2)",
+    switchToSingle: "Switch to Single view",
+    switchToStack: "Switch to Stack view",
   },
 };
 
