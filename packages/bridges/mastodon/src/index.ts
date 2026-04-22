@@ -88,23 +88,19 @@ async function postOneStatus(chunk: string, opts: PostStatusOptions): Promise<st
   // Return the created status id so long-reply chunks can be
   // threaded off each other rather than all re-replying to the
   // original user status (which flattens the thread).
-  try {
-    const parsed: unknown = await res.json();
-    if (isObj(parsed) && typeof parsed.id === "string") return parsed.id;
-  } catch {
-    // ignore — chaining is best-effort; fall back to flat replies
-  }
+  const payload: unknown = await res.json().catch(() => null);
+  if (isObj(payload) && typeof payload.id === "string") return payload.id;
   return null;
 }
 
 async function postStatus(__chatId: string, text: string, inReplyTo: string | null, visibility: string): Promise<void> {
+  // Thread chunk 2+ onto the previous chunk so clients render them as a
+  // readable reply chain rather than N parallel replies to the original.
   const chunks = chunkText(text, MAX_STATUS_LEN);
-  // Chain chunks: each subsequent chunk replies to the previous one
-  // so the Mastodon thread reads top-to-bottom as a single reply.
-  let replyTarget = inReplyTo;
+  let prevId: string | null = inReplyTo;
   for (const chunk of chunks) {
-    const newId = await postOneStatus(chunk, { inReplyTo: replyTarget, visibility });
-    if (newId) replyTarget = newId;
+    const postedId = await postOneStatus(chunk, { inReplyTo: prevId, visibility });
+    if (postedId) prevId = postedId;
   }
 }
 
@@ -218,8 +214,7 @@ async function handleNotification(raw: string): Promise<void> {
     return;
   }
 
-  // Collect attachments FIRST — otherwise image-only DMs (empty text,
-  // one or more images) would be silently dropped by the guard below.
+  // Collect attachments first so image-only DMs (no caption) still flow through.
   const attachments = await collectImageAttachments(parsed.media);
   if (!parsed.text && attachments.length === 0) return;
 
