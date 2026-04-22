@@ -15,6 +15,7 @@ import "./webhooks/telegram.js";
 import "./webhooks/whatsapp.js";
 import "./webhooks/messenger.js";
 import "./webhooks/google-chat.js";
+import "./webhooks/teams.js";
 
 const MAX_QUEUE_SIZE = 1000;
 const QUEUE_KEY_PREFIX = "q:";

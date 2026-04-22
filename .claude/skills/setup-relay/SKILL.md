@@ -46,7 +46,7 @@ cd packages/relay && wrangler secret put RELAY_TOKEN
 
 ### Platform secrets
 
-Ask the user **which platforms** they want to set up. Supported webhook platforms: **LINE, WhatsApp, Messenger, Google Chat, Telegram**. Only register secrets and webhook URLs for the ones they pick — `/health` reports `configured: true/false` per platform, so unused ones stay dormant with zero cost.
+Ask the user **which platforms** they want to set up. Supported webhook platforms: **LINE, WhatsApp, Messenger, Google Chat, Telegram, Microsoft Teams**. Only register secrets and webhook URLs for the ones they pick — `/health` reports `configured: true/false` per platform, so unused ones stay dormant with zero cost.
 
 For each selected platform, walk through the matching block below. All `wrangler secret put` invocations must run from `packages/relay`, use the `!` prefix (the user types the secret in their own terminal), and each registers exactly one secret.
 
@@ -128,6 +128,33 @@ For each selected platform, walk through the matching block below. All `wrangler
    curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<relay-url>/webhook/telegram&secret_token=<SECRET>"
    ```
 
+#### Microsoft Teams
+
+1. [Azure Portal](https://portal.azure.com/) → create **Azure Bot** resource (pricing tier F0 for free) → choose **Multi-tenant** (the simplest option) or **Single-tenant** if the bot is company-only.
+2. After creation, open the bot resource → **Configuration** → copy **Microsoft App ID**. Click **Manage** next to it → **Certificates & secrets** → **New client secret** → copy the **Value** (shows only once).
+3. (SingleTenant only) copy the **Tenant ID** from the same AAD app registration page.
+4. Register secrets:
+   ```
+   ! cd packages/relay && wrangler secret put MICROSOFT_APP_ID
+   ! cd packages/relay && wrangler secret put MICROSOFT_APP_PASSWORD
+   ```
+   For SingleTenant, also:
+   ```
+   ! cd packages/relay && wrangler secret put MICROSOFT_APP_TENANT_ID
+   ```
+   (Optional) AAD user object-ID allowlist:
+   ```
+   ! cd packages/relay && wrangler secret put TEAMS_ALLOWED_USERS
+   ```
+5. Edit `packages/relay/wrangler.toml` and add `MICROSOFT_APP_TYPE` under `[vars]` (non-secret) — values: `MultiTenant` (default) or `SingleTenant`. Re-run `wrangler deploy` after editing.
+6. Back in the Azure Bot resource → **Configuration** → **Messaging endpoint**:
+   ```
+   https://<relay-url>/webhook/teams
+   ```
+   Click **Apply** — Azure doesn't do a verify-token handshake, but your bot won't receive messages until the endpoint is saved here.
+7. Teams channel — on the same bot resource go to **Channels** → **Microsoft Teams** → accept T&C → **Apply**.
+8. Create a Teams app manifest (simplest path: [Developer Portal](https://dev.teams.microsoft.com/) → **Apps** → **New app** → set the `botId` to `MICROSOFT_APP_ID`) and install it into a team / personal scope.
+
 ## Step 4: Configure MulmoClaude
 
 Tell the user to add the Relay connection to `.env` themselves. Both the URL (from Step 2) and the token (generated in Step 3) are needed:
@@ -173,4 +200,7 @@ echo "RELAY_TOKEN=<token-from-step-3>" >> .env
 - **Google Chat uses the project number, not project ID** — project number is numeric (found on the Cloud Console home page), project ID is the human-readable slug
 - **Google Chat service-account JSON**: paste the _entire_ JSON blob (multi-line) at the wrangler prompt — do not base64-encode or try to escape it
 - Messenger webhooks require per-page subscription in addition to the app-level callback — setting only the callback URL is not enough; messages will arrive at Meta but never get forwarded to the app
+- **Teams SingleTenant**: must set both `MICROSOFT_APP_TENANT_ID` (secret) and `MICROSOFT_APP_TYPE=SingleTenant` (var in `wrangler.toml`) — missing either and `/health` reports `teams: false`
+- **Teams client secret shown once**: Azure's "New client secret" dialog displays the Value only on creation — if the user misses it, they have to generate a new one
+- **Teams endpoint is persistent once saved**: Azure doesn't verify the endpoint actively; you won't know it's wrong until a real message fails to arrive. Test with a personal-scope DM first
 - Durable Objects work on the free plan when using `new_sqlite_classes` in `wrangler.toml` (the default in this project)

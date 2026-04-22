@@ -14,6 +14,7 @@ import "./webhooks/telegram.js";
 import "./webhooks/whatsapp.js";
 import "./webhooks/messenger.js";
 import "./webhooks/google-chat.js";
+import "./webhooks/teams.js";
 
 export { RelayDurableObject } from "./durable-object.js";
 

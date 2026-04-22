@@ -1,6 +1,6 @@
 # @mulmobridge/relay
 
-Cloudflare Workers relay for MulmoBridge. Receives webhooks from messaging platforms (LINE, WhatsApp, Messenger, Google Chat, Telegram), queues messages when MulmoClaude is offline, and forwards them via WebSocket when connected.
+Cloudflare Workers relay for MulmoBridge. Receives webhooks from messaging platforms (LINE, WhatsApp, Messenger, Google Chat, Telegram, Microsoft Teams), queues messages when MulmoClaude is offline, and forwards them via WebSocket when connected.
 
 ## Why
 
@@ -18,9 +18,10 @@ With the relay:
 ```text
 LINE ─────────→ /webhook/line         ┐
 WhatsApp ─────→ /webhook/whatsapp     │
-Messenger ────→ /webhook/messenger    ├→ Durable Object → WS → MulmoClaude
-Google Chat ──→ /webhook/google-chat  │   (queue if offline)    (home PC)
-Telegram ─────→ /webhook/telegram     ┘
+Messenger ────→ /webhook/messenger    │
+Google Chat ──→ /webhook/google-chat  ├→ Durable Object → WS → MulmoClaude
+Telegram ─────→ /webhook/telegram     │   (queue if offline)    (home PC)
+Teams ────────→ /webhook/teams        ┘
 ```
 
 ## Setup
@@ -86,6 +87,19 @@ wrangler secret put TELEGRAM_BOT_TOKEN
 wrangler secret put TELEGRAM_WEBHOOK_SECRET
 ```
 
+#### Microsoft Teams
+
+```bash
+wrangler secret put MICROSOFT_APP_ID                # Azure Bot → Configuration → Microsoft App ID
+wrangler secret put MICROSOFT_APP_PASSWORD          # Client secret generated for that app
+# Only for SingleTenant apps:
+wrangler secret put MICROSOFT_APP_TENANT_ID
+# Optional: AAD user object ID allowlist (CSV)
+wrangler secret put TEAMS_ALLOWED_USERS
+```
+
+Also set `MICROSOFT_APP_TYPE` under `[vars]` in `wrangler.toml` (values: `MultiTenant` — default — or `SingleTenant`). It's non-sensitive, so it belongs in vars, not secrets.
+
 ### 3. Set webhook URLs in platform consoles
 
 | Platform    | Webhook URL                                      | Where to register                                                                                                                                 |
@@ -95,6 +109,7 @@ wrangler secret put TELEGRAM_WEBHOOK_SECRET
 | Messenger   | `https://<name>.workers.dev/webhook/messenger`   | [Meta for Developers](https://developers.facebook.com/apps/) → Messenger → **Settings** → **Webhooks** (use `MESSENGER_VERIFY_TOKEN` at prompt)   |
 | Google Chat | `https://<name>.workers.dev/webhook/google-chat` | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Google Chat API → **Configuration** → **App URL**                   |
 | Telegram    | `https://<name>.workers.dev/webhook/telegram`    | Set via Bot API call (see below)                                                                                                                  |
+| Teams       | `https://<name>.workers.dev/webhook/teams`       | [Azure Portal](https://portal.azure.com/) → Azure Bot resource → **Configuration** → **Messaging endpoint**                                       |
 
 Telegram is the odd one out — no GUI, set via API:
 
@@ -115,15 +130,16 @@ RELAY_TOKEN=<same token as step 2>
 
 ## Endpoints
 
-| Method | Path                   | Description                                                                                              |
-| ------ | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| GET    | `/health`              | Health check + configured platforms                                                                      |
-| GET    | `/ws`                  | WebSocket (MulmoClaude connection, bearer auth)                                                          |
-| POST   | `/webhook/line`        | LINE webhook (HMAC-SHA256 verified)                                                                      |
-| POST   | `/webhook/whatsapp`    | WhatsApp Cloud API webhook (Meta signature + `hub.verify_token` echo for GET)                            |
-| POST   | `/webhook/messenger`   | Messenger webhook (Meta signature + `hub.verify_token` echo for GET)                                     |
-| POST   | `/webhook/google-chat` | Google Chat webhook (JWT `iss=chat@system.gserviceaccount.com`, audience = `GOOGLE_CHAT_PROJECT_NUMBER`) |
-| POST   | `/webhook/telegram`    | Telegram webhook (secret token verified)                                                                 |
+| Method | Path                   | Description                                                                                                                    |
+| ------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/health`              | Health check + configured platforms                                                                                            |
+| GET    | `/ws`                  | WebSocket (MulmoClaude connection, bearer auth)                                                                                |
+| POST   | `/webhook/line`        | LINE webhook (HMAC-SHA256 verified)                                                                                            |
+| POST   | `/webhook/whatsapp`    | WhatsApp Cloud API webhook (Meta signature + `hub.verify_token` echo for GET)                                                  |
+| POST   | `/webhook/messenger`   | Messenger webhook (Meta signature + `hub.verify_token` echo for GET)                                                           |
+| POST   | `/webhook/google-chat` | Google Chat webhook (JWT `iss=chat@system.gserviceaccount.com`, audience = `GOOGLE_CHAT_PROJECT_NUMBER`)                       |
+| POST   | `/webhook/telegram`    | Telegram webhook (secret token verified)                                                                                       |
+| POST   | `/webhook/teams`       | Microsoft Teams webhook (Azure AD JWT verified, aud = `MICROSOFT_APP_ID`; non-message activities acked 200 without forwarding) |
 
 ## Security
 
