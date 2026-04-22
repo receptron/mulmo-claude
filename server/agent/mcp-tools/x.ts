@@ -1,5 +1,6 @@
 import { errorMessage } from "../../utils/errors.js";
 import { safeResponseText } from "../../utils/http.js";
+import { toUtcIsoDate } from "../../utils/date.js";
 import { env } from "../../system/env.js";
 
 const X_API_BASE = "https://api.twitter.com/2";
@@ -56,7 +57,7 @@ async function fetchX(path: string): Promise<XApiResponse> {
 }
 
 function formatTweet(tweet: XTweet, author?: XUser, url?: string): string {
-  const date = tweet.created_at ? new Date(tweet.created_at).toISOString().split("T")[0] : "";
+  const date = tweet.created_at ? toUtcIsoDate(new Date(tweet.created_at)) : "";
   const dateSuffix = date ? ` · ${date}` : "";
   const byline = author ? `@${author.username} (${author.name})${dateSuffix}` : date;
   const metrics = tweet.public_metrics

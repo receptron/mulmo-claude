@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileS
 import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { stripDataUri } from "../../utils/files/image-store.js";
+import { writeJsonAtomic } from "../../utils/files/json.js";
 import {
   getFileObject,
   initializeContextFromFiles,
@@ -26,6 +27,7 @@ import { slugify } from "../../utils/slug.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { log } from "../../system/logger/index.js";
 import { validateUpdateBeatBody, validateUpdateScriptBody } from "./mulmoScriptValidate.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -96,7 +98,7 @@ interface FilePathQuery {
   filePath?: string;
 }
 
-router.post(API_ROUTES.mulmoScript.save, (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
+router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
   const { script, filename } = req.body;
 
   if (!script || !Array.isArray(script.beats)) {
@@ -111,7 +113,7 @@ router.post(API_ROUTES.mulmoScript.save, (req: Request<object, object, SaveMulmo
   const fname = `${slug}-${Date.now()}.json`;
   const filePath = path.join(storiesDir, fname);
 
-  writeFileSync(filePath, JSON.stringify(script, null, 2));
+  await writeJsonAtomic(filePath, script);
 
   res.json({
     data: { script, filePath: `stories/${fname}` },
@@ -120,7 +122,7 @@ router.post(API_ROUTES.mulmoScript.save, (req: Request<object, object, SaveMulmo
   });
 });
 
-router.post(API_ROUTES.mulmoScript.updateBeat, (req: Request<object, object, unknown>, res: Response) => {
+router.post(API_ROUTES.mulmoScript.updateBeat, async (req: Request<object, object, unknown>, res: Response) => {
   const validation = validateUpdateBeatBody(req.body);
   if (!validation.ok) {
     badRequest(res, validation.error);
@@ -139,12 +141,12 @@ router.post(API_ROUTES.mulmoScript.updateBeat, (req: Request<object, object, unk
   }
 
   script.beats[beatIndex] = beat as MulmoBeat;
-  writeFileSync(absoluteFilePath, JSON.stringify(script, null, 2));
+  await writeJsonAtomic(absoluteFilePath, script);
 
   res.json({ ok: true });
 });
 
-router.post(API_ROUTES.mulmoScript.updateScript, (req: Request<object, object, unknown>, res: Response) => {
+router.post(API_ROUTES.mulmoScript.updateScript, async (req: Request<object, object, unknown>, res: Response) => {
   const validation = validateUpdateScriptBody(req.body);
   if (!validation.ok) {
     badRequest(res, validation.error);
@@ -155,7 +157,7 @@ router.post(API_ROUTES.mulmoScript.updateScript, (req: Request<object, object, u
   const absoluteFilePath = resolveStoryPath(filePath, res);
   if (!absoluteFilePath) return;
 
-  writeFileSync(absoluteFilePath, JSON.stringify(updatedScript, null, 2));
+  await writeJsonAtomic(absoluteFilePath, updatedScript);
   res.json({ ok: true });
 });
 
@@ -696,7 +698,7 @@ router.post(
 );
 
 router.get(API_ROUTES.mulmoScript.downloadMovie, (req: Request, res: Response) => {
-  const moviePath = typeof req.query.moviePath === "string" ? req.query.moviePath : undefined;
+  const moviePath = getOptionalStringQuery(req, "moviePath");
 
   if (!moviePath) {
     badRequest(res, "moviePath is required");

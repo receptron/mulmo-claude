@@ -8,6 +8,7 @@ import { getCachedCustomDirs, buildCustomDirsPrompt } from "../workspace/custom-
 import { TOOL_NAMES } from "../../src/config/toolNames.js";
 import { getCachedReferenceDirs, buildReferenceDirsPrompt } from "../workspace/reference-dirs.js";
 import { log } from "../system/logger/index.js";
+import { toLocalIsoDate } from "../utils/date.js";
 
 export const SYSTEM_PROMPT = `You are MulmoClaude, a versatile assistant app with rich visual output.
 
@@ -424,7 +425,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     { name: "base", content: SYSTEM_PROMPT },
     { name: "role", content: role.prompt },
     { name: "workspace", content: `Workspace directory: ${workspacePath}` },
-    { name: "date", content: `Today's date: ${new Date().toISOString().split("T")[0]}` },
+    { name: "date", content: `Today's date: ${toLocalIsoDate(new Date())}` },
     { name: "memory", content: buildMemoryContext(workspacePath) },
     { name: "sandbox", content: useDocker ? SANDBOX_TOOLS_HINT : null },
     { name: "wiki", content: buildWikiContext(workspacePath) },
