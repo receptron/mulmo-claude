@@ -55,6 +55,7 @@ const frMessages = {
     dismiss: "Ignorer",
   },
   sidebarHeader: {
+    home: "Aller à la dernière conversation",
     toolCallHistory: "Historique des appels d'outils",
     settings: "Paramètres",
   },

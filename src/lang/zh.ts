@@ -60,6 +60,7 @@ const zhMessages = {
     dismiss: "关闭",
   },
   sidebarHeader: {
+    home: "前往最新对话",
     toolCallHistory: "工具调用历史",
     settings: "设置",
   },

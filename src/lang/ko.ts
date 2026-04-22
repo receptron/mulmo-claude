@@ -62,6 +62,7 @@ const koMessages = {
     dismiss: "닫기",
   },
   sidebarHeader: {
+    home: "최신 채팅으로 이동",
     toolCallHistory: "도구 호출 기록",
     settings: "설정",
   },

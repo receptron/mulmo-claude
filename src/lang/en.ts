@@ -77,6 +77,7 @@ const enMessages = {
     dismiss: "Dismiss",
   },
   sidebarHeader: {
+    home: "Go to latest chat",
     toolCallHistory: "Tool call history",
     settings: "Settings",
   },

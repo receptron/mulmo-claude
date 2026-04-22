@@ -55,6 +55,7 @@ const deMessages = {
     dismiss: "Verwerfen",
   },
   sidebarHeader: {
+    home: "Zum neuesten Chat",
     toolCallHistory: "Tool-Aufrufverlauf",
     settings: "Einstellungen",
   },
