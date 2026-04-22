@@ -177,7 +177,9 @@ const jaMessages = {
     urlPlaceholder: "https://example.com/mcp",
     commandFieldLabel: "コマンド",
     argsLabel: "引数（1行につき1つ）",
-    argsPlaceholder: "-y\n@modelcontextprotocol/server-filesystem\n/workspace/path",
+    // Message function form — skips vue-i18n's message compiler so
+    // the literal `@` isn't parsed as a linked-message reference.
+    argsPlaceholder: () => "-y\n@modelcontextprotocol/server-filesystem\n/workspace/path",
     errNoName: "名前を入力するか、URL / 引数から推論できる値を入力してください。",
     errBadName: "名前は小文字で始まり、[a-z0-9_-] のみ使用できます。",
     errIdExists: "サーバ ID「{id}」は既に存在します。",

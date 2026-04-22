@@ -186,7 +186,9 @@ const enMessages = {
     urlPlaceholder: "https://example.com/mcp",
     commandFieldLabel: "Command",
     argsLabel: "Arguments (one per line)",
-    argsPlaceholder: "-y\n@modelcontextprotocol/server-filesystem\n/workspace/path",
+    // Message function form — skips vue-i18n's message compiler so
+    // the literal `@` isn't parsed as a linked-message reference.
+    argsPlaceholder: () => "-y\n@modelcontextprotocol/server-filesystem\n/workspace/path",
     errNoName: "Please provide a Name, or enter a URL / args we can derive one from.",
     errBadName: "Name must start with a lowercase letter and contain only [a-z0-9_-].",
     errIdExists: 'Server id "{id}" already exists.',
