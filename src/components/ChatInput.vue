@@ -3,6 +3,67 @@
     <div v-if="fileError" class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5" data-testid="file-error">
       {{ fileError }}
     </div>
+    <!-- Audio transcription panel — shown when an audio file is
+         dropped/picked. Runs entirely in the browser via Whisper
+         (Transformers.js); nothing is uploaded. -->
+    <div v-if="transcribePanelOpen" class="mb-2 text-xs border border-gray-200 bg-gray-50 rounded px-3 py-2 space-y-2" data-testid="audio-transcribe-panel">
+      <div class="flex items-center justify-between gap-2">
+        <span class="font-medium text-gray-700 truncate">
+          <span class="material-icons text-sm align-middle mr-1">graphic_eq</span>
+          {{ transcribeFilename }}
+        </span>
+        <button
+          class="text-gray-400 hover:text-gray-600 shrink-0"
+          :title="t('chatInput.audioPanel.discardButton')"
+          data-testid="audio-transcribe-close"
+          @click="discardTranscription"
+        >
+          <span class="material-icons text-sm">close</span>
+        </button>
+      </div>
+
+      <!-- Progress states -->
+      <div v-if="transcribeState.status === 'loading-model'" class="space-y-1">
+        <div class="text-gray-600">{{ t("chatInput.audioPanel.preparing") }}</div>
+        <div class="h-1.5 bg-gray-200 rounded overflow-hidden">
+          <div class="h-full bg-blue-500 transition-[width] duration-150" :style="{ width: loadingPercent + '%' }"></div>
+        </div>
+      </div>
+      <div v-else-if="transcribeState.status === 'decoding-audio'" class="flex items-center gap-2 text-gray-600">
+        <svg class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+        {{ t("chatInput.audioPanel.decoding") }}
+      </div>
+      <div v-else-if="transcribeState.status === 'transcribing'" class="flex items-center gap-2 text-gray-600">
+        <svg class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+        {{ t("chatInput.audioPanel.transcribing") }}
+      </div>
+      <div v-else-if="transcribeState.status === 'error'" class="text-red-600" data-testid="audio-transcribe-error">
+        {{ t("chatInput.audioPanel.error", { error: transcribeState.error }) }}
+      </div>
+      <template v-else-if="transcribeState.status === 'done'">
+        <pre class="max-h-40 overflow-auto text-[11px] font-mono text-gray-700 bg-white border border-gray-200 rounded p-2 whitespace-pre-wrap">{{
+          transcribeState.text
+        }}</pre>
+        <div class="flex gap-2 justify-end">
+          <button
+            class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
+            data-testid="audio-transcribe-discard"
+            @click="discardTranscription"
+          >
+            {{ t("chatInput.audioPanel.discardButton") }}
+          </button>
+          <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="audio-transcribe-paste" @click="pasteTranscription">
+            {{ t("chatInput.audioPanel.pasteButton") }}
+          </button>
+        </div>
+      </template>
+    </div>
     <ChatAttachmentPreview
       v-if="pastedFile"
       :data-url="pastedFile.dataUrl"
@@ -101,10 +162,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ChatAttachmentPreview from "./ChatAttachmentPreview.vue";
 import { useImeAwareEnter } from "../composables/useImeAwareEnter";
+import { useWhisperTranscribe } from "../composables/useWhisperTranscribe";
+import { isAudioFile, isVideoFile } from "../utils/audio/isAudioFile";
 
 const { t } = useI18n();
 
@@ -151,7 +214,44 @@ const ACCEPTED_MIME_EXACT = new Set([
 // expanded by the browser's native file picker; exact MIME entries
 // are passed through. Drop + paste still accept the same set via the
 // isAcceptedType() check below, so all three entry points stay in sync.
-const fileInputAccept = [...ACCEPTED_MIME_PREFIXES.map((prefix) => `${prefix}*`), ...ACCEPTED_MIME_EXACT].join(",");
+// `audio/*` is included so the picker lets the user select audio;
+// the handler short-circuits to the transcription panel rather than
+// attaching it. See startTranscription() below.
+const fileInputAccept = [...ACCEPTED_MIME_PREFIXES.map((prefix) => `${prefix}*`), "audio/*", ...ACCEPTED_MIME_EXACT].join(",");
+
+// ── Audio transcription path ───────────────────────────────────────
+// Audio files don't go through readAttachmentFile (which converts to
+// data URL for upload). Instead they feed Whisper in the browser and
+// surface a preview + "Paste into message" button.
+const { state: transcribeState, transcribe, reset: resetTranscribe } = useWhisperTranscribe();
+const transcribePanelOpen = ref(false);
+const transcribeFilename = ref("");
+
+const loadingPercent = computed(() => {
+  if (transcribeState.value.status !== "loading-model") return 0;
+  return Math.round(transcribeState.value.progress * 100);
+});
+
+function startTranscription(file: File): void {
+  fileError.value = null;
+  transcribeFilename.value = file.name;
+  transcribePanelOpen.value = true;
+  void transcribe(file);
+}
+
+function pasteTranscription(): void {
+  if (transcribeState.value.status !== "done") return;
+  const appended = props.modelValue ? `${props.modelValue}\n\n${transcribeState.value.text}` : transcribeState.value.text;
+  emit("update:modelValue", appended);
+  discardTranscription();
+  nextTick(() => textarea.value?.focus());
+}
+
+function discardTranscription(): void {
+  transcribePanelOpen.value = false;
+  transcribeFilename.value = "";
+  resetTranscribe();
+}
 
 function isAcceptedType(mime: string): boolean {
   return ACCEPTED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix)) || ACCEPTED_MIME_EXACT.has(mime);
@@ -159,6 +259,17 @@ function isAcceptedType(mime: string): boolean {
 
 function readAttachmentFile(file: File): void {
   fileError.value = null;
+  // Audio → route to the transcription panel instead of attaching.
+  if (isAudioFile(file)) {
+    startTranscription(file);
+    return;
+  }
+  // Video — out of scope for v1, but we reject with a clear message
+  // instead of silently falling through to the unsupported-type path.
+  if (isVideoFile(file)) {
+    fileError.value = t("chatInput.audioPanel.videoRejected");
+    return;
+  }
   if (!isAcceptedType(file.type)) {
     // Previously returned silently. That left the user wondering whether
     // the drop/paste registered at all — #499.
@@ -187,7 +298,9 @@ function onPasteFile(event: ClipboardEvent): void {
   const items = event.clipboardData?.items;
   if (!items) return;
   for (const item of items) {
-    if (isAcceptedType(item.type)) {
+    // Audio types are also let through so a pasted audio clip opens
+    // the transcription panel rather than getting silently dropped.
+    if (isAcceptedType(item.type) || item.type.startsWith("audio/") || item.type.startsWith("video/")) {
       const file = item.getAsFile();
       if (file) {
         event.preventDefault();

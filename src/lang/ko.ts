@@ -32,6 +32,15 @@ const koMessages = {
     attachFile: "파일 첨부",
     fileTooLarge: "파일이 너무 큽니다 ({sizeMB} MB). 최대 30 MB 까지 가능합니다.",
     unsupportedFileType: "지원되지 않는 파일 형식입니다. 이미지, PDF, DOCX, XLSX, PPTX, 텍스트 파일만 지원됩니다.",
+    audioPanel: {
+      preparing: "전사 엔진 준비 중 (74 MB, 한 번만)…",
+      decoding: "오디오 디코딩 중…",
+      transcribing: "전사 중…",
+      error: "전사 실패: {error}",
+      pasteButton: "메시지에 붙여넣기",
+      discardButton: "버리기",
+      videoRejected: "동영상 첨부는 아직 지원되지 않습니다. 오디오 트랙을 추출하여 첨부해주세요.",
+    },
   },
   sessionHistoryPanel: {
     filters: {

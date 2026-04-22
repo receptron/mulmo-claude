@@ -30,6 +30,15 @@ const esMessages = {
     attachFile: "Adjuntar archivo",
     fileTooLarge: "El archivo es demasiado grande ({sizeMB} MB). El máximo es 30 MB.",
     unsupportedFileType: "Tipo de archivo no admitido. Se aceptan: imágenes, PDF, DOCX, XLSX, PPTX y archivos de texto.",
+    audioPanel: {
+      preparing: "Preparando el transcriptor (74 MB, solo la primera vez)…",
+      decoding: "Decodificando audio…",
+      transcribing: "Transcribiendo…",
+      error: "Transcripción fallida: {error}",
+      pasteButton: "Pegar en el mensaje",
+      discardButton: "Descartar",
+      videoRejected: "Los adjuntos de vídeo aún no son compatibles — extrae la pista de audio.",
+    },
   },
   sessionHistoryPanel: {
     filters: {

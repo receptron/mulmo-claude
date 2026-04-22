@@ -32,6 +32,15 @@ const jaMessages = {
     attachFile: "ファイルを添付",
     fileTooLarge: "ファイルが大きすぎます（{sizeMB} MB）。上限は 30 MB です。",
     unsupportedFileType: "対応していないファイル形式です。画像・PDF・DOCX・XLSX・PPTX・テキストファイルを使用してください。",
+    audioPanel: {
+      preparing: "書き起こしエンジンを準備中（74 MB、初回のみ）…",
+      decoding: "音声をデコード中…",
+      transcribing: "書き起こし中…",
+      error: "書き起こしに失敗しました: {error}",
+      pasteButton: "メッセージに貼り付け",
+      discardButton: "破棄",
+      videoRejected: "動画ファイルはまだサポートされていません。音声トラックを抽出して添付してください。",
+    },
   },
   sessionHistoryPanel: {
     filters: {

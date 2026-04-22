@@ -31,6 +31,15 @@ const zhMessages = {
     attachFile: "附加文件",
     fileTooLarge: "文件过大（{sizeMB} MB）。上限为 30 MB。",
     unsupportedFileType: "不支持的文件类型。支持:图像、PDF、DOCX、XLSX、PPTX、文本文件。",
+    audioPanel: {
+      preparing: "正在准备转录引擎（74 MB，仅首次）…",
+      decoding: "正在解码音频…",
+      transcribing: "转录中…",
+      error: "转录失败: {error}",
+      pasteButton: "粘贴到消息",
+      discardButton: "放弃",
+      videoRejected: "视频附件暂不支持 — 请提取音频轨道后再试。",
+    },
   },
   sessionHistoryPanel: {
     filters: {

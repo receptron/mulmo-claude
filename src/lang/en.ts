@@ -39,6 +39,15 @@ const enMessages = {
     attachFile: "Attach file",
     fileTooLarge: "File too large ({sizeMB} MB). Maximum is 30 MB.",
     unsupportedFileType: "File type not supported. Accepted: images, PDF, DOCX, XLSX, PPTX, text files.",
+    audioPanel: {
+      preparing: "Preparing transcriber (74 MB, one-time)…",
+      decoding: "Decoding audio…",
+      transcribing: "Transcribing…",
+      error: "Transcription failed: {error}",
+      pasteButton: "Paste into message",
+      discardButton: "Discard",
+      videoRejected: "Video attachments aren't supported yet — please extract the audio track.",
+    },
   },
   sessionHistoryPanel: {
     filters: {

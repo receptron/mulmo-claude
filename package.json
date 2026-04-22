@@ -60,6 +60,7 @@
     "@mulmochat-plugin/ui-image": "^0.3.0",
     "@receptron/task-scheduler": "^0.1.0",
     "@types/dompurify": "^3.2.0",
+    "@xenova/transformers": "^2.17.2",
     "cors": "^2.8.6",
     "dompurify": "^3.4.1",
     "dotenv": "^17.4.2",
