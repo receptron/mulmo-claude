@@ -27,7 +27,7 @@
 import { chunkText } from "@mulmobridge/client/text";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
-import { ONE_HOUR_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
+import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
 import { validateTokenClaims, validateJwkEndorsement, isAllowedSender, type AppType } from "./teams-verify.js";
 
 const MULTITENANT_ISSUER = "https://api.botframework.com";
@@ -199,6 +199,21 @@ interface TeamsMessage {
   channelId: string;
 }
 
+// Wrapper around parseActivity that also tolerates non-JSON bodies.
+// Returns null for any reason the webhook should still ack 200 OK
+// (malformed JSON, non-message activity, missing required fields).
+// Exported for regression tests — the handler inlines the same two
+// steps (JSON.parse → parseActivity).
+export function parseWebhookBody(body: string): TeamsMessage | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  return parseActivity(parsed);
+}
+
 function parseActivity(body: unknown): TeamsMessage | null {
   if (!isObj(body)) return null;
   // Non-message activities (conversationUpdate, invoke, typing, …) are
@@ -258,7 +273,7 @@ async function getAccessToken(env: Env): Promise<string> {
   if (typeof data.access_token !== "string") {
     throw new Error("Teams token response missing access_token");
   }
-  const ttlSec = typeof data.expires_in === "number" ? data.expires_in : 3600;
+  const ttlSec = typeof data.expires_in === "number" ? data.expires_in : ONE_HOUR_S;
   tokenCache = { token: data.access_token, expiresAt: now + ttlSec };
   return data.access_token;
 }
@@ -278,12 +293,12 @@ const teamsPlugin: PlatformPlugin = {
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
     // Parse the activity first so the JWT verifier can cross-check the
-    // serviceUrl / channelId claims against the body. If parsing fails,
-    // the request is a non-message activity (typing, invoke, …) and
-    // still needs a 200 OK — but we skip signature checks since there's
-    // nothing to forward.
-    const activity = parseActivity(JSON.parse(body));
-    if (!activity) return []; // non-message or malformed — ack 200 OK
+    // serviceUrl / channelId claims against the body. Non-JSON bodies
+    // and non-message activities (typing, invoke, …) both return null
+    // here — we ack 200 OK with no message, matching Bot Framework's
+    // expectation and avoiding a spurious 500 on malformed payloads.
+    const activity = parseWebhookBody(body);
+    if (!activity) return [];
 
     const authHeader = request.headers.get("authorization") ?? undefined;
     const valid = await verifyTeamsJwt(authHeader, env, activity);

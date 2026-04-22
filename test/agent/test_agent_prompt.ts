@@ -177,7 +177,11 @@ describe("buildSystemPrompt", () => {
       workspacePath: workspace,
       useDocker: false,
     });
-    const today = new Date().toISOString().split("T")[0];
+    // prompt.ts uses toLocalIsoDate — "what did I do today" is a wall-
+    // clock question, not a UTC question. Mirror that here so the test
+    // doesn't flake near UTC midnight when the local date has changed.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     assert.ok(result.includes(`Today's date: ${today}`));
   });
 

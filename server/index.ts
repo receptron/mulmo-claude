@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import agentRoutes from "./api/routes/agent.js";
@@ -61,6 +60,7 @@ import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../src/types/events.js";
 import { SESSION_ORIGINS } from "../src/types/session.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
+import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "./utils/port.mjs";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
 
 const HTML_TOKEN_PLACEHOLDER = "__MULMOCLAUDE_AUTH_TOKEN__";
@@ -75,7 +75,6 @@ initWorkspace();
 let sandboxEnabled = false;
 
 const app = express();
-const PORT = env.port;
 
 app.disable("x-powered-by");
 // No `cors()` middleware. The Vite dev proxy forwards `/api/*`
@@ -256,18 +255,30 @@ app.use((err: Error, _req: Request, res: Response, __next: NextFunction) => {
   serverError(res, "Internal Server Error");
 });
 
-function isPortFree(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
-    });
-    // Probe the same interface we'll actually bind to so a port
-    // held by a different process on a different interface doesn't
-    // give us a false "free" reading.
-    server.listen(port, "127.0.0.1");
-  });
+// True iff the user set `PORT` explicitly; empty string counts as "not
+// set". We use this to decide between "walk forward when busy" (friendly
+// dev behaviour) and "fail loudly" (respect the user's choice).
+const portExplicit = typeof process.env.PORT === "string" && process.env.PORT.trim() !== "";
+
+// Resolve the port we'll actually bind to. Default PORT (3001) + busy
+// walks forward so a stale `yarn dev` or a parallel test run doesn't
+// crash the launch. Explicit PORT + busy exits — matches the launcher's
+// `--port` semantics so `PORT=3099 yarn dev` behaves the same as
+// `npx mulmoclaude --port 3099`.
+async function resolvePort(): Promise<number> {
+  const requested = env.port;
+  if (await isPortFree(requested)) return requested;
+  if (portExplicit) {
+    log.error("server", `Port ${requested} is already in use. Stop the other process or pick a different PORT.`);
+    process.exit(1);
+  }
+  const fallback = await findAvailablePort(requested + 1);
+  if (fallback === null) {
+    log.error("server", `Port ${requested} is in use and no free port found in ${requested}..${requested + MAX_PORT_PROBES - 1}.`);
+    process.exit(1);
+  }
+  log.info("server", `Port ${requested} busy → using ${fallback} instead`);
+  return fallback;
 }
 
 async function ensureCredentialsAvailable(): Promise<void> {
@@ -351,8 +362,8 @@ function maybeForceChatIndexBackfill(): void {
     .catch(logBackgroundError("chat-index", "forced startup backfill failed"));
 }
 
-function startRuntimeServices(httpServer: ReturnType<typeof app.listen>): void {
-  log.info("server", "listening", { port: PORT });
+function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: number): void {
+  log.info("server", "listening", { port });
 
   // --- Pub/Sub ---
   const pubsub = createPubSub(httpServer);
@@ -497,11 +508,7 @@ process.on("SIGTERM", () => {
 });
 
 (async () => {
-  const portFree = await isPortFree(PORT);
-  if (!portFree) {
-    log.error("server", `Port ${PORT} is already in use. Stop the other process and try again.`);
-    process.exit(1);
-  }
+  const port = await resolvePort();
 
   // Generate the bearer token before `app.listen` so the first
   // request cannot race an uninitialised `getCurrentToken()`. The
@@ -522,8 +529,8 @@ process.on("SIGTERM", () => {
   // `http://<laptop-ip>:3001/api/*`), which combined with the
   // workspace file API is a credential-theft risk. Personal dev
   // tool — localhost is the right default.
-  const httpServer = app.listen(PORT, "127.0.0.1", () => {
-    startRuntimeServices(httpServer);
+  const httpServer = app.listen(port, "127.0.0.1", () => {
+    startRuntimeServices(httpServer, port);
   });
 })();
 

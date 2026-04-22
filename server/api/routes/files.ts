@@ -5,6 +5,7 @@ import { workspacePath } from "../../workspace/workspace.js";
 import { statSafe, statSafeAsync, readDirSafeAsync, resolveWithinRoot, writeFileAtomic } from "../../utils/files/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, sendError, serverError } from "../../utils/httpError.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
 import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
@@ -493,7 +494,7 @@ router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown,
 // (no recursion) so the client can render the tree incrementally.
 // `path` is optional; empty / missing = workspace root.
 router.get(API_ROUTES.files.dir, async (req: Request<object, unknown, unknown, PathQuery>, res: Response<TreeNode | ErrorResponse>) => {
-  const relPath = typeof req.query.path === "string" ? req.query.path : "";
+  const relPath = getOptionalStringQuery(req, "path") ?? "";
 
   // Reference directory branch — resolve against the registered ref dir
   if (isRefPath(relPath)) {
@@ -568,7 +569,7 @@ function resolveAndStatFile<T>(
   req: Request<object, unknown, unknown, PathQuery>,
   res: Response<T | ErrorResponse>,
 ): { relPath: string; absPath: string; stat: Stats } | null {
-  const relPath = typeof req.query.path === "string" ? req.query.path : "";
+  const relPath = getOptionalStringQuery(req, "path") ?? "";
   if (!relPath) {
     badRequest(res, "path required");
     return null;

@@ -9,9 +9,13 @@ import { execSync, spawn } from "child_process";
 import { existsSync } from "fs";
 import { get as httpGet } from "http";
 import { createRequire } from "module";
-import net from "net";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+
+// Shared with `server/index.ts` — the launcher and the dev server use
+// the same probe + fallback logic. See server/utils/port.mjs for why
+// it's plain JS rather than TypeScript.
+import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "../server/utils/port.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -43,27 +47,6 @@ function pickOpenCommand() {
   if (process.platform === "darwin") return "open";
   if (process.platform === "win32") return "start";
   return "xdg-open";
-}
-
-function isPortFree(portNum) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
-    });
-    server.listen(portNum, "127.0.0.1");
-  });
-}
-
-// Walk forward from `start` to find a free port. `MAX_PORT_PROBES` caps
-// the scan so an accidentally-saturated system doesn't spin forever.
-const MAX_PORT_PROBES = 20;
-async function findFreePort(start) {
-  for (let candidate = start; candidate < start + MAX_PORT_PROBES; candidate++) {
-    if (await isPortFree(candidate)) return candidate;
-  }
-  return null;
 }
 
 // Poll the server until it answers an HTTP request, then call `onReady`.
@@ -178,7 +161,7 @@ async function chooseAvailablePort(requested, explicit) {
     error(`Port ${requested} is already in use. Stop the other process or pick a different --port.`);
     process.exit(1);
   }
-  const fallback = await findFreePort(requested + 1);
+  const fallback = await findAvailablePort(requested + 1);
   if (fallback === null) {
     error(`Port ${requested} is in use and no free port found in ${requested}..${requested + MAX_PORT_PROBES - 1}.`);
     process.exit(1);

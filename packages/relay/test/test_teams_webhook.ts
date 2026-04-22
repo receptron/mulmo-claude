@@ -13,6 +13,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { validateTokenClaims, validateJwkEndorsement, isAllowedSender, TEAMS_CHANNEL_ID } from "../src/webhooks/teams-verify.js";
+import { parseWebhookBody } from "../src/webhooks/teams.js";
 
 const APP_ID = "11111111-1111-1111-1111-111111111111";
 const ISSUER = "https://api.botframework.com";
@@ -85,6 +86,32 @@ describe("validateTokenClaims", () => {
   it("rejects when token has expired", () => {
     const ok = validateTokenClaims({
       payload: basePayload({ exp: NOW_SEC - 1 }),
+      appId: APP_ID,
+      expectedIssuer: ISSUER,
+      nowSeconds: NOW_SEC,
+      activity: baseActivity(),
+    });
+    assert.equal(ok, false);
+  });
+
+  it("rejects when exp claim is missing (fail-closed)", () => {
+    const payload = basePayload();
+    delete payload.exp;
+    const ok = validateTokenClaims({
+      payload,
+      appId: APP_ID,
+      expectedIssuer: ISSUER,
+      nowSeconds: NOW_SEC,
+      activity: baseActivity(),
+    });
+    assert.equal(ok, false);
+  });
+
+  it("rejects when exp claim is non-numeric (fail-closed)", () => {
+    const payload = basePayload();
+    payload.exp = "not a number" as unknown as number;
+    const ok = validateTokenClaims({
+      payload,
       appId: APP_ID,
       expectedIssuer: ISSUER,
       nowSeconds: NOW_SEC,
@@ -194,5 +221,43 @@ describe("isAllowedSender", () => {
     // let senders through when aadObjectId was absent — a fail-open bug.
     const allowed = new Set(["user-a"]);
     assert.equal(isAllowedSender({ allowed, senderAadObjectId: "" }), false);
+  });
+});
+
+describe("parseWebhookBody", () => {
+  // Regression guard: non-JSON request bodies used to bubble through
+  // `JSON.parse` and surface as a 500 to the Bot Framework. The Bot
+  // Framework then marks the endpoint as flaky and stops delivering.
+  // Non-JSON must be treated like a non-message activity → ack 200.
+  it("returns null for non-JSON body (no throw)", () => {
+    assert.equal(parseWebhookBody("not json at all"), null);
+  });
+
+  it("returns null for empty body", () => {
+    assert.equal(parseWebhookBody(""), null);
+  });
+
+  it("returns null for JSON that is not a message activity", () => {
+    assert.equal(parseWebhookBody(JSON.stringify({ type: "typing" })), null);
+  });
+
+  it("returns null when the JSON parses but required fields are missing", () => {
+    assert.equal(parseWebhookBody(JSON.stringify({ type: "message", text: "hi" })), null);
+  });
+
+  it("parses a well-formed message activity", () => {
+    const body = JSON.stringify({
+      type: "message",
+      text: "hello",
+      serviceUrl: "https://smba.trafficmanager.net/amer/",
+      channelId: "msteams",
+      conversation: { id: "convo-1" },
+      from: { id: "29:abc", aadObjectId: "user-a" },
+    });
+    const msg = parseWebhookBody(body);
+    assert.notEqual(msg, null);
+    assert.equal(msg?.conversationId, "convo-1");
+    assert.equal(msg?.senderAadObjectId, "user-a");
+    assert.equal(msg?.text, "hello");
   });
 });

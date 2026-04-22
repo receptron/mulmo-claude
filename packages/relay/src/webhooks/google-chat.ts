@@ -71,15 +71,26 @@ function parseJwt(token: string): { header: Record<string, unknown>; payload: Re
   }
 }
 
+// Pure claim-check — no network, safe to unit-test. Verifies the
+// iss / aud / exp claims before any JWKS lookup or signature work.
+// Callers that want signature verification run verifyGoogleJwt below,
+// which layers JWKS + crypto.subtle on top.
+export function validateGoogleChatClaims(payload: Record<string, unknown>, projectNumber: string, nowSeconds: number): boolean {
+  if (payload.iss !== GOOGLE_CHAT_ISSUER) return false;
+  if (String(payload.aud) !== projectNumber) return false;
+  // Fail closed: missing or non-numeric `exp` must reject (previously read
+  // "number AND expired", silently accepting tokens without an exp claim).
+  if (typeof payload.exp !== "number" || payload.exp < nowSeconds) return false;
+  return true;
+}
+
 async function verifyGoogleJwt(authHeader: string | undefined, projectNumber: string): Promise<boolean> {
   if (!authHeader?.startsWith("Bearer ")) return false;
   const token = authHeader.slice(7).trim();
   const jwt = parseJwt(token);
   if (!jwt) return false;
   const { payload, header } = jwt;
-  if (payload.iss !== GOOGLE_CHAT_ISSUER) return false;
-  if (String(payload.aud) !== projectNumber) return false;
-  if (typeof payload.exp === "number" && payload.exp < Date.now() / 1000) return false;
+  if (!validateGoogleChatClaims(payload, projectNumber, Date.now() / 1000)) return false;
   const keyId = typeof header.kid === "string" ? header.kid : "";
   const alg = typeof header.alg === "string" ? header.alg : "RS256";
   const hashAlg = alg === "RS256" ? "SHA-256" : alg === "RS384" ? "SHA-384" : "SHA-512";

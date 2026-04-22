@@ -20,6 +20,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { createBridgeClient } from "@mulmobridge/client";
 import { buildExternalChatId, parseExternalChatId, parseGranularity } from "./sessionId.js";
+import { redactUser } from "./redactUser.js";
 
 const TRANSPORT_ID = "slack";
 
@@ -85,7 +86,7 @@ socketMode.on("message", async ({ event, ack }) => {
   }
 
   const externalChatId = buildExternalChatId(channelId, threadTs, granularity);
-  console.log(`[slack] message channel=${channelId} thread_ts=${threadTs ?? "-"} session=${externalChatId} user=${event.user} len=${text.length}`);
+  console.log(`[slack] message channel=${channelId} thread_ts=${threadTs ?? "-"} session=${externalChatId} user=${redactUser(event.user)} len=${text.length}`);
 
   try {
     const ackResult = await client.send(externalChatId, text);

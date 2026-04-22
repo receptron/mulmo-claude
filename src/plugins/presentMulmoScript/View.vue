@@ -264,7 +264,9 @@
           />
           <div class="flex items-center justify-end gap-2 px-2 pb-2">
             <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">{{
-              t("pluginMulmoScript.saveError", { msg: beatSaveErrors[index] })
+              t(beatSaveErrors[index].kind === "invalidJson" ? "pluginMulmoScript.saveErrorInvalidJson" : "pluginMulmoScript.saveErrorSaveFailed", {
+                error: beatSaveErrors[index].error,
+              })
             }}</span>
             <button
               class="px-2 py-1 text-xs rounded border"
@@ -412,7 +414,10 @@ const sourceOpen = reactive<Record<number, boolean>>({});
 const sourceText = reactive<Record<number, string>>({});
 // Surface POST /api/mulmo-script/update-beat failures inline next to
 // the Update button. Cleared on next successful save or editor close.
-const beatSaveErrors = reactive<Record<number, string>>({});
+// Store raw error + kind tag so the template picks a localized key,
+// instead of pre-composing an English-prefixed string here.
+type BeatSaveError = { kind: "invalidJson" | "saveFailed"; error: string };
+const beatSaveErrors = reactive<Record<number, BeatSaveError>>({});
 const beatSaving = reactive<Record<number, boolean>>({});
 const localOverrides = reactive<Record<number, Beat>>({});
 const movieGenerating = ref(false);
@@ -611,7 +616,7 @@ async function updateBeat(index: number) {
   try {
     beat = JSON.parse(sourceText[index]);
   } catch (err) {
-    beatSaveErrors[index] = `Invalid JSON: ${errorMessage(err)}`;
+    beatSaveErrors[index] = { kind: "invalidJson", error: errorMessage(err) };
     return;
   }
   const prevImage = JSON.stringify(effectiveBeat(index).image);
@@ -625,7 +630,7 @@ async function updateBeat(index: number) {
   });
   delete beatSaving[index];
   if (!response.ok) {
-    beatSaveErrors[index] = `Save failed: ${response.error}`;
+    beatSaveErrors[index] = { kind: "saveFailed", error: response.error };
     return;
   }
 

@@ -24,7 +24,7 @@
     "test": "tsx --test test/test_*.ts"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260421.1",
+    "@cloudflare/workers-types": "^4.20260422.1",
     "typescript": "^5.8.3",
     "wrangler": "^4.84.1"
   },
