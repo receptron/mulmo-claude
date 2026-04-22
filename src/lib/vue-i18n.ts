@@ -20,6 +20,9 @@
 import { createI18n } from "vue-i18n";
 import enMessages from "../lang/en";
 import jaMessages from "../lang/ja";
+import zhMessages from "../lang/zh";
+import koMessages from "../lang/ko";
+import esMessages from "../lang/es";
 
 // Schema generic on createI18n — this is what makes `t("common.save")`
 // calls across the whole app compile-time checked (the module
@@ -27,7 +30,7 @@ import jaMessages from "../lang/ja";
 // v11's `t` overloads still fall back to `string` unless the schema is
 // threaded through here).
 type MessageSchema = typeof enMessages;
-type Locale = "en" | "ja";
+type Locale = "en" | "ja" | "zh" | "ko" | "es";
 
 const SUPPORTED_LOCALES: readonly Locale[] = ["en", "ja"] as const;
 const DEFAULT_LOCALE: Locale = "en";
@@ -70,7 +73,7 @@ const i18n = createI18n<[MessageSchema], Locale>({
   legacy: false,
   locale,
   fallbackLocale: "en",
-  messages: { en: enMessages, ja: jaMessages },
+  messages: { en: enMessages, ja: jaMessages, zh: zhMessages, ko: koMessages, es: esMessages },
 });
 
 export default i18n;
