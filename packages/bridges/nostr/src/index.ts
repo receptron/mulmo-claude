@@ -105,9 +105,29 @@ async function sendDm(recipientPubkey: string, text: string): Promise<void> {
 
 // ── Receive ─────────────────────────────────────────────────────
 
+// Same Nostr event arrives once per subscribed relay (our subscribeMany
+// fan-in aggregates them). Drop duplicates by `evt.id`: Nostr event ids
+// are sha256 hashes, so collisions are statistically impossible.
+// The Map is capped to bound memory on a long-running process; oldest
+// entries roll off once we exceed the cap.
+const SEEN_EVENT_MAX = 10_000;
+const seenEventIds = new Map<string, number>();
+
+function markSeenOnce(eventId: string): boolean {
+  if (seenEventIds.has(eventId)) return false;
+  seenEventIds.set(eventId, Date.now());
+  if (seenEventIds.size > SEEN_EVENT_MAX) {
+    // Map preserves insertion order; delete the oldest.
+    const oldest = seenEventIds.keys().next().value;
+    if (oldest !== undefined) seenEventIds.delete(oldest);
+  }
+  return true;
+}
+
 async function handleEvent(evt: Event): Promise<void> {
   if (evt.kind !== KIND_ENCRYPTED_DM) return;
   if (evt.pubkey === publicKey) return; // ignore our own echoes
+  if (!markSeenOnce(evt.id)) return; // already processed via another relay
 
   const senderPubkey = evt.pubkey.toLowerCase();
   if (!allowAll && !allowedPubkeys.has(senderPubkey)) {

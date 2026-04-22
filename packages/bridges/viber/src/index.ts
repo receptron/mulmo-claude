@@ -44,8 +44,22 @@ const allowAll = allowedUsers.size === 0;
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
 mulmo.onPush((pushEvent) => {
-  sendViber(pushEvent.chatId, pushEvent.message).catch((err) => console.error(`[viber] push send failed: ${err}`));
+  sendViber(decodeChatId(pushEvent.chatId), pushEvent.message).catch((err) => console.error(`[viber] push send failed: ${err}`));
 });
+
+// Viber user ids (the `sender.id` field in a MessageEvent) commonly
+// contain `=` padding (e.g. "01234567890A=") — base64-style output
+// from Viber's internal encoding. MulmoClaude's chat-service restricts
+// chat ids to `/^[\w.-]+$/`, which rejects `=`. Wrap the raw id in
+// base64url (which drops padding) on receive, and unwrap on push so
+// Viber's Send API sees the original bytes again.
+function encodeChatId(rawId: string): string {
+  return Buffer.from(rawId, "utf-8").toString("base64url");
+}
+
+function decodeChatId(encodedId: string): string {
+  return Buffer.from(encodedId, "base64url").toString("utf-8");
+}
 
 // ── Viber REST: send ───────────────────────────────────────────
 
@@ -103,7 +117,10 @@ function isObj(value: unknown): value is JsonRecord {
 }
 
 interface IncomingViber {
-  senderId: string;
+  // Raw Viber user id, e.g. "01234567890A=". Kept so allowlist /
+  // log lookups compare against what the operator actually sees in
+  // the Viber admin console. Encoded when handed to chat-service.
+  rawSenderId: string;
   text: string;
 }
 
@@ -113,11 +130,11 @@ function parseMessageEvent(body: unknown): IncomingViber | null {
   const sender = isObj(body.sender) ? body.sender : null;
   const message = isObj(body.message) ? body.message : null;
   if (!sender || !message) return null;
-  const senderId = typeof sender.id === "string" ? sender.id : "";
+  const rawSenderId = typeof sender.id === "string" ? sender.id : "";
   const textFieldOk = message.type === "text" && typeof message.text === "string";
   const text = textFieldOk ? String(message.text).trim() : "";
-  if (!senderId || !text) return null;
-  return { senderId, text };
+  if (!rawSenderId || !text) return null;
+  return { rawSenderId, text };
 }
 
 const app = express();
@@ -152,20 +169,24 @@ app.post("/viber", async (req: Request, res: ExpressResponse) => {
   const incoming = parseMessageEvent(body);
   if (!incoming) return;
 
-  if (!allowAll && !allowedUsers.has(incoming.senderId)) {
-    console.log(`[viber] denied from=${incoming.senderId}`);
+  // Allowlist compares against the raw operator-visible user id, not
+  // the encoded form the chat-service sees.
+  if (!allowAll && !allowedUsers.has(incoming.rawSenderId)) {
+    console.log(`[viber] denied from=${incoming.rawSenderId}`);
     return;
   }
 
-  console.log(`[viber] message from=${incoming.senderId.slice(0, 8)}… len=${incoming.text.length}`);
+  console.log(`[viber] message from=${incoming.rawSenderId.slice(0, 8)}… len=${incoming.text.length}`);
+
+  const encodedChatId = encodeChatId(incoming.rawSenderId);
 
   try {
-    const ack = await mulmo.send(incoming.senderId, incoming.text);
+    const ack = await mulmo.send(encodedChatId, incoming.text);
     if (ack.ok) {
-      await sendViber(incoming.senderId, ack.reply ?? "");
+      await sendViber(incoming.rawSenderId, ack.reply ?? "");
     } else {
       const statusSuffix = ack.status ? ` (${ack.status})` : "";
-      await sendViber(incoming.senderId, `Error${statusSuffix}: ${ack.error ?? "unknown"}`);
+      await sendViber(incoming.rawSenderId, `Error${statusSuffix}: ${ack.error ?? "unknown"}`);
     }
   } catch (err) {
     console.error(`[viber] message handling failed: ${err}`);
