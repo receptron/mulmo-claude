@@ -147,7 +147,7 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 
   // Non-ASCII page names (e.g. Japanese [[wiki links]]) produce empty
   // slugs after slugification. Fall back to matching by title in the
-  // wiki index so [[日出生台演習場]] resolves to its page file.
+  // wiki index so the link resolves to its page file.
   const indexContent = readFileOrEmpty(indexFile());
   const entries = parseIndexEntries(indexContent);
   const titleMatch = entries.find((entry) => entry.title === pageName);
