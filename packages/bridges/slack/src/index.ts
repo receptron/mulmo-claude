@@ -38,9 +38,14 @@ const allowedChannels = new Set(
 );
 const allowAll = allowedChannels.size === 0;
 
-const granularity = parseGranularity(process.env.SLACK_SESSION_GRANULARITY, (value) =>
-  console.warn(`[slack] unknown SLACK_SESSION_GRANULARITY="${value}" — falling back to "channel".`),
-);
+const granularity = (() => {
+  try {
+    return parseGranularity(process.env.SLACK_SESSION_GRANULARITY);
+  } catch (err) {
+    console.error(`[slack] ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+})();
 
 const web = new WebClient(botToken);
 const socketMode = new SocketModeClient({ appToken });

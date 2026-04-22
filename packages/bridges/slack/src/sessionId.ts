@@ -6,15 +6,15 @@
 export type SessionGranularity = "channel" | "thread" | "auto";
 
 /** Parse the SLACK_SESSION_GRANULARITY env var into a safe enum value.
- *  Unknown / empty values fall back to "channel" — the pre-feature
- *  default — with a warning logged to the caller via `onUnknown`. */
-export function parseGranularity(raw: string | undefined, onUnknown?: (value: string) => void): SessionGranularity {
+ *  Unset falls back to "channel" — the pre-feature default.
+ *  Any explicit invalid value is rejected so operators notice the
+ *  misconfiguration instead of silently getting channel mode. */
+export function parseGranularity(raw: string | undefined): SessionGranularity {
   const normalised = (raw ?? "channel").toLowerCase();
   if (normalised === "channel" || normalised === "thread" || normalised === "auto") {
     return normalised;
   }
-  onUnknown?.(normalised);
-  return "channel";
+  throw new Error(`Invalid SLACK_SESSION_GRANULARITY=${JSON.stringify(raw)}. Expected one of: channel, thread, auto.`);
 }
 
 /** Pack (channel, thread_ts) into the opaque externalChatId the server

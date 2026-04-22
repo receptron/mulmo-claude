@@ -109,7 +109,7 @@ Posts in the root of the channel still share one session (as in `channel` mode),
 
 ### 🤖 `auto` — future auto-detection (reserved)
 
-Currently behaves **exactly like `thread`**. This slot is reserved for a future smarter behaviour (e.g., "infer from channel naming conventions"). Using `auto` today is safe — your setup won't change when we ship the smarter version, because the default `thread`-like behaviour is the sensible fallback.
+Currently behaves **exactly like `thread`**. This slot is reserved for a future smarter behaviour (e.g., "infer from channel naming conventions").
 
 ### Quick comparison
 

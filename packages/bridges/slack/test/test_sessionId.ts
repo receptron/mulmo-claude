@@ -19,16 +19,15 @@ describe("parseGranularity", () => {
     assert.equal(parseGranularity("THREAD"), "thread");
     assert.equal(parseGranularity("Auto"), "auto");
   });
-  it("falls back to 'channel' on unknown value and calls onUnknown", () => {
-    let observed: string | undefined;
-    const result = parseGranularity("chatty", (raw) => {
-      observed = raw;
-    });
-    assert.equal(result, "channel");
-    assert.equal(observed, "chatty");
+  it("throws on unknown value", () => {
+    assert.throws(() => parseGranularity("chatty"), /Invalid SLACK_SESSION_GRANULARITY/);
   });
-  it("empty string → 'channel'", () => {
-    assert.equal(parseGranularity(""), "channel");
+  it("throws on empty string", () => {
+    assert.throws(() => parseGranularity(""), /Invalid SLACK_SESSION_GRANULARITY/);
+  });
+  it("throws on surrounding whitespace instead of trimming it away", () => {
+    assert.throws(() => parseGranularity(" thread"), /Invalid SLACK_SESSION_GRANULARITY/);
+    assert.throws(() => parseGranularity("thread "), /Invalid SLACK_SESSION_GRANULARITY/);
   });
 });
 
