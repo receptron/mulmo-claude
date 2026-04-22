@@ -30,6 +30,15 @@ const ptBRMessages = {
     attachFile: "Anexar arquivo",
     fileTooLarge: "Arquivo muito grande ({sizeMB} MB). O limite é 30 MB.",
     unsupportedFileType: "Tipo de arquivo não suportado. Aceitos: imagens, PDF, DOCX, XLSX, PPTX e arquivos de texto.",
+    audioPanel: {
+      preparing: "Preparando o transcritor (74 MB, apenas na primeira vez)…",
+      decoding: "Decodificando áudio…",
+      transcribing: "Transcrevendo…",
+      error: "Falha na transcrição: {error}",
+      pasteButton: "Colar na mensagem",
+      discardButton: "Descartar",
+      videoRejected: "Anexos de vídeo ainda não são suportados — extraia a faixa de áudio.",
+    },
   },
   sessionHistoryPanel: {
     filters: {

@@ -44,6 +44,52 @@ interface ProgressEvent {
 
 let pipelinePromise: Promise<AsrPipeline> | null = null;
 
+// Opt-in debug: set `localStorage.setItem("whisper:debug", "1")` in the
+// devtools console and refresh. We monkey-patch fetch for the duration
+// of the model-load so every request (URL, status, content-type,
+// first 80 bytes of the body when it looks like HTML/JSON) lands in
+// the console. Makes it easy to spot which fetch is returning the
+// SPA index.html fallback that trips `JSON.parse`.
+function debugEnabled(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem("whisper:debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function installFetchSpy(): () => void {
+  if (!debugEnabled()) return () => {};
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const spy: typeof globalThis.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const started = performance.now();
+    try {
+      const response = await originalFetch(input, init);
+      const contentType = response.headers.get("content-type") ?? "";
+      const elapsed = (performance.now() - started).toFixed(0);
+      let peek = "";
+      if (contentType.includes("html") || contentType.includes("json")) {
+        try {
+          peek = (await response.clone().text()).slice(0, 80).replace(/\s+/g, " ");
+        } catch {
+          /* ignore — clone may fail on some exotic responses */
+        }
+      }
+      const suffix = peek ? ` | ${peek}` : "";
+      console.log(`[whisper] ${response.status} ${elapsed}ms ${contentType} ${url}${suffix}`);
+      return response;
+    } catch (err) {
+      console.error(`[whisper] FETCH FAILED ${url}`, err);
+      throw err;
+    }
+  };
+  globalThis.fetch = spy;
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
 async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<AsrPipeline> {
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
@@ -60,13 +106,31 @@ async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<As
       mod.env.allowLocalModels = false;
       mod.env.allowRemoteModels = true;
       mod.env.backends.onnx.wasm.wasmPaths = ORT_WASM_CDN;
-      // Returns a callable pipeline; the cast is a seam between the
-      // library's any-leaning types and our strict shape above.
-      const pipeline = (await mod.pipeline("automatic-speech-recognition", WHISPER_MODEL, {
-        progress_callback: onProgress,
-      })) as unknown as AsrPipeline;
-      return pipeline;
+      if (debugEnabled()) {
+        console.log("[whisper] env config", {
+          allowLocalModels: mod.env.allowLocalModels,
+          allowRemoteModels: mod.env.allowRemoteModels,
+          remoteHost: mod.env.remoteHost,
+          remotePathTemplate: mod.env.remotePathTemplate,
+          wasmPaths: mod.env.backends.onnx.wasm.wasmPaths,
+        });
+      }
+      const uninstallSpy = installFetchSpy();
+      try {
+        // Returns a callable pipeline; the cast is a seam between the
+        // library's any-leaning types and our strict shape above.
+        const pipeline = (await mod.pipeline("automatic-speech-recognition", WHISPER_MODEL, {
+          progress_callback: onProgress,
+        })) as unknown as AsrPipeline;
+        return pipeline;
+      } finally {
+        uninstallSpy();
+      }
     })().catch((err) => {
+      // Dump full error chain so the console shows which step blew up
+      // (JSON.parse vs fetch vs onnxruntime init) rather than just
+      // the top-level message the UI surfaces.
+      console.error("[whisper] pipeline load failed:", err);
       // Reset so a later retry can start fresh after a transient
       // network failure during the model download.
       pipelinePromise = null;

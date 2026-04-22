@@ -30,6 +30,15 @@ const frMessages = {
     attachFile: "Joindre un fichier",
     fileTooLarge: "Fichier trop volumineux ({sizeMB} Mo). La limite est de 30 Mo.",
     unsupportedFileType: "Type de fichier non pris en charge. Acceptés : images, PDF, DOCX, XLSX, PPTX, fichiers texte.",
+    audioPanel: {
+      preparing: "Préparation du transcripteur (74 Mo, unique)…",
+      decoding: "Décodage audio…",
+      transcribing: "Transcription…",
+      error: "Échec de la transcription : {error}",
+      pasteButton: "Coller dans le message",
+      discardButton: "Abandonner",
+      videoRejected: "Les pièces jointes vidéo ne sont pas encore prises en charge — veuillez extraire la piste audio.",
+    },
   },
   sessionHistoryPanel: {
     filters: {

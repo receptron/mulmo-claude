@@ -30,6 +30,15 @@ const deMessages = {
     attachFile: "Datei anhängen",
     fileTooLarge: "Datei zu groß ({sizeMB} MB). Das Maximum beträgt 30 MB.",
     unsupportedFileType: "Dateityp nicht unterstützt. Akzeptiert: Bilder, PDF, DOCX, XLSX, PPTX, Textdateien.",
+    audioPanel: {
+      preparing: "Transkriptions-Engine wird vorbereitet (74 MB, einmalig)…",
+      decoding: "Audio wird dekodiert…",
+      transcribing: "Wird transkribiert…",
+      error: "Transkription fehlgeschlagen: {error}",
+      pasteButton: "In Nachricht einfügen",
+      discardButton: "Verwerfen",
+      videoRejected: "Videoanhänge werden noch nicht unterstützt — bitte die Audiospur extrahieren.",
+    },
   },
   sessionHistoryPanel: {
     filters: {
