@@ -36,6 +36,14 @@
           <span class="material-icons text-base leading-none">send</span>
         </button>
         <button
+          data-testid="attach-file-btn"
+          class="text-gray-400 hover:text-gray-600 rounded w-8 h-8 flex items-center justify-center"
+          :title="t('chatInput.attachFile')"
+          @click="openFilePicker"
+        >
+          <span class="material-icons text-base leading-none">attach_file</span>
+        </button>
+        <button
           data-testid="expand-input-btn"
           class="text-gray-400 hover:text-gray-600 rounded w-8 h-8 flex items-center justify-center"
           :title="t('chatInput.expandEditor')"
@@ -45,6 +53,12 @@
         </button>
       </div>
     </div>
+
+    <!-- Hidden file input driven by the attach button. The `accept`
+         filter matches ACCEPTED_MIME_PREFIXES/_EXACT below; the change
+         handler routes through the same readAttachmentFile() used by
+         drop + paste, so all three paths behave identically. -->
+    <input ref="fileInput" type="file" class="hidden" :accept="fileInputAccept" data-testid="file-input" @change="onFilePicked" />
 
     <div v-if="expandedEditorOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeExpandedEditor">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col" style="max-height: 80vh">
@@ -116,6 +130,7 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 const expandedTextarea = ref<HTMLTextAreaElement | null>(null);
 const expandedEditorOpen = ref(false);
 const fileError = ref<string | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 const MAX_ATTACH_BYTES = 30 * 1024 * 1024;
 
@@ -131,13 +146,25 @@ const ACCEPTED_MIME_EXACT = new Set([
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
 
+// `accept` attribute for the hidden <input type="file"> that the
+// paperclip button drives. Prefixes like `image/*` and `text/*` are
+// expanded by the browser's native file picker; exact MIME entries
+// are passed through. Drop + paste still accept the same set via the
+// isAcceptedType() check below, so all three entry points stay in sync.
+const fileInputAccept = [...ACCEPTED_MIME_PREFIXES.map((prefix) => `${prefix}*`), ...ACCEPTED_MIME_EXACT].join(",");
+
 function isAcceptedType(mime: string): boolean {
   return ACCEPTED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix)) || ACCEPTED_MIME_EXACT.has(mime);
 }
 
 function readAttachmentFile(file: File): void {
   fileError.value = null;
-  if (!isAcceptedType(file.type)) return;
+  if (!isAcceptedType(file.type)) {
+    // Previously returned silently. That left the user wondering whether
+    // the drop/paste registered at all — #499.
+    fileError.value = t("chatInput.unsupportedFileType");
+    return;
+  }
   if (file.size > MAX_ATTACH_BYTES) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
     fileError.value = t("chatInput.fileTooLarge", { sizeMB });
@@ -175,6 +202,18 @@ function onDropFile(event: DragEvent): void {
   event.preventDefault();
   const file = event.dataTransfer?.files[0];
   if (file) readAttachmentFile(file);
+}
+
+function openFilePicker(): void {
+  fileInput.value?.click();
+}
+
+function onFilePicked(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) readAttachmentFile(file);
+  // Reset so selecting the same file twice in a row still fires @change.
+  input.value = "";
 }
 
 const imeEnter = useImeAwareEnter(() => emit("send"));

@@ -29,12 +29,14 @@ const enMessages = {
     unreadReplies: "{count} unread reply | {count} unread replies",
   },
   chatInput: {
-    placeholder: "Type a task...",
+    placeholder: "Type a task, or drop / paste / attach a file…",
     expandEditor: "Expand editor",
     composeMessage: "Compose message",
     sendHint: "Cmd+Enter to send",
     send: "Send",
+    attachFile: "Attach file",
     fileTooLarge: "File too large ({sizeMB} MB). Maximum is 30 MB.",
+    unsupportedFileType: "File type not supported. Accepted: images, PDF, DOCX, XLSX, PPTX, text files.",
   },
   sessionHistoryPanel: {
     filters: {

@@ -22,12 +22,14 @@ const jaMessages = {
     unreadReplies: "{count} 件の未読返信",
   },
   chatInput: {
-    placeholder: "タスクを入力...",
+    placeholder: "タスクを入力、またはファイルをドロップ・ペースト・添付…",
     expandEditor: "エディタを広げる",
     composeMessage: "メッセージを作成",
     sendHint: "Cmd+Enter で送信",
     send: "送信",
+    attachFile: "ファイルを添付",
     fileTooLarge: "ファイルが大きすぎます（{sizeMB} MB）。上限は 30 MB です。",
+    unsupportedFileType: "対応していないファイル形式です。画像・PDF・DOCX・XLSX・PPTX・テキストファイルを使用してください。",
   },
   sessionHistoryPanel: {
     filters: {
