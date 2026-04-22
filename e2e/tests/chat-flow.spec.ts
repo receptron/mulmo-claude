@@ -278,4 +278,22 @@ test.describe("creating a new session", () => {
     // Input should be focused on the new session (see #300).
     await expect(page.getByTestId("user-input")).toBeFocused();
   });
+
+  test("new-session from a session with content preserves it in Back history", async ({ page }) => {
+    // createNewSession now only replaces the URL when the current
+    // session was empty (nothing worth going back to). When the
+    // previous session has real content, the new chat pushes so
+    // browser Back returns the user to the transcript they left.
+    await page.goto(`/chat/${SESSION_A.id}`);
+    await expect(page.locator("text=Hi there!").first()).toBeVisible({
+      timeout: 5 * ONE_SECOND_MS,
+    });
+
+    await page.getByTestId("new-session-btn").click();
+    await expect(page).not.toHaveURL(new RegExp(SESSION_A.id));
+
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(SESSION_A.id));
+    await expect(page.locator("text=Hi there!").first()).toBeVisible();
+  });
 });

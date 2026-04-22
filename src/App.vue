@@ -542,23 +542,33 @@ function removeCurrentIfEmpty(): boolean {
   return false;
 }
 
+// Replace vs push is derived from state, not chosen by the caller:
+// replace only when we just discarded an empty session AND we're
+// currently on that same /chat/:emptyId URL — otherwise there's
+// something worth keeping in history (a real chat transcript, or
+// a non-chat page like /wiki the user came from).
 function createNewSession(roleId?: string): ActiveSession {
-  removeCurrentIfEmpty();
+  const removedEmpty = removeCurrentIfEmpty();
+  const replace = removedEmpty && isChatPage.value;
   const rId = roleId ?? currentRoleId.value;
   const session = createEmptySession(uuidv4(), rId);
   sessionMap.set(session.id, session);
   currentRoleId.value = rId;
-  navigateToSession(session.id, true);
+  navigateToSession(session.id, replace);
   suggestionsPanelRef.value?.collapse();
   nextTick(() => focusChatInput());
   return sessionMap.get(session.id)!;
 }
 
 function onRoleChange() {
-  // Both the user dropdown click and the agent-triggered role switch
-  // (EVENT_TYPES.switchRole) end up in a fresh chat session —
-  // createNewSession navigates to /chat, so any non-chat page yields
-  // automatically.
+  // On non-chat pages (wiki, files, etc.) the user is just picking
+  // the role that future new-chat actions should use — don't yank
+  // them onto /chat by creating a session here. currentRoleId is
+  // already updated by RoleSelector's v-model, so future "+" clicks
+  // or composer sends will pick it up. Agent-triggered role switches
+  // (EVENT_TYPES.switchRole) always fire during an active run on
+  // /chat, so the guard doesn't affect them.
+  if (!isChatPage.value) return;
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
 }
@@ -602,7 +612,13 @@ function activateSession(sessionId: string, roleId: string, replace: boolean): v
 }
 
 async function loadSession(sessionId: string) {
-  if (sessionId === currentSessionId.value && sessionMap.has(sessionId)) return;
+  // currentSessionId tracks "last active chat session" and is NOT
+  // reset when the user navigates to a non-chat page (/wiki, /files,
+  // …). Also checking the URL ensures that clicking the same session
+  // in the tab bar from /wiki still triggers a /chat navigation
+  // instead of silently no-opping.
+  const alreadyOnThatChat = sessionId === currentSessionId.value && sessionMap.has(sessionId) && route.params.sessionId === sessionId;
+  if (alreadyOnThatChat) return;
   const replaced = removeCurrentIfEmpty();
 
   const live = sessionMap.get(sessionId);
@@ -768,10 +784,21 @@ function navigateToWorkspacePath(href: string): void {
   }
 }
 
+function startNewChat(message: string): void {
+  // createNewSession sets currentSessionId synchronously (see the
+  // comment on its declaration), so the follow-up sendMessage lands
+  // in the new session rather than whatever was previously active.
+  // Cross-route push behaviour (so browser Back returns to /wiki)
+  // is now handled inside createNewSession via the isChatPage check.
+  createNewSession(currentRoleId.value);
+  void sendMessage(message);
+}
+
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
+  startNewChat: (message: string) => startNewChat(message),
   navigateToWorkspacePath: (href: string) => navigateToWorkspacePath(href),
 });
 // Plugin Views that need to tag background work with the current

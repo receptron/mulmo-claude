@@ -320,6 +320,8 @@ const zhMessages = {
     tabLint: "Lint",
     empty: "Wiki 为空。请让 Wiki 管理器采集一个数据源。",
     previewMore: "+ 还有 {count} 项…",
+    chatPlaceholder: "就本页提问…",
+    chatSend: "就本页开启新对话",
   },
   pluginPresentHtml: {
     saveAsPdf: "另存为 PDF(打开打印对话框)",

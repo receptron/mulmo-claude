@@ -323,6 +323,8 @@ const esMessages = {
     tabLint: "Lint",
     empty: "El wiki está vacío. Pide al Wiki Manager que ingiera una fuente.",
     previewMore: "+ {count} más…",
+    chatPlaceholder: "Pregunta sobre esta página…",
+    chatSend: "Iniciar un chat nuevo sobre esta página",
   },
   pluginPresentHtml: {
     saveAsPdf: "Guardar como PDF (abre el diálogo de impresión)",
