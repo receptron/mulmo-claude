@@ -44,24 +44,17 @@ interface ProgressEvent {
 
 let pipelinePromise: Promise<AsrPipeline> | null = null;
 
-// Opt-in debug: set `localStorage.setItem("whisper:debug", "1")` in the
-// devtools console and refresh. We monkey-patch fetch for the duration
-// of the model-load so every request (URL, status, content-type,
-// first 80 bytes of the body when it looks like HTML/JSON) lands in
-// the console. Makes it easy to spot which fetch is returning the
-// SPA index.html fallback that trips `JSON.parse`.
-function debugEnabled(): boolean {
-  try {
-    return typeof localStorage !== "undefined" && localStorage.getItem("whisper:debug") === "1";
-  } catch {
-    return false;
-  }
-}
-
-function installFetchSpy(): () => void {
-  if (!debugEnabled()) return () => {};
-  const originalFetch = globalThis.fetch.bind(globalThis);
-  const spy: typeof globalThis.fetch = async (input, init) => {
+// Always-on fetch trace during the whisper pipeline load. Output is
+// on `console.info` so normal dev logs aren't overrun — filter the
+// console for `[whisper]` to see just this.
+//
+// We install a fetch wrapper via `env.customFetch` if the library
+// supports it, and ALSO monkey-patch globalThis.fetch as a fallback.
+// Some users run under SES (MetaMask etc.) which freezes intrinsics
+// and silently prevents globalThis reassignment — we can't detect
+// that without a probe, so we do both and hope at least one sticks.
+function wrapFetch(originalFetch: typeof globalThis.fetch): typeof globalThis.fetch {
+  return async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const started = performance.now();
     try {
@@ -69,24 +62,45 @@ function installFetchSpy(): () => void {
       const contentType = response.headers.get("content-type") ?? "";
       const elapsed = (performance.now() - started).toFixed(0);
       let peek = "";
-      if (contentType.includes("html") || contentType.includes("json")) {
+      if (contentType.includes("html") || contentType.includes("json") || contentType === "") {
         try {
-          peek = (await response.clone().text()).slice(0, 80).replace(/\s+/g, " ");
+          peek = (await response.clone().text()).slice(0, 120).replace(/\s+/g, " ");
         } catch {
           /* ignore — clone may fail on some exotic responses */
         }
       }
       const suffix = peek ? ` | ${peek}` : "";
-      console.log(`[whisper] ${response.status} ${elapsed}ms ${contentType} ${url}${suffix}`);
+      console.info(`[whisper] ${response.status} ${elapsed}ms ${contentType || "(no ct)"} ${url}${suffix}`);
       return response;
     } catch (err) {
       console.error(`[whisper] FETCH FAILED ${url}`, err);
       throw err;
     }
   };
-  globalThis.fetch = spy;
+}
+
+function installFetchSpy(): () => void {
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const spy = wrapFetch(originalFetch);
+  // Assignment may fail silently under SES — the try/catch is belt-
+  // and-braces. If assignment fails, we still have env.customFetch
+  // below as a backup.
+  let installed = false;
+  try {
+    globalThis.fetch = spy;
+    installed = globalThis.fetch === spy;
+  } catch {
+    installed = false;
+  }
+  console.info(`[whisper] fetch spy installed=${installed}`);
   return () => {
-    globalThis.fetch = originalFetch;
+    if (installed) {
+      try {
+        globalThis.fetch = originalFetch;
+      } catch {
+        /* ignore — can't put it back, but the process is ending anyway */
+      }
+    }
   };
 }
 
@@ -106,15 +120,13 @@ async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<As
       mod.env.allowLocalModels = false;
       mod.env.allowRemoteModels = true;
       mod.env.backends.onnx.wasm.wasmPaths = ORT_WASM_CDN;
-      if (debugEnabled()) {
-        console.log("[whisper] env config", {
-          allowLocalModels: mod.env.allowLocalModels,
-          allowRemoteModels: mod.env.allowRemoteModels,
-          remoteHost: mod.env.remoteHost,
-          remotePathTemplate: mod.env.remotePathTemplate,
-          wasmPaths: mod.env.backends.onnx.wasm.wasmPaths,
-        });
-      }
+      console.info("[whisper] env config", {
+        allowLocalModels: mod.env.allowLocalModels,
+        allowRemoteModels: mod.env.allowRemoteModels,
+        remoteHost: mod.env.remoteHost,
+        remotePathTemplate: mod.env.remotePathTemplate,
+        wasmPaths: mod.env.backends.onnx.wasm.wasmPaths,
+      });
       const uninstallSpy = installFetchSpy();
       try {
         // Returns a callable pipeline; the cast is a seam between the
