@@ -46,8 +46,12 @@ import { marked } from "marked";
 import type { ToolResult, ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "./types";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { classifyWorkspacePath } from "../../utils/path/workspaceLinkRouter";
+import { useAppApi } from "../../composables/useAppApi";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
+
+const appApi = useAppApi();
 
 const props = withDefaults(
   defineProps<{
@@ -160,7 +164,19 @@ function applyChanges() {
 const isAssistant = computed(() => (props.selectedResult.data?.role ?? "assistant") === "assistant");
 
 function openLinksInNewTab(event: MouseEvent): void {
-  handleExternalLinkClick(event);
+  if (handleExternalLinkClick(event)) return;
+  // Internal workspace-path links (rendered by marked from agent
+  // Markdown): route to the appropriate view instead of letting them
+  // navigate the SPA to a non-existent session route.
+  const target = event.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href");
+  if (!href || href.startsWith("#")) return;
+  if (classifyWorkspacePath(href)) {
+    event.preventDefault();
+    appApi.navigateToWorkspacePath(href);
+  }
 }
 
 const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();

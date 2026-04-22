@@ -79,3 +79,13 @@ const emit = defineEmits<{
 const root = ref<HTMLDivElement | null>(null);
 defineExpose({ root });
 </script>
+
+<style scoped>
+/* Prevent rendered markdown links inside preview cards from navigating.
+   Clicking a sidebar card should select the result, not follow links. */
+:deep(a) {
+  pointer-events: none;
+  color: inherit;
+  text-decoration: none;
+}
+</style>

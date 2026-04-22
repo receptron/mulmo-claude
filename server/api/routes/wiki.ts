@@ -132,16 +132,29 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 
   const slug = wikiSlugify(pageName);
 
-  const exact = slugs.get(slug);
-  if (exact) return path.join(dir, exact);
+  if (slug.length > 0) {
+    const exact = slugs.get(slug);
+    if (exact) return path.join(dir, exact);
 
-  // Fuzzy: same `includes` semantics as the old sync path — iterate
-  // the index's keys, no filesystem access.
-  for (const [key, file] of slugs) {
-    if (slug.includes(key) || key.includes(slug)) {
-      return path.join(dir, file);
+    // Fuzzy: same `includes` semantics as the old sync path — iterate
+    // the index's keys, no filesystem access.
+    for (const [key, file] of slugs) {
+      if (slug.includes(key) || key.includes(slug)) {
+        return path.join(dir, file);
+      }
     }
   }
+
+  // Non-ASCII page names (e.g. Japanese [[wiki links]]) produce empty
+  // slugs after slugification. Fall back to matching by title in the
+  // wiki index so the link resolves to its page file.
+  const indexContent = readFileOrEmpty(indexFile());
+  const entries = parseIndexEntries(indexContent);
+  const titleMatch = entries.find((entry) => entry.title === pageName);
+  if (titleMatch && slugs.has(titleMatch.slug)) {
+    return path.join(dir, slugs.get(titleMatch.slug)!);
+  }
+
   return null;
 }
 

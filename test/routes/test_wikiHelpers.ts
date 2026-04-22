@@ -36,6 +36,14 @@ describe("wikiSlugify", () => {
   it("handles empty input", () => {
     assert.equal(wikiSlugify(""), "");
   });
+
+  it("returns empty string for non-ASCII-only input", () => {
+    assert.equal(wikiSlugify("テストページ"), "");
+  });
+
+  it("preserves ASCII portion of mixed input", () => {
+    assert.equal(wikiSlugify("ABC テスト 123"), "abc--123");
+  });
 });
 
 describe("extractSlugFromBulletHref", () => {

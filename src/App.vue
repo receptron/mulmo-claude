@@ -223,6 +223,7 @@ import { useRoute, useRouter } from "vue-router";
 import { apiGet } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
 import { needsGemini } from "./utils/role/plugins";
+import { classifyWorkspacePath } from "./utils/path/workspaceLinkRouter";
 
 // --- Per-session state ---
 // Declared early so that pub/sub callbacks and function declarations
@@ -671,10 +672,42 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
   popupRef: historyPopupRef,
 });
 
+// Route workspace-internal links (wiki pages, files, sessions) to the
+// appropriate canvas view. Called from plugin Views via AppApi.
+//
+// Use a single router.push instead of setCanvasViewMode + router.push
+// to avoid double navigation entries. The route watcher in
+// useCanvasViewMode updates canvasViewMode from route.query.view.
+function navigateToWorkspacePath(href: string): void {
+  const target = classifyWorkspacePath(href);
+  if (!target) return;
+
+  // Clean view-specific query params before building the new query.
+  const query: Record<string, string> = {};
+  for (const [key, val] of Object.entries(route.query)) {
+    if (key !== "path" && key !== "page" && typeof val === "string") {
+      query[key] = val;
+    }
+  }
+
+  switch (target.kind) {
+    case "wiki":
+      router.push({ query: { ...query, view: CANVAS_VIEW.wiki, page: target.slug } }).catch(() => {});
+      break;
+    case "file":
+      router.push({ query: { ...query, view: CANVAS_VIEW.files, path: target.path } }).catch(() => {});
+      break;
+    case "session":
+      handleSessionSelect(target.sessionId);
+      break;
+  }
+}
+
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
+  navigateToWorkspacePath: (href: string) => navigateToWorkspacePath(href),
 });
 // Plugin Views that need to tag background work with the current
 // session (e.g. MulmoScript generations) inject this.

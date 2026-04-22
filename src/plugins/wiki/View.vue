@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
@@ -95,6 +96,7 @@ import { apiPost, apiFetchRaw } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
 
+const route = useRoute();
 const { t } = useI18n();
 
 const props = defineProps<{
@@ -136,6 +138,19 @@ watch(
     }
     void refresh();
   },
+);
+
+// Deep-link support: when navigated via ?page=slug (e.g. clicking a
+// wiki link in a text-response), load the page. immediate: true
+// handles mount with ?page= already set in the URL.
+watch(
+  () => route.query.page,
+  (newPage: string | null | (string | null)[]) => {
+    if (typeof newPage === "string" && newPage.length > 0) {
+      navigatePage(newPage);
+    }
+  },
+  { immediate: true },
 );
 
 const renderedContent = computed(() => {
