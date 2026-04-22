@@ -27,7 +27,7 @@ import { setupMutableTodoMocks } from "../fixtures/todos-mutable";
 import type { TodoFixture } from "../fixtures/todos";
 import { WORKSPACE_FILES } from "../../src/config/workspacePaths";
 
-const TODOS_URL = `/chat?view=files&path=${WORKSPACE_FILES.todosItems}`;
+const TODOS_URL = `/files?path=${WORKSPACE_FILES.todosItems}`;
 
 let itemIdCounter = 0;
 function nextItemId(): string {

@@ -14,12 +14,12 @@
           @open-settings="showSettings = true"
         />
         <div class="flex-1 min-w-0">
-          <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="canvasViewMode" @navigate="onPluginNavigate" />
+          <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
       </div>
       <!-- Row 2: canvas toggle + role selector + session tabs -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
-        <CanvasViewToggle :model-value="canvasViewMode" @update:model-value="setCanvasViewMode" />
+        <CanvasViewToggle v-if="isChatPage" :model-value="layoutMode" @update:model-value="setLayoutMode" />
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           ref="sessionTabBarRef"
@@ -99,8 +99,8 @@
         </div>
 
         <div ref="canvasRef" class="flex-1 overflow-hidden outline-none min-h-0" tabindex="0" @mousedown="activePane = 'main'" @keydown="handleCanvasKeydown">
-          <!-- Single mode -->
-          <template v-if="canvasViewMode === 'single'">
+          <!-- Chat page: single or stack layout -->
+          <template v-if="isChatPage && layoutMode === 'single'">
             <component
               :is="getPlugin(selectedResult.toolName)?.viewComponent"
               v-if="selectedResult && getPlugin(selectedResult.toolName)?.viewComponent"
@@ -115,9 +115,8 @@
               <p>{{ t("app.startConversation") }}</p>
             </div>
           </template>
-          <!-- Stack mode -->
           <StackView
-            v-else-if="canvasViewMode === 'stack'"
+            v-else-if="isChatPage && layoutMode === 'stack'"
             :tool-results="sidebarResults"
             :selected-result-uuid="selectedResultUuid"
             :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
@@ -125,23 +124,18 @@
             @select="(uuid) => (selectedResultUuid = uuid)"
             @update-result="handleUpdateResult"
           />
-          <!-- Files mode -->
-          <FilesView v-else-if="canvasViewMode === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
-          <!-- Todos mode -->
-          <TodoExplorer v-else-if="canvasViewMode === 'todos'" />
-          <!-- Scheduler mode -->
-          <SchedulerView v-else-if="canvasViewMode === 'scheduler'" />
-          <!-- Wiki mode -->
-          <WikiView v-else-if="canvasViewMode === 'wiki'" />
-          <!-- Skills mode -->
-          <SkillsView v-else-if="canvasViewMode === 'skills'" />
-          <!-- Roles mode -->
-          <RolesView v-else-if="canvasViewMode === 'roles'" />
+          <!-- Distinct pages -->
+          <FilesView v-else-if="currentPage === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
+          <TodoExplorer v-else-if="currentPage === 'todos'" />
+          <SchedulerView v-else-if="currentPage === 'scheduler'" />
+          <WikiView v-else-if="currentPage === 'wiki'" />
+          <SkillsView v-else-if="currentPage === 'skills'" />
+          <RolesView v-else-if="currentPage === 'roles'" />
         </div>
 
         <!-- Bottom bar (Stack chat only — plugin views have no
              session context, so no chat input is shown) -->
-        <div v-if="canvasViewMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
+        <div v-if="isChatPage && layoutMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
           <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
           <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="isRunning" @send="sendMessage()" />
         </div>
@@ -192,7 +186,7 @@ import RolesView from "./plugins/manageRoles/View.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import NotificationToast from "./components/NotificationToast.vue";
 import type { NotificationAction } from "./types/notification";
-import { CANVAS_VIEW } from "./utils/canvas/viewMode";
+import { PAGE_ROUTES, type PageRouteName } from "./router";
 import type { SseEvent } from "./types/sse";
 import { type SessionEntry, type ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
@@ -214,7 +208,7 @@ import { useSessionSync } from "./composables/useSessionSync";
 import { useSessionDerived } from "./composables/useSessionDerived";
 import { useFaviconState } from "./composables/useFaviconState";
 import { useMergedSessions } from "./composables/useMergedSessions";
-import { useCanvasViewMode } from "./composables/useCanvasViewMode";
+import { useLayoutMode } from "./composables/useLayoutMode";
 import { useSelectedResult } from "./composables/useSelectedResult";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
@@ -270,9 +264,9 @@ function navigateToSession(sessionId: string, replace = false): void {
   currentSessionId.value = sessionId;
   const method = replace ? router.replace : router.push;
   method({
-    name: "chat",
+    name: PAGE_ROUTES.chat,
     params: { sessionId },
-    query: { ...buildViewQuery(), ...buildRoleQuery() },
+    query: buildRoleQuery(),
   }).catch((err) => {
     if (err?.type !== 16) {
       console.error("[navigateToSession] push failed:", err);
@@ -286,7 +280,7 @@ function handleNotificationNavigate(action: NotificationAction): void {
   if (target.kind === "session") {
     navigateToSession(target.sessionId);
   } else {
-    setCanvasViewMode(CANVAS_VIEW[target.view]);
+    router.push({ name: target.view }).catch(() => {});
   }
 }
 
@@ -369,34 +363,80 @@ const { focusChatInput } = useChatScroll({
 const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
 const showSettings = ref(false);
 
-const { canvasViewMode, setCanvasViewMode, buildViewQuery, filesRefreshToken, handleViewModeShortcut, onPluginNavigate } = useCanvasViewMode({ isRunning });
+const { layoutMode, setLayoutMode, toggleLayoutMode } = useLayoutMode();
 
-// The no-sidebar "stack-style" layout (top bar + full-width canvas +
-// bottom bar) is used for every view mode except Single. Clicking a
-// plugin launcher button (Todos / Scheduler / Files / ...) swaps the
-// canvas content without collapsing the frame back to the sidebar
-// layout.
-const { isStackLayout, restoreChatViewForSession, displayedCurrentSessionId } = useViewLayout({
-  canvasViewMode,
-  setCanvasViewMode,
+// Current page derives from the route. The chat page has a layout
+// preference on top (single vs. stack); other pages are distinct
+// full-width views.
+const isChatPage = computed(() => route.name === PAGE_ROUTES.chat);
+const currentPage = computed<PageRouteName | null>(() => {
+  const name = route.name;
+  return typeof name === "string" && isPageRouteName(name) ? name : null;
+});
+
+// Refresh the files tree after each agent run so newly written files
+// appear without a manual reload.
+const filesRefreshToken = ref(0);
+watch(isRunning, (running, prev) => {
+  if (prev && !running) filesRefreshToken.value++;
+});
+
+// Cmd/Ctrl + 1 toggles layout when on /chat; on any other page it
+// navigates to /chat (layout flip requires a second press). Cmd+2–7
+// navigate directly to the matching page.
+const PAGE_SHORTCUT_KEYS: Record<string, PageRouteName> = {
+  "2": PAGE_ROUTES.files,
+  "3": PAGE_ROUTES.todos,
+  "4": PAGE_ROUTES.scheduler,
+  "5": PAGE_ROUTES.wiki,
+  "6": PAGE_ROUTES.skills,
+  "7": PAGE_ROUTES.roles,
+};
+
+function handleViewModeShortcut(event: KeyboardEvent): void {
+  if (!(event.metaKey || event.ctrlKey)) return;
+  if (event.altKey || event.shiftKey) return;
+
+  if (event.key === "1") {
+    event.preventDefault();
+    if (route.name === PAGE_ROUTES.chat) {
+      toggleLayoutMode();
+    } else {
+      router.push({ name: PAGE_ROUTES.chat }).catch(() => {});
+    }
+    return;
+  }
+
+  const page = PAGE_SHORTCUT_KEYS[event.key];
+  if (page) {
+    event.preventDefault();
+    router.push({ name: page }).catch(() => {});
+  }
+}
+
+function onPluginNavigate(target: { key: string }): void {
+  if (isPageRouteName(target.key)) {
+    router.push({ name: target.key }).catch(() => {});
+  }
+}
+
+function isPageRouteName(value: string): value is PageRouteName {
+  return Object.values(PAGE_ROUTES).includes(value as PageRouteName);
+}
+
+// Layout only matters on /chat; other pages are full-width by design.
+const { isStackLayout, displayedCurrentSessionId } = useViewLayout({
+  layoutMode,
+  isChatPage,
   currentSessionId,
   activePane,
 });
 
-// User-initiated session switches: clicking a session tab, a history
-// row, or a chat link in FilesView. In plugin views (Todos / Files /
-// ...) no chat is active, so the click's purpose is to surface the
-// chat — restore the preferred Single/Stack mode before loading.
-// Not wired into the internal `loadSession` call path because that
-// also fires on initial mount with `?view=plugin` URLs, which must
-// be honoured as-is.
 function handleSessionSelect(sessionId: string): void {
-  restoreChatViewForSession();
   loadSession(sessionId);
 }
 
 function handleNewSessionClick(): void {
-  restoreChatViewForSession();
   createNewSession();
 }
 
@@ -515,10 +555,10 @@ function createNewSession(roleId?: string): ActiveSession {
 }
 
 function onRoleChange() {
-  // Covers both the user dropdown click and the agent-triggered role
-  // switch (EVENT_TYPES.switchRole) — either way the user ends up in
-  // a fresh chat session, so a plugin view should yield to chat.
-  restoreChatViewForSession();
+  // Both the user dropdown click and the agent-triggered role switch
+  // (EVENT_TYPES.switchRole) end up in a fresh chat session —
+  // createNewSession navigates to /chat, so any non-chat page yields
+  // automatically.
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
 }
@@ -680,29 +720,17 @@ const { handler: handleClickOutsideHistory } = useClickOutside({
 });
 
 // Route workspace-internal links (wiki pages, files, sessions) to the
-// appropriate canvas view. Called from plugin Views via AppApi.
-//
-// Use a single router.push instead of setCanvasViewMode + router.push
-// to avoid double navigation entries. The route watcher in
-// useCanvasViewMode updates canvasViewMode from route.query.view.
+// appropriate page. Called from plugin Views via AppApi.
 function navigateToWorkspacePath(href: string): void {
   const target = classifyWorkspacePath(href);
   if (!target) return;
 
-  // Clean view-specific query params before building the new query.
-  const query: Record<string, string> = {};
-  for (const [key, val] of Object.entries(route.query)) {
-    if (key !== "path" && key !== "page" && typeof val === "string") {
-      query[key] = val;
-    }
-  }
-
   switch (target.kind) {
     case "wiki":
-      router.push({ query: { ...query, view: CANVAS_VIEW.wiki, page: target.slug } }).catch(() => {});
+      router.push({ name: PAGE_ROUTES.wiki, query: { page: target.slug } }).catch(() => {});
       break;
     case "file":
-      router.push({ query: { ...query, view: CANVAS_VIEW.files, path: target.path } }).catch(() => {});
+      router.push({ name: PAGE_ROUTES.files, query: { path: target.path } }).catch(() => {});
       break;
     case "session":
       handleSessionSelect(target.sessionId);

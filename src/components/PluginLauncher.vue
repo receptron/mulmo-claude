@@ -26,16 +26,12 @@ import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
 // Quick-access toolbar sitting above the canvas. Each button
-// switches the canvas to a dedicated view mode via URL
-// (?view=todos, ?view=wiki, etc.). The "invoke" kind is kept in
-// the union for future use but currently all targets use "view".
-//
-// First slice of issue #253. The list of targets is declared here so
-// the launcher can be swapped for a customisable per-role palette
-// later without touching the App.vue wiring.
+// navigates to a dedicated page (/todos, /wiki, etc.). The "invoke"
+// kind is kept in the union for future use but currently all targets
+// use "view".
 
 const props = defineProps<{
-  /** Current canvas view mode — the matching button lights up. */
+  /** Current page route name — the matching button lights up. */
   activeViewMode?: string | null;
 }>();
 

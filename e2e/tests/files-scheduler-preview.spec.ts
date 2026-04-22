@@ -7,7 +7,7 @@ import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // the scheduler plugin's calendar/tasks view instead of a raw JSON
 // blob. This covers `toSchedulerResult` + the FileContentRenderer
 // dispatch in the composables/components extracted by #517.
-const SCHEDULER_URL = `/chat?view=files&path=${WORKSPACE_FILES.schedulerItems}`;
+const SCHEDULER_URL = `/files?path=${WORKSPACE_FILES.schedulerItems}`;
 
 const SAMPLE_ITEMS = [
   {

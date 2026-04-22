@@ -1,44 +1,31 @@
-// View-layout state: tracks whether the app is in a "stack" layout
-// (full-width canvas) or "single" (sidebar + canvas), remembers the
-// last chat-oriented view mode, and derives displayedCurrentSessionId
-// (blank in plugin views so no tab appears "current").
+// View-layout state. Derives two values that the template cares about:
+//
+//  - isStackLayout: true whenever the canvas column should be full-width
+//    (no sidebar). This is the case for /chat in stack mode AND for
+//    every non-chat page (/files, /todos, /wiki, etc.). Only /chat in
+//    single mode shows the left sidebar.
+//
+//  - displayedCurrentSessionId: blank on non-chat pages so no session
+//    tab appears "current" while the user is on Files, Todos, etc.
+//
+// Also flips activePane between "sidebar" and "main" so arrow-key
+// navigation follows whichever side of the layout is visible.
 
-import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
-import { CANVAS_VIEW, type CanvasViewMode } from "../utils/canvas/viewMode";
-
-const CHAT_VIEWS = [CANVAS_VIEW.single, CANVAS_VIEW.stack] as const;
-type ChatViewMode = (typeof CHAT_VIEWS)[number];
-
-function isChatView(mode: string): mode is ChatViewMode {
-  return (CHAT_VIEWS as readonly string[]).includes(mode);
-}
+import { computed, watch, type ComputedRef, type Ref } from "vue";
+import { LAYOUT_MODES, type LayoutMode } from "../utils/canvas/layoutMode";
 
 export function useViewLayout(opts: {
-  canvasViewMode: Ref<CanvasViewMode> | ComputedRef<CanvasViewMode>;
-  setCanvasViewMode: (mode: CanvasViewMode) => void;
+  layoutMode: Ref<LayoutMode> | ComputedRef<LayoutMode>;
+  isChatPage: Ref<boolean> | ComputedRef<boolean>;
   currentSessionId: Ref<string>;
   activePane: Ref<"sidebar" | "main">;
 }) {
-  const { canvasViewMode, setCanvasViewMode, currentSessionId, activePane } = opts;
+  const { layoutMode, isChatPage, currentSessionId, activePane } = opts;
 
-  const isStackLayout = computed(() => canvasViewMode.value !== CANVAS_VIEW.single);
+  const isStackLayout = computed(() => !(isChatPage.value && layoutMode.value === LAYOUT_MODES.single));
 
-  const lastChatViewMode = ref<ChatViewMode>(isChatView(canvasViewMode.value) ? canvasViewMode.value : CANVAS_VIEW.stack);
+  const displayedCurrentSessionId = computed(() => (isChatPage.value ? currentSessionId.value : ""));
 
-  watch(canvasViewMode, (mode) => {
-    if (isChatView(mode)) lastChatViewMode.value = mode;
-  });
-
-  function restoreChatViewForSession(): void {
-    if (!isChatView(canvasViewMode.value)) {
-      setCanvasViewMode(lastChatViewMode.value);
-    }
-  }
-
-  const displayedCurrentSessionId = computed(() => (isChatView(canvasViewMode.value) ? currentSessionId.value : ""));
-
-  // Keep arrow-key navigation tied to the canvas when the sidebar
-  // list doesn't exist (Stack layout has no ToolResultsPanel).
   watch(
     isStackLayout,
     (stack) => {
@@ -49,7 +36,6 @@ export function useViewLayout(opts: {
 
   return {
     isStackLayout,
-    restoreChatViewForSession,
     displayedCurrentSessionId,
   };
 }

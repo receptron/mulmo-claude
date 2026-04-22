@@ -48,7 +48,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
       content: html,
     });
 
-    await page.goto("/chat?view=files&path=HTMLs/chart.html");
+    await page.goto("/files?path=HTMLs/chart.html");
     const iframe = page.locator('iframe[title="HTML preview"]');
     await expect(iframe).toBeVisible();
 
@@ -69,7 +69,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
       content: html,
     });
 
-    await page.goto("/chat?view=files&path=HTMLs/x.html");
+    await page.goto("/files?path=HTMLs/x.html");
     const iframe = page.locator('iframe[title="HTML preview"]');
     await expect(iframe).toBeVisible();
 
@@ -93,7 +93,7 @@ test.describe("Files view — markdown image path rewrite", () => {
       content: markdown,
     });
 
-    await page.goto("/chat?view=files&path=markdowns/sample.md");
+    await page.goto("/files?path=markdowns/sample.md");
     // Wait for the rendered markdown to surface a real <img>.
     await expect(page.locator("img[alt='chart']")).toBeVisible();
     const src = await page.locator("img[alt='chart']").getAttribute("src");
@@ -110,7 +110,7 @@ test.describe("Files view — markdown image path rewrite", () => {
       content: markdown,
     });
 
-    await page.goto("/chat?view=files&path=wiki/pages/a.md");
+    await page.goto("/files?path=wiki/pages/a.md");
     await expect(page.locator("img[alt='two']")).toBeVisible();
     const src = await page.locator("img[alt='two']").getAttribute("src");
     expect(src).toContain("/api/files/raw");
@@ -128,7 +128,7 @@ test.describe("Files view — markdown image path rewrite", () => {
       kind: "text",
       content: markdown,
     });
-    await page.goto("/chat?view=files&path=markdowns/pass.md");
+    await page.goto("/files?path=markdowns/pass.md");
     const dataSrc = await page.locator("img[alt='data']").getAttribute("src");
     expect(dataSrc).toBe("data:image/png;base64,AAA=");
     const cdnSrc = await page.locator("img[alt='cdn']").getAttribute("src");

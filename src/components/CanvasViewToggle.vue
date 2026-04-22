@@ -5,7 +5,7 @@
     :title="isStack ? t('canvasViewToggle.stackViewTooltip') : t('canvasViewToggle.singleViewTooltip')"
     :aria-label="isStack ? t('canvasViewToggle.switchToSingle') : t('canvasViewToggle.switchToStack')"
     :data-testid="`canvas-view-toggle-${modelValue}`"
-    @click="emit('update:modelValue', isStack ? CANVAS_VIEW.single : CANVAS_VIEW.stack)"
+    @click="emit('update:modelValue', isStack ? LAYOUT_MODES.single : LAYOUT_MODES.stack)"
   >
     <span class="material-icons text-lg">view_agenda</span>
   </button>
@@ -14,17 +14,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { CANVAS_VIEW, type CanvasViewMode } from "../utils/canvas/viewMode";
+import { LAYOUT_MODES, type LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
 const props = defineProps<{
-  modelValue: CanvasViewMode;
+  modelValue: LayoutMode;
 }>();
 
 const emit = defineEmits<{
-  "update:modelValue": [mode: CanvasViewMode];
+  "update:modelValue": [mode: LayoutMode];
 }>();
 
-const isStack = computed(() => props.modelValue === CANVAS_VIEW.stack);
+const isStack = computed(() => props.modelValue === LAYOUT_MODES.stack);
 </script>

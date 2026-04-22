@@ -98,7 +98,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("file explorer path in URL", () => {
   test("selecting a file puts ?path= in the URL", async ({ page }) => {
-    await page.goto("/chat?view=files");
+    await page.goto("/files");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Wait for the root dir's shallow listing to land — with lazy
@@ -121,7 +121,7 @@ test.describe("file explorer path in URL", () => {
   });
 
   test("direct URL with ?path= opens the file", async ({ page }) => {
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+    await page.goto("/files?path=wiki/hello.md");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // The file content should be visible
@@ -131,7 +131,7 @@ test.describe("file explorer path in URL", () => {
   });
 
   test("?path= with traversal attempt is stripped by guard", async ({ page }) => {
-    await page.goto("/chat?view=files&path=../../../etc/passwd");
+    await page.goto("/files?path=../../../etc/passwd");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // The path param should be stripped
@@ -142,7 +142,7 @@ test.describe("file explorer path in URL", () => {
   });
 
   test("?path= with absolute path is stripped by guard", async ({ page }) => {
-    await page.goto("/chat?view=files&path=/etc/passwd");
+    await page.goto("/files?path=/etc/passwd");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     await expect(async () => {
@@ -178,7 +178,7 @@ test.describe("file explorer path in URL", () => {
       },
     );
 
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+    await page.goto("/files?path=wiki/hello.md");
 
     // Open the collapsible editor — it hangs off the bottom of the
     // rendered markdown pane. The textarea is seeded with the raw
@@ -206,7 +206,7 @@ test.describe("file explorer path in URL", () => {
   });
 
   test("closing a file removes ?path= from URL", async ({ page }) => {
-    await page.goto("/chat?view=files&path=wiki/hello.md");
+    await page.goto("/files?path=wiki/hello.md");
     await expect(page.getByText("This is a test.")).toBeVisible({
       timeout: 5 * ONE_SECOND_MS,
     });

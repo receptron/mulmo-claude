@@ -110,7 +110,7 @@ test.beforeEach(async ({ page }) => {
 test.describe("file explorer lazy expand (#200 phase 2)", () => {
   test("root listing lands once on mount, no subtree fetched yet", async ({ page }) => {
     const mock = await mockLazyDirs(page);
-    await page.goto("/chat?view=files");
+    await page.goto("/files");
     await expect(page.locator('[data-testid="file-tree-dir-wiki"]')).toBeVisible();
     // Only the root fetch should have fired — children of collapsed
     // `wiki` / `notes` must wait for an expand click.
@@ -121,7 +121,7 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
 
   test("clicking a collapsed dir fetches its children exactly once", async ({ page }) => {
     const mock = await mockLazyDirs(page);
-    await page.goto("/chat?view=files");
+    await page.goto("/files");
     await expect(page.locator('[data-testid="file-tree-dir-wiki"]')).toBeVisible();
 
     await page.locator('[data-testid="file-tree-dir-wiki"]').click();
@@ -138,7 +138,7 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
 
   test("deep link auto-expands ancestors", async ({ page }) => {
     const mock = await mockLazyDirs(page);
-    await page.goto("/chat?view=files&path=wiki/pages/foo.md");
+    await page.goto("/files?path=wiki/pages/foo.md");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Both `wiki` and `wiki/pages` should have been fetched so the

@@ -1,12 +1,9 @@
 // Vue-router setup (history mode — clean URLs without #).
 //
-// The route is /chat/:sessionId? which captures the session the user
-// was looking at. Everything else (view mode, file path, result uuid,
-// role) lives in query parameters and will be wired in later phases.
-//
-// The "/" → "/chat" redirect ensures a fresh browser tab always lands
-// on the chat view with the default (new) session, matching the
-// current pre-router behaviour.
+// Each page has its own route: /chat, /files, /todos, /scheduler,
+// /wiki, /skills, /roles. Layout preference (single vs. stack) is a
+// separate concern persisted in localStorage — it is not part of the
+// URL.
 //
 // History mode requires the server to serve index.html for any path
 // that doesn't match an API route or static file. In production the
@@ -18,28 +15,31 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router"
 
 // Stub component that renders nothing. Required by vue-router (every
 // route needs a component) but never actually mounted because App.vue
-// doesn't contain <router-view> in Phase 0.
+// renders based on `route.name` rather than using <router-view>.
 const Stub = defineComponent({ render: () => h("div") });
 
+export const PAGE_ROUTES = {
+  chat: "chat",
+  files: "files",
+  todos: "todos",
+  scheduler: "scheduler",
+  wiki: "wiki",
+  skills: "skills",
+  roles: "roles",
+} as const;
+
+export type PageRouteName = (typeof PAGE_ROUTES)[keyof typeof PAGE_ROUTES];
+
 const routes: RouteRecordRaw[] = [
-  {
-    path: "/",
-    redirect: "/chat",
-  },
-  {
-    // sessionId is optional — /chat with no param means "new session"
-    // (the App.vue logic that auto-creates a session continues to
-    // handle this).
-    path: "/chat/:sessionId?",
-    name: "chat",
-    component: Stub,
-  },
-  {
-    // Catch-all: unknown paths redirect to /chat so a stale bookmark
-    // or a typo doesn't show a blank page.
-    path: "/:pathMatch(.*)*",
-    redirect: "/chat",
-  },
+  { path: "/", redirect: "/chat" },
+  { path: "/chat/:sessionId?", name: PAGE_ROUTES.chat, component: Stub },
+  { path: "/files", name: PAGE_ROUTES.files, component: Stub },
+  { path: "/todos", name: PAGE_ROUTES.todos, component: Stub },
+  { path: "/scheduler", name: PAGE_ROUTES.scheduler, component: Stub },
+  { path: "/wiki", name: PAGE_ROUTES.wiki, component: Stub },
+  { path: "/skills", name: PAGE_ROUTES.skills, component: Stub },
+  { path: "/roles", name: PAGE_ROUTES.roles, component: Stub },
+  { path: "/:pathMatch(.*)*", redirect: "/chat" },
 ];
 
 const router = createRouter({

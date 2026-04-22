@@ -120,12 +120,9 @@ test.describe("internal link navigation", () => {
     // Click the workspace link.
     await wikiLink.click();
 
-    // Should navigate to wiki view with ?page= parameter.
-    await expect(page).toHaveURL(/[?&]view=wiki/);
+    // Should navigate to the /wiki page with ?page= parameter.
+    await expect(page).toHaveURL(/\/wiki(?:$|\?)/);
     await expect(page).toHaveURL(/[?&]page=test-page/);
-
-    // Should NOT create a new session — still on the same session.
-    await expect(page).toHaveURL(/\/chat\/link-test-session/);
   });
 
   test("clicking workspace file link navigates to files view", async ({ page }) => {
@@ -143,11 +140,8 @@ test.describe("internal link navigation", () => {
     // Click the file link.
     await fileLink.click();
 
-    // Should navigate to files view with ?path= parameter.
-    await expect(page).toHaveURL(/[?&]view=files/);
+    // Should navigate to the /files page with ?path= parameter.
+    await expect(page).toHaveURL(/\/files(?:$|\?)/);
     await expect(page).toHaveURL(/[?&]path=config/);
-
-    // Should NOT create a new session.
-    await expect(page).toHaveURL(/\/chat\/link-test-session/);
   });
 });
