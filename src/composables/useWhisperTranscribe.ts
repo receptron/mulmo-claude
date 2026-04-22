@@ -14,6 +14,11 @@ import { toSegments, formatTranscript, type TranscriptSegment } from "../utils/a
 
 const WHISPER_MODEL = "Xenova/whisper-base";
 const TARGET_SAMPLE_RATE = 16_000;
+// Matches the onnxruntime-web version bundled by @xenova/transformers
+// @2.17.x. If transformers.js is upgraded, this must be kept in sync
+// (package.json listing of onnxruntime-web, or the peer dep the
+// library pulls in).
+const ORT_WASM_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/";
 
 export type TranscribeState =
   | { status: "idle" }
@@ -43,16 +48,18 @@ async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<As
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
       const mod = await import("@xenova/transformers");
-      // Force remote-only model loading. By default Transformers.js
-      // tries to fetch `/models/<name>/...` from the page origin
-      // first; under Vite (and most SPA dev servers) that path hits
-      // the index.html fallback and returns HTML, which the library
-      // then tries to JSON.parse — producing
-      //   "Unexpected token '<', \"<!DOCTYPE\"... is not valid JSON".
-      // Disabling local lookup sends every request straight to
-      // huggingface.co, which does return the real config.json.
+      // Under Vite (and most SPA dev servers), unknown paths get the
+      // index.html fallback with a 200 status. Transformers.js then
+      // tries to JSON.parse HTML and surfaces:
+      //   Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+      //
+      // Two places it fetches from the page origin by default:
+      //   1. Model files: `/models/<name>/...` — fix with allowLocalModels=false
+      //   2. onnxruntime-web wasm blobs: relative to the JS bundle —
+      //      fix by pointing wasmPaths at the CDN explicitly.
       mod.env.allowLocalModels = false;
       mod.env.allowRemoteModels = true;
+      mod.env.backends.onnx.wasm.wasmPaths = ORT_WASM_CDN;
       // Returns a callable pipeline; the cast is a seam between the
       // library's any-leaning types and our strict shape above.
       const pipeline = (await mod.pipeline("automatic-speech-recognition", WHISPER_MODEL, {
