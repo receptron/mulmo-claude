@@ -9,20 +9,20 @@ Your personal computer is becoming your most powerful AI assistant. It runs loca
 ## How It Works
 
 ```text
- Phone messaging apps      Bridge process             Your PC
+ Phone messaging apps      Bridge process              Your PC
 ┌─────────────────┐      ┌──────────────────────┐   ┌────────────────────────────────┐
-│  Telegram        │     │  Platform adapter     │   │ @mulmobridge/chat-service     │
-│  LINE            │ ──► │    + @mulmobridge/    │──►│          ↓                    │
-│  Slack, Discord  │     │      client           │   │ Your AI agent                 │
-│  WhatsApp, IRC   │ ◄── │                       │◄──│ (Claude, GPT, custom — or     │
-│  ...             │     └──────────────────────┘   │  @mulmobridge/mock-server for │
-└─────────────────┘         socket.io (secure)      │  offline testing)             │
-                                                     │          ↓                    │
+│  Telegram        │     │ ./bridges/<platform>  │   │ @mulmobridge/chat-service     │
+│  LINE            │ ──► │   (or your own bridge │──►│          ↓                    │
+│  Slack, Discord  │     │    built on           │   │ Your AI agent                 │
+│  WhatsApp, IRC   │ ◄── │    @mulmobridge/      │◄──│ (MulmoClaude, Claude, GPT,    │
+│  ...             │     │    client)            │   │  custom — or @mulmobridge/    │
+└─────────────────┘      └──────────────────────┘   │  mock-server for offline tests)│
+                            socket.io (secure)       │          ↓                    │
                                                      │  Files, tools, data           │
                                                      └────────────────────────────────┘
 ```
 
-A **bridge** is a tiny process (~100 lines) that translates between a messaging platform's API and the MulmoBridge socket.io protocol. The `@mulmobridge/client` library handles all the socket.io boilerplate — writing a new bridge is just writing the platform adapter. For local development you can point a bridge at `@mulmobridge/mock-server` (an echo-mode server speaking the full protocol) to test without the real agent running.
+A **bridge** is a tiny process (~100 lines) that translates between a messaging platform's API and the MulmoBridge socket.io protocol. The platform adapters shipped in this repo live under [`./bridges/`](./bridges/); the `@mulmobridge/client` library handles all the socket.io boilerplate, so writing a new bridge is just writing the platform adapter. For local development you can point a bridge at `@mulmobridge/mock-server` (an echo-mode server speaking the full protocol) to test without a real agent running.
 
 ## Packages
 
