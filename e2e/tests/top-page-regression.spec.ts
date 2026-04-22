@@ -114,6 +114,17 @@ async function mockPubSubWithNotifications(page: Page, notifications: readonly u
   );
 }
 
+/** Read scroll metrics from a scroll container identified by data-testid. */
+async function scrollMetrics(page: Page, testId: string): Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number }> {
+  return page.getByTestId(testId).evaluate((elem) => ({
+    scrollTop: elem.scrollTop,
+    scrollHeight: elem.scrollHeight,
+    clientHeight: elem.clientHeight,
+  }));
+}
+
+const BOTTOM_TOLERANCE_PX = 50;
+
 // ---------------------------------------------------------------------------
 // 1. New session → send → response
 // ---------------------------------------------------------------------------
@@ -173,6 +184,39 @@ test.describe("2. session switching", () => {
     await expect(page).toHaveURL(new RegExp(SESSION_A.id), { timeout: 5 * ONE_SECOND_MS });
     await expect(page.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
   });
+
+  test("switching to a session with hasUnread clears the unread state", async ({ page }) => {
+    // SESSION_B has unread
+    await page.route(urlEndsWith("/api/sessions"), (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      return route.fulfill({
+        json: {
+          sessions: [SESSION_A, { ...SESSION_B, hasUnread: true }],
+          cursor: "v1:0",
+          deletedIds: [],
+        },
+      });
+    });
+
+    await page.goto(`/chat/${SESSION_A.id}`);
+    await expect(page.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // Unread badge should show
+    await expect(page.getByTestId("unread-session-badge")).toBeVisible({ timeout: 3 * ONE_SECOND_MS });
+
+    // Set up response waiter BEFORE the click that triggers it
+    const markReadPromise = page.waitForResponse((resp) => resp.url().includes(`/api/sessions/${SESSION_B.id}`) && resp.request().method() === "POST", {
+      timeout: 5 * ONE_SECOND_MS,
+    });
+
+    // Switch to session B (unread)
+    await selectSessionTab(page, SESSION_B.id);
+    await expect(page).toHaveURL(new RegExp(SESSION_B.id), { timeout: 5 * ONE_SECOND_MS });
+
+    // Verify mark-read POST was sent
+    const markReadSent = await markReadPromise;
+    expect(markReadSent.status()).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -210,6 +254,61 @@ test.describe("3. URL direct access / reload", () => {
     const roleBtn = page.getByTestId("role-selector-btn");
     await expect(roleBtn).toBeVisible();
   });
+
+  test("clicking a result sets ?result= and shows ring selection", async ({ page }) => {
+    // Provide a session with multiple results
+    await page.route(
+      (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
+      (route) => {
+        if (route.request().method() !== "GET") return route.fallback();
+        return route.fulfill({
+          json: [
+            { type: "session_meta", roleId: "general", sessionId: SESSION_A.id },
+            { type: "text", source: "user", message: "Hello" },
+            { type: "text", source: "assistant", message: "Hi there!" },
+            { type: "text", source: "user", message: "Another question" },
+            { type: "text", source: "assistant", message: "Another answer" },
+          ],
+        });
+      },
+    );
+
+    await page.goto(`/chat/${SESSION_A.id}`);
+    await expect(page.locator("text=Another answer").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    const resultCards = page.locator("[data-testid^='tool-result-']");
+    const count = await resultCards.count();
+    expect(count).toBeGreaterThanOrEqual(2);
+
+    // Click the first result card
+    await resultCards.nth(0).click();
+
+    // ?result= param should appear in URL
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.searchParams.get("result")).toBeTruthy();
+    }).toPass({ timeout: 3 * ONE_SECOND_MS });
+
+    const firstResultUuid = new URL(page.url()).searchParams.get("result")!;
+
+    // The clicked card should have the selection ring
+    const firstCard = page.getByTestId(`tool-result-${firstResultUuid}`);
+    await expect(firstCard).toHaveClass(/ring-2/);
+
+    // Click a different result card
+    await resultCards.nth(1).click();
+    await expect(async () => {
+      const url = new URL(page.url());
+      const newResult = url.searchParams.get("result");
+      expect(newResult).toBeTruthy();
+      expect(newResult).not.toBe(firstResultUuid);
+    }).toPass({ timeout: 3 * ONE_SECOND_MS });
+
+    // First card should lose ring, second card should have it
+    await expect(firstCard).not.toHaveClass(/ring-2/);
+    const secondUuid = new URL(page.url()).searchParams.get("result")!;
+    await expect(page.getByTestId(`tool-result-${secondUuid}`)).toHaveClass(/ring-2/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -228,7 +327,7 @@ test.describe("4. back/forward browser buttons", () => {
     await selectSessionTab(page, SESSION_B.id);
     await expect(page).toHaveURL(new RegExp(SESSION_B.id), { timeout: 5 * ONE_SECOND_MS });
 
-    // Go back ��� session A
+    // Go back → session A
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(SESSION_A.id), { timeout: 5 * ONE_SECOND_MS });
 
@@ -302,6 +401,19 @@ test.describe("5. canvas view mode switching", () => {
       const url = new URL(page.url());
       expect(url.searchParams.get("path")).toBeNull();
     }).toPass({ timeout: 3 * ONE_SECOND_MS });
+  });
+
+  test("clicking session tab from non-chat view restores chat view", async ({ page }) => {
+    // Start in todos view
+    await page.goto(`/chat/${SESSION_A.id}?view=todos`);
+    await expect(page).toHaveURL(/[?&]view=todos/);
+
+    // Click session B tab — should revert to a chat view (single/stack)
+    await selectSessionTab(page, SESSION_B.id);
+    await expect(page).toHaveURL(new RegExp(SESSION_B.id), { timeout: 5 * ONE_SECOND_MS });
+
+    // Should NOT be in todos view anymore
+    await expect(page).not.toHaveURL(/[?&]view=todos/, { timeout: 3 * ONE_SECOND_MS });
   });
 });
 
@@ -418,13 +530,17 @@ test.describe("9. streaming auto-scroll", () => {
     await mockAllApis(page);
   });
 
-  test("stack view stays pinned to bottom during streaming", async ({ page }) => {
+  test("stack view stays pinned to bottom throughout streaming, not just at the end", async ({ page }) => {
     const chunk = "Streaming chunk with enough text to fill the viewport. ".repeat(5);
-    const events = Array.from({ length: 30 }, () => ({
+    const totalChunks = 40;
+    const events = Array.from({ length: totalChunks }, () => ({
       type: "text",
       source: "assistant",
       message: chunk,
     }));
+
+    // Track bottom-distance samples taken during streaming
+    const bottomDistanceSamples: number[] = [];
 
     // Use streaming mock with delays between chunks
     await page.routeWebSocket(
@@ -446,11 +562,11 @@ test.describe("9. streaming auto-scroll", () => {
           const [name, arg] = parsed as [string, unknown];
           if (name !== "subscribe" || typeof arg !== "string" || !arg.startsWith("session.")) return;
           const channel = arg;
-          // Stream with small delays
+          // Stream with delays between chunks
           void (async () => {
             for (const event of events) {
               webSocket.send("42" + JSON.stringify(["data", { channel, data: event }]));
-              await new Promise((resolve) => setTimeout(resolve, 20));
+              await new Promise((resolve) => setTimeout(resolve, 30));
             }
             webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
           })();
@@ -468,18 +584,30 @@ test.describe("9. streaming auto-scroll", () => {
 
     await expect(page.locator("text=Streaming chunk").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
 
+    // Sample scroll position multiple times DURING streaming
+    for (let sample = 0; sample < 5; sample++) {
+      await page.waitForTimeout(200);
+      const metrics = await scrollMetrics(page, "stack-scroll");
+      if (metrics.scrollHeight > metrics.clientHeight) {
+        bottomDistanceSamples.push(metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight);
+      }
+    }
+
     // Wait for streaming to finish
-    await page.waitForTimeout(2 * ONE_SECOND_MS);
+    await page.waitForTimeout(ONE_SECOND_MS);
 
-    const metrics = await page.getByTestId("stack-scroll").evaluate((elem) => ({
-      scrollTop: elem.scrollTop,
-      scrollHeight: elem.scrollHeight,
-      clientHeight: elem.clientHeight,
-    }));
+    // Final check
+    const finalMetrics = await scrollMetrics(page, "stack-scroll");
+    if (finalMetrics.scrollHeight > finalMetrics.clientHeight) {
+      bottomDistanceSamples.push(finalMetrics.scrollHeight - finalMetrics.scrollTop - finalMetrics.clientHeight);
+    }
 
-    // Should be near the bottom (within 50px tolerance)
-    if (metrics.scrollHeight > metrics.clientHeight) {
-      expect(metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight).toBeLessThan(50);
+    // ALL mid-stream samples should be near-bottom, not just the final one.
+    // This catches the bug where scroll stops mid-stream but catches up at
+    // the end (e.g. only on session_finished refetch).
+    expect(bottomDistanceSamples.length).toBeGreaterThanOrEqual(3);
+    for (const distance of bottomDistanceSamples) {
+      expect(distance).toBeLessThan(BOTTOM_TOLERANCE_PX);
     }
   });
 });
@@ -488,7 +616,7 @@ test.describe("9. streaming auto-scroll", () => {
 // 10. Multi-tab sync
 // ---------------------------------------------------------------------------
 test.describe("10. multi-tab sync", () => {
-  test("second tab loads same session and shows transcript", async ({ browser }) => {
+  test("tab A sends a message and tab B sees the response via pub/sub", async ({ browser }) => {
     const context = await browser.newContext();
     const page1 = await context.newPage();
     const page2 = await context.newPage();
@@ -498,16 +626,45 @@ test.describe("10. multi-tab sync", () => {
       await mockAllApis(page);
     }
 
-    // Tab 1: load known session A
-    await page1.goto(`/chat/${SESSION_A.id}`);
-    await expect(page1.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    // Tab 1: set up agent + pubsub that streams a response
+    await mockAgentWithPubSub(page1, [
+      { type: "status", message: "Thinking..." },
+      { type: "text", message: "Response visible in both tabs" },
+    ]);
 
-    // Tab 2: load same session via URL
-    await page2.goto(`/chat/${SESSION_A.id}`);
-    // Tab 2 should see the same transcript from the session API
-    await expect(page2.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
-    // Both tabs showing the session means the transcript sync via API works
-    await expect(page2.locator("text=Hello").first()).toBeVisible();
+    // Tab 1 navigates and sends
+    await page1.goto("/");
+    await page1.waitForURL(/\/chat\//);
+    // Extract the session ID that tab 1 created
+    const tab1Url = new URL(page1.url());
+    const sessionId = tab1Url.pathname.split("/chat/")[1];
+
+    await sendChatMessage(page1, "Hello from tab 1");
+    // Tab 1 should see the response
+    await expect(page1.locator("text=Response visible in both tabs").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // Override tab 2's session API to return the transcript that
+    // tab 1 produced (simulating server-side persistence).
+    await page2.route(
+      (url) => url.pathname === `/api/sessions/${sessionId}`,
+      (route) => {
+        if (route.request().method() !== "GET") return route.fallback();
+        return route.fulfill({
+          json: [
+            { type: "session_meta", roleId: "general", sessionId },
+            { type: "text", source: "user", message: "Hello from tab 1" },
+            { type: "text", source: "assistant", message: "Response visible in both tabs" },
+          ],
+        });
+      },
+    );
+
+    // Tab 2 navigates to the same session
+    await page2.goto(`/chat/${sessionId}`);
+
+    // Tab 2 should see both the user message and assistant response
+    await expect(page2.locator("text=Hello from tab 1").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    await expect(page2.locator("text=Response visible in both tabs").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
 
     await context.close();
   });
@@ -633,10 +790,32 @@ test.describe("12. background generation indicators", () => {
 // 13. API error handling
 // ---------------------------------------------------------------------------
 test.describe("13. API error handling", () => {
-  test("connection error shows error card when server is unreachable", async ({ page }) => {
+  test("network error shows Connection error card and unsubscribes", async ({ page }) => {
     await mockAllApis(page);
 
-    // Override /api/agent to return 500
+    // Override /api/agent to abort the request (simulate network failure)
+    await page.route(urlEndsWith("/api/agent"), (route: Route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      return route.abort("connectionrefused");
+    });
+
+    await page.goto("/");
+    await sendChatMessage(page, "this should fail");
+
+    // The error card should display "[Error]" label with connection error
+    await expect(page.locator("text=Error").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // Input should be re-enabled (subscription unsubscribed, not stuck)
+    await expect(chatInput(page)).toBeEnabled({ timeout: 3 * ONE_SECOND_MS });
+
+    // Should be able to type again (session not stuck in running state)
+    await chatInput(page).fill("can I type again?");
+    await expect(chatInput(page)).toHaveValue("can I type again?");
+  });
+
+  test("HTTP 500 shows server error card", async ({ page }) => {
+    await mockAllApis(page);
+
     await page.route(urlEndsWith("/api/agent"), (route: Route) => {
       if (route.request().method() !== "POST") return route.fallback();
       return route.fulfill({
@@ -649,8 +828,11 @@ test.describe("13. API error handling", () => {
     await page.goto("/");
     await sendChatMessage(page, "this should fail");
 
-    // Error message should appear in the chat
-    await expect(page.locator("text=Internal Server Error").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    // Should show "Server error 500" (the exact format from postAgentRun)
+    await expect(page.locator("text=Server error 500").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // Input should be re-enabled (not stuck)
+    await expect(chatInput(page)).toBeEnabled({ timeout: 3 * ONE_SECOND_MS });
   });
 });
 
@@ -681,7 +863,7 @@ test.describe("14. session not found", () => {
 // 15. Arrow key navigation
 // ---------------------------------------------------------------------------
 test.describe("15. arrow key navigation", () => {
-  test("sidebar arrow keys change selected result", async ({ page }) => {
+  test("sidebar ArrowDown/ArrowUp changes selectedResultUuid and updates ?result= param", async ({ page }) => {
     await mockAllApis(page);
 
     // Provide a session with multiple results
@@ -702,26 +884,49 @@ test.describe("15. arrow key navigation", () => {
     );
 
     await page.goto(`/chat/${SESSION_A.id}`);
-
-    // Wait for results to load
     await expect(page.locator("text=First question").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
 
-    // Focus the sidebar results panel
+    // Click the FIRST result card to select it (the app auto-selects
+    // the last result, so we need to start from the first to test ArrowDown)
+    const resultCards = page.locator("[data-testid^='tool-result-']");
+    await resultCards.nth(0).click();
+
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.searchParams.get("result")).toBeTruthy();
+    }).toPass({ timeout: 3 * ONE_SECOND_MS });
+
+    const firstResult = new URL(page.url()).searchParams.get("result")!;
+
+    // Focus the sidebar results panel (sets activePane to "sidebar")
     const sidebar = page.getByTestId("tool-results-scroll");
     await sidebar.click();
 
-    // Press arrow down to change selection
+    // Press ArrowDown — should move to the next result
     await page.keyboard.press("ArrowDown");
-    await page.waitForTimeout(200);
-    await page.keyboard.press("ArrowDown");
-    await page.waitForTimeout(200);
+    await expect(async () => {
+      const url = new URL(page.url());
+      const newResult = url.searchParams.get("result");
+      expect(newResult).toBeTruthy();
+      expect(newResult).not.toBe(firstResult);
+    }).toPass({ timeout: 3 * ONE_SECOND_MS });
 
-    // Press arrow up
+    const secondResult = new URL(page.url()).searchParams.get("result")!;
+
+    // Press ArrowUp — should go back to the first result
     await page.keyboard.press("ArrowUp");
-    await page.waitForTimeout(200);
+    await expect(async () => {
+      const url = new URL(page.url());
+      expect(url.searchParams.get("result")).toBe(firstResult);
+    }).toPass({ timeout: 3 * ONE_SECOND_MS });
 
-    // The sidebar should still be functional (no crash)
-    await expect(sidebar).toBeVisible();
+    // Verify the selected card has the visual ring
+    const selectedCard = page.getByTestId(`tool-result-${firstResult}`);
+    await expect(selectedCard).toHaveClass(/ring-2/);
+
+    // The second card should NOT have the ring
+    const otherCard = page.getByTestId(`tool-result-${secondResult}`);
+    await expect(otherCard).not.toHaveClass(/ring-2/);
   });
 });
 
@@ -733,7 +938,7 @@ test.describe("16. history drawer", () => {
     await mockAllApis(page);
   });
 
-  test("opens and closes on button click", async ({ page }) => {
+  test("opens on button click and closes on click-outside", async ({ page }) => {
     await page.goto("/");
 
     // Open history
