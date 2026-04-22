@@ -41,6 +41,7 @@ const jaMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "すべて",
+      unread: "未読",
       human: "手動",
       scheduler: "スケジューラ",
       skill: "スキル",

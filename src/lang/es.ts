@@ -39,6 +39,7 @@ const esMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "Todas",
+      unread: "No leídas",
       human: "Persona",
       scheduler: "Programador",
       skill: "Skill",

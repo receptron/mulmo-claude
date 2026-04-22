@@ -39,6 +39,7 @@ const zhMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "全部",
+      unread: "未读",
       human: "人工",
       scheduler: "调度器",
       skill: "技能",

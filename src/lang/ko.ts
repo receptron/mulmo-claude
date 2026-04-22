@@ -41,6 +41,7 @@ const koMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "전체",
+      unread: "읽지 않음",
       human: "사람",
       scheduler: "스케줄러",
       skill: "스킬",

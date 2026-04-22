@@ -83,7 +83,13 @@ import { roleIcon, roleName } from "../utils/role/icon";
 
 const { t } = useI18n();
 
-const FILTERS = ["all" as const, SESSION_ORIGINS.human, SESSION_ORIGINS.scheduler, SESSION_ORIGINS.skill, SESSION_ORIGINS.bridge];
+// `unread` is mutually exclusive with origin pills — selecting it
+// shows every unread-flagged session regardless of origin, matching
+// the user expectation that "unread" is the primary question ("what
+// needs my attention?") rather than an origin sub-filter.
+const UNREAD_FILTER = "unread" as const;
+const FILTERS = ["all" as const, UNREAD_FILTER, SESSION_ORIGINS.human, SESSION_ORIGINS.scheduler, SESSION_ORIGINS.skill, SESSION_ORIGINS.bridge];
+type FilterKey = (typeof FILTERS)[number];
 
 const ORIGIN_ICONS: Record<string, string> = {
   human: "person",
@@ -117,7 +123,7 @@ defineExpose({ root });
 
 // ── Filter ──────────────────────────────────────────────────
 
-const activeFilter = ref<SessionOrigin | "all">("all");
+const activeFilter = ref<FilterKey>("all");
 
 function originOf(session: SessionSummary): SessionOrigin {
   return session.origin ?? SESSION_ORIGINS.human;
@@ -125,12 +131,14 @@ function originOf(session: SessionSummary): SessionOrigin {
 
 const filteredSessions = computed(() => {
   if (activeFilter.value === "all") return props.sessions;
+  if (activeFilter.value === UNREAD_FILTER) return props.sessions.filter((session) => session.hasUnread === true);
   return props.sessions.filter((session) => originOf(session) === activeFilter.value);
 });
 
-function countByOrigin(origin: string): number {
-  if (origin === "all") return props.sessions.length;
-  return props.sessions.filter((session) => originOf(session) === origin).length;
+function countByOrigin(filterKey: FilterKey): number {
+  if (filterKey === "all") return props.sessions.length;
+  if (filterKey === UNREAD_FILTER) return props.sessions.filter((session) => session.hasUnread === true).length;
+  return props.sessions.filter((session) => originOf(session) === filterKey).length;
 }
 
 function originIcon(origin: string): string {
