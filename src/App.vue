@@ -757,7 +757,10 @@ function navigateToWorkspacePath(href: string): void {
       router.push({ name: PAGE_ROUTES.wiki, query: { page: target.slug } }).catch(() => {});
       break;
     case "file":
-      router.push({ name: PAGE_ROUTES.files, query: { path: target.path } }).catch(() => {});
+      // Path-based files URL (see plans/feat-files-path-url.md) — pass
+      // segments as an array so each piece is url-encoded independently
+      // and slashes stay as path separators.
+      router.push({ name: PAGE_ROUTES.files, params: { pathMatch: target.path.split("/") } }).catch(() => {});
       break;
     case "session":
       handleSessionSelect(target.sessionId);

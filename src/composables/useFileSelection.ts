@@ -32,12 +32,27 @@ export function isValidFilePath(value: unknown): value is string {
   return !value.split("/").some((seg) => seg === "..");
 }
 
+/**
+ * Extract the logical file path from a route's `pathMatch` param.
+ * Vue Router hands the repeatable catch-all back as an array, a
+ * single string, or `undefined` depending on what matched — normalise
+ * to a `string | null` so the rest of the composable doesn't care.
+ */
+export function readPathMatch(raw: unknown): string | null {
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return null;
+    return raw.join("/");
+  }
+  if (typeof raw === "string" && raw.length > 0) return raw;
+  return null;
+}
+
 export function useFileSelection() {
   const route = useRoute();
   const router = useRouter();
 
-  const urlPath = route.query.path;
-  const selectedPath = ref<string | null>(isValidFilePath(urlPath) ? urlPath : null);
+  const pathFromRoute = readPathMatch(route.params.pathMatch);
+  const selectedPath = ref<string | null>(isValidFilePath(pathFromRoute) ? pathFromRoute : null);
   const content = ref<FileContent | null>(null);
   const contentLoading = ref(false);
   const contentError = ref<string | null>(null);
@@ -71,8 +86,12 @@ export function useFileSelection() {
   function selectFile(filePath: string): void {
     selectedPath.value = filePath;
     loadContent(filePath);
-    const { path: __path, ...restQuery } = route.query;
-    router.push({ query: { ...restQuery, path: filePath } }).catch((err: unknown) => {
+    // Pass segments as an array so Vue Router encodes each segment
+    // independently (spaces / multi-byte / `?#%` get UTF-8 percent-
+    // encoding), while slashes stay as path separators. Passing the
+    // joined string would urlencode `/` → `%2F` and collapse the
+    // visible path shape.
+    router.push({ name: "files", params: { pathMatch: filePath.split("/") }, query: route.query }).catch((err: unknown) => {
       if (!isNavigationFailure(err)) {
         // Frontend composable — server logger not available.
         // console.error is the standard pattern in Vue composables.
@@ -88,8 +107,7 @@ export function useFileSelection() {
     content.value = null;
     contentLoading.value = false;
     contentError.value = null;
-    const { path: __path, ...restQuery } = route.query;
-    router.replace({ query: restQuery }).catch((err: unknown) => {
+    router.replace({ name: "files", params: { pathMatch: [] }, query: route.query }).catch((err: unknown) => {
       if (!isNavigationFailure(err)) {
         console.error("[deselectFile] navigation failed:", err);
       }

@@ -140,8 +140,9 @@ test.describe("internal link navigation", () => {
     // Click the file link.
     await fileLink.click();
 
-    // Should navigate to the /files page with ?path= parameter.
-    await expect(page).toHaveURL(/\/files(?:$|\?)/);
-    await expect(page).toHaveURL(/[?&]path=config/);
+    // Should navigate to /files/<path> (PR #633 migrated from
+    // query-string to path-based form — `/files/config/settings.json`
+    // rather than `/files?path=config/settings.json`).
+    await expect(page).toHaveURL(/\/files\/config\/settings\.json$/);
   });
 });

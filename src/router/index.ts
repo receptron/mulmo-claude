@@ -33,7 +33,14 @@ export type PageRouteName = (typeof PAGE_ROUTES)[keyof typeof PAGE_ROUTES];
 const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/chat" },
   { path: "/chat/:sessionId?", name: PAGE_ROUTES.chat, component: Stub },
-  { path: "/files", name: PAGE_ROUTES.files, component: Stub },
+  // Files view uses a repeatable catch-all so `/files/a/b/c.md` maps
+  // to `params.pathMatch = ["a", "b", "c.md"]`. Joining on `/` at read
+  // time keeps each segment URL-encoded independently — passing a
+  // string-form catch-all (`:pathMatch(.*)`) would collapse slashes
+  // to `%2F` at push time and mangle deep paths. An empty segment
+  // (`/files`) yields an empty array, which we treat as "no file
+  // selected". See plans/feat-files-path-url.md.
+  { path: "/files/:pathMatch(.*)*", name: PAGE_ROUTES.files, component: Stub },
   { path: "/todos", name: PAGE_ROUTES.todos, component: Stub },
   { path: "/scheduler", name: PAGE_ROUTES.scheduler, component: Stub },
   { path: "/wiki", name: PAGE_ROUTES.wiki, component: Stub },

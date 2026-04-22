@@ -7,6 +7,7 @@
 // doesn't push a history entry).
 
 import type { Router } from "vue-router";
+import { readPathMatch } from "../composables/useFileSelection";
 
 // Basic sanity check for a session ID. Real existence verification
 // happens in App.vue's onMounted / loadSession — we can't do async
@@ -31,11 +32,32 @@ export function installGuards(router: Router): void {
     }
 
     if (dest.name === "files") {
-      const filePath = dest.query.path;
-      if (typeof filePath === "string" && (filePath.includes("..") || filePath.startsWith("/"))) {
+      // Back-compat: old query-string form `/files?path=foo.md` →
+      // rewrite to the new path form `/files/foo.md`. Silent
+      // replace so bookmarks / log links keep working. Do this
+      // before the traversal check so `?path=../bad` also lands in
+      // the `..` rejection below.
+      const legacyPath = dest.query.path;
+      if (typeof legacyPath === "string" && legacyPath.length > 0) {
         const cleaned = { ...dest.query };
         delete cleaned.path;
-        return { ...dest, query: cleaned, replace: true };
+        return {
+          name: "files",
+          params: { pathMatch: legacyPath.split("/") },
+          query: cleaned,
+          replace: true,
+        };
+      }
+
+      // Traversal / absolute-path rejection against the new param.
+      const filePath = readPathMatch(dest.params.pathMatch);
+      if (typeof filePath === "string" && (filePath.includes("..") || filePath.startsWith("/"))) {
+        return {
+          name: "files",
+          params: { pathMatch: [] },
+          query: dest.query,
+          replace: true,
+        };
       }
     }
   });
