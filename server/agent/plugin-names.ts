@@ -13,6 +13,7 @@ import ManageSourceDef from "../../src/plugins/manageSource/definition.js";
 import WikiDef from "../../src/plugins/wiki/definition.js";
 import PresentHtmlDef from "../../src/plugins/presentHtml/definition.js";
 import PresentChartDef from "../../src/plugins/chart/definition.js";
+import PresentScene3dDef from "../../src/plugins/scene3d/definition.js";
 import MarkdownDef from "../../src/plugins/markdown/definition.js";
 import SpreadsheetDef from "../../src/plugins/spreadsheet/definition.js";
 import { TOOL_DEFINITION as MindMapDef } from "@gui-chat-plugin/mindmap";
@@ -37,6 +38,7 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [CanvasDef.name]: API_ROUTES.plugins.canvas,
   [PresentHtmlDef.name]: API_ROUTES.html.present,
   [PresentChartDef.name]: API_ROUTES.chart.present,
+  [PresentScene3dDef.name]: API_ROUTES.scene3d.present,
   [EditImageDef.name]: API_ROUTES.image.edit,
   [Present3DDef.name]: API_ROUTES.plugins.present3d,
   [ManageRolesDef.name]: API_ROUTES.roles.manage,
@@ -60,6 +62,7 @@ export const PLUGIN_DEFS = [
   CanvasDef,
   PresentHtmlDef,
   PresentChartDef,
+  PresentScene3dDef,
   EditImageDef,
   Present3DDef,
   ManageRolesDef,
