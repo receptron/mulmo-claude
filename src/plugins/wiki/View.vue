@@ -62,17 +62,17 @@
     </div>
 
     <!-- Index: page card list -->
-    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 overflow-y-auto p-4 space-y-2">
+    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 overflow-y-auto">
       <div
         v-for="entry in pageEntries"
         :key="entry.slug"
-        class="rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
+        class="flex items-baseline gap-2 px-4 py-1 cursor-pointer hover:bg-blue-50 transition-colors"
         @click="navigatePage(entry.slug || entry.title)"
       >
-        <div class="font-medium text-sm text-gray-800">{{ entry.title }}</div>
-        <div v-if="entry.description" class="text-xs text-gray-500 mt-0.5">
+        <span class="font-medium text-sm text-gray-800 shrink-0">{{ entry.title }}</span>
+        <span v-if="entry.description" class="text-xs text-gray-500 truncate">
           {{ entry.description }}
-        </div>
+        </span>
       </div>
     </div>
 
