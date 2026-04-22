@@ -7,13 +7,16 @@
     <div v-for="entry in previewEntries" :key="entry.slug" class="text-xs text-gray-500 truncate">
       {{ entry.title }}
     </div>
-    <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
+    <div v-if="more > 0" class="text-xs text-gray-400">{{ t("pluginWiki.previewMore", { count: more }) }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+const { t } = useI18n();
 import type { WikiData, WikiPageEntry } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { API_ROUTES } from "../../config/apiRoutes";

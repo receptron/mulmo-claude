@@ -37,7 +37,9 @@
           <div class="w-32">
             <label class="block text-xs font-medium text-gray-600 mb-1">
               {{ t("pluginManageRoles.fieldIcon") }}
-              <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">?</a>
+              <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">{{
+                t("pluginManageRoles.helpLink")
+              }}</a>
             </label>
             <input
               v-model="newForm.icon"
@@ -77,7 +79,7 @@
                 class="cursor-pointer disabled:cursor-not-allowed"
               />
               {{ plugin.name }}
-              <span v-if="!plugin.enabled" class="text-xs text-gray-400">(missing {{ plugin.requiredEnv.join(", ") }})</span>
+              <span v-if="!plugin.enabled" class="text-xs text-gray-400">{{ t("pluginManageRoles.missingEnv", { env: plugin.requiredEnv.join(", ") }) }}</span>
             </label>
           </div>
         </div>
@@ -133,7 +135,7 @@
             <div class="flex-1 min-w-0">
               <div class="font-medium text-sm text-gray-800">
                 {{ role.name }}
-                <span class="ml-1 text-xs font-mono text-gray-400">({{ role.id }})</span>
+                <span class="ml-1 text-xs font-mono text-gray-400">{{ t("pluginManageRoles.idFormatted", { id: role.id }) }}</span>
               </div>
               <div class="text-xs text-gray-400 truncate">
                 {{ role.availablePlugins.join(", ") }}
@@ -168,7 +170,9 @@
               <div class="w-32">
                 <label class="block text-xs font-medium text-gray-600 mb-1">
                   {{ t("pluginManageRoles.fieldIcon") }}
-                  <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">?</a>
+                  <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">{{
+                    t("pluginManageRoles.helpLink")
+                  }}</a>
                 </label>
                 <input
                   v-model="editForm.icon"
@@ -208,7 +212,9 @@
                     class="cursor-pointer disabled:cursor-not-allowed"
                   />
                   {{ plugin.name }}
-                  <span v-if="!plugin.enabled" class="text-xs text-gray-400">(missing {{ plugin.requiredEnv.join(", ") }})</span>
+                  <span v-if="!plugin.enabled" class="text-xs text-gray-400">{{
+                    t("pluginManageRoles.missingEnv", { env: plugin.requiredEnv.join(", ") })
+                  }}</span>
                 </label>
               </div>
             </div>

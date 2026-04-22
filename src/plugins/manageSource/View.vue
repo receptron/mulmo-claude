@@ -30,10 +30,10 @@
         <label class="text-xs text-gray-700">
           {{ t("pluginManageSource.typeField") }}
           <select v-model="draft.kind" class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5" data-testid="sources-draft-kind" @change="onKindChange">
-            <option value="rss">RSS</option>
-            <option value="github-releases">GitHub releases</option>
-            <option value="github-issues">GitHub issues</option>
-            <option value="arxiv">arXiv</option>
+            <option value="rss">{{ t("pluginManageSource.kindRss") }}</option>
+            <option value="github-releases">{{ t("pluginManageSource.kindGithubReleases") }}</option>
+            <option value="github-issues">{{ t("pluginManageSource.kindGithubIssues") }}</option>
+            <option value="arxiv">{{ t("pluginManageSource.kindArxiv") }}</option>
           </select>
         </label>
         <input
@@ -166,7 +166,7 @@
         <div class="flex items-baseline justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-800">
             {{ t("pluginManageSource.todaysBrief") }}
-            <span v-if="briefDate" class="text-xs text-gray-400 font-normal"> ({{ briefDate }}) </span>
+            <span v-if="briefDate" class="text-xs text-gray-400 font-normal"> {{ t("pluginManageSource.briefDateLabel", { date: briefDate }) }} </span>
           </h3>
           <button v-if="briefFilePath" class="text-[11px] text-gray-500 hover:text-gray-700" :title="briefFilePath">
             {{ briefFilePath }}

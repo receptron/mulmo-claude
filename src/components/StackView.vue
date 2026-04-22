@@ -1,6 +1,6 @@
 <template>
   <div ref="containerRef" class="h-full overflow-y-auto bg-gray-50 p-4 space-y-3" data-testid="stack-scroll">
-    <div v-if="toolResults.length === 0" class="flex items-center justify-center h-full text-gray-400 text-sm">No results yet</div>
+    <div v-if="toolResults.length === 0" class="flex items-center justify-center h-full text-gray-400 text-sm">{{ t("common.noResultsYet") }}</div>
     <div
       v-for="result in toolResults"
       :key="result.uuid"
@@ -70,7 +70,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { getPlugin } from "../tools";
+
+const { t } = useI18n();
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { View as TextResponseOriginalView } from "../plugins/textResponse/index";
 import { handleExternalLinkClick } from "../utils/dom/externalLink";

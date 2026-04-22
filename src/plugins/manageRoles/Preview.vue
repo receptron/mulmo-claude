@@ -2,7 +2,7 @@
   <div class="text-sm">
     <div class="flex items-center gap-1 font-medium text-gray-700 mb-1">
       <span class="material-icons" style="font-size: 14px">manage_accounts</span>
-      <span>{{ customRoles.length }} custom role{{ customRoles.length !== 1 ? "s" : "" }}</span>
+      <span>{{ t("pluginManageRoles.previewCount", customRoles.length, { named: { count: customRoles.length } }) }}</span>
     </div>
     <div v-for="role in customRoles" :key="role.id" class="text-xs text-gray-600 flex items-center gap-1">
       <span class="material-icons" style="font-size: 12px">{{ role.icon }}</span>
@@ -13,7 +13,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+const { t } = useI18n();
 import type { ManageRolesData, CustomRole } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { API_ROUTES } from "../../config/apiRoutes";

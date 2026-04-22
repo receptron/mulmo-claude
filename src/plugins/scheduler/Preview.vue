@@ -1,23 +1,26 @@
 <template>
   <div class="p-2 text-sm">
     <div class="flex items-center gap-1 font-medium text-gray-700 mb-1">
-      <span>📅</span>
-      <span>{{ upcomingItems.length }} upcoming</span>
+      <span aria-hidden="true">{{ t("pluginScheduler.previewIcon") }}</span>
+      <span>{{ t("pluginScheduler.previewUpcoming", { count: upcomingItems.length }) }}</span>
     </div>
     <div v-for="item in preview" :key="item.id" class="text-xs truncate text-gray-600">
       <span v-if="item.props.date" class="text-gray-400 mr-1">{{ item.props.date }}</span>
       {{ item.title }}
     </div>
-    <div v-if="more > 0" class="text-xs text-gray-400">+ {{ more }} more…</div>
+    <div v-if="more > 0" class="text-xs text-gray-400">{{ t("pluginScheduler.previewMore", { count: more }) }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 const props = defineProps<{ result: ToolResultComplete<SchedulerData> }>();
 

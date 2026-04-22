@@ -38,7 +38,7 @@
             </button>
             <button class="cancel-btn" @click="cancelEdit">{{ t("pluginMarkdown.cancel") }}</button>
           </div>
-          <p v-if="saveError" class="save-error" role="alert">⚠ {{ saveError }}</p>
+          <p v-if="saveError" class="save-error" role="alert">{{ t("pluginMarkdown.saveError", { error: saveError }) }}</p>
         </details>
         <button v-show="!editing" class="copy-btn" :title="copied ? t('pluginMarkdown.copiedLabel') : t('pluginMarkdown.copyLabel')" @click="copyText">
           <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>

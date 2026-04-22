@@ -54,7 +54,7 @@
           :disabled="movieGenerating || anyBeatRendering || characterKeys.every((key) => charRenderState[key] === 'rendering')"
           @click="generateAllCharacters"
         >
-          Generate All
+          {{ t("pluginMulmoScript.generateAll") }}
         </button>
       </div>
       <div class="flex gap-3 flex-wrap">
@@ -88,7 +88,7 @@
             </template>
             <!-- Permanent drop hint -->
             <div v-if="!charDragOver[key]" class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none">
-              or drop image
+              {{ t("pluginMulmoScript.orDropImage") }}
             </div>
             <!-- Drop overlay -->
             <div v-if="charDragOver[key]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
@@ -183,7 +183,7 @@
               v-else-if="!renderedImages[index] && renderState[index] !== 'rendering'"
               class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
             >
-              or drop image
+              {{ t("pluginMulmoScript.orDropImage") }}
             </div>
             <!-- Generate button for imagePrompt beats -->
             <button
@@ -191,7 +191,7 @@
               class="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50"
               @click="renderBeat(index)"
             >
-              Generate
+              {{ t("pluginMulmoScript.generate") }}
             </button>
           </div>
 
@@ -231,7 +231,7 @@
                   class="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50"
                   @click="generateAudio(index)"
                 >
-                  ♪ Generate
+                  {{ t("pluginMulmoScript.generateAudio") }}
                 </button>
               </div>
               <button class="text-gray-400 hover:text-gray-600" :title="sourceOpen[index] ? 'Hide source' : 'Show source'" @click="toggleSource(index)">
@@ -263,7 +263,9 @@
             spellcheck="false"
           />
           <div class="flex items-center justify-end gap-2 px-2 pb-2">
-            <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">⚠ {{ beatSaveErrors[index] }}</span>
+            <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">{{
+              t("pluginMulmoScript.saveError", { msg: beatSaveErrors[index] })
+            }}</span>
             <button
               class="px-2 py-1 text-xs rounded border"
               :class="
@@ -295,7 +297,7 @@
         ></textarea>
         <div class="editor-actions">
           <button class="apply-btn" :disabled="!sourceChanged || !sourceValid" @click="applySource">{{ t("pluginMulmoScript.applyChanges") }}</button>
-          <button class="cancel-btn" @click="cancelSourceEdit">Cancel</button>
+          <button class="cancel-btn" @click="cancelSourceEdit">{{ t("common.cancel") }}</button>
         </div>
       </details>
       <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
@@ -328,7 +330,7 @@
               "
               @click="playAudio(lightbox.index)"
             >
-              {{ playingAudio?.index === lightbox.index ? "■ Stop" : "▶ Play" }}
+              {{ playingAudio?.index === lightbox.index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
             </button>
           </div>
         </div>

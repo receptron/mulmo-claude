@@ -83,7 +83,7 @@
         @touchend="saveDrawing"
       />
       <div class="flex items-center gap-2 flex-wrap mt-3">
-        <span class="text-xs text-gray-500 mr-1">Style:</span>
+        <span class="text-xs text-gray-500 mr-1">{{ t("pluginCanvas.styleLabel") }}</span>
         <button
           v-for="style in artStyles"
           :key="style.id"

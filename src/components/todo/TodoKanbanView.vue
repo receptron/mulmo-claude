@@ -105,7 +105,7 @@
 
           <!-- Add card stub -->
           <button class="m-2 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded py-1.5 transition-colors" @click="emit('quickAdd', col.id)">
-            + Add card
+            {{ t("todoKanban.addCard") }}
           </button>
         </div>
       </template>

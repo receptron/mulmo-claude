@@ -9,7 +9,7 @@
           v-model="search"
           data-testid="todo-search"
           type="text"
-          placeholder="Search..."
+          :placeholder="t('todoExplorer.searchPlaceholder')"
           class="px-2 py-1 text-xs border border-gray-200 rounded w-44 focus:outline-none focus:border-blue-400"
         />
       </div>
@@ -25,7 +25,7 @@
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
         >
-          + Column
+          {{ t("todoExplorer.addColumnButton") }}
         </button>
         <!-- View mode toggle -->
         <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
@@ -61,8 +61,13 @@
         {{ entry.label }}
         <span class="opacity-60">{{ entry.count }}</span>
       </button>
-      <button v-if="activeFilters.size > 0" class="ml-auto text-[11px] text-gray-500 hover:text-gray-700" title="Clear label filters" @click="clearFilters">
-        Clear ✕
+      <button
+        v-if="activeFilters.size > 0"
+        class="ml-auto text-[11px] text-gray-500 hover:text-gray-700"
+        :title="t('todoExplorer.clearFiltersTitle')"
+        @click="clearFilters"
+      >
+        {{ t("todoExplorer.clearButton") }}
       </button>
     </div>
 
@@ -126,11 +131,11 @@
       <div class="bg-white rounded-lg shadow-xl w-80 p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="todo-add-column-title" @click.stop>
         <h3 id="todo-add-column-title" class="text-base font-semibold text-gray-800">{{ t("todoExplorer.addColumn") }}</h3>
         <label class="block text-xs text-gray-600">
-          Label
+          {{ t("todoExplorer.newColumnLabelField") }}
           <input
             v-model="newColumnLabel"
             type="text"
-            placeholder="Review"
+            :placeholder="t('todoExplorer.newColumnPlaceholder')"
             class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
             @keydown.enter="commitNewColumn"
           />

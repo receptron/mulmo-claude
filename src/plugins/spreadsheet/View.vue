@@ -14,12 +14,12 @@
         <div class="p-4">
           <div class="header">
             <h1 class="title">
-              {{ selectedResult.title || "Spreadsheet" }}
+              {{ selectedResult.title || t("pluginSpreadsheet.untitled") }}
             </h1>
             <div class="button-group">
               <button class="download-btn excel-btn" @click="downloadExcel">
                 <span class="material-icons">download</span>
-                Excel
+                {{ t("pluginSpreadsheet.excel") }}
               </button>
             </div>
           </div>

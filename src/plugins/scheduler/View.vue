@@ -88,7 +88,7 @@
                   :key="key"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-600"
                 >
-                  <span class="text-gray-400">{{ key }}:</span>
+                  <span class="text-gray-400">{{ t("pluginScheduler.propLabel", { key }) }}</span>
                   <span>{{ val }}</span>
                 </span>
               </div>
@@ -181,7 +181,7 @@
                 {{ item.title }}
               </div>
               <div v-if="itemsForDay(day).length > MAX_MONTH_ITEMS" class="text-[10px] text-gray-400 px-1">
-                +{{ itemsForDay(day).length - MAX_MONTH_ITEMS }} more
+                {{ t("pluginScheduler.moreCount", { count: itemsForDay(day).length - MAX_MONTH_ITEMS }) }}
               </div>
             </div>
           </div>

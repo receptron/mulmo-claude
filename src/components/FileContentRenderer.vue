@@ -104,7 +104,7 @@
       </div>
       <!-- Binary or too-large -->
       <div v-else class="p-4 text-sm text-gray-500">
-        {{ "message" in content ? content.message : "" }}
+        <template v-if="'message' in content">{{ content.message }}</template>
       </div>
     </template>
   </div>

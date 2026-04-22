@@ -46,6 +46,44 @@ export default [
         messageSyntaxVersion: "^11.0.0",
       },
     },
+    rules: {
+      // Material Icon ligatures, symbol glyphs, and technical
+      // identifiers rendered verbatim in templates (inside
+      // <span class="material-icons">, <code>, <kbd>) are not
+      // translatable content. Filter them out centrally so real
+      // translatable strings remain visible in the lint output.
+      "@intlify/vue-i18n/no-raw-text": [
+        "error",
+        {
+          ignoreNodes: ["code", "kbd", "pre", "tt", "v-pre"],
+          ignorePattern:
+            // snake_case single token → Material Icon name
+            // (e.g. "chevron_left", "expand_more", "picture_as_pdf")
+            // Also covers short lowercase single-word icon names
+            // like "add" / "delete" / "edit" / "save" / "undo".
+            "^(?:[a-z]+(?:_[a-z]+)*|↺|✕|‹|›|▲|▼|♪|⚠|📅|📊|☑|✓|○|🔑|📁|99\\+|·\\s*|\\+|:|\\s+)$",
+          ignoreText: [
+            "MulmoClaude",
+            "GEMINI_API_KEY",
+            ".env",
+            "data/",
+            "artifacts/",
+            "flat",
+            "by-name",
+            "by-date",
+            "claude mcp",
+            "mcp__",
+            "--allowedTools",
+            "host.docker.internal",
+            "/",
+            "s",
+            "?",
+            "(",
+            ")",
+          ],
+        },
+      ],
+    },
   },
   {
     files: [

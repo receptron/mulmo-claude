@@ -8,8 +8,10 @@
       @click.stop
     >
       <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-        <h3 id="todo-edit-dialog-title" class="text-base font-semibold text-gray-800">Edit Todo</h3>
-        <button class="text-gray-400 hover:text-red-500 text-xs px-2 py-0.5" title="Delete this item" @click="emit('delete', item.id)">Delete</button>
+        <h3 id="todo-edit-dialog-title" class="text-base font-semibold text-gray-800">{{ t("todoDialogs.editTitle") }}</h3>
+        <button class="text-gray-400 hover:text-red-500 text-xs px-2 py-0.5" :title="t('todoDialogs.deleteTitle')" @click="emit('delete', item.id)">
+          {{ t("todoDialogs.deleteButton") }}
+        </button>
       </div>
       <TodoEditPanel :item="item" :columns="columns" @save="(input) => emit('save', input)" @cancel="emit('cancel')" />
     </div>
@@ -18,9 +20,12 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import type { StatusColumn, TodoItem } from "../../plugins/todo/index";
 import type { PatchItemInput } from "../../plugins/todo/composables/useTodos";
 import TodoEditPanel from "./TodoEditPanel.vue";
+
+const { t } = useI18n();
 
 defineProps<{
   item: TodoItem;

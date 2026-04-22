@@ -33,7 +33,7 @@
         :title="t('pluginTodo.clearFilters')"
         @click="clearFilters"
       >
-        Clear ✕
+        {{ t("pluginTodo.clearButton") }}
       </button>
     </div>
 
@@ -72,7 +72,7 @@
             :title="t('pluginTodo.deleteItem')"
             @click.stop="remove(item)"
           >
-            ✕
+            {{ t("pluginTodo.deleteSymbol") }}
           </button>
           <span class="material-icons text-gray-400 text-sm" :title="selectedId === item.id ? 'Collapse' : 'Expand'">
             {{ selectedId === item.id ? "expand_less" : "expand_more" }}
