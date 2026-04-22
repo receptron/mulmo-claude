@@ -487,6 +487,19 @@ MulmoClaude uses a yarn-workspaces monorepo. Shared code lives in `packages/`, p
 | `@mulmobridge/zulip`        | messaging | Zulip bridge (long-polling events API)           |
 | `@mulmobridge/messenger`    | messaging | Facebook Messenger bridge (webhook + HMAC)       |
 | `@mulmobridge/google-chat`  | messaging | Google Chat bridge (webhook + JWT)               |
+| `@mulmobridge/mastodon`     | messaging | Mastodon bridge (WebSocket streaming)            |
+| `@mulmobridge/bluesky`      | messaging | Bluesky bridge (chat.bsky DMs, long polling)     |
+| `@mulmobridge/chatwork`     | messaging | Chatwork bridge (Japanese business chat)         |
+| `@mulmobridge/xmpp`         | messaging | XMPP / Jabber bridge                             |
+| `@mulmobridge/rocketchat`   | messaging | Rocket.Chat bridge (REST polling)                |
+| `@mulmobridge/signal`       | messaging | Signal bridge (via signal-cli-rest-api)          |
+| `@mulmobridge/teams`        | messaging | Microsoft Teams bridge (Bot Framework)           |
+| `@mulmobridge/line-works`   | messaging | LINE Works bridge (enterprise LINE)              |
+| `@mulmobridge/nostr`        | messaging | Nostr encrypted DM bridge                        |
+| `@mulmobridge/viber`        | messaging | Viber bridge (Public Account bot)                |
+| `@mulmobridge/webhook`      | messaging | Generic HTTP webhook (developer glue)            |
+| `@mulmobridge/twilio-sms`   | messaging | SMS bridge via Twilio                            |
+| `@mulmobridge/email`        | messaging | Email bridge (IMAP poll + SMTP)                  |
 | `@receptron/task-scheduler` | general   | Persistent task scheduler with catch-up recovery |
 
 **Build order matters** — `build:packages` in root `package.json` runs them in dependency order. When adding a new package, insert it at the correct position in the chain.

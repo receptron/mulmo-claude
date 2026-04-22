@@ -100,6 +100,9 @@ Detailed setup: [Telegram README](https://github.com/receptron/mulmoclaude/blob/
 | **Webhook (generic HTTP)** | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/webhook/README.md) |
 | **SMS (Twilio)** | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/twilio-sms/README.md) |
 | **Email (IMAP+SMTP)** | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/email/README.md) |
+| **LINE Works** | [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/line-works/README.md) |
+| **Nostr** | [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/nostr/README.md) |
+| **Viber** | [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/viber/README.md) |
 
 > **"Experimental" means** testing is limited and bugs are likely. Your feedback is very welcome!
 
@@ -214,6 +217,9 @@ Bridges are ~100 lines. See the [Bridge Protocol](bridge-protocol.md) for the wi
 | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | Generic HTTP webhook bridge | [npm](https://www.npmjs.com/package/@mulmobridge/webhook) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/webhook) |
 | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | SMS bridge via Twilio | [npm](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/twilio-sms) |
 | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | Email bridge (IMAP + SMTP) | [npm](https://www.npmjs.com/package/@mulmobridge/email) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/email) |
+| [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | LINE Works (enterprise LINE) bridge | [npm](https://www.npmjs.com/package/@mulmobridge/line-works) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/line-works) |
+| [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | Nostr encrypted DM bridge | [npm](https://www.npmjs.com/package/@mulmobridge/nostr) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/nostr) |
+| [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | Viber bridge | [npm](https://www.npmjs.com/package/@mulmobridge/viber) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/viber) |
 
 ### General tools (@receptron scope)
 
