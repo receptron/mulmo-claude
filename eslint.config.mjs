@@ -7,6 +7,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 import importPlugin from "eslint-plugin-import";
 import vuePlugin from "eslint-plugin-vue";
 import vueParser from "vue-eslint-parser";
+import vueI18n from "@intlify/eslint-plugin-vue-i18n"
 
 export default [
   {
@@ -20,6 +21,7 @@ export default [
       "lib",
       "src/plugins/spreadsheet/engine",
       "packages/*/dist",
+      "packages/bridges/*/dist",
       // mulmoclaude launcher copies server/client/shared src here at
       // publish time. Original sources are linted at their real paths.
       "packages/mulmoclaude/client",
@@ -31,6 +33,58 @@ export default [
   sonarjs.configs.recommended,
   ...tseslint.configs.recommended,
   ...vuePlugin.configs["flat/recommended"],
+  ...vueI18n.configs.recommended,
+  {
+    // Point `@intlify/vue-i18n/*` rules at the JSON cache generated
+    // by `yarn dumpi18n` (which serialises src/lang/*.ts). Without
+    // `localeDir`, the plugin can't validate key references and
+    // surfaces a global "You need to set 'localeDir'" warning on
+    // every lint run.
+    settings: {
+      "vue-i18n": {
+        localeDir: ".i18n-cache/*.{json}",
+        messageSyntaxVersion: "^11.0.0",
+      },
+    },
+    rules: {
+      // Material Icon ligatures, symbol glyphs, and technical
+      // identifiers rendered verbatim in templates (inside
+      // <span class="material-icons">, <code>, <kbd>) are not
+      // translatable content. Filter them out centrally so real
+      // translatable strings remain visible in the lint output.
+      "@intlify/vue-i18n/no-raw-text": [
+        "error",
+        {
+          ignoreNodes: ["code", "kbd", "pre", "tt", "v-pre"],
+          ignorePattern:
+            // snake_case single token → Material Icon name
+            // (e.g. "chevron_left", "expand_more", "picture_as_pdf")
+            // Also covers short lowercase single-word icon names
+            // like "add" / "delete" / "edit" / "save" / "undo".
+            "^(?:[a-z]+(?:_[a-z]+)*|↺|✕|‹|›|▲|▼|♪|⚠|📅|📊|☑|✓|○|🔑|📁|99\\+|·\\s*|\\+|:|\\s+)$",
+          ignoreText: [
+            "MulmoClaude",
+            "GEMINI_API_KEY",
+            ".env",
+            "data/",
+            "artifacts/",
+            "flat",
+            "by-name",
+            "by-date",
+            "claude mcp",
+            "mcp__",
+            "--allowedTools",
+            "host.docker.internal",
+            "/",
+            "s",
+            "?",
+            "(",
+            ")",
+          ],
+        },
+      ],
+    },
+  },
   {
     files: [
       "**/utils/html_render.ts",
@@ -54,16 +108,14 @@ export default [
     },
     rules: {
       indent: ["error", 2],
-      // Loop iterators (i/j), throwaway (_), and domain-standard
-      // 2-char idioms exempted. `id` covers every record-with-id
-      // in the codebase. `fs`/`os`/`path` are Node-module imports.
-      // `ok` is the Result-pattern discriminator. `ms`/`ts` are
-      // unit-suffixed time values. `md` is markdown. `it` is
-      // node:test's `it()`.
-      // Enabled as `warn` so existing short names across the repo
-      // don't block CI — we migrate incrementally.
+      // Loop iterators (i/j), throwaway (_), and the Result-pattern
+      // discriminator (ok) are the only exempted short names. Everything
+      // else — fs/os namespace imports, id/md/ms abbreviations, etc. —
+      // must be ≥3 chars. Use named imports (e.g. `{ readFileSync }`
+      // from "fs") and descriptive locals (`markdown`, `delayMs`,
+      // `itemId`) instead.
       "id-length": [
-        "warn",
+        "error",
         {
           min: 3,
           // Don't flag object property keys — external API payloads
@@ -73,13 +125,7 @@ export default [
             "_",
             "i",
             "j",
-            "id",
-            "ok",
-            "md",
-            "ms",
-            "it",
-            "fs",
-            "os"
+            "ok"
           ],
         },
       ],
@@ -109,7 +155,10 @@ export default [
       "sonarjs/no-ignored-exceptions": "error",
       "sonarjs/todo-tag": "off",
       "sonarjs/no-commented-code": "off",
-      "sonarjs/no-nested-conditional": "warn",
+      // The rule has no depth option — it flags any nested ternary.
+      // In practice most of our `a ? b : c ? d : e` chains are clean
+      // option tables, not obfuscation. Disable rather than warn.
+      "sonarjs/no-nested-conditional": "off",
       "sonarjs/cognitive-complexity": "error",
       // `@typescript-eslint/no-unused-vars` already covers this and
       // honours the `^__` ignore pattern (see its options above); the

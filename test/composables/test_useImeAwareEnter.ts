@@ -37,8 +37,8 @@ function setup() {
   return {
     handlers,
     sends,
-    advance(ms: number) {
-      nowValue += ms;
+    advance(delayMs: number) {
+      nowValue += delayMs;
     },
     now() {
       return nowValue;

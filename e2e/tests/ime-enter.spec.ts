@@ -97,10 +97,10 @@ test.describe("IME Enter handling", () => {
     // Safari fires all three events synchronously in the same microtask.
     // Dispatch atomically in one evaluate() to avoid CDP round-trip latency
     // inflating the gap beyond SAFARI_IME_RACE_WINDOW_MS (30ms).
-    await input.evaluate((el) => {
-      el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
-      el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
-      el.dispatchEvent(
+    await input.evaluate((elem) => {
+      elem.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      elem.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+      elem.dispatchEvent(
         new KeyboardEvent("keydown", {
           key: "Enter",
           code: "Enter",
@@ -120,10 +120,10 @@ test.describe("IME Enter handling", () => {
     await fillChatInput(page, "テスト");
 
     // Complete an IME sequence first (Safari order) — atomic to avoid CDP latency.
-    await input.evaluate((el) => {
-      el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
-      el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
-      el.dispatchEvent(
+    await input.evaluate((elem) => {
+      elem.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      elem.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+      elem.dispatchEvent(
         new KeyboardEvent("keydown", {
           key: "Enter",
           code: "Enter",

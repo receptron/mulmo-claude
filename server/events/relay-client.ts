@@ -12,6 +12,7 @@
 import WebSocket from "ws";
 import type { ChatService } from "@mulmobridge/chat-service";
 import { ONE_SECOND_MS } from "../utils/time.js";
+import { errorMessage } from "../utils/errors.js";
 
 type RelayFn = ChatService["relay"];
 
@@ -106,7 +107,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
       socket = new WebSocket(buildUrl());
     } catch (err) {
       logger.error(LOG_PREFIX, "failed to create WebSocket", {
-        error: err instanceof Error ? err.message : String(err),
+        error: errorMessage(err),
       });
       scheduleReconnect();
       return;
@@ -204,7 +205,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
     } catch (err) {
       logger.error(LOG_PREFIX, "relay processing failed", {
         id: msg.id,
-        error: err instanceof Error ? err.message : String(err),
+        error: errorMessage(err),
       });
       sendResponse({
         platform: msg.platform,

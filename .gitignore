@@ -1,5 +1,6 @@
 node_modules
 dist
+.i18n-cache/
 .env
 .DS_Store
 *~*.tgz

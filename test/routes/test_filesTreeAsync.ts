@@ -9,7 +9,7 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile, symlink } from "node:fs/promises";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildTreeAsync, listDirShallow } from "../../server/api/routes/files.js";
 
@@ -24,7 +24,7 @@ interface TreeNodeShape {
 }
 
 async function setupFixture(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "files-tree-"));
+  const root = await mkdtemp(path.join(tmpdir(), "files-tree-"));
   // root/
   //   a.md
   //   dir1/
@@ -101,7 +101,7 @@ describe("buildTreeAsync", () => {
   it("skips symlinks (no workspace escape)", async () => {
     // Create a symlink AFTER the fixture so it lives alongside the
     // other children; buildTreeAsync should ignore it.
-    const linkTarget = await mkdtemp(path.join(os.tmpdir(), "files-link-"));
+    const linkTarget = await mkdtemp(path.join(tmpdir(), "files-link-"));
     const linkPath = path.join(root, "escape");
     try {
       await symlink(linkTarget, linkPath);

@@ -15,6 +15,7 @@ import { SESSION_ORIGINS } from "../../../src/types/session.js";
 import { loadUserTasks, validateAndCreate, applyUpdate, withUserTaskLock } from "../../workspace/skills/user-tasks.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
 import { errorMessage } from "../../utils/errors.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { log } from "../../system/logger/index.js";
 import { startChat } from "./agent.js";
 
@@ -150,11 +151,12 @@ interface LogQuery {
 
 router.get(API_ROUTES.scheduler.logs, async (req: Request<object, unknown, object, LogQuery>, res: Response<{ logs: TaskLogEntry[] }>) => {
   const MAX_LIMIT = 500;
-  const rawLimit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined;
+  const rawLimitStr = getOptionalStringQuery(req, "limit");
+  const rawLimit = rawLimitStr ? parseInt(rawLimitStr, 10) : undefined;
   const limit = Number.isFinite(rawLimit) && rawLimit! > 0 ? Math.min(rawLimit!, MAX_LIMIT) : undefined;
   const logs = await getSchedulerLogs({
-    since: typeof req.query.since === "string" ? req.query.since : undefined,
-    taskId: typeof req.query.taskId === "string" ? req.query.taskId : undefined,
+    since: getOptionalStringQuery(req, "since"),
+    taskId: getOptionalStringQuery(req, "taskId"),
     limit,
   });
   res.json({ logs });

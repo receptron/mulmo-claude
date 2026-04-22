@@ -4,6 +4,7 @@ import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { readTextSafeSync, readTextSafe } from "../../utils/files/safe.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
 import { badRequest } from "../../utils/httpError.js";
+import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -132,21 +133,34 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 
   const slug = wikiSlugify(pageName);
 
-  const exact = slugs.get(slug);
-  if (exact) return path.join(dir, exact);
+  if (slug.length > 0) {
+    const exact = slugs.get(slug);
+    if (exact) return path.join(dir, exact);
 
-  // Fuzzy: same `includes` semantics as the old sync path — iterate
-  // the index's keys, no filesystem access.
-  for (const [key, file] of slugs) {
-    if (slug.includes(key) || key.includes(slug)) {
-      return path.join(dir, file);
+    // Fuzzy: same `includes` semantics as the old sync path — iterate
+    // the index's keys, no filesystem access.
+    for (const [key, file] of slugs) {
+      if (slug.includes(key) || key.includes(slug)) {
+        return path.join(dir, file);
+      }
     }
   }
+
+  // Non-ASCII page names (e.g. Japanese [[wiki links]]) produce empty
+  // slugs after slugification. Fall back to matching by title in the
+  // wiki index so the link resolves to its page file.
+  const indexContent = readFileOrEmpty(indexFile());
+  const entries = parseIndexEntries(indexContent);
+  const titleMatch = entries.find((entry) => entry.title === pageName);
+  if (titleMatch && slugs.has(titleMatch.slug)) {
+    return path.join(dir, slugs.get(titleMatch.slug)!);
+  }
+
   return null;
 }
 
 router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
-  const slug = typeof req.query.slug === "string" ? req.query.slug : undefined;
+  const slug = getOptionalStringQuery(req, "slug");
   if (slug) {
     const filePath = await resolvePagePath(slug);
     const content = filePath ? readFileOrEmpty(filePath) : "";

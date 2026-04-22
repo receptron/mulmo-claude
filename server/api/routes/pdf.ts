@@ -1,4 +1,4 @@
-import fs from "fs";
+import { realpathSync } from "fs";
 import path from "path";
 import { Router, Request, Response } from "express";
 import { marked } from "marked";
@@ -56,7 +56,7 @@ const MIME_BY_EXT: Record<string, string> = {
 // Realpath of the workspace, resolved once at module load. Used to
 // validate that image paths resolved relative to markdowns/ stay
 // inside the workspace after symlink resolution.
-const workspaceReal = fs.realpathSync(resolveWorkspacePath(""));
+const workspaceReal = realpathSync(resolveWorkspacePath(""));
 
 /**
  * Inline local images as base64 data URIs so Puppeteer can render them.

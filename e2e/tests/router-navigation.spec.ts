@@ -104,37 +104,46 @@ test.describe("session navigation via URL", () => {
   });
 });
 
-test.describe("view mode in URL", () => {
-  test("?view=files switches to files view", async ({ page }) => {
-    await page.goto("/chat?view=files");
+test.describe("page routing", () => {
+  test("/files loads the files page", async ({ page }) => {
+    await page.goto("/files");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    // The URL should still have ?view=files
-    expect(new URL(page.url()).searchParams.get("view")).toBe("files");
+    expect(new URL(page.url()).pathname).toBe("/files");
   });
 
-  test("?view=stack switches to stack view", async ({ page }) => {
-    await page.goto("/chat?view=stack");
+  test("/todos loads the todos page", async ({ page }) => {
+    await page.goto("/todos");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("view")).toBe("stack");
+    expect(new URL(page.url()).pathname).toBe("/todos");
   });
 
-  test("?view=todos switches to todos view", async ({ page }) => {
-    await page.goto("/chat?view=todos");
+  test("/scheduler loads the scheduler page", async ({ page }) => {
+    await page.goto("/scheduler");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("view")).toBe("todos");
+    expect(new URL(page.url()).pathname).toBe("/scheduler");
   });
 
-  test("?view=scheduler switches to scheduler view", async ({ page }) => {
-    await page.goto("/chat?view=scheduler");
+  test("/wiki loads the wiki page", async ({ page }) => {
+    await page.goto("/wiki");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("view")).toBe("scheduler");
+    expect(new URL(page.url()).pathname).toBe("/wiki");
   });
 
-  test("no ?view= defaults to single (no param in URL)", async ({ page }) => {
-    await page.goto("/chat");
-    await page.waitForURL(/\/chat\//);
-    const url = new URL(page.url());
-    // "single" is the default — no ?view= in URL
-    expect(url.searchParams.get("view")).toBeNull();
+  test("/skills loads the skills page", async ({ page }) => {
+    await page.goto("/skills");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/skills");
+  });
+
+  test("/roles loads the roles page", async ({ page }) => {
+    await page.goto("/roles");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/roles");
+  });
+
+  test("unknown path redirects to /chat", async ({ page }) => {
+    await page.goto("/does-not-exist");
+    await page.waitForURL(/\/chat/);
+    expect(new URL(page.url()).pathname).toMatch(/^\/chat/);
   });
 });

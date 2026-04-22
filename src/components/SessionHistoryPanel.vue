@@ -9,14 +9,14 @@
       <div class="flex gap-1 mb-1 flex-wrap" data-testid="session-filter-bar">
         <button
           v-for="f in FILTERS"
-          :key="f.value"
+          :key="f"
           class="px-2 py-0.5 text-[10px] rounded-full border transition-colors"
-          :class="activeFilter === f.value ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'"
-          :data-testid="`session-filter-${f.value}`"
-          @click="activeFilter = f.value"
+          :class="activeFilter === f ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'"
+          :data-testid="`session-filter-${f}`"
+          @click="activeFilter = f"
         >
-          {{ f.label }}
-          <span v-if="f.value !== 'all'" class="ml-0.5 opacity-70">{{ countByOrigin(f.value) }}</span>
+          {{ t(`sessionHistoryPanel.filters.${f}`) }}
+          <span v-if="f !== 'all'" class="ml-0.5 opacity-70">{{ countByOrigin(f) }}</span>
         </button>
       </div>
 
@@ -26,11 +26,11 @@
         role="alert"
         data-testid="session-history-error"
       >
-        ⚠ Failed to refresh: {{ errorMessage }}
-        <span v-if="sessions.length > 0"> — showing last known list.</span>
+        {{ t("sessionHistoryPanel.failedToRefresh", { error: errorMessage }) }}
+        <span v-if="sessions.length > 0">{{ t("sessionHistoryPanel.showingLastKnown") }}</span>
       </div>
       <p v-if="filteredSessions.length === 0" class="text-xs text-gray-400 p-2">
-        {{ activeFilter === "all" ? "No sessions yet." : "No matching sessions." }}
+        {{ activeFilter === "all" ? t("sessionHistoryPanel.noSessions") : t("sessionHistoryPanel.noMatching") }}
       </p>
       <div
         v-for="session in filteredSessions"
@@ -53,14 +53,14 @@
           <span class="ml-auto flex items-center gap-1.5">
             <span v-if="isSessionRunning(session)" class="flex items-center gap-0.5 text-yellow-600 font-medium">
               <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-              Running
+              {{ t("sessionHistoryPanel.running") }}
             </span>
-            <span v-else-if="isSessionUnread(session)" class="flex items-center gap-0.5 text-gray-900 font-bold"> Unread </span>
+            <span v-else-if="isSessionUnread(session)" class="flex items-center gap-0.5 text-gray-900 font-bold">{{ t("sessionHistoryPanel.unread") }}</span>
             <span v-else>{{ formatDate(session.updatedAt) }}</span>
           </span>
         </div>
         <p class="truncate" :class="previewClasses(session)">
-          {{ session.preview || "(no messages)" }}
+          {{ session.preview || t("sessionHistoryPanel.noMessages") }}
         </p>
         <!-- Optional second line: AI-generated summary of the
              session, populated by the chat indexer (#123). -->
@@ -74,19 +74,16 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary, SessionOrigin } from "../types/session";
 import { SESSION_ORIGINS } from "../types/session";
 import { formatDate } from "../utils/format/date";
 import { roleIcon, roleName } from "../utils/role/icon";
 
-const FILTERS = [
-  { value: "all" as const, label: "All" },
-  { value: SESSION_ORIGINS.human, label: "Human" },
-  { value: SESSION_ORIGINS.scheduler, label: "Scheduler" },
-  { value: SESSION_ORIGINS.skill, label: "Skill" },
-  { value: SESSION_ORIGINS.bridge, label: "Bridge" },
-];
+const { t } = useI18n();
+
+const FILTERS = ["all" as const, SESSION_ORIGINS.human, SESSION_ORIGINS.scheduler, SESSION_ORIGINS.skill, SESSION_ORIGINS.bridge];
 
 const ORIGIN_ICONS: Record<string, string> = {
   human: "person",

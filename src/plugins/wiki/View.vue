@@ -3,48 +3,53 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-3">
-        <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" title="Back to index" @click="navigate('index')">
+        <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" :title="t('pluginWiki.backToIndex')" @click="router.back()">
           <span class="material-icons text-base">arrow_back</span>
         </button>
         <h2 class="text-lg font-semibold text-gray-800">{{ title }}</h2>
       </div>
       <div class="flex gap-1 items-center">
         <template v-if="action === 'page' && content">
-          <button
-            class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 w-16 flex items-center justify-center gap-1"
-            :disabled="pdfDownloading"
-            @click="downloadPdf"
-          >
-            <svg v-if="pdfDownloading" class="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            <span v-else>↓ PDF</span>
-            <span v-if="pdfDownloading">PDF</span>
-          </button>
-          <span v-if="pdfError" class="text-xs text-red-500" :title="pdfError">⚠ PDF failed</span>
+          <div class="button-group">
+            <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
+              <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+              {{ t("pluginWiki.pdf") }}
+            </button>
+          </div>
+          <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">{{ t("pluginWiki.pdfFailed") }}</span>
         </template>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'index' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('index')"
-        >
-          Index
-        </button>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'log' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('log')"
-        >
-          Log
-        </button>
-        <button
-          class="px-3 py-1 text-xs rounded-full border transition-colors"
-          :class="action === 'lint_report' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
-          @click="navigate('lint_report')"
-        >
-          Lint
-        </button>
+        <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'index' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('index')"
+          >
+            <span class="material-icons text-sm">list</span>
+            <span>{{ t("pluginWiki.tabIndex") }}</span>
+          </button>
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'log' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('log')"
+          >
+            <span class="material-icons text-sm">history</span>
+            <span>{{ t("pluginWiki.tabLog") }}</span>
+          </button>
+          <button
+            :class="[
+              'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
+              action === 'lint_report' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            @click="navigate('lint_report')"
+          >
+            <span class="material-icons text-sm">rule</span>
+            <span>{{ t("pluginWiki.tabLint") }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -57,42 +62,85 @@
     <div v-if="!content && !navError" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
       <div class="text-center space-y-2">
         <span class="material-icons text-4xl text-gray-300">menu_book</span>
-        <p>Wiki is empty. Ask the Wiki Manager to ingest a source.</p>
+        <p>{{ t("pluginWiki.empty") }}</p>
       </div>
     </div>
 
     <!-- Index: page card list -->
-    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 overflow-y-auto p-4 space-y-2">
+    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 overflow-y-auto">
       <div
         v-for="entry in pageEntries"
         :key="entry.slug"
-        class="rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
+        class="flex items-baseline gap-2 px-4 py-1 cursor-pointer hover:bg-blue-50 transition-colors"
+        :data-testid="`wiki-page-entry-${entry.slug || entry.title}`"
         @click="navigatePage(entry.slug || entry.title)"
       >
-        <div class="font-medium text-sm text-gray-800">{{ entry.title }}</div>
-        <div v-if="entry.description" class="text-xs text-gray-500 mt-0.5">
+        <span class="font-medium text-sm text-gray-800 shrink-0">{{ entry.title }}</span>
+        <span v-if="entry.description" class="text-xs text-gray-500 truncate">
           {{ entry.description }}
-        </div>
+        </span>
       </div>
     </div>
 
     <!-- Markdown content -->
     <div v-else class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content" @click="handleContentClick" v-html="renderedContent" />
+
+    <!-- Per-page chat composer (standalone /wiki route only). Sending
+         spawns a fresh chat session with a prepended "read this page
+         first" instruction — see AppApi.startNewChat. Hidden when
+         WikiView is mounted as a manageWiki tool result inside /chat:
+         the enclosing chat already has its own composer, and spawning
+         a nested new session from there is confusing. -->
+    <div v-if="action === 'page' && content && isStandaloneWikiRoute" class="border-t border-gray-200 px-4 py-3 shrink-0 bg-gray-50">
+      <div class="flex gap-2">
+        <textarea
+          v-model="chatDraft"
+          data-testid="wiki-page-chat-input"
+          :placeholder="t('pluginWiki.chatPlaceholder')"
+          rows="2"
+          class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none"
+          @compositionstart="imeEnter.onCompositionStart"
+          @compositionend="imeEnter.onCompositionEnd"
+          @keydown="imeEnter.onKeydown"
+          @blur="imeEnter.onBlur"
+        />
+        <button
+          data-testid="wiki-page-chat-send"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-start"
+          :title="t('pluginWiki.chatSend')"
+          :disabled="!canSendChat"
+          @click="submitChat"
+        >
+          <span class="material-icons text-base leading-none">send</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter, isNavigationFailure, type LocationQuery } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { useImeAwareEnter } from "../../composables/useImeAwareEnter";
+import { usePdfDownload } from "../../composables/usePdfDownload";
+import { useAppApi } from "../../composables/useAppApi";
 import { renderWikiLinks } from "./helpers";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
-import { apiPost, apiFetchRaw } from "../../utils/api";
+import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
-import { errorMessage } from "../../utils/errors";
+import { PAGE_ROUTES } from "../../router";
+
+type WikiTabView = "log" | "lint_report";
+
+const route = useRoute();
+const router = useRouter();
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult?: ToolResultComplete<WikiData>;
@@ -104,8 +152,14 @@ const action = ref(props.selectedResult?.data?.action ?? "index");
 const title = ref(props.selectedResult?.data?.title ?? "Wiki");
 const content = ref(props.selectedResult?.data?.content ?? "");
 const pageEntries = ref<WikiPageEntry[]>(props.selectedResult?.data?.pageEntries ?? []);
+// Declared up here — not next to callApi — because the URL watcher
+// below fires with `immediate: true`, which invokes callApi
+// synchronously during setup. If this ref were declared after the
+// watcher, callApi's `navError.value = null` would hit the TDZ on
+// direct loads of /wiki and the fetch would never run.
+const navError = ref<string | null>(null);
 
-const { refresh } = useFreshPluginData<WikiData>({
+const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
   // fetch that page by slug; otherwise fetch the index.
   endpoint: () => {
@@ -119,6 +173,15 @@ const { refresh } = useFreshPluginData<WikiData>({
     content.value = data.content ?? "";
     pageEntries.value = data.pageEntries ?? [];
   },
+});
+
+onMounted(() => {
+  // On /wiki, the route watcher below fires with `immediate: true` and
+  // is the source of truth for the initial fetch (via POST callApi).
+  // useFreshPluginData's mount fetch is GET-only and always returns
+  // the index payload — if it resolves last, it clobbers log / lint /
+  // page state. Cancel it here so the two can't race.
+  if (route.name === PAGE_ROUTES.wiki) abortFreshFetch();
 });
 
 watch(
@@ -135,6 +198,27 @@ watch(
   },
 );
 
+// URL is the single source of truth for wiki navigation. Button
+// handlers push to the router; this watcher drives callApi(). Only
+// runs when WikiView is mounted as the /wiki page — when mounted as
+// a manageWiki tool-result inside /chat, the tool-result watcher
+// above seeds state and this watcher does nothing.
+watch(
+  () => (route.name === PAGE_ROUTES.wiki ? [route.query.page, route.query.view] : null),
+  (params) => {
+    if (!params) return;
+    const [page, view] = params;
+    if (typeof page === "string" && page.length > 0) {
+      callApi({ action: "page", pageName: page });
+    } else if (view === "log" || view === "lint_report") {
+      callApi({ action: view });
+    } else {
+      callApi({ action: "index" });
+    }
+  },
+  { immediate: true },
+);
+
 const renderedContent = computed(() => {
   if (!content.value) return "";
   // Rewrite workspace-relative image refs (`![alt](images/foo.png)`)
@@ -147,9 +231,11 @@ const renderedContent = computed(() => {
   return marked.parse(renderWikiLinks(withImages)) as string;
 });
 
-const navError = ref<string | null>(null);
-const pdfDownloading = ref(false);
-const pdfError = ref<string | null>(null);
+const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
+
+async function downloadPdf() {
+  await rawDownloadPdf(content.value, `${title.value}.pdf`);
+}
 
 async function callApi(body: Record<string, unknown>) {
   navError.value = null;
@@ -180,47 +266,74 @@ async function callApi(body: Record<string, unknown>) {
   }
 }
 
-function navigate(newAction: string) {
-  callApi({ action: newAction });
+function dropKeys(query: LocationQuery, keys: string[]): LocationQuery {
+  const next: LocationQuery = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (!keys.includes(key)) next[key] = value;
+  }
+  return next;
+}
+
+function pushWiki(query: LocationQuery) {
+  const target = route.name === PAGE_ROUTES.wiki ? { query } : { name: PAGE_ROUTES.wiki, query };
+  router.push(target).catch((err: unknown) => {
+    if (!isNavigationFailure(err)) {
+      console.error("[wiki] navigation failed:", err);
+    }
+  });
+}
+
+// Preserve siblings only when already on /wiki. Cross-route jumps
+// (e.g. from /chat, where the URL may carry `?result=<uuid>`) start
+// from a clean query so chat-specific params don't bleed into /wiki.
+function currentWikiQuery(): LocationQuery {
+  return route.name === PAGE_ROUTES.wiki ? route.query : {};
+}
+
+function navigate(newAction: "index" | WikiTabView) {
+  const base = currentWikiQuery();
+  const query = newAction === "index" ? dropKeys(base, ["page", "view"]) : { ...dropKeys(base, ["page"]), view: newAction };
+  pushWiki(query);
 }
 
 function navigatePage(pageName: string) {
-  callApi({ action: "page", pageName });
+  pushWiki({ ...dropKeys(currentWikiQuery(), ["view"]), page: pageName });
 }
 
-async function downloadPdf() {
-  pdfError.value = null;
-  pdfDownloading.value = true;
-  let response: Response;
-  try {
-    response = await apiFetchRaw(API_ROUTES.pdf.markdown, {
-      method: "POST",
-      body: JSON.stringify({
-        markdown: content.value,
-        filename: `${title.value}.pdf`,
-      }),
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    pdfError.value = errorMessage(err);
-    pdfDownloading.value = false;
-    return;
-  }
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    pdfError.value = `PDF error ${response.status}: ${text}`;
-    pdfDownloading.value = false;
-    return;
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${title.value}.pdf`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-  pdfDownloading.value = false;
+// --- Per-page chat composer ---
+const appApi = useAppApi();
+const chatDraft = ref("");
+
+const isStandaloneWikiRoute = computed(() => route.name === PAGE_ROUTES.wiki);
+const canSendChat = computed(() => chatDraft.value.trim().length > 0 && currentSlug() !== null);
+
+// Reject path-traversal tokens so `?page=../secrets` can't be
+// interpolated into the prompt and escape `data/wiki/pages/`. Keeps
+// non-ASCII slugs (e.g. Japanese titles like `さくらインターネット`)
+// working — we only ban separators and `..`, not arbitrary unicode.
+function isSafeSlug(slug: string): boolean {
+  return slug.length > 0 && !slug.includes("/") && !slug.includes("\\") && !slug.includes("..");
 }
+
+function currentSlug(): string | null {
+  // Prefer the URL on /wiki (source of truth for that route); fall
+  // back to the tool-result payload when WikiView is mounted as a
+  // manageWiki result inside /chat.
+  const raw = route.name === PAGE_ROUTES.wiki && typeof route.query.page === "string" ? route.query.page : (props.selectedResult?.data?.pageName ?? null);
+  if (!raw || !isSafeSlug(raw)) return null;
+  return raw;
+}
+
+function submitChat() {
+  const text = chatDraft.value.trim();
+  const slug = currentSlug();
+  if (!text || !slug) return;
+  const prompt = `Before answering, read the wiki page at data/wiki/pages/${slug}.md.\n\n${text}`;
+  chatDraft.value = "";
+  appApi.startNewChat(prompt);
+}
+
+const imeEnter = useImeAwareEnter(submitChat);
 
 function handleContentClick(event: MouseEvent) {
   // 1. Internal wiki links: `[[Page Name]]` was rewritten to a
@@ -241,6 +354,31 @@ function handleContentClick(event: MouseEvent) {
 </script>
 
 <style scoped>
+.button-group {
+  display: flex;
+  gap: 0.5em;
+}
+.download-btn {
+  padding: 0.5em 1em;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.download-btn-green {
+  background-color: #4caf50;
+}
+.download-btn .material-icons {
+  font-size: 1.2em;
+}
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .wiki-content :deep(.wiki-link) {
   color: #2563eb;
   cursor: pointer;

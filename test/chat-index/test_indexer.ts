@@ -22,7 +22,7 @@ afterEach(() => {
 // Helper: seed a session jsonl + matching meta file so the indexer
 // has something real to read. Returns the session id.
 function seedSession(
-  id: string,
+  sessionId: string,
   opts: {
     roleId?: string;
     startedAt?: string;
@@ -37,7 +37,7 @@ function seedSession(
     assistantMessages = ["Sure — tell me what it's about."],
   } = opts;
   const chatDir = join(workspace, "chat");
-  writeFileSync(join(chatDir, `${id}.json`), JSON.stringify({ roleId, startedAt }));
+  writeFileSync(join(chatDir, `${sessionId}.json`), JSON.stringify({ roleId, startedAt }));
   const lines: string[] = [];
   for (let i = 0; i < Math.max(userMessages.length, assistantMessages.length); i++) {
     if (userMessages[i] !== undefined) {
@@ -59,8 +59,8 @@ function seedSession(
       );
     }
   }
-  writeFileSync(join(chatDir, `${id}.jsonl`), lines.join("\n") + "\n");
-  return id;
+  writeFileSync(join(chatDir, `${sessionId}.jsonl`), lines.join("\n") + "\n");
+  return sessionId;
 }
 
 // Helper: build a stub summarize function that records calls and

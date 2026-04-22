@@ -3,8 +3,8 @@
     <button
       class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
       data-testid="new-session-btn"
-      title="New session"
-      aria-label="New session"
+      :title="t('sessionTabBar.newSession')"
+      :aria-label="t('sessionTabBar.newSession')"
       @click="emit('newSession')"
     >
       <span class="material-icons text-sm">add</span>
@@ -29,20 +29,20 @@
       data-testid="history-btn"
       class="relative flex-shrink-0 flex items-center justify-center w-7 py-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
       :class="{ 'text-blue-500': historyOpen }"
-      title="Session history"
+      :title="t('sessionTabBar.sessionHistory')"
       @click="emit('toggleHistory')"
     >
       <span class="material-icons text-base">expand_more</span>
       <span
         v-if="activeSessionCount > 0"
         class="absolute -top-0.5 -left-0.5 min-w-[1rem] h-4 px-0.5 bg-yellow-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-        :title="`${activeSessionCount} active session${activeSessionCount > 1 ? 's' : ''} (agent running)`"
+        :title="t('sessionTabBar.activeSessions', activeSessionCount, { named: { count: activeSessionCount } })"
         >{{ activeSessionCount }}</span
       >
       <span
         v-if="unreadCount > 0"
         class="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none cursor-help"
-        :title="`${unreadCount} unread repl${unreadCount > 1 ? 'ies' : 'y'}`"
+        :title="t('sessionTabBar.unreadReplies', unreadCount, { named: { count: unreadCount } })"
         >{{ unreadCount }}</span
       >
     </button>
@@ -51,9 +51,12 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary } from "../types/session";
 import { roleIcon, roleName } from "../utils/role/icon";
+
+const { t } = useI18n();
 
 defineProps<{
   sessions: SessionSummary[];

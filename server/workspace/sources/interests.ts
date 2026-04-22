@@ -4,7 +4,7 @@
 // during conversation when it detects user interest in a topic.
 // The pipeline's notify phase uses it to score and filter articles.
 
-import fs from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { workspacePath } from "../paths.js";
 import { log } from "../../system/logger/index.js";
@@ -41,8 +41,8 @@ export function loadInterests(root?: string): InterestsProfile | null {
   const base = root ?? workspacePath;
   const filePath = path.join(base, CONFIG_FILE);
   try {
-    if (!fs.existsSync(filePath)) return null;
-    const raw = fs.readFileSync(filePath, "utf-8");
+    if (!existsSync(filePath)) return null;
+    const raw = readFileSync(filePath, "utf-8");
     const parsed: unknown = JSON.parse(raw);
     return validateInterests(parsed);
   } catch (err) {

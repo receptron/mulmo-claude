@@ -1,34 +1,34 @@
 <template>
   <div class="w-72 flex-shrink-0 border-r border-gray-200 overflow-y-auto p-2 bg-gray-50">
     <div class="flex justify-end items-center gap-2 px-1 pb-1 text-xs">
-      <span class="text-gray-400">Sort:</span>
+      <span class="text-gray-400">{{ t("fileTreePane.sort") }}</span>
       <button
         type="button"
         class="px-2 py-0.5 rounded transition-colors"
         :class="sortMode === 'name' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-200'"
         :aria-pressed="sortMode === 'name'"
-        title="Sort by name"
+        :title="t('fileTreePane.sortByName')"
         data-testid="file-sort-name"
         @click="emit('update:sortMode', 'name')"
       >
-        Name
+        {{ t("fileTreePane.name") }}
       </button>
       <button
         type="button"
         class="px-2 py-0.5 rounded transition-colors"
         :class="sortMode === 'recent' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-200'"
         :aria-pressed="sortMode === 'recent'"
-        title="Sort by modified date (newest first)"
+        :title="t('fileTreePane.sortByRecent')"
         data-testid="file-sort-recent"
         @click="emit('update:sortMode', 'recent')"
       >
-        Recent
+        {{ t("fileTreePane.recent") }}
       </button>
     </div>
     <div v-if="treeError" class="p-2 text-xs text-red-600">
       {{ treeError }}
     </div>
-    <div v-else-if="!rootNode" class="p-2 text-xs text-gray-400">Loading...</div>
+    <div v-else-if="!rootNode" class="p-2 text-xs text-gray-400">{{ t("common.loading") }}</div>
     <FileTree
       v-else
       :node="rootNode"
@@ -41,8 +41,8 @@
     />
     <template v-if="refRoots.length > 0">
       <div class="mt-2 pt-2 border-t border-gray-200 px-1 mb-1 flex items-center gap-1">
-        <span class="text-[10px] font-semibold text-gray-400 uppercase">Reference</span>
-        <span class="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-600">RO</span>
+        <span class="text-[10px] font-semibold text-gray-400 uppercase">{{ t("fileTreePane.reference") }}</span>
+        <span class="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-600">{{ t("fileTreePane.readOnlyBadge") }}</span>
       </div>
       <FileTree
         v-for="refNode in refRoots"
@@ -60,9 +60,12 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import FileTree from "./FileTree.vue";
 import type { TreeNode } from "../types/fileTree";
 import type { FileSortMode } from "../composables/useFileSortMode";
+
+const { t } = useI18n();
 
 defineProps<{
   rootNode: TreeNode | null;

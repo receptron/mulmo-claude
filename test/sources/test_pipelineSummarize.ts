@@ -63,9 +63,9 @@ describe("buildSummarizePromptBody", () => {
 
 describe("buildEmptyDayMarkdown", () => {
   it("produces a minimal 'nothing new' markdown for empty days", () => {
-    const md = buildEmptyDayMarkdown("2026-04-13");
-    assert.match(md, /^# Daily brief — 2026-04-13/);
-    assert.match(md, /No new items today/);
+    const markdown = buildEmptyDayMarkdown("2026-04-13");
+    assert.match(markdown, /^# Daily brief — 2026-04-13/);
+    assert.match(markdown, /No new items today/);
   });
 });
 

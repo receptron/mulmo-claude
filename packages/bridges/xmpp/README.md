@@ -1,0 +1,87 @@
+# @mulmobridge/xmpp
+
+> **Experimental** — please test and [report issues](https://github.com/receptron/mulmoclaude/issues/new).
+
+XMPP / Jabber bridge for [MulmoClaude](https://github.com/receptron/mulmoclaude). Connects to any XMPP server (ejabberd, Prosody, Tigase, dino-im.org, snikket.org, …) with a JID + password and bridges `type="chat"` message stanzas to MulmoClaude. Outbound TLS — **no public URL needed**.
+
+## Setup
+
+### 1. Create a JID
+
+Register the bot on any XMPP server. A few public servers that accept registrations:
+
+- [xmpp.jp](https://www.xmpp.jp/) (JP)
+- [jabber.de](https://www.jabber.de/) (DE)
+- [disroot.org](https://disroot.org/) (NL)
+- [yax.im](https://yaxim.org/) (DE)
+
+Or run your own [Prosody](https://prosody.im/) / [ejabberd](https://www.ejabberd.im/).
+
+### 2. Find the service URI
+
+Most servers support both ports; pick one:
+
+- **Implicit TLS (direct TLS, recommended)**: `xmpps://<host>:5223`
+- **STARTTLS**: `xmpp://<host>:5222`
+
+If you don't know which your server supports, `xmpps://<domain>:5223` is the common default.
+
+### 3. Run the bridge
+
+```bash
+# Testing with mock server
+npx @mulmobridge/mock-server &
+XMPP_JID=mulmobot@example.com \
+XMPP_PASSWORD=... \
+XMPP_SERVICE=xmpps://example.com:5223 \
+MULMOCLAUDE_AUTH_TOKEN=mock-test-token \
+npx @mulmobridge/xmpp
+
+# With real MulmoClaude
+XMPP_JID=mulmobot@example.com \
+XMPP_PASSWORD=... \
+XMPP_SERVICE=xmpps://example.com:5223 \
+npx @mulmobridge/xmpp
+```
+
+Add the bot as a contact (or send an unsolicited message from an allowlisted JID) and start chatting.
+
+## Environment variables
+
+| Variable                 | Required | Default                 | Description                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XMPP_JID`               | yes      | —                       | Full JID, e.g. `mulmobot@example.com`                                                                                                                                                                                                                                                                                    |
+| `XMPP_PASSWORD`          | yes      | —                       | Account password                                                                                                                                                                                                                                                                                                         |
+| `XMPP_SERVICE`           | yes      | —                       | Connection URI, e.g. `xmpps://example.com:5223` (implicit TLS) or `xmpp://example.com:5222` (STARTTLS)                                                                                                                                                                                                                   |
+| `XMPP_ALLOWED_JIDS`      | no       | (all)                   | CSV of bare JIDs allowed to converse, e.g. `alice@example.com,bob@another.im`. Empty = everyone                                                                                                                                                                                                                          |
+| `XMPP_RESOURCE`          | no       | `mulmobridge`           | XMPP resource identifier (shows up alongside the JID in some clients)                                                                                                                                                                                                                                                    |
+| `XMPP_REPLY_MODE`        | no       | `bare`                  | `bare` (default) sends replies to `user@domain` and lets the server route to whichever resource is active — works for multi-device users. `full` echoes back to the sender's full JID (`user@domain/resource`), useful when the server's roster/carbons config doesn't forward bare-addressed messages to every resource |
+| `MULMOCLAUDE_AUTH_TOKEN` | no       | auto                    | MulmoClaude bearer token override                                                                                                                                                                                                                                                                                        |
+| `MULMOCLAUDE_API_URL`    | no       | `http://localhost:3001` | MulmoClaude server URL                                                                                                                                                                                                                                                                                                   |
+
+## How it works
+
+1. The bridge connects to `XMPP_SERVICE` and authenticates with `XMPP_JID` + `XMPP_PASSWORD` using `@xmpp/client`.
+2. On `online` it broadcasts `<presence/>` so contacts see the bot as available, then listens for `stanza` events.
+3. For each incoming `<message type="chat">` (or `type="normal"`) with a `<body>`, the bridge strips the resource from the sender's JID, checks the allowlist, and forwards the plain text to MulmoClaude keyed by the sender's bare JID.
+4. MulmoClaude's reply is sent back as another `<message type="chat">` stanza, chunked at 10 000 chars. The `to=` attribute is the sender's bare JID by default — see `XMPP_REPLY_MODE` in the env table above for when to flip to full-JID.
+
+### Bare vs full JID reply
+
+RFC 6121 requires servers to route bare-addressed chat messages to the most-active or all resources, which is normally what you want for a user jumping between phone and laptop. A handful of servers (or custom carbons configurations) deliver bare-addressed messages only to the primary resource, or silently drop them when no resource is "available". If replies reach the sender from one device but not another, set `XMPP_REPLY_MODE=full` so each reply goes straight back to the exact resource the message came from.
+
+## Troubleshooting
+
+| Symptom                          | Cause                                                                           | Fix                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `error: ECONNREFUSED`            | Wrong host/port or server not reachable                                         | Verify the service URI; try the other port                               |
+| `error: authentication failed`   | Wrong password or JID domain mismatch                                           | Double-check credentials; some servers require a specific SASL mechanism |
+| Bridge sends nothing on receive  | Stanza is not `type="chat"` (likely groupchat or headline)                      | Group-chat support is not implemented yet — send via a direct 1:1 chat   |
+| Contacts don't see bot as online | `XMPP_ALLOWED_JIDS` excluded your JID _and_ `<presence/>` not broadcast to them | Ensure bot is added as a contact and approved                            |
+
+## Security notes
+
+- Credentials travel to the XMPP server — always use `xmpps://` (implicit TLS) or `xmpp://` + STARTTLS-required on the server side.
+- Public servers may log message metadata. For sensitive agents, run your own Prosody / ejabberd.
+- Without `XMPP_ALLOWED_JIDS`, anyone who learns the bot's JID can converse with MulmoClaude. Setting an allowlist is strongly recommended.
+- Group-chat (MUC) support is intentionally deferred to v0.2 to avoid accidentally leaking MulmoClaude responses to a whole room; open an issue if you need it.

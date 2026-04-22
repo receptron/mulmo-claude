@@ -2,16 +2,18 @@
   <div class="h-full flex flex-col overflow-hidden">
     <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between">
       <span class="text-sm font-medium text-gray-700 truncate">
-        {{ title ?? "Chart" }}
+        {{ title ?? t("pluginChart.untitled") }}
       </span>
-      <span class="text-xs text-gray-500 shrink-0"> {{ charts.length }} chart{{ charts.length === 1 ? "" : "s" }} </span>
+      <span class="text-xs text-gray-500 shrink-0">
+        {{ t("pluginChart.chartCount", charts.length, { named: { count: charts.length } }) }}
+      </span>
     </div>
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
       <div v-for="(chart, idx) in charts" :key="idx" class="border border-gray-200 rounded-lg bg-white" :data-testid="`chart-card-${idx}`">
         <div class="px-3 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-sm font-medium text-gray-800 truncate">
-              {{ chart.title ?? `Chart ${idx + 1}` }}
+              {{ chart.title ?? t("pluginChart.chartTitle", { num: idx + 1 }) }}
             </span>
             <span v-if="chart.type" class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 bg-blue-50 text-blue-700 shrink-0">
               {{ chart.type }}
@@ -23,7 +25,7 @@
             @click="exportPng(idx, chart.title)"
           >
             <span class="material-icons text-sm align-middle">download</span>
-            PNG
+            {{ t("pluginChart.png") }}
           </button>
         </div>
         <div :ref="(el) => setChartRef(idx, el as HTMLDivElement | null)" class="w-full h-[400px]" :data-testid="`chart-canvas-${idx}`" />
@@ -34,10 +36,13 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ChartEntry, PresentChartData } from "./index";
 import { isRecord } from "../../utils/types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentChartData>;

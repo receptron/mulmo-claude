@@ -48,7 +48,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
       content: html,
     });
 
-    await page.goto("/chat?view=files&path=HTMLs/chart.html");
+    await page.goto("/files/HTMLs/chart.html");
     const iframe = page.locator('iframe[title="HTML preview"]');
     await expect(iframe).toBeVisible();
 
@@ -69,7 +69,7 @@ test.describe("Files view — HTML iframe sandbox + CSP", () => {
       content: html,
     });
 
-    await page.goto("/chat?view=files&path=HTMLs/x.html");
+    await page.goto("/files/HTMLs/x.html");
     const iframe = page.locator('iframe[title="HTML preview"]');
     await expect(iframe).toBeVisible();
 
@@ -87,13 +87,13 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("`![](images/foo.png)` renders as an `<img src=/api/files/raw?...>`", async ({ page }) => {
-    const md = `# Page\n\n![chart](images/foo.png)\n`;
+    const markdown = `# Page\n\n![chart](images/foo.png)\n`;
     await mockFileContent(page, "markdowns/sample.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
 
-    await page.goto("/chat?view=files&path=markdowns/sample.md");
+    await page.goto("/files/markdowns/sample.md");
     // Wait for the rendered markdown to surface a real <img>.
     await expect(page.locator("img[alt='chart']")).toBeVisible();
     const src = await page.locator("img[alt='chart']").getAttribute("src");
@@ -104,13 +104,13 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("`![](../../images/foo.png)` with relative-up prefix also resolves", async ({ page }) => {
-    const md = `![two](../../images/two.png)`;
+    const markdown = `![two](../../images/two.png)`;
     await mockFileContent(page, "wiki/pages/a.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
 
-    await page.goto("/chat?view=files&path=wiki/pages/a.md");
+    await page.goto("/files/wiki/pages/a.md");
     await expect(page.locator("img[alt='two']")).toBeVisible();
     const src = await page.locator("img[alt='two']").getAttribute("src");
     expect(src).toContain("/api/files/raw");
@@ -120,15 +120,15 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("data: URIs and http URLs pass through untouched", async ({ page }) => {
-    const md = `
+    const markdown = `
 ![data](data:image/png;base64,AAA=)
 ![cdn](https://cdn.example.com/x.png)
 `;
     await mockFileContent(page, "markdowns/pass.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
-    await page.goto("/chat?view=files&path=markdowns/pass.md");
+    await page.goto("/files/markdowns/pass.md");
     const dataSrc = await page.locator("img[alt='data']").getAttribute("src");
     expect(dataSrc).toBe("data:image/png;base64,AAA=");
     const cdnSrc = await page.locator("img[alt='cdn']").getAttribute("src");

@@ -312,7 +312,7 @@ async function handleRegister(body: ManageSourceBody, res: Response<ManageSource
 async function handleRemove(body: ManageSourceBody, res: Response<ManageSourceSuccess | ErrorResponse>): Promise<void> {
   const slug = typeof body.slug === "string" ? body.slug.trim() : "";
   if (!isValidSlug(slug)) {
-    res.status(400).json({ error: "slug is required and must be a valid slug" });
+    badRequest(res, "slug is required and must be a valid slug");
     return;
   }
   const removed = await deleteSource(workspacePath, slug);

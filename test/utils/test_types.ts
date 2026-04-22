@@ -175,8 +175,8 @@ describe("hasStringProp", () => {
   it("narrows type correctly", () => {
     const val: unknown = { id: "abc", count: 5 };
     if (hasStringProp(val, "id")) {
-      const id: string = val.id;
-      assert.equal(id, "abc");
+      const fieldId: string = val.id;
+      assert.equal(fieldId, "abc");
     }
   });
 });

@@ -7,7 +7,7 @@
 // doesn't push a history entry).
 
 import type { Router } from "vue-router";
-import { VALID_VIEW_MODES } from "../utils/canvas/viewMode";
+import { readPathMatch } from "../composables/useFileSelection";
 
 // Basic sanity check for a session ID. Real existence verification
 // happens in App.vue's onMounted / loadSession — we can't do async
@@ -24,37 +24,40 @@ function isValidSessionId(value: unknown): boolean {
 
 export function installGuards(router: Router): void {
   router.beforeEach((dest) => {
-    // Only run guards on the chat route — other routes (redirect, etc.)
-    // don't carry parameters that need sanitizing.
-    if (dest.name !== "chat") return;
-
-    // ── sessionId format check ───────────────────────────────────
-    const sessionId = dest.params.sessionId;
-    if (typeof sessionId === "string" && sessionId.length > 0 && !isValidSessionId(sessionId)) {
-      // Garbage sessionId → strip it and go to /chat (new session).
-      return { name: "chat", params: {}, query: {}, replace: true };
+    if (dest.name === "chat") {
+      const sessionId = dest.params.sessionId;
+      if (typeof sessionId === "string" && sessionId.length > 0 && !isValidSessionId(sessionId)) {
+        return { name: "chat", params: {}, query: {}, replace: true };
+      }
     }
 
-    // ── view mode whitelist ──────────────────────────────────────
-    const view = dest.query.view;
-    if (typeof view === "string" && !VALID_VIEW_MODES.has(view)) {
-      const cleaned = { ...dest.query };
-      delete cleaned.view;
-      return { ...dest, query: cleaned, replace: true };
-    }
-
-    // ── file path traversal check ────────────────────────────────
-    const filePath = dest.query.path;
-    if (typeof filePath === "string") {
-      if (filePath.includes("..") || filePath.startsWith("/")) {
+    if (dest.name === "files") {
+      // Back-compat: old query-string form `/files?path=foo.md` →
+      // rewrite to the new path form `/files/foo.md`. Silent
+      // replace so bookmarks / log links keep working. Do this
+      // before the traversal check so `?path=../bad` also lands in
+      // the `..` rejection below.
+      const legacyPath = dest.query.path;
+      if (typeof legacyPath === "string" && legacyPath.length > 0) {
         const cleaned = { ...dest.query };
         delete cleaned.path;
-        return { ...dest, query: cleaned, replace: true };
+        return {
+          name: "files",
+          params: { pathMatch: legacyPath.split("/") },
+          query: cleaned,
+          replace: true,
+        };
       }
 
-      // ?path= without ?view=files → auto-add view=files so FilesView mounts.
-      if (view !== "files") {
-        return { ...dest, query: { ...dest.query, view: "files" }, replace: true };
+      // Traversal / absolute-path rejection against the new param.
+      const filePath = readPathMatch(dest.params.pathMatch);
+      if (typeof filePath === "string" && (filePath.includes("..") || filePath.startsWith("/"))) {
+        return {
+          name: "files",
+          params: { pathMatch: [] },
+          query: dest.query,
+          replace: true,
+        };
       }
     }
   });

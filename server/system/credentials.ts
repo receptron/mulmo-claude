@@ -1,10 +1,10 @@
 import { execFile } from "child_process";
-import { writeFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import { promisify } from "util";
 import { log } from "./logger/index.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS } from "../utils/time.js";
+import { writeFileAtomic } from "../utils/files/atomic.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -208,7 +208,9 @@ export async function refreshCredentials(): Promise<boolean> {
       }
     }
 
-    await writeFile(CREDENTIALS_PATH, credentials + "\n", { mode: 0o600 });
+    // Atomic so a readers mid-refresh can't see a truncated creds
+    // file; mode preserves the 0o600 we always set on this file.
+    await writeFileAtomic(CREDENTIALS_PATH, credentials + "\n", { mode: 0o600 });
     log.info("credentials", "Fresh credentials written to ~/.claude/.credentials.json");
     return true;
   } catch (err) {

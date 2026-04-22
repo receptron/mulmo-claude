@@ -9,6 +9,8 @@ import { saveUserTasks } from "../../utils/files/user-tasks-io.js";
 import { startChat } from "./agent.js";
 import { log } from "../../system/logger/index.js";
 import { SCHEDULER_ACTIONS, TASK_ACTIONS } from "../../../src/config/schedulerActions.js";
+import { badRequest, notFound, serverError } from "../../utils/httpError.js";
+import { errorMessage } from "../../utils/errors.js";
 
 const router = Router();
 
@@ -77,7 +79,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
     if (action === SCHEDULER_ACTIONS.createTask) {
       const result = validateAndCreate(input);
       if (result.kind === "error") {
-        res.status(400).json({ error: result.error });
+        badRequest(res, result.error);
         return;
       }
       const tasks = loadUserTasks();
@@ -97,7 +99,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
       const tasks = loadUserTasks();
       const idx = tasks.findIndex((task) => task.id === taskId);
       if (idx === -1) {
-        res.status(404).json({ error: `task not found: ${taskId}` });
+        notFound(res, `task not found: ${taskId}`);
         return;
       }
       const name = tasks[idx].name;
@@ -117,7 +119,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
       const tasks = loadUserTasks();
       const task = tasks.find((candidate) => candidate.id === taskId);
       if (!task) {
-        res.status(404).json({ error: `task not found: ${taskId}` });
+        notFound(res, `task not found: ${taskId}`);
         return;
       }
       const chatSessionId = crypto.randomUUID();
@@ -143,10 +145,10 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
       return;
     }
 
-    res.status(400).json({ error: `unknown task action: ${action}` });
+    badRequest(res, `unknown task action: ${action}`);
   } catch (err) {
-    log.error("scheduler", "task action failed", { error: String(err) });
-    res.status(500).json({ error: "Internal server error" });
+    log.error("scheduler", "task action failed", { error: errorMessage(err) });
+    serverError(res, "Internal server error");
   }
 }
 

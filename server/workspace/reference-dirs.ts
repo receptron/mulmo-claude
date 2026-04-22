@@ -8,7 +8,7 @@
 
 import { createHash } from "crypto";
 import path from "path";
-import os from "os";
+import { homedir } from "os";
 import { log } from "../system/logger/index.js";
 import { readReferenceDirsJson, writeReferenceDirsJson, isExistingDirectory } from "../utils/files/reference-dirs-io.js";
 import { isRecord } from "../utils/types.js";
@@ -41,7 +41,7 @@ const CONTROL_CHAR_RE_G = /[\x00-\x1f]/g;
 
 function expandHome(inputPath: string): string {
   if (inputPath.startsWith("~/")) {
-    return path.join(os.homedir(), inputPath.slice(2));
+    return path.join(homedir(), inputPath.slice(2));
   }
   return inputPath;
 }
@@ -52,7 +52,7 @@ function isSensitivePath(absPath: string): boolean {
   // Reject filesystem root
   if (normalized === path.parse(normalized).root) return true;
 
-  const home = os.homedir();
+  const home = homedir();
 
   // Block $HOME itself (transitively exposes .ssh etc.)
   if (normalized === home) return true;

@@ -3,7 +3,7 @@
     <!-- API error banner — surfaces POST /api/scheduler failures so a
          delete/add/replace that silently no-ops becomes diagnosable. -->
     <div v-if="apiError" class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700" role="alert" data-testid="scheduler-api-error">
-      ⚠ Failed to update scheduler: {{ apiError }}
+      {{ t("pluginScheduler.apiError", { error: apiError }) }}
     </div>
     <!-- Top-level tab bar: Calendar / Tasks -->
     <div class="flex border-b border-gray-200 px-6">
@@ -13,7 +13,7 @@
         data-testid="scheduler-tab-calendar"
         @click="activeTab = SCHEDULER_TAB.calendar"
       >
-        Calendar
+        {{ t("pluginScheduler.tabCalendar") }}
       </button>
       <button
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
@@ -21,7 +21,7 @@
         data-testid="scheduler-tab-tasks"
         @click="activeTab = SCHEDULER_TAB.tasks"
       >
-        Tasks
+        {{ t("pluginScheduler.tabTasks") }}
       </button>
     </div>
 
@@ -33,17 +33,19 @@
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-3 border-b border-gray-100">
         <div class="flex items-center gap-3">
-          <h2 class="text-lg font-semibold text-gray-800">Scheduler</h2>
-          <span class="text-sm text-gray-500">{{ items.length }} item{{ items.length !== 1 ? "s" : "" }}</span>
+          <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginScheduler.heading") }}</h2>
+          <span class="text-sm text-gray-500">{{ t("pluginScheduler.itemCount", items.length, { named: { count: items.length } }) }}</span>
         </div>
         <div class="flex items-center gap-2">
           <!-- Navigation (calendar modes only) -->
           <template v-if="viewMode !== SCHEDULER_VIEW.list">
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" title="Previous" @click="goPrev">
+            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.prev')" @click="goPrev">
               <span class="material-icons text-sm">chevron_left</span>
             </button>
-            <button class="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded" title="Go to today" @click="goToday">Today</button>
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" title="Next" @click="goNext">
+            <button class="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded" :title="t('pluginScheduler.goToday')" @click="goToday">
+              {{ t("pluginScheduler.today") }}
+            </button>
+            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.next')" @click="goNext">
               <span class="material-icons text-sm">chevron_right</span>
             </button>
             <span class="text-sm text-gray-600 min-w-[140px] text-center">{{ headerLabel }}</span>
@@ -66,7 +68,7 @@
 
       <!-- List view -->
       <div v-if="viewMode === SCHEDULER_VIEW.list" class="flex-1 overflow-y-auto min-h-0">
-        <div v-if="items.length === 0" class="flex items-center justify-center h-full text-gray-400">No scheduled items</div>
+        <div v-if="items.length === 0" class="flex items-center justify-center h-full text-gray-400">{{ t("pluginScheduler.noScheduled") }}</div>
 
         <ul v-else class="p-4 space-y-2">
           <li
@@ -86,14 +88,14 @@
                   :key="key"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-600"
                 >
-                  <span class="text-gray-400">{{ key }}:</span>
+                  <span class="text-gray-400">{{ t("pluginScheduler.propLabel", { key }) }}</span>
                   <span>{{ val }}</span>
                 </span>
               </div>
             </div>
             <button
               class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 mt-0.5 shrink-0"
-              title="Delete item"
+              :title="t('pluginScheduler.deleteItem')"
               @click.stop="remove(item)"
             >
               ✕
@@ -133,7 +135,7 @@
         </div>
         <!-- Unscheduled -->
         <div v-if="unscheduledItems.length > 0" class="p-3 border-t border-gray-200">
-          <div class="text-xs text-gray-400 mb-1.5">Unscheduled</div>
+          <div class="text-xs text-gray-400 mb-1.5">{{ t("pluginScheduler.unscheduled") }}</div>
           <div class="flex flex-wrap gap-1">
             <div
               v-for="item in unscheduledItems"
@@ -179,14 +181,14 @@
                 {{ item.title }}
               </div>
               <div v-if="itemsForDay(day).length > MAX_MONTH_ITEMS" class="text-[10px] text-gray-400 px-1">
-                +{{ itemsForDay(day).length - MAX_MONTH_ITEMS }} more
+                {{ t("pluginScheduler.moreCount", { count: itemsForDay(day).length - MAX_MONTH_ITEMS }) }}
               </div>
             </div>
           </div>
         </div>
         <!-- Unscheduled -->
         <div v-if="unscheduledItems.length > 0" class="p-3 border-t border-gray-200">
-          <div class="text-xs text-gray-400 mb-1.5">Unscheduled</div>
+          <div class="text-xs text-gray-400 mb-1.5">{{ t("pluginScheduler.unscheduled") }}</div>
           <div class="flex flex-wrap gap-1">
             <div
               v-for="item in unscheduledItems"
@@ -204,8 +206,8 @@
       <!-- Item YAML editor -->
       <div v-if="selectedId" class="border-t border-blue-200 bg-blue-50 shrink-0">
         <div class="flex items-center justify-between px-4 py-2 text-sm font-medium text-blue-700">
-          <span>Edit item</span>
-          <button class="text-blue-400 hover:text-blue-600 text-xs" title="Close editor" @click="selectedId = null">✕</button>
+          <span>{{ t("pluginScheduler.editItem") }}</span>
+          <button class="text-blue-400 hover:text-blue-600 text-xs" :title="t('pluginScheduler.closeEditor')" @click="selectedId = null">✕</button>
         </div>
         <div class="px-3 pb-3">
           <textarea
@@ -214,7 +216,9 @@
             spellcheck="false"
           />
           <div class="flex items-center gap-2 mt-2">
-            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">Update</button>
+            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">
+              {{ t("pluginScheduler.update") }}
+            </button>
             <span v-if="yamlError" class="text-xs text-red-500">{{ yamlError }}</span>
           </div>
         </div>
@@ -222,7 +226,9 @@
 
       <!-- JSON source editor -->
       <details class="border-t border-gray-200 bg-gray-50 shrink-0">
-        <summary class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Edit Source</summary>
+        <summary class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">
+          {{ t("pluginScheduler.editSource") }}
+        </summary>
         <div class="p-3">
           <textarea
             v-model="editorText"
@@ -235,7 +241,7 @@
               class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
               @click="applyChanges"
             >
-              Apply Changes
+              {{ t("pluginScheduler.applyChanges") }}
             </button>
             <span v-if="parseError" class="text-xs text-red-500">{{ parseError }}</span>
           </div>
@@ -247,6 +253,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
@@ -254,6 +261,8 @@ import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import TasksTab from "./TasksTab.vue";
 import { isToday } from "../../utils/format/date";
+
+const { t } = useI18n();
 
 type YamlScalar = string | number | boolean | null;
 

@@ -54,7 +54,7 @@ import FileTreePane from "./FileTreePane.vue";
 import FileContentHeader from "./FileContentHeader.vue";
 import FileContentRenderer from "./FileContentRenderer.vue";
 import { useFileTree } from "../composables/useFileTree";
-import { useFileSelection, isValidFilePath } from "../composables/useFileSelection";
+import { useFileSelection, isValidFilePath, readPathMatch } from "../composables/useFileSelection";
 import { useMarkdownMode } from "../composables/useMarkdownMode";
 import { useFileSortMode } from "../composables/useFileSortMode";
 import { useContentDisplay } from "../composables/useContentDisplay";
@@ -161,9 +161,11 @@ const { handleMarkdownLinkClick } = useMarkdownLinkHandler(selectedPath, {
   onLoadSession: (sessionId) => emit("loadSession", sessionId),
 });
 
-// External URL changes (back/forward) → update selectedPath.
+// External URL changes (back/forward) → update selectedPath. Reading
+// from `route.params.pathMatch` after the query→params migration;
+// see plans/feat-files-path-url.md.
 watch(
-  () => route.query.path,
+  () => readPathMatch(route.params.pathMatch),
   (newPath) => {
     if (!isValidFilePath(newPath)) {
       if (selectedPath.value !== null) {

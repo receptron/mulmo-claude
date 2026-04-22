@@ -10,7 +10,7 @@
           {{ script.description }}
         </p>
         <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
-          <span>{{ beats.length }} beat{{ beats.length !== 1 ? "s" : "" }}</span>
+          <span>{{ t("pluginMulmoScript.beatCount", beats.length, { named: { count: beats.length } }) }}</span>
           <span v-if="script.lang">{{ script.lang }}</span>
           <span v-if="filePath" class="truncate">{{ filePath }}</span>
         </div>
@@ -24,7 +24,7 @@
           class="px-3 py-1 text-xs rounded-full border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
         >
           <span class="material-icons text-sm leading-none">download</span>
-          <span>Movie</span>
+          <span>{{ t("pluginMulmoScript.movie") }}</span>
         </a>
         <!-- Generate / Regenerate Movie -->
         <button
@@ -36,10 +36,10 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          <span v-if="movieGenerating">Generating…</span>
+          <span v-if="movieGenerating">{{ t("pluginMulmoScript.generating") }}</span>
           <template v-else>
             <span class="material-icons text-sm leading-none">refresh</span>
-            <span>Movie</span>
+            <span>{{ t("pluginMulmoScript.movie") }}</span>
           </template>
         </button>
       </div>
@@ -48,13 +48,13 @@
     <!-- Characters section -->
     <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-3">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Characters</span>
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ t("pluginMulmoScript.characters") }}</span>
         <button
           class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
           :disabled="movieGenerating || anyBeatRendering || characterKeys.every((key) => charRenderState[key] === 'rendering')"
           @click="generateAllCharacters"
         >
-          Generate All
+          {{ t("pluginMulmoScript.generateAll") }}
         </button>
       </div>
       <div class="flex gap-3 flex-wrap">
@@ -88,11 +88,11 @@
             </template>
             <!-- Permanent drop hint -->
             <div v-if="!charDragOver[key]" class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none">
-              or drop image
+              {{ t("pluginMulmoScript.orDropImage") }}
             </div>
             <!-- Drop overlay -->
             <div v-if="charDragOver[key]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
-              <span class="text-xs text-blue-500 font-medium">Drop</span>
+              <span class="text-xs text-blue-500 font-medium">{{ t("pluginMulmoScript.drop") }}</span>
             </div>
             <!-- Regenerate button -->
             <button
@@ -121,7 +121,7 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              <span v-else>Gen</span>
+              <span v-else>{{ t("pluginMulmoScript.gen") }}</span>
             </button>
           </div>
           <span class="text-xs text-gray-600 text-center truncate w-full">{{ key }}</span>
@@ -163,7 +163,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                <span class="text-xs text-green-500">Rendering…</span>
+                <span class="text-xs text-green-500">{{ t("pluginMulmoScript.rendering") }}</span>
               </template>
               <template v-else-if="renderState[index] === 'error'">
                 <span class="text-xs text-red-400 text-center">{{ renderErrors[index] }}</span>
@@ -177,13 +177,13 @@
             </div>
             <!-- Beat drop hint / overlay -->
             <div v-if="beatDragOver[index]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
-              <span class="text-xs text-blue-500 font-medium">Drop</span>
+              <span class="text-xs text-blue-500 font-medium">{{ t("pluginMulmoScript.drop") }}</span>
             </div>
             <div
               v-else-if="!renderedImages[index] && renderState[index] !== 'rendering'"
               class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none"
             >
-              or drop image
+              {{ t("pluginMulmoScript.orDropImage") }}
             </div>
             <!-- Generate button for imagePrompt beats -->
             <button
@@ -191,7 +191,7 @@
               class="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-blue-400 text-blue-600 bg-white hover:bg-blue-50"
               @click="renderBeat(index)"
             >
-              Generate
+              {{ t("pluginMulmoScript.generate") }}
             </button>
           </div>
 
@@ -213,10 +213,10 @@
                   :class="playingAudio?.index === index ? 'border-red-400 text-red-600 hover:bg-red-50' : 'border-green-400 text-green-600 hover:bg-green-50'"
                   @click="playAudio(index)"
                 >
-                  {{ playingAudio?.index === index ? "■ Stop" : "▶ Play" }}
+                  {{ playingAudio?.index === index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
                 </button>
                 <template v-else-if="audioErrors[index]">
-                  <span class="text-xs text-red-400" :title="audioErrors[index]">⚠ Error</span>
+                  <span class="text-xs text-red-400" :title="audioErrors[index]">{{ t("pluginMulmoScript.errPrefix") }}</span>
                   <button
                     v-if="effectiveBeat(index).text"
                     class="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
@@ -231,7 +231,7 @@
                   class="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50"
                   @click="generateAudio(index)"
                 >
-                  ♪ Generate
+                  {{ t("pluginMulmoScript.generateAudio") }}
                 </button>
               </div>
               <button class="text-gray-400 hover:text-gray-600" :title="sourceOpen[index] ? 'Hide source' : 'Show source'" @click="toggleSource(index)">
@@ -263,7 +263,11 @@
             spellcheck="false"
           />
           <div class="flex items-center justify-end gap-2 px-2 pb-2">
-            <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">⚠ {{ beatSaveErrors[index] }}</span>
+            <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">{{
+              t(beatSaveErrors[index].kind === "invalidJson" ? "pluginMulmoScript.saveErrorInvalidJson" : "pluginMulmoScript.saveErrorSaveFailed", {
+                error: beatSaveErrors[index].error,
+              })
+            }}</span>
             <button
               class="px-2 py-1 text-xs rounded border"
               :class="
@@ -274,19 +278,19 @@
               :disabled="!isValidBeat(index) || !!beatSaving[index]"
               @click="updateBeat(index)"
             >
-              {{ beatSaving[index] ? "Saving…" : "Update" }}
+              {{ beatSaving[index] ? t("pluginMulmoScript.saving") : t("pluginMulmoScript.update") }}
             </button>
           </div>
         </div>
       </div>
 
-      <div v-if="beats.length === 0" class="flex items-center justify-center h-32 text-gray-400 text-sm">No beats found in script</div>
+      <div v-if="beats.length === 0" class="flex items-center justify-center h-32 text-gray-400 text-sm">{{ t("pluginMulmoScript.noBeats") }}</div>
     </div>
 
     <!-- Bottom bar: Edit Script Source + Copy -->
     <div class="bottom-bar-wrapper">
       <details ref="sourceDetails" class="script-source" @toggle="onSourceToggle(($event.target as HTMLDetailsElement).open)">
-        <summary>Edit Script Source</summary>
+        <summary>{{ t("pluginMulmoScript.editSource") }}</summary>
         <textarea
           v-model="editableSource"
           class="script-editor"
@@ -294,8 +298,8 @@
           spellcheck="false"
         ></textarea>
         <div class="editor-actions">
-          <button class="apply-btn" :disabled="!sourceChanged || !sourceValid" @click="applySource">Apply Changes</button>
-          <button class="cancel-btn" @click="cancelSourceEdit">Cancel</button>
+          <button class="apply-btn" :disabled="!sourceChanged || !sourceValid" @click="applySource">{{ t("pluginMulmoScript.applyChanges") }}</button>
+          <button class="cancel-btn" @click="cancelSourceEdit">{{ t("common.cancel") }}</button>
         </div>
       </details>
       <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
@@ -328,7 +332,7 @@
               "
               @click="playAudio(lightbox.index)"
             >
-              {{ playingAudio?.index === lightbox.index ? "■ Stop" : "▶ Play" }}
+              {{ playingAudio?.index === lightbox.index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
             </button>
           </div>
         </div>
@@ -347,7 +351,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+
+const { t } = useI18n();
 import type { MulmoScriptData } from "./index";
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
 import { extractErrorMessage, getMissingCharacterKeys, shouldAutoRenderBeat, streamMovieEvents, validateBeatJSON } from "./helpers";
@@ -407,7 +414,10 @@ const sourceOpen = reactive<Record<number, boolean>>({});
 const sourceText = reactive<Record<number, string>>({});
 // Surface POST /api/mulmo-script/update-beat failures inline next to
 // the Update button. Cleared on next successful save or editor close.
-const beatSaveErrors = reactive<Record<number, string>>({});
+// Store raw error + kind tag so the template picks a localized key,
+// instead of pre-composing an English-prefixed string here.
+type BeatSaveError = { kind: "invalidJson" | "saveFailed"; error: string };
+const beatSaveErrors = reactive<Record<number, BeatSaveError>>({});
 const beatSaving = reactive<Record<number, boolean>>({});
 const localOverrides = reactive<Record<number, Beat>>({});
 const movieGenerating = ref(false);
@@ -606,7 +616,7 @@ async function updateBeat(index: number) {
   try {
     beat = JSON.parse(sourceText[index]);
   } catch (err) {
-    beatSaveErrors[index] = `Invalid JSON: ${errorMessage(err)}`;
+    beatSaveErrors[index] = { kind: "invalidJson", error: errorMessage(err) };
     return;
   }
   const prevImage = JSON.stringify(effectiveBeat(index).image);
@@ -620,7 +630,7 @@ async function updateBeat(index: number) {
   });
   delete beatSaving[index];
   if (!response.ok) {
-    beatSaveErrors[index] = `Save failed: ${response.error}`;
+    beatSaveErrors[index] = { kind: "saveFailed", error: response.error };
     return;
   }
 

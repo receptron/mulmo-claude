@@ -6,7 +6,7 @@
 // Moved from server/utils/file.ts (issue #366 Phase 1). The old
 // file re-exports these for backwards compat.
 
-import fs from "fs";
+import { mkdirSync, promises, renameSync, unlinkSync, writeFileSync } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -50,7 +50,7 @@ function isTransientRenameError(err: unknown): boolean {
 async function renameWithWindowsRetry(fromPath: string, toPath: string): Promise<void> {
   for (const delayMs of RENAME_RETRY_DELAYS_MS) {
     try {
-      await fs.promises.rename(fromPath, toPath);
+      await promises.rename(fromPath, toPath);
       return;
     } catch (err) {
       if (!isTransientRenameError(err)) throw err;
@@ -58,7 +58,7 @@ async function renameWithWindowsRetry(fromPath: string, toPath: string): Promise
     }
   }
   // Final attempt — let any error propagate.
-  await fs.promises.rename(fromPath, toPath);
+  await promises.rename(fromPath, toPath);
 }
 
 // Sync sleep that parks the thread instead of burning CPU. Only
@@ -73,14 +73,14 @@ function sleepSync(millis: number): void {
 function renameSyncWithWindowsRetry(fromPath: string, toPath: string): void {
   for (const delayMs of RENAME_RETRY_DELAYS_MS) {
     try {
-      fs.renameSync(fromPath, toPath);
+      renameSync(fromPath, toPath);
       return;
     } catch (err) {
       if (!isTransientRenameError(err)) throw err;
       sleepSync(delayMs);
     }
   }
-  fs.renameSync(fromPath, toPath);
+  renameSync(fromPath, toPath);
 }
 
 /**
@@ -90,15 +90,15 @@ function renameSyncWithWindowsRetry(fromPath: string, toPath: string): void {
  */
 export async function writeFileAtomic(filePath: string, content: string, opts: WriteAtomicOptions = {}): Promise<void> {
   const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
-  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  await promises.mkdir(path.dirname(filePath), { recursive: true });
   try {
-    await fs.promises.writeFile(tmp, content, {
+    await promises.writeFile(tmp, content, {
       encoding: "utf-8",
       mode: opts.mode,
     });
     await renameWithWindowsRetry(tmp, filePath);
   } catch (err) {
-    await fs.promises.unlink(tmp).catch(() => {});
+    await promises.unlink(tmp).catch(() => {});
     throw err;
   }
 }
@@ -110,13 +110,13 @@ export async function writeFileAtomic(filePath: string, content: string, opts: W
  */
 export function writeFileAtomicSync(filePath: string, content: string, opts: WriteAtomicOptions = {}): void {
   const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  mkdirSync(path.dirname(filePath), { recursive: true });
   try {
-    fs.writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });
+    writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });
     renameSyncWithWindowsRetry(tmp, filePath);
   } catch (err) {
     try {
-      fs.unlinkSync(tmp);
+      unlinkSync(tmp);
     } catch {
       // best-effort cleanup
     }

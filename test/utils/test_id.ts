@@ -10,8 +10,8 @@ describe("makeId", () => {
   });
 
   it("contains a timestamp segment", () => {
-    const id = makeId("x");
-    const parts = id.split("_");
+    const generatedId = makeId("x");
+    const parts = generatedId.split("_");
     // Format: prefix_timestamp_hex
     assert.equal(parts.length, 3);
     const timestamp = Number(parts[1]);
@@ -20,8 +20,8 @@ describe("makeId", () => {
   });
 
   it("ends with 6 hex characters", () => {
-    const id = makeId("test");
-    const hex = id.split("_")[2];
+    const generatedId = makeId("test");
+    const hex = generatedId.split("_")[2];
     assert.equal(hex.length, 6);
     assert.match(hex, /^[0-9a-f]{6}$/);
   });

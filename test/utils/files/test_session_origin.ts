@@ -2,11 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { createSessionMeta, backfillOrigin, readSessionMeta } from "../../../server/utils/files/session-io.ts";
 
 function tmpRoot(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "session-origin-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "session-origin-"));
   mkdirSync(path.join(dir, "conversations", "chat"), { recursive: true });
   return dir;
 }

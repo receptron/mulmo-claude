@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useNotifications } from "../composables/useNotifications";
 import { formatRelativeTime } from "../utils/format/date";
 import { NOTIFICATION_ICONS, NOTIFICATION_ACTION_TYPES, NOTIFICATION_PRIORITIES } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 
+const { t } = useI18n();
 const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
@@ -70,7 +72,12 @@ function handleDismiss(event: Event, notificationId: string): void {
 <template>
   <div ref="rootRef" class="relative">
     <!-- Bell button -->
-    <button class="relative text-gray-400 hover:text-gray-700" data-testid="notification-bell" aria-label="Notifications" @click="toggle">
+    <button
+      class="relative text-gray-400 hover:text-gray-700"
+      data-testid="notification-bell"
+      :aria-label="t('notificationBell.notifications')"
+      @click="toggle"
+    >
       <span class="material-icons">notifications</span>
       <span
         v-if="unreadCount > 0"
@@ -89,12 +96,14 @@ function handleDismiss(event: Event, notificationId: string): void {
     >
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-        <span class="text-sm font-semibold text-gray-700">Notifications</span>
-        <button class="text-xs text-blue-500 hover:text-blue-700" data-testid="notification-mark-all-read" @click="markAllRead">Mark all read</button>
+        <span class="text-sm font-semibold text-gray-700">{{ t("notificationBell.notifications") }}</span>
+        <button class="text-xs text-blue-500 hover:text-blue-700" data-testid="notification-mark-all-read" @click="markAllRead">
+          {{ t("notificationBell.markAllRead") }}
+        </button>
       </div>
 
       <!-- Empty state -->
-      <div v-if="notifications.length === 0" class="py-8 text-center text-sm text-gray-400">No notifications</div>
+      <div v-if="notifications.length === 0" class="py-8 text-center text-sm text-gray-400">{{ t("notificationBell.noNotifications") }}</div>
 
       <!-- Items -->
       <div v-else>
@@ -121,7 +130,7 @@ function handleDismiss(event: Event, notificationId: string): void {
               {{ formatTime(n.firedAt) }}
             </p>
           </div>
-          <button class="text-gray-300 hover:text-gray-500 shrink-0 mt-0.5" aria-label="Dismiss" @click="handleDismiss($event, n.id)">
+          <button class="text-gray-300 hover:text-gray-500 shrink-0 mt-0.5" :aria-label="t('notificationBell.dismiss')" @click="handleDismiss($event, n.id)">
             <span class="material-icons text-sm">close</span>
           </button>
         </div>

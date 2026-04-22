@@ -42,7 +42,7 @@ const LOCALHOST_HOSTNAMES: ReadonlySet<string> = new Set([
 const EXTRA_ALLOWED_ORIGINS: ReadonlySet<string> = new Set(
   (process.env.ALLOWED_ORIGINS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((str) => str.trim())
     .filter(Boolean),
 );
 
@@ -54,7 +54,7 @@ const EXTRA_ALLOWED_ORIGINS: ReadonlySet<string> = new Set(
 const EXTRA_ALLOWED_HOSTS: ReadonlySet<string> = new Set(
   (process.env.ALLOWED_HOSTS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((str) => str.trim())
     .filter(Boolean),
 );
 

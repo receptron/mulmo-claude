@@ -74,7 +74,7 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
   npx @mulmobridge/telegram@latest
 ```
 
-詳しい設定: [Telegram README](https://github.com/receptron/mulmoclaude/blob/main/packages/telegram/README.md)
+詳しい設定: [Telegram README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/telegram/README.md)
 
 ---
 
@@ -82,18 +82,31 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
 
 | プラットフォーム | パッケージ | 状態 | 設定の詳細 |
 |---|---|---|---|
-| **ターミナル (CLI)** | [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | 安定 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/cli/README.md) |
-| **Telegram** | [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | 安定 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/telegram/README.md) |
-| **Discord** | [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/discord/README.md) |
-| **Slack** | [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/slack/README.md) |
-| **LINE** | [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | 動作確認済み | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/line/README.md) |
-| **WhatsApp** | [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/whatsapp/README.md) |
-| **Matrix** | [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/matrix/README.md) |
-| **IRC** | [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/irc/README.md) |
-| **Mattermost** | [@mulmobridge/mattermost](https://www.npmjs.com/package/@mulmobridge/mattermost) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/mattermost/README.md) |
-| **Zulip** | [@mulmobridge/zulip](https://www.npmjs.com/package/@mulmobridge/zulip) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/zulip/README.md) |
-| **Facebook Messenger** | [@mulmobridge/messenger](https://www.npmjs.com/package/@mulmobridge/messenger) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/messenger/README.md) |
-| **Google Chat** | [@mulmobridge/google-chat](https://www.npmjs.com/package/@mulmobridge/google-chat) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/google-chat/README.md) |
+| **ターミナル (CLI)** | [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | 安定 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/cli/README.md) |
+| **Telegram** | [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | 安定 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/telegram/README.md) |
+| **Discord** | [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/discord/README.md) |
+| **Slack** | [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/slack/README.md) |
+| **LINE** | [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | 動作確認済み | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/line/README.md) |
+| **WhatsApp** | [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/whatsapp/README.md) |
+| **Matrix** | [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/matrix/README.md) |
+| **IRC** | [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/irc/README.md) |
+| **Mattermost** | [@mulmobridge/mattermost](https://www.npmjs.com/package/@mulmobridge/mattermost) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/mattermost/README.md) |
+| **Zulip** | [@mulmobridge/zulip](https://www.npmjs.com/package/@mulmobridge/zulip) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/zulip/README.md) |
+| **Facebook Messenger** | [@mulmobridge/messenger](https://www.npmjs.com/package/@mulmobridge/messenger) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/messenger/README.md) |
+| **Google Chat** | [@mulmobridge/google-chat](https://www.npmjs.com/package/@mulmobridge/google-chat) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/google-chat/README.md) |
+| **Mastodon** | [@mulmobridge/mastodon](https://www.npmjs.com/package/@mulmobridge/mastodon) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/mastodon/README.md) |
+| **Bluesky** | [@mulmobridge/bluesky](https://www.npmjs.com/package/@mulmobridge/bluesky) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/bluesky/README.md) |
+| **Chatwork** | [@mulmobridge/chatwork](https://www.npmjs.com/package/@mulmobridge/chatwork) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/chatwork/README.md) |
+| **XMPP / Jabber** | [@mulmobridge/xmpp](https://www.npmjs.com/package/@mulmobridge/xmpp) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/xmpp/README.md) |
+| **Rocket.Chat** | [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/rocketchat/README.md) |
+| **Signal** | [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/signal/README.md) |
+| **Microsoft Teams** | [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/teams/README.md) |
+| **Webhook (汎用 HTTP)** | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/webhook/README.md) |
+| **SMS (Twilio)** | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/twilio-sms/README.md) |
+| **Email (IMAP+SMTP)** | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/email/README.md) |
+| **LINE Works** | [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/line-works/README.md) |
+| **Nostr** | [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/nostr/README.md) |
+| **Viber** | [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/viber/README.md) |
 
 > **「実験的」とは？** テストが十分でなく、バグがある可能性があります。フィードバックをお待ちしています！
 
@@ -211,18 +224,31 @@ if (ack.ok) {
 | [@mulmobridge/chat-service](https://www.npmjs.com/package/@mulmobridge/chat-service) | サーバー側 chat サービス | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/chat-service) |
 | [@mulmobridge/client](https://www.npmjs.com/package/@mulmobridge/client) | ブリッジ側クライアント | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/client) |
 | [@mulmobridge/mock-server](https://www.npmjs.com/package/@mulmobridge/mock-server) | テスト用ダミーサーバー | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/mock-server) |
-| [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | CLI ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/cli) |
-| [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Telegram ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/telegram) |
-| [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Discord ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/discord) |
-| [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Slack ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/slack) |
-| [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | LINE ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/line) |
-| [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | WhatsApp ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/whatsapp) |
-| [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Matrix ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/matrix) |
-| [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | IRC ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/irc) |
-| [@mulmobridge/mattermost](https://www.npmjs.com/package/@mulmobridge/mattermost) | Mattermost ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/mattermost) |
-| [@mulmobridge/zulip](https://www.npmjs.com/package/@mulmobridge/zulip) | Zulip ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/zulip) |
-| [@mulmobridge/messenger](https://www.npmjs.com/package/@mulmobridge/messenger) | Facebook Messenger ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/messenger) |
-| [@mulmobridge/google-chat](https://www.npmjs.com/package/@mulmobridge/google-chat) | Google Chat ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/google-chat) |
+| [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | CLI ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/cli) |
+| [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Telegram ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/telegram) |
+| [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Discord ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/discord) |
+| [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Slack ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/slack) |
+| [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | LINE ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/line) |
+| [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | WhatsApp ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/whatsapp) |
+| [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Matrix ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/matrix) |
+| [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | IRC ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/irc) |
+| [@mulmobridge/mattermost](https://www.npmjs.com/package/@mulmobridge/mattermost) | Mattermost ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/mattermost) |
+| [@mulmobridge/zulip](https://www.npmjs.com/package/@mulmobridge/zulip) | Zulip ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/zulip) |
+| [@mulmobridge/messenger](https://www.npmjs.com/package/@mulmobridge/messenger) | Facebook Messenger ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/messenger) |
+| [@mulmobridge/google-chat](https://www.npmjs.com/package/@mulmobridge/google-chat) | Google Chat ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/google-chat) |
+| [@mulmobridge/mastodon](https://www.npmjs.com/package/@mulmobridge/mastodon) | Mastodon ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/mastodon) |
+| [@mulmobridge/bluesky](https://www.npmjs.com/package/@mulmobridge/bluesky) | Bluesky ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/bluesky) |
+| [@mulmobridge/chatwork](https://www.npmjs.com/package/@mulmobridge/chatwork) | Chatwork ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/chatwork) |
+| [@mulmobridge/xmpp](https://www.npmjs.com/package/@mulmobridge/xmpp) | XMPP / Jabber ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/xmpp) |
+| [@mulmobridge/rocketchat](https://www.npmjs.com/package/@mulmobridge/rocketchat) | Rocket.Chat ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/rocketchat) |
+| [@mulmobridge/signal](https://www.npmjs.com/package/@mulmobridge/signal) | Signal ブリッジ (signal-cli-rest-api 経由) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/signal) |
+| [@mulmobridge/teams](https://www.npmjs.com/package/@mulmobridge/teams) | Microsoft Teams ブリッジ (Bot Framework) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/teams) |
+| [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 汎用 HTTP webhook ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/webhook) |
+| [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | SMS (Twilio) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/twilio-sms) |
+| [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | Email (IMAP+SMTP) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/email) |
+| [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | LINE Works (企業向け LINE) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/line-works) |
+| [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | Nostr 暗号化 DM ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/nostr) |
+| [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | Viber ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/viber) |
 
 ### 汎用ツール（@receptron スコープ）
 

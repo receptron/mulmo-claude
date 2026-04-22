@@ -1,22 +1,22 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import { WORKSPACE_DIRS } from "../../server/workspace/paths.js";
 import { appendOrCreateTopic } from "../../server/utils/files/journal-io.js";
 
 function makeWorkspace(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmoclaude-aoc-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "mulmoclaude-aoc-"));
   // Create the summaries/topics/ dir inside the workspace root
-  fs.mkdirSync(path.join(dir, WORKSPACE_DIRS.summaries, "topics"), {
+  mkdirSync(path.join(dir, WORKSPACE_DIRS.summaries, "topics"), {
     recursive: true,
   });
-  return fs.realpathSync(dir);
+  return realpathSync(dir);
 }
 
 function rmDir(dir: string): void {
-  fs.rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true });
 }
 
 function topicPath(root: string, slug: string): string {
@@ -33,27 +33,27 @@ describe("appendOrCreateTopic — happy paths", () => {
   it("writes a fresh file when missing and reports 'created'", async () => {
     const outcome = await appendOrCreateTopic("topic-a", "first line", root);
     assert.equal(outcome, "created");
-    assert.equal(fs.readFileSync(topicPath(root, "topic-a"), "utf-8"), "first line");
+    assert.equal(readFileSync(topicPath(root, "topic-a"), "utf-8"), "first line");
   });
 
   it("appends with a blank-line separator and reports 'updated'", async () => {
-    fs.writeFileSync(topicPath(root, "topic-b"), "existing line");
+    writeFileSync(topicPath(root, "topic-b"), "existing line");
     const outcome = await appendOrCreateTopic("topic-b", "new line", root);
     assert.equal(outcome, "updated");
-    assert.equal(fs.readFileSync(topicPath(root, "topic-b"), "utf-8"), "existing line\n\nnew line\n");
+    assert.equal(readFileSync(topicPath(root, "topic-b"), "utf-8"), "existing line\n\nnew line\n");
   });
 
   it("trims trailing whitespace from existing content before appending", async () => {
-    fs.writeFileSync(topicPath(root, "topic-c"), "existing\n\n\n");
+    writeFileSync(topicPath(root, "topic-c"), "existing\n\n\n");
     await appendOrCreateTopic("topic-c", "added", root);
-    assert.equal(fs.readFileSync(topicPath(root, "topic-c"), "utf-8"), "existing\n\nadded\n");
+    assert.equal(readFileSync(topicPath(root, "topic-c"), "utf-8"), "existing\n\nadded\n");
   });
 
   it("appends correctly across multiple calls", async () => {
     await appendOrCreateTopic("topic-d", "one", root);
     await appendOrCreateTopic("topic-d", "two", root);
     await appendOrCreateTopic("topic-d", "three", root);
-    assert.equal(fs.readFileSync(topicPath(root, "topic-d"), "utf-8"), "one\n\ntwo\n\nthree\n");
+    assert.equal(readFileSync(topicPath(root, "topic-d"), "utf-8"), "one\n\ntwo\n\nthree\n");
   });
 });
 
@@ -64,7 +64,7 @@ describe("appendOrCreateTopic — non-ENOENT read errors", () => {
   });
   after(() => {
     try {
-      fs.chmodSync(root, 0o755);
+      chmodSync(root, 0o755);
     } catch {
       /* ignore */
     }
@@ -77,15 +77,15 @@ describe("appendOrCreateTopic — non-ENOENT read errors", () => {
       return;
     }
     const lockPath = topicPath(root, "locked");
-    fs.writeFileSync(lockPath, "important content");
-    fs.chmodSync(lockPath, 0o000);
+    writeFileSync(lockPath, "important content");
+    chmodSync(lockPath, 0o000);
     try {
       await assert.rejects(() => appendOrCreateTopic("locked", "would clobber", root), /EACCES|EPERM/);
-      fs.chmodSync(lockPath, 0o644);
-      assert.equal(fs.readFileSync(lockPath, "utf-8"), "important content");
+      chmodSync(lockPath, 0o644);
+      assert.equal(readFileSync(lockPath, "utf-8"), "important content");
     } finally {
       try {
-        fs.chmodSync(lockPath, 0o644);
+        chmodSync(lockPath, 0o644);
       } catch {
         /* ignore */
       }
