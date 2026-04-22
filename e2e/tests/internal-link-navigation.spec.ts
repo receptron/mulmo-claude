@@ -120,9 +120,8 @@ test.describe("internal link navigation", () => {
     // Click the workspace link.
     await wikiLink.click();
 
-    // Should navigate to the /wiki page with ?page= parameter.
-    await expect(page).toHaveURL(/\/wiki(?:$|\?)/);
-    await expect(page).toHaveURL(/[?&]page=test-page/);
+    // Should navigate to the /wiki/pages/<slug> path.
+    await expect(page).toHaveURL(/\/wiki\/pages\/test-page$/);
   });
 
   test("clicking workspace file link navigates to files view", async ({ page }) => {

@@ -120,7 +120,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter, isNavigationFailure, type LocationQuery } from "vue-router";
+import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
@@ -198,20 +198,24 @@ watch(
   },
 );
 
+// URL segment ↔ internal action name. The server/tool still speak
+// `lint_report` (underscore); only the URL uses kebab-case.
+const URL_TO_ACTION: Record<string, WikiTabView> = { log: "log", "lint-report": "lint_report" };
+
 // URL is the single source of truth for wiki navigation. Button
 // handlers push to the router; this watcher drives callApi(). Only
 // runs when WikiView is mounted as the /wiki page — when mounted as
 // a manageWiki tool-result inside /chat, the tool-result watcher
 // above seeds state and this watcher does nothing.
 watch(
-  () => (route.name === PAGE_ROUTES.wiki ? [route.query.page, route.query.view] : null),
+  () => (route.name === PAGE_ROUTES.wiki ? [route.params.section, route.params.slug] : null),
   (params) => {
     if (!params) return;
-    const [page, view] = params;
-    if (typeof page === "string" && page.length > 0) {
-      callApi({ action: "page", pageName: page });
-    } else if (view === "log" || view === "lint_report") {
-      callApi({ action: view });
+    const [section, slug] = params;
+    if (section === "pages" && typeof slug === "string" && slug.length > 0) {
+      callApi({ action: "page", pageName: slug });
+    } else if (typeof section === "string" && section in URL_TO_ACTION) {
+      callApi({ action: URL_TO_ACTION[section] });
     } else {
       callApi({ action: "index" });
     }
@@ -266,38 +270,35 @@ async function callApi(body: Record<string, unknown>) {
   }
 }
 
-function dropKeys(query: LocationQuery, keys: string[]): LocationQuery {
-  const next: LocationQuery = {};
-  for (const [key, value] of Object.entries(query)) {
-    if (!keys.includes(key)) next[key] = value;
+type WikiTarget = { kind: "index" } | { kind: "page"; slug: string } | { kind: "log" } | { kind: "lint_report" };
+
+function targetToParams(target: WikiTarget): Record<string, string> {
+  switch (target.kind) {
+    case "index":
+      return {};
+    case "page":
+      return { section: "pages", slug: target.slug };
+    case "log":
+      return { section: "log" };
+    case "lint_report":
+      return { section: "lint-report" };
   }
-  return next;
 }
 
-function pushWiki(query: LocationQuery) {
-  const target = route.name === PAGE_ROUTES.wiki ? { query } : { name: PAGE_ROUTES.wiki, query };
-  router.push(target).catch((err: unknown) => {
+function pushWiki(target: WikiTarget) {
+  router.push({ name: PAGE_ROUTES.wiki, params: targetToParams(target) }).catch((err: unknown) => {
     if (!isNavigationFailure(err)) {
       console.error("[wiki] navigation failed:", err);
     }
   });
 }
 
-// Preserve siblings only when already on /wiki. Cross-route jumps
-// (e.g. from /chat, where the URL may carry `?result=<uuid>`) start
-// from a clean query so chat-specific params don't bleed into /wiki.
-function currentWikiQuery(): LocationQuery {
-  return route.name === PAGE_ROUTES.wiki ? route.query : {};
-}
-
 function navigate(newAction: "index" | WikiTabView) {
-  const base = currentWikiQuery();
-  const query = newAction === "index" ? dropKeys(base, ["page", "view"]) : { ...dropKeys(base, ["page"]), view: newAction };
-  pushWiki(query);
+  pushWiki(newAction === "index" ? { kind: "index" } : { kind: newAction });
 }
 
 function navigatePage(pageName: string) {
-  pushWiki({ ...dropKeys(currentWikiQuery(), ["view"]), page: pageName });
+  pushWiki({ kind: "page", slug: pageName });
 }
 
 // --- Per-page chat composer ---
@@ -319,7 +320,10 @@ function currentSlug(): string | null {
   // Prefer the URL on /wiki (source of truth for that route); fall
   // back to the tool-result payload when WikiView is mounted as a
   // manageWiki result inside /chat.
-  const raw = route.name === PAGE_ROUTES.wiki && typeof route.query.page === "string" ? route.query.page : (props.selectedResult?.data?.pageName ?? null);
+  const raw =
+    route.name === PAGE_ROUTES.wiki && route.params.section === "pages" && typeof route.params.slug === "string"
+      ? route.params.slug
+      : (props.selectedResult?.data?.pageName ?? null);
   if (!raw || !isSafeSlug(raw)) return null;
   return raw;
 }

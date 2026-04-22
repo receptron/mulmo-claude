@@ -82,13 +82,13 @@ test.describe("wiki page chat composer", () => {
   });
 
   test("composer hidden on the log view", async ({ page }) => {
-    await page.goto("/wiki?view=log");
+    await page.goto("/wiki/log");
     await expect(page.getByText("Did stuff")).toBeVisible();
     await expect(page.getByTestId("wiki-page-chat-input")).toHaveCount(0);
   });
 
   test("composer visible on a leaf page with the send button disabled when empty", async ({ page }) => {
-    await page.goto("/wiki?page=onboarding");
+    await page.goto("/wiki/pages/onboarding");
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
     const input = page.getByTestId("wiki-page-chat-input");
     await expect(input).toBeVisible();
@@ -98,18 +98,18 @@ test.describe("wiki page chat composer", () => {
   });
 
   test("send stays disabled when the URL slug contains path-traversal tokens", async ({ page }) => {
-    // Defence-in-depth: even if the server returns a page payload
-    // for `?page=../secrets`, the client must refuse to interpolate
-    // the slug into `data/wiki/pages/${slug}.md` and fire off an
-    // agent run that could Read outside the wiki directory.
-    await page.goto("/wiki?page=" + encodeURIComponent("../secrets"));
+    // Defence-in-depth: even if the server returns a page payload for
+    // the traversal slug, the client must refuse to interpolate it
+    // into `data/wiki/pages/${slug}.md` and fire off an agent run that
+    // could Read outside the wiki directory.
+    await page.goto("/wiki/pages/" + encodeURIComponent("../secrets"));
     await expect(page.getByTestId("wiki-page-chat-input")).toBeVisible();
     await page.getByTestId("wiki-page-chat-input").fill("What's in here?");
     await expect(page.getByTestId("wiki-page-chat-send")).toBeDisabled();
   });
 
   test("sending prepends the read-page instruction and lands on /chat", async ({ page }) => {
-    await page.goto("/wiki?page=onboarding");
+    await page.goto("/wiki/pages/onboarding");
     await expect(page.getByTestId("wiki-page-chat-input")).toBeVisible();
 
     const agentReq = captureNextAgentRequest(page);
@@ -134,7 +134,7 @@ test.describe("wiki page chat composer", () => {
     // cross-route flow from /wiki must push so the wiki URL stays in
     // history. Otherwise the user loses their way back after a quick
     // handoff.
-    await page.goto("/wiki?page=onboarding");
+    await page.goto("/wiki/pages/onboarding");
     await expect(page.getByTestId("wiki-page-chat-input")).toBeVisible();
 
     await page.getByTestId("wiki-page-chat-input").fill("What does onboarding cover?");
@@ -142,7 +142,7 @@ test.describe("wiki page chat composer", () => {
     await page.waitForURL(/\/chat\//);
 
     await page.goBack();
-    await page.waitForURL(/\/wiki\?page=onboarding/);
+    await page.waitForURL(/\/wiki\/pages\/onboarding$/);
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
   });
 });

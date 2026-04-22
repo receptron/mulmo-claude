@@ -773,7 +773,7 @@ function navigateToWorkspacePath(href: string): void {
 
   switch (target.kind) {
     case "wiki":
-      router.push({ name: PAGE_ROUTES.wiki, query: { page: target.slug } }).catch(() => {});
+      router.push({ name: PAGE_ROUTES.wiki, params: { section: "pages", slug: target.slug } }).catch(() => {});
       break;
     case "file":
       // Path-based files URL (see plans/feat-files-path-url.md) — pass

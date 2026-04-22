@@ -1,20 +1,21 @@
 // URL-driven navigation for the wiki plugin.
 //
-// Covers the routing contract established by plans/feat-wiki-url-sync.md:
+// Covers the routing contract established by plans/feat-wiki-url-sync.md
+// and updated to path-based URLs in plans/feat-wiki-path-urls.md:
 //
-// - /wiki              → index
-// - /wiki?page=<slug>  → page view
-// - /wiki?view=log     → activity log
-// - /wiki?view=lint_report → lint report
+// - /wiki                    → index
+// - /wiki/pages/<slug>       → page view
+// - /wiki/log                → activity log
+// - /wiki/lint-report        → lint report
 //
 // Also regressions:
 //
 // - TDZ in the immediate route watcher (navError declared after callApi
 //   meant direct /wiki loads silently did nothing and rendered
 //   "Wiki is empty").
-// - Mount-vs-watcher race on ?view= / ?page= direct loads
-//   (useFreshPluginData's GET returned the index payload, clobbering
-//   the POST-driven log / page state when it resolved last).
+// - Mount-vs-watcher race on direct /wiki/log or /wiki/pages/<slug>
+//   loads (useFreshPluginData's GET returned the index payload,
+//   clobbering the POST-driven log / page state when it resolved last).
 
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
@@ -42,6 +43,14 @@ const LOG_PAYLOAD = {
   content: "## 2026-04-22\n- Did stuff",
 };
 
+const JAPANESE_SLUG = "さくらインターネット";
+const PAGE_JAPANESE = {
+  action: "page",
+  title: "さくらインターネット",
+  pageName: JAPANESE_SLUG,
+  content: "# さくらインターネット\n\n日本のデータセンター。",
+};
+
 async function mockWikiApi(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === "/api/wiki",
@@ -50,12 +59,16 @@ async function mockWikiApi(page: Page): Promise<void> {
       if (req.method() === "GET") {
         const slug = new URL(req.url()).searchParams.get("slug");
         if (slug === "onboarding") return route.fulfill({ json: { data: PAGE_ONBOARDING } });
+        if (slug === JAPANESE_SLUG) return route.fulfill({ json: { data: PAGE_JAPANESE } });
         return route.fulfill({ json: { data: INDEX_PAYLOAD } });
       }
       if (req.method() === "POST") {
         const body = (req.postDataJSON() ?? {}) as { action?: string; pageName?: string };
         if (body.action === "page" && body.pageName === "onboarding") {
           return route.fulfill({ json: { data: PAGE_ONBOARDING } });
+        }
+        if (body.action === "page" && body.pageName === JAPANESE_SLUG) {
+          return route.fulfill({ json: { data: PAGE_JAPANESE } });
         }
         if (body.action === "log") return route.fulfill({ json: { data: LOG_PAYLOAD } });
         return route.fulfill({ json: { data: INDEX_PAYLOAD } });
@@ -88,27 +101,27 @@ test.describe("wiki navigation — URL sync", () => {
 
     await page.getByTestId("wiki-page-entry-onboarding").click();
 
-    await page.waitForURL(/\/wiki\?page=onboarding/);
+    await page.waitForURL(/\/wiki\/pages\/onboarding$/);
     // h1 comes from the rendered page markdown; h2 is the view header.
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
     await expect(page.getByText("Welcome to the project.")).toBeVisible();
   });
 
-  test("clicking the Log tab switches to ?view=log", async ({ page }) => {
+  test("clicking the Log tab switches to /wiki/log", async ({ page }) => {
     await page.goto("/wiki");
     await expect(page.getByText("Onboarding")).toBeVisible();
 
     await page.getByRole("button", { name: /Log/ }).click();
 
-    await page.waitForURL(/\/wiki\?view=log/);
+    await page.waitForURL(/\/wiki\/log$/);
     await expect(page.getByText("Did stuff")).toBeVisible();
   });
 
-  test("direct /wiki?view=log load renders log content, not index", async ({ page }) => {
+  test("direct /wiki/log load renders log content, not index", async ({ page }) => {
     // Regression guard: useFreshPluginData's mount GET returns the
     // index payload; if it resolves after the POST-driven log fetch
     // on a direct load, the log content was clobbered.
-    await page.goto("/wiki?view=log");
+    await page.goto("/wiki/log");
 
     await expect(page.getByText("Did stuff")).toBeVisible();
     // Page-card rows from the index must not appear here.
@@ -116,11 +129,21 @@ test.describe("wiki navigation — URL sync", () => {
     await expect(page.getByTestId("wiki-page-entry-architecture")).toHaveCount(0);
   });
 
-  test("direct /wiki?page=onboarding load renders the page", async ({ page }) => {
-    await page.goto("/wiki?page=onboarding");
+  test("direct /wiki/pages/onboarding load renders the page", async ({ page }) => {
+    await page.goto("/wiki/pages/onboarding");
 
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
     await expect(page.getByText("Welcome to the project.")).toBeVisible();
+  });
+
+  test("non-ASCII slug round-trips through the URL", async ({ page }) => {
+    // Vue Router percent-encodes path params on push and decodes them
+    // on read. The POST body must receive the original string, not a
+    // percent-encoded version.
+    await page.goto(`/wiki/pages/${encodeURIComponent(JAPANESE_SLUG)}`);
+
+    await expect(page.getByRole("heading", { level: 1, name: JAPANESE_SLUG })).toBeVisible();
+    await expect(page.getByText("日本のデータセンター。")).toBeVisible();
   });
 });
 
@@ -173,11 +196,13 @@ test.describe("wiki navigation — from manageWiki tool result", () => {
 
     await page.getByTestId("wiki-page-entry-onboarding").click();
 
-    // From /chat, clicking a page card should land on /wiki with the
-    // shareable query. Chat-specific params like ?result= must NOT
-    // bleed through — the URL should be exactly /wiki?page=<slug>.
-    await page.waitForURL(/\/wiki\?page=onboarding/);
-    expect(new URL(page.url()).search).toBe("?page=onboarding");
+    // From /chat, clicking a page card should land on the shareable
+    // wiki path. Chat-specific params like ?result= must NOT bleed
+    // through — the URL should be exactly /wiki/pages/<slug>.
+    await page.waitForURL(/\/wiki\/pages\/onboarding$/);
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/wiki/pages/onboarding");
+    expect(url.search).toBe("");
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
   });
 
