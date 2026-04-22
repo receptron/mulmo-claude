@@ -30,7 +30,7 @@
           <tbody>
             <tr v-for="hint in FREQUENCY_HINTS" :key="hint.label" class="border-b border-gray-50 last:border-0">
               <td class="px-3 py-1">{{ hint.label }}</td>
-              <td class="px-3 py-1 font-mono text-gray-700">{{ hint.schedule }}</td>
+              <td class="px-3 py-1 font-mono text-gray-700">{{ formatSchedule(hint.schedule) }}</td>
             </tr>
           </tbody>
         </table>
@@ -120,6 +120,7 @@ import { useI18n } from "vue-i18n";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { formatShortTime } from "../../utils/format/date";
+import { formatSchedule as formatTaskSchedule, type TaskSchedule as FormatterTaskSchedule } from "./formatSchedule";
 
 const { t } = useI18n();
 
@@ -145,13 +146,17 @@ interface SchedulerTask {
   state?: TaskState;
 }
 
-const FREQUENCY_HINTS = [
-  { label: "News / RSS fetch", schedule: "Every 1h" },
-  { label: "Journal daily pass", schedule: "Daily 23:00 UTC" },
-  { label: "Wiki maintenance", schedule: "Daily 02:00 UTC" },
-  { label: "Memory extraction", schedule: "Daily 00:00 UTC" },
-  { label: "Calendar / contact sync", schedule: "Every 4h" },
-] as const;
+// Hints showing common task cadences. Stored as structured schedules
+// (not pre-rendered strings) so the display routes through
+// formatTaskSchedule() and picks up the viewer's local timezone for
+// daily rows — the same conversion applied to real tasks below.
+const FREQUENCY_HINTS: Array<{ label: string; schedule: FormatterTaskSchedule }> = [
+  { label: "News / RSS fetch", schedule: { type: "interval", intervalMs: 3_600_000 } },
+  { label: "Journal daily pass", schedule: { type: "daily", time: "23:00" } },
+  { label: "Wiki maintenance", schedule: { type: "daily", time: "02:00" } },
+  { label: "Memory extraction", schedule: { type: "daily", time: "00:00" } },
+  { label: "Calendar / contact sync", schedule: { type: "interval", intervalMs: 14_400_000 } },
+];
 
 const tasks = ref<SchedulerTask[]>([]);
 const loading = ref(true);
@@ -189,15 +194,7 @@ function resultDotClass(result: string): string {
 }
 
 function formatSchedule(schedule: TaskSchedule): string {
-  if (schedule.type === "interval" && schedule.intervalMs) {
-    const mins = Math.round(schedule.intervalMs / 60000);
-    if (mins >= 60) return `Every ${Math.round(mins / 60)}h`;
-    return `Every ${mins}m`;
-  }
-  if (schedule.type === "daily" && schedule.time) {
-    return `Daily ${schedule.time} UTC`;
-  }
-  return JSON.stringify(schedule);
+  return formatTaskSchedule(schedule as FormatterTaskSchedule);
 }
 
 async function runTask(taskId: string): Promise<void> {
