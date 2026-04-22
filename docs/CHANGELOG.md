@@ -20,6 +20,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 - `@mulmobridge/webhook` (v0.1.0) — Generic HTTP webhook bridge. POST JSON to `/webhook`, get the AI reply in the response body. Optional `x-webhook-secret` header for auth. Developer glue for cron jobs, Zapier / n8n, Home Assistant, etc.
 - `@mulmobridge/twilio-sms` (v0.1.0) — SMS bridge via Twilio Programmable Messaging. Inbound webhook with `X-Twilio-Signature` HMAC-SHA1 verification; outbound via Twilio REST API. Number-based allowlist.
 - `@mulmobridge/email` (v0.1.0) — Email bridge. IMAP poll for unread mail, SMTP reply with threading preserved (`In-Reply-To` + `References`). Uses `imapflow` + `mailparser` + `nodemailer`. Sender allowlist.
+- `@mulmobridge/line-works` (v0.1.0) — LINE Works (enterprise LINE) bridge. Service-account JWT → OAuth access token (auto-refresh); webhook signature verification via bot secret; sends via Bot Message API. Separate from consumer LINE.
+- `@mulmobridge/nostr` (v0.1.0) — Nostr encrypted DM bridge. Subscribes to kind=4 events tagged to the bot pubkey on multiple relays; NIP-04 decrypt + sign-and-broadcast replies. Hex / nsec key input; pubkey allowlist.
+- `@mulmobridge/viber` (v0.1.0) — Viber Public Account bot bridge. Inbound webhook with `X-Viber-Content-Signature` HMAC-SHA256; outbound via Viber REST. Swapped in for KakaoTalk (deferred due to 5 s sync webhook timeout).
 
 ---
 

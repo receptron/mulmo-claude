@@ -61,6 +61,7 @@ yarn telegram
 Bridges are also available as standalone npm packages:
 
 ```bash
+# Chat platforms
 npx @mulmobridge/cli@latest          # CLI bridge
 npx @mulmobridge/telegram@latest     # Telegram bridge
 npx @mulmobridge/slack@latest        # Slack bridge
@@ -73,6 +74,21 @@ npx @mulmobridge/mattermost@latest   # Mattermost bridge
 npx @mulmobridge/zulip@latest        # Zulip bridge
 npx @mulmobridge/messenger@latest    # Facebook Messenger bridge
 npx @mulmobridge/google-chat@latest  # Google Chat bridge
+npx @mulmobridge/mastodon@latest     # Mastodon bridge
+npx @mulmobridge/bluesky@latest      # Bluesky bridge
+npx @mulmobridge/chatwork@latest     # Chatwork bridge (Japanese business chat)
+npx @mulmobridge/xmpp@latest         # XMPP / Jabber bridge
+npx @mulmobridge/rocketchat@latest   # Rocket.Chat bridge
+npx @mulmobridge/signal@latest       # Signal bridge (via signal-cli-rest-api)
+npx @mulmobridge/teams@latest        # Microsoft Teams bridge (Bot Framework)
+npx @mulmobridge/line-works@latest   # LINE Works bridge (enterprise LINE)
+npx @mulmobridge/nostr@latest        # Nostr encrypted DM bridge
+npx @mulmobridge/viber@latest        # Viber bridge
+
+# Universal / glue
+npx @mulmobridge/webhook@latest      # Generic HTTP webhook (dev glue)
+npx @mulmobridge/twilio-sms@latest   # SMS via Twilio
+npx @mulmobridge/email@latest        # Email bridge (IMAP + SMTP)
 ```
 
 All bridges support **real-time text streaming** (typing updates as the agent writes). CLI and Telegram also support **file attachments** (images, PDFs, DOCX, XLSX, PPTX). See [`docs/mulmobridge-guide.md`](docs/mulmobridge-guide.md) for the full platform list and setup instructions.
@@ -555,6 +571,19 @@ Shared code is extracted into publishable npm packages under `packages/`:
 | `@mulmobridge/zulip` | Zulip bridge | [npm](https://www.npmjs.com/package/@mulmobridge/zulip) / [source](packages/bridges/zulip/) |
 | `@mulmobridge/messenger` | Facebook Messenger bridge | [npm](https://www.npmjs.com/package/@mulmobridge/messenger) / [source](packages/bridges/messenger/) |
 | `@mulmobridge/google-chat` | Google Chat bridge | [npm](https://www.npmjs.com/package/@mulmobridge/google-chat) / [source](packages/bridges/google-chat/) |
+| `@mulmobridge/mastodon` | Mastodon bridge | [npm](https://www.npmjs.com/package/@mulmobridge/mastodon) / [source](packages/bridges/mastodon/) |
+| `@mulmobridge/bluesky` | Bluesky bridge | [npm](https://www.npmjs.com/package/@mulmobridge/bluesky) / [source](packages/bridges/bluesky/) |
+| `@mulmobridge/chatwork` | Chatwork bridge (Japanese business chat) | [npm](https://www.npmjs.com/package/@mulmobridge/chatwork) / [source](packages/bridges/chatwork/) |
+| `@mulmobridge/xmpp` | XMPP / Jabber bridge | [npm](https://www.npmjs.com/package/@mulmobridge/xmpp) / [source](packages/bridges/xmpp/) |
+| `@mulmobridge/rocketchat` | Rocket.Chat bridge | [npm](https://www.npmjs.com/package/@mulmobridge/rocketchat) / [source](packages/bridges/rocketchat/) |
+| `@mulmobridge/signal` | Signal bridge (via signal-cli-rest-api) | [npm](https://www.npmjs.com/package/@mulmobridge/signal) / [source](packages/bridges/signal/) |
+| `@mulmobridge/teams` | Microsoft Teams bridge (Bot Framework) | [npm](https://www.npmjs.com/package/@mulmobridge/teams) / [source](packages/bridges/teams/) |
+| `@mulmobridge/line-works` | LINE Works bridge (enterprise LINE) | [npm](https://www.npmjs.com/package/@mulmobridge/line-works) / [source](packages/bridges/line-works/) |
+| `@mulmobridge/nostr` | Nostr encrypted DM bridge | [npm](https://www.npmjs.com/package/@mulmobridge/nostr) / [source](packages/bridges/nostr/) |
+| `@mulmobridge/viber` | Viber bridge | [npm](https://www.npmjs.com/package/@mulmobridge/viber) / [source](packages/bridges/viber/) |
+| `@mulmobridge/webhook` | Generic HTTP webhook bridge (developer glue) | [npm](https://www.npmjs.com/package/@mulmobridge/webhook) / [source](packages/bridges/webhook/) |
+| `@mulmobridge/twilio-sms` | SMS via Twilio | [npm](https://www.npmjs.com/package/@mulmobridge/twilio-sms) / [source](packages/bridges/twilio-sms/) |
+| `@mulmobridge/email` | Email bridge (IMAP + SMTP) | [npm](https://www.npmjs.com/package/@mulmobridge/email) / [source](packages/bridges/email/) |
 | `@mulmobridge/mock-server` | Mock server for testing | [npm](https://www.npmjs.com/package/@mulmobridge/mock-server) / [source](packages/mock-server/) |
 | `@receptron/task-scheduler` | Persistent task scheduler | [npm](https://www.npmjs.com/package/@receptron/task-scheduler) / [source](packages/scheduler/) |
 
