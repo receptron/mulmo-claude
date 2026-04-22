@@ -4,10 +4,10 @@
       <div class="button-group">
         <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
           <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-          PDF
+          {{ t("pluginTextResponse.pdf") }}
         </button>
       </div>
-      <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
+      <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
     </div>
     <div class="flex-1 overflow-hidden relative" @click.capture="openLinksInNewTab">
       <div class="text-response-container">
@@ -27,21 +27,24 @@
 
         <!-- Collapsible Editor -->
         <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
-          <summary data-testid="text-response-edit-summary">Edit Text Content</summary>
+          <summary data-testid="text-response-edit-summary">{{ t("pluginTextResponse.editContent") }}</summary>
           <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
-          <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">Apply Changes</button>
+          <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
+            {{ t("pluginTextResponse.applyChanges") }}
+          </button>
         </details>
       </div>
-      <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
+      <button v-show="!editing" class="copy-btn" :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')" @click="copyText">
         <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
       </button>
-      <button v-show="editing" class="cancel-btn" @click="cancelEdit">Cancel</button>
+      <button v-show="editing" class="cancel-btn" @click="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResult, ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "./types";
@@ -51,6 +54,7 @@ import { useAppApi } from "../../composables/useAppApi";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
 
+const { t } = useI18n();
 const appApi = useAppApi();
 
 const props = withDefaults(

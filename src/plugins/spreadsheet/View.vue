@@ -1,13 +1,13 @@
 <template>
   <div class="spreadsheet-container">
     <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">Loading spreadsheet...</div>
+      <div class="text-gray-500">{{ t("pluginSpreadsheet.loading") }}</div>
     </div>
     <div v-else-if="errorMessage" class="min-h-full p-8 flex items-center justify-center">
       <div class="error">{{ errorMessage }}</div>
     </div>
     <div v-else-if="!resolvedSheets || resolvedSheets.length === 0" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">No spreadsheet data available</div>
+      <div class="text-gray-500">{{ t("pluginSpreadsheet.noData") }}</div>
     </div>
     <template v-else>
       <div class="spreadsheet-content-wrapper">
@@ -43,9 +43,9 @@
 
       <!-- Collapsible Editor -->
       <details v-if="!miniEditorOpen" ref="editorDetails" class="spreadsheet-source">
-        <summary>Edit Spreadsheet Data</summary>
+        <summary>{{ t("pluginSpreadsheet.editData") }}</summary>
         <textarea ref="editorTextarea" v-model="editableData" class="spreadsheet-editor" spellcheck="false" @input="handleDataEdit"></textarea>
-        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">Apply Changes</button>
+        <button class="apply-btn" :disabled="!hasChanges" @click="applyChanges">{{ t("pluginSpreadsheet.applyChanges") }}</button>
       </details>
 
       <!-- Mini Editor at Bottom -->
@@ -57,11 +57,11 @@
           <div class="radio-group">
             <label class="radio-option">
               <input v-model="miniEditorType" type="radio" value="string" />
-              String
+              {{ t("pluginSpreadsheet.stringType") }}
             </label>
             <label class="radio-option">
               <input v-model="miniEditorType" type="radio" value="object" />
-              Formula
+              {{ t("pluginSpreadsheet.formulaType") }}
             </label>
           </div>
 
@@ -93,7 +93,7 @@
             />
           </template>
 
-          <button class="save-btn" @click="saveMiniEditor">Update</button>
+          <button class="save-btn" @click="saveMiniEditor">{{ t("pluginSpreadsheet.update") }}</button>
           <button class="cancel-btn" @click="closeMiniEditor">✕</button>
         </div>
       </div>

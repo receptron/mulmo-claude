@@ -19,31 +19,31 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            <span v-else>↓ PDF</span>
-            <span v-if="pdfDownloading">PDF</span>
+            <span v-else>{{ t("pluginWiki.downloadPdf") }}</span>
+            <span v-if="pdfDownloading">{{ t("pluginWiki.pdfLoadingLabel") }}</span>
           </button>
-          <span v-if="pdfError" class="text-xs text-red-500" :title="pdfError">⚠ PDF failed</span>
+          <span v-if="pdfError" class="text-xs text-red-500" :title="pdfError">{{ t("pluginWiki.pdfFailed") }}</span>
         </template>
         <button
           class="px-3 py-1 text-xs rounded-full border transition-colors"
           :class="action === 'index' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
           @click="navigate('index')"
         >
-          Index
+          {{ t("pluginWiki.tabIndex") }}
         </button>
         <button
           class="px-3 py-1 text-xs rounded-full border transition-colors"
           :class="action === 'log' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
           @click="navigate('log')"
         >
-          Log
+          {{ t("pluginWiki.tabLog") }}
         </button>
         <button
           class="px-3 py-1 text-xs rounded-full border transition-colors"
           :class="action === 'lint_report' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
           @click="navigate('lint_report')"
         >
-          Lint
+          {{ t("pluginWiki.tabLint") }}
         </button>
       </div>
     </div>
@@ -57,7 +57,7 @@
     <div v-if="!content && !navError" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
       <div class="text-center space-y-2">
         <span class="material-icons text-4xl text-gray-300">menu_book</span>
-        <p>Wiki is empty. Ask the Wiki Manager to ingest a source.</p>
+        <p>{{ t("pluginWiki.empty") }}</p>
       </div>
     </div>
 
