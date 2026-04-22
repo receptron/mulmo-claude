@@ -84,6 +84,16 @@ test.describe("history panel (useSessionHistory)", () => {
     await expect(page).toHaveURL(priorUrl);
   });
 
+  test("history button on direct-linked /history falls back to /chat (no prior entry)", async ({ page }) => {
+    // Direct-link opens /history as the first navigation of the tab —
+    // router.back() has nowhere to go. The button should still close
+    // the panel by navigating to /chat instead of escaping the app.
+    await page.goto("/history");
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
+    await page.getByTestId("history-btn").click();
+    await expect(page).toHaveURL(/\/chat/);
+  });
+
   test("clicking a session navigates to /chat/:id", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();

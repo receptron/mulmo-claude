@@ -752,16 +752,28 @@ async function sendMessage(text?: string) {
 // needed. Clicking the history button toggles between /history and the
 // previous page via router.back / router.push.
 function handleHistoryClick(): void {
-  if (currentPage.value === PAGE_ROUTES.history) {
+  if (currentPage.value !== PAGE_ROUTES.history) {
+    router.push({ name: PAGE_ROUTES.history }).catch(() => {});
+    return;
+  }
+  // Direct-link to /history has no prior entry to go back to.
+  // vue-router exposes the previous entry on window.history.state.back;
+  // when null, fall back to /chat so the button still closes the panel.
+  const hasBack = typeof window !== "undefined" && window.history.state?.back != null;
+  if (hasBack) {
     router.back();
   } else {
-    router.push({ name: PAGE_ROUTES.history }).catch(() => {});
+    router.push({ name: PAGE_ROUTES.chat }).catch(() => {});
   }
 }
 
-// Fetch the session list when entering /history. `immediate: true`
-// covers the direct-link case (user opens /history as the first
-// navigation of the session).
+// Fetch the session list when entering /history. Not `immediate` on
+// purpose: onMounted() already fires fetchSessions() unconditionally,
+// so the direct-link /history case is already covered — adding an
+// immediate watcher would race two initial fetches against each other
+// (fetchSessions picks snapshot-vs-diff from the mutable cursor at
+// response time, and a late-arriving full snapshot could be misread
+// as a diff, leaving stale deleted sessions in the list).
 watch(
   () => currentPage.value,
   (page) => {
@@ -769,7 +781,6 @@ watch(
       fetchSessions().catch((err) => console.error("[history] fetch failed:", err));
     }
   },
-  { immediate: true },
 );
 
 // Route workspace-internal links (wiki pages, files, sessions) to the
