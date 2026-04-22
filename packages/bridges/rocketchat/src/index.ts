@@ -148,27 +148,77 @@ async function handleIncoming(msg: IncomingMessage): Promise<void> {
 
 // ── Poll loop ───────────────────────────────────────────────────
 
+// Rocket.Chat's list endpoints cap at 100 per call and tell you the
+// total in the response envelope. Page through by `offset` until we've
+// seen every room — pre-paging, a deployment with >100 DMs would have
+// silently ignored everything beyond the first 100 rooms.
+const ROOMS_PAGE_SIZE = 100;
+// `im.history` caps at 50 per call too. Without paging, a room that
+// accumulates >50 new messages between polls (long idle, a chatty user)
+// would lose everything past the first 50 because the cursor still
+// advances to the newest returned timestamp.
+const HISTORY_PAGE_SIZE = 50;
+// Safety cap on history pages per poll cycle. At 50 × 50 = 2,500
+// messages it's already well beyond anything a real conversation
+// produces per interval; guards against pathological loops.
+const HISTORY_MAX_PAGES = 50;
+
 async function listDmRoomIds(): Promise<string[]> {
-  const result = await rcGet("/im.list", { count: "100" });
-  const rooms = Array.isArray(result.ims) ? result.ims : [];
-  return rooms.filter((room): room is JsonRecord => isObj(room) && typeof room._id === "string").map((room) => String(room._id));
+  const ids: string[] = [];
+  let offset = 0;
+  // `total` is returned by Rocket.Chat alongside the paged result;
+  // loop until we've fetched every row. Fallback to "stop when a
+  // page returns fewer rows than requested" in case `total` is
+  // missing on some server versions.
+  while (true) {
+    const result = await rcGet("/im.list", {
+      count: String(ROOMS_PAGE_SIZE),
+      offset: String(offset),
+    });
+    const rooms = Array.isArray(result.ims) ? result.ims : [];
+    for (const room of rooms) {
+      if (isObj(room) && typeof room._id === "string") ids.push(room._id);
+    }
+    offset += rooms.length;
+    const total = typeof result.total === "number" ? result.total : null;
+    const done = rooms.length < ROOMS_PAGE_SIZE || (total !== null && offset >= total);
+    if (done) break;
+  }
+  return ids;
 }
 
 async function pollRoom(roomId: string, oldestIso: string): Promise<string> {
-  const result = await rcGet("/im.history", {
-    roomId,
-    oldest: oldestIso,
-    inclusive: "false",
-    count: "50",
-  });
-  const messages = Array.isArray(result.messages) ? result.messages : [];
-  const sorted = [...messages].reverse(); // API returns newest-first
+  // Fetch pages of history starting at `oldestIso` until the server
+  // returns fewer than HISTORY_PAGE_SIZE rows (nothing left in the
+  // window) or HISTORY_MAX_PAGES is hit. We narrow the `oldest`
+  // cursor forward each page so we don't re-fetch messages we've
+  // already processed.
+  let cursorIso = oldestIso;
   let newestIso = oldestIso;
-  for (const raw of sorted) {
-    const parsed = parseMessage(raw, roomId);
-    if (!parsed) continue;
-    await handleIncoming(parsed);
-    if (parsed.tsIso > newestIso) newestIso = parsed.tsIso;
+
+  for (let page = 0; page < HISTORY_MAX_PAGES; page++) {
+    const result = await rcGet("/im.history", {
+      roomId,
+      oldest: cursorIso,
+      inclusive: "false",
+      count: String(HISTORY_PAGE_SIZE),
+    });
+    const messages = Array.isArray(result.messages) ? result.messages : [];
+    if (messages.length === 0) break;
+
+    const sorted = [...messages].reverse(); // API returns newest-first
+    for (const raw of sorted) {
+      const parsed = parseMessage(raw, roomId);
+      if (!parsed) continue;
+      await handleIncoming(parsed);
+      if (parsed.tsIso > newestIso) newestIso = parsed.tsIso;
+    }
+
+    // If this page didn't fill up, the window is exhausted. Otherwise,
+    // advance the cursor to the newest message in this batch so the
+    // next page picks up from there.
+    if (messages.length < HISTORY_PAGE_SIZE) break;
+    cursorIso = newestIso;
   }
   return newestIso;
 }
