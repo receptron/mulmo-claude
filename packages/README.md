@@ -82,6 +82,9 @@ Four platforms deliver messages via **inbound HTTP webhooks** — [LINE](./bridg
 | [@mulmobridge/webhook](./bridges/webhook/) | Generic HTTP webhook (developer glue) | Inbound JSON POST | No (localhost) | [![npm](https://img.shields.io/npm/v/@mulmobridge/webhook)](https://www.npmjs.com/package/@mulmobridge/webhook) |
 | [@mulmobridge/twilio-sms](./bridges/twilio-sms/) | SMS via Twilio | Inbound HTTP webhook | **Yes** | [![npm](https://img.shields.io/npm/v/@mulmobridge/twilio-sms)](https://www.npmjs.com/package/@mulmobridge/twilio-sms) |
 | [@mulmobridge/email](./bridges/email/) | Email (IMAP poll + SMTP send) | IMAP polling (outbound) | **No** | [![npm](https://img.shields.io/npm/v/@mulmobridge/email)](https://www.npmjs.com/package/@mulmobridge/email) |
+| [@mulmobridge/line-works](./bridges/line-works/) | LINE Works (enterprise LINE) | Inbound HTTP webhook | **Yes** | [![npm](https://img.shields.io/npm/v/@mulmobridge/line-works)](https://www.npmjs.com/package/@mulmobridge/line-works) |
+| [@mulmobridge/nostr](./bridges/nostr/) | Nostr encrypted DMs | WebSocket to relays (outbound) | **No** | [![npm](https://img.shields.io/npm/v/@mulmobridge/nostr)](https://www.npmjs.com/package/@mulmobridge/nostr) |
+| [@mulmobridge/viber](./bridges/viber/) | Viber Public Account bot | Inbound HTTP webhook | **Yes** | [![npm](https://img.shields.io/npm/v/@mulmobridge/viber)](https://www.npmjs.com/package/@mulmobridge/viber) |
 
 > **"Public URL needed?"** — Bridges that use inbound webhooks require the bridge process to be reachable from the internet (public IP, ngrok, Cloudflare Tunnel, etc.). Outbound-only bridges (polling / WebSocket) work from behind any NAT or firewall with no extra setup.
 
@@ -195,6 +198,9 @@ packages/
     webhook/      ← Generic HTTP webhook (developer glue)
     twilio-sms/   ← SMS via Twilio
     email/        ← Email (IMAP + SMTP)
+    line-works/   ← LINE Works (enterprise LINE)
+    nostr/        ← Nostr encrypted DM
+    viber/        ← Viber Public Account bot
   scheduler/      ← @receptron/task-scheduler (non-MulmoBridge, general-purpose)
   mulmoclaude/    ← launcher npm package for the MulmoClaude app
 ```

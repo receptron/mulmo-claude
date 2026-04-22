@@ -104,6 +104,9 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
 | **Webhook (汎用 HTTP)** | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/webhook/README.md) |
 | **SMS (Twilio)** | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/twilio-sms/README.md) |
 | **Email (IMAP+SMTP)** | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/email/README.md) |
+| **LINE Works** | [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/line-works/README.md) |
+| **Nostr** | [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/nostr/README.md) |
+| **Viber** | [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | 実験的 | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/viber/README.md) |
 
 > **「実験的」とは？** テストが十分でなく、バグがある可能性があります。フィードバックをお待ちしています！
 
@@ -243,6 +246,9 @@ if (ack.ok) {
 | [@mulmobridge/webhook](https://www.npmjs.com/package/@mulmobridge/webhook) | 汎用 HTTP webhook ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/webhook) |
 | [@mulmobridge/twilio-sms](https://www.npmjs.com/package/@mulmobridge/twilio-sms) | SMS (Twilio) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/twilio-sms) |
 | [@mulmobridge/email](https://www.npmjs.com/package/@mulmobridge/email) | Email (IMAP+SMTP) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/email) |
+| [@mulmobridge/line-works](https://www.npmjs.com/package/@mulmobridge/line-works) | LINE Works (企業向け LINE) ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/line-works) |
+| [@mulmobridge/nostr](https://www.npmjs.com/package/@mulmobridge/nostr) | Nostr 暗号化 DM ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/nostr) |
+| [@mulmobridge/viber](https://www.npmjs.com/package/@mulmobridge/viber) | Viber ブリッジ | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/viber) |
 
 ### 汎用ツール（@receptron スコープ）
 
