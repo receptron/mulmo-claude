@@ -79,6 +79,9 @@ Four platforms deliver messages via **inbound HTTP webhooks** — [LINE](./bridg
 | [@mulmobridge/rocketchat](./bridges/rocketchat/) | Rocket.Chat (DMs) | Long polling (outbound HTTP) | **No** | [![npm](https://img.shields.io/npm/v/@mulmobridge/rocketchat)](https://www.npmjs.com/package/@mulmobridge/rocketchat) |
 | [@mulmobridge/signal](./bridges/signal/) | Signal (via signal-cli-rest-api) | WebSocket + REST to local daemon | **No** (daemon local) | [![npm](https://img.shields.io/npm/v/@mulmobridge/signal)](https://www.npmjs.com/package/@mulmobridge/signal) |
 | [@mulmobridge/teams](./bridges/teams/) | Microsoft Teams (Bot Framework) | Inbound HTTP webhook | **Yes** | [![npm](https://img.shields.io/npm/v/@mulmobridge/teams)](https://www.npmjs.com/package/@mulmobridge/teams) |
+| [@mulmobridge/webhook](./bridges/webhook/) | Generic HTTP webhook (developer glue) | Inbound JSON POST | No (localhost) | [![npm](https://img.shields.io/npm/v/@mulmobridge/webhook)](https://www.npmjs.com/package/@mulmobridge/webhook) |
+| [@mulmobridge/twilio-sms](./bridges/twilio-sms/) | SMS via Twilio | Inbound HTTP webhook | **Yes** | [![npm](https://img.shields.io/npm/v/@mulmobridge/twilio-sms)](https://www.npmjs.com/package/@mulmobridge/twilio-sms) |
+| [@mulmobridge/email](./bridges/email/) | Email (IMAP poll + SMTP send) | IMAP polling (outbound) | **No** | [![npm](https://img.shields.io/npm/v/@mulmobridge/email)](https://www.npmjs.com/package/@mulmobridge/email) |
 
 > **"Public URL needed?"** — Bridges that use inbound webhooks require the bridge process to be reachable from the internet (public IP, ngrok, Cloudflare Tunnel, etc.). Outbound-only bridges (polling / WebSocket) work from behind any NAT or firewall with no extra setup.
 
@@ -189,6 +192,9 @@ packages/
     rocketchat/   ← Rocket.Chat bridge (REST polling)
     signal/       ← Signal bridge (via signal-cli-rest-api)
     teams/        ← Microsoft Teams bridge (Bot Framework)
+    webhook/      ← Generic HTTP webhook (developer glue)
+    twilio-sms/   ← SMS via Twilio
+    email/        ← Email (IMAP + SMTP)
   scheduler/      ← @receptron/task-scheduler (non-MulmoBridge, general-purpose)
   mulmoclaude/    ← launcher npm package for the MulmoClaude app
 ```
