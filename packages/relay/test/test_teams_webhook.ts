@@ -93,6 +93,32 @@ describe("validateTokenClaims", () => {
     assert.equal(ok, false);
   });
 
+  it("rejects when exp claim is missing (fail-closed)", () => {
+    const payload = basePayload();
+    delete payload.exp;
+    const ok = validateTokenClaims({
+      payload,
+      appId: APP_ID,
+      expectedIssuer: ISSUER,
+      nowSeconds: NOW_SEC,
+      activity: baseActivity(),
+    });
+    assert.equal(ok, false);
+  });
+
+  it("rejects when exp claim is non-numeric (fail-closed)", () => {
+    const payload = basePayload();
+    payload.exp = "not a number" as unknown as number;
+    const ok = validateTokenClaims({
+      payload,
+      appId: APP_ID,
+      expectedIssuer: ISSUER,
+      nowSeconds: NOW_SEC,
+      activity: baseActivity(),
+    });
+    assert.equal(ok, false);
+  });
+
   it("rejects when serviceurl claim is absent (fail-closed against SSRF)", () => {
     const payload = basePayload();
     delete payload.serviceurl;

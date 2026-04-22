@@ -79,7 +79,9 @@ async function verifyGoogleJwt(authHeader: string | undefined, projectNumber: st
   const { payload, header } = jwt;
   if (payload.iss !== GOOGLE_CHAT_ISSUER) return false;
   if (String(payload.aud) !== projectNumber) return false;
-  if (typeof payload.exp === "number" && payload.exp < Date.now() / 1000) return false;
+  // Fail closed: missing or non-numeric `exp` must reject (previously read
+  // "number AND expired", silently accepting tokens without an exp claim).
+  if (typeof payload.exp !== "number" || payload.exp < Date.now() / 1000) return false;
   const keyId = typeof header.kid === "string" ? header.kid : "";
   const alg = typeof header.alg === "string" ? header.alg : "RS256";
   const hashAlg = alg === "RS256" ? "SHA-256" : alg === "RS384" ? "SHA-384" : "SHA-512";

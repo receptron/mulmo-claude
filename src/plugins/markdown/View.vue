@@ -198,7 +198,9 @@ async function applyMarkdown() {
     });
     saving.value = false;
     if (!result.ok) {
-      saveError.value = t("pluginMarkdown.saveFailed", { error: result.error });
+      // Store the raw error; the template formats it via t() so locale
+      // switches re-render without double-translating.
+      saveError.value = result.error;
       return;
     }
   }

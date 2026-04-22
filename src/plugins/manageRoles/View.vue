@@ -69,7 +69,7 @@
               :key="plugin.name"
               class="flex items-center gap-2 text-sm cursor-pointer"
               :class="plugin.enabled ? 'text-gray-700' : 'text-gray-400 cursor-not-allowed'"
-              :title="plugin.enabled ? '' : `Requires ${plugin.requiredEnv.join(', ')} in .env`"
+              :title="plugin.enabled ? '' : t('pluginManageRoles.requiresEnv', { env: plugin.requiredEnv.join(', ') })"
             >
               <input
                 v-model="newForm.selectedPlugins"
@@ -141,7 +141,10 @@
                 {{ role.availablePlugins.join(", ") }}
               </div>
             </div>
-            <span class="material-icons text-gray-400 text-sm" :title="selectedId === role.id ? 'Collapse' : 'Expand'">
+            <span
+              class="material-icons text-gray-400 text-sm"
+              :title="selectedId === role.id ? t('pluginManageRoles.collapse') : t('pluginManageRoles.expand')"
+            >
               {{ selectedId === role.id ? "expand_less" : "expand_more" }}
             </span>
           </div>
@@ -202,7 +205,7 @@
                   :key="plugin.name"
                   class="flex items-center gap-2 text-sm cursor-pointer"
                   :class="plugin.enabled ? 'text-gray-700' : 'text-gray-400 cursor-not-allowed'"
-                  :title="plugin.enabled ? '' : `Requires ${plugin.requiredEnv.join(', ')} in .env`"
+                  :title="plugin.enabled ? '' : t('pluginManageRoles.requiresEnv', { env: plugin.requiredEnv.join(', ') })"
                 >
                   <input
                     v-model="editForm.selectedPlugins"

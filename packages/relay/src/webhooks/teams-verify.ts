@@ -53,7 +53,10 @@ export function validateTokenClaims(input: ValidateTokenClaimsInput): boolean {
   const audMatches = typeof aud === "string" ? aud === appId : Array.isArray(aud) && aud.includes(appId);
   if (!audMatches) return false;
 
-  if (typeof payload.exp === "number" && payload.exp < nowSeconds) return false;
+  // Fail closed: a missing or non-numeric `exp` is not a reason to pass.
+  // (Previous version of this check read "exp === number AND expired" which
+  // silently accepted tokens with no exp claim at all.)
+  if (typeof payload.exp !== "number" || payload.exp < nowSeconds) return false;
 
   // Bot Framework tokens carry the activity's serviceUrl as the
   // `serviceurl` claim (lowercase). Require it to be present AND match —

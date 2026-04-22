@@ -27,7 +27,7 @@
 import { chunkText } from "@mulmobridge/client/text";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
-import { ONE_HOUR_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
+import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
 import { validateTokenClaims, validateJwkEndorsement, isAllowedSender, type AppType } from "./teams-verify.js";
 
 const MULTITENANT_ISSUER = "https://api.botframework.com";
@@ -258,7 +258,7 @@ async function getAccessToken(env: Env): Promise<string> {
   if (typeof data.access_token !== "string") {
     throw new Error("Teams token response missing access_token");
   }
-  const ttlSec = typeof data.expires_in === "number" ? data.expires_in : 3600;
+  const ttlSec = typeof data.expires_in === "number" ? data.expires_in : ONE_HOUR_S;
   tokenCache = { token: data.access_token, expiresAt: now + ttlSec };
   return data.access_token;
 }
@@ -281,8 +281,15 @@ const teamsPlugin: PlatformPlugin = {
     // serviceUrl / channelId claims against the body. If parsing fails,
     // the request is a non-message activity (typing, invoke, …) and
     // still needs a 200 OK — but we skip signature checks since there's
-    // nothing to forward.
-    const activity = parseActivity(JSON.parse(body));
+    // nothing to forward. Non-JSON bodies also ack 200 (Bot Framework
+    // expects that) rather than bubbling to a 500.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      return [];
+    }
+    const activity = parseActivity(parsed);
     if (!activity) return []; // non-message or malformed — ack 200 OK
 
     const authHeader = request.headers.get("authorization") ?? undefined;
