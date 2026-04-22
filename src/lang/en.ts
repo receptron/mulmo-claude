@@ -230,6 +230,24 @@ const enMessages = {
     valueOrFormulaPlaceholder: "Value or Formula (e.g., 100 or SUM(B2:B11))",
     formatPlaceholder: "Format (e.g., $#,##0.00)",
   },
+  app: {
+    // `<i18n-t>` slots — named `envKey` / `envFile` render as inline
+    // `<code>` in App.vue, so the literal variable and file names
+    // stay untranslated while the surrounding copy is localised.
+    geminiRequired: "Image generation requires {envKey}. Add it to {envFile} and restart the app.",
+    startConversation: "Start a conversation",
+  },
+  suggestionsPanel: {
+    suggestions: "Suggestions",
+    sendEditHint: "click to send · shift+click to edit",
+  },
+  settingsToolsTab: {
+    // Rendered via <i18n-t> with named slots `allowedTools` and `claudeMcp`
+    // so the inline `<code>` tags keep their styling while the copy
+    // is translatable.
+    explanation:
+      "Extra tool names to pass to Claude via {allowedTools}. One per line. Useful for built-in Claude Code MCP servers like Gmail / Google Calendar after you have authenticated via {claudeMcp}.",
+  },
 };
 
 export default enMessages;

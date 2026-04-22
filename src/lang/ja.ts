@@ -221,6 +221,18 @@ const jaMessages = {
     valueOrFormulaPlaceholder: "値または数式（例: 100, SUM(B2:B11)）",
     formatPlaceholder: "書式（例: $#,##0.00）",
   },
+  app: {
+    geminiRequired: "画像生成には {envKey} が必要です。{envFile} に追加してアプリを再起動してください。",
+    startConversation: "会話を開始してください",
+  },
+  suggestionsPanel: {
+    suggestions: "候補",
+    sendEditHint: "クリックで送信 · Shift+クリックで編集",
+  },
+  settingsToolsTab: {
+    explanation:
+      "{allowedTools} を介して Claude に渡す追加ツール名。1行につき1つ。Gmail / Google Calendar などの Claude Code 組み込み MCP サーバを、{claudeMcp} で認証した後に利用する場合に便利です。",
+  },
 };
 
 export default jaMessages;

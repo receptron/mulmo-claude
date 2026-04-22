@@ -56,11 +56,10 @@
         </div>
 
         <div v-if="activeTab === 'tools'" class="space-y-3">
-          <p class="text-xs text-gray-600 leading-relaxed">
-            Extra tool names to pass to Claude via
-            <code class="bg-gray-100 px-1 rounded">--allowedTools</code>. One per line. Useful for built-in Claude Code MCP servers like Gmail / Google Calendar
-            after you have authenticated via <code class="bg-gray-100 px-1 rounded">claude mcp</code>.
-          </p>
+          <i18n-t keypath="settingsToolsTab.explanation" tag="p" class="text-xs text-gray-600 leading-relaxed">
+            <template #allowedTools><code class="bg-gray-100 px-1 rounded">--allowedTools</code></template>
+            <template #claudeMcp><code class="bg-gray-100 px-1 rounded">claude mcp</code></template>
+          </i18n-t>
           <label class="block">
             <span class="text-xs font-semibold text-gray-700">{{ t("settingsModal.toolNamesLabel") }}</span>
             <textarea
