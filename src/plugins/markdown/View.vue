@@ -1,26 +1,26 @@
 <template>
   <div class="markdown-container">
     <div v-if="loading" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">Loading document...</div>
+      <div class="text-gray-500">{{ t("pluginMarkdown.loading") }}</div>
     </div>
     <div v-else-if="loadError && !markdownContent" class="min-h-full p-8 flex items-center justify-center">
-      <div class="load-error-banner" role="alert">⚠ Failed to load document: {{ loadError }}</div>
+      <div class="load-error-banner" role="alert">{{ t("pluginMarkdown.loadFailed", { error: loadError }) }}</div>
     </div>
     <div v-else-if="!markdownContent" class="min-h-full p-8 flex items-center justify-center">
-      <div class="text-gray-500">No markdown content available</div>
+      <div class="text-gray-500">{{ t("pluginMarkdown.noContent") }}</div>
     </div>
     <template v-else>
       <div class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
         <div class="button-group">
           <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
             <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-            PDF
+            {{ t("pluginMarkdown.pdf") }}
           </button>
         </div>
-        <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">⚠ PDF failed</span>
+        <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">{{ t("pluginMarkdown.pdfFailedShort") }}</span>
       </div>
       <div v-if="loadError" class="load-error-banner" role="alert">
-        ⚠ Failed to refresh document: {{ loadError }} — showing last successfully loaded content.
+        {{ t("pluginMarkdown.refreshFailed", { error: loadError }) }}
       </div>
       <div class="markdown-content-wrapper">
         <div class="p-4">
@@ -30,17 +30,17 @@
 
       <div class="bottom-bar-wrapper">
         <details ref="sourceDetails" class="markdown-source" @toggle="onDetailsToggle">
-          <summary>Edit Markdown Source</summary>
+          <summary>{{ t("pluginMarkdown.editSource") }}</summary>
           <textarea v-model="editableMarkdown" class="markdown-editor" spellcheck="false"></textarea>
           <div class="editor-actions">
             <button class="apply-btn" :disabled="!hasChanges || saving" @click="applyMarkdown">
-              {{ saving ? "Saving..." : "Apply Changes" }}
+              {{ saving ? t("pluginMarkdown.saving") : t("pluginMarkdown.applyChanges") }}
             </button>
-            <button class="cancel-btn" @click="cancelEdit">Cancel</button>
+            <button class="cancel-btn" @click="cancelEdit">{{ t("pluginMarkdown.cancel") }}</button>
           </div>
           <p v-if="saveError" class="save-error" role="alert">⚠ {{ saveError }}</p>
         </details>
-        <button v-show="!editing" class="copy-btn" :title="copied ? 'Copied!' : 'Copy'" @click="copyText">
+        <button v-show="!editing" class="copy-btn" :title="copied ? t('pluginMarkdown.copiedLabel') : t('pluginMarkdown.copyLabel')" @click="copyText">
           <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
         </button>
       </div>
@@ -50,7 +50,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
+
+const { t } = useI18n();
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
@@ -195,7 +198,7 @@ async function applyMarkdown() {
     });
     saving.value = false;
     if (!result.ok) {
-      saveError.value = `Save failed: ${result.error}`;
+      saveError.value = t("pluginMarkdown.saveFailed", { error: result.error });
       return;
     }
   }

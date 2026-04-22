@@ -3,8 +3,8 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div>
-        <h2 class="text-lg font-semibold text-gray-800">Skills</h2>
-        <p class="text-xs text-gray-400 mt-0.5">{{ skills.length }} available · click one to view · "Run" invokes it as /&lt;name&gt;</p>
+        <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginManageSkills.heading") }}</h2>
+        <p class="text-xs text-gray-400 mt-0.5">{{ t("pluginManageSkills.subheading", { count: skills.length }) }}</p>
       </div>
     </div>
 
@@ -32,15 +32,16 @@
             {{ skill.source }}
           </div>
         </div>
-        <p v-if="skills.length === 0" class="p-4 text-sm text-gray-400 italic">
-          No skills found. Add skill folders under
-          <code class="text-[11px]">~/.claude/skills/</code>.
-        </p>
+        <i18n-t v-if="skills.length === 0" keypath="pluginManageSkills.emptyWithPath" tag="p" class="p-4 text-sm text-gray-400 italic">
+          <template #path>
+            <code class="text-[11px]">{{ t("pluginManageSkills.emptySkillPath") }}</code>
+          </template>
+        </i18n-t>
       </div>
 
       <!-- Right: detail pane -->
       <div class="flex-1 min-w-0 overflow-y-auto">
-        <div v-if="!selected" class="p-6 text-sm text-gray-400 italic">Select a skill on the left to view its SKILL.md.</div>
+        <div v-if="!selected" class="p-6 text-sm text-gray-400 italic">{{ t("pluginManageSkills.selectHint") }}</div>
         <div v-else class="p-6">
           <div class="flex items-start justify-between gap-4 mb-4">
             <div class="min-w-0">
@@ -58,7 +59,7 @@
                   data-testid="skill-cancel-btn"
                   @click="cancelEdit"
                 >
-                  Cancel
+                  {{ t("common.cancel") }}
                 </button>
                 <button
                   class="px-3 py-1.5 text-sm rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1"
@@ -67,7 +68,7 @@
                   @click="saveEdit"
                 >
                   <span class="material-icons text-base">save</span>
-                  Save
+                  {{ t("common.save") }}
                 </button>
               </template>
               <template v-else>
@@ -79,7 +80,7 @@
                   @click="startEdit"
                 >
                   <span class="material-icons text-base">edit</span>
-                  Edit
+                  {{ t("pluginManageSkills.btnEdit") }}
                 </button>
                 <button
                   v-if="detail && detail.source === 'project'"
@@ -90,7 +91,7 @@
                   @click="deleteSkill"
                 >
                   <span class="material-icons text-base">delete</span>
-                  Delete
+                  {{ t("pluginManageSkills.btnDelete") }}
                 </button>
                 <button
                   class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center gap-1"
@@ -99,19 +100,19 @@
                   @click="runSkill"
                 >
                   <span class="material-icons text-base">play_arrow</span>
-                  Run
+                  {{ t("pluginManageSkills.btnRun") }}
                 </button>
               </template>
             </div>
           </div>
-          <div v-if="detailLoading" class="text-sm text-gray-400 italic">Loading…</div>
+          <div v-if="detailLoading" class="text-sm text-gray-400 italic">{{ t("pluginManageSkills.loading") }}</div>
           <div v-else-if="detailError" class="text-sm text-red-600">
             {{ detailError }}
           </div>
           <!-- Edit mode -->
           <div v-else-if="editing && detail" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1"> Description </label>
+              <label class="block text-xs font-medium text-gray-500 mb-1"> {{ t("pluginManageSkills.fieldDescription") }} </label>
               <input
                 v-model="editDescription"
                 data-testid="skill-edit-description"
@@ -119,7 +120,7 @@
               />
             </div>
             <div class="flex-1">
-              <label class="block text-xs font-medium text-gray-500 mb-1"> Body (Markdown) </label>
+              <label class="block text-xs font-medium text-gray-500 mb-1"> {{ t("pluginManageSkills.fieldBody") }} </label>
               <textarea
                 v-model="editBody"
                 data-testid="skill-edit-body"
@@ -130,7 +131,7 @@
           <!-- View mode -->
           <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify -->
           <div v-else-if="detail && renderedBody" class="markdown-content text-gray-700" data-testid="skill-body-rendered" v-html="renderedBody"></div>
-          <p v-else-if="detail" class="text-sm text-gray-400 italic">(empty body)</p>
+          <p v-else-if="detail" class="text-sm text-gray-400 italic">{{ t("pluginManageSkills.emptyBody") }}</p>
         </div>
       </div>
     </div>
@@ -202,7 +203,7 @@ onMounted(async () => {
   if (props.selectedResult || skills.value.length > 0) return;
   const response = await apiGet<{ skills: SkillSummary[] }>(API_ROUTES.skills.list);
   if (!response.ok) {
-    listError.value = `Failed to load skills: ${response.error}`;
+    listError.value = t("pluginManageSkills.errListFailed", { error: response.error });
     return;
   }
   if (Array.isArray(response.data.skills)) {
@@ -234,7 +235,7 @@ watch(
       return;
     }
     if (!response.ok) {
-      detailError.value = `Failed to load skill: ${response.error}`;
+      detailError.value = t("pluginManageSkills.errDetailFailed", { error: response.error });
       detail.value = null;
     } else {
       detail.value = response.data.skill;
@@ -266,7 +267,7 @@ async function saveEdit(): Promise<void> {
   });
   saving.value = false;
   if (!result.ok) {
-    detailError.value = `Save failed: ${result.error}`;
+    detailError.value = t("pluginManageSkills.errSaveFailed", { error: result.error });
     return;
   }
   detail.value = {
@@ -303,14 +304,14 @@ function runSkill(): void {
 async function deleteSkill(): Promise<void> {
   if (!detail.value || detail.value.source !== "project") return;
   const name = detail.value.name;
-  if (!window.confirm(`Delete skill "${name}"? This removes ~/mulmoclaude/.claude/skills/${name}/SKILL.md.`)) {
+  if (!window.confirm(t("pluginManageSkills.confirmDelete", { name }))) {
     return;
   }
   deleting.value = true;
   const result = await apiDelete<unknown>(API_ROUTES.skills.remove.replace(":name", encodeURIComponent(name)));
   deleting.value = false;
   if (!result.ok) {
-    detailError.value = result.error || "Failed to delete";
+    detailError.value = result.error || t("pluginManageSkills.errDeleteFailed");
     return;
   }
   // Remove from the local list, advance selection, clear detail.

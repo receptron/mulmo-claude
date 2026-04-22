@@ -1,14 +1,11 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-      <h2 class="text-lg font-semibold text-gray-800">Custom Roles</h2>
+      <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginManageRoles.heading") }}</h2>
       <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-500">
-          {{ customRoles.length }}
-          role{{ customRoles.length !== 1 ? "s" : "" }}
-        </span>
+        <span class="text-sm text-gray-500">{{ t("pluginManageRoles.roleCount", customRoles.length, { named: { count: customRoles.length } }) }}</span>
         <button v-if="!creating" data-testid="role-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="startCreate">
-          + Add
+          {{ t("pluginManageRoles.addButton") }}
         </button>
       </div>
     </div>
@@ -16,12 +13,12 @@
     <div class="flex-1 overflow-y-auto">
       <!-- New role creation panel -->
       <div v-if="creating" class="m-4 border border-blue-300 bg-blue-50 rounded-lg p-4 space-y-3">
-        <div class="text-sm font-semibold text-gray-700">Create new role</div>
+        <div class="text-sm font-semibold text-gray-700">{{ t("pluginManageRoles.createPanel") }}</div>
 
         <!-- ID + Name + Icon row -->
         <div class="flex gap-3">
           <div class="w-40">
-            <label class="block text-xs font-medium text-gray-600 mb-1">ID</label>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldId") }}</label>
             <input
               v-model="newForm.id"
               type="text"
@@ -30,7 +27,7 @@
             />
           </div>
           <div class="flex-1">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Name</label>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldName") }}</label>
             <input
               v-model="newForm.name"
               type="text"
@@ -39,7 +36,7 @@
           </div>
           <div class="w-32">
             <label class="block text-xs font-medium text-gray-600 mb-1">
-              Icon
+              {{ t("pluginManageRoles.fieldIcon") }}
               <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">?</a>
             </label>
             <input
@@ -52,7 +49,7 @@
 
         <!-- Prompt -->
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Prompt</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldPrompt") }}</label>
           <textarea
             v-model="newForm.prompt"
             rows="6"
@@ -63,7 +60,7 @@
 
         <!-- Plugins -->
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-2">Plugins</label>
+          <label class="block text-xs font-medium text-gray-600 mb-2">{{ t("pluginManageRoles.fieldPlugins") }}</label>
           <div class="grid gap-x-4 gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             <label
               v-for="plugin in availablePlugins"
@@ -88,8 +85,8 @@
         <!-- Starter queries -->
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">
-            Starter queries
-            <span class="text-gray-400 font-normal">(one per line)</span>
+            {{ t("pluginManageRoles.fieldStarterQueries") }}
+            <span class="text-gray-400 font-normal">{{ t("pluginManageRoles.onePerLine") }}</span>
           </label>
           <textarea
             v-model="newForm.queriesText"
@@ -106,9 +103,11 @@
             :title="newFormError ?? ''"
             @click="saveNew"
           >
-            {{ saving ? "Creating…" : "Create" }}
+            {{ saving ? t("pluginManageRoles.creating") : t("pluginManageRoles.create") }}
           </button>
-          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="cancelCreate">Cancel</button>
+          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="cancelCreate">
+            {{ t("common.cancel") }}
+          </button>
         </div>
         <div v-if="newFormError" class="text-xs text-gray-500" data-testid="role-form-hint">
           {{ newFormError }}
@@ -119,7 +118,7 @@
       </div>
 
       <div v-if="!creating && customRoles.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">
-        No custom roles yet. Click "+ Add" or ask Claude to create one.
+        {{ t("pluginManageRoles.emptyHint") }}
       </div>
 
       <ul v-if="customRoles.length > 0" class="p-4 space-y-2">
@@ -150,7 +149,7 @@
             <!-- ID + Name + Icon row -->
             <div class="flex gap-3">
               <div class="w-40">
-                <label class="block text-xs font-medium text-gray-600 mb-1">ID</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldId") }}</label>
                 <input
                   v-model="editForm.id"
                   type="text"
@@ -158,7 +157,7 @@
                 />
               </div>
               <div class="flex-1">
-                <label class="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldName") }}</label>
                 <input
                   v-model="editForm.name"
                   type="text"
@@ -168,7 +167,7 @@
               </div>
               <div class="w-32">
                 <label class="block text-xs font-medium text-gray-600 mb-1">
-                  Icon
+                  {{ t("pluginManageRoles.fieldIcon") }}
                   <a class="text-blue-400 font-normal ml-1" href="https://fonts.google.com/icons" target="_blank" rel="noopener">?</a>
                 </label>
                 <input
@@ -181,7 +180,7 @@
 
             <!-- Prompt -->
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Prompt</label>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageRoles.fieldPrompt") }}</label>
               <textarea
                 v-model="editForm.prompt"
                 rows="6"
@@ -192,7 +191,7 @@
 
             <!-- Plugins -->
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-2">Plugins</label>
+              <label class="block text-xs font-medium text-gray-600 mb-2">{{ t("pluginManageRoles.fieldPlugins") }}</label>
               <div class="grid gap-x-4 gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
                 <label
                   v-for="plugin in availablePlugins"
@@ -217,8 +216,8 @@
             <!-- Starter queries -->
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">
-                Starter queries
-                <span class="text-gray-400 font-normal">(one per line)</span>
+                {{ t("pluginManageRoles.fieldStarterQueries") }}
+                <span class="text-gray-400 font-normal">{{ t("pluginManageRoles.onePerLine") }}</span>
               </label>
               <textarea
                 v-model="editForm.queriesText"
@@ -236,16 +235,18 @@
                   :title="editFormError ?? ''"
                   @click="saveEdit(role.id)"
                 >
-                  {{ saving ? "Updating…" : "Update" }}
+                  {{ saving ? t("pluginManageRoles.updating") : t("pluginManageRoles.update") }}
                 </button>
-                <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">Cancel</button>
+                <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">
+                  {{ t("common.cancel") }}
+                </button>
               </div>
               <button
                 class="px-3 py-1.5 text-sm rounded border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
                 :disabled="saving"
                 @click="deleteRole(role.id)"
               >
-                Delete
+                {{ t("pluginManageRoles.delete") }}
               </button>
             </div>
             <div v-if="editFormError" class="text-xs text-gray-500">
@@ -263,6 +264,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { useAppApi } from "../../composables/useAppApi";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
@@ -270,6 +272,8 @@ import type { CustomRole, ManageRolesData } from "./index";
 import { getAllPluginNames } from "../../tools/index";
 import { apiGet, apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 interface PluginEntry {
   name: string;
@@ -406,7 +410,10 @@ async function callManage(body: Record<string, unknown>): Promise<ManageResult> 
     // give us anything useful.
     return {
       success: false,
-      error: result.status === 0 ? result.error || "Network error" : result.error || `Server error: ${result.status}`,
+      error:
+        result.status === 0
+          ? result.error || t("pluginManageRoles.errNetworkError")
+          : result.error || t("pluginManageRoles.errServerError", { status: result.status }),
     };
   }
   return result.data;
@@ -432,13 +439,13 @@ async function refreshList() {
 function validateRoleForm(form: EditForm, excludeId: string | null): string | null {
   const trimmedId = form.id.trim();
   const trimmedName = form.name.trim();
-  if (!trimmedId) return "ID is required.";
+  if (!trimmedId) return t("pluginManageRoles.errIdRequired");
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmedId)) {
-    return "ID may only contain letters, numbers, '-' and '_'.";
+    return t("pluginManageRoles.errIdInvalid");
   }
-  if (!trimmedName) return "Name is required.";
+  if (!trimmedName) return t("pluginManageRoles.errNameRequired");
   if (customRoles.value.some((existing) => existing.id === trimmedId && existing.id !== excludeId)) {
-    return `A role with ID '${trimmedId}' already exists.`;
+    return t("pluginManageRoles.errIdDuplicate", { id: trimmedId });
   }
   return null;
 }
@@ -473,7 +480,7 @@ async function saveNew() {
     creating.value = false;
     await refreshList();
   } else {
-    createError.value = result.error ?? "Create failed";
+    createError.value = result.error ?? t("pluginManageRoles.errCreateFailed");
   }
   saving.value = false;
 }
@@ -505,7 +512,7 @@ async function saveEdit(originalId: string) {
     selectedId.value = null;
     await refreshList();
   } else {
-    saveError.value = result.error ?? "Save failed";
+    saveError.value = result.error ?? t("pluginManageRoles.errSaveFailed");
   }
   saving.value = false;
 }
@@ -518,7 +525,7 @@ async function deleteRole(roleId: string) {
     selectedId.value = null;
     await refreshList();
   } else {
-    saveError.value = result.error ?? "Delete failed";
+    saveError.value = result.error ?? t("pluginManageRoles.errDeleteFailed");
   }
   saving.value = false;
 }
