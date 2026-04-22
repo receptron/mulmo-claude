@@ -84,6 +84,34 @@
 
     <!-- Markdown content -->
     <div v-else class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content" @click="handleContentClick" v-html="renderedContent" />
+
+    <!-- Per-page chat composer (leaf pages only). Sending spawns a
+         fresh chat session with a prepended "read this page first"
+         instruction — see AppApi.startNewChat. -->
+    <div v-if="action === 'page' && content" class="border-t border-gray-200 px-4 py-3 shrink-0 bg-gray-50">
+      <div class="flex gap-2">
+        <textarea
+          v-model="chatDraft"
+          data-testid="wiki-page-chat-input"
+          :placeholder="t('pluginWiki.chatPlaceholder')"
+          rows="2"
+          class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none"
+          @compositionstart="imeEnter.onCompositionStart"
+          @compositionend="imeEnter.onCompositionEnd"
+          @keydown="imeEnter.onKeydown"
+          @blur="imeEnter.onBlur"
+        />
+        <button
+          data-testid="wiki-page-chat-send"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-start"
+          :title="t('pluginWiki.chatSend')"
+          :disabled="!canSendChat"
+          @click="submitChat"
+        >
+          <span class="material-icons text-base leading-none">send</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -96,7 +124,9 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { WikiData, WikiPageEntry } from "./index";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
+import { useImeAwareEnter } from "../../composables/useImeAwareEnter";
 import { usePdfDownload } from "../../composables/usePdfDownload";
+import { useAppApi } from "../../composables/useAppApi";
 import { renderWikiLinks } from "./helpers";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { apiPost } from "../../utils/api";
@@ -266,6 +296,33 @@ function navigate(newAction: "index" | WikiTabView) {
 function navigatePage(pageName: string) {
   pushWiki({ ...dropKeys(currentWikiQuery(), ["view"]), page: pageName });
 }
+
+// --- Per-page chat composer ---
+const appApi = useAppApi();
+const chatDraft = ref("");
+
+const canSendChat = computed(() => chatDraft.value.trim().length > 0 && currentSlug() !== null);
+
+function currentSlug(): string | null {
+  // Prefer the URL on /wiki (source of truth for that route); fall
+  // back to the tool-result payload when WikiView is mounted as a
+  // manageWiki result inside /chat.
+  if (route.name === PAGE_ROUTES.wiki && typeof route.query.page === "string" && route.query.page.length > 0) {
+    return route.query.page;
+  }
+  return props.selectedResult?.data?.pageName ?? null;
+}
+
+function submitChat() {
+  const text = chatDraft.value.trim();
+  const slug = currentSlug();
+  if (!text || !slug) return;
+  const prompt = `Before answering, read the wiki page at data/wiki/pages/${slug}.md.\n\n${text}`;
+  chatDraft.value = "";
+  appApi.startNewChat(prompt);
+}
+
+const imeEnter = useImeAwareEnter(submitChat);
 
 function handleContentClick(event: MouseEvent) {
   // 1. Internal wiki links: `[[Page Name]]` was rewritten to a

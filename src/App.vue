@@ -769,10 +769,19 @@ function navigateToWorkspacePath(href: string): void {
   }
 }
 
+function startNewChat(message: string): void {
+  // createNewSession sets currentSessionId synchronously (see the
+  // comment on its declaration), so the follow-up sendMessage lands
+  // in the new session rather than whatever was previously active.
+  createNewSession(currentRoleId.value);
+  void sendMessage(message);
+}
+
 // Plugin Views call back into App.vue via provide/inject (#227).
 provideAppApi({
   refreshRoles,
   sendMessage: (message: string) => sendMessage(message),
+  startNewChat: (message: string) => startNewChat(message),
   navigateToWorkspacePath: (href: string) => navigateToWorkspacePath(href),
 });
 // Plugin Views that need to tag background work with the current

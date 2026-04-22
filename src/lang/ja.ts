@@ -322,6 +322,8 @@ const jaMessages = {
     tabLint: "Lint",
     empty: "Wiki は空です。Wiki Manager にソースの取り込みを依頼してください。",
     previewMore: "+ {count} 件…",
+    chatPlaceholder: "このページについて質問…",
+    chatSend: "このページについて新しいチャットを開始",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF として保存（印刷ダイアログを開きます）",

@@ -330,6 +330,8 @@ const enMessages = {
     tabLint: "Lint",
     empty: "Wiki is empty. Ask the Wiki Manager to ingest a source.",
     previewMore: "+ {count} more…",
+    chatPlaceholder: "Ask about this page…",
+    chatSend: "Start a new chat about this page",
   },
   pluginPresentHtml: {
     saveAsPdf: "Save as PDF (opens print dialog)",
