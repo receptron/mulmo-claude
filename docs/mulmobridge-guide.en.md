@@ -74,7 +74,7 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id \
   npx @mulmobridge/telegram@latest
 ```
 
-Detailed setup: [Telegram README](https://github.com/receptron/mulmoclaude/blob/main/packages/telegram/README.md)
+Detailed setup: [Telegram README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/telegram/README.md)
 
 ---
 
@@ -82,14 +82,14 @@ Detailed setup: [Telegram README](https://github.com/receptron/mulmoclaude/blob/
 
 | Platform | Package | Status | Setup guide |
 |---|---|---|---|
-| **Terminal (CLI)** | [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | Stable | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/cli/README.md) |
-| **Telegram** | [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Stable | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/telegram/README.md) |
-| **Discord** | [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/discord/README.md) |
-| **Slack** | [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/slack/README.md) |
-| **LINE** | [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | Verified | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/line/README.md) |
-| **WhatsApp** | [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/whatsapp/README.md) |
-| **Matrix** | [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/matrix/README.md) |
-| **IRC** | [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/irc/README.md) |
+| **Terminal (CLI)** | [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | Stable | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/cli/README.md) |
+| **Telegram** | [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Stable | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/telegram/README.md) |
+| **Discord** | [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/discord/README.md) |
+| **Slack** | [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/slack/README.md) |
+| **LINE** | [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | Verified | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/line/README.md) |
+| **WhatsApp** | [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/whatsapp/README.md) |
+| **Matrix** | [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/matrix/README.md) |
+| **IRC** | [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | Experimental | [README](https://github.com/receptron/mulmoclaude/blob/main/packages/bridges/irc/README.md) |
 
 > **"Experimental" means** testing is limited and bugs are likely. Your feedback is very welcome!
 
@@ -186,14 +186,14 @@ Bridges are ~100 lines. See the [Bridge Protocol](bridge-protocol.md) for the wi
 | [@mulmobridge/chat-service](https://www.npmjs.com/package/@mulmobridge/chat-service) | Server-side chat service | [npm](https://www.npmjs.com/package/@mulmobridge/chat-service) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/chat-service) |
 | [@mulmobridge/client](https://www.npmjs.com/package/@mulmobridge/client) | Bridge-side client library | [npm](https://www.npmjs.com/package/@mulmobridge/client) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/client) |
 | [@mulmobridge/mock-server](https://www.npmjs.com/package/@mulmobridge/mock-server) | Mock server for testing | [npm](https://www.npmjs.com/package/@mulmobridge/mock-server) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/mock-server) |
-| [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | CLI bridge | [npm](https://www.npmjs.com/package/@mulmobridge/cli) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/cli) |
-| [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Telegram bridge | [npm](https://www.npmjs.com/package/@mulmobridge/telegram) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/telegram) |
-| [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Discord bridge | [npm](https://www.npmjs.com/package/@mulmobridge/discord) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/discord) |
-| [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Slack bridge | [npm](https://www.npmjs.com/package/@mulmobridge/slack) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/slack) |
-| [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | LINE bridge | [npm](https://www.npmjs.com/package/@mulmobridge/line) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/line) |
-| [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | WhatsApp bridge | [npm](https://www.npmjs.com/package/@mulmobridge/whatsapp) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/whatsapp) |
-| [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Matrix bridge | [npm](https://www.npmjs.com/package/@mulmobridge/matrix) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/matrix) |
-| [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | IRC bridge | [npm](https://www.npmjs.com/package/@mulmobridge/irc) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/irc) |
+| [@mulmobridge/cli](https://www.npmjs.com/package/@mulmobridge/cli) | CLI bridge | [npm](https://www.npmjs.com/package/@mulmobridge/cli) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/cli) |
+| [@mulmobridge/telegram](https://www.npmjs.com/package/@mulmobridge/telegram) | Telegram bridge | [npm](https://www.npmjs.com/package/@mulmobridge/telegram) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/telegram) |
+| [@mulmobridge/discord](https://www.npmjs.com/package/@mulmobridge/discord) | Discord bridge | [npm](https://www.npmjs.com/package/@mulmobridge/discord) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/discord) |
+| [@mulmobridge/slack](https://www.npmjs.com/package/@mulmobridge/slack) | Slack bridge | [npm](https://www.npmjs.com/package/@mulmobridge/slack) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/slack) |
+| [@mulmobridge/line](https://www.npmjs.com/package/@mulmobridge/line) | LINE bridge | [npm](https://www.npmjs.com/package/@mulmobridge/line) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/line) |
+| [@mulmobridge/whatsapp](https://www.npmjs.com/package/@mulmobridge/whatsapp) | WhatsApp bridge | [npm](https://www.npmjs.com/package/@mulmobridge/whatsapp) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/whatsapp) |
+| [@mulmobridge/matrix](https://www.npmjs.com/package/@mulmobridge/matrix) | Matrix bridge | [npm](https://www.npmjs.com/package/@mulmobridge/matrix) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/matrix) |
+| [@mulmobridge/irc](https://www.npmjs.com/package/@mulmobridge/irc) | IRC bridge | [npm](https://www.npmjs.com/package/@mulmobridge/irc) | [source](https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/irc) |
 
 ### General tools (@receptron scope)
 
