@@ -1,5 +1,10 @@
 // Korean dictionary. Mirror the shape of src/lang/en.ts —
 // missing keys fall back to English per createI18n's fallbackLocale.
+//
+// ⚠️ `<name>` 같은 꺾쇠 괄호가 들어간 문자열은 vue-i18n 의 XSS
+// 탐지에 걸려 "Detected HTML in '…' message" 경고가 발생하므로
+// 반드시 **함수 형식** 으로 작성한다. 자세한 내용은 en.ts 의
+// 헤더 주석 참고.
 
 const koMessages = {
   common: {
@@ -315,8 +320,7 @@ const koMessages = {
   },
   pluginWiki: {
     backToIndex: "목차로 돌아가기",
-    downloadPdf: "↓ PDF",
-    pdfLoadingLabel: "PDF",
+    pdf: "PDF",
     pdfFailed: "⚠ PDF 실패",
     tabIndex: "목차",
     tabLog: "로그",
@@ -386,7 +390,10 @@ const koMessages = {
     heading: "스킬",
     previewCount: "{count}개 스킬",
     previewMore: "+{count}개 더",
-    subheading: '{count}개 사용 가능 · 클릭해서 보기 · "Run" 은 /<name> 형식으로 호출합니다',
+    // 함수 형식으로 vue-i18n 의 메시지 컴파일러를 우회한다. 일반
+    // 문자열이면 `<name>` 이 HTML 조각으로 간주되어 매번 "Detected
+    // HTML in '…' message" 경고가 발생한다.
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")}개 사용 가능 · 클릭해서 보기 · "Run" 은 /<name> 형식으로 호출합니다`,
     emptyWithPath: "스킬을 찾을 수 없습니다. {path} 아래에 스킬 폴더를 추가하세요.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "왼쪽에서 스킬을 선택해 SKILL.md 를 확인하세요.",

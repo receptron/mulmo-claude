@@ -1,5 +1,10 @@
 // Japanese dictionary. Mirror the shape of src/lang/en.ts —
 // missing keys fall back to English per createI18n's fallbackLocale.
+//
+// ⚠️ `<name>` のような山括弧を含む文字列は vue-i18n の XSS
+// ヒューリスティックに引っかかり「Detected HTML in '…' message」
+// 警告が出るため、**関数形式** で書くこと。詳細は en.ts の
+// ヘッダーコメントを参照。
 
 const jaMessages = {
   common: {
@@ -385,7 +390,10 @@ const jaMessages = {
     heading: "スキル",
     previewCount: "{count} スキル",
     previewMore: "他 {count} 件",
-    subheading: "{count} 件利用可能 · クリックで表示 · 「Run」で /<name> として呼び出し",
+    // 関数形式で vue-i18n のメッセージコンパイラをバイパスする。
+    // 通常形式だと `<name>` が HTML フラグメント扱いされ、毎回
+    // 「Detected HTML in '…' message」警告が出る。
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} 件利用可能 · クリックで表示 · 「Run」で /<name> として呼び出し`,
     emptyWithPath: "スキルが見つかりません。{path} にスキルフォルダを追加してください。",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "左側のスキルを選択して SKILL.md を表示します。",
