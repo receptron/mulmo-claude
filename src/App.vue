@@ -7,6 +7,7 @@
         <SidebarHeader
           :sandbox-enabled="sandboxEnabled"
           :show-right-sidebar="showRightSidebar"
+          :is-chat-page="isChatPage"
           :title-style="debugTitleStyle"
           @test-query="(q) => sendMessage(q)"
           @notification-navigate="handleNotificationNavigate"
@@ -141,9 +142,11 @@
         </div>
       </div>
 
-      <!-- Right sidebar: tool call history -->
+      <!-- Right sidebar: tool call history. Only shown on the chat
+           page — system prompt / tools / tool-call history are all
+           agent-context and have no meaning on plugin views. -->
       <RightSidebar
-        v-if="showRightSidebar"
+        v-if="showRightSidebar && isChatPage"
         ref="rightSidebarRef"
         :tool-call-history="toolCallHistory"
         :available-tools="availableTools"
@@ -338,7 +341,10 @@ const { selectedResultUuid } = useSelectedResult({
 });
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
-useFaviconState({ isRunning, currentSummary, activeSession });
+// `unreadCount` covers every session (not just the active tab), so
+// the favicon badge lights up when a background session gets a new
+// reply even though the user is looking at a different session.
+useFaviconState({ isRunning, currentSummary, activeSession, sessionsUnreadCount: unreadCount });
 
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);

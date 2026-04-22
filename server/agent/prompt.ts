@@ -310,6 +310,61 @@ export interface SystemPromptParams {
    *  environment has no such guarantees, so without Docker we stay
    *  silent. */
   useDocker: boolean;
+  /** IANA timezone from the user's browser (e.g. "Asia/Tokyo"). When
+   *  present, drives the time-section instruction that tells the
+   *  agent to interpret bare times in that zone without asking the
+   *  user every turn. Missing or invalid values fall back to
+   *  server-local date only. */
+  userTimezone?: string;
+}
+
+// Accept IANA-looking strings only. Anything else (including
+// line-break injection attempts from a malicious client) is rejected
+// and the prompt falls back to the server-local form.
+const IANA_TZ_RE = /^[A-Za-z][A-Za-z0-9_+/-]{0,63}$/;
+function sanitizeUserTimezone(zoneId: string | undefined): string | undefined {
+  if (typeof zoneId !== "string") return undefined;
+  if (!IANA_TZ_RE.test(zoneId)) return undefined;
+  try {
+    // Throws a RangeError if the zone isn't recognized by the ICU
+    // data on this runtime.
+    new Intl.DateTimeFormat("en-US", { timeZone: zoneId });
+    return zoneId;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatDateInTimezone(date: Date, zoneId: string): string | null {
+  try {
+    // en-CA gives us YYYY-MM-DD directly, matching the rest of the
+    // workspace's date convention.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: zoneId,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch {
+    return null;
+  }
+}
+
+// Compact prompt section that tells the agent (a) today's date in the
+// user's zone and (b) not to pester the user about timezones for every
+// bare time expression. Falls back to server-local date (previous
+// behaviour) when the browser didn't give us a valid zone.
+export function buildTimeSection(now: Date, userTimezone: string | undefined): string {
+  const sanitized = sanitizeUserTimezone(userTimezone);
+  if (!sanitized) {
+    return `Today's date: ${toLocalIsoDate(now)}`;
+  }
+  const today = formatDateInTimezone(now, sanitized) ?? toLocalIsoDate(now);
+  return `## Time & Timezone
+
+The user's browser timezone is ${sanitized}. Today's date in that timezone is ${today}.
+
+When the user mentions a time without explicitly naming a city or timezone, assume their local timezone (${sanitized}) and proceed — do NOT ask for clarification. Only confirm when the user explicitly mentions another location or timezone (e.g. "3pm in New York", "JST", "UTC+5").`;
 }
 
 // Mirror the tool set installed by Dockerfile.sandbox. Kept here so a
@@ -419,13 +474,13 @@ interface NamedSection {
 const SYSTEM_PROMPT_WARN_THRESHOLD_CHARS = 20000;
 
 export function buildSystemPrompt(params: SystemPromptParams): string {
-  const { role, workspacePath, useDocker } = params;
+  const { role, workspacePath, useDocker, userTimezone } = params;
 
   const sections: NamedSection[] = [
     { name: "base", content: SYSTEM_PROMPT },
     { name: "role", content: role.prompt },
     { name: "workspace", content: `Workspace directory: ${workspacePath}` },
-    { name: "date", content: `Today's date: ${toLocalIsoDate(new Date())}` },
+    { name: "time", content: buildTimeSection(new Date(), userTimezone) },
     { name: "memory", content: buildMemoryContext(workspacePath) },
     { name: "sandbox", content: useDocker ? SANDBOX_TOOLS_HINT : null },
     { name: "wiki", content: buildWikiContext(workspacePath) },

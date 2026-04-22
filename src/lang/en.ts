@@ -8,6 +8,19 @@
 // reads `typeof en` to feed `DefineLocaleMessage`, and readonly literal
 // types would conflict with vue-i18n's writable message interface.
 
+// ⚠️ Angle-bracket text (e.g. `<name>`, `</tag>`) in a plain string
+// message trips vue-i18n's XSS heuristic and logs
+// `[intlify] Detected HTML in '…' message` on every mount. If the
+// copy must contain `<...>`, use the **function form** so the
+// message compiler is skipped entirely:
+//
+//   subheading: ({ named }: { named: (key: string) => unknown }) =>
+//     `${named("count")} available · invokes as /<name>`,
+//
+// See `argsPlaceholder` and `pluginManageSkills.subheading` for
+// worked examples. Mirror the same form in every other lang file
+// when the English side uses a function.
+
 const enMessages = {
   common: {
     save: "Save",
@@ -52,6 +65,7 @@ const enMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "All",
+      unread: "Unread",
       human: "Human",
       scheduler: "Scheduler",
       skill: "Skill",
@@ -404,7 +418,10 @@ const enMessages = {
     heading: "Skills",
     previewCount: "{count} skill | {count} skills",
     previewMore: "+{count} more",
-    subheading: '{count} available · click one to view · "Run" invokes it as /<name>',
+    // Function form skips vue-i18n's message compiler, which
+    // otherwise flags the literal `<name>` as a suspected HTML
+    // fragment and warns about XSS on every mount.
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} available · click one to view · "Run" invokes it as /<name>`,
     emptyWithPath: "No skills found. Add skill folders under {path}.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "Select a skill on the left to view its SKILL.md.",

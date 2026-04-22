@@ -44,4 +44,30 @@ test.describe("right sidebar toggle (useRightSidebar)", () => {
     const stored2 = await page.evaluate(() => localStorage.getItem("right_sidebar_visible"));
     expect(stored2).toBe("false");
   });
+
+  test("is hidden on plugin views even when the preference is on", async ({ page }) => {
+    // User has the panel toggled on — should still hide on wiki / todos /
+    // scheduler etc. because those views have no agent context.
+    await page.addInitScript(() => localStorage.setItem("right_sidebar_visible", "true"));
+
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    // Panel and toggle button both visible on chat.
+    await expect(page.getByRole("heading", { name: "Tool Call History" })).toBeVisible();
+    await expect(page.getByTitle("Tool call history")).toBeVisible();
+
+    for (const route of ["/wiki", "/todos", "/scheduler", "/skills", "/roles", "/files"] as const) {
+      await page.goto(route);
+      await expect(page.getByText("MulmoClaude")).toBeVisible();
+      // Panel content gone.
+      await expect(page.getByRole("heading", { name: "Tool Call History" })).toBeHidden();
+      // Toggle button gone (dead control suppression).
+      await expect(page.getByTitle("Tool call history")).toBeHidden();
+    }
+
+    // Returning to chat restores the panel at the user's saved preference.
+    await page.goto("/chat");
+    await expect(page.getByRole("heading", { name: "Tool Call History" })).toBeVisible();
+    await expect(page.getByTitle("Tool call history")).toBeVisible();
+  });
 });

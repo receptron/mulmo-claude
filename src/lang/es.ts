@@ -1,5 +1,10 @@
 // Spanish dictionary. Mirror the shape of src/lang/en.ts —
 // missing keys fall back to English per createI18n's fallbackLocale.
+//
+// ⚠️ Las cadenas que contienen ángulos (p.ej. `<name>`) activan la
+// heurística XSS de vue-i18n y generan el aviso
+// "Detected HTML in '…' message". Usa siempre la **forma función**
+// en esos casos. Ver la cabecera de en.ts para más detalle.
 
 const esMessages = {
   common: {
@@ -43,6 +48,7 @@ const esMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "Todas",
+      unread: "No leídas",
       human: "Persona",
       scheduler: "Programador",
       skill: "Skill",
@@ -397,7 +403,10 @@ const esMessages = {
     heading: "Skills",
     previewCount: "{count} skill | {count} skills",
     previewMore: "+{count} más",
-    subheading: '{count} disponibles · haz clic para ver · "Run" la invoca como /<name>',
+    // La forma función evita el compilador de mensajes de vue-i18n,
+    // que de lo contrario marca el literal `<name>` como fragmento
+    // HTML y avisa "Detected HTML in '…' message" en cada montaje.
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} disponibles · haz clic para ver · "Run" la invoca como /<name>`,
     emptyWithPath: "No se encontraron skills. Añade carpetas de skills en {path}.",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "Selecciona una skill a la izquierda para ver su SKILL.md.",

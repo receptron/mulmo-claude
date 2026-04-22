@@ -1,5 +1,9 @@
 // Simplified Chinese dictionary. Mirror the shape of src/lang/en.ts —
 // missing keys fall back to English per createI18n's fallbackLocale.
+//
+// ⚠️ 包含 `<name>` 等尖括号的字符串会触发 vue-i18n 的 XSS
+// 检测,输出 "Detected HTML in '…' message" 警告。此类文案必须
+// 改用 **函数形式**。详见 en.ts 的头部注释。
 
 const zhMessages = {
   common: {
@@ -44,6 +48,7 @@ const zhMessages = {
   sessionHistoryPanel: {
     filters: {
       all: "全部",
+      unread: "未读",
       human: "人工",
       scheduler: "调度器",
       skill: "技能",
@@ -394,7 +399,10 @@ const zhMessages = {
     heading: "技能",
     previewCount: "{count} 个技能",
     previewMore: "+还有 {count} 个",
-    subheading: '{count} 个可用 · 点击查看 · "Run" 会以 /<name> 的形式调用',
+    // 使用函数形式绕过 vue-i18n 的消息编译器,否则 `<name>`
+    // 会被当作 HTML 片段,每次挂载都会触发
+    // "Detected HTML in '…' message" 警告。
+    subheading: ({ named }: { named: (key: string) => unknown }) => `${named("count")} 个可用 · 点击查看 · "Run" 会以 /<name> 的形式调用`,
     emptyWithPath: "未找到技能。请在 {path} 下添加技能文件夹。",
     emptySkillPath: "~/.claude/skills/",
     selectHint: "在左侧选择一个技能以查看其 SKILL.md。",

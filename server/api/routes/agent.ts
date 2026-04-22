@@ -105,12 +105,16 @@ export interface StartChatParams {
   /** Where this session originates (#486). Accepts string for
    *  cross-package compatibility (chat-service passes string). */
   origin?: string;
+  /** IANA timezone the user's browser resolved (e.g. "Asia/Tokyo").
+   *  Validated server-side before it reaches the system prompt — an
+   *  invalid or missing value falls back to server-local time. */
+  userTimezone?: string;
 }
 
 export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };
 
 export async function startChat(params: StartChatParams): Promise<StartChatResult> {
-  const { message, roleId, chatSessionId, selectedImageData, attachments } = params;
+  const { message, roleId, chatSessionId, selectedImageData, attachments, userTimezone } = params;
 
   if (!message || !roleId || !chatSessionId) {
     return {
@@ -203,6 +207,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     requestStartedAt,
     toolArgsCache: createArgsCache(),
     attachments: mergeAttachments(selectedImageData, attachments),
+    userTimezone,
   });
 
   return { kind: "started", chatSessionId };
@@ -239,6 +244,7 @@ interface AgentBody {
   roleId: string;
   chatSessionId: string;
   selectedImageData?: string;
+  userTimezone?: string;
 }
 
 interface ErrorResponse {
@@ -271,6 +277,7 @@ interface BackgroundRunParams {
   requestStartedAt: number;
   toolArgsCache: ReturnType<typeof createArgsCache>;
   attachments: Attachment[] | undefined;
+  userTimezone: string | undefined;
 }
 
 // Per-event side-effect context passed to `handleAgentEvent`.
@@ -358,7 +365,8 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
 }
 
 async function runAgentInBackground(params: BackgroundRunParams): Promise<void> {
-  const { decoratedMessage, role, chatSessionId, claudeSessionId, abortSignal, resultsFilePath, requestStartedAt, toolArgsCache, attachments } = params;
+  const { decoratedMessage, role, chatSessionId, claudeSessionId, abortSignal, resultsFilePath, requestStartedAt, toolArgsCache, attachments, userTimezone } =
+    params;
 
   const eventCtx: EventContext = {
     chatSessionId,
@@ -378,7 +386,17 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
   try {
     while (true) {
       let staleSessionDetected = false;
-      for await (const event of runAgent(currentMessage, role, workspacePath, chatSessionId, PORT, currentClaudeSessionId, abortSignal, attachments)) {
+      for await (const event of runAgent(
+        currentMessage,
+        role,
+        workspacePath,
+        chatSessionId,
+        PORT,
+        currentClaudeSessionId,
+        abortSignal,
+        attachments,
+        userTimezone,
+      )) {
         if (failoverAttemptsRemaining > 0 && event.type === EVENT_TYPES.error && typeof event.message === "string" && isStaleSessionError(event.message)) {
           // Swallow the error — we're about to recover. `break`
           // abandons the current generator; since the event is only

@@ -10,8 +10,13 @@ export function useFaviconState(opts: {
   isRunning: ComputedRef<boolean>;
   currentSummary: ComputedRef<SessionSummary | undefined>;
   activeSession: ComputedRef<ActiveSession | undefined>;
+  // Number of sessions (across all tabs) with unread messages. We
+  // light the badge dot when any session is unread, even if it's not
+  // the currently-focused one, so background replies still surface in
+  // the tab bar.
+  sessionsUnreadCount: ComputedRef<number>;
 }) {
-  const { isRunning, currentSummary, activeSession } = opts;
+  const { isRunning, currentSummary, activeSession, sessionsUnreadCount } = opts;
 
   const faviconState = computed<FaviconState>(() => {
     if (isRunning.value) return FAVICON_STATES.running;
@@ -21,7 +26,13 @@ export function useFaviconState(opts: {
   });
 
   const { unreadCount: notificationUnreadCount } = useNotifications();
-  const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0);
+  // Badge dot covers two independent signals:
+  //   1. Pub-sub notifications (scheduled tasks, etc.)
+  //   2. Any session with unread chat messages (including background
+  //      tabs the user isn't currently viewing).
+  // Either one flips the dot on — the dot doesn't distinguish source,
+  // just tells the user "there's something to look at".
+  const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0 || sessionsUnreadCount.value > 0);
 
   useDynamicFavicon({
     state: faviconState,

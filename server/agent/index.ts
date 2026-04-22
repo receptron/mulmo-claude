@@ -158,6 +158,7 @@ export async function* runAgent(
   claudeSessionId?: string,
   abortSignal?: AbortSignal,
   attachments?: Attachment[],
+  userTimezone?: string,
 ): AsyncGenerator<AgentEvent> {
   const activePlugins = getActivePlugins(role);
   const useDocker = await isDockerAvailable();
@@ -181,6 +182,7 @@ export async function* runAgent(
     role,
     workspacePath: useDocker ? CONTAINER_WORKSPACE_PATH : workspacePath,
     useDocker,
+    userTimezone,
   });
 
   // In debug mode (--debug), dump the full system prompt on the first
