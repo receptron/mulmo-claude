@@ -138,7 +138,7 @@ test.describe("file explorer lazy expand (#200 phase 2)", () => {
 
   test("deep link auto-expands ancestors", async ({ page }) => {
     const mock = await mockLazyDirs(page);
-    await page.goto("/files?path=wiki/pages/foo.md");
+    await page.goto("/files/wiki/pages/foo.md");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Both `wiki` and `wiki/pages` should have been fetched so the
