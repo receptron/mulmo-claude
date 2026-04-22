@@ -23,7 +23,7 @@
   "dependencies": {
     "@mulmobridge/client": "^0.1.0",
     "@mulmobridge/protocol": "^0.1.0",
-    "@xmpp/client": "^0.13.1",
+    "@xmpp/client": "^0.14.0",
     "dotenv": "^17.0.0"
   },
   "devDependencies": {
