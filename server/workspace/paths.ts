@@ -52,6 +52,7 @@ export const WORKSPACE_DIRS = {
   transports: "data/transports",
   // artifacts/
   charts: "artifacts/charts",
+  scenes: "artifacts/scenes",
   // `markdowns` key preserved for call-site compatibility; on-disk
   // name is `documents` for clarity.
   markdowns: "artifacts/documents",
@@ -105,6 +106,7 @@ export const WORKSPACE_PATHS = {
   markdowns: path.join(workspacePath, WORKSPACE_DIRS.markdowns),
   spreadsheets: path.join(workspacePath, WORKSPACE_DIRS.spreadsheets),
   charts: path.join(workspacePath, WORKSPACE_DIRS.charts),
+  scenes: path.join(workspacePath, WORKSPACE_DIRS.scenes),
   configs: path.join(workspacePath, WORKSPACE_DIRS.configs),
   helps: path.join(workspacePath, WORKSPACE_DIRS.helps),
   wiki: path.join(workspacePath, WORKSPACE_DIRS.wiki),

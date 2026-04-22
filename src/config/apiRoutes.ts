@@ -37,6 +37,10 @@ export const API_ROUTES = {
     present: "/api/present-chart",
   },
 
+  scene3d: {
+    present: "/api/present-scene3d",
+  },
+
   chatIndex: {
     rebuild: "/api/chat-index/rebuild",
   },

@@ -35,6 +35,7 @@ export const TOOL_NAMES = {
   presentSpreadsheet: "presentSpreadsheet",
   presentHtml: "presentHtml",
   presentChart: "presentChart",
+  presentScene3d: "presentScene3d",
   presentForm: "presentForm",
   present3D: "present3D",
 

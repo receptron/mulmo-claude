@@ -19,6 +19,7 @@ import wikiPlugin from "../plugins/wiki/index";
 import presentMulmoScriptPlugin from "../plugins/presentMulmoScript/index";
 import presentHtmlPlugin from "../plugins/presentHtml/index";
 import presentChartPlugin from "../plugins/chart/index";
+import presentScene3dPlugin from "../plugins/scene3d/index";
 
 const plugins: Record<string, PluginEntry> = {
   "text-response": textResponsePlugin.plugin,
@@ -38,6 +39,7 @@ const plugins: Record<string, PluginEntry> = {
   openCanvas: canvasPlugin,
   presentHtml: presentHtmlPlugin,
   presentChart: presentChartPlugin,
+  presentScene3d: presentScene3dPlugin,
   editImage: editImagePlugin,
   present3D: Present3DPlugin.plugin,
   weather: WeatherPlugin.plugin,

@@ -30,6 +30,7 @@ describe("WORKSPACE_DIRS expected keys", () => {
     "markdowns",
     "news",
     "roles",
+    "scenes",
     "scheduler",
     "searches",
     "sources",
