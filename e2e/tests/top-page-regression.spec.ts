@@ -616,55 +616,96 @@ test.describe("9. streaming auto-scroll", () => {
 // 10. Multi-tab sync
 // ---------------------------------------------------------------------------
 test.describe("10. multi-tab sync", () => {
-  test("tab A sends a message and tab B sees the response via pub/sub", async ({ browser }) => {
+  test("tab B receives events in real time while tab A is streaming", async ({ browser }) => {
     const context = await browser.newContext();
     const page1 = await context.newPage();
     const page2 = await context.newPage();
 
-    // Set up mocks for both pages
     for (const page of [page1, page2]) {
       await mockAllApis(page);
     }
 
-    // Tab 1: set up agent + pubsub that streams a response
-    await mockAgentWithPubSub(page1, [
-      { type: "status", message: "Thinking..." },
-      { type: "text", message: "Response visible in both tabs" },
-    ]);
+    // Shared event bus: when tab A's agent publishes to a session
+    // channel, tab B's WebSocket also receives the same events.
+    const crossTabSenders: Array<(channel: string, data: unknown) => void> = [];
 
-    // Tab 1 navigates and sends
-    await page1.goto("/");
-    await page1.waitForURL(/\/chat\//);
-    // Extract the session ID that tab 1 created
-    const tab1Url = new URL(page1.url());
-    const sessionId = tab1Url.pathname.split("/chat/")[1];
+    async function setupCrossTabPubSub(page: Page): Promise<void> {
+      await page.routeWebSocket(
+        (url) => url.pathname.startsWith("/ws/pubsub"),
+        (webSocket) => {
+          webSocket.send("0" + JSON.stringify({ sid: "mock-sid", upgrades: [], pingInterval: 25000, pingTimeout: 20000, maxPayload: 1_000_000 }));
+          // Register this socket as a cross-tab receiver
+          const sender = (channel: string, data: unknown) => {
+            webSocket.send("42" + JSON.stringify(["data", { channel, data }]));
+          };
+          crossTabSenders.push(sender);
 
-    await sendChatMessage(page1, "Hello from tab 1");
-    // Tab 1 should see the response
-    await expect(page1.locator("text=Response visible in both tabs").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+          webSocket.onMessage((msg) => {
+            const text = String(msg);
+            if (text === "2") return webSocket.send("3");
+            if (text === "40") return webSocket.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
+            // No need to handle subscribe here — events are pushed
+            // from the agent mock via crossTabSenders
+          });
+        },
+      );
+    }
 
-    // Override tab 2's session API to return the transcript that
-    // tab 1 produced (simulating server-side persistence).
-    await page2.route(
-      (url) => url.pathname === `/api/sessions/${sessionId}`,
-      (route) => {
-        if (route.request().method() !== "GET") return route.fallback();
-        return route.fulfill({
-          json: [
-            { type: "session_meta", roleId: "general", sessionId },
-            { type: "text", source: "user", message: "Hello from tab 1" },
-            { type: "text", source: "assistant", message: "Response visible in both tabs" },
-          ],
-        });
-      },
-    );
+    await setupCrossTabPubSub(page1);
+    await setupCrossTabPubSub(page2);
 
-    // Tab 2 navigates to the same session
+    // Tab 1's agent mock: on POST, stream events to ALL connected tabs
+    await page1.route(urlEndsWith("/api/agent"), (route: Route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      const sessionId = body.chatSessionId as string;
+      const channel = `session.${sessionId}`;
+
+      // Stream events to all tabs with delays.
+      // Include the user text event so tab B also sees the user message
+      // (the server echoes it back via pub/sub in the real app).
+      void (async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        for (const sender of crossTabSenders) {
+          sender(channel, { type: "text", source: "user", message: "Hello from tab 1" });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        for (const sender of crossTabSenders) {
+          sender(channel, { type: "status", message: "Thinking..." });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        for (const sender of crossTabSenders) {
+          sender(channel, { type: "text", message: "Live from tab A" });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        for (const sender of crossTabSenders) {
+          sender(channel, { type: "session_finished" });
+        }
+      })();
+
+      return route.fulfill({ status: 202, json: { chatSessionId: sessionId } });
+    });
+
+    // Both tabs navigate to the same KNOWN session (mock API
+    // returns entries for SESSION_A). Tab 2 must load the session
+    // content before tab 1 sends, so the pub/sub subscription is active.
+    const sessionId = SESSION_A.id;
+    await page1.goto(`/chat/${sessionId}`);
+    await expect(page1.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
     await page2.goto(`/chat/${sessionId}`);
+    await expect(page2.locator("text=Hi there!").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
 
-    // Tab 2 should see both the user message and assistant response
-    await expect(page2.locator("text=Hello from tab 1").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
-    await expect(page2.locator("text=Response visible in both tabs").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    // Tab 1 sends a message — events stream to BOTH tabs
+    await sendChatMessage(page1, "Hello from tab 1");
+
+    // Tab 1 should see the response
+    await expect(page1.locator("text=Live from tab A").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // Tab 2 should ALSO see the response (real-time sync via shared pub/sub)
+    await expect(page2.locator("text=Live from tab A").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    // Tab 2 should also see the user message from tab 1
+    await expect(page2.locator("text=Hello from tab 1").first()).toBeVisible();
 
     await context.close();
   });
@@ -802,8 +843,9 @@ test.describe("13. API error handling", () => {
     await page.goto("/");
     await sendChatMessage(page, "this should fail");
 
-    // The error card should display "[Error]" label with connection error
-    await expect(page.locator("text=Error").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    // route.abort produces TypeError("Failed to fetch") which renders
+    // as "[Error] Failed to fetch" via pushErrorMessage
+    await expect(page.locator("text=[Error] Failed to fetch").first()).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
 
     // Input should be re-enabled (subscription unsubscribed, not stuck)
     await expect(chatInput(page)).toBeEnabled({ timeout: 3 * ONE_SECOND_MS });
@@ -938,13 +980,26 @@ test.describe("16. history drawer", () => {
     await mockAllApis(page);
   });
 
-  test("opens on button click and closes on click-outside", async ({ page }) => {
+  test("opens on button click, top aligns with top bar, and closes on click-outside", async ({ page }) => {
     await page.goto("/");
 
     // Open history
     await page.getByTestId("history-btn").click();
     const sessionItem = page.getByTestId(`session-item-${SESSION_A.id}`);
     await expect(sessionItem).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+
+    // The drawer's `top` style should match the top bar's offsetHeight.
+    // App.vue sets historyTopOffset = topBarRef.offsetHeight, and
+    // SessionHistoryPanel applies it as inline style `top: Npx`.
+    const historyPanel = sessionItem.locator("../..");
+    const topBarHeight = await page
+      .locator(".shrink-0.bg-white.text-gray-900")
+      .first()
+      .evaluate((element) => (element as HTMLElement).offsetHeight);
+    const panelTop = await historyPanel.evaluate((element) => parseFloat(getComputedStyle(element).top));
+
+    // Allow 1px rounding tolerance
+    expect(Math.abs(panelTop - topBarHeight)).toBeLessThanOrEqual(1);
 
     // Close by clicking outside (app title)
     await page.getByTestId("app-title").click();
