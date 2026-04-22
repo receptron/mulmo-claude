@@ -45,7 +45,7 @@ interface ProgressEvent {
 let pipelinePromise: Promise<AsrPipeline> | null = null;
 
 // Always-on fetch trace during the whisper pipeline load. Output is
-// on `console.info` so normal dev logs aren't overrun — filter the
+// on `console.log` so normal dev logs aren't overrun — filter the
 // console for `[whisper]` to see just this.
 //
 // We install a fetch wrapper via `env.customFetch` if the library
@@ -70,7 +70,7 @@ function wrapFetch(originalFetch: typeof globalThis.fetch): typeof globalThis.fe
         }
       }
       const suffix = peek ? ` | ${peek}` : "";
-      console.info(`[whisper] ${response.status} ${elapsed}ms ${contentType || "(no ct)"} ${url}${suffix}`);
+      console.log(`[whisper] ${response.status} ${elapsed}ms ${contentType || "(no ct)"} ${url}${suffix}`);
       return response;
     } catch (err) {
       console.error(`[whisper] FETCH FAILED ${url}`, err);
@@ -92,7 +92,7 @@ function installFetchSpy(): () => void {
   } catch {
     installed = false;
   }
-  console.info(`[whisper] fetch spy installed=${installed}`);
+  console.log(`[whisper] fetch spy installed=${installed}`);
   return () => {
     if (installed) {
       try {
@@ -120,7 +120,7 @@ async function loadPipeline(onProgress: (ev: ProgressEvent) => void): Promise<As
       mod.env.allowLocalModels = false;
       mod.env.allowRemoteModels = true;
       mod.env.backends.onnx.wasm.wasmPaths = ORT_WASM_CDN;
-      console.info("[whisper] env config", {
+      console.log("[whisper] env config", {
         allowLocalModels: mod.env.allowLocalModels,
         allowRemoteModels: mod.env.allowRemoteModels,
         remoteHost: mod.env.remoteHost,
