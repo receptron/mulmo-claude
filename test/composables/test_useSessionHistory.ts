@@ -40,8 +40,8 @@ interface SummaryRow {
   preview: string;
 }
 
-function row(id: string, updatedAt = ""): SummaryRow {
-  return { id, roleId: "general", startedAt: "", updatedAt, preview: "" };
+function row(sessionId: string, updatedAt = ""): SummaryRow {
+  return { id: sessionId, roleId: "general", startedAt: "", updatedAt, preview: "" };
 }
 
 function envelope(sessions: SummaryRow[], cursor: string, deletedIds: string[] = []) {

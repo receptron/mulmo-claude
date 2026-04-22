@@ -9,7 +9,7 @@
 // defaults. Writers perform an atomic replace (tmp + rename) so a
 // reader never observes a half-written file.
 
-import fs from "fs";
+import { mkdirSync } from "fs";
 import path from "path";
 import { log } from "./logger/index.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
@@ -44,7 +44,7 @@ export function mcpConfigPath(): string {
 }
 
 export function ensureConfigsDir(): void {
-  fs.mkdirSync(configsDir(), { recursive: true });
+  mkdirSync(configsDir(), { recursive: true });
 }
 
 export function isAppSettings(value: unknown): value is AppSettings {

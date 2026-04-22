@@ -6,7 +6,7 @@
       <code class="bg-gray-100 px-1 rounded">tsx</code>; paths must live under the workspace when Docker is enabled.
     </p>
 
-    <div v-if="servers.length === 0" class="text-xs text-gray-500 italic" data-testid="mcp-empty">No MCP servers configured yet.</div>
+    <div v-if="servers.length === 0" class="text-xs text-gray-500 italic" data-testid="mcp-empty">{{ t("settingsMcpTab.noServers") }}</div>
 
     <ul v-else class="space-y-2" data-testid="mcp-server-list">
       <li
@@ -25,14 +25,16 @@
             >
             <label class="flex items-center gap-1 text-xs text-gray-600 ml-2">
               <input type="checkbox" :checked="entry.spec.enabled !== false" :data-testid="'mcp-enabled-' + entry.id" @change="onToggleEnabled(idx, $event)" />
-              enabled
+              {{ t("settingsMcpTab.enabled") }}
             </label>
           </div>
-          <button class="text-xs text-red-600 hover:text-red-800" :data-testid="'mcp-remove-' + entry.id" @click="emit('remove', idx)">Remove</button>
+          <button class="text-xs text-red-600 hover:text-red-800" :data-testid="'mcp-remove-' + entry.id" @click="emit('remove', idx)">
+            {{ t("common.remove") }}
+          </button>
         </div>
         <div v-if="entry.spec.type === 'http'" class="text-xs space-y-1">
           <div>
-            <span class="text-gray-500">URL:</span>
+            <span class="text-gray-500">{{ t("settingsMcpTab.urlLabel") }}</span>
             <code class="ml-1">{{ entry.spec.url }}</code>
           </div>
           <div v-if="dockerMode && wouldRewriteLocalhost((entry.spec as HttpSpec).url)" class="text-amber-700">
@@ -41,7 +43,7 @@
         </div>
         <div v-else-if="entry.spec.type === 'stdio'" class="text-xs space-y-1">
           <div>
-            <span class="text-gray-500">Command:</span>
+            <span class="text-gray-500">{{ t("settingsMcpTab.commandLabel") }}</span>
             <code class="ml-1">{{ entry.spec.command }}</code>
             <code v-if="(entry.spec as StdioSpec).args?.length" class="ml-1">
               {{ ((entry.spec as StdioSpec).args ?? []).join(" ") }}
@@ -52,23 +54,23 @@
             class="text-red-600"
             :data-testid="'mcp-docker-warning-' + entry.id"
           >
-            ⚠ Contains paths outside the workspace — will not resolve inside Docker.
+            {{ t("settingsMcpTab.dockerNonWorkspaceWarning") }}
           </div>
         </div>
       </li>
     </ul>
 
     <button v-if="!adding" class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50" data-testid="mcp-add-btn" @click="startAdd">
-      + Add MCP Server
+      {{ t("settingsMcpTab.addServerButton") }}
     </button>
 
     <div v-else class="border border-blue-300 rounded p-3 space-y-2" data-testid="mcp-add-form">
       <label class="block text-xs font-semibold text-gray-700">
-        Name
+        {{ t("settingsMcpTab.nameLabel") }}
         <input
           v-model="draft.id"
           type="text"
-          placeholder="my-server"
+          :placeholder="t('settingsMcpTab.namePlaceholder')"
           class="mt-1 w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
           data-testid="mcp-draft-id"
           @keydown.stop
@@ -77,20 +79,20 @@
       <div class="flex gap-3 text-xs">
         <label class="flex items-center gap-1">
           <input v-model="draft.type" type="radio" value="http" data-testid="mcp-draft-type-http" />
-          HTTP
+          {{ t("settingsMcpTab.typeHttp") }}
         </label>
         <label class="flex items-center gap-1">
           <input v-model="draft.type" type="radio" value="stdio" data-testid="mcp-draft-type-stdio" />
-          Stdio (command)
+          {{ t("settingsMcpTab.typeStdio") }}
         </label>
       </div>
       <div v-if="draft.type === 'http'" class="space-y-2">
         <label class="block text-xs font-semibold text-gray-700">
-          URL
+          {{ t("settingsMcpTab.urlFieldLabel") }}
           <input
             v-model="draft.url"
             type="text"
-            placeholder="https://example.com/mcp"
+            :placeholder="t('settingsMcpTab.urlPlaceholder')"
             class="mt-1 w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
             data-testid="mcp-draft-url"
             @keydown.stop
@@ -99,7 +101,7 @@
       </div>
       <div v-else class="space-y-2">
         <label class="block text-xs font-semibold text-gray-700">
-          Command
+          {{ t("settingsMcpTab.commandFieldLabel") }}
           <select
             v-model="draft.command"
             class="mt-1 w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
@@ -111,11 +113,11 @@
           </select>
         </label>
         <label class="block text-xs font-semibold text-gray-700">
-          Arguments (one per line)
+          {{ t("settingsMcpTab.argsLabel") }}
           <textarea
             v-model="draft.argsText"
             class="mt-1 w-full h-20 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-            placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;/workspace/path"
+            :placeholder="t('settingsMcpTab.argsPlaceholder')"
             data-testid="mcp-draft-args"
             @keydown.stop
           ></textarea>
@@ -126,9 +128,11 @@
       </div>
       <div class="flex justify-end gap-2">
         <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="mcp-draft-cancel" @click="cancelAdd">
-          Cancel
+          {{ t("common.cancel") }}
         </button>
-        <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="mcp-draft-add" @click="commitAdd">Add</button>
+        <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="mcp-draft-add" @click="commitAdd">
+          {{ t("common.add") }}
+        </button>
       </div>
     </div>
   </div>
@@ -136,6 +140,9 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 // UI-local representation of a configured server. Matches
 // server/config.ts#McpServerEntry. Re-declared here to avoid a
@@ -269,24 +276,24 @@ function commitAdd(): void {
   if (!mcpId) {
     const suggested = ensureUniqueId(suggestIdFromDraft(draft.value));
     if (!suggested) {
-      draftError.value = "Please provide a Name, or enter a URL / args we can derive one from.";
+      draftError.value = t("settingsMcpTab.errNoName");
       return;
     }
     mcpId = suggested;
   }
   if (!ID_RE.test(mcpId)) {
-    draftError.value = "Name must start with a lowercase letter and contain only [a-z0-9_-].";
+    draftError.value = t("settingsMcpTab.errBadName");
     return;
   }
   if (props.servers.some((server) => server.id === mcpId)) {
-    draftError.value = `Server id "${mcpId}" already exists.`;
+    draftError.value = t("settingsMcpTab.errIdExists", { id: mcpId });
     return;
   }
   let spec: ServerSpec;
   if (draft.value.type === "http") {
     const url = draft.value.url.trim();
     if (!/^https?:\/\//.test(url)) {
-      draftError.value = "HTTP URL must start with http:// or https://";
+      draftError.value = t("settingsMcpTab.errBadHttpUrl");
       return;
     }
     spec = { type: "http", url, enabled: true };

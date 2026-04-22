@@ -1,18 +1,18 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import { loadTodos, saveTodos, loadColumns, saveColumns } from "../../../server/utils/files/todos-io.js";
 
 let root: string;
 
 before(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "todos-io-test-"));
+  root = mkdtempSync(path.join(tmpdir(), "todos-io-test-"));
 });
 
 after(() => {
-  fs.rmSync(root, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true });
 });
 
 describe("loadTodos / saveTodos", () => {
@@ -27,28 +27,28 @@ describe("loadTodos / saveTodos", () => {
   });
 
   it("creates parent dir on save", () => {
-    const freshRoot = fs.mkdtempSync(path.join(os.tmpdir(), "todos-io-nodir-"));
+    const freshRoot = mkdtempSync(path.join(tmpdir(), "todos-io-nodir-"));
     saveTodos([{ id: "2", text: "test" }], freshRoot);
     assert.deepEqual(loadTodos([], freshRoot), [{ id: "2", text: "test" }]);
-    fs.rmSync(freshRoot, { recursive: true, force: true });
+    rmSync(freshRoot, { recursive: true, force: true });
   });
 
   it("returns fallback on corrupt JSON (not crash)", () => {
-    const corruptRoot = fs.mkdtempSync(path.join(os.tmpdir(), "todos-corrupt-"));
+    const corruptRoot = mkdtempSync(path.join(tmpdir(), "todos-corrupt-"));
     const dir = path.join(corruptRoot, "data", "todos");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "todos.json"), "{broken json");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "todos.json"), "{broken json");
     // Should NOT throw — returns fallback and logs
     assert.deepEqual(loadTodos([], corruptRoot), []);
-    fs.rmSync(corruptRoot, { recursive: true, force: true });
+    rmSync(corruptRoot, { recursive: true, force: true });
   });
 });
 
 describe("loadColumns / saveColumns", () => {
   it("returns fallback when file is missing", () => {
-    const freshRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cols-io-test-"));
+    const freshRoot = mkdtempSync(path.join(tmpdir(), "cols-io-test-"));
     assert.deepEqual(loadColumns(["default"], freshRoot), ["default"]);
-    fs.rmSync(freshRoot, { recursive: true, force: true });
+    rmSync(freshRoot, { recursive: true, force: true });
   });
 
   it("round-trips columns", () => {

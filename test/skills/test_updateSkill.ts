@@ -3,25 +3,25 @@
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { updateProjectSkill } from "../../server/workspace/skills/writer.ts";
 
 let tmpDir = "";
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mulmo-skill-update-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "mulmo-skill-update-"));
 });
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 function createSkill(name: string, desc: string, body: string): void {
   const skillDir = path.join(tmpDir, ".claude", "skills", name);
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.writeFileSync(path.join(skillDir, "SKILL.md"), `---\ndescription: ${desc}\n---\n\n${body}`);
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(path.join(skillDir, "SKILL.md"), `---\ndescription: ${desc}\n---\n\n${body}`);
 }
 
 describe("updateProjectSkill", () => {
@@ -35,7 +35,7 @@ describe("updateProjectSkill", () => {
     });
     assert.equal(result.kind, "updated");
     if (result.kind === "updated") {
-      const content = fs.readFileSync(result.path, "utf-8");
+      const content = readFileSync(result.path, "utf-8");
       assert.ok(content.includes("new desc"));
       assert.ok(content.includes("new body"));
     }
@@ -83,7 +83,7 @@ describe("updateProjectSkill", () => {
       description: "v2",
       body: "body v2",
     });
-    const content = fs.readFileSync(path.join(tmpDir, ".claude", "skills", "my-skill", "SKILL.md"), "utf-8");
+    const content = readFileSync(path.join(tmpDir, ".claude", "skills", "my-skill", "SKILL.md"), "utf-8");
     assert.ok(!content.includes("v1"));
     assert.ok(content.includes("v2"));
     assert.ok(content.includes("body v2"));

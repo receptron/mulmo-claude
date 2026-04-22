@@ -1,8 +1,8 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import {
   createSessionMeta,
   readSessionMeta,
@@ -19,13 +19,13 @@ import { WORKSPACE_DIRS } from "../../../server/workspace/paths.js";
 let root: string;
 
 before(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "session-io-test-"));
+  root = mkdtempSync(path.join(tmpdir(), "session-io-test-"));
   // Create the chat dir
-  fs.mkdirSync(path.join(root, WORKSPACE_DIRS.chat), { recursive: true });
+  mkdirSync(path.join(root, WORKSPACE_DIRS.chat), { recursive: true });
 });
 
 after(() => {
-  fs.rmSync(root, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true });
 });
 
 describe("readSessionMeta", () => {
@@ -35,7 +35,7 @@ describe("readSessionMeta", () => {
 
   it("returns null for corrupt JSON (not crash)", async () => {
     const chatDir = path.join(root, WORKSPACE_DIRS.chat);
-    fs.writeFileSync(path.join(chatDir, "corrupt.json"), "{broken");
+    writeFileSync(path.join(chatDir, "corrupt.json"), "{broken");
     assert.equal(await readSessionMeta("corrupt", root), null);
   });
 
@@ -56,12 +56,12 @@ describe("createSessionMeta", () => {
   });
 
   it("creates parent dir if missing", async () => {
-    const freshRoot = fs.mkdtempSync(path.join(os.tmpdir(), "session-io-nodir-"));
+    const freshRoot = mkdtempSync(path.join(tmpdir(), "session-io-nodir-"));
     // Don't pre-create chat dir
     await createSessionMeta("nodir-test", "general", "hi", freshRoot);
     const meta = await readSessionMeta("nodir-test", freshRoot);
     assert.equal(meta?.roleId, "general");
-    fs.rmSync(freshRoot, { recursive: true, force: true });
+    rmSync(freshRoot, { recursive: true, force: true });
   });
 });
 

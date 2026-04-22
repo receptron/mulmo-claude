@@ -21,7 +21,7 @@
 // setting it once on both sides survives restarts.
 
 import { randomBytes } from "crypto";
-import fs from "fs";
+import { promises } from "fs";
 import { writeFileAtomic } from "../../utils/files/index.js";
 import { log } from "../../system/logger/index.js";
 import { isNonEmptyString } from "../../utils/types.js";
@@ -83,7 +83,7 @@ function resolveToken(override: string | undefined): string {
  */
 export async function deleteTokenFile(tokenPath: string = WORKSPACE_PATHS.sessionToken): Promise<void> {
   try {
-    await fs.promises.unlink(tokenPath);
+    await promises.unlink(tokenPath);
   } catch {
     /* already gone — nothing to do */
   }

@@ -1,8 +1,8 @@
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
 import { mkdtemp, rm } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 
 // The config module reads workspacePath at the time of each call,
@@ -16,15 +16,15 @@ type ConfigModule = typeof import("../../server/system/config.js");
 let mod: ConfigModule;
 
 before(async () => {
-  tmpRoot = await mkdtemp(path.join(os.tmpdir(), "mulmo-config-test-"));
+  tmpRoot = await mkdtemp(path.join(tmpdir(), "mulmo-config-test-"));
   originalHome = process.env.HOME;
   originalUserProfile = process.env.USERPROFILE;
-  // os.homedir() uses HOME on POSIX and USERPROFILE on Windows; set both
+  // homedir() uses HOME on POSIX and USERPROFILE on Windows; set both
   // so the test's temp workspace is picked up regardless of platform.
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
   // Pre-create the workspace root that workspace.ts expects.
-  fs.mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
+  mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
   mod = await import("../../server/system/config.js");
 });
 
@@ -69,7 +69,7 @@ describe("isAppSettings", () => {
 describe("loadSettings", () => {
   afterEach(() => {
     // Always start each test with a clean configs dir.
-    fs.rmSync(mod.configsDir(), { recursive: true, force: true });
+    rmSync(mod.configsDir(), { recursive: true, force: true });
   });
 
   it("returns defaults when the file is missing", () => {
@@ -84,14 +84,14 @@ describe("loadSettings", () => {
 
   it("returns defaults and warns on malformed JSON", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(mod.settingsPath(), "not json");
+    writeFileSync(mod.settingsPath(), "not json");
     const cfg = mod.loadSettings();
     assert.deepEqual(cfg, { extraAllowedTools: [] });
   });
 
   it("returns defaults when shape does not match", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(mod.settingsPath(), JSON.stringify({ extraAllowedTools: [1, 2, 3] }));
+    writeFileSync(mod.settingsPath(), JSON.stringify({ extraAllowedTools: [1, 2, 3] }));
     assert.deepEqual(mod.loadSettings(), { extraAllowedTools: [] });
   });
 
@@ -176,7 +176,7 @@ describe("isMcpServerId", () => {
 
 describe("loadMcpConfig / saveMcpConfig", () => {
   beforeEach(() => {
-    fs.rmSync(mod.configsDir(), { recursive: true, force: true });
+    rmSync(mod.configsDir(), { recursive: true, force: true });
   });
 
   it("returns empty mcpServers when missing", () => {
@@ -204,13 +204,13 @@ describe("loadMcpConfig / saveMcpConfig", () => {
 
   it("returns defaults on malformed JSON", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(mod.mcpConfigPath(), "{broken");
+    writeFileSync(mod.mcpConfigPath(), "{broken");
     assert.deepEqual(mod.loadMcpConfig(), { mcpServers: {} });
   });
 
   it("returns defaults when schema does not match", () => {
     mod.ensureConfigsDir();
-    fs.writeFileSync(mod.mcpConfigPath(), JSON.stringify({ mcpServers: { BAD: { type: "http", url: "x" } } }));
+    writeFileSync(mod.mcpConfigPath(), JSON.stringify({ mcpServers: { BAD: { type: "http", url: "x" } } }));
     assert.deepEqual(mod.loadMcpConfig(), { mcpServers: {} });
   });
 
@@ -221,7 +221,7 @@ describe("loadMcpConfig / saveMcpConfig", () => {
         mcpServers: { ok: { type: "nope" } as any },
       }),
     );
-    assert.equal(fs.existsSync(mod.mcpConfigPath()), false);
+    assert.equal(existsSync(mod.mcpConfigPath()), false);
   });
 });
 
@@ -255,12 +255,12 @@ describe("toMcpEntries / fromMcpEntries", () => {
 
 describe("saveSettings", () => {
   beforeEach(() => {
-    fs.rmSync(mod.configsDir(), { recursive: true, force: true });
+    rmSync(mod.configsDir(), { recursive: true, force: true });
   });
 
   it("creates config/ if missing and writes JSON", () => {
     mod.saveSettings({ extraAllowedTools: ["mcp__claude_ai_Gmail"] });
-    const raw = fs.readFileSync(mod.settingsPath(), "utf-8");
+    const raw = readFileSync(mod.settingsPath(), "utf-8");
     assert.deepEqual(JSON.parse(raw), {
       extraAllowedTools: ["mcp__claude_ai_Gmail"],
     });
@@ -268,10 +268,10 @@ describe("saveSettings", () => {
 
   it("writes trailing newline and restrictive permissions", () => {
     mod.saveSettings({ extraAllowedTools: [] });
-    const raw = fs.readFileSync(mod.settingsPath(), "utf-8");
+    const raw = readFileSync(mod.settingsPath(), "utf-8");
     assert.ok(raw.endsWith("\n"));
     if (process.platform !== "win32") {
-      const stat = fs.statSync(mod.settingsPath());
+      const stat = statSync(mod.settingsPath());
       // Low 9 bits = owner/group/other perms; expect 0o600.
       assert.equal(stat.mode & 0o777, 0o600);
     }
@@ -287,7 +287,7 @@ describe("saveSettings", () => {
   it("replaces existing file atomically (no .tmp leftover)", () => {
     mod.saveSettings({ extraAllowedTools: ["first"] });
     mod.saveSettings({ extraAllowedTools: ["second"] });
-    const entries = fs.readdirSync(mod.configsDir());
+    const entries = readdirSync(mod.configsDir());
     const leftover = entries.filter((entry) => entry.endsWith(".tmp"));
     assert.deepEqual(leftover, []);
     assert.deepEqual(mod.loadSettings(), { extraAllowedTools: ["second"] });

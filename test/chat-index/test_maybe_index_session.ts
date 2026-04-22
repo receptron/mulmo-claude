@@ -21,16 +21,16 @@ afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
 });
 
-function seedSession(id: string): void {
+function seedSession(sessionId: string): void {
   const chatDir = join(workspace, "chat");
   writeFileSync(
-    join(chatDir, `${id}.json`),
+    join(chatDir, `${sessionId}.json`),
     JSON.stringify({
       roleId: "general",
       startedAt: "2026-04-12T10:00:00.000Z",
     }),
   );
-  writeFileSync(join(chatDir, `${id}.jsonl`), JSON.stringify({ source: "user", type: "text", message: "hello" }) + "\n");
+  writeFileSync(join(chatDir, `${sessionId}.jsonl`), JSON.stringify({ source: "user", type: "text", message: "hello" }) + "\n");
 }
 
 function stubSummarize(

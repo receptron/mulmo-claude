@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 border-t border-gray-200" @dragover.prevent @drop="onDropFile">
+  <div class="p-2 border-t border-gray-200" @dragover.prevent @drop="onDropFile">
     <div v-if="fileError" class="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5" data-testid="file-error">
       {{ fileError }}
     </div>
@@ -16,37 +16,49 @@
         :value="modelValue"
         data-testid="user-input"
         :placeholder="t('chatInput.placeholder')"
-        :rows="inputFocused ? 8 : 2"
-        class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-all duration-200"
-        :class="inputFocused ? 'ring-2 ring-blue-300' : ''"
+        rows="2"
+        class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
         :disabled="isRunning"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
-        @focus="inputFocused = true"
         @compositionstart="imeEnter.onCompositionStart"
         @compositionend="imeEnter.onCompositionEnd"
         @keydown="imeEnter.onKeydown"
-        @blur="onInputBlur"
+        @blur="imeEnter.onBlur"
         @paste="onPasteFile"
       />
       <div class="flex flex-col gap-1">
         <button
           data-testid="send-btn"
-          class="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="isRunning"
           @click="emit('send')"
         >
-          <span class="material-icons text-base">send</span>
+          <span class="material-icons text-base leading-none">send</span>
+        </button>
+        <button
+          data-testid="attach-file-btn"
+          class="text-gray-400 hover:text-gray-600 rounded w-8 h-8 flex items-center justify-center"
+          :title="t('chatInput.attachFile')"
+          @click="openFilePicker"
+        >
+          <span class="material-icons text-base leading-none">attach_file</span>
         </button>
         <button
           data-testid="expand-input-btn"
-          class="text-gray-400 hover:text-gray-600 rounded px-3 py-1 text-sm"
+          class="text-gray-400 hover:text-gray-600 rounded w-8 h-8 flex items-center justify-center"
           :title="t('chatInput.expandEditor')"
           @click="openExpandedEditor"
         >
-          <span class="material-icons text-base">open_in_full</span>
+          <span class="material-icons text-base leading-none">open_in_full</span>
         </button>
       </div>
     </div>
+
+    <!-- Hidden file input driven by the attach button. The `accept`
+         filter matches ACCEPTED_MIME_PREFIXES/_EXACT below; the change
+         handler routes through the same readAttachmentFile() used by
+         drop + paste, so all three paths behave identically. -->
+    <input ref="fileInput" type="file" class="hidden" :accept="fileInputAccept" data-testid="file-input" @change="onFilePicked" />
 
     <div v-if="expandedEditorOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeExpandedEditor">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col" style="max-height: 80vh">
@@ -116,9 +128,9 @@ const emit = defineEmits<{
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
 const expandedTextarea = ref<HTMLTextAreaElement | null>(null);
-const inputFocused = ref(false);
 const expandedEditorOpen = ref(false);
 const fileError = ref<string | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 const MAX_ATTACH_BYTES = 30 * 1024 * 1024;
 
@@ -134,13 +146,25 @@ const ACCEPTED_MIME_EXACT = new Set([
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
 
+// `accept` attribute for the hidden <input type="file"> that the
+// paperclip button drives. Prefixes like `image/*` and `text/*` are
+// expanded by the browser's native file picker; exact MIME entries
+// are passed through. Drop + paste still accept the same set via the
+// isAcceptedType() check below, so all three entry points stay in sync.
+const fileInputAccept = [...ACCEPTED_MIME_PREFIXES.map((prefix) => `${prefix}*`), ...ACCEPTED_MIME_EXACT].join(",");
+
 function isAcceptedType(mime: string): boolean {
   return ACCEPTED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix)) || ACCEPTED_MIME_EXACT.has(mime);
 }
 
 function readAttachmentFile(file: File): void {
   fileError.value = null;
-  if (!isAcceptedType(file.type)) return;
+  if (!isAcceptedType(file.type)) {
+    // Previously returned silently. That left the user wondering whether
+    // the drop/paste registered at all — #499.
+    fileError.value = t("chatInput.unsupportedFileType");
+    return;
+  }
   if (file.size > MAX_ATTACH_BYTES) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
     fileError.value = t("chatInput.fileTooLarge", { sizeMB });
@@ -180,14 +204,19 @@ function onDropFile(event: DragEvent): void {
   if (file) readAttachmentFile(file);
 }
 
-const imeEnter = useImeAwareEnter(() => emit("send"));
-
-function onInputBlur(): void {
-  imeEnter.onBlur();
-  setTimeout(() => {
-    inputFocused.value = false;
-  }, 150);
+function openFilePicker(): void {
+  fileInput.value?.click();
 }
+
+function onFilePicked(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) readAttachmentFile(file);
+  // Reset so selecting the same file twice in a row still fires @change.
+  input.value = "";
+}
+
+const imeEnter = useImeAwareEnter(() => emit("send"));
 
 function openExpandedEditor(): void {
   expandedEditorOpen.value = true;

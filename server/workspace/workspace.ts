@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import fs from "fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { log } from "../system/logger/index.js";
@@ -16,12 +16,12 @@ const TEMPLATES_DIR = path.join(__dirname, "helps");
 export { workspacePath };
 
 // Must exist before downstream modules call realpathSync(workspacePath) at their own module-load time.
-fs.mkdirSync(workspacePath, { recursive: true });
+mkdirSync(workspacePath, { recursive: true });
 
 export function initWorkspace(): string {
   // Create directory structure if needed
   for (const key of EAGER_WORKSPACE_DIRS) {
-    fs.mkdirSync(WORKSPACE_PATHS[key], { recursive: true });
+    mkdirSync(WORKSPACE_PATHS[key], { recursive: true });
   }
 
   // Create memory.md if it doesn't exist
@@ -30,9 +30,9 @@ export function initWorkspace(): string {
   }
 
   // Always sync all files from server/helps/ into workspace/helps/
-  fs.mkdirSync(WORKSPACE_PATHS.helps, { recursive: true });
-  for (const file of fs.readdirSync(TEMPLATES_DIR)) {
-    fs.copyFileSync(path.join(TEMPLATES_DIR, file), path.join(WORKSPACE_PATHS.helps, file));
+  mkdirSync(WORKSPACE_PATHS.helps, { recursive: true });
+  for (const file of readdirSync(TEMPLATES_DIR)) {
+    copyFileSync(path.join(TEMPLATES_DIR, file), path.join(WORKSPACE_PATHS.helps, file));
   }
 
   // Create .gitignore if missing. The workspace is a git repo for
@@ -56,7 +56,7 @@ export function initWorkspace(): string {
 
   // Git init if not already a repo
   const gitDir = path.join(workspacePath, ".git");
-  if (!fs.existsSync(gitDir)) {
+  if (!existsSync(gitDir)) {
     execSync("git init", { cwd: workspacePath });
     log.info("workspace", "initialized git repository", { workspacePath });
   }

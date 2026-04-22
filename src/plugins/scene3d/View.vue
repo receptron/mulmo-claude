@@ -7,17 +7,23 @@
       <span class="text-xs text-gray-500 shrink-0">{{ objectCount }} object{{ objectCount === 1 ? "" : "s" }}</span>
     </div>
     <div v-if="parseError" class="p-4 text-sm text-red-700 bg-red-50 border-t border-red-100">Invalid scene document: {{ parseError }}</div>
-    <div v-else class="flex-1 relative" data-testid="scene3d-canvas-wrapper">
-      <TresCanvas v-if="scene" :clear-color="scene.background" window-size>
-        <TresPerspectiveCamera :position="cameraPosition" :fov="cameraFov" :look-at="cameraTarget" />
-        <OrbitControls :target="cameraTarget" />
+    <div v-else class="flex-1 relative min-h-0" data-testid="scene3d-canvas-wrapper">
+      <!-- window-size on TresCanvas binds to window.innerHeight/width,
+           which underfills a flex child (fixed aspect, usually narrow). We
+           drop it and use a fully-absolute wrapper so the renderer reads
+           the parent box via ResizeObserver instead. -->
+      <div class="absolute inset-0">
+        <TresCanvas v-if="scene" :clear-color="scene.background">
+          <TresPerspectiveCamera :position="cameraPosition" :fov="cameraFov" :look-at="cameraTarget" />
+          <OrbitControls :target="cameraTarget" />
 
-        <SceneLights :lights="scene.lights" />
-        <TresAxesHelper v-if="scene.axes" :args="[5]" />
-        <TresGridHelper v-if="scene.grid" :args="[20, 20, 0x444444, 0x222222]" />
+          <SceneLights :lights="scene.lights" />
+          <TresAxesHelper v-if="scene.axes" :args="[5]" />
+          <TresGridHelper v-if="scene.grid" :args="[20, 20, 0x444444, 0x222222]" />
 
-        <SceneObjectRenderer v-for="(object, idx) in scene.objects" :key="idx" :object="object" />
-      </TresCanvas>
+          <SceneObjectRenderer v-for="(object, idx) in scene.objects" :key="idx" :object="object" />
+        </TresCanvas>
+      </div>
     </div>
   </div>
 </template>
@@ -213,16 +219,16 @@ function renderBar(obj: BarObject): VNode[] {
 function renderSurface(obj: SurfaceObject): VNode {
   const rows = obj.grid.length;
   const cols = obj.grid[0].length;
-  const dx = (obj.bounds.xMax - obj.bounds.xMin) / (rows - 1);
-  const dz = (obj.bounds.zMax - obj.bounds.zMin) / (cols - 1);
+  const stepX = (obj.bounds.xMax - obj.bounds.xMin) / (rows - 1);
+  const stepZ = (obj.bounds.zMax - obj.bounds.zMin) / (cols - 1);
 
   const positions = new Float32Array(rows * cols * 3);
   for (let i = 0; i < rows; i++) {
     for (let j = 0; j < cols; j++) {
       const idx = (i * cols + j) * 3;
-      positions[idx] = obj.bounds.xMin + i * dx;
+      positions[idx] = obj.bounds.xMin + i * stepX;
       positions[idx + 1] = obj.grid[i][j];
-      positions[idx + 2] = obj.bounds.zMin + j * dz;
+      positions[idx + 2] = obj.bounds.zMin + j * stepZ;
     }
   }
 
@@ -271,10 +277,10 @@ function renderNetwork(obj: NetworkObject): VNode[] {
   // One geometry per edge keeps things simple; v2 can collapse to a
   // single LineSegments if edge counts get large.
   const edges = obj.edges.map((edge, idx) => {
-    const from = nodePositionById.get(edge.from);
-    const to = nodePositionById.get(edge.to);
-    if (!from || !to) return null;
-    const geometry = new BufferGeometry().setFromPoints([new Vector3(...from), new Vector3(...to)]);
+    const fromPos = nodePositionById.get(edge.from);
+    const toPos = nodePositionById.get(edge.to);
+    if (!fromPos || !toPos) return null;
+    const geometry = new BufferGeometry().setFromPoints([new Vector3(...fromPos), new Vector3(...toPos)]);
     return h("TresLine" as unknown as string, { key: `e${idx}` }, [
       h("primitive", { object: geometry, attach: "geometry" }),
       h("TresLineBasicMaterial" as unknown as string, { color: edge.color ?? obj.edgeColor }),

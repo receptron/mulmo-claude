@@ -1,22 +1,22 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { buildSandboxStatus } from "../../server/api/sandboxStatus.js";
 
 // Isolated fixture home so the tests don't depend on the developer
 // actually having ~/.config/gh or a ~/.gitconfig locally. Shares the
 // same pattern as test_sandboxMounts.ts.
 function makeFixtureHome(opts: { gh?: boolean; gitconfig?: boolean }): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-status-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "sandbox-status-"));
   if (opts.gh) {
     const ghDir = path.join(dir, ".config", "gh");
-    fs.mkdirSync(ghDir, { recursive: true });
-    fs.writeFileSync(path.join(ghDir, "hosts.yml"), "github.com:\n");
+    mkdirSync(ghDir, { recursive: true });
+    writeFileSync(path.join(ghDir, "hosts.yml"), "github.com:\n");
   }
   if (opts.gitconfig) {
-    fs.writeFileSync(path.join(dir, ".gitconfig"), "[user]\n  name = t\n");
+    writeFileSync(path.join(dir, ".gitconfig"), "[user]\n  name = t\n");
   }
   return dir;
 }
@@ -24,9 +24,9 @@ function makeFixtureHome(opts: { gh?: boolean; gitconfig?: boolean }): string {
 // Real socket is awkward to stand up in tests; a regular file is
 // enough since sshAgentForwardArgs only needs `existsSync` to pass.
 function makeFakeSocket(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-status-sock-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "sandbox-status-sock-"));
   const sock = path.join(dir, "agent.sock");
-  fs.writeFileSync(sock, "");
+  writeFileSync(sock, "");
   return sock;
 }
 

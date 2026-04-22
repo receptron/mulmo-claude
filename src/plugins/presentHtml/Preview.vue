@@ -1,5 +1,5 @@
 <template>
-  <div class="text-sm">
+  <div class="p-2 text-sm">
     <div class="font-medium text-gray-700 truncate mb-1">
       {{ title }}
     </div>

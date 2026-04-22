@@ -43,6 +43,12 @@ export interface PlatformPlugin {
   isConfigured(env: Env): boolean;
 
   /**
+   * Respond to a platform's GET webhook verification challenge (e.g. Meta hub.challenge).
+   * Only needed for webhook platforms that require a GET verification step before POSTs.
+   */
+  handleVerification?(request: Request, env: Env): Response;
+
+  /**
    * Handle an incoming webhook request.
    * Only called when mode=webhook. Parse + verify → RelayMessage[].
    */

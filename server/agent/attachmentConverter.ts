@@ -17,7 +17,7 @@ import * as XLSX from "xlsx";
 import { execFile } from "child_process";
 import { mkdtemp, readFile, writeFile, rm } from "fs/promises";
 import path from "path";
-import os from "os";
+import { tmpdir } from "os";
 import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
@@ -116,7 +116,7 @@ async function tryDockerLibreOffice(): Promise<boolean> {
 }
 
 async function convertPptxToPdf(data: string): Promise<Buffer | null> {
-  const tmpDir = await mkdtemp(path.join(os.tmpdir(), "pptx-"));
+  const tmpDir = await mkdtemp(path.join(tmpdir(), "pptx-"));
   const inputPath = path.join(tmpDir, "input.pptx");
   const outputPath = path.join(tmpDir, "input.pdf");
 

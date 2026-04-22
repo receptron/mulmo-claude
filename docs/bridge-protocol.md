@@ -220,7 +220,7 @@ await new Promise<void>((resolve) => {
 
 For the production-grade TS version with error paths baked in, use
 `createBridgeClient` from [`@mulmobridge/client`](../packages/client/)
-— `packages/cli/src/index.ts` is a ~40-line example built on top of it.
+— `packages/bridges/cli/src/index.ts` is a ~40-line example built on top of it.
 
 ---
 

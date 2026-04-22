@@ -3,7 +3,7 @@
 // Moved from server/utils/file.ts (issue #366 Phase 1). The old
 // file re-exports these for backwards compat.
 
-import fs from "fs";
+import { mkdirSync, promises, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { writeFileAtomic } from "./atomic.js";
 import { isEnoent } from "./safe.js";
@@ -20,7 +20,7 @@ import { log } from "../../system/logger/index.js";
 export function loadJsonFile<T>(filePath: string, defaultValue: T): T {
   let raw: string;
   try {
-    raw = fs.readFileSync(filePath, "utf-8");
+    raw = readFileSync(filePath, "utf-8");
   } catch (err) {
     if (isEnoent(err)) return defaultValue;
     log.error("json", "loadJsonFile read failed", {
@@ -41,8 +41,8 @@ export function loadJsonFile<T>(filePath: string, defaultValue: T): T {
 }
 
 export function saveJsonFile(filePath: string, data: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
 // ── Async ───────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export async function writeJsonAtomic(filePath: string, data: unknown, opts: Par
  */
 export async function readJsonOrNull<T>(filePath: string): Promise<T | null> {
   try {
-    const content = await fs.promises.readFile(filePath, "utf-8");
+    const content = await promises.readFile(filePath, "utf-8");
     const parsed: T = JSON.parse(content);
     return parsed;
   } catch {

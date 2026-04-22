@@ -20,9 +20,9 @@ describe("BUILTIN_ROLE_IDS", () => {
   });
 
   it("every BUILTIN_ROLE_IDS value resolves to an actual role via ROLES.find", () => {
-    for (const id of Object.values(BUILTIN_ROLE_IDS)) {
-      const role = ROLES.find((roleItem) => roleItem.id === id);
-      assert.ok(role, `no role found for id "${id}"`);
+    for (const roleId of Object.values(BUILTIN_ROLE_IDS)) {
+      const role = ROLES.find((roleItem) => roleItem.id === roleId);
+      assert.ok(role, `no role found for id "${roleId}"`);
     }
   });
 });

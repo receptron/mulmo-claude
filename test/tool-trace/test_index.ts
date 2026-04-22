@@ -2,7 +2,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "fs/promises";
 import { randomBytes } from "crypto";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import { createArgsCache, recordToolEvent, type RecordToolEventDeps } from "../../server/workspace/tool-trace/index.js";
 
@@ -19,8 +19,8 @@ async function makeHarness(workspaceRoot: string): Promise<Harness> {
   const resultsFilePath = path.join(workspaceRoot, "chat", `${SID}.jsonl`);
   // `appendFile` will create the dir's parent only if it exists; make
   // it explicit here so the first append doesn't ENOENT.
-  const fs = await import("node:fs/promises");
-  await fs.mkdir(path.dirname(resultsFilePath), { recursive: true });
+  const fsp = await import("node:fs/promises");
+  await fsp.mkdir(path.dirname(resultsFilePath), { recursive: true });
 
   const savedSearches: { workspaceRoot: string; query: string }[] = [];
   const deps: RecordToolEventDeps = {
@@ -56,7 +56,7 @@ describe("recordToolEvent", () => {
   let workspaceRoot: string;
 
   before(async () => {
-    workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "tool-trace-drv-"));
+    workspaceRoot = await mkdtemp(path.join(tmpdir(), "tool-trace-drv-"));
   });
 
   after(async () => {

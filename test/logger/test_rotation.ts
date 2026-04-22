@@ -1,7 +1,7 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
-import os from "os";
+import { tmpdir } from "os";
 import path from "path";
 import { dailyFileName, enforceMaxFiles, listLogFiles } from "../../server/system/logger/rotation.js";
 
@@ -19,7 +19,7 @@ describe("listLogFiles / enforceMaxFiles", () => {
   let dir: string;
 
   before(async () => {
-    dir = await mkdtemp(path.join(os.tmpdir(), "log-rot-"));
+    dir = await mkdtemp(path.join(tmpdir(), "log-rot-"));
   });
 
   after(async () => {

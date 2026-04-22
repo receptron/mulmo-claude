@@ -12,6 +12,9 @@ import { getPlatformByName } from "./platform.js";
 // Import plugins so they register themselves
 import "./webhooks/line.js";
 import "./webhooks/telegram.js";
+import "./webhooks/whatsapp.js";
+import "./webhooks/messenger.js";
+import "./webhooks/google-chat.js";
 
 const MAX_QUEUE_SIZE = 1000;
 const QUEUE_KEY_PREFIX = "q:";

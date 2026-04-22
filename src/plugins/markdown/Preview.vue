@@ -1,5 +1,5 @@
 <template>
-  <div class="p-3 bg-purple-100 rounded overflow-hidden">
+  <div class="p-2 bg-purple-100 rounded overflow-hidden">
     <div class="text-sm text-gray-800 font-medium truncate">
       {{ displayTitle }}
     </div>

@@ -31,13 +31,25 @@
         </div>
 
         <div class="flex items-center gap-1">
-          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50" title="Undo" @click="undo">
+          <button
+            class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
+            :title="t('pluginCanvas.undo')"
+            @click="undo"
+          >
             <span class="material-icons text-sm">undo</span>
           </button>
-          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50" title="Redo" @click="redo">
+          <button
+            class="w-8 h-8 flex items-center justify-center rounded border-2 border-gray-300 bg-white hover:bg-gray-50"
+            :title="t('pluginCanvas.redo')"
+            @click="redo"
+          >
             <span class="material-icons text-sm">redo</span>
           </button>
-          <button class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50" title="Clear" @click="clear">
+          <button
+            class="w-8 h-8 flex items-center justify-center rounded border-2 border-red-300 bg-white hover:bg-red-50"
+            :title="t('pluginCanvas.clear')"
+            @click="clear"
+          >
             <span class="material-icons text-sm">delete</span>
           </button>
         </div>
@@ -88,11 +100,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import VueDrawingCanvas from "vue-drawing-canvas";
 import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData, CanvasDrawingState } from "./definition";
 import { apiPost, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResult<ImageToolData> | null;
@@ -118,12 +133,8 @@ const artStyles = [
   { id: "pixelart", label: "Pixel Art" },
 ];
 
-const applyStyle = async (style: { id: string; label: string }) => {
-  const saved = await saveDrawingState();
-  if (!saved) return;
-  if (props.sendTextMessage) {
-    props.sendTextMessage(`Turn my drawing on the canvas into a ${style.label} style image.`);
-  }
+const applyStyle = (style: { id: string; label: string }) => {
+  props.sendTextMessage?.(`Turn my drawing on the canvas into a ${style.label} style image.`);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

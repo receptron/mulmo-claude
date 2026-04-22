@@ -193,20 +193,20 @@ describe("topic sort order (compareTopicsNewestFirst)", () => {
   };
 
   it("sorts topics newest first", () => {
-    const md = buildIndexMarkdown({
+    const markdown = buildIndexMarkdown({
       ...BASE,
       topics: [
         { slug: "old", title: "Old", lastUpdatedIso: "2026-01-01T00:00:00Z" },
         { slug: "new", title: "New", lastUpdatedIso: "2026-04-12T00:00:00Z" },
       ],
     });
-    const newIdx = md.indexOf("New");
-    const oldIdx = md.indexOf("Old");
+    const newIdx = markdown.indexOf("New");
+    const oldIdx = markdown.indexOf("Old");
     assert.ok(newIdx < oldIdx, "New should come before Old");
   });
 
   it("topics without timestamps sort after those with timestamps", () => {
-    const md = buildIndexMarkdown({
+    const markdown = buildIndexMarkdown({
       ...BASE,
       topics: [
         { slug: "no-time", title: "No Time" },
@@ -217,13 +217,13 @@ describe("topic sort order (compareTopicsNewestFirst)", () => {
         },
       ],
     });
-    const hasIdx = md.indexOf("Has Time");
-    const noIdx = md.indexOf("No Time");
+    const hasIdx = markdown.indexOf("Has Time");
+    const noIdx = markdown.indexOf("No Time");
     assert.ok(hasIdx < noIdx, "Has Time should come before No Time");
   });
 
   it("same timestamp → sorted by slug for determinism", () => {
-    const md = buildIndexMarkdown({
+    const markdown = buildIndexMarkdown({
       ...BASE,
       topics: [
         {
@@ -238,8 +238,8 @@ describe("topic sort order (compareTopicsNewestFirst)", () => {
         },
       ],
     });
-    const alphaIdx = md.indexOf("Alpha");
-    const zebraIdx = md.indexOf("Zebra");
+    const alphaIdx = markdown.indexOf("Alpha");
+    const zebraIdx = markdown.indexOf("Zebra");
     assert.ok(alphaIdx < zebraIdx, "Alpha should come before Zebra");
   });
 });

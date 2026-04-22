@@ -119,7 +119,7 @@ Run `git diff --stat` and `git diff` first, then check every item below against 
 
 ## 14. Workspace Package Exports (Docker)
 
-- [ ] Every `packages/*/package.json` with an `"exports"` field includes `"require"` and `"default"` conditions (not just `"import"`). Missing `"require"` silently breaks the MCP server in the Docker sandbox.
+- [ ] Every workspace package `package.json` with an `"exports"` field, including `packages/*` and `packages/bridges/*`, includes `"require"` and `"default"` conditions (not just `"import"`). Missing `"require"` silently breaks the MCP server in the Docker sandbox.
 - [ ] If Docker volume mounts in `server/agent/config.ts` changed, or package exports changed, run `npx tsx --test test/agent/test_mcp_docker_smoke.ts` locally to verify.
 
 ## 15. Dependencies

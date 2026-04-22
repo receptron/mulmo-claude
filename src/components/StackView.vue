@@ -54,7 +54,7 @@
       </div>
       <!-- Other plugins: fixed height wrapper so plugins that rely on
            h-full continue to render properly. -->
-      <div v-else :style="{ height: PLUGIN_HEIGHT }">
+      <div v-else :style="{ height: pluginHeightFor(result.toolName) }">
         <component
           :is="getPlugin(result.toolName)?.viewComponent"
           v-if="getPlugin(result.toolName)?.viewComponent"
@@ -82,6 +82,14 @@ import { isRecord } from "../utils/types";
 // height is required for them to render. text-response and the
 // "stack-natural" plugins below are special-cased.
 const PLUGIN_HEIGHT = "min(60vh, 560px)";
+// Immersive viewers (3D scenes, etc.) benefit from a taller viewport
+// than PLUGIN_HEIGHT's 560px cap. Keyed by tool name.
+const TALL_PLUGIN_HEIGHT = "min(85vh, 900px)";
+const TALL_PLUGIN_TOOLS = new Set<string>(["presentScene3d"]);
+
+function pluginHeightFor(toolName: string): string {
+  return TALL_PLUGIN_TOOLS.has(toolName) ? TALL_PLUGIN_HEIGHT : PLUGIN_HEIGHT;
+}
 
 // How long to ignore scroll-spy after a programmatic scroll (sidebar
 // click, auto-scroll on new result). Keeps the spy from emitting a

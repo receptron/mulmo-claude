@@ -117,7 +117,7 @@ const surfaceSchema = z
         zMax: z.number(),
       })
       .strict()
-      .refine((b) => b.xMax > b.xMin && b.zMax > b.zMin, {
+      .refine((bounds) => bounds.xMax > bounds.xMin && bounds.zMax > bounds.zMin, {
         message: "bounds: xMax>xMin and zMax>zMin required",
       }),
     color: hexColor.default("#4a9eff"),

@@ -15,7 +15,7 @@
 // See docs/sandbox-credentials.md for the user-facing contract.
 
 import path from "node:path";
-import fs from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { log } from "../system/logger/index.js";
@@ -105,7 +105,7 @@ export function resolveMountNames(names: readonly string[], allowed: Record<stri
 
 function hostPathExists(spec: SandboxMountSpec): boolean {
   try {
-    const stat = fs.statSync(spec.hostPath);
+    const stat = statSync(spec.hostPath);
     return spec.kind === "dir" ? stat.isDirectory() : stat.isFile();
   } catch {
     return false;
@@ -181,7 +181,7 @@ export function sshAgentForwardArgs(
       skippedReason: "SSH_AUTH_SOCK not set on host",
     };
   }
-  if (!fs.existsSync(sshAuthSock)) {
+  if (!existsSync(sshAuthSock)) {
     return {
       args: [],
       skippedReason: `SSH_AUTH_SOCK=${sshAuthSock} not found on host`,

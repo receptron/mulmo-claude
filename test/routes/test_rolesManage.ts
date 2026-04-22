@@ -1,11 +1,11 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 
 // The roles route imports workspacePath at module load. Override HOME
-// so os.homedir() → temp root, then dynamic-import the modules.
+// so homedir() → temp root, then dynamic-import the modules.
 let tmpRoot: string;
 let originalHome: string | undefined;
 let originalUserProfile: string | undefined;
@@ -17,12 +17,12 @@ let rolesIo: RolesIo;
 let rolesDir: string;
 
 before(async () => {
-  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roles-manage-test-"));
+  tmpRoot = mkdtempSync(path.join(tmpdir(), "roles-manage-test-"));
   originalHome = process.env.HOME;
   originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
-  fs.mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
+  mkdirSync(path.join(tmpRoot, "mulmoclaude"), { recursive: true });
   rolesRoute = await import("../../server/api/routes/roles.js");
   rolesIo = await import("../../server/utils/files/roles-io.js");
   rolesDir = path.join(tmpRoot, "mulmoclaude", "config", "roles");
@@ -33,7 +33,7 @@ after(() => {
   else process.env.HOME = originalHome;
   if (originalUserProfile === undefined) delete process.env.USERPROFILE;
   else process.env.USERPROFILE = originalUserProfile;
-  fs.rmSync(tmpRoot, { recursive: true, force: true });
+  rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 function sampleRole(roleId: string) {
@@ -82,7 +82,7 @@ describe("executeManageRoles — rename (oldRoleId)", () => {
     rolesIo.deleteRole("tmp");
     // Ensure we didn't accidentally create the built-in id file
     const generalPath = path.join(rolesDir, "general.json");
-    assert.equal(fs.existsSync(generalPath), false);
+    assert.equal(existsSync(generalPath), false);
   });
 
   it("rejects a rename into an id already in use", async () => {
@@ -163,7 +163,7 @@ describe("executeManageRoles — rename (oldRoleId)", () => {
     assert.equal(result.success, false);
     assert.match(String(result.error), /already exists/i);
     // Original content must be intact
-    const onDisk = JSON.parse(fs.readFileSync(path.join(rolesDir, "target.json"), "utf-8")) as { name: string };
+    const onDisk = JSON.parse(readFileSync(path.join(rolesDir, "target.json"), "utf-8")) as { name: string };
     assert.equal(onDisk.name, "Original", "existing role must not be overwritten");
     rolesIo.deleteRole("target");
   });

@@ -24,7 +24,7 @@ Read the appropriate doc (`docs/message_apps/line/README.md` or `README.ja.md`) 
 ## Step 3: Start the bridge
 
 ```bash
-node packages/line/dist/index.js
+node packages/bridges/line/dist/index.js
 ```
 
 `npx @mulmobridge/line` does not work inside the monorepo. Use `node` directly.

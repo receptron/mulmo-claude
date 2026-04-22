@@ -303,5 +303,5 @@ This separates "does my bridge config work?" from "does MulmoClaude's LLM work?"
 
 - `docs/bridge-protocol.md` — the contract this mock implements
 - `packages/client/` — TS bridge client library (test target)
-- `packages/cli/` — reference bridge (test subject)
-- `packages/telegram/` — production bridge (test subject)
+- `packages/bridges/cli/` — reference bridge (test subject)
+- `packages/bridges/telegram/` — production bridge (test subject)

@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { dedupAcrossSources } from "../../server/workspace/sources/pipeline/dedup.js";
 import type { SourceItem } from "../../server/workspace/sources/types.js";
 
-function makeItem(id: string, sourceSlug: string): SourceItem {
+function makeItem(itemId: string, sourceSlug: string): SourceItem {
   return {
-    id,
-    title: `Item ${id}`,
-    url: `https://example.com/${id}`,
+    id: itemId,
+    title: `Item ${itemId}`,
+    url: `https://example.com/${itemId}`,
     publishedAt: "2026-04-13T00:00:00Z",
     categories: ["tech-news"],
     sourceSlug,

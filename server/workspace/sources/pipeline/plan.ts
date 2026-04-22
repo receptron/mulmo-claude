@@ -49,18 +49,20 @@ export function planEligibleSources(input: PlanInput): Source[] {
 }
 
 // True when the state indicates the source is STILL in backoff
-// (so we should SKIP it). False means eligible to run now.
+// (so we should SKIP it). Checks both error backoff (nextAttemptAt)
+// and empty-fetch adaptive backoff (emptyBackoffUntil). Either one
+// being in the future is enough to skip this cycle.
 //
-// - No state at all → run.
-// - No nextAttemptAt → run.
-// - nextAttemptAt unparseable → run (don't let a corrupt state
-//   file permanently lock out a source).
-// - nextAttemptAt in the future → skip.
-// - nextAttemptAt at or before now → run.
+// Corrupt / unparseable timestamps are ignored so a bad state file
+// never permanently locks out a source.
 function isWithinBackoff(state: SourceState | undefined, nowMs: number): boolean {
   if (!state) return false;
-  if (!state.nextAttemptAt) return false;
-  const parsed = Date.parse(state.nextAttemptAt);
+  return isFutureTimestamp(state.nextAttemptAt, nowMs) || isFutureTimestamp(state.emptyBackoffUntil, nowMs);
+}
+
+function isFutureTimestamp(timestamp: string | null | undefined, nowMs: number): boolean {
+  if (!timestamp) return false;
+  const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return false;
   return parsed > nowMs;
 }

@@ -9,7 +9,7 @@ const TODOS_URL = `/chat?view=files&path=${WORKSPACE_FILES.todosItems}`;
 async function setupTodoMocks(page: Page): Promise<void> {
   await mockAllApis(page);
   await setupMutableTodoMocks(page, {
-    dispatchColumn(method, id, body, state) {
+    dispatchColumn(method, columnId, body, state) {
       if (method === "POST") {
         const label = typeof body.label === "string" && body.label.length > 0 ? body.label : "New Column";
         const baseId = mockSlugifyColumnId(label);
@@ -21,12 +21,12 @@ async function setupTodoMocks(page: Page): Promise<void> {
           columns: [...state.columns, { id: newId, label }],
         };
       }
-      if (method === "DELETE" && id) {
-        return { columns: state.columns.filter((col) => col.id !== id) };
+      if (method === "DELETE" && columnId) {
+        return { columns: state.columns.filter((col) => col.id !== columnId) };
       }
-      if (method === "PATCH" && id) {
+      if (method === "PATCH" && columnId) {
         return {
-          columns: state.columns.map((col) => (col.id === id ? { ...col, label: "Renamed" } : col)),
+          columns: state.columns.map((col) => (col.id === columnId ? { ...col, label: "Renamed" } : col)),
         };
       }
     },

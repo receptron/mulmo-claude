@@ -16,7 +16,7 @@ import { workspacePath } from "../paths.js";
 import { log } from "../../system/logger/index.js";
 import { slugify } from "../../utils/slug.js";
 import type { Source } from "./types.js";
-import fs from "fs";
+import { mkdirSync } from "fs";
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ export async function discoverAndRegister(root?: string): Promise<DiscoveryResul
 
   // Ensure sources directory exists
   const dir = sourcesRoot(base);
-  fs.mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
 
   const existing = await listSources(base);
   const existingSlugs = new Set(existing.map((source) => source.slug));

@@ -39,11 +39,13 @@
         <div class="flex items-center gap-2">
           <!-- Navigation (calendar modes only) -->
           <template v-if="viewMode !== SCHEDULER_VIEW.list">
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" title="Previous" @click="goPrev">
+            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.prev')" @click="goPrev">
               <span class="material-icons text-sm">chevron_left</span>
             </button>
-            <button class="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded" title="Go to today" @click="goToday">Today</button>
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" title="Next" @click="goNext">
+            <button class="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded" :title="t('pluginScheduler.goToday')" @click="goToday">
+              {{ t("pluginScheduler.today") }}
+            </button>
+            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.next')" @click="goNext">
               <span class="material-icons text-sm">chevron_right</span>
             </button>
             <span class="text-sm text-gray-600 min-w-[140px] text-center">{{ headerLabel }}</span>
@@ -93,7 +95,7 @@
             </div>
             <button
               class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1 mt-0.5 shrink-0"
-              title="Delete item"
+              :title="t('pluginScheduler.deleteItem')"
               @click.stop="remove(item)"
             >
               ✕
@@ -205,7 +207,7 @@
       <div v-if="selectedId" class="border-t border-blue-200 bg-blue-50 shrink-0">
         <div class="flex items-center justify-between px-4 py-2 text-sm font-medium text-blue-700">
           <span>Edit item</span>
-          <button class="text-blue-400 hover:text-blue-600 text-xs" title="Close editor" @click="selectedId = null">✕</button>
+          <button class="text-blue-400 hover:text-blue-600 text-xs" :title="t('pluginScheduler.closeEditor')" @click="selectedId = null">✕</button>
         </div>
         <div class="px-3 pb-3">
           <textarea
@@ -247,6 +249,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
@@ -254,6 +257,8 @@ import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import TasksTab from "./TasksTab.vue";
 import { isToday } from "../../utils/format/date";
+
+const { t } = useI18n();
 
 type YamlScalar = string | number | boolean | null;
 

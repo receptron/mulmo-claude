@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import fs from "fs";
+import { realpathSync } from "fs";
 import { readdir, stat } from "fs/promises";
 import { readTextSafe } from "../../utils/files/safe.js";
 import path from "path";
@@ -242,7 +242,7 @@ router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res
                   const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
                   let storiesReal: string;
                   try {
-                    storiesReal = fs.realpathSync(storiesDir);
+                    storiesReal = realpathSync(storiesDir);
                   } catch {
                     return entry;
                   }

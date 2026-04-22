@@ -87,10 +87,10 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("`![](images/foo.png)` renders as an `<img src=/api/files/raw?...>`", async ({ page }) => {
-    const md = `# Page\n\n![chart](images/foo.png)\n`;
+    const markdown = `# Page\n\n![chart](images/foo.png)\n`;
     await mockFileContent(page, "markdowns/sample.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
 
     await page.goto("/chat?view=files&path=markdowns/sample.md");
@@ -104,10 +104,10 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("`![](../../images/foo.png)` with relative-up prefix also resolves", async ({ page }) => {
-    const md = `![two](../../images/two.png)`;
+    const markdown = `![two](../../images/two.png)`;
     await mockFileContent(page, "wiki/pages/a.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
 
     await page.goto("/chat?view=files&path=wiki/pages/a.md");
@@ -120,13 +120,13 @@ test.describe("Files view — markdown image path rewrite", () => {
   });
 
   test("data: URIs and http URLs pass through untouched", async ({ page }) => {
-    const md = `
+    const markdown = `
 ![data](data:image/png;base64,AAA=)
 ![cdn](https://cdn.example.com/x.png)
 `;
     await mockFileContent(page, "markdowns/pass.md", {
       kind: "text",
-      content: md,
+      content: markdown,
     });
     await page.goto("/chat?view=files&path=markdowns/pass.md");
     const dataSrc = await page.locator("img[alt='data']").getAttribute("src");

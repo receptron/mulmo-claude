@@ -86,7 +86,7 @@
                   class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
                   :disabled="detailLoading || deleting"
                   data-testid="skill-delete-btn"
-                  title="Delete this project-scope skill"
+                  :title="t('pluginManageSkills.deleteProjectSkill')"
                   @click="deleteSkill"
                 >
                   <span class="material-icons text-base">delete</span>
@@ -139,6 +139,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
@@ -146,6 +147,8 @@ import type { ManageSkillsData, SkillSummary } from "./index";
 import { useAppApi } from "../../composables/useAppApi";
 import { apiGet, apiPut, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+
+const { t } = useI18n();
 
 interface SkillDetail {
   name: string;

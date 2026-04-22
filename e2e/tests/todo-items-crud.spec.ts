@@ -55,28 +55,28 @@ function applyCreate(items: TodoFixture[], body: Record<string, unknown>): { ite
   return { items: [...items, item], item };
 }
 
-function applyPatch(items: TodoFixture[], id: string, body: Record<string, unknown>): { items: TodoFixture[]; item: TodoFixture | null } {
+function applyPatch(items: TodoFixture[], itemId: string, body: Record<string, unknown>): { items: TodoFixture[]; item: TodoFixture | null } {
   let item: TodoFixture | null = null;
-  const next = items.map((it) => {
-    if (it.id !== id) return it;
-    item = { ...it, ...body };
+  const next = items.map((todoItem) => {
+    if (todoItem.id !== itemId) return todoItem;
+    item = { ...todoItem, ...body };
     return item;
   });
   return { items: next, item };
 }
 
-function applyMove(items: TodoFixture[], id: string, body: Record<string, unknown>): TodoFixture[] {
-  return items.map((it) =>
-    it.id === id
+function applyMove(items: TodoFixture[], itemId: string, body: Record<string, unknown>): TodoFixture[] {
+  return items.map((todoItem) =>
+    todoItem.id === itemId
       ? {
-          ...it,
+          ...todoItem,
           ...(typeof body.status === "string" && { status: body.status }),
           ...(typeof body.order === "number" && { order: body.order }),
           ...(typeof body.completed === "boolean" && {
             completed: body.completed,
           }),
         }
-      : it,
+      : todoItem,
   );
 }
 
@@ -97,7 +97,7 @@ async function setupItemsCrudMocks(page: Page): Promise<void> {
         return { items: applyMove(state.items, idSegment, body) };
       }
       if (method === "DELETE" && idSegment) {
-        return { items: state.items.filter((it) => it.id !== idSegment) };
+        return { items: state.items.filter((todoItem) => todoItem.id !== idSegment) };
       }
     },
   });

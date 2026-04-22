@@ -1,8 +1,8 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { tmpdir } from "node:os";
 import { statSafe, readDirSafe, readTextOrNull, resolveWithinRoot } from "../../server/utils/files/safe.js";
 
 // Each test gets its own scratch dir so they can run in parallel and
@@ -11,20 +11,20 @@ import { statSafe, readDirSafe, readTextOrNull, resolveWithinRoot } from "../../
 // (a symlink target of /tmp on some configs) and resolveWithinRoot
 // requires its `rootReal` arg to already be a realpath.
 function makeScratch(prefix: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `mulmoclaude-${prefix}-`));
-  return fs.realpathSync(dir);
+  const dir = mkdtempSync(path.join(tmpdir(), `mulmoclaude-${prefix}-`));
+  return realpathSync(dir);
 }
 
 function removeScratch(dir: string): void {
-  fs.rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true });
 }
 
 describe("statSafe", () => {
   let scratch: string;
   before(() => {
     scratch = makeScratch("statSafe");
-    fs.writeFileSync(path.join(scratch, "file.txt"), "hi");
-    fs.mkdirSync(path.join(scratch, "subdir"));
+    writeFileSync(path.join(scratch, "file.txt"), "hi");
+    mkdirSync(path.join(scratch, "subdir"));
   });
   after(() => removeScratch(scratch));
 
@@ -53,9 +53,9 @@ describe("readDirSafe", () => {
   let scratch: string;
   before(() => {
     scratch = makeScratch("readDirSafe");
-    fs.writeFileSync(path.join(scratch, "a.txt"), "");
-    fs.writeFileSync(path.join(scratch, "b.txt"), "");
-    fs.mkdirSync(path.join(scratch, "sub"));
+    writeFileSync(path.join(scratch, "a.txt"), "");
+    writeFileSync(path.join(scratch, "b.txt"), "");
+    mkdirSync(path.join(scratch, "sub"));
   });
   after(() => removeScratch(scratch));
 
@@ -76,7 +76,7 @@ describe("readDirSafe", () => {
 
   it("returns [] for an empty directory", () => {
     const empty = path.join(scratch, "empty-dir");
-    fs.mkdirSync(empty);
+    mkdirSync(empty);
     assert.deepEqual(readDirSafe(empty), []);
   });
 });
@@ -85,7 +85,7 @@ describe("readTextOrNull", () => {
   let scratch: string;
   before(() => {
     scratch = makeScratch("readTextOrNull");
-    fs.writeFileSync(path.join(scratch, "hi.txt"), "hello world");
+    writeFileSync(path.join(scratch, "hi.txt"), "hello world");
   });
   after(() => removeScratch(scratch));
 
@@ -106,9 +106,9 @@ describe("resolveWithinRoot — happy path", () => {
   let scratch: string;
   before(() => {
     scratch = makeScratch("resolveWithinRoot-happy");
-    fs.writeFileSync(path.join(scratch, "file.txt"), "");
-    fs.mkdirSync(path.join(scratch, "sub"));
-    fs.writeFileSync(path.join(scratch, "sub", "nested.txt"), "");
+    writeFileSync(path.join(scratch, "file.txt"), "");
+    mkdirSync(path.join(scratch, "sub"));
+    writeFileSync(path.join(scratch, "sub", "nested.txt"), "");
   });
   after(() => removeScratch(scratch));
 
@@ -140,14 +140,14 @@ describe("resolveWithinRoot — security: traversal", () => {
   let outsideFile: string;
   before(() => {
     scratch = makeScratch("resolveWithinRoot-traversal");
-    fs.writeFileSync(path.join(scratch, "ok.txt"), "");
+    writeFileSync(path.join(scratch, "ok.txt"), "");
     // Create a file OUTSIDE the root that traversal attacks would
     // try to reach. Put it next to scratch so realpath can find it.
     outsideFile = path.join(path.dirname(scratch), "outside.txt");
-    fs.writeFileSync(outsideFile, "secret");
+    writeFileSync(outsideFile, "secret");
   });
   after(() => {
-    fs.rmSync(outsideFile, { force: true });
+    rmSync(outsideFile, { force: true });
     removeScratch(scratch);
   });
 
@@ -181,13 +181,13 @@ describe("resolveWithinRoot — security: symlinks", () => {
   let outsideFile: string;
   before(() => {
     scratch = makeScratch("resolveWithinRoot-symlinks");
-    fs.writeFileSync(path.join(scratch, "real.txt"), "");
+    writeFileSync(path.join(scratch, "real.txt"), "");
     outsideFile = path.join(path.dirname(scratch), "outside-target.txt");
-    fs.writeFileSync(outsideFile, "secret");
+    writeFileSync(outsideFile, "secret");
     // Symlink inside scratch pointing OUTSIDE — the attack we
     // designed resolveWithinRoot to defeat.
     try {
-      fs.symlinkSync(outsideFile, path.join(scratch, "escape"));
+      symlinkSync(outsideFile, path.join(scratch, "escape"));
     } catch {
       // Some CI environments (e.g. Windows without dev mode) can't
       // create symlinks. Tests below will be skipped via the marker.
@@ -195,25 +195,25 @@ describe("resolveWithinRoot — security: symlinks", () => {
     // Symlink inside scratch pointing to another file inside scratch
     // — a legitimate symlink that should resolve normally.
     try {
-      fs.symlinkSync(path.join(scratch, "real.txt"), path.join(scratch, "alias.txt"));
+      symlinkSync(path.join(scratch, "real.txt"), path.join(scratch, "alias.txt"));
     } catch {
       /* ignore */
     }
   });
   after(() => {
-    fs.rmSync(outsideFile, { force: true });
+    rmSync(outsideFile, { force: true });
     removeScratch(scratch);
   });
 
   it("rejects a symlink that resolves outside the root", () => {
     const escapeLink = path.join(scratch, "escape");
-    if (!fs.existsSync(escapeLink)) return; // platform skip
+    if (!existsSync(escapeLink)) return; // platform skip
     assert.equal(resolveWithinRoot(scratch, "escape"), null);
   });
 
   it("accepts a symlink that resolves inside the root", () => {
     const aliasLink = path.join(scratch, "alias.txt");
-    if (!fs.existsSync(aliasLink)) return; // platform skip
+    if (!existsSync(aliasLink)) return; // platform skip
     // The alias is followed to its target — both are inside scratch.
     assert.equal(resolveWithinRoot(scratch, "alias.txt"), path.join(scratch, "real.txt"));
   });
@@ -230,14 +230,14 @@ describe("resolveWithinRoot — symlinked root directory (A1 regression)", () =>
   let symlinkRoot: string;
   before(() => {
     realRoot = makeScratch("symlinkRoot-real");
-    fs.writeFileSync(path.join(realRoot, "story.json"), "{}");
-    fs.mkdirSync(path.join(realRoot, "sub"));
-    fs.writeFileSync(path.join(realRoot, "sub", "nested.mp4"), "");
+    writeFileSync(path.join(realRoot, "story.json"), "{}");
+    mkdirSync(path.join(realRoot, "sub"));
+    writeFileSync(path.join(realRoot, "sub", "nested.mp4"), "");
     // Create a symlink elsewhere that points at realRoot
     const linkParent = makeScratch("symlinkRoot-link");
     symlinkRoot = path.join(linkParent, "stories-link");
     try {
-      fs.symlinkSync(realRoot, symlinkRoot);
+      symlinkSync(realRoot, symlinkRoot);
     } catch {
       // Platform without symlink support — tests will skip via marker.
     }
@@ -245,7 +245,7 @@ describe("resolveWithinRoot — symlinked root directory (A1 regression)", () =>
   after(() => {
     if (symlinkRoot) {
       try {
-        fs.rmSync(path.dirname(symlinkRoot), { recursive: true, force: true });
+        rmSync(path.dirname(symlinkRoot), { recursive: true, force: true });
       } catch {
         /* ignore */
       }
@@ -254,25 +254,25 @@ describe("resolveWithinRoot — symlinked root directory (A1 regression)", () =>
   });
 
   it("resolves child paths against the realpath of a symlinked root", () => {
-    if (!fs.existsSync(symlinkRoot)) return; // platform skip
+    if (!existsSync(symlinkRoot)) return; // platform skip
     // Caller realpaths the root once at module load — this is the
     // pattern routes/mulmo-script.ts uses for ensureStoriesReal().
-    const rootReal = fs.realpathSync(symlinkRoot);
+    const rootReal = realpathSync(symlinkRoot);
     assert.equal(rootReal, realRoot, "sanity: realpath should follow symlink");
     const out = resolveWithinRoot(rootReal, "story.json");
     assert.equal(out, path.join(realRoot, "story.json"));
   });
 
   it("resolves nested paths under a symlinked root", () => {
-    if (!fs.existsSync(symlinkRoot)) return;
-    const rootReal = fs.realpathSync(symlinkRoot);
+    if (!existsSync(symlinkRoot)) return;
+    const rootReal = realpathSync(symlinkRoot);
     const out = resolveWithinRoot(rootReal, "sub/nested.mp4");
     assert.equal(out, path.join(realRoot, "sub", "nested.mp4"));
   });
 
   it("rejects traversal even when the root is the realpath of a symlink", () => {
-    if (!fs.existsSync(symlinkRoot)) return;
-    const rootReal = fs.realpathSync(symlinkRoot);
+    if (!existsSync(symlinkRoot)) return;
+    const rootReal = realpathSync(symlinkRoot);
     assert.equal(resolveWithinRoot(rootReal, "../../etc/passwd"), null);
   });
 });
@@ -298,7 +298,7 @@ describe("resolveWithinRoot — missing files and edge cases", () => {
   });
 
   it("rejects a path containing a null byte", () => {
-    // Node's fs.realpathSync throws on null bytes, which our catch
+    // Node's realpathSync throws on null bytes, which our catch
     // converts to null. This protects against C-string truncation
     // tricks even though Node itself isn't vulnerable.
     assert.equal(resolveWithinRoot(scratch, "foo\0.txt"), null);

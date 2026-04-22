@@ -77,13 +77,13 @@ describe("parseIndexEntries", () => {
   });
 
   it("parses a markdown table with header + separator + rows", () => {
-    const md = [
+    const markdown = [
       "| slug | title | description |",
       "|------|-------|-------------|",
       "| `video-gen` | Video Gen | Notes about video |",
       "| `audio-gen` | Audio Gen | Notes about audio |",
     ].join("\n");
-    const entries = parseIndexEntries(md);
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries.length, 2);
     assert.deepEqual(entries[0], {
       slug: "video-gen",
@@ -93,14 +93,14 @@ describe("parseIndexEntries", () => {
   });
 
   it("falls back to slug as title when title is empty", () => {
-    const md = ["| slug | title |", "|------|-------|", "| `bare` |  |"].join("\n");
-    const entries = parseIndexEntries(md);
+    const markdown = ["| slug | title |", "|------|-------|", "| `bare` |  |"].join("\n");
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries[0]?.title, "bare");
   });
 
   it("parses bullet markdown links", () => {
-    const md = "- [Video Generation](pages/video-generation.md) — about video";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [Video Generation](pages/video-generation.md) — about video";
+    const entries = parseIndexEntries(markdown);
     assert.deepEqual(entries[0], {
       title: "Video Generation",
       slug: "video-generation",
@@ -113,8 +113,8 @@ describe("parseIndexEntries", () => {
     // `wikiSlugify(title)` which stripped every non-ASCII character
     // and returned "", breaking in-canvas navigation. The slug must
     // now come from the href segment.
-    const md = "- [さくらインターネット](pages/sakura-internet.md) — クラウド事業者";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [さくらインターネット](pages/sakura-internet.md) — クラウド事業者";
+    const entries = parseIndexEntries(markdown);
     assert.deepEqual(entries[0], {
       title: "さくらインターネット",
       slug: "sakura-internet",
@@ -125,14 +125,14 @@ describe("parseIndexEntries", () => {
   it("derives slug from a bare filename href", () => {
     // Some historical index.md files used `[Title](slug.md)` without
     // the `pages/` prefix. Still valid — use the filename as slug.
-    const md = "- [Video Generation](video-generation.md) — about video";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [Video Generation](video-generation.md) — about video";
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries[0]?.slug, "video-generation");
   });
 
   it("derives slug from a plain filename with no extension", () => {
-    const md = "- [Video Generation](video-generation) — about video";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [Video Generation](video-generation) — about video";
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries[0]?.slug, "video-generation");
   });
 
@@ -141,14 +141,14 @@ describe("parseIndexEntries", () => {
     // slug is the only reasonable choice. For non-ASCII titles this
     // still produces "" — but that's fine: such a row isn't a
     // real wiki page entry in the first place.
-    const md = "- [Video Generation](https://example.com/xyz) — about video";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [Video Generation](https://example.com/xyz) — about video";
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries[0]?.slug, "video-generation");
   });
 
   it("parses bullet wiki links", () => {
-    const md = "- [[Video Generation]] — about video";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [[Video Generation]] — about video";
+    const entries = parseIndexEntries(markdown);
     assert.deepEqual(entries[0], {
       title: "Video Generation",
       slug: "video-generation",
@@ -166,19 +166,19 @@ describe("parseIndexEntries", () => {
   });
 
   it("handles a missing description on bullet links", () => {
-    const md = "- [Topic](pages/topic.md)";
-    const entries = parseIndexEntries(md);
+    const markdown = "- [Topic](pages/topic.md)";
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries[0]?.description, "");
   });
 
   it("ignores lines that don't match any format", () => {
-    const md = "Just some text\n# A heading\n";
-    assert.deepEqual(parseIndexEntries(md), []);
+    const markdown = "Just some text\n# A heading\n";
+    assert.deepEqual(parseIndexEntries(markdown), []);
   });
 
   it("handles a mix of table and bullet entries", () => {
-    const md = ["| slug | title |", "|------|-------|", "| `t1` | Topic 1 |", "", "- [[Topic 2]]"].join("\n");
-    const entries = parseIndexEntries(md);
+    const markdown = ["| slug | title |", "|------|-------|", "| `t1` | Topic 1 |", "", "- [[Topic 2]]"].join("\n");
+    const entries = parseIndexEntries(markdown);
     assert.equal(entries.length, 2);
     assert.equal(entries[0]?.slug, "t1");
     assert.equal(entries[1]?.slug, "topic-2");

@@ -71,7 +71,7 @@
             v-model="miniEditorValue"
             type="text"
             class="form-input"
-            placeholder="Value"
+            :placeholder="t('pluginSpreadsheet.valuePlaceholder')"
             @keyup.enter="saveMiniEditor"
           />
 
@@ -81,10 +81,16 @@
               v-model="miniEditorFormula"
               type="text"
               class="form-input"
-              placeholder="Value or Formula (e.g., 100 or SUM(B2:B11))"
+              :placeholder="t('pluginSpreadsheet.valueOrFormulaPlaceholder')"
               @keyup.enter="saveMiniEditor"
             />
-            <input v-model="miniEditorFormat" type="text" class="form-input" placeholder="Format (e.g., $#,##0.00)" @keyup.enter="saveMiniEditor" />
+            <input
+              v-model="miniEditorFormat"
+              type="text"
+              class="form-input"
+              :placeholder="t('pluginSpreadsheet.formatPlaceholder')"
+              @keyup.enter="saveMiniEditor"
+            />
           </template>
 
           <button class="save-btn" @click="saveMiniEditor">Update</button>
@@ -97,6 +103,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import * as XLSX from "xlsx";
 import type { ToolResult } from "gui-chat-protocol";
 import type { SpreadsheetToolData, SpreadsheetSheet } from "./definition";
@@ -118,6 +125,8 @@ import { apiGet, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import type { FilesContentResponseLike } from "./engine/responseDecoder";
 import { isObj, isRecord } from "../../utils/types";
+
+const { t } = useI18n();
 
 /**
  * Normalize malformed data structures

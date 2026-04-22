@@ -1,10 +1,10 @@
 <template>
   <div class="flex-1 overflow-auto min-h-0">
-    <div v-if="!selectedPath" class="h-full flex items-center justify-center text-gray-400 text-sm">Select a file</div>
+    <div v-if="!selectedPath" class="h-full flex items-center justify-center text-gray-400 text-sm">{{ t("fileContentRenderer.selectFile") }}</div>
     <div v-else-if="contentError" class="p-4 text-sm text-red-600">
       {{ contentError }}
     </div>
-    <div v-else-if="contentLoading" class="p-4 text-sm text-gray-400">Loading...</div>
+    <div v-else-if="contentLoading" class="p-4 text-sm text-gray-400">{{ t("common.loading") }}</div>
     <template v-else-if="content">
       <template v-if="content.kind === 'text'">
         <!-- Scheduler items.json: render with the scheduler plugin's
@@ -55,7 +55,13 @@
              to restrict script loads to a vetted CDN whitelist +
              inline; connect-src is `'none'` so the page can't
              phone home. See src/utils/html/previewCsp.ts. -->
-        <iframe v-else-if="isHtml" :srcdoc="sandboxedHtml" class="w-full h-full border-0" sandbox="allow-scripts" title="HTML preview" />
+        <iframe
+          v-else-if="isHtml"
+          :srcdoc="sandboxedHtml"
+          class="w-full h-full border-0"
+          sandbox="allow-scripts"
+          :title="t('fileContentRenderer.htmlPreview')"
+        />
         <!-- JSON: pretty-printed with simple syntax coloring. Fall
              back to raw content if the file is malformed. -->
         <pre v-else-if="isJson" class="p-4 text-xs whitespace-pre-wrap font-mono text-gray-800"><span
@@ -66,7 +72,7 @@
         <!-- JSONL / NDJSON: one pretty-printed + colored record per line -->
         <div v-else-if="isJsonl" class="p-4 space-y-2">
           <div v-for="(line, i) in jsonlLines" :key="i" class="rounded border bg-gray-50 p-3" :class="line.parseError ? 'border-red-300' : 'border-gray-200'">
-            <div v-if="line.parseError" class="text-xs text-red-600 mb-1 font-sans">parse error</div>
+            <div v-if="line.parseError" class="text-xs text-red-600 mb-1 font-sans">{{ t("fileContentRenderer.parseError") }}</div>
             <pre class="text-xs font-mono text-gray-800 whitespace-pre-wrap"><span
               v-for="(tok, j) in line.tokens"
               :key="j"
@@ -82,7 +88,12 @@
         <img :src="rawUrl(selectedPath)" :alt="selectedPath" class="max-w-full max-h-full object-contain" />
       </div>
       <!-- PDF -->
-      <iframe v-else-if="content.kind === 'pdf' && selectedPath" :src="rawUrl(selectedPath)" class="w-full h-full border-0" title="PDF preview" />
+      <iframe
+        v-else-if="content.kind === 'pdf' && selectedPath"
+        :src="rawUrl(selectedPath)"
+        class="w-full h-full border-0"
+        :title="t('fileContentRenderer.pdfPreview')"
+      />
       <!-- Audio -->
       <div v-else-if="content.kind === 'audio' && selectedPath" class="h-full flex items-center justify-center p-4">
         <audio :key="selectedPath" :src="rawUrl(selectedPath)" controls preload="metadata" class="w-full max-w-2xl" />
@@ -100,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import TextResponseView from "../plugins/textResponse/View.vue";
 import SchedulerView from "../plugins/scheduler/View.vue";
 import TodoExplorer from "./TodoExplorer.vue";
@@ -113,6 +125,8 @@ import type { JsonToken, JsonlLine } from "../utils/format/jsonSyntax";
 import type { Frontmatter } from "../utils/format/frontmatter";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
 import { API_ROUTES } from "../config/apiRoutes";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedPath: string | null;

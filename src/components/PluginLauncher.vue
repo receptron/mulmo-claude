@@ -8,12 +8,12 @@
           'px-2.5 py-1 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',
           isActive(target) ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
         ]"
-        :title="target.title"
+        :title="t(`pluginLauncher.${target.key}.title`)"
         :data-testid="`plugin-launcher-${target.key}`"
         @click="emit('navigate', target)"
       >
         <span class="material-icons text-sm">{{ target.icon }}</span>
-        <span v-if="!compact">{{ target.label }}</span>
+        <span v-if="!compact">{{ t(`pluginLauncher.${target.key}.label`) }}</span>
       </button>
     </template>
   </div>
@@ -21,6 +21,9 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 // Quick-access toolbar sitting above the canvas. Each button
 // switches the canvas to a dedicated view mode via URL
@@ -38,63 +41,27 @@ const props = defineProps<{
 
 export type PluginLauncherKind = "view"; // Switch the canvas to a dedicated view mode
 
+// The `key` is also the i18n lookup prefix (see pluginLauncher.*
+// in src/lang/en.ts). Templates resolve the label / tooltip via
+// `t(\`pluginLauncher.\${target.key}.label\`)` — keeping label/title
+// strings out of this file avoids duplication across locales.
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
   key: "todos" | "scheduler" | "skills" | "wiki" | "roles" | "files";
   kind: PluginLauncherKind;
   /** Material-icons glyph. */
   icon: string;
-  /** Visible label next to the icon. */
-  label: string;
-  /** Tooltip on hover. */
-  title: string;
 }
 
 const TARGETS: PluginLauncherTarget[] = [
   // ─── Data plugins ───
-  {
-    key: "todos",
-    kind: "view",
-    icon: "checklist",
-    label: "Todos",
-    title: "Open todos (⌘4)",
-  },
-  {
-    key: "scheduler",
-    kind: "view",
-    icon: "event",
-    label: "Schedule",
-    title: "Open schedule (⌘5)",
-  },
-  {
-    key: "wiki",
-    kind: "view",
-    icon: "menu_book",
-    label: "Wiki",
-    title: "Open wiki (⌘6)",
-  },
+  { key: "todos", kind: "view", icon: "checklist" },
+  { key: "scheduler", kind: "view", icon: "event" },
+  { key: "wiki", kind: "view", icon: "menu_book" },
   // ─── Management / navigation ───
-  {
-    key: "skills",
-    kind: "view",
-    icon: "psychology",
-    label: "Skills",
-    title: "Open skills (⌘7)",
-  },
-  {
-    key: "roles",
-    kind: "view",
-    icon: "manage_accounts",
-    label: "Roles",
-    title: "Open roles (⌘8)",
-  },
-  {
-    key: "files",
-    kind: "view",
-    icon: "folder",
-    label: "Files",
-    title: "Open workspace files (⌘3)",
-  },
+  { key: "skills", kind: "view", icon: "psychology" },
+  { key: "roles", kind: "view", icon: "manage_accounts" },
+  { key: "files", kind: "view", icon: "folder" },
 ];
 
 // Index AFTER which the visual separator is inserted (between wiki

@@ -11,6 +11,9 @@ import { getPlatformByPath, getConfiguredPlatforms, CONNECTION_MODES } from "./p
 // Each import registers itself via registerPlatform().
 import "./webhooks/line.js";
 import "./webhooks/telegram.js";
+import "./webhooks/whatsapp.js";
+import "./webhooks/messenger.js";
+import "./webhooks/google-chat.js";
 
 export { RelayDurableObject } from "./durable-object.js";
 
@@ -19,59 +22,40 @@ const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-
-    // Health check — shows all registered + configured platforms
-    if (url.pathname === "/health") {
-      return Response.json({
-        status: "ok",
-        platforms: getConfiguredPlatforms(env),
-      });
-    }
-
-    // WebSocket — proxy to Durable Object
-    if (url.pathname === "/ws") {
-      return forwardToDurableObject(request, env, "/ws");
-    }
-
-    // Webhooks — only POST
-    if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
-    }
-
-    // Body size check (Content-Length header)
-    const contentLength = request.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
-      return new Response("Payload too large", { status: 413 });
-    }
-
-    // Route to platform plugin by path
-    const plugin = getPlatformByPath(url.pathname);
-    if (!plugin) {
-      return new Response("Not found", { status: 404 });
-    }
-
-    if (plugin.mode !== CONNECTION_MODES.webhook || !plugin.handleWebhook) {
-      return new Response("Not a webhook platform", { status: 400 });
-    }
-
-    if (!plugin.isConfigured(env)) {
-      return new Response(`${plugin.name} not configured`, { status: 404 });
-    }
-
-    try {
-      const body = await readBodyWithLimit(request);
-      const messages = await plugin.handleWebhook(request, body, env);
-      await enqueueMessages(messages, env);
-      return new Response("ok", { status: 200 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("verification failed") || msg.includes("not configured")) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-      return new Response("Internal error", { status: 500 });
-    }
+    if (url.pathname === "/health") return Response.json({ status: "ok", platforms: getConfiguredPlatforms(env) });
+    if (url.pathname === "/ws") return forwardToDurableObject(request, env, "/ws");
+    if (request.method === "GET") return handleVerificationRequest(request, env, url);
+    if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+    return handleWebhookPost(request, env, url);
   },
 };
+
+function handleVerificationRequest(request: Request, env: Env, url: URL): Response {
+  const plugin = getPlatformByPath(url.pathname);
+  if (plugin?.handleVerification && plugin.isConfigured(env)) return plugin.handleVerification(request, env);
+  return new Response("Not found", { status: 404 });
+}
+
+async function handleWebhookPost(request: Request, env: Env, url: URL): Promise<Response> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+    return new Response("Payload too large", { status: 413 });
+  }
+  const plugin = getPlatformByPath(url.pathname);
+  if (!plugin) return new Response("Not found", { status: 404 });
+  if (plugin.mode !== CONNECTION_MODES.webhook || !plugin.handleWebhook) return new Response("Not a webhook platform", { status: 400 });
+  if (!plugin.isConfigured(env)) return new Response(`${plugin.name} not configured`, { status: 404 });
+  try {
+    const body = await readBodyWithLimit(request);
+    const messages = await plugin.handleWebhook(request, body, env);
+    await enqueueMessages(messages, env);
+    return new Response("ok", { status: 200 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("verification failed") || msg.includes("not configured")) return new Response("Unauthorized", { status: 401 });
+    return new Response("Internal error", { status: 500 });
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────
 

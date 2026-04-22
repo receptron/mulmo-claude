@@ -47,8 +47,8 @@ describe("sessionJsonlPathFor", () => {
   });
 
   it("handles UUID-style session IDs", () => {
-    const id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-    assert.equal(sessionJsonlPathFor(workspace, id), path.join(workspace, "chat", `${id}.jsonl`));
+    const sessionId = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    assert.equal(sessionJsonlPathFor(workspace, sessionId), path.join(workspace, "chat", `${sessionId}.jsonl`));
   });
 });
 

@@ -7,20 +7,20 @@ import { HostRateLimiter, DEFAULT_MIN_DELAY_MS, type RateLimiterDeps } from "../
 // without real timers.
 function controllableClock(start = 0): {
   deps: RateLimiterDeps;
-  tick: (ms: number) => void;
+  tick: (delayMs: number) => void;
   read: () => number;
 } {
   const state = { t: start };
   return {
     deps: {
       now: () => state.t,
-      sleep: (ms) => {
-        state.t += ms;
+      sleep: (delayMs) => {
+        state.t += delayMs;
         return Promise.resolve();
       },
     },
-    tick: (ms) => {
-      state.t += ms;
+    tick: (delayMs) => {
+      state.t += delayMs;
     },
     read: () => state.t,
   };
@@ -170,7 +170,7 @@ describe("HostRateLimiter — minimum delay enforcement", () => {
     await lim.run("a.com", async () => "first");
     const before = clock.read();
     await lim.run("a.com", async () => "second");
-    assert.ok(clock.read() - before >= DEFAULT_MIN_DELAY_MS, `expected default ${DEFAULT_MIN_DELAY_MS}ms delay, got ${clock.read() - before}`);
+    assert.ok(clock.read() - before >= DEFAULT_MIN_DELAY_MS, `expected default ${DEFAULT_MIN_DELAY_MS}delayMs delay, got ${clock.read() - before}`);
   });
 
   it("marks finishedAt even on error so the next retry waits", async () => {
