@@ -40,7 +40,7 @@ test.describe("session-history side-panel toggle", () => {
     await expect(sidePanel.getByTestId(`session-item-${SESSION_B.id}`)).toBeVisible();
   });
 
-  test("Stack view: toggle button in the canvas header controls the side-panel", async ({ page }) => {
+  test("Stack view: toggle button (lives in SessionTabBar) controls the side-panel", async ({ page }) => {
     // Preset localStorage to Stack layout so we don't have to flip
     // it via the UI first.
     await page.addInitScript(() => {
@@ -53,9 +53,10 @@ test.describe("session-history side-panel toggle", () => {
     // Side panel off initially in Stack too.
     await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
 
-    // Toggle lives in StackView's header; flipping it reveals the
-    // leftmost session-history column, which Stack normally doesn't
-    // have any sidebar for at all.
+    // Toggle lives in SessionTabBar (top bar Row 2) — the same
+    // button is used regardless of Single / Stack layout. Flipping
+    // it reveals the leftmost session-history column, which Stack
+    // normally has no sidebar for at all.
     await page.getByTestId("session-history-toggle-off").click();
     await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
     await expect(page.getByTestId("session-history-side-panel").getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();

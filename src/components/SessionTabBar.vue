@@ -76,6 +76,11 @@
         >{{ unreadCount }}</span
       >
     </button>
+    <!-- Session-history side-panel toggle. Distinct from the
+         expand_more button above (which navigates to /history) —
+         this one opens the SessionHistoryPanel as a standalone left
+         column next to the canvas, persisted in localStorage. -->
+    <SessionHistoryToggleButton :model-value="showSessionHistory" @update:model-value="(value: boolean) => emit('update:showSessionHistory', value)" />
   </div>
 </template>
 
@@ -84,6 +89,7 @@ import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import { SESSION_ORIGINS, type SessionOrigin, type SessionSummary } from "../types/session";
 import { roleIcon, roleName } from "../utils/role/icon";
+import SessionHistoryToggleButton from "./SessionHistoryToggleButton.vue";
 
 const { t } = useI18n();
 
@@ -100,12 +106,14 @@ const props = defineProps<{
   activeSessionCount: number;
   unreadCount: number;
   historyOpen: boolean;
+  showSessionHistory: boolean;
 }>();
 
 const emit = defineEmits<{
   newSession: [];
   loadSession: [id: string];
   toggleHistory: [];
+  "update:showSessionHistory": [value: boolean];
 }>();
 
 // Colour for the tab's main (role) icon. Running always wins

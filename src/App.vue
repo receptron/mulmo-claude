@@ -28,9 +28,11 @@
           :active-session-count="activeSessionCount"
           :unread-count="unreadCount"
           :history-open="currentPage === 'history'"
+          :show-session-history="showSessionHistory"
           @new-session="handleNewSessionClick"
           @load-session="handleSessionSelect"
           @toggle-history="handleHistoryClick"
+          @update:show-session-history="setShowSessionHistory"
         />
       </div>
     </div>
@@ -76,11 +78,9 @@
           :session-role-icon="sessionRoleIcon"
           :layout-mode="layoutMode"
           :show-right-sidebar="showRightSidebar"
-          :show-session-history="showSessionHistory"
           @select="onSidebarItemClick"
           @activate="activePane = 'sidebar'"
           @update:layout-mode="setLayoutMode"
-          @update:show-session-history="setShowSessionHistory"
           @toggle-right-sidebar="toggleRightSidebar"
         />
 
@@ -120,11 +120,9 @@
             :session-role-icon="sessionRoleIcon"
             :layout-mode="layoutMode"
             :show-right-sidebar="showRightSidebar"
-            :show-session-history="showSessionHistory"
             @select="(uuid) => (selectedResultUuid = uuid)"
             @update-result="handleUpdateResult"
             @update:layout-mode="setLayoutMode"
-            @update:show-session-history="setShowSessionHistory"
             @toggle-right-sidebar="toggleRightSidebar"
           />
           <!-- Distinct pages -->
