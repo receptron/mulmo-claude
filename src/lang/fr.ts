@@ -329,7 +329,6 @@ const frMessages = {
     chatSend: "Démarrer une nouvelle conversation sur cette page",
     emptyPage: "La page « {title} » n'existe pas encore.",
     createPage: "Créer cette page wiki",
-    createPagePrompt: "Créez une page wiki sur « {title} ». Recherchez le sujet et rédigez un article complet dans data/wiki/pages/.",
   },
   pluginPresentHtml: {
     saveAsPdf: "Enregistrer en PDF (ouvre la boîte de dialogue d'impression)",

@@ -334,7 +334,6 @@ const esMessages = {
     chatSend: "Iniciar un chat nuevo sobre esta página",
     emptyPage: 'La página "{title}" aún no existe.',
     createPage: "Crear esta página wiki",
-    createPagePrompt: 'Crea una página wiki sobre "{title}". Investiga el tema y escribe un artículo completo en data/wiki/pages/.',
   },
   pluginPresentHtml: {
     saveAsPdf: "Guardar como PDF (abre el diálogo de impresión)",

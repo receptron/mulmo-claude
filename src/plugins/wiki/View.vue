@@ -310,7 +310,7 @@ const isStandaloneWikiRoute = computed(() => route.name === PAGE_ROUTES.wiki);
 const canSendChat = computed(() => chatDraft.value.trim().length > 0 && currentSlug() !== null);
 
 function requestCreatePage() {
-  appApi.startNewChat(t("pluginWiki.createPagePrompt", { title: title.value }));
+  appApi.startNewChat(`Create a wiki page about "${title.value}". Research the topic and write a comprehensive article in data/wiki/pages/.`);
 }
 
 function currentSlug(): string | null {
