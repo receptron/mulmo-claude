@@ -11,3 +11,9 @@ export { EVENT_TYPES, type EventType, GENERATION_KINDS, type GenerationKind, typ
 export { CHAT_SOCKET_PATH, CHAT_SOCKET_EVENTS, type ChatSocketEvent } from "./socket.js";
 export { type Attachment } from "./attachment.js";
 export { CHAT_SERVICE_ROUTES } from "./routes.js";
+
+// step 6 verification marker — intentionally added value export
+// without a version bump to test whether `scripts/mulmoclaude/drift.mjs`
+// flags the drift in CI. This export will be removed when the
+// verify/step6-drift-trap PR is closed.
+export const STEP6_DRIFT_MARKER = "verify/step6-drift-trap";
