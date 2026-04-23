@@ -56,6 +56,9 @@ test.describe("history panel (useSessionHistory)", () => {
     // skip over it) — that matches the mental model of "I visited
     // the history page, clicked a session, now go back".
     await page.goto("/chat");
+    // Wait for the /chat → /chat/<newId> redirect before opening
+    // history — clicking mid-bootstrap makes the stack timing-dependent.
+    await page.waitForURL(/\/chat\//);
     await page.getByTestId("history-btn").click();
     await expect(page).toHaveURL(/\/history$/);
     await page.getByTestId(`session-item-${SESSION_A.id}`).click();
