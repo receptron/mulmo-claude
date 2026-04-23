@@ -70,12 +70,12 @@ test.describe("history panel (useSessionHistory)", () => {
     await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
   });
 
-  test("second click on history button (while on /history) goes back to prior page", async ({ page }) => {
+  test("second click on history button (while on /history) returns to prior page", async ({ page }) => {
     await page.goto("/chat");
     // Wait for the `/chat` → `/chat/<newSessionId>` redirect to
     // settle before capturing the "prior" URL — reading before the
-    // redirect gives the bare /chat which is not what the second
-    // click's router.back() lands on.
+    // redirect gives the bare /chat which isn't what the close push
+    // lands on.
     await page.waitForURL(/\/chat\//);
     const priorUrl = page.url();
 

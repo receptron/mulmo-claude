@@ -84,4 +84,32 @@ test.describe("/history filter URL", () => {
     await expect(page.getByTestId("session-filter-bar")).toBeVisible();
     await expect(page.getByTestId("session-filter-scheduler")).toHaveClass(/bg-blue-500/);
   });
+
+  test("history close button from a deep filter pushes forward to the pre-history page", async ({ page }) => {
+    // "Close" is an explicit user intent — it pushes a new history
+    // entry rather than unwinding, so (a) one click closes the whole
+    // /history section regardless of how many filters were traversed,
+    // and (b) browser back from the closed state still reveals the
+    // last filter the user was viewing.
+    await page.goto("/chat");
+    await page.waitForURL(/\/chat\//);
+    const priorUrl = page.url();
+
+    await page.getByTestId("history-btn").click();
+    await expect(page).toHaveURL(/\/history$/);
+
+    await page.getByTestId("session-filter-unread").click();
+    await expect(page).toHaveURL(/\/history\/unread$/);
+
+    await page.getByTestId("session-filter-human").click();
+    await expect(page).toHaveURL(/\/history\/human$/);
+
+    // One click closes the whole /history section.
+    await page.getByTestId("history-btn").click();
+    await expect(page).toHaveURL(priorUrl);
+
+    // Browser back from the closed state still reveals the last filter.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/history\/human$/);
+  });
 });

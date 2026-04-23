@@ -213,6 +213,7 @@ import { useSessionDerived } from "./composables/useSessionDerived";
 import { useFaviconState } from "./composables/useFaviconState";
 import { useMergedSessions } from "./composables/useMergedSessions";
 import { useLayoutMode } from "./composables/useLayoutMode";
+import { useHistoryEntrance } from "./composables/useHistoryEntrance";
 import { useSelectedResult } from "./composables/useSelectedResult";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
@@ -361,6 +362,7 @@ const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
 const showSettings = ref(false);
 
 const { layoutMode, setLayoutMode, toggleLayoutMode } = useLayoutMode();
+const { preHistoryUrl } = useHistoryEntrance();
 
 // Current page derives from the route. The chat page has a layout
 // preference on top (single vs. stack); other pages are distinct
@@ -763,22 +765,19 @@ async function sendMessage(text?: string) {
 }
 
 // History is a page route (/history) now — no click-outside handling
-// needed. Clicking the history button toggles between /history and the
-// previous page via router.back / router.push.
+// needed. Clicking the history button from elsewhere opens /history;
+// clicking it while on /history "closes" by pushing forward to the
+// page the user came from (remembered by useHistoryEntrance). Close
+// is an explicit user intent — it should create a new history entry,
+// not rewind, so browser-back from the target still reveals the last
+// /history/<filter> the user was looking at.
 function handleHistoryClick(): void {
   if (currentPage.value !== PAGE_ROUTES.history) {
     router.push({ name: PAGE_ROUTES.history }).catch(() => {});
     return;
   }
-  // Direct-link to /history has no prior entry to go back to.
-  // vue-router exposes the previous entry on window.history.state.back;
-  // when null, fall back to /chat so the button still closes the panel.
-  const hasBack = typeof window !== "undefined" && window.history.state?.back != null;
-  if (hasBack) {
-    router.back();
-  } else {
-    router.push({ name: PAGE_ROUTES.chat }).catch(() => {});
-  }
+  const target = preHistoryUrl.value ?? { name: PAGE_ROUTES.chat };
+  router.push(target).catch(() => {});
 }
 
 // Fetch the session list when entering /history. Not `immediate` on
