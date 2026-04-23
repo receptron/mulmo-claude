@@ -75,6 +75,27 @@ jobs:
       - name: Build client
         run: yarn build
 
+      # The launcher pre-flight rejects if `claude --version` doesn't
+      # succeed. Real installs need the Claude Code CLI + auth, but
+      # the smoke test only needs the server to boot and serve `/`
+      # (index.html, no agent query involved). A tiny stub on PATH
+      # passes the pre-flight without pulling the real CLI +
+      # credentials into CI.
+      - name: Stub Claude Code CLI for pre-flight
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/claude" <<'STUB'
+          #!/usr/bin/env bash
+          if [ "$1" = "--version" ]; then
+            echo "claude 0.0.0 (smoke-stub)"
+            exit 0
+          fi
+          echo "smoke-stub claude: no real backend available" >&2
+          exit 1
+          STUB
+          chmod +x "$HOME/.local/bin/claude"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Run publish smoke
         run: node scripts/mulmoclaude/smoke.mjs
 
