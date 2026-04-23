@@ -32,10 +32,11 @@
           >
           <span
             v-if="originGlyph(sessions[i - 1].origin)"
+            role="img"
             class="absolute -top-[3px] -right-[5px] w-3.5 h-3.5 rounded-full bg-white ring-1 ring-gray-300 flex items-center justify-center"
             :aria-label="originTooltip(sessions[i - 1].origin)"
           >
-            <span class="material-icons !text-[10px] leading-none text-gray-500">{{ originGlyph(sessions[i - 1].origin) }}</span>
+            <span class="material-icons !text-[10px] leading-none text-gray-500" aria-hidden="true">{{ originGlyph(sessions[i - 1].origin) }}</span>
           </span>
         </span>
         <span class="text-xs text-gray-700 truncate min-w-0" :class="sessions[i - 1].hasUnread ? 'font-bold' : ''">{{ tabLabel(sessions[i - 1]) }}</span>
