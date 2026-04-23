@@ -1,6 +1,21 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between">
+    <!-- Compact mode (stack view): teleport PDF + Show-Source into
+         StackView's per-card header; suppress our own header. -->
+    <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`">
+      <button
+        class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 flex items-center gap-1"
+        :title="t('pluginPresentHtml.saveAsPdf')"
+        @click.stop="printToPdf"
+      >
+        <span class="material-icons text-sm leading-none">picture_as_pdf</span>
+        <span>{{ t("pluginPresentHtml.pdf") }}</span>
+      </button>
+      <button class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50" @click.stop="sourceOpen = !sourceOpen">
+        {{ sourceOpen ? t("pluginPresentHtml.hideSource") : t("pluginPresentHtml.showSource") }}
+      </button>
+    </Teleport>
+    <div v-if="!compact" class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between">
       <span class="text-sm font-medium text-gray-700 truncate">{{ title ?? t("pluginPresentHtml.untitled") }}</span>
       <div class="flex items-center gap-2">
         <button
@@ -33,6 +48,9 @@ const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentHtmlData>;
+  // Stack view compact contract (#711).
+  compact?: boolean;
+  stackActionsTarget?: string;
 }>();
 
 const PRINT_STYLE = `<style>@media print {

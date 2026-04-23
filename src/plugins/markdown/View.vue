@@ -10,7 +10,22 @@
       <div class="text-gray-500">{{ t("pluginMarkdown.noContent") }}</div>
     </div>
     <template v-else>
-      <div class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
+      <!-- Compact mode (stack view): hoist PDF button into
+           StackView's per-card header via Teleport, suppress this
+           plugin's own header strip. Single view keeps the original
+           header rendered below (v-else). -->
+      <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`">
+        <button
+          class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+          :disabled="pdfDownloading"
+          :title="t('pluginMarkdown.pdf')"
+          @click.stop="downloadPdf"
+        >
+          <span class="material-icons text-sm leading-none">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+          <span>{{ t("pluginMarkdown.pdf") }}</span>
+        </button>
+      </Teleport>
+      <div v-if="!compact" class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
         <div class="button-group">
           <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
             <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
@@ -65,6 +80,12 @@ import { toSafeFilename } from "../../utils/files/filename";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
+  // Stack view compact contract (#711): StackView passes compact=true
+  // and a unique target-element id; when both are set, the plugin
+  // suppresses its own header and teleports primary actions into
+  // StackView's per-card action area.
+  compact?: boolean;
+  stackActionsTarget?: string;
 }>();
 
 const emit = defineEmits<{

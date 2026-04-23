@@ -1,7 +1,24 @@
 <template>
   <div class="h-full bg-white flex flex-col">
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+    <!-- Compact mode (stack view): hoist the page-view PDF button
+         into StackView's per-card header, and suppress our own
+         header entirely. Tabs / index lint-chat are interactive
+         affordances that only make sense in standalone single view,
+         so they're dropped when the plugin is shown as a stacked
+         tool result. See plans/feat-stack-compact-actions.md. -->
+    <Teleport v-if="compact && stackActionsTarget && action === 'page' && content" :to="`#${stackActionsTarget}`">
+      <button
+        class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+        :disabled="pdfDownloading"
+        :title="t('pluginWiki.pdf')"
+        @click.stop="downloadPdf"
+      >
+        <span class="material-icons text-sm leading-none">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+        <span>{{ t("pluginWiki.pdf") }}</span>
+      </button>
+    </Teleport>
+    <!-- Header (non-compact / single view) -->
+    <div v-if="!compact" class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-3">
         <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" :title="t('pluginWiki.backToIndex')" @click="router.back()">
           <span class="material-icons text-base">arrow_back</span>
@@ -195,6 +212,11 @@ const { t } = useI18n();
 const props = defineProps<{
   selectedResult?: ToolResultComplete<WikiData>;
   sendTextMessage?: (text: string) => void;
+  // Stack view compact contract (#711). When set by StackView, we
+  // suppress the full header and teleport the PDF button into the
+  // per-card action area.
+  compact?: boolean;
+  stackActionsTarget?: string;
 }>();
 const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 

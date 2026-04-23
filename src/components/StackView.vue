@@ -24,18 +24,27 @@
         class="bg-white rounded-lg border transition-colors"
         :class="result.uuid === selectedResultUuid ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200'"
       >
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 border-b border-gray-100 text-left hover:bg-gray-50"
-          :title="result.title || result.toolName"
-          @click="emit('select', result.uuid)"
-        >
-          <span class="material-icons text-sm text-gray-400">{{ iconFor(result.toolName) }}</span>
-          <span class="text-sm font-medium text-gray-800 truncate">{{ result.title || result.toolName }}</span>
+        <!-- Per-card header. The left region is the card-select
+             affordance (kept as a <button> for keyboard / a11y);
+             the right region hosts the per-plugin action teleport
+             target, timestamp, and tool name — split out so plugin
+             action buttons aren't illegally nested inside a
+             <button>. -->
+        <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+          <button
+            class="flex-1 flex items-center gap-2 text-left hover:bg-gray-50 min-w-0 -my-2 -ml-3 pl-3 py-2"
+            :title="result.title || result.toolName"
+            @click="emit('select', result.uuid)"
+          >
+            <span class="material-icons text-sm text-gray-400 shrink-0">{{ iconFor(result.toolName) }}</span>
+            <span class="text-sm font-medium text-gray-800 truncate">{{ result.title || result.toolName }}</span>
+          </button>
+          <div :id="`stack-actions-${result.uuid}`" class="flex items-center gap-1 shrink-0"></div>
           <span v-if="resultTimestamps.get(result.uuid)" class="text-[10px] text-gray-400 shrink-0">{{
             formatSmartTime(resultTimestamps.get(result.uuid)!)
           }}</span>
           <span class="font-mono text-xs text-gray-400 shrink-0">{{ result.toolName }}</span>
-        </button>
+        </div>
         <!-- text-response: render the message as Markdown via the
            underlying plugin View. The .stack-text-response class below
            collapses the plugin's own card chrome (outer p-6, inner
@@ -65,6 +74,8 @@
             v-if="getPlugin(result.toolName)?.viewComponent"
             :selected-result="result"
             :send-text-message="sendTextMessage"
+            :compact="true"
+            :stack-actions-target="`stack-actions-${result.uuid}`"
             @update-result="(r: ToolResultComplete) => emit('updateResult', r)"
           />
         </div>
@@ -76,6 +87,8 @@
             v-if="getPlugin(result.toolName)?.viewComponent"
             :selected-result="result"
             :send-text-message="sendTextMessage"
+            :compact="true"
+            :stack-actions-target="`stack-actions-${result.uuid}`"
             @update-result="(r: ToolResultComplete) => emit('updateResult', r)"
           />
           <pre v-else class="h-full overflow-auto p-4 text-xs text-gray-500 whitespace-pre-wrap">{{ JSON.stringify(result, null, 2) }}</pre>
