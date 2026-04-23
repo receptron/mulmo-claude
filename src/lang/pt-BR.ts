@@ -384,6 +384,13 @@ const ptBRMessages = {
     flashPresetAlreadyRegistered: 'Todas as fontes em "{label}" já estão registradas.',
     flashPresetRegistered: 'Registrada {count} fonte de "{label}". Buscando…|Registradas {count} fontes de "{label}". Buscando…',
     flashPresetPartial: "Registradas {ok}/{total}. Erros: {errors}",
+    errPrimaryRequired: "Por favor, preencha o campo URL / consulta.",
+    errRssUrlProtocol: "A URL do feed RSS deve começar com http:// ou https://",
+    errRssUrlInvalid: "A URL do feed RSS não é uma URL válida.",
+    errRssUrlHost: "A URL do feed RSS deve incluir um host.",
+    errGithubInvalid: "Informe uma URL de repositório do GitHub (https://github.com/owner/repo) ou owner/repo.",
+    errUnsupportedKind: "Tipo de fetcher não suportado.",
+    initialLoading: "Carregando fontes…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "Excluir esta skill de projeto",

@@ -386,6 +386,13 @@ const frMessages = {
     flashPresetAlreadyRegistered: 'Toutes les sources de "{label}" sont déjà enregistrées.',
     flashPresetRegistered: '{count} source enregistrée depuis "{label}". Récupération…|{count} sources enregistrées depuis "{label}". Récupération…',
     flashPresetPartial: "Enregistrées {ok}/{total}. Erreurs : {errors}",
+    errPrimaryRequired: "Veuillez remplir le champ URL / requête.",
+    errRssUrlProtocol: "L'URL du flux RSS doit commencer par http:// ou https://",
+    errRssUrlInvalid: "L'URL du flux RSS n'est pas une URL valide.",
+    errRssUrlHost: "L'URL du flux RSS doit inclure un hôte.",
+    errGithubInvalid: "Saisissez une URL de dépôt GitHub (https://github.com/owner/repo) ou owner/repo.",
+    errUnsupportedKind: "Type de fetcher non pris en charge.",
+    initialLoading: "Chargement des sources…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "Supprimer cette skill de projet",

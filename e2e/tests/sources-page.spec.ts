@@ -61,9 +61,12 @@ async function installSourcesMocks(page: import("@playwright/test").Page, initia
     createCalls: [],
   };
 
-  // /api/sources/rebuild must register BEFORE /api/sources because
-  // Playwright matches last-first and the bare /api/sources handler
-  // would otherwise shadow the rebuild path.
+  // Both handlers use exact pathname equality (`url.pathname ===
+  // "/api/sources"` vs `=== "/api/sources/rebuild"`) so they don't
+  // shadow each other regardless of registration order — the DELETE
+  // handler below uses a prefix match and excludes `/rebuild`
+  // explicitly. Tracks the number of create-POSTs and rebuild-POSTs
+  // so tests can assert the commitAdd/installPreset flow.
   await page.route(
     (url) => url.pathname === "/api/sources",
     (route: Route) => {
@@ -157,9 +160,52 @@ test.describe("/sources page", () => {
     await expect(page.getByTestId(`source-row-${SOURCE_B.slug}`)).toBeVisible();
   });
 
+  test("preset buttons don't appear until the initial /api/sources fetch resolves", async ({ page }) => {
+    // Regression for the preset-race bug (PR #676 review): the empty
+    // state + preset buttons rendered before GET /api/sources landed,
+    // so a user could install a preset whose slugs the server already
+    // had, double-registering them.
+    //
+    // Hold the initial GET behind a promise we release manually so we
+    // can observe the gating UI in isolation.
+    let releaseFirstGet: (() => void) | null = null;
+    const firstGetResolved = new Promise<void>((resolve) => {
+      releaseFirstGet = resolve;
+    });
+    let getCount = 0;
+
+    await page.route(
+      (url) => url.pathname === "/api/sources",
+      async (route: Route) => {
+        if (route.request().method() !== "GET") return route.fallback();
+        getCount++;
+        if (getCount === 1) {
+          await firstGetResolved;
+        }
+        return route.fulfill({ json: { sources: [SOURCE_A] } });
+      },
+    );
+
+    await page.goto("/sources");
+
+    // Pre-release: loading indicator visible, presets/empty state hidden.
+    await expect(page.getByTestId("sources-initial-loading")).toBeVisible();
+    await expect(page.getByTestId("sources-presets")).toBeHidden();
+    await expect(page.getByTestId("sources-empty")).toBeHidden();
+
+    // Release the GET — list renders, loading indicator gone.
+    releaseFirstGet!();
+    await expect(page.getByTestId("sources-initial-loading")).toBeHidden();
+    await expect(page.getByTestId(`source-row-${SOURCE_A.slug}`)).toBeVisible();
+  });
+
   test("register form submits POST /api/sources and triggers rebuild", async ({ page }) => {
     const state = await installSourcesMocks(page, []);
     await page.goto("/sources");
+    // Wait for the page-mode initial-loading gate to clear before
+    // interacting — clicking Add before refreshList resolves would
+    // hit the disabled button.
+    await expect(page.getByTestId("sources-initial-loading")).toBeHidden();
     // Empty state renders preset buttons — use the explicit add form.
     await page.getByTestId("sources-add-btn").click();
     await page.getByTestId("sources-draft-primary").fill("https://example.com/feed.xml");

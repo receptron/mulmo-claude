@@ -390,6 +390,13 @@ const esMessages = {
     flashPresetAlreadyRegistered: 'Todas las fuentes de "{label}" ya están registradas.',
     flashPresetRegistered: 'Registrada {count} fuente de "{label}". Obteniendo…|Registradas {count} fuentes de "{label}". Obteniendo…',
     flashPresetPartial: "Registradas {ok}/{total}. Errores: {errors}",
+    errPrimaryRequired: "Por favor, rellena el campo URL / consulta.",
+    errRssUrlProtocol: "La URL del feed RSS debe empezar por http:// o https://",
+    errRssUrlInvalid: "La URL del feed RSS no es una URL válida.",
+    errRssUrlHost: "La URL del feed RSS debe incluir un host.",
+    errGithubInvalid: "Introduce una URL de repositorio de GitHub (https://github.com/owner/repo) o owner/repo.",
+    errUnsupportedKind: "Tipo de fetcher no compatible.",
+    initialLoading: "Cargando fuentes…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "Eliminar esta skill de proyecto",

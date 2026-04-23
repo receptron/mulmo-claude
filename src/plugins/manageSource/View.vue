@@ -1,5 +1,5 @@
 <template>
-  <SourcesManager :initial-data="props.selectedResult.data ?? null" />
+  <SourcesManager mode="plugin" :initial-data="props.selectedResult.data ?? null" />
 </template>
 
 <script setup lang="ts">

@@ -386,6 +386,13 @@ const zhMessages = {
     flashPresetAlreadyRegistered: '"{label}" 中的所有信息源均已注册。',
     flashPresetRegistered: '已从 "{label}" 注册 {count} 个信息源。正在抓取…',
     flashPresetPartial: "已注册 {ok}/{total}。错误: {errors}",
+    errPrimaryRequired: "请填写 URL / 查询字段。",
+    errRssUrlProtocol: "RSS 源 URL 必须以 http:// 或 https:// 开头。",
+    errRssUrlInvalid: "RSS 源 URL 不是有效的 URL。",
+    errRssUrlHost: "RSS 源 URL 必须包含主机名。",
+    errGithubInvalid: "请输入 GitHub 仓库 URL (https://github.com/owner/repo) 或 owner/repo。",
+    errUnsupportedKind: "不支持的 fetcher 类型。",
+    initialLoading: "正在加载信息源…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "删除此项目级技能",

@@ -1,5 +1,5 @@
 <template>
-  <SourcesManager />
+  <SourcesManager mode="page" />
 </template>
 
 <script setup lang="ts">

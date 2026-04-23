@@ -389,6 +389,13 @@ const koMessages = {
     flashPresetAlreadyRegistered: '"{label}" 의 모든 소스가 이미 등록되어 있습니다.',
     flashPresetRegistered: '"{label}" 에서 {count}개 소스를 등록했습니다. 수집 중…',
     flashPresetPartial: "{ok}/{total} 등록. 오류: {errors}",
+    errPrimaryRequired: "URL / 쿼리 필드를 입력하세요.",
+    errRssUrlProtocol: "RSS 피드 URL은 http:// 또는 https://로 시작해야 합니다.",
+    errRssUrlInvalid: "RSS 피드 URL이 유효한 URL이 아닙니다.",
+    errRssUrlHost: "RSS 피드 URL에는 호스트가 포함되어야 합니다.",
+    errGithubInvalid: "GitHub 리포지토리 URL (https://github.com/owner/repo) 또는 owner/repo를 입력하세요.",
+    errUnsupportedKind: "지원하지 않는 fetcher 종류입니다.",
+    initialLoading: "소스를 불러오는 중…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "이 프로젝트 스킬 삭제",

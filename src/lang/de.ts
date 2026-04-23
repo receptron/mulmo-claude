@@ -386,6 +386,13 @@ const deMessages = {
     flashPresetAlreadyRegistered: 'Alle Quellen in "{label}" sind bereits registriert.',
     flashPresetRegistered: '{count} Quelle aus "{label}" registriert. Wird abgerufen…|{count} Quellen aus "{label}" registriert. Wird abgerufen…',
     flashPresetPartial: "{ok}/{total} registriert. Fehler: {errors}",
+    errPrimaryRequired: "Bitte das Feld URL / Abfrage ausfüllen.",
+    errRssUrlProtocol: "RSS-Feed-URL muss mit http:// oder https:// beginnen.",
+    errRssUrlInvalid: "RSS-Feed-URL ist keine gültige URL.",
+    errRssUrlHost: "RSS-Feed-URL muss einen Host enthalten.",
+    errGithubInvalid: "Bitte eine GitHub-Repo-URL (https://github.com/owner/repo) oder owner/repo angeben.",
+    errUnsupportedKind: "Nicht unterstützter Fetcher-Typ.",
+    initialLoading: "Quellen werden geladen…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "Diese Projekt-Skill löschen",

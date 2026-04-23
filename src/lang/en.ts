@@ -405,6 +405,13 @@ const enMessages = {
     flashPresetAlreadyRegistered: 'All sources in "{label}" are already registered.',
     flashPresetRegistered: 'Registered {count} source from "{label}". Fetching…|Registered {count} sources from "{label}". Fetching…',
     flashPresetPartial: "Registered {ok}/{total}. Errors: {errors}",
+    errPrimaryRequired: "Please fill in the URL / query field.",
+    errRssUrlProtocol: "RSS feed URL must start with http:// or https://",
+    errRssUrlInvalid: "RSS feed URL is not a valid URL.",
+    errRssUrlHost: "RSS feed URL must include a host.",
+    errGithubInvalid: "Enter a GitHub repo URL (https://github.com/owner/repo) or owner/repo.",
+    errUnsupportedKind: "Unsupported fetcher kind.",
+    initialLoading: "Loading sources…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "Delete this project-scope skill",

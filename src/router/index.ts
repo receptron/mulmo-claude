@@ -1,9 +1,9 @@
 // Vue-router setup (history mode — clean URLs without #).
 //
 // Each page has its own route: /chat, /files, /todos, /scheduler,
-// /wiki, /skills, /roles. Layout preference (single vs. stack) is a
-// separate concern persisted in localStorage — it is not part of the
-// URL.
+// /wiki, /skills, /roles, /history, /sources. Layout preference
+// (single vs. stack) is a separate concern persisted in localStorage
+// — it is not part of the URL.
 //
 // History mode requires the server to serve index.html for any path
 // that doesn't match an API route or static file. In production the

@@ -6,7 +6,7 @@
         <span class="text-xs text-gray-500"> {{ t("pluginManageSource.sourceCount", sources.length, { named: { count: sources.length } }) }} </span>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-          :disabled="adding || busy === 'rebuild'"
+          :disabled="initialLoading || adding || busy === 'rebuild'"
           data-testid="sources-add-btn"
           @click="startAdd"
         >
@@ -15,7 +15,7 @@
         </button>
         <button
           class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-          :disabled="busy === 'rebuild'"
+          :disabled="initialLoading || busy === 'rebuild'"
           data-testid="sources-rebuild-btn"
           @click="rebuild"
         >
@@ -84,7 +84,14 @@
     </div>
 
     <div class="flex-1 overflow-y-auto">
-      <div v-if="sources.length === 0" class="flex flex-col items-center justify-center h-full p-6 gap-4" data-testid="sources-empty">
+      <!-- Page-mode gate: hide empty state + preset buttons until the
+           initial fetch completes, so users can't register presets
+           against a still-empty local list (would re-POST slugs the
+           server already has). -->
+      <div v-if="initialLoading" class="flex items-center justify-center h-full p-6" data-testid="sources-initial-loading">
+        <span class="text-sm text-gray-500 italic">{{ t("pluginManageSource.initialLoading") }}</span>
+      </div>
+      <div v-else-if="sources.length === 0" class="flex flex-col items-center justify-center h-full p-6 gap-4" data-testid="sources-empty">
         <i18n-t keypath="pluginManageSource.emptyPickPack" tag="p" class="text-sm text-gray-500 italic text-center max-w-md">
           <template #addBold>
             <strong>{{ t("pluginManageSource.emptyAddStrong") }}</strong>
@@ -208,11 +215,15 @@ import { API_ROUTES } from "../config/apiRoutes";
 
 const { t } = useI18n();
 
-// Optional seed from the caller. Plugin context passes the tool
-// result's data; page context passes nothing and we fetch on mount.
-// Reactive — when the prop changes (e.g. plugin user switches to a
-// different tool result) we re-seed local state.
+// Explicit mode — the null-vs-undefined `initialData` heuristic was
+// fragile: a `manageSource` tool result that failed on the server
+// leaves `selectedResult.data === undefined`, which would previously
+// fall through to page-mode and trigger a live refreshList(), hiding
+// the fact that the tool call failed. An explicit prop keeps plugin
+// context (seed-driven, no mount fetch) and page context (mount
+// fetch + loading gate) visibly distinct. See PR #676 review.
 const props = defineProps<{
+  mode: "page" | "plugin";
   initialData?: ManageSourceData | null;
 }>();
 
@@ -224,6 +235,11 @@ const actionError = ref(false);
 // Tracks the current button-driven request: "rebuild", "add", or a
 // slug (Remove). Used to disable/relabel the matching button.
 const busy = ref<string | null>(null);
+// Page-mode initial-fetch gate. Prevents the user from pressing
+// Add / presets / Rebuild before `GET /api/sources` resolves —
+// otherwise `installPreset()` checks `sources.value` against an
+// empty set and re-POSTs slugs the server already has.
+const initialLoading = ref(props.mode === "page");
 
 // --- Add source form state ---------------------------------------------
 
@@ -305,23 +321,31 @@ interface RegisterPayload {
   fetcherParams: Record<string, string>;
 }
 
-function buildRegisterPayload(input: DraftState): RegisterPayload | string {
+// Error returns are i18n keys (not literal strings) so commitAdd
+// can resolve them with t() at the call site — keeps
+// SourcesManager's validation pure and the error messages
+// translatable across all 8 locales.
+interface BuildError {
+  errorKey: string;
+}
+
+function buildRegisterPayload(input: DraftState): RegisterPayload | BuildError {
   const primary = input.primary.trim();
   const title = input.title.trim();
-  if (!primary) return "Please fill in the URL / query field.";
+  if (!primary) return { errorKey: "pluginManageSource.errPrimaryRequired" };
   switch (input.kind) {
     case "rss": {
       if (!/^https?:\/\//i.test(primary)) {
-        return "RSS feed URL must start with http:// or https://";
+        return { errorKey: "pluginManageSource.errRssUrlProtocol" };
       }
       let hostname: string;
       try {
         hostname = new URL(primary).hostname;
       } catch {
-        return "RSS feed URL is not a valid URL.";
+        return { errorKey: "pluginManageSource.errRssUrlInvalid" };
       }
       if (!hostname) {
-        return "RSS feed URL must include a host.";
+        return { errorKey: "pluginManageSource.errRssUrlHost" };
       }
       return {
         title: title || hostname,
@@ -334,7 +358,7 @@ function buildRegisterPayload(input: DraftState): RegisterPayload | string {
     case "github-issues": {
       const slug = parseRepoSlug(primary);
       if (!slug) {
-        return "Enter a GitHub repo URL (https://github.com/owner/repo) or owner/repo.";
+        return { errorKey: "pluginManageSource.errGithubInvalid" };
       }
       return {
         title: title || slug,
@@ -353,13 +377,13 @@ function buildRegisterPayload(input: DraftState): RegisterPayload | string {
       };
     }
   }
-  return "Unsupported fetcher kind.";
+  return { errorKey: "pluginManageSource.errUnsupportedKind" };
 }
 
 async function commitAdd(): Promise<void> {
   const payload = buildRegisterPayload(draft.value);
-  if (typeof payload === "string") {
-    draftError.value = payload;
+  if ("errorKey" in payload) {
+    draftError.value = t(payload.errorKey);
     return;
   }
   draftError.value = "";
@@ -479,10 +503,11 @@ async function installPreset(preset: Preset): Promise<void> {
       failures.push(`${entry.slug}: ${response.error}`);
     }
   }
+  const okCount = toRegister.length - failures.length;
   if (failures.length > 0) {
     flash(
       t("pluginManageSource.flashPresetPartial", {
-        ok: toRegister.length - failures.length,
+        ok: okCount,
         total: toRegister.length,
         errors: failures.join("; "),
       }),
@@ -491,8 +516,13 @@ async function installPreset(preset: Preset): Promise<void> {
   } else {
     flash(t("pluginManageSource.flashPresetRegistered", toRegister.length, { named: { count: toRegister.length, label: preset.label } }));
   }
+  // Skip the rebuild round-trip when nothing was actually registered
+  // (every attempt failed) — refreshList is still useful to pick up
+  // any server-side changes from before this click.
   await refreshList();
-  await rebuildInline();
+  if (okCount > 0) {
+    await rebuildInline();
+  }
   busy.value = null;
 }
 
@@ -514,8 +544,14 @@ const sources = computed<Source[]>(() => localSources.value ?? []);
 const highlightSlug = computed(() => highlightSlugLocal.value);
 
 // Re-seed local state when the plugin caller switches to a different
-// tool result (initialData identity changes). Guards against stale
-// in-View state clobbering the fresher prop.
+// tool result (initialData identity changes). Plugin-only — page mode
+// has no seed and shouldn't react to identity changes on null.
+//
+// A `null` or absent `next` here means "no newer seed" (e.g. the
+// plugin caller passed a failed tool result with no data). We
+// intentionally keep the existing local mirror rather than clearing
+// it — clearing would flash an empty list for a tool result that
+// just happens to lack a `.data` field.
 watch(
   () => props.initialData,
   (next) => {
@@ -686,13 +722,19 @@ const briefHtml = computed(() => {
 });
 
 // Load on mount:
-//   - No seed (page context): fetch the source list via API first,
-//     then load brief for today or the seeded rebuild date.
-//   - With seed (plugin context): skip the list fetch; the seed is
-//     authoritative until the user clicks Rebuild/Remove/Add.
+//   - page mode: fetch the source list via API first (with loading
+//     gate so preset/add can't race an empty local state), then load
+//     the brief for today.
+//   - plugin mode: skip the list fetch — the tool-result seed (even
+//     when .data is absent due to a failure) is authoritative until
+//     the user clicks Rebuild/Remove/Add.
 onMounted(async () => {
-  if (!props.initialData) {
-    await refreshList();
+  if (props.mode === "page") {
+    try {
+      await refreshList();
+    } finally {
+      initialLoading.value = false;
+    }
   }
   const initial = lastRebuild.value?.isoDate ?? todayIsoDate();
   loadBrief(initial);

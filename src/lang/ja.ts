@@ -389,6 +389,13 @@ const jaMessages = {
     flashPresetAlreadyRegistered: "「{label}」のソースはすべて登録済みです。",
     flashPresetRegistered: "「{label}」から {count} 件のソースを登録しました。取得中…",
     flashPresetPartial: "登録 {ok}/{total} 件。エラー: {errors}",
+    errPrimaryRequired: "URL / クエリを入力してください。",
+    errRssUrlProtocol: "RSS フィード URL は http:// または https:// で始めてください。",
+    errRssUrlInvalid: "RSS フィード URL が有効な URL ではありません。",
+    errRssUrlHost: "RSS フィード URL にはホスト名が必要です。",
+    errGithubInvalid: "GitHub リポジトリの URL (https://github.com/owner/repo) または owner/repo を入力してください。",
+    errUnsupportedKind: "未対応の fetcher 種別です。",
+    initialLoading: "ソース一覧を読み込み中…",
   },
   pluginManageSkills: {
     deleteProjectSkill: "このプロジェクト限定スキルを削除",
