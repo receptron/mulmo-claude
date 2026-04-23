@@ -8,7 +8,7 @@ description: Publish the `mulmoclaude` npm package — with dep audit, workspace
 
 1. The package's `dependencies` must cover every `import "…"` in `server/` — the root `package.json` isn't shipped, so implicit inheritance doesn't exist.
 2. `@mulmobridge/*` workspace packages can drift — local `src/` adds exports without a version bump, so `npm install` resolves to an older published `dist/` that's missing them. All dependents fail at runtime.
-3. `prepare-dist.js` runs via `prepublishOnly`, so `npm publish` already invokes it — but you still need `yarn build` first (for `dist/client/`) and `yarn build:packages` if any workspace package was bumped.
+3. `prepare-dist.js` runs via `prepack`, so both `npm pack` and `npm publish` invoke it — but you still need `yarn build` first (for `dist/client/`) and `yarn build:packages` if any workspace package was bumped. (Earlier versions used `prepublishOnly`, which npm 10+ no longer fires on `npm pack`, so the §4 tarball test silently shipped a 4-file stub.)
 
 Run every step; a "ready banner + HTTP 200" in /tmp is the go/no-go.
 

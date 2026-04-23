@@ -75,23 +75,6 @@ jobs:
       - name: Build client
         run: yarn build
 
-      # Debug aid: before running the full smoke, pack the tarball
-      # and list the files we care about. Lets us confirm from the
-      # CI log whether `prepare-dist.js` actually copied everything
-      # — the remote log yesterday showed port.mjs missing despite
-      # it being present locally. Delete this step once the smoke
-      # has been green for a week.
-      - name: Dry-run tarball content check
-        working-directory: packages/mulmoclaude
-        run: |
-          rm -f mulmoclaude-*.tgz
-          npm pack 2>&1 | tail -5
-          echo "--- tarball contents (filtered) ---"
-          tar tzf mulmoclaude-*.tgz | grep -E "port|\.mjs|\.js$" | head -40
-          echo "--- server/utils/ in tarball ---"
-          tar tzf mulmoclaude-*.tgz | grep "server/utils/" | head -20
-          rm -f mulmoclaude-*.tgz
-
       - name: Run publish smoke
         run: node scripts/mulmoclaude/smoke.mjs
 

@@ -7,7 +7,7 @@
     "mulmoclaude": "bin/mulmoclaude.js"
   },
   "scripts": {
-    "prepublishOnly": "node bin/prepare-dist.js",
+    "prepack": "node bin/prepare-dist.js",
     "typecheck": "echo \"mulmoclaude: no typecheck (launcher is plain JS; server and src are dist artifacts)\"",
     "test": "echo no tests yet"
   },
