@@ -91,6 +91,7 @@ export const ROLES: Role[] = [
       "Create a 5-slide presentation on the current state of AI in business.",
       "Fetch AAPL's revenue and net profit for the last several quarters and visualize the trends using D3.js.",
       "Fetch NVDA's latest financial data and present it as a modern financial infographic with a left-to-right Sankey diagram using D3.js.",
+      "Get the weekly closing prices of the Magnificent 7 stocks for the last five years, and multiply each by the number of shares outstanding to compute the market cap. Then plot them on a single graph so we can compare their market caps over time.",
       "Perform relevant search on X about OpenAI and Anthropic, pick top ten interesting topics from them and show the list to me. Then, create a presentation about each article, one by one.",
     ],
   },
