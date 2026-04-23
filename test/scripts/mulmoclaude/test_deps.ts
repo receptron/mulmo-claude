@@ -77,6 +77,29 @@ describe("extractBareImports", () => {
     assert.equal(deps.extractBareImports("export const x = 1;\n").size, 0);
     assert.equal(deps.extractBareImports("").size, 0);
   });
+
+  it("detects dynamic import() with literal specifier", () => {
+    const source = `
+      async function load() {
+        const mod = await import("dynamic-pkg");
+        const other = import("@scope/dyn");
+        return [mod, other];
+      }
+    `;
+    const found = [...deps.extractBareImports(source)].sort();
+    assert.deepEqual(found, ["@scope/dyn", "dynamic-pkg"]);
+  });
+
+  it("ignores dynamic import() with variable specifier", () => {
+    // Audit can't resolve runtime values — by design, \`import(var)\`
+    // is invisible to the regex and left for the operator to flag
+    // manually if the var happens to name an undeclared package.
+    const source = `
+      const name = "dynamic-pkg";
+      const mod = await import(name);
+    `;
+    assert.equal(deps.extractBareImports(source).size, 0);
+  });
 });
 
 describe("packageRoot", () => {

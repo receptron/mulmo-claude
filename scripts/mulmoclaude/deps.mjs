@@ -9,54 +9,18 @@
 // in the tree and it can be unit-tested from node:test.
 
 import { readFile, readdir } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Node built-ins we must never flag as "missing dep". The `node:`
-// prefix form is handled separately — anything starting with it is
-// a built-in by definition. This set covers the bare-identifier
-// forms (e.g. `import fs from "fs"`) that legacy code still uses.
-const NODE_BUILTINS = new Set([
-  "assert",
-  "buffer",
-  "child_process",
-  "cluster",
-  "console",
-  "constants",
-  "crypto",
-  "dgram",
-  "dns",
-  "domain",
-  "events",
-  "fs",
-  "http",
-  "http2",
-  "https",
-  "module",
-  "net",
-  "os",
-  "path",
-  "perf_hooks",
-  "process",
-  "punycode",
-  "querystring",
-  "readline",
-  "repl",
-  "stream",
-  "string_decoder",
-  "sys",
-  "timers",
-  "tls",
-  "trace_events",
-  "tty",
-  "url",
-  "util",
-  "v8",
-  "vm",
-  "wasi",
-  "worker_threads",
-  "zlib",
-]);
+// Node built-ins we must never flag as "missing dep". `node:module`
+// publishes the authoritative list for whatever Node version we're
+// running under — using it (vs. a hand-maintained set) means new
+// built-ins like `async_hooks`, `diagnostics_channel`, `inspector`
+// are covered without a follow-up PR. The `node:` prefix form is
+// handled separately — anything starting with `node:` is a built-in
+// by definition.
+const NODE_BUILTINS = new Set(builtinModules);
 
 // Returns true for `"fs"`, `"node:fs"`, `"fs/promises"`, `"node:fs/promises"`.
 export function isNodeBuiltin(specifier) {
@@ -115,6 +79,11 @@ const IMPORT_PATTERNS = [
   /^\s*(?:import|export)(?:\s+type)?\s+(?:\w+\s*,\s*)?\{[\s\S]*?\}\s*from\s+['"]([^'"]+)['"]/gm,
   // Side-effect `import "pkg"` — no binding before the specifier.
   /^\s*import\s+['"]([^'"]+)['"]/gm,
+  // Dynamic `import("pkg")` / `await import("pkg")`. Literal
+  // specifiers only — `import(someVar)` is unanalysable and the
+  // audit intentionally doesn't try to guess. Anchored to word
+  // boundaries on `import` so it doesn't match `reimport("...")`.
+  /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
 ];
 
 export function extractBareImports(source) {
@@ -139,8 +108,14 @@ export async function walkTsFiles(dir) {
     let entries;
     try {
       entries = await readdir(current, { withFileTypes: true });
-    } catch {
-      return; // non-existent directory — treat as empty so callers can preflight.
+    } catch (err) {
+      // Only swallow "directory isn't there" — callers preflight
+      // against a fresh clone where /server may not yet exist.
+      // Permission errors, ENOTDIR, transient IO failures etc.
+      // must bubble up so the audit fails loud instead of passing
+      // silently on an empty scan.
+      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") return;
+      throw err;
     }
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
@@ -183,7 +158,14 @@ export async function auditServerDeps({ root = process.cwd(), serverDir, package
   const resolvedPkg = packageJsonPath ?? path.join(root, "packages", "mulmoclaude", "package.json");
   const pkgRaw = await readFile(resolvedPkg, "utf8");
   const pkg = JSON.parse(pkgRaw);
-  const declared = new Set(Object.keys(pkg.dependencies ?? {}));
+  // optionalDependencies satisfies a dynamic import with try/catch
+  // (native modules that may fail to build). peerDependencies are
+  // legitimate too when the consumer is expected to supply them.
+  const declared = new Set([
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.optionalDependencies ?? {}),
+    ...Object.keys(pkg.peerDependencies ?? {}),
+  ]);
   const imports = await collectBareImports(resolvedServer);
   return [...imports].filter((name) => !declared.has(name) && !isNodeBuiltin(name)).sort();
 }
