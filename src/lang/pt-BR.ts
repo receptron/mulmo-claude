@@ -333,6 +333,9 @@ const ptBRMessages = {
     previewMore: "+ {count} mais…",
     chatPlaceholder: "Pergunte sobre esta página…",
     chatSend: "Iniciar um novo chat sobre esta página",
+    tagFilterAll: "Todas",
+    noMatches: "Nenhuma página com a tag #{tag}",
+    lintChat: "Revisar meu wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "Salvar como PDF (abre o diálogo de impressão)",

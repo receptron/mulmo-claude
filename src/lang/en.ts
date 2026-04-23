@@ -354,6 +354,9 @@ const enMessages = {
     previewMore: "+ {count} more…",
     chatPlaceholder: "Ask about this page…",
     chatSend: "Start a new chat about this page",
+    tagFilterAll: "All",
+    noMatches: "No pages tagged #{tag}",
+    lintChat: "Lint My Wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "Save as PDF (opens print dialog)",

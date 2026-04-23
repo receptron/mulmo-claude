@@ -335,6 +335,9 @@ const zhMessages = {
     previewMore: "+ 还有 {count} 项…",
     chatPlaceholder: "就本页提问…",
     chatSend: "就本页开启新对话",
+    tagFilterAll: "全部",
+    noMatches: "没有带 #{tag} 标签的页面",
+    lintChat: "检查 Wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "另存为 PDF(打开打印对话框)",

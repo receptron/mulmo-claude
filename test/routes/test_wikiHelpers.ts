@@ -1,15 +1,20 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildTableColumnMap,
+  extractHashTags,
   extractSlugFromBulletHref,
   findBrokenLinksInPage,
   findMissingFiles,
   findOrphanPages,
+  findTagDrift,
   formatLintReport,
   parseIndexEntries,
+  parseTagsCell,
   wikiSlugify,
   type WikiPageEntry,
 } from "../../server/api/routes/wiki.js";
+import { parseFrontmatterTags } from "../../server/api/routes/wiki/frontmatter.js";
 
 describe("wikiSlugify", () => {
   it("lowercases input", () => {
@@ -97,6 +102,7 @@ describe("parseIndexEntries", () => {
       slug: "video-gen",
       title: "Video Gen",
       description: "Notes about video",
+      tags: [],
     });
   });
 
@@ -113,6 +119,7 @@ describe("parseIndexEntries", () => {
       title: "Video Generation",
       slug: "video-generation",
       description: "about video",
+      tags: [],
     });
   });
 
@@ -127,6 +134,7 @@ describe("parseIndexEntries", () => {
       title: "さくらインターネット",
       slug: "sakura-internet",
       description: "クラウド事業者",
+      tags: [],
     });
   });
 
@@ -161,7 +169,48 @@ describe("parseIndexEntries", () => {
       title: "Video Generation",
       slug: "video-generation",
       description: "about video",
+      tags: [],
     });
+  });
+
+  it("parses a Tags column in the table header", () => {
+    const markdown = [
+      "| Slug | Title | Summary | Tags | Updated |",
+      "|------|-------|---------|------|---------|",
+      "| `foo` | Foo | summary text | ai, research, paper | 2026-04-05 |",
+    ].join("\n");
+    const entries = parseIndexEntries(markdown);
+    assert.deepEqual(entries[0]?.tags, ["ai", "paper", "research"]);
+    assert.equal(entries[0]?.description, "summary text");
+  });
+
+  it("keeps legacy 4-column tables working when Tags header is absent", () => {
+    // Regression: the pre-tags workspace index.md uses
+    // | Slug | Title | Summary | Updated | — tags must default to [].
+    const markdown = ["| Slug | Title | Summary | Updated |", "|------|-------|---------|---------|", "| `foo` | Foo | summary | 2026-04-05 |"].join("\n");
+    const entries = parseIndexEntries(markdown);
+    assert.deepEqual(entries[0]?.tags, []);
+    assert.equal(entries[0]?.description, "summary");
+  });
+
+  it("is case- and whitespace-tolerant for the Tags header name", () => {
+    const markdown = ["| slug |  TAGS  | title |", "|------|--------|-------|", "| foo | a, b | Foo |"].join("\n");
+    const entries = parseIndexEntries(markdown);
+    assert.deepEqual(entries[0]?.tags, ["a", "b"]);
+  });
+
+  it("extracts #tag tokens from bullet descriptions", () => {
+    const markdown = "- [Transformer](pages/transformer.md) — foundational #ml #attention (2026-04-05)";
+    const entries = parseIndexEntries(markdown);
+    assert.deepEqual(entries[0]?.tags, ["attention", "ml"]);
+    assert.match(entries[0]?.description ?? "", /foundational/);
+    assert.doesNotMatch(entries[0]?.description ?? "", /#ml|#attention/);
+  });
+
+  it("extracts #tag tokens from bullet wiki links", () => {
+    const entries = parseIndexEntries("- [[Topic A]] — short #foo #bar");
+    assert.deepEqual(entries[0]?.tags, ["bar", "foo"]);
+    assert.equal(entries[0]?.description, "short");
   });
 
   it("treats em-dash, en-dash, and hyphen as the same description separator", () => {
@@ -217,7 +266,7 @@ describe("findOrphanPages", () => {
 
 describe("findMissingFiles", () => {
   function entry(slug: string): WikiPageEntry {
-    return { slug, title: slug, description: "" };
+    return { slug, title: slug, description: "", tags: [] };
   }
 
   it("returns no issues when every indexed entry has a file", () => {
@@ -285,5 +334,184 @@ describe("formatLintReport", () => {
     assert.match(out, /- one/);
     assert.match(out, /- two/);
     assert.match(out, /- three/);
+  });
+});
+
+describe("extractHashTags", () => {
+  it("extracts sorted, deduped, lowercased tags and strips them from the description", () => {
+    const out = extractHashTags("notes #ML #attention");
+    assert.deepEqual(out.tags, ["attention", "ml"]);
+    assert.equal(out.description, "notes");
+  });
+
+  it("returns an empty tag list when no # tokens are present", () => {
+    const out = extractHashTags("just a plain description");
+    assert.deepEqual(out.tags, []);
+    assert.equal(out.description, "just a plain description");
+  });
+
+  it("dedupes repeated tags", () => {
+    assert.deepEqual(extractHashTags("#a #a #b").tags, ["a", "b"]);
+  });
+
+  it("accepts hyphens inside tag names", () => {
+    assert.deepEqual(extractHashTags("#ai-agents #ml-arch").tags, ["ai-agents", "ml-arch"]);
+  });
+
+  it("does not match hashes that aren't at a word boundary", () => {
+    // `foo#bar` is a URL fragment / anchor, not a tag — leave it
+    // alone so we don't corrupt descriptions that link out.
+    const out = extractHashTags("see page#frag for details");
+    assert.deepEqual(out.tags, []);
+    assert.equal(out.description, "see page#frag for details");
+  });
+
+  it("collapses internal whitespace left over after stripping tags", () => {
+    const out = extractHashTags("foo  #a   bar  #b");
+    assert.deepEqual(out.tags, ["a", "b"]);
+    assert.equal(out.description, "foo bar");
+  });
+
+  it("accepts non-ASCII tag names (Japanese, CJK, etc.)", () => {
+    const out = extractHashTags("日本のクラウド事業者 #クラウド #日本企業 #データセンター");
+    assert.deepEqual(out.tags, ["クラウド", "データセンター", "日本企業"]);
+    assert.equal(out.description, "日本のクラウド事業者");
+  });
+
+  it("accepts mixed ASCII + non-ASCII tags", () => {
+    const out = extractHashTags("notes #ai-エージェント #foo");
+    assert.deepEqual(out.tags, ["ai-エージェント", "foo"]);
+  });
+});
+
+describe("parseTagsCell", () => {
+  it("splits on commas and whitespace", () => {
+    assert.deepEqual(parseTagsCell("a, b  c"), ["a", "b", "c"]);
+  });
+
+  it("strips leading # and lowercases", () => {
+    assert.deepEqual(parseTagsCell("#A,#b"), ["a", "b"]);
+  });
+
+  it("dedupes and sorts", () => {
+    assert.deepEqual(parseTagsCell("z, a, a, m"), ["a", "m", "z"]);
+  });
+
+  it("returns an empty list for an empty cell", () => {
+    assert.deepEqual(parseTagsCell(""), []);
+    assert.deepEqual(parseTagsCell("   "), []);
+  });
+});
+
+describe("buildTableColumnMap", () => {
+  it("builds a lowercase-keyed map from a header row", () => {
+    const map = buildTableColumnMap("| Slug | Title | Summary | Tags | Updated |");
+    assert.equal(map.get("slug"), 0);
+    assert.equal(map.get("title"), 1);
+    assert.equal(map.get("summary"), 2);
+    assert.equal(map.get("tags"), 3);
+    assert.equal(map.get("updated"), 4);
+  });
+
+  it("is whitespace-tolerant", () => {
+    const map = buildTableColumnMap("|  slug  |   tags   |");
+    assert.equal(map.get("slug"), 0);
+    assert.equal(map.get("tags"), 1);
+  });
+
+  it("omits empty columns from the map", () => {
+    const map = buildTableColumnMap("| slug | | tags |");
+    assert.equal(map.get("slug"), 0);
+    assert.equal(map.get("tags"), 2);
+    assert.equal(map.size, 2);
+  });
+
+  it("strips surrounding backticks from header cells", () => {
+    // Mirror parseTableRow's data-cell normaliser so a backticked
+    // header like `| `tags` |` still resolves via columnMap.get("tags").
+    const map = buildTableColumnMap("| `slug` | `tags` |");
+    assert.equal(map.get("slug"), 0);
+    assert.equal(map.get("tags"), 1);
+  });
+});
+
+describe("parseFrontmatterTags", () => {
+  it("parses flow-style tags", () => {
+    const content = "---\ntitle: X\ntags: [a, b, c]\n---\n\n# body";
+    assert.deepEqual(parseFrontmatterTags(content), ["a", "b", "c"]);
+  });
+
+  it("parses block-style tags", () => {
+    const content = "---\ntitle: X\ntags:\n  - foo\n  - bar\n---\n\n# body";
+    assert.deepEqual(parseFrontmatterTags(content), ["foo", "bar"]);
+  });
+
+  it("lowercases and strips quotes + leading #", () => {
+    const content = '---\ntags: ["#AI", "Research-Paper"]\n---';
+    assert.deepEqual(parseFrontmatterTags(content), ["ai", "research-paper"]);
+  });
+
+  it("returns [] when frontmatter is missing", () => {
+    assert.deepEqual(parseFrontmatterTags("# just markdown"), []);
+  });
+
+  it("returns [] when the tags field is absent", () => {
+    assert.deepEqual(parseFrontmatterTags("---\ntitle: X\n---"), []);
+  });
+
+  it("returns [] for malformed frontmatter", () => {
+    // Frontmatter block never closes — treated as no frontmatter.
+    assert.deepEqual(parseFrontmatterTags("---\ntitle: X\n"), []);
+  });
+
+  it("stops at the next top-level key when reading a block list", () => {
+    const content = "---\ntags:\n  - a\n  - b\nother: value\n---";
+    assert.deepEqual(parseFrontmatterTags(content), ["a", "b"]);
+  });
+});
+
+describe("findTagDrift", () => {
+  function entry(slug: string, tags: string[]): WikiPageEntry {
+    return { slug, title: slug, description: "", tags };
+  }
+
+  it("returns no issues when index and frontmatter tags match as sets", () => {
+    const entries = [entry("foo", ["a", "b"])];
+    const frontmatter = new Map<string, string[]>([["foo", ["b", "a"]]]);
+    assert.deepEqual(findTagDrift(entries, frontmatter), []);
+  });
+
+  it("flags slugs whose tag sets differ", () => {
+    const entries = [entry("foo", ["a", "b"])];
+    const frontmatter = new Map<string, string[]>([["foo", ["a", "b", "c"]]]);
+    const issues = findTagDrift(entries, frontmatter);
+    assert.equal(issues.length, 1);
+    assert.match(issues[0], /Tag drift.*foo\.md/);
+    assert.match(issues[0], /\[a, b, c\]/);
+    assert.match(issues[0], /\[a, b\]/);
+  });
+
+  it("flags empty index tags against non-empty frontmatter", () => {
+    const entries = [entry("foo", [])];
+    const frontmatter = new Map<string, string[]>([["foo", ["a"]]]);
+    assert.equal(findTagDrift(entries, frontmatter).length, 1);
+  });
+
+  it("ignores slugs missing from the frontmatter map (covered by findMissingFiles)", () => {
+    const entries = [entry("foo", ["a"])];
+    const frontmatter = new Map<string, string[]>();
+    assert.deepEqual(findTagDrift(entries, frontmatter), []);
+  });
+
+  it("lowercases the lookup so mixed-case filenames still match", () => {
+    // collectLintIssues lowercases the map keys. Here the entry's
+    // slug is kept mixed-case (as a parser could produce from a
+    // `MyPage.md` filename before normalization), while the
+    // frontmatter map uses the canonical lowercase key. The test
+    // fails if findTagDrift stops calling `.toLowerCase()` on
+    // `entry.slug` before the lookup.
+    const entries = [entry("MyPage", ["a"])];
+    const frontmatter = new Map<string, string[]>([["mypage", ["a", "b"]]]);
+    assert.equal(findTagDrift(entries, frontmatter).length, 1);
   });
 });

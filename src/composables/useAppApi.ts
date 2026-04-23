@@ -21,12 +21,15 @@ export interface AppApi {
   /** Send a chat message through App.vue's normal sendMessage pipeline. */
   sendMessage: (message: string) => void;
   /**
-   * Open a fresh chat session (using the currently selected role) and
-   * send `message` as its first turn. Used by plugin views that want
-   * to kick off a new conversation instead of threading into whatever
-   * session happens to be active.
+   * Open a fresh chat session and send `message` as its first turn.
+   * Used by plugin views that want to kick off a new conversation
+   * instead of threading into whatever session happens to be active.
+   * Pass `roleId` to override the role for this one session (e.g. a
+   * wiki lint needs the General role even if the user is currently
+   * viewing the wiki under a different role); omit it to inherit the
+   * currently selected role.
    */
-  startNewChat: (message: string) => void;
+  startNewChat: (message: string, roleId?: string) => void;
   /** Navigate to a workspace-internal link (wiki page, file, session). */
   navigateToWorkspacePath: (href: string) => void;
 }

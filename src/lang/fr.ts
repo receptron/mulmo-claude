@@ -334,6 +334,9 @@ const frMessages = {
     previewMore: "+ {count} de plus…",
     chatPlaceholder: "Posez une question sur cette page…",
     chatSend: "Démarrer une nouvelle conversation sur cette page",
+    tagFilterAll: "Toutes",
+    noMatches: "Aucune page avec le tag #{tag}",
+    lintChat: "Vérifier mon wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "Enregistrer en PDF (ouvre la boîte de dialogue d'impression)",

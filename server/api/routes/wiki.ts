@@ -3,6 +3,7 @@ import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { readTextSafeSync, readTextSafe } from "../../utils/files/safe.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
+import { parseFrontmatterTags } from "./wiki/frontmatter.js";
 import { badRequest } from "../../utils/httpError.js";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -21,6 +22,7 @@ export interface WikiPageEntry {
   title: string;
   slug: string;
   description: string;
+  tags: string[];
 }
 
 // Slug rules: lowercase, spaces to hyphens, strip everything that
@@ -40,20 +42,81 @@ const TABLE_SEPARATOR_PATTERN = /^\|[\s|:-]+\|$/;
 // where `wikiSlugify` returns "" and the slug would otherwise be lost.
 const BULLET_LINK_PATTERN = /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
 const BULLET_WIKI_LINK_PATTERN = /^[-*]\s+\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?/;
+// Unicode-aware tag body: any letter or number in any script
+// (so Japanese / Chinese / Korean tags like `#クラウド` or `#可視化`
+// work), plus `-` and `_` as internal joiners. First char is a
+// letter or number only — no leading punctuation.
+const HASHTAG_PATTERN = /(?:^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]*)/gu;
+
+// Extract `#tag` tokens from a bullet description, returning the
+// stripped description and a sorted, deduped, lowercased tag list.
+// Only matches at word boundaries so mid-word `#` (e.g. anchor URLs)
+// is left alone.
+export function extractHashTags(text: string): { description: string; tags: string[] } {
+  const tags: string[] = [];
+  HASHTAG_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = HASHTAG_PATTERN.exec(text)) !== null) {
+    tags.push(match[1].toLowerCase());
+  }
+  const description = text.replace(HASHTAG_PATTERN, "").replace(/\s+/g, " ").trim();
+  const deduped = [...new Set(tags)].sort();
+  return { description, tags: deduped };
+}
+
+// Split a table Tags cell — tolerates comma, whitespace, or `#`
+// prefixes. Empty cell yields an empty list.
+export function parseTagsCell(cell: string): string[] {
+  const tokens = cell
+    .split(/[,\s]+/)
+    .map((token) => token.trim().replace(/^#/, "").toLowerCase())
+    .filter((token) => token.length > 0);
+  return [...new Set(tokens)].sort();
+}
+
+// Map header cell names → column indices, case- and whitespace-
+// tolerant. Used by `parseTableRow` to locate the Tags column (and
+// any other named column) without assuming a fixed position, so
+// older 3- and 4-column tables keep working.
+export function buildTableColumnMap(headerRow: string): Map<string, number> {
+  const cells = headerRow
+    .split("|")
+    .slice(1, -1)
+    // Mirror `parseTableRow`'s cell-normalising: strip the surrounding
+    // backticks that commonly wrap cell values in wiki tables. Without
+    // this, a `| \`tags\` |` header maps to the key "`tags`" and the
+    // subsequent `columnMap.get("tags")` lookup silently misses the
+    // column, falling back to `tags: []`.
+    .map((cell) => cell.trim().replace(/^`|`$/g, "").toLowerCase());
+  const map = new Map<string, number>();
+  cells.forEach((cell, i) => {
+    if (cell) map.set(cell, i);
+  });
+  return map;
+}
 
 // Each parser returns the entry it produced (if any). The parent
 // loop tries them in order; the first non-null result wins.
-function parseTableRow(trimmed: string): WikiPageEntry | null {
+function parseTableRow(trimmed: string, columnMap: Map<string, number> | null): WikiPageEntry | null {
   const cols = trimmed
     .split("|")
     .slice(1, -1)
     .map((column) => column.trim().replace(/^`|`$/g, ""));
   if (cols.length < 2) return null;
-  const slug = cols[0];
-  const title = cols[1] || slug;
-  const desc = cols[2] ?? "";
+  const slugIdx = columnMap?.get("slug") ?? 0;
+  const titleIdx = columnMap?.get("title") ?? 1;
+  // Accept either "summary" (the canonical column name in
+  // server/workspace/helps/wiki.md) or "description" (used by the
+  // existing unit test fixture). Fall back to column 2 when the
+  // table has no header map.
+  const summaryIdx = columnMap?.get("summary") ?? columnMap?.get("description") ?? 2;
+  const tagsIdx = columnMap?.get("tags");
+  const slug = cols[slugIdx] ?? "";
+  const title = cols[titleIdx] || slug;
+  const description = cols[summaryIdx] ?? "";
+  const tags = tagsIdx !== undefined ? parseTagsCell(cols[tagsIdx] ?? "") : [];
   if (!slug || !title) return null;
-  return { title, slug, description: desc };
+  return { title, slug, description, tags };
 }
 
 // Extract the slug segment from a bullet link's href. Accepts the
@@ -75,21 +138,23 @@ function parseBulletLinkRow(trimmed: string): WikiPageEntry | null {
   if (!match) return null;
   const title = match[1].trim();
   const href = match[2] ?? "";
-  const desc = match[3]?.trim() ?? "";
+  const raw = match[3]?.trim() ?? "";
+  const { description, tags } = extractHashTags(raw);
   // Prefer the slug embedded in the href so non-ASCII titles keep
   // a navigable slug. Fall back to slugifying the title only when
   // the href has no recognisable slug (rare — usually means the
   // author put an external URL here).
   const slug = extractSlugFromBulletHref(href) || wikiSlugify(title);
-  return { title, slug, description: desc };
+  return { title, slug, description, tags };
 }
 
 function parseBulletWikiLinkRow(trimmed: string): WikiPageEntry | null {
   const match = BULLET_WIKI_LINK_PATTERN.exec(trimmed);
   if (!match) return null;
   const title = match[1].trim();
-  const desc = match[2]?.trim() ?? "";
-  return { title, slug: wikiSlugify(title), description: desc };
+  const raw = match[2]?.trim() ?? "";
+  const { description, tags } = extractHashTags(raw);
+  return { title, slug: wikiSlugify(title), description, tags };
 }
 
 // Parse entries from index.md — supports three formats:
@@ -99,23 +164,31 @@ function parseBulletWikiLinkRow(trimmed: string): WikiPageEntry | null {
 export function parseIndexEntries(content: string): WikiPageEntry[] {
   const entries: WikiPageEntry[] = [];
   let inTable = false;
+  let columnMap: Map<string, number> | null = null;
 
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
 
     if (trimmed.startsWith("|")) {
-      // Header / separator rows just toggle the in-table flag and
-      // produce no entry.
-      if (TABLE_SEPARATOR_PATTERN.test(trimmed) || !inTable) {
+      if (TABLE_SEPARATOR_PATTERN.test(trimmed)) {
         inTable = true;
         continue;
       }
-      const entry = parseTableRow(trimmed);
+      if (!inTable) {
+        // First `|`-line before the separator is the header. Capture
+        // the column map so parseTableRow can locate the Tags
+        // column (if any) by name rather than position.
+        columnMap = buildTableColumnMap(trimmed);
+        inTable = true;
+        continue;
+      }
+      const entry = parseTableRow(trimmed, columnMap);
       if (entry) entries.push(entry);
       continue;
     }
 
     inTable = false;
+    columnMap = null;
 
     const bullet = parseBulletLinkRow(trimmed) ?? parseBulletWikiLinkRow(trimmed);
     if (bullet) entries.push(bullet);
@@ -300,6 +373,33 @@ export function findBrokenLinksInPage(fileName: string, content: string, fileSlu
   return issues;
 }
 
+function formatTagList(tags: readonly string[]): string {
+  return `[${[...tags].sort().join(", ")}]`;
+}
+
+// Flag any slug whose index.md tags differ from the page's own
+// frontmatter `tags:` field. Comparison is set-based and order-
+// insensitive; both sides are lowercased at parse time. Slugs
+// missing from `frontmatterTagsBySlug` are ignored here — the
+// missing file itself is already reported by `findMissingFiles`.
+export function findTagDrift(pageEntries: readonly WikiPageEntry[], frontmatterTagsBySlug: ReadonlyMap<string, readonly string[]>): string[] {
+  const issues: string[] = [];
+  for (const entry of pageEntries) {
+    // Lowercase on lookup — `collectLintIssues` keys the map with
+    // lowercased slugs, so a `MyPage.md` filename still matches an
+    // `entry.slug` of `mypage` produced by `wikiSlugify` on the
+    // wiki-link parser path.
+    const pageTags = frontmatterTagsBySlug.get(entry.slug.toLowerCase());
+    if (pageTags === undefined) continue;
+    const pageSet = new Set(pageTags);
+    const indexSet = new Set(entry.tags);
+    if (pageSet.size !== indexSet.size || [...pageSet].some((tag) => !indexSet.has(tag))) {
+      issues.push(`- **Tag drift**: \`${entry.slug}.md\` frontmatter has ${formatTagList(pageTags)} but index.md has ${formatTagList(entry.tags)}`);
+    }
+  }
+  return issues;
+}
+
 export function formatLintReport(issues: readonly string[]): string {
   if (issues.length === 0) {
     return "# Wiki Lint Report\n\n✓ No issues found. Wiki is healthy.";
@@ -331,9 +431,17 @@ async function collectLintIssues(): Promise<string[]> {
       return content ?? "";
     }),
   );
+  const frontmatterTagsBySlug = new Map<string, string[]>();
   for (let i = 0; i < pageFiles.length; i++) {
     issues.push(...findBrokenLinksInPage(pageFiles[i], contents[i], fileSlugs));
+    // Lowercase the map key so a `MyPage.md` filename still matches
+    // an `entry.slug` of `mypage` produced by `wikiSlugify` on the
+    // wiki-link parser path. `findTagDrift` lowercases the lookup
+    // side to match.
+    const slug = pageFiles[i].replace(/\.md$/i, "").toLowerCase();
+    frontmatterTagsBySlug.set(slug, parseFrontmatterTags(contents[i]));
   }
+  issues.push(...findTagDrift(pageEntries, frontmatterTagsBySlug));
   return issues;
 }
 

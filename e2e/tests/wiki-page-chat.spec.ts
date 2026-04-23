@@ -11,7 +11,7 @@ const INDEX_PAYLOAD = {
   action: "index",
   title: "Wiki Index",
   content: "# Wiki Index\n\nRoot page.",
-  pageEntries: [{ title: "Onboarding", slug: "onboarding", description: "Getting started" }],
+  pageEntries: [{ title: "Onboarding", slug: "onboarding", description: "Getting started", tags: [] }],
 };
 
 const PAGE_ONBOARDING = {
