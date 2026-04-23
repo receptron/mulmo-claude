@@ -57,7 +57,7 @@
            the same handler here via @click.capture so cross-origin
            links in assistant Markdown don't navigate the SPA away. -->
         <div v-if="isTextResponse(result)" class="stack-text-response" @click.capture="handleExternalLinkClick">
-          <TextResponseOriginalView :selected-result="result" />
+          <TextResponseOriginalView :selected-result="result" :compact="true" :stack-actions-target="`stack-actions-${result.uuid}`" />
         </div>
         <!-- Document-like plugins: let the content flow at its natural
            height by overriding the plugin's internal h-full / overflow

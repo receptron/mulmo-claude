@@ -1,6 +1,19 @@
 <template>
   <div class="h-full flex flex-col">
-    <div v-if="isAssistant" class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
+    <!-- Compact mode (stack view): hoist PDF into StackView's
+         per-card action area, suppress own header. -->
+    <Teleport v-if="compact && stackActionsTarget && isAssistant" :to="`#${stackActionsTarget}`">
+      <button
+        class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+        :disabled="pdfDownloading"
+        :title="t('pluginTextResponse.pdf')"
+        @click.stop="downloadPdf"
+      >
+        <span class="material-icons text-sm leading-none">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+        <span>{{ t("pluginTextResponse.pdf") }}</span>
+      </button>
+    </Teleport>
+    <div v-if="!compact && isAssistant" class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
       <div class="button-group">
         <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
           <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
@@ -68,8 +81,14 @@ const props = withDefaults(
     // display text. Callers listen for `updateSource` to receive the
     // edited source and handle persistence themselves.
     editableSource?: string;
+    // Stack view compact contract (#711). When StackView passes
+    // compact=true and a per-card target id, the plugin suppresses
+    // its own header and teleports the PDF button into StackView's
+    // per-card action area.
+    compact?: boolean;
+    stackActionsTarget?: string;
   }>(),
-  { editable: true, editableSource: undefined },
+  { editable: true, editableSource: undefined, compact: false, stackActionsTarget: undefined },
 );
 const emit = defineEmits<{
   updateResult: [result: ToolResult];
