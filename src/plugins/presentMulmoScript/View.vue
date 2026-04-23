@@ -1,7 +1,7 @@
 <template>
   <div class="h-full bg-white flex flex-col overflow-hidden">
     <!-- Header -->
-    <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+    <div class="flex items-start justify-between px-6 py-2.5 border-b border-gray-100 shrink-0">
       <div class="min-w-0 flex-1">
         <h2 class="text-lg font-semibold text-gray-800 truncate">
           {{ script.title || "Untitled Script" }}
@@ -46,7 +46,7 @@
     </div>
 
     <!-- Characters section -->
-    <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-3">
+    <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-2">
       <div class="flex items-center justify-between mb-2">
         <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ t("pluginMulmoScript.characters") }}</span>
         <button

@@ -10,7 +10,7 @@
       <div class="text-gray-500">{{ t("pluginMarkdown.noContent") }}</div>
     </div>
     <template v-else>
-      <div class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
+      <div class="flex justify-end px-4 py-1.5 border-b border-gray-100 shrink-0">
         <div class="button-group">
           <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
             <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>

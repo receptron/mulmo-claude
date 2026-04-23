@@ -1,7 +1,7 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+    <div class="flex items-center justify-between px-6 py-2.5 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-3">
         <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" :title="t('pluginWiki.backToIndex')" @click="router.back()">
           <span class="material-icons text-base">arrow_back</span>
@@ -74,7 +74,7 @@
 
     <!-- Index: tag filter + page card list -->
     <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 flex flex-col overflow-hidden">
-      <div v-if="allTags.length > 0 || selectedTag !== null" class="shrink-0 border-b border-gray-100 px-4 py-2 flex flex-wrap gap-1">
+      <div v-if="allTags.length > 0 || selectedTag !== null" class="shrink-0 border-b border-gray-100 px-4 py-1.5 flex flex-wrap gap-1">
         <button
           :class="['tag-chip', selectedTag === null ? 'tag-chip-active' : 'tag-chip-inactive']"
           data-testid="wiki-tag-filter-all"

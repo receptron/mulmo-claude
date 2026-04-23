@@ -2,16 +2,16 @@
   <div class="h-full bg-white flex flex-col">
     <!-- API error banner — surfaces POST /api/todos failures so a
          silent add/remove/toggle becomes diagnosable. -->
-    <div v-if="todoApiError" class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700" role="alert" data-testid="todo-api-error">
+    <div v-if="todoApiError" class="px-4 py-1.5 bg-red-50 border-b border-red-200 text-sm text-red-700" role="alert" data-testid="todo-api-error">
       {{ t("pluginTodo.apiError", { error: todoApiError }) }}
     </div>
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center justify-between px-6 py-2.5 border-b border-gray-100">
       <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginTodo.heading") }}</h2>
       <span class="text-sm text-gray-500">{{ t("pluginTodo.completedRatio", { done: completedCount, total: items.length }) }}</span>
     </div>
 
     <!-- Filter bar: only shown when at least one label is in use. -->
-    <div v-if="labelInventory.length > 0" class="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-gray-100 bg-gray-50">
+    <div v-if="labelInventory.length > 0" class="flex flex-wrap items-center gap-1.5 px-6 py-1.5 border-b border-gray-100 bg-gray-50">
       <span class="text-xs text-gray-500 mr-1">{{ t("pluginTodo.filter") }}</span>
       <button
         v-for="entry in labelInventory"
