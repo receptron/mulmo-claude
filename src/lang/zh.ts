@@ -70,6 +70,7 @@ const zhMessages = {
     home: "前往最新对话",
     toolCallHistory: "工具调用历史",
     settings: "设置",
+    settingsGeminiMissing: "设置 — 缺少 Gemini API 密钥",
   },
   rightSidebar: {
     toggleSystemPrompt: "切换系统提示词",
@@ -118,6 +119,7 @@ const zhMessages = {
   settingsModal: {
     title: "设置",
     tabs: {
+      gemini: "Gemini",
       tools: "允许的工具",
       mcp: "MCP 服务器",
       dirs: "目录",
@@ -540,9 +542,6 @@ const zhMessages = {
     formulaType: "公式",
   },
   app: {
-    // `<i18n-t>` 插槽 — 命名为 `envKey` / `envFile`,在 App.vue 中作为
-    // 行内 `<code>` 渲染,因此字面的变量名和文件名保持不翻译。
-    geminiRequired: "图像生成需要 {envKey}。请将它加入 {envFile} 并重启应用。",
     startConversation: "开始对话",
   },
   suggestionsPanel: {
@@ -554,6 +553,19 @@ const zhMessages = {
     // 以便保留 `<code>` 标签的样式,同时文本可本地化。
     explanation:
       "要通过 {allowedTools} 传递给 Claude 的额外工具名。每行一个。适用于在 {claudeMcp} 完成授权后,调用 Claude Code 内置的 MCP 服务器(如 Gmail / Google 日历)。",
+  },
+  settingsGeminiTab: {
+    warningHeading: "{envKey} 尚未配置。",
+    impact:
+      "如果没有 Gemini API 密钥,图像生成、语音合成和视频生成将被禁用。这会影响 Artist 角色、Storyteller 系列角色、MulmoScript 播放,以及 Guide & Planner、Tutor 等角色生成的富文档中的内联图片。",
+    stepsHeading: "如何获取密钥",
+    step1: "打开 {link} 并使用 Google 账号登录。",
+    step1Link: "Google AI Studio",
+    step2: "点击 {createKey}。如有提示,请选择或创建一个 Google Cloud 项目。",
+    step2CreateKey: "Create API key",
+    step3: "复制密钥(以 AIza… 开头),并将它添加到项目根目录下的 {envFile},格式为:",
+    step4: "重启 MulmoClaude,让新的环境变量生效。",
+    freeNote: "Gemini API 提供的免费额度对个人使用完全够用。",
   },
 };
 

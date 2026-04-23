@@ -65,6 +65,7 @@ const deMessages = {
     home: "Zum neuesten Chat",
     toolCallHistory: "Tool-Aufrufverlauf",
     settings: "Einstellungen",
+    settingsGeminiMissing: "Einstellungen — Gemini-API-Schlüssel fehlt",
   },
   rightSidebar: {
     toggleSystemPrompt: "System-Prompt umschalten",
@@ -114,6 +115,7 @@ const deMessages = {
   settingsModal: {
     title: "Einstellungen",
     tabs: {
+      gemini: "Gemini",
       tools: "Erlaubte Tools",
       mcp: "MCP-Server",
       dirs: "Verzeichnisse",
@@ -537,10 +539,6 @@ const deMessages = {
     formulaType: "Formel",
   },
   app: {
-    // `<i18n-t>`-Slots — die Namen `envKey` / `envFile` werden in App.vue
-    // als Inline-`<code>` gerendert, sodass die literalen Variablen- und
-    // Dateinamen unübersetzt bleiben.
-    geminiRequired: "Die Bildgenerierung erfordert {envKey}. Fügen Sie ihn zu {envFile} hinzu und starten Sie die App neu.",
     startConversation: "Gespräch beginnen",
   },
   suggestionsPanel: {
@@ -553,6 +551,19 @@ const deMessages = {
     // behalten, während der Text übersetzbar ist.
     explanation:
       "Zusätzliche Tool-Namen, die Claude über {allowedTools} übergeben werden sollen. Einer pro Zeile. Nützlich für in Claude Code integrierte MCP-Server wie Gmail / Google Kalender, nachdem Sie sich über {claudeMcp} authentifiziert haben.",
+  },
+  settingsGeminiTab: {
+    warningHeading: "{envKey} ist nicht konfiguriert.",
+    impact:
+      "Ohne Gemini-API-Schlüssel sind Bildgenerierung, Text-zu-Sprache und Videogenerierung deaktiviert. Das betrifft die Artist-Rolle, die Storyteller-Rollen, die MulmoScript-Wiedergabe sowie eingebettete Bilder in den reichhaltigen Dokumenten, die von Guide & Planner, Tutor und ähnlichen Rollen erzeugt werden.",
+    stepsHeading: "So bekommen Sie einen Schlüssel",
+    step1: "Öffnen Sie {link} und melden Sie sich mit einem Google-Konto an.",
+    step1Link: "Google AI Studio",
+    step2: "Klicken Sie auf {createKey}. Wenn Sie dazu aufgefordert werden, wählen Sie ein Google-Cloud-Projekt oder erstellen Sie eines.",
+    step2CreateKey: "Create API key",
+    step3: "Kopieren Sie den Schlüssel (beginnt mit AIza…) und fügen Sie ihn wie folgt zur Datei {envFile} im Projektwurzelverzeichnis hinzu:",
+    step4: "Starten Sie MulmoClaude neu, damit die neue Umgebungsvariable übernommen wird.",
+    freeNote: "Die Gemini-API hat ein kostenloses Kontingent, das für den persönlichen Gebrauch ausreicht.",
   },
 };
 

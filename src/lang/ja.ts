@@ -72,6 +72,7 @@ const jaMessages = {
     home: "最新のチャットに移動",
     toolCallHistory: "ツール呼び出し履歴",
     settings: "設定",
+    settingsGeminiMissing: "設定 — Gemini API キーが未設定です",
   },
   rightSidebar: {
     toggleSystemPrompt: "システムプロンプトの表示切替",
@@ -119,6 +120,7 @@ const jaMessages = {
   settingsModal: {
     title: "設定",
     tabs: {
+      gemini: "Gemini",
       tools: "許可ツール",
       mcp: "MCP サーバ",
       dirs: "ディレクトリ",
@@ -543,7 +545,6 @@ const jaMessages = {
     formulaType: "数式",
   },
   app: {
-    geminiRequired: "画像生成には {envKey} が必要です。{envFile} に追加してアプリを再起動してください。",
     startConversation: "会話を開始してください",
   },
   suggestionsPanel: {
@@ -553,6 +554,19 @@ const jaMessages = {
   settingsToolsTab: {
     explanation:
       "{allowedTools} を介して Claude に渡す追加ツール名。1行につき1つ。Gmail / Google Calendar などの Claude Code 組み込み MCP サーバを、{claudeMcp} で認証した後に利用する場合に便利です。",
+  },
+  settingsGeminiTab: {
+    warningHeading: "{envKey} が設定されていません。",
+    impact:
+      "Gemini API キーがない場合、画像生成・音声合成・動画生成が無効になります。Artist ロール、Storyteller 系ロール、MulmoScript の再生、Guide & Planner や Tutor などが生成するリッチドキュメント内のインライン画像に影響します。",
+    stepsHeading: "キーの取得方法",
+    step1: "{link} を開き、Google アカウントでサインインします。",
+    step1Link: "Google AI Studio",
+    step2: "{createKey} をクリックします。プロンプトが表示されたら、Google Cloud プロジェクトを選択または作成してください。",
+    step2CreateKey: "Create API key",
+    step3: "キー（AIza… で始まります）をコピーし、プロジェクトルートの {envFile} に次のように追加します:",
+    step4: "新しい環境変数が反映されるように MulmoClaude を再起動してください。",
+    freeNote: "Gemini API には個人利用に十分な無料枠があります。",
   },
 };
 

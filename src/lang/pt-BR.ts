@@ -65,6 +65,7 @@ const ptBRMessages = {
     home: "Ir para o chat mais recente",
     toolCallHistory: "Histórico de chamadas de ferramentas",
     settings: "Configurações",
+    settingsGeminiMissing: "Configurações — chave da API do Gemini ausente",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",
@@ -114,6 +115,7 @@ const ptBRMessages = {
   settingsModal: {
     title: "Configurações",
     tabs: {
+      gemini: "Gemini",
       tools: "Ferramentas permitidas",
       mcp: "Servidores MCP",
       dirs: "Diretórios",
@@ -535,10 +537,6 @@ const ptBRMessages = {
     formulaType: "Fórmula",
   },
   app: {
-    // Slots `<i18n-t>` — os nomes `envKey` / `envFile` renderizam como
-    // `<code>` inline no App.vue, então os literais de variável e nome
-    // de arquivo permanecem não traduzidos.
-    geminiRequired: "A geração de imagens requer {envKey}. Adicione-o a {envFile} e reinicie o app.",
     startConversation: "Iniciar uma conversa",
   },
   suggestionsPanel: {
@@ -551,6 +549,19 @@ const ptBRMessages = {
     // enquanto o texto é traduzível.
     explanation:
       "Nomes adicionais de ferramentas a serem passados ao Claude via {allowedTools}. Um por linha. Útil para servidores MCP integrados ao Claude Code como Gmail / Google Calendar após autenticar via {claudeMcp}.",
+  },
+  settingsGeminiTab: {
+    warningHeading: "{envKey} não está configurado.",
+    impact:
+      "Sem uma chave da API do Gemini, a geração de imagens, a síntese de voz e a geração de vídeo ficam desabilitadas. Isso afeta o papel Artist, os papéis Storyteller, a reprodução de MulmoScript e as imagens inline nos documentos ricos produzidos por Guide & Planner, Tutor e papéis semelhantes.",
+    stepsHeading: "Como obter uma chave",
+    step1: "Abra {link} e faça login com uma conta Google.",
+    step1Link: "Google AI Studio",
+    step2: "Clique em {createKey}. Se solicitado, selecione ou crie um projeto no Google Cloud.",
+    step2CreateKey: "Create API key",
+    step3: "Copie a chave (começa com AIza…) e adicione-a ao {envFile} na raiz do projeto assim:",
+    step4: "Reinicie o MulmoClaude para que a nova variável de ambiente seja carregada.",
+    freeNote: "A API do Gemini tem um plano gratuito suficiente para uso pessoal.",
   },
 };
 

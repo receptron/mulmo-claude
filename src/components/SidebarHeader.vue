@@ -23,13 +23,21 @@
       />
       <NotificationBell :force-close="lockPopupOpen" @navigate="(action) => emit('notificationNavigate', action)" @update:open="onNotificationOpen" />
       <button
-        class="text-gray-400 hover:text-gray-700"
+        class="relative text-gray-400 hover:text-gray-700"
         data-testid="settings-btn"
-        :title="t('sidebarHeader.settings')"
-        :aria-label="t('sidebarHeader.settings')"
+        :title="geminiAvailable ? t('sidebarHeader.settings') : t('sidebarHeader.settingsGeminiMissing')"
+        :aria-label="geminiAvailable ? t('sidebarHeader.settings') : t('sidebarHeader.settingsGeminiMissing')"
         @click="emit('openSettings')"
       >
         <span class="material-icons">settings</span>
+        <span
+          v-if="!geminiAvailable"
+          class="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 text-yellow-900 rounded-full flex items-center justify-center leading-none ring-1 ring-white"
+          data-testid="settings-gemini-missing-badge"
+          aria-hidden="true"
+        >
+          <span class="material-icons" style="font-size: 12px; line-height: 1">priority_high</span>
+        </span>
       </button>
     </div>
   </div>
@@ -48,6 +56,7 @@ const { t } = useI18n();
 
 defineProps<{
   sandboxEnabled: boolean;
+  geminiAvailable: boolean;
   titleStyle?: CSSProperties;
 }>();
 

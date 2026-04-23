@@ -72,6 +72,7 @@ const koMessages = {
     home: "최신 채팅으로 이동",
     toolCallHistory: "도구 호출 기록",
     settings: "설정",
+    settingsGeminiMissing: "설정 — Gemini API 키가 설정되지 않았습니다",
   },
   rightSidebar: {
     toggleSystemPrompt: "시스템 프롬프트 토글",
@@ -120,6 +121,7 @@ const koMessages = {
   settingsModal: {
     title: "설정",
     tabs: {
+      gemini: "Gemini",
       tools: "허용된 도구",
       mcp: "MCP 서버",
       dirs: "디렉터리",
@@ -543,9 +545,6 @@ const koMessages = {
     formulaType: "수식",
   },
   app: {
-    // `<i18n-t>` 슬롯 — `envKey` / `envFile` 은 App.vue 에서 인라인
-    // `<code>` 로 렌더링되므로 변수명·파일명은 번역하지 않고 남깁니다.
-    geminiRequired: "이미지 생성에는 {envKey} 가 필요합니다. {envFile} 에 추가하고 앱을 재시작해주세요.",
     startConversation: "대화 시작",
   },
   suggestionsPanel: {
@@ -557,6 +556,19 @@ const koMessages = {
     // `<code>` 태그는 스타일을 유지하면서 본문은 번역 가능합니다.
     explanation:
       "{allowedTools} 를 통해 Claude 에 전달할 추가 도구 이름. 한 줄에 하나씩. {claudeMcp} 로 인증을 완료한 후 Claude Code 내장 MCP 서버 (Gmail / Google 캘린더 등) 를 사용할 때 유용합니다.",
+  },
+  settingsGeminiTab: {
+    warningHeading: "{envKey} 가 설정되지 않았습니다.",
+    impact:
+      "Gemini API 키가 없으면 이미지 생성, 음성 합성, 동영상 생성이 비활성화됩니다. Artist 역할, Storyteller 계열 역할, MulmoScript 재생, Guide & Planner·Tutor 등이 생성하는 리치 문서의 인라인 이미지에 영향을 줍니다.",
+    stepsHeading: "키 발급 방법",
+    step1: "{link} 를 열고 Google 계정으로 로그인합니다.",
+    step1Link: "Google AI Studio",
+    step2: "{createKey} 를 클릭합니다. 요청이 나타나면 Google Cloud 프로젝트를 선택하거나 새로 만드세요.",
+    step2CreateKey: "Create API key",
+    step3: "키 (AIza… 로 시작) 를 복사해 프로젝트 루트의 {envFile} 에 다음과 같이 추가합니다:",
+    step4: "새 환경 변수가 적용되도록 MulmoClaude 를 재시작해주세요.",
+    freeNote: "Gemini API 는 개인 사용에 충분한 무료 할당량을 제공합니다.",
   },
 };
 

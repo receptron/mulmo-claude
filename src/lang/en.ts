@@ -87,6 +87,7 @@ const enMessages = {
     home: "Go to latest chat",
     toolCallHistory: "Tool call history",
     settings: "Settings",
+    settingsGeminiMissing: "Settings — Gemini API key missing",
   },
   rightSidebar: {
     toggleSystemPrompt: "Toggle system prompt",
@@ -136,6 +137,7 @@ const enMessages = {
   settingsModal: {
     title: "Settings",
     tabs: {
+      gemini: "Gemini",
       tools: "Allowed Tools",
       mcp: "MCP Servers",
       dirs: "Directories",
@@ -559,10 +561,6 @@ const enMessages = {
     formulaType: "Formula",
   },
   app: {
-    // `<i18n-t>` slots — named `envKey` / `envFile` render as inline
-    // `<code>` in App.vue, so the literal variable and file names
-    // stay untranslated while the surrounding copy is localised.
-    geminiRequired: "Image generation requires {envKey}. Add it to {envFile} and restart the app.",
     startConversation: "Start a conversation",
   },
   suggestionsPanel: {
@@ -575,6 +573,22 @@ const enMessages = {
     // is translatable.
     explanation:
       "Extra tool names to pass to Claude via {allowedTools}. One per line. Useful for built-in Claude Code MCP servers like Gmail / Google Calendar after you have authenticated via {claudeMcp}.",
+  },
+  settingsGeminiTab: {
+    // Rendered via <i18n-t> with named slots `envKey`, `envFile`,
+    // `link`, and `createKey`. Keep the slot names verbatim — the
+    // surrounding copy can be translated but the placeholders stay.
+    warningHeading: "{envKey} is not configured.",
+    impact:
+      "Without a Gemini API key, image generation, text-to-speech, and video generation are disabled. This affects the Artist role, the Storyteller roles, MulmoScript playback, and inline images in rich documents produced by Guide & Planner, Tutor, and similar roles.",
+    stepsHeading: "How to get a key",
+    step1: "Open {link} and sign in with a Google account.",
+    step1Link: "Google AI Studio",
+    step2: "Click {createKey}. If prompted, select or create a Google Cloud project.",
+    step2CreateKey: "Create API key",
+    step3: "Copy the key (it starts with AIza…) and add it to {envFile} in the project root as:",
+    step4: "Restart MulmoClaude so the new environment variable is picked up.",
+    freeNote: "The Gemini API has a free tier that is sufficient for personal use.",
   },
 };
 

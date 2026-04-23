@@ -17,6 +17,16 @@
 
       <div class="flex border-b border-gray-200 px-5">
         <button
+          v-if="!geminiAvailable"
+          class="px-3 py-2 text-sm border-b-2 flex items-center gap-1"
+          :class="activeTab === 'gemini' ? 'border-yellow-500 text-yellow-700' : 'border-transparent text-yellow-700 hover:text-yellow-800'"
+          data-testid="settings-tab-gemini"
+          @click="activeTab = 'gemini'"
+        >
+          <span class="material-icons text-sm leading-none">warning</span>
+          {{ t("settingsModal.tabs.gemini") }}
+        </button>
+        <button
           class="px-3 py-2 text-sm border-b-2"
           :class="activeTab === 'tools' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-tools"
@@ -55,7 +65,48 @@
           ⚠ {{ loadError }}
         </div>
 
-        <div v-if="activeTab === 'tools'" class="space-y-3">
+        <div v-if="activeTab === 'gemini' && !geminiAvailable" class="space-y-4" data-testid="settings-gemini-panel">
+          <div class="rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+            <span class="material-icons text-sm align-middle mr-1">warning</span>
+            <i18n-t keypath="settingsGeminiTab.warningHeading" tag="strong">
+              <template #envKey><code class="font-mono bg-yellow-100 px-1 rounded">GEMINI_API_KEY</code></template>
+            </i18n-t>
+          </div>
+          <p class="text-sm text-gray-700 leading-relaxed">
+            {{ t("settingsGeminiTab.impact") }}
+          </p>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-800 mb-2">{{ t("settingsGeminiTab.stepsHeading") }}</h3>
+            <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
+              <li>
+                <i18n-t keypath="settingsGeminiTab.step1" tag="span">
+                  <template #link>
+                    <a class="text-blue-600 hover:underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                      {{ t("settingsGeminiTab.step1Link") }}
+                    </a>
+                  </template>
+                </i18n-t>
+              </li>
+              <li>
+                <i18n-t keypath="settingsGeminiTab.step2" tag="span">
+                  <template #createKey>
+                    <strong>{{ t("settingsGeminiTab.step2CreateKey") }}</strong>
+                  </template>
+                </i18n-t>
+              </li>
+              <li>
+                <i18n-t keypath="settingsGeminiTab.step3" tag="span">
+                  <template #envFile><code class="font-mono bg-gray-100 px-1 rounded">.env</code></template>
+                </i18n-t>
+                <pre class="mt-1 text-xs bg-gray-900 text-gray-100 rounded px-3 py-2 font-mono overflow-x-auto">GEMINI_API_KEY=AIza…</pre>
+              </li>
+              <li>{{ t("settingsGeminiTab.step4") }}</li>
+            </ol>
+          </div>
+          <p class="text-xs text-gray-500 italic">{{ t("settingsGeminiTab.freeNote") }}</p>
+        </div>
+
+        <div v-else-if="activeTab === 'tools'" class="space-y-3">
           <i18n-t keypath="settingsToolsTab.explanation" tag="p" class="text-xs text-gray-600 leading-relaxed">
             <template #allowedTools><code class="bg-gray-100 px-1 rounded">--allowedTools</code></template>
             <template #claudeMcp><code class="bg-gray-100 px-1 rounded">claude mcp</code></template>
@@ -101,7 +152,7 @@
         <SettingsReferenceDirsTab v-else-if="activeTab === 'refs'" />
       </div>
 
-      <div class="px-5 py-3 border-t border-gray-200 flex items-center justify-between gap-3">
+      <div v-if="activeTab !== 'gemini'" class="px-5 py-3 border-t border-gray-200 flex items-center justify-between gap-3">
         <span v-if="statusMessage" class="text-xs" :class="statusError ? 'text-red-600' : 'text-green-600'" data-testid="settings-status">
           {{ statusMessage }}
         </span>
@@ -140,6 +191,12 @@ const { t } = useI18n();
 interface Props {
   open: boolean;
   dockerMode?: boolean;
+  // Drives the "Gemini" warning tab. True (optimistic) by default so
+  // we don't flash the warning tab during boot before useHealth has
+  // returned. See src/composables/useHealth.ts for the first-fetch
+  // fallback that flips this to false when the /api/health probe
+  // confirms the key is missing.
+  geminiAvailable?: boolean;
   // Forwarded from useMcpTools — if non-null, the MCP tab shows a
   // small warning strip so the user knows "all tools visible" is a
   // fallback rather than an accurate listing.
@@ -148,6 +205,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   dockerMode: false,
+  geminiAvailable: true,
   mcpToolsError: null,
 });
 const emit = defineEmits<{
@@ -160,7 +218,7 @@ const emit = defineEmits<{
 // button" footgun). Null when the MCP tab isn't the active one.
 const mcpTabRef = ref<{ flushDraft: () => boolean } | null>(null);
 
-const activeTab = ref<"tools" | "mcp" | "dirs" | "refs">("tools");
+const activeTab = ref<"gemini" | "tools" | "mcp" | "dirs" | "refs">("tools");
 const toolsText = ref("");
 const mcpServers = ref<McpServerEntry[]>([]);
 const loadError = ref("");
@@ -267,6 +325,12 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
+      // Default to the Gemini warning tab when the key is missing —
+      // that's the most likely reason the user opened settings. When
+      // the key is present the tab isn't rendered at all, so fall back
+      // to "tools" (or whatever tab was last active across opens).
+      if (!props.geminiAvailable) activeTab.value = "gemini";
+      else if (activeTab.value === "gemini") activeTab.value = "tools";
       loadConfig();
       statusMessage.value = "";
       statusError.value = false;
