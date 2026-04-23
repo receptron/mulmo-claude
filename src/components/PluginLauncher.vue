@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="flex border border-gray-300 rounded overflow-hidden text-xs" data-testid="plugin-launcher">
+  <div ref="rootRef" class="inline-flex w-fit border border-gray-300 rounded overflow-hidden text-xs" data-testid="plugin-launcher">
     <template v-for="(target, idx) in TARGETS" :key="target.key">
       <!-- Visual separator between data plugins and management plugins -->
       <div v-if="idx === SEPARATOR_AFTER_INDEX" class="w-px bg-gray-300 my-0.5" />

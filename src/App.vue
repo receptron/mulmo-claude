@@ -6,18 +6,24 @@
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-200">
         <SidebarHeader
           :sandbox-enabled="sandboxEnabled"
-          :show-right-sidebar="showRightSidebar"
-          :is-chat-page="isChatPage"
           :title-style="debugTitleStyle"
           @test-query="(q) => sendMessage(q)"
           @notification-navigate="handleNotificationNavigate"
-          @toggle-right-sidebar="toggleRightSidebar"
           @open-settings="showSettings = true"
           @home="handleHomeClick"
         />
         <div class="flex-1 min-w-0">
           <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
+        <button
+          v-if="isChatPage"
+          class="text-gray-400 hover:text-gray-700"
+          :class="{ 'text-blue-500': showRightSidebar }"
+          :title="t('sidebarHeader.toolCallHistory')"
+          @click="toggleRightSidebar"
+        >
+          <span class="material-icons">build</span>
+        </button>
       </div>
       <!-- Row 2: canvas toggle + role selector + session tabs -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">

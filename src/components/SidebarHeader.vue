@@ -23,15 +23,6 @@
       />
       <NotificationBell :force-close="lockPopupOpen" @navigate="(action) => emit('notificationNavigate', action)" @update:open="onNotificationOpen" />
       <button
-        v-if="isChatPage"
-        class="text-gray-400 hover:text-gray-700"
-        :class="{ 'text-blue-500': showRightSidebar }"
-        :title="t('sidebarHeader.toolCallHistory')"
-        @click="emit('toggleRightSidebar')"
-      >
-        <span class="material-icons">build</span>
-      </button>
-      <button
         class="text-gray-400 hover:text-gray-700"
         data-testid="settings-btn"
         :title="t('sidebarHeader.settings')"
@@ -57,15 +48,12 @@ const { t } = useI18n();
 
 defineProps<{
   sandboxEnabled: boolean;
-  showRightSidebar: boolean;
-  isChatPage: boolean;
   titleStyle?: CSSProperties;
 }>();
 
 const emit = defineEmits<{
   testQuery: [query: string];
   notificationNavigate: [action: NotificationPayload["action"]];
-  toggleRightSidebar: [];
   openSettings: [];
   home: [];
 }>();
