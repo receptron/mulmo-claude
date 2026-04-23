@@ -9,8 +9,6 @@ import { pushErrorMessage, applyTextEvent, applyToolResultToSession } from "../s
 
 export interface AgentEventContext {
   session: ActiveSession;
-  setCurrentRoleId: (roleId: string) => void;
-  onRoleChange: () => void;
   refreshRoles: () => Promise<void>;
   scrollSidebarToBottom: () => void;
   onGenerationsDrained: () => void;
@@ -33,10 +31,9 @@ export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): 
       session.statusMessage = event.message;
       return;
     case EVENT_TYPES.switchRole:
-      setTimeout(() => {
-        ctx.setCurrentRoleId(event.roleId);
-        ctx.onRoleChange();
-      }, 0);
+      // The role selector is now user-owned; agent-initiated role
+      // switches no longer mutate it. Session.roleId still comes
+      // from the server on session load.
       return;
     case EVENT_TYPES.rolesUpdated:
       await ctx.refreshRoles();

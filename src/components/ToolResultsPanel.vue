@@ -6,6 +6,10 @@
     data-testid="tool-results-scroll"
     @mousedown="emit('activate')"
   >
+    <div v-if="sessionRoleName" class="flex items-center gap-1 text-xs text-gray-400" data-testid="sidebar-role-header">
+      <span v-if="sessionRoleIcon" class="material-icons text-xs leading-none">{{ sessionRoleIcon }}</span>
+      <span>{{ sessionRoleName }}</span>
+    </div>
     <div
       v-for="result in results"
       :key="result.uuid"
@@ -69,6 +73,8 @@ defineProps<{
   isRunning: boolean;
   statusMessage: string;
   pendingCalls: PendingCall[];
+  sessionRoleName?: string;
+  sessionRoleIcon?: string;
 }>();
 
 const emit = defineEmits<{

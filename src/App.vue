@@ -74,6 +74,8 @@
           :is-running="isRunning"
           :status-message="statusMessage"
           :pending-calls="pendingCalls"
+          :session-role-name="sessionRoleName"
+          :session-role-icon="sessionRoleIcon"
           @select="onSidebarItemClick"
           @activate="activePane = 'sidebar'"
         />
@@ -122,6 +124,8 @@
             :selected-result-uuid="selectedResultUuid"
             :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
             :send-text-message="sendMessage"
+            :session-role-name="sessionRoleName"
+            :session-role-icon="sessionRoleIcon"
             @select="(uuid) => (selectedResultUuid = uuid)"
             @update-result="handleUpdateResult"
           />
@@ -209,6 +213,7 @@ import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
 import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
+import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
 import { buildLoadedSession, parseSessionEntries } from "./utils/session/sessionEntries";
 import { resolveNotificationTarget } from "./utils/notification/dispatch";
@@ -314,19 +319,6 @@ watch(
   },
 );
 
-// External URL changes for ?role= → sync into currentRoleId.
-// This doesn't trigger onRoleChange (which creates a new session) —
-// the user is just navigating back/forward between sessions that
-// were already associated with a role.
-watch(
-  () => route.query.role,
-  (newRole) => {
-    if (typeof newRole !== "string" || newRole === currentRoleId.value) return;
-    const roleExists = roles.value.some((role) => role.id === newRole);
-    if (roleExists) currentRoleId.value = newRole;
-  },
-);
-
 // --- Global state ---
 const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
 
@@ -349,6 +341,20 @@ const { selectedResultUuid } = useSelectedResult({
   activeSession,
   sessionMap,
   currentSessionId,
+});
+
+// Display name and icon of the role the active session was created
+// under, so the message list can show which role is driving the
+// conversation (independent of what the dropdown currently shows).
+const sessionRoleName = computed(() => {
+  const roleId = activeSession.value?.roleId;
+  if (!roleId) return "";
+  return roleName(roles.value, roleId);
+});
+const sessionRoleIcon = computed(() => {
+  const roleId = activeSession.value?.roleId;
+  if (!roleId) return "";
+  return roleIcon(roles.value, roleId);
 });
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
@@ -557,7 +563,6 @@ function createNewSession(roleId?: string): ActiveSession {
   const rId = roleId ?? currentRoleId.value;
   const session = createEmptySession(uuidv4(), rId);
   sessionMap.set(session.id, session);
-  currentRoleId.value = rId;
   navigateToSession(session.id, replace);
   suggestionsPanelRef.value?.collapse();
   nextTick(() => focusChatInput());
@@ -569,9 +574,7 @@ function onRoleChange() {
   // the role that future new-chat actions should use — don't yank
   // them onto /chat by creating a session here. currentRoleId is
   // already updated by RoleSelector's v-model, so future "+" clicks
-  // or composer sends will pick it up. Agent-triggered role switches
-  // (EVENT_TYPES.switchRole) always fire during an active run on
-  // /chat, so the guard doesn't affect them.
+  // or composer sends will pick it up.
   if (!isChatPage.value) return;
   const session = createNewSession(currentRoleId.value);
   maybeSeedRoleDefault(session);
@@ -594,13 +597,7 @@ async function resumeOrCreateChatSession(): Promise<void> {
     return;
   }
   if (sessionMap.has(topId)) {
-    // Already in memory — activate so the role selector re-syncs to
-    // the session's role. Going through navigateToSession alone would
-    // push `/chat/:topId` without touching `currentRoleId`, leaving
-    // the selector stuck on whatever role the user picked on the
-    // page they're coming from.
-    const live = sessionMap.get(topId)!;
-    activateSession(topId, live.roleId, false);
+    activateSession(topId, false);
     return;
   }
   await loadSession(topId);
@@ -612,13 +609,9 @@ async function resumeOrCreateChatSession(): Promise<void> {
   }
 }
 
-function activateSession(sessionId: string, roleId: string, replace: boolean): void {
+function activateSession(sessionId: string, replace: boolean): void {
   const reactiveSession = sessionMap.get(sessionId);
   if (reactiveSession) ensureSessionSubscription(reactiveSession);
-  // Set role before navigating: buildRoleQuery() reads currentRoleId to
-  // build ?role=, and the route.query.role watcher would otherwise fire
-  // after navigation and revert currentRoleId to the previous session's role.
-  currentRoleId.value = roleId;
   navigateToSession(sessionId, replace);
   // Closing the history popup is no longer explicit — navigating to
   // /chat/:id via navigateToSession changes the route, and the
@@ -643,7 +636,7 @@ async function loadSession(sessionId: string) {
 
   const live = sessionMap.get(sessionId);
   if (live) {
-    activateSession(sessionId, live.roleId, replaced);
+    activateSession(sessionId, replaced);
     return;
   }
 
@@ -659,7 +652,7 @@ async function loadSession(sessionId: string) {
     nowIso: new Date().toISOString(),
   });
   sessionMap.set(sessionId, newSession);
-  activateSession(sessionId, newSession.roleId, replaced);
+  activateSession(sessionId, replaced);
 }
 
 // Re-fetch the transcript from the server and patch any entries the
@@ -686,10 +679,6 @@ function buildAgentEventContext(session: ActiveSession): AgentEventContext {
     get session() {
       return sessionMap.get(sessionId) ?? session;
     },
-    setCurrentRoleId: (roleId) => {
-      currentRoleId.value = roleId;
-    },
-    onRoleChange,
     refreshRoles,
     scrollSidebarToBottom: () => rightSidebarRef.value?.scrollToBottom(),
     onGenerationsDrained: () => {
@@ -836,18 +825,7 @@ function startNewChat(message: string, roleId?: string): void {
   // in the new session rather than whatever was previously active.
   // Cross-route push behaviour (so browser Back returns to /wiki)
   // is now handled inside createNewSession via the isChatPage check.
-  const previousRoleId = currentRoleId.value;
-  createNewSession(roleId ?? previousRoleId);
-  // `createNewSession` mutates `currentRoleId.value` to the role it
-  // just used. When the caller passed an explicit `roleId` override
-  // (e.g. wiki Lint spawns a General-role chat regardless of the
-  // role the user is currently viewing the wiki under), restore the
-  // previously-selected role afterwards so future `+` clicks and
-  // role-aware UI don't inherit this one-shot override. The newly-
-  // created session keeps the overridden role on its own record.
-  if (roleId && roleId !== previousRoleId) {
-    currentRoleId.value = previousRoleId;
-  }
+  createNewSession(roleId);
   void sendMessage(message);
 }
 
@@ -879,12 +857,6 @@ onMounted(async () => {
   // createNewSession() picks a roleId that exists in the merged
   // role list (built-in + custom).
   await refreshRoles();
-
-  // If the URL specifies a role, apply it before session creation.
-  const urlRole = typeof route.query.role === "string" ? route.query.role : null;
-  if (urlRole && roles.value.some((role) => role.id === urlRole)) {
-    currentRoleId.value = urlRole;
-  }
 
   // Session bootstrap only applies on /chat. On /files, /todos, /wiki,
   // etc. we must not create or load a chat session — doing so would

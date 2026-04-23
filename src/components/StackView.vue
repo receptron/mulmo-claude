@@ -1,5 +1,9 @@
 <template>
   <div ref="containerRef" class="h-full overflow-y-auto bg-gray-50 p-4 space-y-3" data-testid="stack-scroll">
+    <div v-if="sessionRoleName" class="flex items-center gap-1 text-xs text-gray-400" data-testid="stack-role-header">
+      <span v-if="sessionRoleIcon" class="material-icons text-xs leading-none">{{ sessionRoleIcon }}</span>
+      <span>{{ sessionRoleName }}</span>
+    </div>
     <div v-if="toolResults.length === 0" class="flex items-center justify-center h-full text-gray-400 text-sm">{{ t("common.noResultsYet") }}</div>
     <div
       v-for="result in toolResults"
@@ -113,6 +117,8 @@ const props = defineProps<{
   selectedResultUuid: string | null;
   resultTimestamps: Map<string, number>;
   sendTextMessage?: (text: string) => void;
+  sessionRoleName?: string;
+  sessionRoleIcon?: string;
 }>();
 
 const emit = defineEmits<{

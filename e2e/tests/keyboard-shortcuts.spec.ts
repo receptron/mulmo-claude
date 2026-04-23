@@ -107,33 +107,27 @@ test.describe("keyboard shortcuts (useEventListeners)", () => {
     expect(stored).toBe("single");
   });
 
-  test("Cmd/Ctrl+1 re-syncs the role selector to the resumed session's role (#665 follow-up)", async ({ page }) => {
-    // Regression: resumeOrCreateChatSession() used to call
-    // navigateToSession() directly on the cached-session branch,
-    // bypassing currentRoleId sync. The selector would stay on
-    // whichever role the user picked on /files / /wiki / etc.
+  test("Cmd/Ctrl+1 keeps the user's role selector pick when resuming a session (#701)", async ({ page }) => {
+    // The role selector is user-owned: only the dropdown mutates it.
+    // Resuming a session from another page must not yank the selector
+    // back to the session's own roleId.
     //
-    // Fixture sessions are created with roleId "general". Change
-    // the selector to "artist" on /files (which is a no-op for
-    // the session since !isChatPage), then Cmd+1 back to /chat
-    // and confirm the selector reverted to "general".
+    // Fixture sessions are created with roleId "general". Change the
+    // selector to "artist" on /files, then Cmd+1 back to /chat and
+    // confirm the selector still shows "Artist" even though the
+    // resumed session is tagged "general".
     await page.goto("/chat");
-    // Wait for /chat → /chat/<id> redirect to settle — resumeOrCreate
-    // reads the top-of-list session on Cmd+1, so we need the initial
-    // session list loaded.
     await page.waitForURL(/\/chat\//);
 
     await page.goto("/files");
     await expect(page).toHaveURL(/\/files/);
 
-    // Flip role to Artist via the selector.
     await page.getByTestId("role-selector-btn").click();
     await page.getByTestId("role-option-artist").click();
     await expect(page.getByTestId("role-selector-btn")).toContainText("Artist");
 
-    // Cmd+1 → back to /chat; resumed session's role is "general".
     await pressShortcut(page, "1");
     await expect(page).toHaveURL(/\/chat\//);
-    await expect(page.getByTestId("role-selector-btn")).toContainText("General");
+    await expect(page.getByTestId("role-selector-btn")).toContainText("Artist");
   });
 });

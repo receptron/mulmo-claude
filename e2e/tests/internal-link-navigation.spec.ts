@@ -95,7 +95,7 @@ test.describe("internal link navigation", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // The sidebar should show the text-response preview card.
-    const previewCard = page.getByTestId("tool-results-scroll").locator("> div").nth(1);
+    const previewCard = page.getByTestId("tool-results-scroll").locator("> div.cursor-pointer").nth(1);
     await expect(previewCard).toBeVisible();
 
     // Click the preview card (which contains markdown-rendered <a> tags).
@@ -110,7 +110,7 @@ test.describe("internal link navigation", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Select the text-response result to show it in the canvas.
-    const previewCard = page.getByTestId("tool-results-scroll").locator("> div").nth(1);
+    const previewCard = page.getByTestId("tool-results-scroll").locator("> div.cursor-pointer").nth(1);
     await previewCard.click();
 
     // Find the wiki page link in the rendered markdown content.
@@ -129,7 +129,7 @@ test.describe("internal link navigation", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // Select the text-response result.
-    const previewCard = page.getByTestId("tool-results-scroll").locator("> div").nth(1);
+    const previewCard = page.getByTestId("tool-results-scroll").locator("> div.cursor-pointer").nth(1);
     await previewCard.click();
 
     // Find the config file link.
