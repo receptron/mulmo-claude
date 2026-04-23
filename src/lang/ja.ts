@@ -331,6 +331,8 @@ const jaMessages = {
     previewMore: "+ {count} 件…",
     chatPlaceholder: "このページについて質問…",
     chatSend: "このページについて新しいチャットを開始",
+    tagFilterAll: "すべて",
+    noMatches: "#{tag} タグのページがありません",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF として保存（印刷ダイアログを開きます）",

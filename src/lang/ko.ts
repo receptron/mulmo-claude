@@ -331,6 +331,8 @@ const koMessages = {
     previewMore: "+ {count}개 더…",
     chatPlaceholder: "이 페이지에 대해 질문…",
     chatSend: "이 페이지에 대한 새 채팅 시작",
+    tagFilterAll: "전체",
+    noMatches: "#{tag} 태그가 달린 페이지가 없습니다",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF 로 저장 (인쇄 대화 상자 열기)",

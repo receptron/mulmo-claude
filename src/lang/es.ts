@@ -332,6 +332,8 @@ const esMessages = {
     previewMore: "+ {count} más…",
     chatPlaceholder: "Pregunta sobre esta página…",
     chatSend: "Iniciar un chat nuevo sobre esta página",
+    tagFilterAll: "Todas",
+    noMatches: "No hay páginas con la etiqueta #{tag}",
   },
   pluginPresentHtml: {
     saveAsPdf: "Guardar como PDF (abre el diálogo de impresión)",

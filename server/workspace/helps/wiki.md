@@ -95,9 +95,9 @@ Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyph
 
 ## ページ一覧
 
-- [Transformer Architecture](pages/transformer-architecture.md) — machine-learning, architecture, attention (2026-04-05)
-- [さくらインターネット](pages/sakura-internet.md) — クラウド, 日本企業, データセンター (2026-04-06)
-- [ECharts DataZoom](pages/echarts-datazoom.md) — ECharts, データ可視化 (2026-04-13)
+- [Transformer Architecture](pages/transformer-architecture.md) — foundational seq2seq model #ml #attention #architecture (2026-04-05)
+- [さくらインターネット](pages/sakura-internet.md) — 日本のクラウド事業者 #クラウド #日本企業 #データセンター (2026-04-06)
+- [ECharts DataZoom](pages/echarts-datazoom.md) — ズーム操作の仕組み #echarts #可視化 (2026-04-13)
 
 ## タグ一覧
 
@@ -107,10 +107,29 @@ Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyph
 
 Key rules:
 
-- Always write bullet items as `[Title](pages/<slug>.md) — description (YYYY-MM-DD)` — **no** `[[slug]]` wiki-link form, and **no** markdown tables. The canvas parser extracts the slug from the href so non-ASCII titles (日本語, etc.) keep a navigable slug.
+- Always write bullet items as `[Title](pages/<slug>.md) — description #tag1 #tag2 (YYYY-MM-DD)` — **no** `[[slug]]` wiki-link form, and **no** markdown tables. The canvas parser extracts the slug from the href so non-ASCII titles (日本語, etc.) keep a navigable slug.
 - Slugs are lowercase ASCII, hyphen-separated. They match the page filename one-to-one (`pages/sakura-internet.md` → slug `sakura-internet`).
+- `#tag` tokens appear inline in the description (word-boundary match). Tokens are extracted and indexed for the Wiki tag-filter UI. Use `[a-z0-9][a-z0-9-]*` for ASCII tags; the "タグ一覧" section can still list non-ASCII group labels.
 - Group by category if useful, then include a "タグ一覧" / "Tags" section with the same `[Title](pages/<slug>.md)` link form so every mention is clickable.
 - Keep the index in sync with `pages/` — when you add a page, add a row; when you rename a file, update every link that points at it.
+
+### Alternative table format
+
+If you prefer a table layout, the canvas also accepts a `Tags` column. Column names are matched by header (case-insensitive), so the order is flexible:
+
+```markdown
+| Slug | Title | Summary | Tags | Updated |
+|------|-------|---------|------|---------|
+| `transformer-architecture` | Transformer Architecture | foundational seq2seq model | ml, attention, architecture | 2026-04-05 |
+```
+
+Pre-existing 3- or 4-column tables (without a Tags header) keep parsing; their entries just have no tags.
+
+## Tag rules
+
+- A page's YAML frontmatter `tags:` field is the source of truth for that page's tags.
+- The tags recorded for that slug in `index.md` must match the frontmatter set exactly (order and case don't matter; we compare as a lowercased set).
+- `manageWiki` `action: "lint_report"` flags any mismatch as **Tag drift**. Fix by updating whichever side is stale.
 
 ## Canvas Tool
 

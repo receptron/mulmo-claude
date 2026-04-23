@@ -10,6 +10,7 @@ export interface WikiPageEntry {
   title: string;
   slug: string;
   description: string;
+  tags: string[];
 }
 
 export interface WikiData {

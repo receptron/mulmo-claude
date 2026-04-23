@@ -66,19 +66,53 @@
       </div>
     </div>
 
-    <!-- Index: page card list -->
-    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 overflow-y-auto">
-      <div
-        v-for="entry in pageEntries"
-        :key="entry.slug"
-        class="flex items-baseline gap-2 px-4 py-1 cursor-pointer hover:bg-blue-50 transition-colors"
-        :data-testid="`wiki-page-entry-${entry.slug || entry.title}`"
-        @click="navigatePage(entry.slug || entry.title)"
-      >
-        <span class="font-medium text-sm text-gray-800 shrink-0">{{ entry.title }}</span>
-        <span v-if="entry.description" class="text-xs text-gray-500 truncate">
-          {{ entry.description }}
-        </span>
+    <!-- Index: tag filter + page card list -->
+    <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 flex flex-col overflow-hidden">
+      <div v-if="allTags.length > 0" class="shrink-0 border-b border-gray-100 px-4 py-2 flex flex-wrap gap-1">
+        <button
+          :class="['tag-chip', selectedTag === null ? 'tag-chip-active' : 'tag-chip-inactive']"
+          data-testid="wiki-tag-filter-all"
+          @click="selectedTag = null"
+        >
+          {{ t("pluginWiki.tagFilterAll") }}
+        </button>
+        <button
+          v-for="[tag, count] in allTags"
+          :key="tag"
+          :class="['tag-chip', selectedTag === tag ? 'tag-chip-active' : 'tag-chip-inactive']"
+          :data-testid="`wiki-tag-filter-${tag}`"
+          @click="toggleTagFilter(tag)"
+        >
+          {{ tag }} ({{ count }})
+        </button>
+      </div>
+      <div v-if="visibleEntries.length === 0 && selectedTag" class="flex-1 flex items-center justify-center text-gray-400 text-sm px-4 text-center">
+        {{ t("pluginWiki.noMatches", { tag: selectedTag }) }}
+      </div>
+      <div v-else class="flex-1 overflow-y-auto">
+        <div
+          v-for="entry in visibleEntries"
+          :key="entry.slug"
+          class="flex items-baseline gap-2 px-4 py-1 cursor-pointer hover:bg-blue-50 transition-colors"
+          :data-testid="`wiki-page-entry-${entry.slug || entry.title}`"
+          @click="navigatePage(entry.slug || entry.title)"
+        >
+          <span class="font-medium text-sm text-gray-800 shrink-0">{{ entry.title }}</span>
+          <span v-if="entry.description" class="text-xs text-gray-500 truncate">
+            {{ entry.description }}
+          </span>
+          <span v-if="entry.tags.length > 0" class="flex gap-1 flex-wrap shrink-0">
+            <button
+              v-for="tag in entry.tags"
+              :key="tag"
+              class="entry-tag-chip"
+              :data-testid="`wiki-entry-tag-${entry.slug}-${tag}`"
+              @click.stop="selectedTag = tag"
+            >
+              {{ `#${tag}` }}
+            </button>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -153,6 +187,10 @@ const action = ref(props.selectedResult?.data?.action ?? "index");
 const title = ref(props.selectedResult?.data?.title ?? "Wiki");
 const content = ref(props.selectedResult?.data?.content ?? "");
 const pageEntries = ref<WikiPageEntry[]>(props.selectedResult?.data?.pageEntries ?? []);
+// View-local tag filter. Null = no filter. Not persisted to URL —
+// kept intentionally ephemeral so it doesn't leak into bookmarks
+// or the per-session stack history.
+const selectedTag = ref<string | null>(null);
 // Declared up here — not next to callApi — because the URL watcher
 // below fires with `immediate: true`, which invokes callApi
 // synchronously during setup. If this ref were declared after the
@@ -222,6 +260,35 @@ watch(
   },
   { immediate: true },
 );
+
+// Tag frequencies for the filter bar — sorted by count desc, then
+// name asc so the most common tags appear first and equally-common
+// tags stay in deterministic order. Singletons are dropped: a tag
+// used on a single page adds no filtering value, just visual noise.
+// Per-entry `#tag` chips still render every tag, so singletons stay
+// clickable from the row itself.
+const allTags = computed<[string, number][]>(() => {
+  const counts = new Map<string, number>();
+  for (const entry of pageEntries.value) {
+    for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).sort(([tagA, countA], [tagB, countB]) => countB - countA || tagA.localeCompare(tagB));
+});
+
+const visibleEntries = computed(() =>
+  selectedTag.value === null ? pageEntries.value : pageEntries.value.filter((entry) => entry.tags.includes(selectedTag.value as string)),
+);
+
+function toggleTagFilter(tag: string) {
+  selectedTag.value = selectedTag.value === tag ? null : tag;
+}
+
+// Clear the filter whenever we leave the index view — otherwise
+// switching to Log / Lint and back leaves a stale filter active,
+// which feels like a bug.
+watch(action, (next) => {
+  if (next !== "index") selectedTag.value = null;
+});
 
 const renderedContent = computed(() => {
   if (!content.value) return "";
@@ -337,6 +404,46 @@ function handleContentClick(event: MouseEvent) {
 </script>
 
 <style scoped>
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.tag-chip-active {
+  background-color: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+.tag-chip-inactive {
+  background-color: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+.tag-chip-inactive:hover {
+  background-color: #e5e7eb;
+}
+.entry-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.375rem;
+  font-size: 0.7rem;
+  line-height: 1rem;
+  border-radius: 9999px;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.entry-tag-chip:hover {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
 .button-group {
   display: flex;
   gap: 0.5em;
