@@ -45,6 +45,11 @@ export interface StartChatParams {
   attachments?: Attachment[];
   /** Session origin — application-defined (e.g. "human", "bridge") */
   origin?: string;
+  /** Opaque bag forwarded from the bridge handshake. Protocol +
+   *  chat-service don't interpret keys; the host app is free to
+   *  look up its own (e.g. `defaultRole`). Empty object when the
+   *  bridge didn't send any. */
+  bridgeOptions?: Readonly<Record<string, unknown>>;
 }
 
 export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };

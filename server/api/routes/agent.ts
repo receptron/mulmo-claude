@@ -109,6 +109,12 @@ export interface StartChatParams {
    *  Validated server-side before it reaches the system prompt — an
    *  invalid or missing value falls back to server-local time. */
   userTimezone?: string;
+  /** Opaque bag forwarded from the bridge handshake (see
+   *  plans/feat-bridge-options-passthrough.md). The session-level
+   *  `defaultRole` override already applied upstream in chat-service;
+   *  MulmoClaude doesn't read any other keys today. Accepted here so
+   *  the typing matches `StartChatFn` exported by chat-service. */
+  bridgeOptions?: Readonly<Record<string, unknown>>;
 }
 
 export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };

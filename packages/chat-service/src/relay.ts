@@ -19,6 +19,10 @@ export interface RelayParams {
   externalChatId: string;
   text: string;
   attachments?: Attachment[];
+  /** Opaque bag captured at handshake time. Forwarded to the host
+   *  app's startChat callback as `bridgeOptions`. Empty when the
+   *  bridge didn't send any. See plans/feat-bridge-options-passthrough.md. */
+  bridgeOptions?: Readonly<Record<string, unknown>>;
   /** Called for each text chunk as the agent generates it. Used by
    *  the socket transport to stream text to the bridge in real time
    *  (Phase C of #268). */
@@ -49,7 +53,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
   const { store, handleCommand, startChat, onSessionEvent, getRole, defaultRoleId, logger } = deps;
 
   return async function relayMessage(params: RelayParams): Promise<RelayResult> {
-    const { transportId, externalChatId, text, attachments } = params;
+    const { transportId, externalChatId, text, attachments, bridgeOptions } = params;
 
     // Log attachment summary (count + mimeTypes) — NEVER log raw
     // base64 data (performance, log size, information leak risk).
@@ -68,8 +72,13 @@ export function createRelay(deps: RelayDeps): RelayFn {
 
     let chatState = await store.getChatState(transportId, externalChatId);
     if (!chatState) {
-      const defaultRole = getRole(defaultRoleId);
-      chatState = await store.resetChatState(transportId, externalChatId, defaultRole.id);
+      // Only on FIRST contact do we honour `bridgeOptions.defaultRole`
+      // — once the session exists, whatever role the user / command
+      // handler settled on is the source of truth. An unknown role
+      // id silently falls back to the host-app default (we log it so
+      // a typo in the bridge's env var is discoverable).
+      const resolved = resolveDefaultRole(bridgeOptions, getRole, defaultRoleId, logger, transportId);
+      chatState = await store.resetChatState(transportId, externalChatId, resolved);
     }
 
     const commandResult = await handleCommand(text, transportId, chatState);
@@ -83,6 +92,9 @@ export function createRelay(deps: RelayDeps): RelayFn {
       chatSessionId: chatState.sessionId,
       attachments,
       origin: "bridge",
+      // Host app may use other keys (e.g. a future `defaultModel`);
+      // we forward the whole bag untouched.
+      bridgeOptions,
     });
 
     if (result.kind === "error") {
@@ -132,6 +144,34 @@ export function createRelay(deps: RelayDeps): RelayFn {
 }
 
 // ── Internals ────────────────────────────────────────────────
+
+// Resolve the role id to seed a NEW bridge chat state with. Prefers
+// `bridgeOptions.defaultRole` when the bridge sent one and it names
+// a role the host app actually has. Falls back to the host-app
+// default on absence / unknown id (with a warn log so an env-var
+// typo is traceable). Exported for direct unit testing.
+export function resolveDefaultRole(
+  bridgeOptions: Readonly<Record<string, unknown>> | undefined,
+  getRole: (roleId: string) => Role,
+  fallbackRoleId: string,
+  logger: Logger,
+  transportId: string,
+): string {
+  const requested = bridgeOptions?.defaultRole;
+  if (typeof requested !== "string" || requested.length === 0) return fallbackRoleId;
+  // `getRole` on an unknown id silently returns the first built-in
+  // role — compare ids to catch that before we commit to it.
+  const resolved = getRole(requested);
+  if (resolved.id !== requested) {
+    logger.warn("chat-service", "bridge requested unknown default role; falling back", {
+      transportId,
+      requested,
+      fallback: fallbackRoleId,
+    });
+    return fallbackRoleId;
+  }
+  return resolved.id;
+}
 
 // Kept out of the factory closure so future packaging doesn't need
 // to re-capture anything; `onSessionEvent` arrives as a plain param.

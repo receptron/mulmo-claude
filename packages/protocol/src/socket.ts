@@ -13,3 +13,18 @@ export const CHAT_SOCKET_EVENTS = {
 } as const;
 
 export type ChatSocketEvent = (typeof CHAT_SOCKET_EVENTS)[keyof typeof CHAT_SOCKET_EVENTS];
+
+/**
+ * Shape of `socket.handshake.auth` on the bridge chat socket. The
+ * server validates `transportId` + `token`; `options` is an opaque
+ * bag forwarded verbatim to the host application's startChat
+ * callback. The protocol doesn't interpret any keys — bridges and
+ * host apps agree on the key names (e.g. `defaultRole`) out of band.
+ *
+ * See `plans/feat-bridge-options-passthrough.md` for the convention.
+ */
+export interface BridgeHandshakeAuth {
+  transportId: string;
+  token?: string;
+  options?: Readonly<Record<string, unknown>>;
+}

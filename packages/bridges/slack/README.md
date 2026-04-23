@@ -177,8 +177,14 @@ SLACK_ACK_REACTION=my_bot_ack           # custom workspace emoji
 | `SLACK_ALLOWED_CHANNELS` | No | CSV of channel IDs to restrict access (empty = all) |
 | `SLACK_SESSION_GRANULARITY` | No | `channel` *(default)* \| `thread` \| `auto`. See above. |
 | `SLACK_ACK_REACTION` | No | Off by default. `1` enables with 👀; any other emoji shortcode selects a custom emoji. Requires the `reactions:write` scope when enabled. See above. |
+| `SLACK_BRIDGE_DEFAULT_ROLE` | No | Role id to seed new bridge sessions with (e.g. `slack`, `coder`). Applied ONLY when a Slack session first appears — once the user switches role via `/role <id>` the session's own role wins. Unknown role ids silently fall back to the server's default with a warn log. |
+| `BRIDGE_DEFAULT_ROLE` | No | Same as above but shared across every bridge. Transport-specific `SLACK_BRIDGE_DEFAULT_ROLE` wins when both are set. |
 | `MULMOCLAUDE_API_URL` | No | Default `http://localhost:3001` |
 | `MULMOCLAUDE_AUTH_TOKEN` | No | Bearer token (auto-read from workspace if not set) |
+
+### Bridge options passthrough
+
+`SLACK_BRIDGE_*` and `BRIDGE_*` env vars are automatically forwarded to the server as a camelCased options bag (e.g. `SLACK_BRIDGE_DEFAULT_ROLE=slack` → `options.defaultRole = "slack"`). The MulmoClaude server reads `defaultRole`; other host apps using `@mulmobridge/client` can define their own keys without any protocol change. See `plans/feat-bridge-options-passthrough.md` for the full convention.
 
 ## License
 
