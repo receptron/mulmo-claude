@@ -12,16 +12,14 @@ interface DirEntry {
   structure: "flat" | "by-name" | "by-date";
 }
 
-// Typed save status so the template can drive colour off `kind`
-// instead of string-comparing a localised "Saved" — previously the
-// green-on-success styling was coupled to the English literal.
-type SaveStatus = { kind: "ok" } | { kind: "error"; message: string };
-
+// Append + remove only — every mutation persists immediately. No
+// draft/save split: there was nothing to edit in place, so the old
+// Save button just risked silent data loss when a user added an
+// entry and forgot to confirm.
 const dirs = ref<DirEntry[]>([]);
 const loading = ref(true);
 const error = ref("");
-const saving = ref(false);
-const saveStatus = ref<SaveStatus | null>(null);
+const persistError = ref("");
 
 // Draft for new entry
 const draftPath = ref("");
@@ -41,23 +39,19 @@ async function load(): Promise<void> {
   dirs.value = result.data.dirs;
 }
 
-async function save(): Promise<void> {
-  saving.value = true;
-  saveStatus.value = null;
+async function persist(previous: DirEntry[]): Promise<boolean> {
   const result = await apiPut<{ dirs: DirEntry[] }>(API_ROUTES.config.workspaceDirs, { dirs: dirs.value });
-  saving.value = false;
   if (!result.ok) {
-    saveStatus.value = { kind: "error", message: result.error };
-    return;
+    dirs.value = previous;
+    persistError.value = result.error;
+    return false;
   }
   dirs.value = result.data.dirs;
-  saveStatus.value = { kind: "ok" };
-  setTimeout(() => {
-    saveStatus.value = null;
-  }, 2000);
+  persistError.value = "";
+  return true;
 }
 
-function addEntry(): void {
+async function addEntry(): Promise<void> {
   draftError.value = "";
   const path = draftPath.value.trim();
   if (!path) {
@@ -72,18 +66,27 @@ function addEntry(): void {
     draftError.value = t("settingsWorkspaceDirs.errAlreadyExists");
     return;
   }
-  dirs.value.push({
-    path,
-    description: draftDescription.value.trim(),
-    structure: draftStructure.value,
-  });
-  draftPath.value = "";
-  draftDescription.value = "";
-  draftStructure.value = "flat";
+  const previous = dirs.value.slice();
+  dirs.value = [
+    ...previous,
+    {
+      path,
+      description: draftDescription.value.trim(),
+      structure: draftStructure.value,
+    },
+  ];
+  const ok = await persist(previous);
+  if (ok) {
+    draftPath.value = "";
+    draftDescription.value = "";
+    draftStructure.value = "flat";
+  }
 }
 
-function removeEntry(index: number): void {
-  dirs.value.splice(index, 1);
+async function removeEntry(index: number): Promise<void> {
+  const previous = dirs.value.slice();
+  dirs.value = previous.filter((_, i) => i !== index);
+  await persist(previous);
 }
 
 onMounted(load);
@@ -165,19 +168,9 @@ onMounted(load);
         </div>
       </div>
 
-      <!-- Save -->
-      <div class="flex items-center gap-2">
-        <button
-          class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300"
-          :disabled="saving"
-          data-testid="workspace-dirs-save-btn"
-          @click="save"
-        >
-          {{ saving ? t("common.saving") : t("common.save") }}
-        </button>
-        <span v-if="saveStatus" class="text-xs" :class="saveStatus.kind === 'ok' ? 'text-green-600' : 'text-red-600'">
-          {{ saveStatus.kind === "ok" ? t("common.saved") : saveStatus.message }}
-        </span>
+      <!-- Persist error (from the most recent add/remove PUT) -->
+      <div v-if="persistError" class="text-xs text-red-600 bg-red-50 rounded px-3 py-1.5" data-testid="workspace-dirs-persist-error">
+        {{ persistError }}
       </div>
     </template>
   </div>
