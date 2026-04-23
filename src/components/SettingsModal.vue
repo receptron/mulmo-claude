@@ -1,5 +1,5 @@
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" data-testid="settings-modal-backdrop" @click="close">
+  <div v-if="open" class="fixed inset-0 z-50 bg-black/40 flex items-start justify-center pt-16" data-testid="settings-modal-backdrop" @click="close">
     <div
       class="bg-white rounded-lg shadow-xl w-[36rem] max-h-[85vh] flex flex-col"
       role="dialog"
