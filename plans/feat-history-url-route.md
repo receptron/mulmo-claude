@@ -96,16 +96,15 @@ watch(currentPage, (page) => {
 
 ### Browser-history semantics
 
-Clicking a session while on `/history` uses `router.replace` (not `push`), swapping the `/history` entry for `/chat/:id`. This keeps session-to-session back/forward working intuitively — `back` from a session you picked via history goes to whatever you were doing before opening history, not back to the panel. If users want the panel again, they click the history button (one click, one push).
-
-Direct-link `/history` still works (it's a real bookmarkable URL); only the replace-on-select changes the stack behavior.
+`/history` is a real page route. Clicking a session pushes `/chat/:id` on top of `/history`, so browser back from the chat returns to `/history` (re-renders the panel). This matches the mental model of "I visited the history page, clicked a session, now go back". Session-to-session navigation via the panel leaves `/history` entries in the stack between sessions — going back through them is a deliberate trace of how the user got there.
 
 ## Test plan
 
 - Manual
   - Click history button on `/chat/<id>` → URL flips to `/history`, panel renders inline
-  - Click a session card → URL flips to `/chat/<id>` (replaces `/history` in the stack)
-  - Browser back → returns to the chat you were on before opening history
+  - Click a session card → URL flips to `/chat/<id>`
+  - Browser back → returns to `/history` (panel re-renders)
+  - Browser back again → returns to the prior chat
   - Direct-link `/history` → panel opens with fetched sessions
   - On `/history`, click history button again → `router.back()` goes to prior page
 - Existing e2e for session history still green (modal-style interactions updated for the route-based flow)

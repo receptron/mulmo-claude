@@ -50,23 +50,24 @@ test.describe("history panel (useSessionHistory)", () => {
     await expect(page.getByTestId(`session-item-${SESSION_B.id}`)).toBeVisible();
   });
 
-  test("clicking a session from /history replaces /history in browser history", async ({ page }) => {
-    // Selecting a session while on /history should replace the
-    // /history entry, so browser back goes to whatever was before
-    // /history — not back to the panel. This preserves intuitive
-    // session-to-session back/forward when the user jumps between
-    // sessions via history.
+  test("browser back from /chat/:id after selecting returns to /history", async ({ page }) => {
+    // /history is a real page in browser history. After selecting a
+    // session from the panel, back should return to /history (not
+    // skip over it) — that matches the mental model of "I visited
+    // the history page, clicked a session, now go back".
     await page.goto("/chat");
+    // Wait for the /chat → /chat/<newId> redirect before opening
+    // history — clicking mid-bootstrap makes the stack timing-dependent.
     await page.waitForURL(/\/chat\//);
-    const priorUrl = page.url();
-
     await page.getByTestId("history-btn").click();
     await expect(page).toHaveURL(/\/history$/);
     await page.getByTestId(`session-item-${SESSION_A.id}`).click();
     await expect(page).toHaveURL(new RegExp(`/chat/${SESSION_A.id}`));
 
     await page.goBack();
-    await expect(page).toHaveURL(priorUrl);
+    await expect(page).toHaveURL(/\/history$/);
+    // Panel re-renders with the session list.
+    await expect(page.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
   });
 
   test("second click on history button (while on /history) goes back to prior page", async ({ page }) => {

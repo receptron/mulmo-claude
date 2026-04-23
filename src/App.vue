@@ -609,10 +609,13 @@ async function loadSession(sessionId: string) {
   // instead of silently no-opping.
   const alreadyOnThatChat = sessionId === currentSessionId.value && sessionMap.has(sessionId) && route.params.sessionId === sessionId;
   if (alreadyOnThatChat) return;
-  // Clicking a session from /history should replace the /history
-  // entry — otherwise browser back lands on /history instead of the
-  // previous session, breaking session-to-session back/forward.
-  const replaced = removeCurrentIfEmpty() || route.name === PAGE_ROUTES.history;
+  // Mirror createNewSession: only replace when we just discarded an
+  // empty session AND we're on that /chat/:emptyId URL. On /history
+  // (or any non-chat page) selecting a session must push, otherwise
+  // the /history entry would be skipped when the last chat happened
+  // to be empty.
+  const removedEmpty = removeCurrentIfEmpty();
+  const replaced = removedEmpty && isChatPage.value;
 
   const live = sessionMap.get(sessionId);
   if (live) {
