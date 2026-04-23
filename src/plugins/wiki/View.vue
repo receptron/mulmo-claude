@@ -8,7 +8,7 @@
          tool result. See plans/feat-stack-compact-actions.md. -->
     <Teleport v-if="compact && stackActionsTarget && action === 'page' && content" :to="`#${stackActionsTarget}`" defer>
       <button
-        class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+        class="px-2 py-0.5 text-xs rounded bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
         :disabled="pdfDownloading"
         :title="t('pluginWiki.pdf')"
         @click.stop="downloadPdf"
