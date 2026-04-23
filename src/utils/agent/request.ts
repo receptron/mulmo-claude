@@ -3,6 +3,7 @@
 import type { Role } from "../../config/roles";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { apiFetchRaw } from "../api";
+import { errorMessage } from "../errors";
 
 export interface AgentRequestBodyParams {
   message: string;
@@ -68,7 +69,7 @@ export async function postAgentRun(body: AgentRequestBody): Promise<{ ok: true }
     console.error("[agent] fetch error:", err);
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Connection error.",
+      error: errorMessage(err, "Connection error."),
     };
   }
 }
