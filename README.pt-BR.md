@@ -169,7 +169,6 @@ Cada papel dá ao Claude uma persona, paleta de ferramentas e área de foco dife
 | **Artist**          | Geração de imagens, edição de imagens, arte generativa com p5.js                    |
 | **Tutor**           | Ensino adaptativo — avalia seu nível antes de explicar qualquer coisa               |
 | **Storyteller**     | Histórias ilustradas interativas com imagens e cenas em HTML                        |
-| **Role Manager**    | Crie e edite papéis personalizados                                                  |
 
 Trocar de papel reinicia o contexto do Claude e carrega apenas as ferramentas de que esse papel precisa — mantendo as respostas rápidas e focadas.
 
@@ -374,9 +373,8 @@ Essas ferramentas estão **desabilitadas por padrão** e requerem um Bearer Toke
 
 Essas ferramentas estão **disponíveis apenas em papéis personalizados**. Os papéis integrados não as incluem por padrão (exceto General). Para usá-las em seu próprio papel:
 
-1. Mude para o papel **Role Manager**
-2. Peça ao Claude para criar um papel personalizado, ou edite um existente
-3. Na lista de plugins, ative `readXPost` e/ou `searchX`
+1. Crie ou edite um arquivo JSON de papel personalizado em `~/mulmoclaude/roles/<id>.json`
+2. Adicione `readXPost` e/ou `searchX` à sua lista `availablePlugins`
 
 Uma vez configurado, você pode colar qualquer URL de `x.com` ou `twitter.com` no chat e o Claude irá buscá-la e lê-la automaticamente.
 
