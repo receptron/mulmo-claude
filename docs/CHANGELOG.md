@@ -8,6 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Changed
+
+- `@mulmobridge/slack` (v0.3.0 → **v0.4.0**) — Opt-in ack-reaction feature. When `SLACK_ACK_REACTION` is set, the bridge adds an emoji reaction to every inbound message it processes, giving the user an immediate "the bot saw me" signal before the agent finishes thinking. Single dual-purpose env var — `1` enables with the default `:eyes:` 👀, any other emoji shortcode selects a custom emoji. Off by default; requires the `reactions:write` Bot Token Scope when enabled. Fire-and-forget: failures (missing scope, rate limit, etc.) log a warning without blocking the handler. Reaction is not removed when the reply arrives — it stays as a "seen" marker (#696, closes #695).
+
+### Packages published during this cycle
+
+- `@mulmobridge/slack@0.4.0`
+
 ---
 
 ## [0.4.0] - 2026-04-23
