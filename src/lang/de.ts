@@ -327,7 +327,7 @@ const deMessages = {
     previewMore: "+ {count} weitere…",
     chatPlaceholder: "Fragen Sie zu dieser Seite…",
     chatSend: "Neuen Chat zu dieser Seite starten",
-    emptyPage: 'Die Seite „{title}" existiert noch nicht.',
+    emptyPage: "Die Seite „{title}“ existiert noch nicht.",
     createPage: "Diese Wiki-Seite erstellen",
   },
   pluginPresentHtml: {
