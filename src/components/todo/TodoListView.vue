@@ -9,8 +9,8 @@
           :aria-label="t('todoTableList.expandRowAria', { task: item.text })"
           class="flex items-center gap-3 p-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
           @click="toggleExpand(item.id)"
-          @keydown.enter.prevent="toggleExpand(item.id)"
-          @keydown.space.prevent="toggleExpand(item.id)"
+          @keydown.enter.prevent.self="toggleExpand(item.id)"
+          @keydown.space.prevent.self="toggleExpand(item.id)"
         >
           <input type="checkbox" :checked="item.completed" class="cursor-pointer shrink-0" @click.stop @change="toggleComplete(item)" />
           <div class="flex-1 min-w-0">

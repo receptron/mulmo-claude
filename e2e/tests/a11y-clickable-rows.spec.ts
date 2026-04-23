@@ -51,4 +51,31 @@ test.describe("clickable-region a11y", () => {
     const label = await row.getAttribute("aria-label");
     expect(label).toBeTruthy();
   });
+
+  test("focused /history session row does not fire activation when Space is pressed on a non-self target", async ({ page }) => {
+    // Regression guard for the `.self` modifier added to keydown
+    // handlers. The session row currently has no inner interactive
+    // control, but future additions (e.g., a menu button) could
+    // bubble a keydown up and hijack the row's own activation.
+    // Simulate that by programmatically dispatching a Space keydown
+    // with a non-self target on the row, then confirming no
+    // navigation occurred.
+    await page.goto("/history");
+    const row = page.getByTestId(`session-item-${SESSION_A.id}`);
+    await expect(row).toBeVisible();
+    const startUrl = page.url();
+
+    await row.evaluate((el) => {
+      // Synthetic keydown event whose target is a CHILD span inside
+      // the row, not the row itself. With `.self`, the handler must
+      // skip. Without it, the handler would fire and navigate away.
+      const child = el.querySelector("span") ?? el;
+      child.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true, cancelable: true }));
+    });
+
+    // Give the event loop a chance to process a navigation that
+    // would happen in the broken case.
+    await page.waitForTimeout(100);
+    expect(page.url()).toBe(startUrl);
+  });
 });

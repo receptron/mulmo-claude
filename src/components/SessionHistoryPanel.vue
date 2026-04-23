@@ -42,8 +42,8 @@
         :class="rowClasses(session)"
         :data-testid="`session-item-${session.id}`"
         @click="emit('loadSession', session.id)"
-        @keydown.enter.prevent="emit('loadSession', session.id)"
-        @keydown.space.prevent="emit('loadSession', session.id)"
+        @keydown.enter.prevent.self="emit('loadSession', session.id)"
+        @keydown.space.prevent.self="emit('loadSession', session.id)"
       >
         <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
           <span class="material-icons text-xs">{{ roleIconFor(session.roleId) }}</span>

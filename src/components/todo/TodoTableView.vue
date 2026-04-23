@@ -4,17 +4,20 @@
     <table v-else class="min-w-full text-sm">
       <thead class="bg-gray-50 sticky top-0 z-10">
         <tr class="text-left text-xs font-medium text-gray-500 uppercase">
+          <!-- Keep the native <th> column-header role so aria-sort and
+               table navigation work for screen readers. role="button"
+               would overwrite the header role and defeat aria-sort.
+               Keyboard activation goes via tabindex + key handlers. -->
           <th
             v-for="col in COLUMNS"
             :key="col.key"
             tabindex="0"
-            role="button"
             :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
             :aria-label="t('todoTableList.sortColumnAria', { column: col.label })"
             class="px-3 py-2 cursor-pointer hover:bg-gray-100 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             @click="setSort(col.key)"
-            @keydown.enter.prevent="setSort(col.key)"
-            @keydown.space.prevent="setSort(col.key)"
+            @keydown.enter.prevent.self="setSort(col.key)"
+            @keydown.space.prevent.self="setSort(col.key)"
           >
             {{ col.label }}
             <span v-if="sortKey === col.key" class="material-icons text-xs align-middle">{{ sortDir === "asc" ? "arrow_upward" : "arrow_downward" }}</span>
@@ -28,14 +31,17 @@
             <td class="px-3 py-2">
               <input type="checkbox" :checked="item.completed" @change="emit('toggleComplete', item)" />
             </td>
+            <!-- Same rationale as the <th> above: keep the native <td>
+                 cell role so screen-reader table navigation still works;
+                 activation goes via tabindex + key handlers, described
+                 via aria-label. -->
             <td
               tabindex="0"
-              role="button"
               :aria-label="t('todoTableList.expandRowAria', { task: item.text })"
               class="px-3 py-2 max-w-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               @click="toggleExpand(item.id)"
-              @keydown.enter.prevent="toggleExpand(item.id)"
-              @keydown.space.prevent="toggleExpand(item.id)"
+              @keydown.enter.prevent.self="toggleExpand(item.id)"
+              @keydown.space.prevent.self="toggleExpand(item.id)"
             >
               <div :class="item.completed ? 'line-through text-gray-400' : 'text-gray-800'">
                 {{ item.text }}
