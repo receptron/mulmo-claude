@@ -25,6 +25,12 @@ const zhMessages = {
     // 中文无单复数之分，但仍保留 `|` 分隔符以对齐 vue-i18n 的 pluralization 约定。
     activeSessions: "{count} 个活动会话（代理运行中）",
     unreadReplies: "{count} 条未读回复",
+    unreadDot: "新回复",
+    origin: {
+      scheduler: "由调度器启动",
+      skill: "由技能启动",
+      bridge: "由桥接启动",
+    },
   },
   chatInput: {
     placeholder: "输入任务,或拖放 / 粘贴 / 附加文件…",

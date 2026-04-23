@@ -25,6 +25,12 @@ const esMessages = {
     sessionHistory: "Historial de sesiones",
     activeSessions: "{count} sesión activa (agente en ejecución) | {count} sesiones activas (agente en ejecución)",
     unreadReplies: "{count} respuesta sin leer | {count} respuestas sin leer",
+    unreadDot: "Nueva respuesta",
+    origin: {
+      scheduler: "Iniciada por el programador",
+      skill: "Iniciada por una skill",
+      bridge: "Iniciada por un bridge",
+    },
   },
   chatInput: {
     placeholder: "Escribe una tarea, o arrastra / pega / adjunta un archivo…",

@@ -20,6 +20,12 @@ const ptBRMessages = {
     sessionHistory: "Histórico de sessões",
     activeSessions: "{count} sessão ativa (agente em execução) | {count} sessões ativas (agente em execução)",
     unreadReplies: "{count} resposta não lida | {count} respostas não lidas",
+    unreadDot: "Nova resposta",
+    origin: {
+      scheduler: "Iniciada pelo agendador",
+      skill: "Iniciada por uma skill",
+      bridge: "Iniciada por um bridge",
+    },
   },
   chatInput: {
     placeholder: "Digite uma tarefa ou arraste / cole / anexe um arquivo…",

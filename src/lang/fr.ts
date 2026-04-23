@@ -20,6 +20,12 @@ const frMessages = {
     sessionHistory: "Historique des sessions",
     activeSessions: "{count} session active (agent en cours d'exécution) | {count} sessions actives (agent en cours d'exécution)",
     unreadReplies: "{count} réponse non lue | {count} réponses non lues",
+    unreadDot: "Nouvelle réponse",
+    origin: {
+      scheduler: "Démarrée par le planificateur",
+      skill: "Démarrée par une skill",
+      bridge: "Démarrée par un bridge",
+    },
   },
   chatInput: {
     placeholder: "Saisissez une tâche, ou glissez / collez / joignez un fichier…",

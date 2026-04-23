@@ -26,6 +26,7 @@
         <SessionTabBar
           :sessions="tabSessions"
           :current-session-id="displayedCurrentSessionId"
+          :is-chat-page="isChatPage"
           :roles="roles"
           :active-session-count="activeSessionCount"
           :unread-count="unreadCount"

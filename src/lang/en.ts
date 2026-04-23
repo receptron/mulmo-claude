@@ -42,6 +42,12 @@ const enMessages = {
     // based on the number. `{count}` is interpolated.
     activeSessions: "{count} active session (agent running) | {count} active sessions (agent running)",
     unreadReplies: "{count} unread reply | {count} unread replies",
+    unreadDot: "New reply",
+    origin: {
+      scheduler: "Started by scheduler",
+      skill: "Started by skill",
+      bridge: "Started by bridge",
+    },
   },
   chatInput: {
     placeholder: "Type a task, or drop / paste / attach a file…",

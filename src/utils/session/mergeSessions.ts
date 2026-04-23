@@ -49,6 +49,11 @@ function buildLiveSummary(live: ActiveSession, serverEntry: SessionSummary | und
     ...(serverEntry?.keywords !== undefined && {
       keywords: serverEntry.keywords,
     }),
+    // `origin` is set once by the server when the session is created
+    // (scheduler / skill / bridge / human). A live session promoted
+    // from the server list must keep it — the tab bar renders the
+    // non-human glyph off this field.
+    ...(serverEntry?.origin !== undefined && { origin: serverEntry.origin }),
     isRunning,
     ...(serverEntry?.hasUnread !== undefined && {
       hasUnread: serverEntry.hasUnread,

@@ -5,6 +5,12 @@ export interface SessionFixture {
   startedAt: string;
   updatedAt: string;
   preview?: string;
+  // Optional fields exercised by tab-bar tests — omitted fixtures
+  // behave as if the flags were absent on the server summary.
+  summary?: string;
+  hasUnread?: boolean;
+  isRunning?: boolean;
+  origin?: "human" | "scheduler" | "skill" | "bridge";
 }
 
 export const SESSION_A: SessionFixture = {

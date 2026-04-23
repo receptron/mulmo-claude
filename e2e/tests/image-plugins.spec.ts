@@ -95,8 +95,10 @@ test.describe("image plugin rendering", () => {
     // The session has tool results — at least one image should render.
     // The sidebar shows preview components for each result.
     await page.waitForTimeout(ONE_SECOND_MS);
-    // No crash, page is interactive.
-    await expect(page.getByText("Generate an image")).toBeVisible();
+    // Scope to the tool-results panel — the session-tab bar now
+    // also surfaces the preview text as a tab label, so an
+    // unscoped getByText would trip strict-mode on duplicates.
+    await expect(page.getByTestId("tool-results-scroll").getByText("Generate an image")).toBeVisible();
   });
 
   test("empty imageData does not produce a broken <img> tag", async ({ page }) => {

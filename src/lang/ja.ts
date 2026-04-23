@@ -27,6 +27,12 @@ const jaMessages = {
     // pluralization API に合わせて `|` 区切りで揃える。
     activeSessions: "{count} 件のアクティブセッション（エージェント実行中）",
     unreadReplies: "{count} 件の未読返信",
+    unreadDot: "新しい返信",
+    origin: {
+      scheduler: "スケジューラから開始",
+      skill: "スキルから開始",
+      bridge: "ブリッジから開始",
+    },
   },
   chatInput: {
     placeholder: "タスクを入力、またはファイルをドロップ・ペースト・添付…",

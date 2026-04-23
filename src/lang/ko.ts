@@ -27,6 +27,12 @@ const koMessages = {
     // pluralization 규약에 맞추기 위해 `|` 구분자를 유지합니다.
     activeSessions: "활성 세션 {count}개 (에이전트 실행 중)",
     unreadReplies: "읽지 않은 답장 {count}개",
+    unreadDot: "새 답장",
+    origin: {
+      scheduler: "스케줄러에서 시작됨",
+      skill: "스킬에서 시작됨",
+      bridge: "브리지에서 시작됨",
+    },
   },
   chatInput: {
     placeholder: "작업을 입력하거나 파일을 드래그 / 붙여넣기 / 첨부하세요…",

@@ -20,6 +20,12 @@ const deMessages = {
     sessionHistory: "Sitzungsverlauf",
     activeSessions: "{count} aktive Sitzung (Agent läuft) | {count} aktive Sitzungen (Agent läuft)",
     unreadReplies: "{count} ungelesene Antwort | {count} ungelesene Antworten",
+    unreadDot: "Neue Antwort",
+    origin: {
+      scheduler: "Vom Scheduler gestartet",
+      skill: "Von einer Skill gestartet",
+      bridge: "Von einem Bridge gestartet",
+    },
   },
   chatInput: {
     placeholder: "Aufgabe eingeben oder Datei ziehen / einfügen / anhängen…",
