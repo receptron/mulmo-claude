@@ -6,6 +6,7 @@
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-200">
         <SidebarHeader
           :sandbox-enabled="sandboxEnabled"
+          :gemini-available="geminiAvailable"
           :title-style="debugTitleStyle"
           @test-query="(q) => sendMessage(q)"
           @notification-navigate="handleNotificationNavigate"
@@ -43,15 +44,6 @@
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar (Single layout only) -->
       <div v-if="!isStackLayout" class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative">
-        <!-- Gemini API key warning -->
-        <div v-if="!geminiAvailable" class="mx-4 mt-3 mb-2 rounded border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-700 shrink-0">
-          <span class="material-icons text-xs align-middle mr-1">warning</span>
-          <i18n-t keypath="app.geminiRequired" tag="span">
-            <template #envKey><code class="font-mono">GEMINI_API_KEY</code></template>
-            <template #envFile><code class="font-mono">.env</code></template>
-          </i18n-t>
-        </div>
-
         <!-- Tool result previews -->
         <ToolResultsPanel
           ref="toolResultsPanelRef"
@@ -80,15 +72,6 @@
 
       <!-- Canvas column -->
       <div class="flex-1 flex flex-col bg-white text-gray-900 min-w-0 overflow-hidden relative">
-        <!-- Gemini API key warning (Stack layouts — no sidebar to host it) -->
-        <div v-if="isStackLayout && !geminiAvailable" class="mx-3 mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-700 shrink-0">
-          <span class="material-icons text-xs align-middle mr-1">warning</span>
-          <i18n-t keypath="app.geminiRequired" tag="span">
-            <template #envKey><code class="font-mono">GEMINI_API_KEY</code></template>
-            <template #envFile><code class="font-mono">.env</code></template>
-          </i18n-t>
-        </div>
-
         <div ref="canvasRef" class="flex-1 overflow-hidden outline-none min-h-0" tabindex="0" @mousedown="activePane = 'main'" @keydown="handleCanvasKeydown">
           <!-- Chat page: single or stack layout -->
           <template v-if="isChatPage && layoutMode === 'single'">
@@ -161,7 +144,14 @@
     </div>
 
     <!-- Global settings modal -->
-    <SettingsModal :open="showSettings" :docker-mode="sandboxEnabled" :mcp-tools-error="mcpToolsError" @update:open="showSettings = $event" />
+    <SettingsModal
+      :open="showSettings"
+      :docker-mode="sandboxEnabled"
+      :gemini-available="geminiAvailable"
+      :mcp-tools-error="mcpToolsError"
+      @update:open="showSettings = $event"
+      @ask-gemini="handleAskGemini"
+    />
     <NotificationToast />
   </div>
 </template>
@@ -222,6 +212,7 @@ import { useHistoryEntrance } from "./composables/useHistoryEntrance";
 import { useSelectedResult } from "./composables/useSelectedResult";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
+import { BUILTIN_ROLE_IDS } from "./config/roles";
 import { usePubSub } from "./composables/usePubSub";
 import { sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
@@ -815,6 +806,10 @@ function startNewChat(message: string, roleId?: string): void {
   // is now handled inside createNewSession via the isChatPage check.
   createNewSession(roleId);
   void sendMessage(message);
+}
+
+function handleAskGemini(): void {
+  startNewChat(t("settingsModal.geminiAskMessage"), BUILTIN_ROLE_IDS.general);
 }
 
 // Plugin Views call back into App.vue via provide/inject (#227).

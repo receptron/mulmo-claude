@@ -23,13 +23,19 @@
       />
       <NotificationBell :force-close="lockPopupOpen" @navigate="(action) => emit('notificationNavigate', action)" @update:open="onNotificationOpen" />
       <button
-        class="text-gray-400 hover:text-gray-700"
+        class="relative text-gray-400 hover:text-gray-700"
         data-testid="settings-btn"
         :title="t('sidebarHeader.settings')"
         :aria-label="t('sidebarHeader.settings')"
         @click="emit('openSettings')"
       >
         <span class="material-icons">settings</span>
+        <span
+          v-if="!geminiAvailable"
+          class="gemini-missing-badge absolute -top-0.5 -right-0.5 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-yellow-400 text-[9px] font-bold leading-none text-white ring-1 ring-white"
+          data-testid="settings-gemini-badge"
+          aria-hidden="true"
+        ></span>
       </button>
     </div>
   </div>
@@ -46,10 +52,14 @@ import logoUrl from "../assets/mulmo_bw.png";
 
 const { t } = useI18n();
 
-defineProps<{
-  sandboxEnabled: boolean;
-  titleStyle?: CSSProperties;
-}>();
+withDefaults(
+  defineProps<{
+    sandboxEnabled: boolean;
+    geminiAvailable?: boolean;
+    titleStyle?: CSSProperties;
+  }>(),
+  { geminiAvailable: true, titleStyle: () => ({}) },
+);
 
 const emit = defineEmits<{
   testQuery: [query: string];
@@ -78,3 +88,9 @@ function onNotificationOpen(isOpen: boolean): void {
   if (isOpen) lockPopupOpen.value = false;
 }
 </script>
+
+<style scoped>
+.gemini-missing-badge::before {
+  content: "!";
+}
+</style>

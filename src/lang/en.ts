@@ -136,11 +136,18 @@ const enMessages = {
   settingsModal: {
     title: "Settings",
     tabs: {
+      gemini: "Gemini API Key",
       tools: "Allowed Tools",
       mcp: "MCP Servers",
       dirs: "Directories",
       refs: "Reference Dirs",
     },
+    // `<i18n-t>` slots — named `envKey` / `envFile` render as inline
+    // `<code>` in SettingsModal.vue, so the literal variable and file
+    // names stay untranslated while the surrounding copy is localised.
+    geminiRequired: "Image generation requires {envKey}. Add it to {envFile} and restart the app.",
+    geminiAskButton: "Ask Claude",
+    geminiAskMessage: "What is the role of the Gemini API key in this app?",
     toolNamesLabel: "Tool names",
     invalidToolNamesPrefix: "These look non-standard (expected prefix",
     invalidToolNamesSuffix: "):",
@@ -559,10 +566,6 @@ const enMessages = {
     formulaType: "Formula",
   },
   app: {
-    // `<i18n-t>` slots — named `envKey` / `envFile` render as inline
-    // `<code>` in App.vue, so the literal variable and file names
-    // stay untranslated while the surrounding copy is localised.
-    geminiRequired: "Image generation requires {envKey}. Add it to {envFile} and restart the app.",
     startConversation: "Start a conversation",
   },
   suggestionsPanel: {

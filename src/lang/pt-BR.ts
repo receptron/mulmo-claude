@@ -114,11 +114,18 @@ const ptBRMessages = {
   settingsModal: {
     title: "Configurações",
     tabs: {
+      gemini: "Chave API do Gemini",
       tools: "Ferramentas permitidas",
       mcp: "Servidores MCP",
       dirs: "Diretórios",
       refs: "Diretórios de referência",
     },
+    // Slots `<i18n-t>` — os nomes `envKey` / `envFile` renderizam como
+    // `<code>` inline no SettingsModal.vue, então os literais de
+    // variável e nome de arquivo permanecem não traduzidos.
+    geminiRequired: "A geração de imagens requer {envKey}. Adicione-o a {envFile} e reinicie o app.",
+    geminiAskButton: "Perguntar ao Claude",
+    geminiAskMessage: "Qual é o papel da chave API do Gemini neste app?",
     toolNamesLabel: "Nomes de ferramentas",
     invalidToolNamesPrefix: "Estes parecem não padrão (prefixo esperado",
     invalidToolNamesSuffix: "):",
@@ -535,10 +542,6 @@ const ptBRMessages = {
     formulaType: "Fórmula",
   },
   app: {
-    // Slots `<i18n-t>` — os nomes `envKey` / `envFile` renderizam como
-    // `<code>` inline no App.vue, então os literais de variável e nome
-    // de arquivo permanecem não traduzidos.
-    geminiRequired: "A geração de imagens requer {envKey}. Adicione-o a {envFile} e reinicie o app.",
     startConversation: "Iniciar uma conversa",
   },
   suggestionsPanel: {

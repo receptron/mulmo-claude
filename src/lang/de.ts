@@ -114,11 +114,18 @@ const deMessages = {
   settingsModal: {
     title: "Einstellungen",
     tabs: {
+      gemini: "Gemini-API-Schlüssel",
       tools: "Erlaubte Tools",
       mcp: "MCP-Server",
       dirs: "Verzeichnisse",
       refs: "Referenzverzeichnisse",
     },
+    // `<i18n-t>`-Slots — die Namen `envKey` / `envFile` werden in
+    // SettingsModal.vue als Inline-`<code>` gerendert, sodass die
+    // literalen Variablen- und Dateinamen unübersetzt bleiben.
+    geminiRequired: "Die Bildgenerierung erfordert {envKey}. Fügen Sie ihn zu {envFile} hinzu und starten Sie die App neu.",
+    geminiAskButton: "Claude fragen",
+    geminiAskMessage: "Welche Rolle spielt der Gemini-API-Schlüssel in dieser App?",
     toolNamesLabel: "Tool-Namen",
     invalidToolNamesPrefix: "Diese sehen nicht standardmäßig aus (erwartetes Präfix",
     invalidToolNamesSuffix: "):",
@@ -537,10 +544,6 @@ const deMessages = {
     formulaType: "Formel",
   },
   app: {
-    // `<i18n-t>`-Slots — die Namen `envKey` / `envFile` werden in App.vue
-    // als Inline-`<code>` gerendert, sodass die literalen Variablen- und
-    // Dateinamen unübersetzt bleiben.
-    geminiRequired: "Die Bildgenerierung erfordert {envKey}. Fügen Sie ihn zu {envFile} hinzu und starten Sie die App neu.",
     startConversation: "Gespräch beginnen",
   },
   suggestionsPanel: {

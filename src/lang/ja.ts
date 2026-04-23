@@ -119,11 +119,18 @@ const jaMessages = {
   settingsModal: {
     title: "設定",
     tabs: {
+      gemini: "Gemini API キー",
       tools: "許可ツール",
       mcp: "MCP サーバ",
       dirs: "ディレクトリ",
       refs: "参照ディレクトリ",
     },
+    // `<i18n-t>` スロット — `envKey` / `envFile` は SettingsModal.vue で
+    // インラインの `<code>` として描画されるため、変数名とファイル名は
+    // 翻訳せずそのまま残します。
+    geminiRequired: "画像生成には {envKey} が必要です。{envFile} に追加してアプリを再起動してください。",
+    geminiAskButton: "Claude に質問",
+    geminiAskMessage: "このアプリにおける Gemini API キーの役割は何ですか?",
     toolNamesLabel: "ツール名",
     invalidToolNamesPrefix: "次の項目は標準的ではないようです（期待される接頭辞",
     invalidToolNamesSuffix: "）:",
@@ -543,7 +550,6 @@ const jaMessages = {
     formulaType: "数式",
   },
   app: {
-    geminiRequired: "画像生成には {envKey} が必要です。{envFile} に追加してアプリを再起動してください。",
     startConversation: "会話を開始してください",
   },
   suggestionsPanel: {

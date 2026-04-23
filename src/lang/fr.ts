@@ -114,11 +114,18 @@ const frMessages = {
   settingsModal: {
     title: "Paramètres",
     tabs: {
+      gemini: "Clé API Gemini",
       tools: "Outils autorisés",
       mcp: "Serveurs MCP",
       dirs: "Répertoires",
       refs: "Répertoires de référence",
     },
+    // Slots `<i18n-t>` — les noms `envKey` / `envFile` sont rendus sous
+    // forme de `<code>` inline dans SettingsModal.vue ; les littéraux
+    // (nom de variable et nom de fichier) restent donc non traduits.
+    geminiRequired: "La génération d'images nécessite {envKey}. Ajoutez-le à {envFile} et redémarrez l'application.",
+    geminiAskButton: "Demander à Claude",
+    geminiAskMessage: "Quel est le rôle de la clé API Gemini dans cette application ?",
     toolNamesLabel: "Noms d'outils",
     invalidToolNamesPrefix: "Ceux-ci semblent non standards (préfixe attendu",
     invalidToolNamesSuffix: ") :",
@@ -537,10 +544,6 @@ const frMessages = {
     formulaType: "Formule",
   },
   app: {
-    // Slots `<i18n-t>` — les noms `envKey` / `envFile` sont rendus sous
-    // forme de `<code>` inline dans App.vue ; les littéraux (nom de
-    // variable et nom de fichier) restent donc non traduits.
-    geminiRequired: "La génération d'images nécessite {envKey}. Ajoutez-le à {envFile} et redémarrez l'application.",
     startConversation: "Démarrer une conversation",
   },
   suggestionsPanel: {

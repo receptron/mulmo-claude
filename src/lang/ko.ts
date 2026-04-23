@@ -120,11 +120,18 @@ const koMessages = {
   settingsModal: {
     title: "설정",
     tabs: {
+      gemini: "Gemini API 키",
       tools: "허용된 도구",
       mcp: "MCP 서버",
       dirs: "디렉터리",
       refs: "참조 디렉터리",
     },
+    // `<i18n-t>` 슬롯 — `envKey` / `envFile` 은 SettingsModal.vue 에서
+    // 인라인 `<code>` 로 렌더링되므로 변수명·파일명은 번역하지 않고
+    // 남깁니다.
+    geminiRequired: "이미지 생성에는 {envKey} 가 필요합니다. {envFile} 에 추가하고 앱을 재시작해주세요.",
+    geminiAskButton: "Claude 에게 질문",
+    geminiAskMessage: "이 앱에서 Gemini API 키는 어떤 역할을 하나요?",
     toolNamesLabel: "도구 이름",
     invalidToolNamesPrefix: "다음은 비표준으로 보입니다 (예상 접두사",
     invalidToolNamesSuffix: "):",
@@ -543,9 +550,6 @@ const koMessages = {
     formulaType: "수식",
   },
   app: {
-    // `<i18n-t>` 슬롯 — `envKey` / `envFile` 은 App.vue 에서 인라인
-    // `<code>` 로 렌더링되므로 변수명·파일명은 번역하지 않고 남깁니다.
-    geminiRequired: "이미지 생성에는 {envKey} 가 필요합니다. {envFile} 에 추가하고 앱을 재시작해주세요.",
     startConversation: "대화 시작",
   },
   suggestionsPanel: {

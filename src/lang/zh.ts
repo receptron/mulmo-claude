@@ -118,11 +118,17 @@ const zhMessages = {
   settingsModal: {
     title: "设置",
     tabs: {
+      gemini: "Gemini API 密钥",
       tools: "允许的工具",
       mcp: "MCP 服务器",
       dirs: "目录",
       refs: "引用目录",
     },
+    // `<i18n-t>` 插槽 — 命名为 `envKey` / `envFile`,在 SettingsModal.vue
+    // 中作为行内 `<code>` 渲染,因此字面的变量名和文件名保持不翻译。
+    geminiRequired: "图像生成需要 {envKey}。请将它加入 {envFile} 并重启应用。",
+    geminiAskButton: "询问 Claude",
+    geminiAskMessage: "Gemini API 密钥在这个应用中起什么作用?",
     toolNamesLabel: "工具名称",
     invalidToolNamesPrefix: "以下工具名看起来不符合规范(预期前缀",
     invalidToolNamesSuffix: "):",
@@ -540,9 +546,6 @@ const zhMessages = {
     formulaType: "公式",
   },
   app: {
-    // `<i18n-t>` 插槽 — 命名为 `envKey` / `envFile`,在 App.vue 中作为
-    // 行内 `<code>` 渲染,因此字面的变量名和文件名保持不翻译。
-    geminiRequired: "图像生成需要 {envKey}。请将它加入 {envFile} 并重启应用。",
     startConversation: "开始对话",
   },
   suggestionsPanel: {
