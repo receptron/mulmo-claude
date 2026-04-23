@@ -330,7 +330,8 @@ const zhMessages = {
     chatSend: "就本页开启新对话",
     emptyPage: "页面「{title}」尚不存在。",
     emptyContent: "页面「{title}」已存在，但没有内容。",
-    createPage: "创建此 Wiki 页面",
+    createPage: "请求创建此 Wiki 页面",
+    updatePage: "请求更新此 Wiki 页面",
   },
   pluginPresentHtml: {
     saveAsPdf: "另存为 PDF(打开打印对话框)",

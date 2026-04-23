@@ -79,9 +79,18 @@
 
     <!-- Empty state: page file exists but has no content -->
     <div v-else-if="!content && !navError && action === 'page'" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
-      <div class="text-center space-y-2">
+      <div class="text-center space-y-4">
         <span class="material-icons text-4xl text-gray-300">article</span>
         <p>{{ t("pluginWiki.emptyContent", { title: title }) }}</p>
+        <button
+          v-if="isStandaloneWikiRoute"
+          data-testid="wiki-update-page-button"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          @click="requestCreatePage"
+        >
+          <span class="material-icons text-base">auto_fix_high</span>
+          {{ t("pluginWiki.updatePage") }}
+        </button>
       </div>
     </div>
 

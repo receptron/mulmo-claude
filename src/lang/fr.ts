@@ -329,7 +329,8 @@ const frMessages = {
     chatSend: "Démarrer une nouvelle conversation sur cette page",
     emptyPage: "La page « {title} » n'existe pas encore.",
     emptyContent: "La page « {title} » existe mais n'a pas de contenu.",
-    createPage: "Créer cette page wiki",
+    createPage: "Demander la création de cette page wiki",
+    updatePage: "Demander la mise à jour de cette page wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "Enregistrer en PDF (ouvre la boîte de dialogue d'impression)",

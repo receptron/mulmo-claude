@@ -329,7 +329,8 @@ const deMessages = {
     chatSend: "Neuen Chat zu dieser Seite starten",
     emptyPage: "Die Seite „{title}“ existiert noch nicht.",
     emptyContent: "Die Seite „{title}“ existiert, hat aber keinen Inhalt.",
-    createPage: "Diese Wiki-Seite erstellen",
+    createPage: "Erstellung dieser Wiki-Seite anfordern",
+    updatePage: "Aktualisierung dieser Wiki-Seite anfordern",
   },
   pluginPresentHtml: {
     saveAsPdf: "Als PDF speichern (öffnet Druckdialog)",

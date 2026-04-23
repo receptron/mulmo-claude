@@ -328,7 +328,8 @@ const ptBRMessages = {
     chatSend: "Iniciar um novo chat sobre esta página",
     emptyPage: 'A página "{title}" ainda não existe.',
     emptyContent: 'A página "{title}" existe, mas não tem conteúdo.',
-    createPage: "Criar esta página wiki",
+    createPage: "Solicitar a criação desta página wiki",
+    updatePage: "Solicitar a atualização desta página wiki",
   },
   pluginPresentHtml: {
     saveAsPdf: "Salvar como PDF (abre o diálogo de impressão)",

@@ -349,7 +349,8 @@ const enMessages = {
     chatSend: "Start a new chat about this page",
     emptyPage: 'The page "{title}" does not exist yet.',
     emptyContent: 'The page "{title}" exists but has no content.',
-    createPage: "Create this wiki page",
+    createPage: "Request creation of this wiki page",
+    updatePage: "Request update of this wiki page",
   },
   pluginPresentHtml: {
     saveAsPdf: "Save as PDF (opens print dialog)",

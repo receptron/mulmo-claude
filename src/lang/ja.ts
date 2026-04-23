@@ -333,7 +333,8 @@ const jaMessages = {
     chatSend: "このページについて新しいチャットを開始",
     emptyPage: "「{title}」のページはまだありません。",
     emptyContent: "「{title}」のページは存在しますが、内容がありません。",
-    createPage: "この Wiki ページを作成",
+    createPage: "この Wiki ページの作成をお願いする",
+    updatePage: "この Wiki ページの更新をお願いする",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF として保存（印刷ダイアログを開きます）",

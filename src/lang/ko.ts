@@ -333,7 +333,8 @@ const koMessages = {
     chatSend: "이 페이지에 대한 새 채팅 시작",
     emptyPage: "「{title}」 페이지가 아직 없습니다.",
     emptyContent: "「{title}」 페이지는 존재하지만 내용이 없습니다.",
-    createPage: "이 Wiki 페이지 만들기",
+    createPage: "이 Wiki 페이지 작성 요청",
+    updatePage: "이 Wiki 페이지 업데이트 요청",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF 로 저장 (인쇄 대화 상자 열기)",
