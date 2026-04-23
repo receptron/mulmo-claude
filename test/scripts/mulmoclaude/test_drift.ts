@@ -12,6 +12,18 @@ import * as drift from "../../../scripts/mulmoclaude/drift.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(HERE, "fixtures");
 
+// Most tests want to exercise the local-fixture fallback rather
+// than the real registry. Pass this stub to force the fallback
+// branch (registry "unreachable") and let the existing fixtures
+// under installed_packages/.../\_dist/ drive the comparison.
+const offlineRegistry = async () => ({ version: null, source: null, reason: "test stub — skip registry" });
+
+// Stub returning a specific source, used by the new drifted-from-
+// published tests below.
+function registryReturning(source: string, version = "0.0.0-stub") {
+  return async () => ({ version, source, reason: null });
+}
+
 describe("countValueExportLines", () => {
   it("counts plain re-export lines", () => {
     const source = `export { foo } from "./foo";\nexport { bar } from "./bar";\n`;
@@ -74,6 +86,7 @@ describe("checkPackageDrift", () => {
       packageBaseName: "protocol",
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(result.status, "ok");
     assert.equal(result.localCount, 3);
@@ -87,6 +100,7 @@ describe("checkPackageDrift", () => {
       packageBaseName: "protocol",
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(result.status, "drifted");
     assert.equal(result.localCount, 3);
@@ -99,6 +113,7 @@ describe("checkPackageDrift", () => {
       packageBaseName: "client",
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(result.status, "ok");
     assert.equal(result.localCount, 1);
@@ -114,6 +129,7 @@ describe("checkPackageDrift", () => {
       packageBaseName: "chat-service",
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(result.status, "skipped");
     assert.match(result.reason ?? "", /src not found|dist not found/);
@@ -121,6 +137,37 @@ describe("checkPackageDrift", () => {
 
   it("throws when packageBaseName is missing", async () => {
     await assert.rejects(drift.checkPackageDrift({ root: FIXTURES }), /packageBaseName is required/);
+  });
+
+  it("flags drift against the registry-published source (workspace-symlink aware)", async () => {
+    // drift-clean's protocol src has 3 value-export lines. The
+    // stub registry returns a dist with only 2 lines — what
+    // would ship to users after an install-from-registry. Drift
+    // must flag this even though the local workspace dist would
+    // otherwise match src.
+    const publishedOldDist = `export { a } from "./a.js";\nexport { b } from "./b.js";\n`;
+    const result = await drift.checkPackageDrift({
+      root: path.join(FIXTURES, "drift-clean"),
+      packageBaseName: "protocol",
+      fetchPublishedSource: registryReturning(publishedOldDist, "0.1.3"),
+    });
+    assert.equal(result.status, "drifted");
+    assert.equal(result.localCount, 3);
+    assert.equal(result.distCount, 2);
+    assert.equal(result.publishedVersion, "0.1.3");
+    assert.equal(result.fallbackReason, undefined, "must not use local fallback when registry succeeded");
+  });
+
+  it("falls back to local installed dist when the registry fetch returns no source", async () => {
+    const result = await drift.checkPackageDrift({
+      root: path.join(FIXTURES, "drift-clean"),
+      packageBaseName: "protocol",
+      installedRoot: "installed_packages",
+      distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
+    });
+    assert.equal(result.status, "ok");
+    assert.match(result.fallbackReason ?? "", /registry unreachable/);
   });
 });
 
@@ -150,6 +197,7 @@ describe("checkWorkspaceDrift (auto-detection)", () => {
       root: path.join(FIXTURES, "drift-drifted"),
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(results.length, 2);
     const protocolResult = results.find((row) => row.packageBaseName === "protocol");
@@ -164,6 +212,7 @@ describe("checkWorkspaceDrift (auto-detection)", () => {
       packageBaseNames: ["protocol"],
       installedRoot: "installed_packages",
       distRelative: "_dist/index.js",
+      fetchPublishedSource: offlineRegistry,
     });
     assert.equal(results.length, 1);
     assert.equal(results[0].status, "ok");

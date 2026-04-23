@@ -1,21 +1,29 @@
 // @mulmobridge/* drift check (§2 of publish-mulmoclaude skill).
 //
 // Problem: a local `packages/<name>/src/` file adds a new runtime
-// export without a version bump. `yarn install` keeps using the
-// older dist/ already in node_modules, so consumers crash with:
+// export without a version bump. The tarball a real user installs
+// from the registry ships the OLD dist/, so consumers crash with:
 //   does not provide an export named X
 // at runtime — invisible to lint, typecheck, or local dev.
 //
-// Detection strategy (from the skill, unchanged):
-//   count value-export LINES in src/index.ts
-//   count value-export LINES in <installed dist>/index.js
-//   if src > dist, the package has drifted and must be bumped.
+// Detection strategy: count value-export LINES in src/index.ts and
+// in the currently-published dist (fetched from the npm registry),
+// flag when src > published.
+//
+// Why the registry and not `node_modules/.../dist`: in a yarn-
+// workspace repo, `node_modules/@mulmobridge/<name>` is a symlink
+// into `packages/<name>/`. `yarn build:packages` then rebuilds that
+// symlinked dist from the current src, making `src == dist` in CI
+// regardless of whether the published version lags behind — the
+// whole point of the check. Compare against the registry payload
+// instead so the drift picks up exactly what a fresh
+// `npm install mulmoclaude` would see at runtime.
 //
 // "Value export LINES" = every `^export …` line except ones that
 // are entirely type-only (`export type …`, `export interface …`,
 // `export { type … }`). Counting lines (not individual specifiers)
-// is intentional — the skill has been using this heuristic across
-// real releases and it's picked up every regression we've seen.
+// matches the original skill heuristic and has caught every real
+// drift we've seen.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -23,6 +31,9 @@ import { fileURLToPath } from "node:url";
 
 const MULMOBRIDGE_SCOPE = "@mulmobridge/";
 const DEFAULT_INSTALLED_ROOT = "node_modules";
+const REGISTRY_BASE = "https://registry.npmjs.org";
+const UNPKG_BASE = "https://unpkg.com";
+const REGISTRY_TIMEOUT_MS = 15_000;
 
 // Returns how many `^export …` lines in `source` declare at least
 // one runtime (value) export. Type-only lines are filtered.
@@ -60,26 +71,82 @@ async function readLocalVersion(root, packageBaseName) {
   }
 }
 
+// Default published-source fetcher: queries the npm registry for
+// the package's `latest` dist-tag version, then pulls the `main` /
+// `module` entry from unpkg. Returns `null` on any network / 404
+// failure so the caller can skip rather than crash.
+async function defaultFetchPublishedSource({ packageBaseName, timeoutMs = REGISTRY_TIMEOUT_MS } = {}) {
+  const fullName = MULMOBRIDGE_SCOPE + packageBaseName;
+  const controller = new AbortController();
+  const killer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const metaRes = await fetch(`${REGISTRY_BASE}/${encodeURIComponent(fullName)}/latest`, {
+      signal: controller.signal,
+    });
+    if (!metaRes.ok) return { version: null, source: null, reason: `registry ${metaRes.status}` };
+    const meta = await metaRes.json();
+    const version = typeof meta.version === "string" ? meta.version : null;
+    if (!version) return { version: null, source: null, reason: "registry meta missing version" };
+    // Prefer the package's declared `main` / `module` entry rather
+    // than assuming `dist/index.js` — a future refactor of the
+    // @mulmobridge/* packages could move the entry file.
+    const entry =
+      typeof meta.module === "string"
+        ? meta.module
+        : typeof meta.main === "string"
+          ? meta.main
+          : "dist/index.js";
+    const distRes = await fetch(`${UNPKG_BASE}/${fullName}@${version}/${entry.replace(/^\.?\/+/, "")}`, {
+      signal: controller.signal,
+    });
+    if (!distRes.ok) return { version, source: null, reason: `unpkg ${distRes.status}` };
+    const source = await distRes.text();
+    return { version, source, reason: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { version: null, source: null, reason: `network: ${message}` };
+  } finally {
+    clearTimeout(killer);
+  }
+}
+
+// Read installed-dist source (the pre-registry behaviour). Kept as
+// a fallback so offline / registry-unreachable callers still get a
+// signal, and the existing fixture-based tests keep working.
+async function readInstalledDistSource({ root, packageBaseName, installedRoot, distRelative }) {
+  const distPath = path.join(root, installedRoot, MULMOBRIDGE_SCOPE + packageBaseName, distRelative);
+  try {
+    return await readFile(distPath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 // Inspect one package: compare local src value-export count with
-// installed dist value-export count. If either file is missing,
-// the package is reported as `skipped` with a reason so the CLI
-// caller can decide whether to treat it as a failure or warning.
+// the currently-published dist (fetched from the registry). Returns
+// `{ status: "ok"|"drifted"|"skipped", ... }`.
 //
-// `installedRoot` is overridable so fixture trees (which can't use
-// a real `node_modules/` path — it's globally gitignored) can point
-// the lookup at an alternate directory.
+// Options:
+//   fetchPublishedSource: override for the registry fetcher; must
+//     resolve to `{ version, source, reason }` shape. Tests pass a
+//     fake; real runs use defaultFetchPublishedSource.
+//   installedRoot / distRelative: legacy local-dist fallback, used
+//     when `fetchPublishedSource` returns no source (offline CI,
+//     package not on registry, etc.). Also kept so the existing
+//     fixture tests can exercise the local-dist path without hitting
+//     the network.
 export async function checkPackageDrift({
   root = process.cwd(),
   packageBaseName,
   srcRelative = "src/index.ts",
   distRelative = "dist/index.js",
   installedRoot = DEFAULT_INSTALLED_ROOT,
+  fetchPublishedSource = defaultFetchPublishedSource,
 } = {}) {
   if (!packageBaseName) {
     throw new Error("checkPackageDrift: packageBaseName is required");
   }
   const srcPath = path.join(root, "packages", packageBaseName, srcRelative);
-  const distPath = path.join(root, installedRoot, MULMOBRIDGE_SCOPE + packageBaseName, distRelative);
   const localVersion = await readLocalVersion(root, packageBaseName);
 
   let srcSource;
@@ -89,14 +156,24 @@ export async function checkPackageDrift({
     return { packageBaseName, localVersion, status: "skipped", reason: `local src not found at ${srcRelative}` };
   }
 
-  let distSource;
-  try {
-    distSource = await readFile(distPath, "utf8");
-  } catch {
-    // Common when `yarn install` hasn't run yet, or when the dep
-    // isn't in node_modules at this workspace level. Not an error —
-    // the caller (CLI or smoke driver) decides.
-    return { packageBaseName, localVersion, status: "skipped", reason: "installed dist not found (run yarn install first)" };
+  const published = await fetchPublishedSource({ packageBaseName });
+  let distSource = published.source;
+  let publishedVersion = published.version;
+  let fallbackReason = null;
+  if (distSource === null) {
+    distSource = await readInstalledDistSource({ root, packageBaseName, installedRoot, distRelative });
+    if (distSource !== null) {
+      fallbackReason = `registry unreachable (${published.reason ?? "unknown"}) — compared against local ${installedRoot}/.../${distRelative}`;
+    }
+  }
+
+  if (distSource === null) {
+    return {
+      packageBaseName,
+      localVersion,
+      status: "skipped",
+      reason: `no dist to compare — registry: ${published.reason ?? "unknown"}, local dist not found either`,
+    };
   }
 
   const localCount = countValueExportLines(srcSource);
@@ -105,9 +182,11 @@ export async function checkPackageDrift({
   return {
     packageBaseName,
     localVersion,
+    publishedVersion,
     status: drifted ? "drifted" : "ok",
     localCount,
     distCount,
+    ...(fallbackReason ? { fallbackReason } : {}),
   };
 }
 
@@ -136,25 +215,37 @@ export async function checkWorkspaceDrift({
   installedRoot = DEFAULT_INSTALLED_ROOT,
   srcRelative,
   distRelative,
+  fetchPublishedSource,
 } = {}) {
   const names = packageBaseNames ?? (await detectMulmobridgeDeps({ root }));
   const results = [];
   for (const name of names) {
-    results.push(await checkPackageDrift({ root, packageBaseName: name, installedRoot, srcRelative, distRelative }));
+    results.push(
+      await checkPackageDrift({
+        root,
+        packageBaseName: name,
+        installedRoot,
+        srcRelative,
+        distRelative,
+        ...(fetchPublishedSource ? { fetchPublishedSource } : {}),
+      }),
+    );
   }
   return results;
 }
 
 function formatLine(result) {
-  const { packageBaseName, localVersion, status } = result;
-  const ver = localVersion ? `v${localVersion}` : "(no local version)";
+  const { packageBaseName, localVersion, publishedVersion, status, fallbackReason } = result;
+  const local = localVersion ? `v${localVersion}` : "(no local version)";
+  const published = publishedVersion ? `→ published v${publishedVersion}` : "";
+  const fallback = fallbackReason ? ` [${fallbackReason}]` : "";
   if (status === "drifted") {
-    return `  ⚠ @mulmobridge/${packageBaseName} ${ver}: local has ${result.localCount} value-export lines, installed dist has ${result.distCount}`;
+    return `  ⚠ @mulmobridge/${packageBaseName} ${local} ${published}: src has ${result.localCount} value-export lines, published dist has ${result.distCount}${fallback}`;
   }
   if (status === "skipped") {
-    return `  · @mulmobridge/${packageBaseName} ${ver}: skipped — ${result.reason}`;
+    return `  · @mulmobridge/${packageBaseName} ${local}: skipped — ${result.reason}`;
   }
-  return `  ✓ @mulmobridge/${packageBaseName} ${ver}: ${result.localCount} value-export lines (src == dist)`;
+  return `  ✓ @mulmobridge/${packageBaseName} ${local} ${published}: ${result.localCount} value-export lines (src == published)${fallback}`;
 }
 
 // CLI: exits 1 if any package drifted, 0 otherwise. "skipped"

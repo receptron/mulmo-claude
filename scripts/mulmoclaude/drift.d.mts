@@ -6,6 +6,9 @@
 export interface PackageDriftResult {
   packageBaseName: string;
   localVersion: string | null;
+  /** The version the `latest` dist-tag resolved to on the registry. Null when
+   * the fetch failed and we fell back to the local installed dist. */
+  publishedVersion?: string | null;
   status: "ok" | "drifted" | "skipped";
   /** Present when `status` is "ok" or "drifted". */
   localCount?: number;
@@ -13,7 +16,20 @@ export interface PackageDriftResult {
   distCount?: number;
   /** Present when `status` is "skipped" — human-readable explanation. */
   reason?: string;
+  /** Present when the registry was unreachable and we compared against
+   * the local installed dist instead. */
+  fallbackReason?: string;
 }
+
+/** Outcome of the registry fetch — raw source plus the resolved version. */
+export interface PublishedSource {
+  version: string | null;
+  source: string | null;
+  reason: string | null;
+}
+
+/** Injectable fetcher — tests supply a stub, real runs use the registry. */
+export type FetchPublishedSource = (args: { packageBaseName: string; timeoutMs?: number }) => Promise<PublishedSource>;
 
 export function countValueExportLines(source: string): number;
 
@@ -27,6 +43,9 @@ export interface CheckPackageDriftOptions {
   /** Override the `node_modules` path (used by fixtures that
    * can't ship a real node_modules/ — globally gitignored). */
   installedRoot?: string;
+  /** Injectable published-source fetcher. Defaults to the real
+   * registry+unpkg implementation; tests pass a stub. */
+  fetchPublishedSource?: FetchPublishedSource;
 }
 
 export function checkPackageDrift(options: CheckPackageDriftOptions): Promise<PackageDriftResult>;
@@ -46,6 +65,7 @@ export interface CheckWorkspaceDriftOptions {
   installedRoot?: string;
   srcRelative?: string;
   distRelative?: string;
+  fetchPublishedSource?: FetchPublishedSource;
 }
 
 export function checkWorkspaceDrift(options?: CheckWorkspaceDriftOptions): Promise<PackageDriftResult[]>;
