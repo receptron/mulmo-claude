@@ -80,18 +80,26 @@ export function readWikiRouteTarget(params: unknown): WikiTarget | null {
 
 // Inverse of `readWikiRouteTarget`: given a target, produce the
 // `{ section, slug }` params object that `router.push({ name: "wiki",
-// params })` needs. Index returns `{}` so the router strips the
-// optional segments and lands on `/wiki`.
+// params })` needs.
+//
+// Optional route params are NOT cleared by named-route navigation
+// unless explicitly set — returning `{}` for `kind: "index"` would
+// leak the previous `section`/`slug` into the URL when navigating
+// from `/wiki/pages/foo` back to the index, leaving the user on
+// `/wiki/pages/foo` with the View believing it's the index. Pass
+// empty strings so the router writes out `/wiki` cleanly. The
+// readWikiRouteTarget() branch for `section === ""` already
+// normalises those back to `{ kind: "index" }`.
 export function buildWikiRouteParams(target: WikiTarget): Record<string, string> {
   switch (target.kind) {
     case "index":
-      return {};
+      return { section: "", slug: "" };
     case "page":
       return { section: WIKI_ROUTE_SECTION.pages, slug: target.slug };
     case "log":
-      return { section: WIKI_ROUTE_SECTION.log };
+      return { section: WIKI_ROUTE_SECTION.log, slug: "" };
     case "lint_report":
-      return { section: WIKI_ROUTE_SECTION.lintReport };
+      return { section: WIKI_ROUTE_SECTION.lintReport, slug: "" };
   }
 }
 

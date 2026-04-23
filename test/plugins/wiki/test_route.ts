@@ -85,17 +85,25 @@ describe("readWikiRouteTarget", () => {
 });
 
 describe("buildWikiRouteParams", () => {
-  it("returns {} for index (so the router strips optional segments)", () => {
-    assert.deepEqual(buildWikiRouteParams({ kind: "index" }), {});
+  it("returns empty strings for index so vue-router clears stale optional params", () => {
+    // Named-route navigation does NOT clear optional params unless
+    // they're explicitly set. Returning `{}` would leak the previous
+    // `section`/`slug` when navigating from `/wiki/pages/foo` back
+    // to the index, leaving the URL stuck on the page route. Empty
+    // strings tell the router to write out the bare `/wiki` path.
+    assert.deepEqual(buildWikiRouteParams({ kind: "index" }), { section: "", slug: "" });
   });
 
   it("builds page params", () => {
     assert.deepEqual(buildWikiRouteParams({ kind: "page", slug: "onboarding" }), { section: "pages", slug: "onboarding" });
   });
 
-  it("builds log / lint_report params (kebab-case URL)", () => {
-    assert.deepEqual(buildWikiRouteParams({ kind: "log" }), { section: "log" });
-    assert.deepEqual(buildWikiRouteParams({ kind: "lint_report" }), { section: "lint-report" });
+  it("builds log / lint_report params with slug explicitly cleared (kebab-case URL)", () => {
+    // Same optional-param leak concern as the index case: slug needs
+    // to be explicitly "" so `/wiki/pages/foo` → log navigation
+    // doesn't produce `/wiki/log/foo`.
+    assert.deepEqual(buildWikiRouteParams({ kind: "log" }), { section: "log", slug: "" });
+    assert.deepEqual(buildWikiRouteParams({ kind: "lint_report" }), { section: "lint-report", slug: "" });
   });
 
   it("round-trips through readWikiRouteTarget", () => {

@@ -179,6 +179,40 @@ test.describe("wiki navigation — URL sync", () => {
     await expect(page.getByText("Welcome to the project.")).toBeVisible();
   });
 
+  test("navigating from a page back to the index strips the slug from the URL (#655 follow-up)", async ({ page }) => {
+    // Regression: buildWikiRouteParams({ kind: "index" }) used to
+    // return `{}`, but Vue Router's named-route navigation does NOT
+    // clear previously-set optional params. The old URL `section` /
+    // `slug` would leak into the push, leaving the user on
+    // `/wiki/pages/foo` after clicking the Index tab, while the View
+    // rendered the index. Empty-string params now force a clean URL.
+    await page.goto("/wiki/pages/onboarding");
+    await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
+
+    // Click the Index tab (first button in the tab bar).
+    await page.getByRole("button", { name: /Index/ }).click();
+
+    await expect(async () => {
+      const parsed = new URL(page.url());
+      expect(parsed.pathname).toMatch(/^\/wiki\/?$/);
+    }).toPass({ timeout: 5000 });
+    await expect(page.getByTestId("wiki-page-entry-onboarding")).toBeVisible();
+  });
+
+  test("navigating from a page to the log clears the slug (#655 follow-up)", async ({ page }) => {
+    // Same stale-param concern as the index case, but the log
+    // destination still has a section — only the slug needs
+    // clearing. `/wiki/pages/foo` → log click must land on
+    // `/wiki/log`, not `/wiki/log/foo`.
+    await page.goto("/wiki/pages/onboarding");
+    await expect(page.getByRole("heading", { level: 1, name: "Onboarding" })).toBeVisible();
+
+    await page.getByRole("button", { name: /Log/ }).click();
+
+    await page.waitForURL(/\/wiki\/log$/);
+    await expect(page.getByText("Did stuff")).toBeVisible();
+  });
+
   // Table-driven round-trip for reserved / non-ASCII characters:
   // navigate straight to /wiki/pages/<encoded>, assert the API saw
   // the decoded slug verbatim (sentinel body renders in the DOM).
