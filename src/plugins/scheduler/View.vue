@@ -511,7 +511,7 @@ async function applyItemEdit() {
   yamlError.value = "";
   const parsed = parseYaml(yamlText.value);
   if (!parsed) {
-    yamlError.value = "Could not parse YAML — ensure 'title' is present";
+    yamlError.value = t("pluginScheduler.yamlParseError");
     return;
   }
   const success = await callApi({

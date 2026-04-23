@@ -244,7 +244,7 @@ async function save(): Promise<void> {
   // the user can fix it.
   if (mcpTabRef.value && !mcpTabRef.value.flushDraft()) {
     statusError.value = true;
-    statusMessage.value = "Finish or cancel the pending MCP server entry first.";
+    statusMessage.value = t("settingsMcpTab.pendingEntryWarning");
     return;
   }
   saving.value = true;

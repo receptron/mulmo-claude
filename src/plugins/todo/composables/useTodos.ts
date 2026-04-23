@@ -9,6 +9,7 @@
 // action route is intentionally NOT used by the explorer.
 
 import { ref, type Ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { API_ROUTES } from "../../../config/apiRoutes";
 import { useFreshPluginData } from "../../../composables/useFreshPluginData";
 import { errorMessage } from "../../../utils/errors";
@@ -104,6 +105,7 @@ export interface PatchColumnInput {
 // items via its `selectedResult` prop). The composable then refreshes
 // from the server on mount and updates the refs in place.
 export function useTodos(initialItems: TodoItem[] = [], initialColumns: StatusColumn[] = []): UseTodosHandle {
+  const { t } = useI18n();
   const items = ref<TodoItem[]>(initialItems);
   const columns = ref<StatusColumn[]>(initialColumns);
   const error = ref<string | null>(null);
@@ -132,7 +134,7 @@ export function useTodos(initialItems: TodoItem[] = [], initialColumns: StatusCo
   async function refresh(): Promise<boolean> {
     error.value = null;
     const success = await rawRefresh();
-    if (!success) error.value = "Failed to load todos";
+    if (!success) error.value = t("pluginTodo.loadFailed");
     return success;
   }
 

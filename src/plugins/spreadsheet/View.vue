@@ -118,6 +118,7 @@ import {
   type CellValue,
 } from "./engine";
 import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
+import { errorMessage as formatErrorMessage } from "../../utils/errors";
 
 // Import all spreadsheet functions to populate the function registry
 import "./engine/functions";
@@ -212,7 +213,7 @@ async function fetchSheets(): Promise<void> {
   loading.value = true;
   const response = await apiGet<FilesContentResponseLike>(API_ROUTES.files.content, { path: raw });
   if (!response.ok) {
-    errorMessage.value = `Failed to load spreadsheet: ${response.error}`;
+    errorMessage.value = t("pluginSpreadsheet.loadFailed", { error: response.error });
     resolvedSheets.value = [];
     loading.value = false;
     return;
@@ -560,7 +561,7 @@ async function applyChanges() {
 
     // Validate it's an array
     if (!Array.isArray(parsedSheets)) {
-      throw new Error("Data must be an array of sheets");
+      throw new Error(t("pluginSpreadsheet.dataMustBeArray"));
     }
 
     // Persist to disk (if file-backed) and emit update
@@ -569,7 +570,7 @@ async function applyChanges() {
     // Reset to first sheet after update
     activeSheetIndex.value = 0;
   } catch (error) {
-    alert(`Invalid JSON format: ${error instanceof Error ? error.message : "Unknown error"}`);
+    alert(t("pluginSpreadsheet.invalidJsonAlert", { error: formatErrorMessage(error, t("pluginSpreadsheet.unknownError")) }));
   }
 }
 
