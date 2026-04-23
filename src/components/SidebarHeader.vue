@@ -9,7 +9,9 @@
       @click="emit('home')"
     >
       <img :src="logoUrl" alt="" class="h-[50px] w-auto -my-3.5 -ml-3 rounded object-contain shrink-0" />
-      <h1 data-testid="app-title" class="text-sm font-semibold text-gray-800 mr-1" :style="titleStyle">MulmoClaude</h1>
+      <!-- span, not h1: `<h1>` inside `<button>` is invalid HTML, and
+           the brand label here is a clickable logo, not a page heading. -->
+      <span data-testid="app-title" class="text-sm font-semibold text-gray-800 mr-1" :style="titleStyle">MulmoClaude</span>
     </button>
     <div class="flex gap-2">
       <LockStatusPopup

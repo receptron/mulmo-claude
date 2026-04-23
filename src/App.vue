@@ -588,10 +588,13 @@ async function resumeOrCreateChatSession(): Promise<void> {
     return;
   }
   if (sessionMap.has(topId)) {
-    // Already in memory — navigate explicitly. loadSession would
-    // early-return here if topId === currentSessionId, skipping the
-    // URL push we need when arriving from a non-chat page.
-    navigateToSession(topId);
+    // Already in memory — activate so the role selector re-syncs to
+    // the session's role. Going through navigateToSession alone would
+    // push `/chat/:topId` without touching `currentRoleId`, leaving
+    // the selector stuck on whatever role the user picked on the
+    // page they're coming from.
+    const live = sessionMap.get(topId)!;
+    activateSession(topId, live.roleId, false);
     return;
   }
   await loadSession(topId);
