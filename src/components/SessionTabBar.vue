@@ -16,6 +16,7 @@
         :class="sessions[i - 1].id === currentSessionId ? 'border border-gray-300 bg-white shadow-sm' : 'hover:bg-gray-100'"
         :title="tabTooltip(sessions[i - 1])"
         :data-testid="`session-tab-${sessions[i - 1].id}`"
+        :aria-current="sessions[i - 1].id === currentSessionId ? 'page' : undefined"
         @click="emit('loadSession', sessions[i - 1].id)"
       >
         <!-- Single icon slot. Non-human sessions swap the role

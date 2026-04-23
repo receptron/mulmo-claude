@@ -17,10 +17,12 @@ test.describe("session tab bar — visible per-tab info", () => {
     const tabA = page.getByTestId(`session-tab-${SESSION_A.id}`);
     const tabB = page.getByTestId(`session-tab-${SESSION_B.id}`);
 
-    // Label is derived from the preview (first 10 chars). SESSION_A's
-    // preview is "Hello from session A" → "Hello from".
-    await expect(tabA).toContainText("Hello from");
-    await expect(tabB).toContainText("Hello from");
+    // Assert on the distinguishing suffix ("session A" / "session B")
+    // rather than the shared "Hello from" prefix — otherwise the test
+    // would pass even if the tabs got swapped and each rendered the
+    // wrong session's label.
+    await expect(tabA).toContainText("session A");
+    await expect(tabB).toContainText("session B");
 
     // Tab tooltip keeps the full preview for users who want more.
     await expect(tabA).toHaveAttribute("title", SESSION_A.preview ?? "");
@@ -80,10 +82,12 @@ test.describe("session tab bar — visible per-tab info", () => {
     // literally looking at that conversation).
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    const tabB = page.getByTestId(`session-tab-${SESSION_B.id}`);
-    await expect(tabB).toBeVisible();
-    const activeTabId = await tabB.evaluate((node) => node.getAttribute("data-testid"));
-    // SESSION_B is newer → it's the displayed chat session.
+    await expect(page.getByTestId(`session-tab-${SESSION_B.id}`)).toBeVisible();
+    // Query by `aria-current="page"` to identify the active tab —
+    // reading data-testid from a tab we selected by id (the previous
+    // approach) was tautological and would pass even if the tabs
+    // were swapped. SESSION_B is newer → it's the displayed chat.
+    const activeTabId = await page.locator("button[aria-current='page'][data-testid^='session-tab-']").getAttribute("data-testid");
     expect(activeTabId).toBe(`session-tab-${SESSION_B.id}`);
 
     // Navigate off chat. The dot on tab B must now appear, because
