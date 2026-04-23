@@ -504,11 +504,13 @@ describe("findTagDrift", () => {
   });
 
   it("lowercases the lookup so mixed-case filenames still match", () => {
-    // collectLintIssues lowercases the map keys. Here the index.md
-    // slug is lowercased (via wikiSlugify on a wiki-link), and the
-    // map was keyed from a `MyPage.md` filename — we still expect
-    // the two to be compared.
-    const entries = [entry("mypage", ["a"])];
+    // collectLintIssues lowercases the map keys. Here the entry's
+    // slug is kept mixed-case (as a parser could produce from a
+    // `MyPage.md` filename before normalization), while the
+    // frontmatter map uses the canonical lowercase key. The test
+    // fails if findTagDrift stops calling `.toLowerCase()` on
+    // `entry.slug` before the lookup.
+    const entries = [entry("MyPage", ["a"])];
     const frontmatter = new Map<string, string[]>([["mypage", ["a", "b"]]]);
     assert.equal(findTagDrift(entries, frontmatter).length, 1);
   });

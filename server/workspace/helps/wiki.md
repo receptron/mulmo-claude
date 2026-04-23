@@ -107,7 +107,7 @@ Cross-references use `[[Page Name]]` wiki-link syntax. Slugs are lowercase, hyph
 
 Key rules:
 
-- Always write bullet items as `[Title](pages/<slug>.md) — description #tag1 #tag2 (YYYY-MM-DD)` — **no** `[[slug]]` wiki-link form, and **no** markdown tables. The canvas parser extracts the slug from the href so non-ASCII titles (日本語, etc.) keep a navigable slug.
+- Prefer bullet items as `[Title](pages/<slug>.md) — description #tag1 #tag2 (YYYY-MM-DD)` — avoid the `[[slug]]` wiki-link form. The canvas parser extracts the slug from the href so non-ASCII titles (日本語, etc.) keep a navigable slug. Markdown tables are also supported via the alternative format below, but the bullet form is easier to read in plain text and plays nicer with non-ASCII titles.
 - Slugs are lowercase ASCII, hyphen-separated. They match the page filename one-to-one (`pages/sakura-internet.md` → slug `sakura-internet`).
 - `#tag` tokens appear inline in the description (whitespace-bounded on the left). Tokens are extracted and indexed for the Wiki tag-filter UI. Tags accept any Unicode letter or digit (so `#クラウド`, `#可視化`, `#ai-agents` all work); `-` and `_` are allowed as internal joiners but not as the first character. Separate adjacent tags with a space — there is no right-hand boundary char, so `#クラウドデータ` parses as one tag.
 - Group by category if useful, then include a "タグ一覧" / "Tags" section with the same `[Title](pages/<slug>.md)` link form so every mention is clickable.

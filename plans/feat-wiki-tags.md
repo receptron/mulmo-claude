@@ -142,6 +142,7 @@ Add under `pluginWiki` in `src/lang/{en,ja,zh,ko,es,pt-BR,fr,de}.ts`:
 |---|---|
 | `tagFilterAll` | `All` |
 | `noMatches` | `No pages tagged {tag}` |
+| `lintChat` | `Lint My Wiki` |
 
 Translate each into the target locale — don't copy English. Placeholders (`{tag}`) stay verbatim. `en.ts` is the schema source of truth, so add there first, then the 7 siblings in the same PR.
 
@@ -160,7 +161,7 @@ Update `server/workspace/helps/wiki.md`:
 4. **Lint rule**: add `findTagDrift` + direct unit tests alongside existing ones. Wire into `collectLintIssues` using the already-read `contents` array.
 5. **Frontend type mirror** in `src/plugins/wiki/index.ts`.
 6. **`View.vue` UI**: tag filter bar, per-entry chips, `visibleEntries` computed, empty-filter state. Scoped styles match existing Tailwind chip vibe (gray border, blue active).
-7. **i18n**: `tagFilterAll`, `noMatches` across all 8 locales.
+7. **i18n**: `tagFilterAll`, `noMatches`, `lintChat` across all 8 locales.
 8. **Schema doc** update in `server/workspace/helps/wiki.md`.
 9. **Run** `yarn format && yarn lint && yarn typecheck && yarn build && yarn test`.
 
