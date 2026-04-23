@@ -13,6 +13,7 @@ import { Router, Request, Response } from "express";
 import { backfillAllSessions } from "../../workspace/chat-index/index.js";
 import { log } from "../../system/logger/index.js";
 import { serverError } from "../../utils/httpError.js";
+import { errorMessage } from "../../utils/errors.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 interface RebuildResponse {
@@ -39,7 +40,7 @@ router.post(API_ROUTES.chatIndex.rebuild, async (_req: Request, res: Response<Re
     res.json(result);
   } catch (err) {
     log.warn("chat-index", "rebuild failed", { error: String(err) });
-    serverError(res, err instanceof Error ? err.message : "unknown error");
+    serverError(res, errorMessage(err, "unknown error"));
   }
 });
 

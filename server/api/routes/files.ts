@@ -486,7 +486,7 @@ router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown,
     const tree = await buildTreeAsync(workspaceReal, "");
     res.json(tree);
   } catch (err) {
-    res.status(500).json({ error: `Failed to read workspace: ${errorMessage(err)}` });
+    serverError(res, `Failed to read workspace: ${errorMessage(err)}`);
   }
 });
 
@@ -671,7 +671,7 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
   try {
     content = readFileSync(absPath, "utf-8");
   } catch (err) {
-    res.status(500).json({ error: `Failed to read file: ${errorMessage(err)}` });
+    serverError(res, `Failed to read file: ${errorMessage(err)}`);
     return;
   }
   res.json({ kind: "text", ...meta, content });

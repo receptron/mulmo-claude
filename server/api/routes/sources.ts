@@ -33,6 +33,7 @@ import {
 } from "../../workspace/sources/types.js";
 import { normalizeCategories, type CategorySlug } from "../../workspace/sources/taxonomy.js";
 import { badRequest, conflict, sendError, serverError } from "../../utils/httpError.js";
+import { errorMessage } from "../../utils/errors.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { isNonEmptyString, isRecord } from "../../utils/types.js";
 
@@ -60,7 +61,7 @@ router.get(API_ROUTES.sources.list, async (_req: Request, res: Response<ListSour
     res.json({ sources });
   } catch (err) {
     log.warn("sources", "list failed", { error: String(err) });
-    serverError(res, err instanceof Error ? err.message : "unknown error");
+    serverError(res, errorMessage(err, "unknown error"));
   }
 });
 
@@ -114,7 +115,7 @@ router.post(API_ROUTES.sources.create, async (req: Request<object, unknown, Regi
   try {
     await writeSource(workspacePath, source);
   } catch (err) {
-    serverError(res, err instanceof Error ? err.message : "failed to write source");
+    serverError(res, errorMessage(err, "failed to write source"));
     return;
   }
   log.info("sources", "source registered", {
@@ -192,7 +193,7 @@ router.post(API_ROUTES.sources.rebuild, async (req: Request<object, unknown, Reb
     });
   } catch (err) {
     log.warn("sources", "rebuild failed", { error: String(err) });
-    serverError(res, err instanceof Error ? err.message : "rebuild failed");
+    serverError(res, errorMessage(err, "rebuild failed"));
   }
 });
 
@@ -261,7 +262,7 @@ router.post(API_ROUTES.sources.manage, async (req: Request<object, unknown, Mana
     }
   } catch (err) {
     log.warn("sources", "manage failed", { action, error: String(err) });
-    serverError(res, err instanceof Error ? err.message : "manage failed");
+    serverError(res, errorMessage(err, "manage failed"));
   }
 });
 
