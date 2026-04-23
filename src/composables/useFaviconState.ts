@@ -6,7 +6,7 @@
 // `resolveFaviconColor` rule chain, and hands the resolved color
 // to `useDynamicFavicon` for painting.
 
-import { computed, onScopeDispose, ref, watch, type ComputedRef } from "vue";
+import { computed, onScopeDispose, ref, type ComputedRef } from "vue";
 import { useDynamicFavicon } from "./useDynamicFavicon";
 import { useNotifications } from "./useNotifications";
 import { resolveFaviconColor } from "./favicon/resolveColor";
@@ -41,11 +41,26 @@ export function useFaviconState(opts: {
     return FAVICON_STATES.idle;
   });
 
-  // Track when the current run began. Cleared the moment `isRunning`
-  // flips false so the next run starts a fresh blue/cyan timer.
-  const runningSinceMs = ref<number | null>(isRunning.value ? Date.now() : null);
-  watch(isRunning, (running) => {
-    runningSinceMs.value = running ? Date.now() : null;
+  // Run-start timestamp, derived from the session's `updatedAt` —
+  // which the server bumps every time the user sends a message, i.e.
+  // right before a run begins. That means:
+  //   1. The clock is correct across a page reload or a second tab:
+  //      a 5-minute-old run stays cyan instead of reverting to blue
+  //      for 60 s after mount.
+  //   2. We don't need a separate server "runStartedAt" field; the
+  //      existing `updatedAt` already serves as the anchor because
+  //      the session is locked during a run, so `updatedAt` can't
+  //      change until this run ends.
+  // Falls back to `Date.now()` only if the session has no
+  // `updatedAt` (brand-new session before the first server echo).
+  const runningSinceMs = computed<number | null>(() => {
+    if (!isRunning.value) return null;
+    const updatedAt = activeSession.value?.updatedAt;
+    if (updatedAt) {
+      const parsed = new Date(updatedAt).getTime();
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return Date.now();
   });
 
   // Per-minute tick so time-of-day rules (morning, late-night,

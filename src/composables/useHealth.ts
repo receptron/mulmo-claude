@@ -44,16 +44,36 @@ export function useHealth(): {
   const cpuLoad1 = ref<number | null>(null);
   const cpuCores = ref<number | null>(null);
 
+  // Separate flag so transient poll failures don't flip
+  // `geminiAvailable` back to false after a successful boot-time
+  // fetch. `geminiAvailable` / `sandboxEnabled` are config-derived
+  // and don't change at runtime — once we've observed them once,
+  // the next 15 s poll's network blip shouldn't mask them.
+  let bootFetchCompleted = false;
+
   async function fetchHealth(): Promise<void> {
     const result = await apiGet<HealthResponse>(API_ROUTES.health);
     if (!result.ok) {
-      geminiAvailable.value = false;
+      // Only the CPU figures get nulled — the favicon resolver
+      // reads null as "skip overloaded" which is the correct fail-
+      // closed behaviour. The config flags keep their last-known
+      // values, and stay at the initial defaults if we never
+      // succeeded (gemini=true → request lands, gets an auth error
+      // handled elsewhere; sandbox=true → lock indicator reads on).
       cpuLoad1.value = null;
       cpuCores.value = null;
+      if (!bootFetchCompleted) {
+        // On the FIRST fetch we do still flip gemini → false so
+        // the "Gemini key required" banner can show immediately
+        // without waiting for a second attempt. Subsequent poll
+        // failures don't re-enter this branch.
+        geminiAvailable.value = false;
+      }
       return;
     }
     geminiAvailable.value = !!result.data.geminiAvailable;
     sandboxEnabled.value = !!result.data.sandboxEnabled;
+    bootFetchCompleted = true;
     const cpu = result.data.cpu;
     if (cpu && typeof cpu.load1 === "number" && Number.isFinite(cpu.load1) && typeof cpu.cores === "number" && cpu.cores > 0) {
       cpuLoad1.value = cpu.load1;
