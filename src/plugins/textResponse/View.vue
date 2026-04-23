@@ -2,7 +2,7 @@
   <div class="h-full flex flex-col">
     <!-- Compact mode (stack view): hoist PDF into StackView's
          per-card action area, suppress own header. -->
-    <Teleport v-if="compact && stackActionsTarget && isAssistant" :to="`#${stackActionsTarget}`">
+    <Teleport v-if="compact && stackActionsTarget && isAssistant" :to="`#${stackActionsTarget}`" defer>
       <button
         class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
         :disabled="pdfDownloading"

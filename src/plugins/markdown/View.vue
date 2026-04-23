@@ -14,7 +14,7 @@
            StackView's per-card header via Teleport, suppress this
            plugin's own header strip. Single view keeps the original
            header rendered below (v-else). -->
-      <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`">
+      <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`" defer>
         <button
           class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
           :disabled="pdfDownloading"

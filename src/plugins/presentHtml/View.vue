@@ -2,7 +2,7 @@
   <div class="h-full flex flex-col overflow-hidden">
     <!-- Compact mode (stack view): teleport PDF + Show-Source into
          StackView's per-card header; suppress our own header. -->
-    <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`">
+    <Teleport v-if="compact && stackActionsTarget" :to="`#${stackActionsTarget}`" defer>
       <button
         class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 flex items-center gap-1"
         :title="t('pluginPresentHtml.saveAsPdf')"

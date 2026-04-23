@@ -6,7 +6,7 @@
          affordances that only make sense in standalone single view,
          so they're dropped when the plugin is shown as a stacked
          tool result. See plans/feat-stack-compact-actions.md. -->
-    <Teleport v-if="compact && stackActionsTarget && action === 'page' && content" :to="`#${stackActionsTarget}`">
+    <Teleport v-if="compact && stackActionsTarget && action === 'page' && content" :to="`#${stackActionsTarget}`" defer>
       <button
         class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
         :disabled="pdfDownloading"
