@@ -18,23 +18,17 @@
         :data-testid="`session-tab-${sessions[i - 1].id}`"
         @click="emit('loadSession', sessions[i - 1].id)"
       >
-        <!-- Origin glyph — coloured material-icons mark at the
-             top-left for non-human-started sessions. Colour AND
-             shape together tell scheduler / skill / bridge apart
-             at a glance without forcing users to memorise a
-             colour legend. The tab `title` also spells it out
-             for hover / screen readers. -->
-        <span
-          v-if="originMeta(sessions[i - 1].origin)"
-          class="material-icons absolute top-0 left-0.5 leading-none text-[11px]"
-          :class="originMeta(sessions[i - 1].origin)!.color"
-          :aria-label="originTooltip(sessions[i - 1].origin)"
-          >{{ originMeta(sessions[i - 1].origin)!.glyph }}</span
-        >
+        <!-- Single icon slot. Non-human sessions swap the role
+             icon for a coloured origin glyph (schedule / build /
+             sync_alt) so the origin is readable at a glance
+             without stacking two icons next to each other.
+             Human sessions keep the role icon. Origin info is
+             also prepended to the tab `title` tooltip. -->
         <span
           class="material-icons text-base leading-none shrink-0"
-          :class="[tabColor(sessions[i - 1]), sessions[i - 1].isRunning ? 'animate-spin [animation-duration:3s]' : '']"
-          >{{ roleIcon(roles, sessions[i - 1].roleId) }}</span
+          :class="[iconColor(sessions[i - 1]), sessions[i - 1].isRunning ? 'animate-spin [animation-duration:3s]' : '']"
+          :aria-label="iconAriaLabel(sessions[i - 1]) || undefined"
+          >{{ iconGlyph(sessions[i - 1]) }}</span
         >
         <span class="text-xs text-gray-700 truncate min-w-0">{{ tabLabel(sessions[i - 1]) }}</span>
         <!-- Unread dot. Suppressed only when the user is actually
@@ -104,10 +98,34 @@ const emit = defineEmits<{
   toggleHistory: [];
 }>();
 
-function tabColor(session: SessionSummary): string {
+// Colour for the tab's main icon. Running always wins (yellow
+// is the "work-in-progress" signal), then origin colour for
+// scheduler / skill / bridge, then the standard active / idle
+// greys for human sessions.
+function iconColor(session: SessionSummary): string {
   if (session.isRunning) return "text-yellow-400";
+  const origin = originMeta(session.origin);
+  if (origin) return origin.color;
   if (session.hasUnread) return "text-gray-900";
   return "text-gray-400";
+}
+
+// Which material-icons glyph to render in the tab's icon slot.
+// Non-human sessions surface origin (scheduler / skill / bridge)
+// instead of the role icon — role is still available via the
+// `title` tooltip's fallback chain.
+function iconGlyph(session: SessionSummary): string {
+  const origin = originMeta(session.origin);
+  if (origin) return origin.glyph;
+  return roleIcon(props.roles, session.roleId);
+}
+
+// `aria-label` announces the origin for non-human sessions
+// (human sessions get nothing — the tab `title` already covers
+// them and a redundant aria-label just doubles the screen
+// reader's output).
+function iconAriaLabel(session: SessionSummary): string {
+  return originTooltip(session.origin);
 }
 
 // Short label shown next to the role icon so users can tell
