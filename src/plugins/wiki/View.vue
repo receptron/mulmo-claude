@@ -1,7 +1,7 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+    <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-3">
         <button v-if="action !== 'index'" class="text-gray-400 hover:text-gray-700" :title="t('pluginWiki.backToIndex')" @click="router.back()">
           <span class="material-icons text-base">arrow_back</span>
