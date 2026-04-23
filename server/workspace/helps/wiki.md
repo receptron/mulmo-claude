@@ -43,6 +43,20 @@ Ask any question. Claude searches `data/wiki/index.md` for relevant pages, reads
 
 Ask Claude to health-check the wiki. It scans for contradictions, stale claims, orphan pages, missing cross-references, and concepts that deserve their own page, then fixes issues automatically.
 
+## Chat About a Page
+
+Every wiki page has a built-in chat composer at the bottom. Ask a question, press send, and Claude starts a fresh chat session already pointed at that specific page — the agent reads the page first, then answers with that context loaded.
+
+This is one of the defining features of MulmoClaude. Your wiki is not a static archive: every page is a live entry point into a conversation with Claude about what's on it.
+
+Why it matters:
+
+- **Instant deep dive.** Open any page, ask _"how does this relate to X?"_ or _"summarize the main argument"_ or _"what would change if Y were false?"_ — no need to name the page or construct a prompt.
+- **Scoped grounding.** The prompt pins the page path, so Claude starts from that page rather than searching the index from scratch. Answers stay tight to the material you're actually looking at.
+- **Clean sessions.** Each question spawns its own chat, so spending half an hour drilling into one page doesn't pollute an existing working session. Good answers can be filed back into the wiki as their own pages.
+
+The composer appears on the standalone Wiki view (one of the top-level tabs). When a wiki page is embedded as a tool result inside another chat, that chat's own composer is used instead — no nested sessions.
+
 ## Folder Layout
 
 ```
