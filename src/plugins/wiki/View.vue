@@ -74,7 +74,7 @@
 
     <!-- Index: tag filter + page card list -->
     <div v-else-if="action === 'index' && pageEntries && pageEntries.length > 0" class="flex-1 flex flex-col overflow-hidden">
-      <div v-if="allTags.length > 0" class="shrink-0 border-b border-gray-100 px-4 py-2 flex flex-wrap gap-1">
+      <div v-if="allTags.length > 0 || selectedTag !== null" class="shrink-0 border-b border-gray-100 px-4 py-2 flex flex-wrap gap-1">
         <button
           :class="['tag-chip', selectedTag === null ? 'tag-chip-active' : 'tag-chip-inactive']"
           data-testid="wiki-tag-filter-all"
@@ -90,6 +90,14 @@
           @click="toggleTagFilter(tag)"
         >
           {{ tag }} ({{ count }})
+        </button>
+        <button
+          v-if="selectedTag !== null && !allTags.some(([tag]) => tag === selectedTag)"
+          class="tag-chip tag-chip-active"
+          :data-testid="`wiki-tag-filter-${selectedTag}`"
+          @click="toggleTagFilter(selectedTag)"
+        >
+          {{ `${selectedTag} (1)` }}
         </button>
       </div>
       <div v-if="visibleEntries.length === 0 && selectedTag" class="flex-1 flex items-center justify-center text-gray-400 text-sm px-4 text-center">
@@ -113,7 +121,7 @@
               :key="tag"
               class="entry-tag-chip"
               :data-testid="`wiki-entry-tag-${entry.slug}-${tag}`"
-              @click.stop="selectedTag = tag"
+              @click.stop="toggleTagFilter(tag)"
             >
               {{ `#${tag}` }}
             </button>

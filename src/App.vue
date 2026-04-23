@@ -825,7 +825,18 @@ function startNewChat(message: string, roleId?: string): void {
   // in the new session rather than whatever was previously active.
   // Cross-route push behaviour (so browser Back returns to /wiki)
   // is now handled inside createNewSession via the isChatPage check.
-  createNewSession(roleId ?? currentRoleId.value);
+  const previousRoleId = currentRoleId.value;
+  createNewSession(roleId ?? previousRoleId);
+  // `createNewSession` mutates `currentRoleId.value` to the role it
+  // just used. When the caller passed an explicit `roleId` override
+  // (e.g. wiki Lint spawns a General-role chat regardless of the
+  // role the user is currently viewing the wiki under), restore the
+  // previously-selected role afterwards so future `+` clicks and
+  // role-aware UI don't inherit this one-shot override. The newly-
+  // created session keeps the overridden role on its own record.
+  if (roleId && roleId !== previousRoleId) {
+    currentRoleId.value = previousRoleId;
+  }
   void sendMessage(message);
 }
 
