@@ -171,7 +171,7 @@ Jede Rolle gibt Claude eine andere Persona, eine andere Werkzeugauswahl und eine
 
 Das Wechseln der Rolle setzt Claudes Kontext zurück und tauscht nur die Werkzeuge aus, die diese Rolle benötigt — so bleiben die Antworten schnell und fokussiert.
 
-## Skills — Führen Sie Ihre Claude Code Skills von MulmoClaude aus aus
+## Skills — Claude Code Skills aus MulmoClaude ausführen
 
 MulmoClaude kann die **Claude Code Skills**, die Sie bereits haben, auflisten und starten. Ein Skill ist ein beliebiger Ordner unter `~/.claude/skills/<name>/`, der eine `SKILL.md`-Datei mit einer YAML-Frontmatter-`description` und einem Markdown-Text mit Anweisungen enthält. Siehe die [Claude Code Skills-Dokumentation](https://docs.claude.com/en/docs/claude-code/skills) für Details zum Erstellen von Skills.
 

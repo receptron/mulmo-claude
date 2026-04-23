@@ -48,6 +48,7 @@ yarn dev
 
 > **MulmoClaude를 해킹하고 싶으신가요?** 환경 변수, 스크립트, 아키텍처는 [`docs/developer.md`](docs/developer.md) 를 참고하세요.
 
+<a id="messaging-bridges"></a>
 ### 메시징 브릿지
 
 MulmoClaude는 **브릿지 프로세스**를 통해 메시징 앱에서 접근할 수 있습니다. 브릿지는 별도의 자식 프로세스로 실행되며 socket.io 를 통해 서버에 연결됩니다.
@@ -114,6 +115,7 @@ Gemini API 키가 없으면 이미지 생성을 사용하는 역할은 UI에서 
 
 Gemini API에는 개인 사용에 충분한 무료 티어가 있습니다.
 
+<a id="security"></a>
 ## 보안
 
 MulmoClaude는 AI 백엔드로 Claude Code를 사용하며, Bash를 포함한 도구에 접근할 수 있습니다 — 즉, 여러분의 머신에서 파일을 읽고 쓸 수 있습니다.

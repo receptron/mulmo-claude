@@ -48,6 +48,7 @@ Abra [http://localhost:5173](http://localhost:5173). É isso — comece a conver
 
 > **Mexendo no MulmoClaude?** Consulte [`docs/developer.md`](docs/developer.md) para variáveis de ambiente, scripts e arquitetura.
 
+<a id="messaging-bridges"></a>
 ### Bridges de mensagens
 
 O MulmoClaude pode ser acessado de aplicativos de mensagens via **processos bridge**. Os bridges são executados como processos filhos separados e se conectam ao servidor via socket.io.
@@ -114,6 +115,7 @@ Sem uma chave da API do Gemini, os papéis que usam geração de imagens serão 
 
 A API do Gemini tem uma camada gratuita que é suficiente para uso pessoal.
 
+<a id="security"></a>
 ## Segurança
 
 O MulmoClaude usa o Claude Code como backend de IA, que tem acesso a ferramentas incluindo Bash — o que significa que ele pode ler e escrever arquivos na sua máquina.
@@ -159,7 +161,7 @@ formato, comportamento de rotação e receitas.
 
 Cada papel dá ao Claude uma persona, paleta de ferramentas e área de foco diferente:
 
-| Role                | O que faz                                                                           |
+| Papel               | O que faz                                                                           |
 | ------------------- | ----------------------------------------------------------------------------------- |
 | **General**         | Assistente para todos os fins — tarefas, agendador, wiki, documentos, mapas mentais |
 | **Office**          | Documentos, planilhas, formulários, apresentações, painéis de dados                 |

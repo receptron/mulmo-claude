@@ -48,6 +48,7 @@ Ouvrez [http://localhost:5173](http://localhost:5173). C'est tout — commencez 
 
 > **Vous bidouillez MulmoClaude ?** Consultez [`docs/developer.md`](docs/developer.md) pour les variables d'environnement, les scripts et l'architecture.
 
+<a id="messaging-bridges"></a>
 ### Ponts de messagerie
 
 MulmoClaude est accessible depuis des applications de messagerie via des **processus de pont**. Les ponts s'exécutent en tant que processus enfants distincts et se connectent au serveur via socket.io.
@@ -114,6 +115,7 @@ Sans clé d'API Gemini, les rôles qui utilisent la génération d'images seront
 
 L'API Gemini propose un niveau gratuit suffisant pour un usage personnel.
 
+<a id="security"></a>
 ## Sécurité
 
 MulmoClaude utilise Claude Code comme moteur IA, lequel a accès à des outils incluant Bash — ce qui signifie qu'il peut lire et écrire des fichiers sur votre machine.
@@ -156,7 +158,7 @@ Consultez [docs/logging.md](docs/logging.md) pour la référence complète, des 
 
 Chaque rôle donne à Claude une personnalité différente, une palette d'outils et un domaine de prédilection :
 
-| Role                | Description                                                                                   |
+| Rôle                | Description                                                                                   |
 | ------------------- | --------------------------------------------------------------------------------------------- |
 | **General**         | Assistant polyvalent — tâches, planificateur, wiki, documents, cartes mentales                |
 | **Office**          | Documents, feuilles de calcul, formulaires, présentations, tableaux de bord de données        |

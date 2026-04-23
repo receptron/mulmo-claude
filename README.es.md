@@ -157,7 +157,7 @@ Consulta [docs/logging.md](docs/logging.md) para la referencia completa, ejemplo
 
 Cada rol le da a Claude una persona diferente, una paleta de herramientas distinta y un área de enfoque específica:
 
-| Role                | What it does                                                                                |
+| Rol                 | Qué hace                                                                                    |
 | ------------------- | ------------------------------------------------------------------------------------------- |
 | **General**         | Asistente de propósito general — pendientes, planificador, wiki, documentos, mapas mentales |
 | **Office**          | Documentos, hojas de cálculo, formularios, presentaciones, paneles de datos                 |
