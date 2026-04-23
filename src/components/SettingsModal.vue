@@ -17,6 +17,15 @@
 
       <div class="flex border-b border-gray-200 px-5">
         <button
+          v-if="!geminiAvailable"
+          class="px-3 py-2 text-sm border-b-2"
+          :class="activeTab === 'gemini' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
+          data-testid="settings-tab-gemini"
+          @click="activeTab = 'gemini'"
+        >
+          {{ t("settingsModal.tabs.gemini") }}
+        </button>
+        <button
           class="px-3 py-2 text-sm border-b-2"
           :class="activeTab === 'tools' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'"
           data-testid="settings-tab-tools"
@@ -55,7 +64,20 @@
           ⚠ {{ loadError }}
         </div>
 
-        <div v-if="activeTab === 'tools'" class="space-y-3">
+        <div v-if="activeTab === 'gemini'" class="space-y-3">
+          <div class="rounded border border-yellow-400 bg-yellow-50 p-3 text-sm text-yellow-800" data-testid="settings-gemini-warning">
+            <span class="material-icons text-sm align-middle mr-1">warning</span>
+            <i18n-t keypath="settingsModal.geminiRequired" tag="span">
+              <template #envKey><code class="font-mono">GEMINI_API_KEY</code></template>
+              <template #envFile><code class="font-mono">.env</code></template>
+            </i18n-t>
+          </div>
+          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="settings-gemini-ask-btn" @click="askAboutGemini">
+            {{ t("settingsModal.geminiAskButton") }}
+          </button>
+        </div>
+
+        <div v-else-if="activeTab === 'tools'" class="space-y-3">
           <i18n-t keypath="settingsToolsTab.explanation" tag="p" class="text-xs text-gray-600 leading-relaxed">
             <template #allowedTools><code class="bg-gray-100 px-1 rounded">--allowedTools</code></template>
             <template #claudeMcp><code class="bg-gray-100 px-1 rounded">claude mcp</code></template>
@@ -119,8 +141,9 @@
            Dirs auto-save; Allowed Tools has its own Save button inside
            the tab body. So no global Save/Cancel — close the modal
            via the ✕ button in the header (which prompts on unsaved
-           tools edits or a pending MCP draft). -->
-      <div class="px-5 py-3 border-t border-gray-200 min-h-[2.75rem] flex items-center gap-3">
+           tools edits or a pending MCP draft). Hidden on the gemini
+           tab since it has no settings to save. -->
+      <div v-if="activeTab !== 'gemini'" class="px-5 py-3 border-t border-gray-200 min-h-[2.75rem] flex items-center gap-3">
         <span v-if="statusMessage" class="text-xs" :class="statusError ? 'text-red-600' : 'text-green-600'" data-testid="settings-status">
           {{ statusMessage }}
         </span>
@@ -157,6 +180,7 @@ const { t } = useI18n();
 interface Props {
   open: boolean;
   dockerMode?: boolean;
+  geminiAvailable?: boolean;
   // Forwarded from useMcpTools — if non-null, the MCP tab shows a
   // small warning strip so the user knows "all tools visible" is a
   // fallback rather than an accurate listing.
@@ -165,11 +189,13 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   dockerMode: false,
+  geminiAvailable: true,
   mcpToolsError: null,
 });
 const emit = defineEmits<{
   "update:open": [value: boolean];
   saved: [];
+  "ask-gemini": [];
 }>();
 
 // Typed ref to the SettingsMcpTab. Needed so close() can check
@@ -178,7 +204,7 @@ const emit = defineEmits<{
 // update / remove persist immediately).
 const mcpTabRef = ref<{ flushDraft: () => boolean; hasPendingDraft: () => boolean } | null>(null);
 
-const activeTab = ref<"tools" | "mcp" | "dirs" | "refs">("tools");
+const activeTab = ref<"gemini" | "tools" | "mcp" | "dirs" | "refs">("tools");
 const toolsText = ref("");
 // Server truth for tools — updated on load and on a successful Save
 // from the Tools tab. `toolsDirty` compares this against `toolsText`
@@ -199,14 +225,19 @@ const loading = ref(false);
 // modal has been reopened can notice it's stale and discard its result.
 let loadToken = 0;
 
-const toolsDirty = computed(() => toolsText.value !== toolsSavedText.value);
-
 const parsedToolNames = computed(() =>
   toolsText.value
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0),
 );
+
+// `toolsSavedText` is stored in normalized form (trimmed, blank lines
+// dropped, joined with "\n"). Comparing the raw textarea against it
+// would flag blank/trailing whitespace as "dirty" forever, so compare
+// the normalized parse instead — the close-confirm then only fires
+// when the effective tool list actually differs from the server's.
+const toolsDirty = computed(() => parsedToolNames.value.join("\n") !== toolsSavedText.value);
 
 const invalidToolNames = computed(() => parsedToolNames.value.filter((name) => !name.startsWith("mcp__") && !isBuiltIn(name)));
 
@@ -279,6 +310,11 @@ async function persistMcp(next: McpServerEntry[], previous: McpServerEntry[]): P
   statusMessage.value = "";
 }
 
+function askAboutGemini(): void {
+  emit("ask-gemini");
+  close();
+}
+
 function addMcpServer(entry: McpServerEntry): void {
   const previous = mcpServers.value.slice();
   void persistMcp([...previous, entry], previous);
@@ -316,6 +352,7 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
+      activeTab.value = props.geminiAvailable ? "tools" : "gemini";
       loadConfig();
       statusMessage.value = "";
       statusError.value = false;

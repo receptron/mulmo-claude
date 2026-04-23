@@ -3,6 +3,8 @@
 import type { Role } from "../../config/roles";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { apiFetchRaw } from "../api";
+import { errorMessage } from "../errors";
+import { isNonEmptyString } from "../types";
 
 export interface AgentRequestBodyParams {
   message: string;
@@ -30,7 +32,7 @@ export interface AgentRequestBody {
 function resolveBrowserTimezone(): string | undefined {
   try {
     const zoneId = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return typeof zoneId === "string" && zoneId.length > 0 ? zoneId : undefined;
+    return isNonEmptyString(zoneId) ? zoneId : undefined;
   } catch {
     return undefined;
   }
@@ -68,7 +70,7 @@ export async function postAgentRun(body: AgentRequestBody): Promise<{ ok: true }
     console.error("[agent] fetch error:", err);
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Connection error.",
+      error: errorMessage(err, "Connection error."),
     };
   }
 }

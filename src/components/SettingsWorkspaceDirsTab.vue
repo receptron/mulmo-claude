@@ -39,16 +39,40 @@ async function load(): Promise<void> {
   dirs.value = result.data.dirs;
 }
 
-async function persist(previous: DirEntry[]): Promise<boolean> {
-  const result = await apiPut<{ dirs: DirEntry[] }>(API_ROUTES.config.workspaceDirs, { dirs: dirs.value });
-  if (!result.ok) {
-    dirs.value = previous;
-    persistError.value = result.error;
-    return false;
-  }
-  dirs.value = result.data.dirs;
-  persistError.value = "";
-  return true;
+// Concurrency: user can click Add then Remove (or two Adds) before
+// the first PUT returns. If we just rolled back to a captured
+// `previous` on failure, a stale response would clobber newer local
+// state. Instead:
+//  - Queue PUTs through a Promise chain (`inflight`) so they run in
+//    the same order the user triggered them and can't overlap.
+//  - Each task only applies the server echo if it's the LAST one
+//    still pending — intermediate echoes might be stale relative
+//    to subsequent optimistic mutations.
+//  - On failure with nothing else pending, reload from the server
+//    (authoritative) instead of rolling back to a snapshot that
+//    may itself be obsolete.
+let inflight: Promise<unknown> = Promise.resolve();
+let pendingCount = 0;
+
+async function persist(nextState: DirEntry[]): Promise<boolean> {
+  dirs.value = nextState;
+  pendingCount++;
+  const task: Promise<boolean> = inflight
+    .catch(() => undefined)
+    .then(async () => {
+      const result = await apiPut<{ dirs: DirEntry[] }>(API_ROUTES.config.workspaceDirs, { dirs: nextState });
+      pendingCount--;
+      if (!result.ok) {
+        persistError.value = result.error;
+        if (pendingCount === 0) await load();
+        return false;
+      }
+      persistError.value = "";
+      if (pendingCount === 0) dirs.value = result.data.dirs;
+      return true;
+    });
+  inflight = task;
+  return task;
 }
 
 async function addEntry(): Promise<void> {
@@ -66,16 +90,14 @@ async function addEntry(): Promise<void> {
     draftError.value = t("settingsWorkspaceDirs.errAlreadyExists");
     return;
   }
-  const previous = dirs.value.slice();
-  dirs.value = [
-    ...previous,
+  const ok = await persist([
+    ...dirs.value,
     {
       path,
       description: draftDescription.value.trim(),
       structure: draftStructure.value,
     },
-  ];
-  const ok = await persist(previous);
+  ]);
   if (ok) {
     draftPath.value = "";
     draftDescription.value = "";
@@ -84,9 +106,7 @@ async function addEntry(): Promise<void> {
 }
 
 async function removeEntry(index: number): Promise<void> {
-  const previous = dirs.value.slice();
-  dirs.value = previous.filter((_, i) => i !== index);
-  await persist(previous);
+  await persist(dirs.value.filter((_, i) => i !== index));
 }
 
 onMounted(load);

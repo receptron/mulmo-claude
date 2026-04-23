@@ -9,6 +9,7 @@
 import type { Router } from "vue-router";
 import { readPathMatch } from "../composables/useFileSelection";
 import { readWikiRouteTarget } from "../plugins/wiki/route";
+import { isNonEmptyString } from "../utils/types";
 
 // Basic sanity check for a session ID. Real existence verification
 // happens in App.vue's onMounted / loadSession — we can't do async
@@ -27,7 +28,7 @@ export function installGuards(router: Router): void {
   router.beforeEach((dest) => {
     if (dest.name === "chat") {
       const sessionId = dest.params.sessionId;
-      if (typeof sessionId === "string" && sessionId.length > 0 && !isValidSessionId(sessionId)) {
+      if (isNonEmptyString(sessionId) && !isValidSessionId(sessionId)) {
         return { name: "chat", params: {}, query: {}, replace: true };
       }
     }
@@ -53,7 +54,7 @@ export function installGuards(router: Router): void {
       // before the traversal check so `?path=../bad` also lands in
       // the `..` rejection below.
       const legacyPath = dest.query.path;
-      if (typeof legacyPath === "string" && legacyPath.length > 0) {
+      if (isNonEmptyString(legacyPath)) {
         const cleaned = { ...dest.query };
         delete cleaned.path;
         return {

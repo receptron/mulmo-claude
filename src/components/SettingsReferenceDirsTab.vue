@@ -37,19 +37,40 @@ async function load(): Promise<void> {
   dirs.value = result.data.dirs;
 }
 
-// Push a new list to the server. On failure the caller rolls back
-// the optimistic local mutation via `previous` so the UI and server
-// stay in sync.
-async function persist(previous: RefDirEntry[]): Promise<boolean> {
-  const result = await apiPut<{ dirs: RefDirEntry[] }>(API_ROUTES.config.referenceDirs, { dirs: dirs.value });
-  if (!result.ok) {
-    dirs.value = previous;
-    persistError.value = result.error;
-    return false;
-  }
-  dirs.value = result.data.dirs;
-  persistError.value = "";
-  return true;
+// Concurrency: user can click Add then Remove (or two Adds) before
+// the first PUT returns. If we just rolled back to a captured
+// `previous` on failure, a stale response would clobber newer local
+// state. Instead:
+//  - Queue PUTs through a Promise chain (`inflight`) so they run in
+//    the same order the user triggered them and can't overlap.
+//  - Each task only applies the server echo if it's the LAST one
+//    still pending — intermediate echoes might be stale relative
+//    to subsequent optimistic mutations.
+//  - On failure with nothing else pending, reload from the server
+//    (authoritative) instead of rolling back to a snapshot that
+//    may itself be obsolete.
+let inflight: Promise<unknown> = Promise.resolve();
+let pendingCount = 0;
+
+async function persist(nextState: RefDirEntry[]): Promise<boolean> {
+  dirs.value = nextState;
+  pendingCount++;
+  const task: Promise<boolean> = inflight
+    .catch(() => undefined)
+    .then(async () => {
+      const result = await apiPut<{ dirs: RefDirEntry[] }>(API_ROUTES.config.referenceDirs, { dirs: nextState });
+      pendingCount--;
+      if (!result.ok) {
+        persistError.value = result.error;
+        if (pendingCount === 0) await load();
+        return false;
+      }
+      persistError.value = "";
+      if (pendingCount === 0) dirs.value = result.data.dirs;
+      return true;
+    });
+  inflight = task;
+  return task;
 }
 
 async function addEntry(): Promise<void> {
@@ -84,9 +105,7 @@ async function addEntry(): Promise<void> {
     draftError.value = t("settingsReferenceDirs.errLabelConflict", { label });
     return;
   }
-  const previous = dirs.value.slice();
-  dirs.value = [...previous, { hostPath: normalized, label }];
-  const ok = await persist(previous);
+  const ok = await persist([...dirs.value, { hostPath: normalized, label }]);
   if (ok) {
     draftPath.value = "";
     draftLabel.value = "";
@@ -94,9 +113,7 @@ async function addEntry(): Promise<void> {
 }
 
 async function removeEntry(index: number): Promise<void> {
-  const previous = dirs.value.slice();
-  dirs.value = previous.filter((_, i) => i !== index);
-  await persist(previous);
+  await persist(dirs.value.filter((_, i) => i !== index));
 }
 
 onMounted(load);

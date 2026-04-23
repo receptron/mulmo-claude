@@ -12,6 +12,7 @@ import {
   type McpServerEntry,
 } from "../../system/config.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
+import { errorMessage } from "../../utils/errors.js";
 import { isRecord } from "../../utils/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { loadCustomDirs, saveCustomDirs, ensureCustomDirs, validateCustomDirs, type CustomDirEntry } from "../../workspace/custom-dirs.js";
@@ -53,7 +54,7 @@ function parseMcpPayloadOrFail(res: ConfigRes, servers: McpServerEntry[]): McpCo
   try {
     return fromMcpEntries(servers);
   } catch (err) {
-    badRequest(res, err instanceof Error ? err.message : "invalid mcp entries");
+    badRequest(res, errorMessage(err, "invalid mcp entries"));
     return null;
   }
 }
@@ -66,7 +67,7 @@ function runSaveOrFail(res: ConfigRes, save: () => void, fallback: string): bool
     save();
     return true;
   } catch (err) {
-    serverError(res, err instanceof Error ? err.message : fallback);
+    serverError(res, errorMessage(err, fallback));
     return false;
   }
 }
@@ -173,7 +174,7 @@ router.put(
       ensureCustomDirs(result.entries);
       res.json({ dirs: result.entries });
     } catch (err) {
-      serverError(res, err instanceof Error ? err.message : "save failed");
+      serverError(res, errorMessage(err, "save failed"));
     }
   },
 );
@@ -201,7 +202,7 @@ router.put(
       saveReferenceDirs(result.entries);
       res.json({ dirs: result.entries });
     } catch (err) {
-      serverError(res, err instanceof Error ? err.message : "save failed");
+      serverError(res, errorMessage(err, "save failed"));
     }
   },
 );
@@ -250,7 +251,7 @@ router.put(
 
       res.json({ overrides: loadSchedulerOverrides() });
     } catch (err) {
-      serverError(res, err instanceof Error ? err.message : "save failed");
+      serverError(res, errorMessage(err, "save failed"));
     }
   },
 );

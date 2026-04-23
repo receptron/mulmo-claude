@@ -32,7 +32,7 @@ const DEFAULT_TODOS = {
 
 const DEFAULT_HEALTH = {
   status: "OK",
-  geminiAvailable: false,
+  geminiAvailable: true,
   sandboxEnabled: false,
 };
 

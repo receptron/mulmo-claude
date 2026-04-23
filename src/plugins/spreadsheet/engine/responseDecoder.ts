@@ -11,6 +11,7 @@
  */
 
 import type { SheetData } from "./types.js";
+import { errorMessage } from "../../../utils/errors";
 
 /** Shape of the `/api/files/content` response we care about. The
  *  server returns more fields (kind, size, modifiedMs, …) but this
@@ -51,7 +52,7 @@ export function decodeSpreadsheetResponse(body: FilesContentResponseLike): Decod
   } catch (err) {
     return {
       kind: "error",
-      message: `Spreadsheet JSON is malformed: ${err instanceof Error ? err.message : "parse error"}`,
+      message: `Spreadsheet JSON is malformed: ${errorMessage(err, "parse error")}`,
     };
   }
   if (!Array.isArray(parsed)) {

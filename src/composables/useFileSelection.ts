@@ -5,6 +5,7 @@ import { ref } from "vue";
 import { useRoute, useRouter, isNavigationFailure } from "vue-router";
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { isNonEmptyString } from "../utils/types";
 
 interface TextContent {
   kind: "text";
@@ -43,7 +44,7 @@ export function readPathMatch(raw: unknown): string | null {
     if (raw.length === 0) return null;
     return raw.join("/");
   }
-  if (typeof raw === "string" && raw.length > 0) return raw;
+  if (isNonEmptyString(raw)) return raw;
   return null;
 }
 

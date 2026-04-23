@@ -261,6 +261,7 @@ import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import TasksTab from "./TasksTab.vue";
 import { isToday } from "../../utils/format/date";
+import { errorMessage } from "../../utils/errors";
 
 const { t } = useI18n();
 
@@ -566,7 +567,7 @@ async function applyChanges() {
     parsed = JSON.parse(editorText.value);
     if (!Array.isArray(parsed)) throw new Error("Expected a JSON array");
   } catch (err) {
-    parseError.value = err instanceof Error ? err.message : "Invalid JSON";
+    parseError.value = errorMessage(err, "Invalid JSON");
     return;
   }
   callApi({ action: "replace", items: parsed });
