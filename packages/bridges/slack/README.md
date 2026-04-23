@@ -21,6 +21,7 @@ Slack bridge for [MulmoClaude](https://github.com/receptron/mulmoclaude). Uses *
 - `groups:history` — read messages in private channels
 - `im:history` — read direct messages
 - `mpim:history` — read group DMs
+- `reactions:write` — **optional**, only needed if you enable `SLACK_ACK_REACTION` (see below)
 
 ### 3. Enable Socket Mode
 
@@ -142,6 +143,31 @@ That said, if you switch from `channel` → `thread`, messages that were previou
 
 ---
 
+## Ack reaction (👀)
+
+Add an emoji reaction to every inbound message the bridge processes, so the user gets an immediate "the bot saw me" signal — before the agent has finished thinking. Off by default; opt in with `SLACK_ACK_REACTION`.
+
+| `SLACK_ACK_REACTION` value | Behaviour |
+|---|---|
+| unset / empty / `0` / `false` / `off` / `no` | Off (default) |
+| `1` / `true` / `on` / `yes` | On, reacts with `:eyes:` |
+| Any other emoji shortcode (no colons) | On, reacts with that emoji |
+
+Emoji shortcode rules: lowercase letters, digits, `_`, `+`, `-`. No surrounding colons. Both standard emoji (`white_check_mark`, `thumbsup`) and custom workspace emoji (`my_bot_ack`) work.
+
+```bash
+# Examples
+SLACK_ACK_REACTION=1                    # 👀
+SLACK_ACK_REACTION=white_check_mark     # ✅
+SLACK_ACK_REACTION=my_bot_ack           # custom workspace emoji
+```
+
+**Operator setup**: add the `reactions:write` Bot Token Scope in **OAuth & Permissions** and reinstall the app. Without the scope, the reaction call fails with `missing_scope` — the bridge logs a warning and continues normally, so the rest of the bot still works.
+
+**Design**: the reaction call is fire-and-forget — the agent starts processing immediately, not after the reaction lands. The reaction is not removed when the reply arrives; it stays as a "seen" indicator.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -150,6 +176,7 @@ That said, if you switch from `channel` → `thread`, messages that were previou
 | `SLACK_APP_TOKEN` | Yes | `xapp-...` App-Level Token (connections:write) |
 | `SLACK_ALLOWED_CHANNELS` | No | CSV of channel IDs to restrict access (empty = all) |
 | `SLACK_SESSION_GRANULARITY` | No | `channel` *(default)* \| `thread` \| `auto`. See above. |
+| `SLACK_ACK_REACTION` | No | Off by default. `1` enables with 👀; any other emoji shortcode selects a custom emoji. Requires the `reactions:write` scope. See above. |
 | `MULMOCLAUDE_API_URL` | No | Default `http://localhost:3001` |
 | `MULMOCLAUDE_AUTH_TOKEN` | No | Bearer token (auto-read from workspace if not set) |
 

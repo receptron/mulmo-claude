@@ -21,6 +21,7 @@ English: [`README.md`](README.md)
 - `groups:history` — プライベートチャネルのメッセージ閲覧
 - `im:history` — DM の閲覧
 - `mpim:history` — グループ DM の閲覧
+- `reactions:write` — **任意**。`SLACK_ACK_REACTION` を有効にするときだけ必要 (下記参照)
 
 ### 3. Socket Mode を有効化
 
@@ -142,6 +143,31 @@ Slack で `/invite @MulmoClaude` を実行して bot をチャネルに招待。
 
 ---
 
+## 既読リアクション (👀)
+
+bridge が受信したメッセージに即座に絵文字リアクションを付ける機能。「bot がちゃんと届いていることを認識している」という安心感を、agent の返信を待たずにユーザへ返せます。デフォルトは OFF、`SLACK_ACK_REACTION` で opt-in。
+
+| `SLACK_ACK_REACTION` の値 | 挙動 |
+|---|---|
+| 未設定 / 空 / `0` / `false` / `off` / `no` | OFF（デフォルト） |
+| `1` / `true` / `on` / `yes` | ON、`:eyes:` でリアクション |
+| 上記以外の絵文字ショートコード（コロン無し） | ON、その絵文字でリアクション |
+
+絵文字ショートコードの書式: 小文字英字・数字・`_`・`+`・`-`。前後のコロンは付けない。標準絵文字 (`white_check_mark`, `thumbsup`) もカスタム絵文字 (`my_bot_ack`) も使えます。
+
+```bash
+# 例
+SLACK_ACK_REACTION=1                    # 👀
+SLACK_ACK_REACTION=white_check_mark     # ✅
+SLACK_ACK_REACTION=my_bot_ack           # ワークスペースのカスタム絵文字
+```
+
+**Operator の設定**: **OAuth & Permissions** に `reactions:write` スコープを追加してアプリを再インストール。スコープが無い場合は `missing_scope` で失敗しますが、bridge は警告ログを出して処理を続けるので、他の動作には影響しません。
+
+**設計**: リアクション呼び出しは fire-and-forget。agent 処理はリアクションの成否を待たずに即座に開始。返信が届いてもリアクションは残したまま (「既読」マーカーとして保持)。
+
+---
+
 ## 環境変数
 
 | 変数 | 必須 | 説明 |
@@ -150,6 +176,7 @@ Slack で `/invite @MulmoClaude` を実行して bot をチャネルに招待。
 | `SLACK_APP_TOKEN` | はい | `xapp-...` App-Level Token (`connections:write`) |
 | `SLACK_ALLOWED_CHANNELS` | いいえ | アクセスを許可するチャネル ID の CSV（空ならすべて許可） |
 | `SLACK_SESSION_GRANULARITY` | いいえ | `channel`（デフォルト） / `thread` / `auto`。上記参照 |
+| `SLACK_ACK_REACTION` | いいえ | デフォルト OFF。`1` で 👀 を付ける、他の絵文字ショートコードを指定するとその絵文字。`reactions:write` スコープが必要。上記参照 |
 | `MULMOCLAUDE_API_URL` | いいえ | デフォルト `http://localhost:3001` |
 | `MULMOCLAUDE_AUTH_TOKEN` | いいえ | Bearer token（未指定ならワークスペースから自動取得） |
 

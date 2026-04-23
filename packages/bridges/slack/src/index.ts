@@ -12,6 +12,10 @@
 //   SLACK_SESSION_GRANULARITY  — "channel" (default) | "thread" | "auto"
 //                                Controls how a single Slack channel is split
 //                                into MulmoClaude sessions. See README.md.
+//   SLACK_ACK_REACTION         — unset / "0" = off (default)
+//                                "1" = on with default ":eyes:"
+//                                any other emoji shortcode (no colons) = on with that emoji
+//                                Requires the `reactions:write` bot scope.
 //   MULMOCLAUDE_API_URL        — default http://localhost:3001
 //   MULMOCLAUDE_AUTH_TOKEN     — bearer token (or read from workspace)
 
@@ -20,6 +24,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { createBridgeClient } from "@mulmobridge/client";
 import { buildExternalChatId, effectiveThreadTs, parseExternalChatId, parseGranularity } from "./sessionId.js";
+import { parseAckReaction } from "./ackReaction.js";
 import { redactUser } from "./redactUser.js";
 
 const TRANSPORT_ID = "slack";
@@ -42,6 +47,15 @@ const allowAll = allowedChannels.size === 0;
 const granularity = (() => {
   try {
     return parseGranularity(process.env.SLACK_SESSION_GRANULARITY);
+  } catch (err) {
+    console.error(`[slack] ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+})();
+
+const ackEmoji = (() => {
+  try {
+    return parseAckReaction(process.env.SLACK_ACK_REACTION);
   } catch (err) {
     console.error(`[slack] ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
@@ -88,6 +102,8 @@ socketMode.on("message", async ({ event, ack }) => {
   const externalChatId = buildExternalChatId(channelId, threadTs, granularity);
   console.log(`[slack] message channel=${channelId} thread_ts=${threadTs ?? "-"} session=${externalChatId} user=${redactUser(event.user)} len=${text.length}`);
 
+  sendAckReaction(channelId, event.ts);
+
   try {
     const ackResult = await client.send(externalChatId, text);
     if (ackResult.ok) {
@@ -106,6 +122,16 @@ socketMode.on("message", async ({ event, ack }) => {
     console.error(`[slack] message handling failed: ${err}`);
   }
 });
+
+// Fire-and-forget "seen" reaction. Deliberately not awaited so the
+// agent processing starts immediately; errors (missing_scope,
+// already_reacted, rate-limit, message_not_found, …) are logged and
+// swallowed so they never stop the main handler.
+function sendAckReaction(channel: string, eventTs: unknown): void {
+  if (ackEmoji === null) return;
+  if (typeof eventTs !== "string") return;
+  web.reactions.add({ channel, timestamp: eventTs, name: ackEmoji }).catch((err) => console.warn(`[slack] reactions.add failed (continuing): ${err}`));
+}
 
 async function sendChunked(channel: string, threadTs: string | undefined, text: string): Promise<void> {
   // Slack's max message length is ~40,000 chars but we chunk at 4000
@@ -133,6 +159,7 @@ async function main(): Promise<void> {
   console.log("MulmoClaude Slack bridge");
   console.log(`Channels: ${allowAll ? "(all)" : [...allowedChannels].join(", ")}`);
   console.log(`Session granularity: ${granularity}`);
+  console.log(`Ack reaction: ${ackEmoji ?? "(disabled)"}`);
 
   await socketMode.start();
   console.log("Connected to Slack (Socket Mode).");
