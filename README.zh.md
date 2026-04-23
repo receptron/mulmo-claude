@@ -166,7 +166,6 @@ MulmoClaude 使用 Claude Code 作为 AI 后端，它可以访问包括 Bash 在
 | **Artist**          | 图片生成、图片编辑、使用 p5.js 的生成艺术          |
 | **Tutor**           | 自适应教学 —— 在解释任何内容之前先评估你的水平     |
 | **Storyteller**     | 带图片和 HTML 场景的交互式图文故事                 |
-| **Role Manager**    | 创建和编辑自定义角色                               |
 
 切换角色会重置 Claude 的上下文，并只加载该角色需要的工具 —— 保持响应快速而专注。
 
@@ -371,9 +370,8 @@ MulmoClaude 包含可选的 MCP 工具，通过官方 X API v2 读取和搜索 X
 
 这些工具 **仅在自定义角色中可用**。内置角色默认不包含它们（General 除外）。要在你自己的角色中使用它们：
 
-1. 切换到 **Role Manager** 角色
-2. 让 Claude 创建一个自定义角色，或编辑现有角色
-3. 在插件清单中，启用 `readXPost` 和 / 或 `searchX`
+1. 在 `~/mulmoclaude/roles/<id>.json` 下创建或编辑自定义角色的 JSON 文件
+2. 将 `readXPost` 和 / 或 `searchX` 加入其 `availablePlugins` 列表
 
 配置完成后，你可以将任意 `x.com` 或 `twitter.com` URL 粘贴到聊天中，Claude 会自动获取并阅读。
 

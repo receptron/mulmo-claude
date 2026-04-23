@@ -167,7 +167,6 @@ Jede Rolle gibt Claude eine andere Persona, eine andere Werkzeugauswahl und eine
 | **Artist**          | Bildgenerierung, Bildbearbeitung, generative Kunst mit p5.js               |
 | **Tutor**           | Adaptives Lehren — bewertet Ihr Niveau, bevor etwas erklärt wird           |
 | **Storyteller**     | Interaktive illustrierte Geschichten mit Bildern und HTML-Szenen           |
-| **Role Manager**    | Erstellen und Bearbeiten benutzerdefinierter Rollen                        |
 
 Das Wechseln der Rolle setzt Claudes Kontext zurück und tauscht nur die Werkzeuge aus, die diese Rolle benötigt — so bleiben die Antworten schnell und fokussiert.
 
@@ -372,9 +371,8 @@ Diese Tools sind **standardmäßig deaktiviert** und benötigen ein X API Bearer
 
 Diese Tools sind **nur in benutzerdefinierten Rollen verfügbar**. Die eingebauten Rollen enthalten sie standardmäßig nicht (außer General). Um sie in Ihrer eigenen Rolle zu verwenden:
 
-1. Wechseln Sie zur Rolle **Role Manager**
-2. Bitten Sie Claude, eine benutzerdefinierte Rolle zu erstellen oder eine bestehende zu bearbeiten
-3. Aktivieren Sie in der Plugin-Checkliste `readXPost` und/oder `searchX`
+1. Erstellen oder bearbeiten Sie eine benutzerdefinierte Rollen-JSON-Datei unter `~/mulmoclaude/roles/<id>.json`
+2. Fügen Sie `readXPost` und/oder `searchX` zu ihrer `availablePlugins`-Liste hinzu
 
 Einmal konfiguriert, können Sie jede `x.com`- oder `twitter.com`-URL in den Chat einfügen und Claude ruft sie automatisch ab und liest sie.
 

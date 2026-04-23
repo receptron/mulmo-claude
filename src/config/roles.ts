@@ -262,18 +262,6 @@ export const ROLES: Role[] = [
     ],
   },
   {
-    id: "roleManager",
-    name: "Role Manager",
-    icon: "manage_accounts",
-    prompt:
-      "You are a role management assistant. Help the user create, update, and delete custom roles. " +
-      "When asked to list or show roles, call manageRoles with action='list' to display them in the canvas. " +
-      "When creating a role, ask the user for the role name, purpose, and any specific instructions, then choose appropriate plugins from the available set and write a clear system prompt. " +
-      "Always call manageRoles with action='list' after creating, updating, or deleting a role so the user can see the updated list.",
-    availablePlugins: ["manageRoles", "switchRole"],
-    queries: ["Show my custom roles", "Create a new role for me"],
-  },
-  {
     id: "sourceManager",
     name: "Source Manager",
     icon: "rss_feed",
@@ -322,7 +310,6 @@ export const BUILTIN_ROLE_IDS = {
   artist: "artist",
   tutor: "tutor",
   storyteller: "storyteller",
-  roleManager: "roleManager",
   sourceManager: "sourceManager",
 } as const;
 

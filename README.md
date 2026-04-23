@@ -167,7 +167,6 @@ Each role gives Claude a different persona, tool palette, and focus area:
 | **Artist**          | Image generation, image editing, generative art with p5.js           |
 | **Tutor**           | Adaptive teaching — evaluates your level before explaining anything  |
 | **Storyteller**     | Interactive illustrated stories with images and HTML scenes          |
-| **Role Manager**    | Create and edit custom roles                                         |
 
 Switching roles resets Claude's context and swaps in only the tools that role needs — keeping responses fast and focused.
 
@@ -372,9 +371,8 @@ These tools are **disabled by default** and require an X API Bearer Token to act
 
 These tools are **only available in custom roles**. The built-in roles do not include them by default (except General). To use them in your own role:
 
-1. Switch to the **Role Manager** role
-2. Ask Claude to create a custom role, or edit an existing one
-3. In the plugin checklist, enable `readXPost` and/or `searchX`
+1. Create or edit a custom role JSON file under `~/mulmoclaude/roles/<id>.json`
+2. Add `readXPost` and/or `searchX` to its `availablePlugins` list
 
 Once configured, you can paste any `x.com` or `twitter.com` URL into the chat and Claude will fetch and read it automatically.
 

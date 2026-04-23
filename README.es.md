@@ -165,7 +165,6 @@ Cada rol le da a Claude una persona diferente, una paleta de herramientas distin
 | **Artist**          | Generación de imágenes, edición de imágenes, arte generativo con p5.js                      |
 | **Tutor**           | Enseñanza adaptativa — evalúa tu nivel antes de explicar cualquier cosa                     |
 | **Storyteller**     | Historias ilustradas interactivas con imágenes y escenas HTML                               |
-| **Role Manager**    | Crea y edita roles personalizados                                                           |
 
 Cambiar de rol reinicia el contexto de Claude y carga solo las herramientas que ese rol necesita — manteniendo las respuestas rápidas y enfocadas.
 
@@ -370,9 +369,8 @@ Estas herramientas están **deshabilitadas por defecto** y requieren un Bearer T
 
 Estas herramientas **solo están disponibles en roles personalizados**. Los roles integrados no las incluyen por defecto (excepto General). Para usarlas en tu propio rol:
 
-1. Cambia al rol **Role Manager**
-2. Pídele a Claude que cree un rol personalizado o edite uno existente
-3. En la lista de plugins, habilita `readXPost` y/o `searchX`
+1. Crea o edita un archivo JSON de rol personalizado en `~/mulmoclaude/roles/<id>.json`
+2. Añade `readXPost` y/o `searchX` a su lista `availablePlugins`
 
 Una vez configurado, puedes pegar cualquier URL de `x.com` o `twitter.com` en el chat y Claude la descargará y leerá automáticamente.
 
