@@ -16,31 +16,37 @@
           </div>
         </div>
 
-        <!-- Bottom action bar. The collapsible editor's summary row
-             doubles as the plugin's primary action strip: PDF (assistant
-             only) and the edit-toggle live together, so stack view no
-             longer needs a separate top header strip above the card
-             chrome. Clicks on the PDF button use @click.stop.prevent so
-             they don't toggle the `<details>` element. -->
-        <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
-          <summary class="text-response-edit-summary" data-testid="text-response-edit-summary">
-            <span class="text-response-edit-label">{{ t("pluginTextResponse.editContent") }}</span>
-            <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click.stop.prevent="downloadPdf">
+        <!-- Bottom area: a thin action row (PDF / Copy) above the
+             full-width <details> edit panel. Keeping the buttons in a
+             separate row lets the editor textarea keep the full width
+             while nothing floats over the content — stack view only
+             needs the card chrome as a header. -->
+        <div class="text-response-bottom">
+          <div class="text-response-actions">
+            <span v-if="pdfError" class="text-xs text-red-500 self-center" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
+            <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click="downloadPdf">
               <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
               {{ t("pluginTextResponse.pdf") }}
             </button>
-            <span v-if="pdfError" class="text-xs text-red-500 ml-2" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
-          </summary>
-          <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
-          <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
-            {{ t("pluginTextResponse.applyChanges") }}
-          </button>
-        </details>
+            <button
+              v-show="!editing"
+              class="copy-btn"
+              :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')"
+              @click="copyText"
+            >
+              <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
+            </button>
+            <button v-show="editing" class="cancel-btn" @click="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
+          </div>
+          <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
+            <summary data-testid="text-response-edit-summary">{{ t("pluginTextResponse.editContent") }}</summary>
+            <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
+            <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
+              {{ t("pluginTextResponse.applyChanges") }}
+            </button>
+          </details>
+        </div>
       </div>
-      <button v-show="!editing" class="copy-btn" :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')" @click="copyText">
-        <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
-      </button>
-      <button v-show="editing" class="cancel-btn" @click="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
     </div>
   </div>
 </template>
@@ -394,17 +400,17 @@ async function downloadPdf() {
   color: #333;
 }
 
-/* Summary row now carries the primary actions (edit toggle + PDF).
-   Flex layout with the label taking the free space keeps the PDF
-   button right-aligned regardless of label length. */
-.text-response-edit-summary {
+/* Bottom region: thin action row above the full-width edit panel.
+   Keeping the action buttons in their own row lets the editor
+   textarea span the full width when <details> opens. */
+.text-response-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-}
-
-.text-response-edit-label {
-  flex: 1;
+  padding: 0.375rem 0.5rem;
+  border-top: 1px solid #e0e0e0;
+  background: #f9fafb;
 }
 
 .pdf-inline-btn {
@@ -495,15 +501,12 @@ async function downloadPdf() {
 }
 
 .copy-btn {
-  position: absolute;
-  bottom: 0.3rem;
-  right: 0.65rem;
-  padding: 0.4rem;
+  padding: 0.35rem;
   background: none;
   border: none;
   color: #333;
   cursor: pointer;
-  z-index: 1;
+  line-height: 0;
 }
 
 .copy-btn:hover {
@@ -515,18 +518,14 @@ async function downloadPdf() {
 }
 
 .cancel-btn {
-  position: absolute;
-  bottom: 0.5rem;
-  right: 0.65rem;
-  padding: 0.5rem 1rem;
+  padding: 0.25em 0.9em;
   background: #e0e0e0;
   color: #333;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85em;
   font-weight: 500;
-  z-index: 1;
 }
 
 .cancel-btn:hover {
