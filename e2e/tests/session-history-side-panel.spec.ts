@@ -30,10 +30,13 @@ test.describe("session-history side-panel toggle", () => {
     await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
     await expect(page.getByTestId("session-history-toggle-off")).toBeVisible();
 
-    // Click the toggle — panel appears and the session list renders.
+    // Click the toggle — SessionTabBar disappears, panel appears with
+    // its own toggle in the header.
     await page.getByTestId("session-history-toggle-off").click();
     await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
-    await expect(page.getByTestId("session-history-toggle-on")).toBeVisible();
+    // Only one toggle-on button (in the panel) — the SessionTabBar is
+    // unmounted so its toggle is gone too.
+    await expect(page.getByTestId("session-history-toggle-on")).toHaveCount(1);
 
     const sidePanel = page.getByTestId("session-history-side-panel");
     await expect(sidePanel.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
@@ -88,22 +91,22 @@ test.describe("session-history side-panel toggle", () => {
     await expect(page).toHaveURL(new RegExp(`/chat/${SESSION_A.id}`));
   });
 
-  test("opening the side panel hides the 6 top session tabs", async ({ page }) => {
+  test("opening the side panel replaces the SessionTabBar entirely", async ({ page }) => {
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
-    // Tabs are visible while the side-panel is off.
+    // SessionTabBar is present with its tabs and toggle when the panel is off.
     await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();
+    await expect(page.getByTestId("session-history-toggle-off")).toBeVisible();
 
-    // Turning the panel on collapses the top tab row — the left
-    // panel takes over that role. The toggle itself stays visible
-    // so the user can close the panel again.
+    // Click the toggle — SessionTabBar unmounts completely; the panel
+    // takes over and carries its own toggle in the header.
     await page.getByTestId("session-history-toggle-off").click();
     await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
     await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeHidden();
-    await expect(page.getByTestId("session-history-toggle-on")).toBeVisible();
+    await expect(page.getByTestId("session-history-toggle-off")).toBeHidden();
 
-    // Toggling off brings the top tabs back.
+    // The in-panel toggle returns to the tabs-on-top layout.
     await page.getByTestId("session-history-toggle-on").click();
     await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
     await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();

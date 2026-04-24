@@ -9,61 +9,52 @@
     >
       <span class="material-icons text-sm">add</span>
     </button>
-    <!-- The 6 session tabs. Hidden when the side-panel
-         (SessionHistoryPanel) is showing on the left — it covers the
-         same sessions in a richer layout, so keeping the tabs here
-         is redundant and just steals horizontal space. The spacer
-         below keeps the right-side buttons (history / toggle)
-         right-aligned while tabs are hidden. -->
-    <template v-if="!showSessionHistory">
-      <template v-for="i in 6" :key="i">
-        <button
-          v-if="sessions[i - 1]"
-          class="relative flex-1 min-w-0 flex items-center justify-start gap-1.5 pl-2 pr-2 py-1 rounded overflow-hidden transition-colors"
-          :class="sessions[i - 1].id === currentSessionId ? 'border border-gray-300 bg-white shadow-sm' : 'hover:bg-gray-100'"
-          :title="tabTooltip(sessions[i - 1])"
-          :data-testid="`session-tab-${sessions[i - 1].id}`"
-          :aria-current="sessions[i - 1].id === currentSessionId ? 'page' : undefined"
-          @click="emit('loadSession', sessions[i - 1].id)"
-        >
-          <!-- Role icon is the primary glyph on every tab. Non-human
-               sessions add a small grey circled origin badge on the
-               top-right (schedule / build / sync_alt) so the origin
-               is still readable without hiding the role. Origin is
-               also prepended to the tab `title` tooltip. -->
-          <span class="relative shrink-0 flex items-center leading-none">
-            <span
-              class="material-icons text-base leading-none"
-              :class="[iconColor(sessions[i - 1]), sessions[i - 1].isRunning ? 'animate-spin [animation-duration:3s]' : '']"
-              >{{ iconGlyph(sessions[i - 1]) }}</span
-            >
-            <span
-              v-if="originGlyph(sessions[i - 1].origin)"
-              role="img"
-              class="absolute -top-[3px] -right-[5px] w-3.5 h-3.5 rounded-full bg-white ring-1 ring-gray-300 flex items-center justify-center"
-              :title="originTooltip(sessions[i - 1].origin)"
-              :aria-label="originTooltip(sessions[i - 1].origin)"
-            >
-              <span class="material-icons !text-[10px] leading-none text-gray-500" aria-hidden="true">{{ originGlyph(sessions[i - 1].origin) }}</span>
-            </span>
-          </span>
-          <span class="text-xs text-gray-700 truncate min-w-0" :class="sessions[i - 1].hasUnread ? 'font-bold' : ''">{{ tabLabel(sessions[i - 1]) }}</span>
-          <!-- Unread dot. Suppressed only when the user is actually
-               looking at that chat session — otherwise
-               `currentSessionId` keeps pointing at the last chat
-               even when the user is on /wiki, /files, etc., and the
-               dot would silently disappear on the tab that most
-               needs it. -->
+    <template v-for="i in 6" :key="i">
+      <button
+        v-if="sessions[i - 1]"
+        class="relative flex-1 min-w-0 flex items-center justify-start gap-1.5 pl-2 pr-2 py-1 rounded overflow-hidden transition-colors"
+        :class="sessions[i - 1].id === currentSessionId ? 'border border-gray-300 bg-white shadow-sm' : 'hover:bg-gray-100'"
+        :title="tabTooltip(sessions[i - 1])"
+        :data-testid="`session-tab-${sessions[i - 1].id}`"
+        :aria-current="sessions[i - 1].id === currentSessionId ? 'page' : undefined"
+        @click="emit('loadSession', sessions[i - 1].id)"
+      >
+        <!-- Role icon is the primary glyph on every tab. Non-human
+             sessions add a small grey circled origin badge on the
+             top-right (schedule / build / sync_alt) so the origin
+             is still readable without hiding the role. Origin is
+             also prepended to the tab `title` tooltip. -->
+        <span class="relative shrink-0 flex items-center leading-none">
           <span
-            v-if="sessions[i - 1].hasUnread && !(isChatPage && sessions[i - 1].id === currentSessionId)"
-            class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"
-            :aria-label="t('sessionTabBar.unreadDot')"
-          />
-        </button>
-        <div v-else class="flex-1" />
-      </template>
+            class="material-icons text-base leading-none"
+            :class="[iconColor(sessions[i - 1]), sessions[i - 1].isRunning ? 'animate-spin [animation-duration:3s]' : '']"
+            >{{ iconGlyph(sessions[i - 1]) }}</span
+          >
+          <span
+            v-if="originGlyph(sessions[i - 1].origin)"
+            role="img"
+            class="absolute -top-[3px] -right-[5px] w-3.5 h-3.5 rounded-full bg-white ring-1 ring-gray-300 flex items-center justify-center"
+            :title="originTooltip(sessions[i - 1].origin)"
+            :aria-label="originTooltip(sessions[i - 1].origin)"
+          >
+            <span class="material-icons !text-[10px] leading-none text-gray-500" aria-hidden="true">{{ originGlyph(sessions[i - 1].origin) }}</span>
+          </span>
+        </span>
+        <span class="text-xs text-gray-700 truncate min-w-0" :class="sessions[i - 1].hasUnread ? 'font-bold' : ''">{{ tabLabel(sessions[i - 1]) }}</span>
+        <!-- Unread dot. Suppressed only when the user is actually
+             looking at that chat session — otherwise
+             `currentSessionId` keeps pointing at the last chat
+             even when the user is on /wiki, /files, etc., and the
+             dot would silently disappear on the tab that most
+             needs it. -->
+        <span
+          v-if="sessions[i - 1].hasUnread && !(isChatPage && sessions[i - 1].id === currentSessionId)"
+          class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"
+          :aria-label="t('sessionTabBar.unreadDot')"
+        />
+      </button>
+      <div v-else class="flex-1" />
     </template>
-    <div v-else class="flex-1" />
     <button
       data-testid="history-btn"
       class="relative flex-shrink-0 flex items-center justify-center w-7 py-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"

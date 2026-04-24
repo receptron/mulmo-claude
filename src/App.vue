@@ -17,10 +17,13 @@
           <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
       </div>
-      <!-- Row 2: role selector + session tabs -->
+      <!-- Row 2: role selector + session tabs. The SessionTabBar
+           disappears entirely when the side-panel takes over — the
+           panel has its own toggle to restore this row. -->
       <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
+          v-if="!showSessionHistory"
           :sessions="tabSessions"
           :current-session-id="displayedCurrentSessionId"
           :is-chat-page="isChatPage"
@@ -51,16 +54,24 @@
            page experience on non-chat contexts. -->
       <div
         v-if="isChatPage && showSessionHistory"
-        class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900"
+        class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900 flex flex-col"
         data-testid="session-history-side-panel"
       >
-        <SessionHistoryPanel
-          :sessions="mergedSessions"
-          :current-session-id="currentSessionId"
-          :roles="roles"
-          :error-message="historyError"
-          @load-session="handleSessionSelect"
-        />
+        <!-- In-panel toggle so the user can close the side-panel
+             without hunting for the tab-bar button. Clicking it
+             returns the UI to the tabs-on-top layout. -->
+        <div class="flex items-center justify-end px-2 py-1 border-b border-gray-100">
+          <SessionHistoryToggleButton :model-value="showSessionHistory" @update:model-value="setShowSessionHistory" />
+        </div>
+        <div class="flex-1 min-h-0">
+          <SessionHistoryPanel
+            :sessions="mergedSessions"
+            :current-session-id="currentSessionId"
+            :roles="roles"
+            :error-message="historyError"
+            @load-session="handleSessionSelect"
+          />
+        </div>
       </div>
 
       <!-- Sidebar (Single layout only) -->
@@ -192,6 +203,7 @@ import SessionTabBar from "./components/SessionTabBar.vue";
 import SuggestionsPanel from "./components/SuggestionsPanel.vue";
 import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
+import SessionHistoryToggleButton from "./components/SessionHistoryToggleButton.vue";
 import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import PluginLauncher from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
