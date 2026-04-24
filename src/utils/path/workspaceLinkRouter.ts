@@ -55,6 +55,24 @@ export function classifyWorkspacePath(href: string): WorkspaceLinkTarget | null 
   return { kind: "file", path: normalized };
 }
 
+/**
+ * Resolve a potentially-relative href against a workspace base directory.
+ * Relative paths (`./`, `../`) are prepended with `baseDir` so that
+ * `classifyWorkspacePath` can normalize the `../` segments.
+ * Bare filenames (no `/`) are also treated as relative to `baseDir`.
+ *
+ * Example: resolveWikiHref("../sources/foo.md", "data/wiki/pages")
+ *        → "data/wiki/pages/../sources/foo.md"
+ *        → (after normalization by classifyWorkspacePath) "data/wiki/sources/foo.md"
+ */
+export function resolveWikiHref(href: string, baseDir: string): string {
+  if (isExternalHref(href)) return href;
+  if (href.startsWith("./") || href.startsWith("../") || !href.includes("/")) {
+    return `${baseDir}/${href}`;
+  }
+  return href;
+}
+
 function stripFragmentAndQuery(str: string): string {
   const hashIdx = str.indexOf("#");
   const queryIdx = str.indexOf("?");
