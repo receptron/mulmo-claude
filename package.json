@@ -18,6 +18,7 @@
     "predev:debug": "yarn build:packages:dev",
     "dev:debug": "concurrently -n server,client -k \"npm run server:debug\" \"sleep 2 && vite\"",
     "dev:client": "vite",
+    "dev:client:e2e": "vite --port 45173 --strictPort",
     "dev:server": "tsx server/index.ts",
     "server": "tsx server/index.ts",
     "server:debug": "tsx server/index.ts --debug",
