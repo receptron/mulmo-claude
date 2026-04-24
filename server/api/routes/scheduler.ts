@@ -11,6 +11,7 @@ import { log } from "../../system/logger/index.js";
 import { SCHEDULER_ACTIONS, TASK_ACTIONS } from "../../../src/config/schedulerActions.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
 import { errorMessage } from "../../utils/errors.js";
+import { makeUuid } from "../../utils/id.js";
 
 const router = Router();
 
@@ -69,7 +70,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
     if (action === SCHEDULER_ACTIONS.listTasks) {
       const tasks = loadUserTasks();
       res.json({
-        uuid: crypto.randomUUID(),
+        uuid: makeUuid(),
         message: `${tasks.length} scheduled task(s) found.`,
         data: { tasks },
       });
@@ -87,7 +88,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
       await saveUserTasks(tasks);
       await refreshUserTasks();
       res.json({
-        uuid: crypto.randomUUID(),
+        uuid: makeUuid(),
         message: `Task "${result.task.name}" created and scheduled.`,
         data: { task: result.task },
       });
@@ -107,7 +108,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
       await saveUserTasks(tasks);
       await refreshUserTasks();
       res.json({
-        uuid: crypto.randomUUID(),
+        uuid: makeUuid(),
         message: `Task "${name}" deleted.`,
         data: { deleted: taskId },
       });
@@ -122,7 +123,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
         notFound(res, `task not found: ${taskId}`);
         return;
       }
-      const chatSessionId = crypto.randomUUID();
+      const chatSessionId = makeUuid();
       log.info("scheduler", "manual run via MCP", {
         name: task.name,
         chatSessionId,
@@ -138,7 +139,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
         });
       });
       res.json({
-        uuid: crypto.randomUUID(),
+        uuid: makeUuid(),
         message: `Task "${task.name}" triggered.`,
         data: { triggered: taskId, chatSessionId },
       });

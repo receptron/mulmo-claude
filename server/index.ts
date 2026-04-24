@@ -29,6 +29,7 @@ import { onSessionEvent } from "./events/session-store/index.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
 import { serverError } from "./utils/httpError.js";
+import { makeUuid } from "./utils/id.js";
 import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
 import { env, isGeminiAvailable } from "./system/env.js";
@@ -559,7 +560,7 @@ function registerDebugTasks(taskManager: ITaskManager, pubsub: IPubSub) {
       if (!last) return;
 
       taskManager.removeTask("debug.auto-chat");
-      const chatSessionId = crypto.randomUUID();
+      const chatSessionId = makeUuid();
       log.info("debug", "starting auto-chat", { chatSessionId });
       const result = await startChat({
         message: "Tell me about this app, MulmoClaude.",

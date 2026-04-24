@@ -18,6 +18,7 @@ import { errorMessage } from "../../utils/errors.js";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { log } from "../../system/logger/index.js";
 import { startChat } from "./agent.js";
+import { makeUuid } from "../../utils/id.js";
 
 const router = Router();
 
@@ -112,7 +113,7 @@ router.post(API_ROUTES.scheduler.taskRun, async (req: Request<{ id: string }>, r
   const userTasks = loadUserTasks();
   const userTask = userTasks.find((task) => task.id === taskId);
   if (userTask) {
-    const chatSessionId = crypto.randomUUID();
+    const chatSessionId = makeUuid();
     log.info("scheduler-tasks", "manual run (user task)", {
       name: userTask.name,
       chatSessionId,

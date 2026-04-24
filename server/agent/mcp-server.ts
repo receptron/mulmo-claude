@@ -15,6 +15,7 @@ import { extractFetchError } from "../utils/fetch.js";
 import { safeResponseText } from "../utils/http.js";
 import { readTextSafeSync } from "../utils/files/safe.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
+import { makeUuid } from "../utils/id.js";
 
 type JsonRpcId = string | number | null;
 
@@ -192,7 +193,7 @@ async function pushSkillsListResult(message: string): Promise<void> {
   const skills = await fetchSkillsList();
   await postJson(API_ROUTES.agent.internal.toolResult, {
     toolName: "manageSkills",
-    uuid: crypto.randomUUID(),
+    uuid: makeUuid(),
     title: "Skills",
     message,
     data: { skills },
@@ -204,7 +205,7 @@ async function handleManageSkillsList(): Promise<string> {
   const suffix = skills.length === 1 ? "" : "s";
   await postJson(API_ROUTES.agent.internal.toolResult, {
     toolName: "manageSkills",
-    uuid: crypto.randomUUID(),
+    uuid: makeUuid(),
     title: "Skills",
     message: `Found ${skills.length} skill${suffix}.`,
     data: { skills },
@@ -290,7 +291,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     if (args.action === "list" && result.success) {
       await postJson(API_ROUTES.agent.internal.toolResult, {
         toolName: "manageRoles",
-        uuid: crypto.randomUUID(),
+        uuid: makeUuid(),
         ...result,
       });
     }
@@ -322,7 +323,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   // Push visual ToolResult to the frontend via the session
   await postJson(API_ROUTES.agent.internal.toolResult, {
     toolName: name,
-    uuid: crypto.randomUUID(),
+    uuid: makeUuid(),
     ...result,
   });
 

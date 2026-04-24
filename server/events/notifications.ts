@@ -22,6 +22,7 @@ import {
 } from "../../src/types/notification.js";
 import { ONE_SECOND_MS, MAX_NOTIFICATION_DELAY_SEC } from "../utils/time.js";
 import { log } from "../system/logger/index.js";
+import { makeUuid } from "../utils/id.js";
 
 // ── Dependencies (injected at startup) ──────────────────────────
 
@@ -60,7 +61,7 @@ export interface PublishNotificationOpts {
 export function publishNotification(opts: PublishNotificationOpts): void {
   try {
     const payload: NotificationPayload = {
-      id: crypto.randomUUID(),
+      id: makeUuid(),
       kind: opts.kind,
       title: opts.title,
       body: opts.body,

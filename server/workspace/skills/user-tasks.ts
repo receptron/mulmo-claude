@@ -16,6 +16,7 @@ import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.
 import { log } from "../../system/logger/index.js";
 import type { ITaskManager } from "../../events/task-manager/index.js";
 import { isRecord } from "../../utils/types.js";
+import { makeUuid } from "../../utils/id.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export function validateAndCreate(input: unknown): ValidateResult {
 
   const now = new Date().toISOString();
   const task: PersistedUserTask = {
-    id: crypto.randomUUID(),
+    id: makeUuid(),
     name: obj.name.trim(),
     description: typeof obj.description === "string" ? obj.description.trim() : "",
     schedule: obj.schedule,
@@ -220,7 +221,7 @@ async function doRegisterUserTasks(deps: UserTaskDeps): Promise<number> {
       description: `User task: ${task.name}`,
       schedule: task.schedule,
       run: async () => {
-        const chatSessionId = crypto.randomUUID();
+        const chatSessionId = makeUuid();
         log.info("user-tasks", "running user task", {
           name: task.name,
           roleId: task.roleId,

@@ -6,13 +6,8 @@
 // slugification and timestamp suffixing.
 
 import path from "node:path";
-import crypto from "node:crypto";
+import { shortId } from "../id.js";
 import { slugify } from "../slug.js";
-
-// Length of the random hex suffix appended by `buildArtifactPathRandom`.
-// 16 chars = 64 bits ≈ birthday-collision at 2^32 entries — effectively
-// impossible for any realistic per-workspace artifact volume.
-const RANDOM_SUFFIX_LEN = 16;
 
 /**
  * Build a workspace-relative path for a new artifact file.
@@ -44,7 +39,6 @@ export function buildArtifactPathRandom(dir: string, prefix: string, ext: string
   // Pass fallbackSlug as slugify's default so it overrides slugify's
   // built-in "page" default when `prefix` sanitizes to empty.
   const slug = slugify(prefix, fallbackSlug);
-  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, RANDOM_SUFFIX_LEN);
-  const fname = `${slug}-${suffix}${ext}`;
+  const fname = `${slug}-${shortId()}${ext}`;
   return path.posix.join(dir, fname);
 }

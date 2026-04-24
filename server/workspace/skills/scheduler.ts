@@ -15,6 +15,7 @@ import { log } from "../../system/logger/index.js";
 import { readFileSync } from "fs";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
 import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
+import { makeUuid } from "../../utils/id.js";
 
 interface SkillScheduleInfo {
   schedule: TaskSchedule;
@@ -95,7 +96,7 @@ async function doRegister(deps: SkillSchedulerDeps): Promise<number> {
       description: `Scheduled skill: ${skill.name} — ${skill.description}`,
       schedule,
       run: async () => {
-        const chatSessionId = crypto.randomUUID();
+        const chatSessionId = makeUuid();
         log.info("skills", "running scheduled skill", {
           name: skill.name,
           roleId,

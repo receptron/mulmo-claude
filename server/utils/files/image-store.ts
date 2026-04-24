@@ -1,7 +1,7 @@
 import { mkdir, readFile, realpath, writeFile } from "fs/promises";
 import path from "path";
-import crypto from "crypto";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
+import { shortId } from "../id.js";
 import { resolveWithinRoot } from "./safe.js";
 
 const IMAGES_DIR = WORKSPACE_PATHS.images;
@@ -35,8 +35,7 @@ async function safeResolve(relativePath: string): Promise<string> {
 /** Save raw base64 (no data URI prefix) as a PNG file. Returns the workspace-relative path. */
 export async function saveImage(base64Data: string): Promise<string> {
   await ensureImagesDir();
-  const imageId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const filename = `${imageId}.png`;
+  const filename = `${shortId()}.png`;
   const absPath = path.join(IMAGES_DIR, filename);
   await writeFile(absPath, Buffer.from(base64Data, "base64"));
   return path.posix.join(WORKSPACE_DIRS.images, filename);
