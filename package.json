@@ -39,6 +39,7 @@
     "build": "yarn build:packages && vite build",
     "test": "tsx --test ./test/*/test_*.ts ./test/*/*/test_*.ts ./test/*/*/*/test_*.ts && yarn workspaces run test",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "demo:finance": "playwright test --config e2e/demo/playwright.config.ts",
     "test:coverage": "tsx --test --experimental-test-coverage ./test/*/test_*.ts ./test/*/*/test_*.ts && yarn workspaces run test",
     "sandbox:remove": "docker rmi mulmoclaude-sandbox",
     "sandbox:login": "security find-generic-password -s 'Claude Code-credentials' -w > ~/.claude/.credentials.json && echo 'Credentials exported to ~/.claude/.credentials.json'",
