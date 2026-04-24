@@ -407,7 +407,7 @@ const { focusChatInput } = useChatScroll({
 const { showRightSidebar, toggleRightSidebar } = useRightSidebar();
 const showSettings = ref(false);
 
-const { layoutMode, setLayoutMode, toggleLayoutMode } = useLayoutMode();
+const { layoutMode, setLayoutMode } = useLayoutMode();
 const { sidePanelVisible, setSidePanelVisible } = useSidePanelVisible();
 // Transient full-width mode for the session-history side panel.
 // Not persisted: reopening the panel should always start collapsed.
@@ -442,40 +442,6 @@ watch(sidePanelVisible, (visible, prev) => {
     fetchSessions().catch((err) => console.error("[side-panel] session fetch failed:", err));
   }
 });
-
-// Cmd/Ctrl + 1 toggles layout when on /chat; on any other page it
-// navigates to /chat (layout flip requires a second press). Cmd+2–7
-// navigate directly to the matching page.
-const PAGE_SHORTCUT_KEYS: Record<string, PageRouteName> = {
-  "2": PAGE_ROUTES.files,
-  "3": PAGE_ROUTES.todos,
-  "4": PAGE_ROUTES.calendar,
-  "5": PAGE_ROUTES.wiki,
-  "6": PAGE_ROUTES.skills,
-  "7": PAGE_ROUTES.roles,
-  "9": PAGE_ROUTES.automations,
-};
-
-function handleViewModeShortcut(event: KeyboardEvent): void {
-  if (!(event.metaKey || event.ctrlKey)) return;
-  if (event.altKey || event.shiftKey) return;
-
-  if (event.key === "1") {
-    // Cmd+1 toggles layout on /chat; on any other page it's a no-op.
-    // Users navigate to /chat by clicking a session in the history
-    // panel or via the URL.
-    if (route.name !== PAGE_ROUTES.chat) return;
-    event.preventDefault();
-    toggleLayoutMode();
-    return;
-  }
-
-  const page = PAGE_SHORTCUT_KEYS[event.key];
-  if (page) {
-    event.preventDefault();
-    router.push({ name: page }).catch(() => {});
-  }
-}
 
 function onPluginNavigate(target: { key: string }): void {
   if (isPageRouteName(target.key)) {
@@ -869,7 +835,6 @@ provideActiveSession(activeSession);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,
-  onViewModeShortcut: handleViewModeShortcut,
   onTeardown: teardownPendingCalls,
 });
 

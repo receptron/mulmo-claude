@@ -8,12 +8,11 @@
 // split.
 
 import { ref, type Ref } from "vue";
-import { LAYOUT_MODES, LAYOUT_MODE_STORAGE_KEY, LEGACY_VIEW_MODE_STORAGE_KEY, parseStoredLayoutMode, type LayoutMode } from "../utils/canvas/layoutMode";
+import { LAYOUT_MODE_STORAGE_KEY, LEGACY_VIEW_MODE_STORAGE_KEY, parseStoredLayoutMode, type LayoutMode } from "../utils/canvas/layoutMode";
 
 export function useLayoutMode(): {
   layoutMode: Ref<LayoutMode>;
   setLayoutMode: (mode: LayoutMode) => void;
-  toggleLayoutMode: () => void;
 } {
   localStorage.removeItem(LEGACY_VIEW_MODE_STORAGE_KEY);
 
@@ -24,9 +23,5 @@ export function useLayoutMode(): {
     localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, mode);
   }
 
-  function toggleLayoutMode(): void {
-    setLayoutMode(layoutMode.value === LAYOUT_MODES.stack ? LAYOUT_MODES.single : LAYOUT_MODES.stack);
-  }
-
-  return { layoutMode, setLayoutMode, toggleLayoutMode };
+  return { layoutMode, setLayoutMode };
 }
