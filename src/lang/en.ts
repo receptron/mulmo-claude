@@ -87,6 +87,7 @@ const enMessages = {
     home: "Go to latest chat",
     toolCallHistory: "Tool call history",
     settings: "Settings",
+    settingsGeminiMissing: "Settings — Gemini API key missing",
   },
   rightSidebar: {
     toggleSystemPrompt: "Toggle system prompt",

@@ -72,6 +72,7 @@ const jaMessages = {
     home: "最新のチャットに移動",
     toolCallHistory: "ツール呼び出し履歴",
     settings: "設定",
+    settingsGeminiMissing: "設定 — Gemini API キー未設定",
   },
   rightSidebar: {
     toggleSystemPrompt: "システムプロンプトの表示切替",

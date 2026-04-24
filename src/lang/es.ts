@@ -70,6 +70,7 @@ const esMessages = {
     home: "Ir al chat más reciente",
     toolCallHistory: "Historial de llamadas a herramientas",
     settings: "Ajustes",
+    settingsGeminiMissing: "Ajustes — Falta la clave API de Gemini",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",

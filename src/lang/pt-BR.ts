@@ -65,6 +65,7 @@ const ptBRMessages = {
     home: "Ir para o chat mais recente",
     toolCallHistory: "Histórico de chamadas de ferramentas",
     settings: "Configurações",
+    settingsGeminiMissing: "Configurações — Chave da API Gemini ausente",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",

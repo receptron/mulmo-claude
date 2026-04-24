@@ -65,6 +65,7 @@ const frMessages = {
     home: "Aller à la dernière conversation",
     toolCallHistory: "Historique des appels d'outils",
     settings: "Paramètres",
+    settingsGeminiMissing: "Paramètres — Clé API Gemini manquante",
   },
   rightSidebar: {
     toggleSystemPrompt: "Basculer le system prompt",

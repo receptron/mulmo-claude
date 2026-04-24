@@ -72,6 +72,7 @@ const koMessages = {
     home: "최신 채팅으로 이동",
     toolCallHistory: "도구 호출 기록",
     settings: "설정",
+    settingsGeminiMissing: "설정 — Gemini API 키 없음",
   },
   rightSidebar: {
     toggleSystemPrompt: "시스템 프롬프트 토글",

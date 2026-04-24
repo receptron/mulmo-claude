@@ -65,6 +65,7 @@ const deMessages = {
     home: "Zum neuesten Chat",
     toolCallHistory: "Tool-Aufrufverlauf",
     settings: "Einstellungen",
+    settingsGeminiMissing: "Einstellungen — Gemini-API-Schlüssel fehlt",
   },
   rightSidebar: {
     toggleSystemPrompt: "System-Prompt umschalten",

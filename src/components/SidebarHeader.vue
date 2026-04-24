@@ -25,8 +25,8 @@
       <button
         class="relative text-gray-400 hover:text-gray-700"
         data-testid="settings-btn"
-        :title="t('sidebarHeader.settings')"
-        :aria-label="t('sidebarHeader.settings')"
+        :title="settingsLabel"
+        :aria-label="settingsLabel"
         @click="emit('openSettings')"
       >
         <span class="material-icons">settings</span>
@@ -52,7 +52,7 @@ import logoUrl from "../assets/mulmo_bw.png";
 
 const { t } = useI18n();
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     sandboxEnabled: boolean;
     geminiAvailable?: boolean;
@@ -67,6 +67,13 @@ const emit = defineEmits<{
   openSettings: [];
   home: [];
 }>();
+
+// Settings button accessible name has to convey the `!` badge's
+// meaning (missing API key) to screen-reader users — the badge
+// itself is decorative (aria-hidden), so without this the a11y
+// tree just announces "Settings" and the whole point of the
+// attention signal is lost.
+const settingsLabel = computed(() => (props.geminiAvailable ? t("sidebarHeader.settings") : t("sidebarHeader.settingsGeminiMissing")));
 
 const lockPopupOpen = ref(false);
 const lockPopup = ref<{
