@@ -288,11 +288,14 @@ function buildIndexResponse(action: string): WikiResponse {
   };
 }
 
-async function buildPageResponse(action: string, pageName: string): Promise<WikiResponse> {
-  const filePath = await resolvePagePath(pageName);
-  const content = filePath ? readFileOrEmpty(filePath) : "";
-  const resolvedTitle = filePath ? path.basename(filePath, ".md") : pageName;
-  const exists = !!filePath;
+// Pure branching helper extracted from buildPageResponse so the three
+// states (missing / empty / has-content) can be pinned by unit tests
+// without requiring a real filesystem. The I/O wrapper below supplies
+// `exists`, `content`, and `resolvedTitle` from disk; this function
+// builds the response shape — including the error / message /
+// instructions distinctions that the GET and POST handlers share.
+export function buildPageResponseData(args: { action: string; pageName: string; resolvedTitle: string; content: string; exists: boolean }): WikiResponse {
+  const { action, pageName, resolvedTitle, content, exists } = args;
   const hasContent = !!content;
   // Three states:
   //   1. !exists              → page file is missing entirely.
@@ -304,9 +307,8 @@ async function buildPageResponse(action: string, pageName: string): Promise<Wiki
   // instructions now distinguish missing vs empty so the client and
   // the agent get consistent signals.
   const missing = !exists;
-  const empty = exists && !hasContent;
   const slug = wikiSlugify(pageName);
-  const errorMessage = missing ? `Page not found: ${pageName}` : empty ? `Page is empty: ${pageName}` : undefined;
+  const errorMessage = missing ? `Page not found: ${pageName}` : hasContent ? undefined : `Page is empty: ${pageName}`;
   const statusMessage = hasContent ? `Showing page: ${resolvedTitle}` : missing ? `Page not found: ${pageName}` : `Page exists but is empty: ${resolvedTitle}`;
   const statusInstructions = hasContent
     ? "The wiki page is now displayed on the canvas."
@@ -327,6 +329,19 @@ async function buildPageResponse(action: string, pageName: string): Promise<Wiki
     instructions: statusInstructions,
     updating: true,
   };
+}
+
+async function buildPageResponse(action: string, pageName: string): Promise<WikiResponse> {
+  const filePath = await resolvePagePath(pageName);
+  const content = filePath ? readFileOrEmpty(filePath) : "";
+  const resolvedTitle = filePath ? path.basename(filePath, ".md") : pageName;
+  return buildPageResponseData({
+    action,
+    pageName,
+    resolvedTitle,
+    content,
+    exists: !!filePath,
+  });
 }
 
 function buildLogResponse(action: string): WikiResponse {
