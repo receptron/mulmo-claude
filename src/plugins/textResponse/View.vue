@@ -16,35 +16,36 @@
           </div>
         </div>
 
-        <!-- Bottom area: a thin action row (PDF / Copy) above the
-             full-width <details> edit panel. Keeping the buttons in a
-             separate row lets the editor textarea keep the full width
-             while nothing floats over the content — stack view only
-             needs the card chrome as a header. -->
-        <div class="text-response-bottom">
-          <div class="text-response-actions">
-            <span v-if="pdfError" class="text-xs text-red-500 self-center" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
-            <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click="downloadPdf">
-              <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-              {{ t("pluginTextResponse.pdf") }}
-            </button>
-            <button
-              v-show="!editing"
-              class="copy-btn"
-              :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')"
-              @click="copyText"
-            >
-              <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
-            </button>
-            <button v-show="editing" class="cancel-btn" @click="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
-          </div>
+        <!-- Bottom bar. The <details> edit panel takes the free width
+             with Copy / Cancel nested inside its <summary> (so they
+             read as part of the same edit control). PDF sits outside
+             <details> as a sibling on the right. Clicks on the nested
+             Copy / Cancel use @click.stop.prevent so they don't
+             trigger the summary's native open/close toggle. -->
+        <div class="text-response-bottom-bar">
           <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
-            <summary data-testid="text-response-edit-summary">{{ t("pluginTextResponse.editContent") }}</summary>
+            <summary class="text-response-edit-summary" data-testid="text-response-edit-summary">
+              <span class="text-response-edit-label">{{ t("pluginTextResponse.editContent") }}</span>
+              <button
+                v-show="!editing"
+                class="copy-btn"
+                :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')"
+                @click.stop.prevent="copyText"
+              >
+                <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
+              </button>
+              <button v-show="editing" class="cancel-btn" @click.stop.prevent="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
+            </summary>
             <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
             <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
               {{ t("pluginTextResponse.applyChanges") }}
             </button>
           </details>
+          <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click="downloadPdf">
+            <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+            {{ t("pluginTextResponse.pdf") }}
+          </button>
+          <span v-if="pdfError" class="text-xs text-red-500 self-center" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
         </div>
       </div>
     </div>
@@ -400,17 +401,35 @@ async function downloadPdf() {
   color: #333;
 }
 
-/* Bottom region: thin action row above the full-width edit panel.
-   Keeping the action buttons in their own row lets the editor
-   textarea span the full width when <details> opens. */
-.text-response-actions {
+/* Bottom bar: <details> takes the free width (so the editor
+   textarea stays wide); PDF sits on the right as a sibling.
+   align-items: flex-start keeps PDF aligned with the summary row
+   even after <details> opens and grows downward. */
+.text-response-bottom-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.text-response-bottom-bar .text-response-source {
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  border-top: none;
+}
+
+/* Summary row contains the Edit-Content label plus the inline
+   Copy / Cancel button on the right. Label takes the free width so
+   the button stays right-aligned regardless of label length. */
+.text-response-edit-summary {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.5rem;
-  padding: 0.375rem 0.5rem;
-  border-top: 1px solid #e0e0e0;
-  background: #f9fafb;
+}
+
+.text-response-edit-label {
+  flex: 1;
 }
 
 .pdf-inline-btn {
