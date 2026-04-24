@@ -28,7 +28,7 @@ View and manage events in month, week, or list view.
 - Manage "unscheduled" items without dates
 
 **How to access:**
-Select **Schedule** from the bottom-left menu.
+Pick **Calendar** from the plugin launcher at the top of the window. Automated tasks live in the adjacent **Actions** tab — the former single "Schedule" menu was split into Calendar / Actions in 2026-04.
 
 **Adding events:**
 Just ask Claude: "Add a meeting tomorrow at 2 PM." You can also add directly from the UI.
@@ -57,7 +57,7 @@ Two built-in tasks that run without any configuration:
 | **Journal** | Summarizes recent chats into daily notes | Every hour |
 | **Chat Index** | Adds titles and summaries to chat history | Every hour |
 
-These appear in the Tasks tab but can't be modified (marked with a "System" badge).
+These appear in the **Actions** tab but can't be modified (marked with a "System" badge).
 
 ### User Tasks (Created by You)
 
@@ -96,11 +96,11 @@ Just tell Claude in natural language:
 
 Claude understands and creates the task with the right schedule.
 
-### Method 2: Tasks Tab
+### Method 2: Actions Tab
 
-1. Select **Schedule** from the menu
-2. Click the **Tasks** tab
-3. View all tasks (creation is via Claude)
+1. Pick **Actions** (formerly the Tasks tab under Schedule) from the plugin launcher
+2. View all tasks — each row shows the schedule, last run, and next run
+3. Create / edit is still driven by Claude ("schedule X every Y"); the UI is for inspection and manual triggers
 
 ---
 
@@ -206,7 +206,7 @@ Scheduler data lives in your MulmoClaude workspace:
 ### Q: My task isn't running
 
 - Is your PC awake? MulmoClaude server must be running
-- Check the Tasks tab — is the task "enabled"?
+- Check the **Actions** tab — is the task "enabled"?
 - Look at execution history for errors
 
 ### Q: How do I set my local timezone?
@@ -222,7 +222,7 @@ All times are UTC. Convert to your timezone:
 
 ### Q: How do I stop all tasks?
 
-Stop the MulmoClaude server and all tasks stop. To stop individual tasks, disable them in the Tasks tab.
+Stop the MulmoClaude server and all tasks stop. To stop individual tasks, disable them in the **Actions** tab.
 
 ### Q: Do calendar events trigger actions?
 

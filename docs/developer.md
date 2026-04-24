@@ -512,7 +512,7 @@ See [`packages/README.md`](../packages/README.md) for the MulmoBridge architectu
 
 ## Common gotchas
 
-- **Vite `reuseExistingServer: true`** in `e2e/playwright.config.ts` — if a stale `vite` process is already serving `:5173` (e.g. from a different working tree), Playwright happily talks to _that_ one. Symptom: tests fail because UI changes "haven't landed". Kill the stray process: `lsof -i :5173 | grep LISTEN`.
+- **Playwright uses its own port `:45173`** (`dev:client:e2e` in `package.json` + `webServer` in `e2e/playwright.config.ts`), so it doesn't collide with a running `yarn dev` on `:5173`. `reuseExistingServer: true` is still on for that port — if a stale `vite` process from a different working tree is already serving `:45173`, Playwright will happily talk to _that_ one. Symptom: tests fail because UI changes "haven't landed". Kill the stray process: `lsof -i :45173 | grep LISTEN`.
 - **CSRF guard is strict.** `requireSameOrigin` (`server/api/csrfGuard.ts`) rejects state-changing requests from non-localhost origins. Requests with no `Origin` header (CLI tools, server-to-server) are allowed because the listener is bound to `127.0.0.1`. If you ever expose the listener publicly, tighten this middleware first.
 - **Workspace is git-init'd.** The first server start creates `~/mulmoclaude/.git`. Don't be surprised when journal / wiki edits show up in `git log`.
 - **`.vue` cognitive-complexity is warn-only.** A few legacy components exceed 15. The override demotes the rule to warn so CI isn't blocked. Each fix should re-raise to error in `eslint.config.mjs`.
