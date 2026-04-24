@@ -28,7 +28,7 @@ View and manage events in month, week, or list view.
 - Manage "unscheduled" items without dates
 
 **How to access:**
-Select **Schedule** from the bottom-left menu.
+Pick **Calendar** from the plugin launcher at the top of the window. Automated tasks live in the adjacent **Actions** tab — the former single "Schedule" menu was split into Calendar / Actions in 2026-04.
 
 **Adding events:**
 Just ask Claude: "Add a meeting tomorrow at 2 PM." You can also add directly from the UI.
@@ -96,11 +96,11 @@ Just tell Claude in natural language:
 
 Claude understands and creates the task with the right schedule.
 
-### Method 2: Tasks Tab
+### Method 2: Actions Tab
 
-1. Select **Schedule** from the menu
-2. Click the **Tasks** tab
-3. View all tasks (creation is via Claude)
+1. Pick **Actions** (formerly the Tasks tab under Schedule) from the plugin launcher
+2. View all tasks — each row shows the schedule, last run, and next run
+3. Create / edit is still driven by Claude ("schedule X every Y"); the UI is for inspection and manual triggers
 
 ---
 
