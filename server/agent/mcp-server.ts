@@ -11,7 +11,7 @@ import { errorMessage } from "../utils/errors.js";
 import { isNonEmptyString, isRecord } from "../utils/types.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
-import { extractFetchError } from "../utils/fetch.js";
+import { extractFetchError, fetchWithTimeout } from "../utils/fetch.js";
 import { safeResponseText } from "../utils/http.js";
 import { readTextSafeSync } from "../utils/files/safe.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
@@ -143,7 +143,7 @@ async function postJson(path: string, body: unknown, opts: PostJsonOpts = {}): P
   // hardcoded literals.
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
+    res = await fetchWithTimeout(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...AUTH_HEADER },
       body: JSON.stringify(body),
@@ -177,7 +177,7 @@ async function fetchSkillsList(): Promise<{ name: string }[]> {
   const url = `${BASE_URL}/api/skills?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: AUTH_HEADER });
+    res = await fetchWithTimeout(url, { headers: AUTH_HEADER });
   } catch (err) {
     throw new Error(`Network error calling /api/skills: ${errorMessage(err)}`);
   }
@@ -238,7 +238,7 @@ async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<
   const url = `${BASE_URL}/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithTimeout(url, {
       method: "PUT",
       headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -261,7 +261,7 @@ async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${url}`, {
+    res = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "DELETE",
       headers: AUTH_HEADER,
     });
