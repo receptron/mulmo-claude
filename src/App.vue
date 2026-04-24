@@ -153,7 +153,8 @@
           <!-- Distinct pages -->
           <FilesView v-else-if="currentPage === 'files'" :refresh-token="filesRefreshToken" @load-session="handleSessionSelect" />
           <TodoExplorer v-else-if="currentPage === 'todos'" />
-          <SchedulerView v-else-if="currentPage === 'scheduler'" />
+          <CalendarView v-else-if="currentPage === 'calendar'" />
+          <AutomationsView v-else-if="currentPage === 'automations'" />
           <WikiView v-else-if="currentPage === 'wiki'" />
           <SkillsView v-else-if="currentPage === 'skills'" />
           <RolesView v-else-if="currentPage === 'roles'" />
@@ -216,7 +217,8 @@ import PluginLauncher from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
 import FilesView from "./components/FilesView.vue";
 import TodoExplorer from "./components/TodoExplorer.vue";
-import SchedulerView from "./plugins/scheduler/View.vue";
+import CalendarView from "./plugins/scheduler/CalendarView.vue";
+import AutomationsView from "./plugins/scheduler/AutomationsView.vue";
 import WikiView from "./plugins/wiki/View.vue";
 import { buildWikiRouteParams } from "./plugins/wiki/route";
 import SkillsView from "./plugins/manageSkills/View.vue";
@@ -439,10 +441,11 @@ watch(sidePanelVisible, (visible, prev) => {
 const PAGE_SHORTCUT_KEYS: Record<string, PageRouteName> = {
   "2": PAGE_ROUTES.files,
   "3": PAGE_ROUTES.todos,
-  "4": PAGE_ROUTES.scheduler,
+  "4": PAGE_ROUTES.calendar,
   "5": PAGE_ROUTES.wiki,
   "6": PAGE_ROUTES.skills,
   "7": PAGE_ROUTES.roles,
+  "9": PAGE_ROUTES.automations,
 };
 
 function handleViewModeShortcut(event: KeyboardEvent): void {

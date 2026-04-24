@@ -1,9 +1,9 @@
 // Vue-router setup (history mode — clean URLs without #).
 //
-// Each page has its own route: /chat, /files, /todos, /scheduler,
-// /wiki, /skills, /roles, /sources. Layout preference (single vs.
-// stack) is a separate concern persisted in localStorage — it is
-// not part of the URL.
+// Each page has its own route: /chat, /files, /todos, /calendar,
+// /automations, /wiki, /skills, /roles, /sources. Layout preference
+// (single vs. stack) is a separate concern persisted in localStorage
+// — it is not part of the URL.
 //
 // History mode requires the server to serve index.html for any path
 // that doesn't match an API route or static file. In production the
@@ -22,7 +22,8 @@ export const PAGE_ROUTES = {
   chat: "chat",
   files: "files",
   todos: "todos",
-  scheduler: "scheduler",
+  calendar: "calendar",
+  automations: "automations",
   wiki: "wiki",
   skills: "skills",
   roles: "roles",
@@ -43,7 +44,11 @@ const routes: RouteRecordRaw[] = [
   // selected". See plans/feat-files-path-url.md.
   { path: "/files/:pathMatch(.*)*", name: PAGE_ROUTES.files, component: Stub },
   { path: "/todos", name: PAGE_ROUTES.todos, component: Stub },
-  { path: "/scheduler", name: PAGE_ROUTES.scheduler, component: Stub },
+  { path: "/calendar", name: PAGE_ROUTES.calendar, component: Stub },
+  { path: "/automations", name: PAGE_ROUTES.automations, component: Stub },
+  // Legacy Scheduler URL — split into Calendar + Automations (#758).
+  // Redirect preserves bookmarks; delete once telemetry shows no hits.
+  { path: "/scheduler", redirect: "/calendar" },
   // Wiki sub-views live on the path rather than in query params so
   // URLs mirror the filesystem layout (`data/wiki/pages/<slug>.md`)
   // and stay sibling-safe (no query-key bleed from other routes).

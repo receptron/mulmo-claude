@@ -182,7 +182,8 @@ const frMessages = {
   },
   pluginLauncher: {
     todos: { label: "Tâches", title: "Ouvrir les tâches (⌘4)" },
-    scheduler: { label: "Planning", title: "Ouvrir le planning (⌘5)" },
+    calendar: { label: "Calendrier", title: "Ouvrir le calendrier (⌘4)" },
+    automations: { label: "Actions", title: "Ouvrir les actions (⌘9)" },
     wiki: { label: "Wiki", title: "Ouvrir le wiki (⌘6)" },
     sources: { label: "Sources", title: "Ouvrir les sources d'information" },
     skills: { label: "Skills", title: "Ouvrir les skills (⌘7)" },

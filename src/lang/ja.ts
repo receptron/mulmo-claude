@@ -186,7 +186,8 @@ const jaMessages = {
   },
   pluginLauncher: {
     todos: { label: "Todo", title: "Todo を開く (⌘4)" },
-    scheduler: { label: "スケジュール", title: "スケジュールを開く (⌘5)" },
+    calendar: { label: "カレンダー", title: "カレンダーを開く (⌘4)" },
+    automations: { label: "自動化", title: "自動化を開く (⌘9)" },
     wiki: { label: "Wiki", title: "Wiki を開く (⌘6)" },
     sources: { label: "ソース", title: "情報ソースを開く" },
     skills: { label: "スキル", title: "スキルを開く (⌘7)" },

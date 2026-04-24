@@ -43,7 +43,7 @@ export type PluginLauncherKind = "view"; // Switch the canvas to a dedicated vie
 // strings out of this file avoids duplication across locales.
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
-  key: "todos" | "scheduler" | "wiki" | "sources" | "skills" | "roles" | "files";
+  key: "todos" | "calendar" | "automations" | "wiki" | "sources" | "skills" | "roles" | "files";
   kind: PluginLauncherKind;
   /** Material-icons glyph. */
   icon: string;
@@ -52,7 +52,11 @@ export interface PluginLauncherTarget {
 const TARGETS: PluginLauncherTarget[] = [
   // ─── Data plugins ───
   { key: "todos", kind: "view", icon: "checklist" },
-  { key: "scheduler", kind: "view", icon: "event" },
+  // Calendar + Automations were a single "Scheduler" entry until
+  // #758 split them. Calendar keeps the former ⌘4 shortcut; the
+  // Automations entry picks up ⌘9 (the first unused number).
+  { key: "calendar", kind: "view", icon: "calendar_month" },
+  { key: "automations", kind: "view", icon: "schedule" },
   { key: "wiki", kind: "view", icon: "menu_book" },
   { key: "sources", kind: "view", icon: "rss_feed" },
   // ─── Management / navigation ───

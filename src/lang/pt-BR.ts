@@ -181,7 +181,8 @@ const ptBRMessages = {
   },
   pluginLauncher: {
     todos: { label: "Tarefas", title: "Abrir tarefas (⌘4)" },
-    scheduler: { label: "Agenda", title: "Abrir agenda (⌘5)" },
+    calendar: { label: "Calendário", title: "Abrir calendário (⌘4)" },
+    automations: { label: "Ações", title: "Abrir ações (⌘9)" },
     wiki: { label: "Wiki", title: "Abrir wiki (⌘6)" },
     sources: { label: "Fontes", title: "Abrir fontes de informação" },
     skills: { label: "Skills", title: "Abrir skills (⌘7)" },

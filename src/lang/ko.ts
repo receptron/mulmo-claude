@@ -187,7 +187,8 @@ const koMessages = {
   },
   pluginLauncher: {
     todos: { label: "할 일", title: "할 일 열기 (⌘4)" },
-    scheduler: { label: "일정", title: "일정 열기 (⌘5)" },
+    calendar: { label: "캘린더", title: "캘린더 열기 (⌘4)" },
+    automations: { label: "자동화", title: "자동화 열기 (⌘9)" },
     wiki: { label: "위키", title: "위키 열기 (⌘6)" },
     sources: { label: "소스", title: "정보 소스 열기" },
     skills: { label: "스킬", title: "스킬 열기 (⌘7)" },

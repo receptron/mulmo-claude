@@ -182,7 +182,8 @@ const deMessages = {
   },
   pluginLauncher: {
     todos: { label: "To-dos", title: "To-dos öffnen (⌘4)" },
-    scheduler: { label: "Zeitplan", title: "Zeitplan öffnen (⌘5)" },
+    calendar: { label: "Kalender", title: "Kalender öffnen (⌘4)" },
+    automations: { label: "Aktionen", title: "Aktionen öffnen (⌘9)" },
     wiki: { label: "Wiki", title: "Wiki öffnen (⌘6)" },
     sources: { label: "Quellen", title: "Informationsquellen öffnen" },
     skills: { label: "Skills", title: "Skills öffnen (⌘7)" },

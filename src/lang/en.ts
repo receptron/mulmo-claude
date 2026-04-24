@@ -203,7 +203,8 @@ const enMessages = {
   },
   pluginLauncher: {
     todos: { label: "Todos", title: "Open todos (⌘4)" },
-    scheduler: { label: "Schedule", title: "Open schedule (⌘5)" },
+    calendar: { label: "Calendar", title: "Open calendar (⌘4)" },
+    automations: { label: "Actions", title: "Open actions (⌘9)" },
     wiki: { label: "Wiki", title: "Open wiki (⌘6)" },
     sources: { label: "Sources", title: "Open information sources" },
     skills: { label: "Skills", title: "Open skills (⌘7)" },

@@ -188,7 +188,8 @@ const esMessages = {
   },
   pluginLauncher: {
     todos: { label: "Tareas", title: "Abrir tareas (⌘4)" },
-    scheduler: { label: "Agenda", title: "Abrir agenda (⌘5)" },
+    calendar: { label: "Calendario", title: "Abrir calendario (⌘4)" },
+    automations: { label: "Acciones", title: "Abrir acciones (⌘9)" },
     wiki: { label: "Wiki", title: "Abrir wiki (⌘6)" },
     sources: { label: "Fuentes", title: "Abrir fuentes de información" },
     skills: { label: "Skills", title: "Abrir skills (⌘7)" },

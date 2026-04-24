@@ -57,7 +57,8 @@ export const ROLES: Role[] = [
       "Show my wiki index",
       "Lint my wiki",
       "Show my todo list",
-      "Show me the scheduler",
+      "Show me my calendar",
+      "Show my scheduled actions",
     ],
   },
   {

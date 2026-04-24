@@ -183,7 +183,8 @@ const zhMessages = {
   },
   pluginLauncher: {
     todos: { label: "待办", title: "打开待办 (⌘4)" },
-    scheduler: { label: "日程", title: "打开日程 (⌘5)" },
+    calendar: { label: "日历", title: "打开日历 (⌘4)" },
+    automations: { label: "自动化", title: "打开自动化 (⌘9)" },
     wiki: { label: "百科", title: "打开 Wiki (⌘6)" },
     sources: { label: "信息源", title: "打开信息源" },
     skills: { label: "技能", title: "打开技能 (⌘7)" },
