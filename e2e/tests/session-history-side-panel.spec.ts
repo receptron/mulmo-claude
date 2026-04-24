@@ -88,6 +88,27 @@ test.describe("session-history side-panel toggle", () => {
     await expect(page).toHaveURL(new RegExp(`/chat/${SESSION_A.id}`));
   });
 
+  test("opening the side panel hides the 6 top session tabs", async ({ page }) => {
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    // Tabs are visible while the side-panel is off.
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();
+
+    // Turning the panel on collapses the top tab row — the left
+    // panel takes over that role. The toggle itself stays visible
+    // so the user can close the panel again.
+    await page.getByTestId("session-history-toggle-off").click();
+    await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeHidden();
+    await expect(page.getByTestId("session-history-toggle-on")).toBeVisible();
+
+    // Toggling off brings the top tabs back.
+    await page.getByTestId("session-history-toggle-on").click();
+    await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();
+  });
+
   test("side panel is hidden on non-chat pages even when toggled on", async ({ page }) => {
     // Enable the toggle on /chat first so the preference is on.
     await page.goto("/chat");
