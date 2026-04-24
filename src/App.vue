@@ -58,21 +58,21 @@
            page experience on non-chat contexts. -->
       <div
         v-if="sidePanelVisible"
-        class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900 flex flex-col"
+        class="w-72 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900 flex flex-col"
         data-testid="session-history-side-panel"
       >
         <!-- Panel header. Stacked over two rows because w-80 can't
              fit RoleSelector (w-56) plus three 28–32px buttons on a
-             single line. Row 1 owns the role picker; Row 2 carries
-             the actions (new session, /history nav, close toggle).
+             single line. Row 1 pairs the role picker with the new-
+             session button so the `+` sits next to RoleSelector just
+             like it does in the hidden SessionTabBar; Row 2 carries
+             the remaining actions (/history nav + close toggle).
              When Row 2's SessionTabBar is hidden by sidePanelVisible,
              these controls are the only session UI on /chat, so
              none of them can be dropped. -->
         <div class="border-b border-gray-100">
-          <div class="px-2 py-1">
+          <div class="flex items-center gap-1 px-2 py-1">
             <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
-          </div>
-          <div class="flex items-center gap-1 px-2 pb-1">
             <button
               class="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
               data-testid="new-session-btn"
@@ -82,6 +82,8 @@
             >
               <span class="material-icons text-sm">add</span>
             </button>
+          </div>
+          <div class="flex items-center gap-1 px-2 pb-1">
             <!-- /history entrypoint + per-session stats. Mirrored from
                  the hidden Row 2 SessionTabBar so the full-page history
                  view is still reachable in one click when the side
