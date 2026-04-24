@@ -379,4 +379,28 @@ watch(
   },
   { immediate: true },
 );
+
+// `geminiAvailable` can flip while the modal is already open — the
+// `/api/health` poll in `useHealth` recovers from a transient failure
+// asynchronously. Without this watcher, a user who opened the modal
+// during the failure stays on the `"gemini"` tab even after the tab
+// button disappears (v-if="!geminiAvailable") — leaving them on an
+// empty view until they manually click another tab. Hop to `"tools"`
+// as soon as Gemini recovers; mirror the inverse for the (much rarer)
+// case where Gemini goes away while the modal is open on a
+// non-gemini tab.
+watch(
+  () => props.geminiAvailable,
+  (available) => {
+    if (!props.open) return;
+    if (available && activeTab.value === "gemini") {
+      activeTab.value = "tools";
+    } else if (!available && activeTab.value !== "gemini" && activeTab.value === "tools") {
+      // Only bounce to the warning tab if the user hasn't navigated
+      // away from the default landing tab. Respecting an explicit
+      // pick on dirs / mcp / refs avoids yanking them mid-edit.
+      activeTab.value = "gemini";
+    }
+  },
+);
 </script>
