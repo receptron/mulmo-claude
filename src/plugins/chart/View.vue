@@ -20,7 +20,7 @@
             </span>
           </div>
           <button
-            class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
+            class="ui-btn-xs border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
             :data-testid="`chart-export-png-${idx}`"
             @click="exportPng(idx, chart.title)"
           >

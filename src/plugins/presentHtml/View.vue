@@ -4,14 +4,14 @@
       <span class="text-sm font-medium text-gray-700 truncate">{{ title ?? t("pluginPresentHtml.untitled") }}</span>
       <div class="flex items-center gap-2">
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
+          class="ui-btn-xs border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
           :title="t('pluginPresentHtml.saveAsPdf')"
           @click="printToPdf"
         >
           <span class="material-icons text-sm align-middle">picture_as_pdf</span>
           {{ t("pluginPresentHtml.pdf") }}
         </button>
-        <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0" @click="sourceOpen = !sourceOpen">
+        <button class="ui-btn-xs border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0" @click="sourceOpen = !sourceOpen">
           {{ sourceOpen ? t("pluginPresentHtml.hideSource") : t("pluginPresentHtml.showSource") }}
         </button>
       </div>

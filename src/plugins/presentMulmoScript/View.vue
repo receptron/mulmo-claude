@@ -269,7 +269,7 @@
               })
             }}</span>
             <button
-              class="px-2 py-1 text-xs rounded border"
+              class="ui-btn-xs border"
               :class="
                 isValidBeat(index) && !beatSaving[index]
                   ? 'border-blue-400 text-blue-600 hover:bg-blue-50 cursor-pointer'

@@ -87,8 +87,8 @@
             spellcheck="false"
           />
           <div class="flex items-center gap-2">
-            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">{{ t("pluginTodo.update") }}</button>
-            <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">
+            <button class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">{{ t("pluginTodo.update") }}</button>
+            <button class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50" @click="selectedId = null">
               {{ t("common.cancel") }}
             </button>
             <span v-if="yamlError" class="text-xs text-red-500">{{ yamlError }}</span>

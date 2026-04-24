@@ -71,7 +71,7 @@
               <!-- Enable/disable toggle -->
               <button
                 v-if="task.origin === 'user'"
-                class="px-2 py-1 text-xs rounded"
+                class="ui-btn-xs"
                 :class="task.enabled !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'"
                 :title="task.enabled !== false ? t('pluginSchedulerTasks.disable') : t('pluginSchedulerTasks.enable')"
                 @click="toggleEnabled(task)"

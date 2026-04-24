@@ -15,14 +15,14 @@
       </div>
       <div class="flex items-center gap-2">
         <!-- Add button -->
-        <button data-testid="todo-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">
+        <button data-testid="todo-add-btn" class="ui-btn-xs bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">
           {{ t("todoExplorer.addButton") }}
         </button>
         <!-- Add column button (kanban only) -->
         <button
           v-if="viewMode === TODO_VIEW.kanban"
           data-testid="todo-column-add-btn"
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+          class="ui-btn-xs border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
         >
           {{ t("todoExplorer.addColumnButton") }}
@@ -141,10 +141,10 @@
           />
         </label>
         <div class="flex justify-end gap-2 pt-1">
-          <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="addColumnOpen = false">
+          <button class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50" @click="addColumnOpen = false">
             {{ t("common.cancel") }}
           </button>
-          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="commitNewColumn">{{ t("common.add") }}</button>
+          <button class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600" @click="commitNewColumn">{{ t("common.add") }}</button>
         </div>
       </div>
     </div>

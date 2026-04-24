@@ -216,7 +216,7 @@
             spellcheck="false"
           />
           <div class="flex items-center gap-2 mt-2">
-            <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">
+            <button class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600" @click="applyItemEdit">
               {{ t("pluginScheduler.update") }}
             </button>
             <span v-if="yamlError" class="text-xs text-red-500">{{ yamlError }}</span>
@@ -238,7 +238,7 @@
           <div class="flex items-center gap-2 mt-2">
             <button
               :disabled="!isModified"
-              class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+              class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
               @click="applyChanges"
             >
               {{ t("pluginScheduler.applyChanges") }}

@@ -14,6 +14,24 @@
   }
 }
 
+@layer components {
+  .ui-btn-xs {
+    @apply inline-flex min-h-7 items-center justify-center rounded px-2 py-1 text-xs;
+  }
+
+  .ui-btn-sm {
+    @apply inline-flex min-h-8 items-center justify-center rounded px-3 py-1.5 text-sm;
+  }
+
+  .ui-select-xs {
+    @apply h-7 px-2 py-1 text-xs;
+  }
+
+  .ui-select-sm {
+    @apply h-8 px-2 py-1 text-sm;
+  }
+}
+
 /* Markdown content styles.
    The text-response plugin wraps rendered Markdown in a
    `.markdown-content` container with `prose prose-slate` classes, but

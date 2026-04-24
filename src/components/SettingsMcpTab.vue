@@ -133,10 +133,10 @@
         {{ draftError }}
       </div>
       <div class="flex justify-end gap-2">
-        <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="mcp-draft-cancel" @click="cancelAdd">
+        <button class="ui-btn-xs border border-gray-300 text-gray-600 hover:bg-gray-50" data-testid="mcp-draft-cancel" @click="cancelAdd">
           {{ t("common.cancel") }}
         </button>
-        <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="mcp-draft-add" @click="commitAdd">
+        <button class="ui-btn-xs bg-blue-500 text-white hover:bg-blue-600" data-testid="mcp-draft-add" @click="commitAdd">
           {{ t("common.add") }}
         </button>
       </div>

@@ -5,7 +5,7 @@
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-gray-500"> {{ t("pluginManageSource.sourceCount", sources.length, { named: { count: sources.length } }) }} </span>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="ui-btn-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || adding || busy === 'rebuild'"
           data-testid="sources-add-btn"
           @click="startAdd"
@@ -14,7 +14,7 @@
           {{ t("pluginManageSource.addButton") }}
         </button>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="ui-btn-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || busy === 'rebuild'"
           data-testid="sources-rebuild-btn"
           @click="rebuild"
@@ -29,7 +29,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <label class="text-xs text-gray-700">
           {{ t("pluginManageSource.typeField") }}
-          <select v-model="draft.kind" class="ml-1 text-xs border border-gray-300 rounded px-1 py-0.5" data-testid="sources-draft-kind" @change="onKindChange">
+          <select v-model="draft.kind" class="ml-1 ui-select-xs border border-gray-300 rounded" data-testid="sources-draft-kind" @change="onKindChange">
             <option value="rss">{{ t("pluginManageSource.kindRss") }}</option>
             <option value="github-releases">{{ t("pluginManageSource.kindGithubReleases") }}</option>
             <option value="github-issues">{{ t("pluginManageSource.kindGithubIssues") }}</option>

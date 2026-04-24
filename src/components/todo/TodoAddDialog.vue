@@ -30,7 +30,7 @@
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-xs text-gray-600">
           {{ t("todoDialogs.fieldStatus") }}
-          <select v-model="status" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
+          <select v-model="status" class="mt-1 w-full ui-select-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
             <option v-for="col in columns" :key="col.id" :value="col.id">
               {{ col.label }}
             </option>
@@ -38,7 +38,7 @@
         </label>
         <label class="block text-xs text-gray-600">
           {{ t("todoDialogs.fieldPriority") }}
-          <select v-model="priority" class="mt-1 w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
+          <select v-model="priority" class="mt-1 w-full ui-select-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
             <option value="">{{ t("todoDialogs.noneOption") }}</option>
             <option v-for="p in PRIORITIES" :key="p" :value="p">
               {{ PRIORITY_LABELS[p] }}
@@ -64,10 +64,10 @@
         </label>
       </div>
       <div class="flex justify-end gap-2 pt-1">
-        <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">
+        <button class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50" @click="emit('cancel')">
           {{ t("common.cancel") }}
         </button>
-        <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" @click="submit">{{ t("common.add") }}</button>
+        <button class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600" @click="submit">{{ t("common.add") }}</button>
       </div>
     </div>
   </div>

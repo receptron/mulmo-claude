@@ -178,7 +178,7 @@ onMounted(load);
           @keydown.stop
         />
         <div class="flex items-center gap-2">
-          <button class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="reference-dir-add-btn" @click="addEntry">
+          <button class="ui-btn-xs bg-blue-500 text-white hover:bg-blue-600" data-testid="reference-dir-add-btn" @click="addEntry">
             {{ t("common.add") }}
           </button>
           <span v-if="draftError" class="text-xs text-red-500">{{ draftError }}</span>

@@ -82,11 +82,11 @@
         <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200">
           <p class="text-xs text-gray-400">{{ t("chatInput.sendHint") }}</p>
           <div class="flex gap-2">
-            <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="closeExpandedEditor">
+            <button class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50" @click="closeExpandedEditor">
               {{ t("common.cancel") }}
             </button>
             <button
-              class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
+              class="ui-btn-sm bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
               :disabled="isRunning"
               data-testid="expanded-send-btn"
               @click="sendFromExpanded"

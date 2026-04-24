@@ -55,14 +55,14 @@
             <div class="flex items-center gap-2 shrink-0">
               <template v-if="editing">
                 <button
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+                  class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
                   data-testid="skill-cancel-btn"
                   @click="cancelEdit"
                 >
                   {{ t("common.cancel") }}
                 </button>
                 <button
-                  class="px-3 py-1.5 text-sm rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1"
+                  class="ui-btn-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1"
                   :disabled="saving"
                   data-testid="skill-save-btn"
                   @click="saveEdit"
@@ -74,7 +74,7 @@
               <template v-else>
                 <button
                   v-if="detail && detail.source === 'project'"
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1"
+                  class="ui-btn-sm border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1"
                   :disabled="detailLoading"
                   data-testid="skill-edit-btn"
                   @click="startEdit"
@@ -84,7 +84,7 @@
                 </button>
                 <button
                   v-if="detail && detail.source === 'project'"
-                  class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
+                  class="ui-btn-sm border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
                   :disabled="detailLoading || deleting"
                   data-testid="skill-delete-btn"
                   :title="t('pluginManageSkills.deleteProjectSkill')"
@@ -94,7 +94,7 @@
                   {{ t("pluginManageSkills.btnDelete") }}
                 </button>
                 <button
-                  class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center gap-1"
+                  class="ui-btn-sm bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center gap-1"
                   :disabled="detailLoading || !detail"
                   data-testid="skill-run-btn"
                   @click="runSkill"

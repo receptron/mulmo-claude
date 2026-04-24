@@ -72,7 +72,7 @@
               <template #envFile><code class="font-mono">.env</code></template>
             </i18n-t>
           </div>
-          <button class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600" data-testid="settings-gemini-ask-btn" @click="askAboutGemini">
+          <button class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600" data-testid="settings-gemini-ask-btn" @click="askAboutGemini">
             {{ t("settingsModal.geminiAskButton") }}
           </button>
         </div>
@@ -99,7 +99,7 @@
           </p>
           <div class="flex items-center gap-2">
             <button
-              class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              class="ui-btn-sm bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               :disabled="toolsSaving || loading || !!loadError || !toolsDirty"
               :title="loadError ? t('settingsModal.cannotSaveTooltip') : undefined"
               data-testid="settings-tools-save-btn"
