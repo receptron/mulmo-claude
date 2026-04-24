@@ -46,7 +46,11 @@
         @keydown.space.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
       >
         <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
-          <span class="material-icons text-xs">{{ roleIconFor(session.roleId) }}</span>
+          <!-- Role glyph mirrors SessionTabBar: yellow + slow spin
+               while the agent is running, darker gray when unread,
+               otherwise default. Keeps the two session surfaces
+               visually consistent. -->
+          <span class="material-icons text-xs leading-none" :class="roleIconClass(session)">{{ roleIconFor(session.roleId) }}</span>
           <span>{{ roleNameFor(session.roleId) }}</span>
           <span
             v-if="originOf(session) !== 'human'"
@@ -173,6 +177,13 @@ function roleIconFor(roleId: string): string {
 }
 function roleNameFor(roleId: string): string {
   return roleName(props.roles, roleId);
+}
+
+// Mirrors SessionTabBar's icon state: running > unread > default.
+function roleIconClass(session: SessionSummary): string {
+  if (isSessionRunning(session)) return "text-yellow-400 animate-spin [animation-duration:3s]";
+  if (isSessionUnread(session)) return "text-gray-900";
+  return "";
 }
 
 function isSessionRunning(session: SessionSummary): boolean {
