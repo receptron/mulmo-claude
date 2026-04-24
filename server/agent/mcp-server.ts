@@ -11,7 +11,8 @@ import { errorMessage } from "../utils/errors.js";
 import { isNonEmptyString, isRecord } from "../utils/types.js";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 import { env } from "../system/env.js";
-import { extractFetchError } from "../utils/fetch.js";
+import { extractFetchError, fetchWithTimeout } from "../utils/fetch.js";
+import { ONE_SECOND_MS } from "../utils/time.js";
 import { safeResponseText } from "../utils/http.js";
 import { readTextSafeSync } from "../utils/files/safe.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
@@ -113,6 +114,15 @@ const ALL_TOOLS: Record<string, ToolDef> = {
 
 const tools = PLUGIN_NAMES.map((name) => ALL_TOOLS[name]).filter(Boolean);
 
+// MCP tools (e.g. readXPost, searchX) call external APIs through their
+// own handlers. The bridge timeout must exceed those inner timeouts
+// plus a small buffer for JSON parsing / HTTP round-trip, otherwise the
+// bridge aborts before the handler can return a formatted error.
+// Currently the slowest inner timeout is the X API (20 s); 30 s gives
+// 10 s of headroom and still lands well inside the MCP client's own
+// 30-60 s tool-call window.
+const MCP_TOOL_BRIDGE_TIMEOUT_MS = 30 * ONE_SECOND_MS;
+
 function respond(msg: unknown): void {
   process.stdout.write(JSON.stringify(msg) + "\n");
 }
@@ -133,6 +143,12 @@ function respond(msg: unknown): void {
 // status-aware result handling).
 interface PostJsonOpts {
   allowHttpError?: boolean;
+  // Override the default bridge-call timeout. Needed when the
+  // downstream handler itself does slow work (e.g. /api/mcp-tools/*
+  // that hits an external API): the bridge must wait long enough for
+  // the handler's own timeout to fire, otherwise the outer abort
+  // preempts a formatted error.
+  timeoutMs?: number;
 }
 
 async function postJson(path: string, body: unknown, opts: PostJsonOpts = {}): Promise<Response> {
@@ -143,10 +159,11 @@ async function postJson(path: string, body: unknown, opts: PostJsonOpts = {}): P
   // hardcoded literals.
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
+    res = await fetchWithTimeout(`${BASE_URL}${path}?session=${encodeURIComponent(SESSION_ID)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...AUTH_HEADER },
       body: JSON.stringify(body),
+      timeoutMs: opts.timeoutMs,
     });
   } catch (err) {
     throw new Error(`Network error calling ${path}: ${errorMessage(err)}`);
@@ -177,7 +194,7 @@ async function fetchSkillsList(): Promise<{ name: string }[]> {
   const url = `${BASE_URL}/api/skills?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: AUTH_HEADER });
+    res = await fetchWithTimeout(url, { headers: AUTH_HEADER });
   } catch (err) {
     throw new Error(`Network error calling /api/skills: ${errorMessage(err)}`);
   }
@@ -238,7 +255,7 @@ async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<
   const url = `${BASE_URL}/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithTimeout(url, {
       method: "PUT",
       headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -261,7 +278,7 @@ async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${url}`, {
+    res = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "DELETE",
       headers: AUTH_HEADER,
     });
@@ -304,10 +321,14 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly
   // (no frontend push). Opt out of postJson's HTTP error throw because
   // we want to surface the JSON error body to the caller as a string.
+  // The tool handler may hit a slow external API (e.g. X), so pass a
+  // longer bridge timeout than the default 10 s used for localhost
+  // roundtrips — see MCP_TOOL_BRIDGE_TIMEOUT_MS.
   const mcpTool = mcpTools.find((toolDef) => toolDef.definition.name === name);
   if (mcpTool) {
     const res = await postJson(`/api/mcp-tools/${name}`, args, {
       allowHttpError: true,
+      timeoutMs: MCP_TOOL_BRIDGE_TIMEOUT_MS,
     });
     const json = await res.json();
     if (!res.ok) return `Error: ${json.error ?? res.status}`;

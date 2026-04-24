@@ -1,9 +1,17 @@
 import { errorMessage } from "../../utils/errors.js";
+import { fetchWithTimeout } from "../../utils/fetch.js";
 import { safeResponseText } from "../../utils/http.js";
 import { toUtcIsoDate } from "../../utils/date.js";
+import { ONE_SECOND_MS } from "../../utils/time.js";
 import { env } from "../../system/env.js";
 
 const X_API_BASE = "https://api.twitter.com/2";
+
+// X API can stall under rate limit — a 10 s default (used for internal
+// localhost calls) would produce false timeouts. 20 s gives enough
+// headroom for a slow but real response while still bailing long
+// before the MCP client's tool-call timeout fires.
+const X_API_TIMEOUT_MS = 20 * ONE_SECOND_MS;
 const TWEET_FIELDS = "tweet.fields=created_at,author_id,public_metrics,entities";
 const EXPANSIONS = "expansions=author_id";
 const USER_FIELDS = "user.fields=name,username";
@@ -39,8 +47,9 @@ async function fetchX(path: string): Promise<XApiResponse> {
 
   let response: Response;
   try {
-    response = await fetch(`${X_API_BASE}${path}`, {
+    response = await fetchWithTimeout(`${X_API_BASE}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
+      timeoutMs: X_API_TIMEOUT_MS,
     });
   } catch (err) {
     throw new Error(`Network error calling X API: ${errorMessage(err)}`);
