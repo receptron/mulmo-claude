@@ -16,38 +16,29 @@
           </div>
         </div>
 
-        <!-- Bottom bar. The <details> edit panel takes the free width
-             with Copy / Cancel nested inside its <summary> (so they
-             read as part of the same edit control). PDF sits outside
-             <details> as a sibling on the right. Clicks on the nested
-             Copy / Cancel use @click.stop.prevent so they don't
-             trigger the summary's native open/close toggle. -->
+        <!-- Bottom area. <details> edit panel on the left, PDF icon
+             (assistant only) as a sibling on the right, styled to
+             match the gray summary box so the two read as a single
+             action strip. Stack view no longer needs a top header
+             because PDF has moved down here. -->
         <div class="text-response-bottom-bar">
           <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
-            <summary class="text-response-edit-summary" data-testid="text-response-edit-summary">
-              <span class="text-response-edit-label">{{ t("pluginTextResponse.editContent") }}</span>
-              <button
-                v-show="!editing"
-                class="copy-btn"
-                :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')"
-                @click.stop.prevent="copyText"
-              >
-                <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
-              </button>
-              <button v-show="editing" class="cancel-btn" @click.stop.prevent="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
-            </summary>
+            <summary data-testid="text-response-edit-summary">{{ t("pluginTextResponse.editContent") }}</summary>
             <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
             <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
               {{ t("pluginTextResponse.applyChanges") }}
             </button>
           </details>
-          <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click="downloadPdf">
-            <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-            {{ t("pluginTextResponse.pdf") }}
+          <button v-if="isAssistant" class="pdf-icon-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click="downloadPdf">
+            <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "picture_as_pdf" }}</span>
           </button>
           <span v-if="pdfError" class="text-xs text-red-500 self-center" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
         </div>
       </div>
+      <button v-show="!editing" class="copy-btn" :title="copied ? t('pluginTextResponse.copiedLabel') : t('pluginTextResponse.copyLabel')" @click="copyText">
+        <span class="material-icons">{{ copied ? "check" : "content_copy" }}</span>
+      </button>
+      <button v-show="editing" class="cancel-btn" @click="cancelEdit">{{ t("pluginTextResponse.cancel") }}</button>
     </div>
   </div>
 </template>
@@ -401,70 +392,60 @@ async function downloadPdf() {
   color: #333;
 }
 
-/* Bottom bar: <details> takes the free width (so the editor
-   textarea stays wide); PDF sits on the right as a sibling.
-   align-items: flex-start keeps PDF aligned with the summary row
-   even after <details> opens and grows downward. */
-.text-response-bottom-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0 0.5rem 0.5rem;
-}
-
-.text-response-bottom-bar .text-response-source {
-  flex: 1;
-  padding: 0;
-  background: transparent;
-  border-top: none;
-}
-
-/* Summary row contains the Edit-Content label plus the inline
-   Copy / Cancel button on the right. Label takes the free width so
-   the button stays right-aligned regardless of label length. */
-.text-response-edit-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.text-response-edit-label {
-  flex: 1;
-}
-
-.pdf-inline-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25em 0.75em;
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-  font-weight: 500;
-}
-
-.pdf-inline-btn:hover:not(:disabled) {
-  background-color: #45a049;
-}
-
-.pdf-inline-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.pdf-inline-btn .material-icons {
-  font-size: 1.1em;
-}
-
 .text-response-source[open] summary {
   margin-bottom: 0.5rem;
 }
 
 .text-response-source summary:hover {
   background: #d8d8d8;
+}
+
+/* Bottom action strip. <details> takes the free width, PDF icon sits
+   to the right. The strip carries the padding + gray background so
+   the <details> inside can render without its own padding/bg and
+   the PDF button visually sits on the same strip as the summary. */
+.text-response-bottom-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.text-response-bottom-bar > .text-response-source {
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  border-top: none;
+}
+
+/* PDF icon button. Padding / radius / color match the summary's gray
+   box so the two read as a pair at the same height. */
+.pdf-icon-btn {
+  padding: 0.5rem;
+  background: #e8e8e8;
+  border: none;
+  border-radius: 4px;
+  color: #333;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.pdf-icon-btn:hover:not(:disabled) {
+  background: #d8d8d8;
+}
+
+.pdf-icon-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdf-icon-btn .material-icons {
+  font-size: 1.15rem;
 }
 
 .text-response-editor {
@@ -519,13 +500,47 @@ async function downloadPdf() {
   background: #cccccc;
 }
 
+/* Toolbar button styles */
+.button-group {
+  display: flex;
+  gap: 0.5em;
+}
+
+.download-btn {
+  padding: 0.5em 1em;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.download-btn-green {
+  background-color: #4caf50;
+}
+
+.download-btn .material-icons {
+  font-size: 1.2em;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .copy-btn {
-  padding: 0.35rem;
+  position: absolute;
+  bottom: 0.3rem;
+  right: 0.65rem;
+  padding: 0.4rem;
   background: none;
   border: none;
   color: #333;
   cursor: pointer;
-  line-height: 0;
+  z-index: 1;
 }
 
 .copy-btn:hover {
@@ -537,14 +552,18 @@ async function downloadPdf() {
 }
 
 .cancel-btn {
-  padding: 0.25em 0.9em;
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.65rem;
+  padding: 0.5rem 1rem;
   background: #e0e0e0;
   color: #333;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 0.9rem;
   font-weight: 500;
+  z-index: 1;
 }
 
 .cancel-btn:hover {
