@@ -21,7 +21,6 @@ const zhMessages = {
   },
   sessionTabBar: {
     newSession: "新建会话",
-    sessionHistory: "会话历史",
     // 中文无单复数之分，但仍保留 `|` 分隔符以对齐 vue-i18n 的 pluralization 约定。
     activeSessions: "{count} 个活动会话（代理运行中）",
     unreadReplies: "{count} 条未读回复",

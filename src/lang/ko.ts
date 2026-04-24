@@ -22,7 +22,6 @@ const koMessages = {
   },
   sessionTabBar: {
     newSession: "새 세션",
-    sessionHistory: "세션 기록",
     // 한국어는 단·복수 구분이 없어 같은 문자열이지만 vue-i18n 의
     // pluralization 규약에 맞추기 위해 `|` 구분자를 유지합니다.
     activeSessions: "활성 세션 {count}개 (에이전트 실행 중)",

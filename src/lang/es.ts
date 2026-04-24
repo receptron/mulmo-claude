@@ -22,7 +22,6 @@ const esMessages = {
   },
   sessionTabBar: {
     newSession: "Nueva sesión",
-    sessionHistory: "Historial de sesiones",
     activeSessions: "{count} sesión activa (agente en ejecución) | {count} sesiones activas (agente en ejecución)",
     unreadReplies: "{count} respuesta sin leer | {count} respuestas sin leer",
     unreadDot: "Nueva respuesta",

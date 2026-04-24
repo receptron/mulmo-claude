@@ -17,7 +17,6 @@ const frMessages = {
   },
   sessionTabBar: {
     newSession: "Nouvelle session",
-    sessionHistory: "Historique des sessions",
     activeSessions: "{count} session active (agent en cours d'exécution) | {count} sessions actives (agent en cours d'exécution)",
     unreadReplies: "{count} réponse non lue | {count} réponses non lues",
     unreadDot: "Nouvelle réponse",

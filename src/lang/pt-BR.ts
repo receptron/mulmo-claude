@@ -17,7 +17,6 @@ const ptBRMessages = {
   },
   sessionTabBar: {
     newSession: "Nova sessão",
-    sessionHistory: "Histórico de sessões",
     activeSessions: "{count} sessão ativa (agente em execução) | {count} sessões ativas (agente em execução)",
     unreadReplies: "{count} resposta não lida | {count} respostas não lidas",
     unreadDot: "Nova resposta",

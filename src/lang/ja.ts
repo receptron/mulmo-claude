@@ -22,7 +22,6 @@ const jaMessages = {
   },
   sessionTabBar: {
     newSession: "新しいセッション",
-    sessionHistory: "セッション履歴",
     // 日本語は単複同形のため左右同じ文字列だが、vue-i18n の
     // pluralization API に合わせて `|` 区切りで揃える。
     activeSessions: "{count} 件のアクティブセッション（エージェント実行中）",

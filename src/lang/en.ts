@@ -37,7 +37,6 @@ const enMessages = {
   },
   sessionTabBar: {
     newSession: "New session",
-    sessionHistory: "Session history",
     // vue-i18n pluralization: `t(key, count)` picks singular / plural
     // based on the number. `{count}` is interpolated.
     activeSessions: "{count} active session (agent running) | {count} active sessions (agent running)",

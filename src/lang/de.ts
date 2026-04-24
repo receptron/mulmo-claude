@@ -17,7 +17,6 @@ const deMessages = {
   },
   sessionTabBar: {
     newSession: "Neue Sitzung",
-    sessionHistory: "Sitzungsverlauf",
     activeSessions: "{count} aktive Sitzung (Agent läuft) | {count} aktive Sitzungen (Agent läuft)",
     unreadReplies: "{count} ungelesene Antwort | {count} ungelesene Antworten",
     unreadDot: "Neue Antwort",
