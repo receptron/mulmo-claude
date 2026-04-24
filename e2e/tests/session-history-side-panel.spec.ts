@@ -30,10 +30,13 @@ test.describe("session-history side-panel toggle", () => {
     await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
     await expect(page.getByTestId("session-history-toggle-off")).toBeVisible();
 
-    // Click the toggle — panel appears and the session list renders.
+    // Click the toggle — SessionTabBar disappears, panel appears with
+    // its own toggle in the header.
     await page.getByTestId("session-history-toggle-off").click();
     await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
-    await expect(page.getByTestId("session-history-toggle-on")).toBeVisible();
+    // Only one toggle-on button (in the panel) — the SessionTabBar is
+    // unmounted so its toggle is gone too.
+    await expect(page.getByTestId("session-history-toggle-on")).toHaveCount(1);
 
     const sidePanel = page.getByTestId("session-history-side-panel");
     await expect(sidePanel.getByTestId(`session-item-${SESSION_A.id}`)).toBeVisible();
@@ -86,6 +89,45 @@ test.describe("session-history side-panel toggle", () => {
     // that /history uses.
     await page.getByTestId("session-history-side-panel").getByTestId(`session-item-${SESSION_A.id}`).click();
     await expect(page).toHaveURL(new RegExp(`/chat/${SESSION_A.id}`));
+  });
+
+  test("opening the side panel replaces the SessionTabBar entirely", async ({ page }) => {
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    // SessionTabBar is present with its tabs and toggle when the panel is off.
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();
+    await expect(page.getByTestId("session-history-toggle-off")).toBeVisible();
+
+    // Click the toggle — SessionTabBar unmounts completely; the panel
+    // takes over and carries its own toggle in the header.
+    await page.getByTestId("session-history-toggle-off").click();
+    await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeHidden();
+    await expect(page.getByTestId("session-history-toggle-off")).toBeHidden();
+
+    // The in-panel toggle returns to the tabs-on-top layout.
+    await page.getByTestId("session-history-toggle-on").click();
+    await expect(page.getByTestId("session-history-side-panel")).toBeHidden();
+    await expect(page.getByTestId(`session-tab-${SESSION_A.id}`)).toBeVisible();
+  });
+
+  test("history-btn entrypoint to /history stays reachable while the panel is open", async ({ page }) => {
+    // Regression guard for the first Codex review pass: hiding Row 2
+    // removes the SessionTabBar, which contained the only in-app
+    // link to /history. The panel header now mirrors that button so
+    // a one-click jump to the full-page history view survives.
+    await page.goto("/chat");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+
+    await page.getByTestId("session-history-toggle-off").click();
+    await expect(page.getByTestId("session-history-side-panel")).toBeVisible();
+
+    // The button still exists (inside the panel header now) and
+    // navigates to /history when clicked.
+    await expect(page.getByTestId("history-btn")).toBeVisible();
+    await page.getByTestId("history-btn").click();
+    await expect(page).toHaveURL(/\/history(\/|$)/);
   });
 
   test("side panel is hidden on non-chat pages even when toggled on", async ({ page }) => {

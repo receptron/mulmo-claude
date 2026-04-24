@@ -45,16 +45,12 @@
         @keydown.enter.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
         @keydown.space.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
       >
-        <div class="flex items-center gap-1 text-xs text-gray-500 mb-1">
-          <span class="material-icons text-xs">{{ roleIconFor(session.roleId) }}</span>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+          <!-- Shared role + origin glyph: same visual treatment as
+               the SessionTabBar tabs. Role name stays next to it so
+               the panel row still identifies the role in text. -->
+          <SessionRoleIcon :session="session" :roles="roles" size="sm" />
           <span>{{ roleNameFor(session.roleId) }}</span>
-          <span
-            v-if="originOf(session) !== 'human'"
-            class="material-icons text-[10px] ml-0.5"
-            :class="originColor(originOf(session))"
-            :title="originOf(session)"
-            >{{ originIcon(originOf(session)) }}</span
-          >
           <span class="ml-auto flex items-center gap-1.5">
             <span v-if="isSessionRunning(session)" class="flex items-center gap-0.5 text-yellow-600 font-medium">
               <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
@@ -87,7 +83,8 @@ import { SESSION_ORIGINS } from "../types/session";
 import { HISTORY_FILTERS, HISTORY_FILTER_ORDER, isHistoryFilter, type HistoryFilter } from "../config/historyFilters";
 import { PAGE_ROUTES } from "../router";
 import { formatDate } from "../utils/format/date";
-import { roleIcon, roleName } from "../utils/role/icon";
+import { roleName } from "../utils/role/icon";
+import SessionRoleIcon from "./SessionRoleIcon.vue";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -97,20 +94,6 @@ const router = useRouter();
 // shows every unread-flagged session regardless of origin, matching
 // the user expectation that "unread" is the primary question ("what
 // needs my attention?") rather than an origin sub-filter.
-
-const ORIGIN_ICONS: Record<string, string> = {
-  human: "person",
-  scheduler: "event",
-  skill: "auto_fix_high",
-  bridge: "chat",
-};
-
-const ORIGIN_COLORS: Record<string, string> = {
-  human: "text-gray-400",
-  scheduler: "text-blue-500",
-  skill: "text-purple-500",
-  bridge: "text-green-500",
-};
 
 const props = defineProps<{
   sessions: SessionSummary[];
@@ -158,19 +141,8 @@ function countByOrigin(filterKey: HistoryFilter): number {
   return props.sessions.filter((session) => originOf(session) === filterKey).length;
 }
 
-function originIcon(origin: string): string {
-  return ORIGIN_ICONS[origin] ?? "person";
-}
-
-function originColor(origin: string): string {
-  return ORIGIN_COLORS[origin] ?? "text-gray-400";
-}
-
 // ── Role helpers ────────────────────────────────────────────
 
-function roleIconFor(roleId: string): string {
-  return roleIcon(props.roles, roleId);
-}
 function roleNameFor(roleId: string): string {
   return roleName(props.roles, roleId);
 }

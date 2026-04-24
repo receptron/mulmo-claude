@@ -17,8 +17,15 @@
           <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
       </div>
-      <!-- Row 2: role selector + session tabs -->
-      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+      <!-- Row 2: role selector + session tabs.
+           Hidden when the side-panel is actually on-screen (chat +
+           preference on) — in that "vertical" layout the panel
+           header carries RoleSelector + new-session + toggle, so
+           keeping this row would duplicate controls and steal
+           vertical canvas space. On non-chat pages the panel can't
+           render, so Row 2 stays as the only session UI even when
+           the preference is on. -->
+      <div v-if="!sidePanelVisible" class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           :sessions="tabSessions"
@@ -50,17 +57,54 @@
            /chat — the existing `/history` route still owns the full-
            page experience on non-chat contexts. -->
       <div
-        v-if="isChatPage && showSessionHistory"
-        class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900"
+        v-if="sidePanelVisible"
+        class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900 flex flex-col"
         data-testid="session-history-side-panel"
       >
-        <SessionHistoryPanel
-          :sessions="mergedSessions"
-          :current-session-id="currentSessionId"
-          :roles="roles"
-          :error-message="historyError"
-          @load-session="handleSessionSelect"
-        />
+        <!-- Panel header. Stacked over two rows because w-80 can't
+             fit RoleSelector (w-56) plus three 28–32px buttons on a
+             single line. Row 1 owns the role picker; Row 2 carries
+             the actions (new session, /history nav, close toggle).
+             When Row 2's SessionTabBar is hidden by sidePanelVisible,
+             these controls are the only session UI on /chat, so
+             none of them can be dropped. -->
+        <div class="border-b border-gray-100">
+          <div class="px-2 py-1">
+            <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
+          </div>
+          <div class="flex items-center gap-1 px-2 pb-1">
+            <button
+              class="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              data-testid="new-session-btn"
+              :title="t('sessionTabBar.newSession')"
+              :aria-label="t('sessionTabBar.newSession')"
+              @click="handleNewSessionClick"
+            >
+              <span class="material-icons text-sm">add</span>
+            </button>
+            <!-- /history entrypoint + per-session stats. Mirrored from
+                 the hidden Row 2 SessionTabBar so the full-page history
+                 view is still reachable in one click when the side
+                 panel is open. -->
+            <SessionHistoryNavButton
+              class="ml-auto"
+              :active-session-count="activeSessionCount"
+              :unread-count="unreadCount"
+              :history-open="currentPage === 'history'"
+              @toggle-history="handleHistoryClick"
+            />
+            <SessionHistoryToggleButton :model-value="showSessionHistory" @update:model-value="setShowSessionHistory" />
+          </div>
+        </div>
+        <div class="flex-1 min-h-0">
+          <SessionHistoryPanel
+            :sessions="mergedSessions"
+            :current-session-id="currentSessionId"
+            :roles="roles"
+            :error-message="historyError"
+            @load-session="handleSessionSelect"
+          />
+        </div>
       </div>
 
       <!-- Sidebar (Single layout only) -->
@@ -191,7 +235,9 @@ import RoleSelector from "./components/RoleSelector.vue";
 import SessionTabBar from "./components/SessionTabBar.vue";
 import SuggestionsPanel from "./components/SuggestionsPanel.vue";
 import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
+import SessionHistoryNavButton from "./components/SessionHistoryNavButton.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
+import SessionHistoryToggleButton from "./components/SessionHistoryToggleButton.vue";
 import ToolResultsPanel from "./components/ToolResultsPanel.vue";
 import PluginLauncher from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
@@ -391,6 +437,13 @@ const currentPage = computed<PageRouteName | null>(() => {
   const name = route.name;
   return typeof name === "string" && isPageRouteName(name) ? name : null;
 });
+
+// True when the SessionHistoryPanel is actually rendered as the
+// leftmost column. Gates both the panel itself and Row 2 (so the
+// two don't render the session UI twice). On non-chat pages the
+// panel is suppressed even when the preference is on, so Row 2
+// stays visible as the only session UI there.
+const sidePanelVisible = computed(() => isChatPage.value && showSessionHistory.value);
 
 // Refresh the files tree after each agent run so newly written files
 // appear without a manual reload.
