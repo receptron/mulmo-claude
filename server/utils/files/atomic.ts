@@ -8,15 +8,16 @@
 
 import { mkdirSync, promises, renameSync, unlinkSync, writeFileSync } from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import { shortId } from "../id.js";
 
 export interface WriteAtomicOptions {
   /** File mode for the final file (e.g. `0o600` for secrets). */
   mode?: number;
   /**
-   * If true, append a randomUUID to the tmp filename to avoid
-   * collisions at the OS level when multiple writers target the same
-   * final path concurrently (e.g. chat-index has this concern).
+   * If true, append a short opaque id (`shortId()`) to the tmp
+   * filename to avoid collisions at the OS level when multiple
+   * writers target the same final path concurrently (e.g.
+   * chat-index has this concern).
    * Default false — a single `${path}.tmp` is fine for most callers.
    */
   uniqueTmp?: boolean;
@@ -89,7 +90,7 @@ function renameSyncWithWindowsRetry(fromPath: string, toPath: string): void {
  * crashed partial write can't wedge the next try.
  */
 export async function writeFileAtomic(filePath: string, content: string, opts: WriteAtomicOptions = {}): Promise<void> {
-  const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
+  const tmp = opts.uniqueTmp ? `${filePath}.${shortId()}.tmp` : `${filePath}.tmp`;
   await promises.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await promises.writeFile(tmp, content, {
@@ -109,7 +110,7 @@ export async function writeFileAtomic(filePath: string, content: string, opts: W
  * Same contract as `writeFileAtomic` but blocking.
  */
 export function writeFileAtomicSync(filePath: string, content: string, opts: WriteAtomicOptions = {}): void {
-  const tmp = opts.uniqueTmp ? `${filePath}.${randomUUID()}.tmp` : `${filePath}.tmp`;
+  const tmp = opts.uniqueTmp ? `${filePath}.${shortId()}.tmp` : `${filePath}.tmp`;
   mkdirSync(path.dirname(filePath), { recursive: true });
   try {
     writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });
