@@ -20,7 +20,7 @@
       <!-- Row 2: role selector + session tabs. Shown whenever the
            side panel is hidden — Row 2 and the side panel are
            mutually exclusive. -->
-      <div v-if="!sidePanelVisible" class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+      <div v-if="!sidePanelVisible" class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           :sessions="tabSessions"
@@ -56,23 +56,25 @@
              close toggle. The expand affordance lives on the panel's
              right edge as a hover-reveal handle instead of a header
              button, so no second row is needed. -->
-        <div class="flex items-center gap-1 px-2 py-1 border-b border-gray-100">
+        <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
           <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" fluid @change="onRoleChange" />
-          <button
-            class="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-            data-testid="new-session-btn"
-            :title="t('sessionTabBar.newSession')"
-            :aria-label="t('sessionTabBar.newSession')"
-            @click="handleNewSessionClick"
-          >
-            <span class="material-icons text-sm">add</span>
-          </button>
-          <SessionHistoryToggleButton
-            :model-value="sidePanelVisible"
-            :active-session-count="activeSessionCount"
-            :unread-count="unreadCount"
-            @update:model-value="setSidePanelVisibleAndCollapse"
-          />
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              data-testid="new-session-btn"
+              :title="t('sessionTabBar.newSession')"
+              :aria-label="t('sessionTabBar.newSession')"
+              @click="handleNewSessionClick"
+            >
+              <span class="material-icons text-sm">add</span>
+            </button>
+            <SessionHistoryToggleButton
+              :model-value="sidePanelVisible"
+              :active-session-count="activeSessionCount"
+              :unread-count="unreadCount"
+              @update:model-value="setSidePanelVisibleAndCollapse"
+            />
+          </div>
         </div>
         <div class="relative flex-1 min-h-0">
           <SessionHistoryPanel
