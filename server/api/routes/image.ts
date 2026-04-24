@@ -4,7 +4,7 @@ import { getSessionImageData } from "../../events/session-store/index.js";
 import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
-import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath, imagePathFromFilename } from "../../utils/files/image-store.js";
+import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
 const router = Router();
@@ -145,25 +145,30 @@ router.post(API_ROUTES.image.upload, async (req: Request<object, unknown, Canvas
   await saveCanvasImage(res, base64, async (b64) => saveImage(b64));
 });
 
-router.put(
-  API_ROUTES.image.update,
-  async (req: Request<{ filename: string }, unknown, CanvasImageBody>, res: Response<CanvasImageResponse | CanvasImageError>) => {
-    const relativePath = imagePathFromFilename(req.params.filename);
-    if (!relativePath) {
-      badRequest(res, "invalid image filename");
-      return;
-    }
-    const { imageData } = req.body;
-    if (!imageData) {
-      badRequest(res, "imageData is required");
-      return;
-    }
-    const base64 = stripDataUri(imageData);
-    await saveCanvasImage(res, base64, async (b64) => {
-      await overwriteImage(relativePath, b64);
-      return relativePath;
-    });
-  },
-);
+interface UpdateImageBody extends CanvasImageBody {
+  relativePath: string;
+}
+
+// Canvas saves come in with the workspace-relative path the file
+// already lives at (returned at canvas creation), so the client never
+// has to know how `saveImage` shards by YYYY/MM. The server validates
+// the prefix + extension via `isImagePath`; `safeResolve` inside
+// `overwriteImage` blocks any traversal.
+router.put(API_ROUTES.image.update, async (req: Request<object, unknown, UpdateImageBody>, res: Response<CanvasImageResponse | CanvasImageError>) => {
+  const { relativePath, imageData } = req.body;
+  if (!relativePath || !isImagePath(relativePath)) {
+    badRequest(res, "invalid image relativePath");
+    return;
+  }
+  if (!imageData) {
+    badRequest(res, "imageData is required");
+    return;
+  }
+  const base64 = stripDataUri(imageData);
+  await saveCanvasImage(res, base64, async (b64) => {
+    await overwriteImage(relativePath, b64);
+    return relativePath;
+  });
+});
 
 export default router;

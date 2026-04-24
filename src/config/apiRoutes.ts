@@ -71,7 +71,10 @@ export const API_ROUTES = {
     generate: "/api/generate-image",
     edit: "/api/edit-image",
     upload: "/api/images",
-    update: "/api/images/:filename",
+    // Body carries the workspace-relative path so the route doesn't
+    // have to reconstruct one from a basename — required after #764
+    // sharded image storage by YYYY/MM.
+    update: "/api/images/update",
   },
 
   mcpTools: {

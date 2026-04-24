@@ -2,6 +2,7 @@ import { mkdir, readFile, realpath, writeFile } from "fs/promises";
 import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { shortId } from "../id.js";
+import { yearMonthUtc } from "./naming.js";
 import { resolveWithinRoot } from "./safe.js";
 
 const IMAGES_DIR = WORKSPACE_PATHS.images;
@@ -32,13 +33,17 @@ async function safeResolve(relativePath: string): Promise<string> {
   return result;
 }
 
-/** Save raw base64 (no data URI prefix) as a PNG file. Returns the workspace-relative path. */
+/** Save raw base64 (no data URI prefix) as a PNG file. New files
+ *  land under `images/YYYY/MM/` (UTC) so the dir doesn't accumulate
+ *  unbounded — see #764. Returns the workspace-relative path. */
 export async function saveImage(base64Data: string): Promise<string> {
   await ensureImagesDir();
+  const partition = yearMonthUtc();
+  const parentAbs = path.join(IMAGES_DIR, partition);
+  await mkdir(parentAbs, { recursive: true });
   const filename = `${shortId()}.png`;
-  const absPath = path.join(IMAGES_DIR, filename);
-  await writeFile(absPath, Buffer.from(base64Data, "base64"));
-  return path.posix.join(WORKSPACE_DIRS.images, filename);
+  await writeFile(path.join(parentAbs, filename), Buffer.from(base64Data, "base64"));
+  return path.posix.join(WORKSPACE_DIRS.images, partition, filename);
 }
 
 /** Overwrite an existing image file. The relativePath must start with "images/". */
@@ -59,18 +64,9 @@ export function stripDataUri(dataUri: string): string {
   return dataUri.replace(/^data:image\/[^;]+;base64,/, "");
 }
 
-/** Check if a string is a file reference (not a data URI). */
+/** Check if a string is a file reference (not a data URI). Accepts
+ *  arbitrary depth under `images/` (e.g. `images/2026/04/abc.png`)
+ *  so the per-month sharded paths from `saveImage` still validate. */
 export function isImagePath(value: string): boolean {
   return value.startsWith(`${WORKSPACE_DIRS.images}/`) && value.endsWith(".png");
-}
-
-/** Build the workspace-relative image path for a filename, or null
- *  if the derived path wouldn't satisfy `isImagePath` (e.g. empty
- *  name, wrong extension). Keeps route handlers from reaching for
- *  `WORKSPACE_DIRS.images` directly — the images/ convention lives
- *  in exactly one place. */
-export function imagePathFromFilename(filename: string): string | null {
-  if (!filename) return null;
-  const relativePath = path.posix.join(WORKSPACE_DIRS.images, filename);
-  return isImagePath(relativePath) ? relativePath : null;
 }

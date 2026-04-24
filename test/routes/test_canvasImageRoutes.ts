@@ -1,12 +1,13 @@
 // Route-level checks for the canvas image persistence path.
 //
 // Covers:
-//   - POST /api/canvas    → pre-allocates a PNG file and bakes its
+//   - POST /api/canvas        → pre-allocates a PNG file and bakes its
 //     workspace-relative path into `data.imageData` on the tool result.
-//   - PUT  /api/images/:filename → overwrites that pre-allocated file
-//     with new PNG bytes (the canvas's autosave path). Regressed once
-//     already when `WORKSPACE_DIRS.images` moved to `"artifacts/images"`
-//     but this route kept building `"images/..."`.
+//   - PUT  /api/images/update → overwrites that pre-allocated file
+//     with new PNG bytes (the canvas's autosave path). The route now
+//     takes the workspace-relative path in the body rather than
+//     reconstructing it from a `:filename` URL param — required after
+//     #764 sharded `images/` by YYYY/MM.
 //
 // We drive the handlers with plain Request / Response mocks so we
 // don't pay for an Express + supertest harness — matching the pattern
@@ -116,7 +117,7 @@ before(async () => {
   const pluginsMod: PluginsModule = await import("../../server/api/routes/plugins.js");
   const imageMod: ImageModule = await import("../../server/api/routes/image.js");
   canvasHandler = extractRouteHandler(pluginsMod, "/api/canvas", "post");
-  putImageHandler = extractRouteHandler(imageMod, "/api/images/:filename", "put");
+  putImageHandler = extractRouteHandler(imageMod, "/api/images/update", "put");
 });
 
 after(async () => {
@@ -149,7 +150,7 @@ describe("POST /api/canvas — pre-allocate image file", () => {
     assert.ok(body.data, "response should have data");
     assert.equal(typeof body.data.imageData, "string");
     assert.equal(body.data.prompt, "");
-    assert.match(body.data.imageData, /^artifacts\/images\/[0-9a-f]+\.png$/, "expected an artifacts/images/*.png path");
+    assert.match(body.data.imageData, /^artifacts\/images\/\d{4}\/\d{2}\/[0-9a-f]+\.png$/, "expected an artifacts/images/YYYY/MM/*.png path (#764)");
 
     // File exists and is non-empty (placeholder PNG).
     const absPath = path.join(workspaceDir, body.data.imageData);
@@ -178,7 +179,7 @@ describe("POST /api/canvas — pre-allocate image file", () => {
   });
 });
 
-describe("PUT /api/images/:filename — overwrite pre-allocated file", () => {
+describe("PUT /api/images/update — overwrite pre-allocated file", () => {
   it("overwrites the pre-allocated PNG with the new data-URI bytes", async () => {
     // Allocate a canvas image the same way the client would.
     const { state: openState, res: openRes } = mockRes();
@@ -186,13 +187,12 @@ describe("PUT /api/images/:filename — overwrite pre-allocated file", () => {
     const relPath = (openState.body as OpenCanvasBody).data!.imageData;
     createdImagePaths.push(relPath);
 
-    const filename = path.posix.basename(relPath);
     const absPath = path.join(workspaceDir, relPath);
     const originalBytes = await readFile(absPath);
 
     // Overwrite with a distinct 1×1 red PNG.
     const { state, res } = mockRes();
-    await putImageHandler(req({ imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }, { filename }), res);
+    await putImageHandler(req({ relativePath: relPath, imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }), res);
 
     assert.equal(state.status, 200);
     const body = state.body as PutOkBody;
@@ -208,10 +208,9 @@ describe("PUT /api/images/:filename — overwrite pre-allocated file", () => {
     await canvasHandler(req({}), openRes);
     const relPath = (openState.body as OpenCanvasBody).data!.imageData;
     createdImagePaths.push(relPath);
-    const filename = path.posix.basename(relPath);
 
     const { state, res } = mockRes();
-    await putImageHandler(req({ imageData: TEST_PNG_BASE64 }, { filename }), res);
+    await putImageHandler(req({ relativePath: relPath, imageData: TEST_PNG_BASE64 }), res);
 
     assert.equal(state.status, 200);
     const updatedBytes = await readFile(path.join(workspaceDir, relPath));
@@ -220,23 +219,31 @@ describe("PUT /api/images/:filename — overwrite pre-allocated file", () => {
 
   it("rejects a request with no imageData body field", async () => {
     const { state, res } = mockRes();
-    await putImageHandler(req({}, { filename: "whatever.png" }), res);
+    await putImageHandler(req({ relativePath: "artifacts/images/2026/04/whatever.png" }), res);
     assert.equal(state.status, 400);
     assert.match((state.body as ErrorBody).error ?? "", /imagedata/i);
   });
 
-  it("rejects a filename that doesn't end in .png (imagePathFromFilename gate)", async () => {
+  it("rejects a relativePath that doesn't satisfy isImagePath", async () => {
     const { state, res } = mockRes();
-    await putImageHandler(req({ imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }, { filename: "notes.txt" }), res);
+    // Wrong prefix — not under artifacts/images/.
+    await putImageHandler(req({ relativePath: "artifacts/notes/foo.png", imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }), res);
     assert.equal(state.status, 400);
-    assert.match((state.body as ErrorBody).error ?? "", /invalid image filename/i);
+    assert.match((state.body as ErrorBody).error ?? "", /invalid image relativepath/i);
+  });
+
+  it("rejects a missing relativePath", async () => {
+    const { state, res } = mockRes();
+    await putImageHandler(req({ imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }), res);
+    assert.equal(state.status, 400);
+    assert.match((state.body as ErrorBody).error ?? "", /invalid image relativepath/i);
   });
 
   it("returns 500 when the target file does not exist (safeResolve requires realpath)", async () => {
     // We never allocated this path, so overwriteImage's safeResolve
     // will fail — surfaced as a 500 with the descriptive message.
     const { state, res } = mockRes();
-    await putImageHandler(req({ imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }, { filename: "does-not-exist.png" }), res);
+    await putImageHandler(req({ relativePath: "artifacts/images/2026/04/does-not-exist.png", imageData: `data:image/png;base64,${TEST_PNG_BASE64}` }), res);
     assert.equal(state.status, 500);
   });
 });

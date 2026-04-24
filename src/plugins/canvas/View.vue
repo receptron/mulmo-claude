@@ -204,8 +204,10 @@ const saveDrawing = async (): Promise<void> => {
   uploadInFlight = true;
   try {
     const imageDataUri: string = await canvasRef.value.save();
-    const filename = imagePath.value.split("/").pop() ?? "";
-    const result = await apiPut<{ path: string }>(API_ROUTES.image.update.replace(":filename", filename), { imageData: imageDataUri });
+    const result = await apiPut<{ path: string }>(API_ROUTES.image.update, {
+      relativePath: imagePath.value,
+      imageData: imageDataUri,
+    });
     if (!result.ok) throw new Error(`PUT failed: ${result.error}`);
     bumpImage(imagePath.value);
   } catch (error) {

@@ -10,18 +10,34 @@ import { shortId } from "../id.js";
 import { slugify } from "../slug.js";
 
 /**
+ * UTC-based `YYYY/MM` partition segment for new artifacts (#764).
+ * Keeps each artifact directory from accumulating a flat list of
+ * thousands of files. UTC is used (rather than local time) so a
+ * workspace synced across machines / timezones still groups files
+ * into the same bucket.
+ *
+ * Exported for unit tests and callers that need the partition without
+ * also generating a filename (e.g. saveImage / saveSpreadsheet).
+ */
+export function yearMonthUtc(now: Date = new Date()): string {
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}/${month}`;
+}
+
+/**
  * Build a workspace-relative path for a new artifact file.
  *
  * @param dir  Workspace-relative directory (e.g. WORKSPACE_DIRS.charts)
  * @param title  Human-readable title (slugified for the filename)
  * @param ext  File extension with leading dot (e.g. ".html", ".json")
  * @param fallbackSlug  Slug to use when title is empty/undefined
- * @returns  Workspace-relative path like "artifacts/charts/sales-1776135210389.chart.json"
+ * @returns  Workspace-relative path like "artifacts/charts/2026/04/sales-1776135210389.chart.json"
  */
 export function buildArtifactPath(dir: string, title: string | undefined, ext: string, fallbackSlug = "file"): string {
   const slug = title ? slugify(title) || fallbackSlug : fallbackSlug;
   const fname = `${slug}-${Date.now()}${ext}`;
-  return path.posix.join(dir, fname);
+  return path.posix.join(dir, yearMonthUtc(), fname);
 }
 
 /**
@@ -40,5 +56,5 @@ export function buildArtifactPathRandom(dir: string, prefix: string, ext: string
   // built-in "page" default when `prefix` sanitizes to empty.
   const slug = slugify(prefix, fallbackSlug);
   const fname = `${slug}-${shortId()}${ext}`;
-  return path.posix.join(dir, fname);
+  return path.posix.join(dir, yearMonthUtc(), fname);
 }
