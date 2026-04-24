@@ -235,24 +235,7 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
   const slug = getOptionalStringQuery(req, "slug");
   if (slug) {
-    const filePath = await resolvePagePath(slug);
-    const content = filePath ? readFileOrEmpty(filePath) : "";
-    const resolvedTitle = filePath ? path.basename(filePath, ".md") : slug;
-    const exists = !!filePath;
-    res.json({
-      data: {
-        action: "page",
-        title: resolvedTitle,
-        content,
-        pageName: resolvedTitle,
-        pageExists: exists,
-        error: content ? undefined : `Page not found: ${slug}`,
-      },
-      message: content ? `Showing page: ${resolvedTitle}` : `Page not found: ${slug}`,
-      title: resolvedTitle,
-      instructions: "The wiki page is now displayed on the canvas.",
-      updating: true,
-    });
+    res.json(await buildPageResponse("page", slug));
   } else {
     const content = readFileOrEmpty(indexFile());
     const pageEntries = parseIndexEntries(content);

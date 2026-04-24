@@ -146,6 +146,8 @@ test.describe("wiki empty page — update button", () => {
 
     const body = (await agentReq).postDataJSON() as { message?: string };
     expect(body.message).toContain("empty-file");
+    expect(body.message).toMatch(/update/i);
+    expect(body.message).toContain("wiki page");
   });
 
   test("update button hidden on page with content", async ({ page }) => {
