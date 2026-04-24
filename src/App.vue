@@ -17,13 +17,17 @@
           <PluginLauncher :active-tool-name="selectedResult?.toolName ?? null" :active-view-mode="currentPage" @navigate="onPluginNavigate" />
         </div>
       </div>
-      <!-- Row 2: role selector + session tabs. The SessionTabBar
-           disappears entirely when the side-panel takes over — the
-           panel has its own toggle to restore this row. -->
-      <div class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+      <!-- Row 2: role selector + session tabs.
+           Hidden when the side-panel is actually on-screen (chat +
+           preference on) — in that "vertical" layout the panel
+           header carries RoleSelector + new-session + toggle, so
+           keeping this row would duplicate controls and steal
+           vertical canvas space. On non-chat pages the panel can't
+           render, so Row 2 stays as the only session UI even when
+           the preference is on. -->
+      <div v-if="!sidePanelVisible" class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
-          v-if="!showSessionHistory"
           :sessions="tabSessions"
           :current-session-id="displayedCurrentSessionId"
           :is-chat-page="isChatPage"
@@ -53,15 +57,28 @@
            /chat — the existing `/history` route still owns the full-
            page experience on non-chat contexts. -->
       <div
-        v-if="isChatPage && showSessionHistory"
+        v-if="sidePanelVisible"
         class="w-80 flex-shrink-0 border-r border-gray-200 bg-white text-gray-900 flex flex-col"
         data-testid="session-history-side-panel"
       >
-        <!-- In-panel toggle so the user can close the side-panel
-             without hunting for the tab-bar button. Clicking it
-             returns the UI to the tabs-on-top layout. -->
-        <div class="flex items-center justify-end px-2 py-1 border-b border-gray-100">
-          <SessionHistoryToggleButton :model-value="showSessionHistory" @update:model-value="setShowSessionHistory" />
+        <!-- Panel header carries the controls that used to live in
+             Row 2 (RoleSelector, new-session) plus the toggle that
+             closes the panel. With Row 2 hidden, the canvas column
+             can extend up to the SidebarHeader. -->
+        <div class="flex items-center gap-2 px-2 py-1 border-b border-gray-100">
+          <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
+          <button
+            class="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+            data-testid="new-session-btn"
+            :title="t('sessionTabBar.newSession')"
+            :aria-label="t('sessionTabBar.newSession')"
+            @click="handleNewSessionClick"
+          >
+            <span class="material-icons text-sm">add</span>
+          </button>
+          <div class="ml-auto">
+            <SessionHistoryToggleButton :model-value="showSessionHistory" @update:model-value="setShowSessionHistory" />
+          </div>
         </div>
         <div class="flex-1 min-h-0">
           <SessionHistoryPanel
@@ -403,6 +420,13 @@ const currentPage = computed<PageRouteName | null>(() => {
   const name = route.name;
   return typeof name === "string" && isPageRouteName(name) ? name : null;
 });
+
+// True when the SessionHistoryPanel is actually rendered as the
+// leftmost column. Gates both the panel itself and Row 2 (so the
+// two don't render the session UI twice). On non-chat pages the
+// panel is suppressed even when the preference is on, so Row 2
+// stays visible as the only session UI there.
+const sidePanelVisible = computed(() => isChatPage.value && showSessionHistory.value);
 
 // Refresh the files tree after each agent run so newly written files
 // appear without a manual reload.
