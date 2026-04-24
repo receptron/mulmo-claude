@@ -189,6 +189,24 @@ describe("resolveWikiHref", () => {
     });
   });
 
+  describe("external schemes (must pass through unchanged)", () => {
+    it("passes through mailto: links", () => {
+      assert.equal(resolveWikiHref("mailto:user@example.com", PAGES_BASE), "mailto:user@example.com");
+    });
+
+    it("passes through tel: links", () => {
+      assert.equal(resolveWikiHref("tel:+819012345678", PAGES_BASE), "tel:+819012345678");
+    });
+
+    it("passes through custom scheme links", () => {
+      assert.equal(resolveWikiHref("slack://channel/general", PAGES_BASE), "slack://channel/general");
+    });
+
+    it("passes through https: links", () => {
+      assert.equal(resolveWikiHref("https://example.com", PAGES_BASE), "https://example.com");
+    });
+  });
+
   describe("absolute workspace paths (contains /)", () => {
     it("passes through workspace-root-relative paths unchanged", () => {
       assert.equal(resolveWikiHref("data/wiki/sources/foo.md", PAGES_BASE), "data/wiki/sources/foo.md");

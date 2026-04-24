@@ -66,6 +66,7 @@ export function classifyWorkspacePath(href: string): WorkspaceLinkTarget | null 
  *        → (after normalization by classifyWorkspacePath) "data/wiki/sources/foo.md"
  */
 export function resolveWikiHref(href: string, baseDir: string): string {
+  if (isExternalHref(href)) return href;
   if (href.startsWith("./") || href.startsWith("../") || !href.includes("/")) {
     return `${baseDir}/${href}`;
   }
