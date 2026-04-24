@@ -1,14 +1,5 @@
 <template>
   <div class="h-full flex flex-col">
-    <div v-if="isAssistant" class="flex justify-end px-4 py-2 border-b border-gray-100 shrink-0">
-      <div class="button-group">
-        <button class="download-btn download-btn-green" :disabled="pdfDownloading" @click="downloadPdf">
-          <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
-          {{ t("pluginTextResponse.pdf") }}
-        </button>
-      </div>
-      <span v-if="pdfError" class="text-xs text-red-500 self-center ml-2" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
-    </div>
     <div class="flex-1 overflow-hidden relative" @click.capture="openLinksInNewTab">
       <div class="text-response-container">
         <div class="text-response-content-wrapper">
@@ -25,9 +16,21 @@
           </div>
         </div>
 
-        <!-- Collapsible Editor -->
+        <!-- Bottom action bar. The collapsible editor's summary row
+             doubles as the plugin's primary action strip: PDF (assistant
+             only) and the edit-toggle live together, so stack view no
+             longer needs a separate top header strip above the card
+             chrome. Clicks on the PDF button use @click.stop.prevent so
+             they don't toggle the `<details>` element. -->
         <details v-if="editable" ref="detailsEl" class="text-response-source" data-testid="text-response-edit">
-          <summary data-testid="text-response-edit-summary">{{ t("pluginTextResponse.editContent") }}</summary>
+          <summary class="text-response-edit-summary" data-testid="text-response-edit-summary">
+            <span class="text-response-edit-label">{{ t("pluginTextResponse.editContent") }}</span>
+            <button v-if="isAssistant" class="pdf-inline-btn" :disabled="pdfDownloading" :title="t('pluginTextResponse.pdf')" @click.stop.prevent="downloadPdf">
+              <span class="material-icons">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>
+              {{ t("pluginTextResponse.pdf") }}
+            </button>
+            <span v-if="pdfError" class="text-xs text-red-500 ml-2" :title="pdfError">{{ t("pluginTextResponse.pdfFailed") }}</span>
+          </summary>
           <textarea v-model="editedText" class="text-response-editor" spellcheck="false" data-testid="text-response-edit-textarea"></textarea>
           <button class="apply-btn" :disabled="!hasChanges" data-testid="text-response-apply-btn" @click="applyChanges">
             {{ t("pluginTextResponse.applyChanges") }}
@@ -391,6 +394,46 @@ async function downloadPdf() {
   color: #333;
 }
 
+/* Summary row now carries the primary actions (edit toggle + PDF).
+   Flex layout with the label taking the free space keeps the PDF
+   button right-aligned regardless of label length. */
+.text-response-edit-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.text-response-edit-label {
+  flex: 1;
+}
+
+.pdf-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25em 0.75em;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.pdf-inline-btn:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.pdf-inline-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdf-inline-btn .material-icons {
+  font-size: 1.1em;
+}
+
 .text-response-source[open] summary {
   margin-bottom: 0.5rem;
 }
@@ -449,37 +492,6 @@ async function downloadPdf() {
 
 .apply-btn:disabled:hover {
   background: #cccccc;
-}
-
-/* Toolbar button styles */
-.button-group {
-  display: flex;
-  gap: 0.5em;
-}
-
-.download-btn {
-  padding: 0.5em 1em;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9em;
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-}
-
-.download-btn-green {
-  background-color: #4caf50;
-}
-
-.download-btn .material-icons {
-  font-size: 1.2em;
-}
-
-.download-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .copy-btn {
