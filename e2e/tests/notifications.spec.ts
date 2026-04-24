@@ -100,9 +100,9 @@ const SCENARIOS: readonly NotificationScenario[] = [
       type: NOTIFICATION_ACTION_TYPES.navigate,
       target: { view: NOTIFICATION_VIEWS.files, path: "sources/federal-reserve/2026-04-25.md" },
     }),
-    expectedPathname: "/sources/federal-reserve/2026-04-25.md",
-    // Files use a catch-all, so the URL path is just the nested path.
-    fullUrl: "/files/sources/federal-reserve/2026-04-25.md",
+    // Files use a catch-all, so the URL pathname is /files +
+    // the nested segments.
+    expectedPathname: "/files/sources/federal-reserve/2026-04-25.md",
   },
   {
     description: "wiki target with slug + anchor",
@@ -259,13 +259,15 @@ test.describe("notification permalinks", () => {
 
       await page.getByTestId(`notification-item-${scenario.payload.id}`).click();
 
-      // toHaveURL accepts a substring match on the URL — use the
-      // full URL assertion when a query string or fragment matters,
-      // otherwise just the pathname.
+      // Strict assertion: when fullUrl is set we compare the
+      // combined path+search+hash, otherwise just the pathname.
+      // Previously this had an `||` fallback that would silently
+      // accept the wrong URL — Codex caught that the files
+      // scenario relied on it.
       const expected = scenario.fullUrl ?? scenario.expectedPathname;
       await expect(page).toHaveURL((url) => {
-        const candidate = url.pathname + url.search + url.hash;
-        return candidate === expected || url.pathname === scenario.expectedPathname;
+        const candidate = scenario.fullUrl ? url.pathname + url.search + url.hash : url.pathname;
+        return candidate === expected;
       });
     });
   }
