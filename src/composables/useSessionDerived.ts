@@ -18,15 +18,19 @@ export function useSessionDerived(opts: { sessionMap: Map<string, ActiveSession>
 
   const currentSummary = computed(() => sessions.value.find((summary) => summary.id === currentSessionId.value));
 
-  // The server-side summary already merges pendingGenerations into
-  // `isRunning` (see server/api/routes/sessions.ts), but pub/sub events
-  // for background generations arrive faster than the next sessions
-  // refetch — fold the in-memory map in so ChatInput reflects the new
-  // state immediately.
+  // Global "is anything running" across every known session — in-memory
+  // map (which reflects pub/sub events faster than server refetch) and
+  // server-side summaries (for sessions not yet hydrated into the map).
+  // Scoping this to `activeSession` would drop to false as soon as the
+  // user leaves /chat (activeSession → undefined), firing downstream
+  // `watch(isRunning)` consumers before background runs actually
+  // finish — e.g. FilesView would refresh too early and miss writes.
   const isRunning = computed(() => {
-    const active = activeSession.value;
-    const pending = active ? Object.keys(active.pendingGenerations).length > 0 : false;
-    return currentSummary.value?.isRunning || active?.isRunning || pending || false;
+    for (const session of sessionMap.values()) {
+      if (session.isRunning) return true;
+      if (Object.keys(session.pendingGenerations).length > 0) return true;
+    }
+    return sessions.value.some((summary) => summary.isRunning);
   });
 
   const statusMessage = computed(() => currentSummary.value?.statusMessage ?? activeSession.value?.statusMessage ?? "");
