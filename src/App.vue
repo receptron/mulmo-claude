@@ -20,7 +20,7 @@
       <!-- Row 2: role selector + session tabs. Shown whenever the
            side panel is hidden — Row 2 and the side panel are
            mutually exclusive. -->
-      <div v-if="!sidePanelVisible" class="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+      <div v-if="!sidePanelVisible" class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
         <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
         <SessionTabBar
           :sessions="tabSessions"
@@ -47,23 +47,20 @@
            role selector + new-session button instead. -->
       <div
         v-if="sidePanelVisible"
-        class="border-r border-gray-200 bg-white text-gray-900 flex flex-col min-w-0 overflow-hidden"
+        class="group relative border-r border-gray-200 bg-white text-gray-900 flex flex-col min-w-0 overflow-hidden"
         :class="sidePanelExpanded ? 'flex-1' : 'w-72 flex-shrink-0'"
         data-testid="session-history-side-panel"
       >
-        <!-- Panel header. Stacked over two rows because w-72 can't
-             fit RoleSelector (w-56) plus two 28–32px buttons on a
-             single line. Row 1 pairs the role picker with the new-
-             session button so the `+` sits next to RoleSelector just
-             like it does in the hidden SessionTabBar; Row 2 carries
-             the expand / close toggle pair. These controls are the
-             only session UI while the panel is open (Row 2's
-             SessionTabBar is hidden), so none can be dropped. -->
-        <div class="border-b border-gray-100">
-          <div class="flex items-center gap-1 px-2 py-1">
-            <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" @change="onRoleChange" />
+        <!-- Single-row panel header. RoleSelector flexes to share the
+             w-72 width with the new-session button and the side-panel
+             close toggle. The expand affordance lives on the panel's
+             right edge as a hover-reveal handle instead of a header
+             button, so no second row is needed. -->
+        <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+          <RoleSelector v-model:current-role-id="currentRoleId" :roles="roles" fluid @change="onRoleChange" />
+          <div class="flex items-center gap-1 shrink-0">
             <button
-              class="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              class="flex-shrink-0 flex items-center justify-center w-7 py-1 rounded border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
               data-testid="new-session-btn"
               :title="t('sessionTabBar.newSession')"
               :aria-label="t('sessionTabBar.newSession')"
@@ -71,13 +68,6 @@
             >
               <span class="material-icons text-sm">add</span>
             </button>
-          </div>
-          <div class="flex items-center gap-1 px-2 pb-1">
-            <SessionHistoryExpandButton
-              class="ml-auto"
-              :model-value="sidePanelExpanded"
-              @update:model-value="(value: boolean) => (sidePanelExpanded = value)"
-            />
             <SessionHistoryToggleButton
               :model-value="sidePanelVisible"
               :active-session-count="activeSessionCount"
@@ -86,7 +76,7 @@
             />
           </div>
         </div>
-        <div class="flex-1 min-h-0">
+        <div class="relative flex-1 min-h-0">
           <SessionHistoryPanel
             :sessions="mergedSessions"
             :current-session-id="currentSessionId"
@@ -94,6 +84,7 @@
             :error-message="historyError"
             @load-session="handleSessionSelect"
           />
+          <SessionHistoryExpandButton :model-value="sidePanelExpanded" @update:model-value="(value: boolean) => (sidePanelExpanded = value)" />
         </div>
       </div>
 

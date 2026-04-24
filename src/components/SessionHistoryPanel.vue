@@ -3,7 +3,7 @@
        (see plans/feat-history-url-route.md). Previously this was an
        absolute-positioned overlay; the `h-full overflow-y-auto` root
        plus inline flow replaces the z-index + topOffset plumbing. -->
-  <div ref="root" class="h-full overflow-y-auto bg-white">
+  <div ref="root" class="h-full overflow-y-auto bg-white select-none">
     <div class="p-2 space-y-2">
       <!-- Origin filter bar -->
       <div class="flex gap-1 mb-1 flex-wrap" data-testid="session-filter-bar">
@@ -38,7 +38,7 @@
         tabindex="0"
         role="button"
         :aria-label="t('sessionHistoryPanel.openRowAria', { preview: session.preview || t('sessionHistoryPanel.noMessages') })"
-        class="relative cursor-pointer rounded border p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        class="relative cursor-pointer rounded p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         :class="rowClasses(session)"
         :data-testid="`session-item-${session.id}`"
         @click="emit('loadSession', session.id)"
@@ -137,8 +137,8 @@ function isSessionUnread(session: SessionSummary): boolean {
 }
 
 function rowClasses(session: SessionSummary): string {
-  if (session.id === props.currentSessionId) return "border-black hover:bg-gray-50";
-  return "border-gray-200 hover:bg-gray-50";
+  if (session.id === props.currentSessionId) return "border-2 border-blue-500 hover:bg-gray-50";
+  return "border border-gray-200 hover:bg-gray-50";
 }
 
 function previewClasses(session: SessionSummary): string {

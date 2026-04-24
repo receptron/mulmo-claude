@@ -1,13 +1,17 @@
 <template>
+  <!-- Right-edge hover handle for the session-history side panel.
+       Hidden until the parent (marked with Tailwind `group`) is
+       hovered or contains focus, so the expand affordance stays
+       reachable by keyboard/touch without cluttering the header. -->
   <button
-    class="flex items-center justify-center w-8 h-8 rounded text-gray-400 hover:text-gray-700 transition-colors hover:bg-gray-100"
+    class="absolute top-0 bottom-0 right-0 flex items-center justify-center w-6 bg-gray-400/30 text-gray-700 hover:bg-gray-400/50 transition-opacity opacity-0 group-hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
     :title="modelValue ? t('sessionHistoryExpand.collapseTooltip') : t('sessionHistoryExpand.expandTooltip')"
     :aria-label="modelValue ? t('sessionHistoryExpand.collapse') : t('sessionHistoryExpand.expand')"
     :aria-pressed="modelValue"
     :data-testid="`session-history-expand-${modelValue ? 'on' : 'off'}`"
     @click="emit('update:modelValue', !modelValue)"
   >
-    <span class="material-icons text-lg" aria-hidden="true">{{ modelValue ? "close_fullscreen" : "open_in_full" }}</span>
+    <span class="material-icons" style="font-size: 40px" aria-hidden="true">{{ modelValue ? "arrow_left" : "arrow_right" }}</span>
   </button>
 </template>
 

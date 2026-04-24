@@ -1,13 +1,12 @@
 <template>
   <button
-    class="flex items-center justify-center w-8 h-8 rounded transition-colors hover:bg-gray-100"
-    :class="isStack ? 'text-blue-500' : 'text-gray-400 hover:text-gray-700'"
+    class="flex items-center justify-center w-8 h-8 rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
     :title="isStack ? t('canvasViewToggle.stackViewTooltip') : t('canvasViewToggle.singleViewTooltip')"
     :aria-label="isStack ? t('canvasViewToggle.switchToSingle') : t('canvasViewToggle.switchToStack')"
     :data-testid="`canvas-view-toggle-${modelValue}`"
     @click="emit('update:modelValue', isStack ? LAYOUT_MODES.single : LAYOUT_MODES.stack)"
   >
-    <span class="material-icons text-lg">view_agenda</span>
+    <span class="material-symbols-outlined text-lg" aria-hidden="true">{{ isStack ? "auto_awesome_motion" : "crop_square" }}</span>
   </button>
 </template>
 

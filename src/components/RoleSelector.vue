@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-2 relative w-56 shrink-0">
+  <div class="flex items-center gap-2 relative" :class="fluid ? 'min-w-0 flex-1' : 'w-56 shrink-0'">
     <button
       ref="button"
       class="flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 hover:bg-gray-50 text-left"
@@ -34,6 +34,7 @@ import { useClickOutside } from "../composables/useClickOutside";
 const props = defineProps<{
   roles: Role[];
   currentRoleId: string;
+  fluid?: boolean;
 }>();
 
 const emit = defineEmits<{
