@@ -355,18 +355,8 @@ const { markSessionRead } = useSessionSync({
 });
 const { geminiAvailable, sandboxEnabled, cpuLoadRatio, fetchHealth } = useHealth();
 
-const {
-  activeSession,
-  toolResults,
-  sidebarResults,
-  currentSummary,
-  isRunning,
-  activeSessionRunning,
-  statusMessage,
-  toolCallHistory,
-  activeSessionCount,
-  unreadCount,
-} = useSessionDerived({ sessionMap, currentSessionId, sessions });
+const { activeSession, toolResults, sidebarResults, isRunning, activeSessionRunning, statusMessage, toolCallHistory, activeSessionCount, unreadCount } =
+  useSessionDerived({ sessionMap, currentSessionId, sessions });
 
 const { selectedResultUuid } = useSelectedResult({
   activeSession,
@@ -389,10 +379,10 @@ const sessionRoleIcon = computed(() => {
 });
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
-// `unreadCount` covers every session (not just the active tab), so
-// the favicon badge lights up when a background session gets a new
-// reply even though the user is looking at a different session.
-useFaviconState({ isRunning, currentSummary, activeSession, sessionsUnreadCount: unreadCount, cpuLoadRatio });
+// Every input here is global, not per-on-screen-session: the user
+// is often on /files or other non-chat views, so the favicon has
+// to react to the whole session list rather than `activeSession`.
+useFaviconState({ isRunning, sessions, sessionsUnreadCount: unreadCount, cpuLoadRatio });
 
 const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
