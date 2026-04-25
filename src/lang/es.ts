@@ -460,6 +460,17 @@ const esMessages = {
     initialLoading: "Cargando fuentes…",
     initialLoadFailed: "No se pudieron cargar las fuentes.",
     retryLabel: "Reintentar",
+    filter: {
+      all: "Todas",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "Diario",
+      scheduleWeekly: "Semanal",
+      scheduleManual: "Manual",
+      noMatching: "No hay fuentes que coincidan con el filtro actual.",
+      clearFilter: "Quitar filtro",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "Eliminar esta skill de proyecto",

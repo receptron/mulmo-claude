@@ -454,6 +454,17 @@ const zhMessages = {
     initialLoading: "正在加载信息源…",
     initialLoadFailed: "加载信息源失败。",
     retryLabel: "重试",
+    filter: {
+      all: "全部",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "每日",
+      scheduleWeekly: "每周",
+      scheduleManual: "手动",
+      noMatching: "没有匹配当前筛选条件的信息源。",
+      clearFilter: "清除筛选",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "删除此项目级技能",

@@ -455,6 +455,17 @@ const frMessages = {
     initialLoading: "Chargement des sources…",
     initialLoadFailed: "Impossible de charger les sources.",
     retryLabel: "Réessayer",
+    filter: {
+      all: "Toutes",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "Quotidien",
+      scheduleWeekly: "Hebdomadaire",
+      scheduleManual: "Manuel",
+      noMatching: "Aucune source ne correspond au filtre actuel.",
+      clearFilter: "Effacer le filtre",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "Supprimer cette skill de projet",
