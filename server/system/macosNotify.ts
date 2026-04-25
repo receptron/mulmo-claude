@@ -1,24 +1,27 @@
 // macOS Reminder notification sink (#789).
 //
-// When `MACOS_REMINDER_NOTIFICATIONS=1` and the host is darwin, every
-// `publishNotification()` call in `server/events/notifications.ts`
-// also creates a reminder in the user's default Reminders list. The
-// iCloud Reminders sync then mirrors the entry to the user's iPhone,
-// which delivers the system notification.
+// On darwin, every `publishNotification()` call in
+// `server/events/notifications.ts` also creates a reminder in the
+// user's default Reminders list. The iCloud Reminders sync then
+// mirrors the entry to the user's iPhone, which delivers the
+// system notification.
+//
+// **Opt-out, on by default on darwin.** Set
+// `DISABLE_MACOS_REMINDER_NOTIFICATIONS=1` to silence the sink
+// (e.g. on a shared dev machine where the iPhone owner shouldn't
+// be pinged). On non-darwin platforms the sink is a silent no-op
+// regardless of env.
 //
 // Design notes:
-// - Title / body are passed via environment variables that the
-//   AppleScript reads through `system attribute`. This sidesteps any
-//   AppleScript-string escaping concern (no quoting, no backslash
-//   handling — the script never sees the literal user text).
+// - Title / body are passed as `argv` (after osascript's `--`
+//   separator). Going through argv rather than `system attribute`
+//   sidesteps the UTF-8 garbling that `system attribute` exhibits
+//   on multi-byte input (#789 follow-up).
 // - Failures (osascript not found, Reminders.app permission denied,
 //   non-zero exit) log a warn and resolve. They MUST NOT throw —
 //   `publishNotification` itself wraps every sink in try/catch but
 //   we keep the local guarantee here too so future call-sites can't
 //   trip on it.
-// - Non-darwin platforms log a single warn at first call, then
-//   no-op forever. Spamming once per notification would drown out
-//   real logs.
 
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { env } from "./env.js";
@@ -54,35 +57,27 @@ export type Spawner = (command: string, args: readonly string[], options: SpawnO
 interface Deps {
   spawner: Spawner;
   platform: Platform;
-  enabled: boolean;
+  // Opt-out flag (#789): on darwin the sink is enabled by default.
+  // Set DISABLE_MACOS_REMINDER_NOTIFICATIONS=1 to silence it.
+  disabled: boolean;
 }
 
 const defaultDeps: Deps = {
   spawner: spawn,
   platform: process.platform as Platform,
-  enabled: env.macosReminderNotifications,
+  disabled: env.disableMacosReminderNotifications,
 };
-
-let nonDarwinWarned = false;
 
 export function pushToMacosReminder(title: string, body?: string): Promise<void> {
   return pushToMacosReminderWithDeps(defaultDeps, title, body);
 }
 
 // Internal — exposed for tests. Lets the test suite inject a fake
-// spawn / platform / enabled triple without touching real env or
+// spawn / platform / disabled triple without touching real env or
 // firing real subprocesses.
 export function pushToMacosReminderWithDeps(deps: Deps, title: string, body?: string): Promise<void> {
-  if (!deps.enabled) return Promise.resolve();
-  if (deps.platform !== "darwin") {
-    if (!nonDarwinWarned) {
-      log.warn("macos-notify", "MACOS_REMINDER_NOTIFICATIONS is set but platform is not darwin — sink is disabled", {
-        platform: deps.platform,
-      });
-      nonDarwinWarned = true;
-    }
-    return Promise.resolve();
-  }
+  if (deps.platform !== "darwin") return Promise.resolve();
+  if (deps.disabled) return Promise.resolve();
 
   return new Promise((resolve) => {
     let child: ChildProcess;
@@ -119,9 +114,4 @@ export function pushToMacosReminderWithDeps(deps: Deps, title: string, body?: st
       resolve();
     });
   });
-}
-
-// Test-only reset hook for the platform-warn guard.
-export function _resetWarnFlagForTest(): void {
-  nonDarwinWarned = false;
 }

@@ -88,10 +88,13 @@ export const env = Object.freeze({
 
   // macOS Reminder notification sink (#789). Darwin-only; iCloud
   // Reminders sync mirrors the entry to the user's iPhone, which
-  // delivers the system notification. No-op on other platforms
-  // (logs a single warn at first call). Off by default to avoid
-  // surprising new users with a Reminders permission prompt.
-  macosReminderNotifications: asFlag(process.env.MACOS_REMINDER_NOTIFICATIONS),
+  // delivers the system notification. **On by default** on macOS —
+  // first run will prompt the user for Reminders.app access, which
+  // is the right place to consent. Set
+  // `DISABLE_MACOS_REMINDER_NOTIFICATIONS=1` to opt out (e.g. for
+  // a shared dev box where the iPhone owner shouldn't get pinged).
+  // Mirrors the `DISABLE_SANDBOX` convention.
+  disableMacosReminderNotifications: asFlag(process.env.DISABLE_MACOS_REMINDER_NOTIFICATIONS),
 
   // MulmoBridge Relay (#520). Optional — when both are set the server
   // connects to the Relay via WebSocket and forwards bridge messages.
