@@ -276,4 +276,65 @@ test.describe("/sources page", () => {
     await expect(page.getByTestId(`source-row-${SOURCE_A.slug}`)).toBeHidden();
     expect(state.sources.find((source) => source.slug === SOURCE_A.slug)).toBeUndefined();
   });
+
+  // Filter chips (#768). These tests cover the chip group's
+  // single-select + count-badge + clear-filter contract end-to-end.
+  // The pure predicate is unit-tested in test/utils/sources/test_filter.ts;
+  // here we just verify the UI wiring around it (visibility, active-state,
+  // empty fallback).
+  test("filter chips show kind and schedule buckets, single-select narrows the list", async ({ page }) => {
+    const sourceRss1 = makeSource("rss-one", "RSS One", "https://example.com/rss-1");
+    const sourceRss2 = makeSource("rss-two", "RSS Two", "https://example.com/rss-2");
+    const sourceGithub: MockSource = {
+      ...makeSource("gh-rel", "GH releases", "https://github.com/owner/repo"),
+      fetcherKind: "github-releases",
+      fetcherParams: { owner: "owner", repo: "repo" },
+      schedule: "weekly",
+    };
+    const sourceArxiv: MockSource = {
+      ...makeSource("arxiv-cl", "arXiv cs.CL", "https://arxiv.org/api?cat=cs.CL"),
+      fetcherKind: "arxiv",
+      fetcherParams: { query: "cat:cs.CL" },
+      schedule: "manual",
+    };
+    await installSourcesMocks(page, [sourceRss1, sourceRss2, sourceGithub, sourceArxiv]);
+    await page.goto("/sources");
+
+    // Default state: All chip active, all 4 rows visible.
+    await expect(page.getByTestId("sources-filter")).toBeVisible();
+    await expect(page.getByTestId("sources-filter-chip-all")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId(`source-row-${sourceRss1.slug}`)).toBeVisible();
+    await expect(page.getByTestId(`source-row-${sourceGithub.slug}`)).toBeVisible();
+
+    // Click RSS chip → only the two RSS rows remain. github / arxiv hidden.
+    await page.getByTestId("sources-filter-chip-rss").click();
+    await expect(page.getByTestId("sources-filter-chip-rss")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId(`source-row-${sourceRss1.slug}`)).toBeVisible();
+    await expect(page.getByTestId(`source-row-${sourceRss2.slug}`)).toBeVisible();
+    await expect(page.getByTestId(`source-row-${sourceGithub.slug}`)).toBeHidden();
+    await expect(page.getByTestId(`source-row-${sourceArxiv.slug}`)).toBeHidden();
+
+    // Schedule:weekly → only the github source (which is weekly).
+    await page.getByTestId("sources-filter-chip-schedule:weekly").click();
+    await expect(page.getByTestId(`source-row-${sourceGithub.slug}`)).toBeVisible();
+    await expect(page.getByTestId(`source-row-${sourceRss1.slug}`)).toBeHidden();
+
+    // Back to All.
+    await page.getByTestId("sources-filter-chip-all").click();
+    await expect(page.getByTestId(`source-row-${sourceRss1.slug}`)).toBeVisible();
+    await expect(page.getByTestId(`source-row-${sourceGithub.slug}`)).toBeVisible();
+  });
+
+  test("filter chips for buckets with zero matches are hidden", async ({ page }) => {
+    // Only RSS sources registered → arxiv / github / non-daily schedule
+    // chips should not render. The All chip is always present.
+    await installSourcesMocks(page, [SOURCE_A]);
+    await page.goto("/sources");
+
+    await expect(page.getByTestId("sources-filter-chip-all")).toBeVisible();
+    await expect(page.getByTestId("sources-filter-chip-rss")).toBeVisible();
+    await expect(page.getByTestId("sources-filter-chip-arxiv")).toHaveCount(0);
+    await expect(page.getByTestId("sources-filter-chip-github")).toHaveCount(0);
+    await expect(page.getByTestId("sources-filter-chip-schedule:weekly")).toHaveCount(0);
+  });
 });

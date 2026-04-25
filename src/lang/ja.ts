@@ -458,6 +458,17 @@ const jaMessages = {
     initialLoading: "ソース一覧を読み込み中…",
     initialLoadFailed: "ソース一覧の読み込みに失敗しました。",
     retryLabel: "再試行",
+    filter: {
+      all: "すべて",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "毎日",
+      scheduleWeekly: "毎週",
+      scheduleManual: "手動",
+      noMatching: "現在のフィルタに一致するソースはありません。",
+      clearFilter: "フィルタを解除",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "このプロジェクト限定スキルを削除",

@@ -453,6 +453,17 @@ const ptBRMessages = {
     initialLoading: "Carregando fontes…",
     initialLoadFailed: "Falha ao carregar fontes.",
     retryLabel: "Tentar novamente",
+    filter: {
+      all: "Todas",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "Diário",
+      scheduleWeekly: "Semanal",
+      scheduleManual: "Manual",
+      noMatching: "Nenhuma fonte corresponde ao filtro atual.",
+      clearFilter: "Limpar filtro",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "Excluir esta skill de projeto",

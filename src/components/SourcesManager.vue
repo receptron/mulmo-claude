@@ -134,50 +134,96 @@
           </button>
         </div>
       </div>
-      <ul v-else class="divide-y divide-gray-100 border-b border-gray-100">
-        <li
-          v-for="source in sources"
-          :key="source.slug"
-          class="px-4 py-3 flex items-start gap-3"
-          :class="{
-            'bg-amber-50': source.slug === highlightSlug,
-          }"
-          :data-testid="`source-row-${source.slug}`"
+      <template v-else>
+        <!-- Filter chip row (#768). Hidden when no sources are
+             registered — the empty/preset state above already owns
+             the screen. Single-select; clicking a chip replaces the
+             active filter rather than toggling. -->
+        <div
+          v-if="sources.length > 0"
+          class="px-4 py-2 border-b border-gray-100 flex flex-wrap items-center gap-1.5 shrink-0"
+          data-testid="sources-filter"
+          role="toolbar"
+          :aria-label="t('pluginManageSource.filter.all')"
         >
-          <span class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 mt-0.5 shrink-0" :class="kindBadgeClass(source.fetcherKind)">
-            {{ kindLabel(source.fetcherKind) }}
-          </span>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-baseline gap-2">
-              <a :href="source.url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-blue-700 hover:underline truncate">
-                {{ source.title }}
-              </a>
-              <code class="text-[11px] text-gray-400 shrink-0">
-                {{ source.slug }}
-              </code>
-            </div>
-            <div class="text-xs text-gray-500 truncate">
-              {{ source.url }}
-            </div>
-            <div v-if="source.categories.length > 0" class="mt-1 flex flex-wrap gap-1">
-              <span v-for="cat in source.categories" :key="cat" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-                {{ cat }}
-              </span>
-            </div>
-            <div v-if="source.notes" class="mt-1 text-xs text-gray-600 italic">
-              {{ source.notes }}
-            </div>
-          </div>
           <button
-            class="text-xs text-red-600 hover:text-red-800 shrink-0 disabled:opacity-50"
-            :disabled="busy === source.slug"
-            :data-testid="`source-remove-${source.slug}`"
-            @click="remove(source.slug)"
+            v-for="key in visibleFilterKeys"
+            :key="key"
+            class="text-[11px] px-2 py-0.5 rounded-full border transition-colors"
+            :class="filterKey === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            :data-testid="`sources-filter-chip-${key}`"
+            :aria-pressed="filterKey === key"
+            @click="selectFilter(key)"
           >
-            {{ busy === source.slug ? t("pluginManageSource.removingLabel") : t("pluginManageSource.removeLabel") }}
+            {{ filterChipLabel(key) }}
+            <span class="ml-1 text-[10px] opacity-80">{{ filterCounts[key] }}</span>
           </button>
-        </li>
-      </ul>
+        </div>
+
+        <!-- Filter-only empty state. Distinct from the no-sources
+             empty state above: here the user has registered sources
+             but the active chip has zero matches — offer a single
+             "Clear filter" affordance. -->
+        <div
+          v-if="sources.length > 0 && filteredSources.length === 0"
+          class="flex flex-col items-center justify-center p-6 gap-3"
+          data-testid="sources-filter-empty"
+        >
+          <span class="text-sm text-gray-500 italic">{{ t("pluginManageSource.filter.noMatching") }}</span>
+          <button
+            class="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+            data-testid="sources-filter-clear"
+            @click="clearFilter"
+          >
+            {{ t("pluginManageSource.filter.clearFilter") }}
+          </button>
+        </div>
+
+        <ul v-if="filteredSources.length > 0" class="divide-y divide-gray-100 border-b border-gray-100">
+          <li
+            v-for="source in filteredSources"
+            :key="source.slug"
+            class="px-4 py-3 flex items-start gap-3"
+            :class="{
+              'bg-amber-50': source.slug === highlightSlug,
+            }"
+            :data-testid="`source-row-${source.slug}`"
+          >
+            <span class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 mt-0.5 shrink-0" :class="kindBadgeClass(source.fetcherKind)">
+              {{ kindLabel(source.fetcherKind) }}
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2">
+                <a :href="source.url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-blue-700 hover:underline truncate">
+                  {{ source.title }}
+                </a>
+                <code class="text-[11px] text-gray-400 shrink-0">
+                  {{ source.slug }}
+                </code>
+              </div>
+              <div class="text-xs text-gray-500 truncate">
+                {{ source.url }}
+              </div>
+              <div v-if="source.categories.length > 0" class="mt-1 flex flex-wrap gap-1">
+                <span v-for="cat in source.categories" :key="cat" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                  {{ cat }}
+                </span>
+              </div>
+              <div v-if="source.notes" class="mt-1 text-xs text-gray-600 italic">
+                {{ source.notes }}
+              </div>
+            </div>
+            <button
+              class="text-xs text-red-600 hover:text-red-800 shrink-0 disabled:opacity-50"
+              :disabled="busy === source.slug"
+              :data-testid="`source-remove-${source.slug}`"
+              @click="remove(source.slug)"
+            >
+              {{ busy === source.slug ? t("pluginManageSource.removingLabel") : t("pluginManageSource.removeLabel") }}
+            </button>
+          </li>
+        </ul>
+      </template>
 
       <!-- Today's brief. Auto-fetched on mount and refreshed after
            every Rebuild. Rendered as markdown so lists / headings
@@ -225,6 +271,7 @@ import DOMPurify from "dompurify";
 import type { ManageSourceData, RebuildSummary, Source } from "../plugins/manageSource/index";
 import { apiGet, apiPost, apiDelete } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { SOURCE_FILTER_KEYS, countByFilter, matchesSourceFilter, type SourceFilterKey } from "../utils/sources/filter";
 
 const { t } = useI18n();
 
@@ -562,6 +609,45 @@ async function rebuildInline(): Promise<void> {
 
 const sources = computed<Source[]>(() => localSources.value ?? []);
 const highlightSlug = computed(() => highlightSlugLocal.value);
+
+// Filter chip state (#768). Single-select. `all` is the implicit
+// default; clicking a chip replaces the active filter rather than
+// toggling — the chip group is mutually exclusive across kind and
+// schedule, so users always see the current bucket without
+// remembering compound state.
+const filterKey = ref<SourceFilterKey>("all");
+const filteredSources = computed<Source[]>(() => sources.value.filter((source) => matchesSourceFilter(source, filterKey.value)));
+const filterCounts = computed(() => countByFilter(sources.value));
+// Hide chips for buckets that match zero sources so the chip row
+// stays compact. `all` is always shown — it's the reset target.
+const visibleFilterKeys = computed<readonly SourceFilterKey[]>(() => SOURCE_FILTER_KEYS.filter((key) => key === "all" || filterCounts.value[key] > 0));
+
+function filterChipLabel(key: SourceFilterKey): string {
+  switch (key) {
+    case "all":
+      return t("pluginManageSource.filter.all");
+    case "rss":
+      return t("pluginManageSource.filter.rss");
+    case "github":
+      return t("pluginManageSource.filter.github");
+    case "arxiv":
+      return t("pluginManageSource.filter.arxiv");
+    case "schedule:daily":
+      return t("pluginManageSource.filter.scheduleDaily");
+    case "schedule:weekly":
+      return t("pluginManageSource.filter.scheduleWeekly");
+    case "schedule:manual":
+      return t("pluginManageSource.filter.scheduleManual");
+  }
+}
+
+function selectFilter(key: SourceFilterKey): void {
+  filterKey.value = key;
+}
+
+function clearFilter(): void {
+  filterKey.value = "all";
+}
 
 // Re-seed local state when the plugin caller switches to a different
 // tool result (initialData identity changes). Plugin-only — page mode

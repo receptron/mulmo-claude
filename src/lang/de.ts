@@ -455,6 +455,17 @@ const deMessages = {
     initialLoading: "Quellen werden geladen…",
     initialLoadFailed: "Quellen konnten nicht geladen werden.",
     retryLabel: "Erneut versuchen",
+    filter: {
+      all: "Alle",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "Täglich",
+      scheduleWeekly: "Wöchentlich",
+      scheduleManual: "Manuell",
+      noMatching: "Keine Quellen passen zum aktuellen Filter.",
+      clearFilter: "Filter zurücksetzen",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "Diese Projekt-Skill löschen",

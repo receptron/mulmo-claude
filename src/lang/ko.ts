@@ -458,6 +458,17 @@ const koMessages = {
     initialLoading: "소스를 불러오는 중…",
     initialLoadFailed: "소스를 불러오지 못했습니다.",
     retryLabel: "다시 시도",
+    filter: {
+      all: "전체",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "매일",
+      scheduleWeekly: "매주",
+      scheduleManual: "수동",
+      noMatching: "현재 필터와 일치하는 소스가 없습니다.",
+      clearFilter: "필터 해제",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "이 프로젝트 스킬 삭제",

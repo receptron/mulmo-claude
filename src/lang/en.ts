@@ -474,6 +474,17 @@ const enMessages = {
     initialLoading: "Loading sources…",
     initialLoadFailed: "Failed to load sources.",
     retryLabel: "Retry",
+    filter: {
+      all: "All",
+      rss: "RSS",
+      github: "GitHub",
+      arxiv: "arXiv",
+      scheduleDaily: "Daily",
+      scheduleWeekly: "Weekly",
+      scheduleManual: "Manual",
+      noMatching: "No sources match the current filter.",
+      clearFilter: "Clear filter",
+    },
   },
   pluginManageSkills: {
     deleteProjectSkill: "Delete this project-scope skill",
