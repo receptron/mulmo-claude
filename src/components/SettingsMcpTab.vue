@@ -6,6 +6,70 @@
       <template #tsx><code class="bg-gray-100 px-1 rounded">tsx</code></template>
     </i18n-t>
 
+    <!-- Catalog (#823 Phase 1) — checkbox install for curated MCP servers.
+         Phase 1 ships only config-free entries; per-server config (api keys
+         etc.) lands in Phase 2. -->
+    <section data-testid="mcp-catalog" class="space-y-2 pt-1">
+      <h3 class="text-xs font-semibold text-gray-700">{{ t("settingsMcpTab.catalog.heading") }}</h3>
+
+      <details class="group" open data-testid="mcp-catalog-audience-general">
+        <summary class="cursor-pointer text-xs font-medium text-gray-700 select-none py-1">
+          {{ t("settingsMcpTab.catalog.audience.general") }}
+          <span class="text-gray-400 ml-1">({{ generalEntries.length }})</span>
+        </summary>
+        <ul class="mt-2 space-y-2">
+          <li
+            v-for="entry in generalEntries"
+            :key="entry.id"
+            :data-testid="`mcp-catalog-entry-${entry.id}`"
+            class="border border-gray-200 rounded p-3 space-y-1.5"
+          >
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                :checked="isInstalled(entry.id)"
+                :data-testid="`mcp-catalog-toggle-${entry.id}`"
+                class="mt-1 shrink-0"
+                @change="onCatalogToggle(entry, $event)"
+              />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-sm font-semibold text-gray-800">{{ t(entry.displayName) }}</span>
+                  <span class="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5" :class="riskBadgeClass(entry.riskLevel)">
+                    {{ t(`settingsMcpTab.catalog.risk.${entry.riskLevel}`) }}
+                  </span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5">{{ t(entry.description) }}</p>
+              </div>
+            </label>
+            <div class="text-[11px] text-gray-500 flex flex-wrap gap-x-3 ml-6">
+              <a
+                :href="entry.upstreamUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-blue-600 hover:underline"
+                :data-testid="`mcp-catalog-upstream-${entry.id}`"
+                v-text="t('settingsMcpTab.catalog.upstream')"
+              ></a>
+              <a
+                v-if="entry.setupGuideUrl"
+                :href="entry.setupGuideUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-blue-600 hover:underline"
+                :data-testid="`mcp-catalog-setup-${entry.id}`"
+                v-text="t('settingsMcpTab.catalog.setupGuide')"
+              ></a>
+            </div>
+          </li>
+        </ul>
+      </details>
+    </section>
+
+    <hr class="border-gray-200" />
+
+    <h3 class="text-xs font-semibold text-gray-700">{{ t("settingsMcpTab.customHeading") }}</h3>
+
     <div v-if="servers.length === 0" class="text-xs text-gray-500 italic" data-testid="mcp-empty">{{ t("settingsMcpTab.noServers") }}</div>
 
     <ul v-else class="space-y-2" data-testid="mcp-server-list">
@@ -145,32 +209,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
 // UI-local representation of a configured server. Matches
-// server/config.ts#McpServerEntry. Re-declared here to avoid a
-// cross-module type import from the server package.
-export interface HttpSpec {
-  type: "http";
-  url: string;
-  headers?: Record<string, string>;
-  enabled?: boolean;
-}
-export interface StdioSpec {
-  type: "stdio";
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  enabled?: boolean;
-}
-export type ServerSpec = HttpSpec | StdioSpec;
-export interface McpServerEntry {
-  id: string;
-  spec: ServerSpec;
-}
+// server/config.ts#McpServerEntry. Re-declared in src/config/mcpTypes.ts
+// to avoid a cross-module type import from the server package.
+import { type HttpSpec, type StdioSpec, type McpServerSpec, type McpServerEntry } from "../config/mcpTypes";
+import { MCP_CATALOG, type McpCatalogEntry } from "../config/mcpCatalog";
+
+// Re-exported for callers that imported these from the SFC before the
+// types moved out (#823 Phase 1).
+export type { HttpSpec, StdioSpec, McpServerSpec, McpServerEntry };
+/** @deprecated alias kept for the previous SFC-local name. */
+export type ServerSpec = McpServerSpec;
 
 interface Props {
   servers: McpServerEntry[];
@@ -195,6 +249,38 @@ interface DraftState {
 const adding = ref(false);
 const draft = ref<DraftState>(emptyDraft());
 const draftError = ref("");
+
+// ── Catalog (#823 Phase 1) ─────────────────────────────────────
+//
+// Catalog membership is derived from `props.servers`: a checkbox is
+// "on" iff a custom server with the same id already exists. Toggle
+// emits `add` (with the catalog spec) or `remove` (by index) — the
+// parent owns persistence.
+//
+// Phase 1 only renders General audience. Developer entries are
+// out-of-band until Phase 3.
+
+const generalEntries = computed(() => MCP_CATALOG.filter((entry) => entry.audience === "general"));
+
+function isInstalled(serverId: string): boolean {
+  return props.servers.some((server) => server.id === serverId);
+}
+
+function onCatalogToggle(entry: McpCatalogEntry, event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  if (checked) {
+    emit("add", { id: entry.id, spec: { ...entry.spec, enabled: true } });
+    return;
+  }
+  const idx = props.servers.findIndex((server) => server.id === entry.id);
+  if (idx >= 0) emit("remove", idx);
+}
+
+function riskBadgeClass(level: McpCatalogEntry["riskLevel"]): string {
+  if (level === "low") return "bg-green-100 text-green-700";
+  if (level === "medium") return "bg-amber-100 text-amber-700";
+  return "bg-red-100 text-red-700";
+}
 
 function emptyDraft(): DraftState {
   return { id: "", type: "http", url: "", command: "npx", argsText: "" };

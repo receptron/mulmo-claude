@@ -232,6 +232,44 @@ const zhMessages = {
     errIdExists: '服务器 id "{id}" 已存在。',
     errBadHttpUrl: "HTTP URL 必须以 http:// 或 https:// 开头",
     pendingEntryWarning: "请先完成或取消待处理的 MCP 服务器条目。",
+    customHeading: "自定义服务器",
+    catalog: {
+      heading: "预设 MCP 服务器",
+      audience: { general: "🟢 通用", developer: "🔵 开发者" },
+      risk: { low: "低", medium: "中", high: "高" },
+      upstream: "📦 源",
+      setupGuide: "📚 设置",
+      entry: {
+        memory: {
+          displayName: "记忆",
+          description: "让 Claude 在会话之间记住对话内容。",
+        },
+        sequentialThinking: {
+          displayName: "顺序思考",
+          description: "帮助 Claude 一步一步地解决复杂问题。",
+        },
+        appleReminders: {
+          displayName: "Apple 提醒事项",
+          description: "在 macOS 提醒事项 App 中读写提醒。",
+        },
+        appleCalendar: {
+          displayName: "Apple 日历",
+          description: "在 macOS 日历 App 中读写事件。",
+        },
+        appleNotes: {
+          displayName: "Apple 备忘录",
+          description: "在 macOS 备忘录 App 中读写笔记。",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "控制 macOS Music App 的播放与搜索。",
+        },
+        screenshot: {
+          displayName: "截图",
+          description: "捕获屏幕为 Claude 可读取的图像。",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "上一个",

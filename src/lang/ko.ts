@@ -236,6 +236,44 @@ const koMessages = {
     errIdExists: '서버 id "{id}" 는 이미 존재합니다.',
     errBadHttpUrl: "HTTP URL 은 http:// 또는 https:// 로 시작해야 합니다",
     pendingEntryWarning: "대기 중인 MCP 서버 항목을 완료하거나 취소하세요.",
+    customHeading: "사용자 정의 서버",
+    catalog: {
+      heading: "사전 설정된 MCP 서버",
+      audience: { general: "🟢 일반", developer: "🔵 개발자" },
+      risk: { low: "낮음", medium: "중간", high: "높음" },
+      upstream: "📦 소스",
+      setupGuide: "📚 설정",
+      entry: {
+        memory: {
+          displayName: "메모리",
+          description: "Claude 가 세션을 넘어 대화 내용을 기억합니다.",
+        },
+        sequentialThinking: {
+          displayName: "단계별 사고",
+          description: "복잡한 문제를 단계별로 해결하도록 돕습니다.",
+        },
+        appleReminders: {
+          displayName: "Apple 미리 알림",
+          description: "macOS 미리 알림 앱의 항목을 읽고 씁니다.",
+        },
+        appleCalendar: {
+          displayName: "Apple 캘린더",
+          description: "macOS 캘린더 앱의 일정을 읽고 씁니다.",
+        },
+        appleNotes: {
+          displayName: "Apple 메모",
+          description: "macOS 메모 앱의 메모를 읽고 씁니다.",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "macOS Music 앱의 재생 제어와 검색.",
+        },
+        screenshot: {
+          displayName: "스크린샷",
+          description: "화면을 Claude 가 읽을 수 있는 이미지로 캡처합니다.",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "이전",

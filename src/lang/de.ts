@@ -232,6 +232,44 @@ const deMessages = {
     errIdExists: 'Die Server-ID "{id}" existiert bereits.',
     errBadHttpUrl: "Die HTTP-URL muss mit http:// oder https:// beginnen",
     pendingEntryWarning: "Schließen Sie den ausstehenden MCP-Servereintrag zuerst ab oder brechen Sie ihn ab.",
+    customHeading: "Benutzerdefinierte Server",
+    catalog: {
+      heading: "Vorkonfigurierte MCP-Server",
+      audience: { general: "🟢 Allgemein", developer: "🔵 Entwickler" },
+      risk: { low: "niedrig", medium: "mittel", high: "hoch" },
+      upstream: "📦 Quelle",
+      setupGuide: "📚 Einrichtung",
+      entry: {
+        memory: {
+          displayName: "Memory",
+          description: "Lässt Claude den Gesprächskontext über Sitzungen hinweg merken.",
+        },
+        sequentialThinking: {
+          displayName: "Sequenzielles Denken",
+          description: "Hilft Claude, komplexe Probleme schrittweise zu lösen.",
+        },
+        appleReminders: {
+          displayName: "Apple Erinnerungen",
+          description: "Erinnerungen in der macOS-Erinnerungen-App lesen und schreiben.",
+        },
+        appleCalendar: {
+          displayName: "Apple Kalender",
+          description: "Termine in der macOS-Kalender-App lesen und schreiben.",
+        },
+        appleNotes: {
+          displayName: "Apple Notizen",
+          description: "Notizen in der macOS-Notizen-App lesen und schreiben.",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "Wiedergabe steuern und in der macOS-Music-App suchen.",
+        },
+        screenshot: {
+          displayName: "Bildschirmfoto",
+          description: "Bildschirm als Bild aufnehmen, das Claude lesen kann.",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "Zurück",

@@ -232,6 +232,44 @@ const frMessages = {
     errIdExists: 'L\'identifiant de serveur "{id}" existe déjà.',
     errBadHttpUrl: "L'URL HTTP doit commencer par http:// ou https://",
     pendingEntryWarning: "Terminez ou annulez d'abord l'entrée de serveur MCP en attente.",
+    customHeading: "Serveurs personnalisés",
+    catalog: {
+      heading: "Serveurs MCP préconfigurés",
+      audience: { general: "🟢 Général", developer: "🔵 Développeur" },
+      risk: { low: "faible", medium: "moyen", high: "élevé" },
+      upstream: "📦 Source",
+      setupGuide: "📚 Configuration",
+      entry: {
+        memory: {
+          displayName: "Mémoire",
+          description: "Permet à Claude de se souvenir du contexte entre les sessions.",
+        },
+        sequentialThinking: {
+          displayName: "Pensée séquentielle",
+          description: "Aide Claude à aborder les problèmes complexes étape par étape.",
+        },
+        appleReminders: {
+          displayName: "Rappels Apple",
+          description: "Lire et écrire des rappels dans l'app Rappels de macOS.",
+        },
+        appleCalendar: {
+          displayName: "Calendrier Apple",
+          description: "Lire et écrire des événements dans l'app Calendrier de macOS.",
+        },
+        appleNotes: {
+          displayName: "Notes Apple",
+          description: "Lire et écrire des notes dans l'app Notes de macOS.",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "Contrôler la lecture et rechercher dans l'app Musique de macOS.",
+        },
+        screenshot: {
+          displayName: "Capture d'écran",
+          description: "Capturer l'écran comme une image que Claude peut lire.",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "Précédent",

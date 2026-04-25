@@ -231,6 +231,44 @@ const ptBRMessages = {
     errIdExists: 'O id de servidor "{id}" já existe.',
     errBadHttpUrl: "A URL HTTP deve começar com http:// ou https://",
     pendingEntryWarning: "Conclua ou cancele primeiro a entrada de servidor MCP pendente.",
+    customHeading: "Servidores personalizados",
+    catalog: {
+      heading: "Servidores MCP pré-configurados",
+      audience: { general: "🟢 Geral", developer: "🔵 Desenvolvedor" },
+      risk: { low: "baixo", medium: "médio", high: "alto" },
+      upstream: "📦 Origem",
+      setupGuide: "📚 Configuração",
+      entry: {
+        memory: {
+          displayName: "Memória",
+          description: "Permite que o Claude lembre o contexto entre sessões.",
+        },
+        sequentialThinking: {
+          displayName: "Pensamento sequencial",
+          description: "Ajuda o Claude a resolver problemas complexos passo a passo.",
+        },
+        appleReminders: {
+          displayName: "Lembretes da Apple",
+          description: "Ler e escrever lembretes no app Lembretes do macOS.",
+        },
+        appleCalendar: {
+          displayName: "Calendário da Apple",
+          description: "Ler e escrever eventos no app Calendário do macOS.",
+        },
+        appleNotes: {
+          displayName: "Notas da Apple",
+          description: "Ler e escrever notas no app Notas do macOS.",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "Controlar a reprodução e buscar no app Music do macOS.",
+        },
+        screenshot: {
+          displayName: "Captura de tela",
+          description: "Capturar a tela como imagem que o Claude pode ler.",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "Anterior",

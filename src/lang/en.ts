@@ -252,6 +252,44 @@ const enMessages = {
     errIdExists: 'Server id "{id}" already exists.',
     errBadHttpUrl: "HTTP URL must start with http:// or https://",
     pendingEntryWarning: "Finish or cancel the pending MCP server entry first.",
+    customHeading: "Custom servers",
+    catalog: {
+      heading: "Pre-configured MCP servers",
+      audience: { general: "🟢 General", developer: "🔵 Developer" },
+      risk: { low: "low", medium: "medium", high: "high" },
+      upstream: "📦 Source",
+      setupGuide: "📚 Setup",
+      entry: {
+        memory: {
+          displayName: "Memory",
+          description: "Lets Claude remember conversation context across sessions.",
+        },
+        sequentialThinking: {
+          displayName: "Sequential Thinking",
+          description: "Helps Claude work through multi-step problems by thinking step by step.",
+        },
+        appleReminders: {
+          displayName: "Apple Reminders",
+          description: "Read and write reminders in the macOS Reminders app.",
+        },
+        appleCalendar: {
+          displayName: "Apple Calendar",
+          description: "Read and write events in the macOS Calendar app.",
+        },
+        appleNotes: {
+          displayName: "Apple Notes",
+          description: "Read and write notes in the macOS Notes app.",
+        },
+        appleMusic: {
+          displayName: "Apple Music",
+          description: "Control playback and search the macOS Music app.",
+        },
+        screenshot: {
+          displayName: "Screenshot",
+          description: "Capture the screen as an image Claude can read.",
+        },
+      },
+    },
   },
   pluginScheduler: {
     prev: "Previous",
