@@ -25,6 +25,7 @@ const router = Router();
 // ── List all tasks ──────────────────────────────────────────────
 
 router.get(API_ROUTES.scheduler.tasks, (_req: Request, res: Response) => {
+  log.info("scheduler-tasks", "list: start");
   // getSchedulerTasks() returns system-only tasks (registered via
   // initScheduler at startup — journal, chat-index, sources, etc.).
   // origin: "system" is correct, not an overwrite — these tasks
@@ -32,13 +33,14 @@ router.get(API_ROUTES.scheduler.tasks, (_req: Request, res: Response) => {
   const systemTasks = getSchedulerTasks();
   const userTasks = loadUserTasks();
   const all = [...systemTasks.map((task) => ({ ...task, origin: "system" as const })), ...userTasks.map((task) => ({ ...task, origin: "user" as const }))];
-  log.info("scheduler-tasks", "list ok", { system: systemTasks.length, user: userTasks.length });
+  log.info("scheduler-tasks", "list: ok", { system: systemTasks.length, user: userTasks.length });
   res.json({ tasks: all });
 });
 
 // ── Create user task ────────────────────────────────────────────
 
 router.post(API_ROUTES.scheduler.tasks, async (req: Request, res: Response) => {
+  log.info("scheduler-tasks", "create: start");
   const validated = validateAndCreate(req.body);
   if (validated.kind === "error") {
     log.warn("scheduler-tasks", "create: validation failed", { error: validated.error });
@@ -50,10 +52,10 @@ router.post(API_ROUTES.scheduler.tasks, async (req: Request, res: Response) => {
       tasks: [...tasks, validated.task],
       result: validated.task,
     }));
-    log.info("scheduler-tasks", "create ok", { id: task.id, name: task.name });
+    log.info("scheduler-tasks", "create: ok", { id: task.id, name: task.name });
     res.status(201).json({ task });
   } catch (err) {
-    log.error("scheduler-tasks", "create failed", {
+    log.error("scheduler-tasks", "create: failed", {
       error: String(err),
     });
     serverError(res, "Failed to create task");
@@ -64,6 +66,7 @@ router.post(API_ROUTES.scheduler.tasks, async (req: Request, res: Response) => {
 
 router.put(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, res: Response) => {
   const { id: taskId } = req.params;
+  log.info("scheduler-tasks", "update: start", { taskId });
   try {
     const updated = await withUserTaskLock(async (tasks) => {
       const result = applyUpdate(tasks, taskId, req.body);
@@ -73,14 +76,16 @@ router.put(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, res: 
       const task = result.tasks.find((taskItem) => taskItem.id === taskId);
       return { tasks: result.tasks, result: task };
     });
+    log.info("scheduler-tasks", "update: ok", { taskId });
     res.json({ task: updated });
   } catch (err) {
     const msg = errorMessage(err);
     if (msg.startsWith("task not found") || msg.startsWith("request body")) {
+      log.warn("scheduler-tasks", "update: validation failed", { taskId, reason: msg });
       notFound(res, msg);
       return;
     }
-    log.error("scheduler-tasks", "update failed", { error: msg });
+    log.error("scheduler-tasks", "update: failed", { taskId, error: msg });
     serverError(res, "Failed to update task");
   }
 });
@@ -89,6 +94,7 @@ router.put(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, res: 
 
 router.delete(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, res: Response) => {
   const { id: taskId } = req.params;
+  log.info("scheduler-tasks", "delete: start", { taskId });
   try {
     await withUserTaskLock(async (tasks) => {
       const index = tasks.findIndex((task) => task.id === taskId);
@@ -96,14 +102,16 @@ router.delete(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, re
       const next = tasks.filter((task) => task.id !== taskId);
       return { tasks: next, result: undefined };
     });
+    log.info("scheduler-tasks", "delete: ok", { taskId });
     res.json({ deleted: taskId });
   } catch (err) {
     const msg = errorMessage(err);
     if (msg.startsWith("task not found")) {
+      log.warn("scheduler-tasks", "delete: not found", { taskId });
       notFound(res, msg);
       return;
     }
-    log.error("scheduler-tasks", "delete failed", { error: msg });
+    log.error("scheduler-tasks", "delete: failed", { taskId, error: msg });
     serverError(res, "Failed to delete task");
   }
 });
@@ -112,12 +120,14 @@ router.delete(API_ROUTES.scheduler.task, async (req: Request<{ id: string }>, re
 
 router.post(API_ROUTES.scheduler.taskRun, async (req: Request<{ id: string }>, res: Response) => {
   const { id: taskId } = req.params;
+  log.info("scheduler-tasks", "run: start", { taskId });
   // Check user tasks first
   const userTasks = loadUserTasks();
   const userTask = userTasks.find((task) => task.id === taskId);
   if (userTask) {
     const chatSessionId = makeUuid();
-    log.info("scheduler-tasks", "manual run (user task)", {
+    log.info("scheduler-tasks", "run: user task triggered", {
+      taskId,
       name: userTask.name,
       chatSessionId,
     });
@@ -127,7 +137,8 @@ router.post(API_ROUTES.scheduler.taskRun, async (req: Request<{ id: string }>, r
       chatSessionId,
       origin: SESSION_ORIGINS.scheduler,
     }).catch((err) => {
-      log.error("scheduler-tasks", "manual run failed", {
+      log.error("scheduler-tasks", "run: startChat failed", {
+        taskId,
         error: String(err),
       });
     });
@@ -138,10 +149,12 @@ router.post(API_ROUTES.scheduler.taskRun, async (req: Request<{ id: string }>, r
   const systemTasks = getSchedulerTasks();
   const found = systemTasks.find((task) => task.id === taskId);
   if (!found) {
+    log.warn("scheduler-tasks", "run: not found", { taskId });
     notFound(res, `task not found: ${taskId}`);
     return;
   }
   // System tasks don't have a prompt to startChat with — return 400
+  log.warn("scheduler-tasks", "run: refused (system task)", { taskId });
   badRequest(res, "manual run is only supported for user tasks");
 });
 

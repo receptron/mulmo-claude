@@ -503,7 +503,14 @@ Routes that do anything more than echo state should follow this shape, mirroring
 | Internal exception (we threw, not the SDK) | `error` | input preview + `errorMessage(err)` |
 | External SDK request/response shape | `debug` | only inside the SDK wrapper (`server/utils/gemini.ts` etc.); never inside route files |
 
-Use `previewSnippet` from [`server/utils/logPreview.ts`](../server/utils/logPreview.ts) to clamp prompts / wiki bodies / search queries to 120 chars. **Never log** API keys, bearer tokens, cookies, full prompts, full markdown bodies, or absolute paths that include `/Users/<name>` (use the workspace-relative path instead).
+Two helpers, picked by call-site shape:
+
+| Helper | Use for | Output |
+|---|---|---|
+| [`promptMeta`](../server/utils/promptMeta.ts) | freeform user-supplied prompts / pasted text — anything that could carry credentials, URLs, or PII | `{ length, sha256: <12-hex> }` — fingerprint only |
+| [`previewSnippet`](../server/utils/logPreview.ts) | identifier-shaped fields with grep value (slug, page name, action verb) | first 120 chars + `…` |
+
+Default to `promptMeta` for any field a user types or pastes freely; reserve `previewSnippet` for fields the user picks from a closed set (a slug, an action name) or that the system already constrains (a page name routed through a slugifier). **Never log** API keys, bearer tokens, cookies, full prompts, full markdown bodies, or absolute paths that include `/Users/<name>` (use the workspace-relative path instead).
 
 ### Operational note: hard-to-reproduce error reports
 

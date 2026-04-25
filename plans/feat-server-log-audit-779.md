@@ -23,7 +23,9 @@ When a user reports "this failed with no UI feedback," the first move is `grep` 
    - `daily-refactoring` skill (Phase 3) — add a "try/catch logging" item.
    - `docs/developer.md` — add an operational note: *for hard-to-reproduce error reports, start by auditing the route's log coverage*.
    - Optional `CONTRIBUTING.md` entry if one exists; otherwise developer.md is enough.
-4. **Shared helper**: extract the `previewPrompt` / `previewSnippet` pattern (currently inline in `server/api/routes/image.ts`) into `server/utils/logPreview.ts` so the four new files share one definition. Same 120-char cap, same `…` ellipsis suffix.
+4. **Shared helpers**:
+   - Extract a `previewSnippet` truncate-and-show helper into `server/utils/logPreview.ts`. Same 120-char cap as the original `previewPrompt` in `image.ts`. Used in this PR for **identifier-shaped** fields (wiki slug, page name, action verb) — places where retaining grep value matters.
+   - **Also note**: while this PR was in review, PR #783 landed on main introducing a stricter `promptMeta()` (`{ length, sha256 }`) helper for freeform user prompts, and migrated `image.ts` to it. After the main-merge, `image.ts` no longer uses `previewSnippet`; new prompt logging in subsequent route follow-ups should default to `promptMeta` instead. `previewSnippet` survives for identifier-shaped fields. See `findings.md` § "Helpers in play".
 
 ## Out of scope (tracked as follow-up)
 
