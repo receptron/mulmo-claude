@@ -9,12 +9,14 @@ export interface MarkdownToolData {
 }
 
 /** True when the `markdown` field is a workspace-relative file path
- *  rather than inline content. Covers both the post-#284 canonical
- *  path (`artifacts/documents/*.md`) and the legacy `markdowns/*.md`
- *  prefix for sessions whose jsonl hasn't been migrated yet. */
+ *  rather than inline content. Accepts only the canonical
+ *  `artifacts/documents/*.md` prefix now that server-side
+ *  `isMarkdownPath` agrees. Any legacy `markdowns/*.md` references
+ *  in old session JSONL must be migrated via
+ *  `scripts/migrate-legacy-artifact-paths.ts` (#773). */
 export function isFilePath(value: string): boolean {
   if (!value.endsWith(".md")) return false;
-  return value.startsWith("artifacts/documents/") || value.startsWith("markdowns/");
+  return value.startsWith("artifacts/documents/");
 }
 
 const toolDefinition: ToolDefinition = {

@@ -195,8 +195,11 @@ const loading = ref(false);
 const errorMessage = ref("");
 const resolvedSheets = ref<SpreadsheetSheet[]>([]);
 
+// Accepts only the canonical prefix. Any legacy `spreadsheets/*.json`
+// references in old session JSONL must be migrated via
+// `scripts/migrate-legacy-artifact-paths.ts` (#773).
 function isFilePath(value: unknown): value is string {
-  return typeof value === "string" && (value.startsWith("artifacts/spreadsheets/") || value.startsWith("spreadsheets/")) && value.endsWith(".json");
+  return typeof value === "string" && value.startsWith("artifacts/spreadsheets/") && value.endsWith(".json");
 }
 
 async function fetchSheets(): Promise<void> {
