@@ -141,6 +141,23 @@ RELAY_TOKEN=<same token as step 2>
 | POST   | `/webhook/telegram`    | Telegram webhook (secret token verified)                                                                                       |
 | POST   | `/webhook/teams`       | Microsoft Teams webhook (Azure AD JWT verified, aud = `MICROSOFT_APP_ID`; non-message activities acked 200 without forwarding) |
 
+## Per-platform default role (host-app side)
+
+The MulmoClaude server can pin a different default role per relay platform. Set these env vars on the **host app** (the MulmoClaude process that connects to this Worker — _not_ on the Worker itself):
+
+| Variable                          | Effect                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `RELAY_DEFAULT_ROLE`              | Blanket fallback applied to every relay-routed platform                 |
+| `RELAY_LINE_DEFAULT_ROLE`         | LINE-only override                                                      |
+| `RELAY_WHATSAPP_DEFAULT_ROLE`     | WhatsApp-only override                                                  |
+| `RELAY_MESSENGER_DEFAULT_ROLE`    | Messenger-only override                                                 |
+| `RELAY_GOOGLE_CHAT_DEFAULT_ROLE`  | Google Chat-only override (note `_GOOGLE_CHAT_`, not `_GOOGLE-CHAT_`)   |
+| `RELAY_TEAMS_DEFAULT_ROLE`        | Microsoft Teams-only override                                           |
+
+Per-platform overrides win over the blanket form on conflict. A new chat session opened via a relay-forwarded message starts in the resolved role; existing sessions keep whatever role they were created with. See [#739](https://github.com/receptron/mulmoclaude/issues/739) for the design and `server/events/resolveRelayBridgeOptions.ts` for the implementation.
+
+For symmetry: native bridge processes (e.g. `yarn slack`) use `<TRANSPORT>_BRIDGE_DEFAULT_ROLE` instead — that scrape lives in `@mulmobridge/client`. The two schemes are intentionally parallel; pick the one matching your deployment topology.
+
 ## Security
 
 - **Webhook verification**: Each platform's signature is verified before processing

@@ -13,6 +13,7 @@ import WebSocket from "ws";
 import type { ChatService } from "@mulmobridge/chat-service";
 import { ONE_SECOND_MS } from "../utils/time.js";
 import { errorMessage } from "../utils/errors.js";
+import { resolveRelayBridgeOptions } from "./resolveRelayBridgeOptions.js";
 
 type RelayFn = ChatService["relay"];
 
@@ -188,10 +189,18 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
     const externalChatId = `${msg.platform}__${msg.chatId}`;
 
     try {
+      // Per-platform default-role resolution (#739). Mirrors the
+      // bridges-side handshake (#729): each platform can pin its own
+      // default role via `RELAY_<PLATFORM>_DEFAULT_ROLE`, with
+      // `RELAY_DEFAULT_ROLE` as the blanket fallback. The helper
+      // never forwards `RELAY_TOKEN` / `RELAY_URL` — they aren't on
+      // the recognised-keys allowlist.
+      const bridgeOptions = resolveRelayBridgeOptions(msg.platform, process.env);
       const result = await relay({
         transportId: TRANSPORT_ID,
         externalChatId,
         text: msg.text,
+        bridgeOptions,
       });
 
       const replyText = result.kind === "ok" ? result.reply : `Error: ${result.message}`;
