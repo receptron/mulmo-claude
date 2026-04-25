@@ -669,7 +669,17 @@ async function resumeOrCreateChatSession(): Promise<void> {
 function activateSession(sessionId: string, replace: boolean): void {
   const reactiveSession = sessionMap.get(sessionId);
   if (reactiveSession) ensureSessionSubscription(reactiveSession);
-  navigateToSession(sessionId, replace);
+  // Skip the redundant navigateToSession when we're already on the
+  // matching /chat/:sessionId URL. The route-watcher path arrives
+  // here AFTER the URL has changed (notification permalink, browser
+  // back/forward, manual paste), and re-pushing the same path would
+  // strip query strings — `?result=<uuid>` for the
+  // notification-permalink case (#762) — because navigateToSession
+  // builds the location object with `params` only.
+  const onTargetSession = route.name === PAGE_ROUTES.chat && route.params.sessionId === sessionId;
+  if (!onTargetSession) {
+    navigateToSession(sessionId, replace);
+  }
   // Closing the history popup is no longer explicit — navigating to
   // /chat/:id via navigateToSession changes the route, and the
   // canvas-column branches away from SessionHistoryPanel naturally.
