@@ -16,8 +16,12 @@ export function formatElapsed(elapsedMs: number): string {
   // race never renders "-0s".
   const elapsed = elapsedMs > 0 ? elapsedMs : 0;
   if (elapsed < ONE_SECOND_MS) {
-    const seconds = elapsed / ONE_SECOND_MS;
-    return `${seconds.toFixed(1)}s`;
+    // Floor to one decimal so the badge never reads ahead of the
+    // clock — `toFixed(1)` rounds half-up and would render 999ms as
+    // "1.0s" (Codex iter-1 #798). Keep the integer-second branch's
+    // "floor not round" rule consistent here.
+    const tenths = Math.floor(elapsed / 100);
+    return `${(tenths / 10).toFixed(1)}s`;
   }
   if (elapsed < ONE_MINUTE_MS) {
     return `${Math.floor(elapsed / ONE_SECOND_MS)}s`;

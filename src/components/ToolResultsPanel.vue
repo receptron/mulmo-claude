@@ -45,8 +45,10 @@
         <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
       </div>
 
-      <!-- Thinking indicator -->
-      <div v-if="isRunning" class="px-2 py-1 text-sm">
+      <!-- Thinking indicator. `role="status"` + polite live region so
+           screen readers announce status updates (current tool, elapsed
+           tick) without yanking focus. Codex iter-1 #798 follow-up. -->
+      <div v-if="isRunning" class="px-2 py-1 text-sm" role="status" aria-live="polite">
         <div class="flex items-center gap-2 text-gray-500">
           <span class="text-xs">{{ statusMessage }}</span>
           <span class="flex gap-1">

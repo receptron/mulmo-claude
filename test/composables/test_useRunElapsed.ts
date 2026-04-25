@@ -104,4 +104,26 @@ describe("useRunElapsed", () => {
     assert.equal(result.elapsedMs.value, null);
     dispose();
   });
+
+  it("teardown stops the watcher — a later isRunning flip cannot recreate the timer (Codex iter-1 #798)", async () => {
+    // Pre-fix: teardown only cleared the current interval; the
+    // watcher stayed live, so a subsequent isRunning flip would
+    // recreate the timer and elapsedMs would start updating again
+    // — defeating the "final cleanup" contract of teardown().
+    const isRunning = ref(true);
+    const { result, dispose } = withScope(() => useRunElapsed({ isRunning }));
+    await nextTick();
+    assert.notEqual(result.elapsedMs.value, null);
+    result.teardown();
+    assert.equal(result.elapsedMs.value, null);
+    // Flip isRunning after teardown — watcher must be stopped, so
+    // elapsedMs must STAY null. Pre-fix this would have flipped to
+    // a number again.
+    isRunning.value = false;
+    await nextTick();
+    isRunning.value = true;
+    await nextTick();
+    assert.equal(result.elapsedMs.value, null, "watcher must be stopped after teardown");
+    dispose();
+  });
 });

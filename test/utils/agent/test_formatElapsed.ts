@@ -20,12 +20,17 @@ describe("formatElapsed", () => {
       assert.equal(formatElapsed(333), "0.3s");
     });
 
-    it("rounds 999ms to '1.0s' (boundary still in the sub-second branch)", () => {
-      // 999 / 1000 = 0.999 → toFixed(1) → "1.0". Not ideal but the
-      // alternative (special-case the rounding) costs more than it
-      // saves; the very next tick promotes us to the integer-second
-      // branch anyway.
-      assert.equal(formatElapsed(999), "1.0s");
+    it("floors 999ms to '0.9s' (Codex iter-1 #798 — never read ahead of the clock)", () => {
+      // Pre-fix: this rendered "1.0s" because `toFixed(1)` rounds
+      // half-up. The integer-seconds branch already follows a
+      // floor-not-round rule (see test below); the sub-second branch
+      // is now consistent — 999ms stays "0.9s" until the very next
+      // tick promotes to the integer-second branch.
+      assert.equal(formatElapsed(999), "0.9s");
+    });
+
+    it("floors 950ms to '0.9s' (no half-up rounding into the next tenth)", () => {
+      assert.equal(formatElapsed(950), "0.9s");
     });
   });
 

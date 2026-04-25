@@ -14,7 +14,7 @@
 // background, and the user expects the elapsed counter to keep
 // running across tab switches.
 
-import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
+import { computed, ref, watch, type ComputedRef, type Ref, type WatchStopHandle } from "vue";
 
 const ONE_SECOND_MS = 1000;
 
@@ -29,8 +29,9 @@ export function useRunElapsed(opts: UseRunElapsedOptions): {
   const startedAt = ref<number | null>(null);
   const now = ref(0);
   let interval: ReturnType<typeof setInterval> | null = null;
+  let stopWatch: WatchStopHandle | null = null;
 
-  watch(
+  stopWatch = watch(
     opts.isRunning,
     (running) => {
       if (running) {
@@ -62,6 +63,12 @@ export function useRunElapsed(opts: UseRunElapsedOptions): {
   });
 
   function teardown(): void {
+    // Stop the watcher first — otherwise an isRunning flip after
+    // teardown would recreate the interval (Codex iter-1 #798).
+    if (stopWatch !== null) {
+      stopWatch();
+      stopWatch = null;
+    }
     if (interval !== null) {
       clearInterval(interval);
       interval = null;
