@@ -273,12 +273,15 @@ curl -X POST http://localhost:3001/api/notifications/test \
 
 Body fields (all optional):
 
-| Field          | Default                | Effect                                                                                                |
-| -------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| `message`      | `"Test notification"`  | Text delivered to both targets.                                                                       |
-| `delaySeconds` | `60`, capped at `3600` | Timer length. Non-numeric / NaN falls back to the default; negative clamps to `0`; fractional floors. |
-| `transportId`  | `"cli"`                | Bridge target for `chatService.pushToBridge`.                                                         |
-| `chatId`       | `"notifications"`      | Bridge chat slot.                                                                                     |
+| Field          | Default                | Effect                                                                                                                                  |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `message`      | `"Test notification"`  | Title delivered to both targets.                                                                                                        |
+| `body`         | _(none)_               | Optional second-line body in the bell panel.                                                                                            |
+| `delaySeconds` | `60`, capped at `3600` | Timer length. Non-numeric / NaN falls back to the default; negative clamps to `0`; fractional floors.                                   |
+| `transportId`  | `"cli"`                | Bridge target for `chatService.pushToBridge`.                                                                                           |
+| `chatId`       | `"notifications"`      | Bridge chat slot.                                                                                                                       |
+| `kind`         | `"push"`               | One of `todo` / `scheduler` / `agent` / `journal` / `push` / `bridge`. Drives the bell-panel icon — see `NOTIFICATION_ICONS`.           |
+| `action`       | `{ type: "none" }`     | Permalink target — see [Notification permalinks](#notification-permalinks-762) below. Without this the click in the bell does nothing. |
 
 ### Fan-out at fire time
 
@@ -305,6 +308,52 @@ Web subscribers listen on `PUBSUB_CHANNELS.notifications` (`src/config/pubsubCha
 - **One-shot only**: no repeat / snooze / dedup. Production triggers should go through the notification center once #144 lands.
 
 Full motivation + file plan: `plans/feat-notification-push-scaffold.md`. Implementation: `server/events/notifications.ts` (scheduler) + `server/api/routes/notifications.ts` (HTTP wrapper) + `src/composables/useNotifications.ts` + `src/components/NotificationToast.vue`.
+
+### Notification permalinks (#762)
+
+Clicking a bell entry calls `router.push` with whatever its `action.target` resolves to. Targets are typed per feature page so the dispatcher and the page components agree on identifier semantics:
+
+| `target.view` | Identifier(s)                        | Resolves to URL                                       |
+| ------------- | ------------------------------------ | ----------------------------------------------------- |
+| `chat`        | `sessionId` (required), `resultUuid` | `/chat/:sessionId` (`?result=:resultUuid` if set)     |
+| `todos`       | `itemId?`                            | `/todos` or `/todos/:itemId` (scrolls + flashes card) |
+| `calendar`    | _none_                               | `/calendar`                                           |
+| `automations` | `taskId?`                            | `/automations` or `/automations/:taskId`              |
+| `sources`     | `slug?`                              | `/sources` or `/sources/:slug`                        |
+| `files`       | `path?`                              | `/files/<segments>` (catch-all)                       |
+| `wiki`        | `slug?`, `anchor?`                   | `/wiki/pages/:slug` (`#:anchor` if set)               |
+
+Pure dispatcher: `src/utils/notification/dispatch.ts`. App.vue feeds the result straight into `router.push(target)`.
+
+#### Manual testing
+
+`scripts/dev/fire-sample-notifications.sh` POSTs eight representative notifications — one per target variant — through the test endpoint. Useful for confirming every permalink lands on the right page after a UI change.
+
+```bash
+# Server + Vite
+yarn dev
+
+# In another terminal
+./scripts/dev/fire-sample-notifications.sh
+# (optional flags) --host http://127.0.0.1:3001  --delay 0.5
+```
+
+The script reads the bearer token from `MULMOCLAUDE_AUTH_TOKEN` first, then falls back to `~/mulmoclaude/.session-token`. **Stale-token gotcha**: a long-running server's in-memory token can drift from the on-disk file if a different server process overwrote it. If every call returns `401`, restart `yarn dev` so memory + file resync, or pin a token across restarts:
+
+```bash
+MULMOCLAUDE_AUTH_TOKEN=$(openssl rand -hex 32) yarn dev
+# In another terminal — must use the same value
+MULMOCLAUDE_AUTH_TOKEN=<same value> ./scripts/dev/fire-sample-notifications.sh
+```
+
+After firing, open the bell in the Web UI and click each entry; every click should land on the URL noted in the script's `→` output line. The `automations`, `sources`, and `todos` rows additionally scroll + flash the matching item via `scrollIntoViewByTestId` (`src/utils/dom/`).
+
+#### Automated coverage
+
+- **Unit**: `test/utils/notification/test_dispatch.ts` — every target variant + edge cases (missing sessionId, file path splitting, wiki anchor hash).
+- **E2E**: `e2e/tests/notifications.spec.ts` — boots the app with a mocked pub-sub socket that delivers one canned payload per scenario, clicks bell + item, asserts the resulting URL. Run via `yarn test:e2e notifications`.
+
+Plan doc: `plans/feat-notification-permalinks.md`. Implementation lives in `src/types/notification.ts` (typed targets), `src/utils/notification/dispatch.ts` (dispatcher), `src/router/pageRoutes.ts` (route names), and per-page mount-time scroll handlers (`TodoExplorer.vue`, `SourcesView.vue`, `TasksTab.vue`).
 
 ---
 

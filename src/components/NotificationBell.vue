@@ -7,7 +7,7 @@ import { NOTIFICATION_ICONS, NOTIFICATION_ACTION_TYPES, NOTIFICATION_PRIORITIES 
 import type { NotificationPayload } from "../types/notification";
 
 const { t } = useI18n();
-const { notifications, unreadCount, markAllRead, dismiss } = useNotifications();
+const { notifications, unreadCount, isRead, markRead, markAllRead, dismiss } = useNotifications();
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
 
@@ -39,7 +39,10 @@ watch(
 
 function toggle(): void {
   open.value = !open.value;
-  if (open.value) markAllRead();
+  // Opening the panel does NOT auto-mark items as read — the user
+  // has to click an item (markRead via handleClick) or dismiss it
+  // (× button) for the unread badge to drop. The "Mark all read"
+  // button in the panel header still bulk-clears.
   emit("update:open", open.value);
 }
 
@@ -57,6 +60,10 @@ function formatTime(iso: string): string {
 }
 
 function handleClick(notification: NotificationPayload): void {
+  // Mark this single item read regardless of whether it has a
+  // navigate action — the user has explicitly engaged with it,
+  // which is the unambiguous "I've seen this" signal.
+  markRead(notification.id);
   if (notification.action.type === NOTIFICATION_ACTION_TYPES.navigate) {
     emit("navigate", notification.action);
     close();
@@ -65,6 +72,10 @@ function handleClick(notification: NotificationPayload): void {
 
 function handleDismiss(event: Event, notificationId: string): void {
   event.stopPropagation();
+  // dismiss removes the entry from the list, so its contribution
+  // to unreadCount drops automatically. No separate markRead call
+  // needed — and we don't want the entry to linger as "read" if
+  // the user explicitly chose to remove it.
   dismiss(notificationId);
 }
 </script>
@@ -113,17 +124,22 @@ function handleDismiss(event: Event, notificationId: string): void {
           role="button"
           tabindex="0"
           class="flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 focus:bg-gray-100 cursor-pointer outline-none"
+          :class="isRead(n.id) ? 'bg-white' : 'bg-blue-50/40'"
           :data-testid="`notification-item-${n.id}`"
+          :data-unread="isRead(n.id) ? 'false' : 'true'"
           :aria-label="n.title"
           @click="handleClick(n)"
           @keydown.enter.prevent.self="(e) => !e.repeat && handleClick(n)"
           @keydown.space.prevent.self="(e) => !e.repeat && handleClick(n)"
         >
+          <!-- Unread dot — small leading marker so the user can scan
+               the panel for what's new. Hidden once `markRead` fires. -->
+          <span class="w-2 h-2 mt-2 shrink-0 rounded-full" :class="isRead(n.id) ? 'bg-transparent' : 'bg-blue-500'" aria-hidden="true" />
           <span class="material-icons text-lg mt-0.5 shrink-0" :class="n.priority === NOTIFICATION_PRIORITIES.high ? 'text-red-500' : 'text-gray-400'">
             {{ iconName(n) }}
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-gray-800 truncate">{{ n.title }}</p>
+            <p class="text-sm truncate" :class="isRead(n.id) ? 'text-gray-600 font-normal' : 'text-gray-900 font-semibold'">{{ n.title }}</p>
             <p v-if="n.body" class="text-xs text-gray-500 truncate mt-0.5">
               {{ n.body }}
             </p>

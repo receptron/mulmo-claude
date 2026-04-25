@@ -308,11 +308,12 @@ function navigateToSession(sessionId: string, replace = false): void {
 function handleNotificationNavigate(action: NotificationAction): void {
   const target = resolveNotificationTarget(action);
   if (!target) return;
-  if (target.kind === "session") {
-    navigateToSession(target.sessionId);
-  } else {
-    router.push({ name: target.view }).catch(() => {});
-  }
+  // No special-casing for chat targets: PR #774 moved the role
+  // selector's state into the `useCurrentRole` singleton, so the
+  // role no longer needs to be pinned via `?role=` on every
+  // session-navigate. router.push(target) keeps the user's
+  // current role choice across the navigation automatically.
+  router.push(target).catch(() => {});
 }
 
 // External URL changes (back/forward button, typed URL) → update ref.

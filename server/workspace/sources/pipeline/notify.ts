@@ -42,9 +42,15 @@ function publishBatchNotification(scored: readonly ScoredItem[]): void {
       title: item.title,
       body: formatSingleBody(item),
       priority: item.severity === "critical" ? NOTIFICATION_PRIORITIES.high : NOTIFICATION_PRIORITIES.normal,
+      // Deep-link to the owning source feed so the user lands on the
+      // specific registered source rather than the /sources index
+      // (plans/feat-notification-permalinks.md).
       action: {
         type: NOTIFICATION_ACTION_TYPES.navigate,
-        view: NOTIFICATION_VIEWS.files,
+        target: {
+          view: NOTIFICATION_VIEWS.sources,
+          slug: item.sourceSlug,
+        },
       },
     });
     return;
@@ -59,6 +65,8 @@ function publishBatchNotification(scored: readonly ScoredItem[]): void {
   // Preserve high priority if any item in the batch is critical
   const hasCritical = scored.some((row) => row.item.severity === "critical");
 
+  // Batch case: multiple source feeds in play, so no single slug to
+  // deep-link to — fall back to the sources index.
   publishNotification({
     kind: NOTIFICATION_KINDS.push,
     title: `${scored.length} interesting articles found`,
@@ -66,7 +74,7 @@ function publishBatchNotification(scored: readonly ScoredItem[]): void {
     priority: hasCritical ? NOTIFICATION_PRIORITIES.high : NOTIFICATION_PRIORITIES.normal,
     action: {
       type: NOTIFICATION_ACTION_TYPES.navigate,
-      view: NOTIFICATION_VIEWS.files,
+      target: { view: NOTIFICATION_VIEWS.sources },
     },
   });
 }

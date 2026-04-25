@@ -113,9 +113,19 @@ export const DEFAULT_NOTIFICATION_CHAT_ID = "notifications";
 
 export interface ScheduleNotificationOptions {
   message?: string;
+  body?: string;
   delaySeconds?: number;
   transportId?: string;
   chatId?: string;
+  // Optional deep-link action — lets dev-side callers fire a
+  // notification that navigates to a specific permalink when
+  // clicked. Without this the fired notification has no click
+  // behaviour (same as before #762).
+  action?: NotificationAction;
+  // Optional kind override — lets the manual-test helper fire a
+  // representative notification for every NotificationKind (todo,
+  // scheduler, agent, …) so the bell's icons can be eyeballed.
+  kind?: NotificationKind;
 }
 
 export interface ScheduledNotification {
@@ -130,14 +140,21 @@ export function scheduleTestNotification(opts: ScheduleNotificationOptions, lega
   const chatId = opts.chatId ?? DEFAULT_NOTIFICATION_CHAT_ID;
   const delaySeconds = clampDelay(opts.delaySeconds);
   const delayMs = delaySeconds * ONE_SECOND_MS;
+  const kind = opts.kind ?? NOTIFICATION_KINDS.push;
 
   const firesAt = new Date(Date.now() + delayMs).toISOString();
 
   const timer = setTimeout(() => {
     publishNotification({
-      kind: NOTIFICATION_KINDS.push,
+      kind,
       title: message,
+      body: opts.body,
       priority: NOTIFICATION_PRIORITIES.normal,
+      // When the caller supplied an action, pass it through so the
+      // bell clicks into the requested permalink. Otherwise leave
+      // it undefined so publishNotification falls back to the
+      // "navigate: none" default.
+      action: opts.action,
     });
     legacyDeps.pushToBridge(transportId, chatId, message);
   }, delayMs);
