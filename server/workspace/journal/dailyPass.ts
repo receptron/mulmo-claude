@@ -69,9 +69,82 @@ export interface DailyPassResult {
   skipped: Array<{ date: string; reason: string }>;
 }
 
-export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Promise<{ nextState: JournalState; result: DailyPassResult }> {
+// Inputs to the day loop, gathered up-front by `buildDailyPassPlan`
+// so `runDailyPass` reads as orchestration only — no IO interleaved
+// with scheduling decisions. Returned as a single object instead of
+// a tuple so future fields (e.g. caller-provided clock for tests)
+// can be added without re-threading every call site.
+//
+// `newTopicsSeen` is a mutable accumulator: the day loop adds to it
+// as topics are created. Including it in the plan keeps the lifecycle
+// visible at the call site.
+export interface DailyPassPlan {
+  workspaceRoot: string;
+  perSessionExcerpts: Map<string, Map<string, SessionExcerpt>>;
+  dayBuckets: ReadonlyMap<string, SessionExcerpt[]>;
+  sessionToDays: Map<string, Set<string>>;
+  /** Day keys in chronological order so an earlier day's topic
+   *  updates are visible to the next day's processing. */
+  orderedDays: string[];
+  existingTopics: ExistingTopicSnapshot[];
+  /** Mutable — the day loop adds new topic slugs as they're created. */
+  newTopicsSeen: Set<string>;
+  initialNextState: JournalState;
+  dirtyMetaById: ReadonlyMap<string, SessionFileMeta>;
+}
+
+/**
+ * Read-only setup for `runDailyPass`: enumerate sessions, find the
+ * dirty ones, build day buckets, snapshot existing topics, and
+ * compute the initial mutable state. Returns `null` when there's
+ * nothing to do (no dirty sessions). Otherwise returns a plan object
+ * the day loop can iterate over.
+ *
+ * Intentionally does NOT short-circuit on empty `dayBuckets`. If
+ * every dirty session produces zero excerpts (all malformed, or all
+ * tool-only with no text turns) we still want `readAllTopics` to
+ * fire and `initialNextState.knownTopics` to be normalised/sorted.
+ * The day loop then iterates zero times and we drop straight through.
+ */
+export async function buildDailyPassPlan(state: JournalState, deps: DailyPassDeps): Promise<DailyPassPlan | null> {
   const workspaceRoot = deps.workspaceRoot ?? defaultWorkspacePath;
   const chatDir = path.join(workspaceRoot, WORKSPACE_DIRS.chat);
+
+  const eligible = (await listSessionMetas(chatDir)).filter((sessionMeta) => !deps.activeSessionIds.has(sessionMeta.id));
+  const { dirty } = findDirtySessions(eligible, state.processedSessions);
+  if (dirty.length === 0) return null;
+
+  const perSessionExcerpts = await loadDirtySessionExcerpts(chatDir, dirty, workspaceRoot);
+  const { dayBuckets, sessionToDays } = buildDayBuckets(perSessionExcerpts);
+
+  const existingTopics = await readAllTopics(workspaceRoot);
+  const newTopicsSeen = new Set<string>(state.knownTopics);
+  // `nextState` is rebuilt through the day loop and persisted after
+  // each successful day via writeState (atomic tmp+rename). We do
+  // NOT bump lastDailyRunAt here — that's the outer runner's job
+  // after the whole pass (including optimization) finishes, so
+  // partial progress doesn't look like a complete pass.
+  const initialNextState: JournalState = {
+    ...state,
+    knownTopics: [...newTopicsSeen].sort(),
+  };
+  const dirtyMetaById = new Map(eligible.map((sessionMeta) => [sessionMeta.id, sessionMeta]));
+  const orderedDays = [...dayBuckets.keys()].sort();
+
+  return {
+    workspaceRoot,
+    perSessionExcerpts,
+    dayBuckets,
+    sessionToDays,
+    orderedDays,
+    existingTopics,
+    newTopicsSeen,
+    initialNextState,
+    dirtyMetaById,
+  };
+}
+
+export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Promise<{ nextState: JournalState; result: DailyPassResult }> {
   const result: DailyPassResult = {
     daysTouched: [],
     sessionsIngested: [],
@@ -80,52 +153,21 @@ export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Pr
     skipped: [],
   };
 
-  // --- Phase 1: figure out what work there is to do ------------------
-  const eligible = (await listSessionMetas(chatDir)).filter((sessionMeta) => !deps.activeSessionIds.has(sessionMeta.id));
-  const { dirty } = findDirtySessions(eligible, state.processedSessions);
-  if (dirty.length === 0) return { nextState: { ...state }, result };
+  const plan = await buildDailyPassPlan(state, deps);
+  if (plan === null) return { nextState: { ...state }, result };
 
-  const perSessionExcerpts = await loadDirtySessionExcerpts(chatDir, dirty, workspaceRoot);
-  const { dayBuckets, sessionToDays } = buildDayBuckets(perSessionExcerpts);
+  let nextState = plan.initialNextState;
 
-  // Note: we intentionally do NOT early-return when `dayBuckets` is
-  // empty. Letting the pipeline fall through preserves the pre-
-  // refactor behaviour for the edge case where every dirty session
-  // produces zero excerpts (all malformed, or all metadata/tool-only
-  // with no text turns): `readAllTopics` still fires, and the
-  // returned `nextState.knownTopics` is still normalized / sorted
-  // from the existing state. The empty `orderedDays` loop then
-  // iterates zero times and we fall through to `return { nextState,
-  // result }`.
-
-  // --- Phase 2: set up per-pass state --------------------------------
-  const existingTopics = await readAllTopics(workspaceRoot);
-  const newTopicsSeen = new Set<string>(state.knownTopics);
-  // `nextState` is rebuilt through the day loop and persisted after
-  // each successful day via writeState (atomic tmp+rename). We do
-  // NOT bump lastDailyRunAt here — that's the outer runner's job
-  // after the whole pass (including optimization) finishes, so
-  // partial progress doesn't look like a complete pass.
-  let nextState: JournalState = {
-    ...state,
-    knownTopics: [...newTopicsSeen].sort(),
-  };
-  const dirtyMetaById = new Map(eligible.map((sessionMeta) => [sessionMeta.id, sessionMeta]));
-  // Process days in chronological order so topic state accumulates
-  // naturally: an earlier day's update is visible to the next day.
-  const orderedDays = [...dayBuckets.keys()].sort();
-
-  // --- Phase 3: process each day -------------------------------------
-  for (const date of orderedDays) {
+  for (const date of plan.orderedDays) {
     const dayResult = await processDayAndAdvance({
-      workspaceRoot,
+      workspaceRoot: plan.workspaceRoot,
       date,
-      dayBuckets,
-      existingTopics,
+      dayBuckets: plan.dayBuckets,
+      existingTopics: plan.existingTopics,
       summarize: deps.summarize,
-      sessionToDays,
-      dirtyMetaById,
-      newTopicsSeen,
+      sessionToDays: plan.sessionToDays,
+      dirtyMetaById: plan.dirtyMetaById,
+      newTopicsSeen: plan.newTopicsSeen,
       nextState,
     });
     if (dayResult.kind === "skipped") {
@@ -139,8 +181,7 @@ export async function runDailyPass(state: JournalState, deps: DailyPassDeps): Pr
     nextState = dayResult.nextState;
   }
 
-  // --- Phase 4: memory extraction ------------------------------------
-  await maybeExtractMemory(perSessionExcerpts, workspaceRoot, deps);
+  await maybeExtractMemory(plan.perSessionExcerpts, plan.workspaceRoot, deps);
 
   return { nextState, result };
 }
