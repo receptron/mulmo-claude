@@ -4,8 +4,6 @@ import { EventEmitter } from "node:events";
 import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { pushToMacosReminderWithDeps, _resetWarnFlagForTest, type Spawner } from "../../server/system/macosNotify.js";
 
-type ProcessEnv = Record<string, string | undefined>;
-
 interface SpawnCall {
   command: string;
   args: readonly string[];
@@ -82,31 +80,31 @@ describe("pushToMacosReminderWithDeps — spawn arguments", () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].command, "osascript");
     assert.equal(calls[0].args[0], "-e");
+    assert.match(calls[0].args[1] as string, /on run argv/);
     assert.match(calls[0].args[1] as string, /tell application "Reminders"/);
-    assert.match(calls[0].args[1] as string, /system attribute "MULMOC_NOTIFY_TITLE"/);
   });
 
-  it("forwards title and body via env (no AppleScript escaping risk)", async () => {
+  it("forwards title and body as argv (Unicode-safe path)", async () => {
     const { spawner, calls, respond } = makeSpawner();
     const promise = pushToMacosReminderWithDeps(
       { spawner, platform: "darwin", enabled: true },
-      'Title with "quotes" and \\backslash',
-      "Body line 1\nBody line 2",
+      'Title with "quotes" and \\backslash and 日本語',
+      "Body line 1\nBody line 2 — 文字化け確認",
     );
     respond(0);
     await promise;
-    const childEnv = calls[0].options.env as ProcessEnv;
-    assert.equal(childEnv.MULMOC_NOTIFY_TITLE, 'Title with "quotes" and \\backslash');
-    assert.equal(childEnv.MULMOC_NOTIFY_BODY, "Body line 1\nBody line 2");
+    // argv layout: [-e, SCRIPT, --, title, body]
+    assert.equal(calls[0].args[2], "--");
+    assert.equal(calls[0].args[3], 'Title with "quotes" and \\backslash and 日本語');
+    assert.equal(calls[0].args[4], "Body line 1\nBody line 2 — 文字化け確認");
   });
 
-  it("sets MULMOC_NOTIFY_BODY to empty string when body is omitted", async () => {
+  it("sends an empty-string body when none is supplied", async () => {
     const { spawner, calls, respond } = makeSpawner();
     const promise = pushToMacosReminderWithDeps({ spawner, platform: "darwin", enabled: true }, "Title only");
     respond(0);
     await promise;
-    const childEnv = calls[0].options.env as ProcessEnv;
-    assert.equal(childEnv.MULMOC_NOTIFY_BODY, "");
+    assert.equal(calls[0].args[4], "");
   });
 });
 

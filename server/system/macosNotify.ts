@@ -29,18 +29,24 @@ import { log } from "./logger/index.js";
 // see in type-only positions. Mirrors the same workaround used in
 // `server/agent/config.ts`.
 type Platform = "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd";
-type ProcessEnv = Record<string, string | undefined>;
 
+// AppleScript reads `title` / `body` from the script's `argv` (passed
+// after `--` on the osascript command line). Going through argv rather
+// than `system attribute "FOO"` avoids the UTF-8 garble that
+// `system attribute` exhibits on multi-byte characters — argv is
+// always handed to the script as Unicode text.
 const SCRIPT = [
-  'tell application "Reminders"',
-  '    set t to (system attribute "MULMOC_NOTIFY_TITLE")',
-  '    set b to (system attribute "MULMOC_NOTIFY_BODY")',
-  '    if b is "" then',
-  "        make new reminder in default list with properties {name:t, due date:(current date)}",
-  "    else",
-  "        make new reminder in default list with properties {name:t, body:b, due date:(current date)}",
-  "    end if",
-  "end tell",
+  "on run argv",
+  "    set t to item 1 of argv",
+  "    set b to item 2 of argv",
+  '    tell application "Reminders"',
+  '        if b is "" then',
+  "            make new reminder in default list with properties {name:t, due date:(current date)}",
+  "        else",
+  "            make new reminder in default list with properties {name:t, body:b, due date:(current date)}",
+  "        end if",
+  "    end tell",
+  "end run",
 ].join("\n");
 
 export type Spawner = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
@@ -81,13 +87,10 @@ export function pushToMacosReminderWithDeps(deps: Deps, title: string, body?: st
   return new Promise((resolve) => {
     let child: ChildProcess;
     try {
-      const childEnv: ProcessEnv = {
-        ...process.env,
-        MULMOC_NOTIFY_TITLE: title,
-        MULMOC_NOTIFY_BODY: body ?? "",
-      };
-      child = deps.spawner("osascript", ["-e", SCRIPT], {
-        env: childEnv,
+      // Title / body ride on argv so AppleScript receives them as
+      // Unicode text. The trailing `--` is osascript's separator
+      // between its own options and the script's `argv`.
+      child = deps.spawner("osascript", ["-e", SCRIPT, "--", title, body ?? ""], {
         stdio: ["ignore", "ignore", "pipe"],
       });
     } catch (err) {
