@@ -13,13 +13,16 @@ import { isBirthday, isChristmas, isLateNight, isManyUnread, isMorning, isNewYea
 // Keeping the palette values adjacent to the resolver (rather than
 // in a separate constants module) makes the "why does this colour
 // fire?" audit a one-file read.
+// "running" and "has-unread" no longer have background colors — the
+// yellow dot (top-left) and red dot (top-right) communicate those
+// states. The background is reserved for ambient context (error,
+// load, calendar, time-of-day) plus the two *escalations* of the
+// dot states (runningLong, manyUnread) that carry severity.
 const COLORS = {
   error: "#DC2626", // red-600
   overloaded: "#EA580C", // orange-600 — machine is burning
   manyUnread: "#D946EF", // fuchsia-500 — attention pile-up
   runningLong: "#06B6D4", // cyan-500 — still thinking (> 60 s)
-  running: "#3B82F6", // blue-500 — default running
-  hasUnread: "#22C55E", // green-500 — reply waiting
   birthday: "#EAB308", // yellow-500
   newYear: "#B91C1C", // red-700 — festive deeper red
   christmas: "#15803D", // green-700 — festive deeper green
@@ -33,8 +36,11 @@ const COLORS = {
 // argument is in one place and each helper stays under the
 // cognitive-complexity threshold.
 
-// Rules 1–6 in the plan: error + load + state-adjusted unread /
-// running. These always fire when applicable, beating any flavour.
+// Rules 1–4: error + load + escalations. These always fire when
+// applicable, beating any flavour. The plain `running` and
+// `hasUnread` rules are gone — the yellow / red corner dots own
+// those signals now, so the background stays free for ambient
+// context even while a session is running.
 function resolveByState(ctx: FaviconContext): FaviconPick | null {
   if (ctx.state === FAVICON_STATES.error) {
     return { color: COLORS.error, reason: FAVICON_REASONS.error };
@@ -45,14 +51,8 @@ function resolveByState(ctx: FaviconContext): FaviconPick | null {
   if (isManyUnread(ctx.sessionsUnreadCount)) {
     return { color: COLORS.manyUnread, reason: FAVICON_REASONS.manyUnread };
   }
-  if (ctx.state === FAVICON_STATES.running) {
-    if (isRunningLong(ctx.runningSinceMs, ctx.now)) {
-      return { color: COLORS.runningLong, reason: FAVICON_REASONS.runningLong };
-    }
-    return { color: COLORS.running, reason: FAVICON_REASONS.running };
-  }
-  if (ctx.state === FAVICON_STATES.done) {
-    return { color: COLORS.hasUnread, reason: FAVICON_REASONS.hasUnread };
+  if (ctx.state === FAVICON_STATES.running && isRunningLong(ctx.runningSinceMs, ctx.now)) {
+    return { color: COLORS.runningLong, reason: FAVICON_REASONS.runningLong };
   }
   return null;
 }

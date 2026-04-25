@@ -20,8 +20,6 @@ export const FAVICON_REASONS = {
   overloaded: "overloaded",
   manyUnread: "many-unread",
   runningLong: "running-long",
-  running: "running",
-  hasUnread: "has-unread",
   birthday: "birthday",
   newYear: "new-year",
   christmas: "christmas",

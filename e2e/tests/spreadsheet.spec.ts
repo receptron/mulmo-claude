@@ -8,7 +8,7 @@ import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // both the file-backed fetchSheets path and the table render.
 
 interface SpreadsheetResultOptions {
-  // Stored file path ("spreadsheets/abc.json") or inline sheets array.
+  // Stored file path ("artifacts/spreadsheets/abc.json") or inline sheets array.
   sheets: string | unknown[];
   sessionId?: string;
   title?: string;
@@ -72,7 +72,7 @@ async function openSpreadsheetView(page: Page, sessionId = "sheet-session", side
 
 test.describe("spreadsheet — rendering", () => {
   test("file-backed spreadsheet renders cell values", async ({ page }) => {
-    const path = "spreadsheets/abc.json";
+    const path = "artifacts/spreadsheets/abc.json";
     const sheets = [
       {
         name: "Sheet1",
@@ -317,7 +317,7 @@ test.describe("spreadsheet — source editor", () => {
 
 test.describe("spreadsheet — error handling", () => {
   test("too-large file shows an error message", async ({ page }) => {
-    const path = "spreadsheets/huge.json";
+    const path = "artifacts/spreadsheets/huge.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, {
       kind: "too-large",
@@ -330,7 +330,7 @@ test.describe("spreadsheet — error handling", () => {
   });
 
   test("binary file shows the default 'Cannot load' message", async ({ page }) => {
-    const path = "spreadsheets/blob.json";
+    const path = "artifacts/spreadsheets/blob.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, { kind: "binary" });
     await openSpreadsheetView(page);
@@ -338,7 +338,7 @@ test.describe("spreadsheet — error handling", () => {
   });
 
   test("malformed JSON shows a parse error message", async ({ page }) => {
-    const path = "spreadsheets/broken.json";
+    const path = "artifacts/spreadsheets/broken.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, {
       kind: "text",
@@ -349,7 +349,7 @@ test.describe("spreadsheet — error handling", () => {
   });
 
   test("non-array content shows a shape error", async ({ page }) => {
-    const path = "spreadsheets/wrong.json";
+    const path = "artifacts/spreadsheets/wrong.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, {
       kind: "text",
@@ -362,7 +362,7 @@ test.describe("spreadsheet — error handling", () => {
   });
 
   test("missing content field shows 'no content' message", async ({ page }) => {
-    const path = "spreadsheets/empty.json";
+    const path = "artifacts/spreadsheets/empty.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await mockFileContent(page, path, { kind: "text" });
     await openSpreadsheetView(page);
@@ -370,7 +370,7 @@ test.describe("spreadsheet — error handling", () => {
   });
 
   test("HTTP failure shows a statusText error", async ({ page }) => {
-    const path = "spreadsheets/404.json";
+    const path = "artifacts/spreadsheets/404.json";
     await setupSpreadsheetSession(page, { sheets: path });
     await page.route(
       (url) => url.pathname === "/api/files/content" && url.searchParams.get("path") === path,

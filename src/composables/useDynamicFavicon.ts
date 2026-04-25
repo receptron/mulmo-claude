@@ -19,6 +19,7 @@ import logoUrl from "../assets/mulmo_bw.png";
 // Keep the palette-independent display constants local to this file
 // — they describe pixel geometry, not semantics.
 const NOTIFICATION_DOT_COLOR = "#DC2626"; // red-600
+const ACTIVE_SESSION_DOT_COLOR = "#EAB308"; // yellow-500
 const SIZE = 32;
 const RADIUS = 6;
 // How much of the rounded square the mascot fills. 2 px of padding
@@ -117,22 +118,30 @@ function drawLogoCentered(ctx: CanvasRenderingContext2D, source: HTMLCanvasEleme
   ctx.drawImage(source, drawX, drawY, drawW, drawH);
 }
 
-function drawNotificationDot(ctx: CanvasRenderingContext2D): void {
+function drawCornerDot(ctx: CanvasRenderingContext2D, dotX: number, dotY: number, color: string): void {
   const dotR = 5;
-  const dotX = SIZE - dotR - 1;
-  const dotY = dotR + 1;
   ctx.beginPath();
   ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
-  ctx.fillStyle = NOTIFICATION_DOT_COLOR;
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.strokeStyle = "white";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 }
 
+function drawNotificationDot(ctx: CanvasRenderingContext2D): void {
+  const dotR = 5;
+  drawCornerDot(ctx, SIZE - dotR - 1, dotR + 1, NOTIFICATION_DOT_COLOR);
+}
+
+function drawActiveSessionDot(ctx: CanvasRenderingContext2D): void {
+  const dotR = 5;
+  drawCornerDot(ctx, dotR + 1, dotR + 1, ACTIVE_SESSION_DOT_COLOR);
+}
+
 // ── Composition ────────────────────────────────────────────────
 
-function renderFallbackFavicon(ctx: CanvasRenderingContext2D, color: string, hasNotification: boolean): void {
+function renderFallbackFavicon(ctx: CanvasRenderingContext2D, color: string, isRunning: boolean, hasNotification: boolean): void {
   drawRoundedRect(ctx, 1, 1, SIZE - 2, SIZE - 2, RADIUS);
   ctx.fillStyle = color;
   ctx.fill();
@@ -143,6 +152,7 @@ function renderFallbackFavicon(ctx: CanvasRenderingContext2D, color: string, has
   ctx.textBaseline = "middle";
   ctx.fillText("M", SIZE / 2, SIZE / 2 + 1);
 
+  if (isRunning) drawActiveSessionDot(ctx);
   if (hasNotification) drawNotificationDot(ctx);
 }
 
@@ -157,16 +167,7 @@ function renderLogoFavicon(ctx: CanvasRenderingContext2D, logo: HTMLCanvasElemen
   drawLogoCentered(ctx, logo, MASCOT_INSET);
   ctx.restore();
 
-  // Running glow — kept at a fixed white/translucent ring so it reads
-  // against any resolved color (blue, cyan, orange, whatever) rather
-  // than having to retune per palette entry.
-  if (isRunning) {
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    ctx.lineWidth = 1.5;
-    drawRoundedRect(ctx, 2.25, 2.25, SIZE - 4.5, SIZE - 4.5, Math.max(RADIUS - 1, 2));
-    ctx.stroke();
-  }
-
+  if (isRunning) drawActiveSessionDot(ctx);
   if (hasNotification) drawNotificationDot(ctx);
 }
 
@@ -187,7 +188,7 @@ async function renderFavicon(color: string, isRunning: boolean, hasNotification:
     }
   }
 
-  renderFallbackFavicon(ctx, color, hasNotification);
+  renderFallbackFavicon(ctx, color, isRunning, hasNotification);
   return canvas.toDataURL("image/png");
 }
 

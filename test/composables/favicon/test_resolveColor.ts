@@ -22,7 +22,7 @@ function baseIdle(): FaviconContext {
   };
 }
 
-describe("resolveFaviconColor — state-driven rules (priority 1-6)", () => {
+describe("resolveFaviconColor — state-driven rules (priority 1-4)", () => {
   it("error state beats everything, including overload and calendar", () => {
     const pick = resolveFaviconColor({
       ...baseIdle(),
@@ -75,8 +75,10 @@ describe("resolveFaviconColor — state-driven rules (priority 1-6)", () => {
     assert.equal(pick.color, FAVICON_COLORS.runningLong);
   });
 
-  it("short running fires the default running branch", () => {
-    const now = new Date(2026, 3, 23, 14, 0, 10); // 10 s elapsed
+  it("short running falls through to flavour — yellow dot carries the signal, background shows ambient context", () => {
+    // 10 s elapsed on a plain weekday midday — no escalation fires,
+    // so the background should land on the flavour default (idle).
+    const now = new Date(2026, 3, 23, 14, 0, 10);
     const runningSinceMs = new Date(2026, 3, 23, 14, 0).getTime();
     const pick = resolveFaviconColor({
       ...baseIdle(),
@@ -84,18 +86,20 @@ describe("resolveFaviconColor — state-driven rules (priority 1-6)", () => {
       now,
       runningSinceMs,
     });
-    assert.equal(pick.reason, FAVICON_REASONS.running);
-    assert.equal(pick.color, FAVICON_COLORS.running);
+    assert.equal(pick.reason, FAVICON_REASONS.idle);
+    assert.equal(pick.color, FAVICON_COLORS.idle);
   });
 
-  it("has-unread fires for done state with a modest unread count", () => {
+  it("done state with a modest unread count falls through to flavour — red dot carries the signal", () => {
+    // Morning weekday with 2 unread — red dot shows unread, background
+    // paints the morning flavour. Previously this would have been green.
     const pick = resolveFaviconColor({
       ...baseIdle(),
       state: FAVICON_STATES.done,
       sessionsUnreadCount: 2,
+      now: new Date(2026, 3, 23, 7, 0),
     });
-    assert.equal(pick.reason, FAVICON_REASONS.hasUnread);
-    assert.equal(pick.color, FAVICON_COLORS.hasUnread);
+    assert.equal(pick.reason, FAVICON_REASONS.morning);
   });
 });
 
@@ -159,15 +163,27 @@ describe("resolveFaviconColor — flavour rules (priority 7-12)", () => {
 });
 
 describe("resolveFaviconColor — cross-rule priority", () => {
-  it("state-driven rules always beat flavour", () => {
-    // Christmas 00:00 with a running agent — running-blue, not christmas-green.
+  it("short-running agent on Christmas shows christmas flavour (yellow dot will indicate running)", () => {
+    // 1 s elapsed — under the 60 s runningLong threshold, so no state
+    // escalation fires and the flavour rule wins.
     const pick = resolveFaviconColor({
       ...baseIdle(),
       state: FAVICON_STATES.running,
-      runningSinceMs: new Date(2026, 11, 25, 0, 0).getTime() - 1000,
-      now: new Date(2026, 11, 25, 0, 0),
+      runningSinceMs: new Date(2026, 11, 25, 14, 0).getTime() - 1000,
+      now: new Date(2026, 11, 25, 14, 0),
     });
-    assert.equal(pick.reason, FAVICON_REASONS.running);
+    assert.equal(pick.reason, FAVICON_REASONS.christmas);
+  });
+
+  it("long-running agent still beats flavour via the runningLong escalation", () => {
+    // 90 s elapsed on Christmas — runningLong cyan takes priority.
+    const pick = resolveFaviconColor({
+      ...baseIdle(),
+      state: FAVICON_STATES.running,
+      runningSinceMs: new Date(2026, 11, 25, 14, 0).getTime() - 90_000,
+      now: new Date(2026, 11, 25, 14, 0),
+    });
+    assert.equal(pick.reason, FAVICON_REASONS.runningLong);
   });
 
   it("skips overloaded when cpuLoadRatio is null (no data yet / Windows)", () => {

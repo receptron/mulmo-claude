@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { isFilePath } from "../../../src/plugins/markdown/definition.js";
 
 describe("markdown isFilePath", () => {
-  it("accepts a stored markdown file path", () => {
-    assert.equal(isFilePath("markdowns/abc.md"), true);
+  it("accepts the canonical artifacts/documents/ path", () => {
+    assert.equal(isFilePath("artifacts/documents/abc.md"), true);
   });
 
   it("rejects inline markdown content", () => {
@@ -16,35 +16,8 @@ describe("markdown isFilePath", () => {
     assert.equal(isFilePath("wiki/foo.md"), false);
   });
 
-  it("rejects non-.md extensions under markdowns/", () => {
-    assert.equal(isFilePath("markdowns/foo.txt"), false);
-    assert.equal(isFilePath("markdowns/foo"), false);
-  });
-
   it("rejects empty string", () => {
     assert.equal(isFilePath(""), false);
-  });
-
-  it("accepts subdirectory paths under markdowns/", () => {
-    assert.equal(isFilePath("markdowns/sub/nested.md"), true);
-  });
-
-  it("rejects an empty filename (`markdowns/.md`)", () => {
-    // Current behaviour: the prefix/suffix check passes. Documenting
-    // via a test so any future tightening of the helper is intentional
-    // rather than silent.
-    assert.equal(isFilePath("markdowns/.md"), true);
-  });
-
-  it("is case-sensitive on the directory prefix", () => {
-    assert.equal(isFilePath("MARKDOWNS/foo.md"), false);
-    assert.equal(isFilePath("Markdowns/foo.md"), false);
-  });
-
-  // Post-#284 canonical path (artifacts/documents/) — PR #348 added
-  // dual-prefix support; these tests guard the new path.
-  it("accepts post-#284 canonical path (artifacts/documents/)", () => {
-    assert.equal(isFilePath("artifacts/documents/abc.md"), true);
   });
 
   it("accepts nested paths under artifacts/documents/", () => {
@@ -59,5 +32,18 @@ describe("markdown isFilePath", () => {
   it("rejects artifacts/ without documents/ subdirectory", () => {
     assert.equal(isFilePath("artifacts/foo.md"), false);
     assert.equal(isFilePath("artifacts/spreadsheets/foo.md"), false);
+  });
+
+  it("is case-sensitive on the directory prefix", () => {
+    assert.equal(isFilePath("ARTIFACTS/documents/foo.md"), false);
+  });
+
+  // Legacy pre-#284 prefix (`markdowns/`). Support was removed in
+  // #773 — the migration script rewrites old session JSONL to
+  // canonical paths so the validator can be symmetric with the
+  // server.
+  it("rejects the legacy markdowns/ prefix", () => {
+    assert.equal(isFilePath("markdowns/abc.md"), false);
+    assert.equal(isFilePath("markdowns/sub/nested.md"), false);
   });
 });
