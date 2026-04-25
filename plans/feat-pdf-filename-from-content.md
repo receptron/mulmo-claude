@@ -103,4 +103,3 @@ All three look up the timestamp via `useAppApi().getResultTimestamp(selectedResu
 - whitespace-only → `""`
 - long line → truncated to 50 chars
 - H1 with markdown chars → trimmed
-EOF
