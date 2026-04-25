@@ -10,7 +10,8 @@ import { PUBSUB_CHANNELS, sessionChannel } from "../../../src/config/pubsubChann
 import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
 import { EVENT_TYPES, GENERATION_KINDS, type GenerationKind, type PendingGeneration, generationKey } from "../../../src/types/events.js";
-import { ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
+import { ONE_DAY_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
+import { env } from "../../system/env.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -135,10 +136,14 @@ function removeSession(chatSessionId: string): void {
 // Tombstones for sessions purged off-disk (currently only the first-
 // turn cancel path #822). The /api/sessions list endpoint reads this
 // to populate the response's `deletedIds` array so cursor-based
-// clients drop the deleted ids from their cached lists. Bounded by
-// `SESSIONS_LIST_WINDOW_DAYS` (same horizon the list itself uses) —
-// older tombstones are evicted when the next purge runs.
-const SESSIONS_TOMBSTONE_TTL_MS = 24 * 60 * 60 * 1000;
+// clients drop the deleted ids from their cached lists. The TTL
+// matches the sessions-list horizon: a tombstone older than that
+// can no longer matter because the corresponding session row is
+// already off the list anyway. Eviction happens on BOTH the write
+// path (purgeSession) and the read path (getRecentlyPurgedSessionIds)
+// so tombstones don't linger forever in a quiet server — Codex
+// iter-2 #822.
+const SESSIONS_TOMBSTONE_TTL_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 const recentlyPurgedSessions = new Map<string, number>();
 
 function evictOldTombstones(now: number): void {
@@ -166,8 +171,11 @@ export function purgeSession(chatSessionId: string): void {
  *  SESSIONS_TOMBSTONE_TTL_MS window. Returned by the sessions list
  *  endpoint so clients can drop deleted ids from their cached lists.
  *  `sinceMs === 0` (no cursor) returns every live tombstone — fine
- *  because the response is the full session list anyway. */
+ *  because the response is the full session list anyway. Evicts
+ *  expired entries on the way out so a quiet server still cleans
+ *  up after itself. */
 export function getRecentlyPurgedSessionIds(sinceMs: number): string[] {
+  evictOldTombstones(Date.now());
   const cutoff = sinceMs > 0 ? sinceMs : 0;
   const result: string[] = [];
   for (const [sessionId, deletedAt] of recentlyPurgedSessions) {

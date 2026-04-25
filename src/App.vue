@@ -835,28 +835,29 @@ function unsubscribeSession(chatSessionId: string): void {
 async function cancelActiveRun(): Promise<void> {
   const sessionId = currentSessionId.value;
   if (!sessionId) return;
-  // Snapshot the running state at click time. If we were running
-  // when the user clicked Stop, we should undo the local turn
-  // regardless of whether the server confirms the cancel — `ok=false`
-  // also covers the "another tab already cancelled it" race, and in
-  // that race the user still expects their draft restored. Codex iter-1
-  // #822: gating only on transport `ok` was too coarse.
-  const wasRunning = activeSessionRunning.value;
-  console.info("[agent] cancel requested", { chatSessionId: sessionId, wasRunning });
+  console.info("[agent] cancel requested", { chatSessionId: sessionId });
   const result = await apiPost<{ ok: boolean }>(API_ROUTES.agent.cancel, { chatSessionId: sessionId });
   if (!result.ok) {
     console.warn("[agent] cancel POST failed", { chatSessionId: sessionId, error: result.error });
     return;
   }
+  // Only undo locally when the server confirms it actually killed a
+  // run for us. `data.ok=false` ambiguously covers two cases:
+  //   (a) the run completed naturally between our render and the
+  //       click — the chat is now showing a real, completed turn
+  //       and undoing would shred legitimate output
+  //   (b) another tab cancelled this same run first — server has
+  //       already truncated the jsonl + emitted a deletedIds
+  //       tombstone, so our sidebar will sync via that channel
+  //       without needing a local undo
+  // Both cases want the same answer: don't undo. The user's draft
+  // is unrecoverable in (a) but a different tab's draft in (b),
+  // and we can't tell which from the response alone — so we err on
+  // the safe side. Codex iter-2 #822.
   if (!result.data?.ok) {
-    console.info("[agent] cancel was a no-op on the server", { chatSessionId: sessionId, wasRunning });
+    console.info("[agent] cancel was a no-op on the server — skipping local undo", { chatSessionId: sessionId });
+    return;
   }
-  // Only undo when we believed a run was in flight at click time.
-  // The button itself only renders while running, but the SSE
-  // session-finished event can flip `isRunning` between render and
-  // click — in that natural-finish race we must NOT shred the
-  // legitimately-completed turn.
-  if (!wasRunning) return;
   const session = sessionMap.get(sessionId);
   if (!session) return;
   const { restoredText } = undoLastTurn(session);

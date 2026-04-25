@@ -436,31 +436,45 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
 // }
 
 // Roll the session jsonl back to its pre-turn boundary if the most-
-// recent run was cancelled (#822). Called from the runAgentInBackground
-// `finally` block before `endRun` clears the per-run flags. Lifted into
-// a helper so the main flow stays under the project's cognitive-
-// complexity threshold and so this logic has its own log line.
-async function rollbackJsonlIfCancelled(chatSessionId: string): Promise<void> {
-  if (!wasCancelled(chatSessionId)) return;
+// recent run was cancelled (#822). Returns true when the run was a
+// first-turn cancel — caller must invoke `purgeFirstTurnAfterEndRun`
+// after `endRun` so the broadcast still goes out (Codex iter-2 #822
+// flagged that purging before endRun suppressed session_finished and
+// left other tabs with a stale view).
+async function rollbackJsonlIfCancelled(chatSessionId: string): Promise<{ firstTurn: boolean }> {
+  if (!wasCancelled(chatSessionId)) return { firstTurn: false };
   const rollbackTo = getTurnStartJsonlSize(chatSessionId);
-  if (rollbackTo === undefined) return;
+  if (rollbackTo === undefined) return { firstTurn: false };
   try {
     await truncateSessionJsonl(chatSessionId, rollbackTo);
     log.info("agent", "cancel: jsonl truncated", { chatSessionId, rollbackTo });
-    // First-turn cancel: rollbackTo === 0 means there's no prior
-    // history on disk for this session, so the cancelled message was
-    // its only content. Drop the meta + the in-memory entry so an
-    // empty stub doesn't haunt the sidebar (clicking it landed on
-    // an empty chat — observed live during #822 manual testing).
-    if (rollbackTo === 0) {
-      await deleteSessionFiles(chatSessionId);
-      purgeSession(chatSessionId);
-      log.info("agent", "cancel: first-turn session purged", { chatSessionId });
-    }
+    return { firstTurn: rollbackTo === 0 };
   } catch (truncErr) {
     log.warn("agent", "cancel: jsonl truncate failed", {
       chatSessionId,
       error: String(truncErr),
+    });
+    return { firstTurn: false };
+  }
+}
+
+// First-turn cancel: rollbackTo === 0 means there's no prior history
+// for this session, so the cancelled message was its only content.
+// Drop the meta + the in-memory entry so an empty stub doesn't haunt
+// the sidebar. Runs AFTER endRun so the normal session_finished
+// broadcast still fires for any other tabs subscribed to this
+// session (Codex iter-2 #822). The purge then issues its own
+// notifySessionsChanged broadcast which propagates the deletedIds
+// tombstone via the next /api/sessions response.
+async function purgeFirstTurnAfterEndRun(chatSessionId: string): Promise<void> {
+  try {
+    await deleteSessionFiles(chatSessionId);
+    purgeSession(chatSessionId);
+    log.info("agent", "cancel: first-turn session purged", { chatSessionId });
+  } catch (err) {
+    log.warn("agent", "cancel: first-turn purge failed", {
+      chatSessionId,
+      error: String(err),
     });
   }
 }
@@ -549,8 +563,9 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
       message: String(err),
     });
   } finally {
-    await rollbackJsonlIfCancelled(chatSessionId);
+    const { firstTurn } = await rollbackJsonlIfCancelled(chatSessionId);
     endRun(chatSessionId);
+    if (firstTurn) await purgeFirstTurnAfterEndRun(chatSessionId);
     // Commented out: this would create a duplicate notification.
     //
     // `endRun(chatSessionId)` above flips `session.hasUnread = true`
