@@ -76,6 +76,42 @@ export function applyTextEvent(session: ActiveSession, message: string, source: 
   }
 }
 
+/** Undo the most recent user turn in a session: remove the last user
+ *  message AND every result that the in-flight (or just-cancelled)
+ *  agent run produced in response. Returns the text of the removed
+ *  user message so the caller can restore it to the input form, or
+ *  null when there's nothing to undo. Used by the Stop button (#821)
+ *  so that "cancel" reads as "this turn never happened" — the user
+ *  edits their draft and resends rather than seeing a half-finished
+ *  exchange + a "what to continue?" reply. */
+export function undoLastTurn(session: ActiveSession): { restoredText: string | null } {
+  // beginUserTurn / applyTextEvent set runStartIndex to one past the
+  // user message. So the user message lives at runStartIndex - 1.
+  if (session.runStartIndex <= 0) return { restoredText: null };
+  const userIndex = session.runStartIndex - 1;
+  const userResult = session.toolResults[userIndex];
+  const userData = userResult?.data as { role?: string; text?: string } | undefined;
+  // Defensive: only undo when the boundary really points at a user
+  // text result. If something else lives there (race / corrupt
+  // state), bail rather than throw away unrelated events.
+  if (userResult?.toolName !== "text-response" || userData?.role !== "user") {
+    return { restoredText: null };
+  }
+  const restoredText = userData.text ?? null;
+  const removed = session.toolResults.splice(userIndex);
+  for (const item of removed) {
+    session.resultTimestamps.delete(item.uuid);
+  }
+  // After splice, the turn boundary is the new (possibly shorter)
+  // length. The previous turn (if any) is fully preserved.
+  session.runStartIndex = session.toolResults.length;
+  // Drop selection if it pointed inside the removed range.
+  if (session.selectedResultUuid && removed.some((item) => item.uuid === session.selectedResultUuid)) {
+    session.selectedResultUuid = null;
+  }
+  return { restoredText };
+}
+
 /** In-place update a result that was re-emitted by a plugin view
  *  (e.g. after the user edits a chart config). */
 export function updateResult(session: ActiveSession, updatedResult: ToolResultComplete): void {

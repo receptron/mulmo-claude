@@ -244,7 +244,7 @@ import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
-import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
+import { pushErrorMessage, beginUserTurn, updateResult, undoLastTurn } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
 import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
@@ -810,11 +810,19 @@ function unsubscribeSession(chatSessionId: string): void {
   }
 }
 
-// Stop the in-flight agent run for the currently displayed session.
-// Backend (POST /api/agent/cancel) flips the run's AbortController,
-// which closes the SSE stream and resets `isRunning`. We don't
-// optimistically flip local state — the SSE close handler does that
-// uniformly whether the cancel came from us or anywhere else (#731).
+// Stop the in-flight agent run AND undo the turn locally — drop the
+// just-sent user message + any partial assistant output from the
+// chat view, restore the message to the input form so the user can
+// edit and resend. Server still kills the claude subprocess and
+// suppresses the resulting SIGTERM exit error (#821 / #731 follow-up).
+//
+// Two-phase reasoning: backend POST /api/agent/cancel flips the
+// AbortController and closes the SSE stream as before; the local
+// undo runs after the cancel POST resolves so we don't strip the UI
+// before the cancel has actually been issued (rare race where the
+// click misses the run). The SSE-close handler still uniformly
+// resets isRunning whether the cancel came from us, another tab,
+// or a backend timeout.
 async function cancelActiveRun(): Promise<void> {
   const sessionId = currentSessionId.value;
   if (!sessionId) return;
@@ -824,11 +832,20 @@ async function cancelActiveRun(): Promise<void> {
     console.warn("[agent] cancel POST failed", { chatSessionId: sessionId, error: result.error });
     return;
   }
-  // Backend's `ok: false` means the session wasn't in-flight (already
-  // finished, or duplicate Stop click). Benign, but distinct from a
-  // network failure — surface separately in the console.
+  // `data.ok=false` means there was no run in flight (already
+  // finished, duplicate Stop click). Skip the local undo too — the
+  // turn either landed cleanly or was already undone by a prior
+  // click; either way there's nothing to peel off here.
   if (!result.data?.ok) {
     console.info("[agent] cancel was a no-op (no run in flight)", { chatSessionId: sessionId });
+    return;
+  }
+  const session = sessionMap.get(sessionId);
+  if (!session) return;
+  const { restoredText } = undoLastTurn(session);
+  if (restoredText !== null) {
+    userInput.value = restoredText;
+    nextTick(() => focusChatInput());
   }
 }
 
