@@ -74,6 +74,18 @@ let running = false;
 // on every session-end. Reset on server restart.
 let disabled = false;
 
+// Test-only reset for the module-level flags. The lock + disable
+// flags are intentionally module-scoped so a fresh server start
+// always begins from "neither running nor disabled"; a unit test
+// that exercises maybeRunJournal across multiple call sequences
+// needs a way to reproduce that fresh-start condition without
+// re-importing the module. Not exported via index — only consumers
+// importing this file directly should reach for it.
+export function __resetForTests(): void {
+  running = false;
+  disabled = false;
+}
+
 // The agent route calls this as `maybeRunJournal().catch(...)`.
 export interface MaybeRunJournalOptions {
   summarize?: Summarize;
