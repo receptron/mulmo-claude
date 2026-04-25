@@ -39,7 +39,7 @@ We confirmed cases where setting `num_ctx 65536` in a Modelfile is also ignored 
 
 Specifying a context larger than the model's `n_ctx_train` is clamped to the training value with a warning:
 
-```
+```text
 msg="requested context size too large for model" num_ctx=65536 n_ctx_train=40960
 ```
 
@@ -65,7 +65,7 @@ Example: `qwen3:14b` is trained with a 40960 (40k) limit, so it cannot fit Claud
 
 ### `gpt-oss:20b` 500 error details
 
-```
+```text
 chat prompt error: template: :108:130: executing "" at <index $prop.Type 0>:
   error calling index: reflect: slice index out of range
 ```

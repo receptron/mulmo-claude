@@ -39,7 +39,7 @@ Modelfile で明示的に `num_ctx 65536` を指定しても、Ollama の Runner
 
 モデル自体の `n_ctx_train` を超えた指定はログで警告が出て訓練値に丸められる:
 
-```
+```text
 msg="requested context size too large for model" num_ctx=65536 n_ctx_train=40960
 ```
 
@@ -65,7 +65,7 @@ msg="requested context size too large for model" num_ctx=65536 n_ctx_train=40960
 
 ### gpt-oss:20b の 500 エラー詳細
 
-```
+```text
 chat prompt error: template: :108:130: executing "" at <index $prop.Type 0>:
   error calling index: reflect: slice index out of range
 ```
