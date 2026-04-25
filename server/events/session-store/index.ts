@@ -37,6 +37,22 @@ export interface ServerSession {
   /** Kills the spawned Claude CLI process for this session. */
   abortRun?: () => void;
   /**
+   * Set true by `cancelRun` and consumed by `endRun` so the agent
+   * route can roll the session jsonl back to its pre-turn size when
+   * a Stop button cancel ended the run. Stays in step with a
+   * matching `turnStartJsonlSize` snapshot taken in `beginRun`. See
+   * the Stop-as-undo flow in #821 / #822.
+   */
+  cancelled?: boolean;
+  /**
+   * Byte offset of the session jsonl at the moment `beginRun` was
+   * called — i.e. before the user message line was appended. The
+   * cancel path truncates the file back to this offset so the
+   * cancelled turn doesn't survive on disk and reappear on the next
+   * `GET /api/sessions/:id`.
+   */
+  turnStartJsonlSize?: number;
+  /**
    * In-flight background generations keyed by `generationKey(kind, filePath, key)`.
    * The value carries the decomposed (kind, filePath, key) so consumers never
    * have to parse the opaque composite key back out. Non-empty means the
@@ -118,8 +134,11 @@ function removeSession(chatSessionId: string): void {
 
 // ── State mutations (publish to pub/sub) ───────────────────────
 
-/** Mark a session as running. Rejects if already running (409). */
-export function beginRun(chatSessionId: string, abortRun: () => void): boolean {
+/** Mark a session as running. Rejects if already running (409).
+ *  `turnStartJsonlSize` is the jsonl byte offset before the user
+ *  message line was appended — captured by the caller and stored
+ *  here so cancelRun/endRun can roll the file back to it (#822). */
+export function beginRun(chatSessionId: string, abortRun: () => void, turnStartJsonlSize?: number): boolean {
   const session = store.get(chatSessionId);
   if (!session) return false;
   if (session.isRunning) return false;
@@ -127,6 +146,8 @@ export function beginRun(chatSessionId: string, abortRun: () => void): boolean {
   session.statusMessage = "";
   session.toolCallHistory = [];
   session.abortRun = abortRun;
+  session.cancelled = false;
+  session.turnStartJsonlSize = turnStartJsonlSize;
   session.updatedAt = new Date().toISOString();
   notifySessionsChanged();
   return true;
@@ -148,12 +169,33 @@ export function endRun(chatSessionId: string): void {
   notifySessionsChanged();
 }
 
-/** Cancel a running session by killing the child process. */
+/** Cancel a running session by killing the child process. The
+ *  `cancelled` flag is read in `endRun` (and by the agent route's
+ *  per-turn jsonl-truncation step) to roll the on-disk log back to
+ *  before this turn started. See #822. */
 export function cancelRun(chatSessionId: string): boolean {
   const session = store.get(chatSessionId);
   if (!session?.isRunning || !session.abortRun) return false;
+  session.cancelled = true;
   session.abortRun();
   return true;
+}
+
+/** True iff the most-recent run for this session was cancelled by
+ *  `cancelRun` (rather than completed naturally). The agent route
+ *  consumes this in its post-run cleanup to decide whether to
+ *  truncate the jsonl back to `getTurnStartJsonlSize`. Returns
+ *  false for unknown sessions. */
+export function wasCancelled(chatSessionId: string): boolean {
+  return store.get(chatSessionId)?.cancelled ?? false;
+}
+
+/** Byte offset captured in `beginRun` — the jsonl size before the
+ *  user message of the current/most-recent turn was appended. Used
+ *  by the cancel rollback path. Returns undefined for unknown
+ *  sessions or runs created before this field existed. */
+export function getTurnStartJsonlSize(chatSessionId: string): number | undefined {
+  return store.get(chatSessionId)?.turnStartJsonlSize;
 }
 
 /** Clear the unread flag (called when a client views the session).

@@ -12,12 +12,24 @@ import {
   readSessionJsonl,
   sessionJsonlAbsPath,
   ensureChatDir,
+  statSessionJsonlSize,
+  truncateSessionJsonl,
 } from "../../utils/files/session-io.js";
 import { getRole } from "../../workspace/roles.js";
 import { runAgent } from "../../agent/index.js";
 import { prependJournalPointer } from "../../agent/prompt.js";
 import { buildTranscriptPreamble, isStaleSessionError } from "../../agent/resumeFailover.js";
-import { getOrCreateSession, beginRun, endRun, cancelRun, pushSessionEvent, pushToolResult, getActiveSessionIds } from "../../events/session-store/index.js";
+import {
+  getOrCreateSession,
+  beginRun,
+  endRun,
+  cancelRun,
+  pushSessionEvent,
+  pushToolResult,
+  getActiveSessionIds,
+  wasCancelled,
+  getTurnStartJsonlSize,
+} from "../../events/session-store/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { maybeRunJournal } from "../../workspace/journal/index.js";
 import { maybeIndexSession } from "../../workspace/chat-index/index.js";
@@ -175,8 +187,15 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   // Writing the user message to jsonl or broadcasting it before this
   // check leaves an orphan message on disk + in every viewing tab
   // when the run is rejected — see #281.
+  //
+  // We also snapshot the jsonl size right *before* the user message
+  // is appended so the cancel path can roll the on-disk log back to
+  // exactly this turn boundary. Pre-#822 a Stop click left the user
+  // message stranded on disk and any later GET /api/sessions/:id
+  // would replay it into the chat (#821 / #822 root cause).
+  const turnStartJsonlSize = await statSessionJsonlSize(chatSessionId);
   const abortController = new AbortController();
-  const started = beginRun(chatSessionId, () => abortController.abort());
+  const started = beginRun(chatSessionId, () => abortController.abort(), turnStartJsonlSize);
   if (!started) {
     return { kind: "error", error: "Session is already running", status: 409 };
   }
@@ -414,6 +433,26 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
 //   }
 // }
 
+// Roll the session jsonl back to its pre-turn boundary if the most-
+// recent run was cancelled (#822). Called from the runAgentInBackground
+// `finally` block before `endRun` clears the per-run flags. Lifted into
+// a helper so the main flow stays under the project's cognitive-
+// complexity threshold and so this logic has its own log line.
+async function rollbackJsonlIfCancelled(chatSessionId: string): Promise<void> {
+  if (!wasCancelled(chatSessionId)) return;
+  const rollbackTo = getTurnStartJsonlSize(chatSessionId);
+  if (rollbackTo === undefined) return;
+  try {
+    await truncateSessionJsonl(chatSessionId, rollbackTo);
+    log.info("agent", "cancel: jsonl truncated", { chatSessionId, rollbackTo });
+  } catch (truncErr) {
+    log.warn("agent", "cancel: jsonl truncate failed", {
+      chatSessionId,
+      error: String(truncErr),
+    });
+  }
+}
+
 async function runAgentInBackground(params: BackgroundRunParams): Promise<void> {
   const { decoratedMessage, role, chatSessionId, claudeSessionId, abortSignal, resultsFilePath, requestStartedAt, toolArgsCache, attachments, userTimezone } =
     params;
@@ -498,6 +537,7 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
       message: String(err),
     });
   } finally {
+    await rollbackJsonlIfCancelled(chatSessionId);
     endRun(chatSessionId);
     // Commented out: this would create a duplicate notification.
     //
