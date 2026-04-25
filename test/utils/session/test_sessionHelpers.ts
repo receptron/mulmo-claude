@@ -136,6 +136,41 @@ describe("undoLastTurn", () => {
     assert.equal(session.selectedResultUuid, survivor.uuid);
   });
 
+  it("arms the cancel-rebroadcast guard so a delayed SSE re-insert is dropped (#822 race)", () => {
+    // The bug: server pushes the user message via pushSessionEvent
+    // BEFORE the agent runs. A fast Stop click leaves that broadcast
+    // in transit. Without this guard, `applyTextEvent` re-inserts
+    // the cancelled message after we just removed it.
+    const session = createEmptySession("s1", "general");
+    beginUserTurn(session, "first send");
+    undoLastTurn(session);
+    assert.equal(session.toolResults.length, 0);
+
+    // Simulate the delayed SSE delivery of the same text.
+    applyTextEvent(session, "first send", "user");
+    assert.equal(session.toolResults.length, 0, "delayed user-text broadcast must not undo the undo");
+    // Guard is one-shot — second arrival of the same text is NOT
+    // dropped (would mask a real new send with identical text).
+    applyTextEvent(session, "first send", "user");
+    assert.equal(session.toolResults.length, 1, "guard must consume on first match only");
+  });
+
+  it("a fresh beginUserTurn clears the cancel-guard so identical retypes still register", () => {
+    // User cancels "hello", then retypes "hello" verbatim. The
+    // guard must NOT silence the new send — beginUserTurn clears
+    // pendingDropUserText.
+    const session = createEmptySession("s1", "general");
+    beginUserTurn(session, "hello");
+    undoLastTurn(session);
+    // Re-send with identical text.
+    beginUserTurn(session, "hello");
+    assert.equal(session.toolResults.length, 1);
+    // SSE rebroadcast of the new send (same text again) gets
+    // deduped by isDuplicateUserText, not the cancel guard.
+    applyTextEvent(session, "hello", "user");
+    assert.equal(session.toolResults.length, 1);
+  });
+
   it("bails out (no-op) when the boundary doesn't point at a user message", () => {
     // Defensive guard: if some race / corrupt state leaves
     // runStartIndex pointing at an assistant result, don't shred

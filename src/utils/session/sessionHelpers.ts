@@ -33,6 +33,13 @@ export function beginUserTurn(session: ActiveSession, message: string): void {
   session.updatedAt = new Date().toISOString();
   pushResult(session, makeTextResult(message, "user"));
   session.runStartIndex = session.toolResults.length;
+  // A fresh send always wins over a stale "drop the last cancel"
+  // marker — even if the user retypes the exact same text we just
+  // cancelled, that re-send must NOT be silenced.
+  session.pendingDropUserText = null;
+  // Defensively clear the transcript-refresh skip too — a fresh
+  // turn replaces any pending undo state.
+  session.skipNextTranscriptRefresh = false;
 }
 
 /** Append text to the last assistant text-response if one exists.
@@ -62,6 +69,15 @@ function isDuplicateUserText(session: ActiveSession, message: string): boolean {
  *  result when appropriate. */
 export function applyTextEvent(session: ActiveSession, message: string, source: "user" | "assistant"): void {
   if (source === "user") {
+    // Cancelled-broadcast guard (#822): the server emits the user
+    // message via pushSessionEvent BEFORE running the agent, so a
+    // fast Stop click can leave that broadcast in transit. When it
+    // arrives after `undoLastTurn` has already wiped the message
+    // locally, dropping it once here prevents a re-insertion.
+    if (session.pendingDropUserText === message) {
+      session.pendingDropUserText = null;
+      return;
+    }
     if (!isDuplicateUserText(session, message)) {
       pushResult(session, makeTextResult(message, "user"));
       session.runStartIndex = session.toolResults.length;
@@ -108,6 +124,13 @@ export function undoLastTurn(session: ActiveSession): { restoredText: string | n
   // Drop selection if it pointed inside the removed range.
   if (session.selectedResultUuid && removed.some((item) => item.uuid === session.selectedResultUuid)) {
     session.selectedResultUuid = null;
+  }
+  // Arm the one-shot cancel guard so a delayed SSE rebroadcast of
+  // this user message (server pushes it pre-run, may still be in
+  // transit) doesn't undo our undo. Cleared by either applyTextEvent
+  // (drop the matching event) or beginUserTurn (next fresh send).
+  if (restoredText !== null) {
+    session.pendingDropUserText = restoredText;
   }
   return { restoredText };
 }

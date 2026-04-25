@@ -737,6 +737,15 @@ async function loadSession(sessionId: string) {
 async function refreshSessionTranscript(sessionId: string): Promise<void> {
   const session = sessionMap.get(sessionId);
   if (!session) return;
+  // One-shot skip: a Stop-button cancel just spliced the cancelled
+  // turn locally, and the server jsonl still has it on disk
+  // (server-side truncation is a deferred follow-up to #821). Without
+  // this guard the next refresh re-inserts what the user just
+  // removed.
+  if (session.skipNextTranscriptRefresh) {
+    session.skipNextTranscriptRefresh = false;
+    return;
+  }
   const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
   if (!response.ok) return;
   const serverResults = parseSessionEntries(response.data);
@@ -826,26 +835,41 @@ function unsubscribeSession(chatSessionId: string): void {
 async function cancelActiveRun(): Promise<void> {
   const sessionId = currentSessionId.value;
   if (!sessionId) return;
-  console.info("[agent] cancel requested", { chatSessionId: sessionId });
+  // Snapshot the running state at click time. If we were running
+  // when the user clicked Stop, we should undo the local turn
+  // regardless of whether the server confirms the cancel — `ok=false`
+  // also covers the "another tab already cancelled it" race, and in
+  // that race the user still expects their draft restored. Codex iter-1
+  // #822: gating only on transport `ok` was too coarse.
+  const wasRunning = activeSessionRunning.value;
+  console.info("[agent] cancel requested", { chatSessionId: sessionId, wasRunning });
   const result = await apiPost<{ ok: boolean }>(API_ROUTES.agent.cancel, { chatSessionId: sessionId });
   if (!result.ok) {
     console.warn("[agent] cancel POST failed", { chatSessionId: sessionId, error: result.error });
     return;
   }
-  // `data.ok=false` means there was no run in flight (already
-  // finished, duplicate Stop click). Skip the local undo too — the
-  // turn either landed cleanly or was already undone by a prior
-  // click; either way there's nothing to peel off here.
   if (!result.data?.ok) {
-    console.info("[agent] cancel was a no-op (no run in flight)", { chatSessionId: sessionId });
-    return;
+    console.info("[agent] cancel was a no-op on the server", { chatSessionId: sessionId, wasRunning });
   }
+  // Only undo when we believed a run was in flight at click time.
+  // The button itself only renders while running, but the SSE
+  // session-finished event can flip `isRunning` between render and
+  // click — in that natural-finish race we must NOT shred the
+  // legitimately-completed turn.
+  if (!wasRunning) return;
   const session = sessionMap.get(sessionId);
   if (!session) return;
   const { restoredText } = undoLastTurn(session);
   if (restoredText !== null) {
     userInput.value = restoredText;
     nextTick(() => focusChatInput());
+    // Block the upcoming session_finished-driven transcript refresh
+    // exactly once. The server jsonl still has the cancelled user
+    // message (server-side truncation is a deferred follow-up), and
+    // refreshSessionTranscript would replace our just-spliced state
+    // with the longer server view, instantly re-inserting what we
+    // just removed (#822 second-race).
+    session.skipNextTranscriptRefresh = true;
   }
 }
 
