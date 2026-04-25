@@ -308,22 +308,12 @@ function navigateToSession(sessionId: string, replace = false): void {
 function handleNotificationNavigate(action: NotificationAction): void {
   const target = resolveNotificationTarget(action);
   if (!target) return;
-  // Chat permalinks need to keep the user's current role hint so
-  // navigating from a notification doesn't silently reset the role
-  // selector. Merge `?role=` (when non-default) into whatever query
-  // the dispatcher already produced (`?result=` if any).
-  const merged = mergeRoleQuery(target);
-  router.push(merged).catch(() => {});
-}
-
-function mergeRoleQuery(target: ReturnType<typeof resolveNotificationTarget>): NonNullable<ReturnType<typeof resolveNotificationTarget>> {
-  if (!target) return target as never;
-  if (typeof target !== "object" || !("name" in target) || target.name !== PAGE_ROUTES.chat) return target;
-  const roleQuery = buildRoleQuery();
-  if (Object.keys(roleQuery).length === 0) return target;
-  // target.query may be undefined (no resultUuid) or { result: ... }
-  const existingQuery = (target.query as Record<string, string> | undefined) ?? {};
-  return { ...target, query: { ...existingQuery, ...roleQuery } };
+  // No special-casing for chat targets: PR #774 moved the role
+  // selector's state into the `useCurrentRole` singleton, so the
+  // role no longer needs to be pinned via `?role=` on every
+  // session-navigate. router.push(target) keeps the user's
+  // current role choice across the navigation automatically.
+  router.push(target).catch(() => {});
 }
 
 // External URL changes (back/forward button, typed URL) → update ref.
