@@ -14,6 +14,7 @@ const ptBRMessages = {
     saved: "Salvo",
     noResultsYet: "Ainda não há resultados",
     noImageYet: "Ainda não há imagem",
+    sendChat: "Iniciar um novo chat",
   },
   sessionTabBar: {
     newSession: "Nova sessão",
@@ -364,7 +365,6 @@ const ptBRMessages = {
     empty: "O wiki está vazio. Peça ao Wiki Manager para ingerir uma fonte.",
     previewMore: "+ {count} mais…",
     chatPlaceholder: "Pergunte sobre esta página…",
-    chatSend: "Iniciar um novo chat sobre esta página",
     emptyPage: 'A página "{title}" ainda não existe.',
     emptyContent: 'A página "{title}" existe, mas não tem conteúdo.',
     createPage: "Solicitar a criação desta página wiki",
@@ -395,6 +395,7 @@ const ptBRMessages = {
     noBody: "Sem conteúdo — abra o artigo original.",
     bodyError: "Falha ao carregar o conteúdo: {error}",
     loadError: "Falha ao carregar notícias: {error}",
+    chatPlaceholder: "Pergunte o que quiser sobre este artigo",
   },
   pluginManageSource: {
     titlePlaceholder: "Título (opcional)",

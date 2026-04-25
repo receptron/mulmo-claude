@@ -185,30 +185,12 @@
          WikiView is mounted as a manageWiki tool result inside /chat:
          the enclosing chat already has its own composer, and spawning
          a nested new session from there is confusing. -->
-    <div v-if="action === 'page' && content && isStandaloneWikiRoute" class="border-t border-gray-200 px-4 py-3 shrink-0 bg-gray-50">
-      <div class="flex gap-2">
-        <textarea
-          v-model="chatDraft"
-          data-testid="wiki-page-chat-input"
-          :placeholder="t('pluginWiki.chatPlaceholder')"
-          rows="2"
-          class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none"
-          @compositionstart="imeEnter.onCompositionStart"
-          @compositionend="imeEnter.onCompositionEnd"
-          @keydown="imeEnter.onKeydown"
-          @blur="imeEnter.onBlur"
-        />
-        <button
-          data-testid="wiki-page-chat-send"
-          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-start"
-          :title="t('pluginWiki.chatSend')"
-          :disabled="!canSendChat"
-          @click="submitChat"
-        >
-          <span class="material-icons text-base leading-none">send</span>
-        </button>
-      </div>
-    </div>
+    <PageChatComposer
+      v-if="action === 'page' && content && isStandaloneWikiRoute && currentSlug() !== null"
+      :placeholder="t('pluginWiki.chatPlaceholder')"
+      :prepend-text="`Before answering, read the wiki page at data/wiki/pages/${currentSlug()}.md.`"
+      test-id-prefix="wiki-page-chat"
+    />
   </div>
 </template>
 
@@ -222,10 +204,10 @@ import type { WikiData, WikiPageEntry } from "./index";
 import { handleExternalLinkClick } from "../../utils/dom/externalLink";
 import { classifyWorkspacePath, resolveWikiHref } from "../../utils/path/workspaceLinkRouter";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
-import { useImeAwareEnter } from "../../composables/useImeAwareEnter";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useAppApi } from "../../composables/useAppApi";
 import { renderWikiLinks } from "./helpers";
+import PageChatComposer from "../../components/PageChatComposer.vue";
 import { BUILTIN_ROLE_IDS } from "../../config/roles";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { extractFrontmatter } from "../../utils/format/frontmatter";
@@ -459,10 +441,8 @@ function navigatePage(pageName: string) {
 
 // --- Per-page chat composer ---
 const appApi = useAppApi();
-const chatDraft = ref("");
 
 const isStandaloneWikiRoute = computed(() => route.name === PAGE_ROUTES.wiki);
-const canSendChat = computed(() => chatDraft.value.trim().length > 0 && currentSlug() !== null);
 
 // Always route wiki create/update CTAs through BUILTIN_ROLE_IDS.general
 // (the wiki-capable role) so the new chat has the tools needed to
@@ -496,17 +476,6 @@ function currentSlug(): string | null {
       : (props.selectedResult?.data?.pageName ?? null);
   return isSafeWikiSlug(raw) ? raw : null;
 }
-
-function submitChat() {
-  const text = chatDraft.value.trim();
-  const slug = currentSlug();
-  if (!text || !slug) return;
-  const prompt = `Before answering, read the wiki page at data/wiki/pages/${slug}.md.\n\n${text}`;
-  chatDraft.value = "";
-  appApi.startNewChat(prompt);
-}
-
-const imeEnter = useImeAwareEnter(submitChat);
 
 /** Base directory for wiki content, adjusted by the current view. */
 const WIKI_BASE_DIR = computed(() => (action.value === "page" ? "data/wiki/pages" : "data/wiki"));
