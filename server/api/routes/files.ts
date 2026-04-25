@@ -9,6 +9,8 @@ import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
 import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
+import { log } from "../../system/logger/index.js";
+import { previewSnippet } from "../../utils/logPreview.js";
 
 const router = Router();
 
@@ -476,6 +478,7 @@ export async function listDirShallow(absPath: string, relPath: string, gitFilter
 }
 
 router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown, object>, res: Response<TreeNode | ErrorResponse>) => {
+  log.info("files", "GET tree: start");
   try {
     // Start with an empty filter — the workspace root's .gitignore
     // is for git (excluding github/ from commits), NOT for the
@@ -486,6 +489,7 @@ router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown,
     const tree = await buildTreeAsync(workspaceReal, "");
     res.json(tree);
   } catch (err) {
+    log.error("files", "GET tree: threw", { error: errorMessage(err) });
     serverError(res, `Failed to read workspace: ${errorMessage(err)}`);
   }
 });
@@ -495,16 +499,19 @@ router.get(API_ROUTES.files.tree, async (_req: Request<object, unknown, unknown,
 // `path` is optional; empty / missing = workspace root.
 router.get(API_ROUTES.files.dir, async (req: Request<object, unknown, unknown, PathQuery>, res: Response<TreeNode | ErrorResponse>) => {
   const relPath = getOptionalStringQuery(req, "path") ?? "";
+  log.info("files", "GET dir: start", { pathPreview: previewSnippet(relPath) });
 
   // Reference directory branch — resolve against the registered ref dir
   if (isRefPath(relPath)) {
     const absPath = resolveRefPath(relPath);
     if (!absPath) {
+      log.warn("files", "GET dir: ref dir not found", { pathPreview: previewSnippet(relPath) });
       notFound(res, "Not found");
       return;
     }
     const stat = await statSafeAsync(absPath);
     if (!stat || !stat.isDirectory()) {
+      log.warn("files", "GET dir: ref path missing or not a dir", { pathPreview: previewSnippet(relPath) });
       notFound(res, "Not found");
       return;
     }
@@ -516,15 +523,18 @@ router.get(API_ROUTES.files.dir, async (req: Request<object, unknown, unknown, P
   // Workspace path — existing logic
   const absPath = resolveSafe(relPath);
   if (!absPath) {
+    log.warn("files", "GET dir: path outside workspace", { pathPreview: previewSnippet(relPath) });
     notFound(res, "Not found");
     return;
   }
   const stat = await statSafeAsync(absPath);
   if (!stat) {
+    log.warn("files", "GET dir: not found", { pathPreview: previewSnippet(relPath) });
     notFound(res, "Not found");
     return;
   }
   if (!stat.isDirectory()) {
+    log.warn("files", "GET dir: not a directory", { pathPreview: previewSnippet(relPath) });
     badRequest(res, "path is not a directory");
     return;
   }
@@ -542,6 +552,7 @@ router.get(API_ROUTES.files.dir, async (req: Request<object, unknown, unknown, P
     const listing = await listDirShallow(absPath, path.relative(workspaceReal, absPath), filter);
     res.json(listing);
   } catch (err) {
+    log.error("files", "GET dir: threw", { pathPreview: previewSnippet(relPath), error: errorMessage(err) });
     serverError(res, `Failed to read directory: ${errorMessage(err)}`);
   }
 });
@@ -624,8 +635,16 @@ function resolveAndStatFile<T>(
 }
 
 router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, PathQuery>, res: Response<FileContentResponse | ErrorResponse>) => {
+  const requestedPath = getOptionalStringQuery(req, "path") ?? "";
+  log.info("files", "GET content: start", { pathPreview: previewSnippet(requestedPath) });
   const ctx = resolveAndStatFile(req, res);
-  if (!ctx) return;
+  if (!ctx) {
+    // resolveAndStatFile already wrote the 4xx; surface the gate
+    // miss so the operator can correlate the user-visible error
+    // with a concrete reason in the log without re-running.
+    log.warn("files", "GET content: gated by resolve/stat", { pathPreview: previewSnippet(requestedPath) });
+    return;
+  }
   const { relPath, absPath, stat } = ctx;
 
   const meta = {
@@ -671,9 +690,11 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
   try {
     content = readFileSync(absPath, "utf-8");
   } catch (err) {
+    log.error("files", "GET content: read threw", { pathPreview: previewSnippet(relPath), error: errorMessage(err) });
     serverError(res, `Failed to read file: ${errorMessage(err)}`);
     return;
   }
+  log.info("files", "GET content: ok", { pathPreview: previewSnippet(relPath), bytes: stat.size });
   res.json({ kind: "text", ...meta, content });
 });
 
@@ -683,15 +704,22 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
 // The file must already exist; creating new files is out of scope.
 router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteContentRequest>, res: Response<WriteContentResponse | ErrorResponse>) => {
   const { path: relPathRaw, content: contentRaw } = req.body ?? {};
+  log.info("files", "PUT content: start", {
+    pathPreview: typeof relPathRaw === "string" ? previewSnippet(relPathRaw) : undefined,
+    bytes: typeof contentRaw === "string" ? Buffer.byteLength(contentRaw, "utf-8") : undefined,
+  });
   if (typeof relPathRaw !== "string" || relPathRaw.length === 0) {
+    log.warn("files", "PUT content: missing path");
     badRequest(res, "path required");
     return;
   }
   if (typeof contentRaw !== "string") {
+    log.warn("files", "PUT content: missing content", { pathPreview: previewSnippet(relPathRaw) });
     badRequest(res, "content required");
     return;
   }
   if (Buffer.byteLength(contentRaw, "utf-8") > MAX_PREVIEW_BYTES) {
+    log.warn("files", "PUT content: too large", { pathPreview: previewSnippet(relPathRaw), bytes: Buffer.byteLength(contentRaw, "utf-8") });
     badRequest(res, `content exceeds ${MAX_PREVIEW_BYTES} byte limit`);
     return;
   }
@@ -730,10 +758,15 @@ router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteC
     // other's staging file and race through the rename.
     await writeFileAtomic(absPath, contentRaw, { uniqueTmp: true });
   } catch (err) {
+    log.error("files", "PUT content: write threw", { pathPreview: previewSnippet(relPathRaw), error: errorMessage(err) });
     serverError(res, `Failed to write file: ${errorMessage(err)}`);
     return;
   }
   const fresh = await statSafeAsync(absPath);
+  log.info("files", "PUT content: ok", {
+    pathPreview: previewSnippet(relPathRaw),
+    bytes: fresh?.size ?? Buffer.byteLength(contentRaw, "utf-8"),
+  });
   res.json({
     path: relPathRaw,
     size: fresh?.size ?? Buffer.byteLength(contentRaw, "utf-8"),
@@ -742,11 +775,17 @@ router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteC
 });
 
 router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQuery>, res: Response<ErrorResponse>) => {
+  const requestedPath = getOptionalStringQuery(req, "path") ?? "";
+  log.info("files", "GET raw: start", { pathPreview: previewSnippet(requestedPath) });
   const ctx = resolveAndStatFile(req, res);
-  if (!ctx) return;
+  if (!ctx) {
+    log.warn("files", "GET raw: gated by resolve/stat", { pathPreview: previewSnippet(requestedPath) });
+    return;
+  }
   const { absPath, stat } = ctx;
 
   if (stat.size > MAX_RAW_BYTES) {
+    log.warn("files", "GET raw: too large", { pathPreview: previewSnippet(requestedPath), bytes: stat.size });
     sendError(res, 413, `File too large to stream (${stat.size} bytes, limit ${MAX_RAW_BYTES})`);
     return;
   }
@@ -795,6 +834,7 @@ router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQue
 // prefix so subsequent /dir and /content requests route correctly.
 
 router.get(API_ROUTES.files.refRoots, async (_req: Request, res: Response<TreeNode[]>) => {
+  log.info("files", "GET ref-roots: start");
   const entries = getCachedReferenceDirs();
   const nodes: TreeNode[] = [];
   for (const entry of entries) {
@@ -807,6 +847,7 @@ router.get(API_ROUTES.files.refRoots, async (_req: Request, res: Response<TreeNo
       modifiedMs: stat.mtimeMs,
     });
   }
+  log.info("files", "GET ref-roots: ok", { configured: entries.length, mounted: nodes.length });
   res.json(nodes);
 });
 
