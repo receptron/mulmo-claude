@@ -631,7 +631,15 @@ function onTaskCheckboxClick(event: MouseEvent, target: HTMLInputElement): void 
   // the chain has been broken (by a prior failure) by the time it
   // runs. See `persistWikiPage` for the semantics.
   const generation = saveQueueGeneration;
-  taskPersistChain = taskPersistChain.then(() => persistWikiPage(pageName, newContent, generation));
+  // `.catch` keeps the chain self-healing: if `persistWikiPage`
+  // throws (e.g. its post-failure `refresh()` rejects with a network
+  // error), an un-caught rejection would leave `taskPersistChain` in
+  // a permanently-rejected state, and every subsequent click's
+  // `.then()` would short-circuit silently — no more toggles ever
+  // persist. Swallow the rejection here so the next click starts
+  // from a fresh resolved chain. The error is already surfaced via
+  // `navError` inside `persistWikiPage`'s `!response.ok` branch.
+  taskPersistChain = taskPersistChain.then(() => persistWikiPage(pageName, newContent, generation)).catch(() => undefined);
 }
 
 function handleContentClick(event: MouseEvent) {
