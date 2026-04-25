@@ -594,7 +594,11 @@ router.post(API_ROUTES.wiki.base, async (req: Request<object, unknown, WikiBody>
       }
       case "lint_report": {
         const response = await buildLintReportResponse(action);
-        log.info("wiki", "POST lint_report: ok", { issues: response.message });
+        // `summary` not `issues`: the field is the human-readable
+        // result string ("Wiki is healthy" / "N issue(s) found"),
+        // not a count. Aggregators that group by `issues` would
+        // otherwise treat the same string as a numeric facet.
+        log.info("wiki", "POST lint_report: ok", { summary: response.message });
         res.json(response);
         return;
       }
