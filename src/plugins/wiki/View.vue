@@ -271,9 +271,14 @@ const navError = ref<string | null>(null);
 
 const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
-  // fetch that page by slug; otherwise fetch the index.
+  // fetch that page by slug; otherwise fetch the index. Reads the
+  // slug via `currentSlug()` so both mount paths are covered —
+  // standalone /wiki/<slug> via route params, embedded WikiView via
+  // selectedResult. Reading only from selectedResult would make a
+  // failed-save `refresh()` reload the index instead of the page
+  // and clobber the user's view (#775 / codex iter 2).
   endpoint: () => {
-    const slug = action.value === "page" ? props.selectedResult?.data?.pageName : undefined;
+    const slug = action.value === "page" ? currentSlug() : null;
     return slug ? `${API_ROUTES.wiki.base}?slug=${encodeURIComponent(slug)}` : API_ROUTES.wiki.base;
   },
   extract: (json) => (json as { data?: WikiData }).data ?? null,
