@@ -1,9 +1,9 @@
-// Composable that owns the active role list, the currently
-// selected role id, and the refresh-from-server fetch. The merge
-// rule lives in src/utils/roleMerge so it can be unit-tested
-// independently.
+// Composable that owns the active role list and its server-merge
+// fetch. The selected role is owned by SessionHeaderControls via
+// useCurrentRole — selection is a UI-local concern and lives next
+// to the dropdown that drives it.
 
-import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { ref, type Ref } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
 import { ROLES, type Role } from "../config/roles";
 import { mergeRoles } from "../utils/role/merge";
@@ -11,13 +11,9 @@ import { apiGet } from "../utils/api";
 
 export function useRoles(): {
   roles: Ref<Role[]>;
-  currentRoleId: Ref<string>;
-  currentRole: ComputedRef<Role>;
   refreshRoles: () => Promise<void>;
 } {
   const roles = ref<Role[]>(ROLES);
-  const currentRoleId = ref(ROLES[0].id);
-  const currentRole = computed(() => roles.value.find((role) => role.id === currentRoleId.value) ?? roles.value[0]);
 
   async function refreshRoles(): Promise<void> {
     const result = await apiGet<Role[]>(API_ROUTES.roles.list);
@@ -30,5 +26,5 @@ export function useRoles(): {
     roles.value = mergeRoles(ROLES, result.data);
   }
 
-  return { roles, currentRoleId, currentRole, refreshRoles };
+  return { roles, refreshRoles };
 }

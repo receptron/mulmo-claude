@@ -27,7 +27,6 @@
       <div v-if="!sidePanelVisible" class="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
         <div class="w-[264px] shrink-0">
           <SessionHeaderControls
-            v-model:current-role-id="currentRoleId"
             :roles="roles"
             :side-panel-visible="sidePanelVisible"
             :active-session-count="activeSessionCount"
@@ -62,7 +61,6 @@
              button, so no second row is needed. -->
         <div class="flex items-center px-3 py-2 border-b border-gray-100">
           <SessionHeaderControls
-            v-model:current-role-id="currentRoleId"
             :roles="roles"
             :side-panel-visible="sidePanelVisible"
             :active-session-count="activeSessionCount"
@@ -106,7 +104,7 @@
         />
 
         <!-- Sample queries (expandable pane) -->
-        <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
+        <SuggestionsPanel ref="suggestionsPanelRef" :queries="sessionRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
 
         <!-- Text input -->
         <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="activeSessionRunning" @send="sendMessage()" />
@@ -160,7 +158,7 @@
         <!-- Bottom bar (Stack chat only — plugin views have no
              session context, so no chat input is shown) -->
         <div v-if="isChatPage && layoutMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
-          <SuggestionsPanel ref="suggestionsPanelRef" :queries="currentRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
+          <SuggestionsPanel ref="suggestionsPanelRef" :queries="sessionRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
           <ChatInput ref="chatInputRef" v-model="userInput" v-model:pasted-file="pastedFile" :is-running="activeSessionRunning" @send="sendMessage()" />
         </div>
       </div>
@@ -173,7 +171,7 @@
         ref="rightSidebarRef"
         :tool-call-history="toolCallHistory"
         :available-tools="availableTools"
-        :role-prompt="currentRole.prompt"
+        :role-prompt="sessionRole.prompt"
         :tool-descriptions="toolDescriptions"
       />
     </div>
@@ -249,7 +247,8 @@ import { useSidePanelVisible } from "./composables/useSidePanelVisible";
 import { useSelectedResult } from "./composables/useSelectedResult";
 import { useMcpTools } from "./composables/useMcpTools";
 import { useRoles } from "./composables/useRoles";
-import { BUILTIN_ROLE_IDS } from "./config/roles";
+import { useCurrentRole } from "./composables/useCurrentRole";
+import { BUILTIN_ROLE_IDS, type Role } from "./config/roles";
 import { usePubSub } from "./composables/usePubSub";
 import { sessionChannel } from "./config/pubsubChannels";
 import { useHealth } from "./composables/useHealth";
@@ -293,20 +292,12 @@ const { subscribe: pubsubSubscribe } = usePubSub();
 const route = useRoute();
 const router = useRouter();
 
-// Omit ?role= for the default role to keep URLs clean.
-function buildRoleQuery(): Record<string, string> {
-  const roleId = currentRoleId.value;
-  if (!roleId || roles.value.length === 0 || roleId === roles.value[0]?.id) return {};
-  return { role: roleId };
-}
-
 function navigateToSession(sessionId: string, replace = false): void {
   currentSessionId.value = sessionId;
   const method = replace ? router.replace : router.push;
   method({
     name: PAGE_ROUTES.chat,
     params: { sessionId },
-    query: buildRoleQuery(),
   }).catch((err) => {
     if (err?.type !== 16) {
       console.error("[navigateToSession] push failed:", err);
@@ -341,7 +332,17 @@ watch(
 );
 
 // --- Global state ---
-const { roles, currentRoleId, currentRole, refreshRoles } = useRoles();
+// `roles` is the merged list (built-in + custom). `currentRoleId`
+// is the role-selector dropdown's current pick — App.vue reads it
+// as the fallback in createNewSession() so plugin callers like
+// wiki's `appApi.startNewChat(message)` (no roleId) start their
+// chat in whatever role the user last selected, instead of silently
+// reverting to the first built-in role. Writes to `currentRoleId`
+// happen only inside SessionHeaderControls (the dropdown owner).
+// Code that needs "the role of the conversation in progress" reads
+// `sessionRole` below, which derives from the active session.
+const { roles, refreshRoles } = useRoles();
+const { currentRoleId } = useCurrentRole(roles);
 
 const userInput = ref("");
 const pastedFile = ref<PastedFile | null>(null);
@@ -386,6 +387,20 @@ const sessionRoleIcon = computed(() => {
   const roleId = activeSession.value?.roleId;
   if (!roleId) return "";
   return roleIcon(roles.value, roleId);
+});
+
+// Role of the conversation in progress. Drives the suggested-query
+// list, the right-sidebar role-prompt, and the MCP tool filter so
+// they all match the active session (not the role-selector
+// dropdown — which is owned by SessionHeaderControls and whose
+// selection only matters at "+" / role-change time).
+const sessionRole = computed<Role>(() => {
+  const sessionRoleId = activeSession.value?.roleId;
+  if (sessionRoleId) {
+    const match = roles.value.find((role) => role.id === sessionRoleId);
+    if (match) return match;
+  }
+  return roles.value[0];
 });
 
 // ── Dynamic favicon (#470) ──────────────────────────────────
@@ -478,9 +493,9 @@ function handleSessionSelect(sessionId: string): void {
   loadSession(sessionId);
 }
 
-function handleNewSessionClick(): void {
+function handleNewSessionClick(roleId: string): void {
   sidePanelExpanded.value = false;
-  createNewSession();
+  createNewSession(roleId);
 }
 
 function handleHomeClick(): void {
@@ -490,7 +505,7 @@ function handleHomeClick(): void {
 const rightSidebarRef = ref<InstanceType<typeof RightSidebar> | null>(null);
 
 const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } = useMcpTools({
-  currentRole,
+  currentRole: sessionRole,
   getDefinition: (name) => getPlugin(name)?.toolDefinition ?? null,
 });
 
@@ -587,7 +602,13 @@ function removeCurrentIfEmpty(): boolean {
 function createNewSession(roleId?: string): ActiveSession {
   const removedEmpty = removeCurrentIfEmpty();
   const replace = removedEmpty && isChatPage.value;
-  const rId = roleId ?? currentRoleId.value;
+  // The "+" button and role-change handler always supply roleId
+  // (read from SessionHeaderControls). When omitted (plugin-driven
+  // startNewChat, initial bootstrap, post-failure recovery) inherit
+  // the dropdown's current selection so the new chat uses the role
+  // the user last picked. Final fallback to roles[0] only matters
+  // before the dropdown has seeded (very early bootstrap).
+  const rId = roleId ?? (currentRoleId.value || roles.value[0]?.id || "");
   const session = createEmptySession(uuidv4(), rId);
   sessionMap.set(session.id, session);
   navigateToSession(session.id, replace);
@@ -596,14 +617,14 @@ function createNewSession(roleId?: string): ActiveSession {
   return sessionMap.get(session.id)!;
 }
 
-function onRoleChange() {
+function onRoleChange(roleId: string) {
   // On non-chat pages (wiki, files, etc.) the user is just picking
   // the role that future new-chat actions should use — don't yank
-  // them onto /chat by creating a session here. currentRoleId is
-  // already updated by RoleSelector's v-model, so future "+" clicks
-  // or composer sends will pick it up.
+  // them onto /chat by creating a session here. The new selection
+  // is preserved inside SessionHeaderControls (useCurrentRole) and
+  // future "+" clicks will read it from there.
   if (!isChatPage.value) return;
-  const session = createNewSession(currentRoleId.value);
+  const session = createNewSession(roleId);
   maybeSeedRoleDefault(session);
 }
 
@@ -667,7 +688,7 @@ async function loadSession(sessionId: string) {
   const newSession = buildLoadedSession({
     id: sessionId,
     entries: response.data,
-    defaultRoleId: currentRoleId.value,
+    defaultRoleId: roles.value[0]?.id ?? "",
     urlResult: typeof route.query.result === "string" ? route.query.result : null,
     serverSummary: sessions.value.find((summary) => summary.id === sessionId),
     nowIso: new Date().toISOString(),
@@ -767,7 +788,6 @@ async function sendMessage(text?: string) {
   if (!session) return;
 
   beginUserTurn(session, message);
-  const sessionRole = roles.value.find((role) => role.id === session.roleId) ?? roles.value[0];
   const selectedRes = session.toolResults.find((result) => result.uuid === session.selectedResultUuid) ?? undefined;
 
   ensureSessionSubscription(session);
@@ -775,7 +795,7 @@ async function sendMessage(text?: string) {
   const result = await postAgentRun(
     buildAgentRequestBody({
       message,
-      role: sessionRole,
+      role: sessionRole.value,
       chatSessionId: session.id,
       selectedImageData: fileSnapshot?.dataUrl ?? extractImageData(selectedRes),
     }),
