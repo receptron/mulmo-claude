@@ -20,14 +20,14 @@ export type Summarize = (systemPrompt: string, userPrompt: string) => Promise<st
 // that a wedged subprocess doesn't tie up resources forever.
 const CLI_TIMEOUT_MS = CLI_SUBPROCESS_TIMEOUT_MS;
 
-// Sentinel we throw on ENOENT so maybeRunJournal can disable the
-// feature for the rest of the server lifetime instead of retrying
-// on every session-end. Re-used by chat-index / sources for the
-// same intent — the `claude` CLI is a project-wide optional dep,
-// not journal-specific.
+// Sentinel thrown on ENOENT. Each subsystem catches this and decides
+// what to do — journal disables itself for the rest of the server
+// lifetime; chat-index / sources log and skip. The message is
+// subsystem-neutral so callers logging `err.message` verbatim (e.g.
+// chat-index) don't surface a misleading "journal disabled" warning.
 export class ClaudeCliNotFoundError extends Error {
   constructor() {
-    super("[journal] `claude` CLI is not available on PATH — journal disabled");
+    super("`claude` CLI is not available on PATH");
     this.name = "ClaudeCliNotFoundError";
   }
 }
@@ -36,7 +36,7 @@ export class ClaudeCliFailedError extends Error {
   readonly exitCode: number | null;
   readonly stderr: string;
   constructor(exitCode: number | null, stderr: string) {
-    super(`[journal] \`claude\` CLI exited ${exitCode ?? "(killed)"}: ${stderr.slice(0, 500)}`);
+    super(`\`claude\` CLI exited ${exitCode ?? "(killed)"}: ${stderr.slice(0, 500)}`);
     this.name = "ClaudeCliFailedError";
     this.exitCode = exitCode;
     this.stderr = stderr;
