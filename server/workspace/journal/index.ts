@@ -9,9 +9,9 @@
 //
 // ── Architecture (#799) ──────────────────────────────────────────
 //
-// Three independent pipelines run from the same entry point. Each
-// has its own cadence, its own state-machine slot, and its own
-// outputs:
+// Two top-level passes hang off `maybeRunJournal()`, each with its
+// own cadence and its own state-machine slot. Memory extraction is
+// a sub-step of the daily pass, not a peer pipeline.
 //
 //   session-end
 //     │
@@ -23,18 +23,23 @@
 //           │                        mtime, buckets events by local
 //           │                        date, calls `claude` CLI once
 //           │                        per day, writes daily summaries
-//           │                        + topics + state checkpoint
+//           │                        + topics + state checkpoint.
+//           │     │
+//           │     │  early-returns when no dirty sessions; otherwise
+//           │     │  at the end of the per-day loop:
+//           │     │
+//           │     └─> extractAndAppendMemory
+//           │           memoryExtractor.ts  scans the day's new
+//           │                              daily file for memory-
+//           │                              worthy facts, appends to
+//           │                              the user's ~/.claude/
+//           │                              memory.md.
 //           │
-//           ├─> runOptimizationPass  (≥ 7 d since last)
-//           │     optimizationPass.ts reads existing topics, asks
-//           │                        the LLM to merge duplicates /
-//           │                        archive stale ones, writes back
-//           │                        and updates archive/
-//           │
-//           └─> extractAndAppendMemory  (end of every daily pass)
-//                 memoryExtractor.ts  scans the new daily file for
-//                                    memory-worthy facts, appends
-//                                    to the user's global memory.md
+//           └─> runOptimizationPass  (≥ 7 d since last)
+//                 optimizationPass.ts reads existing topics, asks
+//                                    the LLM to merge duplicates /
+//                                    archive stale ones, writes back
+//                                    and updates archive/.
 //
 // _index.md is rebuilt at the end of every successful pass so the
 // UI's directory listing reflects whatever was just written.
