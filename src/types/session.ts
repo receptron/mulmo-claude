@@ -114,4 +114,28 @@ export interface ActiveSession {
    * views read those fields directly. Empty map = no background work.
    */
   pendingGenerations: Record<string, PendingGeneration>;
+  /**
+   * One-shot pointer set by `undoLastTurn` (Stop button cancel,
+   * #821 / #822) to the text of the just-removed user message. The
+   * server pushes the user message via `pushSessionEvent` BEFORE
+   * starting the agent run, so a cancel that fires fast can race
+   * with the SSE delivery and re-insert the cancelled message.
+   * `applyTextEvent` consumes this slot on the next matching user
+   * text and clears it; `beginUserTurn` clears it on the next send
+   * so a stale pointer can't drop a fresh message that happens to
+   * have identical text.
+   */
+  pendingDropUserText?: string | null;
+  /**
+   * One-shot flag set by `cancelActiveRun` after a successful local
+   * undo. The post-run `refreshSessionTranscript` re-fetches the
+   * session jsonl from the server and replaces `toolResults` when
+   * the server has more entries — but the server's jsonl still
+   * contains the cancelled turn (server-side truncation is a
+   * deferred follow-up), so without this guard the cancelled
+   * message immediately reappears. The flag is one-shot: cleared
+   * by the next `refreshSessionTranscript` (or `beginUserTurn`,
+   * defensively, so a stale flag never blocks a legitimate refresh).
+   */
+  skipNextTranscriptRefresh?: boolean;
 }

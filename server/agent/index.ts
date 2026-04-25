@@ -82,7 +82,7 @@ function createMcpTracker() {
   };
 }
 
-async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
+async function* readAgentEvents(proc: ClaudeProc, opts: { abortSignal?: AbortSignal } = {}): AsyncGenerator<AgentEvent> {
   let stderrOutput = "";
   let stderrBuffer = "";
   proc.stderr.on("data", (chunk: Buffer) => {
@@ -130,12 +130,20 @@ async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
   log.info("agent", "claude exited", { exitCode });
   mcpTracker.logIfSuspicious();
 
-  if (exitCode !== 0) {
+  if (shouldYieldExitError(exitCode, Boolean(opts.abortSignal?.aborted))) {
     yield {
       type: EVENT_TYPES.error,
       message: stderrOutput || `claude exited with code ${exitCode}`,
     };
   }
+}
+
+// Don't surface a user-facing error event when the non-zero exit
+// came from our own SIGTERM (Stop button → cancelRun → proc.kill).
+// Otherwise users see a scary "[Error] claude exited with code 143"
+// for what was a deliberate cancellation. See #821.
+export function shouldYieldExitError(exitCode: number, aborted: boolean): boolean {
+  return exitCode !== 0 && !aborted;
 }
 
 export interface RunAgentOptions {
@@ -257,7 +265,7 @@ export async function* runAgent(
   abortSignal?.addEventListener("abort", onAbort, { once: true });
 
   try {
-    yield* readAgentEvents(proc);
+    yield* readAgentEvents(proc, { abortSignal });
   } finally {
     abortSignal?.removeEventListener("abort", onAbort);
     if (!proc.killed) proc.kill();

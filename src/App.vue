@@ -244,7 +244,7 @@ import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
-import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
+import { pushErrorMessage, beginUserTurn, updateResult, undoLastTurn } from "./utils/session/sessionHelpers";
 import { maybeSeedRoleDefault } from "./utils/session/seedRoleDefault";
 import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
@@ -734,17 +734,45 @@ async function loadSession(sessionId: string) {
 // client missed (e.g. due to a pub-sub disconnect during a long
 // Docker build). Called on session_finished so the user sees the
 // full response even if mid-run events were lost. See issue #350.
-async function refreshSessionTranscript(sessionId: string): Promise<void> {
+async function refreshSessionTranscript(sessionId: string, opts: { forceReplace?: boolean } = {}): Promise<void> {
   const session = sessionMap.get(sessionId);
   if (!session) return;
+  // One-shot skip: a Stop-button cancel just spliced the cancelled
+  // turn locally, and we don't want the upcoming session_finished-
+  // driven refresh to undo the splice. Skipped only on the
+  // session_finished path, not on the explicit forceReplace path
+  // (the latter is the multi-tab sync we DO want to apply).
+  if (!opts.forceReplace && session.skipNextTranscriptRefresh) {
+    session.skipNextTranscriptRefresh = false;
+    return;
+  }
   const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
   if (!response.ok) return;
   const serverResults = parseSessionEntries(response.data);
-  // Only patch if the server knows more than we do — avoids
-  // replacing a richer in-flight state with a stale snapshot when
-  // session_finished races with the last few events.
-  if (serverResults.length > session.toolResults.length) {
+  // Default path: only patch when the server knows more than we do —
+  // avoids replacing a richer in-flight state with a stale snapshot
+  // when session_finished races with the last few events.
+  // forceReplace path: trust the server unconditionally. Used for
+  // the multi-tab cancel race, where another tab's cancel truncated
+  // the server jsonl and our local copy is now LONGER than the
+  // canonical version. Codex iter-3 #822.
+  if (opts.forceReplace || serverResults.length > session.toolResults.length) {
     session.toolResults = serverResults;
+    // Reconcile the selection: if the previously-selected result no
+    // longer exists in the new transcript (force-replace can shrink
+    // the list, e.g. multi-tab cancel truncated mid-turn), drop the
+    // selection so the canvas doesn't render against a dead uuid.
+    // Route through the writable computed so the URL's `?result=`
+    // query is cleared in lockstep — Codex iter-4/5 #822.
+    if (session.selectedResultUuid && !serverResults.some((entry) => entry.uuid === session.selectedResultUuid)) {
+      // Only the active-session path needs URL sync; another tab's
+      // session in the map can't be the one whose URL is open here.
+      if (sessionId === currentSessionId.value) {
+        selectedResultUuid.value = null;
+      } else {
+        session.selectedResultUuid = null;
+      }
+    }
   }
 }
 
@@ -810,11 +838,19 @@ function unsubscribeSession(chatSessionId: string): void {
   }
 }
 
-// Stop the in-flight agent run for the currently displayed session.
-// Backend (POST /api/agent/cancel) flips the run's AbortController,
-// which closes the SSE stream and resets `isRunning`. We don't
-// optimistically flip local state — the SSE close handler does that
-// uniformly whether the cancel came from us or anywhere else (#731).
+// Stop the in-flight agent run AND undo the turn locally — drop the
+// just-sent user message + any partial assistant output from the
+// chat view, restore the message to the input form so the user can
+// edit and resend. Server still kills the claude subprocess and
+// suppresses the resulting SIGTERM exit error (#821 / #731 follow-up).
+//
+// Two-phase reasoning: backend POST /api/agent/cancel flips the
+// AbortController and closes the SSE stream as before; the local
+// undo runs after the cancel POST resolves so we don't strip the UI
+// before the cancel has actually been issued (rare race where the
+// click misses the run). The SSE-close handler still uniformly
+// resets isRunning whether the cancel came from us, another tab,
+// or a backend timeout.
 async function cancelActiveRun(): Promise<void> {
   const sessionId = currentSessionId.value;
   if (!sessionId) return;
@@ -824,11 +860,38 @@ async function cancelActiveRun(): Promise<void> {
     console.warn("[agent] cancel POST failed", { chatSessionId: sessionId, error: result.error });
     return;
   }
-  // Backend's `ok: false` means the session wasn't in-flight (already
-  // finished, or duplicate Stop click). Benign, but distinct from a
-  // network failure — surface separately in the console.
+  // `data.ok=false` ambiguously covers two cases:
+  //   (a) the run completed naturally between our render and the
+  //       click — the chat is now showing a real, completed turn
+  //       and undoing would shred legitimate output
+  //   (b) another tab cancelled this same run first — server has
+  //       already truncated the jsonl, so our local copy is LONGER
+  //       than the canonical state and needs to shrink
+  // The local undo is destructive in (a) and necessary in (b), and
+  // we can't tell which from the response alone. Use a force-replace
+  // refresh instead: it converges on whatever the server has now —
+  // truncated for (b), full transcript for (a) — without relying on
+  // our own splice. Codex iter-2 + iter-3 #822.
   if (!result.data?.ok) {
-    console.info("[agent] cancel was a no-op (no run in flight)", { chatSessionId: sessionId });
+    console.info("[agent] cancel was a no-op on the server — force-syncing transcript", { chatSessionId: sessionId });
+    refreshSessionTranscript(sessionId, { forceReplace: true }).catch((err) => {
+      console.warn("[agent] force-sync after cancel-noop failed", { chatSessionId: sessionId, error: String(err) });
+    });
+    return;
+  }
+  const session = sessionMap.get(sessionId);
+  if (!session) return;
+  const { restoredText } = undoLastTurn(session);
+  if (restoredText !== null) {
+    userInput.value = restoredText;
+    nextTick(() => focusChatInput());
+    // Block the upcoming session_finished-driven transcript refresh
+    // exactly once. The server jsonl still has the cancelled user
+    // message (server-side truncation is a deferred follow-up), and
+    // refreshSessionTranscript would replace our just-spliced state
+    // with the longer server view, instantly re-inserting what we
+    // just removed (#822 second-race).
+    session.skipNextTranscriptRefresh = true;
   }
 }
 

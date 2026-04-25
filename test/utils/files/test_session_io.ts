@@ -13,6 +13,9 @@ import {
   clearClaudeSessionId,
   appendSessionLine,
   readSessionJsonl,
+  statSessionJsonlSize,
+  truncateSessionJsonl,
+  deleteSessionFiles,
 } from "../../../server/utils/files/session-io.js";
 import { WORKSPACE_DIRS } from "../../../server/workspace/paths.js";
 
@@ -145,5 +148,115 @@ describe("appendSessionLine", () => {
 describe("readSessionJsonl", () => {
   it("returns null for non-existent session", async () => {
     assert.equal(await readSessionJsonl("no-jsonl", root), null);
+  });
+});
+
+// statSessionJsonlSize / truncateSessionJsonl are the persistence
+// half of the Stop-button "this turn never happened" flow (#822).
+// `statSessionJsonlSize` snapshots the byte boundary right before
+// the user message is appended; `truncateSessionJsonl` rolls the
+// file back to that boundary when the run was cancelled.
+
+describe("statSessionJsonlSize", () => {
+  it("returns 0 for a session with no jsonl on disk yet (ENOENT swallowed)", async () => {
+    // First-turn cancel hits this branch: the file doesn't exist
+    // until the first appendSessionLine succeeds. Returning 0
+    // (instead of throwing) lets the cancel rollback path treat
+    // 'truncate to 0' = 'delete contents' uniformly.
+    assert.equal(await statSessionJsonlSize("never-existed", root), 0);
+  });
+
+  it("returns the current byte size after appends", async () => {
+    await appendSessionLine("size-test", JSON.stringify({ source: "user", message: "hi" }), root);
+    const after1 = await statSessionJsonlSize("size-test", root);
+    assert.ok(after1 > 0, `expected size > 0, got ${after1}`);
+    await appendSessionLine("size-test", JSON.stringify({ source: "user", message: "hi again" }), root);
+    const after2 = await statSessionJsonlSize("size-test", root);
+    assert.ok(after2 > after1, `expected ${after2} > ${after1}`);
+  });
+});
+
+describe("truncateSessionJsonl", () => {
+  it("rolls a file back to a recorded byte offset (cancel happy path)", async () => {
+    // Simulate the agent route's flow: snapshot size → append user
+    // message → run "fails" via cancel → truncate back.
+    const sessionId = "truncate-happy";
+    const sizeBefore = await statSessionJsonlSize(sessionId, root);
+    assert.equal(sizeBefore, 0);
+    await appendSessionLine(sessionId, JSON.stringify({ source: "user", message: "doomed" }), root);
+    await truncateSessionJsonl(sessionId, sizeBefore, root);
+    const raw = await readSessionJsonl(sessionId, root);
+    assert.equal(raw, "");
+  });
+
+  it("preserves earlier turns when called mid-history (multi-turn cancel)", async () => {
+    // Turn 1 lands; turn 2 gets cancelled. Truncating to the
+    // turn-2 boundary must keep turn 1's bytes intact.
+    const sessionId = "truncate-multiturn";
+    await appendSessionLine(sessionId, JSON.stringify({ source: "user", message: "turn 1" }), root);
+    await appendSessionLine(sessionId, JSON.stringify({ source: "assistant", message: "ok" }), root);
+    const turnTwoBoundary = await statSessionJsonlSize(sessionId, root);
+    await appendSessionLine(sessionId, JSON.stringify({ source: "user", message: "turn 2 doomed" }), root);
+    await truncateSessionJsonl(sessionId, turnTwoBoundary, root);
+    const raw = (await readSessionJsonl(sessionId, root)) ?? "";
+    assert.equal(raw.includes("turn 1"), true);
+    assert.equal(raw.includes("ok"), true);
+    assert.equal(raw.includes("doomed"), false);
+  });
+
+  it("is idempotent — already-shorter file is a no-op", async () => {
+    // Defensive: if the cancel path runs after some other process
+    // already truncated (or the file never grew past the boundary),
+    // truncate must NOT extend the file with zero bytes.
+    const sessionId = "truncate-idempotent";
+    await appendSessionLine(sessionId, "short\n", root);
+    const sizeBefore = await statSessionJsonlSize(sessionId, root);
+    await truncateSessionJsonl(sessionId, sizeBefore + 1000, root);
+    const sizeAfter = await statSessionJsonlSize(sessionId, root);
+    assert.equal(sizeAfter, sizeBefore, "must not grow the file");
+  });
+
+  it("no-ops on a non-existent file (ENOENT swallowed)", async () => {
+    // First-turn cancel where the user message append failed before
+    // the file was created — truncate must not throw.
+    await truncateSessionJsonl("never-existed-truncate", 0, root);
+    // Sanity: file still doesn't exist; readSessionJsonl returns null.
+    assert.equal(await readSessionJsonl("never-existed-truncate", root), null);
+  });
+});
+
+describe("deleteSessionFiles", () => {
+  it("removes BOTH meta json and event jsonl (first-turn cancel cleanup)", async () => {
+    // The flow that hit production: user types one message, hits
+    // Stop. truncate brings jsonl to 0 bytes; deleteSessionFiles
+    // then removes the meta json so the empty session doesn't
+    // show in the sidebar history.
+    const sessionId = "delete-both";
+    await createSessionMeta(sessionId, "general", "doomed message", root);
+    await appendSessionLine(sessionId, JSON.stringify({ source: "user", message: "doomed" }), root);
+    // Sanity: both files exist before delete.
+    assert.notEqual(await readSessionMeta(sessionId, root), null);
+    assert.notEqual(await readSessionJsonl(sessionId, root), null);
+
+    await deleteSessionFiles(sessionId, root);
+
+    assert.equal(await readSessionMeta(sessionId, root), null);
+    assert.equal(await readSessionJsonl(sessionId, root), null);
+  });
+
+  it("is idempotent — deleting an already-gone session does not throw", async () => {
+    // Cancel-after-delete-after-cancel races shouldn't crash.
+    await deleteSessionFiles("never-existed-delete", root);
+    await deleteSessionFiles("never-existed-delete", root);
+  });
+
+  it("tolerates a half-state where only the meta exists", async () => {
+    // Hypothetical: meta written but jsonl append failed. Delete
+    // must still succeed and clean up the meta.
+    const sessionId = "half-state";
+    await createSessionMeta(sessionId, "general", "x", root);
+    assert.notEqual(await readSessionMeta(sessionId, root), null);
+    await deleteSessionFiles(sessionId, root);
+    assert.equal(await readSessionMeta(sessionId, root), null);
   });
 });

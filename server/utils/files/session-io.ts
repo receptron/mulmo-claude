@@ -4,7 +4,7 @@
 //
 // All functions take optional `root` for test DI.
 
-import { appendFile } from "fs/promises";
+import { appendFile, stat, truncate, unlink } from "fs/promises";
 import path from "node:path";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { workspacePath } from "../../workspace/paths.js";
@@ -133,4 +133,66 @@ export async function readSessionJsonl(sessionId: string, rootOverride?: string)
 export async function appendSessionLine(sessionId: string, line: string, rootOverride?: string): Promise<void> {
   const normalized = line.endsWith("\n") ? line : `${line}\n`;
   await appendFile(resolvePath(root(rootOverride), jsonlRel(sessionId)), normalized);
+}
+
+/**
+ * Current byte size of the session's jsonl log, or 0 if it doesn't
+ * exist yet. Used as a turn-boundary marker by the Stop-button cancel
+ * flow (#822): the server records the size *before* appending the
+ * user message so that on cancel it can roll the file back to that
+ * point, dropping the cancelled user message and any partial agent
+ * output the run produced before SIGTERM landed.
+ */
+export async function statSessionJsonlSize(sessionId: string, rootOverride?: string): Promise<number> {
+  const filePath = resolvePath(root(rootOverride), jsonlRel(sessionId));
+  try {
+    const stats = await stat(filePath);
+    return stats.size;
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "ENOENT") {
+      return 0;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Delete BOTH the session's meta json and event jsonl from disk.
+ * Used by the first-turn cancel path (#822 follow-up) so an empty
+ * session doesn't linger in the sidebar history. Idempotent —
+ * ENOENT on either file is treated as success.
+ */
+export async function deleteSessionFiles(sessionId: string, rootOverride?: string): Promise<void> {
+  const baseRoot = root(rootOverride);
+  const targets = [resolvePath(baseRoot, metaRel(sessionId)), resolvePath(baseRoot, jsonlRel(sessionId))];
+  await Promise.all(
+    targets.map(async (target) => {
+      try {
+        await unlink(target);
+      } catch (err: unknown) {
+        if (typeof err === "object" && err !== null && (err as { code?: string }).code === "ENOENT") return;
+        throw err;
+      }
+    }),
+  );
+}
+
+/**
+ * Truncate the session's jsonl log to `byteSize`. No-op when the
+ * file doesn't exist or is already shorter (idempotent), so that
+ * the cancel path doesn't crash on an absent jsonl. Counterpart to
+ * `statSessionJsonlSize`.
+ */
+export async function truncateSessionJsonl(sessionId: string, byteSize: number, rootOverride?: string): Promise<void> {
+  const filePath = resolvePath(root(rootOverride), jsonlRel(sessionId));
+  try {
+    const stats = await stat(filePath);
+    if (stats.size <= byteSize) return;
+    await truncate(filePath, byteSize);
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "ENOENT") {
+      return;
+    }
+    throw err;
+  }
 }

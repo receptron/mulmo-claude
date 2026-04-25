@@ -12,12 +12,26 @@ import {
   readSessionJsonl,
   sessionJsonlAbsPath,
   ensureChatDir,
+  statSessionJsonlSize,
+  truncateSessionJsonl,
+  deleteSessionFiles,
 } from "../../utils/files/session-io.js";
 import { getRole } from "../../workspace/roles.js";
 import { runAgent } from "../../agent/index.js";
 import { prependJournalPointer } from "../../agent/prompt.js";
 import { buildTranscriptPreamble, isStaleSessionError } from "../../agent/resumeFailover.js";
-import { getOrCreateSession, beginRun, endRun, cancelRun, pushSessionEvent, pushToolResult, getActiveSessionIds } from "../../events/session-store/index.js";
+import {
+  getOrCreateSession,
+  beginRun,
+  endRun,
+  cancelRun,
+  pushSessionEvent,
+  pushToolResult,
+  getActiveSessionIds,
+  wasCancelled,
+  getTurnStartJsonlSize,
+  purgeSession,
+} from "../../events/session-store/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { maybeRunJournal } from "../../workspace/journal/index.js";
 import { maybeIndexSession } from "../../workspace/chat-index/index.js";
@@ -175,8 +189,15 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   // Writing the user message to jsonl or broadcasting it before this
   // check leaves an orphan message on disk + in every viewing tab
   // when the run is rejected — see #281.
+  //
+  // We also snapshot the jsonl size right *before* the user message
+  // is appended so the cancel path can roll the on-disk log back to
+  // exactly this turn boundary. Pre-#822 a Stop click left the user
+  // message stranded on disk and any later GET /api/sessions/:id
+  // would replay it into the chat (#821 / #822 root cause).
+  const turnStartJsonlSize = await statSessionJsonlSize(chatSessionId);
   const abortController = new AbortController();
-  const started = beginRun(chatSessionId, () => abortController.abort());
+  const started = beginRun(chatSessionId, () => abortController.abort(), turnStartJsonlSize);
   if (!started) {
     return { kind: "error", error: "Session is already running", status: 409 };
   }
@@ -414,6 +435,50 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
 //   }
 // }
 
+// Roll the session jsonl back to its pre-turn boundary if the most-
+// recent run was cancelled (#822). Returns true when the run was a
+// first-turn cancel — caller must invoke `purgeFirstTurnAfterEndRun`
+// after `endRun` so the broadcast still goes out (Codex iter-2 #822
+// flagged that purging before endRun suppressed session_finished and
+// left other tabs with a stale view).
+async function rollbackJsonlIfCancelled(chatSessionId: string): Promise<{ firstTurn: boolean }> {
+  if (!wasCancelled(chatSessionId)) return { firstTurn: false };
+  const rollbackTo = getTurnStartJsonlSize(chatSessionId);
+  if (rollbackTo === undefined) return { firstTurn: false };
+  try {
+    await truncateSessionJsonl(chatSessionId, rollbackTo);
+    log.info("agent", "cancel: jsonl truncated", { chatSessionId, rollbackTo });
+    return { firstTurn: rollbackTo === 0 };
+  } catch (truncErr) {
+    log.warn("agent", "cancel: jsonl truncate failed", {
+      chatSessionId,
+      error: String(truncErr),
+    });
+    return { firstTurn: false };
+  }
+}
+
+// First-turn cancel: rollbackTo === 0 means there's no prior history
+// for this session, so the cancelled message was its only content.
+// Drop the meta + the in-memory entry so an empty stub doesn't haunt
+// the sidebar. Runs AFTER endRun so the normal session_finished
+// broadcast still fires for any other tabs subscribed to this
+// session (Codex iter-2 #822). The purge then issues its own
+// notifySessionsChanged broadcast which propagates the deletedIds
+// tombstone via the next /api/sessions response.
+async function purgeFirstTurnAfterEndRun(chatSessionId: string): Promise<void> {
+  try {
+    await deleteSessionFiles(chatSessionId);
+    purgeSession(chatSessionId);
+    log.info("agent", "cancel: first-turn session purged", { chatSessionId });
+  } catch (err) {
+    log.warn("agent", "cancel: first-turn purge failed", {
+      chatSessionId,
+      error: String(err),
+    });
+  }
+}
+
 async function runAgentInBackground(params: BackgroundRunParams): Promise<void> {
   const { decoratedMessage, role, chatSessionId, claudeSessionId, abortSignal, resultsFilePath, requestStartedAt, toolArgsCache, attachments, userTimezone } =
     params;
@@ -498,7 +563,9 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
       message: String(err),
     });
   } finally {
+    const { firstTurn } = await rollbackJsonlIfCancelled(chatSessionId);
     endRun(chatSessionId);
+    if (firstTurn) await purgeFirstTurnAfterEndRun(chatSessionId);
     // Commented out: this would create a duplicate notification.
     //
     // `endRun(chatSessionId)` above flips `session.hasUnread = true`
