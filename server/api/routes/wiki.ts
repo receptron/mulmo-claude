@@ -2,9 +2,10 @@ import { Router, Request, Response } from "express";
 import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { readTextSafeSync, readTextSafe } from "../../utils/files/safe.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
 import { parseFrontmatterTags } from "./wiki/frontmatter.js";
-import { badRequest } from "../../utils/httpError.js";
+import { badRequest, notFound } from "../../utils/httpError.js";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
@@ -273,6 +274,8 @@ router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse
 interface WikiBody {
   action: string;
   pageName?: string;
+  // `save` action only: full new file contents (frontmatter + body).
+  content?: string;
 }
 
 interface WikiData {
@@ -498,6 +501,52 @@ async function collectLintIssues(): Promise<string[]> {
   return issues;
 }
 
+// Result of a save attempt — null on lookup miss so the route can
+// return 404 distinctly from a 400 / 500.
+type SaveOutcome = { ok: true; absPath: string } | { ok: false; reason: "not-found" };
+
+async function saveExistingPage(pageName: string, content: string): Promise<SaveOutcome> {
+  const absPath = await resolvePagePath(pageName);
+  if (!absPath) return { ok: false, reason: "not-found" };
+  // Atomic write: tmp file alongside the destination, fsync, rename.
+  // Prevents a crashed write from leaving the wiki page truncated.
+  await writeFileAtomic(absPath, content);
+  return { ok: true, absPath };
+}
+
+// Extracted from the POST switch to keep the route handler under
+// the project's cognitive-complexity limit. Returns true if the
+// response was sent (success or any handled error), false to fall
+// through to the next case (currently unused — every code path
+// terminates).
+async function handleSaveAction(
+  req: Request<object, unknown, WikiBody>,
+  res: Response<WikiResponse | ErrorResponse>,
+  pageName: string | undefined,
+): Promise<void> {
+  if (!pageName) {
+    log.warn("wiki", "POST save: missing pageName");
+    badRequest(res, "pageName required for save action");
+    return;
+  }
+  const content = req.body.content;
+  if (typeof content !== "string") {
+    log.warn("wiki", "POST save: missing content", { pageNamePreview: previewSnippet(pageName) });
+    badRequest(res, "content (string) required for save action");
+    return;
+  }
+  const outcome = await saveExistingPage(pageName, content);
+  if (!outcome.ok) {
+    log.warn("wiki", "POST save: page not found", { pageNamePreview: previewSnippet(pageName) });
+    notFound(res, `Page not found: ${pageName}`);
+    return;
+  }
+  log.info("wiki", "POST save: ok", { pageNamePreview: previewSnippet(pageName), bytes: content.length });
+  // Re-read so the response carries the canonical post-write state.
+  const response = await buildPageResponse("page", pageName);
+  res.json(response);
+}
+
 async function buildLintReportResponse(action: string): Promise<WikiResponse> {
   const issues = await collectLintIssues();
   const report = formatLintReport(issues);
@@ -547,6 +596,14 @@ router.post(API_ROUTES.wiki.base, async (req: Request<object, unknown, WikiBody>
         const response = await buildLintReportResponse(action);
         log.info("wiki", "POST lint_report: ok", { issues: response.message });
         res.json(response);
+        return;
+      }
+      case "save": {
+        // Used by the wiki page View when the user toggles a GFM
+        // task checkbox in the rendered body (#775). Overwrites the
+        // existing page file atomically; refuses to create new pages
+        // — that flow lives elsewhere (LLM via Write, manageWiki).
+        await handleSaveAction(req, res, pageName);
         return;
       }
       default:

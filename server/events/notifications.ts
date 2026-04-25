@@ -23,6 +23,7 @@ import {
 import { ONE_SECOND_MS, MAX_NOTIFICATION_DELAY_SEC } from "../utils/time.js";
 import { log } from "../system/logger/index.js";
 import { makeUuid } from "../utils/id.js";
+import { pushToMacosReminder } from "../system/macosNotify.js";
 
 // ── Dependencies (injected at startup) ──────────────────────────
 
@@ -86,6 +87,11 @@ export function publishNotification(opts: PublishNotificationOpts): void {
     if (deps && opts.transportId) {
       deps.pushToBridge(opts.transportId, "notifications", formatBridgeMessage(payload));
     }
+
+    // Push to macOS Reminders (#789). No-op unless
+    // MACOS_REMINDER_NOTIFICATIONS=1 + darwin. Fire-and-forget so a
+    // slow / failing osascript can't block the bell update.
+    void pushToMacosReminder(payload.title, payload.body);
 
     log.info("notifications", "published", {
       kind: payload.kind,

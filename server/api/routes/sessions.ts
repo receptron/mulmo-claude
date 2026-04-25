@@ -17,6 +17,8 @@ import type { SessionOrigin } from "../../../src/types/session.js";
 import { env } from "../../system/env.js";
 import { ONE_DAY_MS } from "../../utils/time.js";
 import { encodeCursor, parseCursor, sessionChangeMs } from "./sessionsCursor.js";
+import { errorMessage } from "../../utils/errors.js";
+import { log } from "../../system/logger/index.js";
 
 interface SessionMeta {
   roleId: string;
@@ -167,6 +169,7 @@ export async function loadAllSessions(): Promise<{ summary: SessionSummary; chan
 router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsResponse, object, SessionsQuery>, res: Response<SessionsResponse>) => {
   try {
     const sinceMs = parseCursor(req.query.since);
+    log.info("sessions", "list: start", { sinceMs: sinceMs > 0 ? sinceMs : undefined });
     const rows = await loadAllSessions();
 
     // Cursor = max(changeMs) across every visible session, regardless
@@ -184,6 +187,7 @@ router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsRespons
       return new Date(rightSession.startedAt).getTime() - new Date(leftSession.startedAt).getTime();
     });
 
+    log.info("sessions", "list: ok", { total: sessions.length, returned: filtered.length });
     res.json({
       sessions,
       cursor: encodeCursor(maxChangeMs),
@@ -193,7 +197,8 @@ router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsRespons
       // deletion lands.
       deletedIds: [],
     });
-  } catch {
+  } catch (err) {
+    log.error("sessions", "list: threw", { error: errorMessage(err) });
     res.json({ sessions: [], cursor: encodeCursor(0), deletedIds: [] });
   }
 });
@@ -209,10 +214,12 @@ interface SessionErrorResponse {
 router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<unknown[] | SessionErrorResponse>) => {
   const { id: sessionId } = req.params;
   const chatDir = WORKSPACE_PATHS.chat;
+  log.info("sessions", "detail: start", { sessionId });
   try {
     const meta = await readSessionMeta(chatDir, sessionId);
     const content = await readSessionJsonl(sessionId);
     if (!content) {
+      log.warn("sessions", "detail: not found", { sessionId });
       notFound(res, `Session ${sessionId} not found`);
       return;
     }
@@ -277,8 +284,10 @@ router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res
     ).filter(Boolean);
     // Prepend metadata as session_meta entry for the frontend
     const result = meta ? [{ type: EVENT_TYPES.sessionMeta, ...meta }, ...entries] : entries;
+    log.info("sessions", "detail: ok", { sessionId, entries: result.length });
     res.json(result);
-  } catch {
+  } catch (err) {
+    log.error("sessions", "detail: threw", { sessionId, error: errorMessage(err) });
     notFound(res, "Session not found");
   }
 });
@@ -287,7 +296,9 @@ router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res
 // Awaits persistence so the response only arrives after the disk write
 // completes — prevents the client from refetching stale hasUnread values.
 router.post(API_ROUTES.sessions.markRead, async (req: Request<SessionIdParams>, res: Response<{ ok: boolean }>) => {
+  log.info("sessions", "mark-read: start", { sessionId: req.params.id });
   await markRead(req.params.id);
+  log.info("sessions", "mark-read: ok", { sessionId: req.params.id });
   res.json({ ok: true });
 });
 

@@ -53,6 +53,7 @@ export const TOOL_NAMES = {
   // role's `availablePlugins` alongside GUI plugins.
   readXPost: "readXPost",
   searchX: "searchX",
+  notify: "notify",
 
   // Built-in (handled specially by the MCP stdio bridge).
   switchRole: "switchRole",

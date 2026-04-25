@@ -235,6 +235,7 @@ import { renderWikiLinks } from "./helpers";
 import { BUILTIN_ROLE_IDS } from "../../config/roles";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
 import { extractFrontmatter } from "../../utils/format/frontmatter";
+import { findTaskLines, makeTasksInteractive, toggleTaskAt } from "../../utils/markdown/taskList";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { PAGE_ROUTES } from "../../router";
@@ -270,9 +271,14 @@ const navError = ref<string | null>(null);
 
 const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
-  // fetch that page by slug; otherwise fetch the index.
+  // fetch that page by slug; otherwise fetch the index. Reads the
+  // slug via `currentSlug()` so both mount paths are covered —
+  // standalone /wiki/<slug> via route params, embedded WikiView via
+  // selectedResult. Reading only from selectedResult would make a
+  // failed-save `refresh()` reload the index instead of the page
+  // and clobber the user's view (#775 / codex iter 2).
   endpoint: () => {
-    const slug = action.value === "page" ? props.selectedResult?.data?.pageName : undefined;
+    const slug = action.value === "page" ? currentSlug() : null;
     return slug ? `${API_ROUTES.wiki.base}?slug=${encodeURIComponent(slug)}` : API_ROUTES.wiki.base;
   },
   extract: (json) => (json as { data?: WikiData }).data ?? null,
@@ -395,7 +401,12 @@ const renderedContent = computed(() => {
   // individual pages so `../images/foo.png` resolves correctly.
   const basePath = action.value === "page" ? "wiki/pages" : "wiki";
   const withImages = rewriteMarkdownImageRefs(body, basePath);
-  return marked.parse(renderWikiLinks(withImages)) as string;
+  // Strip marked's `disabled=""` from GFM task checkboxes and tag
+  // them with `class="md-task"` so `handleContentClick` can find
+  // them via DOM delegation (#775). Other view modes (index / log /
+  // lint_report) get the same transform — it's a no-op when no
+  // checkboxes are present.
+  return makeTasksInteractive(marked.parse(renderWikiLinks(withImages)) as string);
 });
 
 const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
@@ -505,11 +516,135 @@ const imeEnter = useImeAwareEnter(submitChat);
 /** Base directory for wiki content, adjusted by the current view. */
 const WIKI_BASE_DIR = computed(() => (action.value === "page" ? "data/wiki/pages" : "data/wiki"));
 
+// Serialised PUT chain for rapid checkbox clicks (#775). Each click
+// queues onto the previous so a slower network can't reorder writes.
+//
+// `saveQueueGeneration` invalidates older queued saves after a
+// failure-triggered refresh: their captured snapshots were computed
+// against the now-discarded optimistic state, so writing them would
+// overwrite the canonical server content with stale data. We bump
+// the generation on failure; queued saves whose generation no longer
+// matches skip silently.
+let taskPersistChain: Promise<unknown> = Promise.resolve();
+let saveQueueGeneration = 0;
+
+async function persistWikiPage(pageName: string, newContent: string, generation: number): Promise<void> {
+  // Stale queued save (a previous save failed + refresh discarded
+  // the optimistic state this snapshot was based on).
+  if (generation !== saveQueueGeneration) return;
+  // Bail if the page navigation has changed mid-flight — saving the
+  // captured snapshot to a different page would clobber unrelated
+  // state. The watchers on route / selectedResult already load the
+  // new page; touching state here is wrong. `currentSlug()` returns
+  // the right source for both the standalone /wiki view (route
+  // params) and the tool-result-embedded view (selectedResult).
+  if (currentSlug() !== pageName) return;
+
+  const response = await apiPost<{ data?: { content?: string } }>(API_ROUTES.wiki.base, {
+    action: "save",
+    pageName,
+    content: newContent,
+  });
+
+  if (generation !== saveQueueGeneration) return;
+  if (currentSlug() !== pageName) return;
+
+  if (!response.ok) {
+    navError.value = response.status === 0 ? response.error : `Wiki save failed (${response.status}): ${response.error}`;
+    // Refresh resets local state to the canonical server content.
+    // The generation bump must come AFTER refresh completes — clicks
+    // arriving WHILE refresh is in flight capture the pre-bump
+    // generation; bumping post-refresh invalidates them too. Bumping
+    // pre-refresh would let those during-refresh clicks slip through
+    // (they'd capture the new gen and persist a toggle computed
+    // against the not-yet-reset DOM).
+    await refresh();
+    saveQueueGeneration += 1;
+    return;
+  }
+  // Successful save — clear any stale error from a prior click.
+  navError.value = null;
+}
+
+// Split the current content into the frontmatter prefix (delimiters
+// + YAML) and the body marked actually renders. Reassembling
+// `prefix + body` round-trips byte-for-byte regardless of
+// frontmatter shape — the body length is always exact.
+function splitFrontmatter(): { prefix: string; body: string } {
+  const frontmatter = extractFrontmatter(content.value);
+  const body = frontmatter.body;
+  const prefix = content.value.slice(0, content.value.length - body.length);
+  return { prefix, body };
+}
+
+// Compute the body-relative new content from a click. Returns null
+// when the toggle should be refused (drift, navigation away,
+// out-of-range index). The caller is responsible for reverting the
+// visual state and surfacing any error.
+function computeToggledContent(target: HTMLInputElement, root: HTMLElement): string | null {
+  const taskInputs = root.querySelectorAll<HTMLInputElement>("input.md-task");
+  const taskIndex = Array.from(taskInputs).indexOf(target);
+  if (taskIndex < 0) return null;
+
+  const { prefix, body } = splitFrontmatter();
+  const sourceTasks = findTaskLines(body);
+  if (sourceTasks.length !== taskInputs.length) {
+    navError.value = "Wiki source and rendered output disagree on the number of tasks. Refusing to toggle to avoid corruption.";
+    return null;
+  }
+  const updatedBody = toggleTaskAt(body, taskIndex);
+  if (updatedBody === null) return null;
+  return prefix + updatedBody;
+}
+
+function onTaskCheckboxClick(event: MouseEvent, target: HTMLInputElement): void {
+  // Only meaningful for the page view; everything else is read-only.
+  if (action.value !== "page") {
+    target.checked = !target.checked;
+    return;
+  }
+  // `currentSlug()` covers both mount paths — standalone /wiki/<slug>
+  // (route param) and tool-result-embedded WikiView (selectedResult).
+  // The standalone path is the primary one; reading only from
+  // selectedResult would silently no-op every click on /wiki/<slug>.
+  const pageName = currentSlug();
+  if (!pageName) {
+    target.checked = !target.checked;
+    return;
+  }
+
+  const root = event.currentTarget as HTMLElement;
+  const newContent = computeToggledContent(target, root);
+  if (newContent === null) {
+    target.checked = !target.checked;
+    return;
+  }
+
+  // Optimistic local update — re-render is driven by `content`'s
+  // existing watcher.
+  content.value = newContent;
+  navError.value = null;
+
+  // Capture the current generation so the queued save knows whether
+  // the chain has been broken (by a prior failure) by the time it
+  // runs. See `persistWikiPage` for the semantics.
+  const generation = saveQueueGeneration;
+  taskPersistChain = taskPersistChain.then(() => persistWikiPage(pageName, newContent, generation));
+}
+
 function handleContentClick(event: MouseEvent) {
+  // 0. GFM task checkbox toggle (#775). Tagged by `makeTasksInteractive`
+  //    on the rendered HTML; only meaningful while we're showing a
+  //    page body. Index / log / lint_report views never carry user
+  //    content to write back.
+  const target = event.target as HTMLElement;
+  if (target instanceof HTMLInputElement && target.type === "checkbox" && target.classList.contains("md-task")) {
+    onTaskCheckboxClick(event, target);
+    return;
+  }
   // 1. Internal wiki links: `[[Page Name]]` was rewritten to a
   //    `<span class="wiki-link">` during markdown pre-processing,
   //    so it doesn't overlap with regular `<a>` handling.
-  const target = event.target as HTMLElement;
   const link = target.closest(".wiki-link") as HTMLElement | null;
   if (link?.dataset.page) {
     navigatePage(link.dataset.page);

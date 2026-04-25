@@ -4,6 +4,8 @@ import { writeWorkspaceText } from "../../utils/files/workspace-io.js";
 import { buildArtifactPath } from "../../utils/files/naming.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
+import { log } from "../../system/logger/index.js";
+import { previewSnippet } from "../../utils/logPreview.js";
 import { isRecord } from "../../utils/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
@@ -68,13 +70,22 @@ function isValidChartEntry(value: unknown): value is ChartEntry {
 
 router.post(API_ROUTES.chart.present, async (req: Request<object, unknown, PresentChartBody>, res: Response<PresentChartResponse>) => {
   const { document, title } = req.body;
+  log.info("chart", "present: start", {
+    titlePreview: typeof title === "string" ? previewSnippet(title) : undefined,
+    chartCount:
+      typeof document === "object" && document !== null && Array.isArray((document as { charts?: unknown[] }).charts)
+        ? (document as { charts: unknown[] }).charts.length
+        : undefined,
+  });
 
   if (!isValidChartDocument(document)) {
+    log.warn("chart", "present: invalid document shape");
     badRequest(res, "document must be { charts: [{ option: {...}, title?, type? }, ...] } with at least one entry");
     return;
   }
 
   if (title !== undefined && typeof title !== "string") {
+    log.warn("chart", "present: title must be string");
     badRequest(res, "title must be a string when provided");
     return;
   }
@@ -83,6 +94,7 @@ router.post(API_ROUTES.chart.present, async (req: Request<object, unknown, Prese
     const baseLabel = title ?? document.title ?? "chart";
     const filePath = buildArtifactPath(WORKSPACE_DIRS.charts, baseLabel, ".chart.json", "chart");
     await writeWorkspaceText(filePath, `${JSON.stringify(document, null, 2)}\n`);
+    log.info("chart", "present: ok", { filePath, chartCount: document.charts.length });
     res.json({
       message: `Saved chart document to ${filePath}`,
       instructions:
@@ -91,6 +103,7 @@ router.post(API_ROUTES.chart.present, async (req: Request<object, unknown, Prese
       data: { document, title, filePath },
     });
   } catch (err) {
+    log.error("chart", "present: threw", { error: errorMessage(err) });
     serverError(res, errorMessage(err));
   }
 });

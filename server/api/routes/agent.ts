@@ -27,7 +27,9 @@ import { logBackgroundError } from "../../utils/logBackgroundError.js";
 import { createArgsCache, recordToolEvent } from "../../workspace/tool-trace/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
-import { isSessionOrigin } from "../../../src/types/session.js";
+import { isSessionOrigin, SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
+import { NOTIFICATION_KINDS } from "../../../src/types/notification.js";
+import { publishNotification } from "../../events/notifications.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "@mulmobridge/client";
@@ -220,6 +222,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     toolArgsCache: createArgsCache(),
     attachments: mergeAttachments(selectedImageData, attachments),
     userTimezone,
+    origin: validOrigin,
   });
 
   return { kind: "started", chatSessionId };
@@ -290,6 +293,11 @@ interface BackgroundRunParams {
   toolArgsCache: ReturnType<typeof createArgsCache>;
   attachments: Attachment[] | undefined;
   userTimezone: string | undefined;
+  // Where this run was triggered from. Used to decide whether to
+  // fire a completion notification: human-initiated runs don't (the
+  // user is right there in the UI), but scheduler / bridge / skill
+  // runs do (the user is probably away from the keyboard).
+  origin: SessionOrigin | undefined;
 }
 
 // Per-event side-effect context passed to `handleAgentEvent`.
@@ -374,6 +382,22 @@ async function flushTextAccumulator(ctx: EventContext): Promise<void> {
       message: fullText,
     }),
   );
+}
+
+// Build the title used for the agent-completion notification on
+// non-human runs. Surfaces both the role name and the trigger so
+// the user can read it in passing on a phone lock screen.
+function completionNotificationTitle(roleName: string, origin: SessionOrigin): string {
+  switch (origin) {
+    case SESSION_ORIGINS.scheduler:
+      return `✅ ${roleName} (scheduler) finished`;
+    case SESSION_ORIGINS.skill:
+      return `✅ ${roleName} (skill) finished`;
+    case SESSION_ORIGINS.bridge:
+      return `✅ ${roleName} reply ready`;
+    default:
+      return `✅ ${roleName} finished`;
+  }
 }
 
 async function runAgentInBackground(params: BackgroundRunParams): Promise<void> {
@@ -461,6 +485,18 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
     });
   } finally {
     endRun(chatSessionId);
+    // Fire a completion notification for runs the user wasn't sitting
+    // in front of. Human-initiated runs are skipped because the
+    // bell-update is already visible in the UI. The wrapper inside
+    // `publishNotification` handles all sinks (web bell + bridge +
+    // macOS Reminders) so this single call covers every channel.
+    if (params.origin && params.origin !== SESSION_ORIGINS.human) {
+      publishNotification({
+        kind: NOTIFICATION_KINDS.agent,
+        title: completionNotificationTitle(params.role.name, params.origin),
+        sessionId: chatSessionId,
+      });
+    }
     // Fire-and-forget: journal + chat-index post-processing
     maybeRunJournal({ activeSessionIds: getActiveSessionIds() }).catch(logBackgroundError("journal"));
     maybeIndexSession({

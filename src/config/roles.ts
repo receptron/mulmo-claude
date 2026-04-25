@@ -46,6 +46,7 @@ export const ROLES: Role[] = [
       "presentChart",
       "readXPost",
       "searchX",
+      "notify",
       "switchRole",
     ],
     queries: [
@@ -82,6 +83,7 @@ export const ROLES: Role[] = [
       "presentChart",
       "readXPost",
       "searchX",
+      "notify",
       "manageSkills",
       "manageSource",
       "switchRole",

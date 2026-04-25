@@ -3,6 +3,8 @@ import { readCurrentHtml, writeCurrentHtml } from "../../utils/files/html-io.js"
 import { getGeminiClient, isGeminiAvailable } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { log } from "../../system/logger/index.js";
+import { promptMeta } from "../../utils/promptMeta.js";
 
 const router = Router();
 
@@ -41,11 +43,14 @@ type HtmlResponse = HtmlSuccessResponse | HtmlErrorResponse;
 
 router.post(API_ROUTES.html.generate, async (req: Request<object, unknown, HtmlPromptBody>, res: Response<HtmlResponse>) => {
   const { prompt } = req.body;
+  log.info("html", "generate: start", { prompt: typeof prompt === "string" ? promptMeta(prompt) : undefined });
   if (!prompt) {
+    log.warn("html", "generate: missing prompt");
     res.status(400).json({ message: "prompt is required" });
     return;
   }
   if (!isGeminiAvailable()) {
+    log.warn("html", "generate: GEMINI_API_KEY not set");
     res.status(500).json({ message: "GEMINI_API_KEY is not set" });
     return;
   }
@@ -54,6 +59,7 @@ router.post(API_ROUTES.html.generate, async (req: Request<object, unknown, HtmlP
     const html = await callGemini(fullPrompt);
 
     await writeCurrentHtml(html);
+    log.info("html", "generate: ok", { bytes: html.length });
     res.json({
       message: "HTML generation succeeded",
       instructions: "Acknowledge that the HTML was generated and has been presented to the user.",
@@ -61,23 +67,28 @@ router.post(API_ROUTES.html.generate, async (req: Request<object, unknown, HtmlP
       data: { html, type: "tailwind" },
     });
   } catch (err) {
+    log.error("html", "generate: threw", { error: errorMessage(err), prompt: promptMeta(prompt) });
     res.status(500).json({ message: errorMessage(err) });
   }
 });
 
 router.post(API_ROUTES.html.edit, async (req: Request<object, unknown, HtmlPromptBody>, res: Response<HtmlResponse>) => {
   const { prompt } = req.body;
+  log.info("html", "edit: start", { prompt: typeof prompt === "string" ? promptMeta(prompt) : undefined });
   if (!prompt) {
+    log.warn("html", "edit: missing prompt");
     res.status(400).json({ message: "prompt is required" });
     return;
   }
   if (!isGeminiAvailable()) {
+    log.warn("html", "edit: GEMINI_API_KEY not set");
     res.status(500).json({ message: "GEMINI_API_KEY is not set" });
     return;
   }
   try {
     const existingHtml = await readCurrentHtml();
     if (!existingHtml?.trim()) {
+      log.warn("html", "edit: no existing HTML to modify");
       res.status(400).json({
         message: "No HTML page has been generated yet. Use generateHtml first.",
       });
@@ -86,6 +97,7 @@ router.post(API_ROUTES.html.edit, async (req: Request<object, unknown, HtmlPromp
     const fullPrompt = `Modify the following HTML page based on this instruction: ${prompt}\n\nExisting HTML:\n${existingHtml}\n\nRequirements:\n- Return only the complete modified HTML, no explanation`;
     const html = await callGemini(fullPrompt);
     await writeCurrentHtml(html);
+    log.info("html", "edit: ok", { bytes: html.length });
     res.json({
       message: "HTML editing succeeded",
       instructions: "Acknowledge that the HTML was modified and has been presented to the user.",
@@ -94,6 +106,7 @@ router.post(API_ROUTES.html.edit, async (req: Request<object, unknown, HtmlPromp
       updating: true,
     });
   } catch (err) {
+    log.error("html", "edit: threw", { error: errorMessage(err), prompt: promptMeta(prompt) });
     res.status(500).json({ message: errorMessage(err) });
   }
 });

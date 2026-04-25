@@ -6,6 +6,8 @@ import { pushSessionEvent } from "../../events/session-store/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
 import { roleExists, deleteRole, saveRole } from "../../utils/files/roles-io.js";
+import { log } from "../../system/logger/index.js";
+import { previewSnippet } from "../../utils/logPreview.js";
 
 const BUILTIN_IDS = new Set(BUILTIN_ROLES.map((role) => role.id));
 
@@ -17,7 +19,15 @@ router.get(API_ROUTES.roles.list, (_req: Request, res: Response<Role[]>) => {
 
 router.post(API_ROUTES.roles.manage, async (req: Request, res: Response<Record<string, unknown>>) => {
   const session = getSessionQuery(req);
+  const action = typeof req.body?.action === "string" ? req.body.action : undefined;
+  const roleId = typeof req.body?.roleId === "string" ? req.body.roleId : typeof req.body?.role?.id === "string" ? req.body.role.id : undefined;
+  log.info("roles", "manage: start", { action: action ? previewSnippet(action) : undefined, roleId: roleId ? previewSnippet(roleId) : undefined });
   const result = await executeManageRoles(req.body, session);
+  if (result.success === false) {
+    log.warn("roles", "manage: error", { action, roleId, error: result.error });
+  } else {
+    log.info("roles", "manage: ok", { action, roleId });
+  }
   res.json(result);
 });
 

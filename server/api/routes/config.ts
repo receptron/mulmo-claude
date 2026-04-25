@@ -15,6 +15,7 @@ import { badRequest, serverError } from "../../utils/httpError.js";
 import { errorMessage } from "../../utils/errors.js";
 import { isRecord } from "../../utils/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { log } from "../../system/logger/index.js";
 import { loadCustomDirs, saveCustomDirs, ensureCustomDirs, validateCustomDirs, type CustomDirEntry } from "../../workspace/custom-dirs.js";
 import { loadReferenceDirs, saveReferenceDirs, validateReferenceDirs, type ReferenceDirEntry } from "../../workspace/reference-dirs.js";
 
@@ -67,6 +68,7 @@ function runSaveOrFail(res: ConfigRes, save: () => void, fallback: string): bool
     save();
     return true;
   } catch (err) {
+    log.error("config", `save failed: ${fallback}`, { error: errorMessage(err) });
     serverError(res, errorMessage(err, fallback));
     return false;
   }
@@ -95,7 +97,9 @@ function isPutConfigBody(value: unknown): value is PutConfigBody {
 
 router.put(API_ROUTES.config.base, (req: Request<unknown, unknown, PutConfigBody>, res: ConfigRes) => {
   const body = req.body;
+  log.info("config", "PUT base: start");
   if (!isPutConfigBody(body)) {
+    log.warn("config", "PUT base: invalid payload");
     badRequest(res, "Invalid config payload");
     return;
   }
@@ -114,29 +118,35 @@ router.put(API_ROUTES.config.base, (req: Request<unknown, unknown, PutConfigBody
     // is already on the wire.
     try {
       saveSettings(previousSettings);
-    } catch {
-      /* swallow — original error already sent */
+    } catch (err) {
+      log.error("config", "PUT base: rollback also failed", { error: errorMessage(err) });
     }
     return;
   }
+  log.info("config", "PUT base: ok");
   res.json(buildFullResponse());
 });
 
 router.put(API_ROUTES.config.settings, (req: Request<unknown, unknown, AppSettings>, res: ConfigRes) => {
   const body = req.body;
+  log.info("config", "PUT settings: start");
   if (!isAppSettings(body)) {
+    log.warn("config", "PUT settings: invalid payload");
     badRequest(res, "Invalid AppSettings payload");
     return;
   }
   if (!runSaveOrFail(res, () => saveSettings(body), "saveSettings failed")) {
     return;
   }
+  log.info("config", "PUT settings: ok");
   res.json(buildFullResponse());
 });
 
 router.put(API_ROUTES.config.mcp, (req: Request<unknown, unknown, { servers: McpServerEntry[] }>, res: ConfigRes) => {
   const body = req.body;
+  log.info("config", "PUT mcp: start", { servers: Array.isArray(body?.servers) ? body.servers.length : undefined });
   if (!isMcpPutBody(body)) {
+    log.warn("config", "PUT mcp: invalid envelope");
     badRequest(res, "Invalid mcp payload envelope");
     return;
   }
@@ -147,6 +157,7 @@ router.put(API_ROUTES.config.mcp, (req: Request<unknown, unknown, { servers: Mcp
   if (!runSaveOrFail(res, () => saveMcpConfig(cfg), "saveMcpConfig failed")) {
     return;
   }
+  log.info("config", "PUT mcp: ok", { servers: body.servers.length });
   res.json(buildFullResponse());
 });
 
@@ -160,20 +171,25 @@ router.put(
   API_ROUTES.config.workspaceDirs,
   (req: Request<unknown, unknown, { dirs: unknown }>, res: Response<{ dirs: CustomDirEntry[] } | ConfigErrorResponse>) => {
     const body = req.body;
+    log.info("config", "PUT workspace-dirs: start");
     if (!isRecord(body) || !("dirs" in body)) {
+      log.warn("config", "PUT workspace-dirs: invalid envelope");
       badRequest(res, "expected { dirs: [...] }");
       return;
     }
     const result = validateCustomDirs(body.dirs);
     if ("error" in result) {
+      log.warn("config", "PUT workspace-dirs: validation failed", { error: result.error });
       badRequest(res, result.error);
       return;
     }
     try {
       saveCustomDirs(result.entries);
       ensureCustomDirs(result.entries);
+      log.info("config", "PUT workspace-dirs: ok", { dirs: result.entries.length });
       res.json({ dirs: result.entries });
     } catch (err) {
+      log.error("config", "PUT workspace-dirs: threw", { error: errorMessage(err) });
       serverError(res, errorMessage(err, "save failed"));
     }
   },
@@ -189,19 +205,24 @@ router.put(
   API_ROUTES.config.referenceDirs,
   (req: Request<unknown, unknown, { dirs: unknown }>, res: Response<{ dirs: ReferenceDirEntry[] } | ConfigErrorResponse>) => {
     const body = req.body;
+    log.info("config", "PUT reference-dirs: start");
     if (!isRecord(body) || !("dirs" in body)) {
+      log.warn("config", "PUT reference-dirs: invalid envelope");
       badRequest(res, "expected { dirs: [...] }");
       return;
     }
     const result = validateReferenceDirs(body.dirs);
     if ("error" in result) {
+      log.warn("config", "PUT reference-dirs: validation failed", { error: result.error });
       badRequest(res, result.error);
       return;
     }
     try {
       saveReferenceDirs(result.entries);
+      log.info("config", "PUT reference-dirs: ok", { dirs: result.entries.length });
       res.json({ dirs: result.entries });
     } catch (err) {
+      log.error("config", "PUT reference-dirs: threw", { error: errorMessage(err) });
       serverError(res, errorMessage(err, "save failed"));
     }
   },
@@ -221,12 +242,15 @@ router.put(
   API_ROUTES.config.schedulerOverrides,
   async (req: Request<unknown, unknown, { overrides: unknown }>, res: Response<{ overrides: ScheduleOverrides } | ConfigErrorResponse>) => {
     const body = req.body;
+    log.info("config", "PUT scheduler-overrides: start");
     if (!isRecord(body) || !("overrides" in body)) {
+      log.warn("config", "PUT scheduler-overrides: invalid envelope");
       badRequest(res, "expected { overrides: { ... } }");
       return;
     }
     const raw = body.overrides;
     if (!isRecord(raw)) {
+      log.warn("config", "PUT scheduler-overrides: overrides not an object");
       badRequest(res, "overrides must be an object");
       return;
     }
@@ -249,8 +273,10 @@ router.put(
         }
       }
 
+      log.info("config", "PUT scheduler-overrides: ok", { tasks: Object.keys(overrides).length });
       res.json({ overrides: loadSchedulerOverrides() });
     } catch (err) {
+      log.error("config", "PUT scheduler-overrides: threw", { error: errorMessage(err) });
       serverError(res, errorMessage(err, "save failed"));
     }
   },
