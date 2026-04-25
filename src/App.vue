@@ -734,25 +734,29 @@ async function loadSession(sessionId: string) {
 // client missed (e.g. due to a pub-sub disconnect during a long
 // Docker build). Called on session_finished so the user sees the
 // full response even if mid-run events were lost. See issue #350.
-async function refreshSessionTranscript(sessionId: string): Promise<void> {
+async function refreshSessionTranscript(sessionId: string, opts: { forceReplace?: boolean } = {}): Promise<void> {
   const session = sessionMap.get(sessionId);
   if (!session) return;
   // One-shot skip: a Stop-button cancel just spliced the cancelled
-  // turn locally, and the server jsonl still has it on disk
-  // (server-side truncation is a deferred follow-up to #821). Without
-  // this guard the next refresh re-inserts what the user just
-  // removed.
-  if (session.skipNextTranscriptRefresh) {
+  // turn locally, and we don't want the upcoming session_finished-
+  // driven refresh to undo the splice. Skipped only on the
+  // session_finished path, not on the explicit forceReplace path
+  // (the latter is the multi-tab sync we DO want to apply).
+  if (!opts.forceReplace && session.skipNextTranscriptRefresh) {
     session.skipNextTranscriptRefresh = false;
     return;
   }
   const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
   if (!response.ok) return;
   const serverResults = parseSessionEntries(response.data);
-  // Only patch if the server knows more than we do — avoids
-  // replacing a richer in-flight state with a stale snapshot when
-  // session_finished races with the last few events.
-  if (serverResults.length > session.toolResults.length) {
+  // Default path: only patch when the server knows more than we do —
+  // avoids replacing a richer in-flight state with a stale snapshot
+  // when session_finished races with the last few events.
+  // forceReplace path: trust the server unconditionally. Used for
+  // the multi-tab cancel race, where another tab's cancel truncated
+  // the server jsonl and our local copy is now LONGER than the
+  // canonical version. Codex iter-3 #822.
+  if (opts.forceReplace || serverResults.length > session.toolResults.length) {
     session.toolResults = serverResults;
   }
 }
@@ -841,21 +845,23 @@ async function cancelActiveRun(): Promise<void> {
     console.warn("[agent] cancel POST failed", { chatSessionId: sessionId, error: result.error });
     return;
   }
-  // Only undo locally when the server confirms it actually killed a
-  // run for us. `data.ok=false` ambiguously covers two cases:
+  // `data.ok=false` ambiguously covers two cases:
   //   (a) the run completed naturally between our render and the
   //       click — the chat is now showing a real, completed turn
   //       and undoing would shred legitimate output
   //   (b) another tab cancelled this same run first — server has
-  //       already truncated the jsonl + emitted a deletedIds
-  //       tombstone, so our sidebar will sync via that channel
-  //       without needing a local undo
-  // Both cases want the same answer: don't undo. The user's draft
-  // is unrecoverable in (a) but a different tab's draft in (b),
-  // and we can't tell which from the response alone — so we err on
-  // the safe side. Codex iter-2 #822.
+  //       already truncated the jsonl, so our local copy is LONGER
+  //       than the canonical state and needs to shrink
+  // The local undo is destructive in (a) and necessary in (b), and
+  // we can't tell which from the response alone. Use a force-replace
+  // refresh instead: it converges on whatever the server has now —
+  // truncated for (b), full transcript for (a) — without relying on
+  // our own splice. Codex iter-2 + iter-3 #822.
   if (!result.data?.ok) {
-    console.info("[agent] cancel was a no-op on the server — skipping local undo", { chatSessionId: sessionId });
+    console.info("[agent] cancel was a no-op on the server — force-syncing transcript", { chatSessionId: sessionId });
+    refreshSessionTranscript(sessionId, { forceReplace: true }).catch((err) => {
+      console.warn("[agent] force-sync after cancel-noop failed", { chatSessionId: sessionId, error: String(err) });
+    });
     return;
   }
   const session = sessionMap.get(sessionId);

@@ -137,13 +137,15 @@ function removeSession(chatSessionId: string): void {
 // turn cancel path #822). The /api/sessions list endpoint reads this
 // to populate the response's `deletedIds` array so cursor-based
 // clients drop the deleted ids from their cached lists. The TTL
-// matches the sessions-list horizon: a tombstone older than that
-// can no longer matter because the corresponding session row is
-// already off the list anyway. Eviction happens on BOTH the write
-// path (purgeSession) and the read path (getRecentlyPurgedSessionIds)
-// so tombstones don't linger forever in a quiet server — Codex
-// iter-2 #822.
-const SESSIONS_TOMBSTONE_TTL_MS = env.sessionsListWindowDays * ONE_DAY_MS;
+// matches the sessions-list horizon when one is set; otherwise
+// (sessionsListWindowDays === 0 = "no cutoff" per env.ts docs) we
+// fall back to a 90-day floor so tombstones still survive long
+// enough for cursor-based clients to consume them. Eviction happens
+// on BOTH the write path (purgeSession) and the read path
+// (getRecentlyPurgedSessionIds) so tombstones don't linger forever
+// in a quiet server — Codex iter-2/3 #822.
+const SESSIONS_TOMBSTONE_FALLBACK_DAYS = 90;
+const SESSIONS_TOMBSTONE_TTL_MS = (env.sessionsListWindowDays > 0 ? env.sessionsListWindowDays : SESSIONS_TOMBSTONE_FALLBACK_DAYS) * ONE_DAY_MS;
 const recentlyPurgedSessions = new Map<string, number>();
 
 function evictOldTombstones(now: number): void {
