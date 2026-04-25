@@ -6,7 +6,7 @@
 //
 // Single-select today: the chip clicked replaces the active filter.
 // Multi-select / AND-composition is deliberately out of scope (see
-// `plans/feat-sources-filter-chips-768.md`).
+// `plans/done/feat-sources-filter-chips-768.md`).
 
 import type { Source } from "../../plugins/manageSource/index";
 

@@ -872,7 +872,7 @@ function navigateToWorkspacePath(href: string): void {
       router.push({ name: PAGE_ROUTES.wiki, params: buildWikiRouteParams({ kind: "page", slug: target.slug }) }).catch(() => {});
       break;
     case "file":
-      // Path-based files URL (see plans/feat-files-path-url.md) — pass
+      // Path-based files URL (see plans/done/feat-files-path-url.md) — pass
       // segments as an array so each piece is url-encoded independently
       // and slashes stay as path separators.
       router.push({ name: PAGE_ROUTES.files, params: { pathMatch: target.path.split("/") } }).catch(() => {});

@@ -386,7 +386,7 @@ Runtime \`pip install\` / \`apt install\` are not available (no network-installe
 // fetched on demand via the Read tool. 2000 chars keeps today's small
 // helps (github.md ~1.2K, spreadsheet.md ~1.4K) inline, while wiki.md /
 // mulmoscript.md / telegram.md (4–7K each) switch to summary mode. See
-// plans/feat-help-pointer-threshold.md and issue #487.
+// plans/done/feat-help-pointer-threshold.md and issue #487.
 const HELP_INLINE_THRESHOLD_CHARS = 2000;
 const HELP_SUMMARY_PARAGRAPH_CAP = 200;
 

@@ -1,6 +1,6 @@
 // Priority-ordered rule chain that picks the favicon's backing
 // colour from the full runtime context. See
-// `plans/feat-favicon-conditional-palette.md` for the reasoning
+// `plans/done/feat-favicon-conditional-palette.md` for the reasoning
 // behind the ordering and the chosen hex values.
 //
 // The function is pure: one input → one output. No clock, no DOM,

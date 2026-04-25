@@ -437,7 +437,7 @@ Set `VITE_LOCALE=ja` (or `en`) in `.env` and restart `yarn dev`. Vite inlines en
 
 ### Scope today vs. plans
 
-`src/lang/*.ts` currently holds only a seed (`common.save` / `common.cancel`). Existing hard-coded strings across `src/**/*.vue` will be extracted incrementally in follow-up PRs. See `plans/feat-vue-i18n-setup.md` for the rationale and [issue #559](https://github.com/receptron/mulmoclaude/issues/559).
+`src/lang/*.ts` currently holds only a seed (`common.save` / `common.cancel`). Existing hard-coded strings across `src/**/*.vue` will be extracted incrementally in follow-up PRs. See `plans/done/feat-vue-i18n-setup.md` for the rationale and [issue #559](https://github.com/receptron/mulmoclaude/issues/559).
 
 ---
 
