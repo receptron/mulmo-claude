@@ -11,6 +11,10 @@ import {
   getActiveSessionIds,
   getSessionImageData,
   initSessionStore,
+  purgeSession,
+  getRecentlyPurgedSessionIds,
+  wasCancelled,
+  getTurnStartJsonlSize,
 } from "../../server/events/session-store/index.ts";
 
 const NOW = "2026-04-17T00:00:00.000Z";
@@ -195,5 +199,80 @@ describe("getSessionImageData", () => {
 
   it("returns undefined for unknown session", () => {
     assert.equal(getSessionImageData("nope"), undefined);
+  });
+});
+
+// Cancel-rollback bookkeeping (#822). Pinned in the store tests
+// because the agent route consumes these accessors in its post-run
+// cleanup; getting them wrong would silently revert the Stop-button
+// "this turn never happened" UX.
+describe("cancel rollback flags", () => {
+  it("beginRun records turnStartJsonlSize and clears any prior cancelled flag", () => {
+    getOrCreateSession("s1", sessionOpts());
+    beginRun("s1", () => {}, 42);
+    assert.equal(getTurnStartJsonlSize("s1"), 42);
+    assert.equal(wasCancelled("s1"), false);
+  });
+
+  it("cancelRun flips wasCancelled true and runs the abort callback", () => {
+    let aborted = false;
+    getOrCreateSession("s1", sessionOpts());
+    beginRun(
+      "s1",
+      () => {
+        aborted = true;
+      },
+      0,
+    );
+    const ok = cancelRun("s1");
+    assert.equal(ok, true);
+    assert.equal(aborted, true);
+    assert.equal(wasCancelled("s1"), true);
+  });
+
+  it("cancelRun is a no-op (returns false) when no run is in flight", () => {
+    getOrCreateSession("s1", sessionOpts());
+    assert.equal(cancelRun("s1"), false);
+    assert.equal(wasCancelled("s1"), false);
+  });
+
+  it("starting a fresh run clears the prior cancelled flag", () => {
+    getOrCreateSession("s1", sessionOpts());
+    beginRun("s1", () => {}, 0);
+    cancelRun("s1");
+    assert.equal(wasCancelled("s1"), true);
+    endRun("s1");
+    beginRun("s1", () => {}, 100);
+    assert.equal(wasCancelled("s1"), false, "second run must not inherit the prior cancel");
+    assert.equal(getTurnStartJsonlSize("s1"), 100);
+  });
+});
+
+describe("purgeSession + getRecentlyPurgedSessionIds (tombstones)", () => {
+  it("purgeSession removes the in-memory entry and records a tombstone", () => {
+    getOrCreateSession("s1", sessionOpts());
+    purgeSession("s1");
+    assert.equal(getSession("s1"), undefined);
+    assert.deepEqual(getRecentlyPurgedSessionIds(0), ["s1"]);
+  });
+
+  it("getRecentlyPurgedSessionIds(sinceMs) filters by deletion time", () => {
+    purgeSession("oldOne");
+    // Force a small wait via an explicit timestamp boundary: we
+    // can't reliably step time without injecting a clock, so just
+    // assert the relative behavior — sinceMs in the future returns
+    // empty, sinceMs at 0 returns everything.
+    assert.deepEqual(getRecentlyPurgedSessionIds(Date.now() + 1_000_000), []);
+    assert.ok(getRecentlyPurgedSessionIds(0).includes("oldOne"));
+  });
+
+  it("multiple purges accumulate", () => {
+    purgeSession("a");
+    purgeSession("b");
+    purgeSession("c");
+    const ids = getRecentlyPurgedSessionIds(0);
+    assert.ok(ids.includes("a"));
+    assert.ok(ids.includes("b"));
+    assert.ok(ids.includes("c"));
   });
 });

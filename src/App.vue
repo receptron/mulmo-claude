@@ -758,6 +758,14 @@ async function refreshSessionTranscript(sessionId: string, opts: { forceReplace?
   // canonical version. Codex iter-3 #822.
   if (opts.forceReplace || serverResults.length > session.toolResults.length) {
     session.toolResults = serverResults;
+    // Reconcile the selection: if the previously-selected result no
+    // longer exists in the new transcript (force-replace can shrink
+    // the list, e.g. multi-tab cancel truncated mid-turn), drop the
+    // selection so the canvas doesn't render against a dead uuid.
+    // Codex iter-4 #822.
+    if (session.selectedResultUuid && !serverResults.some((entry) => entry.uuid === session.selectedResultUuid)) {
+      session.selectedResultUuid = null;
+    }
   }
 }
 
