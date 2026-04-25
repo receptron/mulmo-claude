@@ -1,10 +1,15 @@
 <template>
   <div class="h-full bg-white flex flex-col">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100">
       <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginManageRoles.heading") }}</h2>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <span class="text-sm text-gray-500">{{ t("pluginManageRoles.roleCount", customRoles.length, { named: { count: customRoles.length } }) }}</span>
-        <button v-if="!creating" data-testid="role-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="startCreate">
+        <button
+          v-if="!creating"
+          data-testid="role-add-btn"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+          @click="startCreate"
+        >
           {{ t("pluginManageRoles.addButton") }}
         </button>
       </div>

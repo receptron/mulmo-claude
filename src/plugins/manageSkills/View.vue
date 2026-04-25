@@ -1,7 +1,7 @@
 <template>
   <div class="h-full bg-white flex flex-col overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+    <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
       <div>
         <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginManageSkills.heading") }}</h2>
         <p class="text-xs text-gray-400 mt-0.5">{{ t("pluginManageSkills.subheading", { count: skills.length }) }}</p>
@@ -55,51 +55,51 @@
             <div class="flex items-center gap-2 shrink-0">
               <template v-if="editing">
                 <button
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
                   data-testid="skill-cancel-btn"
                   @click="cancelEdit"
                 >
                   {{ t("common.cancel") }}
                 </button>
                 <button
-                  class="px-3 py-1.5 text-sm rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1"
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-40"
                   :disabled="saving"
                   data-testid="skill-save-btn"
                   @click="saveEdit"
                 >
-                  <span class="material-icons text-base">save</span>
+                  <span class="material-icons text-sm">save</span>
                   {{ t("common.save") }}
                 </button>
               </template>
               <template v-else>
                 <button
                   v-if="detail && detail.source === 'project'"
-                  class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1"
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                   :disabled="detailLoading"
                   data-testid="skill-edit-btn"
                   @click="startEdit"
                 >
-                  <span class="material-icons text-base">edit</span>
+                  <span class="material-icons text-sm">edit</span>
                   {{ t("pluginManageSkills.btnEdit") }}
                 </button>
                 <button
                   v-if="detail && detail.source === 'project'"
-                  class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1"
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40"
                   :disabled="detailLoading || deleting"
                   data-testid="skill-delete-btn"
                   :title="t('pluginManageSkills.deleteProjectSkill')"
                   @click="deleteSkill"
                 >
-                  <span class="material-icons text-base">delete</span>
+                  <span class="material-icons text-sm">delete</span>
                   {{ t("pluginManageSkills.btnDelete") }}
                 </button>
                 <button
-                  class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center gap-1"
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
                   :disabled="detailLoading || !detail"
                   data-testid="skill-run-btn"
                   @click="runSkill"
                 >
-                  <span class="material-icons text-base">play_arrow</span>
+                  <span class="material-icons text-sm">play_arrow</span>
                   {{ t("pluginManageSkills.btnRun") }}
                 </button>
               </template>

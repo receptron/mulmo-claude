@@ -1,8 +1,8 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0 gap-3">
-      <div class="flex items-center gap-3 min-w-0">
+    <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
+      <div class="flex items-center gap-2 min-w-0">
         <h2 class="text-base font-semibold text-gray-800 shrink-0">{{ t("todoExplorer.heading") }}</h2>
         <span class="text-xs text-gray-500 shrink-0">{{ t("todoExplorer.doneRatio", { done: completedCount, total: items.length }) }}</span>
         <input
@@ -10,29 +10,33 @@
           data-testid="todo-search"
           type="text"
           :placeholder="t('todoExplorer.searchPlaceholder')"
-          class="px-2 py-1 text-xs border border-gray-200 rounded w-44 focus:outline-none focus:border-blue-400"
+          class="h-8 px-2.5 text-sm border border-gray-200 rounded w-44 focus:outline-none focus:border-blue-400"
         />
       </div>
       <div class="flex items-center gap-2">
         <!-- Add button -->
-        <button data-testid="todo-add-btn" class="px-2 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600" @click="addOpen = true">
+        <button
+          data-testid="todo-add-btn"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+          @click="addOpen = true"
+        >
           {{ t("todoExplorer.addButton") }}
         </button>
         <!-- Add column button (kanban only) -->
         <button
           v-if="viewMode === TODO_VIEW.kanban"
           data-testid="todo-column-add-btn"
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           @click="addColumnOpen = true"
         >
           {{ t("todoExplorer.addColumnButton") }}
         </button>
         <!-- View mode toggle -->
-        <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+        <div class="flex border border-gray-300 rounded overflow-hidden">
           <button
             v-for="mode in VIEW_MODES"
             :key="mode.key"
-            class="px-2.5 py-1"
+            class="h-8 w-8 flex items-center justify-center"
             :class="viewMode === mode.key ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
             :data-testid="`todo-view-${mode.key}`"
             :title="mode.label"

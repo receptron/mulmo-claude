@@ -1,7 +1,7 @@
 <template>
   <div class="h-full bg-white flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between gap-2 px-6 py-2 border-b border-gray-100 shrink-0">
+    <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-2 min-w-0">
         <button
           v-if="action !== 'index'"
@@ -34,7 +34,7 @@
           <span class="material-icons text-base">rule</span>
           {{ t("pluginWiki.lintChat") }}
         </button>
-        <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+        <div class="flex border border-gray-300 rounded overflow-hidden">
           <button
             :class="[
               'h-8 px-2.5 flex items-center gap-1 border-r border-gray-200 last:border-r-0 transition-colors',

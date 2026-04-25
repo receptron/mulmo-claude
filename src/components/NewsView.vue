@@ -1,7 +1,7 @@
 <template>
   <div class="h-full flex flex-col bg-white" data-testid="news-view">
     <!-- Header: title + filter chips + actions. -->
-    <div class="px-5 py-3 border-b border-gray-200 flex flex-wrap items-center gap-2 shrink-0">
+    <div class="px-3 py-2 border-b border-gray-200 flex flex-wrap items-center gap-2 shrink-0">
       <h1 class="text-base font-semibold text-gray-900 mr-3">{{ t("pluginNews.title") }}</h1>
       <span class="text-xs text-gray-500" data-testid="news-counts">{{
         t("pluginNews.itemCount", {
@@ -10,12 +10,12 @@
         })
       }}</span>
       <div class="ml-auto flex items-center gap-2">
-        <div class="flex border border-gray-300 rounded overflow-hidden text-xs" role="tablist">
+        <div class="flex border border-gray-300 rounded overflow-hidden" role="tablist">
           <button
             v-for="filter in readFilterChoices"
             :key="filter.value"
             :class="[
-              'px-2.5 py-1 transition-colors',
+              'h-8 px-2.5 flex items-center gap-1 text-sm transition-colors',
               readFilter === filter.value ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
             ]"
             :data-testid="`news-filter-${filter.value}`"
@@ -26,7 +26,7 @@
           </button>
         </div>
         <button
-          class="text-xs px-2.5 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="unreadCount === 0"
           data-testid="news-mark-all-read"
           @click="markAllReadNow"
@@ -37,7 +37,7 @@
     </div>
 
     <!-- Source filter chip row (only sources with items). -->
-    <div v-if="sourceChoices.length > 1" class="px-5 py-2 border-b border-gray-100 flex flex-wrap items-center gap-1 shrink-0">
+    <div v-if="sourceChoices.length > 1" class="px-3 py-2 border-b border-gray-100 flex flex-wrap items-center gap-1 shrink-0">
       <FilterChip
         v-for="choice in sourceChoices"
         :key="choice.slug"

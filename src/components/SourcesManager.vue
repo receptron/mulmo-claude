@@ -1,25 +1,25 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
+    <div class="px-3 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
       <span class="text-sm font-medium text-gray-700 truncate"> {{ t("pluginManageSource.heading") }} </span>
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-gray-500"> {{ t("pluginManageSource.sourceCount", sources.length, { named: { count: sources.length } }) }} </span>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || adding || busy === 'rebuild'"
           data-testid="sources-add-btn"
           @click="startAdd"
         >
-          <span class="material-icons text-sm align-middle">add</span>
+          <span class="material-icons text-sm">add</span>
           {{ t("pluginManageSource.addButton") }}
         </button>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || busy === 'rebuild'"
           data-testid="sources-rebuild-btn"
           @click="rebuild"
         >
-          <span class="material-icons text-sm align-middle">refresh</span>
+          <span class="material-icons text-sm">refresh</span>
           {{ busy === "rebuild" ? t("pluginManageSource.rebuilding") : t("pluginManageSource.rebuildNow") }}
         </button>
       </div>
