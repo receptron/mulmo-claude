@@ -29,7 +29,7 @@ Snapshot taken 2026-04-25 from the branch landing this PR. Counts are `grep -c "
 | `roles.ts` | 0 | none | silent | followup |
 | `scheduler.ts` | partial → good (this PR) | good | every action handler now logs entry + success + validation warns + error | **THIS PR** ✅ |
 | `schedulerHandlers.ts` | 0 | none | every handler silent | followup |
-| `schedulerTasks.ts` | partial → good (this PR) | good | list / create / update / delete / run all log entry + success + validation warns + error | **THIS PR** ✅ |
+| `schedulerTasks.ts` | partial → good (this PR) | good | list / create / update / delete / run / logs all log entry + success; validation warns on bad input; not-found warns on missing taskId; error catches surround all I/O paths | **THIS PR** ✅ |
 | `sessions.ts` | 0 | none | list / detail / mark-read silent | followup |
 | `sessionsCursor.ts` | 0 | none | cursor advance silent | followup |
 | `skills.ts` | 3 | partial | create / update / delete partly covered | followup |

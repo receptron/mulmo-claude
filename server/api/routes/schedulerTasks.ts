@@ -26,15 +26,25 @@ const router = Router();
 
 router.get(API_ROUTES.scheduler.tasks, (_req: Request, res: Response) => {
   log.info("scheduler-tasks", "list: start");
-  // getSchedulerTasks() returns system-only tasks (registered via
-  // initScheduler at startup — journal, chat-index, sources, etc.).
-  // origin: "system" is correct, not an overwrite — these tasks
-  // have no origin field of their own.
-  const systemTasks = getSchedulerTasks();
-  const userTasks = loadUserTasks();
-  const all = [...systemTasks.map((task) => ({ ...task, origin: "system" as const })), ...userTasks.map((task) => ({ ...task, origin: "user" as const }))];
-  log.info("scheduler-tasks", "list: ok", { system: systemTasks.length, user: userTasks.length });
-  res.json({ tasks: all });
+  try {
+    // getSchedulerTasks() returns system-only tasks (registered via
+    // initScheduler at startup — journal, chat-index, sources, etc.).
+    // origin: "system" is correct, not an overwrite — these tasks
+    // have no origin field of their own.
+    const systemTasks = getSchedulerTasks();
+    const userTasks = loadUserTasks();
+    const all = [...systemTasks.map((task) => ({ ...task, origin: "system" as const })), ...userTasks.map((task) => ({ ...task, origin: "user" as const }))];
+    log.info("scheduler-tasks", "list: ok", { system: systemTasks.length, user: userTasks.length });
+    res.json({ tasks: all });
+  } catch (err) {
+    // loadUserTasks reads JSON from disk and getSchedulerTasks
+    // queries the in-memory registry — neither is supposed to
+    // throw, but a corrupted user-tasks.json or an early-startup
+    // registry race would. Without the catch the route would 500
+    // with no trace, which is the original #779 complaint pattern.
+    log.error("scheduler-tasks", "list: failed", { error: errorMessage(err) });
+    serverError(res, "Failed to list tasks");
+  }
 });
 
 // ── Create user task ────────────────────────────────────────────
@@ -171,12 +181,20 @@ router.get(API_ROUTES.scheduler.logs, async (req: Request<object, unknown, objec
   const rawLimitStr = getOptionalStringQuery(req, "limit");
   const rawLimit = rawLimitStr ? parseInt(rawLimitStr, 10) : undefined;
   const limit = Number.isFinite(rawLimit) && rawLimit! > 0 ? Math.min(rawLimit!, MAX_LIMIT) : undefined;
-  const logs = await getSchedulerLogs({
-    since: getOptionalStringQuery(req, "since"),
-    taskId: getOptionalStringQuery(req, "taskId"),
-    limit,
-  });
-  res.json({ logs });
+  const taskId = getOptionalStringQuery(req, "taskId");
+  log.info("scheduler-tasks", "logs: start", { taskId, limit });
+  try {
+    const logs = await getSchedulerLogs({
+      since: getOptionalStringQuery(req, "since"),
+      taskId,
+      limit,
+    });
+    log.info("scheduler-tasks", "logs: ok", { entries: logs.length, taskId });
+    res.json({ logs });
+  } catch (err) {
+    log.error("scheduler-tasks", "logs: failed", { taskId, error: errorMessage(err) });
+    serverError(res, "Failed to read scheduler logs");
+  }
 });
 
 export default router;

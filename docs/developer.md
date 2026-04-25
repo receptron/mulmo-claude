@@ -497,13 +497,13 @@ Routes that do anything more than echo state should follow this shape, mirroring
 
 | Stage | Level | Required payload |
 |---|---|---|
-| Entry, after input validation | `info` | route name + key id (sessionId / slug / path) + `previewSnippet(prompt)` for any user-supplied freeform text |
+| Entry, after input validation | `info` | route name + key id (sessionId / slug / path) + `promptMeta(prompt)` for freeform user input, or `previewSnippet(slug)` for identifier-shaped fields |
 | Success | `info` | bytes / item count / generated id |
-| External SDK / fetch returned no data | `warn` | input preview + reason |
-| Internal exception (we threw, not the SDK) | `error` | input preview + `errorMessage(err)` |
+| External SDK / fetch returned no data | `warn` | input fingerprint + reason |
+| Internal exception (we threw, not the SDK) | `error` | input fingerprint + `errorMessage(err)` |
 | External SDK request/response shape | `debug` | only inside the SDK wrapper (`server/utils/gemini.ts` etc.); never inside route files |
 
-Two helpers, picked by call-site shape:
+The "input fingerprint" in the warn / error rows is whichever helper the entry log used — `promptMeta` for freeform prompts, `previewSnippet` for identifiers. Pick by call-site shape, per the table below:
 
 | Helper | Use for | Output |
 |---|---|---|
