@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { notify, makeNotifyTool, type NotifyPublishFn } from "../../server/agent/mcp-tools/notify.js";
+import { mcpTools } from "../../server/agent/mcp-tools/index.js";
 import { NOTIFICATION_KINDS } from "../../src/types/notification.js";
 
 // Capture each `publish` call so tests can assert on the args
@@ -94,5 +95,22 @@ describe("notify MCP tool — definition shape", () => {
     const tool = makeNotifyTool({ publish });
     assert.equal(tool.definition.name, notify.definition.name);
     assert.deepEqual(tool.definition.inputSchema, notify.definition.inputSchema);
+  });
+});
+
+// Codex review on #808 surfaced a gap: the unit tests above exercise
+// the factory in isolation, but never assert that the production
+// singleton is actually wired into the agent's MCP tool registry.
+// Without this, a refactor could quietly drop `notify` from the
+// registry and the agent would lose access — but every existing
+// test would still pass.
+describe("notify MCP tool — registry integration", () => {
+  it("is registered in the production mcpTools array", () => {
+    assert.ok(mcpTools.includes(notify), "notify must be in the mcpTools registry exported from server/agent/mcp-tools/index.ts");
+  });
+
+  it("appears in mcpTools by its canonical name", () => {
+    const byName = mcpTools.find((tool) => tool.definition.name === "notify");
+    assert.equal(byName, notify, "the tool registered under the name 'notify' must be the same object as the exported singleton");
   });
 });
