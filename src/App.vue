@@ -762,9 +762,16 @@ async function refreshSessionTranscript(sessionId: string, opts: { forceReplace?
     // longer exists in the new transcript (force-replace can shrink
     // the list, e.g. multi-tab cancel truncated mid-turn), drop the
     // selection so the canvas doesn't render against a dead uuid.
-    // Codex iter-4 #822.
+    // Route through the writable computed so the URL's `?result=`
+    // query is cleared in lockstep — Codex iter-4/5 #822.
     if (session.selectedResultUuid && !serverResults.some((entry) => entry.uuid === session.selectedResultUuid)) {
-      session.selectedResultUuid = null;
+      // Only the active-session path needs URL sync; another tab's
+      // session in the map can't be the one whose URL is open here.
+      if (sessionId === currentSessionId.value) {
+        selectedResultUuid.value = null;
+      } else {
+        session.selectedResultUuid = null;
+      }
     }
   }
 }

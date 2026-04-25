@@ -579,6 +579,11 @@ function evictIdleSessions(): void {
 export function __resetForTests(): void {
   store.clear();
   storelessPending.clear();
+  // Also clear the cancel-rollback tombstone map (#822 / Codex
+  // iter-5) — a test order where one suite calls purgeSession and
+  // a later suite asserts on getRecentlyPurgedSessionIds would
+  // otherwise see a leaked entry from a previous run.
+  recentlyPurgedSessions.clear();
   pubsub = null;
   if (evictionTimer) {
     clearInterval(evictionTimer);
