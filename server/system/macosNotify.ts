@@ -62,10 +62,19 @@ interface Deps {
   disabled: boolean;
 }
 
+// Auto-disable inside `node:test`. The runner sets
+// `NODE_TEST_CONTEXT` on the child process so we can detect it
+// here. Without this gate, any test that goes through
+// `publishNotification` (e.g. the route-level scheduleTest tests)
+// fires real osascript and pollutes Reminders.app.
+function isInsideNodeTest(): boolean {
+  return typeof process.env.NODE_TEST_CONTEXT === "string" && process.env.NODE_TEST_CONTEXT.length > 0;
+}
+
 const defaultDeps: Deps = {
   spawner: spawn,
   platform: process.platform as Platform,
-  disabled: env.disableMacosReminderNotifications,
+  disabled: env.disableMacosReminderNotifications || isInsideNodeTest(),
 };
 
 export function pushToMacosReminder(title: string, body?: string): Promise<void> {
