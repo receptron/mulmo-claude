@@ -1,122 +1,14 @@
-// Thin wrapper around the Claude Code CLI used as the journal's
-// summarizer. The default `runClaudeCli` spawns `claude -p` as a
-// subprocess so summarization draws from the user's subscription
-// quota rather than the API key budget.
+// Data shapes, prompts, and validators for the journal archivist.
+// Pure module — no IO, no subprocess, no global state. The CLI
+// transport (subprocess wrapper, error classes, default Summarize)
+// lives in `./archivist-cli.ts`.
 //
-// The rest of the journal module receives a `Summarize` function
-// via dependency injection — tests supply a deterministic fake, the
-// production path supplies `runClaudeCli`.
+// Splitting these used to be one file (`archivist.ts`), but it had
+// grown to 386 lines mixing transport with schemas. Keeping prompts
+// + validators separate lets tests / future passes import the data
+// shapes without dragging in `node:child_process`.
 
-import { spawn } from "node:child_process";
-import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../utils/time.js";
-
-// (systemPrompt, userPrompt) → raw model output as a string.
-// The daily/optimization passes parse JSON out of the string
-// themselves; this layer stays transport-only.
-export type Summarize = (systemPrompt: string, userPrompt: string) => Promise<string>;
-
-// Wall-clock cap per CLI invocation. 5 minutes is comfortably above
-// the worst-case summarization run we've seen and still short enough
-// that a wedged subprocess doesn't tie up resources forever.
-const CLI_TIMEOUT_MS = CLI_SUBPROCESS_TIMEOUT_MS;
-
-// Sentinel we throw on ENOENT so maybeRunJournal can disable the
-// feature for the rest of the server lifetime instead of retrying
-// on every session-end.
-export class ClaudeCliNotFoundError extends Error {
-  constructor() {
-    super("[journal] `claude` CLI is not available on PATH — journal disabled");
-    this.name = "ClaudeCliNotFoundError";
-  }
-}
-
-export class ClaudeCliFailedError extends Error {
-  readonly exitCode: number | null;
-  readonly stderr: string;
-  constructor(exitCode: number | null, stderr: string) {
-    super(`[journal] \`claude\` CLI exited ${exitCode ?? "(killed)"}: ${stderr.slice(0, 500)}`);
-    this.name = "ClaudeCliFailedError";
-    this.exitCode = exitCode;
-    this.stderr = stderr;
-  }
-}
-
-// Default summarizer. Spawns `claude -p` and pipes the combined
-// system + user prompt to stdin so we don't hit shell-argv limits
-// for large day excerpts.
-export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
-  return new Promise((resolve, reject) => {
-    const child = spawn("claude", ["-p", "--output-format", "text"], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-    let settled = false;
-
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-    }, CLI_TIMEOUT_MS);
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", (err: Error & { code?: string }) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      if (err.code === "ENOENT") {
-        reject(new ClaudeCliNotFoundError());
-      } else {
-        reject(err);
-      }
-    });
-
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      if (timedOut) {
-        reject(new ClaudeCliFailedError(null, `timed out after ${CLI_TIMEOUT_MS}ms\n${stderr}`));
-        return;
-      }
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new ClaudeCliFailedError(code, stderr));
-      }
-    });
-
-    // Surface stdin write errors (e.g. EPIPE if the child exited
-    // before we finished writing) instead of silently dropping them.
-    child.stdin.on("error", (err: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      reject(err);
-    });
-
-    // Send the full prompt in one write. If Node's stream layer
-    // signals backpressure (write returns false), wait for "drain"
-    // before calling end() so we don't close stdin while the buffer
-    // still has data to flush. For typical archivist prompts this
-    // path rarely fires, but very large session excerpts can reach
-    // it.
-    const payload = `${systemPrompt}\n\n---\n\n${userPrompt}`;
-    const flushed = child.stdin.write(payload);
-    if (flushed) {
-      child.stdin.end();
-    } else {
-      child.stdin.once("drain", () => child.stdin.end());
-    }
-  });
-};
+import { isRecord } from "../../utils/types.js";
 
 // --- Daily archivist contract ---------------------------------------
 
@@ -342,11 +234,11 @@ export function buildOptimizationUserPrompt(input: OptimizationInput): string {
 // on failure so callers can log-and-skip instead of crash.
 //
 // JSON extraction helpers moved to server/utils/json.ts.
-// Re-export for backwards compatibility with callers that import
-// from this module (dailyPass.ts, optimizationPass.ts).
+// Re-export here so journal callers (and existing tests) keep a
+// single import surface for the archivist contract.
 export { extractJsonObject, findBalancedBraceBlock } from "../../utils/json.js";
 
-import { isRecord } from "../../utils/types.js";
+// --- Validators ------------------------------------------------------
 
 // Type guards used by callers to validate parsed output. Written as
 // guards rather than `as` casts per project conventions.

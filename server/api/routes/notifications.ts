@@ -2,7 +2,7 @@
 // simultaneously to every open Web tab (pub-sub) and every bridge
 // (chat-service `pushToBridge`). Stepping stone for the in-app
 // notification center (#144) and external-channel notifications
-// (#142); see plans/feat-notification-push-scaffold.md for the
+// (#142); see plans/done/feat-notification-push-scaffold.md for the
 // motivation and the production plan.
 //
 // Usage (basic):

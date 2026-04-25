@@ -44,7 +44,7 @@ function publishBatchNotification(scored: readonly ScoredItem[]): void {
       priority: item.severity === "critical" ? NOTIFICATION_PRIORITIES.high : NOTIFICATION_PRIORITIES.normal,
       // Deep-link to the owning source feed so the user lands on the
       // specific registered source rather than the /sources index
-      // (plans/feat-notification-permalinks.md).
+      // (plans/done/feat-notification-permalinks.md).
       action: {
         type: NOTIFICATION_ACTION_TYPES.navigate,
         target: {

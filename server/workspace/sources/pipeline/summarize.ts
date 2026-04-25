@@ -12,7 +12,7 @@
 
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
-import { ClaudeCliNotFoundError } from "../../journal/archivist.js";
+import { ClaudeCliNotFoundError } from "../../journal/archivist-cli.js";
 import { formatSpawnFailure } from "../../../utils/spawn.js";
 import { errorMessage } from "../../../utils/errors.js";
 import type { SourceItem } from "../types.js";

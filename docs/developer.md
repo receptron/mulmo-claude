@@ -307,7 +307,7 @@ Web subscribers listen on `PUBSUB_CHANNELS.notifications` (`src/config/pubsubCha
 - **One bridge per call**: `pushToBridge` targets a single `transportId`. Fan-out to every connected bridge is deferred until a caller needs it.
 - **One-shot only**: no repeat / snooze / dedup. Production triggers should go through the notification center once #144 lands.
 
-Full motivation + file plan: `plans/feat-notification-push-scaffold.md`. Implementation: `server/events/notifications.ts` (scheduler) + `server/api/routes/notifications.ts` (HTTP wrapper) + `src/composables/useNotifications.ts` + `src/components/NotificationToast.vue`.
+Full motivation + file plan: `plans/done/feat-notification-push-scaffold.md`. Implementation: `server/events/notifications.ts` (scheduler) + `server/api/routes/notifications.ts` (HTTP wrapper) + `src/composables/useNotifications.ts` + `src/components/NotificationToast.vue`.
 
 ### Notification permalinks (#762)
 
@@ -353,7 +353,7 @@ After firing, open the bell in the Web UI and click each entry; every click shou
 - **Unit**: `test/utils/notification/test_dispatch.ts` — every target variant + edge cases (missing sessionId, file path splitting, wiki anchor hash).
 - **E2E**: `e2e/tests/notifications.spec.ts` — boots the app with a mocked pub-sub socket that delivers one canned payload per scenario, clicks bell + item, asserts the resulting URL. Run via `yarn test:e2e notifications`.
 
-Plan doc: `plans/feat-notification-permalinks.md`. Implementation lives in `src/types/notification.ts` (typed targets), `src/utils/notification/dispatch.ts` (dispatcher), `src/router/pageRoutes.ts` (route names), and per-page mount-time scroll handlers (`TodoExplorer.vue`, `SourcesView.vue`, `TasksTab.vue`).
+Plan doc: `plans/done/feat-notification-permalinks.md`. Implementation lives in `src/types/notification.ts` (typed targets), `src/utils/notification/dispatch.ts` (dispatcher), `src/router/pageRoutes.ts` (route names), and per-page mount-time scroll handlers (`TodoExplorer.vue`, `SourcesView.vue`, `TasksTab.vue`).
 
 ---
 
@@ -437,7 +437,7 @@ Set `VITE_LOCALE=ja` (or `en`) in `.env` and restart `yarn dev`. Vite inlines en
 
 ### Scope today vs. plans
 
-`src/lang/*.ts` currently holds only a seed (`common.save` / `common.cancel`). Existing hard-coded strings across `src/**/*.vue` will be extracted incrementally in follow-up PRs. See `plans/feat-vue-i18n-setup.md` for the rationale and [issue #559](https://github.com/receptron/mulmoclaude/issues/559).
+`src/lang/*.ts` currently holds only a seed (`common.save` / `common.cancel`). Existing hard-coded strings across `src/**/*.vue` will be extracted incrementally in follow-up PRs. See `plans/done/feat-vue-i18n-setup.md` for the rationale and [issue #559](https://github.com/receptron/mulmoclaude/issues/559).
 
 ---
 

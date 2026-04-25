@@ -121,7 +121,7 @@ No new unit test — the changes are pure template a11y attributes.
 - `src/components/NotificationBell.vue` (Space-key addition)
 - `src/lang/{en,ja,zh,ko,es,pt-BR,fr,de}.ts` (new aria-label strings, 8 files)
 - `e2e/tests/a11y-clickable-rows.spec.ts` (new)
-- `plans/fix-a11y-clickable-non-buttons.md` (this file)
+- `plans/done/fix-a11y-clickable-non-buttons.md` (this file)
 
 ## Done when
 

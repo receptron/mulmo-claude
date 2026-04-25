@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { maybeIndexSession, backfillAllSessions, __resetForTests } from "../../server/workspace/chat-index/index.js";
 import { indexEntryPathFor } from "../../server/workspace/chat-index/paths.js";
-import { ClaudeCliNotFoundError } from "../../server/workspace/journal/archivist.js";
+import { ClaudeCliNotFoundError } from "../../server/workspace/journal/archivist-cli.js";
 import type { SummaryResult } from "../../server/workspace/chat-index/types.js";
 
 let workspace: string;

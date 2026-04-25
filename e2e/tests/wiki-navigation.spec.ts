@@ -1,7 +1,7 @@
 // URL-driven navigation for the wiki plugin.
 //
-// Covers the routing contract established by plans/feat-wiki-url-sync.md
-// and updated to path-based URLs in plans/feat-wiki-path-urls.md:
+// Covers the routing contract established by plans/done/feat-wiki-url-sync.md
+// and updated to path-based URLs in plans/done/feat-wiki-path-urls.md:
 //
 // - /wiki                    → index
 // - /wiki/pages/<slug>       → page view

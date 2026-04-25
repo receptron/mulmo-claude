@@ -373,4 +373,4 @@ Scheduler パターンを踏襲。`todos/todos.json` を選択した時に、`to
 - `server/api/routes/todosHandlers.ts:302-316` — HANDLERS map（新 action 追加先）
 - `src/components/FilesView.vue:58-60` / `src/components/FilesView.vue:298-317` — Scheduler の特殊ケース統合パターン
 - `src/plugins/scheduler/View.vue` — full-canvas plugin view の参考実装
-- `plans/feat-todo-labels.md` — labels 機能の前 PR の設計（流儀の参考）
+- `plans/done/feat-todo-labels.md` — labels 機能の前 PR の設計（流儀の参考）

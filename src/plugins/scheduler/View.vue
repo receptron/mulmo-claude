@@ -37,31 +37,45 @@
     <!-- Calendar tab (existing content) -->
     <template v-if="activeTab === SCHEDULER_TAB.calendar">
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-3 border-b border-gray-100">
-        <div class="flex items-center gap-3">
+      <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100">
+        <div class="flex items-center gap-2">
           <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginScheduler.heading") }}</h2>
           <span class="text-sm text-gray-500">{{ t("pluginScheduler.itemCount", items.length, { named: { count: items.length } }) }}</span>
         </div>
         <div class="flex items-center gap-2">
           <!-- Navigation (calendar modes only) -->
           <template v-if="viewMode !== SCHEDULER_VIEW.list">
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.prev')" @click="goPrev">
-              <span class="material-icons text-sm">chevron_left</span>
-            </button>
-            <button class="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded" :title="t('pluginScheduler.goToday')" @click="goToday">
-              {{ t("pluginScheduler.today") }}
-            </button>
-            <button class="px-2 py-1 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded" :title="t('pluginScheduler.next')" @click="goNext">
-              <span class="material-icons text-sm">chevron_right</span>
-            </button>
+            <div class="flex gap-0.5">
+              <button
+                class="h-8 w-8 flex items-center justify-center rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                :title="t('pluginScheduler.prev')"
+                @click="goPrev"
+              >
+                <span class="material-icons text-sm">chevron_left</span>
+              </button>
+              <button
+                class="h-8 px-2.5 flex items-center gap-1 text-sm rounded text-gray-600 hover:bg-gray-100"
+                :title="t('pluginScheduler.goToday')"
+                @click="goToday"
+              >
+                {{ t("pluginScheduler.today") }}
+              </button>
+              <button
+                class="h-8 w-8 flex items-center justify-center rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                :title="t('pluginScheduler.next')"
+                @click="goNext"
+              >
+                <span class="material-icons text-sm">chevron_right</span>
+              </button>
+            </div>
             <span class="text-sm text-gray-600 min-w-[140px] text-center">{{ headerLabel }}</span>
           </template>
           <!-- View mode toggle -->
-          <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+          <div class="flex border border-gray-300 rounded overflow-hidden">
             <button
               v-for="mode in VIEW_MODES"
               :key="mode.key"
-              class="px-2.5 py-1"
+              class="h-8 w-8 flex items-center justify-center"
               :class="viewMode === mode.key ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
               :title="mode.label"
               @click="viewMode = mode.key"

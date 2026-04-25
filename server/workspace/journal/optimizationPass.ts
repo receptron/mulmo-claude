@@ -6,14 +6,13 @@
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { writeTopicFile, readAllTopicFiles, archiveTopic } from "../../utils/files/journal-io.js";
 import {
-  type Summarize,
   type OptimizationTopicSnapshot,
   OPTIMIZATION_SYSTEM_PROMPT,
   buildOptimizationUserPrompt,
   extractJsonObject,
   isOptimizationOutput,
-  ClaudeCliNotFoundError,
-} from "./archivist.js";
+} from "./archivist-schemas.js";
+import { type Summarize, ClaudeCliNotFoundError } from "./archivist-cli.js";
 import { slugify } from "./paths.js";
 import type { JournalState } from "./state.js";
 import { log } from "../../system/logger/index.js";

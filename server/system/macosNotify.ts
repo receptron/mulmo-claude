@@ -67,15 +67,41 @@ interface Deps {
 // here. Without this gate, any test that goes through
 // `publishNotification` (e.g. the route-level scheduleTest tests)
 // fires real osascript and pollutes Reminders.app.
+//
+// Narrowed to the canonical `"child-v8"` value (the only one node's
+// test runner currently emits) rather than "any non-empty string"
+// — that limits the false-positive surface if a user happens to
+// have NODE_TEST_CONTEXT exported in their dev shell with some
+// other sentinel value (codex review on PR #808).
+const NODE_TEST_CONTEXT_VALUES = new Set(["child-v8"]);
+
 function isInsideNodeTest(): boolean {
-  return typeof process.env.NODE_TEST_CONTEXT === "string" && process.env.NODE_TEST_CONTEXT.length > 0;
+  const value = process.env.NODE_TEST_CONTEXT;
+  return typeof value === "string" && NODE_TEST_CONTEXT_VALUES.has(value);
 }
+
+const autoDisabledForTests = isInsideNodeTest();
 
 const defaultDeps: Deps = {
   spawner: spawn,
   platform: process.platform as Platform,
-  disabled: env.disableMacosReminderNotifications || isInsideNodeTest(),
+  disabled: env.disableMacosReminderNotifications || autoDisabledForTests,
 };
+
+// Observability hook — log once at module load if the auto-disable
+// fired but the user didn't set the explicit DISABLE_… flag. Lets a
+// dev who has NODE_TEST_CONTEXT inherited from their shell notice
+// why their reminders aren't firing. We only log on darwin to avoid
+// noise on Linux / Windows where the sink is silent anyway.
+if (autoDisabledForTests && !env.disableMacosReminderNotifications && process.platform === "darwin") {
+  log.info(
+    "macos-notify",
+    "auto-disabled because NODE_TEST_CONTEXT is set; export it only in test runners or set DISABLE_MACOS_REMINDER_NOTIFICATIONS=1 to silence this sink intentionally",
+    {
+      nodeTestContext: process.env.NODE_TEST_CONTEXT,
+    },
+  );
+}
 
 export function pushToMacosReminder(title: string, body?: string): Promise<void> {
   return pushToMacosReminderWithDeps(defaultDeps, title, body);

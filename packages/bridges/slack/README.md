@@ -184,7 +184,7 @@ SLACK_ACK_REACTION=my_bot_ack           # custom workspace emoji
 
 ### Bridge options passthrough
 
-`SLACK_BRIDGE_*` and `BRIDGE_*` env vars are automatically forwarded to the server as a camelCased options bag (e.g. `SLACK_BRIDGE_DEFAULT_ROLE=slack` → `options.defaultRole = "slack"`). The MulmoClaude server reads `defaultRole`; other host apps using `@mulmobridge/client` can define their own keys without any protocol change. See `plans/feat-bridge-options-passthrough.md` for the full convention.
+`SLACK_BRIDGE_*` and `BRIDGE_*` env vars are automatically forwarded to the server as a camelCased options bag (e.g. `SLACK_BRIDGE_DEFAULT_ROLE=slack` → `options.defaultRole = "slack"`). The MulmoClaude server reads `defaultRole`; other host apps using `@mulmobridge/client` can define their own keys without any protocol change. See `plans/done/feat-bridge-options-passthrough.md` for the full convention.
 
 ## Ecosystem
 

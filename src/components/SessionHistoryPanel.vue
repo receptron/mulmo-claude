@@ -1,23 +1,21 @@
 <template>
   <!-- Rendered as the canvas-column content for the /history route
-       (see plans/feat-history-url-route.md). Previously this was an
+       (see plans/done/feat-history-url-route.md). Previously this was an
        absolute-positioned overlay; the `h-full overflow-y-auto` root
        plus inline flow replaces the z-index + topOffset plumbing. -->
   <div ref="root" class="h-full overflow-y-auto bg-white select-none">
     <div class="p-2 space-y-2">
       <!-- Origin filter bar -->
-      <div class="flex gap-1 mb-1 flex-wrap" data-testid="session-filter-bar">
-        <button
+      <div class="flex gap-1 mb-3 flex-wrap" data-testid="session-filter-bar">
+        <FilterChip
           v-for="f in HISTORY_FILTER_ORDER"
           :key="f"
-          class="px-2 py-0.5 text-[10px] rounded-full border transition-colors"
-          :class="activeFilter === f ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'"
+          :active="activeFilter === f"
+          :label="t(`sessionHistoryPanel.filters.${f}`)"
+          :count="f === HISTORY_FILTERS.all ? undefined : countByOrigin(f)"
           :data-testid="`session-filter-${f}`"
           @click="activeFilter = f"
-        >
-          {{ t(`sessionHistoryPanel.filters.${f}`) }}
-          <span v-if="f !== HISTORY_FILTERS.all" class="ml-0.5 opacity-70">{{ countByOrigin(f) }}</span>
-        </button>
+        />
       </div>
 
       <div
@@ -81,6 +79,7 @@ import { SESSION_ORIGINS } from "../types/session";
 import { HISTORY_FILTERS, HISTORY_FILTER_ORDER, type HistoryFilter } from "../config/historyFilters";
 import { formatDate } from "../utils/format/date";
 import SessionRoleIcon from "./SessionRoleIcon.vue";
+import FilterChip from "./FilterChip.vue";
 
 const { t } = useI18n();
 

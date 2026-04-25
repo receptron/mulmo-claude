@@ -14,7 +14,7 @@
 // point at a `mkdtempSync` directory.
 
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
-import { ClaudeCliNotFoundError } from "../journal/archivist.js";
+import { ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
 import { indexSession, listSessionIds, type IndexerDeps } from "./indexer.js";
 import { log } from "../../system/logger/index.js";
 

@@ -368,7 +368,7 @@ a test harness we don't have for todos right now.
 
 | File | Type | Lines (approx) |
 |---|---|---|
-| `plans/feat-todo-labels.md` | new | — (this file) |
+| `plans/done/feat-todo-labels.md` | new | — (this file) |
 | `src/plugins/todo/labels.ts` | new | 80 |
 | `server/api/routes/todos.ts` | modified | +90 |
 | `src/plugins/todo/definition.ts` | modified | +30 |

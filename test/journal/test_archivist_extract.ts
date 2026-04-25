@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractJsonObject, findBalancedBraceBlock } from "../../server/workspace/journal/archivist.js";
+import { extractJsonObject, findBalancedBraceBlock } from "../../server/workspace/journal/archivist-schemas.js";
 
 describe("findBalancedBraceBlock", () => {
   it("extracts a simple JSON object", () => {

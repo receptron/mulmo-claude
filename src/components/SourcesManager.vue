@@ -1,25 +1,25 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
+    <div class="px-3 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between gap-2">
       <span class="text-sm font-medium text-gray-700 truncate"> {{ t("pluginManageSource.heading") }} </span>
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-gray-500"> {{ t("pluginManageSource.sourceCount", sources.length, { named: { count: sources.length } }) }} </span>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || adding || busy === 'rebuild'"
           data-testid="sources-add-btn"
           @click="startAdd"
         >
-          <span class="material-icons text-sm align-middle">add</span>
+          <span class="material-icons text-sm">add</span>
           {{ t("pluginManageSource.addButton") }}
         </button>
         <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           :disabled="initialLoading || initialLoadError !== null || busy === 'rebuild'"
           data-testid="sources-rebuild-btn"
           @click="rebuild"
         >
-          <span class="material-icons text-sm align-middle">refresh</span>
+          <span class="material-icons text-sm">refresh</span>
           {{ busy === "rebuild" ? t("pluginManageSource.rebuilding") : t("pluginManageSource.rebuildNow") }}
         </button>
       </div>
@@ -146,18 +146,15 @@
           role="toolbar"
           :aria-label="t('pluginManageSource.filter.all')"
         >
-          <button
+          <FilterChip
             v-for="key in visibleFilterKeys"
             :key="key"
-            class="text-[11px] px-2 py-0.5 rounded-full border transition-colors"
-            :class="filterKey === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            :active="filterKey === key"
+            :label="filterChipLabel(key)"
+            :count="filterCounts[key]"
             :data-testid="`sources-filter-chip-${key}`"
-            :aria-pressed="filterKey === key"
             @click="selectFilter(key)"
-          >
-            {{ filterChipLabel(key) }}
-            <span class="ml-1 text-[10px] opacity-80">{{ filterCounts[key] }}</span>
-          </button>
+          />
         </div>
 
         <!-- Filter-only empty state. Distinct from the no-sources
@@ -272,6 +269,7 @@ import type { ManageSourceData, RebuildSummary, Source } from "../plugins/manage
 import { apiGet, apiPost, apiDelete } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 import { SOURCE_FILTER_KEYS, countByFilter, matchesSourceFilter, type SourceFilterKey } from "../utils/sources/filter";
+import FilterChip from "./FilterChip.vue";
 
 const { t } = useI18n();
 

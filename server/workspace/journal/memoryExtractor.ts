@@ -12,7 +12,7 @@ import path from "path";
 import { WORKSPACE_FILES } from "../paths.js";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { log } from "../../system/logger/index.js";
-import { ClaudeCliNotFoundError } from "./archivist.js";
+import { ClaudeCliNotFoundError } from "./archivist-cli.js";
 
 const EXTRACTION_SYSTEM_PROMPT = `You are a personal-fact extractor. Given a batch of chat excerpts between a user and an AI assistant, extract ONLY durable facts about the USER — things that would still be true next week.
 

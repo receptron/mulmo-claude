@@ -13,7 +13,7 @@ import {
   bucketParsedEvents,
   type ParsedEntry,
 } from "../../server/workspace/journal/dailyPass.js";
-import type { SessionExcerpt, ExistingTopicSnapshot } from "../../server/workspace/journal/archivist.js";
+import type { SessionExcerpt, ExistingTopicSnapshot } from "../../server/workspace/journal/archivist-schemas.js";
 import type { SessionFileMeta } from "../../server/workspace/journal/diff.js";
 import type { JournalState } from "../../server/workspace/journal/state.js";
 
