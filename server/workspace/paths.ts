@@ -132,6 +132,7 @@ export const WORKSPACE_PATHS = {
   schedulerItems: path.join(workspacePath, WORKSPACE_FILES.schedulerItems),
   schedulerUserTasks: path.join(workspacePath, WORKSPACE_FILES.schedulerUserTasks),
   schedulerOverrides: path.join(workspacePath, WORKSPACE_FILES.schedulerOverrides),
+  newsReadState: path.join(workspacePath, WORKSPACE_FILES.newsReadState),
 } as const;
 
 export type WorkspaceDirKey = keyof typeof WORKSPACE_DIRS;

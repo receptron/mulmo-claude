@@ -63,6 +63,9 @@ const routes: RouteRecordRaw[] = [
   // can surface a specific registered feed. Missing slug lands on
   // the full source list.
   { path: "/sources/:slug?", name: PAGE_ROUTES.sources, component: Stub },
+  // News viewer (#761). Optional `?source=<slug>` query for the
+  // Sources-page deep link.
+  { path: "/news", name: PAGE_ROUTES.news, component: Stub },
   { path: "/:pathMatch(.*)*", redirect: "/chat" },
 ];
 

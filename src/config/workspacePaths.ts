@@ -21,4 +21,5 @@ export const WORKSPACE_FILES = {
   schedulerItems: "data/scheduler/items.json",
   schedulerUserTasks: "config/scheduler/tasks.json",
   schedulerOverrides: "config/scheduler/overrides.json",
+  newsReadState: "config/news-read-state.json",
 } as const;

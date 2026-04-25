@@ -43,7 +43,7 @@ export type PluginLauncherKind = "view"; // Switch the canvas to a dedicated vie
 // strings out of this file avoids duplication across locales.
 export interface PluginLauncherTarget {
   /** Stable key for testid + dispatch in App.vue. */
-  key: "todos" | "calendar" | "automations" | "wiki" | "sources" | "skills" | "roles" | "files";
+  key: "todos" | "calendar" | "automations" | "wiki" | "sources" | "news" | "skills" | "roles" | "files";
   kind: PluginLauncherKind;
   /** Material-icons glyph. */
   icon: string;
@@ -59,6 +59,10 @@ const TARGETS: PluginLauncherTarget[] = [
   { key: "automations", kind: "view", icon: "schedule" },
   { key: "wiki", kind: "view", icon: "menu_book" },
   { key: "sources", kind: "view", icon: "rss_feed" },
+  // News viewer (#761) — a reader UI for items aggregated by the
+  // sources pipeline. Sits next to the source-registry button so the
+  // pair reads as "manage sources" → "read what they fetched".
+  { key: "news", kind: "view", icon: "newspaper" },
   // ─── Management / navigation ───
   { key: "skills", kind: "view", icon: "psychology" },
   { key: "roles", kind: "view", icon: "manage_accounts" },
@@ -67,9 +71,9 @@ const TARGETS: PluginLauncherTarget[] = [
 
 // Index AFTER which the visual separator is inserted (between data
 // plugins on the left and management on the right). Data plugins are
-// todos / calendar / automations / wiki / sources (indices 0-4), so
-// the divider renders before index 5 (skills).
-const SEPARATOR_AFTER_INDEX = 5;
+// todos / calendar / automations / wiki / sources / news (indices
+// 0-5), so the divider renders before index 6 (skills).
+const SEPARATOR_AFTER_INDEX = 6;
 
 function isActive(target: PluginLauncherTarget): boolean {
   return props.activeViewMode === target.key;

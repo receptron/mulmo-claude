@@ -163,6 +163,12 @@ export const API_ROUTES = {
     manage: "/api/sources/manage",
   },
 
+  news: {
+    items: "/api/news/items",
+    itemBody: "/api/news/items/:id/body",
+    readState: "/api/news/read-state",
+  },
+
   todos: {
     list: "/api/todos",
     dispatch: "/api/todos",
