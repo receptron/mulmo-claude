@@ -152,8 +152,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
+import { scrollIntoViewByTestId } from "../utils/dom/scrollIntoViewByTestId";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TodoData, TodoItem } from "../plugins/todo/index";
 import { colorForLabel, filterByLabels, listLabelsWithCount } from "../plugins/todo/labels";
@@ -285,6 +287,39 @@ function onExplorerKeydown(event: KeyboardEvent): void {
 }
 onMounted(() => document.addEventListener("keydown", onExplorerKeydown));
 onUnmounted(() => document.removeEventListener("keydown", onExplorerKeydown));
+
+// Permalink support (#762): arrivals on /todos/:itemId scroll and
+// flash the matching card. Safe to run unconditionally — when the
+// explorer is embedded in FilesView the URL has no :itemId and
+// scrollIntoViewByTestId is a no-op. Retry a handful of times to
+// cover the window between mount and the first items fetch landing.
+const TODO_FOCUS_MAX_RETRIES = 10;
+const TODO_FOCUS_RETRY_MS = 150;
+const route = useRoute();
+
+async function focusUrlItem(itemId: string): Promise<void> {
+  for (let attempt = 0; attempt < TODO_FOCUS_MAX_RETRIES; attempt++) {
+    await nextTick();
+    if (scrollIntoViewByTestId(`todo-card-${itemId}`)) return;
+    await new Promise((resolve) => window.setTimeout(resolve, TODO_FOCUS_RETRY_MS));
+  }
+}
+
+onMounted(() => {
+  const itemId = route.params.itemId;
+  if (typeof itemId === "string" && itemId) {
+    void focusUrlItem(itemId);
+  }
+});
+
+watch(
+  () => route.params.itemId,
+  (itemId) => {
+    if (typeof itemId === "string" && itemId) {
+      void focusUrlItem(itemId);
+    }
+  },
+);
 
 // ── Item handlers ──────────────────────────────────────────────
 

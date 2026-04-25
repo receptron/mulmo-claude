@@ -115,12 +115,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { formatShortTime } from "../../utils/format/date";
 import { formatSchedule as formatTaskSchedule, type TaskSchedule as FormatterTaskSchedule } from "./formatSchedule";
+import { scrollIntoViewByTestId } from "../../utils/dom/scrollIntoViewByTestId";
 
 const { t } = useI18n();
 
@@ -230,5 +232,34 @@ async function deleteTask(taskId: string): Promise<void> {
   await fetchTasks();
 }
 
-onMounted(fetchTasks);
+// When the user lands on /automations/:taskId (e.g. from a
+// notification), fetch the list, then scroll + flash the matching
+// row once it's rendered. Unknown IDs are a no-op — the list still
+// renders normally.
+const route = useRoute();
+
+async function focusUrlTask(taskId: string): Promise<void> {
+  await nextTick();
+  scrollIntoViewByTestId(`scheduler-task-${taskId}`);
+}
+
+onMounted(async () => {
+  await fetchTasks();
+  const urlTaskId = route.params.taskId;
+  if (typeof urlTaskId === "string" && urlTaskId) {
+    await focusUrlTask(urlTaskId);
+  }
+});
+
+// Also react when the user is already on the page and the URL
+// changes (e.g. clicking a second notification without leaving the
+// Automations view).
+watch(
+  () => route.params.taskId,
+  (taskId) => {
+    if (typeof taskId === "string" && taskId) {
+      void focusUrlTask(taskId);
+    }
+  },
+);
 </script>
