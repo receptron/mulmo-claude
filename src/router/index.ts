@@ -41,7 +41,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/files/:pathMatch(.*)*", name: PAGE_ROUTES.files, component: Stub },
   // Todos accepts an optional `:itemId` so notifications / deep-links
   // can jump to a specific card. Missing id falls through to the
-  // board index view. See plans/feat-notification-permalinks.md.
+  // board index view. See plans/done/feat-notification-permalinks.md.
   { path: "/todos/:itemId?", name: PAGE_ROUTES.todos, component: Stub },
   { path: "/calendar", name: PAGE_ROUTES.calendar, component: Stub },
   // Automations accepts an optional `:taskId` for the same reason —

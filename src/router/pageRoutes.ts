@@ -4,7 +4,7 @@
 // so that modules importing the constant do not transitively pull in
 // `createRouter` / `createWebHistory`, which access `window` at
 // module-eval time and therefore can't run under node-side tests.
-// See plans/feat-notification-permalinks.md (#762) for the test that
+// See plans/done/feat-notification-permalinks.md (#762) for the test that
 // forced the split.
 
 export const PAGE_ROUTES = {

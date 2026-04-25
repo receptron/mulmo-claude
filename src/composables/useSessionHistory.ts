@@ -2,7 +2,7 @@
 //
 // Owns the `sessions` list (what the server knows about) plus the
 // fetch helper. The view's open/closed state is now URL-backed (see
-// plans/feat-history-url-route.md) — callers watch `route.name` and
+// plans/done/feat-history-url-route.md) — callers watch `route.name` and
 // invoke `fetchSessions()` on route enter rather than going through
 // an in-memory toggle flag.
 //
