@@ -1,6 +1,12 @@
 // Synthesize a ToolResultComplete<SchedulerData> from raw scheduler
-// items.json content so FilesView can render it with the scheduler
-// plugin's calendar view. Extracted from FilesView.vue (#507 step 8).
+// items.json content so FilesView can render it with the calendar
+// plugin's view. Extracted from FilesView.vue (#507 step 8).
+//
+// items.json holds calendar items only — automations live in
+// `config/scheduler/tasks.json` and have a different shape. After
+// the manageScheduler split (#824) the synthesised tool result is
+// tagged `manageCalendar` so the file preview routes to
+// CalendarView, not the (long-gone) tab-bar fallback.
 
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData, ScheduledItem } from "../../plugins/scheduler/index";
@@ -30,7 +36,7 @@ export function toSchedulerResult(selectedPath: string | null, rawText: string |
   if (!isScheduledItemArray(parsed)) return null;
   return {
     uuid: "files-scheduler-preview",
-    toolName: "manageScheduler",
+    toolName: "manageCalendar",
     message: WORKSPACE_FILES.schedulerItems,
     title: "Scheduler",
     data: { items: parsed },

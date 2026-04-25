@@ -36,7 +36,8 @@ export const ROLES: Role[] = [
       "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. The page-list section of `index.md` is a flat, recency-ordered log: prepend new pages at the top, and when a page is updated (content, description, tags, or rename) move its entry to the top — don't group by category. The Tags section (if present) still needs its per-tag page lists updated on add / rename / delete, but the tag order itself is not reordered by recency. Read `config/helps/wiki.md` for full details.",
     availablePlugins: [
       "manageTodoList",
-      "manageScheduler",
+      "manageCalendar",
+      "manageAutomations",
       "manageWiki",
       "manageSkills",
       "manageSource",

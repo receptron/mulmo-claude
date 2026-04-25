@@ -5,7 +5,8 @@
  */
 
 import TodoDef from "../../src/plugins/todo/definition.js";
-import SchedulerDef from "../../src/plugins/scheduler/definition.js";
+import ManageCalendarDef from "../../src/plugins/scheduler/calendarDefinition.js";
+import ManageAutomationsDef from "../../src/plugins/scheduler/automationsDefinition.js";
 import PresentMulmoScriptDef from "../../src/plugins/presentMulmoScript/definition.js";
 import ManageRolesDef from "../../src/plugins/manageRoles/definition.js";
 import ManageSkillsDef from "../../src/plugins/manageSkills/definition.js";
@@ -27,7 +28,11 @@ import { API_ROUTES } from "../../src/config/apiRoutes.js";
 /** Maps plugin tool name → REST API endpoint. */
 export const TOOL_ENDPOINTS: Record<string, string> = {
   [TodoDef.name]: API_ROUTES.todos.dispatch,
-  [SchedulerDef.name]: API_ROUTES.scheduler.base,
+  // Both halves of the former manageScheduler share the same backend
+  // endpoint (#824 / PR #758). Server-side dispatch routes per-action
+  // via TASK_ACTIONS, so one route happily handles both tool names.
+  [ManageCalendarDef.name]: API_ROUTES.scheduler.base,
+  [ManageAutomationsDef.name]: API_ROUTES.scheduler.base,
   [MarkdownDef.name]: API_ROUTES.plugins.presentDocument,
   [SpreadsheetDef.name]: API_ROUTES.plugins.presentSpreadsheet,
   [MindMapDef.name]: API_ROUTES.plugins.mindmap,
@@ -49,7 +54,8 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
 /** All ToolDefinition objects for package and local plugins. */
 export const PLUGIN_DEFS = [
   TodoDef,
-  SchedulerDef,
+  ManageCalendarDef,
+  ManageAutomationsDef,
   PresentMulmoScriptDef,
   MarkdownDef,
   SpreadsheetDef,

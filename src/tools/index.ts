@@ -11,7 +11,7 @@ import editImagePlugin from "../plugins/editImage/index";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
-import schedulerPlugin from "../plugins/scheduler/index";
+import { manageCalendarPlugin, manageAutomationsPlugin } from "../plugins/scheduler/index";
 import manageRolesPlugin from "../plugins/manageRoles/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
 import manageSourcePlugin from "../plugins/manageSource/index";
@@ -23,7 +23,8 @@ import presentChartPlugin from "../plugins/chart/index";
 const plugins: Record<string, PluginEntry> = {
   "text-response": textResponsePlugin.plugin,
   manageTodoList: todoPlugin,
-  manageScheduler: schedulerPlugin,
+  manageCalendar: manageCalendarPlugin,
+  manageAutomations: manageAutomationsPlugin,
   manageRoles: manageRolesPlugin,
   manageSkills: manageSkillsPlugin,
   manageSource: manageSourcePlugin,
