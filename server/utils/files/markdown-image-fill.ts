@@ -11,20 +11,24 @@
 // that hid the 10 s bridge-timeout bug.
 import { generateGeminiImageFromPrompt, isGeminiAvailable } from "../gemini.js";
 import { errorMessage } from "../errors.js";
+import { promptMeta } from "../promptMeta.js";
 import { log } from "../../system/logger/index.js";
 import { saveImage } from "./image-store.js";
 
 export const IMAGE_PLACEHOLDER = /!\[([^\]]+)\]\(\/?__too_be_replaced_image_path__\)/g;
-const PROMPT_PREVIEW_CHARS = 80;
 const LOG_PREFIX = "present-document";
 
 async function generateImageFile(prompt: string, index: number, total: number): Promise<string | null> {
   if (!isGeminiAvailable()) return null;
   const startedAt = Date.now();
+  // Prompt is user-controlled and may contain pasted URLs / emails /
+  // credentials, so we log a `{ length, sha256 }` fingerprint instead
+  // of a raw prefix. See `server/utils/promptMeta.ts`.
+  const meta = promptMeta(prompt);
   log.info(LOG_PREFIX, "image gen start", {
     index,
     total,
-    promptPreview: prompt.slice(0, PROMPT_PREVIEW_CHARS),
+    prompt: meta,
   });
   try {
     const { imageData } = await generateGeminiImageFromPrompt(prompt);
@@ -38,7 +42,7 @@ async function generateImageFile(prompt: string, index: number, total: number): 
       index,
       total,
       elapsedMs,
-      promptPreview: prompt.slice(0, PROMPT_PREVIEW_CHARS),
+      prompt: meta,
     });
   } catch (err) {
     log.warn(LOG_PREFIX, "image gen failed", {
@@ -46,7 +50,7 @@ async function generateImageFile(prompt: string, index: number, total: number): 
       total,
       elapsedMs: Date.now() - startedAt,
       error: errorMessage(err),
-      promptPreview: prompt.slice(0, PROMPT_PREVIEW_CHARS),
+      prompt: meta,
     });
   }
   return null;

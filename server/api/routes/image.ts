@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { Router, Request, Response } from "express";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { getSessionImageData } from "../../events/session-store/index.js";
@@ -6,28 +5,15 @@ import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../..
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
+import { promptMeta } from "../../utils/promptMeta.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
 
 // Image-generation routes were silent on success and on failure. When
 // the canvas showed "missing image" with no server-side trace, there
 // was nothing to grep. Log lines now carry a prompt fingerprint
-// (`{ length, sha256 }`) instead of the raw text — image prompts are
-// user-controlled and commonly contain pasted URLs, emails, or even
-// credentials, and structured logs are persisted. The sha256 prefix
-// is enough to correlate retries / duplicate requests without leaking
-// content.
-const PROMPT_SHA256_PREFIX_CHARS = 12;
-interface PromptMeta {
-  length: number;
-  sha256: string;
-}
-function promptMeta(prompt: string): PromptMeta {
-  return {
-    length: prompt.length,
-    sha256: createHash("sha256").update(prompt).digest("hex").slice(0, PROMPT_SHA256_PREFIX_CHARS),
-  };
-}
+// (`{ length, sha256 }`) via `promptMeta()` instead of the raw text —
+// see `server/utils/promptMeta.ts` for why.
 
 const router = Router();
 
