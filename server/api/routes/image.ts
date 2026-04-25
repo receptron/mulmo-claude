@@ -7,15 +7,15 @@ import { badRequest, serverError } from "../../utils/httpError.js";
 import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
+import { previewSnippet } from "../../utils/logPreview.js";
 
 // Image-generation routes were silent on success and on failure. When
 // the canvas showed "missing image" with no server-side trace, there
 // was nothing to grep. The new log lines surface the request
 // (prompt preview, model, optional sessionId) and the outcome.
-const PROMPT_PREVIEW_LIMIT = 120;
-function previewPrompt(prompt: string): string {
-  return prompt.length > PROMPT_PREVIEW_LIMIT ? `${prompt.slice(0, PROMPT_PREVIEW_LIMIT)}…` : prompt;
-}
+// Local alias kept for readability of the call sites — every other
+// route that adopts the same pattern uses `previewSnippet` directly.
+const previewPrompt = previewSnippet;
 
 const router = Router();
 

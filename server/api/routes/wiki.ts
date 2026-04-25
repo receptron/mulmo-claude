@@ -7,6 +7,13 @@ import { parseFrontmatterTags } from "./wiki/frontmatter.js";
 import { badRequest } from "../../utils/httpError.js";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { log } from "../../system/logger/index.js";
+import { previewSnippet } from "../../utils/logPreview.js";
+// Aliased because `buildPageResponseData` below declares a local
+// string named `errorMessage`; importing the errors util under a
+// different name avoids the no-shadow clash without renaming the
+// long-standing local.
+import { errorMessage as formatError } from "../../utils/errors.js";
 
 const router = Router();
 
@@ -235,18 +242,32 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
 router.get(API_ROUTES.wiki.base, async (req: Request, res: Response<WikiResponse | ErrorResponse>) => {
   const slug = getOptionalStringQuery(req, "slug");
   if (slug) {
-    res.json(await buildPageResponse("page", slug));
-  } else {
-    const content = readFileOrEmpty(indexFile());
-    const pageEntries = parseIndexEntries(content);
-    res.json({
-      data: { action: "index", title: "Wiki Index", content, pageEntries },
-      message: content ? `Wiki index — ${pageEntries.length} page(s)` : "Wiki index is empty.",
-      title: "Wiki Index",
-      instructions: "The wiki index is now displayed on the canvas.",
-      updating: true,
-    });
+    log.info("wiki", "GET page: start", { slugPreview: previewSnippet(slug) });
+    try {
+      const response = await buildPageResponse("page", slug);
+      if (!response.data.pageExists) {
+        log.warn("wiki", "GET page: not found", { slugPreview: previewSnippet(slug) });
+      } else {
+        log.info("wiki", "GET page: ok", { slugPreview: previewSnippet(slug), bytes: response.data.content.length });
+      }
+      res.json(response);
+    } catch (err) {
+      log.error("wiki", "GET page: threw", { slugPreview: previewSnippet(slug), error: formatError(err) });
+      throw err;
+    }
+    return;
   }
+  log.info("wiki", "GET index: start");
+  const content = readFileOrEmpty(indexFile());
+  const pageEntries = parseIndexEntries(content);
+  log.info("wiki", "GET index: ok", { pages: pageEntries.length, bytes: content.length });
+  res.json({
+    data: { action: "index", title: "Wiki Index", content, pageEntries },
+    message: content ? `Wiki index — ${pageEntries.length} page(s)` : "Wiki index is empty.",
+    title: "Wiki Index",
+    instructions: "The wiki index is now displayed on the canvas.",
+    updating: true,
+  });
 });
 
 interface WikiBody {
@@ -492,25 +513,49 @@ async function buildLintReportResponse(action: string): Promise<WikiResponse> {
 
 router.post(API_ROUTES.wiki.base, async (req: Request<object, unknown, WikiBody>, res: Response<WikiResponse | ErrorResponse>) => {
   const { action, pageName } = req.body;
-  switch (action) {
-    case "index":
-      res.json(buildIndexResponse(action));
-      return;
-    case "page":
-      if (!pageName) {
-        badRequest(res, "pageName required for page action");
+  log.info("wiki", "POST: start", { action, pageNamePreview: pageName ? previewSnippet(pageName) : undefined });
+  try {
+    switch (action) {
+      case "index": {
+        const response = buildIndexResponse(action);
+        log.info("wiki", "POST index: ok", { pages: response.data.pageEntries?.length ?? 0 });
+        res.json(response);
         return;
       }
-      res.json(await buildPageResponse(action, pageName));
-      return;
-    case "log":
-      res.json(buildLogResponse(action));
-      return;
-    case "lint_report":
-      res.json(await buildLintReportResponse(action));
-      return;
-    default:
-      badRequest(res, `Unknown action: ${action}`);
+      case "page": {
+        if (!pageName) {
+          log.warn("wiki", "POST page: missing pageName");
+          badRequest(res, "pageName required for page action");
+          return;
+        }
+        const response = await buildPageResponse(action, pageName);
+        if (!response.data.pageExists) {
+          log.warn("wiki", "POST page: not found", { pageNamePreview: previewSnippet(pageName) });
+        } else {
+          log.info("wiki", "POST page: ok", { pageNamePreview: previewSnippet(pageName), bytes: response.data.content.length });
+        }
+        res.json(response);
+        return;
+      }
+      case "log": {
+        const response = buildLogResponse(action);
+        log.info("wiki", "POST log: ok", { bytes: response.data.content.length });
+        res.json(response);
+        return;
+      }
+      case "lint_report": {
+        const response = await buildLintReportResponse(action);
+        log.info("wiki", "POST lint_report: ok", { issues: response.message });
+        res.json(response);
+        return;
+      }
+      default:
+        log.warn("wiki", "POST: unknown action", { action });
+        badRequest(res, `Unknown action: ${action}`);
+    }
+  } catch (err) {
+    log.error("wiki", "POST: threw", { action, pageNamePreview: pageName ? previewSnippet(pageName) : undefined, error: formatError(err) });
+    throw err;
   }
 });
 

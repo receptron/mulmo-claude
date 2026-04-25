@@ -16,6 +16,7 @@ import type { FetcherKind, Source, SourceState } from "../types.js";
 import { defaultSourceState } from "../types.js";
 import { errorMessage } from "../../../utils/errors.js";
 import { ONE_MINUTE_MS, ONE_HOUR_MS, ONE_DAY_MS } from "../../../utils/time.js";
+import { log } from "../../../system/logger/index.js";
 
 // Outcome of one source's fetch attempt.
 export type FetchOutcome =
@@ -64,14 +65,27 @@ async function fetchOneSource(
 ): Promise<FetchOutcome> {
   const fetcher = getFetcher(source.fetcherKind);
   if (!fetcher) {
+    log.warn("pipeline.fetch", "no fetcher registered", {
+      sourceSlug: source.slug,
+      fetcherKind: source.fetcherKind,
+    });
     return {
       kind: "no-fetcher",
       sourceSlug: source.slug,
       error: `no fetcher registered for kind "${source.fetcherKind}"`,
     };
   }
+  log.debug("pipeline.fetch", "fetcher start", {
+    sourceSlug: source.slug,
+    fetcherKind: source.fetcherKind,
+  });
   try {
     const result = await fetcher.fetch(source, state, deps);
+    log.debug("pipeline.fetch", "fetcher ok", {
+      sourceSlug: source.slug,
+      fetcherKind: source.fetcherKind,
+      items: result.items.length,
+    });
     return {
       kind: "success",
       sourceSlug: source.slug,
@@ -79,6 +93,15 @@ async function fetchOneSource(
       cursor: result.cursor,
     };
   } catch (err) {
+    // Per-source warn: the pipeline's outer catch in
+    // computeNextState handles backoff, but without this log a
+    // single bad RSS feed throws no trace anywhere — the user's
+    // exact complaint in #779.
+    log.warn("pipeline.fetch", "fetcher threw", {
+      sourceSlug: source.slug,
+      fetcherKind: source.fetcherKind,
+      error: errorMessage(err),
+    });
     return {
       kind: "error",
       sourceSlug: source.slug,

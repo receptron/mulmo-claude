@@ -489,7 +489,25 @@ Full reference: [`docs/logging.md`](logging.md). Two rules to keep in mind when 
 1. **Never call `console.*` outside `server/system/logger/`.** Import and use `log.{error,warn,info,debug}(prefix, msg, data?)` instead. The structured payload powers JSON file shipping and grep-friendly text output. The only sanctioned `console.error` is the file-sink fallback inside the logger itself.
 2. **Prefix is lowercase, hyphenated, no brackets.** The text formatter wraps it in `[ ]`. Keep payload values scalar; nested objects are JSON-stringified.
 
-Existing prefixes in use: `agent`, `agent-stderr`, `server`, `workspace`, `sandbox`, `mcp`, `task-manager`, `journal`, `chat-index`, `pdf`, `config`.
+Existing prefixes in use: `agent`, `agent-stderr`, `server`, `workspace`, `sandbox`, `mcp`, `task-manager`, `journal`, `chat-index`, `pdf`, `config`, `image`, `wiki`, `pipeline`, `pipeline.fetch`, `scheduler`, `scheduler-tasks`, `sources`, `notifications`, `auth`.
+
+### Layered logging template (#779)
+
+Routes that do anything more than echo state should follow this shape, mirroring [`server/api/routes/image.ts`](../server/api/routes/image.ts) (PR #780) and [`server/api/routes/wiki.ts`](../server/api/routes/wiki.ts):
+
+| Stage | Level | Required payload |
+|---|---|---|
+| Entry, after input validation | `info` | route name + key id (sessionId / slug / path) + `previewSnippet(prompt)` for any user-supplied freeform text |
+| Success | `info` | bytes / item count / generated id |
+| External SDK / fetch returned no data | `warn` | input preview + reason |
+| Internal exception (we threw, not the SDK) | `error` | input preview + `errorMessage(err)` |
+| External SDK request/response shape | `debug` | only inside the SDK wrapper (`server/utils/gemini.ts` etc.); never inside route files |
+
+Use `previewSnippet` from [`server/utils/logPreview.ts`](../server/utils/logPreview.ts) to clamp prompts / wiki bodies / search queries to 120 chars. **Never log** API keys, bearer tokens, cookies, full prompts, full markdown bodies, or absolute paths that include `/Users/<name>` (use the workspace-relative path instead).
+
+### Operational note: hard-to-reproduce error reports
+
+When a user reports "this failed with no UI feedback" and you can't reproduce it, **start by auditing the relevant route's log coverage**. If the file has zero `log.*` calls (or only catch-block logs without an entry log), there's nothing to grep against — the first move is to add the layered logging template above and ship it as its own PR before continuing the bug hunt. The current state of every route is tracked in [`plans/log-audit/findings.md`](../plans/log-audit/findings.md); if the route you're touching is marked "none" or "partial", upgrading it counts as in-scope groundwork.
 
 ---
 

@@ -108,6 +108,8 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
   const fallbackMonth = toLocalYearMonth(startMs);
   const summarizeFn = input.summarizeFn ?? makeDefaultSummarize(isoDate);
 
+  log.info("pipeline", "run: start", { scheduleType, isoDate });
+
   // --- 0. Auto-discover arXiv sources from interests ------------------
   // Best-effort: a bad interests.json or FS error must not abort the
   // entire pipeline. The daily news fetch is more important than
@@ -128,6 +130,7 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
     workspaceRoot,
     allSources.map((source) => source.slug),
   );
+  log.info("pipeline", "run: registry loaded", { sources: allSources.length });
 
   // --- 2. Plan ------------------------------------------------------
   onProgress("plan");
@@ -137,6 +140,7 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
     scheduleType,
     nowMs: startMs,
   });
+  log.info("pipeline", "run: planned", { eligible: eligible.length, total: allSources.length });
   if (eligible.length === 0) {
     // Write an empty-day daily file so it's clear the pipeline
     // ran. Archive append is a no-op. State untouched.
@@ -174,11 +178,24 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
     deps: fetcherDeps,
     getFetcher,
   });
+  const fetchSummary = summariseOutcomes(outcomes);
+  log.info("pipeline", "run: fetched", fetchSummary);
+  for (const failure of fetchSummary.failures) {
+    // One warn per failed source so the slug is greppable. The
+    // pipeline isolates errors per-source, but without this trace
+    // a silently-failing fetcher disappears entirely.
+    log.warn("pipeline", "run: fetcher failed", failure);
+  }
 
   // --- 4. Dedup -----------------------------------------------------
   onProgress("dedup");
   const rawItems = flattenItems(outcomes);
   const dedup = dedupAcrossSources(rawItems);
+  log.info("pipeline", "run: deduped", {
+    raw: rawItems.length,
+    unique: dedup.stats.uniqueCount,
+    duplicates: dedup.stats.duplicateCount,
+  });
 
   // --- 5. Notify (user interest matching) ----------------------------
   onProgress("notify");
@@ -191,6 +208,12 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
   onProgress("write"); // step 7
   const dailyPath = await writeDailyFile(workspaceRoot, isoDate, markdown, dedup.items);
   const archiveResult = await appendItemsToArchives(workspaceRoot, dedup.items, fallbackMonth);
+  log.info("pipeline", "run: wrote", {
+    items: dedup.items.length,
+    dailyBytes: markdown.length,
+    archiveFiles: archiveResult.writtenPaths.length,
+    archiveErrors: archiveResult.errors.length,
+  });
 
   // --- 8. Persist state ---------------------------------------------
   onProgress("persist");
@@ -198,6 +221,11 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
   await writeManyStates(workspaceRoot, nextStates);
 
   onProgress("done");
+  log.info("pipeline", "run: done", {
+    plannedCount: eligible.length,
+    items: dedup.items.length,
+    elapsedMs: nowMs() - startMs,
+  });
   return {
     plannedCount: eligible.length,
     outcomes,
@@ -209,6 +237,35 @@ export async function runSourcesPipeline(input: RunPipelineInput): Promise<RunPi
     nextStates,
     isoDate,
   };
+}
+
+// Cheap one-pass scan over outcomes producing the counters and the
+// per-failure log payload the pipeline emits in the `fetched` log.
+// Kept inline rather than reused elsewhere — only the pipeline
+// summarises outcomes this way.
+function summariseOutcomes(outcomes: readonly FetchOutcome[]): {
+  total: number;
+  success: number;
+  noFetcher: number;
+  errored: number;
+  failures: Array<{ sourceSlug: string; kind: "no-fetcher" | "error"; error: string }>;
+} {
+  let success = 0;
+  let noFetcher = 0;
+  let errored = 0;
+  const failures: Array<{ sourceSlug: string; kind: "no-fetcher" | "error"; error: string }> = [];
+  for (const outcome of outcomes) {
+    if (outcome.kind === "success") {
+      success++;
+    } else if (outcome.kind === "no-fetcher") {
+      noFetcher++;
+      failures.push({ sourceSlug: outcome.sourceSlug, kind: "no-fetcher", error: outcome.error });
+    } else {
+      errored++;
+      failures.push({ sourceSlug: outcome.sourceSlug, kind: "error", error: outcome.error });
+    }
+  }
+  return { total: outcomes.length, success, noFetcher, errored, failures };
 }
 
 // Flatten successful-outcome items into a single list for

@@ -32,6 +32,7 @@ router.get(API_ROUTES.scheduler.tasks, (_req: Request, res: Response) => {
   const systemTasks = getSchedulerTasks();
   const userTasks = loadUserTasks();
   const all = [...systemTasks.map((task) => ({ ...task, origin: "system" as const })), ...userTasks.map((task) => ({ ...task, origin: "user" as const }))];
+  log.info("scheduler-tasks", "list ok", { system: systemTasks.length, user: userTasks.length });
   res.json({ tasks: all });
 });
 
@@ -40,6 +41,7 @@ router.get(API_ROUTES.scheduler.tasks, (_req: Request, res: Response) => {
 router.post(API_ROUTES.scheduler.tasks, async (req: Request, res: Response) => {
   const validated = validateAndCreate(req.body);
   if (validated.kind === "error") {
+    log.warn("scheduler-tasks", "create: validation failed", { error: validated.error });
     badRequest(res, validated.error);
     return;
   }
@@ -48,6 +50,7 @@ router.post(API_ROUTES.scheduler.tasks, async (req: Request, res: Response) => {
       tasks: [...tasks, validated.task],
       result: validated.task,
     }));
+    log.info("scheduler-tasks", "create ok", { id: task.id, name: task.name });
     res.status(201).json({ task });
   } catch (err) {
     log.error("scheduler-tasks", "create failed", {
