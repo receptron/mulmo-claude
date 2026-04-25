@@ -562,6 +562,7 @@ const jaMessages = {
     saveError: "⚠ 保存失敗: {error}",
     copyLabel: "コピー",
     copiedLabel: "コピーしました！",
+    taskCountMismatch: "Markdown ソースと描画結果でタスク数が一致しないため、ファイル破損を避けるためトグル操作を中止しました。",
   },
   pluginTextResponse: {
     pdf: "PDF",

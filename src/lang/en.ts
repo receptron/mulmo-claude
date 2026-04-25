@@ -578,6 +578,7 @@ const enMessages = {
     saveError: "⚠ Save failed: {error}",
     copyLabel: "Copy",
     copiedLabel: "Copied!",
+    taskCountMismatch: "Markdown source and rendered output disagree on the number of tasks. Refusing to toggle to avoid corruption.",
   },
   pluginTextResponse: {
     pdf: "PDF",

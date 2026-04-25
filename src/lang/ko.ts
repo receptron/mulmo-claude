@@ -562,6 +562,7 @@ const koMessages = {
     saveError: "⚠ 저장 실패: {error}",
     copyLabel: "복사",
     copiedLabel: "복사됨!",
+    taskCountMismatch: "Markdown 원본과 렌더링 결과의 작업 수가 일치하지 않아, 파일 손상을 방지하기 위해 토글이 거부되었습니다.",
   },
   pluginTextResponse: {
     pdf: "PDF",

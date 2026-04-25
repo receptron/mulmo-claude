@@ -554,6 +554,7 @@ const ptBRMessages = {
     saveError: "⚠ {error}",
     copyLabel: "Copiar",
     copiedLabel: "Copiado!",
+    taskCountMismatch: "O número de tarefas diverge entre a fonte Markdown e a saída renderizada. A alternância foi recusada para evitar corromper o arquivo.",
   },
   pluginTextResponse: {
     pdf: "PDF",

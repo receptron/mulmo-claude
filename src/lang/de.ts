@@ -556,6 +556,8 @@ const deMessages = {
     saveError: "⚠ {error}",
     copyLabel: "Kopieren",
     copiedLabel: "Kopiert!",
+    taskCountMismatch:
+      "Die Anzahl der Aufgaben in der Markdown-Quelle und im gerenderten Ergebnis stimmt nicht überein. Das Umschalten wurde abgelehnt, um eine Beschädigung der Datei zu vermeiden.",
   },
   pluginTextResponse: {
     pdf: "PDF",

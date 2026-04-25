@@ -564,6 +564,7 @@ const esMessages = {
     saveError: "⚠ Error al guardar: {error}",
     copyLabel: "Copiar",
     copiedLabel: "¡Copiado!",
+    taskCountMismatch: "El número de tareas no coincide entre la fuente Markdown y la salida renderizada. Se rechazó el cambio para evitar dañar el archivo.",
   },
   pluginTextResponse: {
     pdf: "PDF",
