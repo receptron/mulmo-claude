@@ -161,7 +161,7 @@
               :key="tag"
               class="entry-tag-chip"
               :data-testid="`wiki-entry-tag-${entry.slug}-${tag}`"
-              @click.stop="toggleTagFilter(tag)"
+              @click.stop="setTagFilter(tag)"
             >
               {{ `#${tag}` }}
             </button>
@@ -354,6 +354,18 @@ const visibleEntries = computed(() =>
 
 function toggleTagFilter(tag: string) {
   selectedTag.value = selectedTag.value === tag ? null : tag;
+}
+
+// Per-entry tag chips set the filter unconditionally — clicking a
+// `#javascript` chip on a page row should always filter the index to
+// that tag, even when the user is already viewing the same filter.
+// Using `toggleTagFilter` here was unintuitive: clicking a `#tag`
+// chip on a row that's already in the active filter would clear the
+// filter, surprising the user. The filter chips at the top of the
+// list still toggle (so users have an obvious "click again to clear"
+// affordance there).
+function setTagFilter(tag: string) {
+  selectedTag.value = tag;
 }
 
 // Spawn a new chat under the General role (which owns the wiki
