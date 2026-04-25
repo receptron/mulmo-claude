@@ -1,142 +1,17 @@
-import { spawn, type ChildProcessByStdio } from "child_process";
 import { mkdir, unlink } from "fs/promises";
 import { writeJsonAtomic } from "../utils/files/json.js";
 import { dirname } from "path";
-import type { Readable, Writable } from "stream";
 import { isDockerAvailable } from "../system/docker.js";
 import { refreshCredentials } from "../system/credentials.js";
 import { loadMcpConfig, loadSettings } from "../system/config.js";
 import type { Role } from "../../src/config/roles.js";
 import { loadAllRoles } from "../workspace/roles.js";
 import { buildSystemPrompt } from "./prompt.js";
-import {
-  CONTAINER_WORKSPACE_PATH,
-  buildCliArgs,
-  buildDockerSpawnArgs,
-  buildMcpConfig,
-  buildUserMessageLine,
-  getActivePlugins,
-  prepareUserServers,
-  resolveMcpConfigPaths,
-  userServerAllowedToolNames,
-} from "./config.js";
+import { CONTAINER_WORKSPACE_PATH, buildMcpConfig, getActivePlugins, prepareUserServers, resolveMcpConfigPaths, userServerAllowedToolNames } from "./config.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import { createStreamParser, type AgentEvent, type RawStreamEvent } from "./stream.js";
+import type { AgentEvent } from "./stream.js";
 import { log } from "../system/logger/index.js";
-import { EVENT_TYPES } from "../../src/types/events.js";
-import { env } from "../system/env.js";
-import { resolveSandboxAuth } from "./sandboxMounts.js";
-import { getCachedReferenceDirs, referenceDirMountArgs } from "../workspace/reference-dirs.js";
-
-type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
-
-function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[]): ClaudeProc {
-  if (!useDocker) {
-    return spawn("claude", cliArgs, {
-      cwd: workspacePath,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  }
-  const sandboxAuth = resolveSandboxAuth({
-    sshAgentForward: env.sandboxSshAgentForward,
-    sshAllowedHosts: env.sandboxSshAllowedHosts,
-    configMountNames: env.sandboxMountConfigs,
-    sshAuthSock: process.env.SSH_AUTH_SOCK,
-  });
-  const refDirArgs = referenceDirMountArgs(getCachedReferenceDirs());
-  const dockerArgs = buildDockerSpawnArgs({
-    workspacePath,
-    cliArgs,
-    uid: process.getuid?.() ?? 1000,
-    gid: process.getgid?.() ?? 1000,
-    platform: process.platform,
-    sandboxAuthArgs: [...sandboxAuth.args, ...refDirArgs],
-    sshAgentForward: env.sandboxSshAgentForward,
-  });
-  return spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
-}
-
-// Track MCP tool usage to detect silent MCP server failures.
-// If ToolSearch was called but no mcp__* tool was ever invoked,
-// the MCP server likely crashed on startup (e.g. module resolution
-// failure inside Docker). See #430.
-function createMcpTracker() {
-  let toolSearchCalled = false;
-  let mcpToolCalled = false;
-  return {
-    track(event: AgentEvent) {
-      if (event.type !== EVENT_TYPES.toolCall) return;
-      if (event.toolName === "ToolSearch") toolSearchCalled = true;
-      if (event.toolName.startsWith("mcp__")) mcpToolCalled = true;
-    },
-    logIfSuspicious() {
-      if (toolSearchCalled && !mcpToolCalled) {
-        log.warn(
-          "agent",
-          "ToolSearch was used but no MCP tool was called — the MCP server may have crashed. " +
-            "Check Docker volume mounts and package.json exports. " +
-            "Run: npx tsx --test test/agent/test_mcp_docker_smoke.ts",
-        );
-      }
-    },
-  };
-}
-
-async function* readAgentEvents(proc: ClaudeProc): AsyncGenerator<AgentEvent> {
-  let stderrOutput = "";
-  let stderrBuffer = "";
-  proc.stderr.on("data", (chunk: Buffer) => {
-    const text = chunk.toString();
-    stderrOutput += text;
-    stderrBuffer += text;
-    const lines = stderrBuffer.split("\n");
-    stderrBuffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (line.trim()) log.error("agent-stderr", line);
-    }
-  });
-
-  // Stateful parser tracks whether text was already streamed via
-  // assistant content blocks so the final `result` event's duplicate
-  // text is suppressed. See createStreamParser() in stream.ts.
-  const parser = createStreamParser();
-
-  const mcpTracker = createMcpTracker();
-
-  let buffer = "";
-  for await (const chunk of proc.stdout) {
-    buffer += (chunk as Buffer).toString();
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      let event: RawStreamEvent;
-      try {
-        event = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      for (const agentEvent of parser.parse(event)) {
-        mcpTracker.track(agentEvent);
-        yield agentEvent;
-      }
-    }
-  }
-
-  const exitCode = await new Promise<number>((resolve) => proc.on("close", resolve));
-
-  if (stderrBuffer.trim()) log.error("agent-stderr", stderrBuffer);
-  log.info("agent", "claude exited", { exitCode });
-  mcpTracker.logIfSuspicious();
-
-  if (exitCode !== 0) {
-    yield {
-      type: EVENT_TYPES.error,
-      message: stderrOutput || `claude exited with code ${exitCode}`,
-    };
-  }
-}
+import { getActiveBackend } from "./backend/index.js";
 
 export interface RunAgentOptions {
   message: string;
@@ -220,47 +95,38 @@ export async function* runAgent(
   const settings = loadSettings();
   const userServerAllowedTools = userServerAllowedToolNames(userServers, useDocker);
 
-  const cliArgs = buildCliArgs({
-    systemPrompt: fullSystemPrompt,
-    activePlugins,
-    claudeSessionId,
-    mcpConfigPath: hasMcp ? mcpPaths.argPath : undefined,
-    extraAllowedTools: [...settings.extraAllowedTools, ...userServerAllowedTools],
-  });
-
   // Don't persist raw sessionId into log sinks (esp. the retained
   // file sink). A boolean presence flag is enough for operational
   // debugging and avoids writing identifiers that route back to a
   // specific session into long-lived log files.
-  log.info("agent", "spawning claude", {
+  const backend = getActiveBackend();
+  log.info("agent", "spawning agent", {
+    backend: backend.id,
     roleId: role.id,
     useDocker,
     hasMcp,
     resumed: Boolean(claudeSessionId),
     hasSessionId: Boolean(sessionId),
   });
-  const proc = spawnClaude(useDocker, workspacePath, cliArgs);
-
-  // stream-json input mode: stream the user turn as a single JSON
-  // line to stdin, then close the pipe so the CLI knows no further
-  // turns are coming. Writing before attaching the abort handler
-  // is fine — if the write fails because the process already died
-  // for other reasons, the `readAgentEvents` loop below surfaces it.
-  const messageLine = await buildUserMessageLine(message, attachments);
-  proc.stdin.write(messageLine);
-  proc.stdin.end();
-
-  // If an abort signal is provided, kill the process when it fires.
-  const onAbort = () => {
-    if (!proc.killed) proc.kill();
-  };
-  abortSignal?.addEventListener("abort", onAbort, { once: true });
 
   try {
-    yield* readAgentEvents(proc);
+    yield* backend.runAgent({
+      systemPrompt: fullSystemPrompt,
+      message,
+      role,
+      workspacePath,
+      sessionId,
+      port,
+      sessionToken: claudeSessionId,
+      attachments,
+      activePlugins,
+      mcpConfigPath: hasMcp ? mcpPaths.argPath : undefined,
+      extraAllowedTools: [...settings.extraAllowedTools, ...userServerAllowedTools],
+      abortSignal,
+      userTimezone,
+      useDocker,
+    });
   } finally {
-    abortSignal?.removeEventListener("abort", onAbort);
-    if (!proc.killed) proc.kill();
     if (hasMcp) unlink(mcpPaths.hostPath).catch(() => {});
   }
 }
