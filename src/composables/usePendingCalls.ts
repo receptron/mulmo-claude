@@ -59,7 +59,17 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
     // unused.
     const __tickDep = displayTick.value;
     const now = Date.now();
-    return opts.toolCallHistory.value.filter((entry) => __tickDep >= 0 && isCallStillPending(entry, now));
+    // Project to a narrower shape that carries `elapsedMs` so the
+    // consumer doesn't need its own ticker for the per-tool badge —
+    // the 50ms re-evaluation here already drives the display
+    // (#731 PR2).
+    return opts.toolCallHistory.value
+      .filter((entry) => __tickDep >= 0 && isCallStillPending(entry, now))
+      .map((entry) => ({
+        toolUseId: entry.toolUseId,
+        toolName: entry.toolName,
+        elapsedMs: now - entry.timestamp,
+      }));
   });
 
   function teardown(): void {

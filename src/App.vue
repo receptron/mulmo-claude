@@ -92,6 +92,7 @@
           :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
           :is-running="activeSessionRunning"
           :status-message="statusMessage"
+          :run-elapsed-ms="runElapsedMs"
           :pending-calls="pendingCalls"
           :session-role-name="sessionRoleName"
           :session-role-icon="sessionRoleIcon"
@@ -250,6 +251,7 @@ import { createEmptySession } from "./utils/session/sessionFactory";
 import { buildLoadedSession, parseSessionEntries } from "./utils/session/sessionEntries";
 import { resolveNotificationTarget } from "./utils/notification/dispatch";
 import { usePendingCalls } from "./composables/usePendingCalls";
+import { useRunElapsed } from "./composables/useRunElapsed";
 import { useKeyNavigation } from "./composables/useKeyNavigation";
 import { useDebugBeat } from "./composables/useDebugBeat";
 import { useChatScroll } from "./composables/useChatScroll";
@@ -531,6 +533,13 @@ const { availableTools, toolDescriptions, mcpToolsError, fetchMcpToolsStatus } =
 const { pendingCalls, teardown: teardownPendingCalls } = usePendingCalls({
   isRunning: activeSessionRunning,
   toolCallHistory,
+});
+
+// Run-level elapsed time for the Thinking indicator (#731 PR2).
+// Pure UI: ticks once per second while the active session is running,
+// flips back to null on completion. No backend or schema changes.
+const { elapsedMs: runElapsedMs, teardown: teardownRunElapsed } = useRunElapsed({
+  isRunning: activeSessionRunning,
 });
 
 const selectedResult = computed(() => toolResults.value.find((result) => result.uuid === selectedResultUuid.value) ?? null);
@@ -901,7 +910,10 @@ provideActiveSession(activeSession);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,
-  onTeardown: teardownPendingCalls,
+  onTeardown: () => {
+    teardownPendingCalls();
+    teardownRunElapsed();
+  },
 });
 
 onMounted(async () => {
