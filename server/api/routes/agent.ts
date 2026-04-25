@@ -14,6 +14,7 @@ import {
   ensureChatDir,
   statSessionJsonlSize,
   truncateSessionJsonl,
+  deleteSessionFiles,
 } from "../../utils/files/session-io.js";
 import { getRole } from "../../workspace/roles.js";
 import { runAgent } from "../../agent/index.js";
@@ -29,6 +30,7 @@ import {
   getActiveSessionIds,
   wasCancelled,
   getTurnStartJsonlSize,
+  purgeSession,
 } from "../../events/session-store/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { maybeRunJournal } from "../../workspace/journal/index.js";
@@ -445,6 +447,16 @@ async function rollbackJsonlIfCancelled(chatSessionId: string): Promise<void> {
   try {
     await truncateSessionJsonl(chatSessionId, rollbackTo);
     log.info("agent", "cancel: jsonl truncated", { chatSessionId, rollbackTo });
+    // First-turn cancel: rollbackTo === 0 means there's no prior
+    // history on disk for this session, so the cancelled message was
+    // its only content. Drop the meta + the in-memory entry so an
+    // empty stub doesn't haunt the sidebar (clicking it landed on
+    // an empty chat — observed live during #822 manual testing).
+    if (rollbackTo === 0) {
+      await deleteSessionFiles(chatSessionId);
+      purgeSession(chatSessionId);
+      log.info("agent", "cancel: first-turn session purged", { chatSessionId });
+    }
   } catch (truncErr) {
     log.warn("agent", "cancel: jsonl truncate failed", {
       chatSessionId,

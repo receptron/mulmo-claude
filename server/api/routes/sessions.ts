@@ -9,7 +9,7 @@ import { readSessionMeta as readSessionMetaIO, readSessionJsonl, sessionJsonlAbs
 import { readManifest } from "../../workspace/chat-index/indexer.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import type { ChatIndexEntry } from "../../workspace/chat-index/types.js";
-import { markRead, getSession } from "../../events/session-store/index.js";
+import { markRead, getSession, getRecentlyPurgedSessionIds } from "../../events/session-store/index.js";
 import { notFound } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
@@ -187,15 +187,16 @@ router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsRespons
       return new Date(rightSession.startedAt).getTime() - new Date(leftSession.startedAt).getTime();
     });
 
-    log.info("sessions", "list: ok", { total: sessions.length, returned: filtered.length });
+    // Cancel-purge tombstones (#822 follow-up). Only sessions that
+    // were eligible to appear in the previous response need to be
+    // surfaced, so we filter by the same `since` cursor used to
+    // filter live rows above.
+    const deletedIds = getRecentlyPurgedSessionIds(sinceMs);
+    log.info("sessions", "list: ok", { total: sessions.length, returned: filtered.length, deleted: deletedIds.length });
     res.json({
       sessions,
       cursor: encodeCursor(maxChangeMs),
-      // No session-delete code path exists today — issue #205 picked
-      // approach A (tombstones) so the client already merges this
-      // field; populating it becomes a server-only change when
-      // deletion lands.
-      deletedIds: [],
+      deletedIds,
     });
   } catch (err) {
     log.error("sessions", "list: threw", { error: errorMessage(err) });

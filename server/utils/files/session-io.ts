@@ -4,7 +4,7 @@
 //
 // All functions take optional `root` for test DI.
 
-import { appendFile, stat, truncate } from "fs/promises";
+import { appendFile, stat, truncate, unlink } from "fs/promises";
 import path from "node:path";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { workspacePath } from "../../workspace/paths.js";
@@ -154,6 +154,27 @@ export async function statSessionJsonlSize(sessionId: string, rootOverride?: str
     }
     throw err;
   }
+}
+
+/**
+ * Delete BOTH the session's meta json and event jsonl from disk.
+ * Used by the first-turn cancel path (#822 follow-up) so an empty
+ * session doesn't linger in the sidebar history. Idempotent —
+ * ENOENT on either file is treated as success.
+ */
+export async function deleteSessionFiles(sessionId: string, rootOverride?: string): Promise<void> {
+  const baseRoot = root(rootOverride);
+  const targets = [resolvePath(baseRoot, metaRel(sessionId)), resolvePath(baseRoot, jsonlRel(sessionId))];
+  await Promise.all(
+    targets.map(async (target) => {
+      try {
+        await unlink(target);
+      } catch (err: unknown) {
+        if (typeof err === "object" && err !== null && (err as { code?: string }).code === "ENOENT") return;
+        throw err;
+      }
+    }),
+  );
 }
 
 /**

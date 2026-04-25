@@ -132,6 +132,50 @@ function removeSession(chatSessionId: string): void {
   notifySessionsChanged();
 }
 
+// Tombstones for sessions purged off-disk (currently only the first-
+// turn cancel path #822). The /api/sessions list endpoint reads this
+// to populate the response's `deletedIds` array so cursor-based
+// clients drop the deleted ids from their cached lists. Bounded by
+// `SESSIONS_LIST_WINDOW_DAYS` (same horizon the list itself uses) —
+// older tombstones are evicted when the next purge runs.
+const SESSIONS_TOMBSTONE_TTL_MS = 24 * 60 * 60 * 1000;
+const recentlyPurgedSessions = new Map<string, number>();
+
+function evictOldTombstones(now: number): void {
+  for (const [sessionId, deletedAt] of recentlyPurgedSessions) {
+    if (now - deletedAt > SESSIONS_TOMBSTONE_TTL_MS) {
+      recentlyPurgedSessions.delete(sessionId);
+    }
+  }
+}
+
+/** Purge the session's in-memory state, record a tombstone for
+ *  cursor-aware clients, and broadcast a sessions-changed
+ *  notification. Used by the first-turn cancel path (#822) to evict
+ *  the empty session from the sidebar history after the meta +
+ *  jsonl have been deleted from disk. Other tabs then re-fetch the
+ *  summaries via the broadcast and drop this id via `deletedIds`. */
+export function purgeSession(chatSessionId: string): void {
+  const now = Date.now();
+  evictOldTombstones(now);
+  recentlyPurgedSessions.set(chatSessionId, now);
+  removeSession(chatSessionId);
+}
+
+/** Tombstones for sessions purged in the last
+ *  SESSIONS_TOMBSTONE_TTL_MS window. Returned by the sessions list
+ *  endpoint so clients can drop deleted ids from their cached lists.
+ *  `sinceMs === 0` (no cursor) returns every live tombstone — fine
+ *  because the response is the full session list anyway. */
+export function getRecentlyPurgedSessionIds(sinceMs: number): string[] {
+  const cutoff = sinceMs > 0 ? sinceMs : 0;
+  const result: string[] = [];
+  for (const [sessionId, deletedAt] of recentlyPurgedSessions) {
+    if (deletedAt >= cutoff) result.push(sessionId);
+  }
+  return result;
+}
+
 // ── State mutations (publish to pub/sub) ───────────────────────
 
 /** Mark a session as running. Rejects if already running (409).

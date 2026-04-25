@@ -15,6 +15,7 @@ import {
   readSessionJsonl,
   statSessionJsonlSize,
   truncateSessionJsonl,
+  deleteSessionFiles,
 } from "../../../server/utils/files/session-io.js";
 import { WORKSPACE_DIRS } from "../../../server/workspace/paths.js";
 
@@ -221,5 +222,41 @@ describe("truncateSessionJsonl", () => {
     await truncateSessionJsonl("never-existed-truncate", 0, root);
     // Sanity: file still doesn't exist; readSessionJsonl returns null.
     assert.equal(await readSessionJsonl("never-existed-truncate", root), null);
+  });
+});
+
+describe("deleteSessionFiles", () => {
+  it("removes BOTH meta json and event jsonl (first-turn cancel cleanup)", async () => {
+    // The flow that hit production: user types one message, hits
+    // Stop. truncate brings jsonl to 0 bytes; deleteSessionFiles
+    // then removes the meta json so the empty session doesn't
+    // show in the sidebar history.
+    const sessionId = "delete-both";
+    await createSessionMeta(sessionId, "general", "doomed message", root);
+    await appendSessionLine(sessionId, JSON.stringify({ source: "user", message: "doomed" }), root);
+    // Sanity: both files exist before delete.
+    assert.notEqual(await readSessionMeta(sessionId, root), null);
+    assert.notEqual(await readSessionJsonl(sessionId, root), null);
+
+    await deleteSessionFiles(sessionId, root);
+
+    assert.equal(await readSessionMeta(sessionId, root), null);
+    assert.equal(await readSessionJsonl(sessionId, root), null);
+  });
+
+  it("is idempotent — deleting an already-gone session does not throw", async () => {
+    // Cancel-after-delete-after-cancel races shouldn't crash.
+    await deleteSessionFiles("never-existed-delete", root);
+    await deleteSessionFiles("never-existed-delete", root);
+  });
+
+  it("tolerates a half-state where only the meta exists", async () => {
+    // Hypothetical: meta written but jsonl append failed. Delete
+    // must still succeed and clean up the meta.
+    const sessionId = "half-state";
+    await createSessionMeta(sessionId, "general", "x", root);
+    assert.notEqual(await readSessionMeta(sessionId, root), null);
+    await deleteSessionFiles(sessionId, root);
+    assert.equal(await readSessionMeta(sessionId, root), null);
   });
 });
