@@ -14,6 +14,7 @@
 
 import { test, expect, type Page, type WebSocketRoute } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
+import type { SessionFixture } from "../fixtures/sessions";
 import type { NotificationPayload } from "../../src/types/notification";
 import { NOTIFICATION_ACTION_TYPES, NOTIFICATION_KINDS, NOTIFICATION_PRIORITIES, NOTIFICATION_VIEWS } from "../../src/types/notification";
 
@@ -30,7 +31,24 @@ interface NotificationScenario {
   // path+search+hash, so specs with query strings use the full
   // string. Leave undefined when only the pathname matters.
   fullUrl?: string;
+  // Sessions to pre-seed in the mock. The chat-target scenario
+  // needs this: when the notification click pushes /chat/<id>,
+  // App.vue's session-load watcher fetches the session from the
+  // server. If the fetch 404s the watcher falls back to
+  // createNewSession(), clobbering the URL with a freshly-created
+  // UUID. Pre-seeding keeps the URL stable. Other scenarios don't
+  // need a session so the field defaults to an empty list.
+  seedSessions?: SessionFixture[];
 }
+
+const CHAT_TARGET_SESSION: SessionFixture = {
+  id: "sess-xyz",
+  title: "Notification target session",
+  roleId: "general",
+  startedAt: "2026-04-25T05:00:00Z",
+  updatedAt: "2026-04-25T05:00:00Z",
+  preview: "Stub for the notification permalink E2E",
+};
 
 function buildPayload(notifId: string, title: string, action: NotificationPayload["action"]): NotificationPayload {
   return {
@@ -53,6 +71,7 @@ const SCENARIOS: readonly NotificationScenario[] = [
     }),
     expectedPathname: "/chat/sess-xyz",
     fullUrl: "/chat/sess-xyz?result=uuid-abc",
+    seedSessions: [CHAT_TARGET_SESSION],
   },
   {
     description: "todos target with itemId",
@@ -247,7 +266,7 @@ test.describe("notification permalinks", () => {
 
   for (const scenario of SCENARIOS) {
     test(scenario.description, async ({ page }) => {
-      await mockAllApis(page, { sessions: [] });
+      await mockAllApis(page, { sessions: scenario.seedSessions ?? [] });
       await installNotificationStream(page, scenario.payload);
 
       // Start on /todos rather than /. The home redirect lands on
