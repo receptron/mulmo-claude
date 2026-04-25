@@ -1,86 +1,86 @@
-# feat: MulmoClaude × Ollama (local LLM) support
+# feat: MulmoClaude × Ollama（ローカル LLM）対応
 
-## Status
+## ステータス
 
-**Investigation only — no implementation yet.**
+**調査のみ。実装は未着手。**
 
-This plan documents what it would take to make MulmoClaude itself usable against a local Ollama backend (today only the standalone `claude` CLI works against Ollama; see `.claude/skills/setup-ollama-local/SKILL.md` and `docs/tips/claude-code-ollama.md`).
+このプランは、MulmoClaude 本体をローカル Ollama バックエンドで使えるようにする場合の必要作業をまとめたもの。現状動くのは `claude` CLI 単体での Ollama 接続のみ（`.claude/skills/setup-ollama-local/SKILL.md` および `docs/tips/claude-code-ollama.md` 参照）。
 
-## Background / Why this is hard
+## 背景 / なぜ難しいか
 
-MulmoClaude does not call the Anthropic API directly. The server **spawns the `claude` CLI as a child process** ([server/agent/index.ts](../server/agent/index.ts)) and pipes stream-json over stdin/stdout. Two consequences:
+MulmoClaude は Anthropic API を直接叩いていない。サーバが **`claude` CLI を子プロセスとして spawn** し（[server/agent/index.ts](../server/agent/index.ts)）、stream-json を stdin/stdout で受け渡す構造。ここから 2 つの制約が発生する:
 
-1. **The model selection is whatever `claude` defaults to.** [`buildCliArgs` in server/agent/config.ts](../server/agent/config.ts) does not pass `--model`.
-2. **Backend selection is whatever env vars the parent process has.** When MulmoClaude is started normally, those are the cloud Claude defaults.
+1. **モデル指定は `claude` のデフォルト依存**。[server/agent/config.ts の `buildCliArgs`](../server/agent/config.ts) は `--model` を渡していない。
+2. **バックエンド指定は親プロセスの env 依存**。MulmoClaude を通常起動した場合、env はクラウド Claude のデフォルト設定。
 
-For local Ollama to work end-to-end, both the spawned CLI's model flag and its env have to point at the local server. Docker sandbox mode adds a third concern: env vars are not forwarded into the container, and `localhost:11434` from inside the container is not the host's Ollama (`host.docker.internal` would have to be added).
+ローカル Ollama を end-to-end で動かすには、spawn される CLI の `--model` フラグと env の両方をローカル向けにする必要がある。Docker sandbox モードは追加で問題があり、env が container に伝わらず、container 内から `localhost:11434` ではホストの Ollama が見えない（`host.docker.internal` の追加が必須）。
 
-There is also a UX problem inherited from the Claude Code × Ollama work: even on `qwen3.5:9b` (the lightest verified-working model), the **first turn takes 10+ minutes** and subsequent turns 1–3 minutes on a MacBook Air M4 32GB. MulmoClaude's chat UI is interactive; users will not enjoy this. The implementation should at minimum make the trade-off explicit.
+UX 上の問題も継承される: 検証で動作確認できた最軽量モデル `qwen3.5:9b` でも MacBook Air M4 32GB で **初回 10 分超**、2 回目以降 1〜3 分。MulmoClaude の chat UI はインタラクティブ前提なのでユーザー体験は厳しい。実装する場合は最低限このトレードオフを明示する必要がある。
 
-## Goal
+## ゴール
 
-Let a user opt into a local Ollama backend via settings or env, and have every spawn of `claude` (both bare and inside the Docker sandbox) route to that backend with the chosen model. Cloud usage remains the default and is not regressed.
+設定または env でローカル Ollama バックエンドにオプトインできるようにし、`claude` の spawn（通常モード／Docker sandbox 両方）が指定モデルでローカルにルーティングされる状態にする。クラウド利用は引き続きデフォルトで、デグレなし。
 
-## Scope tiers
+## 実装ティア
 
-The work has three natural cut points. Recommend stopping at Tier 2 unless there's clear demand.
+作業は 3 段階に分けられる。明確な需要がない限り Tier 2 で止めるのを推奨。
 
-### Tier 1: env + CLI flag pass-through (~50–100 LoC, ~half a day)
+### Tier 1: env と CLI フラグのパススルー（50〜100 行、半日）
 
-Just enough that a power user editing `settings.json` can switch to Ollama.
+パワーユーザーが `settings.json` を直接編集してバックエンド切替できる最小実装。
 
-- [server/system/env.ts](../server/system/env.ts): add `ollamaBaseUrl?`, `ollamaModel?` (or a `llmProvider: "cloud" | "ollama"` discriminator) read from `process.env`.
+- [server/system/env.ts](../server/system/env.ts): `ollamaBaseUrl?`、`ollamaModel?` を追加（または `llmProvider: "cloud" | "ollama"` のような discriminator）。`process.env` から読み込み。
 - [server/agent/config.ts](../server/agent/config.ts):
-  - `buildCliArgs`: when local mode, append `"--model", ollamaModel`.
-  - `buildDockerSpawnArgs`: when local mode, add `-e ANTHROPIC_AUTH_TOKEN=ollama -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://host.docker.internal:11434` and `--add-host host.docker.internal:host-gateway` (Linux/Mac).
-- [server/agent/index.ts](../server/agent/index.ts) `spawnClaude`: pass `env: { ...process.env, ANTHROPIC_* }` when local mode is enabled (non-Docker path inherits naturally; the Docker path is handled in step above).
-- [server/system/config.ts](../server/system/config.ts): add `llm` object to settings schema (e.g. `{ provider: "cloud" | "ollama", ollamaBaseUrl?, ollamaModel? }`).
+  - `buildCliArgs`: ローカルモード時に `"--model", ollamaModel` を追加。
+  - `buildDockerSpawnArgs`: ローカルモード時に `-e ANTHROPIC_AUTH_TOKEN=ollama -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://host.docker.internal:11434` と `--add-host host.docker.internal:host-gateway`（Linux/Mac）を追加。
+- [server/agent/index.ts](../server/agent/index.ts) の `spawnClaude`: ローカルモード時に `env: { ...process.env, ANTHROPIC_* }` を渡す（非 Docker パスは自動継承、Docker パスは上記の `-e` で対応）。
+- [server/system/config.ts](../server/system/config.ts): settings スキーマに `llm` オブジェクト（例: `{ provider: "cloud" | "ollama", ollamaBaseUrl?, ollamaModel? }`）を追加。
 
-Done = manually editing `~/mulmoclaude/config/settings.json` flips the backend.
+完了基準 = `~/mulmoclaude/config/settings.json` の手動編集でバックエンドが切り替わる。
 
-### Tier 2: settings UI + connection check (~300–500 LoC, ~2–3 days) — **recommended**
+### Tier 2: 設定 UI と接続テスト（300〜500 行、2〜3 日）— **推奨**
 
-Make the option discoverable and at least somewhat safe.
+オプションを発見可能にし、ある程度安全にする。
 
-Adds on top of Tier 1:
+Tier 1 に追加で:
 
-- New Vue section under [`src/components/`](../src/components/) (alongside the existing settings panes). Inputs for provider radio, base URL (default `http://localhost:11434`), model dropdown.
-- `GET /api/settings/ollama/models` route that proxies `GET <baseUrl>/v1/models` and returns the list. Used to populate the dropdown.
-- `POST /api/settings/ollama/test` route: makes a minimal `/v1/messages` request, returns `{ ok, kvSize, contextLength, error? }`. Used by a "Test connection" button.
-- i18n: every new string lands in all 8 locales (`src/lang/{en,ja,zh,ko,es,pt-BR,fr,de}.ts`) — see CLAUDE.md i18n rules.
-- Status indicator in the chat header showing **Cloud** vs **Ollama (model name)** so the active backend is never ambiguous.
-- Warning copy in the UI explaining the slowness trade-off and that some MulmoClaude plugins/skills depend on tool calling that local models handle poorly.
-- Tests:
-  - Unit: env parsing, settings round-trip, CLI args construction in both modes (mirrors existing `test/agent/config.test.ts`-style coverage).
-  - E2E: a fixture that mocks `localhost:11434` and verifies the settings UI flow + "Test connection" path.
+- [`src/components/`](../src/components/) 配下に新しい Vue セクション（既存設定ペインと並べる）。プロバイダのラジオボタン、base URL 入力（デフォルト `http://localhost:11434`）、モデル選択ドロップダウン。
+- `GET /api/settings/ollama/models` ルート: `GET <baseUrl>/v1/models` をプロキシしてリストを返す。ドロップダウン用。
+- `POST /api/settings/ollama/test` ルート: 最小限の `/v1/messages` リクエストを投げ、`{ ok, kvSize, contextLength, error? }` を返す。「接続テスト」ボタン用。
+- i18n: 新しい文字列はすべて 8 ロケール（`src/lang/{en,ja,zh,ko,es,pt-BR,fr,de}.ts`）に同時追加。CLAUDE.md の i18n ルール参照。
+- chat ヘッダーにステータスインジケータを表示（**Cloud** vs **Ollama (モデル名)**）。アクティブバックエンドが曖昧にならないように。
+- UI 上に警告コピー: 速度トレードオフと、tool calling に依存する MulmoClaude プラグイン/スキルがローカルモデルでは不安定であること。
+- テスト:
+  - Unit: env パース、settings の round-trip、両モードでの CLI args 構築（既存の `test/agent/config.test.ts` 風カバレッジ）。
+  - E2E: `localhost:11434` をモックする fixture で設定 UI フロー + 「接続テスト」パスを検証。
 
-### Tier 3: production polish (~1000+ LoC, 1–2 weeks)
+### Tier 3: プロダクション仕上げ（1000+ 行、1〜2 週間）
 
-Everything below is optional and only worth doing if local backend becomes a first-class story.
+以下はすべてオプション。ローカルバックエンドを first-class なストーリーにする場合のみ着手する価値あり。
 
-- **Timeout adjustments**: extend the SSE/agent loop timeouts when `provider === "ollama"` so the 10-minute Claude Code default does not kill the first turn.
-- **Warm-up on boot**: when local mode is active, send a one-shot `/v1/messages` `"hello"` at server startup so the KV cache is primed before the first user turn.
-- **Cloud fallback**: detect Ollama down / model missing and either fall back to cloud (with a banner) or surface a clear actionable error.
-- **Plugin/skill compatibility flags**: maintain a list of plugins that depend on tool-use formatting and silently disable them in local mode (or warn in the UI).
-- **Recommended-models check**: on save, compare the chosen model against an allowlist (qwen3.5+, MoE variants confirmed to handle thinking blocks correctly) and warn if unverified.
-- **Progress UI**: parse the Ollama log stream and surface a "processing prompt X/Y tokens" hint in the chat UI so users understand why the first turn takes 10 minutes.
-- **Docs**: update [docs/developer.md](../docs/developer.md), [README.md](../README.md), and the README translations under `packages/`.
+- **タイムアウト調整**: `provider === "ollama"` 時に SSE / agent ループのタイムアウトを延長し、Claude Code のデフォルト 10 分タイムアウトで初回が落ちないようにする。
+- **起動時 warmup**: ローカルモード時、サーバ起動直後に `/v1/messages` で `"hello"` を送り KV cache を温めてからユーザーターンに入る。
+- **クラウドフォールバック**: Ollama down / モデル無し検知時にクラウドに自動フォールバック（バナー付き）するか、明確な actionable error を表示。
+- **プラグイン/スキル互換フラグ**: tool-use 形式に依存するプラグインのリストを保持し、ローカルモードでは無効化（または UI で警告）。
+- **推奨モデルチェック**: 保存時に選択モデルを allowlist（thinking ブロックを正しく処理できることが確認された qwen3.5+、MoE バリアント等）と照合し、未検証なら警告。
+- **進捗表示**: Ollama のログストリームをパースし、chat UI に「プロンプト処理中 X/Y トークン」のヒントを表示。10 分かかる理由をユーザーに見せる。
+- **ドキュメント**: [docs/developer.md](../docs/developer.md)、[README.md](../README.md)、`packages/` 配下の README 翻訳を更新。
 
-## Open questions
+## オープンクエスチョン
 
-- Do we want `provider` per-role (so e.g. the `general` role uses cloud and a `local-fast` role uses Ollama), or globally?
-- Should the Docker sandbox mode be supported for local Ollama at all? Forwarding `host.docker.internal` makes the container less isolated; there's an argument for "local Ollama only works without sandbox".
-- Settings file location: should the `llm` section live in the existing `settings.json`, or in a new `llm.json` to avoid bloating the main file?
+- `provider` をロール単位にする（例: `general` ロールはクラウド、`local-fast` ロールは Ollama）か、グローバル設定にするか。
+- Docker sandbox モードでローカル Ollama をサポートすべきか。`host.docker.internal` を通すと container の隔離性が下がるので、「ローカル Ollama は sandbox 無効時のみ」という割り切りもあり得る。
+- 設定ファイルの場所: `llm` セクションは既存の `settings.json` に入れるか、メインファイルが膨らむのを避けて新しい `llm.json` に分けるか。
 
-## Non-goals
+## Non-Goals
 
-- Supporting OpenAI / other non-Anthropic-compatible backends. Out of scope; would need a different abstraction.
-- Optimising local model performance. That's an Ollama / hardware concern, not a MulmoClaude one.
-- A full provider-abstraction layer. We're piggy-backing on Claude Code's existing Anthropic-compatibility env vars deliberately.
+- OpenAI 等、Anthropic 互換でないバックエンドのサポート。スコープ外。別の抽象化が必要になる。
+- ローカルモデルのパフォーマンス改善。Ollama / ハードウェアの問題で、MulmoClaude 側の関心ではない。
+- 完全なプロバイダ抽象化レイヤー。Claude Code の Anthropic 互換 env 仕様に乗っかる方針を意図的に選択している。
 
-## References
+## 参考
 
-- Findings (Japanese): [`docs/tips/claude-code-ollama.md`](../docs/tips/claude-code-ollama.md)
-- Findings (English): [`docs/tips/claude-code-ollama.en.md`](../docs/tips/claude-code-ollama.en.md)
-- Setup skill (Claude Code only): [`.claude/skills/setup-ollama-local/SKILL.md`](../.claude/skills/setup-ollama-local/SKILL.md)
+- 検証知見（日本語）: [`docs/tips/claude-code-ollama.md`](../docs/tips/claude-code-ollama.md)
+- 検証知見（英語）: [`docs/tips/claude-code-ollama.en.md`](../docs/tips/claude-code-ollama.en.md)
+- セットアップスキル（Claude Code 単体向け）: [`.claude/skills/setup-ollama-local/SKILL.md`](../.claude/skills/setup-ollama-local/SKILL.md)
 - Ollama Claude Code integration: https://docs.ollama.com/integrations/claude-code
