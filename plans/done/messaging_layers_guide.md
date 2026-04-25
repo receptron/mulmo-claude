@@ -127,7 +127,7 @@ above this layer is under our control.
 
 Per-platform code running as **separate child processes** of MulmoClaude.
 The wire protocol is **socket.io** on `/ws/chat` (see issue #268 /
-`plans/feat-chat-socketio.md`). The handshake carries the same
+`plans/done/feat-chat-socketio.md`). The handshake carries the same
 bearer token (#272) as the HTTP path, via `auth.token`. The legacy HTTP
 endpoint `POST /api/transports/:transportId/chats/:externalChatId` is
 kept for backwards compatibility and will be deprecated in Phase D.
@@ -137,7 +137,7 @@ New bridges should use socket.io; the event shape mirrors the HTTP body
 **Bidirectional traffic:**
 
 - **Bridge → server** (Phase A): `emit("message", { externalChatId, text }, ack)` — the ack callback receives the assistant reply.
-- **Server → bridge** (Phase B, `plans/feat-chat-socketio-phase-b.md`): each bridge joins room `bridge:${transportId}` on connect. Server code calls `chatService.pushToBridge(transportId, chatId, message)` to deliver a scheduled / event-driven message. If no bridge is connected, the push is held in an in-memory FIFO queue per-transport and drains to the next joining socket.
+- **Server → bridge** (Phase B, `plans/done/feat-chat-socketio-phase-b.md`): each bridge joins room `bridge:${transportId}` on connect. Server code calls `chatService.pushToBridge(transportId, chatId, message)` to deliver a scheduled / event-driven message. If no bridge is connected, the push is held in an in-memory FIFO queue per-transport and drains to the next joining socket.
 
 Each bridge is a small, self-contained program:
 

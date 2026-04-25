@@ -1,4 +1,4 @@
-// Per-page chat composer on wiki leaf pages (see plans/feat-wiki-page-chat.md).
+// Per-page chat composer on wiki leaf pages (see plans/done/feat-wiki-page-chat.md).
 //
 // Sending from the composer spawns a fresh chat session with a
 // "read data/wiki/pages/<slug>.md first" instruction prepended to
@@ -98,7 +98,7 @@ test.describe("wiki page chat composer", () => {
   });
 
   test("traversal URL is redirected to /wiki by the router guard", async ({ page }) => {
-    // After the guard was added (plans/feat-wiki-path-urls.md review
+    // After the guard was added (plans/done/feat-wiki-path-urls.md review
     // pass), dangerous slugs like `../secrets` never reach the view —
     // the guard `replace:true`-redirects to `/wiki` before mount. So
     // the composer isn't just disabled, it doesn't exist: we should

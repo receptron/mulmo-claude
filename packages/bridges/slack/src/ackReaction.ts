@@ -4,7 +4,7 @@
 //   - emoji shortcode name → feature enabled, use that emoji
 //
 // The var is dual-purpose (on/off switch + emoji selector) so we
-// don't need a second variable. See plans/feat-slack-ack-reaction.md.
+// don't need a second variable. See plans/done/feat-slack-ack-reaction.md.
 //
 // Shortcode charset matches what Slack accepts for custom and
 // standard emoji names: lowercase letters, digits, `_`, `+`, `-`.

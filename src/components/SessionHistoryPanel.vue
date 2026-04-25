@@ -1,6 +1,6 @@
 <template>
   <!-- Rendered as the canvas-column content for the /history route
-       (see plans/feat-history-url-route.md). Previously this was an
+       (see plans/done/feat-history-url-route.md). Previously this was an
        absolute-positioned overlay; the `h-full overflow-y-auto` root
        plus inline flow replaces the z-index + topOffset plumbing. -->
   <div ref="root" class="h-full overflow-y-auto bg-white select-none">

@@ -107,7 +107,7 @@ Phase B adds `push` for async delivery.
    attaches the socket with a stub relay, connects a real client, and
    exercises: happy path, missing transportId, missing token,
    wrong token, payload validation, relay error propagation.
-8. Docs — `plans/messaging_layers_guide.md` Layer 2 section mentions
+8. Docs — `plans/done/messaging_layers_guide.md` Layer 2 section mentions
    the socket transport alongside the HTTP endpoint.
 
 ### Out (tracked in Phase B/C/D)

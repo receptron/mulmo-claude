@@ -102,7 +102,7 @@ Exposed from `createChatService(deps)` as
 5. `test/chat-service/test_push_queue.ts` — unit tests for the queue.
 6. `test/chat-service/test_push.ts` — integration tests: live push,
    offline-then-reconnect flush, multi-socket distribution, ordering.
-7. Docs: `plans/messaging_layers_guide.md` Layer 2/3 notes include the
+7. Docs: `plans/done/messaging_layers_guide.md` Layer 2/3 notes include the
    push direction.
 
 ### Out (Phase C / D / separate follow-ups)

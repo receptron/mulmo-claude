@@ -12,7 +12,7 @@
 // **Express params**: patterns like `:id` / `:filename` are kept as
 // Express-compatible strings. Client-side URL builders (e.g. a
 // `todoItem(id)` helper) are deliberately NOT added here until the
-// frontend migration lands — see plans/refactor-api-routes-constants.md.
+// frontend migration lands — see plans/done/refactor-api-routes-constants.md.
 //
 // **Adding a new endpoint**: add it here first, then reference the
 // constant from the router file. Keep the nesting shallow and the
@@ -41,7 +41,7 @@ export const API_ROUTES = {
     rebuild: "/api/chat-index/rebuild",
   },
 
-  // Single source of truth: @mulmobridge/protocol. See plans/messaging_transports.md.
+  // Single source of truth: @mulmobridge/protocol. See plans/done/messaging_transports.md.
   chatService: CHAT_SERVICE_ROUTES,
 
   config: {
@@ -84,7 +84,7 @@ export const API_ROUTES = {
 
   notifications: {
     // PoC endpoint for scheduled push fan-out (Web pub-sub + bridge).
-    // Scaffolding for #144 / #142 — see plans/feat-notification-push-scaffold.md.
+    // Scaffolding for #144 / #142 — see plans/done/feat-notification-push-scaffold.md.
     test: "/api/notifications/test",
   },
 

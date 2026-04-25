@@ -163,7 +163,7 @@ const { handleMarkdownLinkClick } = useMarkdownLinkHandler(selectedPath, {
 
 // External URL changes (back/forward) → update selectedPath. Reading
 // from `route.params.pathMatch` after the query→params migration;
-// see plans/feat-files-path-url.md.
+// see plans/done/feat-files-path-url.md.
 watch(
   () => readPathMatch(route.params.pathMatch),
   (newPath) => {

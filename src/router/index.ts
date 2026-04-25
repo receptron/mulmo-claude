@@ -37,11 +37,11 @@ const routes: RouteRecordRaw[] = [
   // string-form catch-all (`:pathMatch(.*)`) would collapse slashes
   // to `%2F` at push time and mangle deep paths. An empty segment
   // (`/files`) yields an empty array, which we treat as "no file
-  // selected". See plans/feat-files-path-url.md.
+  // selected". See plans/done/feat-files-path-url.md.
   { path: "/files/:pathMatch(.*)*", name: PAGE_ROUTES.files, component: Stub },
   // Todos accepts an optional `:itemId` so notifications / deep-links
   // can jump to a specific card. Missing id falls through to the
-  // board index view. See plans/feat-notification-permalinks.md.
+  // board index view. See plans/done/feat-notification-permalinks.md.
   { path: "/todos/:itemId?", name: PAGE_ROUTES.todos, component: Stub },
   { path: "/calendar", name: PAGE_ROUTES.calendar, component: Stub },
   // Automations accepts an optional `:taskId` for the same reason —
@@ -55,7 +55,7 @@ const routes: RouteRecordRaw[] = [
   // and stay sibling-safe (no query-key bleed from other routes).
   // `section` is a closed enum; unknown sections fall through to the
   // catch-all redirect below. `slug` only applies when `section ===
-  // "pages"`. See plans/feat-wiki-path-urls.md.
+  // "pages"`. See plans/done/feat-wiki-path-urls.md.
   { path: "/wiki/:section(pages|log|lint-report)?/:slug?", name: PAGE_ROUTES.wiki, component: Stub },
   { path: "/skills", name: PAGE_ROUTES.skills, component: Stub },
   { path: "/roles", name: PAGE_ROUTES.roles, component: Stub },

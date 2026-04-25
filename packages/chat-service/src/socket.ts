@@ -24,7 +24,7 @@
 //   C — streaming text chunks via `reply.chunk`
 //   D — HTTP endpoint deprecation
 //
-// See plans/feat-chat-socketio.md and plans/feat-chat-socketio-phase-b.md.
+// See plans/done/feat-chat-socketio.md and plans/done/feat-chat-socketio-phase-b.md.
 
 import type http from "http";
 import { Server as SocketServer } from "socket.io";

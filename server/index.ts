@@ -103,7 +103,7 @@ app.use(requireSameOrigin);
 // Layered *on top of* CSRF guard so we catch both cross-origin
 // browser attacks (origin check) and local sibling processes that
 // bypass browser CORS (bearer check). See #272 and
-// plans/feat-bearer-token-auth.md.
+// plans/done/feat-bearer-token-auth.md.
 //
 // /api/files/* is exempt because <img src="/api/files/raw?path=...">
 // tags in rendered markdown can't attach Authorization headers.
@@ -502,7 +502,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: n
 // Graceful shutdown: best-effort cleanup of the auth token file so
 // other readers (Vite plugin, future bridges) don't latch onto a
 // dead token. Crashes that skip this are harmless — see
-// plans/feat-bearer-token-auth.md; the next startup overwrites and
+// plans/done/feat-bearer-token-auth.md; the next startup overwrites and
 // the stale file's token no longer matches the live in-memory one.
 let isShuttingDown = false;
 async function gracefulShutdown(signal: string): Promise<void> {

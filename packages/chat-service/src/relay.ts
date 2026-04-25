@@ -23,7 +23,7 @@ export interface RelayParams {
    *  number / boolean values only — see socket.ts sanitiser).
    *  Forwarded to the host app's startChat callback as
    *  `bridgeOptions`. Empty when the bridge didn't send any.
-   *  See plans/feat-bridge-options-passthrough.md. */
+   *  See plans/done/feat-bridge-options-passthrough.md. */
   bridgeOptions?: Readonly<Record<string, string | number | boolean>>;
   /** Called for each text chunk as the agent generates it. Used by
    *  the socket transport to stream text to the bridge in real time

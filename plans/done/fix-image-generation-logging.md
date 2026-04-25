@@ -59,7 +59,7 @@ markdown:  artifacts/documents/2026/04/morocco.md
 - `server/agent/mcp-server.ts` — タイムアウト定数、`postJson` ポリシーコメント、catch の stderr ログ、プラグイン経路の `timeoutMs` 引き渡し
 - `server/api/routes/plugins.ts` — image-fill ロジックを util に委譲
 - `server/utils/files/markdown-image-fill.ts` — 新規 (image placeholder 置換 + observability)
-- `plans/fix-image-generation-logging.md` — このファイル
+- `plans/done/fix-image-generation-logging.md` — このファイル
 
 ## 検証
 

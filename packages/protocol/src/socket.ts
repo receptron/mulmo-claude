@@ -35,7 +35,7 @@ export type BridgeOptions = Readonly<Record<string, string | number | boolean>>;
  * Shape of `socket.handshake.auth` on the bridge chat socket. The
  * server validates `transportId` + `token`; `options` is the opaque-
  * but-primitive bag forwarded to the host application's startChat
- * callback. See `plans/feat-bridge-options-passthrough.md`.
+ * callback. See `plans/done/feat-bridge-options-passthrough.md`.
  */
 export interface BridgeHandshakeAuth {
   transportId: string;

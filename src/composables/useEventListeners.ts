@@ -10,7 +10,7 @@
 //
 // The click-outside handler for the history popup was dropped when
 // the popup became a real page at /history (see
-// plans/feat-history-url-route.md).
+// plans/done/feat-history-url-route.md).
 //
 // Each listener is supplied as an option so the composable stays
 // independent of App.vue's local state; the caller passes the
