@@ -32,6 +32,7 @@ const frMessages = {
     composeMessage: "Rédiger un message",
     sendHint: "Cmd+Entrée pour envoyer",
     send: "Envoyer",
+    stop: "Arrêter",
     attachFile: "Joindre un fichier",
     fileTooLarge: "Fichier trop volumineux ({sizeMB} Mo). La limite est de 30 Mo.",
     unsupportedFileType: "Type de fichier non pris en charge. Acceptés : images, PDF, DOCX, XLSX, PPTX, fichiers texte.",

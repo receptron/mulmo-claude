@@ -32,6 +32,7 @@ const ptBRMessages = {
     composeMessage: "Escrever mensagem",
     sendHint: "Cmd+Enter para enviar",
     send: "Enviar",
+    stop: "Parar",
     attachFile: "Anexar arquivo",
     fileTooLarge: "Arquivo muito grande ({sizeMB} MB). O limite é 30 MB.",
     unsupportedFileType: "Tipo de arquivo não suportado. Aceitos: imagens, PDF, DOCX, XLSX, PPTX e arquivos de texto.",

@@ -32,6 +32,7 @@ const deMessages = {
     composeMessage: "Nachricht verfassen",
     sendHint: "Cmd+Eingabe zum Senden",
     send: "Senden",
+    stop: "Stoppen",
     attachFile: "Datei anhängen",
     fileTooLarge: "Datei zu groß ({sizeMB} MB). Das Maximum beträgt 30 MB.",
     unsupportedFileType: "Dateityp nicht unterstützt. Akzeptiert: Bilder, PDF, DOCX, XLSX, PPTX, Textdateien.",

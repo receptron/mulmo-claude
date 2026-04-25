@@ -27,10 +27,21 @@
         @paste="onPasteFile"
       />
       <div class="flex flex-col gap-1">
+        <!-- Swap Send → Stop while a run is in flight (#731). Same
+             slot / same dimensions so the column doesn't jump. -->
         <button
+          v-if="isRunning"
+          data-testid="stop-btn"
+          class="bg-red-600 hover:bg-red-700 text-white rounded w-8 h-8 flex items-center justify-center"
+          :title="t('chatInput.stop')"
+          @click="emit('cancel')"
+        >
+          <span class="material-icons text-base leading-none">stop</span>
+        </button>
+        <button
+          v-else
           data-testid="send-btn"
-          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="isRunning"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded w-8 h-8 flex items-center justify-center"
           @click="emit('send')"
         >
           <span class="material-icons text-base leading-none">send</span>
@@ -85,9 +96,18 @@
             <button class="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50" @click="closeExpandedEditor">
               {{ t("common.cancel") }}
             </button>
+            <!-- Same Send → Stop swap as the inline button (#731). -->
             <button
-              class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
-              :disabled="isRunning"
+              v-if="isRunning"
+              class="px-3 py-1.5 text-sm rounded bg-red-600 hover:bg-red-700 text-white"
+              data-testid="expanded-stop-btn"
+              @click="cancelFromExpanded"
+            >
+              {{ t("chatInput.stop") }}
+            </button>
+            <button
+              v-else
+              class="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white"
               data-testid="expanded-send-btn"
               @click="sendFromExpanded"
             >
@@ -124,6 +144,7 @@ const emit = defineEmits<{
   "update:modelValue": [value: string];
   "update:pastedFile": [file: PastedFile | null];
   send: [];
+  cancel: [];
 }>();
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
@@ -232,6 +253,13 @@ function sendFromExpanded(): void {
   if (props.isRunning) return;
   closeExpandedEditor();
   emit("send");
+}
+
+function cancelFromExpanded(): void {
+  // Mirror sendFromExpanded — close the modal so the running state
+  // stays visible in the chat area while the cancel propagates.
+  closeExpandedEditor();
+  emit("cancel");
 }
 
 function focus(): void {

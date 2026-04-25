@@ -39,6 +39,7 @@ const koMessages = {
     composeMessage: "메시지 작성",
     sendHint: "Cmd+Enter 로 전송",
     send: "전송",
+    stop: "정지",
     attachFile: "파일 첨부",
     fileTooLarge: "파일이 너무 큽니다 ({sizeMB} MB). 최대 30 MB 까지 가능합니다.",
     unsupportedFileType: "지원되지 않는 파일 형식입니다. 이미지, PDF, DOCX, XLSX, PPTX, 텍스트 파일만 지원됩니다.",
