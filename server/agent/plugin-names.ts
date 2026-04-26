@@ -19,7 +19,7 @@ import SpreadsheetDef from "../../src/plugins/spreadsheet/definition.js";
 import { TOOL_DEFINITION as MindMapDef } from "@gui-chat-plugin/mindmap";
 import GenerateImageDef from "../../src/plugins/generateImage/definition.js";
 import { TOOL_DEFINITION as QuizDef } from "@mulmochat-plugin/quiz";
-import { TOOL_DEFINITION as FormDef } from "@mulmochat-plugin/form";
+import { TOOL_DEFINITION as FormDef } from "../../src/plugins/presentForm/definition.js";
 import CanvasDef from "../../src/plugins/canvas/definition.js";
 import EditImageDef from "../../src/plugins/editImage/definition.js";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";

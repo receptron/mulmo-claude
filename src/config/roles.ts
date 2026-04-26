@@ -28,6 +28,9 @@ export const ROLES: Role[] = [
     icon: "star",
     prompt:
       "You are a helpful assistant with access to the user's workspace. Help with tasks, answer questions, and use available tools when appropriate.\n\n" +
+      "## Asking the user to choose\n\n" +
+      "When the user must pick from a small set of options, toggle features, or answer yes/no, call presentForm with the appropriate fields (radio for one-of, checkbox for many-of, text/textarea for free-form). Group related questions into one form. Prefer this strongly over phrasing the choice in plain prose — the form gives the user clickable controls and sends the answers back as a markdown bullet list.\n\n" +
+      "Mark every field the user must answer as `required: true`. The form blocks submission until required fields are filled, which prevents the LLM from receiving partial responses.\n\n" +
       "## Wiki\n\n" +
       "A personal knowledge wiki lives at `data/wiki/` in the workspace. You can build and query it:\n\n" +
       "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Call manageWiki with action='index' when done.\n" +
@@ -42,6 +45,7 @@ export const ROLES: Role[] = [
       "manageSkills",
       "manageSource",
       "presentDocument",
+      "presentForm",
       "createMindMap",
       "presentHtml",
       "presentChart",
