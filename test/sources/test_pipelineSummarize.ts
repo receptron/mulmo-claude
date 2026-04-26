@@ -105,12 +105,14 @@ describe("parseSummarizeOutput", () => {
 });
 
 describe("makeDefaultSummarize — empty day short-circuit", () => {
-  it("returns the empty-day markdown without invoking claude for an empty list", async () => {
-    // Use makeDefaultSummarize — with no items it should never
-    // even attempt to spawn the CLI. The timeout is short just
-    // as a defensive backstop (if it ever DID try, the test
-    // would time out fast rather than hang).
-    const summarize = makeDefaultSummarize("2026-04-13", 500);
+  it("returns the empty-day markdown without invoking the LLM backend for an empty list", async () => {
+    // With no items, makeDefaultSummarize should short-circuit
+    // and never reach the backend at all — no spawn, no
+    // network. The assertions below only need to verify the
+    // empty-day markdown shape; if the short-circuit ever
+    // regressed, the call would fail fast (no `claude` on test
+    // PATH) rather than block the run.
+    const summarize = makeDefaultSummarize("2026-04-13");
     const out = await summarize([]);
     assert.match(out, /^# Daily brief — 2026-04-13/);
     assert.match(out, /No new items today/);

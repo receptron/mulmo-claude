@@ -57,9 +57,51 @@ export interface BackendCapabilities {
   mcp: boolean;
 }
 
+/** Tuning profile names for one-shot LLM calls (generate /
+ *  generateStructured). Each backend has a tuning module
+ *  (e.g. claude-code.tuning.ts) mapping every name in this union to
+ *  its own knob vocabulary — enforced at compile time via
+ *  `satisfies Record<ProfileName, ...>` in each tuning module.
+ *  Adding a new profile here is a 2-step change: extend the union
+ *  AND add the entry to every backend's tuning module. */
+export type ProfileName = "journal-archivist" | "chat-index-summary" | "source-classify" | "source-summarize";
+
+/** Inputs for one-shot generation calls. The portable surface is
+ *  intentionally tiny: backend-specific tuning (model, budget cap,
+ *  output format, isolation, timeout) is looked up by `profile` in
+ *  the active backend's tuning module rather than passed here. */
+export interface GenerateInput {
+  systemPrompt: string;
+  userPrompt: string;
+  profile: ProfileName;
+}
+
+/** Thrown when the configured backend isn't available on this host
+ *  (e.g. `claude` CLI missing on PATH for ClaudeCodeBackend). Each
+ *  caller decides what to do — journal disables itself for the
+ *  rest of the server lifetime; chat-index / sources log and skip.
+ *
+ *  Re-exported from server/workspace/journal/archivist-cli.ts as
+ *  `ClaudeCliNotFoundError` for back-compat with existing catch
+ *  sites (same class, two names). */
+export class LLMBackendUnavailableError extends Error {
+  constructor(message: string = "LLM backend is not available") {
+    super(message);
+    this.name = "LLMBackendUnavailableError";
+  }
+}
+
 export interface LLMBackend {
   readonly id: string;
   readonly capabilities: BackendCapabilities;
   /** Run one user turn. Yields portable AgentEvents. */
   runAgent(input: AgentInput): AsyncIterable<AgentEvent>;
+  /** One-shot text generation (no tools, no streaming). Throws if
+   *  the profile's tuning declares structured output. */
+  generate(input: GenerateInput): Promise<string>;
+  /** One-shot structured generation against a JSON schema. Throws
+   *  if the profile's tuning declares free-text output. The schema
+   *  is the JSON Schema object the backend hands to its provider
+   *  (Claude: --json-schema; OpenAI: response_format; etc.). */
+  generateStructured<T>(input: GenerateInput, schema: object): Promise<T>;
 }

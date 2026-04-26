@@ -4,7 +4,15 @@
 
 Make the server-side agent loop pluggable so MulmoClaude can later support backends other than Claude Code (OpenAI Codex, Ollama native, Gemini API, etc.). Today the agent loop is hard-wired to spawn the `claude` CLI as a subprocess. We want a single seam — an `LLMBackend` interface — that everything above the seam talks to, and a `ClaudeCodeBackend` adapter that preserves today's behavior exactly.
 
-This plan is the **first of three** PRs. It is a **pure refactor — no behavior change.**
+## Status
+
+| PR | Scope | Status |
+|---|---|---|
+| #1 | Define `LLMBackend`, extract `ClaudeCodeBackend`, rewire `runAgent` | **Landed** (`3254f0f8`) |
+| #2 | Migrate journal / chat-index / sources to `backend.generate` + per-backend tuning config | **In progress** |
+| #3 | Add a second backend (probably OpenAI) — real validation of the interface | Not started |
+
+Other deferred work tracked at the end of this doc.
 
 ## Background
 
@@ -15,175 +23,249 @@ The server already has thinner Claude coupling than you might expect:
 - **Tool schemas are portable** (`gui-chat-protocol`'s JSON-Schema-based `ToolDefinition`).
 - **MCP is vendor-neutral** — other backends can either speak MCP or call MulmoClaude's `/api/...` endpoints directly the way `mcp-server.ts` does today.
 
-The Claude-specific surface is concentrated in just a few files:
+After PR #1 the Claude-specific surface is concentrated in:
 
 | File | What's Claude-specific |
 |---|---|
-| `server/agent/index.ts` | `spawnClaude()`, `readAgentEvents()` (parses Claude CLI JSON), `runAgent()` orchestrator |
-| `server/agent/config.ts` | `buildCliArgs()` (Claude CLI flags), `buildDockerSpawnArgs()`, `buildUserMessageLine()` (stream-JSON input) |
+| `server/agent/backend/claude-code.ts` | Spawn + stream-JSON parse for the agent loop |
+| `server/agent/config.ts` | `buildCliArgs()`, `buildDockerSpawnArgs()`, `buildUserMessageLine()` |
 | `server/agent/stream.ts` | `createStreamParser()` translating Claude CLI events → portable `AgentEvent` |
-| `server/agent/resumeFailover.ts` | Stale-`--resume` recovery, only meaningful for Claude |
-| `server/api/routes/agent.ts` | Reads/writes `claudeSessionId` in session meta; orchestrates `runAgent()` |
-| Three auxiliary CLI calls | `journal/archivist-cli.ts`, `chat-index/summarizer.ts`, `sources/classifier.ts` (all `spawn("claude", ...)`) |
+| `server/agent/resumeFailover.ts` | Stale-`--resume` recovery |
+| `server/api/routes/agent.ts` | Reads/writes `claudeSessionId` in session meta |
+| `server/workspace/journal/archivist-cli.ts` | One-shot `claude -p` for journal summarization |
+| `server/workspace/chat-index/summarizer.ts` | One-shot `claude --json-schema` for session titles |
+| `server/workspace/sources/classifier.ts` | One-shot `claude --json-schema` for source classification |
+| `server/workspace/sources/pipeline/summarize.ts` | One-shot `claude --output-format json` for daily-brief markdown |
 
-## Out of scope (for this PR)
+The first five are agent-loop concerns and stay where they are. The last four are the auxiliary callers PR #2 migrates.
 
-- **Auxiliary CLI calls** (journal / chat-index / sources). Migrating those is PR #2 — they already accept injectable summarize functions, so it's a small isolated change.
-- **A second backend.** That's PR #3 and is what actually validates the interface. Expect interface refinements then.
-- **Renaming `claudeSessionId` → `llmSessionToken`.** This touches `@mulmobridge/protocol` (a published wire-format) and 15 files. Deferred to a small follow-up PR after #1 lands.
-- **Migrating the existing `feat-mulmoclaude-ollama-support.md` plan.** That plan takes a different approach — env-passthrough to leverage Claude Code CLI's Anthropic-compat mode. Both can coexist; the env-passthrough route stays useful for Anthropic-compatible endpoints, and the abstraction below is what unlocks non-Anthropic-shaped backends (OpenAI function calling, Gemini, etc.).
+---
 
-## Design
+## PR #1 — landed
 
-### The interface
+The shipped design (for reference):
 
-New file: `server/agent/backend/types.ts`
+### Interface (`server/agent/backend/types.ts`)
 
 ```typescript
-import type { Attachment } from "@mulmobridge/protocol";
-import type { Role } from "../../../src/config/roles.js";
-import type { AgentEvent } from "../stream.js";
-
-/** Inputs the orchestrator passes to a backend for one user turn.
- *  The orchestrator owns role expansion, system prompt building, and
- *  MCP config writing. The backend owns spawn / SDK call + stream
- *  translation into AgentEvent. */
-export interface AgentInput {
-  systemPrompt: string;
-  message: string;
-  role: Role;
-  workspacePath: string;
-  sessionId: string;
-  port: number;
-  /** Opaque, backend-specific resume token. For Claude this is the
-   *  CLI's session id; other backends interpret it differently or
-   *  ignore it entirely (capabilities.sessionResume === false). */
-  sessionToken?: string;
-  attachments?: Attachment[];
-  /** Active MCP plugin names (subset of role.availablePlugins that
-   *  is registered in MCP_PLUGINS). The orchestrator already filtered
-   *  these — backends should not re-derive. */
-  activePlugins: string[];
-  /** When set, the path the backend should hand to its MCP loader.
-   *  Pre-resolved for host-vs-container by the orchestrator. */
-  mcpConfigPath?: string;
-  /** Extra allowed-tool names from settings + user MCP servers. */
-  extraAllowedTools: string[];
-  /** When fired, the backend must terminate any in-flight subprocess
-   *  / connection. */
-  abortSignal?: AbortSignal;
-  userTimezone?: string;
-}
-
-export interface BackendCapabilities {
-  /** Can the backend resume a prior conversation by an opaque token?
-   *  Claude: yes (--resume <id>). OpenAI: no. Ollama: no. Used by
-   *  the orchestrator to decide whether to replay transcript instead. */
-  sessionResume: boolean;
-  /** Does the backend speak MCP natively? Claude: yes. Others: emulate
-   *  or skip. Today only Claude consumes activePlugins / mcpConfigPath. */
-  mcp: boolean;
-}
-
 export interface LLMBackend {
   readonly id: string;
   readonly capabilities: BackendCapabilities;
-  /** Run one user turn. Yields portable AgentEvents. */
   runAgent(input: AgentInput): AsyncIterable<AgentEvent>;
 }
 ```
 
-Note: the interface is intentionally narrow. Auxiliary "summarize one shot" calls (PR #2) get a separate `generate` / `generateStructured` pair on a future expansion of this interface; we don't add them now because we don't need them yet and shapes are clearer once we have the second backend.
+`AgentInput` carries `systemPrompt`, `message`, `role`, MCP config path, attachments, abort signal, and an opaque `sessionToken` (today: the Claude CLI's session id; tomorrow: whatever the backend uses for resume).
 
-### The adapter
+### Adapter (`server/agent/backend/claude-code.ts`)
 
-New file: `server/agent/backend/claude-code.ts`
+Owns the spawn + stream-JSON parser. Pure helpers (`buildCliArgs`, `buildDockerSpawnArgs`, `buildUserMessageLine`, `createStreamParser`) stay in their existing home so `test/agent/` keeps working unchanged.
 
-`ClaudeCodeBackend` owns everything that's currently in `spawnClaude()`, `readAgentEvents()`, `buildCliArgs()`, `buildDockerSpawnArgs()`, `buildUserMessageLine()`, and `createStreamParser()`. The functions don't move physically — they stay in `server/agent/{config,stream}.ts` because they're testable utilities — the adapter just **calls** them. This keeps the diff small and the existing tests untouched.
-
-```typescript
-export const claudeCodeBackend: LLMBackend = {
-  id: "claude-code",
-  capabilities: { sessionResume: true, mcp: true },
-  async *runAgent(input) {
-    // existing spawnClaude + readAgentEvents flow, lifted from index.ts
-  },
-};
-```
-
-### The factory
-
-New file: `server/agent/backend/index.ts`
+### Factory (`server/agent/backend/index.ts`)
 
 ```typescript
 export function getActiveBackend(): LLMBackend {
-  // Today: always claude-code. Future: switch on env / settings.
-  return claudeCodeBackend;
+  return claudeCodeBackend;  // Future: switch on env / settings.
 }
 ```
 
-A factory rather than a direct export so PR #3 can flip on env without touching every call site.
+### Result
 
-### Rewired orchestrator
+`server/agent/index.ts` shrunk from 266 → 132 lines. `runAgent()` keeps its signature; the spawn/stream half delegates to `backend.runAgent(input)`.
 
-`runAgent()` in `server/agent/index.ts` keeps its signature and responsibilities — the orchestrator still:
+---
 
-1. Filters role plugins
-2. Loads user MCP servers + checks Docker availability
-3. Refreshes credentials (macOS sandbox)
-4. Builds the full system prompt
-5. Writes the MCP config file
-6. Loads settings (extra allowed tools)
+## PR #2 — auxiliary callers via tuning config
 
-…but instead of building CLI args + spawning + streaming itself, it builds an `AgentInput` and calls `getActiveBackend().runAgent(input)`. Yields the events through unchanged.
+### Why a separate tuning file per backend
 
-The stale-`--resume` recovery in `server/api/routes/agent.ts` stays where it is (Claude-specific failure mode, can be moved into the backend later when a non-Claude backend exists to compare against).
+The three auxiliary callers each have backend-specific knobs: `--model haiku`, `--max-budget-usd 0.15`, `--no-session-persistence`, `cwd: tmpdir()` to skip project context. An earlier sketch tried to lift those into a portable `tier: "fast"` / `maxBudgetUsd?: number` shape on `GenerateInput`. That just put Claude-shaped concepts in a hat and called them portable — adapters for OpenAI / Ollama / Gemini would have to ignore the budget cap, invent a "fast tier" mapping, etc.
 
-## File-level changes
+The fix: **the portable surface carries only a profile name; each backend has its own tuning file.** The set of profile names is shared across backends (caller picks one); the knobs are not (each backend's tuning file uses its own vocabulary). Different vocabularies don't pretend to translate.
+
+### Interface extension (`server/agent/backend/types.ts`)
+
+```typescript
+/** Tuning profile names. Each backend's tuning file must have an
+ *  entry for every name in this union — enforced at compile time
+ *  via `satisfies Record<ProfileName, ...>` in each backend's
+ *  tuning module. */
+export type ProfileName =
+  | "journal-archivist"
+  | "chat-index-summary"
+  | "source-classify"
+  | "source-summarize";
+
+export interface GenerateInput {
+  systemPrompt: string;
+  userPrompt: string;
+  profile: ProfileName;
+}
+
+export interface LLMBackend {
+  // ... existing runAgent
+  generate(input: GenerateInput): Promise<string>;
+  generateStructured<T>(input: GenerateInput, schema: object): Promise<T>;
+}
+```
+
+`generate` is for free-text output (today: journal-archivist, source-summarize). `generateStructured` is for JSON-schema-constrained output (today: chat-index-summary, source-classify). Each backend decides which one matches the profile and throws if the wrong method is called.
+
+### Per-backend tuning module
+
+`server/agent/backend/claude-code.tuning.ts`:
+
+```typescript
+import { ONE_MINUTE_MS } from "../../utils/time.js";
+import type { ProfileName } from "./types.js";
+
+interface ClaudeCodeProfile {
+  /** Three Claude-CLI invocation shapes the four callers use today:
+   *   - "text-stdin": prompt via stdin, --output-format text
+   *     (journal: prompts can be huge, no envelope needed)
+   *   - "text-envelope": prompt via argv -p, --output-format json
+   *     without --json-schema; adapter extracts envelope.result
+   *     (sources/pipeline/summarize: free-form markdown but wants
+   *     structured-error detection on stdout)
+   *   - "json-schema": prompt via argv -p, --output-format json
+   *     with --json-schema; adapter extracts envelope.structured_output
+   *     (chat-index, sources/classifier) */
+  outputFormat: "text-stdin" | "text-envelope" | "json-schema";
+  model?: "haiku" | "sonnet" | "opus";
+  maxBudgetUsd?: number;
+  noSessionPersistence?: boolean;
+  /** Run from tmpdir() so the CLI doesn't load the project's
+   *  CLAUDE.md / plugins / memory and inflate the prompt. */
+  isolatedFromProject?: boolean;
+  timeoutMs: number;
+}
+
+export const claudeCodeTuning = {
+  "journal-archivist": {
+    outputFormat: "text-stdin",
+    timeoutMs: 5 * ONE_MINUTE_MS,
+  },
+  "source-summarize": {
+    outputFormat: "text-envelope",
+    model: "haiku",
+    maxBudgetUsd: 0.25,
+    noSessionPersistence: true,
+    isolatedFromProject: true,
+    timeoutMs: 5 * ONE_MINUTE_MS,
+  },
+  "chat-index-summary": {
+    outputFormat: "json-schema",
+    model: "haiku",
+    maxBudgetUsd: 0.15,
+    noSessionPersistence: true,
+    isolatedFromProject: true,
+    timeoutMs: 2 * ONE_MINUTE_MS,
+  },
+  "source-classify": {
+    outputFormat: "json-schema",
+    model: "haiku",
+    maxBudgetUsd: 0.05,
+    noSessionPersistence: true,
+    isolatedFromProject: true,
+    timeoutMs: 2 * ONE_MINUTE_MS,
+  },
+} as const satisfies Record<ProfileName, ClaudeCodeProfile>;
+```
+
+The `satisfies Record<ProfileName, ClaudeCodeProfile>` is load-bearing: it forces every profile in the portable union to have a tuning entry, and every entry to match the Claude profile shape. Adding a new profile in `types.ts` is a compile error in this file until the entry exists. A future `openai.tuning.ts` would have the same `satisfies` line against a completely different `OpenAIProfile` shape — no shared knob vocabulary, no leaky abstraction.
+
+**Why TS over JSON.** A TS module gives you the union-completeness check above for free; a JSON file would need a runtime zod schema + load step + startup error path to get the same property. The cost of TS is that bumping `maxBudgetUsd` from 0.15 to 0.20 needs a rebuild — for tuning that lives next to the adapter and changes on the order of months, that's the right trade. If the values ever become user-editable, that's the time to flip to JSON.
+
+### Adapter implementation
+
+`ClaudeCodeBackend` adds two methods that look up the profile, validate the output-format kind, and spawn `claude` with the right flags:
+
+```typescript
+async function generate(input: GenerateInput): Promise<string> {
+  const profile = claudeCodeTuning[input.profile];
+  if (profile.outputFormat === "json-schema") {
+    throw new Error(`profile ${input.profile} is structured — use generateStructured()`);
+  }
+  // text-stdin (journal) vs text-envelope (sources/pipeline/summarize)
+  // routes to two different spawn helpers but both return Promise<string>.
+  return profile.outputFormat === "text-stdin" ? spawnTextStdin(input, profile) : spawnTextEnvelope(input, profile);
+}
+
+async function generateStructured<T>(input: GenerateInput, schema: object): Promise<T> {
+  const profile = claudeCodeTuning[input.profile];
+  if (profile.outputFormat !== "json-schema") {
+    throw new Error(`profile ${input.profile} is text — use generate()`);
+  }
+  const stdout = await spawnJsonSchema(input, schema, profile);
+  return parseClaudeJsonEnvelope<T>(stdout);
+}
+```
+
+The three private spawn helpers are lifted from the bodies of `runClaudeCli` (archivist-cli.ts), `spawnClaudeSummarize` in summarizer.ts and pipeline/summarize.ts, and `spawnClaudeClassify` (classifier.ts). The shared envelope parser handles `{is_error, structured_output, result}` — the same lesson PR #94 learned about errors landing on stdout.
+
+### Caller migration
+
+The four callers' default impls become thin wrappers; **the public DI signatures don't change**, so injected fakes in tests keep working unchanged.
+
+```typescript
+// archivist-cli.ts (after)
+export const runClaudeCli: Summarize = (systemPrompt, userPrompt) =>
+  getActiveBackend().generate({ systemPrompt, userPrompt, profile: "journal-archivist" });
+
+// summarizer.ts (after)
+export const defaultSummarize: SummarizeFn = async (input) => {
+  const result = await getActiveBackend().generateStructured<unknown>(
+    { systemPrompt: SYSTEM_PROMPT, userPrompt: input, profile: "chat-index-summary" },
+    SUMMARY_SCHEMA,
+  );
+  return validateSummaryResult(result);  // existing lenient normalizer
+};
+
+// classifier.ts and pipeline/summarize.ts — analogous
+```
+
+Pure helpers stay where they are: `extractText`, `truncate`, `validateSummaryResult`, `validateClassifyResult`, `buildClassifyPrompt`, `parseSummarizeOutput`, `buildSummarizePromptBody`. The Claude-CLI-specific envelope parsing moves into the adapter — it's the adapter's protocol, not the caller's concern.
+
+### Error portability
+
+`ClaudeCliNotFoundError` (currently in `archivist-cli.ts`, re-imported by summarizer / classifier / pipeline-summarize) becomes a portable `LLMBackendUnavailableError` exported from the backend module. To avoid touching ~10 `instanceof ClaudeCliNotFoundError` catch sites in production code and tests, `archivist-cli.ts` re-exports `LLMBackendUnavailableError as ClaudeCliNotFoundError` — same class, two names. New code can catch the portable name; existing catches keep working.
+
+### File-level changes
 
 **New files:**
-
-- `server/agent/backend/types.ts` — interface + types
-- `server/agent/backend/claude-code.ts` — Claude adapter (calls existing helpers)
-- `server/agent/backend/index.ts` — `getActiveBackend()` factory
+- `server/agent/backend/claude-code.tuning.ts`
 
 **Modified files:**
+- `server/agent/backend/types.ts` — add `ProfileName`, `GenerateInput`, extend `LLMBackend`, export `LLMBackendUnavailableError`
+- `server/agent/backend/claude-code.ts` — implement `generate` / `generateStructured`, lift spawn helpers from the four caller files
+- `server/workspace/journal/archivist-cli.ts` — `runClaudeCli` becomes a wrapper; spawn body + `ClaudeCliFailedError` deleted; `ClaudeCliNotFoundError` becomes a re-export alias
+- `server/workspace/chat-index/summarizer.ts` — `defaultSummarize` becomes a wrapper; `spawnClaudeSummarize` + `parseClaudeJsonResult` deleted
+- `server/workspace/sources/classifier.ts` — `defaultClassify` becomes a wrapper; `spawnClaudeClassify` + envelope-parse half of `parseClassifyOutput` deleted
+- `server/workspace/sources/pipeline/summarize.ts` — `makeDefaultSummarize` becomes a wrapper; `spawnClaudeSummarize` deleted; `parseSummarizeOutput` keeps its `result`-extraction role (adapter returns the envelope's `result` field as a string)
 
-- `server/agent/index.ts` — `runAgent()` keeps its signature but delegates the spawn/stream half to the active backend. `spawnClaude()` and `readAgentEvents()` move into the adapter.
+**Untouched:**
+- All callers of `Summarize` / `SummarizeFn` / `ClassifyFn` (`dailyPass.ts`, indexer, source registry, daily-brief writer)
+- All tests under `test/journal/`, `test/chat-index/`, `test/sources/` — they inject fakes, not the spawn layer
 
-**Untouched** (verifies the boundary is right):
+### Acceptance criteria
 
-- `server/agent/config.ts`
-- `server/agent/stream.ts`
-- `server/agent/prompt.ts`
-- `server/agent/resumeFailover.ts`
-- `server/api/routes/agent.ts`
-- All tests under `test/agent/`
+- `yarn format && yarn lint && yarn typecheck && yarn build && yarn test` all clean
+- `git grep "spawn.*\\bclaude\\b" server/workspace/` returns zero hits
+- Every existing fake injected by tests still satisfies `Summarize` / `SummarizeFn` / `ClassifyFn` without changes
 
-## Sequencing inside this PR
+---
 
-1. Add `server/agent/backend/types.ts` (pure types)
-2. Add `server/agent/backend/claude-code.ts` (lifts `spawnClaude` + `readAgentEvents` from `index.ts`)
-3. Add `server/agent/backend/index.ts` (factory)
-4. Rewire `runAgent()` in `index.ts` to build `AgentInput` and delegate
-5. Run `yarn format && yarn lint && yarn typecheck && yarn build && yarn test`
+## Follow-up PRs (after #2)
 
-## Acceptance criteria
-
-- `yarn typecheck`, `yarn lint`, `yarn build`, `yarn test` all pass
-- `runAgent()` keeps the same exported signature
-- No behavior change observable from `server/api/routes/agent.ts` or tests
-- `server/agent/backend/types.ts` is the only file imported by any future second backend
-- `git grep "spawn.*claude"` outside `server/agent/backend/` and the three auxiliary files returns zero hits
-
-## Follow-up PRs (not in this one)
-
-- **PR #2:** Migrate `journal/archivist-cli.ts`, `chat-index/summarizer.ts`, `sources/classifier.ts` to a `generate` / `generateStructured` extension of `LLMBackend`. Three files, all already test-injectable.
 - **PR #2.5 (optional):** Rename `claudeSessionId` → `llmSessionToken` across server, tests, and `@mulmobridge/protocol`. Wire-format change — coordinate package version bump.
-- **PR #3:** Add a second backend (probably OpenAI). Real validation of the interface; expect refinements.
+- **PR #3:** Add a second backend (probably OpenAI). Real validation of the interface; expect refinements. Will exercise both `runAgent` and `generate*` paths and clarify whether the orchestrator's MCP-config-writing belongs there or behind a `capabilities.mcp` check.
+
+## Out of scope
+
+- **Migrating the existing `feat-mulmoclaude-ollama-support.md` plan.** That plan takes a different approach — env-passthrough to leverage Claude Code CLI's Anthropic-compat mode. Both can coexist; the env-passthrough route stays useful for Anthropic-compatible endpoints, and the abstraction in this doc is what unlocks non-Anthropic-shaped backends (OpenAI function calling, Gemini, etc.).
 
 ## Risks
 
-- The orchestrator/backend split has to put MCP config writing on the *orchestrator* side (it's filesystem state, not LLM call), but `mcpConfigPath` only matters to the Claude adapter. That's OK as long as we keep `BackendCapabilities.mcp` and let other adapters ignore the field.
-- `BackendCapabilities` is meant to be honest, not enforcing. The orchestrator may grow `if (backend.capabilities.sessionResume) { ... }` branches over time. That's the right place for them; resist the temptation to push them into adapters as no-ops.
-- The interface is provisional. Don't optimize for it being perfect on PR #1 — it will refine in PR #3.
+- **`generate` / `generateStructured` are provisional.** Their signatures will refine when PR #3 wires up a real second backend — that's the only thing that proves the per-profile tuning file is the right unit. Don't optimize for perfect now.
+- **Output-format mismatch is a runtime error.** Calling `generate` for a profile whose tuning has `outputFormat: "json"` (or vice versa) throws. Compile-time discrimination would need discriminated-union profiles, which complicates the tuning shape. Tests cover each profile's correct path; the runtime check is a defensive net.
+- **`ProfileName` is a closed union.** Adding a profile is a 2-step change: extend the union *and* add the entry to every backend's tuning module. The compiler enforces both halves; this is the same load-bearing property that makes the design work.

@@ -7,7 +7,8 @@
 import { claudeCodeBackend } from "./claude-code.js";
 import type { LLMBackend } from "./types.js";
 
-export type { AgentInput, BackendCapabilities, LLMBackend } from "./types.js";
+export type { AgentInput, BackendCapabilities, GenerateInput, LLMBackend, ProfileName } from "./types.js";
+export { LLMBackendUnavailableError } from "./types.js";
 
 export function getActiveBackend(): LLMBackend {
   return claudeCodeBackend;

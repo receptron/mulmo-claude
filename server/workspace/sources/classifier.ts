@@ -2,29 +2,25 @@
 //
 // When a user registers a new source, the UI / CLI calls
 // `classifySource({ title, url, sampleTitles, sampleSummaries })`.
-// The classifier spawns `claude` with a strict JSON schema that
-// limits output to the fixed 25-slug taxonomy (see
-// server/sources/taxonomy.ts), so the model can't invent
+// `defaultClassify` drives the active LLM backend with a strict
+// JSON schema that limits output to the fixed 25-slug taxonomy
+// (see server/sources/taxonomy.ts), so the model can't invent
 // `artificial-intelligence` when we already have `ai` — the whole
 // point of the closed enum.
 //
-// Shape of the spawn layer mirrors `server/chat-index/summarizer.ts`
-// so we reuse the "errors on stdout not stderr", "budget
-// exhaustion surfaces cleanly" behaviour that we already got
-// right once.
-//
 // Injection-friendly: production `classifySource` goes through
 // `defaultClassify`. Tests pass their own `ClassifyFn` that
-// skips the CLI entirely.
+// skips the backend entirely.
 
-import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
+import { getActiveBackend } from "../../agent/backend/index.js";
 import { ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
-import { formatSpawnFailure } from "../../utils/spawn.js";
 import { ONE_MINUTE_MS } from "../../utils/time.js";
 import { CATEGORY_SLUGS, normalizeCategories, type CategorySlug } from "./taxonomy.js";
 import { errorMessage } from "../../utils/errors.js";
 import { isRecord } from "../../utils/types.js";
+
+// Re-export so existing callers don't have to change imports.
+export { ClaudeCliNotFoundError };
 
 // Structured input passed to the classifier. Kept small (not the
 // full source content) so the prompt stays cheap — a couple of
@@ -61,16 +57,12 @@ export interface ClassifyResult {
 // `defaultClassify`.
 export type ClassifyFn = (input: ClassifyInput) => Promise<ClassifyResult>;
 
-// Max time we let `claude` run during registration. Registration
+// Max time the LLM call may run during registration. Registration
 // is a foreground user action, so anything longer than 2 min is
-// effectively broken anyway.
+// effectively broken anyway. Kept exported for back-compat with
+// callers that read it; the actual timeout per call now lives in
+// the backend's tuning module.
 export const DEFAULT_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
-
-// Budget cap. Classification is one small call per source (once
-// at registration, rarely re-classified) so $0.05 is fine — we
-// don't pay the first-call cache-creation cost on every source
-// because we warm it once and reuse.
-const MAX_BUDGET_USD = 0.05;
 
 const SYSTEM_PROMPT =
   "You classify an information source (RSS feed, GitHub repo, web site, etc.) into a fixed taxonomy. " +
@@ -140,8 +132,10 @@ interface ClaudeJsonResult {
 }
 
 // Pure: parse the claude `--output-format json` envelope and
-// validate against our result shape. Exported so tests cover the
-// envelope-handling + normalization paths without spawning CLI.
+// validate against our result shape. Retained as a test-callable
+// helper that documents the envelope shape; the production path
+// goes through `backend.generateStructured`, which extracts
+// `structured_output` itself.
 export function parseClassifyOutput(stdout: string): ClassifyResult {
   let parsed: ClaudeJsonResult;
   try {
@@ -182,82 +176,20 @@ export function validateClassifyResult(obj: unknown): ClassifyResult {
   return { categories, rationale };
 }
 
-// --- spawn layer --------------------------------------------------------
-
-function spawnClaudeClassify(userPrompt: string, timeoutMs: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const args = [
-      "--print",
-      "--no-session-persistence",
-      "--output-format",
-      "json",
-      "--model",
-      "haiku",
-      "--max-budget-usd",
-      String(MAX_BUDGET_USD),
-      "--json-schema",
-      JSON.stringify(classifySchema()),
-      "--system-prompt",
-      SYSTEM_PROMPT,
-      "-p",
-      userPrompt,
-    ];
-    // Run from tmpdir so claude doesn't load the project's
-    // CLAUDE.md / plugins / memory and inflate the context.
-    const proc = spawn("claude", args, {
-      cwd: tmpdir(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      proc.kill("SIGKILL");
-      reject(new Error(`[sources/classifier] claude timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    proc.on("error", (err: Error & { code?: string }) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (err.code === "ENOENT") {
-        reject(new ClaudeCliNotFoundError());
-      } else {
-        reject(err);
-      }
-    });
-    proc.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (code !== 0) {
-        // claude writes structured errors (incl.
-        // error_max_budget_usd) to STDOUT in JSON form — same
-        // lesson we learned in chat-index/summarizer. Prefer the
-        // structured message when we can parse it.
-        reject(new Error(formatSpawnFailure("[sources/classifier]", code, stdout, stderr)));
-        return;
-      }
-      resolve(stdout);
-    });
-  });
-}
-
-// Production ClassifyFn — spawns the real claude CLI.
+// Production ClassifyFn. The backend's tuning module owns model /
+// budget / isolation knobs; this layer composes prompt + schema +
+// validator and lets the adapter handle the spawn-and-envelope dance.
 export const defaultClassify: ClassifyFn = async (input) => {
   const userPrompt = buildClassifyPrompt(input);
-  const stdout = await spawnClaudeClassify(userPrompt, DEFAULT_TIMEOUT_MS);
-  return parseClassifyOutput(stdout);
+  const result = await getActiveBackend().generateStructured<unknown>(
+    {
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      profile: "source-classify",
+    },
+    classifySchema(),
+  );
+  return validateClassifyResult(result);
 };
 
 // Public entry. Thin wrapper so tests can inject a ClassifyFn
