@@ -4,12 +4,13 @@
 // a known-good server with sane defaults. The general user shouldn't
 // have to read a README to wire up Memory or a calendar.
 //
-// Phase 1 (#825) shipped 7 config-free entries (Memory / Sequential
-// Thinking / Apple-native / Screenshot). Phase 2 adds 6 more in the
-// docs / info-gathering / general-task buckets and wires up the
-// per-server config form (api keys, paths, etc.) — fields described
-// by `configSchema` are interpolated into the spec template at
-// install time via `interpolateMcpSpec`.
+// Phase 1 (#825) shipped 2 config-free entries (Memory / Sequential
+// Thinking) — Apple-native / Screenshot were explored but dropped
+// at merge because no community package was stable enough to pin.
+// Phase 2 adds 6 more in the docs / info-gathering / general-task
+// buckets and wires up the per-server config form (api keys, paths,
+// etc.) — fields described by `configSchema` are interpolated into
+// the spec template at install time via `interpolateMcpSpec`.
 //
 // Selection criteria:
 //   - 🟢 catalogue value > Claude Code built-in coverage
@@ -19,10 +20,10 @@
 //   - safe defaults: no auth required, or one-time API key the user
 //     can paste during install.
 //
-// **community package names are best-effort** — Apple-native,
-// Screenshot, Slack, Google Maps, and Open-Meteo MCPs vary by
-// maintainer activity; PR reviewers should pin the exact package +
-// version on merge after checking weekly downloads / last commit.
+// **community package names are best-effort** — Slack, Google Maps,
+// and Open-Meteo MCPs vary by maintainer activity; PR reviewers
+// should pin the exact package + version on merge after checking
+// weekly downloads / last commit.
 
 import type { McpServerSpec } from "./mcpTypes";
 
@@ -67,14 +68,11 @@ export interface McpCatalogEntry {
   riskLevel: "low" | "medium" | "high";
 }
 
-// Phase 1 entries — all config-free.
-//
-// Implementation note for reviewers: the official `@modelcontextprotocol/*`
-// packages are pinned by the upstream Anthropic team and stable. Apple-
-// native and screenshot entries reference *placeholder* community
-// packages — please verify the maintenance status (last commit, weekly
-// downloads, open issues) before merge and replace if a healthier fork
-// exists.
+// Phase 1 ships the two upstream-pinned entries; Phase 2 adds six
+// more with `configSchema` form-driven setup. The official
+// `@modelcontextprotocol/*` packages are pinned by the upstream
+// Anthropic team; community packages added in Phase 2 should be
+// re-verified at every release.
 export const MCP_CATALOG: McpCatalogEntry[] = [
   {
     id: "memory",
@@ -104,83 +102,10 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     configSchema: [],
     riskLevel: "low",
   },
-  // Apple-native entries — macOS only at runtime. Surfaced on every
-  // platform so the user understands why they exist; non-darwin hosts
-  // get a server-side error on first use. Phase 2 adds an
-  // `osConstraint: "darwin"` field so the UI can grey them out.
-  {
-    id: "apple-reminders",
-    displayName: "settingsMcpTab.catalog.entry.appleReminders.displayName",
-    description: "settingsMcpTab.catalog.entry.appleReminders.description",
-    audience: "general",
-    // TODO(reviewer): pin a maintained community package. As of
-    // 2026-04, candidates include `mcp-server-apple-reminders` and
-    // `apple-mcp` — pick the one with most recent activity.
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-reminders"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-calendar",
-    displayName: "settingsMcpTab.catalog.entry.appleCalendar.displayName",
-    description: "settingsMcpTab.catalog.entry.appleCalendar.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-calendar"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-notes",
-    displayName: "settingsMcpTab.catalog.entry.appleNotes.displayName",
-    description: "settingsMcpTab.catalog.entry.appleNotes.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-notes"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-music",
-    displayName: "settingsMcpTab.catalog.entry.appleMusic.displayName",
-    description: "settingsMcpTab.catalog.entry.appleMusic.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-music"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "screenshot",
-    displayName: "settingsMcpTab.catalog.entry.screenshot.displayName",
-    description: "settingsMcpTab.catalog.entry.screenshot.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-screenshot"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
+  // Apple-native + screenshot entries explored during the #823
+  // design were intentionally dropped from Phase 1 (#825) because no
+  // community package was stable enough to pin. They land in a
+  // follow-up once a maintained package is selected.
 
   // ── Phase 2 entries (#823) ────────────────────────────────────
 

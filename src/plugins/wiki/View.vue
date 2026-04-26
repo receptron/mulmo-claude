@@ -378,6 +378,9 @@ watch(content, async () => {
   if (scrollRef.value) scrollRef.value.scrollTop = 0;
 });
 
+/** Base directory for wiki content, adjusted by the current view. */
+const WIKI_BASE_DIR = computed(() => (action.value === "page" ? "data/wiki/pages" : "data/wiki"));
+
 const renderedContent = computed(() => {
   if (!content.value) return "";
   // Strip YAML frontmatter before rendering — marked doesn't parse
@@ -388,10 +391,9 @@ const renderedContent = computed(() => {
   // Rewrite workspace-relative image refs (`![alt](images/foo.png)`)
   // to `/api/files/raw?path=...` BEFORE marked parses them — without
   // this, the browser tries to fetch against the SPA route URL
-  // (/chat/…/images/foo.png) and 404s. basePath = wiki/pages for
-  // individual pages so `../images/foo.png` resolves correctly.
-  const basePath = action.value === "page" ? "wiki/pages" : "wiki";
-  const withImages = rewriteMarkdownImageRefs(body, basePath);
+  // (/chat/…/images/foo.png) and 404s. Reuse WIKI_BASE_DIR so a
+  // page's `../images/foo.png` resolves under `data/wiki/`.
+  const withImages = rewriteMarkdownImageRefs(body, WIKI_BASE_DIR.value);
   // Strip marked's `disabled=""` from GFM task checkboxes and tag
   // them with `class="md-task"` so `handleContentClick` can find
   // them via DOM delegation (#775). Other view modes (index / log /
@@ -496,9 +498,6 @@ function currentSlug(): string | null {
       : (props.selectedResult?.data?.pageName ?? null);
   return isSafeWikiSlug(raw) ? raw : null;
 }
-
-/** Base directory for wiki content, adjusted by the current view. */
-const WIKI_BASE_DIR = computed(() => (action.value === "page" ? "data/wiki/pages" : "data/wiki"));
 
 // Serialised POST chain for rapid task-checkbox clicks (#775). Each
 // click queues onto the previous so a slower network can't reorder

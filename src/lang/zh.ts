@@ -249,26 +249,6 @@ const zhMessages = {
           displayName: "顺序思考",
           description: "帮助 Claude 一步一步地解决复杂问题。",
         },
-        appleReminders: {
-          displayName: "Apple 提醒事项",
-          description: "在 macOS 提醒事项 App 中读写提醒。",
-        },
-        appleCalendar: {
-          displayName: "Apple 日历",
-          description: "在 macOS 日历 App 中读写事件。",
-        },
-        appleNotes: {
-          displayName: "Apple 备忘录",
-          description: "在 macOS 备忘录 App 中读写笔记。",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "控制 macOS Music App 的播放与搜索。",
-        },
-        screenshot: {
-          displayName: "截图",
-          description: "捕获屏幕为 Claude 可读取的图像。",
-        },
         context7: {
           displayName: "Context7（库文档）",
           description: "获取主流库的最新文档 — 超越模型训练截止日期的信息源。",

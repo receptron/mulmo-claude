@@ -5,13 +5,13 @@ import spreadsheetPlugin from "../plugins/spreadsheet/index";
 import MindMapPlugin from "@gui-chat-plugin/mindmap/vue";
 import generateImagePlugin from "../plugins/generateImage/index";
 import QuizPlugin from "@mulmochat-plugin/quiz/vue";
-import FormPlugin from "@mulmochat-plugin/form/vue";
+import presentFormPlugin from "../plugins/presentForm/index";
 import canvasPlugin from "../plugins/canvas/index";
 import editImagePlugin from "../plugins/editImage/index";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
-import schedulerPlugin from "../plugins/scheduler/index";
+import { manageCalendarPlugin, manageAutomationsPlugin, legacyManageSchedulerEntry } from "../plugins/scheduler/index";
 import manageRolesPlugin from "../plugins/manageRoles/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
 import manageSourcePlugin from "../plugins/manageSource/index";
@@ -23,7 +23,13 @@ import presentChartPlugin from "../plugins/chart/index";
 const plugins: Record<string, PluginEntry> = {
   "text-response": textResponsePlugin.plugin,
   manageTodoList: todoPlugin,
-  manageScheduler: schedulerPlugin,
+  manageCalendar: manageCalendarPlugin,
+  manageAutomations: manageAutomationsPlugin,
+  // View-only fallback so chat sessions saved before #824
+  // continue to render rich tool-result cards. Not exposed to
+  // the LLM (absent from server/agent/plugin-names.ts and
+  // src/config/toolNames.ts) — strictly historical rendering.
+  manageScheduler: legacyManageSchedulerEntry,
   manageRoles: manageRolesPlugin,
   manageSkills: manageSkillsPlugin,
   manageSource: manageSourcePlugin,
@@ -34,7 +40,7 @@ const plugins: Record<string, PluginEntry> = {
   createMindMap: MindMapPlugin.plugin,
   generateImage: generateImagePlugin,
   putQuestions: QuizPlugin.plugin,
-  presentForm: FormPlugin.plugin,
+  presentForm: presentFormPlugin,
   openCanvas: canvasPlugin,
   presentHtml: presentHtmlPlugin,
   presentChart: presentChartPlugin,

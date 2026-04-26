@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { executeMindMap } from "@gui-chat-plugin/mindmap";
 import { executeSpreadsheet, type SpreadsheetArgs } from "../../../src/plugins/spreadsheet/definition.js";
 import { executeQuiz } from "@mulmochat-plugin/quiz";
-import { executeForm } from "@mulmochat-plugin/form";
+import { executeForm } from "../../../src/plugins/presentForm/plugin.js";
 import { executeOpenCanvas } from "../../../src/plugins/canvas/definition.js";
 import { executePresent3D } from "@gui-chat-plugin/present3d";
 import { errorMessage } from "../../utils/errors.js";

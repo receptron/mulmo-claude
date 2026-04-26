@@ -33,7 +33,7 @@ describe("isUserTextResponse", () => {
 
   it("returns false for non text-response tool names", () => {
     const toolResult = makeResult({
-      toolName: "manageScheduler",
+      toolName: "manageCalendar",
       data: { role: "user" },
     });
     assert.equal(isUserTextResponse(toolResult), false);

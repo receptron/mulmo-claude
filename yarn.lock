@@ -1147,13 +1147,6 @@
   dependencies:
     zod "^4.3.5"
 
-"@mulmochat-plugin/form@0.5.0":
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/@mulmochat-plugin/form/-/form-0.5.0.tgz#49c38e0ea982197251e2654714bab16c52d23f20"
-  integrity sha512-k3hbvSTDhop5/rRpk3hkcEuU2LUKTQYOFIBu1cvdS6Vw4pIKZ6ao36wXQbxCJL0WOC3IclHbpII8n32bkTi71w==
-  dependencies:
-    gui-chat-protocol "^0.0.4"
-
 "@mulmochat-plugin/quiz@0.4.0":
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/@mulmochat-plugin/quiz/-/quiz-0.4.0.tgz#f6604f3608e0aaef894e416ca58efd27e21fc462"
@@ -4705,11 +4698,6 @@ gui-chat-protocol@0.1.0, gui-chat-protocol@^0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-0.1.0.tgz#46c51b5bd45af81eb8c909ea7dfa23d93e687a4b"
   integrity sha512-e592yYijeU1hPVbe2g0Y728otN+NcRSj3yvBg7sRi6YmSPWEU/pEjnGhcI2td4myqzdYqiK+E/v/bUKCnV9QSw==
-
-gui-chat-protocol@^0.0.4:
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-0.0.4.tgz#dd8c0c4a979f06f87cfc406760491834f1d4ce69"
-  integrity sha512-TsmO0vRnKUl0zWXbZlj1u35JRz0sum2JtzsKrTKtT+yJt0mHBVRX+o8McIihACTnlXVssjJ9bxYiH+k17S5BhQ==
 
 has-bigints@^1.0.2:
   version "1.1.0"

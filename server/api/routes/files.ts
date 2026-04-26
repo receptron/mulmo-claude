@@ -15,7 +15,12 @@ import { previewSnippet } from "../../utils/logPreview.js";
 const router = Router();
 
 const MAX_PREVIEW_BYTES = 1024 * 1024; // 1 MB — text content embedded in JSON
-const MAX_RAW_BYTES = 50 * 1024 * 1024; // 50 MB — cap for binary streaming
+const MAX_RAW_BYTES = 50 * 1024 * 1024; // 50 MB — cap for non-media streaming (images/pdf/binary load whole into the browser)
+// Audio/video are streamed via HTTP Range requests (see GET /raw),
+// so the browser never buffers the whole file. Podcasts commonly
+// run 100–300 MB and recorded video can run multi-GB; cap at 4 GB
+// just to keep an obviously-pathological file from being served.
+const MAX_MEDIA_BYTES = 4 * 1024 * 1024 * 1024;
 const HIDDEN_DIRS = new Set([".git"]);
 
 // Files whose basename exactly matches one of these is refused by
@@ -653,10 +658,13 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
     modifiedMs: stat.mtimeMs,
   };
 
-  // Anything past the binary stream cap is "too-large" regardless of
-  // type — even images/PDFs, since the client would have to fetch
-  // them via /files/raw which enforces the same limit.
-  if (stat.size > MAX_RAW_BYTES) {
+  const kind = classify(absPath);
+  // Audio/video stream via Range requests, so they get the looser
+  // MAX_MEDIA_BYTES cap. Everything else (images/PDFs/binary) is
+  // loaded whole by the browser and stays at MAX_RAW_BYTES.
+  const isStreamingMedia = kind === "audio" || kind === "video";
+  const sizeCap = isStreamingMedia ? MAX_MEDIA_BYTES : MAX_RAW_BYTES;
+  if (stat.size > sizeCap) {
     res.json({
       kind: "too-large",
       ...meta,
@@ -665,7 +673,6 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
     return;
   }
 
-  const kind = classify(absPath);
   if (kind === "image" || kind === "pdf" || kind === "audio" || kind === "video") {
     res.json({ kind, ...meta });
     return;
@@ -784,9 +791,11 @@ router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQue
   }
   const { absPath, stat } = ctx;
 
-  if (stat.size > MAX_RAW_BYTES) {
-    log.warn("files", "GET raw: too large", { pathPreview: previewSnippet(requestedPath), bytes: stat.size });
-    sendError(res, 413, `File too large to stream (${stat.size} bytes, limit ${MAX_RAW_BYTES})`);
+  const rawKind = classify(absPath);
+  const rawSizeCap = rawKind === "audio" || rawKind === "video" ? MAX_MEDIA_BYTES : MAX_RAW_BYTES;
+  if (stat.size > rawSizeCap) {
+    log.warn("files", "GET raw: too large", { pathPreview: previewSnippet(requestedPath), bytes: stat.size, cap: rawSizeCap });
+    sendError(res, 413, `File too large to stream (${stat.size} bytes, limit ${rawSizeCap})`);
     return;
   }
   const ext = path.extname(absPath).toLowerCase();

@@ -23,7 +23,11 @@ export const TOOL_NAMES = {
 
   // Management plugins
   manageTodoList: "manageTodoList",
-  manageScheduler: "manageScheduler",
+  // Calendar / Automations split (#824) — replaced the unified
+  // `manageScheduler` so the LLM and chat-tool-result UI both have
+  // a 1:1 mapping between tool name and domain.
+  manageCalendar: "manageCalendar",
+  manageAutomations: "manageAutomations",
   manageRoles: "manageRoles",
   manageSkills: "manageSkills",
   manageSource: "manageSource",

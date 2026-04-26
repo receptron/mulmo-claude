@@ -249,26 +249,6 @@ const deMessages = {
           displayName: "Sequenzielles Denken",
           description: "Hilft Claude, komplexe Probleme schrittweise zu lösen.",
         },
-        appleReminders: {
-          displayName: "Apple Erinnerungen",
-          description: "Erinnerungen in der macOS-Erinnerungen-App lesen und schreiben.",
-        },
-        appleCalendar: {
-          displayName: "Apple Kalender",
-          description: "Termine in der macOS-Kalender-App lesen und schreiben.",
-        },
-        appleNotes: {
-          displayName: "Apple Notizen",
-          description: "Notizen in der macOS-Notizen-App lesen und schreiben.",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "Wiedergabe steuern und in der macOS-Music-App suchen.",
-        },
-        screenshot: {
-          displayName: "Bildschirmfoto",
-          description: "Bildschirm als Bild aufnehmen, das Claude lesen kann.",
-        },
         context7: {
           displayName: "Context7 (Bibliotheksdokumentation)",
           description: "Aktuelle Dokumentation gängiger Bibliotheken — geht über das Trainings-Cutoff des Modells hinaus.",

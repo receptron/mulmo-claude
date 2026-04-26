@@ -12,7 +12,7 @@ describe("toSchedulerResult", () => {
     const result = toSchedulerResult(WORKSPACE_FILES.schedulerItems, JSON.stringify(items));
     assert.ok(result);
     assert.ok(result.data);
-    assert.equal(result.toolName, "manageScheduler");
+    assert.equal(result.toolName, "manageCalendar");
     assert.equal(result.message, WORKSPACE_FILES.schedulerItems);
     assert.equal(result.title, "Scheduler");
     assert.deepEqual(result.data.items, items);

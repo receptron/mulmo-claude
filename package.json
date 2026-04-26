@@ -56,7 +56,6 @@
     "@gui-chat-plugin/weather": "^0.1.0",
     "@mulmobridge/client": "^0.1.0",
     "@mulmocast/types": "^2.6.8",
-    "@mulmochat-plugin/form": "0.5.0",
     "@mulmochat-plugin/quiz": "0.4.0",
     "@mulmochat-plugin/ui-image": "^0.3.0",
     "@receptron/task-scheduler": "^0.1.0",
