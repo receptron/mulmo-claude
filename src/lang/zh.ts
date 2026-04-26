@@ -18,6 +18,7 @@ const zhMessages = {
     saved: "已保存",
     noResultsYet: "暂无结果",
     noImageYet: "暂无图片",
+    sendChat: "开启新对话",
   },
   sessionTabBar: {
     newSession: "新建会话",
@@ -312,6 +313,9 @@ const zhMessages = {
     runFailed: "运行失败: {error}",
     toggleFailed: "切换失败: {error}",
     deleteFailed: "删除失败: {error}",
+    detailsToggle: "显示详情",
+    promptLabel: "提示词",
+    roleLabel: "角色",
   },
   pluginCanvas: {
     undo: "撤销",
@@ -403,7 +407,6 @@ const zhMessages = {
     empty: "Wiki 为空。请让 Wiki 管理器采集一个数据源。",
     previewMore: "+ 还有 {count} 项…",
     chatPlaceholder: "就本页提问…",
-    chatSend: "就本页开启新对话",
     emptyPage: "页面「{title}」尚不存在。",
     emptyContent: "页面「{title}」已存在，但没有内容。",
     createPage: "请求创建此 Wiki 页面",
@@ -434,6 +437,7 @@ const zhMessages = {
     noBody: "无正文 — 请打开原文。",
     bodyError: "加载正文失败: {error}",
     loadError: "加载新闻失败: {error}",
+    chatPlaceholder: "就本文章随意提问",
   },
   pluginManageSource: {
     titlePlaceholder: "标题(可选)",
@@ -641,6 +645,7 @@ const zhMessages = {
   },
   app: {
     startConversation: "开始对话",
+    thinking: "思考中…",
   },
   suggestionsPanel: {
     suggestions: "建议",

@@ -66,6 +66,15 @@ Top-bar and panel-header controls share one sizing language. Use these exact cla
 
 Do NOT introduce new heights (`h-7`, `h-9`, `py-1.5`, etc.) or new gap values for chrome controls. The logo in `SidebarHeader` is the one sanctioned exception — it escapes row padding via negative margins (`-my-3.5`) because it's a brand mark, not a control.
 
+### UI references — anchor to testids and components
+
+Big-picture ASCII layouts of the major surfaces (top chrome, NotificationBell, /chat, /calendar, /automations, /wiki, /sources, /todos, /files) live at [`docs/ui-cheatsheet.md`](docs/ui-cheatsheet.md). Use it for:
+
+- **Naming a UI region in chat / PR / issue text**: prefer `[notification-badge]` / `<CalendarView>` / `(:wiki)` over "the bell" / "the calendar widget" / "the wiki page" — names are greppable, prose is not.
+- **Onboarding context**: when proposing UI changes, point at the matching block to disambiguate which component / route is in scope.
+
+When you rename a `data-testid`, restructure a layout, or add a new top-level surface, **update the matching ASCII block in `docs/ui-cheatsheet.md` in the same PR** — same discipline as updating tests when changing API. Out-of-date layout art is worse than no art; if you can't update it cleanly, delete the stale block instead of leaving it.
+
 ### i18n — all 8 locales in lockstep
 
 Supported UI locales live under `src/lang/`: `en.ts`, `ja.ts`, `zh.ts`, `ko.ts`, `es.ts`, `pt-BR.ts`, `fr.ts`, `de.ts`. `src/lang/en.ts` is the schema source of truth; `typeof enMessages` is threaded through `createI18n` in `src/lib/vue-i18n.ts`, so `vue-tsc` treats every missing or extra key as a type error.

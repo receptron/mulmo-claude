@@ -44,30 +44,6 @@
         <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
         <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
       </div>
-
-      <!-- Thinking indicator. `role="status"` + polite live region so
-           screen readers announce status updates (current tool, elapsed
-           tick) without yanking focus. Codex iter-1 #798 follow-up. -->
-      <div v-if="isRunning" class="px-2 py-1 text-sm" role="status" aria-live="polite">
-        <div class="flex items-center gap-2 text-gray-500">
-          <span class="text-xs">{{ statusMessage }}</span>
-          <span class="flex gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms" />
-            <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms" />
-            <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms" />
-          </span>
-          <span v-if="runElapsedMs !== null && runElapsedMs >= 1000" class="text-xs text-gray-400 tabular-nums" data-testid="run-elapsed">
-            · {{ formatElapsed(runElapsedMs) }}
-          </span>
-        </div>
-        <div v-if="pendingCalls.length > 0" class="mt-1 space-y-0.5">
-          <div v-for="call in pendingCalls" :key="call.toolUseId" class="flex items-center gap-1.5 text-xs text-gray-400">
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-300 shrink-0 animate-pulse" />
-            <span class="font-mono truncate">{{ call.toolName }}</span>
-            <span class="text-xs text-gray-300 tabular-nums shrink-0">· {{ formatElapsed(call.elapsedMs) }}</span>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -78,7 +54,6 @@ import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
 import { formatSmartTime } from "../utils/format/date";
-import { formatElapsed } from "../utils/agent/formatElapsed";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
 import type { LayoutMode } from "../utils/canvas/layoutMode";
 
@@ -89,29 +64,10 @@ function sourceLabel(result: ToolResultComplete): string {
   return result.toolName;
 }
 
-interface PendingCall {
-  toolUseId: string;
-  toolName: string;
-  // Milliseconds since the call started — driven by the 50ms tick in
-  // `usePendingCalls`, so the rendered "· 2.3s" badge updates without
-  // the consumer needing its own ticker.
-  elapsedMs: number;
-}
-
 defineProps<{
   results: ToolResultComplete[];
   selectedUuid: string | null;
   resultTimestamps: Map<string, number>;
-  isRunning: boolean;
-  statusMessage: string;
-  /**
-   * How long the active agent run has been going. `null` while idle
-   * (or for the first <1s, gated in the template so the badge appears
-   * only after a meaningful delay). Updates once per second via
-   * `useRunElapsed`.
-   */
-  runElapsedMs: number | null;
-  pendingCalls: PendingCall[];
   sessionRoleName?: string;
   sessionRoleIcon?: string;
   layoutMode: LayoutMode;

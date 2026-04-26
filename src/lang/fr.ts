@@ -14,6 +14,7 @@ const frMessages = {
     saved: "Enregistré",
     noResultsYet: "Aucun résultat pour le moment",
     noImageYet: "Aucune image pour le moment",
+    sendChat: "Démarrer une nouvelle conversation",
   },
   sessionTabBar: {
     newSession: "Nouvelle session",
@@ -312,6 +313,9 @@ const frMessages = {
     runFailed: "Échec de l'exécution : {error}",
     toggleFailed: "Échec du basculement : {error}",
     deleteFailed: "Échec de la suppression : {error}",
+    detailsToggle: "Afficher les détails",
+    promptLabel: "Prompt",
+    roleLabel: "Rôle",
   },
   pluginCanvas: {
     undo: "Annuler",
@@ -403,7 +407,6 @@ const frMessages = {
     empty: "Le wiki est vide. Demandez au Wiki Manager d'ingérer une source.",
     previewMore: "+ {count} de plus…",
     chatPlaceholder: "Posez une question sur cette page…",
-    chatSend: "Démarrer une nouvelle conversation sur cette page",
     emptyPage: "La page « {title} » n'existe pas encore.",
     emptyContent: "La page « {title} » existe mais n'a pas de contenu.",
     createPage: "Demander la création de cette page wiki",
@@ -434,6 +437,7 @@ const frMessages = {
     noBody: "Pas de contenu — ouvre l'article original.",
     bodyError: "Échec du chargement du contenu : {error}",
     loadError: "Échec du chargement des actualités : {error}",
+    chatPlaceholder: "Posez toute question sur cet article",
   },
   pluginManageSource: {
     titlePlaceholder: "Titre (facultatif)",
@@ -639,6 +643,7 @@ const frMessages = {
   },
   app: {
     startConversation: "Démarrer une conversation",
+    thinking: "Réflexion…",
   },
   suggestionsPanel: {
     suggestions: "Suggestions",

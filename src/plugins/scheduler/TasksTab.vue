@@ -104,10 +104,35 @@
             <span v-if="task.state?.nextScheduledAt">{{ t("pluginSchedulerTasks.nextRun", { time: formatShortTime(task.state.nextScheduledAt) }) }}</span>
           </div>
 
-          <!-- Description -->
-          <div v-if="task.description" class="mt-1 text-xs text-gray-400 truncate">
+          <!-- Description (full, not truncated — users need to know what
+               each task actually does). System tasks have only this
+               line; user / skill tasks have an expandable details
+               block below with the prompt + role. -->
+          <div v-if="task.description" class="mt-1 text-xs text-gray-500 whitespace-pre-line">
             {{ task.description }}
           </div>
+
+          <!-- Prompt + role (user / skill tasks only). Collapsed by
+               default to keep the list compact; click to inspect. -->
+          <details v-if="task.prompt" class="mt-2" :data-testid="`scheduler-task-details-${task.id}`">
+            <summary class="text-xs text-gray-500 cursor-pointer select-none hover:text-gray-700">
+              {{ t("pluginSchedulerTasks.detailsToggle") }}
+            </summary>
+            <div class="mt-1.5 space-y-1.5 ml-4">
+              <div v-if="task.roleId" class="text-xs text-gray-600">
+                <span class="font-medium">{{ t("pluginSchedulerTasks.roleLabel") }}:</span>
+                <code class="ml-1 px-1 py-0.5 rounded bg-gray-100 text-gray-700">{{ task.roleId }}</code>
+              </div>
+              <div class="text-xs text-gray-600">
+                <div class="font-medium mb-0.5">{{ t("pluginSchedulerTasks.promptLabel") }}:</div>
+                <pre
+                  class="px-2 py-1.5 rounded bg-gray-50 border border-gray-200 text-gray-700 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed"
+                  :data-testid="`scheduler-task-prompt-${task.id}`"
+                  >{{ task.prompt }}</pre
+                >
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </div>
@@ -146,6 +171,12 @@ interface SchedulerTask {
   origin: string;
   enabled?: boolean;
   state?: TaskState;
+  // user / skill tasks carry the agent prompt + role on the wire;
+  // system tasks omit them (their "what does this do" is the
+  // description text plus the source code behind the id).
+  prompt?: string;
+  roleId?: string;
+  missedRunPolicy?: string;
 }
 
 // Hints showing common task cadences. Stored as structured schedules

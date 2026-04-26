@@ -6,14 +6,14 @@ import { computed, nextTick, watch, type ComputedRef, type Ref } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 export function useChatScroll(opts: {
-  toolResultsPanelRef: Ref<{ root: HTMLDivElement | null } | null>;
+  sessionSidebarRef: Ref<{ root: HTMLDivElement | null } | null>;
   toolResults: ComputedRef<ToolResultComplete[]>;
   isRunning: ComputedRef<boolean>;
   chatInputRef: Ref<{ focus: () => void } | null>;
 }) {
-  const { toolResultsPanelRef, toolResults, isRunning, chatInputRef } = opts;
+  const { sessionSidebarRef, toolResults, isRunning, chatInputRef } = opts;
 
-  const chatListRef = computed(() => toolResultsPanelRef.value?.root ?? null);
+  const chatListRef = computed(() => sessionSidebarRef.value?.root ?? null);
   // Key that changes both on new results AND on streaming updates to
   // the last text card (which appends in place, leaving length stable).
   const latestResultScrollKey = computed(() => {

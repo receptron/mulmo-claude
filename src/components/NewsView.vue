@@ -88,36 +88,47 @@
       </div>
 
       <!-- Detail pane -->
-      <div class="flex-1 min-w-0 overflow-y-auto" data-testid="news-detail">
-        <div v-if="!selected" class="h-full flex items-center justify-center text-sm text-gray-400">
+      <div class="flex-1 min-w-0 flex flex-col" data-testid="news-detail">
+        <div v-if="!selected" class="flex-1 flex items-center justify-center text-sm text-gray-400">
           {{ t("pluginNews.selectPrompt") }}
         </div>
-        <div v-else class="px-6 py-4 max-w-3xl">
-          <h2 class="text-xl font-semibold text-gray-900 leading-snug">{{ selected.title }}</h2>
-          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-            <span>{{ selected.sourceSlug }}</span>
-            <span>{{ formatSmartTime(selected.publishedAt) }}</span>
-            <span v-for="cat in selected.categories" :key="cat" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-              {{ cat }}
-            </span>
+        <template v-else>
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            <div class="px-6 py-4 max-w-3xl">
+              <h2 class="text-xl font-semibold text-gray-900 leading-snug">{{ selected.title }}</h2>
+              <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                <span>{{ selected.sourceSlug }}</span>
+                <span>{{ formatSmartTime(selected.publishedAt) }}</span>
+                <span v-for="cat in selected.categories" :key="cat" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                  {{ cat }}
+                </span>
+              </div>
+              <a
+                :href="selected.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                data-testid="news-open-original"
+              >
+                <span class="material-icons text-sm">open_in_new</span>
+                {{ t("pluginNews.openOriginal") }}
+              </a>
+              <div class="mt-4">
+                <div v-if="bodyLoading" class="text-sm text-gray-400">{{ t("common.loading") }}</div>
+                <div v-else-if="bodyError" class="text-sm text-red-600">{{ t("pluginNews.bodyError", { error: bodyError }) }}</div>
+                <div v-else-if="!body" class="text-sm text-gray-400 italic">{{ t("pluginNews.noBody") }}</div>
+                <div v-else class="markdown-content prose prose-slate max-w-none" v-html="renderedBody"></div>
+              </div>
+            </div>
           </div>
-          <a
-            :href="selected.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            data-testid="news-open-original"
-          >
-            <span class="material-icons text-sm">open_in_new</span>
-            {{ t("pluginNews.openOriginal") }}
-          </a>
-          <div class="mt-4">
-            <div v-if="bodyLoading" class="text-sm text-gray-400">{{ t("common.loading") }}</div>
-            <div v-else-if="bodyError" class="text-sm text-red-600">{{ t("pluginNews.bodyError", { error: bodyError }) }}</div>
-            <div v-else-if="!body" class="text-sm text-gray-400 italic">{{ t("pluginNews.noBody") }}</div>
-            <div v-else class="markdown-content prose prose-slate max-w-none" v-html="renderedBody"></div>
-          </div>
-        </div>
+          <PageChatComposer
+            :key="selected.id"
+            :placeholder="t('pluginNews.chatPlaceholder')"
+            :prepend-text="`Read this article. ${selected.url}`"
+            :allow-empty="true"
+            test-id-prefix="news-page-chat"
+          />
+        </template>
       </div>
     </div>
   </div>
@@ -134,6 +145,7 @@ import { formatSmartTime } from "../utils/format/date";
 import { useNewsItems } from "../composables/useNewsItems";
 import { useNewsReadState } from "../composables/useNewsReadState";
 import FilterChip from "./FilterChip.vue";
+import PageChatComposer from "./PageChatComposer.vue";
 
 const { t } = useI18n();
 const route = useRoute();

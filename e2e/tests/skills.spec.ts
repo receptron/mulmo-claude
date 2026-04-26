@@ -196,8 +196,10 @@ test.describe("manageSkills plugin", () => {
     await expect(page.getByTestId("skill-body-rendered")).toContainText("CI Enable");
     await page.getByTestId("skill-run-btn").click();
 
-    // Run button routes through App.vue's sendMessage via the
-    // useAppApi() provide/inject contract (#227). The slash command
+    // Run button routes through App.vue's startNewChat via the
+    // useAppApi() provide/inject contract (#227) — startNewChat (not
+    // sendMessage) so the user is routed to /chat to see the response,
+    // since Skills view is only rendered on /skills. The slash command
     // form (`/<name>`) is what Claude CLI resolves against
     // ~/.claude/skills/ natively, so we don't need to ship the body.
     await expect.poll(() => agentPosts.length, { timeout: 5 * ONE_SECOND_MS }).toBeGreaterThan(0);

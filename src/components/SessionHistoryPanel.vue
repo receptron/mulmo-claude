@@ -44,7 +44,7 @@
         @keydown.space.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
       >
         <!-- Timestamp pill straddling the top border, mirroring the
-             ToolResultsPanel card design. The running indicator
+             SessionSidebar card design. The running indicator
              still renders inline in the meta line below (it's a
              status, not a time); unread is signalled solely through
              previewClasses (bold text). -->

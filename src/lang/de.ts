@@ -14,6 +14,7 @@ const deMessages = {
     saved: "Gespeichert",
     noResultsYet: "Noch keine Ergebnisse",
     noImageYet: "Noch kein Bild",
+    sendChat: "Neuen Chat starten",
   },
   sessionTabBar: {
     newSession: "Neue Sitzung",
@@ -312,6 +313,9 @@ const deMessages = {
     runFailed: "Ausführung fehlgeschlagen: {error}",
     toggleFailed: "Umschalten fehlgeschlagen: {error}",
     deleteFailed: "Löschen fehlgeschlagen: {error}",
+    detailsToggle: "Details anzeigen",
+    promptLabel: "Prompt",
+    roleLabel: "Rolle",
   },
   pluginCanvas: {
     undo: "Rückgängig",
@@ -403,7 +407,6 @@ const deMessages = {
     empty: "Das Wiki ist leer. Bitten Sie den Wiki Manager, eine Quelle einzulesen.",
     previewMore: "+ {count} weitere…",
     chatPlaceholder: "Fragen Sie zu dieser Seite…",
-    chatSend: "Neuen Chat zu dieser Seite starten",
     emptyPage: "Die Seite „{title}“ existiert noch nicht.",
     emptyContent: "Die Seite „{title}“ existiert, hat aber keinen Inhalt.",
     createPage: "Erstellung dieser Wiki-Seite anfordern",
@@ -435,6 +438,7 @@ const deMessages = {
     noBody: "Kein Inhalt verfügbar — öffne den Originalartikel.",
     bodyError: "Inhalt konnte nicht geladen werden: {error}",
     loadError: "Nachrichten konnten nicht geladen werden: {error}",
+    chatPlaceholder: "Fragen Sie alles zu diesem Artikel",
   },
   pluginManageSource: {
     titlePlaceholder: "Titel (optional)",
@@ -641,6 +645,7 @@ const deMessages = {
   },
   app: {
     startConversation: "Gespräch beginnen",
+    thinking: "Denkt nach…",
   },
   suggestionsPanel: {
     suggestions: "Vorschläge",

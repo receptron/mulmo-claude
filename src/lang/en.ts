@@ -34,6 +34,7 @@ const enMessages = {
     saved: "Saved",
     noResultsYet: "No results yet",
     noImageYet: "No image yet",
+    sendChat: "Start a new chat",
   },
   sessionTabBar: {
     newSession: "New session",
@@ -332,6 +333,9 @@ const enMessages = {
     runFailed: "Run failed: {error}",
     toggleFailed: "Toggle failed: {error}",
     deleteFailed: "Delete failed: {error}",
+    detailsToggle: "Show details",
+    promptLabel: "Prompt",
+    roleLabel: "Role",
   },
   pluginCanvas: {
     undo: "Undo",
@@ -423,7 +427,6 @@ const enMessages = {
     empty: "Wiki is empty. Ask the Wiki Manager to ingest a source.",
     previewMore: "+ {count} more…",
     chatPlaceholder: "Ask about this page…",
-    chatSend: "Start a new chat about this page",
     emptyPage: 'The page "{title}" does not exist yet.',
     emptyContent: 'The page "{title}" exists but has no content.',
     createPage: "Request creation of this wiki page",
@@ -454,6 +457,7 @@ const enMessages = {
     noBody: "No body available — open the original article.",
     bodyError: "Failed to load body: {error}",
     loadError: "Failed to load news: {error}",
+    chatPlaceholder: "Ask anything about this article",
   },
   pluginManageSource: {
     titlePlaceholder: "Title (optional)",
@@ -661,6 +665,7 @@ const enMessages = {
   },
   app: {
     startConversation: "Start a conversation",
+    thinking: "Thinking…",
   },
   suggestionsPanel: {
     suggestions: "Suggestions",

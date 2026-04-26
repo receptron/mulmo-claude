@@ -289,12 +289,13 @@ async function saveEdit(): Promise<void> {
 // Run = send the skill invocation as a Claude Code slash command.
 // Claude CLI already knows about every ~/.claude/skills/<name>/SKILL.md
 // at spawn, so sending `/<name>` is enough — no need to ship the body.
-// Routes through App.vue's sendMessage via provide/inject (#227).
+// Uses startNewChat (not sendMessage) so the user is routed to /chat
+// to see the response — Skills view is only rendered on /skills.
 const appApi = useAppApi();
 
 function runSkill(): void {
   if (!selectedName.value) return;
-  appApi.sendMessage(`/${selectedName.value}`);
+  appApi.startNewChat(`/${selectedName.value}`);
 }
 
 // Delete is project-scope only — see saveProjectSkill / deleteProjectSkill

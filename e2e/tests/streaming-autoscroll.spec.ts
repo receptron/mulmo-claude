@@ -121,7 +121,7 @@ async function scrollMetrics(page: Page, testId: string): Promise<{ scrollTop: n
 // rounding and late iframe sizing can leave a handful of pixels.
 const BOTTOM_TOLERANCE_PX = 50;
 
-// The sidebar ToolResultsPanel only renders preview titles for each
+// The sidebar SessionSidebar only renders preview titles for each
 // result, so long streamed text never makes it overflow — the
 // streaming bug wasn't observable there in practice. StackView on
 // the other hand renders the full message body, where the stalled

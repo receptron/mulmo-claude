@@ -196,4 +196,56 @@ test.describe("presentMulmoScript plugin", () => {
   // suite (the Update button fetch was occasionally never seen by the
   // per-test mock even though it passed in isolation), so the check
   // lives in manual testing rather than gating CI.
+
+  // Regression for #839 + the in-PR follow-up. The slide view must
+  // light up the shared ThinkingIndicator while the active session
+  // has a chat turn in flight — same signal the chat sidebar uses,
+  // not just the slide-local generation flags.
+  test("ThinkingIndicator lights up when the active session is running", async ({ page }) => {
+    // Override only the session-list endpoint so mulmo-session
+    // reports isRunning=true. setupScriptSession (in beforeEach)
+    // already mocks everything else; calling mockAllApis again
+    // would clobber the script transcript route. Playwright routes
+    // are LIFO, so this added handler takes precedence.
+    await page.route(
+      (url) => url.pathname === "/api/sessions",
+      (route) => {
+        return route.fulfill({
+          json: {
+            sessions: [
+              {
+                id: "mulmo-session",
+                title: "Mulmo Session",
+                roleId: "general",
+                startedAt: "2026-04-12T10:00:00Z",
+                updatedAt: "2026-04-12T10:05:00Z",
+                isRunning: true,
+              },
+            ],
+            cursor: "v1:0",
+            deletedIds: [],
+          },
+        });
+      },
+    );
+
+    await page.goto("/chat/mulmo-session");
+    await page.getByText(SCRIPT_TITLE).first().click();
+    await expect(page.getByRole("heading", { name: SCRIPT_TITLE, level: 2 })).toBeVisible();
+
+    // The indicator lives in the chat sidebar (above ChatInput),
+    // not inside the slide view itself — App.vue is now the
+    // canonical mount slot.
+    //
+    // Two complementary assertions:
+    //   1. Page-wide count == 1 catches duplicate role=status
+    //      regions reappearing anywhere in the DOM (Codex iter-1).
+    //   2. The sidebar-scoped lookup pins the canonical mount slot
+    //      so a stray copy outside the sidebar would still fail
+    //      the count check above (Codex iter-2/3).
+    await expect(page.getByTestId("thinking-indicator")).toHaveCount(1);
+    const sidebarIndicator = page.getByTestId("chat-sidebar").getByTestId("thinking-indicator");
+    await expect(sidebarIndicator).toBeVisible();
+    await expect(sidebarIndicator).toContainText("Thinking");
+  });
 });

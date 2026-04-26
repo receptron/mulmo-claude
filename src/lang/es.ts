@@ -19,6 +19,7 @@ const esMessages = {
     saved: "Guardado",
     noResultsYet: "Aún no hay resultados",
     noImageYet: "Aún no hay imagen",
+    sendChat: "Iniciar un chat nuevo",
   },
   sessionTabBar: {
     newSession: "Nueva sesión",
@@ -318,6 +319,9 @@ const esMessages = {
     runFailed: "Error al ejecutar: {error}",
     toggleFailed: "Error al alternar: {error}",
     deleteFailed: "Error al eliminar: {error}",
+    detailsToggle: "Mostrar detalles",
+    promptLabel: "Prompt",
+    roleLabel: "Rol",
   },
   pluginCanvas: {
     undo: "Deshacer",
@@ -409,7 +413,6 @@ const esMessages = {
     empty: "El wiki está vacío. Pide al Wiki Manager que ingiera una fuente.",
     previewMore: "+ {count} más…",
     chatPlaceholder: "Pregunta sobre esta página…",
-    chatSend: "Iniciar un chat nuevo sobre esta página",
     emptyPage: 'La página "{title}" aún no existe.',
     emptyContent: 'La página "{title}" existe pero no tiene contenido.',
     createPage: "Solicitar la creación de esta página wiki",
@@ -440,6 +443,7 @@ const esMessages = {
     noBody: "Sin cuerpo — abre el artículo original.",
     bodyError: "No se pudo cargar el contenido: {error}",
     loadError: "No se pudieron cargar las noticias: {error}",
+    chatPlaceholder: "Pregunta lo que quieras sobre este artículo",
   },
   pluginManageSource: {
     titlePlaceholder: "Título (opcional)",
@@ -647,6 +651,7 @@ const esMessages = {
   },
   app: {
     startConversation: "Inicia una conversación",
+    thinking: "Pensando…",
   },
   suggestionsPanel: {
     suggestions: "Sugerencias",

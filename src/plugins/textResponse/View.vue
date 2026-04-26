@@ -55,6 +55,8 @@ import { classifyWorkspacePath } from "../../utils/path/workspaceLinkRouter";
 import { useAppApi } from "../../composables/useAppApi";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
+import { buildPdfFilename } from "../../utils/files/filename";
+import { extractTextResponseTitle } from "./utils";
 
 const { t } = useI18n();
 const appApi = useAppApi();
@@ -218,7 +220,11 @@ async function copyText() {
 
 async function downloadPdf() {
   const text = props.selectedResult.data?.text ?? "";
-  const filename = `${props.selectedResult.title ?? "response"}.pdf`;
+  const filename = buildPdfFilename({
+    name: extractTextResponseTitle(text),
+    fallback: "chat",
+    timestampMs: appApi.getResultTimestamp(props.selectedResult.uuid),
+  });
   await rawDownloadPdf(text, filename);
 }
 </script>
