@@ -19,6 +19,7 @@ const jaMessages = {
     saved: "保存しました",
     noResultsYet: "まだ結果はありません",
     noImageYet: "画像はまだありません",
+    sendChat: "新しいチャットを開始",
   },
   sessionTabBar: {
     newSession: "新しいセッション",
@@ -369,7 +370,6 @@ const jaMessages = {
     empty: "Wiki は空です。Wiki Manager にソースの取り込みを依頼してください。",
     previewMore: "+ {count} 件…",
     chatPlaceholder: "このページについて質問…",
-    chatSend: "このページについて新しいチャットを開始",
     emptyPage: "「{title}」のページはまだありません。",
     emptyContent: "「{title}」のページは存在しますが、内容がありません。",
     createPage: "この Wiki ページの作成をお願いする",
@@ -400,6 +400,7 @@ const jaMessages = {
     noBody: "本文がありません — 元の記事を開いてください。",
     bodyError: "本文の取得に失敗: {error}",
     loadError: "ニュースの取得に失敗: {error}",
+    chatPlaceholder: "この記事について何でも質問",
   },
   pluginManageSource: {
     titlePlaceholder: "タイトル（省略可）",

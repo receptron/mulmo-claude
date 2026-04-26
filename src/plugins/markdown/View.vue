@@ -68,7 +68,8 @@ import { usePdfDownload } from "../../composables/usePdfDownload";
 import { apiGet, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
-import { toSafeFilename } from "../../utils/files/filename";
+import { buildPdfFilename } from "../../utils/files/filename";
+import { useAppApi } from "../../composables/useAppApi";
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -77,6 +78,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   updateResult: [result: ToolResult<MarkdownToolData>];
 }>();
+
+const appApi = useAppApi();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -190,9 +193,14 @@ const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload
 async function downloadPdf() {
   if (!markdownContent.value) return;
   const prefix = props.selectedResult.data?.filenamePrefix;
-  const rawName = prefix || props.selectedResult.title || "document";
-  const title = toSafeFilename(rawName, "document");
-  await rawDownloadPdf(markdownContent.value, `${title}.pdf`);
+  const rawName = prefix || props.selectedResult.title || "";
+  const uuid = props.selectedResult.uuid;
+  const filename = buildPdfFilename({
+    name: rawName,
+    fallback: "document",
+    timestampMs: uuid ? appApi.getResultTimestamp(uuid) : undefined,
+  });
+  await rawDownloadPdf(markdownContent.value, filename);
 }
 
 async function applyMarkdown() {
