@@ -97,7 +97,19 @@
                      so the inline error block stays the single
                      source of truth (and so the e2e can submit an
                      empty form to exercise the validation path). -->
+                <select
+                  v-if="field.kind === 'select'"
+                  :id="`mcp-config-${entry.id}-${field.key}`"
+                  v-model="configFormValues[field.key]"
+                  :aria-required="field.required"
+                  :class="['w-full px-2 py-1 text-xs border rounded', configFormErrors.includes(field.key) ? 'border-red-400 bg-red-50' : 'border-gray-300']"
+                  :data-testid="`mcp-catalog-config-input-${entry.id}-${field.key}`"
+                >
+                  <option v-if="!field.required" value="">{{ field.placeholder ?? "" }}</option>
+                  <option v-for="option in field.options ?? []" :key="option" :value="option">{{ option }}</option>
+                </select>
                 <input
+                  v-else
                   :id="`mcp-config-${entry.id}-${field.key}`"
                   v-model="configFormValues[field.key]"
                   :type="configFieldInputType(field)"
@@ -397,7 +409,7 @@ function onConfigFormInstall(entry: McpCatalogEntry): void {
   const result = interpolateMcpSpec(entry.spec, configFormValues.value, requiredKeysOf(entry));
   if (!result.ok) {
     configFormErrors.value = result.missing;
-    persistDraftToStorage(entry.id, configFormValues.value);
+    persistDraftToStorage(entry.id, configFormValues.value, entry.configSchema);
     return;
   }
   emit("add", { id: entry.id, spec: { ...result.spec, enabled: true } });
@@ -423,9 +435,21 @@ function readDraftFromStorage(entryId: string): Record<string, string> {
   }
 }
 
-function persistDraftToStorage(entryId: string, values: Record<string, string>): void {
+function persistDraftToStorage(entryId: string, values: Record<string, string>, schema: McpConfigField[]): void {
+  // SECRET HYGIENE (Codex iter-1 #852): never write `kind: "secret"`
+  // values to localStorage. Plaintext API keys would survive cancel
+  // / reload outside the encrypted mcp.json path and remain
+  // recoverable via dev tools / XSS. Non-secret fields (host id,
+  // workspace path, etc.) keep their draft so a missing-field
+  // re-submission doesn't clobber the user's other typing.
+  const secretKeys = new Set(schema.filter((field) => field.kind === "secret").map((field) => field.key));
+  const safeValues: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (secretKeys.has(key)) continue;
+    safeValues[key] = value;
+  }
   try {
-    window.localStorage.setItem(CONFIG_DRAFT_LS_PREFIX + entryId, JSON.stringify(values));
+    window.localStorage.setItem(CONFIG_DRAFT_LS_PREFIX + entryId, JSON.stringify(safeValues));
   } catch {
     // localStorage can throw in private browsing or when full — silent
     // no-op; draft just won't survive the page reload.
@@ -441,6 +465,10 @@ function clearDraftFromStorage(entryId: string): void {
 }
 
 function configFieldInputType(field: McpConfigField): string {
+  // `select` is rendered as a <select> element, not <input>, so this
+  // helper is only ever called for input-rendered kinds. `path` falls
+  // through to plain text for now — file-picker UX is out of scope
+  // for Phase 2 (Codex iter-1 #852, partial).
   if (field.kind === "secret") return "password";
   if (field.kind === "url") return "url";
   return "text";

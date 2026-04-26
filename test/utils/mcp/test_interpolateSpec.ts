@@ -135,3 +135,62 @@ describe("interpolateMcpSpec — passthrough", () => {
     assert.equal(out.spec.env, undefined);
   });
 });
+
+describe("interpolateMcpSpec — required-key drift guard (Codex iter-1 #852)", () => {
+  it("flags a required key that is never referenced in the template", () => {
+    // Catalog-author mistake: form schema declares a required
+    // NOTION_API_KEY field but the spec template forgot to consume
+    // it (no `${NOTION_API_KEY}` anywhere). Pre-fix the install
+    // succeeded silently and the user's value was simply discarded.
+    // The fix flags the drift through the same missing-fields
+    // error path the UI already renders.
+    const template: McpServerSpec = {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@example/notion-mcp"],
+      // No env, no `${NOTION_API_KEY}` placeholder anywhere.
+    };
+    const out = interpolateMcpSpec(template, { NOTION_API_KEY: "secret_abc" }, new Set(["NOTION_API_KEY"]));
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    assert.deepEqual(out.missing, ["NOTION_API_KEY"]);
+  });
+
+  it("accepts a required key that IS referenced (happy path)", () => {
+    const template: McpServerSpec = {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@example/notion-mcp"],
+      env: { NOTION_API_KEY: "${NOTION_API_KEY}" },
+    };
+    const out = interpolateMcpSpec(template, { NOTION_API_KEY: "secret_abc" }, new Set(["NOTION_API_KEY"]));
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    if (out.spec.type !== "stdio") return;
+    assert.equal(out.spec.env?.NOTION_API_KEY, "secret_abc");
+  });
+
+  it("flags BOTH unreferenced-required AND empty-required at once", () => {
+    // Spec references PORT but not API_KEY. User leaves PORT blank.
+    // Both should surface in `missing` so the UI shows the catalog
+    // drift AND the user oversight together — no progressive nag.
+    const template: McpServerSpec = {
+      type: "http",
+      url: "https://example.test:${PORT}/mcp",
+    };
+    const out = interpolateMcpSpec(template, { PORT: "" }, new Set(["PORT", "API_KEY"]));
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    const missingSet = new Set(out.missing);
+    assert.equal(missingSet.has("PORT"), true);
+    assert.equal(missingSet.has("API_KEY"), true);
+  });
+
+  it("does NOT flag optional keys that are never referenced", () => {
+    // Optional placeholders may legitimately not appear in some
+    // spec templates. The drift guard only fires for required keys.
+    const template: McpServerSpec = { type: "stdio", command: "npx", args: ["-y", "x"] };
+    const out = interpolateMcpSpec(template, {}, new Set());
+    assert.equal(out.ok, true);
+  });
+});
