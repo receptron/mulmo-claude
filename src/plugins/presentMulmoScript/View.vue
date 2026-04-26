@@ -45,6 +45,12 @@
       </div>
     </div>
 
+    <!-- Shared Thinking indicator (matches the chat sidebar). Only
+         renders while a generation is in flight; the dot animation +
+         status text reassures the user that the long-running movie /
+         beat / character / audio job is still alive. -->
+    <ThinkingIndicator v-if="busyStatus" :status-message="busyStatus" class="px-6 border-b border-gray-100 shrink-0" />
+
     <!-- Characters section -->
     <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-3">
       <div class="flex items-center justify-between mb-2">
@@ -353,6 +359,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import ThinkingIndicator from "../../components/ThinkingIndicator.vue";
 
 const { t } = useI18n();
 import type { MulmoScriptData } from "./index";
@@ -442,6 +449,19 @@ const charDragOver = reactive<Record<string, boolean>>({});
 const beatDragOver = reactive<Record<number, boolean>>({});
 
 const anyBeatRendering = computed(() => Object.values(renderState).some((state) => state === "rendering"));
+const anyCharRendering = computed(() => Object.values(charRenderState).some((state) => state === "rendering"));
+const anyAudioGenerating = computed(() => Object.values(audioState).some((state) => state === "generating"));
+
+// Drives the shared ThinkingIndicator. Picks the most specific
+// label so the user can tell *what* is in flight rather than just
+// "busy" — order mirrors how long each operation typically takes.
+const busyStatus = computed<string | null>(() => {
+  if (movieGenerating.value) return t("pluginMulmoScript.statusGeneratingMovie");
+  if (anyBeatRendering.value) return t("pluginMulmoScript.statusGeneratingBeats");
+  if (anyCharRendering.value) return t("pluginMulmoScript.statusGeneratingCharacters");
+  if (anyAudioGenerating.value) return t("pluginMulmoScript.statusGeneratingAudio");
+  return null;
+});
 
 const characterKeys = computed(() => {
   const imgs = script.value.imageParams?.images ?? {};
