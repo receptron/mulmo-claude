@@ -613,6 +613,7 @@ const koMessages = {
   },
   app: {
     startConversation: "대화 시작",
+    thinking: "생각 중…",
   },
   suggestionsPanel: {
     suggestions: "추천",

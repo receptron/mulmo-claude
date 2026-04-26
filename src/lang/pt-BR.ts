@@ -605,6 +605,7 @@ const ptBRMessages = {
   },
   app: {
     startConversation: "Iniciar uma conversa",
+    thinking: "Pensando…",
   },
   suggestionsPanel: {
     suggestions: "Sugestões",

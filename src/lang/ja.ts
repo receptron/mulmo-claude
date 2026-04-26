@@ -613,6 +613,7 @@ const jaMessages = {
   },
   app: {
     startConversation: "会話を開始してください",
+    thinking: "考え中…",
   },
   suggestionsPanel: {
     suggestions: "候補",

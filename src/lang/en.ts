@@ -629,6 +629,7 @@ const enMessages = {
   },
   app: {
     startConversation: "Start a conversation",
+    thinking: "Thinking…",
   },
   suggestionsPanel: {
     suggestions: "Suggestions",

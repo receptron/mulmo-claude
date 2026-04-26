@@ -104,13 +104,15 @@
           @toggle-right-sidebar="toggleRightSidebar"
         />
 
-        <!-- DEBUG: always-on Thinking indicator above the chat input
-             so the user can confirm the placement is correct. Switch
-             to v-if="activeSessionRunning" once verified. -->
-        <ThinkingIndicator :status-message="'DEBUG: always-on (single layout)'" class="border-t border-gray-100 bg-yellow-50" />
-
         <!-- Sample queries (expandable pane) -->
         <SuggestionsPanel ref="suggestionsPanelRef" :queries="sessionRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
+
+        <!-- Shared Thinking indicator. Sits between the suggestions
+             panel and the chat input so the user gets the same
+             "still alive" cue regardless of which plugin view fills
+             the canvas (the sidebar copy inside ToolResultsPanel
+             scrolls with results and can fall below the fold). -->
+        <ThinkingIndicator v-if="activeSessionRunning" :status-message="t('app.thinking')" class="border-t border-gray-100" />
 
         <!-- Text input -->
         <ChatInput
@@ -172,8 +174,8 @@
         <!-- Bottom bar (Stack chat only — plugin views have no
              session context, so no chat input is shown) -->
         <div v-if="isChatPage && layoutMode === 'stack'" class="border-t border-gray-200 bg-white shrink-0">
-          <ThinkingIndicator :status-message="'DEBUG: always-on (stack layout)'" class="bg-yellow-50" />
           <SuggestionsPanel ref="suggestionsPanelRef" :queries="sessionRole.queries ?? []" @send="(q) => sendMessage(q)" @edit="onQueryEdit" />
+          <ThinkingIndicator v-if="activeSessionRunning" :status-message="t('app.thinking')" class="border-t border-gray-100" />
           <ChatInput
             ref="chatInputRef"
             v-model="userInput"
