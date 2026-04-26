@@ -235,13 +235,16 @@ test.describe("presentMulmoScript plugin", () => {
 
     // The indicator lives in the chat sidebar (above ChatInput),
     // not inside the slide view itself — App.vue is now the
-    // canonical mount slot. Scope to the sidebar wrapper so a
-    // misplaced copy elsewhere in the DOM (e.g. somebody re-adding
-    // one to ToolResultsPanel or to the slide view) wouldn't
-    // satisfy this assertion. `toHaveCount(1)` further guards the
-    // role=status uniqueness Codex iter-1 flagged.
+    // canonical mount slot.
+    //
+    // Two complementary assertions:
+    //   1. Page-wide count == 1 catches duplicate role=status
+    //      regions reappearing anywhere in the DOM (Codex iter-1).
+    //   2. The sidebar-scoped lookup pins the canonical mount slot
+    //      so a stray copy outside the sidebar would still fail
+    //      the count check above (Codex iter-2/3).
+    await expect(page.getByTestId("thinking-indicator")).toHaveCount(1);
     const sidebarIndicator = page.getByTestId("chat-sidebar").getByTestId("thinking-indicator");
-    await expect(sidebarIndicator).toHaveCount(1);
     await expect(sidebarIndicator).toBeVisible();
     await expect(sidebarIndicator).toContainText("Thinking");
   });
