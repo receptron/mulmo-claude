@@ -211,6 +211,107 @@ const koMessages = {
     pdfPreview: "PDF 미리보기",
     parseError: "파싱 오류",
   },
+  systemFiles: {
+    showDetails: "상세",
+    hideDetails: "닫기",
+    schemaLabel: "스키마",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "에이전트 관리 (수동 편집 가능)",
+      "user-editable": "사용자 편집 가능",
+      "agent-managed": "에이전트 관리",
+      "fragile-format": "포맷 민감",
+      ephemeral: "런타임 상태 — 편집 불필요",
+    },
+    interests: {
+      title: "뉴스 알림 필터 프로필",
+      summary:
+        "알림 벨용 기사 점수 산정에 사용되는 파일입니다. 채팅에서 관심 주제를 언급하면 에이전트가 업데이트합니다. 수동 편집도 가능하며, 검증은 느슨하여 잘못된 항목은 조용히 무시됩니다.",
+    },
+    mcp: {
+      title: "MCP 서버 등록부",
+      summary:
+        "에이전트에 노출되는 외부 MCP 서버 설정입니다. 설정 → MCP 에서 편집할 수 있고 JSON 직접 편집도 지원합니다. stdio 서버는 샌드박스 이미지에서 실행되므로 Docker 모드에서는 경로가 워크스페이스 상대여야 합니다.",
+    },
+    settings: {
+      title: "앱 설정",
+      summary:
+        "워크스페이스 단위의 앱 설정으로 에이전트 호출마다 다시 로드됩니다. 현재는 extra allowed-tools 항목 (예: Claude Code 내장 MCP 접두어)을 보관합니다.",
+    },
+    schedulerTasks: {
+      title: "사용자 정의 자동화",
+      summary:
+        "에이전트가 만들었거나 사용자가 작성한 예약 작업. Automations 페이지에서 편집을 권장하지만 JSON 직접 편집도 지원됩니다. 변경 시 에이전트가 다시 쓰는 점에 유의하세요.",
+    },
+    schedulerOverrides: {
+      title: "작업별 스케줄 오버라이드",
+      summary: "tasks.json 위에 적용되는 수동 disable/snooze 플래그. UI 에서 자동화를 토글하면 에이전트가 갱신합니다.",
+    },
+    newsReadState: {
+      title: "알림 읽음 상태",
+      summary: "벨이 중복 알림하지 않도록 본 뉴스 항목을 추적합니다. 순수 런타임 상태이므로 삭제해도 안전합니다 — 한 차례의 재알림이 발생할 뿐입니다.",
+    },
+    schedulerItems: {
+      title: "캘린더 항목",
+      summary: "Calendar 뷰에 표시되는 일정. 채팅을 통해 에이전트가 작성합니다. JSON 수동 편집은 가능하지만 에이전트가 다시 쓰면 변경 사항이 사라집니다.",
+    },
+    todosItems: {
+      title: "Todo 칸반",
+      summary: "Todos 페이지에 표시되는 작업. 채팅 지시에 따라 에이전트가 읽고 씁니다. 수동 편집도 지원됩니다.",
+    },
+    todosColumns: {
+      title: "Todo 칸반 컬럼",
+      summary: "Todo 칸반의 컬럼 정의 (id, 제목, 색상). 사용자 소유 파일이므로 자유롭게 편집해 보드를 재구성할 수 있습니다.",
+    },
+    wikiIndex: {
+      title: "Wiki 인덱스",
+      summary: "Wiki 의 자동 생성 목차. 페이지 집합으로부터 에이전트가 재구성하므로 수동 편집은 다음 인덱스 처리에서 사라집니다.",
+    },
+    wikiLog: {
+      title: "Wiki 편집 로그",
+      summary: "Wiki 편집의 추가 전용 로그. 에이전트가 자동으로 항목을 추가합니다. 새 로직이 시간순에 의존하므로 이전 항목을 재배열하거나 삭제하지 마세요.",
+    },
+    wikiSummary: {
+      title: "Wiki 요약",
+      summary: "Wiki 전체 주제의 AI 생성 요약. 에이전트가 필요 시 재생성합니다.",
+    },
+    wikiSchema: {
+      title: "Wiki 스키마 정의",
+      summary:
+        "Wiki 페이지의 내부 일관성을 유지하기 위해 에이전트가 참조하는 구조 스키마. 포맷 민감도가 높아 작은 편집으로도 인덱서가 동기화 깨질 수 있습니다.",
+    },
+    memory: {
+      title: "장기 기억",
+      summary: "대화에서 추출된 장기 사실. 수동 편집이 가능합니다 — 더 이상 정확하지 않은 항목을 정리하거나 에이전트가 기억해 주길 원하는 사실을 추가하세요.",
+    },
+    summariesIndex: {
+      title: "요약 인덱스",
+      summary: "conversations/summaries/ 아래의 일별 / 주제별 요약 인덱스. journal 인덱서가 재생성하므로 수동 편집은 덮어씌워집니다.",
+    },
+    rolesJson: {
+      title: "롤 설정 (config)",
+      summary: "롤 셀렉터가 사용하는 롤별 설정 — 표시명, 아이콘, 기본 모델, 플러그인 활성화. 사용자 소유 파일입니다. 수동 편집해 롤을 커스터마이즈하세요.",
+    },
+    rolesMd: {
+      title: "롤 시스템 프롬프트",
+      summary: "이 롤을 선택했을 때 Claude 에 전송되는 Markdown 시스템 프롬프트. 자유롭게 편집할 수 있으며 다음 채팅 실행부터 반영됩니다.",
+    },
+    sourceFeed: {
+      title: "소스 피드 등록",
+      summary: "하나의 뉴스 / 기사 소스를 기술하는 Markdown frontmatter (URL, slug, 카테고리). 사용자 소유 파일이며 소스 파이프라인이 매번 읽습니다.",
+    },
+    sourceState: {
+      title: "소스 파이프라인 런타임 상태",
+      summary: "소스별 부기 (마지막 가져오기 커서, 중복제거 해시, 에러 카운트). 순수 런타임 상태이므로 삭제하면 재가져오기만 발생할 뿐 안전합니다.",
+    },
+    journalDaily: {
+      title: "일일 요약",
+      summary: "하루치 대화의 AI 요약. journal 서브시스템이 정해진 일정으로 재생성합니다. 수동 편집은 다음 패스에서 사라집니다.",
+    },
+    journalTopic: {
+      title: "주제 요약",
+      summary: "여러 날에 걸친 단일 주제의 AI 요약. journal 인덱서가 재생성하므로 수동 편집은 보존되지 않습니다.",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "외부 MCP 서버를 추가합니다. HTTP 서버는 모든 모드에서 동작합니다. Stdio 서버는 샌드박스 이미지의 {npx} / {node} / {tsx} 를 사용하며, Docker 가 활성화된 경우 경로는 워크스페이스 안에 있어야 합니다.",

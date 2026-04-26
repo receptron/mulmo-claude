@@ -206,6 +206,119 @@ const deMessages = {
     pdfPreview: "PDF-Vorschau",
     parseError: "Parse-Fehler",
   },
+  systemFiles: {
+    showDetails: "Details",
+    hideDetails: "Schließen",
+    schemaLabel: "Schema",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Vom Agenten verwaltet (von Hand editierbar)",
+      "user-editable": "Vom Nutzer editierbar",
+      "agent-managed": "Vom Agenten verwaltet",
+      "fragile-format": "Format empfindlich",
+      ephemeral: "Laufzeit-Status — nicht editieren",
+    },
+    interests: {
+      title: "Filterprofil für Nachrichten-Benachrichtigungen",
+      summary:
+        "Bewertet Artikel für die Benachrichtigungsglocke. Der Agent aktualisiert diese Datei, wenn du im Chat Interessen erwähnst; Hand-Editierung ist ebenfalls möglich. Lockere Validierung: fehlerhafte Einträge werden stillschweigend verworfen.",
+    },
+    mcp: {
+      title: "MCP-Server-Registrierung",
+      summary:
+        "Externe MCP-Server, die dem Agenten freigegeben sind. Bearbeitung über Einstellungen → MCP, oder direktes Editieren der JSON-Datei. Stdio-Server laufen in der Sandbox; Pfade müssen workspace-relativ sein, wenn Docker aktiviert ist.",
+    },
+    settings: {
+      title: "App-Einstellungen",
+      summary:
+        "Workspace-bezogene App-Konfiguration, bei jedem Agent-Start neu geladen. Enthält derzeit extra-allowed-tools-Einträge (z. B. eingebaute MCP-Präfixe von Claude Code).",
+    },
+    schedulerTasks: {
+      title: "Nutzerdefinierte Automatisierungen",
+      summary:
+        "Geplante Aufgaben, die der Agent erstellt hat oder die du selbst geschrieben hast. Bearbeitung über die Automations-Seite empfohlen; direktes JSON-Editieren wird ebenfalls unterstützt, doch der Agent schreibt die Datei bei Änderungen neu.",
+    },
+    schedulerOverrides: {
+      title: "Pro-Aufgabe Scheduler-Overrides",
+      summary:
+        "Manuelle disable / snooze-Flags zusätzlich zu den Definitionen aus tasks.json. Der Agent aktualisiert dies, wenn du Automatisierungen in der UI umschaltest.",
+    },
+    newsReadState: {
+      title: "Lesestatus der Benachrichtigungen",
+      summary:
+        "Verfolgt, welche News-Items du gesehen hast, damit die Glocke nicht erneut alarmiert. Reiner Laufzeit-Status — Löschen ist sicher; du erhältst nur eine Runde Re-Benachrichtigungen.",
+    },
+    schedulerItems: {
+      title: "Kalender-Einträge",
+      summary:
+        "In der Calendar-Ansicht angezeigte Termine. Vom Agent aus dem Chat geschrieben; manuelles JSON-Editieren funktioniert, geht aber verloren, wenn der Agent die Datei neu schreibt.",
+    },
+    todosItems: {
+      title: "Todos-Kanban",
+      summary: "In der Todos-Seite angezeigte Aufgaben. Der Agent liest und schreibt diese Datei nach Chat-Anweisungen; manuelles Editieren wird unterstützt.",
+    },
+    todosColumns: {
+      title: "Todos-Kanban-Spalten",
+      summary: "Spaltendefinitionen des Kanban (id, Titel, Farbe). Diese Datei gehört dir — bearbeite sie frei, um das Board umzugestalten.",
+    },
+    wikiIndex: {
+      title: "Wiki-Inhaltsverzeichnis",
+      summary:
+        "Automatisch generiertes Inhaltsverzeichnis für dein Wiki. Der Agent baut es aus den Seiten neu auf; manuelle Änderungen werden im nächsten Indexlauf überschrieben.",
+    },
+    wikiLog: {
+      title: "Wiki-Bearbeitungsprotokoll",
+      summary:
+        "Append-only-Protokoll der Wiki-Bearbeitungen. Der Agent fügt Einträge automatisch hinzu. Neue Logik hängt von der chronologischen Reihenfolge ab — alte Einträge weder umsortieren noch löschen.",
+    },
+    wikiSummary: {
+      title: "Wiki-Zusammenfassung",
+      summary: "Per KI generierte Gesamtübersicht der Wiki-Themen. Der Agent regeneriert sie bei Bedarf.",
+    },
+    wikiSchema: {
+      title: "Wiki-Schemadefinition",
+      summary:
+        "Strukturschema, das der Agent zur internen Konsistenz der Wiki-Seiten verwendet. Format-empfindlich — kleine Änderungen können den Indexer entkoppeln.",
+    },
+    memory: {
+      title: "Langzeitgedächtnis",
+      summary:
+        "Langlebige Fakten, die der Agent aus deinen Gesprächen extrahiert. Hand-editierbar: nicht mehr zutreffende Einträge entfernen oder Fakten hinzufügen, die der Agent merken soll.",
+    },
+    summariesIndex: {
+      title: "Zusammenfassungs-Index",
+      summary:
+        "Index der Tages- und Themen-Zusammenfassungen unter conversations/summaries/. Vom Journal-Indexer regeneriert; manuelle Änderungen werden überschrieben.",
+    },
+    rolesJson: {
+      title: "Rollendefinition (config)",
+      summary:
+        "Pro-Rolle-Konfiguration, die vom Rollen-Selector genutzt wird — Anzeigename, Icon, Standardmodell, aktivierte Plugins. Diese Datei gehört dir; bearbeite sie zur Anpassung einer Rolle von Hand.",
+    },
+    rolesMd: {
+      title: "System-Prompt der Rolle",
+      summary:
+        "Der Markdown-System-Prompt, der an Claude gesendet wird, wenn du diese Rolle wählst. Frei editierbar — Änderungen wirken im nächsten Chat-Lauf.",
+    },
+    sourceFeed: {
+      title: "Quellen-Feed-Registrierung",
+      summary:
+        "Markdown-Frontmatter, das eine Nachrichten- / Artikelquelle beschreibt (URL, Slug, Kategorie). Diese Datei gehört dir; die Source-Pipeline liest sie bei jedem Lauf.",
+    },
+    sourceState: {
+      title: "Source-Pipeline-Laufzeitstatus",
+      summary:
+        "Pro-Quelle Buchführung (zuletzt abgerufener Cursor, Dedup-Hashes, Fehlerzähler). Reiner Laufzeitstatus — Löschen erzwingt einen erneuten Abruf, ist aber sicher.",
+    },
+    journalDaily: {
+      title: "Tageszusammenfassung",
+      summary:
+        "KI-Zusammenfassung der Gespräche eines Tages. Das Journal-Subsystem regeneriert dies geplant; manuelle Änderungen gehen beim nächsten Lauf verloren.",
+    },
+    journalTopic: {
+      title: "Themen-Zusammenfassung",
+      summary: "KI-Zusammenfassung, beschränkt auf ein Thema über mehrere Tage hinweg. Vom Journal-Indexer regeneriert — manuelle Änderungen überleben nicht.",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "Externe MCP-Server hinzufügen. HTTP-Server funktionieren in allen Modi. Stdio-Server nutzen {npx} / {node} / {tsx} aus dem Sandbox-Image; wenn Docker aktiviert ist, müssen die Pfade im Workspace liegen.",

@@ -1,14 +1,23 @@
 <template>
-  <!-- Standalone Automations page (#758). Surfaces the scheduler's
-       Tasks tab as a peer page to Calendar. Same delegation pattern
-       as CalendarView: forces the tab, hides the bar. The underlying
-       TasksTab renders user-registered cron/interval/daily tasks,
-       skill-scheduled runs, and source-watcher pipeline runs — i.e.
-       every task the task-manager knows about. -->
-  <SchedulerView :force-tab="SCHEDULER_TAB.tasks" />
+  <!-- Automations mount point used in two places (#758, #824):
+       1. Standalone /automations page — no `selectedResult`, the
+          underlying TasksTab fetches via /api/scheduler/tasks.
+       2. `manageAutomations` chat tool result — `selectedResult`
+          is forwarded so View.vue can pick up task-shaped data.
+       Both modes lock the tab to "tasks" so the legacy tab bar
+       inside SchedulerView stays hidden. -->
+  <SchedulerView :force-tab="SCHEDULER_TAB.tasks" :selected-result="selectedResult" @update-result="(result) => emit('updateResult', result)" />
 </template>
 
 <script setup lang="ts">
+import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import SchedulerView from "./View.vue";
 import { SCHEDULER_TAB } from "./viewModes";
+import type { SchedulerData } from "./index";
+
+defineProps<{
+  selectedResult?: ToolResultComplete<SchedulerData>;
+}>();
+
+const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 </script>

@@ -17,7 +17,7 @@
       :title="node.path"
       @click="emit('select', node.path)"
     >
-      <span class="material-icons text-sm text-gray-400 shrink-0">description</span>
+      <span class="material-icons text-sm shrink-0" :class="iconColorClass">description</span>
       <span class="truncate">{{ node.name }}</span>
       <span v-if="isRecent" class="ml-auto w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" :title="t('fileTree.recentlyChanged')" />
     </button>
@@ -46,7 +46,10 @@ import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
 import { sortChildren } from "../utils/files/sortChildren";
+import { descriptorForPath, EDIT_POLICY_ICON_COLOR } from "../config/systemFileDescriptors";
 import type { FileSortMode } from "../composables/useFileSortMode";
+
+const DEFAULT_FILE_ICON_COLOR = "text-gray-400";
 
 const { t } = useI18n();
 
@@ -115,4 +118,13 @@ function onToggle(): void {
 }
 
 const isRecent = computed(() => props.recentPaths.has(props.node.path));
+
+// System-managed files get tinted by edit policy so the user can
+// spot them in the tree before clicking. Folders and unrecognised
+// files fall through to the default neutral gray.
+const iconColorClass = computed(() => {
+  if (props.node.type !== "file") return DEFAULT_FILE_ICON_COLOR;
+  const descriptor = descriptorForPath(props.node.path);
+  return descriptor ? EDIT_POLICY_ICON_COLOR[descriptor.editPolicy] : DEFAULT_FILE_ICON_COLOR;
+});
 </script>

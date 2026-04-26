@@ -210,6 +210,111 @@ const jaMessages = {
     pdfPreview: "PDF プレビュー",
     parseError: "パースエラー",
   },
+  systemFiles: {
+    showDetails: "詳細",
+    hideDetails: "閉じる",
+    schemaLabel: "スキーマ",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "エージェント管理 (手動編集可)",
+      "user-editable": "ユーザ編集可",
+      "agent-managed": "エージェント管理",
+      "fragile-format": "フォーマット注意",
+      ephemeral: "ランタイム状態 — 編集不要",
+    },
+    interests: {
+      title: "ニュース通知のフィルタープロファイル",
+      summary:
+        "通知ベル用に記事をスコアリングするためのファイルです。チャットで関心のある話題を伝えるとエージェントが更新します。手動編集も可能です。検証は緩く、不正なエントリは黙って無視されます。",
+    },
+    mcp: {
+      title: "MCP サーバ登録",
+      summary:
+        "エージェントに公開する外部 MCP サーバの設定です。設定 → MCP から編集できますが、JSON を直接編集しても構いません。stdio サーバはサンドボックス内で動くため、Docker モードではパスをワークスペース相対にする必要があります。",
+    },
+    settings: {
+      title: "アプリ設定",
+      summary:
+        "ワークスペース固有のアプリ設定。エージェント起動ごとに読み直されます。現状は extra allowed-tools (Claude Code の組み込み MCP プレフィックス等) を保持します。",
+    },
+    schedulerTasks: {
+      title: "ユーザ定義オートメーション",
+      summary:
+        "エージェントが作成したか、あなたが書いたスケジュール済みタスクです。Automations ページから編集するのが推奨ですが、JSON 直接編集もサポートしています。エージェントが変更時に書き換える点に注意。",
+    },
+    schedulerOverrides: {
+      title: "タスク別スケジュール上書き",
+      summary: "tasks.json のタスク定義に対する手動の disable / snooze フラグを保持します。UI からオートメーションを切り替えると更新されます。",
+    },
+    newsReadState: {
+      title: "通知の既読状態",
+      summary: "ベルが二重通知しないよう、見たニュース項目を記録します。純粋なランタイム状態。削除しても再通知が一度発生するだけで問題ありません。",
+    },
+    schedulerItems: {
+      title: "カレンダーアイテム",
+      summary:
+        "Calendar ビューに表示される予定です。チャットからエージェントが書き込みます。JSON 直接編集も可能ですが、エージェントが上書きすると変更が失われます。",
+    },
+    todosItems: {
+      title: "Todo (かんばん)",
+      summary: "Todos ページに表示されるタスクです。チャットの指示に応じてエージェントが読み書きします。手動編集もサポート。",
+    },
+    todosColumns: {
+      title: "Todo かんばんのカラム",
+      summary: "Todos かんばんのカラム定義 (id, title, color)。あなたが所有するファイルなので自由に編集してボードを再構成できます。",
+    },
+    wikiIndex: {
+      title: "Wiki 目次",
+      summary: "Wiki 全体の自動生成された目次です。ページ集合からエージェントが再構築するため、手動編集は次回のインデックス処理で消えます。",
+    },
+    wikiLog: {
+      title: "Wiki 編集ログ",
+      summary:
+        "Wiki への追記専用ログ。エージェントが自動的に追加します。新しいロジックが時系列順に依存しているため、過去エントリの並べ替え / 削除は行わないでください。",
+    },
+    wikiSummary: {
+      title: "Wiki サマリ",
+      summary: "Wiki 全体のトピックを AI が要約したファイル。エージェントがオンデマンドで再生成します。",
+    },
+    wikiSchema: {
+      title: "Wiki スキーマ定義",
+      summary:
+        "Wiki ページの内部整合性を保つためにエージェントが参照する構造スキーマ。フォーマット依存度が高く、わずかな編集でインデクサが動作不能になります。",
+    },
+    memory: {
+      title: "長期記憶",
+      summary: "会話から抽出された long-term ファクト。手動編集できます。古くなったエントリの削除や、覚えてほしい事実の追加が可能です。",
+    },
+    summariesIndex: {
+      title: "サマリ索引",
+      summary: "conversations/summaries/ 配下の daily / topic サマリの索引。journal インデクサが再生成するため、手動編集は上書きされます。",
+    },
+    rolesJson: {
+      title: "ロール設定 (config)",
+      summary:
+        "ロールセレクタが使うロール毎の設定 — 表示名、アイコン、デフォルトモデル、プラグイン有効化。あなたが所有するファイルです。手動編集してロールをカスタマイズしてください。",
+    },
+    rolesMd: {
+      title: "ロールのシステムプロンプト",
+      summary: "このロールを選んだとき Claude に送られる Markdown システムプロンプト。自由に編集してください。次のチャット実行から反映されます。",
+    },
+    sourceFeed: {
+      title: "ソースフィード登録",
+      summary:
+        "ニュース / 記事ソースを 1 つ記述する Markdown frontmatter (URL、slug、カテゴリ)。あなたが所有するファイルで、ソースパイプラインが毎回読み込みます。",
+    },
+    sourceState: {
+      title: "ソースパイプラインのランタイム状態",
+      summary: "ソースごとの bookkeeping (最終取得カーソル、dedupe ハッシュ、エラーカウント)。純粋なランタイム状態。削除すると再取得が走るだけで安全です。",
+    },
+    journalDaily: {
+      title: "日次サマリ",
+      summary: "1 日分の会話を AI が要約したファイル。journal サブシステムが定期再生成します。手動編集は次回パスで失われます。",
+    },
+    journalTopic: {
+      title: "トピックサマリ",
+      summary: "複数日にまたがる 1 トピックの AI 要約。journal インデクサが再生成するため、手動編集は残りません。",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "外部 MCP サーバを追加します。HTTP サーバはすべてのモードで動作します。Stdio サーバはサンドボックスイメージの {npx} / {node} / {tsx} を使用します。Docker 有効時はパスはワークスペース内である必要があります。",

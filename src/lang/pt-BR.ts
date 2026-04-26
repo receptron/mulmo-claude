@@ -205,6 +205,116 @@ const ptBRMessages = {
     pdfPreview: "Pré-visualização PDF",
     parseError: "erro de análise",
   },
+  systemFiles: {
+    showDetails: "Detalhes",
+    hideDetails: "Ocultar",
+    schemaLabel: "Esquema",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Gerenciado pelo agente (editável à mão)",
+      "user-editable": "Editável pelo usuário",
+      "agent-managed": "Gerenciado pelo agente",
+      "fragile-format": "Formato sensível",
+      ephemeral: "Estado de runtime — não edite",
+    },
+    interests: {
+      title: "Perfil de filtro de notificações de notícias",
+      summary:
+        "Pontua artigos para o sino de notificações. O agente atualiza este arquivo quando você menciona interesses no chat; também é possível editar à mão. Validação branda: entradas malformadas são silenciosamente descartadas.",
+    },
+    mcp: {
+      title: "Registro de servidores MCP",
+      summary:
+        "Servidores MCP externos expostos ao agente. Edite via Configurações → MCP, ou edite o JSON manualmente. Servidores stdio rodam dentro do sandbox; quando o Docker está habilitado, os caminhos devem ser relativos ao workspace.",
+    },
+    settings: {
+      title: "Configurações do app",
+      summary:
+        "Configuração do app por workspace, recarregada a cada invocação do agente. Atualmente guarda extra-allowed-tools (por exemplo, prefixos MCP embutidos do Claude Code).",
+    },
+    schedulerTasks: {
+      title: "Automatizações definidas pelo usuário",
+      summary:
+        "Tarefas agendadas criadas pelo agente ou por você. Recomenda-se editar pela página Automations; edição direta do JSON também é suportada, mas o agente reescreve o arquivo a cada mudança.",
+    },
+    schedulerOverrides: {
+      title: "Sobreposições de agendamento por tarefa",
+      summary: "Flags manuais disable / snooze aplicadas sobre as definições em tasks.json. O agente atualiza isso quando você alterna automatizações pela UI.",
+    },
+    newsReadState: {
+      title: "Estado de leitura das notificações",
+      summary:
+        "Rastreia quais notícias você já viu para o sino não notificar de novo. Estado puramente em runtime — apagar é seguro: você verá apenas uma nova rodada de re-notificações.",
+    },
+    schedulerItems: {
+      title: "Itens do calendário",
+      summary:
+        "Eventos exibidos na visão Calendar. Escrito pelo agente a partir do chat; edição manual do JSON funciona, mas você perde alterações se o agente reescrever o arquivo.",
+    },
+    todosItems: {
+      title: "Kanban de Todos",
+      summary: "Tarefas exibidas na página Todos. O agente lê e escreve este arquivo conforme as instruções do chat; edição manual é suportada.",
+    },
+    todosColumns: {
+      title: "Colunas do kanban de Todos",
+      summary: "Definições de coluna do kanban (id, título, cor). Este arquivo é seu — edite livremente para reorganizar o board.",
+    },
+    wikiIndex: {
+      title: "Índice do wiki",
+      summary:
+        "Sumário gerado automaticamente para seu wiki. O agente reconstrói a partir do conjunto de páginas; edições à mão são sobrescritas na próxima passagem.",
+    },
+    wikiLog: {
+      title: "Log de edições do wiki",
+      summary:
+        "Log append-only de edições do wiki. O agente adiciona entradas automaticamente. A lógica nova depende da ordem cronológica — não reordene nem apague entradas antigas.",
+    },
+    wikiSummary: {
+      title: "Resumo do wiki",
+      summary: "Resumo geral dos tópicos do wiki gerado por IA. O agente regenera sob demanda.",
+    },
+    wikiSchema: {
+      title: "Definição do esquema do wiki",
+      summary:
+        "Esquema estrutural que o agente usa para manter as páginas do wiki internamente coerentes. Sensível a formato — pequenas edições podem dessincronizar o indexador.",
+    },
+    memory: {
+      title: "Memória de longo prazo",
+      summary:
+        "Fatos persistentes que o agente extrai das suas conversas. Editável à mão: poda entradas que não fazem mais sentido, ou adicione fatos que você queira que o agente lembre.",
+    },
+    summariesIndex: {
+      title: "Índice de resumos",
+      summary: "Índice de resumos diários e por tópico em conversations/summaries/. Regenerado pelo indexador do journal; edições manuais são sobrescritas.",
+    },
+    rolesJson: {
+      title: "Definição de papel (config)",
+      summary:
+        "Configuração por papel usada pelo seletor de papéis — nome de exibição, ícone, modelo padrão, plugins habilitados. Este arquivo é seu; edite à mão para personalizar um papel.",
+    },
+    rolesMd: {
+      title: "System prompt do papel",
+      summary:
+        "O system prompt em Markdown enviado ao Claude quando você seleciona este papel. Edite à vontade — as alterações entram em vigor na próxima execução do chat.",
+    },
+    sourceFeed: {
+      title: "Registro de feed de fonte",
+      summary:
+        "Frontmatter Markdown descrevendo uma fonte de notícias / artigos (URL, slug, categoria). Este arquivo é seu; o pipeline de fontes o lê a cada execução.",
+    },
+    sourceState: {
+      title: "Estado runtime do pipeline de fontes",
+      summary:
+        "Contabilidade por fonte (cursor da última coleta, hashes de deduplicação, contagens de erro). Estado puramente runtime — apagar força uma recoleta, mas é seguro.",
+    },
+    journalDaily: {
+      title: "Resumo diário",
+      summary: "Resumo por IA das conversas de um dia. O subsistema journal regenera regularmente; edições manuais são perdidas na próxima passagem.",
+    },
+    journalTopic: {
+      title: "Resumo por tópico",
+      summary: "Resumo por IA escopado a um tópico atravessando vários dias. Regenerado pelo indexador do journal — edições manuais não sobrevivem.",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "Adicione servidores MCP externos. Servidores HTTP funcionam em todos os modos. Servidores Stdio usam o {npx} / {node} / {tsx} da imagem do sandbox; quando o Docker está habilitado, os caminhos devem ficar dentro do workspace.",

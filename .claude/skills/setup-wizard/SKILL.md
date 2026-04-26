@@ -1,5 +1,5 @@
 ---
-description: Set up automations conversationally — when users want recurring tasks, source monitoring, or scheduled workflows, guide them through setup using existing MCP tools (manageScheduler, manageSkills, manageSource). Respond in the user's language.
+description: Set up automations conversationally — when users want recurring tasks, source monitoring, or scheduled workflows, guide them through setup using existing MCP tools (manageAutomations, manageSkills, manageSource). Respond in the user's language.
 ---
 
 # Setup Wizard
@@ -16,7 +16,8 @@ When the user describes something they want automated or set up regularly, help 
 ## Tools to use
 
 - **manageSource** `register` — for monitoring websites, RSS, GitHub repos
-- **manageScheduler** `createTask` — for recurring tasks (daily/interval, times in UTC)
+- **manageAutomations** `createTask` — for recurring tasks (daily/interval, times in UTC)
+- **manageCalendar** `add` — for one-off dated calendar events
 - **manageSkills** `save` — for on-demand workflows
 
 ## Timezone

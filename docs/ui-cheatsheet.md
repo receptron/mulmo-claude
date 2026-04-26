@@ -269,22 +269,25 @@ Two layouts share `<WikiView>`: the **index** (page list) and a **single page** 
 ┌─[<FilesView>]──────────────────────────────────────────────────────────┐
 │ ┌─Tree pane──────────┐ ┌─Preview pane (route param: pathMatch)───────┐ │
 │ │ ▶ artifacts/       │ │                                             │ │
-│ │ ▼ config/          │ │  Selected file: data/sources/foo.md         │ │
-│ │   • interests.json │ │                                             │ │
-│ │   • mcp.json       │ │  ┌─Preview rendered by FileContentRenderer┐ │ │
-│ │   • settings.json  │ │  │                                        │ │ │
-│ │ ▶ conversations/   │ │  │  • markdown → marked + Vue             │ │ │
-│ │ ▶ data/            │ │  │  • images → <img>                      │ │ │
-│ │ ▼ data/sources/    │ │  │  • todos JSON → <TodoExplorer>         │ │ │
-│ │   • foo.md   ←sel  │ │  │  • scheduler items.json → <CalendarView>│ │ │
-│ │   • bar.md         │ │  │  • code → text                         │ │ │
-│ │ ...                │ │  │                                        │ │ │
-│ └────────────────────┘ │  └────────────────────────────────────────┘ │ │
-│                        └─────────────────────────────────────────────┘ │
+│ │ ▼ config/          │ │ ┌─[system-file-banner] (#832, optional)───┐ │ │
+│ │   • interests.json │ │ │ ℹ News notification filter profile · 🟢│ │ │
+│ │   • mcp.json       │ │ │   Scores articles for the bell. …       │ │ │
+│ │   • settings.json  │ │ │   Schema: server/.../interests.ts       │ │ │
+│ │ ▶ conversations/   │ │ └─────────────────────────────────────────┘ │ │
+│ │ ▶ data/            │ │                                             │ │
+│ │ ▼ data/sources/    │ │  ┌─Preview rendered by FileContentRenderer┐ │ │
+│ │   • foo.md   ←sel  │ │  │                                        │ │ │
+│ │   • bar.md         │ │  │  • markdown → marked + Vue             │ │ │
+│ │ ...                │ │  │  • images → <img>                      │ │ │
+│ │                    │ │  │  • todos JSON → <TodoExplorer>         │ │ │
+│ │                    │ │  │  • scheduler items.json → <CalendarView>│ │ │
+│ │                    │ │  │  • code → text                         │ │ │
+│ │                    │ │  └────────────────────────────────────────┘ │ │
+│ └────────────────────┘ └─────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The preview pane reuses plugin views — clicking a `config/scheduler/items.json` mounts `<CalendarView>` via `toSchedulerResult` (issue #832 / #833 will add a description banner + Edit button on top of this).
+The preview pane reuses plugin views — clicking a `config/scheduler/items.json` mounts `<CalendarView>` via `toSchedulerResult`. System-managed files (`config/*.json`, `data/wiki/*.md`, `conversations/memory.md`, …) get a `[system-file-banner]` above the body explaining what the file is, who writes it, and whether hand-edits survive (descriptors live in `src/config/systemFileDescriptors.ts`; #832).
 
 ## /skills — workspace skills list
 

@@ -212,6 +212,118 @@ const esMessages = {
     pdfPreview: "Vista previa PDF",
     parseError: "error al analizar",
   },
+  systemFiles: {
+    showDetails: "Detalles",
+    hideDetails: "Ocultar",
+    schemaLabel: "Esquema",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Gestionado por el agente (editable a mano)",
+      "user-editable": "Editable por el usuario",
+      "agent-managed": "Gestionado por el agente",
+      "fragile-format": "Formato delicado",
+      ephemeral: "Estado en tiempo de ejecución — no editar",
+    },
+    interests: {
+      title: "Perfil de filtro de notificaciones de noticias",
+      summary:
+        "Puntúa los artículos para la campana de notificaciones. El agente actualiza este archivo cuando mencionas intereses en el chat; también puedes editarlo a mano. Validación laxa: las entradas mal formadas se descartan en silencio.",
+    },
+    mcp: {
+      title: "Registro de servidores MCP",
+      summary:
+        "Servidores MCP externos expuestos al agente. Edita desde Ajustes → MCP, o modifica el JSON manualmente. Los servidores stdio se ejecutan dentro del sandbox; las rutas deben ser relativas al workspace cuando Docker está habilitado.",
+    },
+    settings: {
+      title: "Configuración de la app",
+      summary:
+        "Configuración de la app por workspace, recargada en cada invocación del agente. Actualmente almacena entradas extra-allowed-tools (p. ej. prefijos de MCP integrados de Claude Code).",
+    },
+    schedulerTasks: {
+      title: "Automatizaciones definidas por el usuario",
+      summary:
+        "Tareas programadas creadas por el agente o por ti. Se recomienda editar desde la página Automations; también admite edición JSON, pero el archivo se reescribe cuando el agente cambia algo.",
+    },
+    schedulerOverrides: {
+      title: "Anulaciones de programación por tarea",
+      summary:
+        "Indicadores manuales disable / snooze sobre las definiciones de tasks.json. El agente lo actualiza cuando alternas automatizaciones desde la UI.",
+    },
+    newsReadState: {
+      title: "Estado de lectura de notificaciones",
+      summary:
+        "Registra qué noticias has visto para que la campana no vuelva a alertar. Estado puramente en tiempo de ejecución — borrarlo es seguro: solo verás una nueva tanda de re-notificaciones.",
+    },
+    schedulerItems: {
+      title: "Eventos del calendario",
+      summary:
+        "Eventos mostrados en la vista Calendar. Lo escribe el agente desde el chat; la edición JSON manual funciona, pero se pierden los cambios si el agente reescribe el archivo.",
+    },
+    todosItems: {
+      title: "Tablero kanban de Todos",
+      summary: "Tareas mostradas en la página Todos. El agente lee y escribe este archivo según las instrucciones del chat; la edición manual está soportada.",
+    },
+    todosColumns: {
+      title: "Columnas del kanban de Todos",
+      summary: "Definiciones de columnas del kanban (id, título, color). Es tu archivo — edítalo libremente para reorganizar el tablero.",
+    },
+    wikiIndex: {
+      title: "Índice del wiki",
+      summary:
+        "Tabla de contenidos generada del wiki. El agente la reconstruye desde el conjunto de páginas; las ediciones manuales se sobrescriben en la siguiente pasada.",
+    },
+    wikiLog: {
+      title: "Registro de ediciones del wiki",
+      summary:
+        "Log append-only de ediciones del wiki. El agente añade entradas automáticamente. La nueva lógica depende del orden cronológico — no reordenes ni elimines entradas anteriores.",
+    },
+    wikiSummary: {
+      title: "Resumen del wiki",
+      summary: "Resumen general de los temas del wiki generado por IA. El agente lo regenera bajo demanda.",
+    },
+    wikiSchema: {
+      title: "Definición del esquema del wiki",
+      summary:
+        "Esquema estructural que el agente usa para mantener la coherencia interna de las páginas wiki. Sensible al formato — pequeñas ediciones pueden desincronizar el indexador.",
+    },
+    memory: {
+      title: "Memoria a largo plazo",
+      summary:
+        "Hechos de larga duración que el agente extrae de tus conversaciones. Editable a mano: elimina entradas obsoletas o añade hechos que quieras que el agente recuerde.",
+    },
+    summariesIndex: {
+      title: "Índice de resúmenes",
+      summary: "Índice de resúmenes diarios y por tema bajo conversations/summaries/. Lo regenera el indexador del journal; las ediciones manuales se pisan.",
+    },
+    rolesJson: {
+      title: "Definición de rol (config)",
+      summary:
+        "Configuración por rol usada por el selector de roles — nombre, icono, modelo por defecto, plugins habilitados. Es tu archivo; edítalo a mano para personalizar un rol.",
+    },
+    rolesMd: {
+      title: "System prompt del rol",
+      summary:
+        "El system prompt en Markdown enviado a Claude cuando seleccionas este rol. Edítalo libremente — los cambios surten efecto en la próxima ejecución del chat.",
+    },
+    sourceFeed: {
+      title: "Registro de fuente",
+      summary:
+        "Frontmatter Markdown que describe una fuente de noticias o artículos (URL, slug, categoría). Es tu archivo; el pipeline de fuentes lo lee en cada ejecución.",
+    },
+    sourceState: {
+      title: "Estado en tiempo de ejecución del pipeline de fuentes",
+      summary:
+        "Contabilidad por fuente (cursor de última lectura, hashes de deduplicación, contador de errores). Estado puramente runtime — borrarlo fuerza una recarga, pero es seguro.",
+    },
+    journalDaily: {
+      title: "Resumen diario",
+      summary:
+        "Resumen IA de las conversaciones de un día. El subsistema journal lo regenera periódicamente; las ediciones manuales se pierden en la siguiente pasada.",
+    },
+    journalTopic: {
+      title: "Resumen por tema",
+      summary: "Resumen IA acotado a un tema en varios días. Lo regenera el indexador del journal — las ediciones manuales no sobreviven.",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "Añade servidores MCP externos. Los servidores HTTP funcionan en todos los modos. Los servidores Stdio usan el {npx} / {node} / {tsx} de la imagen del sandbox; cuando Docker está activo las rutas deben estar dentro del área de trabajo.",
