@@ -48,15 +48,32 @@ jobs:
       run: Set-MpPreference -DisableRealtimeMonitoring $true
       shell: powershell
     # Windows: cache node_modules directly (faster than yarn cache
-    # because it skips the tar extract → yarn install file-write cycle)
+    # because it skips the tar extract → yarn install file-write cycle).
+    # restore-keys lets a yarn.lock change land on a warm node_modules
+    # tree (yarn install fills in the diff) instead of a cold cache.
     - name: Cache node_modules (Windows)
       if: runner.os == 'Windows'
       uses: actions/cache@v4
       with:
         path: node_modules
         key: win-node-modules-${{ matrix.node-version }}-${{ hashFiles('yarn.lock') }}
+        restore-keys: |
+          win-node-modules-${{ matrix.node-version }}-
     - run: yarn install --frozen-lockfile --network-timeout 120000
+    # Cache the output of `yarn build:packages` keyed on the source
+    # files it consumes. The 25 @mulmobridge/* workspaces all run tsc
+    # serially / pairwise — slowest non-install step on Windows. When
+    # no package source / tsconfig / package.json changed, skip the
+    # build step entirely. Cache key includes runner.os and node
+    # version because emitted JS can differ across them.
+    - name: Cache packages/dist
+      id: pkg-dist-cache
+      uses: actions/cache@v4
+      with:
+        path: packages/*/dist
+        key: pkg-dist-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsconfig.json', 'packages/*/package.json', 'config/tsconfig.packages.json') }}
     - name: Build internal packages (required before typecheck)
+      if: steps.pkg-dist-cache.outputs.cache-hit != 'true'
       run: yarn build:packages
     - run: yarn run typecheck
     - run: yarn run lint
@@ -83,7 +100,17 @@ jobs:
         node-version: 22.x
         cache: 'yarn'
     - run: yarn install --frozen-lockfile --network-timeout 120000
+    # Same packages/dist cache as lint_test — shares the cache key
+    # across both jobs on ubuntu-latest + node 22.x, so whichever
+    # finishes building first warms the cache for the other.
+    - name: Cache packages/dist
+      id: pkg-dist-cache
+      uses: actions/cache@v4
+      with:
+        path: packages/*/dist
+        key: pkg-dist-${{ runner.os }}-22.x-${{ hashFiles('packages/*/src/**', 'packages/*/tsconfig.json', 'packages/*/package.json', 'config/tsconfig.packages.json') }}
     - name: Build internal packages
+      if: steps.pkg-dist-cache.outputs.cache-hit != 'true'
       run: yarn build:packages
     - name: Install Playwright browsers
       run: npx playwright install chromium webkit --with-deps
