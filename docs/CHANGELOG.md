@@ -8,16 +8,102 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] - 2026-04-27
+
+### Highlights
+
+- **Notifications grew up** — macOS Reminders sink (Darwin-only, opt-out by default via `MACOS_REMINDER_NOTIFICATIONS=0`); `notify` exposed as an MCP tool so the agent can fire notifications directly; deep-link permalinks let a notification jump to its target todo / wiki page / chat session; per-item read state — clicking or dismissing a single notification decreases the badge count.
+- **Sources got its own page** — `/sources` replaces the Source Manager built-in role with a page-scoped chat composer plus filter chips by fetcher kind / schedule. Suggested queries on the Sources view start chats already aware of the active filter.
+- **News viewer (`/news`)** — unread management UI, per-article chat composer that scopes the new session to that article.
+- **`manageScheduler` split into `manageCalendar` + `manageAutomations`** (#824) — clearer per-surface tools; legacy view-only fallback keeps pre-split chat sessions readable.
+- **MCP catalog UI** (#823) — Phase 1 ships a curated list of preset MCP servers with checkbox install for config-free entries; Phase 2 adds a per-server config form and 6 new entries.
+- **`presentForm` in General role** (#826) — choice / yes-no / feature-toggle prompts surface as clickable forms; submit text reads as a markdown bullet list (`- {label}: {value}`) instead of a JSON wrapper, so chat history stays human-readable.
+- **Wiki**: tag-based filtering on the index, "Create this wiki page" empty-state CTA, "Lint My Wiki" button, interactive GFM task checkboxes that round-trip to disk, Unicode hashtags accepted in index bullets.
+- **Session history side panel** (#728) — independent toggle (canvas and history can coexist), expand-to-full-width, badge moved onto the toggle button. The standalone `/history` route is retired in favor of the panel.
+- **Files view** (#832) — system-managed file description banner; file-tree icons tinted by edit policy (read-only / system-managed / writable).
+- **Thinking… indicator** (#839, #731 PR2) — shared across slide and stack views, per-tool elapsed time, gated on whether *this* session is running rather than the global isRunning.
+- **Server observability** (#779) — structured `log.{error,warn,info,debug}` audit; layered logging on 10+ routes (plugin / files / todos / chart / config / html / roles / sessions / skills / image).
+- **Smoke-tested `mulmoclaude` tarball in CI** (#667) — pre-publish smoke workflow verifies the npm package boots before release.
+- **Slack ack reaction** (`@mulmobridge/slack@0.4.0`) — `SLACK_ACK_REACTION=1` adds 👀 on receive so the user sees the bot saw the message before the agent finishes (#695).
+- **Per-platform default role for relay** — `RELAY_<PLATFORM>_DEFAULT_ROLE` lets relay assign different default roles per platform (#739).
+
+### Added
+
+- **`/news`** viewer with unread management; per-article chat composer.
+- **`/sources`** page with chat composer + filter chips by fetcher kind / schedule; suggested-queries list.
+- **macOS Reminders notification sink** — Darwin-only, on by default, disable with `MACOS_REMINDER_NOTIFICATIONS=0`; title/body passed via argv (not osascript attribute) to close a string-injection vector (#789).
+- **`notify` MCP tool** — agent can fire push-style notifications directly.
+- **Notification permalinks** — every notification deep-links to its target item (#762).
+- **`manageCalendar` + `manageAutomations`** plugins (split from `manageScheduler`, #824).
+- **MCP catalog UI** — preset server list, checkbox install, per-server config form, 6 curated entries (#823).
+- **`presentForm` in General role** with prompt nudge for choice questions and `required: true` instruction (#826).
+- **Wiki**: tag filter chips on index, "Create this wiki page" CTA on empty pages, "Lint My Wiki" header button, interactive GFM task-checkbox toggle (#775), Unicode hashtag support, per-page chat composer extracted into reusable `PageChatComposer`.
+- **Files**: system-managed file description banner, edit-policy-tinted file-tree icons (#832).
+- **`fetchWithTimeout` helper** — `AbortController`-based; wired into MCP + X API call sites (#722).
+- **Layered logging** on plugin routes / files / todos / chart / config / html / roles / sessions / skills / image (#779).
+- **Smoke-test workflow** for the published `mulmoclaude` tarball — dep audit, drift check, tarball smoke, CI artifact upload (#667).
+- **Slack ack reaction** — opt-in `SLACK_ACK_REACTION` env (#695).
+- **Per-platform default role** — `RELAY_<PLATFORM>_DEFAULT_ROLE` (#739).
+- **Artifact directory sharding** by `YYYY/MM` to keep folders manageable (#764).
+- **Side-panel expand toggle** — full-width session-history view (#728 follow-up).
+- **History filter via URL path param** — `/history/unread`, `/history/scheduler`, … bookmarkable (#677).
+- **Suggestions trigger** moved into the composer button column for closer reach.
+- **Tab-bar origin badge overlaid on role icon**; bold unread labels.
+
 ### Changed
 
-- `@mulmobridge/slack` (v0.3.0 → **v0.4.0**) — Opt-in ack-reaction feature. When `SLACK_ACK_REACTION` is set, the bridge adds an emoji reaction to every inbound message it processes, giving the user an immediate "the bot saw me" signal before the agent finishes thinking. Single dual-purpose env var — `1` enables with the default `:eyes:` 👀, any other emoji shortcode selects a custom emoji. Off by default; requires the `reactions:write` Bot Token Scope when enabled. Fire-and-forget: failures (missing scope, rate limit, etc.) log a warning without blocking the handler. Reaction is not removed when the reply arrives — it stays as a "seen" marker (#696, closes #695).
-- **Slug rule unified across journal / todos / wiki / files** (#732). Single canonical `slugify` (`server/utils/slug.ts`) — non-ASCII inputs deterministically hash (16-char base64url SHA-256 prefix), ASCII inputs lowercase + hyphenate. `isValidSlug` and the slug-output cap both moved from 64 → 120 chars to fit longer titles. **Breaking** for two surfaces:
-  - **Journal topics with non-ASCII names**: Previously `slugify` dropped non-ASCII characters entirely and fell back to `"topic"`, so distinct Japanese topic names (e.g. "プロジェクトA" / "プロジェクトB") all collided onto a single `topic.md` file and silently overwrote each other. After #732 each distinct name maps to a unique `<hash>.md` (with optional ASCII prefix). **Migration**: none. After upgrading, **the existing `topic.md` (and any incidentally-collided successors) under `<workspace>/conversations/summaries/topics/` are no longer read by the agent** — they remain on disk as orphans. The journal's daily / optimization passes regenerate fresh summary files under the new hashed names from the conversation log on the next run; operators may delete the orphaned files at their own pace. No automated cleanup ships with this change.
-  - **Todo columns**: The default-column id `in_progress` becomes `in-progress`, and newly-created custom column ids use the hyphen separator (`my-column` instead of `my_column`). **Migration**: none. Existing `<workspace>/data/todos/columns.json` is read as-is — the stored ids stay live and items keep referencing them — so a workspace upgraded mid-flight ends up with a mixed-separator column list. The new defaults only apply to brand-new workspaces or freshly added columns. The on-disk column-id collision suffix also changes from `_2` to `-2` (only visible if a user adds two columns with the same label after upgrade).
+- **`manageScheduler` is now split** into `manageCalendar` + `manageAutomations`. Pre-split sessions render via a legacy view-only fallback (#824). See **Breaking Changes** below.
+- **`/history` retired** — history is now the side panel only; the route + entrance composable were removed.
+- **Source Manager and Role Manager built-in roles removed** — sources live on `/sources`, roles on `/roles`.
+- **`currentRoleId` is user-owned**; `RoleSelector` ownership refactored so role state isn't trapped in a chat composable (#714).
+- **`presentForm` submit text** — JSON `{"formSubmission":{...}}` → markdown bullet list (`- {label}: {value}`). Free-form text values use indented continuation; checkbox selections render as a nested sub-list to avoid comma-ambiguity (#826).
+- **Slug rule unified** across journal / todos / wiki / files (#732). Single canonical `slugify` (`server/utils/slug.ts`) — non-ASCII deterministically hashed (16-char base64url SHA-256 prefix), ASCII lowercased + hyphenated. `isValidSlug` and the slug-output cap both moved from 64 → 120 chars. **Breaking** — see below.
+- **`FilterChip` component** unified across panels — Sources, History, Wiki tag filter all share one chip implementation.
+- **Top-bar and panel-header control sizing** standardized (`h-8` square / `h-8 px-2.5 pill` / `flex items-center gap-2 px-3 py-2` row container). Panel-header layouts collapse into one row to match.
+- **`@mulmobridge/slack`** v0.3.0 → **v0.4.1** — ack reaction, then a stable-version bump as part of the bridge package sweep.
+- **`@mulmobridge/protocol`** → **v0.1.4**, **`@mulmobridge/chat-service`** → **v0.1.2**, **`@mulmobridge/client`** → **v0.1.3** → **v0.1.4** — opaque `options` passthrough from bridge env to the host app, narrower `bridgeOptions` types.
+- **`@mulmobridge/cli`** → **v0.1.3**, **`@mulmobridge/telegram`** → **v0.1.3**, all other 22 bridges → **v0.1.1** — workspace-dep range tightening + README catch-up sweep.
+
+### Fixed
+
+- **Wiki**: per-entry tag chips set the filter (no longer toggle the active filter off); index-table images resolve under `data/wiki/`; distinguishes missing vs empty page; route GET `/api/wiki?slug=...` through `buildPageResponse`; backtick-stripped index-table headers; tag filter cleared on Index/Log/Lint navigation; toolbar padding + frontmatter visibility cleaned up.
+- **Files**: large audio/video preview in `/files` + audio-file icon; PDF filename derived from content with `yyyy-mm-dd` suffix (#831).
+- **Image plugin**: workspace-rooted refs + bridge timeout (#782); legacy `markdowns/` and `spreadsheets/` paths migrated and rejected at the validator (#773).
+- **Notifications**: per-item read state — click or dismiss decreases the badge; chat-target test pre-seeds a session to avoid the `/chat` auto-create race; agent-completion bell muted (duplicate of session panel badge).
+- **Sessions**: `isRunning` split into global vs active-session scoped; URL query preserved when `activateSession` runs on URL-driven path; current session id cleared off `/chat` so unread doesn't clear on background finish.
+- **Skills Run button** routes through `startNewChat` so the user sees the response.
+- **Spreadsheet preview cards** simplified; e2e canonical paths under `artifacts/spreadsheets/`.
+- **i18n**: 6 user-facing English strings translated (closes #713); German typographic-quote handling rule added (`„` U+201E / `"` U+201C in `de.ts`); aria-labels on send/attach/suggestions buttons.
+- **Settings**: reference + workspace dirs auto-save on add/remove (#716); modal-level Save/Cancel dropped (Tools tab keeps its own); MCP form serializes `persistMcp` and updated E2E for new save UX.
+- **Wiki self-heal**: `taskPersistChain` recovers when `persistWikiPage` rejects (#795).
+- **Build / CI**: i18n cache reset between wiki page-save tests (Windows / Node 24 flake); Playwright runs on dedicated port 45173; ci-stub for Claude Code CLI in launcher pre-flight; smoke-verified mulmoclaude tarball uploaded as workflow artifact.
+- Many follow-up commits addressing Codex / CodeRabbit / human review feedback across ~30 PRs.
+
+### Security
+
+- **macOS Reminders sink**: title/body now passed via argv to `osascript` instead of the system attribute, closing a string-injection vector that could land in a Reminder if a notification body contained `osascript`-meta characters (#789).
+- **Sandbox + smoke**: smoke driver runs with `DISABLE_SANDBOX=1` on CI (no `~/.claude` available), but ships sandbox-on for end-users.
+
+### Breaking Changes
+
+- **`manageScheduler` is split into `manageCalendar` + `manageAutomations`** (#824). Pre-split chat sessions still render their tool-results via a view-only legacy fallback (`legacyManageSchedulerEntry`), but agents can no longer call `manageScheduler` — new prompts must target the right half (`manageCalendar` for events / `manageAutomations` for recurring tasks).
+- **Source Manager and Role Manager built-in roles removed**. Existing chat sessions keep working; new manageSource / manageRoles calls flow through their respective dedicated pages (`/sources`, `/roles`) and any role still on the legacy id falls back to `general`.
+- **Slug rule unification (#732)** — same impact as documented in the prior `[Unreleased]`:
+  - **Journal topics with non-ASCII names**: `slugify` previously dropped non-ASCII characters and collided distinct Japanese names onto a single `topic.md`. After #732 each distinct name maps to a unique `<hash>.md`. **Migration**: none — old `topic.md` files become orphans under `<workspace>/conversations/summaries/topics/`; the journal regenerates fresh summary files on the next pass and operators may delete the orphans at their own pace.
+  - **Todo columns**: default column id `in_progress` becomes `in-progress`, new custom-column ids use the hyphen separator. Existing `data/todos/columns.json` is read as-is so workspaces keep their stored ids; the new defaults apply only to fresh workspaces.
 
 ### Packages published during this cycle
 
-- `@mulmobridge/slack@0.4.0`
+- `mulmoclaude@0.5.0` (this release)
+- `@mulmobridge/slack@0.4.1`, 0.4.0, 0.3.0
+- `@mulmobridge/protocol@0.1.4`
+- `@mulmobridge/chat-service@0.1.2`
+- `@mulmobridge/client@0.1.4`, 0.1.3
+- `@mulmobridge/cli@0.1.3`
+- `@mulmobridge/telegram@0.1.3`
+- `@mulmobridge/{bluesky,chatwork,discord,email,google-chat,irc,line,line-works,mastodon,matrix,mattermost,messenger,nostr,rocketchat,signal,teams,twilio-sms,viber,webhook,whatsapp,xmpp,zulip}@0.1.1`
 
 ---
 
