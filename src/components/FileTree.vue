@@ -17,7 +17,7 @@
       :title="node.path"
       @click="emit('select', node.path)"
     >
-      <span class="material-icons text-sm text-gray-400 shrink-0">description</span>
+      <span class="material-icons text-sm text-gray-400 shrink-0">{{ fileIcon }}</span>
       <span class="truncate">{{ node.name }}</span>
       <span v-if="isRecent" class="ml-auto w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" :title="t('fileTree.recentlyChanged')" />
     </button>
@@ -113,6 +113,21 @@ function onToggle(): void {
   if (cached.value !== undefined) return;
   emit("loadChildren", props.node.path);
 }
+
+// Mirrors the server's AUDIO_EXTENSIONS in server/api/routes/files.ts
+// so the tree icon agrees with how /api/files/content classifies the
+// file. Keep these two lists in sync when adding new formats.
+const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a", ".ogg", ".oga", ".flac", ".aac"]);
+
+const fileIcon = computed(() => {
+  if (props.node.type !== "file") return "description";
+  const name = props.node.name;
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) return "description";
+  const ext = name.slice(dot).toLowerCase();
+  if (AUDIO_EXTENSIONS.has(ext)) return "audiotrack";
+  return "description";
+});
 
 const isRecent = computed(() => props.recentPaths.has(props.node.path));
 </script>
