@@ -613,6 +613,7 @@ const esMessages = {
   },
   app: {
     startConversation: "Inicia una conversación",
+    thinking: "Pensando…",
   },
   suggestionsPanel: {
     suggestions: "Sugerencias",

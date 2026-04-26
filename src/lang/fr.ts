@@ -605,6 +605,7 @@ const frMessages = {
   },
   app: {
     startConversation: "Démarrer une conversation",
+    thinking: "Réflexion…",
   },
   suggestionsPanel: {
     suggestions: "Suggestions",

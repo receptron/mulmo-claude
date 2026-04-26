@@ -607,6 +607,7 @@ const deMessages = {
   },
   app: {
     startConversation: "Gespräch beginnen",
+    thinking: "Denkt nach…",
   },
   suggestionsPanel: {
     suggestions: "Vorschläge",
