@@ -369,7 +369,7 @@ import { apiGet, apiPost, apiFetchRaw } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
-import { useActiveSession } from "../../composables/useActiveSession";
+import { useActiveSession, useActiveSessionRunning } from "../../composables/useActiveSession";
 import { GENERATION_KINDS, type PendingGeneration } from "../../types/events";
 
 interface Beat {
@@ -463,7 +463,7 @@ const busyStatus = computed<string | null>(() => {
   if (anyBeatRendering.value) return t("pluginMulmoScript.statusGeneratingBeats");
   if (anyCharRendering.value) return t("pluginMulmoScript.statusGeneratingCharacters");
   if (anyAudioGenerating.value) return t("pluginMulmoScript.statusGeneratingAudio");
-  if (activeSessionRef?.value?.isRunning) return t("pluginMulmoScript.statusThinking");
+  if (activeSessionRunningRef?.value) return t("pluginMulmoScript.statusThinking");
   return null;
 });
 
@@ -476,6 +476,7 @@ const characterKeys = computed(() => {
 // unmount/remount and tags new generations on the correct session
 // channel so the cross-session sidebar indicator stays lit.
 const activeSessionRef = useActiveSession();
+const activeSessionRunningRef = useActiveSessionRunning();
 const chatSessionId = computed(() => activeSessionRef?.value?.id);
 
 const pendingForThisScript = computed(() => {

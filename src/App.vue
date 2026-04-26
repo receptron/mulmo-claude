@@ -274,7 +274,7 @@ import { useSessionHistory } from "./composables/useSessionHistory";
 import { useRightSidebar } from "./composables/useRightSidebar";
 import { useEventListeners } from "./composables/useEventListeners";
 import { provideAppApi } from "./composables/useAppApi";
-import { provideActiveSession } from "./composables/useActiveSession";
+import { provideActiveSession, provideActiveSessionRunning } from "./composables/useActiveSession";
 import { useRoute, useRouter } from "vue-router";
 import { apiGet, apiPost } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
@@ -908,6 +908,11 @@ provideAppApi({
 // Plugin Views that need to tag background work with the current
 // session (e.g. MulmoScript generations) inject this.
 provideActiveSession(activeSession);
+// Same audience: a reactive "is the active session busy?" flag,
+// exposed so the slide view's ThinkingIndicator can light up the
+// instant a chat turn starts (well before the pubsub round-trip
+// that flips ActiveSession.isRunning).
+provideActiveSessionRunning(activeSessionRunning);
 
 useEventListeners({
   onKeyNavigation: handleKeyNavigation,
