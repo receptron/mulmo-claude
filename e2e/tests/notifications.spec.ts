@@ -247,7 +247,26 @@ test.describe("notification permalinks", () => {
 
   for (const scenario of SCENARIOS) {
     test(scenario.description, async ({ page }) => {
-      await mockAllApis(page, { sessions: [] });
+      // Chat-target scenarios reference a specific sessionId. If that
+      // session 404s on the mock, App.vue's route-watcher falls back
+      // to `createNewSession()` (App.vue:362-365), which clobbers the
+      // post-click URL with a fresh sessionId AND drops the
+      // `?result=<uuid>` query the test is asserting on. Pre-populate
+      // the mock so loadSession succeeds and the fallback never runs.
+      const target = scenario.payload.action?.type === "navigate" ? scenario.payload.action.target : undefined;
+      const targetSessionId = target && "sessionId" in target ? target.sessionId : undefined;
+      const sessions = targetSessionId
+        ? [
+            {
+              id: targetSessionId,
+              title: "Notification target session",
+              roleId: "general",
+              startedAt: "2026-04-25T00:00:00Z",
+              updatedAt: "2026-04-25T00:00:00Z",
+            },
+          ]
+        : [];
+      await mockAllApis(page, { sessions });
       await installNotificationStream(page, scenario.payload);
 
       // Start on /todos rather than /. The home redirect lands on
