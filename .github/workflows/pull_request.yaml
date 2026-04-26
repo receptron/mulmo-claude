@@ -66,6 +66,15 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Split the 268-test e2e suite across 2 parallel runners via
+    # Playwright's --shard. Wall clock drops from ~8 min to ~4-5 min
+    # at the cost of running twice the runner-minutes (no impact for
+    # OSS / free tier). fail-fast off so a flake on shard 1 doesn't
+    # mask a real failure on shard 2.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
     - uses: actions/checkout@v6
     - name: Use Node.js 22.x
@@ -78,12 +87,12 @@ jobs:
       run: yarn build:packages
     - name: Install Playwright browsers
       run: npx playwright install chromium webkit --with-deps
-    - name: Run E2E tests
-      run: yarn test:e2e
+    - name: Run E2E tests (shard ${{ matrix.shard }}/2)
+      run: yarn test:e2e --shard=${{ matrix.shard }}/2
     - name: Upload test results on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: playwright-results
+        name: playwright-results-shard-${{ matrix.shard }}
         path: test-results/
         retention-days: 7
