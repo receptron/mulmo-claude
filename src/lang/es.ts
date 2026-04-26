@@ -367,26 +367,6 @@ const esMessages = {
           displayName: "Pensamiento secuencial",
           description: "Ayuda a Claude a abordar problemas complejos paso a paso.",
         },
-        appleReminders: {
-          displayName: "Recordatorios de Apple",
-          description: "Leer y escribir recordatorios en la app Recordatorios de macOS.",
-        },
-        appleCalendar: {
-          displayName: "Calendario de Apple",
-          description: "Leer y escribir eventos en la app Calendario de macOS.",
-        },
-        appleNotes: {
-          displayName: "Notas de Apple",
-          description: "Leer y escribir notas en la app Notas de macOS.",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "Controlar la reproducción y buscar en la app Música de macOS.",
-        },
-        screenshot: {
-          displayName: "Captura de pantalla",
-          description: "Capturar la pantalla como una imagen que Claude puede leer.",
-        },
       },
     },
   },

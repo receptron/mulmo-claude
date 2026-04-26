@@ -377,26 +377,6 @@ const enMessages = {
           displayName: "Sequential Thinking",
           description: "Helps Claude work through multi-step problems by thinking step by step.",
         },
-        appleReminders: {
-          displayName: "Apple Reminders",
-          description: "Read and write reminders in the macOS Reminders app.",
-        },
-        appleCalendar: {
-          displayName: "Apple Calendar",
-          description: "Read and write events in the macOS Calendar app.",
-        },
-        appleNotes: {
-          displayName: "Apple Notes",
-          description: "Read and write notes in the macOS Notes app.",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "Control playback and search the macOS Music app.",
-        },
-        screenshot: {
-          displayName: "Screenshot",
-          description: "Capture the screen as an image Claude can read.",
-        },
       },
     },
   },

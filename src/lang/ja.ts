@@ -357,26 +357,6 @@ const jaMessages = {
           displayName: "順序立てた思考",
           description: "複雑な問題を段階的に考える支援。",
         },
-        appleReminders: {
-          displayName: "Apple リマインダー",
-          description: "macOS のリマインダー App を読み書き。",
-        },
-        appleCalendar: {
-          displayName: "Apple カレンダー",
-          description: "macOS のカレンダー App の予定を読み書き。",
-        },
-        appleNotes: {
-          displayName: "Apple メモ",
-          description: "macOS のメモ App を読み書き。",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "macOS の Music App の再生制御と検索。",
-        },
-        screenshot: {
-          displayName: "スクリーンショット",
-          description: "画面を Claude が読める画像としてキャプチャ。",
-        },
       },
     },
   },

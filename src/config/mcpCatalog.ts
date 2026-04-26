@@ -16,10 +16,12 @@
 //     duplicating those are out (#823 §"価値マトリクス").
 //   - safe defaults: no auth required, or static config that won't
 //     change per session.
-//
-// **community package names are best-effort** — Apple-native and
-// screenshot MCPs vary by maintainer activity; PR reviewers should
-// pin the exact package + version on merge.
+//   - **only verified, pinned packages.** Apple-native + screenshot
+//     entries explored during design have no ecosystem-stable
+//     package today (community impls vary by maintainer activity);
+//     they are intentionally NOT shipped in Phase 1. Add them in
+//     a follow-up PR once a maintained package is selected and
+//     pinned by version.
 
 import type { McpServerSpec } from "./mcpTypes";
 
@@ -60,14 +62,13 @@ export interface McpCatalogEntry {
   riskLevel: "low" | "medium" | "high";
 }
 
-// Phase 1 entries — all config-free.
-//
-// Implementation note for reviewers: the official `@modelcontextprotocol/*`
-// packages are pinned by the upstream Anthropic team and stable. Apple-
-// native and screenshot entries reference *placeholder* community
-// packages — please verify the maintenance status (last commit, weekly
-// downloads, open issues) before merge and replace if a healthier fork
-// exists.
+// Phase 1 entries — all config-free, all pinned to verified upstream
+// packages maintained by the official `@modelcontextprotocol` team.
+// The Apple-native and screenshot entries explored during the #823
+// design discussion are deliberately NOT shipped here: no community
+// package was stable enough to pin (last-commit / downloads / open-
+// issues all uncertain). They land in a follow-up once a maintained
+// package is selected.
 export const MCP_CATALOG: McpCatalogEntry[] = [
   {
     id: "memory",
@@ -93,83 +94,6 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
       type: "stdio",
       command: "npx",
       args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  // Apple-native entries — macOS only at runtime. Surfaced on every
-  // platform so the user understands why they exist; non-darwin hosts
-  // get a server-side error on first use. Phase 2 adds an
-  // `osConstraint: "darwin"` field so the UI can grey them out.
-  {
-    id: "apple-reminders",
-    displayName: "settingsMcpTab.catalog.entry.appleReminders.displayName",
-    description: "settingsMcpTab.catalog.entry.appleReminders.description",
-    audience: "general",
-    // TODO(reviewer): pin a maintained community package. As of
-    // 2026-04, candidates include `mcp-server-apple-reminders` and
-    // `apple-mcp` — pick the one with most recent activity.
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-reminders"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-calendar",
-    displayName: "settingsMcpTab.catalog.entry.appleCalendar.displayName",
-    description: "settingsMcpTab.catalog.entry.appleCalendar.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-calendar"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-notes",
-    displayName: "settingsMcpTab.catalog.entry.appleNotes.displayName",
-    description: "settingsMcpTab.catalog.entry.appleNotes.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-notes"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "apple-music",
-    displayName: "settingsMcpTab.catalog.entry.appleMusic.displayName",
-    description: "settingsMcpTab.catalog.entry.appleMusic.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-server-apple-music"],
-    },
-    configSchema: [],
-    riskLevel: "low",
-  },
-  {
-    id: "screenshot",
-    displayName: "settingsMcpTab.catalog.entry.screenshot.displayName",
-    description: "settingsMcpTab.catalog.entry.screenshot.description",
-    audience: "general",
-    upstreamUrl: "https://github.com/modelcontextprotocol/servers#community-servers",
-    spec: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "mcp-screenshot"],
     },
     configSchema: [],
     riskLevel: "low",

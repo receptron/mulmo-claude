@@ -358,26 +358,6 @@ const ptBRMessages = {
           displayName: "Pensamento sequencial",
           description: "Ajuda o Claude a resolver problemas complexos passo a passo.",
         },
-        appleReminders: {
-          displayName: "Lembretes da Apple",
-          description: "Ler e escrever lembretes no app Lembretes do macOS.",
-        },
-        appleCalendar: {
-          displayName: "Calendário da Apple",
-          description: "Ler e escrever eventos no app Calendário do macOS.",
-        },
-        appleNotes: {
-          displayName: "Notas da Apple",
-          description: "Ler e escrever notas no app Notas do macOS.",
-        },
-        appleMusic: {
-          displayName: "Apple Music",
-          description: "Controlar a reprodução e buscar no app Music do macOS.",
-        },
-        screenshot: {
-          displayName: "Captura de tela",
-          description: "Capturar a tela como imagem que o Claude pode ler.",
-        },
       },
     },
   },
