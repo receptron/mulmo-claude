@@ -903,6 +903,7 @@ provideAppApi({
   sendMessage: (message: string) => sendMessage(message),
   startNewChat: (message: string, roleId?: string) => startNewChat(message, roleId),
   navigateToWorkspacePath: (href: string) => navigateToWorkspacePath(href),
+  getResultTimestamp: (uuid: string) => activeSession.value?.resultTimestamps.get(uuid),
 });
 // Plugin Views that need to tag background work with the current
 // session (e.g. MulmoScript generations) inject this.

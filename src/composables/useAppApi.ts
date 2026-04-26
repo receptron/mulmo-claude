@@ -32,6 +32,17 @@ export interface AppApi {
   startNewChat: (message: string, roleId?: string) => void;
   /** Navigate to a workspace-internal link (wiki page, file, session). */
   navigateToWorkspacePath: (href: string) => void;
+  /**
+   * Look up the timestamp (epoch ms) recorded for a tool result in
+   * the active session's `resultTimestamps` map. For results that
+   * arrived via the live SSE stream this is the actual time the
+   * result was added; for results loaded from a saved jsonl this is
+   * the session's `startedAt` baseline (per-entry timestamps aren't
+   * persisted in the jsonl yet — see `pushResult` in
+   * `utils/session/sessionHelpers.ts`). Returns `undefined` when the
+   * uuid isn't in the active session.
+   */
+  getResultTimestamp: (uuid: string) => number | undefined;
 }
 
 const APP_API_KEY = Symbol("appApi");
