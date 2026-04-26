@@ -5,7 +5,7 @@
 // units so the line stays compact.
 //
 // Used by the agent run-elapsed counter (#731 PR2) and the per-tool
-// elapsed badge in `ToolResultsPanel.vue`.
+// elapsed badge in `SessionSidebar.vue` (the running-indicator block).
 
 const ONE_SECOND_MS = 1000;
 const ONE_MINUTE_MS = 60 * ONE_SECOND_MS;

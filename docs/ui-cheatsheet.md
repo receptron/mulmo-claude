@@ -36,6 +36,36 @@ A quick visual reference so chat instructions about UI ("the bell at the top rig
 
 Sidebar visibility toggles via the canvas-layout state. When closed, the main pane is full-width.
 
+## `<SessionSidebar>` — left column on every chat session (single layout)
+
+The `w-80` left column inside the chat page (and any other view that mounts it). Despite the historical name `ToolResultsPanel` (renamed in #842), it owns the whole left chrome of an active session: role header, layout / tool-call-history toggles, the tool-result preview list, and the run-time "thinking" indicator.
+
+```
+┌─<SessionSidebar>──────────────────────────────┐
+│ ┌─[sidebar-role-header]─────────────────────┐ │
+│ │ ⭐ General                       🔧  ▦/▥  │ │  ← role icon + name
+│ │                                            │ │     toggle right sidebar (build icon)
+│ │                                            │ │     <CanvasViewToggle> single/stack
+│ └────────────────────────────────────────────┘ │
+│ ┌─[tool-results-scroll]────────────────────┐   │  ← scrollable list,
+│ │ ┌─card (selected: ring-blue-500)──────┐ │   │     click → emit("select", uuid)
+│ │ │ source •          • smart-time       │ │   │
+│ │ │ [<plugin>.previewComponent]         │ │   │
+│ │ └──────────────────────────────────────┘ │   │
+│ │ ┌─card──────────────────────────────────┐ │   │
+│ │ │ ...                                   │ │   │
+│ │ └──────────────────────────────────────┘ │   │
+│ └──────────────────────────────────────────┘   │
+│ ┌─Thinking indicator (only while isRunning)─┐  │  ← role="status" aria-live="polite"
+│ │ status • • • • [run-elapsed] (≥1s)        │  │
+│ │   • pendingToolName · 2.3s                │  │
+│ │   • pendingToolName · 0.8s                │  │
+│ └────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────┘
+```
+
+In **Stack layout** this sidebar isn't rendered; the same data flows through `<StackView>` which inlines result bodies into the main column. Only single layout shows the preview list.
+
 ## NotificationBell expanded
 
 ```

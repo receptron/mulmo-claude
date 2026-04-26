@@ -41,7 +41,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const session = reactive(createEmptySession("s1", "general"));
     const { el, writes } = makeFakeScrollEl();
 
-    const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>({
+    const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>({
       root: el,
     });
     const toolResults = computed<ToolResultComplete[]>(() => session.toolResults);
@@ -49,7 +49,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const chatInputRef = ref<{ focus: () => void } | null>(null);
 
     useChatScroll({
-      toolResultsPanelRef,
+      sessionSidebarRef,
       toolResults,
       isRunning,
       chatInputRef,
@@ -71,7 +71,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const session = reactive(createEmptySession("s2", "general"));
     const { el, writes } = makeFakeScrollEl();
 
-    const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>({
+    const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>({
       root: el,
     });
     const toolResults = computed<ToolResultComplete[]>(() => session.toolResults);
@@ -79,7 +79,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const chatInputRef = ref<{ focus: () => void } | null>(null);
 
     useChatScroll({
-      toolResultsPanelRef,
+      sessionSidebarRef,
       toolResults,
       isRunning,
       chatInputRef,
@@ -120,7 +120,7 @@ describe("useChatScroll — streaming auto-scroll", () => {
     const { el } = makeFakeScrollEl();
 
     useChatScroll({
-      toolResultsPanelRef: ref({ root: el }),
+      sessionSidebarRef: ref({ root: el }),
       toolResults: computed(() => session.toolResults),
       isRunning: computed(() => running.value),
       chatInputRef: ref(null),

@@ -88,9 +88,9 @@
         class="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white text-gray-900 relative"
         data-testid="chat-sidebar"
       >
-        <!-- Tool result previews -->
-        <ToolResultsPanel
-          ref="toolResultsPanelRef"
+        <!-- Tool result previews + role header (#842) -->
+        <SessionSidebar
+          ref="sessionSidebarRef"
           :results="sidebarResults"
           :selected-uuid="selectedResultUuid"
           :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
@@ -110,7 +110,7 @@
         <!-- Shared Thinking indicator. Sits between the suggestions
              panel and the chat input so the user gets the same
              "still alive" cue regardless of which plugin view fills
-             the canvas (the sidebar copy inside ToolResultsPanel
+             the canvas (the sidebar copy inside SessionSidebar
              scrolls with results and can fall below the fold). -->
         <ThinkingIndicator
           v-if="activeSessionRunning"
@@ -241,7 +241,7 @@ import SuggestionsPanel from "./components/SuggestionsPanel.vue";
 import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
 import SessionHistoryExpandButton from "./components/SessionHistoryExpandButton.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
-import ToolResultsPanel from "./components/ToolResultsPanel.vue";
+import SessionSidebar from "./components/SessionSidebar.vue";
 import ThinkingIndicator from "./components/ThinkingIndicator.vue";
 import PluginLauncher from "./components/PluginLauncher.vue";
 import StackView from "./components/StackView.vue";
@@ -451,11 +451,11 @@ const { mergedSessions, tabSessions } = useMergedSessions({
 // /api/sessions refetch.
 useFaviconState({ isRunning, sessions: mergedSessions, sessionsUnreadCount: unreadCount, cpuLoadRatio });
 
-const toolResultsPanelRef = ref<{ root: HTMLDivElement | null } | null>(null);
+const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
 const chatInputRef = ref<{ focus: () => void } | null>(null);
 const { focusChatInput } = useChatScroll({
-  toolResultsPanelRef,
+  sessionSidebarRef,
   toolResults,
   isRunning: activeSessionRunning,
   chatInputRef,
