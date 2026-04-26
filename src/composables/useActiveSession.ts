@@ -23,27 +23,11 @@ import type { ActiveSession } from "../types/session";
  */
 export type ActiveSessionRef = Ref<ActiveSession | undefined>;
 
-/**
- * Ref mirroring the chat sidebar's `activeSessionRunning` flag —
- * the merged "is the active session busy?" signal across server
- * snapshots, in-memory state, and pending generations. The plain
- * `ActiveSession.isRunning` field only updates on a pubsub round
- * trip, so consumers that need an immediately-reactive busy flag
- * (e.g. the slide-view ThinkingIndicator) must read this instead.
- */
-export type ActiveSessionRunningRef = Ref<boolean>;
-
 const ACTIVE_SESSION_KEY = Symbol("activeSession");
-const ACTIVE_SESSION_RUNNING_KEY = Symbol("activeSessionRunning");
 
 /** Called once in App.vue setup to expose the ref to descendants. */
 export function provideActiveSession(ref: ActiveSessionRef): void {
   provide(ACTIVE_SESSION_KEY, ref);
-}
-
-/** Called once in App.vue setup to expose the running-flag ref. */
-export function provideActiveSessionRunning(ref: ActiveSessionRunningRef): void {
-  provide(ACTIVE_SESSION_RUNNING_KEY, ref);
 }
 
 /**
@@ -53,14 +37,4 @@ export function provideActiveSessionRunning(ref: ActiveSessionRunningRef): void 
  */
 export function useActiveSession(): ActiveSessionRef | undefined {
   return inject<ActiveSessionRef>(ACTIVE_SESSION_KEY);
-}
-
-/**
- * Plugin Views call this to observe the active session's busy flag —
- * see `ActiveSessionRunningRef` for the rationale on why a separate
- * ref is needed. Returns `undefined` when used outside an App.vue
- * subtree.
- */
-export function useActiveSessionRunning(): ActiveSessionRunningRef | undefined {
-  return inject<ActiveSessionRunningRef>(ACTIVE_SESSION_RUNNING_KEY);
 }
