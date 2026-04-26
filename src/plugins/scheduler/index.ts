@@ -13,6 +13,7 @@ import CalendarView from "./CalendarView.vue";
 import AutomationsView from "./AutomationsView.vue";
 import LegacySchedulerView from "./LegacySchedulerView.vue";
 import Preview from "./Preview.vue";
+import AutomationsPreview from "./AutomationsPreview.vue";
 import calendarDefinition from "./calendarDefinition";
 import automationsDefinition from "./automationsDefinition";
 import { apiPost } from "../../utils/api";
@@ -66,7 +67,11 @@ export const manageAutomationsPlugin: ToolPlugin<SchedulerData> = {
   isEnabled: () => true,
   generatingMessage: "Managing automations...",
   viewComponent: AutomationsView,
-  previewComponent: Preview,
+  // Previews must not share Preview.vue with manageCalendarPlugin —
+  // Preview.vue auto-refreshes from `/api/scheduler` which returns
+  // calendar items, so the automations sidebar would show calendar
+  // data after the first refresh tick (#828 follow-up).
+  previewComponent: AutomationsPreview,
 };
 
 // View-only fallback for tool results saved under the pre-split

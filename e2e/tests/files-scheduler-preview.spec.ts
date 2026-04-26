@@ -25,7 +25,7 @@ const SAMPLE_ITEMS = [
 ];
 
 test.describe("Files view — scheduler preview", () => {
-  test("renders SchedulerView (Calendar + Tasks tabs) when opening the items file", async ({ page }) => {
+  test("renders calendar-only view when opening the items file (no Tasks tab)", async ({ page }) => {
     await mockAllApis(page);
 
     // Serve the raw JSON body via /api/files/content so the renderer
@@ -44,9 +44,13 @@ test.describe("Files view — scheduler preview", () => {
 
     await page.goto(SCHEDULER_URL);
 
-    // Tabs from SchedulerView (not present in a raw-JSON code view)
-    await expect(page.locator('[data-testid="scheduler-tab-calendar"]')).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
-    await expect(page.locator('[data-testid="scheduler-tab-tasks"]')).toBeVisible();
+    // Post-#828 follow-up: items.json holds calendar items only, so
+    // FileContentRenderer mounts CalendarView (force-tab="calendar")
+    // which hides the dual-tab bar. Confirm calendar content rendered
+    // and that neither tab button is present.
+    await expect(page.getByRole("heading", { name: "Scheduler" })).toBeVisible({ timeout: 5 * ONE_SECOND_MS });
+    await expect(page.getByTestId("scheduler-tab-calendar")).toHaveCount(0);
+    await expect(page.getByTestId("scheduler-tab-tasks")).toHaveCount(0);
   });
 
   test("falls back to raw JSON rendering when the body is malformed", async ({ page }) => {

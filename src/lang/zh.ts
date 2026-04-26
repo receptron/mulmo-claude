@@ -324,6 +324,7 @@ const zhMessages = {
     moreCount: "+还有 {count} 个",
     previewIcon: "📅",
     previewUpcoming: "即将 {count} 个",
+    previewAutomations: "{count} 个自动化",
     previewMore: "+ 还有 {count} 个…",
   },
   pluginSchedulerTasks: {
@@ -444,6 +445,18 @@ const zhMessages = {
     noMatches: "没有带 #{tag} 标签的页面",
     lintChat: "检查 Wiki",
     taskCountMismatch: "Wiki 源与渲染输出的任务数不一致，为避免文件损坏，已拒绝切换。",
+  },
+  pluginPresentForm: {
+    fallbackTitle: "表单",
+    fieldCount: "{count} 个字段",
+    submitted: "已提交",
+    errorSummary: "请修正以下错误",
+    requiredMarker: "*",
+    selectOption: "请选择",
+    charactersCount: "{current} / {max} 字符",
+    charactersCountNoMax: "{current} 字符",
+    submit: "提交",
+    progress: "已填写 {filled} / {total} 个必填字段",
   },
   pluginPresentHtml: {
     saveAsPdf: "另存为 PDF(打开打印对话框)",

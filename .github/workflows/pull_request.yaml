@@ -4,6 +4,17 @@ on:
   pull_request:
     branches:
       - main
+    # Skip when ALL changed files are docs / plans / top-level markdown.
+    # Applied to lint_test + e2e — both jobs in this workflow are
+    # value-added only when source / config / tests change. PRs that
+    # only move plan files (e.g. plans/ → plans/done/ chore PRs) or
+    # tweak markdown docs go straight to mergeable. paths-ignore is
+    # AND-style: a PR that mixes a code change and a doc change still
+    # runs CI in full.
+    paths-ignore:
+      - 'docs/**'
+      - 'plans/**'
+      - '**/*.md'
   push:
     branches:
       - main

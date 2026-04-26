@@ -330,6 +330,7 @@ const esMessages = {
     moreCount: "+{count} más",
     previewIcon: "📅",
     previewUpcoming: "{count} próximos",
+    previewAutomations: "{count} automatización | {count} automatizaciones",
     previewMore: "+ {count} más…",
   },
   pluginSchedulerTasks: {
@@ -450,6 +451,18 @@ const esMessages = {
     noMatches: "No hay páginas con la etiqueta #{tag}",
     lintChat: "Revisar mi wiki",
     taskCountMismatch: "La fuente del wiki y la salida renderizada difieren en el número de tareas. Se rechazó el cambio para evitar dañar el archivo.",
+  },
+  pluginPresentForm: {
+    fallbackTitle: "Formulario",
+    fieldCount: "{count} campo | {count} campos",
+    submitted: "Enviado",
+    errorSummary: "Por favor, corrija los siguientes errores",
+    requiredMarker: "*",
+    selectOption: "Seleccione una opción",
+    charactersCount: "{current} / {max} caracteres",
+    charactersCountNoMax: "{current} caracteres",
+    submit: "Enviar",
+    progress: "{filled} de {total} campos obligatorios completados",
   },
   pluginPresentHtml: {
     saveAsPdf: "Guardar como PDF (abre el diálogo de impresión)",

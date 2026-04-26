@@ -1,4 +1,5 @@
 import type { PluginEntry } from "./types";
+import { LEGACY_VIEW_ONLY_PLUGIN_NAMES } from "./legacyPluginNames";
 import textResponsePlugin from "../plugins/textResponse/index";
 import markdownPlugin from "../plugins/markdown/index";
 import spreadsheetPlugin from "../plugins/spreadsheet/index";
@@ -54,5 +55,5 @@ export function getPlugin(name: string): PluginEntry | null {
 }
 
 export function getAllPluginNames(): string[] {
-  return Object.keys(plugins);
+  return Object.keys(plugins).filter((name) => !LEGACY_VIEW_ONLY_PLUGIN_NAMES.has(name));
 }

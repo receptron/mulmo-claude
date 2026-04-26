@@ -328,6 +328,7 @@ const koMessages = {
     moreCount: "+{count}개 더",
     previewIcon: "📅",
     previewUpcoming: "예정 {count}개",
+    previewAutomations: "자동화 {count}개",
     previewMore: "+ {count}개 더…",
   },
   pluginSchedulerTasks: {
@@ -448,6 +449,18 @@ const koMessages = {
     noMatches: "#{tag} 태그가 달린 페이지가 없습니다",
     lintChat: "Wiki 점검",
     taskCountMismatch: "Wiki 원본과 렌더링 결과의 작업 수가 일치하지 않아, 파일 손상을 방지하기 위해 토글이 거부되었습니다.",
+  },
+  pluginPresentForm: {
+    fallbackTitle: "양식",
+    fieldCount: "{count}개 항목",
+    submitted: "제출됨",
+    errorSummary: "다음 오류를 수정해주세요",
+    requiredMarker: "*",
+    selectOption: "선택하세요",
+    charactersCount: "{current} / {max} 자",
+    charactersCountNoMax: "{current} 자",
+    submit: "제출",
+    progress: "필수 항목 {total}개 중 {filled}개 입력됨",
   },
   pluginPresentHtml: {
     saveAsPdf: "PDF 로 저장 (인쇄 대화 상자 열기)",

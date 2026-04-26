@@ -344,6 +344,7 @@ const enMessages = {
     moreCount: "+{count} more",
     previewIcon: "📅",
     previewUpcoming: "{count} upcoming",
+    previewAutomations: "{count} automation | {count} automations",
     previewMore: "+ {count} more…",
   },
   pluginSchedulerTasks: {
@@ -464,6 +465,18 @@ const enMessages = {
     noMatches: "No pages tagged #{tag}",
     lintChat: "Lint My Wiki",
     taskCountMismatch: "Wiki source and rendered output disagree on the number of tasks. Refusing to toggle to avoid corruption.",
+  },
+  pluginPresentForm: {
+    fallbackTitle: "Form",
+    fieldCount: "{count} field | {count} fields",
+    submitted: "Submitted",
+    errorSummary: "Please fix the following errors",
+    requiredMarker: "*",
+    selectOption: "Select an option",
+    charactersCount: "{current} / {max} characters",
+    charactersCountNoMax: "{current} characters",
+    submit: "Submit",
+    progress: "{filled} of {total} required fields completed",
   },
   pluginPresentHtml: {
     saveAsPdf: "Save as PDF (opens print dialog)",

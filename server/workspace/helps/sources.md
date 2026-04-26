@@ -6,7 +6,7 @@ This page describes the information-source registry: how to register feeds, how 
 
 ### Register
 
-Ask the user for the canonical URL (RSS feed URL, GitHub repo URL, or arXiv listing URL), infer `fetcherKind` from it, and populate `fetcherParams` accordingly:
+Ask the user for the canonical URL (RSS feed URL, GitHub repo URL, or arXiv listing URL), infer `fetcher_kind` from it, and populate the fetcher-specific params (added as flat top-level YAML keys) accordingly:
 
 - **`rss`** — `{ rss_url: <feed URL> }`
 - **`github-releases`** / **`github-issues`** — `{ github_repo: "<owner>/<name>" }`. Pick releases vs. issues based on user intent.
@@ -30,7 +30,7 @@ Every `manageSource` action's response already includes the refreshed list — y
 
 The pipeline reads and writes these files under the workspace root:
 
-- **`sources/<slug>.md`** — source config. YAML frontmatter: `title`, `url`, `fetcherKind`, `fetcherParams`, `schedule`, `categories`, `maxItemsPerFetch`, `addedAt`, `notes`.
+- **`sources/<slug>.md`** — source config. Flat YAML frontmatter: `slug`, `title`, `url`, `fetcher_kind`, `schedule`, `categories`, `max_items_per_fetch`, `added_at`. Any unrecognized top-level keys (e.g. `rss_url`, `github_repo`, `arxiv_query`) become fetcher-specific params. Body is `notes`.
 - **`sources/_state/<slug>.json`** — runtime state: `lastFetchedAt`, `cursor`, `consecutiveFailures`, `nextAttemptAt`.
 - **`news/daily/YYYY/MM/DD.md`** — the aggregated daily brief: markdown body plus a trailing fenced JSON block listing items.
 - **`news/archive/<slug>/YYYY/MM.md`** — per-source monthly archive. Lossless; no cross-source dedup.
