@@ -57,7 +57,12 @@ Total: 21×2 + 5 + 3 = **50 keys per locale × 8 locales = ~400 entries**.
 - Each locale gets a real translation, not English copy. Confirm with native conventions.
 - Keep titles short (chip-friendly) and summaries to ≤2 sentences.
 - Edit policies are chips — keep them terse (1–3 words).
-- German file: respect `~/.claude/rules/i18n-de.md` typographic-quote rule.
+- German file: avoid German typographic quotes (U+201E / U+201C) in
+  string literals — the tokenizer can collapse U+201C to ASCII `"`,
+  silently terminating the surrounding JS string. Use ASCII quotes
+  inside the source; if user-facing typographic quotes are needed,
+  inject them via Unicode escapes from a Node one-liner instead of
+  the Edit / Write tools.
 - vue-tsc enforces lockstep — missing keys in any locale = build fail.
 
 ## Validation

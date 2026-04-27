@@ -205,6 +205,16 @@ describe("wiki-pages/io — classifyAsWikiPage", () => {
     assert.deepEqual(out, { wiki: false });
   });
 
+  // CodeRabbit review #883: classifier used to accept `<pagesDir>/.md`
+  // and return slug = "", which then crashed downstream wikiPagePath()
+  // with "refusing unsafe slug". Mirroring isSafeSlug here makes the
+  // classifier produce the clean fallback (wiki: false → routes to
+  // generic writeFileAtomic) instead of a 500.
+  it("rejects bare `.md` filename (slug would be empty)", () => {
+    const out = classifyAsWikiPage(path.join(pagesDir, ".md"), { workspaceRoot: root });
+    assert.deepEqual(out, { wiki: false });
+  });
+
   it("rejects pagesDir itself (no slug)", () => {
     const out = classifyAsWikiPage(pagesDir, { workspaceRoot: root });
     assert.deepEqual(out, { wiki: false });

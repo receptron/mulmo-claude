@@ -131,7 +131,17 @@ export function classifyAsWikiPage(absPath: string, opts: WikiPageWriteOptions =
   // wrongly rejected it).
   if (rel.includes(path.sep)) return { wiki: false };
   if (!rel.endsWith(".md")) return { wiki: false };
-  return { wiki: true, slug: rel.slice(0, -".md".length) };
+  const slug = rel.slice(0, -".md".length);
+  // Mirror isSafeSlug at the classifier so any path the classifier
+  // accepts is one writeWikiPage can actually handle. The two
+  // documented escapes are `<pagesDir>/.md` (rel = ".md", slug = "")
+  // and the literal "." / ".." filenames (`.md.md` is fine, `..md`
+  // is fine too — those are valid filenames). Without this check,
+  // writeWikiPage's wikiPagePath() throws "refusing unsafe slug" and
+  // the caller (files PUT) bubbles a 500 instead of falling through
+  // to the generic writeFileAtomic path. Coderabbit review #883.
+  if (!isSafeSlug(slug)) return { wiki: false };
+  return { wiki: true, slug };
 }
 
 // ── Internal: snapshot stub ────────────────────────────────────

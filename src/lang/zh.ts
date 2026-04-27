@@ -207,7 +207,7 @@ const zhMessages = {
     parseError: "解析错误",
   },
   systemFiles: {
-    schemaLabel: "Schema",
+    schemaLabel: "架构",
     showDetails: "显示详情",
     hideDetails: "隐藏详情",
     editPolicy: {
