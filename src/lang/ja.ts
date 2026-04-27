@@ -354,15 +354,11 @@ const jaMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "曲の検索、プレイリスト管理、再生操作。BYO Spotify Developer アプリ — Client ID と Client Secret を発行してください。",
+          description: "曲の検索、プレイリスト管理、再生操作。BYO Spotify Developer アプリ — Client ID のみ（PKCE フローのため Client Secret 不要）。",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app で取得。デスクトップ用途では Redirect URI が実在のサイトに一致する必要はありません。",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "同じ Developer Dashboard → アプリの Show client secret から取得。一度貼ればローカルに保存されます。",
+              help: "Spotify Developer Dashboard → Create app、Redirect URI に http://127.0.0.1:8888/callback を設定、Client ID をコピー。その後ターミナルで一度 `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` を実行してログイン（リフレッシュトークンは ~/.spotify-mcp/tokens.json にキャッシュ）。",
             },
           },
         },

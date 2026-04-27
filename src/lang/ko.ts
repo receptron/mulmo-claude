@@ -355,15 +355,11 @@ const koMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "트랙 검색, 플레이리스트 관리, 재생 제어. BYO Spotify 개발자 앱 — Client ID + Client Secret.",
+          description: "트랙 검색, 플레이리스트 관리, 재생 제어. BYO Spotify 개발자 앱 — Client ID만 (PKCE 플로우, Client Secret 불필요).",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → Client ID를 복사하세요. 데스크톱 용도에서는 Redirect URI가 실제 사이트와 일치하지 않아도 됩니다.",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "동일한 Developer Dashboard → 앱의 Show client secret. 한 번 붙여 넣으면 로컬에 캐시됩니다.",
+              help: "Spotify Developer Dashboard → Create app, Redirect URI를 http://127.0.0.1:8888/callback 으로 설정, Client ID 복사. 그 다음 터미널에서 한 번만 `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` 실행해 로그인하세요 (리프레시 토큰은 ~/.spotify-mcp/tokens.json 에 캐시).",
             },
           },
         },

@@ -351,15 +351,11 @@ const zhMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "搜索曲目、管理播放列表、控制播放。BYO Spotify 开发者应用 — Client ID + Client Secret。",
+          description: "搜索曲目、管理播放列表、控制播放。BYO Spotify 开发者应用 — 仅需 Client ID（PKCE 流程，不需要 Client Secret）。",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → 复制 Client ID。桌面用途下 Redirect URI 不需要匹配真实站点。",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "同一 Developer Dashboard → 在应用中点 Show client secret。粘贴一次后会缓存在本地。",
+              help: "Spotify Developer Dashboard → Create app，将 Redirect URI 设为 http://127.0.0.1:8888/callback，复制 Client ID。然后在终端运行一次 `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` 登录（刷新令牌缓存在 ~/.spotify-mcp/tokens.json）。",
             },
           },
         },

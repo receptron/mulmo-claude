@@ -352,15 +352,12 @@ const deMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "Suche Tracks, verwalte Playlists, steuere die Wiedergabe. BYO Spotify-Developer-App — Client ID + Client Secret.",
+          description:
+            "Suche Tracks, verwalte Playlists, steuere die Wiedergabe. BYO Spotify-Developer-App — nur Client ID (PKCE-Flow, kein Client Secret nötig).",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → kopiere die Client ID. Die Redirect URI muss für Desktop-Nutzung keiner echten Seite entsprechen.",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "Selbes Developer Dashboard → in der App auf Show client secret klicken. Einmal eingefügt, lokal gecacht.",
+              help: "Spotify Developer Dashboard → Create app, setze die Redirect URI auf http://127.0.0.1:8888/callback, kopiere die Client ID. Führe dann einmal im Terminal `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` aus, um dich anzumelden (Refresh-Token wird in ~/.spotify-mcp/tokens.json gecacht).",
             },
           },
         },

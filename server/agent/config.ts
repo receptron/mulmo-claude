@@ -144,7 +144,7 @@ function excludeReservedKeys(servers: Record<string, McpServerSpec>): Record<str
   return out;
 }
 
-export function buildMcpConfig(params: McpConfigParams): object {
+export function buildMcpConfig(params: McpConfigParams): { mcpServers: Record<string, unknown> } {
   const { chatSessionId, port, activePlugins, roleIds, useDocker = false, userServers = {} } = params;
   return {
     mcpServers: {

@@ -358,15 +358,12 @@ const esMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "Busca canciones, gestiona playlists y controla la reproducción. BYO app de desarrollador de Spotify — Client ID + Client Secret.",
+          description:
+            "Busca canciones, gestiona playlists y controla la reproducción. BYO app de desarrollador de Spotify — solo Client ID (flujo PKCE, sin client secret).",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → copia el Client ID. La Redirect URI no necesita apuntar a un sitio real para uso de escritorio.",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "Mismo Developer Dashboard → en la app, pulsa Show client secret. Se pega una vez y queda en local.",
+              help: "Spotify Developer Dashboard → Create app, configura la Redirect URI como http://127.0.0.1:8888/callback, copia el Client ID. Luego ejecuta una vez en la terminal `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` para iniciar sesión (el refresh token se guarda en ~/.spotify-mcp/tokens.json).",
             },
           },
         },
