@@ -902,6 +902,29 @@ async function generateAllCharacters() {
   await Promise.all(characterKeys.value.filter((key) => charRenderState[key] !== "rendering").map((key) => renderCharacter(key, false)));
 }
 
+// Mount-time policy: prefer the cached PNG on disk over re-rendering.
+// Deterministic beat types (textSlide/markdown/chart/mermaid/html_tailwind)
+// are cheap to render but not free — every renderBeat round-trips,
+// flips renderState to "rendering", and emits publishGeneration
+// start/finish events that flicker the global busy indicator. So if
+// the image already exists (e.g. after a movie generation, or a
+// previous mount of the same result), we just load it. Only fall
+// through to renderBeat when the disk has nothing yet AND the type is
+// safe to auto-render (deterministic content, no characters waiting).
+//
+// Edits invalidate cached PNGs through other paths: per-beat saves
+// already do `delete renderedImages[index]; renderBeat(index)` on
+// image change in updateBeat(), and the per-beat ↺ regenerate button
+// is always available — so a stale PNG is one click away from being
+// refreshed.
+async function hydrateBeatImage(beat: Beat, index: number, hasCharacters: boolean, autoRenderTypes: readonly string[]): Promise<void> {
+  await loadExistingBeatImage(index);
+  if (renderedImages[index]) return;
+  if (shouldAutoRenderBeat(beat, hasCharacters, autoRenderTypes)) {
+    await renderBeat(index);
+  }
+}
+
 async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
@@ -927,11 +950,7 @@ async function initializeScript() {
   const AUTO_RENDER_TYPES = ["textSlide", "markdown", "chart", "mermaid", "html_tailwind"] as const;
   const hasCharacters = characterKeys.value.length > 0;
   beats.value.forEach((beat, index) => {
-    if (shouldAutoRenderBeat(beat, hasCharacters, AUTO_RENDER_TYPES)) {
-      renderBeat(index);
-    } else if (beat.imagePrompt) {
-      loadExistingBeatImage(index);
-    }
+    void hydrateBeatImage(beat, index, hasCharacters, AUTO_RENDER_TYPES);
     if (beat.text) loadExistingBeatAudio(index);
   });
 
