@@ -14,7 +14,13 @@ Two modes — provide EXACTLY ONE of \`script\` or \`filePath\`:
 
 Optional \`autoGenerateMovie: true\` kicks off movie generation in the background, so the final video is ready by the time the user opens the canvas. Movie generation is expensive (multiple image + audio API calls + video encoding) — only set this when the user has explicitly asked for the movie. Default \`false\`.
 
-Always use Google providers when creating new scripts. Required structure:
+Provider rules for new scripts:
+- \`speechParams.speakers.<name>.provider\`: \`"gemini"\` — pairs with Gemini voices like \`"Kore"\`, \`"Aoede"\`, \`"Puck"\`. Do NOT use \`"google"\` here — that routes to Google Cloud TTS, where Gemini-class voices fail with "This voice requires a model name to be specified." unless an explicit \`model\` is set.
+- \`imageParams.provider\`: \`"google"\`
+- \`movieParams.provider\`: \`"google"\`
+- Do NOT add a top-level \`provider\` field to \`speechParams\` — provider belongs per-speaker only.
+
+Required structure:
 
 {
   "$mulmocast": { "version": "1.1" },
