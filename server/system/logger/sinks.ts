@@ -1,7 +1,7 @@
 import { appendFile } from "fs/promises";
 import path from "path";
 import type { ConsoleSinkConfig, FileSinkConfig, TelemetrySinkConfig } from "./config.js";
-import { formatJson, formatText } from "./formatters.js";
+import { formatJson, formatText, formatTextColor } from "./formatters.js";
 import { dailyFileName, enforceMaxFiles, ensureDir } from "./rotation.js";
 import type { Formatter, LogRecord, Sink } from "./types.js";
 
@@ -9,15 +9,30 @@ function pickFormatter(kind: "text" | "json"): Formatter {
   return kind === "json" ? formatJson : formatText;
 }
 
+// Honour the cross-tool `NO_COLOR` convention (https://no-color.org/).
+// Any non-empty value disables colour even on a real TTY — useful when
+// piping to a file or running under a CI runner that doesn't strip
+// escapes itself.
+function colorEnabled(stream: { isTTY?: boolean }): boolean {
+  if (process.env.NO_COLOR && process.env.NO_COLOR.length > 0) return false;
+  return stream.isTTY === true;
+}
+
 export function createConsoleSink(config: ConsoleSinkConfig): Sink {
-  const fmt = pickFormatter(config.format);
+  // Pre-resolve a (plain, colour) pair once. `text` may upgrade to the
+  // ANSI variant per record based on which stream the record will hit;
+  // `json` stays uncoloured so structured-log consumers get a clean
+  // stream regardless of the terminal.
+  const plain = pickFormatter(config.format);
+  const colored: Formatter = config.format === "text" ? formatTextColor : plain;
+
   return {
     name: "console",
     level: config.level,
     write(record: LogRecord) {
-      const line = fmt(record) + "\n";
       const stream = record.level === "error" || record.level === "warn" ? process.stderr : process.stdout;
-      stream.write(line);
+      const fmt = colorEnabled(stream) ? colored : plain;
+      stream.write(fmt(record) + "\n");
     },
   };
 }

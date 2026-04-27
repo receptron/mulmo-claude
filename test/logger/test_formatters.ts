@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatJson, formatText } from "../../server/system/logger/formatters.js";
+import { formatJson, formatText, formatTextColor } from "../../server/system/logger/formatters.js";
 import type { LogRecord } from "../../server/system/logger/types.js";
 
 function record(overrides: Partial<LogRecord> = {}): LogRecord {
@@ -47,6 +47,36 @@ describe("formatText", () => {
   it("serialises nested objects as JSON", () => {
     const out = formatText(record({ data: { meta: { a: 1, b: [2, 3] } } }));
     assert.ok(out.includes('meta={"a":1,"b":[2,3]}'));
+  });
+});
+
+describe("formatTextColor", () => {
+  // Build the ANSI patterns from String.fromCharCode so the lint rule
+  // `no-control-regex` doesn't trip on a literal ESC byte in the source.
+  const ESC = String.fromCharCode(27);
+  const COLOR_RE = new RegExp(`^2026-04-13T07:12:45\\.123Z ${ESC}\\[[0-9;]+m([A-Z ]+?)${ESC}\\[0m \\[agent\\]`);
+  const ANY_ANSI = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+  const FIRST_CODE = new RegExp(`${ESC}\\[([0-9;]+)m`);
+
+  it("wraps the level word in an ANSI escape but leaves the rest untouched", () => {
+    const colored = formatTextColor(record({ level: "warn" }));
+    const plain = formatText(record({ level: "warn" }));
+    const match = COLOR_RE.exec(colored);
+    assert.ok(match, "expected coloured output to start with timestamp + ANSI level");
+    assert.equal(match[1], "WARN ");
+    // Stripping every ANSI escape recovers the plain output exactly.
+    assert.equal(colored.replaceAll(ANY_ANSI, ""), plain);
+  });
+
+  it("uses distinct colour codes per level (sanity check)", () => {
+    const seen = new Set<string>();
+    for (const level of ["error", "warn", "info", "debug"] as const) {
+      const out = formatTextColor(record({ level }));
+      const match = FIRST_CODE.exec(out);
+      assert.ok(match, `expected colour escape for level ${level}`);
+      seen.add(match[1] ?? "");
+    }
+    assert.equal(seen.size, 4, "every level should map to a distinct ANSI code");
   });
 });
 
