@@ -98,7 +98,6 @@ export const API_ROUTES = {
 
   mulmoScript: {
     save: "/api/mulmo-script",
-    load: "/api/mulmo-script/load",
     updateBeat: "/api/mulmo-script/update-beat",
     updateScript: "/api/mulmo-script/update-script",
     beatImage: "/api/mulmo-script/beat-image",
@@ -111,7 +110,6 @@ export const API_ROUTES = {
     uploadCharacterImage: "/api/mulmo-script/upload-character-image",
     movieStatus: "/api/mulmo-script/movie-status",
     generateMovie: "/api/mulmo-script/generate-movie",
-    generateMovieBackground: "/api/mulmo-script/generate-movie-background",
     downloadMovie: "/api/mulmo-script/download-movie",
   },
 

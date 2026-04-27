@@ -27,7 +27,7 @@ import { slugify } from "../../utils/slug.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
-import { getOptionalStringQuery } from "../../utils/request.js";
+import { getOptionalStringQuery, getSessionQuery } from "../../utils/request.js";
 import { log } from "../../system/logger/index.js";
 import { validateUpdateBeatBody, validateUpdateScriptBody } from "./mulmoScriptValidate.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -65,8 +65,10 @@ function ensureStoriesReal(): string | null {
 }
 
 interface SaveMulmoScriptBody {
-  script: MulmoScript;
+  script?: MulmoScript;
   filename?: string;
+  filePath?: string;
+  autoGenerateMovie?: boolean;
 }
 
 interface RenderBeatBody {
@@ -98,59 +100,84 @@ interface FilePathQuery {
   filePath?: string;
 }
 
-router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
-  const { script, filename } = req.body;
+interface ScriptOutcome {
+  script: MulmoScript;
+  /** Workspace-relative wire form, e.g. "stories/foo.json". */
+  wireFilePath: string;
+  /** Realpath, used by movie generation and the dedup set. */
+  absoluteFilePath: string;
+  message: string;
+}
 
-  if (!script || !Array.isArray(script.beats)) {
-    badRequest(res, "script with beats array is required");
+// Unified entry point — save a fresh `script` OR re-display an existing
+// one referenced by `filePath`. Folding both modes into one route lets
+// the agent (MCP) and the GUI dispatcher hit the same endpoint without
+// either side needing to know which mode the user picked. The MCP layer
+// in `server/agent/plugin-names.ts` routes the tool name straight here,
+// so any per-mode logic on the client would be invisible to it.
+router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
+  const { script, filename, filePath, autoGenerateMovie } = req.body ?? {};
+
+  const hasScript = script !== undefined && script !== null;
+  const hasFilePath = typeof filePath === "string" && filePath !== "";
+  if (hasScript === hasFilePath) {
+    badRequest(
+      res,
+      hasScript ? "Provide either `script` or `filePath`, not both." : "Provide either `script` (new presentation) or `filePath` (existing presentation).",
+    );
     return;
   }
 
+  const outcome = hasFilePath ? await loadScriptFromDisk(filePath, res) : await saveScriptToDisk(script as MulmoScript, filename, res);
+  if (!outcome) return; // helper already wrote a 4xx/5xx response
+
+  if (autoGenerateMovie === true) {
+    triggerAutoBackgroundMovie(outcome.absoluteFilePath, outcome.wireFilePath, getSessionQuery(req) || undefined);
+  }
+
+  res.json({
+    data: { script: outcome.script, filePath: outcome.wireFilePath },
+    message: outcome.message,
+    instructions: "Display the storyboard to the user.",
+  });
+});
+
+async function saveScriptToDisk(script: MulmoScript, filename: string | undefined, res: Response): Promise<ScriptOutcome | null> {
+  if (!Array.isArray(script.beats)) {
+    badRequest(res, "script with beats array is required");
+    return null;
+  }
   mkdirSync(storiesDir, { recursive: true });
 
   const title = script.title || "untitled";
   const slug = filename ? filename.replace(/\.json$/, "") : slugify(title);
   const fname = `${slug}-${Date.now()}.json`;
-  const filePath = path.join(storiesDir, fname);
+  const absoluteFilePath = path.join(storiesDir, fname);
 
-  await writeJsonAtomic(filePath, script);
+  await writeJsonAtomic(absoluteFilePath, script);
 
-  res.json({
-    data: { script, filePath: `stories/${fname}` },
+  return {
+    script,
+    wireFilePath: `stories/${fname}`,
+    absoluteFilePath,
     message: `Saved MulmoScript to stories/${fname}`,
-    instructions: "Display the storyboard to the user.",
-  });
-});
-
-interface LoadMulmoScriptBody {
-  filePath?: string;
+  };
 }
 
-// Re-display an already-saved MulmoScript without resending the full
-// JSON. Path is workspace-relative (e.g. "stories/foo.json"); the
-// resolveStoryPath helper enforces realpath-based confinement to the
-// stories directory and a `.json` extension is required to keep this
-// endpoint from doubling as a generic file-read primitive.
-router.post(API_ROUTES.mulmoScript.load, async (req: Request<object, object, LoadMulmoScriptBody>, res: Response) => {
-  const { filePath } = req.body ?? {};
-  if (typeof filePath !== "string" || filePath === "") {
-    badRequest(res, "filePath must be a non-empty string");
-    return;
-  }
+async function loadScriptFromDisk(filePath: string, res: Response): Promise<ScriptOutcome | null> {
   if (!filePath.toLowerCase().endsWith(".json")) {
     badRequest(res, "filePath must point to a .json file");
-    return;
+    return null;
   }
-
   const absoluteFilePath = resolveStoryPath(filePath, res);
-  if (!absoluteFilePath) return;
+  if (!absoluteFilePath) return null; // resolveStoryPath already responded
 
   let raw: string;
   try {
     raw = readFileSync(absoluteFilePath, "utf-8");
   } catch (err) {
     serverError(res, errorMessage(err));
-    return;
+    return null;
   }
 
   let parsed: unknown;
@@ -158,27 +185,32 @@ router.post(API_ROUTES.mulmoScript.load, async (req: Request<object, object, Loa
     parsed = JSON.parse(raw);
   } catch (err) {
     badRequest(res, `Invalid JSON: ${errorMessage(err)}`);
-    return;
+    return null;
   }
 
   const validation = mulmoScriptSchema.safeParse(parsed);
   if (!validation.success) {
     badRequest(res, "File is not a valid MulmoScript");
-    return;
+    return null;
   }
 
-  // Normalize the returned filePath so the View / future calls always
-  // use the canonical "stories/<rel>" wire form, regardless of what the
-  // caller passed in. Keeps pendingGenerations keys consistent across
-  // save and load.
-  const normalized = filePath.startsWith("stories/") || filePath === "stories" ? filePath : `stories/${filePath}`;
+  // Canonicalize the wire form to "stories/<rel>" so pendingGenerations
+  // keys match across save and load regardless of what the caller passed.
+  const wireFilePath = filePath.startsWith("stories/") || filePath === "stories" ? filePath : `stories/${filePath}`;
 
-  res.json({
-    data: { script: validation.data, filePath: normalized },
-    message: `Loaded MulmoScript from ${normalized}`,
-    instructions: "Display the storyboard to the user.",
-  });
-});
+  return {
+    script: validation.data,
+    wireFilePath,
+    absoluteFilePath,
+    message: `Loaded MulmoScript from ${wireFilePath}`,
+  };
+}
+
+function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): void {
+  if (inFlightMovies.has(absoluteFilePath)) return;
+  inFlightMovies.add(absoluteFilePath);
+  void runBackgroundMovieGeneration(absoluteFilePath, wireFilePath, chatSessionId);
+}
 
 router.post(API_ROUTES.mulmoScript.updateBeat, async (req: Request<object, object, unknown>, res: Response) => {
   const validation = validateUpdateBeatBody(req.body);
@@ -566,11 +598,11 @@ interface MovieProgressEvent {
 }
 
 // Shared core for both the SSE-streaming `generateMovie` route and the
-// fire-and-forget `generateMovieBackground` route. Builds the mulmo
-// context, runs images→audio→movie, and reports per-beat progress
-// through the supplied callback. Throws on unexpected pipeline errors;
-// returns a structured failure when the pipeline runs to completion
-// but the output file is missing.
+// fire-and-forget background path triggered by `autoGenerateMovie`.
+// Builds the mulmo context, runs images→audio→movie, and reports
+// per-beat progress through the supplied callback. Throws on
+// unexpected pipeline errors; returns a structured failure when the
+// pipeline runs to completion but the output file is missing.
 async function runMovieGeneration(absoluteFilePath: string, onProgressEvent: (event: MovieProgressEvent) => void): Promise<MovieGenerationResult> {
   const context = await buildContext(absoluteFilePath);
   if (!context) return { ok: false, error: "Failed to initialize mulmo context" };
@@ -648,41 +680,15 @@ router.post(API_ROUTES.mulmoScript.generateMovie, async (req: Request<object, ob
   }
 });
 
-// Background sibling of `generateMovie`. POST returns 200 immediately;
-// the heavy work runs detached, reporting progress through the same
-// session pendingGenerations channel that the View already watches —
-// so a user opening the canvas mid-generation sees spinners, and a
-// user opening it after completion sees the finished movie loaded
-// from disk by the View's normal mount-time path.
-//
-// Errors are persisted to a `<filename>.error.txt` sidecar next to the
-// script (no synchronous client to alert), and any stale sidecar from
-// a previous failed run is cleared on each new attempt.
-router.post(
-  API_ROUTES.mulmoScript.generateMovieBackground,
-  async (req: Request<object, object, { filePath: string; chatSessionId?: string }>, res: Response) => {
-    const { filePath, chatSessionId } = req.body;
-
-    if (!filePath) {
-      badRequest(res, "filePath is required");
-      return;
-    }
-
-    const absoluteFilePath = resolveStoryPath(filePath, res);
-    if (!absoluteFilePath) return;
-
-    if (inFlightMovies.has(absoluteFilePath)) {
-      badRequest(res, "Movie generation is already in progress for this script");
-      return;
-    }
-
-    inFlightMovies.add(absoluteFilePath);
-    res.json({ ok: true });
-
-    void runBackgroundMovieGeneration(absoluteFilePath, filePath, chatSessionId);
-  },
-);
-
+// Detached movie generation. Reports progress through the same session
+// pendingGenerations channel that the View already watches — so a user
+// opening the canvas mid-generation sees spinners, and a user opening
+// it after completion sees the finished movie loaded from disk by the
+// View's normal mount-time path. Errors are persisted to a
+// `<filename>.error.txt` sidecar next to the script (no synchronous
+// client to alert); any stale sidecar from a previous run is cleared on
+// each new attempt. Triggered server-side from the unified save route
+// when the caller passes `autoGenerateMovie: true`.
 async function runBackgroundMovieGeneration(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): Promise<void> {
   const errorSidecarPath = `${absoluteFilePath}.error.txt`;
   // Clear stale error from a previous failed run before starting; if it
