@@ -659,11 +659,17 @@ async function runMovieGeneration(absoluteFilePath: string, onProgressEvent: (ev
 
   addSessionProgressCallback(onProgress);
   try {
-    const imagesContext = await images(context);
-    const audioContext = await audio(imagesContext);
-    await movie(audioContext);
+    // Order matters: audio() must run before images(). For html_tailwind
+    // beats with `animation: true`, mulmocast only emits the per-beat
+    // `_animated.mp4` when the beat's duration is already known (see
+    // processHtmlTailwindAnimated in mulmocast). Durations are populated
+    // by audio(), so running images() first leaves the .mp4 files
+    // missing and movie() then fails in validateBeatSource.
+    const audioContext = await audio(context);
+    const imagesContext = await images(audioContext);
+    await movie(imagesContext);
 
-    const outputPath = movieFilePath(audioContext);
+    const outputPath = movieFilePath(imagesContext);
     if (!existsSync(outputPath)) return { ok: false, error: "Movie was not generated" };
     return { ok: true, outputPath };
   } finally {
