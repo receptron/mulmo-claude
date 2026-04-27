@@ -505,10 +505,20 @@ const hasNext = computed(() => {
 function lightboxMove(delta: number) {
   if (!lightbox.value) return;
   const total = beats.value.length;
+  // If audio was playing when the user clicked the arrow, carry the
+  // playback over to the next beat that has audio. openLightbox()
+  // unconditionally stops any active audio, so we capture the flag
+  // BEFORE that and replay AFTER. The on-ended auto-advance path
+  // already nulls playingAudio before calling lightboxMove, so this
+  // branch won't double-fire there.
+  const wasPlaying = playingAudio.value !== null;
   let i = lightbox.value.index + delta;
   while (i >= 0 && i < total) {
     if (renderedImages[i]) {
       openLightbox(i);
+      if (wasPlaying && beatAudios[i]) {
+        playAudio(i);
+      }
       return;
     }
     i += delta;
