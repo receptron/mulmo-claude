@@ -84,6 +84,9 @@ const enMessages = {
     toolCallHistory: "Tool call history",
     settings: "Settings",
     settingsGeminiMissing: "Settings — Gemini API key missing",
+    todayJournal: "Today's journal",
+    todayJournalNotFound: "No journal summary yet — chat for a while and the journal will generate one.",
+    todayJournalLoadFailed: "Failed to load journal (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "Toggle system prompt",
@@ -222,6 +225,111 @@ const enMessages = {
     htmlPreview: "HTML preview",
     pdfPreview: "PDF preview",
     parseError: "parse error",
+  },
+  // SystemFileBanner copy. Each id matches a descriptor in
+  // src/config/systemFileDescriptors.ts. `title` is the chip-style
+  // headline above the file body; `summary` is one or two sentences
+  // explaining what the file is, who edits it, and why the banner is
+  // showing. Edit-policy chip labels go under `editPolicy`; the
+  // remaining keys (schemaLabel, showDetails, hideDetails) are
+  // banner chrome.
+  systemFiles: {
+    schemaLabel: "Schema",
+    showDetails: "Show details",
+    hideDetails: "Hide details",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Agent-managed (hand-edit OK)",
+      "user-editable": "User-editable",
+      "agent-managed": "Agent-managed",
+      "fragile-format": "Fragile format",
+      ephemeral: "Ephemeral",
+    },
+    interests: {
+      title: "Interests config",
+      summary: "Topics that the news / sources pipeline watches and ranks for you. Editable by hand; the agent also updates it from chat.",
+    },
+    mcp: {
+      title: "MCP servers",
+      summary: "External Model Context Protocol servers attached to the agent. Add HTTP or stdio servers to expand the agent's tool surface.",
+    },
+    settings: {
+      title: "App settings",
+      summary: "User-editable behavioural preferences for the app — Gemini API key, allowed tools, sandbox config, and similar.",
+    },
+    schedulerTasks: {
+      title: "Scheduler tasks",
+      summary: "Recurring agent automations that fire on a schedule. Managed via the Automations UI; this file is the on-disk source of truth.",
+    },
+    schedulerOverrides: {
+      title: "Scheduler overrides",
+      summary:
+        "Per-task time / interval overrides applied on top of the system schedule. The agent edits this when you ask to change a recurring task's timing.",
+    },
+    newsReadState: {
+      title: "News read state",
+      summary: "Local-only tracking of which news items you've seen. Ephemeral — safe to delete; will be regenerated as you read.",
+    },
+    schedulerItems: {
+      title: "Scheduler items queue",
+      summary: "Active scheduled invocations ready to fire. Agent-managed; do not hand-edit unless you know exactly what each field means.",
+    },
+    todosItems: {
+      title: "Todo items",
+      summary: 'Your tasks across all columns of the kanban board. The agent writes here when you say things like "add a todo"; you can also hand-edit.',
+    },
+    todosColumns: {
+      title: "Todo columns",
+      summary: "Column layout of the kanban board (titles, order, ids). User-editable — rename or reorder freely.",
+    },
+    wikiIndex: {
+      title: "Wiki index",
+      summary: "Auto-generated index of every wiki page. Refreshed on each wiki edit; do not hand-edit (your changes will be overwritten).",
+    },
+    wikiLog: {
+      title: "Wiki edit log",
+      summary: "Activity log of wiki page creates and edits. Agent-managed and append-only; useful as a recent-changes feed.",
+    },
+    wikiSummary: {
+      title: "Wiki summary",
+      summary: "Auto-generated overview of the wiki — topic clusters, page counts, recent activity. Refreshed by the agent.",
+    },
+    wikiSchema: {
+      title: "Wiki schema",
+      summary: "The format spec the agent reads to keep wiki pages consistent. Fragile — the agent expects a specific structure, so prefer agent-driven edits.",
+    },
+    memory: {
+      title: "Memory",
+      summary:
+        "Distilled facts about you, always loaded as context for new conversations. The journal extractor appends here automatically; you can also hand-edit.",
+    },
+    summariesIndex: {
+      title: "Summaries index",
+      summary: "Browseable index linking the daily and topic summaries the journal generates. Agent-managed; refreshed on each journal pass.",
+    },
+    rolesJson: {
+      title: "Role definition (JSON)",
+      summary: "Role configuration — model choice, MCP servers, allowed plugins, query suggestions. User-editable; restart not required.",
+    },
+    rolesMd: {
+      title: "Role description (Markdown)",
+      summary: "The role's persona and system-prompt prose, loaded as context when this role is active. User-editable; changes apply on the next message.",
+    },
+    sourceFeed: {
+      title: "Source feed",
+      summary: "One subscribed source (RSS, GitHub releases / issues, arXiv, etc.). User-editable; the sources pipeline polls these on schedule.",
+    },
+    sourceState: {
+      title: "Source state",
+      summary: "Ephemeral pipeline state for one source — last-seen ids, ETags, fetch errors. Safe to delete; will be regenerated on the next pipeline run.",
+    },
+    journalDaily: {
+      title: "Daily journal summary",
+      summary: "Auto-generated recap of your activity for one calendar day, distilled from chat sessions by the journal pass.",
+    },
+    journalTopic: {
+      title: "Topic journal",
+      summary: "Long-running notes for one specific topic, accumulated and revised as you keep talking about it. Agent-managed.",
+    },
   },
   settingsMcpTab: {
     explanation:

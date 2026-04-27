@@ -69,6 +69,9 @@ const jaMessages = {
     toolCallHistory: "ツール呼び出し履歴",
     settings: "設定",
     settingsGeminiMissing: "設定 — Gemini API キー未設定",
+    todayJournal: "今日のまとめ",
+    todayJournalNotFound: "まだまとめがありません — しばらく会話するとjournalが生成します。",
+    todayJournalLoadFailed: "journal の読み込みに失敗しました (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "システムプロンプトの表示切替",
@@ -205,6 +208,102 @@ const jaMessages = {
     htmlPreview: "HTML プレビュー",
     pdfPreview: "PDF プレビュー",
     parseError: "パースエラー",
+  },
+  systemFiles: {
+    schemaLabel: "スキーマ",
+    showDetails: "詳細を表示",
+    hideDetails: "詳細を隠す",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "エージェント管理（手動編集可）",
+      "user-editable": "ユーザー編集可",
+      "agent-managed": "エージェント管理",
+      "fragile-format": "壊れやすい書式",
+      ephemeral: "一時ファイル",
+    },
+    interests: {
+      title: "Interests 設定",
+      summary: "ニュース／ソースのパイプラインが監視・スコアリングする話題を定義します。手動編集可能で、エージェントも会話から自動更新します。",
+    },
+    mcp: {
+      title: "MCP サーバ",
+      summary: "エージェントに接続される外部の Model Context Protocol サーバ。HTTP / stdio サーバを追加してツールを拡張できます。",
+    },
+    settings: {
+      title: "アプリ設定",
+      summary: "ユーザー編集可能な動作設定 — Gemini API キー、許可ツール、サンドボックス設定など。",
+    },
+    schedulerTasks: {
+      title: "スケジューラタスク",
+      summary: "定期実行されるエージェント自動化。Automations UI から管理し、このファイルがディスク上の正本です。",
+    },
+    schedulerOverrides: {
+      title: "スケジューラオーバーライド",
+      summary: "システム既定スケジュールに上書きするタスクごとの時刻 / 間隔の上書き。会話で「このタスクの時刻を変えて」と頼むとエージェントが書き換えます。",
+    },
+    newsReadState: {
+      title: "ニュース既読状態",
+      summary: "閲覧済みニュースのローカル追跡。一時ファイル — 削除しても再読み込みで再生成されます。",
+    },
+    schedulerItems: {
+      title: "スケジューラアイテムキュー",
+      summary: "発火待ちの予約済み実行キュー。エージェント管理 — 各フィールドの意味を理解していなければ手動編集しないでください。",
+    },
+    todosItems: {
+      title: "Todo アイテム",
+      summary: "カンバン全列にまたがるタスク一覧。「Todo を追加して」と言うとエージェントがここに書き込みます。手動編集も可能です。",
+    },
+    todosColumns: {
+      title: "Todo 列定義",
+      summary: "カンバンの列レイアウト（タイトル・順序・ID）。ユーザー編集可 — 自由に名前変更や並び替えができます。",
+    },
+    wikiIndex: {
+      title: "Wiki インデックス",
+      summary: "全 Wiki ページの自動生成インデックス。Wiki 編集ごとに更新されます — 手動編集すると上書きされます。",
+    },
+    wikiLog: {
+      title: "Wiki 編集ログ",
+      summary: "Wiki ページ作成・編集の活動ログ。エージェント管理の追記専用 — 直近変更フィードとして便利です。",
+    },
+    wikiSummary: {
+      title: "Wiki サマリ",
+      summary: "Wiki の自動生成概要 — トピッククラスタ、ページ数、最近の活動。エージェントが定期的に更新します。",
+    },
+    wikiSchema: {
+      title: "Wiki スキーマ",
+      summary: "Wiki ページの一貫性を保つためにエージェントが参照する書式仕様。壊れやすい — 特定の構造を期待するため、エージェント主導の編集を推奨します。",
+    },
+    memory: {
+      title: "メモリ",
+      summary: "新しい会話のコンテキストとして常に読み込まれる、あなたに関する蒸留された事実。journal の抽出器が自動追記し、手動編集も可能です。",
+    },
+    summariesIndex: {
+      title: "サマリインデックス",
+      summary: "journal が生成する日次・トピックサマリへのリンク集。エージェント管理 — journal 実行ごとに更新されます。",
+    },
+    rolesJson: {
+      title: "ロール定義 (JSON)",
+      summary: "ロール設定 — モデル選択、MCP サーバ、利用可能プラグイン、クエリ候補。ユーザー編集可、再起動不要。",
+    },
+    rolesMd: {
+      title: "ロール説明 (Markdown)",
+      summary: "ロールのペルソナとシステムプロンプト本文。このロール選択時にコンテキストとして読み込まれます。次のメッセージから反映されます。",
+    },
+    sourceFeed: {
+      title: "ソースフィード",
+      summary: "購読中の1ソース（RSS、GitHub リリース/Issue、arXiv 等）。ユーザー編集可 — sources パイプラインが定期的にポーリングします。",
+    },
+    sourceState: {
+      title: "ソース状態",
+      summary: "1ソース分の一時的なパイプライン状態 — 最終既読 ID、ETag、fetch エラー等。削除可 — 次回実行時に再生成されます。",
+    },
+    journalDaily: {
+      title: "日次 journal まとめ",
+      summary: "1日分のあなたの活動を、journal パスがチャットセッションから蒸留して自動生成した要約です。",
+    },
+    journalTopic: {
+      title: "トピック journal",
+      summary: "1つの特定トピックに関する長期的なメモ。話題が継続するたびに蓄積・更新されます。エージェント管理。",
+    },
   },
   settingsMcpTab: {
     explanation:
