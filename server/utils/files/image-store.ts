@@ -1,7 +1,8 @@
-import { mkdir, readFile, realpath, writeFile } from "fs/promises";
+import { mkdir, readFile, realpath } from "fs/promises";
 import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { shortId } from "../id.js";
+import { writeFileAtomic } from "./atomic.js";
 import { yearMonthUtc } from "./naming.js";
 import { resolveWithinRoot } from "./safe.js";
 
@@ -35,21 +36,24 @@ async function safeResolve(relativePath: string): Promise<string> {
 
 /** Save raw base64 (no data URI prefix) as a PNG file. New files
  *  land under `images/YYYY/MM/` (UTC) so the dir doesn't accumulate
- *  unbounded — see #764. Returns the workspace-relative path. */
+ *  unbounded — see #764. Returns the workspace-relative path.
+ *  Atomic: a crashed write can't leave a half-written PNG on disk
+ *  (#881 v1). `writeFileAtomic` accepts Buffer directly, so the raw
+ *  PNG bytes pass through without re-encoding. */
 export async function saveImage(base64Data: string): Promise<string> {
   await ensureImagesDir();
   const partition = yearMonthUtc();
-  const parentAbs = path.join(IMAGES_DIR, partition);
-  await mkdir(parentAbs, { recursive: true });
   const filename = `${shortId()}.png`;
-  await writeFile(path.join(parentAbs, filename), Buffer.from(base64Data, "base64"));
+  const absPath = path.join(IMAGES_DIR, partition, filename);
+  await writeFileAtomic(absPath, Buffer.from(base64Data, "base64"));
   return path.posix.join(WORKSPACE_DIRS.images, partition, filename);
 }
 
-/** Overwrite an existing image file. The relativePath must start with "images/". */
+/** Overwrite an existing image file. The relativePath must start with "images/".
+ *  Atomic — see {@link saveImage}. */
 export async function overwriteImage(relativePath: string, base64Data: string): Promise<void> {
   const absPath = await safeResolve(relativePath);
-  await writeFile(absPath, Buffer.from(base64Data, "base64"));
+  await writeFileAtomic(absPath, Buffer.from(base64Data, "base64"));
 }
 
 /** Read an image file and return raw base64 (no data URI prefix). */

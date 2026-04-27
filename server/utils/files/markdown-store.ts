@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { readFile } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../../workspace/workspace.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
+import { writeFileAtomic } from "./atomic.js";
 import { buildArtifactPathRandom } from "./naming.js";
 
 /**
@@ -9,15 +10,16 @@ import { buildArtifactPathRandom } from "./naming.js";
  * `prefix` is slugified; a random id is always appended to prevent
  * collisions between concurrent writers sharing the same prefix.
  *
- * `buildArtifactPathRandom` now injects a `YYYY/MM` partition (#764),
- * so this function ensures the partition directory exists before
- * writing — `writeFile` doesn't create missing parents on its own.
+ * `buildArtifactPathRandom` injects a `YYYY/MM` partition (#764) and
+ * `writeFileAtomic` creates missing parents itself, so callers don't
+ * need a separate `mkdir` step.
+ *
+ * Atomic: a crashed write can't leave a half-written .md (#881 v1).
  */
 export async function saveMarkdown(content: string, prefix: string): Promise<string> {
   const relPath = buildArtifactPathRandom(WORKSPACE_DIRS.markdowns, prefix, ".md", "document");
   const absPath = path.join(workspacePath, relPath);
-  await mkdir(path.dirname(absPath), { recursive: true });
-  await writeFile(absPath, content, "utf-8");
+  await writeFileAtomic(absPath, content);
   return relPath;
 }
 
@@ -27,10 +29,10 @@ export async function loadMarkdown(relativePath: string): Promise<string> {
   return readFile(absPath, "utf-8");
 }
 
-/** Overwrite an existing markdown file. */
+/** Overwrite an existing markdown file. Atomic — see {@link saveMarkdown}. */
 export async function overwriteMarkdown(relativePath: string, content: string): Promise<void> {
   const absPath = path.join(workspacePath, relativePath);
-  await writeFile(absPath, content, "utf-8");
+  await writeFileAtomic(absPath, content);
 }
 
 /** Check if a string is a markdown file path (not inline content).
