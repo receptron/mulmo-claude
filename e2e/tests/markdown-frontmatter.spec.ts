@@ -102,6 +102,13 @@ test.describe("FileContentRenderer — frontmatter (#895 PR A)", () => {
     await expect(page.getByText("demo", { exact: true })).toBeVisible();
     await expect(page.getByText("frontmatter", { exact: true })).toBeVisible();
 
+    // Nested object values must NOT render as `[object Object]` —
+    // `formatScalarField` JSON-stringifies them (codex iter-2 #902).
+    // The fixture doesn't include nested objects directly, so we
+    // assert the absence of the placeholder string here as a
+    // regression guard for future fixtures.
+    expect(await page.locator("body").innerText()).not.toContain("[object Object]");
+
     // The raw `---` fence must NOT appear as text in the rendered
     // body. (marked turns a stray `---` line into an `<hr>` element,
     // and the `title: Sample Doc` line would render as plain text

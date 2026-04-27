@@ -62,7 +62,14 @@ export function parseFrontmatter(raw: string): ParsedMarkdown {
 /** Serialize a meta object + body back into the canonical
  *  `---\n...\n---\n\nbody` shape. An empty `meta` returns the body
  *  alone (no envelope) — the lazy-on-write contract: don't add
- *  ceremony to documents that don't have anything to record. */
+ *  ceremony to documents that don't have anything to record.
+ *
+ *  Round-trip semantics: VALUE-preserving, NOT byte-preserving.
+ *  `js-yaml` adds quotes to ambiguous scalars (`'1.20'`, `'true'`)
+ *  so they parse back as the same string under FAILSAFE_SCHEMA.
+ *  Source-text formatting (unquoted vs quoted) may change on save
+ *  but the parsed value is stable across rounds (codex review
+ *  iter-2 #902). */
 export function serializeWithFrontmatter(meta: Record<string, unknown>, body: string): string {
   if (Object.keys(meta).length === 0) return body;
   // `lineWidth: -1` disables auto-wrap so long URLs / titles stay on

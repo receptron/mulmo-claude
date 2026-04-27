@@ -31,8 +31,12 @@
               <span class="font-semibold text-gray-600 shrink-0">{{ field.key }}:</span>
               <template v-if="Array.isArray(field.value)">
                 <span class="flex flex-wrap gap-1">
-                  <span v-for="item in field.value" :key="String(item)" class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700">
-                    {{ item }}
+                  <span
+                    v-for="(item, idx) in field.value"
+                    :key="String(idx) + ':' + formatScalarField(item)"
+                    class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700"
+                  >
+                    {{ formatScalarField(item) }}
                   </span>
                 </span>
               </template>

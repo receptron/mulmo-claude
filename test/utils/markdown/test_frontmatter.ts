@@ -147,6 +147,32 @@ describe("serializeWithFrontmatter", () => {
     assert.equal(out.meta.count, "5");
     assert.equal(out.meta.enabled, "true");
   });
+
+  it("round-trip is VALUE-preserving — quoted ambiguous scalars still parse back as the same string (codex iter-2 #902)", () => {
+    // js-yaml's dump quotes ambiguous scalars to keep them
+    // parsable as strings under any schema. The serialized text
+    // for `1.20` is `'1.20'` (quoted) — DIFFERENT bytes from the
+    // user's original `1.20` — but the parsed value is identical
+    // ("1.20"). Pin: the value survives any number of save/load
+    // cycles, even if the source-text formatting changes once.
+    const original = "---\nversion: 1.20\nflag: true\nzeros: 00123\n---\nbody";
+    const round1 = parseFrontmatter(original);
+    assert.equal(round1.meta.version, "1.20");
+    assert.equal(round1.meta.flag, "true");
+    assert.equal(round1.meta.zeros, "00123");
+
+    const text2 = serializeWithFrontmatter(round1.meta, round1.body);
+    const round2 = parseFrontmatter(text2);
+    assert.equal(round2.meta.version, "1.20");
+    assert.equal(round2.meta.flag, "true");
+    assert.equal(round2.meta.zeros, "00123");
+
+    // And one more cycle for good measure — the meta is a fixed
+    // point of (parse ∘ serialize).
+    const text3 = serializeWithFrontmatter(round2.meta, round2.body);
+    const round3 = parseFrontmatter(text3);
+    assert.deepEqual(round3.meta, round2.meta);
+  });
 });
 
 describe("mergeFrontmatter", () => {
