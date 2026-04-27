@@ -143,21 +143,44 @@ router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, Sav
 });
 
 async function saveScriptToDisk(script: MulmoScript, filename: string | undefined, res: Response): Promise<ScriptOutcome | null> {
-  if (!Array.isArray(script.beats)) {
-    badRequest(res, "script with beats array is required");
+  // Validate against the same schema the reopen path uses so /save and
+  // /load agree on what counts as a valid MulmoScript — otherwise
+  // /save could persist a script that /load would later refuse, and
+  // autoGenerateMovie could kick off against malformed input.
+  const validation = mulmoScriptSchema.safeParse(script);
+  if (!validation.success) {
+    badRequest(res, "script is not a valid MulmoScript");
     return null;
   }
+  const validatedScript = validation.data;
+
   mkdirSync(storiesDir, { recursive: true });
 
-  const title = script.title || "untitled";
-  const slug = filename ? filename.replace(/\.json$/, "") : slugify(title);
+  const title = validatedScript.title || "untitled";
+  // slugify drops `/`, `\`, and `..`, so a hostile `filename` like
+  // "../../etc/passwd" can never escape storiesDir via the path.join
+  // below — defense in depth on top of the wire-side validation.
+  const slug = filename ? slugify(filename.replace(/\.json$/i, "")) : slugify(title);
   const fname = `${slug}-${Date.now()}.json`;
-  const absoluteFilePath = path.join(storiesDir, fname);
+  const writePath = path.join(storiesDir, fname);
 
-  await writeJsonAtomic(absoluteFilePath, script);
+  await writeJsonAtomic(writePath, validatedScript);
+
+  // Realpath-resolve the freshly written file so `inFlightMovies`
+  // entries created from this code path collide with ones produced by
+  // `resolveStoryPath` (used by reopen / SSE generateMovie / movie-
+  // status). Without this, a symlinked storiesDir would let two movie
+  // generations for the same physical file run concurrently because
+  // their dedup keys differ (path.join vs realpath).
+  let absoluteFilePath: string;
+  try {
+    absoluteFilePath = realpathSync(writePath);
+  } catch {
+    absoluteFilePath = writePath;
+  }
 
   return {
-    script,
+    script: validatedScript,
     wireFilePath: `stories/${fname}`,
     absoluteFilePath,
     message: `Saved MulmoScript to stories/${fname}`,
@@ -194,9 +217,11 @@ async function loadScriptFromDisk(filePath: string, res: Response): Promise<Scri
     return null;
   }
 
-  // Canonicalize the wire form to "stories/<rel>" so pendingGenerations
-  // keys match across save and load regardless of what the caller passed.
-  const wireFilePath = filePath.startsWith("stories/") || filePath === "stories" ? filePath : `stories/${filePath}`;
+  // Canonicalize via the realpath-resolved absoluteFilePath so wire
+  // forms like "bar.json" or "stories/foo/../bar.json" all collapse
+  // to the same "stories/<rel>" key — pendingGenerations and movie-
+  // status lookups depend on that stability.
+  const wireFilePath = toStoryRef(absoluteFilePath);
 
   return {
     script: validation.data,
@@ -613,6 +638,16 @@ async function runMovieGeneration(absoluteFilePath: string, onProgressEvent: (ev
     idToIndex.set(key, index);
   });
 
+  // Known limitation: addSessionProgressCallback is global, so when two
+  // movie generations for *different* scripts run concurrently, both
+  // closures are invoked for every beat event and rely on idToIndex to
+  // filter out the other run's events. That filter is reliable only
+  // when each beat carries an explicit `id`. Beats without one fall
+  // back to "__index__${index}", and identical fallback ids across
+  // scripts collide → progress meant for script A surfaces on script B.
+  // Fixing this properly needs mulmocast to attach a per-run identifier
+  // to its progress events (or a global serialization gate); tracked
+  // separately, out of scope for this PR.
   const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
     if (event.kind !== "beat" || event.inSession || event.id === undefined) return;
     const beatIndex = idToIndex.get(event.id);
