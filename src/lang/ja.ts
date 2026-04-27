@@ -617,6 +617,9 @@ const jaMessages = {
     noMatches: "#{tag} タグのページがありません",
     lintChat: "Wiki を Lint",
     taskCountMismatch: "Wiki ソースと描画結果でタスク数が一致しないため、ファイル破損を避けるためトグル操作を中止しました。",
+    metadataCreated: "作成",
+    metadataUpdated: "更新",
+    metadataEditor: "編集者",
   },
   pluginPresentForm: {
     fallbackTitle: "フォーム",

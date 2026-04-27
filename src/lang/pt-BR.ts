@@ -619,6 +619,9 @@ const ptBRMessages = {
     noMatches: "Nenhuma página com a tag #{tag}",
     lintChat: "Revisar meu wiki",
     taskCountMismatch: "A fonte do wiki e a saída renderizada divergem no número de tarefas. A alternância foi recusada para evitar corromper o arquivo.",
+    metadataCreated: "Criado",
+    metadataUpdated: "Atualizado",
+    metadataEditor: "Editor",
   },
   pluginPresentForm: {
     fallbackTitle: "Formulário",

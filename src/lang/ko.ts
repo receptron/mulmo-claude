@@ -617,6 +617,9 @@ const koMessages = {
     noMatches: "#{tag} 태그가 달린 페이지가 없습니다",
     lintChat: "Wiki 점검",
     taskCountMismatch: "Wiki 원본과 렌더링 결과의 작업 수가 일치하지 않아, 파일 손상을 방지하기 위해 토글이 거부되었습니다.",
+    metadataCreated: "생성",
+    metadataUpdated: "업데이트",
+    metadataEditor: "편집자",
   },
   pluginPresentForm: {
     fallbackTitle: "양식",

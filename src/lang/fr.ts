@@ -620,6 +620,9 @@ const frMessages = {
     noMatches: "Aucune page avec le tag #{tag}",
     lintChat: "Vérifier mon wiki",
     taskCountMismatch: "La source du wiki et le rendu diffèrent sur le nombre de tâches. La modification a été refusée pour éviter de corrompre le fichier.",
+    metadataCreated: "Créé",
+    metadataUpdated: "Mis à jour",
+    metadataEditor: "Éditeur",
   },
   pluginPresentForm: {
     fallbackTitle: "Formulaire",

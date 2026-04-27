@@ -110,7 +110,10 @@ describe("POST /api/wiki — action: save", () => {
     __resetPageIndexCache();
   });
 
-  it("overwrites an existing page atomically", async () => {
+  it("overwrites an existing page atomically (with auto-stamped frontmatter)", async () => {
+    // Post-#895-PR-B: even body-only saves get a frontmatter
+    // envelope stamped with created / updated / editor. The body
+    // content survives verbatim; the wrapper is the new shape.
     const slug = "test-page";
     const filePath = path.join(pagesDir, `${slug}.md`);
     await writeFile(filePath, "# Original\n\n- [ ] task\n", "utf-8");
@@ -121,13 +124,21 @@ describe("POST /api/wiki — action: save", () => {
 
     assert.equal(state.status, 200);
     const onDisk = await readFile(filePath, "utf-8");
-    assert.equal(onDisk, newContent);
-    // Response carries the canonical post-write content.
-    assert.equal(state.body?.data?.content, newContent);
+    // Body must be preserved verbatim, but the file now carries a
+    // frontmatter envelope with auto-stamped fields.
+    assert.match(onDisk, /\n- \[x\] task\n$/);
+    assert.match(onDisk, /^---\n/);
+    assert.match(onDisk, /editor: user/);
+    // Response should reflect the on-disk canonical content.
+    assert.equal(state.body?.data?.content, onDisk);
     assert.equal(state.body?.data?.pageExists, true);
   });
 
   it("preserves frontmatter when the body has been toggled", async () => {
+    // The route now stamps `created` / `updated` / `editor` on save
+    // (#895 PR B). Existing user-supplied keys must still survive
+    // verbatim. Assert the stable fields explicitly rather than
+    // comparing the whole file byte-for-byte.
     const slug = "with-frontmatter";
     const filePath = path.join(pagesDir, `${slug}.md`);
     const original = "---\ntitle: Foo\ntags: [a, b]\n---\n\n- [ ] task one\n- [ ] task two\n";
@@ -139,8 +150,16 @@ describe("POST /api/wiki — action: save", () => {
 
     assert.equal(state.status, 200);
     const onDisk = await readFile(filePath, "utf-8");
-    assert.equal(onDisk, updated);
-    assert.match(onDisk, /^---\ntitle: Foo/, "frontmatter delimiters should round-trip");
+    assert.match(onDisk, /^---\n/, "frontmatter delimiters should round-trip");
+    assert.match(onDisk, /title: Foo/, "user-supplied title preserved");
+    assert.match(onDisk, /\n- \[x\] task one\n- \[ \] task two\n$/, "body toggled correctly");
+    // `tags` round-trips as either flow-style `[a, b]` or block list.
+    // Either is fine — assert both entries appear somewhere in the
+    // header rather than pinning a specific YAML serialisation.
+    const headerEnd = onDisk.indexOf("\n---\n", 4);
+    const header = onDisk.slice(0, headerEnd);
+    assert.match(header, /\ba\b/);
+    assert.match(header, /\bb\b/);
   });
 
   it("rejects a request with no pageName", async () => {

@@ -642,6 +642,9 @@ const enMessages = {
     noMatches: "No pages tagged #{tag}",
     lintChat: "Lint My Wiki",
     taskCountMismatch: "Wiki source and rendered output disagree on the number of tasks. Refusing to toggle to avoid corruption.",
+    metadataCreated: "Created",
+    metadataUpdated: "Updated",
+    metadataEditor: "Editor",
   },
   pluginPresentForm: {
     fallbackTitle: "Form",

@@ -613,6 +613,9 @@ const zhMessages = {
     noMatches: "没有带 #{tag} 标签的页面",
     lintChat: "检查 Wiki",
     taskCountMismatch: "Wiki 源与渲染输出的任务数不一致，为避免文件损坏，已拒绝切换。",
+    metadataCreated: "创建",
+    metadataUpdated: "更新",
+    metadataEditor: "编辑者",
   },
   pluginPresentForm: {
     fallbackTitle: "表单",

@@ -14,7 +14,13 @@ import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } f
 import { tmpdir } from "os";
 import path from "path";
 import { classifyAsWikiPage, readWikiPage, wikiPagePath, writeWikiPage } from "../../../server/workspace/wiki-pages/io.js";
+import { parseFrontmatter } from "../../../server/utils/markdown/frontmatter.js";
 import { WORKSPACE_DIRS } from "../../../server/workspace/paths.js";
+
+/** Helper: a fixed `now` injector so frontmatter timestamps are
+ *  deterministic across tests. */
+const FIXED_NOW = new Date("2026-04-27T12:34:56.789Z");
+const fixedNow = () => FIXED_NOW;
 
 describe("wiki-pages/io — wikiPagePath", () => {
   it("composes data/wiki/pages/<slug>.md under the given workspaceRoot", () => {
@@ -107,23 +113,74 @@ describe("wiki-pages/io — writeWikiPage", () => {
     await rm(workspaceRoot, { recursive: true, force: true });
   });
 
-  it("creates a new page when none exists", async () => {
-    await writeWikiPage("brand-new", "# Brand New\n\nfresh\n", { editor: "user" }, { workspaceRoot });
+  it("creates a new page when none exists, stamping created/updated/editor", async () => {
+    await writeWikiPage("brand-new", "# Brand New\n\nfresh\n", { editor: "user" }, { workspaceRoot, now: fixedNow });
 
     const fileContent = await readFile(wikiPagePath("brand-new", { workspaceRoot }), "utf-8");
-    assert.equal(fileContent, "# Brand New\n\nfresh\n");
+    const parsed = parseFrontmatter(fileContent);
+    assert.equal(parsed.hasHeader, true);
+    assert.equal(parsed.body, "# Brand New\n\nfresh\n");
+    assert.equal(parsed.meta.created, "2026-04-27");
+    assert.equal(parsed.meta.updated, "2026-04-27T12:34:56.789Z");
+    assert.equal(parsed.meta.editor, "user");
   });
 
-  it("overwrites an existing page", async () => {
-    await writeWikiPage("topic-x", "v1\n", { editor: "user" }, { workspaceRoot });
-    await writeWikiPage("topic-x", "v2\n", { editor: "user" }, { workspaceRoot });
+  it("overwrites an existing page; created stays sticky, updated bumps", async () => {
+    const earlier = new Date("2026-04-26T10:00:00.000Z");
+    const later = new Date("2026-04-27T15:30:00.000Z");
+    await writeWikiPage("topic-x", "v1\n", { editor: "user" }, { workspaceRoot, now: () => earlier });
+    await writeWikiPage("topic-x", "v2\n", { editor: "llm", sessionId: "s1" }, { workspaceRoot, now: () => later });
 
     const fileContent = await readFile(wikiPagePath("topic-x", { workspaceRoot }), "utf-8");
-    assert.equal(fileContent, "v2\n");
+    const parsed = parseFrontmatter(fileContent);
+    assert.equal(parsed.body, "v2\n");
+    assert.equal(parsed.meta.created, "2026-04-26"); // first save's date — sticky
+    assert.equal(parsed.meta.updated, "2026-04-27T15:30:00.000Z"); // second save's instant
+    assert.equal(parsed.meta.editor, "llm"); // last writer
+  });
+
+  it("preserves unknown frontmatter keys across saves", async () => {
+    // First save: bring an existing page with custom frontmatter
+    // into being, simulating a hand-edited file already on disk.
+    const pagesDir = path.join(workspaceRoot, WORKSPACE_DIRS.wikiPages);
+    await mkdir(pagesDir, { recursive: true });
+    const seedPath = path.join(pagesDir, "with-extras.md");
+    await writeFile(seedPath, "---\ntitle: Has Title\nprerequisites: Node 22+\ntags: [demo, custom]\n---\n\noriginal body\n", "utf-8");
+
+    // User saves a new body — auto-stamped fields appear, but
+    // `title` / `prerequisites` / `tags` survive verbatim.
+    await writeWikiPage("with-extras", "updated body\n", { editor: "user" }, { workspaceRoot, now: fixedNow });
+
+    const fileContent = await readFile(wikiPagePath("with-extras", { workspaceRoot }), "utf-8");
+    const parsed = parseFrontmatter(fileContent);
+    assert.equal(parsed.body, "updated body\n");
+    assert.equal(parsed.meta.title, "Has Title");
+    assert.equal(parsed.meta.prerequisites, "Node 22+");
+    assert.deepEqual(parsed.meta.tags, ["demo", "custom"]);
+    assert.equal(parsed.meta.created, "2026-04-27"); // first writeWikiPage save (file pre-existed but had no `created`)
+    assert.equal(parsed.meta.updated, "2026-04-27T12:34:56.789Z");
+    assert.equal(parsed.meta.editor, "user");
+  });
+
+  it("accepts caller-supplied frontmatter and merges with auto-stamps", async () => {
+    // manageWiki MCP can send `---\nprerequisites: …\n---\nbody`
+    // and the new frontmatter merges into whatever's already on
+    // disk. Auto-stamps still land on top.
+    const incoming = "---\nprerequisites: Node 22+\nupdated: '2020-01-01'\n---\n\nfrom MCP\n";
+    await writeWikiPage("from-mcp", incoming, { editor: "llm", sessionId: "s1" }, { workspaceRoot, now: fixedNow });
+
+    const fileContent = await readFile(wikiPagePath("from-mcp", { workspaceRoot }), "utf-8");
+    const parsed = parseFrontmatter(fileContent);
+    assert.equal(parsed.body, "from MCP\n");
+    assert.equal(parsed.meta.prerequisites, "Node 22+");
+    // The caller's `updated: '2020-01-01'` is overwritten by the
+    // auto-stamp — that field is owned by writeWikiPage.
+    assert.equal(parsed.meta.updated, "2026-04-27T12:34:56.789Z");
+    assert.equal(parsed.meta.editor, "llm");
   });
 
   it("does not leave a .tmp staging file after a successful write", async () => {
-    await writeWikiPage("clean", "content\n", { editor: "user" }, { workspaceRoot });
+    await writeWikiPage("clean", "content\n", { editor: "user" }, { workspaceRoot, now: fixedNow });
 
     const pagesDir = path.join(workspaceRoot, WORKSPACE_DIRS.wikiPages);
     const entries = await readdir(pagesDir);
@@ -137,26 +194,27 @@ describe("wiki-pages/io — writeWikiPage", () => {
     // ENOENT mid-rename. The test for uniqueTmp is observable as
     // "both writes complete without throwing".
     const writes = Promise.all([
-      writeWikiPage("race", "writer-a\n", { editor: "user" }, { workspaceRoot }),
-      writeWikiPage("race", "writer-b\n", { editor: "system", sessionId: "s" }, { workspaceRoot }),
+      writeWikiPage("race", "writer-a\n", { editor: "user" }, { workspaceRoot, now: fixedNow }),
+      writeWikiPage("race", "writer-b\n", { editor: "system", sessionId: "s" }, { workspaceRoot, now: fixedNow }),
     ]);
     await assert.doesNotReject(writes);
 
-    // The final content is one of the two — we don't assert which,
-    // because rename order is racey and the test asserts isolation,
-    // not last-write-wins semantics.
+    // The final content is one of the two bodies — we don't assert
+    // which because rename order is racey. We only assert that the
+    // serialised body parses to `writer-a\n` or `writer-b\n`.
     const final = await readFile(wikiPagePath("race", { workspaceRoot }), "utf-8");
-    assert.ok(final === "writer-a\n" || final === "writer-b\n", `unexpected content: ${final}`);
+    const body = parseFrontmatter(final).body;
+    assert.ok(body === "writer-a\n" || body === "writer-b\n", `unexpected body: ${body}`);
   });
 
-  it("accepts every editor identity without distinction (PR 1 no-op)", async () => {
-    // PR 1 only consolidates the wiring; the snapshot stub is a
-    // no-op regardless of editor. PR 2 will introduce semantics.
-    await writeWikiPage("by-llm", "llm content\n", { editor: "llm", sessionId: "s1" }, { workspaceRoot });
-    await writeWikiPage("by-system", "system content\n", { editor: "system", sessionId: "s2" }, { workspaceRoot });
+  it("records the editor identity per call site (llm / user / system)", async () => {
+    await writeWikiPage("by-llm", "llm content\n", { editor: "llm", sessionId: "s1" }, { workspaceRoot, now: fixedNow });
+    await writeWikiPage("by-system", "system content\n", { editor: "system", sessionId: "s2" }, { workspaceRoot, now: fixedNow });
 
-    assert.equal(await readWikiPage("by-llm", { workspaceRoot }), "llm content\n");
-    assert.equal(await readWikiPage("by-system", { workspaceRoot }), "system content\n");
+    const llmFile = await readFile(wikiPagePath("by-llm", { workspaceRoot }), "utf-8");
+    const sysFile = await readFile(wikiPagePath("by-system", { workspaceRoot }), "utf-8");
+    assert.equal(parseFrontmatter(llmFile).meta.editor, "llm");
+    assert.equal(parseFrontmatter(sysFile).meta.editor, "system");
   });
 });
 

@@ -627,6 +627,9 @@ const deMessages = {
     lintChat: "Wiki prüfen",
     taskCountMismatch:
       "Wiki-Quelle und gerendertes Ergebnis stimmen in der Anzahl der Aufgaben nicht überein. Die Umschaltung wurde abgelehnt, um eine Beschädigung der Datei zu vermeiden.",
+    metadataCreated: "Erstellt",
+    metadataUpdated: "Aktualisiert",
+    metadataEditor: "Bearbeiter",
   },
   pluginPresentForm: {
     fallbackTitle: "Formular",
