@@ -222,6 +222,14 @@ import FilterChip from "../../components/FilterChip.vue";
 
 type WikiTabView = typeof WIKI_ACTION.log | typeof WIKI_ACTION.lintReport;
 
+// Workspace-relative wiki dirs. Centralised so future layout shifts
+// (e.g. the prior `wiki/` → `data/wiki/` move) only need to change
+// these two literals — all callers (image-ref rewriter, wiki-link
+// resolver, agent-prompt strings, the page-chat prepend-text in
+// the template above) derive from them.
+const WIKI_PAGES_DIR = "data/wiki/pages";
+const WIKI_DATA_DIR = "data/wiki";
+
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
@@ -396,13 +404,6 @@ watch(content, async () => {
   await nextTick();
   if (scrollRef.value) scrollRef.value.scrollTop = 0;
 });
-
-// Workspace-relative wiki dirs. Centralised so future layout shifts
-// (e.g. the prior `wiki/` → `data/wiki/` move) only need to change
-// these two literals — all callers (image-ref rewriter, wiki-link
-// resolver, agent-prompt strings) derive from them.
-const WIKI_PAGES_DIR = "data/wiki/pages";
-const WIKI_DATA_DIR = "data/wiki";
 
 /** Base directory for wiki content, adjusted by the current view. */
 const WIKI_BASE_DIR = computed(() => (action.value === "page" ? WIKI_PAGES_DIR : WIKI_DATA_DIR));
