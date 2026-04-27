@@ -663,6 +663,21 @@ async function applySource() {
     return;
   }
 
+  // Snapshot the per-beat visual source BEFORE we re-initialize so we
+  // can identify which beats had their image / imagePrompt change in
+  // the source edit. initializeScript() prefers the on-disk PNG by
+  // default; for these changed beats that PNG is now stale, so we
+  // mark them invalidated and force a fresh render.
+  const oldImageSources = beats.value.map((beat, i) => beatImageSource(localOverrides[i] ?? beat));
+  const newBeats = (parsed.beats ?? []) as Beat[];
+  const invalidatedImageIndices = new Set<number>();
+  newBeats.forEach((newBeat, i) => {
+    if (i >= oldImageSources.length) return;
+    if (oldImageSources[i] !== beatImageSource(newBeat)) {
+      invalidatedImageIndices.add(i);
+    }
+  });
+
   // Update the UI with the new script.
   // Note: the parent's handleUpdateResult uses Object.assign (in-place
   // mutation), so the watcher on props.selectedResult won't fire.
@@ -674,7 +689,15 @@ async function applySource() {
   });
 
   if (sourceDetails.value) sourceDetails.value.open = false;
-  await initializeScript();
+  await initializeScript({ invalidatedImageIndices });
+}
+
+// Stable string key over the visual-source fields of a beat — `image`
+// (deterministic types) and `imagePrompt` (AI-generated). Used by
+// applySource to diff old vs new beats so a stale on-disk PNG doesn't
+// linger after a source edit.
+function beatImageSource(beat: Beat): string {
+  return JSON.stringify({ image: beat.image, imagePrompt: beat.imagePrompt });
 }
 
 async function copyText() {
@@ -998,20 +1021,30 @@ async function generateAllCharacters() {
 // through to renderBeat when the disk has nothing yet AND the type is
 // safe to auto-render (deterministic content, no characters waiting).
 //
-// Edits invalidate cached PNGs through other paths: per-beat saves
-// already do `delete renderedImages[index]; renderBeat(index)` on
-// image change in updateBeat(), and the per-beat ↺ regenerate button
-// is always available — so a stale PNG is one click away from being
-// refreshed.
-async function hydrateBeatImage(beat: Beat, index: number, hasCharacters: boolean, autoRenderTypes: readonly string[]): Promise<void> {
-  await loadExistingBeatImage(index);
-  if (renderedImages[index]) return;
+// `forceRefresh` skips the disk-load branch entirely — used by
+// applySource() so beats whose visual source changed in the source
+// edit get a fresh render instead of the now-stale cached PNG.
+async function hydrateBeatImage(beat: Beat, index: number, hasCharacters: boolean, autoRenderTypes: readonly string[], forceRefresh: boolean): Promise<void> {
+  if (!forceRefresh) {
+    await loadExistingBeatImage(index);
+    if (renderedImages[index]) return;
+  }
   if (shouldAutoRenderBeat(beat, hasCharacters, autoRenderTypes)) {
     await renderBeat(index);
   }
 }
 
-async function initializeScript() {
+interface InitializeScriptOptions {
+  /**
+   * Beat indices whose visual source changed since the last mount.
+   * Used by applySource() to invalidate stale on-disk PNGs after a
+   * source edit; mount-time callers leave this empty and rely on the
+   * disk cache.
+   */
+  invalidatedImageIndices?: ReadonlySet<number>;
+}
+
+async function initializeScript(opts: InitializeScriptOptions = {}) {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
@@ -1035,8 +1068,9 @@ async function initializeScript() {
 
   const AUTO_RENDER_TYPES = ["textSlide", "markdown", "chart", "mermaid", "html_tailwind"] as const;
   const hasCharacters = characterKeys.value.length > 0;
+  const invalidated = opts.invalidatedImageIndices;
   beats.value.forEach((beat, index) => {
-    void hydrateBeatImage(beat, index, hasCharacters, AUTO_RENDER_TYPES);
+    void hydrateBeatImage(beat, index, hasCharacters, AUTO_RENDER_TYPES, invalidated?.has(index) ?? false);
     if (beat.text) loadExistingBeatAudio(index);
   });
 
@@ -1057,8 +1091,13 @@ async function initializeScript() {
   }
 }
 
-onMounted(initializeScript);
-watch(() => props.selectedResult, initializeScript);
+onMounted(() => initializeScript());
+// Wrap in arrow so Vue's (newVal, oldVal) watcher args don't collide
+// with the new `InitializeScriptOptions` parameter signature.
+watch(
+  () => props.selectedResult,
+  () => initializeScript(),
+);
 
 // Keep the view in sync with generations that started from a different
 // view mount or a parallel tab. When a generation for this script
