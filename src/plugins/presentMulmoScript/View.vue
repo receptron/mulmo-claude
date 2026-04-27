@@ -991,6 +991,19 @@ async function generateAllCharacters() {
   await Promise.all(characterKeys.value.filter((key) => charRenderState[key] !== "rendering").map((key) => renderCharacter(key, false)));
 }
 
+// Probe the server for an existing beat PNG before triggering any
+// generation. Only auto-renders when the disk is empty AND the beat
+// is a deterministic type — imagePrompt beats are left empty so the
+// user clicks Generate explicitly (avoids surprise paid text2image
+// calls on every page refresh).
+async function hydrateBeatImage(beat: Beat, index: number, hasCharacters: boolean, autoRenderTypes: readonly string[]): Promise<void> {
+  await loadExistingBeatImage(index);
+  if (renderedImages[index]) return;
+  if (shouldAutoRenderBeat(beat, hasCharacters, autoRenderTypes)) {
+    await renderBeat(index);
+  }
+}
+
 async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
@@ -1013,26 +1026,23 @@ async function initializeScript() {
   moviePath.value = null;
   if (sourceDetails.value) sourceDetails.value.open = false;
 
-  // Mount-time policy: deterministic beat types
-  // (textSlide/markdown/chart/mermaid/html_tailwind) re-render every
-  // mount so a script edit always reflects the current source — the
-  // cached PNG on disk could be stale, and tracking every invalidation
-  // path (applySource, hasCharacters flips, beat additions) added more
-  // complexity than the brief mount-time spinner saves. mulmocast
-  // hashes by content server-side, so unchanged beats short-circuit
-  // without doing real work.
+  // Mount-time policy: prefer the existing PNG on the server. Every
+  // beat — deterministic AND imagePrompt — first probes /beat-image,
+  // and we only fall through to renderBeat() when the disk has nothing
+  // yet AND the type is safe to auto-render (deterministic content,
+  // no characters waiting). Without this probe a refresh would re-fire
+  // generateBeatImage for every beat, and for imagePrompt beats that
+  // means a paid text2image call against an image we already have.
   //
-  // imagePrompt beats stay on the load-existing path because their
-  // re-render is a paid AI call — users explicitly trigger refresh via
-  // the per-beat ↺. Same for audio (paid TTS).
+  // Stale-after-edit: if the user edits the script source the on-disk
+  // PNG is no longer in sync with the new content, but we don't try to
+  // detect that here — the per-beat ↺ button is one click away and a
+  // page refresh re-runs this same probe, so the user can opt back into
+  // a fresh render whenever they need to.
   const AUTO_RENDER_TYPES = ["textSlide", "markdown", "chart", "mermaid", "html_tailwind"] as const;
   const hasCharacters = characterKeys.value.length > 0;
   beats.value.forEach((beat, index) => {
-    if (shouldAutoRenderBeat(beat, hasCharacters, AUTO_RENDER_TYPES)) {
-      renderBeat(index);
-    } else if (beat.imagePrompt) {
-      loadExistingBeatImage(index);
-    }
+    void hydrateBeatImage(beat, index, hasCharacters, AUTO_RENDER_TYPES);
     if (beat.text) loadExistingBeatAudio(index);
   });
 
