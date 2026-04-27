@@ -257,7 +257,9 @@
                   {{ playingAudio?.index === index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
                 </button>
                 <template v-else-if="audioErrors[index]">
-                  <span class="text-xs text-red-400" :title="audioErrors[index]">{{ t("pluginMulmoScript.errPrefix") }}</span>
+                  <span class="text-xs text-red-400 truncate min-w-0 max-w-[20rem]" :title="audioErrors[index]">
+                    {{ t("pluginMulmoScript.errPrefix") }} {{ audioErrors[index] }}
+                  </span>
                   <button
                     v-if="effectiveBeat(index).text"
                     class="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
