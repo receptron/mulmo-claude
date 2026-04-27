@@ -864,6 +864,9 @@ const jaMessages = {
   },
   suggestionsPanel: {
     suggestions: "候補",
+    skills: "スキル",
+    emptySuggestions: "候補はありません。",
+    emptySkills: "スキルがインストールされていません。",
     sendEditHint: "クリックで送信 · Shift+クリックで編集",
   },
   settingsToolsTab: {

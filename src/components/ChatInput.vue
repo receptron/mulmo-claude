@@ -30,7 +30,7 @@
         />
         <div class="flex flex-col gap-1">
           <button
-            v-if="queries.length > 0"
+            v-if="showSuggestionsButton"
             data-testid="suggestions-btn"
             class="rounded w-8 h-8 flex items-center justify-center"
             :class="suggestionsExpanded ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'"
@@ -72,11 +72,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ChatAttachmentPreview from "./ChatAttachmentPreview.vue";
 import SuggestionsPanel from "./SuggestionsPanel.vue";
 import { useImeAwareEnter } from "../composables/useImeAwareEnter";
+import { useSkillsList } from "../composables/useSkillsList";
 
 const { t } = useI18n();
 
@@ -86,7 +87,7 @@ export interface PastedFile {
   mime: string;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue: string;
     pastedFile: PastedFile | null;
@@ -107,6 +108,9 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 const fileError = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const suggestionsExpanded = ref(false);
+
+const { skills } = useSkillsList();
+const showSuggestionsButton = computed(() => (props.queries?.length ?? 0) > 0 || skills.value.length > 0);
 
 const MAX_ATTACH_BYTES = 30 * 1024 * 1024;
 

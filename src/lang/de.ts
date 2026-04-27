@@ -873,6 +873,9 @@ const deMessages = {
   },
   suggestionsPanel: {
     suggestions: "Vorschläge",
+    skills: "Skills",
+    emptySuggestions: "Keine Vorschläge.",
+    emptySkills: "Keine Skills installiert.",
     sendEditHint: "klicken zum Senden · Shift+Klick zum Bearbeiten",
   },
   settingsToolsTab: {

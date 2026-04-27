@@ -1,7 +1,7 @@
 <template>
   <div class="border-t border-gray-200 shrink-0 bg-gray-50">
     <SuggestionsPanel
-      v-if="suggestions && suggestions.length > 0"
+      v-if="showSuggestionsButton"
       v-model:expanded="suggestionsExpanded"
       :queries="suggestions"
       @send="onSuggestionSend"
@@ -22,7 +22,7 @@
       />
       <div class="flex flex-col gap-1 shrink-0">
         <button
-          v-if="suggestions && suggestions.length > 0"
+          v-if="showSuggestionsButton"
           :data-testid="`${testIdPrefix}-suggestions`"
           class="rounded w-8 h-8 flex items-center justify-center"
           :class="suggestionsExpanded ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'"
@@ -52,6 +52,7 @@ import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppApi } from "../composables/useAppApi";
 import { useImeAwareEnter } from "../composables/useImeAwareEnter";
+import { useSkillsList } from "../composables/useSkillsList";
 import SuggestionsPanel from "./SuggestionsPanel.vue";
 
 const props = withDefaults(
@@ -71,6 +72,9 @@ const appApi = useAppApi();
 const draft = ref("");
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const suggestionsExpanded = ref(false);
+
+const { skills } = useSkillsList();
+const showSuggestionsButton = computed(() => (props.suggestions?.length ?? 0) > 0 || skills.value.length > 0);
 
 const canSend = computed(() => !props.disabled && (props.allowEmpty || draft.value.trim().length > 0));
 

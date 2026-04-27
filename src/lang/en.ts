@@ -889,6 +889,9 @@ const enMessages = {
   },
   suggestionsPanel: {
     suggestions: "Suggestions",
+    skills: "Skills",
+    emptySuggestions: "No suggestions.",
+    emptySkills: "No skills installed.",
     sendEditHint: "click to send · shift+click to edit",
   },
   settingsToolsTab: {

@@ -863,6 +863,9 @@ const ptBRMessages = {
   },
   suggestionsPanel: {
     suggestions: "Sugestões",
+    skills: "Habilidades",
+    emptySuggestions: "Sem sugestões.",
+    emptySkills: "Nenhuma habilidade instalada.",
     sendEditHint: "clique para enviar · shift+clique para editar",
   },
   settingsToolsTab: {

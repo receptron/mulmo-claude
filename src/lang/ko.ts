@@ -864,6 +864,9 @@ const koMessages = {
   },
   suggestionsPanel: {
     suggestions: "추천",
+    skills: "스킬",
+    emptySuggestions: "추천이 없습니다.",
+    emptySkills: "설치된 스킬이 없습니다.",
     sendEditHint: "클릭하여 전송 · shift+클릭 으로 편집",
   },
   settingsToolsTab: {

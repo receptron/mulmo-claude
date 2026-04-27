@@ -873,6 +873,9 @@ const esMessages = {
   },
   suggestionsPanel: {
     suggestions: "Sugerencias",
+    skills: "Habilidades",
+    emptySuggestions: "No hay sugerencias.",
+    emptySkills: "No hay habilidades instaladas.",
     sendEditHint: "clic para enviar · shift+clic para editar",
   },
   settingsToolsTab: {
