@@ -1,7 +1,8 @@
-import { mkdir, realpath, writeFile } from "fs/promises";
+import { mkdir, realpath } from "fs/promises";
 import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { shortId } from "../id.js";
+import { writeFileAtomic } from "./atomic.js";
 import { yearMonthUtc } from "./naming.js";
 import { resolveWithinRoot } from "./safe.js";
 
@@ -36,21 +37,22 @@ async function safeResolve(relativePath: string): Promise<string> {
 
 /** Save sheets array as a JSON file. New files land under
  *  `spreadsheets/YYYY/MM/` (UTC) so the dir doesn't accumulate
- *  unbounded — see #764. Returns the workspace-relative path. */
+ *  unbounded — see #764. Returns the workspace-relative path.
+ *  Atomic: writeFileAtomic creates the partition dir and prevents
+ *  half-written JSON on crash (#881 v1). */
 export async function saveSpreadsheet(sheets: unknown[]): Promise<string> {
   await ensureSpreadsheetsDir();
   const partition = yearMonthUtc();
-  const parentAbs = path.join(SPREADSHEETS_DIR, partition);
-  await mkdir(parentAbs, { recursive: true });
   const filename = `${shortId()}.json`;
-  await writeFile(path.join(parentAbs, filename), JSON.stringify(sheets), "utf-8");
+  const absPath = path.join(SPREADSHEETS_DIR, partition, filename);
+  await writeFileAtomic(absPath, JSON.stringify(sheets));
   return path.posix.join(WORKSPACE_DIRS.spreadsheets, partition, filename);
 }
 
-/** Overwrite an existing spreadsheet file. */
+/** Overwrite an existing spreadsheet file. Atomic — see {@link saveSpreadsheet}. */
 export async function overwriteSpreadsheet(relativePath: string, sheets: unknown[]): Promise<void> {
   const absPath = await safeResolve(relativePath);
-  await writeFile(absPath, JSON.stringify(sheets), "utf-8");
+  await writeFileAtomic(absPath, JSON.stringify(sheets));
 }
 
 /** Check if a string is a spreadsheet file path (not inline data).
