@@ -67,6 +67,9 @@ const zhMessages = {
     toolCallHistory: "工具调用历史",
     settings: "设置",
     settingsGeminiMissing: "设置 — 缺少 Gemini API 密钥",
+    todayJournal: "今日总结",
+    todayJournalNotFound: "暂无总结 — 多聊一会儿，journal 会自动生成。",
+    todayJournalLoadFailed: "加载 journal 失败 (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "切换系统提示词",

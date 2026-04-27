@@ -67,6 +67,9 @@ const esMessages = {
     toolCallHistory: "Historial de llamadas a herramientas",
     settings: "Ajustes",
     settingsGeminiMissing: "Ajustes — Falta la clave API de Gemini",
+    todayJournal: "Resumen de hoy",
+    todayJournalNotFound: "Aún no hay resumen — chatea un rato y el journal lo generará.",
+    todayJournalLoadFailed: "Error al cargar el journal (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",

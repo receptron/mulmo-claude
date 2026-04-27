@@ -62,6 +62,9 @@ const ptBRMessages = {
     toolCallHistory: "Histórico de chamadas de ferramentas",
     settings: "Configurações",
     settingsGeminiMissing: "Configurações — Chave da API Gemini ausente",
+    todayJournal: "Resumo de hoje",
+    todayJournalNotFound: "Ainda sem resumo — converse um pouco e o journal será gerado.",
+    todayJournalLoadFailed: "Falha ao carregar o journal (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",
