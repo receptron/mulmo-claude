@@ -210,6 +210,102 @@ const koMessages = {
     pdfPreview: "PDF 미리보기",
     parseError: "파싱 오류",
   },
+  systemFiles: {
+    schemaLabel: "스키마",
+    showDetails: "자세히 보기",
+    hideDetails: "자세히 숨기기",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "에이전트 관리 (수동 편집 가능)",
+      "user-editable": "사용자 편집 가능",
+      "agent-managed": "에이전트 관리",
+      "fragile-format": "취약한 형식",
+      ephemeral: "임시 파일",
+    },
+    interests: {
+      title: "Interests 설정",
+      summary: "뉴스 / 소스 파이프라인이 추적하고 점수를 매기는 주제입니다. 수동 편집이 가능하며, 에이전트도 대화에서 자동으로 업데이트합니다.",
+    },
+    mcp: {
+      title: "MCP 서버",
+      summary: "에이전트에 연결된 외부 Model Context Protocol 서버. HTTP 또는 stdio 서버를 추가하여 도구를 확장할 수 있습니다.",
+    },
+    settings: {
+      title: "앱 설정",
+      summary: "사용자 편집 가능한 동작 환경설정 — Gemini API 키, 허용된 도구, 샌드박스 설정 등.",
+    },
+    schedulerTasks: {
+      title: "스케줄러 작업",
+      summary: "일정에 따라 실행되는 반복 에이전트 자동화. Automations UI 에서 관리하며, 이 파일이 디스크상의 정본입니다.",
+    },
+    schedulerOverrides: {
+      title: "스케줄러 오버라이드",
+      summary: "시스템 기본 일정 위에 덮어쓰는 작업별 시간 / 간격 오버라이드. 반복 작업 시간을 변경해 달라고 요청하면 에이전트가 여기에 기록합니다.",
+    },
+    newsReadState: {
+      title: "뉴스 읽음 상태",
+      summary: "이미 본 뉴스의 로컬 추적. 임시 파일 — 삭제해도 다시 읽으면 재생성됩니다.",
+    },
+    schedulerItems: {
+      title: "스케줄러 아이템 큐",
+      summary: "발화 대기 중인 예약 호출 큐. 에이전트 관리 — 각 필드의 의미를 정확히 알지 않으면 수동 편집하지 마세요.",
+    },
+    todosItems: {
+      title: "할 일 항목",
+      summary: '칸반 보드 모든 열의 작업. "할 일 추가"라고 말하면 에이전트가 여기에 기록하며, 수동 편집도 가능합니다.',
+    },
+    todosColumns: {
+      title: "할 일 열 정의",
+      summary: "칸반 보드의 열 레이아웃(제목, 순서, ID). 사용자 편집 가능 — 자유롭게 이름 변경이나 재정렬 가능합니다.",
+    },
+    wikiIndex: {
+      title: "위키 인덱스",
+      summary: "모든 위키 페이지의 자동 생성 인덱스. 위키 편집 시마다 새로 갱신되므로 수동 편집하면 덮어써집니다.",
+    },
+    wikiLog: {
+      title: "위키 편집 로그",
+      summary: "위키 페이지 생성 및 편집 활동 로그. 에이전트 관리이며 추가만 가능 — 최근 변경 피드로 유용합니다.",
+    },
+    wikiSummary: {
+      title: "위키 요약",
+      summary: "위키의 자동 생성 개요 — 주제 클러스터, 페이지 수, 최근 활동. 에이전트가 새로 갱신합니다.",
+    },
+    wikiSchema: {
+      title: "위키 스키마",
+      summary: "에이전트가 위키 페이지 일관성을 유지하기 위해 참조하는 형식 명세. 취약 — 특정 구조를 기대하므로 에이전트 주도 편집을 권장합니다.",
+    },
+    memory: {
+      title: "메모리",
+      summary: "당신에 관한 정제된 사실로, 새 대화의 컨텍스트로 항상 로드됩니다. journal 추출기가 자동으로 추가하며 수동 편집도 가능합니다.",
+    },
+    summariesIndex: {
+      title: "요약 인덱스",
+      summary: "journal 이 생성하는 일별 및 주제별 요약 링크 모음. 에이전트 관리 — journal 실행 시마다 새로 갱신됩니다.",
+    },
+    rolesJson: {
+      title: "역할 정의 (JSON)",
+      summary: "역할 설정 — 모델 선택, MCP 서버, 허용 플러그인, 쿼리 제안. 사용자 편집 가능, 재시작 불필요.",
+    },
+    rolesMd: {
+      title: "역할 설명 (Markdown)",
+      summary: "역할의 페르소나와 시스템 프롬프트 본문. 이 역할이 활성화되면 컨텍스트로 로드됩니다. 사용자 편집 가능, 다음 메시지부터 적용.",
+    },
+    sourceFeed: {
+      title: "소스 피드",
+      summary: "구독 중인 단일 소스 (RSS, GitHub 릴리스 / 이슈, arXiv 등). 사용자 편집 가능 — 소스 파이프라인이 일정에 따라 폴링합니다.",
+    },
+    sourceState: {
+      title: "소스 상태",
+      summary: "단일 소스의 임시 파이프라인 상태 — 마지막으로 본 ID, ETag, fetch 오류 등. 삭제 가능 — 다음 실행 시 재생성됩니다.",
+    },
+    journalDaily: {
+      title: "일별 journal 요약",
+      summary: "journal 패스가 채팅 세션에서 추출한 하루치 활동의 자동 생성 요약입니다.",
+    },
+    journalTopic: {
+      title: "주제별 journal",
+      summary: "특정 주제에 대한 장기 메모로, 해당 주제에 대한 대화가 이어질수록 누적되고 갱신됩니다. 에이전트 관리.",
+    },
+  },
   settingsMcpTab: {
     explanation:
       "외부 MCP 서버를 추가합니다. HTTP 서버는 모든 모드에서 동작합니다. Stdio 서버는 샌드박스 이미지의 {npx} / {node} / {tsx} 를 사용하며, Docker 가 활성화된 경우 경로는 워크스페이스 안에 있어야 합니다.",
