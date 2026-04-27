@@ -353,6 +353,24 @@ const esMessages = {
           displayName: "Clima (Open-Meteo)",
           description: "Pronósticos meteorológicos gratuitos y condiciones actuales en todo el mundo — sin clave API.",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "Busca canciones, gestiona playlists y controla la reproducción. BYO app de desarrollador de Spotify — Client ID + Client Secret.",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app → copia el Client ID. La Redirect URI no necesita apuntar a un sitio real para uso de escritorio.",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "Mismo Developer Dashboard → en la app, pulsa Show client secret. Se pega una vez y queda en local.",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "Transcripción de YouTube",
+          description: "Obtén los subtítulos de cualquier vídeo público de YouTube por URL. Sin credenciales.",
+        },
       },
       config: {
         howToGet: "Cómo obtenerlo",

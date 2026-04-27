@@ -484,6 +484,78 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     configSchema: [],
     riskLevel: "low",
   },
+
+  // Spotify Web API access — search tracks, manage playlists, control
+  // playback. Requires a Spotify developer app (Client ID + Client
+  // Secret) which the user creates in their own dashboard. The server
+  // handles the OAuth handshake on first run, caching the refresh
+  // token locally.
+  //
+  // TODO(reviewer): pin the most-active community package — as of
+  // 2026-04 candidates include `@superseoworld/mcp-spotify` and
+  // `spotify-mcp`.
+  {
+    id: "spotify",
+    displayName: "settingsMcpTab.catalog.entry.spotify.displayName",
+    description: "settingsMcpTab.catalog.entry.spotify.description",
+    audience: "general",
+    upstreamUrl: "https://github.com/superseoworld/mcp-spotify",
+    setupGuideUrl: "https://developer.spotify.com/documentation/web-api/concepts/apps",
+    spec: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@superseoworld/mcp-spotify"],
+      env: {
+        SPOTIFY_CLIENT_ID: "${SPOTIFY_CLIENT_ID}",
+        SPOTIFY_CLIENT_SECRET: "${SPOTIFY_CLIENT_SECRET}",
+      },
+    },
+    configSchema: [
+      {
+        key: "SPOTIFY_CLIENT_ID",
+        label: "settingsMcpTab.catalog.entry.spotify.field.clientId.label",
+        kind: "secret",
+        placeholder: "spotify-client-id",
+        required: true,
+        helpUrl: "https://developer.spotify.com/dashboard",
+        helpText: "settingsMcpTab.catalog.entry.spotify.field.clientId.help",
+      },
+      {
+        key: "SPOTIFY_CLIENT_SECRET",
+        label: "settingsMcpTab.catalog.entry.spotify.field.clientSecret.label",
+        kind: "secret",
+        placeholder: "spotify-client-secret",
+        required: true,
+        helpUrl: "https://developer.spotify.com/dashboard",
+        helpText: "settingsMcpTab.catalog.entry.spotify.field.clientSecret.help",
+      },
+    ],
+    riskLevel: "medium",
+  },
+
+  // YouTube transcript fetcher — give it a video URL and it returns
+  // the captions. No auth needed; the package scrapes the public
+  // transcript endpoint. Useful for "summarise this YouTube video"
+  // workflows where Claude Code's built-in WebFetch can't reach the
+  // separate transcript subresource.
+  //
+  // TODO(reviewer): pin the most-active package — as of 2026-04
+  // candidates include `@kimtaeyoon83/mcp-server-youtube-transcript`
+  // and `mcp-youtube-transcript`.
+  {
+    id: "youtube-transcript",
+    displayName: "settingsMcpTab.catalog.entry.youtubeTranscript.displayName",
+    description: "settingsMcpTab.catalog.entry.youtubeTranscript.description",
+    audience: "general",
+    upstreamUrl: "https://github.com/kimtaeyoon83/mcp-server-youtube-transcript",
+    spec: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@kimtaeyoon83/mcp-server-youtube-transcript"],
+    },
+    configSchema: [],
+    riskLevel: "low",
+  },
 ];
 
 /** Look up by id. Returns null when the id isn't in the catalog

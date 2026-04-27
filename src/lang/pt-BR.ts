@@ -346,6 +346,24 @@ const ptBRMessages = {
           displayName: "Clima (Open-Meteo)",
           description: "Previsão do tempo gratuita e condições atuais no mundo todo — sem chave de API.",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "Pesquisa faixas, gerencia playlists e controla a reprodução. BYO app de desenvolvedor do Spotify — Client ID + Client Secret.",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app → copie o Client ID. A Redirect URI não precisa apontar para um site real para uso desktop.",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "Mesmo Developer Dashboard → no app, clique em Show client secret. Cola uma vez e fica em cache local.",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "Transcrição do YouTube",
+          description: "Obtém as legendas de qualquer vídeo público do YouTube pela URL. Sem credenciais.",
+        },
       },
       config: {
         howToGet: "Como obter",

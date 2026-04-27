@@ -349,6 +349,24 @@ const jaMessages = {
           displayName: "天気予報（Open-Meteo）",
           description: "世界各地の天気予報と現在の気象情報 — API キー不要で無料利用可能。",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "曲の検索、プレイリスト管理、再生操作。BYO Spotify Developer アプリ — Client ID と Client Secret を発行してください。",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app で取得。デスクトップ用途では Redirect URI が実在のサイトに一致する必要はありません。",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "同じ Developer Dashboard → アプリの Show client secret から取得。一度貼ればローカルに保存されます。",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "YouTube 字幕",
+          description: "公開 YouTube 動画の URL から字幕を取得。認証情報不要。",
+        },
       },
       config: {
         howToGet: "取得方法",

@@ -366,6 +366,24 @@ const enMessages = {
           displayName: "Weather (Open-Meteo)",
           description: "Free weather forecasts and current conditions worldwide — no API key needed.",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "Search tracks, manage playlists, control playback. BYO Spotify developer app — Client ID + Client Secret.",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app → copy the Client ID. The redirect URI doesn't need to match an existing site for desktop usage.",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "Same Spotify Developer Dashboard → Show client secret on your app. Pasted once and cached locally.",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "YouTube transcript",
+          description: "Fetch the captions for any public YouTube video by URL. No credentials needed.",
+        },
       },
       config: {
         howToGet: "How to get this",

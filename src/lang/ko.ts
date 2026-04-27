@@ -350,6 +350,24 @@ const koMessages = {
           displayName: "날씨 (Open-Meteo)",
           description: "전 세계 무료 일기예보와 현재 기상 정보 — API 키 불필요.",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "트랙 검색, 플레이리스트 관리, 재생 제어. BYO Spotify 개발자 앱 — Client ID + Client Secret.",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app → Client ID를 복사하세요. 데스크톱 용도에서는 Redirect URI가 실제 사이트와 일치하지 않아도 됩니다.",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "동일한 Developer Dashboard → 앱의 Show client secret. 한 번 붙여 넣으면 로컬에 캐시됩니다.",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "YouTube 자막",
+          description: "공개된 YouTube 동영상의 URL로 자막을 가져옵니다. 자격 증명 불필요.",
+        },
       },
       config: {
         howToGet: "발급 방법",

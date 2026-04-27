@@ -346,6 +346,24 @@ const zhMessages = {
           displayName: "天气（Open-Meteo）",
           description: "全球免费天气预报和当前气象 — 无需 API 密钥。",
         },
+        spotify: {
+          displayName: "Spotify",
+          description: "搜索曲目、管理播放列表、控制播放。BYO Spotify 开发者应用 — Client ID + Client Secret。",
+          field: {
+            clientId: {
+              label: "Client ID",
+              help: "Spotify Developer Dashboard → Create app → 复制 Client ID。桌面用途下 Redirect URI 不需要匹配真实站点。",
+            },
+            clientSecret: {
+              label: "Client Secret",
+              help: "同一 Developer Dashboard → 在应用中点 Show client secret。粘贴一次后会缓存在本地。",
+            },
+          },
+        },
+        youtubeTranscript: {
+          displayName: "YouTube 字幕",
+          description: "通过 URL 获取任意公开 YouTube 视频的字幕。无需凭证。",
+        },
       },
       config: {
         howToGet: "获取方式",
