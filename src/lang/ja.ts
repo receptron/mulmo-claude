@@ -290,6 +290,10 @@ const jaMessages = {
             },
           },
         },
+        appleNative: {
+          displayName: "Apple ネイティブアプリ（macOS）",
+          description: "AppleScript 経由で リマインダー / カレンダー / メモ / メール / マップ を読み書き。macOS 限定 — 認証情報不要。",
+        },
         weatherOpenMeteo: {
           displayName: "天気予報（Open-Meteo）",
           description: "世界各地の天気予報と現在の気象情報 — API キー不要で無料利用可能。",

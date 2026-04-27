@@ -257,6 +257,33 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
 
   // Weather forecast / current conditions via Open-Meteo. Open-Meteo
   // is keyless for non-commercial use, so this entry is config-free.
+  // Apple native apps (macOS only) — bundles Reminders / Calendar /
+  // Notes / Mail / Maps / Messages via AppleScript bridges. No
+  // credentials needed since it talks to the local system apps; the
+  // package no-ops on Linux/Windows. Bundle entry keeps install simple;
+  // if per-app granularity is wanted later, split into separate ids.
+  //
+  // TODO(reviewer): pin the most-active bundle package — as of 2026-04
+  // candidates include `apple-mcp` (Dhravya) and per-app variants like
+  // `mcp-server-apple-reminders` / `apple-notes-mcp`.
+  {
+    id: "apple-native",
+    displayName: "settingsMcpTab.catalog.entry.appleNative.displayName",
+    description: "settingsMcpTab.catalog.entry.appleNative.description",
+    audience: "general",
+    upstreamUrl: "https://github.com/Dhravya/apple-mcp",
+    spec: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@dhravya/apple-mcp"],
+    },
+    configSchema: [],
+    // Reads + writes Reminders / Notes / Calendar etc. — flagged
+    // medium because the agent can modify the user's data, even
+    // though no auth secret leaves the box.
+    riskLevel: "medium",
+  },
+
   // TODO(reviewer): pick the most-active community package — as of
   // 2026-04 candidates include `mcp-server-open-meteo` and
   // `@cloud-rocket/mcp-server-open-meteo`.

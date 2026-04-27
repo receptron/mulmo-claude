@@ -287,6 +287,10 @@ const frMessages = {
             },
           },
         },
+        appleNative: {
+          displayName: "Apps natives Apple (macOS)",
+          description: "Lit et écrit Rappels, Calendrier, Notes, Mail et Plans via AppleScript. macOS uniquement — sans identifiants.",
+        },
         weatherOpenMeteo: {
           displayName: "Météo (Open-Meteo)",
           description: "Prévisions météo gratuites et conditions actuelles dans le monde entier — sans clé d'API.",

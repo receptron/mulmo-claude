@@ -286,6 +286,10 @@ const ptBRMessages = {
             },
           },
         },
+        appleNative: {
+          displayName: "Apps nativos da Apple (macOS)",
+          description: "Lê e escreve em Lembretes, Calendário, Notas, Mail e Mapas via AppleScript. Apenas macOS — sem credenciais.",
+        },
         weatherOpenMeteo: {
           displayName: "Clima (Open-Meteo)",
           description: "Previsão do tempo gratuita e condições atuais no mundo todo — sem chave de API.",

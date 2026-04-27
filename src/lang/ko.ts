@@ -291,6 +291,10 @@ const koMessages = {
             },
           },
         },
+        appleNative: {
+          displayName: "Apple 네이티브 앱 (macOS)",
+          description: "AppleScript로 미리 알림 / 캘린더 / 메모 / 메일 / 지도 읽기·쓰기. macOS 전용 — 자격 증명 불필요.",
+        },
         weatherOpenMeteo: {
           displayName: "날씨 (Open-Meteo)",
           description: "전 세계 무료 일기예보와 현재 기상 정보 — API 키 불필요.",

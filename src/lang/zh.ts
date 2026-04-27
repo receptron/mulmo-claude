@@ -287,6 +287,10 @@ const zhMessages = {
             },
           },
         },
+        appleNative: {
+          displayName: "Apple 原生应用（macOS）",
+          description: "通过 AppleScript 读写 提醒事项 / 日历 / 备忘录 / 邮件 / 地图。仅限 macOS — 无需凭证。",
+        },
         weatherOpenMeteo: {
           displayName: "天气（Open-Meteo）",
           description: "全球免费天气预报和当前气象 — 无需 API 密钥。",
