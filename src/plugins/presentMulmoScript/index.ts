@@ -16,6 +16,11 @@ export interface MulmoScriptData {
 const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
   toolDefinition,
 
+  // Pass-through: the agent (MCP) and GUI dispatcher both end up at the
+  // same backend route, which dispatches between create-new (`script`)
+  // and reopen-existing (`filePath`) modes and handles the optional
+  // `autoGenerateMovie` background trigger server-side. Keeping this
+  // function trivial means the two callers can never drift apart.
   async execute(_context, args) {
     const result = await apiPost<ToolResult<MulmoScriptData>>(API_ROUTES.mulmoScript.save, args);
     if (!result.ok) {
