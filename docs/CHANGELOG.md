@@ -8,9 +8,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+---
+
+## [0.5.1] - 2026-04-27
+
 ### Fixed
 
-- **MCP catalog Notion entry** — switched from the legacy `OPENAPI_MCP_HEADERS` JSON-string form (with a hardcoded `Notion-Version: 2022-06-28`, three years stale) to the official `NOTION_TOKEN` env var, which the upstream README marks as recommended. Users who installed Notion via the catalog before this change still work, but their `~/mulmoclaude/config/mcp.json` keeps the old shape — re-install from Settings → MCP to pick up the new env shape and access the 2025-09-03 API features (data sources, 7 new tools).
+- **MCP catalog Notion entry** — switched from the legacy `OPENAPI_MCP_HEADERS` JSON-string form (with a hardcoded `Notion-Version: 2022-06-28`, three years stale) to the official `NOTION_TOKEN` env var, which the upstream README marks as recommended. Users who installed Notion via the catalog before this change still work, but their `~/mulmoclaude/config/mcp.json` keeps the old shape — re-install from Settings → MCP to pick up the new env shape and access the 2025-09-03 API features (data sources, 7 new tools). (#852 / #860)
+- **Wiki / sources help text**: align on-disk YAML key names so the help-file driven hints match the keys the agent emits (#855 / #861).
+- **E2E**: stop flakiness in the chat-target notification test (#863); update Notion catalog test for the new `NOTION_TOKEN` env shape.
+
+### Changed
+
+- **CI**: shard e2e across 2 parallel runners; add `restore-keys` + `packages/dist` cache for Windows speedup; skip `lint_test` + `e2e` on docs / plans / markdown-only PRs (#862, #864).
 
 ---
 
