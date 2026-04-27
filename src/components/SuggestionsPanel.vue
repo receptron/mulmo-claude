@@ -69,7 +69,7 @@ const emit = defineEmits<{
   edit: [query: string];
 }>();
 
-const { skills } = useSkillsList();
+const { skills, refresh: refreshSkills } = useSkillsList();
 
 const listRef = ref<HTMLDivElement | null>(null);
 const panelRef = ref<HTMLDivElement | null>(null);
@@ -114,6 +114,7 @@ watch(
   () => props.expanded,
   (isExpanded) => {
     if (!isExpanded) return;
+    void refreshSkills();
     nextTick(() => scrollToBottom());
   },
 );

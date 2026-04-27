@@ -8,12 +8,17 @@ export interface SkillSummary {
   source: "user" | "project";
 }
 
+// Module-level shared state so consumers (ChatInput, PageChatComposer,
+// SuggestionsPanel) all see the same list. We do not cache: every
+// `refresh()` re-hits /api/skills. The first auto-fetch on mount is
+// a bootstrap so the toggle button's visibility is correct on load;
+// everything beyond that re-reads from disk (deletions in /skills
+// would otherwise leave stale entries here — see issue from #885 review).
 const skills = ref<SkillSummary[]>([]);
-const loaded = ref(false);
+let bootstrapped = false;
 let inflight: Promise<void> | null = null;
 
-async function fetchSkills(): Promise<void> {
-  if (loaded.value) return;
+async function refresh(): Promise<void> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
@@ -22,7 +27,6 @@ async function fetchSkills(): Promise<void> {
         skills.value = result.data.skills;
       }
     } finally {
-      loaded.value = true;
       inflight = null;
     }
   })();
@@ -31,17 +35,14 @@ async function fetchSkills(): Promise<void> {
 
 export function useSkillsList(): {
   skills: DeepReadonly<Ref<SkillSummary[]>>;
-  loaded: DeepReadonly<Ref<boolean>>;
   refresh: () => Promise<void>;
 } {
-  void fetchSkills();
+  if (!bootstrapped) {
+    bootstrapped = true;
+    void refresh();
+  }
   return {
     skills: readonly(skills),
-    loaded: readonly(loaded),
-    refresh: async () => {
-      loaded.value = false;
-      inflight = null;
-      await fetchSkills();
-    },
+    refresh,
   };
 }
