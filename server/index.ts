@@ -22,6 +22,7 @@ import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
+import { createJournalRouter } from "./api/routes/journal.js";
 import { type NotificationDeps, initNotifications } from "./events/notifications.js";
 import { createChatService } from "@mulmobridge/chat-service";
 import { loadAllSessions } from "./api/routes/sessions.js";
@@ -250,6 +251,7 @@ const notificationDeps: NotificationDeps = {
   pushToBridge: chatService.pushToBridge,
 };
 app.use(createNotificationsRouter(notificationDeps));
+app.use(createJournalRouter());
 app.use(mcpToolsRouter);
 app.use(schedulerTasksRoutes);
 

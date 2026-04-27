@@ -67,6 +67,9 @@ const zhMessages = {
     toolCallHistory: "工具调用历史",
     settings: "设置",
     settingsGeminiMissing: "设置 — 缺少 Gemini API 密钥",
+    todayJournal: "今日总结",
+    todayJournalNotFound: "暂无总结 — 多聊一会儿，journal 会自动生成。",
+    todayJournalLoadFailed: "加载 journal 失败 (status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "切换系统提示词",
@@ -202,6 +205,102 @@ const zhMessages = {
     htmlPreview: "HTML 预览",
     pdfPreview: "PDF 预览",
     parseError: "解析错误",
+  },
+  systemFiles: {
+    schemaLabel: "Schema",
+    showDetails: "显示详情",
+    hideDetails: "隐藏详情",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "代理管理（可手动编辑）",
+      "user-editable": "用户可编辑",
+      "agent-managed": "代理管理",
+      "fragile-format": "脆弱格式",
+      ephemeral: "临时文件",
+    },
+    interests: {
+      title: "Interests 配置",
+      summary: "新闻 / 信息源管线监控并打分的话题。可手动编辑，代理也会从对话中自动更新。",
+    },
+    mcp: {
+      title: "MCP 服务器",
+      summary: "附加到代理的外部 Model Context Protocol 服务器。添加 HTTP 或 stdio 服务器以扩展代理工具。",
+    },
+    settings: {
+      title: "应用设置",
+      summary: "用户可编辑的行为偏好 — Gemini API 密钥、允许的工具、沙箱配置等。",
+    },
+    schedulerTasks: {
+      title: "调度器任务",
+      summary: "按计划触发的定期代理自动化。通过 Automations UI 管理，本文件是磁盘上的权威来源。",
+    },
+    schedulerOverrides: {
+      title: "调度器覆盖",
+      summary: "在系统调度之上叠加的每任务时间 / 间隔覆盖。当你要求修改某个定期任务的时间时，代理会写入此文件。",
+    },
+    newsReadState: {
+      title: "新闻已读状态",
+      summary: "本地仅记录的已读追踪。临时文件 — 删除后阅读时会重新生成。",
+    },
+    schedulerItems: {
+      title: "调度器条目队列",
+      summary: "等待触发的预定调用队列。代理管理；除非你清楚每个字段的含义，否则不要手动编辑。",
+    },
+    todosItems: {
+      title: "待办事项",
+      summary: "看板各列中的所有任务。当你说「添加待办」时代理会写入此文件，也可以手动编辑。",
+    },
+    todosColumns: {
+      title: "待办列定义",
+      summary: "看板的列布局（标题、顺序、ID）。用户可编辑 — 可自由重命名或重排。",
+    },
+    wikiIndex: {
+      title: "Wiki 索引",
+      summary: "所有 Wiki 页面的自动生成索引。每次 Wiki 编辑后刷新；请勿手动编辑（更改会被覆盖）。",
+    },
+    wikiLog: {
+      title: "Wiki 编辑日志",
+      summary: "Wiki 页面创建与编辑的活动日志。代理管理且仅追加；适合作为最近变更动态。",
+    },
+    wikiSummary: {
+      title: "Wiki 总览",
+      summary: "Wiki 的自动生成概览 — 主题聚类、页面数量、近期活动。由代理刷新。",
+    },
+    wikiSchema: {
+      title: "Wiki 架构",
+      summary: "代理用于保持 Wiki 页面一致性的格式规范。脆弱 — 代理期望特定结构，建议交由代理编辑。",
+    },
+    memory: {
+      title: "记忆",
+      summary: "关于你的精炼事实，作为新对话的上下文始终加载。journal 提取器会自动追加，也可手动编辑。",
+    },
+    summariesIndex: {
+      title: "总结索引",
+      summary: "可浏览的索引，链接 journal 生成的日次与主题总结。代理管理；每次 journal 运行时刷新。",
+    },
+    rolesJson: {
+      title: "角色定义 (JSON)",
+      summary: "角色配置 — 模型选择、MCP 服务器、允许的插件、查询建议。用户可编辑，无需重启。",
+    },
+    rolesMd: {
+      title: "角色描述 (Markdown)",
+      summary: "角色的人设与系统提示正文，激活该角色时作为上下文加载。用户可编辑，下一条消息生效。",
+    },
+    sourceFeed: {
+      title: "信息源订阅",
+      summary: "一个订阅的信息源（RSS、GitHub 发布 / Issue、arXiv 等）。用户可编辑；信息源管线按计划轮询。",
+    },
+    sourceState: {
+      title: "信息源状态",
+      summary: "单个信息源的临时管线状态 — 已见 ID、ETag、抓取错误等。可删除 — 下次运行时会重新生成。",
+    },
+    journalDaily: {
+      title: "日次 journal 总结",
+      summary: "由 journal 流程从聊天会话中提炼出的当日活动自动生成回顾。",
+    },
+    journalTopic: {
+      title: "主题 journal",
+      summary: "围绕某个特定主题的长期笔记，随该主题的持续讨论而累积和修订。代理管理。",
+    },
   },
   settingsMcpTab: {
     explanation:
@@ -348,15 +447,11 @@ const zhMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "搜索曲目、管理播放列表、控制播放。BYO Spotify 开发者应用 — Client ID + Client Secret。",
+          description: "搜索曲目、管理播放列表、控制播放。BYO Spotify 开发者应用 — 仅需 Client ID（PKCE 流程，不需要 Client Secret）。",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → 复制 Client ID。桌面用途下 Redirect URI 不需要匹配真实站点。",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "同一 Developer Dashboard → 在应用中点 Show client secret。粘贴一次后会缓存在本地。",
+              help: "Spotify Developer Dashboard → Create app，将 Redirect URI 设为 http://127.0.0.1:8888/callback，复制 Client ID。然后在终端运行一次 `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` 登录（刷新令牌缓存在 ~/.spotify-mcp/tokens.json）。",
             },
           },
         },
