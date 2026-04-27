@@ -94,6 +94,15 @@
                   {{ t("pluginManageSkills.btnDelete") }}
                 </button>
                 <button
+                  class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  :disabled="detailLoading || !detail"
+                  data-testid="skill-schedule-btn"
+                  @click="openScheduleDialog"
+                >
+                  <span class="material-icons text-sm">schedule</span>
+                  {{ t("pluginManageSkills.btnSchedule") }}
+                </button>
+                <button
                   class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
                   :disabled="detailLoading || !detail"
                   data-testid="skill-run-btn"
@@ -135,19 +144,31 @@
         </div>
       </div>
     </div>
+
+    <SkillScheduleDialog
+      v-if="scheduleDialogOpen && selected"
+      :skill-name="selected.name"
+      :submitting="scheduleSubmitting"
+      :error-message="scheduleError"
+      @cancel="closeScheduleDialog"
+      @submit="submitSchedule"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSkillsData, SkillSummary } from "./index";
 import { useAppApi } from "../../composables/useAppApi";
-import { apiGet, apiPut, apiDelete } from "../../utils/api";
+import { apiGet, apiPut, apiPost, apiDelete } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+import SkillScheduleDialog from "./SkillScheduleDialog.vue";
+import type { ScheduleSubmission } from "./scheduleSubmission";
 
 const { t } = useI18n();
 
@@ -296,6 +317,46 @@ const appApi = useAppApi();
 function runSkill(): void {
   if (!selectedName.value) return;
   appApi.startNewChat(`/${selectedName.value}`);
+}
+
+// Schedule = open dialog, POST a user task that fires `/<name>` on
+// the chosen cadence. Same slash-command trick as runSkill, just
+// invoked by the scheduler instead of immediately. On success we
+// route to /automations so the user sees the new task land.
+const router = useRouter();
+const scheduleDialogOpen = ref(false);
+const scheduleSubmitting = ref(false);
+const scheduleError = ref<string | undefined>(undefined);
+
+function openScheduleDialog(): void {
+  if (!detail.value) return;
+  scheduleError.value = undefined;
+  scheduleDialogOpen.value = true;
+}
+
+function closeScheduleDialog(): void {
+  if (scheduleSubmitting.value) return;
+  scheduleDialogOpen.value = false;
+}
+
+async function submitSchedule(payload: ScheduleSubmission): Promise<void> {
+  if (!selectedName.value) return;
+  const name = selectedName.value;
+  scheduleSubmitting.value = true;
+  scheduleError.value = undefined;
+  const result = await apiPost<{ task: { id: string } }>(API_ROUTES.scheduler.tasks, {
+    name,
+    description: t("pluginManageSkills.scheduleDescription", { name }),
+    schedule: payload,
+    prompt: `/${name}`,
+  });
+  scheduleSubmitting.value = false;
+  if (!result.ok) {
+    scheduleError.value = t("pluginManageSkills.errScheduleFailed", { error: result.error });
+    return;
+  }
+  scheduleDialogOpen.value = false;
+  await router.push("/automations");
 }
 
 // Delete is project-scope only — see saveProjectSkill / deleteProjectSkill
