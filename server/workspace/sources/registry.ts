@@ -66,18 +66,27 @@ interface ParsedFrontmatter {
 // arrive as strings, which is exactly what this consumer wants.
 // Sequences become string arrays (filtered for string entries —
 // nested objects in a sources file are unusable here).
+//
+// `null` is coerced to the empty string so a bare `foo:` line (a
+// legitimate way to declare a fetcher param with no value) is
+// preserved in `fetcherParams`. The legacy line-by-line parser's
+// `parseScalar` returned `""` for an empty raw value; matching
+// that semantic keeps the round-trip contract that the existing
+// test suite pins (codex review iter-2 #908).
 function metaToLegacyFields(meta: Record<string, unknown>): Map<string, string | string[]> {
   const out = new Map<string, string | string[]>();
   for (const [key, value] of Object.entries(meta)) {
     if (typeof value === "string") {
       out.set(key, value);
+    } else if (value === null) {
+      out.set(key, "");
     } else if (Array.isArray(value)) {
       out.set(
         key,
         value.filter((item): item is string => typeof item === "string"),
       );
     }
-    // Any other shape (nested object, null) is ignored — sources
+    // Any other shape (nested object, number) is ignored — sources
     // files use flat YAML by design (see parser policy comment).
   }
   return out;
