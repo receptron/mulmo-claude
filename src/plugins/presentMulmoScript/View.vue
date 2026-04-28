@@ -367,14 +367,17 @@
           </button>
           <div class="flex flex-col items-center">
             <img :src="lightbox.src" class="max-w-[80vw] max-h-[85vh] object-contain rounded shadow-2xl" />
-            <div v-if="!lightbox.isCharacter && beats.length > 1" class="relative w-full h-1.5">
+            <div v-if="!lightbox.isCharacter && beats.length > 1" class="relative w-full h-1">
               <div class="flex gap-1 h-full">
                 <div
                   v-for="i in beats.length"
                   :key="i - 1"
-                  class="flex-1"
+                  class="flex-1 cursor-pointer relative"
                   :class="i - 1 === lightbox.index ? 'bg-white/80' : i - 1 < lightbox.index ? 'bg-white/40' : 'bg-white/20'"
-                />
+                  @click="jumpToBeat(i - 1)"
+                >
+                  <span class="absolute -inset-y-3 inset-x-0" />
+                </div>
               </div>
               <div
                 v-if="playingAudio && playingAudio.index === lightbox.index"
@@ -601,6 +604,17 @@ const hasNext = computed(() => {
   }
   return false;
 });
+
+function jumpToBeat(index: number) {
+  if (!lightbox.value) return;
+  if (index === lightbox.value.index) return;
+  if (!renderedImages[index]) return;
+  const wasPlaying = playingAudio.value !== null;
+  openLightbox(index);
+  if (wasPlaying && beatAudios[index]) {
+    playAudio(index);
+  }
+}
 
 function lightboxMove(delta: number) {
   if (!lightbox.value) return;
