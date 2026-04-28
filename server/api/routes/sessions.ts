@@ -13,7 +13,7 @@ import {
   updateIsBookmarked,
   deleteSessionFiles,
 } from "../../utils/files/session-io.js";
-import { readManifest } from "../../workspace/chat-index/indexer.js";
+import { readManifest, removeSessionFromIndex } from "../../workspace/chat-index/indexer.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import type { ChatIndexEntry } from "../../workspace/chat-index/types.js";
 import { markRead, getSession, evictSession, publishSessionsChanged } from "../../events/session-store/index.js";
@@ -339,16 +339,36 @@ router.post(
   },
 );
 
-// Hard-delete a session: remove its jsonl + meta sidecar from disk and
-// evict any in-memory store entry. The list endpoint reflects the
-// removal on the next refetch (no tombstones — clients also drop the
-// row optimistically).
+// Hard-delete a session: remove the jsonl, meta sidecar, AND the
+// chat-index per-session file + manifest entry, then evict the
+// in-memory store entry and broadcast `deletedIds` so every tab
+// prunes its caches.
+//
+// Order matters:
+//   1. Refuse if the session is currently running. The agent route
+//      (server/api/routes/agent.ts) writes via `appendSessionLine` /
+//      `endRun`; deleting the files out from under a live run would
+//      either resurrect them or corrupt mid-stream state. Caller
+//      should cancel first, then retry the delete.
+//   2. Delete the on-disk artifacts (jsonl + meta + index entry +
+//      manifest prune). If any of these throw we abort BEFORE
+//      evicting / broadcasting, so clients don't see "session gone"
+//      while the file lingers.
+//   3. Only after disk is clean do we evict from the store and fire
+//      `notifySessionsChanged({ deletedIds })`. Now the broadcast is
+//      a truthful statement.
 router.delete(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<{ ok: boolean } | SessionErrorResponse>) => {
   const { id: sessionId } = req.params;
   log.info("sessions", "delete: start", { sessionId });
+  if (getSession(sessionId)?.isRunning) {
+    log.warn("sessions", "delete: refused — session running", { sessionId });
+    res.status(409).json({ error: "Session is running. Cancel the run before deleting." });
+    return;
+  }
   try {
-    evictSession(sessionId);
     await deleteSessionFiles(sessionId);
+    await removeSessionFromIndex(workspacePath, sessionId);
+    evictSession(sessionId);
     log.info("sessions", "delete: ok", { sessionId });
     res.json({ ok: true });
   } catch (err) {
