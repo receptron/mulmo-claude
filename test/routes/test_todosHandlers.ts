@@ -482,7 +482,7 @@ describe("kanban field preservation", () => {
     const result = handleUpdate([item], { text: "old", newText: "New" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const updated = result.items[0];
+    const [updated] = result.items;
     assert.equal(updated?.text, "New");
     assert.equal(updated?.status, "in-progress");
     assert.equal(updated?.priority, "high");
@@ -503,7 +503,7 @@ describe("kanban field preservation", () => {
     const result = handleCheck([item], { text: "x" });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const updated = result.items[0];
+    const [updated] = result.items;
     assert.equal(updated?.completed, true);
     assert.equal(updated?.status, "in-progress");
     assert.equal(updated?.priority, "urgent");
@@ -524,7 +524,7 @@ describe("kanban field preservation", () => {
     const result = handleAddLabel([item], { text: "x", labels: ["urgent"] });
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const updated = result.items[0];
+    const [updated] = result.items;
     assert.deepEqual(updated?.labels, ["work", "urgent"]);
     assert.equal(updated?.status, "todo");
     assert.equal(updated?.priority, "medium");

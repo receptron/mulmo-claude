@@ -33,6 +33,7 @@ async function setupTodoMocks(page: Page): Promise<void> {
           columns: state.columns.map((col) => (col.id === columnId ? { ...col, label: "Renamed" } : col)),
         };
       }
+      return undefined;
     },
   });
 }

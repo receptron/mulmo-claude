@@ -189,7 +189,7 @@ describe("GET /api/sessions — full fetch (no ?since=)", () => {
     await getHandler({ query: {} } as unknown as Request, res);
 
     assert.equal(state.status, 200);
-    const body = state.body;
+    const { body } = state;
     assert.ok(body);
     assert.equal(body.sessions.length, 2);
     assert.deepEqual(body.deletedIds, [], "deletedIds is always [] today");

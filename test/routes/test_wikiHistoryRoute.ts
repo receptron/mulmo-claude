@@ -166,7 +166,7 @@ describe("GET /api/wiki/pages/:slug/history/:stamp", () => {
     await writeWikiPage(slug, "hello body\n", { editor: "user", reason: "first" });
     const snapshots = await listSnapshots(slug);
     assert.ok(snapshots.length >= 1);
-    const { stamp } = snapshots[0];
+    const [{ stamp }] = snapshots;
 
     const { state, res } = mockRes();
     await readHandler(makeReq({ slug, stamp }), res);

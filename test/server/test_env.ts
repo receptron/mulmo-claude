@@ -56,12 +56,14 @@ const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const key of ENV_KEYS) {
     saved[key] = process.env[key];
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- key is from a fixed ENV_KEYS allow-list
     delete process.env[key];
   }
 });
 
 afterEach(() => {
   for (const key of ENV_KEYS) {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- key is from a fixed ENV_KEYS allow-list
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
   }

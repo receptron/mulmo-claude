@@ -99,6 +99,7 @@ async function setupItemsCrudMocks(page: Page): Promise<void> {
       if (method === "DELETE" && idSegment) {
         return { items: state.items.filter((todoItem) => todoItem.id !== idSegment) };
       }
+      return undefined;
     },
   });
 }

@@ -46,8 +46,14 @@ async function streamEventsToSocket(webSocket: { send: (data: string) => void },
 }
 
 function handleSocketFrame(text: string, webSocket: { send: (data: string) => void }, events: readonly unknown[]): void {
-  if (text === "2") return webSocket.send("3");
-  if (text === "40") return webSocket.send(`40${JSON.stringify({ sid: "mock-socket-sid" })}`);
+  if (text === "2") {
+    webSocket.send("3");
+    return;
+  }
+  if (text === "40") {
+    webSocket.send(`40${JSON.stringify({ sid: "mock-socket-sid" })}`);
+    return;
+  }
   if (!text.startsWith("42")) return;
   let parsed: unknown;
   try {

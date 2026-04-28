@@ -55,7 +55,7 @@ describe("buildDailyJsonIndex", () => {
 
   it("strips `summary` / `content` — only compact metadata goes into JSON", () => {
     const idx = buildDailyJsonIndex([makeItem({ summary: "s", content: "c" })]);
-    const item = idx.items[0];
+    const [item] = idx.items;
     assert.equal("summary" in item, false);
     assert.equal("content" in item, false);
   });
