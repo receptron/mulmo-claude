@@ -1,7 +1,8 @@
 import { Router, Request, Response } from "express";
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "fs";
 import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { stripDataUri } from "../../utils/files/image-store.js";
 import { writeJsonAtomic } from "../../utils/files/json.js";
 import {
@@ -22,12 +23,12 @@ import {
   removeSessionProgressCallback,
   type MulmoScript,
 } from "mulmocast";
-import type { MulmoBeat, MulmoImagePromptMedia } from "@mulmocast/types";
+import { mulmoScriptSchema, type MulmoBeat, type MulmoImagePromptMedia } from "@mulmocast/types";
 import { slugify } from "../../utils/slug.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, serverError } from "../../utils/httpError.js";
-import { getOptionalStringQuery } from "../../utils/request.js";
+import { getOptionalStringQuery, getSessionQuery } from "../../utils/request.js";
 import { log } from "../../system/logger/index.js";
 import { validateUpdateBeatBody, validateUpdateScriptBody } from "./mulmoScriptValidate.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -65,8 +66,10 @@ function ensureStoriesReal(): string | null {
 }
 
 interface SaveMulmoScriptBody {
-  script: MulmoScript;
+  script?: MulmoScript;
   filename?: string;
+  filePath?: string;
+  autoGenerateMovie?: boolean;
 }
 
 interface RenderBeatBody {
@@ -98,29 +101,142 @@ interface FilePathQuery {
   filePath?: string;
 }
 
-router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
-  const { script, filename } = req.body;
+interface ScriptOutcome {
+  script: MulmoScript;
+  /** Workspace-relative wire form, e.g. "stories/foo.json". */
+  wireFilePath: string;
+  /** Realpath, used by movie generation and the dedup set. */
+  absoluteFilePath: string;
+  message: string;
+}
 
-  if (!script || !Array.isArray(script.beats)) {
-    badRequest(res, "script with beats array is required");
+// Unified entry point — save a fresh `script` OR re-display an existing
+// one referenced by `filePath`. Folding both modes into one route lets
+// the agent (MCP) and the GUI dispatcher hit the same endpoint without
+// either side needing to know which mode the user picked. The MCP layer
+// in `server/agent/plugin-names.ts` routes the tool name straight here,
+// so any per-mode logic on the client would be invisible to it.
+router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
+  const { script, filename, filePath, autoGenerateMovie } = req.body ?? {};
+
+  const hasScript = script !== undefined && script !== null;
+  const hasFilePath = typeof filePath === "string" && filePath !== "";
+  if (hasScript === hasFilePath) {
+    badRequest(
+      res,
+      hasScript ? "Provide either `script` or `filePath`, not both." : "Provide either `script` (new presentation) or `filePath` (existing presentation).",
+    );
     return;
   }
 
-  mkdirSync(storiesDir, { recursive: true });
+  const outcome = hasFilePath ? await loadScriptFromDisk(filePath, res) : await saveScriptToDisk(script as MulmoScript, filename, res);
+  if (!outcome) return; // helper already wrote a 4xx/5xx response
 
-  const title = script.title || "untitled";
-  const slug = filename ? filename.replace(/\.json$/, "") : slugify(title);
-  const fname = `${slug}-${Date.now()}.json`;
-  const filePath = path.join(storiesDir, fname);
-
-  await writeJsonAtomic(filePath, script);
+  if (autoGenerateMovie === true) {
+    triggerAutoBackgroundMovie(outcome.absoluteFilePath, outcome.wireFilePath, getSessionQuery(req) || undefined);
+  }
 
   res.json({
-    data: { script, filePath: `stories/${fname}` },
-    message: `Saved MulmoScript to stories/${fname}`,
+    data: { script: outcome.script, filePath: outcome.wireFilePath },
+    message: outcome.message,
     instructions: "Display the storyboard to the user.",
   });
 });
+
+async function saveScriptToDisk(script: MulmoScript, filename: string | undefined, res: Response): Promise<ScriptOutcome | null> {
+  // Validate against the same schema the reopen path uses so /save and
+  // /load agree on what counts as a valid MulmoScript — otherwise
+  // /save could persist a script that /load would later refuse, and
+  // autoGenerateMovie could kick off against malformed input.
+  const validation = mulmoScriptSchema.safeParse(script);
+  if (!validation.success) {
+    badRequest(res, "script is not a valid MulmoScript");
+    return null;
+  }
+  const validatedScript = validation.data;
+
+  mkdirSync(storiesDir, { recursive: true });
+
+  const title = validatedScript.title || "untitled";
+  // slugify drops `/`, `\`, and `..`, so a hostile `filename` like
+  // "../../etc/passwd" can never escape storiesDir via the path.join
+  // below — defense in depth on top of the wire-side validation.
+  const slug = filename ? slugify(filename.replace(/\.json$/i, "")) : slugify(title);
+  const fname = `${slug}-${Date.now()}.json`;
+  const writePath = path.join(storiesDir, fname);
+
+  await writeJsonAtomic(writePath, validatedScript);
+
+  // Realpath-resolve the freshly written file so `inFlightMovies`
+  // entries created from this code path collide with ones produced by
+  // `resolveStoryPath` (used by reopen / SSE generateMovie / movie-
+  // status). Without this, a symlinked storiesDir would let two movie
+  // generations for the same physical file run concurrently because
+  // their dedup keys differ (path.join vs realpath).
+  let absoluteFilePath: string;
+  try {
+    absoluteFilePath = realpathSync(writePath);
+  } catch {
+    absoluteFilePath = writePath;
+  }
+
+  return {
+    script: validatedScript,
+    wireFilePath: `stories/${fname}`,
+    absoluteFilePath,
+    message: `Saved MulmoScript to stories/${fname}`,
+  };
+}
+
+async function loadScriptFromDisk(filePath: string, res: Response): Promise<ScriptOutcome | null> {
+  if (!filePath.toLowerCase().endsWith(".json")) {
+    badRequest(res, "filePath must point to a .json file");
+    return null;
+  }
+  const absoluteFilePath = resolveStoryPath(filePath, res);
+  if (!absoluteFilePath) return null; // resolveStoryPath already responded
+
+  let raw: string;
+  try {
+    raw = readFileSync(absoluteFilePath, "utf-8");
+  } catch (err) {
+    serverError(res, errorMessage(err));
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    badRequest(res, `Invalid JSON: ${errorMessage(err)}`);
+    return null;
+  }
+
+  const validation = mulmoScriptSchema.safeParse(parsed);
+  if (!validation.success) {
+    badRequest(res, "File is not a valid MulmoScript");
+    return null;
+  }
+
+  // Canonicalize via the realpath-resolved absoluteFilePath so wire
+  // forms like "bar.json" or "stories/foo/../bar.json" all collapse
+  // to the same "stories/<rel>" key — pendingGenerations and movie-
+  // status lookups depend on that stability.
+  const wireFilePath = toStoryRef(absoluteFilePath);
+
+  return {
+    script: validation.data,
+    wireFilePath,
+    absoluteFilePath,
+    message: `Loaded MulmoScript from ${wireFilePath}`,
+  };
+}
+
+function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): void {
+  if (inFlightMovies.has(absoluteFilePath)) return;
+  inFlightMovies.add(absoluteFilePath);
+  void runBackgroundMovieGeneration(absoluteFilePath, wireFilePath, chatSessionId);
+}
 
 router.post(API_ROUTES.mulmoScript.updateBeat, async (req: Request<object, object, unknown>, res: Response) => {
   const validation = validateUpdateBeatBody(req.body);
@@ -493,6 +609,74 @@ router.post(API_ROUTES.mulmoScript.renderBeat, async (req: Request<object, objec
   }
 });
 
+// Module-level dedup so a foreground SSE call and a fire-and-forget
+// background call can't race on the same script. Keyed by the realpath
+// (absoluteFilePath) so two different wire spellings of the same file
+// still collide. The set is intentionally process-local — a multi-
+// process deployment would need an external lock; that's out of scope.
+const inFlightMovies = new Set<string>();
+
+type MovieGenerationResult = { ok: true; outputPath: string } | { ok: false; error: string };
+
+interface MovieProgressEvent {
+  kind: "image" | "audio";
+  beatIndex: number;
+}
+
+// Shared core for both the SSE-streaming `generateMovie` route and the
+// fire-and-forget background path triggered by `autoGenerateMovie`.
+// Builds the mulmo context, runs images→audio→movie, and reports
+// per-beat progress through the supplied callback. Throws on
+// unexpected pipeline errors; returns a structured failure when the
+// pipeline runs to completion but the output file is missing.
+async function runMovieGeneration(absoluteFilePath: string, onProgressEvent: (event: MovieProgressEvent) => void): Promise<MovieGenerationResult> {
+  const context = await buildContext(absoluteFilePath);
+  if (!context) return { ok: false, error: "Failed to initialize mulmo context" };
+
+  const idToIndex = new Map<string, number>();
+  (context.studio.script.beats as MulmoBeat[]).forEach((beat, index) => {
+    const key = beat.id ?? `__index__${index}`;
+    idToIndex.set(key, index);
+  });
+
+  // Known limitation: addSessionProgressCallback is global, so when two
+  // movie generations for *different* scripts run concurrently, both
+  // closures are invoked for every beat event and rely on idToIndex to
+  // filter out the other run's events. That filter is reliable only
+  // when each beat carries an explicit `id`. Beats without one fall
+  // back to "__index__${index}", and identical fallback ids across
+  // scripts collide → progress meant for script A surfaces on script B.
+  // Fixing this properly needs mulmocast to attach a per-run identifier
+  // to its progress events (or a global serialization gate); tracked
+  // separately, out of scope for this PR.
+  const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
+    if (event.kind !== "beat" || event.inSession || event.id === undefined) return;
+    const beatIndex = idToIndex.get(event.id);
+    if (beatIndex === undefined) return;
+    if (event.sessionType !== "image" && event.sessionType !== "audio") return;
+    onProgressEvent({ kind: event.sessionType, beatIndex });
+  };
+
+  addSessionProgressCallback(onProgress);
+  try {
+    // Order matters: audio() must run before images(). For html_tailwind
+    // beats with `animation: true`, mulmocast only emits the per-beat
+    // `_animated.mp4` when the beat's duration is already known (see
+    // processHtmlTailwindAnimated in mulmocast). Durations are populated
+    // by audio(), so running images() first leaves the .mp4 files
+    // missing and movie() then fails in validateBeatSource.
+    const audioContext = await audio(context);
+    const imagesContext = await images(audioContext);
+    await movie(imagesContext);
+
+    const outputPath = movieFilePath(imagesContext);
+    if (!existsSync(outputPath)) return { ok: false, error: "Movie was not generated" };
+    return { ok: true, outputPath };
+  } finally {
+    removeSessionProgressCallback(onProgress);
+  }
+}
+
 router.post(API_ROUTES.mulmoScript.generateMovie, async (req: Request<object, object, { filePath: string; chatSessionId?: string }>, res: Response) => {
   const { filePath, chatSessionId } = req.body;
 
@@ -504,65 +688,106 @@ router.post(API_ROUTES.mulmoScript.generateMovie, async (req: Request<object, ob
   const absoluteFilePath = resolveStoryPath(filePath, res);
   if (!absoluteFilePath) return;
 
+  if (inFlightMovies.has(absoluteFilePath)) {
+    badRequest(res, "Movie generation is already in progress for this script");
+    return;
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
   const send = (data: unknown) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
+  inFlightMovies.add(absoluteFilePath);
   publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", false);
   let genError: string | undefined;
   try {
-    const context = await buildContext(absoluteFilePath);
-    if (!context) {
-      genError = "Failed to initialize mulmo context";
-      send({ type: "error", message: genError });
-      res.end();
+    const result = await runMovieGeneration(absoluteFilePath, (event) => {
+      send({ type: `beat_${event.kind}_done`, beatIndex: event.beatIndex });
+    });
+    if (!result.ok) {
+      genError = result.error;
+      send({ type: "error", message: result.error });
       return;
     }
-
-    // Build id → beatIndex map for the progress callback
-    const idToIndex = new Map<string, number>();
-    (context.studio.script.beats as MulmoBeat[]).forEach((beat, index) => {
-      const key = beat.id ?? `__index__${index}`;
-      idToIndex.set(key, index);
-    });
-
-    const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
-      if (event.kind === "beat" && !event.inSession && event.id !== undefined) {
-        const beatIndex = idToIndex.get(event.id);
-        if (beatIndex !== undefined) {
-          send({ type: `beat_${event.sessionType}_done`, beatIndex });
-        }
-      }
-    };
-
-    addSessionProgressCallback(onProgress);
-    try {
-      const imagesContext = await images(context);
-      const audioContext = await audio(imagesContext);
-      await movie(audioContext);
-
-      const outputPath = movieFilePath(audioContext);
-      if (!existsSync(outputPath)) {
-        genError = "Movie was not generated";
-        send({ type: "error", message: genError });
-        res.end();
-        return;
-      }
-
-      send({ type: "done", moviePath: toStoryRef(outputPath) });
-    } finally {
-      removeSessionProgressCallback(onProgress);
-    }
+    send({ type: "done", moviePath: toStoryRef(result.outputPath) });
   } catch (err) {
     genError = errorMessage(err);
     send({ type: "error", message: genError });
   } finally {
+    inFlightMovies.delete(absoluteFilePath);
     publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", true, genError);
     res.end();
   }
 });
+
+// Detached movie generation. Reports progress through the same session
+// pendingGenerations channel that the View already watches — so a user
+// opening the canvas mid-generation sees spinners, and a user opening
+// it after completion sees the finished movie loaded from disk by the
+// View's normal mount-time path. Errors are persisted to a
+// `<filename>.error.txt` sidecar next to the script (no synchronous
+// client to alert); any stale sidecar from a previous run is cleared on
+// each new attempt. Triggered server-side from the unified save route
+// when the caller passes `autoGenerateMovie: true`.
+async function runBackgroundMovieGeneration(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): Promise<void> {
+  const errorSidecarPath = `${absoluteFilePath}.error.txt`;
+  // Clear stale error from a previous failed run before starting; if it
+  // doesn't exist that's fine. Catch any unexpected fs errors silently —
+  // the worst case is the user sees an out-of-date error file later.
+  try {
+    unlinkSync(errorSidecarPath);
+  } catch {
+    // intentional: ENOENT is the common case, others non-fatal
+  }
+
+  publishGeneration(chatSessionId, GENERATION_KINDS.movie, wireFilePath, "", false);
+  let genError: string | undefined;
+  try {
+    const result = await runMovieGeneration(absoluteFilePath, (event) => {
+      // Mirror per-beat completions through the session channel so the
+      // View's pendingGenerations watcher reloads the asset off disk.
+      // We fire start+finish in two ticks — `setImmediate` lets the SSE
+      // writer flush the start event before the finish removes the
+      // entry, otherwise Vue's batched reactivity could see a net "no
+      // change" and skip the reload.
+      const eventKind = event.kind === "image" ? GENERATION_KINDS.beatImage : GENERATION_KINDS.beatAudio;
+      const key = String(event.beatIndex);
+      publishGeneration(chatSessionId, eventKind, wireFilePath, key, false);
+      setImmediate(() => publishGeneration(chatSessionId, eventKind, wireFilePath, key, true));
+    });
+
+    if (!result.ok) {
+      genError = result.error;
+      writeErrorSidecar(errorSidecarPath, result.error);
+      log.warn("mulmo-script", "background movie generation failed", { filePath: wireFilePath, error: result.error });
+      return;
+    }
+    log.info("mulmo-script", "background movie generation done", {
+      filePath: wireFilePath,
+      outputPath: result.outputPath,
+    });
+  } catch (err) {
+    genError = errorMessage(err);
+    writeErrorSidecar(errorSidecarPath, genError);
+    log.error("mulmo-script", "background movie generation crashed", { filePath: wireFilePath, error: genError });
+  } finally {
+    inFlightMovies.delete(absoluteFilePath);
+    publishGeneration(chatSessionId, GENERATION_KINDS.movie, wireFilePath, "", true, genError);
+  }
+}
+
+function writeErrorSidecar(errorSidecarPath: string, message: string): void {
+  try {
+    writeFileSync(errorSidecarPath, message);
+  } catch (writeErr) {
+    log.error("mulmo-script", "failed to write error sidecar", {
+      errorSidecarPath,
+      error: errorMessage(writeErr),
+    });
+  }
+}
 
 interface CharacterImageQuery {
   filePath?: string;
@@ -615,10 +840,10 @@ router.post(API_ROUTES.mulmoScript.uploadBeatImage, async (req: Request<object, 
 
   await withStoryContext(res, filePath, {}, async ({ context }) => {
     const { imagePath } = getBeatPngImagePath(context, beatIndex);
-    mkdirSync(path.dirname(imagePath), { recursive: true });
-
+    // writeFileAtomic creates parent dirs and prevents a half-
+    // written PNG from surviving a crash mid-write (#881 v2).
     const base64 = stripDataUri(imageData);
-    writeFileSync(imagePath, Buffer.from(base64, "base64"));
+    await writeFileAtomic(imagePath, Buffer.from(base64, "base64"));
 
     res.json({ image: fileToDataUri(imagePath, "image/png") });
   });
@@ -687,10 +912,10 @@ router.post(
 
     await withStoryContext(res, filePath, {}, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
-      mkdirSync(path.dirname(imagePath), { recursive: true });
-
+      // writeFileAtomic creates parent dirs and prevents a half-
+      // written PNG from surviving a crash mid-write (#881 v2).
       const base64 = stripDataUri(imageData);
-      writeFileSync(imagePath, Buffer.from(base64, "base64"));
+      await writeFileAtomic(imagePath, Buffer.from(base64, "base64"));
 
       res.json({ image: fileToDataUri(imagePath, "image/png") });
     });

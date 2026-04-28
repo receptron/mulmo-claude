@@ -18,7 +18,7 @@ Chat with Claude Code and get back not just text but **interactive visual output
 
 **Access from anywhere**: connect Telegram, Slack, LINE, Discord, or [10 other messaging apps](#messaging-bridges) to talk to your AI agent from your phone.
 
-**Scheduled tasks**: hand off recurring work — daily summaries, periodic checks, timed reminders — to a built-in scheduler that runs your agent on a cron.
+**Scheduled tasks**: hand off recurring work — daily summaries, periodic checks, timed reminders — to a built-in scheduler that runs your agent on a cron schedule.
 
 ## Quick Start
 

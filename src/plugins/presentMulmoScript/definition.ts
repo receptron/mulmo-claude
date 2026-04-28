@@ -7,7 +7,20 @@ const toolDefinition: ToolDefinition = {
   name: TOOL_NAME,
   description: `Save and present a MulmoScript story or presentation as a visual storyboard in the canvas.
 
-Always use Google providers. Required structure:
+Two modes — provide EXACTLY ONE of \`script\` or \`filePath\`:
+
+1. **Create new** — pass \`script\` (full MulmoScript JSON). Server saves it to disk and presents it.
+2. **Re-display existing** — pass \`filePath\` (workspace-relative path returned by a previous call, e.g. "stories/my-story-1700000000000.json"). Much cheaper than re-sending the full script. Use whenever the user wants to revisit a presentation that was already created in this workspace.
+
+Optional \`autoGenerateMovie: true\` kicks off movie generation in the background, so the final video is ready by the time the user opens the canvas. Movie generation is expensive (multiple image + audio API calls + video encoding) — only set this when the user has explicitly asked for the movie. Default \`false\`.
+
+Provider rules for new scripts:
+- \`speechParams.speakers.<name>.provider\`: \`"gemini"\` — pairs with Gemini voices like \`"Kore"\`, \`"Aoede"\`, \`"Puck"\`. Do NOT use \`"google"\` here — that routes to Google Cloud TTS, where Gemini-class voices fail with "This voice requires a model name to be specified." unless an explicit \`model\` is set.
+- \`imageParams.provider\`: \`"google"\`
+- \`movieParams.provider\`: \`"google"\`
+- Do NOT add a top-level \`provider\` field to \`speechParams\` — provider belongs per-speaker only.
+
+Required structure:
 
 {
   "$mulmocast": { "version": "1.1" },
@@ -80,15 +93,26 @@ IMPORTANT: "imagePrompt" and "moviePrompt" are plain string fields on the beat, 
       script: {
         type: "object",
         description:
-          "Complete MulmoScript JSON. Must include $mulmocast, speechParams, imageParams, movieParams, and beats array. Always populate the top-level 'description' field with a concise 1–2 sentence summary of the presentation.",
+          "Complete MulmoScript JSON for a NEW presentation. Must include $mulmocast, speechParams, imageParams, movieParams, and beats array. Always populate the top-level 'description' field with a concise 1–2 sentence summary of the presentation. Do NOT pass alongside `filePath`.",
         additionalProperties: true,
       },
       filename: {
         type: "string",
-        description: "Optional filename without extension. Defaults to a slug of the script title.",
+        description:
+          "Optional filename without extension. Defaults to a slug of the script title. Only meaningful with `script`; ignored when `filePath` is given.",
+      },
+      filePath: {
+        type: "string",
+        description:
+          "Workspace-relative path to an EXISTING MulmoScript JSON file (e.g. 'stories/my-story-1700000000000.json'). Use this to re-display a script previously saved in this workspace, instead of resending the full JSON. Do NOT pass alongside `script`.",
+      },
+      autoGenerateMovie: {
+        type: "boolean",
+        description:
+          "When true, the server starts movie generation in the background after save/load. The user does NOT need to open the canvas — progress streams via the existing session channel. Default false. Only set true when the user has explicitly asked for the movie; generation is expensive.",
       },
     },
-    required: ["script"],
+    required: [],
   },
 };
 

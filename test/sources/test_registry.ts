@@ -98,6 +98,29 @@ added_at: 2026-04-13T00:00:00Z
     assert.ok(out);
     assert.deepEqual(out!.fields.get("categories"), []);
   });
+
+  // Codex review iter-2 #908: legacy line-by-line parser stored a
+  // bare `foo:` key as the empty string in the fields map (via
+  // parseScalar trimming the empty raw value). Pin that semantic
+  // post-migration so unknown fetcher params with no value still
+  // round-trip into `fetcherParams`.
+  it("preserves bare unknown keys (`foo:`) as empty string fields", () => {
+    const raw = `---
+slug: x
+title: hey
+url: https://example.com
+fetcher_kind: rss
+schedule: daily
+categories: []
+max_items_per_fetch: 5
+added_at: 2026-04-13T00:00:00Z
+github_repo:
+---
+`;
+    const out = parseSourceFile(raw);
+    assert.ok(out);
+    assert.equal(out!.fields.get("github_repo"), "");
+  });
 });
 
 describe("buildSource — validation", () => {

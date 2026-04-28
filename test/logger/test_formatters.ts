@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatJson, formatText } from "../../server/system/logger/formatters.js";
+import { formatJson, formatText, formatTextColor } from "../../server/system/logger/formatters.js";
 import type { LogRecord } from "../../server/system/logger/types.js";
 
 function record(overrides: Partial<LogRecord> = {}): LogRecord {
@@ -47,6 +47,51 @@ describe("formatText", () => {
   it("serialises nested objects as JSON", () => {
     const out = formatText(record({ data: { meta: { a: 1, b: [2, 3] } } }));
     assert.ok(out.includes('meta={"a":1,"b":[2,3]}'));
+  });
+});
+
+describe("formatTextColor", () => {
+  // Build the ANSI patterns from String.fromCharCode so the lint rule
+  // `no-control-regex` doesn't trip on a literal ESC byte in the source.
+  const ESC = String.fromCharCode(27);
+  const ANY_ANSI = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+  const FIRST_CODE = new RegExp(`${ESC}\\[([0-9;]+)m`);
+
+  it("wraps the entire line for error and warn (whole-row colour)", () => {
+    for (const level of ["error", "warn"] as const) {
+      const colored = formatTextColor(record({ level }));
+      assert.ok(colored.startsWith(ESC + "["), `expected ${level} line to start with an ANSI escape`);
+      assert.ok(colored.endsWith(ESC + "[0m"), `expected ${level} line to end with the ANSI reset`);
+      // Exactly one open escape + the closing reset — no nested wraps
+      // around the level word.
+      const escapeCount = (colored.match(ANY_ANSI) ?? []).length;
+      assert.equal(escapeCount, 2, `expected exactly two SGR codes for ${level}, got ${escapeCount}`);
+      // Stripping ANSI recovers the plain output exactly.
+      assert.equal(colored.replaceAll(ANY_ANSI, ""), formatText(record({ level })));
+    }
+  });
+
+  it("colours only the level word for info and debug (chatty levels stay quiet)", () => {
+    for (const level of ["info", "debug"] as const) {
+      const colored = formatTextColor(record({ level }));
+      // Should NOT start with an escape — the timestamp leads.
+      assert.ok(!colored.startsWith(ESC + "["), `expected ${level} line to start with the timestamp, not ANSI`);
+      // Exactly one wrapped slot: open + reset around the level word.
+      const escapeCount = (colored.match(ANY_ANSI) ?? []).length;
+      assert.equal(escapeCount, 2, `expected exactly one wrapped slot for ${level}`);
+      assert.equal(colored.replaceAll(ANY_ANSI, ""), formatText(record({ level })));
+    }
+  });
+
+  it("uses distinct colour codes per level (sanity check)", () => {
+    const seen = new Set<string>();
+    for (const level of ["error", "warn", "info", "debug"] as const) {
+      const out = formatTextColor(record({ level }));
+      const match = FIRST_CODE.exec(out);
+      assert.ok(match, `expected colour escape for level ${level}`);
+      seen.add(match[1] ?? "");
+    }
+    assert.equal(seen.size, 4, "every level should map to a distinct ANSI code");
   });
 });
 

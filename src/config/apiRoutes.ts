@@ -88,6 +88,14 @@ export const API_ROUTES = {
     test: "/api/notifications/test",
   },
 
+  journal: {
+    // Most recent existing daily summary (today, falling back to
+    // prior days). Backs the top-bar "today's journal" shortcut
+    // (#876). Returns null when no daily summary has been generated
+    // yet on this workspace.
+    latestDaily: "/api/journal/latest-daily",
+  },
+
   mulmoScript: {
     save: "/api/mulmo-script",
     updateBeat: "/api/mulmo-script/update-beat",

@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import path from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { readTextSafeSync, readTextSafe } from "../../utils/files/safe.js";
-import { writeFileAtomic } from "../../utils/files/atomic.js";
+import { writeWikiPage } from "../../workspace/wiki-pages/io.js";
 import { getPageIndex } from "./wiki/pageIndex.js";
 import { parseFrontmatterTags } from "./wiki/frontmatter.js";
 import { badRequest, notFound } from "../../utils/httpError.js";
@@ -15,6 +15,7 @@ import { previewSnippet } from "../../utils/logPreview.js";
 // different name avoids the no-shadow clash without renaming the
 // long-standing local.
 import { errorMessage as formatError } from "../../utils/errors.js";
+import { BULLET_LINK_PATTERN, BULLET_WIKI_LINK_PATTERN } from "../../utils/regex.js";
 
 const router = Router();
 
@@ -44,12 +45,12 @@ export function wikiSlugify(text: string): string {
 }
 
 const TABLE_SEPARATOR_PATTERN = /^\|[\s|:-]+\|$/;
-// Capture the href (group 2) alongside the title (group 1) so we can
-// derive the slug from the file name instead of re-slugifying the
-// title. This matters for non-ASCII titles like "さくらインターネット"
+// Bullet-link patterns (BULLET_LINK_PATTERN, BULLET_WIKI_LINK_PATTERN)
+// live in `server/utils/regex.ts` alongside other server regex audit
+// notes. Capture the href (group 2) alongside the title (group 1) so
+// we can derive the slug from the file name instead of re-slugifying
+// the title — important for non-ASCII titles like "さくらインターネット"
 // where `wikiSlugify` returns "" and the slug would otherwise be lost.
-const BULLET_LINK_PATTERN = /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
-const BULLET_WIKI_LINK_PATTERN = /^[-*]\s+\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?/;
 // Unicode-aware tag body: any letter or number in any script
 // (so Japanese / Chinese / Korean tags like `#クラウド` or `#可視化`
 // work), plus `-` and `_` as internal joiners. First char is a
@@ -508,9 +509,14 @@ type SaveOutcome = { ok: true; absPath: string } | { ok: false; reason: "not-fou
 async function saveExistingPage(pageName: string, content: string): Promise<SaveOutcome> {
   const absPath = await resolvePagePath(pageName);
   if (!absPath) return { ok: false, reason: "not-found" };
-  // Atomic write: tmp file alongside the destination, fsync, rename.
-  // Prevents a crashed write from leaving the wiki page truncated.
-  await writeFileAtomic(absPath, content);
+  // Funnel through the wiki-page write helper. Atomic write is
+  // guaranteed inside; the helper also routes the (old, new) pair
+  // to the snapshot pipeline (#763 PR 2 — currently a no-op stub).
+  // Editor identity defaults to "user" here because the route is
+  // hit by both LLM (`manageWiki` MCP) and frontend saves; PR 2
+  // disambiguates them via a request-side flag.
+  const slug = path.basename(absPath, ".md");
+  await writeWikiPage(slug, content, { editor: "user" });
   return { ok: true, absPath };
 }
 

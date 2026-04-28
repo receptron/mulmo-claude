@@ -8,14 +8,14 @@
 //
 //   atomic.ts        — write-then-rename primitives
 //   safe.ts          — ENOENT-swallowing wrappers (stat, readdir, readText, resolveWithinRoot)
-//   json.ts          — JSON read/write (sync legacy + async atomic)
+//   json.ts          — JSON sync read + async atomic write
 //   workspace-io.ts  — workspace-aware helpers (path resolve + I/O in one call)
 
 export { writeFileAtomic, writeFileAtomicSync, type WriteAtomicOptions } from "./atomic.js";
 
 export { isEnoent, readTextSafeSync, statSafe, statSafeAsync, readDirSafe, readDirSafeAsync, readTextOrNull, resolveWithinRoot } from "./safe.js";
 
-export { loadJsonFile, saveJsonFile, writeJsonAtomic, readJsonOrNull } from "./json.js";
+export { loadJsonFile, writeJsonAtomic, readJsonOrNull } from "./json.js";
 
 export {
   resolveWorkspacePath,

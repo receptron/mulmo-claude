@@ -170,14 +170,48 @@
       </div>
     </div>
 
-    <!-- Markdown content -->
-    <div
-      v-else
-      ref="scrollRef"
-      class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content"
-      @click="handleContentClick"
-      v-html="renderedContent"
-    />
+    <!-- Markdown content (with optional metadata bar above) -->
+    <template v-else>
+      <!-- Metadata bar (#895 PR B). One thin row that surfaces
+           `created` / `updated` / `editor` / `tags` from the page's
+           frontmatter. Hidden when the page has no header — keeps
+           the existing header-less content visually unchanged. -->
+      <div
+        v-if="action === 'page' && hasPageMeta"
+        data-testid="wiki-page-metadata-bar"
+        class="shrink-0 border-b border-gray-100 px-6 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500"
+      >
+        <span v-if="pageMeta.created" data-testid="wiki-page-metadata-created">
+          <span class="text-gray-400">{{ t("pluginWiki.metadataCreated") }}:</span>
+          {{ pageMeta.created }}
+        </span>
+        <span v-if="pageMeta.updated" data-testid="wiki-page-metadata-updated">
+          <span class="text-gray-400">{{ t("pluginWiki.metadataUpdated") }}:</span>
+          {{ formatUpdated(pageMeta.updated) }}
+        </span>
+        <span v-if="pageMeta.editor" data-testid="wiki-page-metadata-editor">
+          <span class="text-gray-400">{{ t("pluginWiki.metadataEditor") }}:</span>
+          {{ pageMeta.editor }}
+        </span>
+        <span v-if="pageMeta.tags.length > 0" class="flex flex-wrap gap-1" data-testid="wiki-page-metadata-tags">
+          <button
+            v-for="tag in pageMeta.tags"
+            :key="tag"
+            class="entry-tag-chip"
+            :data-testid="`wiki-page-metadata-tag-${tag}`"
+            @click="setTagFilterAndNavigate(tag)"
+          >
+            {{ `#${tag}` }}
+          </button>
+        </span>
+      </div>
+      <div
+        ref="scrollRef"
+        class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content"
+        @click="handleContentClick"
+        v-html="renderedContent"
+      />
+    </template>
 
     <!-- Per-page chat composer (standalone /wiki route only). Sending
          spawns a fresh chat session with a prepended "read this page
@@ -189,7 +223,7 @@
       v-if="action === 'page' && content && isStandaloneWikiRoute && currentSlug() !== null"
       :key="currentSlug() ?? ''"
       :placeholder="t('pluginWiki.chatPlaceholder')"
-      :prepend-text="`Before answering, read the wiki page at data/wiki/pages/${currentSlug()}.md.`"
+      :prepend-text="`Before answering, read the wiki page at ${WIKI_PAGES_DIR}/${currentSlug()}.md.`"
       test-id-prefix="wiki-page-chat"
     />
   </div>
@@ -212,7 +246,8 @@ import { renderWikiLinks } from "./helpers";
 import PageChatComposer from "../../components/PageChatComposer.vue";
 import { BUILTIN_ROLE_IDS } from "../../config/roles";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
-import { extractFrontmatter } from "../../utils/format/frontmatter";
+import { parseFrontmatter } from "../../utils/markdown/frontmatter";
+import { useMarkdownDoc } from "../../composables/useMarkdownDoc";
 import { findTaskLines, makeTasksInteractive, toggleTaskAt } from "../../utils/markdown/taskList";
 import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
@@ -221,6 +256,14 @@ import { WIKI_ACTION, WIKI_ROUTE_SECTION, buildWikiRouteParams, isSafeWikiSlug, 
 import FilterChip from "../../components/FilterChip.vue";
 
 type WikiTabView = typeof WIKI_ACTION.log | typeof WIKI_ACTION.lintReport;
+
+// Workspace-relative wiki dirs. Centralised so future layout shifts
+// (e.g. the prior `wiki/` → `data/wiki/` move) only need to change
+// these two literals — all callers (image-ref rewriter, wiki-link
+// resolver, agent-prompt strings, the page-chat prepend-text in
+// the template above) derive from them.
+const WIKI_PAGES_DIR = "data/wiki/pages";
+const WIKI_DATA_DIR = "data/wiki";
 
 const route = useRoute();
 const router = useRouter();
@@ -235,6 +278,11 @@ const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
 const action = ref(props.selectedResult?.data?.action ?? "index");
 const title = ref(props.selectedResult?.data?.title ?? "Wiki");
 const content = ref(props.selectedResult?.data?.content ?? "");
+// Frontmatter view of the loaded page content. Drives the
+// metadata bar (Created / Updated / Editor / Tags) above the
+// rendered body. `useMarkdownDoc` is reactive so editing or
+// switching pages re-derives without manual recomputation.
+const mdDoc = useMarkdownDoc(content);
 const pageEntries = ref<WikiPageEntry[]>(props.selectedResult?.data?.pageEntries ?? []);
 const pageExists = ref(props.selectedResult?.data?.pageExists ?? true);
 // View-local tag filter. Null = no filter. Not persisted to URL —
@@ -371,6 +419,17 @@ function setTagFilter(tag: string) {
   selectedTag.value = tag;
 }
 
+// Tag chips on the page metadata bar (#895 PR B) live in the
+// `action === 'page'` view. Clicking one should jump to the
+// filtered index — both navigating away from the page and
+// pre-selecting the tag the user wants to explore. Without the
+// navigation step the user would need a separate Back-to-index
+// click to see the filter take effect.
+function setTagFilterAndNavigate(tag: string) {
+  setTagFilter(tag);
+  navigate("index");
+}
+
 // Spawn a new chat under the General role (which owns the wiki
 // tooling) regardless of the role the user is currently viewing the
 // wiki under. "lint my wiki" is a direct instruction to the agent,
@@ -398,14 +457,73 @@ watch(content, async () => {
 });
 
 /** Base directory for wiki content, adjusted by the current view. */
-const WIKI_BASE_DIR = computed(() => (action.value === "page" ? "data/wiki/pages" : "data/wiki"));
+const WIKI_BASE_DIR = computed(() => (action.value === "page" ? WIKI_PAGES_DIR : WIKI_DATA_DIR));
+
+// ── Metadata bar (#895 PR B) ──────────────────────────────────
+//
+// Show a single thin row above the rendered body with
+// `Created` / `Updated` / `Editor` / `Tags` derived from the
+// frontmatter. Hidden when none of those are present (header-less
+// pages render unchanged so old wiki content keeps its current
+// appearance).
+
+/** String accessor that survives the `unknown` type from FAILSAFE
+ *  YAML — `meta` values are all strings under FAILSAFE schema, but
+ *  type-narrowing requires a runtime check. */
+function metaString(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  return value;
+}
+
+/** Array-of-strings accessor for `tags`. Allows the chips template
+ *  to skip a render branch when the field is missing or malformed. */
+function metaStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+const pageMeta = computed(() => ({
+  created: metaString(mdDoc.value.meta.created),
+  updated: metaString(mdDoc.value.meta.updated),
+  editor: metaString(mdDoc.value.meta.editor),
+  tags: metaStringArray(mdDoc.value.meta.tags),
+}));
+
+const hasPageMeta = computed(() => {
+  const meta = pageMeta.value;
+  return meta.created !== null || meta.updated !== null || meta.editor !== null || meta.tags.length > 0;
+});
+
+/** Render `updated` ISO timestamp as `YYYY-MM-DD HH:MM` in the
+ *  user's local timezone. The on-disk value is UTC ISO
+ *  (`2026-04-27T14:32:56.789Z`) — showing the raw `14:32` would
+ *  read like local wall time on a non-UTC machine and mislead
+ *  the user (codex review iter-1 #905). Falls back to the raw
+ *  value if it doesn't parse as a Date (defensive — user-supplied
+ *  frontmatter may have any string here). */
+function formatUpdated(raw: string): string {
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  // `sv-SE` locale gives ISO-like `YYYY-MM-DD HH:MM` (with a
+  // space, no `T`) which matches the original format intent.
+  // `hour12: false` defends against locales that would otherwise
+  // emit AM/PM.
+  return new Intl.DateTimeFormat("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
+}
 
 const renderedContent = computed(() => {
   if (!content.value) return "";
   // Strip YAML frontmatter before rendering — marked doesn't parse
   // it, so the `---` fences turn into <hr>s and the inner keys
   // render as plain text (title / created / updated / tags / source).
-  const body = extractFrontmatter(content.value).body;
+  const body = parseFrontmatter(content.value).body;
   if (!body) return "";
   // Rewrite workspace-relative image refs (`![alt](images/foo.png)`)
   // to `/api/files/raw?path=...` BEFORE marked parses them — without
@@ -492,14 +610,14 @@ const isStandaloneWikiRoute = computed(() => route.name === PAGE_ROUTES.wiki);
 // wiki tooling — and silently produce useless sessions.
 function requestCreatePage() {
   appApi.startNewChat(
-    `Create a wiki page about ${JSON.stringify(title.value)}. Research the topic and write a comprehensive article in data/wiki/pages/.`,
+    `Create a wiki page about ${JSON.stringify(title.value)}. Research the topic and write a comprehensive article in ${WIKI_PAGES_DIR}/.`,
     BUILTIN_ROLE_IDS.general,
   );
 }
 
 function requestUpdatePage() {
   appApi.startNewChat(
-    `Update the existing wiki page about ${JSON.stringify(title.value)}. The page file exists but has no content. Research the topic and write a comprehensive article in data/wiki/pages/.`,
+    `Update the existing wiki page about ${JSON.stringify(title.value)}. The page file exists but has no content. Research the topic and write a comprehensive article in ${WIKI_PAGES_DIR}/.`,
     BUILTIN_ROLE_IDS.general,
   );
 }
@@ -575,8 +693,8 @@ async function persistWikiPage(pageName: string, newContent: string, generation:
 // `prefix + body` round-trips byte-for-byte regardless of
 // frontmatter shape — the body length is always exact.
 function splitFrontmatter(): { prefix: string; body: string } {
-  const frontmatter = extractFrontmatter(content.value);
-  const body = frontmatter.body;
+  const parsed = parseFrontmatter(content.value);
+  const body = parsed.body;
   const prefix = content.value.slice(0, content.value.length - body.length);
   return { prefix, body };
 }

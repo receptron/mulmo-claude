@@ -1,9 +1,9 @@
 <template>
   <div class="border-t border-gray-200 shrink-0 bg-gray-50">
     <SuggestionsPanel
-      v-if="suggestions && suggestions.length > 0"
       v-model:expanded="suggestionsExpanded"
       :queries="suggestions"
+      :trigger-ref="suggestionsBtnRef"
       @send="onSuggestionSend"
       @edit="onSuggestionEdit"
     />
@@ -22,12 +22,12 @@
       />
       <div class="flex flex-col gap-1 shrink-0">
         <button
-          v-if="suggestions && suggestions.length > 0"
+          ref="suggestionsBtnRef"
           :data-testid="`${testIdPrefix}-suggestions`"
           class="rounded w-8 h-8 flex items-center justify-center"
           :class="suggestionsExpanded ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'"
-          :title="t('suggestionsPanel.suggestions')"
-          :aria-label="t('suggestionsPanel.suggestions')"
+          :title="t('suggestionsPanel.tooltip')"
+          :aria-label="t('suggestionsPanel.tooltip')"
           @click="suggestionsExpanded = !suggestionsExpanded"
         >
           <span class="material-icons text-base leading-none">lightbulb</span>
@@ -71,6 +71,7 @@ const appApi = useAppApi();
 const draft = ref("");
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const suggestionsExpanded = ref(false);
+const suggestionsBtnRef = ref<HTMLButtonElement | null>(null);
 
 const canSend = computed(() => !props.disabled && (props.allowEmpty || draft.value.trim().length > 0));
 

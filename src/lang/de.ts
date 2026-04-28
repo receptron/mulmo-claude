@@ -62,6 +62,9 @@ const deMessages = {
     toolCallHistory: "Tool-Aufrufverlauf",
     settings: "Einstellungen",
     settingsGeminiMissing: "Einstellungen — Gemini-API-Schlüssel fehlt",
+    todayJournal: "Heutige Zusammenfassung",
+    todayJournalNotFound: "Noch keine Zusammenfassung — chatte etwas und das Journal erstellt eine.",
+    todayJournalLoadFailed: "Journal konnte nicht geladen werden (Status {status}): {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "System-Prompt umschalten",
@@ -201,6 +204,113 @@ const deMessages = {
     htmlPreview: "HTML-Vorschau",
     pdfPreview: "PDF-Vorschau",
     parseError: "Parse-Fehler",
+  },
+  systemFiles: {
+    schemaLabel: "Schema",
+    showDetails: "Details anzeigen",
+    hideDetails: "Details ausblenden",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Agent-verwaltet (manuelle Bearbeitung erlaubt)",
+      "user-editable": "Benutzer-bearbeitbar",
+      "agent-managed": "Agent-verwaltet",
+      "fragile-format": "Empfindliches Format",
+      ephemeral: "Flüchtig",
+    },
+    interests: {
+      title: "Interests-Konfiguration",
+      summary: "Themen, die die News-/Quellen-Pipeline beobachtet und für dich bewertet. Manuell editierbar; der Agent aktualisiert ebenfalls aus dem Chat.",
+    },
+    mcp: {
+      title: "MCP-Server",
+      summary:
+        "Externe Model-Context-Protocol-Server, die mit dem Agenten verbunden sind. HTTP- oder Stdio-Server hinzufügen, um die Werkzeugauswahl zu erweitern.",
+    },
+    settings: {
+      title: "App-Einstellungen",
+      summary: "Vom Benutzer bearbeitbare Verhaltenseinstellungen — Gemini-API-Schlüssel, erlaubte Werkzeuge, Sandbox-Konfiguration usw.",
+    },
+    schedulerTasks: {
+      title: "Scheduler-Aufgaben",
+      summary:
+        "Wiederkehrende Agent-Automationen, die nach Zeitplan ausgelöst werden. Verwaltet über die Automations-UI; diese Datei ist die Quelle auf Festplatte.",
+    },
+    schedulerOverrides: {
+      title: "Scheduler-Überschreibungen",
+      summary:
+        "Pro-Aufgabe Zeit-/Intervall-Überschreibungen über dem Systemzeitplan. Der Agent bearbeitet dies, wenn du den Zeitpunkt einer wiederkehrenden Aufgabe änderst.",
+    },
+    newsReadState: {
+      title: "Lesestatus der News",
+      summary: "Lokales Tracking, welche News du gesehen hast. Flüchtig — kann gelöscht werden; wird beim Lesen neu erzeugt.",
+    },
+    schedulerItems: {
+      title: "Scheduler-Item-Warteschlange",
+      summary: "Geplante Aufrufe, die zur Auslösung bereitstehen. Agent-verwaltet; nicht von Hand bearbeiten, ohne jedes Feld zu verstehen.",
+    },
+    todosItems: {
+      title: "Todo-Einträge",
+      summary:
+        "Deine Aufgaben in allen Spalten des Kanban-Boards. Der Agent schreibt hier, wenn du sagst: füge ein Todo hinzu — Handbearbeitung ist ebenfalls möglich.",
+    },
+    todosColumns: {
+      title: "Todo-Spalten",
+      summary: "Spaltenaufteilung des Kanban-Boards (Titel, Reihenfolge, IDs). Vom Benutzer bearbeitbar — frei umbenennen oder umsortieren.",
+    },
+    wikiIndex: {
+      title: "Wiki-Index",
+      summary:
+        "Automatisch erzeugter Index aller Wiki-Seiten. Wird bei jeder Wiki-Bearbeitung aktualisiert; nicht von Hand bearbeiten (Änderungen werden überschrieben).",
+    },
+    wikiLog: {
+      title: "Wiki-Bearbeitungsprotokoll",
+      summary:
+        "Aktivitätsprotokoll der Erstellungs- und Bearbeitungsvorgänge im Wiki. Agent-verwaltet und nur anhängend — nützlich als Feed der letzten Änderungen.",
+    },
+    wikiSummary: {
+      title: "Wiki-Übersicht",
+      summary: "Automatisch erzeugte Übersicht des Wikis — Themencluster, Seitenzahl, jüngste Aktivitäten. Vom Agenten aktualisiert.",
+    },
+    wikiSchema: {
+      title: "Wiki-Schema",
+      summary:
+        "Formatspezifikation, die der Agent liest, um Wiki-Seiten konsistent zu halten. Empfindlich — eine bestimmte Struktur wird erwartet; bevorzuge Agent-getriebene Bearbeitung.",
+    },
+    memory: {
+      title: "Memory",
+      summary:
+        "Destillierte Fakten über dich, immer als Kontext für neue Gespräche geladen. Der Journal-Extraktor hängt automatisch an; manuelle Bearbeitung ebenfalls möglich.",
+    },
+    summariesIndex: {
+      title: "Zusammenfassungs-Index",
+      summary:
+        "Durchsuchbarer Index, der zu den vom Journal erzeugten Tages- und Themen-Zusammenfassungen verlinkt. Agent-verwaltet; bei jedem Journal-Lauf aktualisiert.",
+    },
+    rolesJson: {
+      title: "Rollendefinition (JSON)",
+      summary: "Rollenkonfiguration — Modellauswahl, MCP-Server, erlaubte Plugins, Anfragen-Vorschläge. Vom Benutzer bearbeitbar, kein Neustart nötig.",
+    },
+    rolesMd: {
+      title: "Rollenbeschreibung (Markdown)",
+      summary:
+        "Persona und System-Prompt-Text der Rolle, geladen als Kontext, wenn diese Rolle aktiv ist. Vom Benutzer bearbeitbar; Änderungen wirken ab der nächsten Nachricht.",
+    },
+    sourceFeed: {
+      title: "Abonnierte Quelle",
+      summary: "Eine abonnierte Quelle (RSS, GitHub-Releases / Issues, arXiv usw.). Vom Benutzer bearbeitbar; die Quellen-Pipeline pollt nach Zeitplan.",
+    },
+    sourceState: {
+      title: "Quellenstatus",
+      summary:
+        "Flüchtiger Pipeline-Zustand für eine Quelle — zuletzt gesehene IDs, ETags, Fetch-Fehler. Kann gelöscht werden; wird beim nächsten Lauf neu erzeugt.",
+    },
+    journalDaily: {
+      title: "Tägliche Journal-Zusammenfassung",
+      summary: "Automatisch erzeugte Rückschau auf deine Aktivitäten an einem Kalendertag, vom Journal-Lauf aus den Chat-Sitzungen destilliert.",
+    },
+    journalTopic: {
+      title: "Themen-Journal",
+      summary: "Langlaufende Notizen zu einem bestimmten Thema, gesammelt und überarbeitet, während du weiter darüber sprichst. Agent-verwaltet.",
+    },
   },
   settingsMcpTab: {
     explanation:
@@ -349,15 +459,12 @@ const deMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "Suche Tracks, verwalte Playlists, steuere die Wiedergabe. BYO Spotify-Developer-App — Client ID + Client Secret.",
+          description:
+            "Suche Tracks, verwalte Playlists, steuere die Wiedergabe. BYO Spotify-Developer-App — nur Client ID (PKCE-Flow, kein Client Secret nötig).",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → kopiere die Client ID. Die Redirect URI muss für Desktop-Nutzung keiner echten Seite entsprechen.",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "Selbes Developer Dashboard → in der App auf Show client secret klicken. Einmal eingefügt, lokal gecacht.",
+              help: "Spotify Developer Dashboard → Create app, setze die Redirect URI auf http://127.0.0.1:8888/callback, kopiere die Client ID. Führe dann einmal im Terminal `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` aus, um dich anzumelden (Refresh-Token wird in ~/.spotify-mcp/tokens.json gecacht).",
             },
           },
         },
@@ -520,6 +627,9 @@ const deMessages = {
     lintChat: "Wiki prüfen",
     taskCountMismatch:
       "Wiki-Quelle und gerendertes Ergebnis stimmen in der Anzahl der Aufgaben nicht überein. Die Umschaltung wurde abgelehnt, um eine Beschädigung der Datei zu vermeiden.",
+    metadataCreated: "Erstellt",
+    metadataUpdated: "Aktualisiert",
+    metadataEditor: "Bearbeiter",
   },
   pluginPresentForm: {
     fallbackTitle: "Formular",
@@ -702,6 +812,8 @@ const deMessages = {
     gen: "Generieren",
     play: "▶ Abspielen",
     stop: "■ Stoppen",
+    playPresentation: "Präsentation abspielen",
+    regenerateMovie: "Video neu generieren",
     errPrefix: "⚠ Fehler",
     noBeats: "Keine Beats im Skript gefunden",
     editSource: "Skript-Quelle bearbeiten",
@@ -766,6 +878,11 @@ const deMessages = {
   },
   suggestionsPanel: {
     suggestions: "Vorschläge",
+    skills: "Skills",
+    tooltip: "Vorschläge und Skills",
+    emptySuggestions: "Keine Vorschläge.",
+    emptySkills: "Keine Skills installiert.",
+    skillsError: "Fehler beim Laden der Skills: {error}",
     sendEditHint: "klicken zum Senden · Shift+Klick zum Bearbeiten",
   },
   settingsToolsTab: {

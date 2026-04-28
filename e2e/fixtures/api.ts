@@ -107,6 +107,11 @@ export async function mockAllApis(page: Page, opts: MockApiOptions = {}): Promis
   // .filter TypeError on non-array responses.
   await page.route(urlStartsWith("/api/mcp-tools"), (route) => route.fulfill({ json: [] }));
 
+  // SuggestionsPanel calls /api/skills on every panel open. Default to
+  // an empty list so tests that don't care about skills don't trip the
+  // [mock] unhandled warning.
+  await page.route(urlEndsWith("/api/skills"), (route) => route.fulfill({ json: { skills: [] } }));
+
   await page.route(urlStartsWith("/api/chat-index"), (route) => route.fulfill({ json: {} }));
 
   await page.route(urlEndsWith("/api/files/tree"), (route) =>

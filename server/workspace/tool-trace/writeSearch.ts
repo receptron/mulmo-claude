@@ -11,6 +11,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { slugify } from "../../utils/slug.js";
 import { toUtcIsoDate } from "../../utils/date.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { WORKSPACE_DIRS } from "../paths.js";
 
 export const SEARCHES_DIR = WORKSPACE_DIRS.searches;
@@ -87,7 +88,11 @@ const defaultDeps: WriteSearchDeps = {
   mkdir: async (dir) => {
     await fsp.mkdir(dir, { recursive: true });
   },
-  writeFile: (filePath, content) => fsp.writeFile(filePath, content, "utf-8"),
+  // Atomic write so a crash mid-flight can't leave a half-written
+  // search markdown that the jsonl `contentRef` then points at
+  // (#881 v2). Tests inject their own adapter so behaviour stays
+  // mockable.
+  writeFile: (filePath, content) => writeFileAtomic(filePath, content),
 };
 
 /**

@@ -84,19 +84,28 @@ function renameSyncWithWindowsRetry(fromPath: string, toPath: string): void {
   renameSync(fromPath, toPath);
 }
 
+// Binary writes (PNGs, etc.) come in as Uint8Array / Buffer. Strings
+// stay text-encoded as utf-8. Forcing utf-8 on a Uint8Array would
+// re-encode the bytes, which is exactly what we don't want for
+// images. Pick the encoding option per content type.
+function writeOptionsFor(content: string | Uint8Array, mode: number | undefined): { encoding?: "utf-8"; mode?: number } {
+  return typeof content === "string" ? { encoding: "utf-8", mode } : { mode };
+}
+
 /**
  * Write `content` to `filePath` atomically. The parent directory is
  * created if missing. The tmp file is cleaned up on failure so a
  * crashed partial write can't wedge the next try.
+ *
+ * Accepts either text (utf-8 encoded) or binary content. Buffers
+ * extend `Uint8Array`, so PNG / other binary blobs pass through
+ * without conversion.
  */
-export async function writeFileAtomic(filePath: string, content: string, opts: WriteAtomicOptions = {}): Promise<void> {
+export async function writeFileAtomic(filePath: string, content: string | Uint8Array, opts: WriteAtomicOptions = {}): Promise<void> {
   const tmp = opts.uniqueTmp ? `${filePath}.${shortId()}.tmp` : `${filePath}.tmp`;
   await promises.mkdir(path.dirname(filePath), { recursive: true });
   try {
-    await promises.writeFile(tmp, content, {
-      encoding: "utf-8",
-      mode: opts.mode,
-    });
+    await promises.writeFile(tmp, content, writeOptionsFor(content, opts.mode));
     await renameWithWindowsRetry(tmp, filePath);
   } catch (err) {
     await promises.unlink(tmp).catch(() => {});
@@ -107,13 +116,14 @@ export async function writeFileAtomic(filePath: string, content: string, opts: W
 /**
  * Synchronous atomic write for callers that need it (e.g. server
  * startup, config saves that must complete before the next line).
- * Same contract as `writeFileAtomic` but blocking.
+ * Same contract as `writeFileAtomic` but blocking. Binary content
+ * (Buffer / Uint8Array) is supported the same way.
  */
-export function writeFileAtomicSync(filePath: string, content: string, opts: WriteAtomicOptions = {}): void {
+export function writeFileAtomicSync(filePath: string, content: string | Uint8Array, opts: WriteAtomicOptions = {}): void {
   const tmp = opts.uniqueTmp ? `${filePath}.${shortId()}.tmp` : `${filePath}.tmp`;
   mkdirSync(path.dirname(filePath), { recursive: true });
   try {
-    writeFileSync(tmp, content, { encoding: "utf-8", mode: opts.mode });
+    writeFileSync(tmp, content, writeOptionsFor(content, opts.mode));
     renameSyncWithWindowsRetry(tmp, filePath);
   } catch (err) {
     try {

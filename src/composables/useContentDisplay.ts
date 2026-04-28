@@ -5,7 +5,7 @@ import { computed, type Ref } from "vue";
 import type { FileContent } from "./useFileSelection";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import { tokenizeJson, tokenizeJsonl, prettyJson } from "../utils/format/jsonSyntax";
-import { extractFrontmatter } from "../utils/format/frontmatter";
+import { parseFrontmatter } from "../utils/markdown/frontmatter";
 
 function hasExt(filePath: string | null, exts: string[]): boolean {
   if (!filePath) return false;
@@ -33,10 +33,16 @@ export function useContentDisplay(selectedPath: Ref<string | null>, content: Ref
     return tokenizeJsonl(content.value.content);
   });
 
+  // Returns the canonical `ParsedMarkdown` shape (`{ meta, body,
+  // hasHeader }`) augmented with an ordered `fields` array for the
+  // properties-panel template. Templates iterate `fields` and
+  // branch on `Array.isArray(value)` for chip rendering.
   const mdFrontmatter = computed(() => {
     if (!content.value || content.value.kind !== "text") return null;
     if (!isMarkdown.value) return null;
-    return extractFrontmatter(content.value.content);
+    const parsed = parseFrontmatter(content.value.content);
+    const fields = Object.entries(parsed.meta).map(([key, value]) => ({ key, value }));
+    return { ...parsed, fields };
   });
 
   return {

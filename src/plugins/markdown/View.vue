@@ -26,6 +26,27 @@
       </div>
       <div class="markdown-content-wrapper">
         <div class="p-4">
+          <!-- Frontmatter properties panel (FileContentRenderer-style)
+               — only rendered when the file has a `---\n...\n---`
+               header. Lazy-on-write means most existing files don't
+               have one yet (#895). -->
+          <div v-if="mdDoc.fields.length > 0" class="mb-3 rounded border border-gray-200 bg-gray-50 p-3 text-xs">
+            <div v-for="field in mdDoc.fields" :key="field.key" class="flex items-baseline gap-2 py-0.5">
+              <span class="font-semibold text-gray-600 shrink-0">{{ field.key }}:</span>
+              <template v-if="Array.isArray(field.value)">
+                <span class="flex flex-wrap gap-1">
+                  <span
+                    v-for="(item, idx) in field.value"
+                    :key="String(idx) + ':' + formatScalarField(item)"
+                    class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700"
+                  >
+                    {{ formatScalarField(item) }}
+                  </span>
+                </span>
+              </template>
+              <span v-else class="text-gray-800 break-words">{{ formatScalarField(field.value) }}</span>
+            </div>
+          </div>
           <!-- Click delegation: a single listener on the wrapper picks
                up every interactive checkbox inserted by v-html. We
                cannot bind @click directly on each `<input>` because
@@ -58,6 +79,7 @@
 import { computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { marked } from "marked";
+import { formatScalarField, useMarkdownDoc } from "../../composables/useMarkdownDoc";
 
 const { t } = useI18n();
 import type { ToolResult } from "gui-chat-protocol";
@@ -132,6 +154,13 @@ const hasChanges = computed(() => {
   return editableMarkdown.value !== markdownContent.value;
 });
 
+// Frontmatter-aware view of the loaded content — separates the
+// `---\n...\n---` header (rendered as a properties panel) from the
+// markdown body (passed to marked). Without this split the header
+// would render as a stray `<hr>` plus key:value plain text in
+// every file the LLM saved with frontmatter (#895 PR A).
+const mdDoc = useMarkdownDoc(markdownContent);
+
 const renderedHtml = computed(() => {
   if (!markdownContent.value) return "";
   // Rewrite workspace-relative image refs BEFORE marked parses them —
@@ -142,7 +171,7 @@ const renderedHtml = computed(() => {
   // references get rewritten.
   const raw = props.selectedResult.data?.markdown;
   const basePath = typeof raw === "string" && isFilePath(raw) ? raw.slice(0, raw.lastIndexOf("/")) : "";
-  const withImages = rewriteMarkdownImageRefs(markdownContent.value, basePath);
+  const withImages = rewriteMarkdownImageRefs(mdDoc.value.body, basePath);
   // Strip the `disabled=""` attribute marked puts on GFM task
   // checkboxes and tag them so `onMarkdownClick` can find them
   // (#775). Inline content (no file backing) gets the same
@@ -317,20 +346,27 @@ function onMarkdownClick(event: MouseEvent): void {
   // it as a task; marked treats it as code) — toggling source by
   // index would corrupt the file. Refuse all clicks when this
   // happens.
-  const sourceTasks = findTaskLines(markdownContent.value);
+  // Walk only the body (the same source `marked` rendered) so
+  // frontmatter contents containing `- [ ]`-shaped YAML never
+  // collide with task counting (#895 PR A). The prefix is
+  // preserved byte-for-byte and re-attached after the toggle.
+  const body = mdDoc.value.body;
+  const prefix = markdownContent.value.slice(0, markdownContent.value.length - body.length);
+  const sourceTasks = findTaskLines(body);
   if (sourceTasks.length !== taskInputs.length) {
     target.checked = !target.checked;
     saveError.value = t("pluginMarkdown.taskCountMismatch");
     return;
   }
 
-  const updated = toggleTaskAt(markdownContent.value, taskIndex);
-  if (updated === null) {
+  const updatedBody = toggleTaskAt(body, taskIndex);
+  if (updatedBody === null) {
     // Source/DOM drift — refuse to write something we can't trace.
     target.checked = !target.checked;
     return;
   }
 
+  const updated = prefix + updatedBody;
   // Optimistic local update — v-html will re-render and the
   // textarea (if anyone opens it next) sees the same content.
   markdownContent.value = updated;

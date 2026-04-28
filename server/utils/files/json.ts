@@ -1,10 +1,14 @@
-// JSON file helpers — synchronous (legacy) and async (preferred).
+// JSON file helpers — synchronous read, async atomic write.
 //
 // Moved from server/utils/file.ts (issue #366 Phase 1). The old
 // file re-exports these for backwards compat.
+//
+// `saveJsonFile` (sync, non-atomic write) was removed in #881 v2 —
+// it had no production callers and the synchronous code path
+// couldn't offer the atomic-rename guarantee that `writeJsonAtomic`
+// already does. Reach for `writeJsonAtomic` from now on.
 
-import { mkdirSync, promises, readFileSync, writeFileSync } from "fs";
-import path from "path";
+import { promises, readFileSync } from "fs";
 import { writeFileAtomic } from "./atomic.js";
 import { isEnoent } from "./safe.js";
 import { log } from "../../system/logger/index.js";
@@ -38,11 +42,6 @@ export function loadJsonFile<T>(filePath: string, defaultValue: T): T {
     });
     return defaultValue;
   }
-}
-
-export function saveJsonFile(filePath: string, data: unknown): void {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
 // ── Async ───────────────────────────────────────────────────────

@@ -25,6 +25,11 @@ export const JSON_TOKEN_CLASS: Record<JsonTokenType, string> = {
 // sonarjs/regex-complexity and is easier to reason about.
 const STRING_RE = /^"(?:[^"\\]|\\.)*"/;
 const KEYWORD_RE = /^(?:true|false|null)\b/;
+// Bounded JSON number parser — each `\d+` runs over a digits-only
+// class with hard delimiters (`.`, `e`, `E`, `+`, `-`) between
+// segments. Linear in input length; safe-regex flags the optional
+// groups generically.
+// eslint-disable-next-line security/detect-unsafe-regex -- bounded JSON number parser, no nested-quantifier overlap
 const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 const WS_RE = /^\s+/;
 const PUNCT_RE = /^[{}[\]:,]/;

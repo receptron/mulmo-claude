@@ -1,7 +1,3 @@
-/**
- * Form Tool Definition (Schema)
- */
-
 import type { ToolDefinition } from "gui-chat-protocol";
 
 export const TOOL_NAME = "presentForm";

@@ -46,6 +46,7 @@ export const ROLES: Role[] = [
       "manageSource",
       "presentDocument",
       "presentForm",
+      "presentMulmoScript",
       "createMindMap",
       "presentHtml",
       "presentChart",

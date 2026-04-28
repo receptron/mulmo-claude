@@ -113,6 +113,7 @@ function extractSessionIdFromHref(href: string): string | null {
 function stripFragmentAndQuery(href: string): string {
   let end = href.length;
   const hash = href.indexOf("#");
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- numeric indexOf check, not a credential compare
   if (hash !== -1) end = hash;
   const query = href.indexOf("?");
   if (query !== -1 && query < end) end = query;

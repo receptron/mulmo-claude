@@ -41,6 +41,7 @@ import { isFetcherKind, isSourceSchedule, type Source, type FetcherParams, type 
 import { normalizeCategories } from "./taxonomy.js";
 import type { CategorySlug } from "./taxonomy.js";
 import { writeFileAtomic } from "../../utils/files/index.js";
+import { parseFrontmatter } from "../../utils/markdown/frontmatter.js";
 import { sourceFilePath, sourcesRoot } from "./paths.js";
 import { isValidSlug } from "../../utils/slug.js";
 import { isNonEmptyString } from "../../utils/types.js";
@@ -54,75 +55,52 @@ import { log } from "../../system/logger/index.js";
 // another typed field for every new fetcher.
 const RESERVED_KEYS = new Set(["slug", "title", "url", "fetcher_kind", "schedule", "categories", "max_items_per_fetch", "added_at"]);
 
-const FRONTMATTER_OPEN = /^---\r?\n/;
-const FRONTMATTER_CLOSE = /\r?\n---\s*(\r?\n|$)/;
-
 interface ParsedFrontmatter {
   fields: Map<string, string | string[]>;
   body: string;
 }
 
+// Coerce shared `parseFrontmatter` output into the legacy
+// `Map<string, string | string[]>` shape `buildSource` already
+// understands. The new util parses with FAILSAFE_SCHEMA so scalars
+// arrive as strings, which is exactly what this consumer wants.
+// Sequences become string arrays (filtered for string entries —
+// nested objects in a sources file are unusable here).
+//
+// `null` is coerced to the empty string so a bare `foo:` line (a
+// legitimate way to declare a fetcher param with no value) is
+// preserved in `fetcherParams`. The legacy line-by-line parser's
+// `parseScalar` returned `""` for an empty raw value; matching
+// that semantic keeps the round-trip contract that the existing
+// test suite pins (codex review iter-2 #908).
+function metaToLegacyFields(meta: Record<string, unknown>): Map<string, string | string[]> {
+  const out = new Map<string, string | string[]>();
+  for (const [key, value] of Object.entries(meta)) {
+    if (typeof value === "string") {
+      out.set(key, value);
+    } else if (value === null) {
+      out.set(key, "");
+    } else if (Array.isArray(value)) {
+      out.set(
+        key,
+        value.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    // Any other shape (nested object, number) is ignored — sources
+    // files use flat YAML by design (see parser policy comment).
+  }
+  return out;
+}
+
 // Extract YAML frontmatter + body. Returns null when the file has
 // no frontmatter at all — that's an error condition for source
-// files (we always write frontmatter), not a degraded mode.
+// files (we always write frontmatter), not a degraded mode. Built
+// on the shared `parseFrontmatter` helper so escape / array / line-
+// ending edge cases match the rest of the codebase (#895 PR C).
 export function parseSourceFile(raw: string): ParsedFrontmatter | null {
-  if (!FRONTMATTER_OPEN.test(raw)) return null;
-  const afterOpen = raw.replace(FRONTMATTER_OPEN, "");
-  const closeMatch = FRONTMATTER_CLOSE.exec(afterOpen);
-  if (!closeMatch || closeMatch.index === undefined) return null;
-  const fmText = afterOpen.slice(0, closeMatch.index);
-  const body = afterOpen.slice(closeMatch.index + closeMatch[0].length);
-  return { fields: parseFields(fmText), body };
-}
-
-function parseFields(fmText: string): Map<string, string | string[]> {
-  const fields = new Map<string, string | string[]>();
-  for (const line of fmText.split(/\r?\n/)) {
-    const parsed = parseLine(line);
-    if (parsed) fields.set(parsed.key, parsed.value);
-  }
-  return fields;
-}
-
-function parseLine(line: string): { key: string; value: string | string[] } | null {
-  if (!line.trim() || line.trimStart().startsWith("#")) return null;
-  const colonIdx = line.indexOf(":");
-  if (colonIdx <= 0) return null;
-  const key = line.slice(0, colonIdx).trim();
-  const rawValue = line.slice(colonIdx + 1).trim();
-  if (!key) return null;
-  return { key, value: parseValue(rawValue) };
-}
-
-function parseValue(raw: string): string | string[] {
-  if (!raw) return "";
-  const arrayMatch = /^\[(.*)\]$/.exec(raw);
-  if (arrayMatch) {
-    return arrayMatch[1]
-      .split(",")
-      .map((segment) => unquote(segment.trim()))
-      .filter((segment) => segment.length > 0);
-  }
-  return unquote(raw);
-}
-
-function unquote(input: string): string {
-  // Double-quoted strings: yamlScalar writes JSON-compatible escape
-  // sequences (\\ for \, \" for "), so JSON.parse reverses them in
-  // one shot. Fall back to a plain strip if the string is
-  // double-quoted but somehow malformed.
-  if (input.length >= 2 && input.startsWith('"') && input.endsWith('"')) {
-    try {
-      return JSON.parse(input);
-    } catch {
-      return input.slice(1, -1);
-    }
-  }
-  // Single-quoted scalars follow YAML's doubling convention: '' → '.
-  if (input.length >= 2 && input.startsWith("'") && input.endsWith("'")) {
-    return input.slice(1, -1).replace(/''/g, "'");
-  }
-  return input;
+  const parsed = parseFrontmatter(raw);
+  if (!parsed.hasHeader) return null;
+  return { fields: metaToLegacyFields(parsed.meta), body: parsed.body };
 }
 
 // --- Source validation / construction -----------------------------------

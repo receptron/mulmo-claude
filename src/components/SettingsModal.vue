@@ -255,6 +255,7 @@ async function loadConfig(): Promise<void> {
     mcp?: { servers: McpServerEntry[] };
   }>(API_ROUTES.config.base);
   // A newer open() has already started another load — drop this one.
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- in-memory race-token guard, not an auth compare
   if (token !== loadToken) return;
   if (!response.ok) {
     loadError.value = response.status === 0 ? response.error || "Network error" : `Failed to load settings (HTTP ${response.status})`;
@@ -264,6 +265,7 @@ async function loadConfig(): Promise<void> {
     toolsSavedText.value = text;
     mcpServers.value = response.data.mcp?.servers ?? [];
   }
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- same race-token guard as above
   if (token === loadToken) loading.value = false;
 }
 

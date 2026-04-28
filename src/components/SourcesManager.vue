@@ -811,6 +811,7 @@ async function loadBrief(isoDate: string): Promise<void> {
   const relPath = dailyPathFor(isoDate);
   briefFilePath.value = relPath;
   const response = await apiGet<{ content?: string; kind?: string }>(API_ROUTES.files.content, { path: relPath });
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- in-memory race-token guard, not an auth compare
   if (token !== briefLoadToken) return;
   if (!response.ok) {
     if (response.status === 404) {

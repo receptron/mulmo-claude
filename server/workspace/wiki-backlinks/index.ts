@@ -21,6 +21,7 @@ import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";
 import { log } from "../../system/logger/index.js";
 import { updateSessionBacklinks } from "./sessionBacklinks.js";
+import { writeWikiPage } from "../wiki-pages/io.js";
 import { ONE_SECOND_MS } from "../../utils/time.js";
 
 // Small tolerance for filesystem mtime granularity (some filesystems
@@ -35,12 +36,23 @@ export interface WikiBacklinksDeps {
   writeFile: (filePath: string, content: string) => Promise<void>;
 }
 
-const defaultDeps: WikiBacklinksDeps = {
-  readdir: (dir) => fsp.readdir(dir),
-  stat: (filePath) => fsp.stat(filePath),
-  readFile: (filePath) => fsp.readFile(filePath, "utf-8"),
-  writeFile: (filePath, content) => fsp.writeFile(filePath, content, "utf-8"),
-};
+// Default writers funnel through `writeWikiPage` so the backlink
+// append participates in the same atomic-write + history pipeline
+// as user / LLM edits. Pre-#763 this was a non-atomic
+// `fsp.writeFile` and the call could leave a half-written page on
+// crash. Editor identity is `"system"` so PR 2's snapshot view can
+// distinguish automated edits from human / LLM ones.
+function buildDefaultDeps(workspaceRoot: string, sessionId: string): WikiBacklinksDeps {
+  return {
+    readdir: (dir) => fsp.readdir(dir),
+    stat: (filePath) => fsp.stat(filePath),
+    readFile: (filePath) => fsp.readFile(filePath, "utf-8"),
+    writeFile: async (filePath, content) => {
+      const slug = path.basename(filePath, ".md");
+      await writeWikiPage(slug, content, { editor: "system", sessionId }, { workspaceRoot });
+    },
+  };
+}
 
 export interface MaybeAppendWikiBacklinksOptions {
   chatSessionId: string;
@@ -52,7 +64,7 @@ export interface MaybeAppendWikiBacklinksOptions {
 export async function maybeAppendWikiBacklinks(opts: MaybeAppendWikiBacklinksOptions): Promise<void> {
   if (!opts.chatSessionId) return;
   const workspaceRoot = opts.workspaceRoot ?? defaultWorkspacePath;
-  const deps: WikiBacklinksDeps = { ...defaultDeps, ...(opts.deps ?? {}) };
+  const deps: WikiBacklinksDeps = { ...buildDefaultDeps(workspaceRoot, opts.chatSessionId), ...(opts.deps ?? {}) };
   const pagesDir = path.join(workspaceRoot, WORKSPACE_DIRS.wikiPages);
 
   const files = await listPageFiles(pagesDir, deps);

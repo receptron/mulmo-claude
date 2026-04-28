@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { SLUG_PATTERN } from "./regex.js";
 
 // Bits of sha256 kept as the non-ASCII fallback id. 16 base64url chars =
 // 96 bits; birthday-collision expectation lives at ~2^48 entries, so
@@ -37,7 +38,8 @@ export function hashSlug(input: string, length: number = NON_ASCII_HASH_LEN): st
 export function isValidSlug(slug: string): boolean {
   if (typeof slug !== "string") return false;
   if (slug.length === 0 || slug.length > DEFAULT_MAX_LENGTH) return false;
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) return false;
+  // Pattern + ReDoS-safety rationale lives in `server/utils/regex.ts`.
+  if (!SLUG_PATTERN.test(slug)) return false;
   if (slug.includes("--")) return false;
   return true;
 }

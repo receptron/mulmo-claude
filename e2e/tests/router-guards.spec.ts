@@ -1,6 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
+// Bounded path validator — `[\w-]+` doesn't overlap with anything
+// else in the pattern, so the optional capture group can't trigger
+// catastrophic backtracking on adversarial input. eslint-plugin-
+// security flags any `(...)+` shape generically; rationale captured
+// here so future readers don't try to "harden" it into a slower form.
+// eslint-disable-next-line security/detect-unsafe-regex -- bounded, no nested-quantifier overlap
+const VALID_CHAT_PATH = /^\/chat(\/[\w-]+)?$/;
+
 test.beforeEach(async ({ page }) => {
   await mockAllApis(page);
 });
@@ -14,7 +22,7 @@ test.describe("URL injection defence", () => {
 
     // URL must resolve to a valid /chat path — no script tags in decoded pathname
     const pathname = decodeURIComponent(new URL(page.url()).pathname);
-    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
+    expect(pathname).toMatch(VALID_CHAT_PATH);
     expect(pathname).not.toContain("<script>");
   });
 
@@ -24,7 +32,7 @@ test.describe("URL injection defence", () => {
 
     // URL must resolve to a valid /chat path, not a traversed location
     const pathname = new URL(page.url()).pathname;
-    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
+    expect(pathname).toMatch(VALID_CHAT_PATH);
   });
 
   test("extremely long path segment → app renders normally", async ({ page }) => {
@@ -37,7 +45,7 @@ test.describe("URL injection defence", () => {
     await page.goto("/admin/secret");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     const pathname = new URL(page.url()).pathname;
-    expect(pathname).toMatch(/^\/chat(\/[\w-]+)?$/);
+    expect(pathname).toMatch(VALID_CHAT_PATH);
   });
 
   test("special chars in path → app does not crash", async ({ page }) => {

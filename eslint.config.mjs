@@ -4,6 +4,7 @@ import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import prettierPlugin from "eslint-plugin-prettier";
 import sonarjs from "eslint-plugin-sonarjs";
+import securityPlugin from "eslint-plugin-security";
 import importPlugin from "eslint-plugin-import";
 import vuePlugin from "eslint-plugin-vue";
 import vueParser from "vue-eslint-parser";
@@ -35,6 +36,7 @@ export default [
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,
+  securityPlugin.configs.recommended,
   ...tseslint.configs.recommended,
   ...vuePlugin.configs["flat/recommended"],
   ...vueI18n.configs.recommended,
@@ -174,7 +176,34 @@ export default [
       // MulmoClaude is a local desktop app — spawning claude/docker/git
       // via PATH is normal operation, not a server-side injection risk.
       "sonarjs/no-os-command-from-path": "off",
-      "sonarjs/cors": "off"
+      "sonarjs/cors": "off",
+      // ── eslint-plugin-security tuning ──────────────────────────
+      // Three high-volume rules are disabled because they fire on
+      // patterns that are normal in this codebase, drowning the
+      // signal-rich rules:
+      //   - detect-non-literal-fs-filename: every workspace-aware
+      //     `fs.readFile(WORKSPACE_PATHS.foo)` looks "non-literal"
+      //     to the rule. WORKSPACE_PATHS is a static constants table,
+      //     not user input. Keeping this on produced 527 warnings
+      //     and 0 actionable findings on first audit.
+      //   - detect-object-injection: any `obj[key]` with a dynamic
+      //     key trips it (incl. `arr[i]`, locale-keyed message maps).
+      //     Famously high-FP; SonarJS covers the real cases via
+      //     `sonarjs/no-built-in-shadow` etc. 329 warnings / 0
+      //     actionable on first audit.
+      //   - detect-non-literal-regexp: e2e tests build regexps from
+      //     testid prefixes — controlled inputs, not attacker-supplied.
+      //     27 warnings / 0 actionable.
+      // The remaining rules (detect-eval-with-expression, detect-
+      // child-process, detect-unsafe-regex, detect-possible-timing-
+      // attacks, detect-non-literal-require, detect-pseudoRandomBytes,
+      // detect-buffer-noassert, detect-disable-mustache-escape,
+      // detect-no-csrf-before-method-override, detect-bidi-characters,
+      // detect-new-buffer) stay as warnings — tripwires for future
+      // additions, audited at PR review time.
+      "security/detect-non-literal-fs-filename": "off",
+      "security/detect-object-injection": "off",
+      "security/detect-non-literal-regexp": "off",
     },
     plugins: {
       prettier: prettierPlugin,

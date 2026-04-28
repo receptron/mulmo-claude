@@ -1,7 +1,7 @@
 import { appendFile } from "fs/promises";
 import path from "path";
 import type { ConsoleSinkConfig, FileSinkConfig, TelemetrySinkConfig } from "./config.js";
-import { formatJson, formatText } from "./formatters.js";
+import { formatJson, formatText, formatTextColor } from "./formatters.js";
 import { dailyFileName, enforceMaxFiles, ensureDir } from "./rotation.js";
 import type { Formatter, LogRecord, Sink } from "./types.js";
 
@@ -9,15 +9,36 @@ function pickFormatter(kind: "text" | "json"): Formatter {
   return kind === "json" ? formatJson : formatText;
 }
 
+// Decide whether to emit ANSI escapes on this stream:
+//   1. `NO_COLOR=<anything>` → off, always (https://no-color.org/).
+//   2. `FORCE_COLOR=<non-zero>` → on, even when the stream isn't a
+//      TTY. Concurrently / yarn / npm scripts set this on child
+//      processes by default, so `yarn dev` piped output keeps colour.
+//      `FORCE_COLOR=0` is treated as "explicitly off".
+//   3. Otherwise: on iff the stream itself is a real TTY.
+function colorEnabled(stream: { isTTY?: boolean }): boolean {
+  if (process.env.NO_COLOR && process.env.NO_COLOR.length > 0) return false;
+  const force = process.env.FORCE_COLOR;
+  if (force !== undefined && force !== "" && force !== "0" && force !== "false") return true;
+  if (force === "0" || force === "false") return false;
+  return stream.isTTY === true;
+}
+
 export function createConsoleSink(config: ConsoleSinkConfig): Sink {
-  const fmt = pickFormatter(config.format);
+  // Pre-resolve a (plain, colour) pair once. `text` may upgrade to the
+  // ANSI variant per record based on which stream the record will hit;
+  // `json` stays uncoloured so structured-log consumers get a clean
+  // stream regardless of the terminal.
+  const plain = pickFormatter(config.format);
+  const colored: Formatter = config.format === "text" ? formatTextColor : plain;
+
   return {
     name: "console",
     level: config.level,
     write(record: LogRecord) {
-      const line = fmt(record) + "\n";
       const stream = record.level === "error" || record.level === "warn" ? process.stderr : process.stdout;
-      stream.write(line);
+      const fmt = colorEnabled(stream) ? colored : plain;
+      stream.write(fmt(record) + "\n");
     },
   };
 }

@@ -31,12 +31,16 @@
               <span class="font-semibold text-gray-600 shrink-0">{{ field.key }}:</span>
               <template v-if="Array.isArray(field.value)">
                 <span class="flex flex-wrap gap-1">
-                  <span v-for="item in field.value" :key="item" class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700">
-                    {{ item }}
+                  <span
+                    v-for="(item, idx) in field.value"
+                    :key="String(idx) + ':' + formatScalarField(item)"
+                    class="rounded-full bg-white border border-gray-300 px-2 py-0.5 text-gray-700"
+                  >
+                    {{ formatScalarField(item) }}
                   </span>
                 </span>
               </template>
-              <span v-else class="text-gray-800 break-words">{{ field.value }}</span>
+              <span v-else class="text-gray-800 break-words">{{ formatScalarField(field.value) }}</span>
             </div>
           </div>
           <div class="flex-1 min-h-0" @click.capture="(e: MouseEvent) => emit('markdownLinkClick', e)">
@@ -132,7 +136,7 @@ import type { SchedulerData } from "../plugins/scheduler/index";
 import type { TodoData } from "../plugins/todo/index";
 import { JSON_TOKEN_CLASS } from "../utils/format/jsonSyntax";
 import type { JsonToken, JsonlLine } from "../utils/format/jsonSyntax";
-import type { Frontmatter } from "../utils/format/frontmatter";
+import { formatScalarField, type MarkdownDocView } from "../composables/useMarkdownDoc";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
 import { API_ROUTES } from "../config/apiRoutes";
 import { descriptorForPath } from "../config/systemFileDescriptors";
@@ -154,7 +158,7 @@ const props = defineProps<{
   sandboxedHtml: string;
   jsonTokens: JsonToken[];
   jsonlLines: JsonlLine[];
-  mdFrontmatter: Frontmatter | null;
+  mdFrontmatter: MarkdownDocView | null;
   rawSaveError: string | null;
 }>();
 

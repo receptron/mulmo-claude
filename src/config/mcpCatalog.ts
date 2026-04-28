@@ -467,47 +467,46 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     riskLevel: "medium",
   },
 
-  // TODO(reviewer): pick the most-active community package — as of
-  // 2026-04 candidates include `mcp-server-open-meteo` and
-  // `@cloud-rocket/mcp-server-open-meteo`.
+  // Open-Meteo weather forecasts. Package switched from the
+  // (non-existent on npm) `mcp-server-open-meteo` to `open-meteo-mcp`,
+  // verified via `npm view` 2026-04-27. No API key required —
+  // Open-Meteo is keyless for non-commercial use.
   {
     id: "weather-open-meteo",
     displayName: "settingsMcpTab.catalog.entry.weatherOpenMeteo.displayName",
     description: "settingsMcpTab.catalog.entry.weatherOpenMeteo.description",
     audience: "general",
-    upstreamUrl: "https://open-meteo.com/",
+    upstreamUrl: "https://www.npmjs.com/package/open-meteo-mcp",
     spec: {
       type: "stdio",
       command: "npx",
-      args: ["-y", "mcp-server-open-meteo"],
+      args: ["-y", "open-meteo-mcp"],
     },
     configSchema: [],
     riskLevel: "low",
   },
 
   // Spotify Web API access — search tracks, manage playlists, control
-  // playback. Requires a Spotify developer app (Client ID + Client
-  // Secret) which the user creates in their own dashboard. The server
-  // handles the OAuth handshake on first run, caching the refresh
-  // token locally.
-  //
-  // TODO(reviewer): pin the most-active community package — as of
-  // 2026-04 candidates include `@superseoworld/mcp-spotify` and
-  // `spotify-mcp`.
+  // playback. Switched from the (non-existent on npm) package
+  // `@superseoworld/mcp-spotify` to `spotify-mcp` (calebWei/SpotifyMCP),
+  // verified via `npm view` 2026-04-27. Uses PKCE flow — no client
+  // secret needed; just a Client ID. Users must run a one-time
+  // `npx spotify-mcp@latest auth` to log in (browser window opens, the
+  // refresh token is cached at `~/.spotify-mcp/tokens.json`). The
+  // help text below points users at that step.
   {
     id: "spotify",
     displayName: "settingsMcpTab.catalog.entry.spotify.displayName",
     description: "settingsMcpTab.catalog.entry.spotify.description",
     audience: "general",
-    upstreamUrl: "https://github.com/superseoworld/mcp-spotify",
+    upstreamUrl: "https://github.com/calebWei/SpotifyMCP",
     setupGuideUrl: "https://developer.spotify.com/documentation/web-api/concepts/apps",
     spec: {
       type: "stdio",
       command: "npx",
-      args: ["-y", "@superseoworld/mcp-spotify"],
+      args: ["-y", "spotify-mcp@latest"],
       env: {
         SPOTIFY_CLIENT_ID: "${SPOTIFY_CLIENT_ID}",
-        SPOTIFY_CLIENT_SECRET: "${SPOTIFY_CLIENT_SECRET}",
       },
     },
     configSchema: [
@@ -519,15 +518,6 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
         required: true,
         helpUrl: "https://developer.spotify.com/dashboard",
         helpText: "settingsMcpTab.catalog.entry.spotify.field.clientId.help",
-      },
-      {
-        key: "SPOTIFY_CLIENT_SECRET",
-        label: "settingsMcpTab.catalog.entry.spotify.field.clientSecret.label",
-        kind: "secret",
-        placeholder: "spotify-client-secret",
-        required: true,
-        helpUrl: "https://developer.spotify.com/dashboard",
-        helpText: "settingsMcpTab.catalog.entry.spotify.field.clientSecret.help",
       },
     ],
     riskLevel: "medium",

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { loadJsonFile, saveJsonFile, writeJsonAtomic, readJsonOrNull } from "../../../server/utils/files/json.js";
+import { loadJsonFile, writeJsonAtomic, readJsonOrNull } from "../../../server/utils/files/json.js";
 
 let tmpDir: string;
 
@@ -34,20 +34,6 @@ describe("loadJsonFile (sync)", () => {
   });
 });
 
-describe("saveJsonFile (sync)", () => {
-  it("writes pretty-printed JSON", () => {
-    const file = path.join(tmpDir, "save.json");
-    saveJsonFile(file, { b: 2 });
-    assert.deepEqual(JSON.parse(readFileSync(file, "utf-8")), { b: 2 });
-  });
-
-  it("creates parent directories", () => {
-    const file = path.join(tmpDir, "save-deep", "nested.json");
-    saveJsonFile(file, [1, 2, 3]);
-    assert.deepEqual(JSON.parse(readFileSync(file, "utf-8")), [1, 2, 3]);
-  });
-});
-
 describe("writeJsonAtomic (async)", () => {
   it("writes atomically and pretty-prints", async () => {
     const file = path.join(tmpDir, "atomic.json");
@@ -56,6 +42,15 @@ describe("writeJsonAtomic (async)", () => {
     assert.deepEqual(JSON.parse(raw), { c: true });
     // Pretty-printed: contains newlines
     assert.ok(raw.includes("\n"));
+  });
+
+  it("creates parent directories", async () => {
+    // Old `saveJsonFile` covered this via mkdirSync(); after the
+    // #881 v2 removal, writeJsonAtomic inherits parent-dir creation
+    // from writeFileAtomic and should still pass the same shape.
+    const file = path.join(tmpDir, "atomic-deep", "nested.json");
+    await writeJsonAtomic(file, [1, 2, 3]);
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf-8")), [1, 2, 3]);
   });
 });
 

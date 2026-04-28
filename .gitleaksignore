@@ -1,0 +1,22 @@
+# gitleaks fingerprints we deliberately allow.
+#
+# Format: <commit-sha>:<file>:<rule>:<line>
+# Each entry silences exactly that one finding — same file at a
+# different line, or the same line in a NEW commit, gets re-scanned.
+#
+# Forward note: fingerprints embed the gitleaks rule id (e.g.
+# `stripe-access-token`). If a future gitleaks version renames the
+# rule, the entry stops matching and the false positive resurfaces.
+# Refresh the entry on gitleaks version bumps if a finding starts
+# firing again.
+#
+# This file is ALSO scanned by gitleaks. Do NOT include the literal
+# fixture string in any rationale comment — gitleaks would flag the
+# rationale itself. Describe the shape, don't reproduce it.
+
+# test/utils/test_promptMeta.ts uses a deliberate Stripe-shaped fake
+# fixture (`sk_live_…`) at line 51 to assert that promptMeta() does
+# NOT leak its input prompt into the returned object. Changing the
+# fixture would defeat the test's intent — we WANT a known-token-
+# shape string so the redaction proof is meaningful. Not a real key.
+9637475787b4b8fa48b2e42b06ee15f08bec2922:test/utils/test_promptMeta.ts:stripe-access-token:51

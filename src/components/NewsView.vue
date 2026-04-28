@@ -220,6 +220,7 @@ watch(
     const token = ++bodyToken;
     const url = API_ROUTES.news.itemBody.replace(":id", encodeURIComponent(itemId));
     const result = await apiGet<{ body: string | null }>(url);
+    // eslint-disable-next-line security/detect-possible-timing-attacks -- in-memory race-token guard, not an auth compare
     if (token !== bodyToken) return;
     bodyLoading.value = false;
     if (!result.ok) {

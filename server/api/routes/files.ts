@@ -9,6 +9,7 @@ import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
 import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
+import { classifyAsWikiPage, writeWikiPage } from "../../workspace/wiki-pages/io.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
 
@@ -760,10 +761,26 @@ router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteC
     return;
   }
   try {
+    // Wiki pages have their own choke-point write helper that
+    // captures (old, new) for the edit-history pipeline (#763).
+    // Anything else falls back to the generic atomic write.
     // `uniqueTmp: true` appends a randomUUID to the tmp filename so
     // two simultaneous PUTs to the same path can't clobber each
-    // other's staging file and race through the rename.
-    await writeFileAtomic(absPath, contentRaw, { uniqueTmp: true });
+    // other's staging file and race through the rename
+    // (writeWikiPage applies it internally).
+    //
+    // Pass the already-realpath'd `workspaceReal` to the classifier:
+    // `resolveSafe()` returns a realpath'd `absPath`, so the root
+    // we compare against MUST also be realpath'd. Otherwise a
+    // symlinked workspace (e.g. `~/mulmoclaude` → some real path
+    // elsewhere) silently routes wiki writes through the generic
+    // branch and bypasses the chokepoint.
+    const wikiClass = classifyAsWikiPage(absPath, { workspaceRoot: workspaceReal });
+    if (wikiClass.wiki) {
+      await writeWikiPage(wikiClass.slug, contentRaw, { editor: "user" }, { workspaceRoot: workspaceReal });
+    } else {
+      await writeFileAtomic(absPath, contentRaw, { uniqueTmp: true });
+    }
   } catch (err) {
     log.error("files", "PUT content: write threw", { pathPreview: previewSnippet(relPathRaw), error: errorMessage(err) });
     serverError(res, `Failed to write file: ${errorMessage(err)}`);

@@ -149,9 +149,30 @@ function htmlToText(html: string): string {
   return decodeEntities(stripTags(withNewlines)).trim();
 }
 
+// Bounded regex with no nested quantifier overlap — matches at most
+// one mention token at a time. Safe against ReDoS even on adversarial
+// input because the engine commits to a single mention's bounded
+// `[A-Za-z0-9_.]+` / `[A-Za-z0-9_.-]+` runs and either advances or
+// fails in O(n) per match. eslint-plugin-security's safe-regex
+// heuristic flags any `(...)?` containing `+` generically, even
+// when the surrounding pattern can't drive exponential backtracking.
+// eslint-disable-next-line security/detect-unsafe-regex -- single-mention pattern, no nested-quantifier overlap; the iterative caller bounds total work to O(N) in the input length
+const SINGLE_MENTION_RE = /^@[A-Za-z0-9_.]+(?:@[A-Za-z0-9_.-]+)?\s+/;
+
 function stripLeadingMentions(text: string): string {
-  // Remove one or more leading "@acct" / "@acct@instance" tokens
-  return text.replace(/^(?:@[A-Za-z0-9_.]+(?:@[A-Za-z0-9_.-]+)?\s+)+/, "").trim();
+  // Iterative strip — peel off one leading "@acct" / "@acct@instance"
+  // mention per pass until the prefix no longer matches. Avoids the
+  // outer `+` over a group with nested `+` quantifiers (the previous
+  // `(?:@[\w.]+(?:@[\w.-]+)?\s+)+` form), which `eslint-plugin-security`
+  // / `safe-regex` flag as ReDoS-prone on inputs like long runs of
+  // `@a@a@a…` without a trailing space.
+  let stripped = text;
+  while (true) {
+    const match = SINGLE_MENTION_RE.exec(stripped);
+    if (!match) break;
+    stripped = stripped.slice(match[0].length);
+  }
+  return stripped.trim();
 }
 
 // ── Attachment fetching ─────────────────────────────────────────

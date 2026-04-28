@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
 import path from "path";
 import { tmpdir } from "os";
-import { loadJsonFile, saveJsonFile, writeFileAtomic, writeJsonAtomic, readJsonOrNull } from "../../server/utils/files/index.js";
+import { loadJsonFile, writeFileAtomic, writeJsonAtomic, readJsonOrNull } from "../../server/utils/files/index.js";
 
 let tmpDir = "";
 
@@ -37,16 +37,6 @@ describe("loadJsonFile (existing)", () => {
     assert.deepEqual(loadJsonFile<{ x: number }>(filePath, { x: 42 }), {
       x: 42,
     });
-  });
-});
-
-describe("saveJsonFile (existing)", () => {
-  it("creates the parent directory and writes pretty JSON", () => {
-    const filePath = path.join(tmpDir, "nested", "deep", "x.json");
-    saveJsonFile(filePath, { a: 1, b: [2, 3] });
-    const raw = readFileSync(filePath, "utf-8");
-    assert.ok(raw.includes("\n"), "JSON should be pretty-printed");
-    assert.deepEqual(JSON.parse(raw), { a: 1, b: [2, 3] });
   });
 });
 

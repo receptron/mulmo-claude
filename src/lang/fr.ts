@@ -62,6 +62,9 @@ const frMessages = {
     toolCallHistory: "Historique des appels d'outils",
     settings: "Paramètres",
     settingsGeminiMissing: "Paramètres — Clé API Gemini manquante",
+    todayJournal: "Résumé du jour",
+    todayJournalNotFound: "Pas encore de résumé — discutez un peu et le journal en générera un.",
+    todayJournalLoadFailed: "Échec du chargement du journal (status {status}) : {error}",
   },
   rightSidebar: {
     toggleSystemPrompt: "Basculer le system prompt",
@@ -201,6 +204,107 @@ const frMessages = {
     htmlPreview: "Aperçu HTML",
     pdfPreview: "Aperçu PDF",
     parseError: "erreur d'analyse",
+  },
+  systemFiles: {
+    schemaLabel: "Schéma",
+    showDetails: "Afficher les détails",
+    hideDetails: "Masquer les détails",
+    editPolicy: {
+      "agent-managed-but-hand-editable": "Géré par l'agent (édition manuelle OK)",
+      "user-editable": "Éditable par l'utilisateur",
+      "agent-managed": "Géré par l'agent",
+      "fragile-format": "Format fragile",
+      ephemeral: "Éphémère",
+    },
+    interests: {
+      title: "Configuration des centres d'intérêt",
+      summary: "Sujets que le pipeline news / sources surveille et classe pour vous. Éditable à la main ; l'agent le met également à jour depuis le chat.",
+    },
+    mcp: {
+      title: "Serveurs MCP",
+      summary: "Serveurs externes Model Context Protocol attachés à l'agent. Ajoutez des serveurs HTTP ou stdio pour étendre les outils disponibles.",
+    },
+    settings: {
+      title: "Paramètres de l'app",
+      summary: "Préférences de comportement éditables — clé API Gemini, outils autorisés, configuration du sandbox, etc.",
+    },
+    schedulerTasks: {
+      title: "Tâches du planificateur",
+      summary: "Automatisations récurrentes de l'agent déclenchées selon un planning. Gérées via l'UI Automations ; ce fichier est la source sur disque.",
+    },
+    schedulerOverrides: {
+      title: "Surcharges du planificateur",
+      summary:
+        "Surcharges horaires / d'intervalle par tâche appliquées au-dessus du planning système. L'agent édite ce fichier quand vous demandez à changer l'horaire d'une tâche récurrente.",
+    },
+    newsReadState: {
+      title: "État de lecture des news",
+      summary: "Suivi local des news déjà vues. Éphémère — vous pouvez le supprimer ; il sera régénéré au fil de votre lecture.",
+    },
+    schedulerItems: {
+      title: "File d'éléments du planificateur",
+      summary: "Invocations planifiées prêtes à se déclencher. Géré par l'agent ; n'éditez pas à la main sans comprendre chaque champ.",
+    },
+    todosItems: {
+      title: "Tâches à faire",
+      summary:
+        "Vos tâches dans toutes les colonnes du tableau kanban. L'agent écrit ici quand vous dites « ajoute une tâche » ; vous pouvez aussi éditer à la main.",
+    },
+    todosColumns: {
+      title: "Colonnes des tâches",
+      summary: "Disposition des colonnes du tableau kanban (titres, ordre, ids). Éditable par l'utilisateur — renommez ou réordonnez librement.",
+    },
+    wikiIndex: {
+      title: "Index du wiki",
+      summary: "Index auto-généré de toutes les pages du wiki. Régénéré à chaque édition — n'éditez pas à la main (vos changements seront écrasés).",
+    },
+    wikiLog: {
+      title: "Journal d'édition du wiki",
+      summary: "Journal d'activité des créations et éditions de pages. Géré par l'agent et en append seulement — utile comme flux des changements récents.",
+    },
+    wikiSummary: {
+      title: "Résumé du wiki",
+      summary: "Vue d'ensemble auto-générée du wiki — clusters thématiques, nombre de pages, activité récente. Régénérée par l'agent.",
+    },
+    wikiSchema: {
+      title: "Schéma du wiki",
+      summary:
+        "Spécification de format que l'agent lit pour garder les pages du wiki cohérentes. Fragile — il attend une structure précise ; préférez les éditions via l'agent.",
+    },
+    memory: {
+      title: "Mémoire",
+      summary:
+        "Faits distillés à votre sujet, toujours chargés comme contexte pour les nouvelles conversations. L'extracteur du journal y ajoute automatiquement ; vous pouvez aussi éditer à la main.",
+    },
+    summariesIndex: {
+      title: "Index des résumés",
+      summary: "Index navigable reliant les résumés quotidiens et thématiques générés par le journal. Géré par l'agent ; régénéré à chaque passe.",
+    },
+    rolesJson: {
+      title: "Définition du rôle (JSON)",
+      summary: "Configuration du rôle — choix du modèle, serveurs MCP, plugins autorisés, suggestions de requêtes. Éditable, pas besoin de redémarrage.",
+    },
+    rolesMd: {
+      title: "Description du rôle (Markdown)",
+      summary: "Persona et system prompt du rôle, chargés comme contexte quand ce rôle est actif. Éditable ; les changements s'appliquent au prochain message.",
+    },
+    sourceFeed: {
+      title: "Source abonnée",
+      summary: "Une source abonnée (RSS, releases / issues GitHub, arXiv, etc.). Éditable ; le pipeline interroge selon le planning.",
+    },
+    sourceState: {
+      title: "État de la source",
+      summary:
+        "État éphémère du pipeline pour une source — derniers ids vus, ETags, erreurs de fetch. Vous pouvez le supprimer ; il sera régénéré à la prochaine exécution.",
+    },
+    journalDaily: {
+      title: "Résumé quotidien du journal",
+      summary: "Récapitulatif auto-généré de votre activité pour une journée, distillé par le journal à partir des sessions de chat.",
+    },
+    journalTopic: {
+      title: "Journal thématique",
+      summary: "Notes à long terme sur un sujet spécifique, accumulées et révisées au fur et à mesure que vous en reparlez. Géré par l'agent.",
+    },
   },
   settingsMcpTab: {
     explanation:
@@ -349,15 +453,12 @@ const frMessages = {
         },
         spotify: {
           displayName: "Spotify",
-          description: "Recherche des morceaux, gère les playlists, contrôle la lecture. BYO app développeur Spotify — Client ID + Client Secret.",
+          description:
+            "Recherche des morceaux, gère les playlists, contrôle la lecture. BYO app développeur Spotify — Client ID uniquement (flux PKCE, pas de client secret).",
           field: {
             clientId: {
               label: "Client ID",
-              help: "Spotify Developer Dashboard → Create app → copie le Client ID. La Redirect URI n'a pas besoin de correspondre à un vrai site pour un usage desktop.",
-            },
-            clientSecret: {
-              label: "Client Secret",
-              help: "Même Developer Dashboard → dans l'app, clique sur Show client secret. Collé une fois, mis en cache local.",
+              help: "Spotify Developer Dashboard → Create app, configurez la Redirect URI à http://127.0.0.1:8888/callback, copiez le Client ID. Puis exécutez une fois dans le terminal `SPOTIFY_CLIENT_ID=<id> npx spotify-mcp@latest auth` pour vous connecter (refresh token mis en cache dans ~/.spotify-mcp/tokens.json).",
             },
           },
         },
@@ -519,6 +620,9 @@ const frMessages = {
     noMatches: "Aucune page avec le tag #{tag}",
     lintChat: "Vérifier mon wiki",
     taskCountMismatch: "La source du wiki et le rendu diffèrent sur le nombre de tâches. La modification a été refusée pour éviter de corrompre le fichier.",
+    metadataCreated: "Créé",
+    metadataUpdated: "Mis à jour",
+    metadataEditor: "Éditeur",
   },
   pluginPresentForm: {
     fallbackTitle: "Formulaire",
@@ -701,6 +805,8 @@ const frMessages = {
     gen: "Générer",
     play: "▶ Lire",
     stop: "■ Arrêter",
+    playPresentation: "Lire la présentation",
+    regenerateMovie: "Régénérer la vidéo",
     errPrefix: "⚠ Erreur",
     noBeats: "Aucun beat trouvé dans le script",
     editSource: "Modifier la source du script",
@@ -764,6 +870,11 @@ const frMessages = {
   },
   suggestionsPanel: {
     suggestions: "Suggestions",
+    skills: "Compétences",
+    tooltip: "Suggestions et compétences",
+    emptySuggestions: "Aucune suggestion.",
+    emptySkills: "Aucune compétence installée.",
+    skillsError: "Échec du chargement des compétences : {error}",
     sendEditHint: "cliquez pour envoyer · shift+clic pour modifier",
   },
   settingsToolsTab: {

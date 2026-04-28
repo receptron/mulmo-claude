@@ -180,6 +180,10 @@ log(`Starting MulmoClaude on port ${port}...`);
 let tsxCli;
 try {
   const tsxPkgJson = require.resolve("tsx/package.json");
+  // Path is the resolved location of tsx's own package.json under
+  // node_modules — not user-influenced, so the dynamic require is
+  // safe. require.resolve already validated the path.
+  // eslint-disable-next-line security/detect-non-literal-require -- resolved package.json path from require.resolve, not user input
   const tsxPkg = require(tsxPkgJson);
   tsxCli = join(dirname(tsxPkgJson), tsxPkg.bin);
 } catch {
