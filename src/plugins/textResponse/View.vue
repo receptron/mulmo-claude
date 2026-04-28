@@ -106,7 +106,7 @@ const renderedHtml = computed(() => {
   if ((trimmedText.startsWith("{") && trimmedText.endsWith("}")) || (trimmedText.startsWith("[") && trimmedText.endsWith("]"))) {
     try {
       JSON.parse(trimmedText);
-      processedText = "```json\n" + trimmedText + "\n```";
+      processedText = `\`\`\`json\n${trimmedText}\n\`\`\``;
     } catch {
       // Not valid JSON, continue with original text
     }

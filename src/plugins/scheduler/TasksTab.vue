@@ -164,7 +164,7 @@ interface SchedulerTask {
 }
 
 // Structured (not pre-rendered) so daily rows route through formatTaskSchedule and pick up the viewer's local timezone.
-const FREQUENCY_HINTS: Array<{ label: string; schedule: FormatterTaskSchedule }> = [
+const FREQUENCY_HINTS: { label: string; schedule: FormatterTaskSchedule }[] = [
   { label: "News / RSS fetch", schedule: { type: "interval", intervalMs: 3_600_000 } },
   { label: "Journal daily pass", schedule: { type: "daily", time: "23:00" } },
   { label: "Wiki maintenance", schedule: { type: "daily", time: "02:00" } },

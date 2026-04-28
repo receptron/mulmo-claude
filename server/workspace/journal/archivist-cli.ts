@@ -27,8 +27,8 @@ export class ClaudeCliFailedError extends Error {
 }
 
 // Pipe the combined prompt via stdin to dodge shell-argv limits for large day excerpts.
-export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
-  return new Promise((resolve, reject) => {
+export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) =>
+  new Promise((resolve, reject) => {
     const child = spawn("claude", ["-p", "--output-format", "text"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -93,4 +93,3 @@ export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
       child.stdin.once("drain", () => child.stdin.end());
     }
   });
-};

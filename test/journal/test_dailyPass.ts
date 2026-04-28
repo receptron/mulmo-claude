@@ -333,7 +333,7 @@ describe("parseArchivistOutput", () => {
   };
 
   it("returns the parsed output for a well-formed JSON fence", () => {
-    const raw = "Some preface\n```json\n" + JSON.stringify(validOutput) + "\n```";
+    const raw = `Some preface\n\`\`\`json\n${JSON.stringify(validOutput)}\n\`\`\``;
     const out = parseArchivistOutput(raw);
     assert.ok(out);
     assert.equal(out!.dailySummaryMarkdown, validOutput.dailySummaryMarkdown);
@@ -349,18 +349,15 @@ describe("parseArchivistOutput", () => {
   });
 
   it("returns null when required fields are missing", () => {
-    const raw = "```json\n" + JSON.stringify({ topicUpdates: [] }) + "\n```";
+    const raw = `\`\`\`json\n${JSON.stringify({ topicUpdates: [] })}\n\`\`\``;
     assert.equal(parseArchivistOutput(raw), null);
   });
 
   it("returns null when topicUpdates has the wrong shape", () => {
-    const raw =
-      "```json\n" +
-      JSON.stringify({
-        dailySummaryMarkdown: "# x",
-        topicUpdates: [{ slug: "t" }], // missing action / content
-      }) +
-      "\n```";
+    const raw = `\`\`\`json\n${JSON.stringify({
+      dailySummaryMarkdown: "# x",
+      topicUpdates: [{ slug: "t" }], // missing action / content
+    })}\n\`\`\``;
     assert.equal(parseArchivistOutput(raw), null);
   });
 });

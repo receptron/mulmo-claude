@@ -38,7 +38,7 @@ let putConfigHandler: Handler;
 interface StackFrame {
   route?: {
     path: string;
-    stack: Array<{ method: string; handle: Handler }>;
+    stack: { method: string; handle: Handler }[];
   };
 }
 

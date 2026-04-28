@@ -221,7 +221,7 @@ export async function refreshCredentials(): Promise<boolean> {
 
     // Atomic so a readers mid-refresh can't see a truncated creds
     // file; mode preserves the 0o600 we always set on this file.
-    await writeFileAtomic(CREDENTIALS_PATH, credentials + "\n", { mode: 0o600 });
+    await writeFileAtomic(CREDENTIALS_PATH, `${credentials}\n`, { mode: 0o600 });
     log.info("credentials", "Fresh credentials written to ~/.claude/.credentials.json");
     return true;
   } catch (err) {

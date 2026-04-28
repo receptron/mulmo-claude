@@ -168,11 +168,11 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
   it("handles the array-wrapper flavor (todo / scheduler shape)", async () => {
     stubFetch(async () => mockResponse(true, { data: { items: [{ id: "a" }, { id: "b" }] } }));
     const controller = new AbortController();
-    const ok = await refreshOnce<Array<{ id: string }>>(
+    const ok = await refreshOnce<{ id: string }[]>(
       {
         endpoint: () => "/api/todos",
         extract: (json) => {
-          const val = (json as { data?: { items?: Array<{ id: string }> } }).data?.items;
+          const val = (json as { data?: { items?: { id: string }[] } }).data?.items;
           return Array.isArray(val) ? val : null;
         },
         apply: (data) => appliedWith.push(data),
@@ -186,10 +186,10 @@ describe("refreshOnce (core of useFreshPluginData)", () => {
   it("handles the bare-array flavor (manageRoles shape)", async () => {
     stubFetch(async () => mockResponse(true, [{ id: "role1" }]));
     const controller = new AbortController();
-    const ok = await refreshOnce<Array<{ id: string }>>(
+    const ok = await refreshOnce<{ id: string }[]>(
       {
         endpoint: () => "/api/roles",
-        extract: (json) => (Array.isArray(json) ? (json as Array<{ id: string }>) : null),
+        extract: (json) => (Array.isArray(json) ? (json as { id: string }[]) : null),
         apply: (data) => appliedWith.push(data),
       },
       controller.signal,

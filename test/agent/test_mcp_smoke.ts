@@ -26,7 +26,7 @@ interface JsonRpcResponse {
     protocolVersion?: string;
     capabilities?: object;
     serverInfo?: { name: string };
-    tools?: Array<{ name: string; description: string }>;
+    tools?: { name: string; description: string }[];
   };
   error?: { code: number; message: string };
 }
@@ -54,7 +54,7 @@ function sendAndReceive(lines: string[], env: Record<string, string>): Promise<J
 
     // Send all lines, then close stdin to signal EOF.
     for (const line of lines) {
-      child.stdin.write(line + "\n");
+      child.stdin.write(`${line}\n`);
     }
     child.stdin.end();
 

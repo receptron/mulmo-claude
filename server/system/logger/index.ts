@@ -9,10 +9,10 @@ export type { LoggerConfig } from "./config.js";
 export { resolveConfig, DEFAULT_CONFIG } from "./config.js";
 
 export interface Logger {
-  error(prefix: string, message: string, data?: Record<string, unknown>): void;
-  warn(prefix: string, message: string, data?: Record<string, unknown>): void;
-  info(prefix: string, message: string, data?: Record<string, unknown>): void;
-  debug(prefix: string, message: string, data?: Record<string, unknown>): void;
+  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
+  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
+  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
+  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
 }
 
 export function createLogger(config: LoggerConfig): Logger {

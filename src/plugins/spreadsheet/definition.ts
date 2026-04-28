@@ -9,7 +9,7 @@ export interface SpreadsheetCell {
 
 export interface SpreadsheetSheet {
   name: string;
-  data: Array<Array<SpreadsheetCell>>;
+  data: SpreadsheetCell[][];
 }
 
 export interface SpreadsheetToolData {

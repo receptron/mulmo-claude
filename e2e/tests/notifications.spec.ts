@@ -134,7 +134,7 @@ function emitPayloadsStaggered(socket: WebSocketRoute, list: readonly Notificati
     const payload = list[index];
     setTimeout(
       () => {
-        socket.send("42" + JSON.stringify(["data", { channel: NOTIFICATIONS_CHANNEL, data: payload }]));
+        socket.send(`42${JSON.stringify(["data", { channel: NOTIFICATIONS_CHANNEL, data: payload }])}`);
       },
       30 + index * 20,
     );
@@ -147,14 +147,13 @@ async function installNotificationStream(page: Page, payloads: NotificationPaylo
     (url) => url.pathname.startsWith("/ws/pubsub"),
     (socket: WebSocketRoute) => {
       socket.send(
-        "0" +
-          JSON.stringify({
-            sid: "notif-sid",
-            upgrades: [],
-            pingInterval: 25_000,
-            pingTimeout: 20_000,
-            maxPayload: 1_000_000,
-          }),
+        `0${JSON.stringify({
+          sid: "notif-sid",
+          upgrades: [],
+          pingInterval: 25_000,
+          pingTimeout: 20_000,
+          maxPayload: 1_000_000,
+        })}`,
       );
       socket.onMessage((msg) => {
         const text = String(msg);
@@ -163,7 +162,7 @@ async function installNotificationStream(page: Page, payloads: NotificationPaylo
           return;
         }
         if (text === "40") {
-          socket.send("40" + JSON.stringify({ sid: "notif-socket-sid" }));
+          socket.send(`40${JSON.stringify({ sid: "notif-socket-sid" })}`);
           return;
         }
         if (!text.startsWith("42")) return;

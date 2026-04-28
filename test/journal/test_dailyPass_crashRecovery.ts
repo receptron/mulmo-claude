@@ -41,8 +41,8 @@ before(async () => {
   // `parseEntry` only accepts EVENT_TYPES.text / .toolResult.
   const dayOneFile = path.join(chatDir, `${SESSION_DAY1}.jsonl`);
   const dayTwoFile = path.join(chatDir, `${SESSION_DAY2}.jsonl`);
-  await writeFile(dayOneFile, JSON.stringify({ source: "user", type: "text", message: "day one" }) + "\n");
-  await writeFile(dayTwoFile, JSON.stringify({ source: "user", type: "text", message: "day two" }) + "\n");
+  await writeFile(dayOneFile, `${JSON.stringify({ source: "user", type: "text", message: "day one" })}\n`);
+  await writeFile(dayTwoFile, `${JSON.stringify({ source: "user", type: "text", message: "day two" })}\n`);
   await utimes(dayOneFile, dayOneEpoch, dayOneEpoch);
   await utimes(dayTwoFile, dayTwoEpoch, dayTwoEpoch);
 });

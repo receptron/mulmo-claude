@@ -295,7 +295,7 @@ const miniEditorFormula = ref("");
 const miniEditorFormat = ref("");
 
 // Referenced cells state (for formula highlighting)
-const referencedCells = ref<Array<{ row: number; col: number }>>([]);
+const referencedCells = ref<{ row: number; col: number }[]>([]);
 
 // Check if spreadsheet data has been modified
 const hasChanges = computed(() => {

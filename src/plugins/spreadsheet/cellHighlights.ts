@@ -28,9 +28,8 @@ export interface HighlightableContainer {
   // Overload: the spreadsheet root container is known to return a
   // table when asked for the table id, so callers can keep the
   // result strongly typed without casting.
-  querySelector(selector: "#spreadsheet-table"): HighlightableTable | null;
-  querySelector(selector: string): HighlightableElement | null;
-  querySelectorAll(selector: string): ArrayLike<HighlightableElement> & Iterable<HighlightableElement>;
+  querySelector: ((selector: "#spreadsheet-table") => HighlightableTable | null) & ((selector: string) => HighlightableElement | null);
+  querySelectorAll: (selector: string) => ArrayLike<HighlightableElement> & Iterable<HighlightableElement>;
 }
 
 export interface CellCoord {

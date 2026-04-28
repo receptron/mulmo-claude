@@ -85,7 +85,9 @@ interface UploadBeatImageBody {
   imageData: string; // base64 data URI
 }
 
-type ErrorResponse = { error: string };
+interface ErrorResponse {
+  error: string;
+}
 
 type BeatImageResponse = { image: string | null } | ErrorResponse;
 type BeatAudioResponse = { audio: string | null } | ErrorResponse;
@@ -373,7 +375,7 @@ function resolveStoryPath(filePath: string, res: Response): string | null {
   // Strip the optional "stories/" prefix so the remainder is a path
   // relative to storiesReal. Accepts both "stories/foo.json" (the
   // canonical caller convention) and bare "foo.json".
-  const STORIES_PREFIX = "stories" + path.sep;
+  const STORIES_PREFIX = `stories${path.sep}`;
   const relFromStories =
     filePath === "stories" ? "" : filePath.startsWith(STORIES_PREFIX) || filePath.startsWith("stories/") ? filePath.slice("stories/".length) : filePath;
   // resolveWithinRoot enforces both the realpath boundary AND

@@ -134,7 +134,7 @@ const MCP_TOOL_BRIDGE_TIMEOUT_MS = 30 * ONE_SECOND_MS;
 const PLUGIN_BRIDGE_TIMEOUT_MS = 20 * ONE_MINUTE_MS;
 
 function respond(msg: unknown): void {
-  process.stdout.write(JSON.stringify(msg) + "\n");
+  process.stdout.write(`${JSON.stringify(msg)}\n`);
 }
 
 // All bridge calls go to the same backend on the same session, so
@@ -296,7 +296,7 @@ async function handleManageSkillsSave(args: Record<string, unknown>): Promise<st
     { allowHttpError: true },
   );
   if (!res.ok) {
-    return "Error: " + (await extractFetchError(res));
+    return `Error: ${await extractFetchError(res)}`;
   }
   await pushSkillsListResult(`Saved skill "${name}".`);
   return `Saved skill ${name}. Run with /${name}.`;
@@ -319,7 +319,7 @@ async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<
     throw new Error(`Network error calling PUT /api/skills/${name}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
-    return "Error: " + (await extractFetchError(res));
+    return `Error: ${await extractFetchError(res)}`;
   }
   await pushSkillsListResult(`Updated skill "${name}".`);
   return `Updated skill ${name}. The changes take effect in new sessions.`;
@@ -338,7 +338,7 @@ async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<
     throw new Error(`Network error calling DELETE ${url}: ${errorMessage(err)}`);
   }
   if (!res.ok) {
-    return "Error: " + (await extractFetchError(res));
+    return `Error: ${await extractFetchError(res)}`;
   }
   await pushSkillsListResult(`Deleted skill "${name}".`);
   return `Deleted skill ${name}.`;

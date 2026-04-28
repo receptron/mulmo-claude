@@ -8,16 +8,14 @@ import { TOOL_DEFINITION, SYSTEM_PROMPT } from "./definition";
 
 export { TOOL_NAME, TOOL_DEFINITION, SYSTEM_PROMPT } from "./definition";
 
-export const executeTextResponse = async (_context: ToolContext, args: TextResponseArgs): Promise<ToolResult<TextResponseData, unknown>> => {
-  return {
-    data: {
-      text: args.text,
-      role: args.role,
-      transportKind: args.transportKind,
-    },
-    message: args.text,
-  };
-};
+export const executeTextResponse = async (_context: ToolContext, args: TextResponseArgs): Promise<ToolResult<TextResponseData, unknown>> => ({
+  data: {
+    text: args.text,
+    role: args.role,
+    transportKind: args.transportKind,
+  },
+  message: args.text,
+});
 
 export const pluginCore: ToolPluginCore<TextResponseData, unknown, TextResponseArgs> = {
   toolDefinition: TOOL_DEFINITION,

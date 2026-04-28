@@ -38,14 +38,13 @@ async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Prom
       // start emitting `subscribe` events. Values are placeholders —
       // the client only inspects `sid` and the timing fields.
       webSocket.send(
-        "0" +
-          JSON.stringify({
-            sid: "mock-sid",
-            upgrades: [],
-            pingInterval: 25000,
-            pingTimeout: 20000,
-            maxPayload: 1_000_000,
-          }),
+        `0${JSON.stringify({
+          sid: "mock-sid",
+          upgrades: [],
+          pingInterval: 25000,
+          pingTimeout: 20000,
+          maxPayload: 1_000_000,
+        })}`,
       );
 
       webSocket.onMessage((msg) => {
@@ -56,7 +55,7 @@ async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Prom
         }
         // Client CONNECT to default namespace.
         if (text === "40") {
-          webSocket.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
+          webSocket.send(`40${JSON.stringify({ sid: "mock-socket-sid" })}`);
           return;
         }
         // Event: `42["subscribe", "session.…"]`.
@@ -75,9 +74,9 @@ async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Prom
         const channel = arg;
         setTimeout(() => {
           for (const event of events) {
-            webSocket.send("42" + JSON.stringify(["data", { channel, data: event }]));
+            webSocket.send(`42${JSON.stringify(["data", { channel, data: event }])}`);
           }
-          webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
+          webSocket.send(`42${JSON.stringify(["data", { channel, data: { type: "session_finished" } }])}`);
         }, 50);
       });
     },

@@ -51,7 +51,7 @@ const SOURCE_B = makeSource("arxiv-cs-cl", "arXiv cs.CL", "https://export.arxiv.
 interface SourcesState {
   sources: MockSource[];
   rebuildCalls: number;
-  createCalls: Array<Record<string, unknown>>;
+  createCalls: Record<string, unknown>[];
 }
 
 async function installSourcesMocks(page: import("@playwright/test").Page, initial: MockSource[]): Promise<SourcesState> {

@@ -3,7 +3,7 @@ import { Server as IOServer } from "socket.io";
 
 export interface IPubSub {
   /** Publish data to all clients subscribed to this channel. */
-  publish(channel: string, data: unknown): void;
+  publish: (channel: string, data: unknown) => void;
 }
 
 // Channel names are treated as socket.io rooms — one room per

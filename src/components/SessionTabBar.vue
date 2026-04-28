@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
-import { type SessionSummary } from "../types/session";
+import type { SessionSummary } from "../types/session";
 import { roleName } from "../utils/role/icon";
 import SessionRoleIcon from "./SessionRoleIcon.vue";
 

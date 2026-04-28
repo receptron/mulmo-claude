@@ -433,7 +433,10 @@ interface ParsedRegisterBody {
   skipClassify: boolean;
 }
 
-type ParseError = { status: number; error: string };
+interface ParseError {
+  status: number;
+  error: string;
+}
 
 function parseRegisterBody(body: RegisterSourceBody): ParsedRegisterBody | ParseError {
   const title = typeof body.title === "string" ? body.title.trim() : "";

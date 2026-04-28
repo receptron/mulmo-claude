@@ -84,7 +84,7 @@ interface ReplyMeta {
 
 async function sendReply(recipient: string, subject: string, references: string[], text: string): Promise<void> {
   const subj = subject.startsWith("Re:") ? subject : `Re: ${subject || "(no subject)"}`;
-  const truncated = text.length > MAX_REPLY_LEN ? text.slice(0, MAX_REPLY_LEN) + "\n\n…(truncated)" : text;
+  const truncated = text.length > MAX_REPLY_LEN ? `${text.slice(0, MAX_REPLY_LEN)}\n\n…(truncated)` : text;
   const inReplyTo = references[references.length - 1] ?? "";
   try {
     await smtp.sendMail({
@@ -197,7 +197,7 @@ async function handleIncoming(msg: Incoming): Promise<void> {
     // did `chunkText(msg.text, MAX_BODY_LEN).join("")` which is a
     // no-op — chunk-then-rejoin returns the original string. Replaced
     // with an explicit slice so the MAX_BODY_LEN cap actually bites.
-    const trimmed = msg.text.length > MAX_BODY_LEN ? msg.text.slice(0, MAX_BODY_LEN) + "\n\n…(input truncated)" : msg.text;
+    const trimmed = msg.text.length > MAX_BODY_LEN ? `${msg.text.slice(0, MAX_BODY_LEN)}\n\n…(input truncated)` : msg.text;
     const ack = await mulmo.send(msg.senderAddress, trimmed);
     const statusSuffix = ack.status ? ` (${ack.status})` : "";
     const replyText = ack.ok ? (ack.reply ?? "") : `Error${statusSuffix}: ${ack.error ?? "unknown"}`;

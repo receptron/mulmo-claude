@@ -487,7 +487,10 @@ const sourceText = reactive<Record<number, string>>({});
 // the Update button. Cleared on next successful save or editor close.
 // Store raw error + kind tag so the template picks a localized key,
 // instead of pre-composing an English-prefixed string here.
-type BeatSaveError = { kind: "invalidJson" | "saveFailed"; error: string };
+interface BeatSaveError {
+  kind: "invalidJson" | "saveFailed";
+  error: string;
+}
 const beatSaveErrors = reactive<Record<number, BeatSaveError>>({});
 const beatSaving = reactive<Record<number, boolean>>({});
 const localOverrides = reactive<Record<number, Beat>>({});

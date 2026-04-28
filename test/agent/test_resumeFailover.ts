@@ -11,7 +11,7 @@ function jsonlLine(source: "user" | "assistant", message: string): string {
 }
 
 function jsonlFrom(entries: { source: "user" | "assistant"; message: string }[]): string {
-  return entries.map((entry) => jsonlLine(entry.source, entry.message)).join("\n") + "\n";
+  return `${entries.map((entry) => jsonlLine(entry.source, entry.message)).join("\n")}\n`;
 }
 
 describe("isStaleSessionError", () => {
@@ -47,12 +47,11 @@ describe("buildTranscriptPreamble — basic formatting", () => {
   it("returns empty string when no text entries exist", () => {
     // A jsonl containing only tool events must not yield a preamble,
     // since there's nothing human-readable to replay.
-    const jsonl =
-      JSON.stringify({
-        source: "tool",
-        type: EVENT_TYPES.toolResult,
-        result: {},
-      }) + "\n";
+    const jsonl = `${JSON.stringify({
+      source: "tool",
+      type: EVENT_TYPES.toolResult,
+      result: {},
+    })}\n`;
     assert.equal(buildTranscriptPreamble(jsonl), "");
   });
 
@@ -100,7 +99,7 @@ describe("buildTranscriptPreamble — filtering", () => {
       }),
       jsonlLine("assistant", "answer text"),
     ];
-    const preamble = buildTranscriptPreamble(lines.join("\n") + "\n");
+    const preamble = buildTranscriptPreamble(`${lines.join("\n")}\n`);
     assert.match(preamble, /User: first user msg/);
     assert.match(preamble, /Assistant: answer text/);
     assert.doesNotMatch(preamble, /toolUseId/);
@@ -108,7 +107,7 @@ describe("buildTranscriptPreamble — filtering", () => {
   });
 
   it("skips malformed lines without throwing", () => {
-    const jsonl = "not json\n" + jsonlLine("user", "still works") + "\n" + "{also broken\n" + jsonlLine("assistant", "reply") + "\n";
+    const jsonl = `not json\n${jsonlLine("user", "still works")}\n` + `{also broken\n${jsonlLine("assistant", "reply")}\n`;
     const preamble = buildTranscriptPreamble(jsonl);
     assert.match(preamble, /User: still works/);
     assert.match(preamble, /Assistant: reply/);
@@ -123,7 +122,7 @@ describe("buildTranscriptPreamble — filtering", () => {
       }),
       jsonlLine("user", "kept"),
     ];
-    const preamble = buildTranscriptPreamble(lines.join("\n") + "\n");
+    const preamble = buildTranscriptPreamble(`${lines.join("\n")}\n`);
     assert.doesNotMatch(preamble, /system note/);
     assert.match(preamble, /User: kept/);
   });
@@ -134,7 +133,7 @@ describe("buildTranscriptPreamble — filtering", () => {
       JSON.stringify({ source: "user", type: EVENT_TYPES.text }),
       jsonlLine("user", "real one"),
     ];
-    const preamble = buildTranscriptPreamble(lines.join("\n") + "\n");
+    const preamble = buildTranscriptPreamble(`${lines.join("\n")}\n`);
     assert.match(preamble, /User: real one/);
     // Empty strings shouldn't produce bare "User: " lines
     assert.doesNotMatch(preamble, /^User: $/m);

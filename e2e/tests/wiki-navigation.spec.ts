@@ -54,7 +54,7 @@ const LOG_PAYLOAD = {
 // `..` is a security token (see DANGEROUS_URLS) so it is NOT in this
 // table. Non-ASCII characters round-trip via UTF-8 percent-encoding
 // and are included to lock in that behaviour.
-const SAFE_SLUGS: ReadonlyArray<{ label: string; slug: string }> = [
+const SAFE_SLUGS: readonly { label: string; slug: string }[] = [
   { label: "ASCII baseline", slug: "plain-ascii" },
   { label: "space", slug: "my notes" },
   { label: "percent literal", slug: "100%done" },
@@ -73,11 +73,11 @@ const SAFE_SLUGS: ReadonlyArray<{ label: string; slug: string }> = [
 // `..%2Fsecrets` decodes to `../secrets` — both would otherwise reach
 // the server's `wikiSlugify` fuzzy matcher and could match a different
 // page. `/wiki/pages` (no slug) is malformed by construction.
-const DANGEROUS_URLS: ReadonlyArray<{ label: string; url: string }> = [
-  { label: "%2F in slug (decodes to /)", url: "/wiki/pages/" + encodeURIComponent("a/b") },
-  { label: "traversal via %2F", url: "/wiki/pages/" + encodeURIComponent("../secrets") },
-  { label: "bare `..` in slug", url: "/wiki/pages/" + encodeURIComponent("..") },
-  { label: "backslash in slug", url: "/wiki/pages/" + encodeURIComponent("a\\b") },
+const DANGEROUS_URLS: readonly { label: string; url: string }[] = [
+  { label: "%2F in slug (decodes to /)", url: `/wiki/pages/${encodeURIComponent("a/b")}` },
+  { label: "traversal via %2F", url: `/wiki/pages/${encodeURIComponent("../secrets")}` },
+  { label: "bare `..` in slug", url: `/wiki/pages/${encodeURIComponent("..")}` },
+  { label: "backslash in slug", url: `/wiki/pages/${encodeURIComponent("a\\b")}` },
   // `/wiki/pages` with no trailing slug matches the route regex
   // (section=pages, slug=undefined) and the guard bounces it.
   { label: "missing slug on pages section", url: "/wiki/pages" },
@@ -219,7 +219,7 @@ test.describe("wiki navigation — URL sync", () => {
   // Mirrors the fixture table in e2e/tests/files-path-url.spec.ts.
   for (const { label, slug } of SAFE_SLUGS) {
     test(`safe slug round-trips: ${label}`, async ({ page }) => {
-      await page.goto("/wiki/pages/" + encodeURIComponent(slug));
+      await page.goto(`/wiki/pages/${encodeURIComponent(slug)}`);
       await expect(page.getByText(`SENTINEL-BODY ${slug}`).first()).toBeVisible();
     });
   }

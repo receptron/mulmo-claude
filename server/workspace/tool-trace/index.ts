@@ -246,5 +246,5 @@ function extractQuery(args: unknown): string | null {
 
 async function appendRecord(deps: RecordToolEventDeps, record: object): Promise<void> {
   const append = deps.appendLine ?? defaultAppendLine;
-  await append(deps.resultsFilePath, JSON.stringify(record) + "\n");
+  await append(deps.resultsFilePath, `${JSON.stringify(record)}\n`);
 }

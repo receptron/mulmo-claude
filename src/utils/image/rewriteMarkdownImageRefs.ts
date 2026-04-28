@@ -174,7 +174,7 @@ function renderToken(token: Token, basePath: string, out: string[]): void {
  * ref instead of silently re-pointing it. Image-ref syntax inside
  * code blocks / inline code spans is left alone.
  */
-export function rewriteMarkdownImageRefs(markdown: string, basePath: string = ""): string {
+export function rewriteMarkdownImageRefs(markdown: string, basePath = ""): string {
   const tokens = marked.lexer(markdown);
   const parts: string[] = [];
   for (const token of tokens) renderToken(token, basePath, parts);

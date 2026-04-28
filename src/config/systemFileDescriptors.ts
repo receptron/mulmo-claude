@@ -35,7 +35,7 @@ type Entry = ExactEntry | PatternEntry;
 // fragile-format descriptor, not get swallowed by a generic
 // `data/wiki/*.md` pattern (which we currently don't have, but
 // the ordering keeps that future option open).
-export const SYSTEM_FILE_DESCRIPTORS: ReadonlyArray<Entry> = [
+export const SYSTEM_FILE_DESCRIPTORS: readonly Entry[] = [
   // ── config/ ──
   {
     kind: "exact",

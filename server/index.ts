@@ -190,7 +190,7 @@ async function listSessionsForBridge(opts: { limit: number; offset: number }) {
 async function getSessionHistoryForBridge(sessionId: string, opts: { limit: number; offset: number }) {
   const content = await readSessionJsonl(sessionId);
   if (!content) return { messages: [], total: 0 };
-  const allMessages: Array<{ source: string; text: string }> = [];
+  const allMessages: { source: string; text: string }[] = [];
   const lines = content.split("\n").filter(Boolean);
   // Collect all text events newest-first
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -366,7 +366,7 @@ function logMcpStatus(): void {
     });
   }
   if (disabledMcpTools.length > 0) {
-    const names = disabledMcpTools.map((toolDef) => toolDef.definition.name + " (" + (toolDef.requiredEnv ?? []).join(", ") + ")").join(", ");
+    const names = disabledMcpTools.map((toolDef) => `${toolDef.definition.name} (${(toolDef.requiredEnv ?? []).join(", ")})`).join(", ");
     log.info("mcp", "Unavailable (missing env)", { tools: names });
   }
 }

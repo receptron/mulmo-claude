@@ -21,9 +21,7 @@ const props = defineProps<{
   result: ToolResult<SpreadsheetToolData>;
 }>();
 
-const displayTitle = computed(() => {
-  return props.result.title || t("pluginSpreadsheet.previewUntitled");
-});
+const displayTitle = computed(() => props.result.title || t("pluginSpreadsheet.previewUntitled"));
 
 const sheetCount = computed(() => {
   const sheets = props.result.data?.sheets;

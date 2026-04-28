@@ -9,14 +9,14 @@ import { useMarkdownLinkHandler } from "../../src/composables/useMarkdownLinkHan
 // which we satisfy by stubbing `globalThis.Element`.
 
 interface FakeAnchor {
-  getAttribute(name: string): string | null;
+  getAttribute: (name: string) => string | null;
 }
 
 interface FakeElement {
   tag: string;
   parent: FakeElement | null;
   href?: string;
-  closest(selector: string): FakeAnchor | null;
+  closest: (selector: string) => FakeAnchor | null;
 }
 
 function makeAnchor(href: string | null): FakeElement {

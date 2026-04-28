@@ -61,5 +61,5 @@ export interface LLMBackend {
   readonly id: string;
   readonly capabilities: BackendCapabilities;
   /** Run one user turn. Yields portable AgentEvents. */
-  runAgent(input: AgentInput): AsyncIterable<AgentEvent>;
+  runAgent: (input: AgentInput) => AsyncIterable<AgentEvent>;
 }

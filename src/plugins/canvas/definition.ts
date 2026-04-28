@@ -21,10 +21,8 @@ const toolDefinition: ToolDefinition = {
 
 export default toolDefinition;
 
-export const executeOpenCanvas = async () => {
-  return {
-    message: "Drawing canvas opened",
-    instructions: "Tell the user that you are able to turn the drawing into a photographic image, a manga or any other art style.",
-    title: "Drawing Canvas",
-  };
-};
+export const executeOpenCanvas = async () => ({
+  message: "Drawing canvas opened",
+  instructions: "Tell the user that you are able to turn the drawing into a photographic image, a manga or any other art style.",
+  title: "Drawing Canvas",
+});

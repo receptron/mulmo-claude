@@ -30,8 +30,8 @@ test.describe("Files view — scheduler preview", () => {
 
     // Serve the raw JSON body via /api/files/content so the renderer
     // can parse it into SchedulerData.
-    await page.route("**/api/files/content?**", (route) => {
-      return route.fulfill({
+    await page.route("**/api/files/content?**", (route) =>
+      route.fulfill({
         json: {
           kind: "text",
           path: WORKSPACE_FILES.schedulerItems,
@@ -39,8 +39,8 @@ test.describe("Files view — scheduler preview", () => {
           size: JSON.stringify(SAMPLE_ITEMS).length,
           modifiedMs: Date.now(),
         },
-      });
-    });
+      }),
+    );
 
     await page.goto(SCHEDULER_URL);
 

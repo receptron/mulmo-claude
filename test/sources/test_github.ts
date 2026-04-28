@@ -91,7 +91,7 @@ describe("parseRepoSlug — rejects malformed / unsafe input", () => {
   });
 
   it("rejects over-long segments (defensive cap)", () => {
-    assert.equal(parseRepoSlug("a/" + "b".repeat(101)), null);
+    assert.equal(parseRepoSlug(`a/${"b".repeat(101)}`), null);
   });
 
   it("rejects non-string input", () => {

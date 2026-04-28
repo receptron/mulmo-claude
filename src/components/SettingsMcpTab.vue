@@ -299,7 +299,7 @@ const { t } = useI18n();
 // UI-local representation of a configured server. Matches
 // server/config.ts#McpServerEntry. Re-declared in src/config/mcpTypes.ts
 // to avoid a cross-module type import from the server package.
-import { type HttpSpec, type StdioSpec, type McpServerSpec, type McpServerEntry } from "../config/mcpTypes";
+import type { HttpSpec, StdioSpec, McpServerSpec, McpServerEntry } from "../config/mcpTypes";
 import { MCP_CATALOG, requiredKeysOf, type McpCatalogEntry, type McpConfigField } from "../config/mcpCatalog";
 import { interpolateMcpSpec } from "../utils/mcp/interpolateSpec";
 

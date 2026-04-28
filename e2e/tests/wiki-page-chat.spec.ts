@@ -103,7 +103,7 @@ test.describe("wiki page chat composer", () => {
     // the guard `replace:true`-redirects to `/wiki` before mount. So
     // the composer isn't just disabled, it doesn't exist: we should
     // land on the index with no page-chat input rendered at all.
-    await page.goto("/wiki/pages/" + encodeURIComponent("../secrets"));
+    await page.goto(`/wiki/pages/${encodeURIComponent("../secrets")}`);
     await expect(page.getByTestId("wiki-page-entry-onboarding")).toBeVisible();
     await expect(page.getByTestId("wiki-page-chat-input")).toHaveCount(0);
     await expect(async () => {

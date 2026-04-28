@@ -59,7 +59,7 @@ function seedSession(
       );
     }
   }
-  writeFileSync(join(chatDir, `${sessionId}.jsonl`), lines.join("\n") + "\n");
+  writeFileSync(join(chatDir, `${sessionId}.jsonl`), `${lines.join("\n")}\n`);
   return sessionId;
 }
 
@@ -236,7 +236,7 @@ describe("indexSession — skip conditions", () => {
         startedAt: "2026-04-12T10:00:00.000Z",
       }),
     );
-    writeFileSync(join(chatDir, "sess-F.jsonl"), JSON.stringify({ source: "tool", type: "tool_result", message: "x" }) + "\n");
+    writeFileSync(join(chatDir, "sess-F.jsonl"), `${JSON.stringify({ source: "tool", type: "tool_result", message: "x" })}\n`);
     const stub = makeStubSummarize();
     const result = await indexSession(workspace, "sess-F", {
       summarize: stub.fn,

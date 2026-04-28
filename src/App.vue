@@ -257,7 +257,7 @@ import NotificationToast from "./components/NotificationToast.vue";
 import type { NotificationAction } from "./types/notification";
 import { PAGE_ROUTES, type PageRouteName } from "./router";
 import type { SseEvent } from "./types/sse";
-import { type SessionEntry, type ActiveSession } from "./types/session";
+import type { SessionEntry, ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";

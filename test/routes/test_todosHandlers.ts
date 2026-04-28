@@ -73,10 +73,10 @@ describe("handleShow", () => {
     const result = handleShow(items, {});
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const jsonItems = result.jsonData.items as Array<{
+    const jsonItems = result.jsonData.items as {
       text: string;
       labels?: string[];
-    }>;
+    }[];
     assert.deepEqual(jsonItems[0]?.labels, ["work", "urgent"]);
     assert.equal(jsonItems[1]?.labels, undefined);
   });
@@ -433,10 +433,10 @@ describe("handleListLabels", () => {
     const result = handleListLabels(items);
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
-    const inventory = result.jsonData.labels as Array<{
+    const inventory = result.jsonData.labels as {
       label: string;
       count: number;
-    }>;
+    }[];
     const work = inventory.find((labelItem) => labelItem.label.toLowerCase() === "work");
     assert.equal(work?.count, 2);
   });

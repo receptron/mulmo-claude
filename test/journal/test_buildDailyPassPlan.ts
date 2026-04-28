@@ -65,7 +65,7 @@ describe("buildDailyPassPlan", () => {
       timestamp: "2026-04-25T01:00:00Z",
       message: "hello",
     };
-    await writeFile(sessionFile, JSON.stringify(event) + "\n");
+    await writeFile(sessionFile, `${JSON.stringify(event)}\n`);
 
     const plan = await buildDailyPassPlan(defaultState(), {
       workspaceRoot,

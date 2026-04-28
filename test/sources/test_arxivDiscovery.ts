@@ -104,7 +104,7 @@ describe("discoverAndRegister", () => {
     assert.ok(result.registered[0].startsWith("arxiv-auto-transformer-"));
 
     // Verify source file was created
-    const sourceFile = path.join(tmp, "sources", result.registered[0] + ".md");
+    const sourceFile = path.join(tmp, "sources", `${result.registered[0]}.md`);
     assert.ok(existsSync(sourceFile));
     const content = readFileSync(sourceFile, "utf-8");
     assert.ok(content.includes("arxiv_query"));

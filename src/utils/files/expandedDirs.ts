@@ -6,7 +6,7 @@ export const EXPANDED_DIRS_STORAGE_KEY = "files_expanded_dirs";
 // Default: only the workspace root ("") is expanded — matches the
 // pre-persistence behavior of FileTree.vue, where nested dirs start
 // collapsed so opening Files mode doesn't render the whole tree.
-const DEFAULT_EXPANDED: ReadonlyArray<string> = [""];
+const DEFAULT_EXPANDED: readonly string[] = [""];
 
 export function parseStoredExpandedDirs(raw: string | null): Set<string> {
   if (raw === null) return new Set(DEFAULT_EXPANDED);

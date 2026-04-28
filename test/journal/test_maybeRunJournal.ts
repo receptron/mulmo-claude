@@ -29,7 +29,7 @@ async function makeFreshWorkspace(): Promise<string> {
   const sessionId = "11111111-1111-1111-1111-111111111111";
   const sessionFile = path.join(tmpRoot, "conversations", "chat", `${sessionId}.jsonl`);
   await mkdir(path.dirname(sessionFile), { recursive: true });
-  await writeFile(sessionFile, JSON.stringify({ source: "user", type: "text", message: "hi" }) + "\n");
+  await writeFile(sessionFile, `${JSON.stringify({ source: "user", type: "text", message: "hi" })}\n`);
   return tmpRoot;
 }
 

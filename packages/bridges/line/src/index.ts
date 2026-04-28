@@ -93,12 +93,12 @@ app.post("/webhook", async (req: Request, res: Response) => {
   res.status(200).send("OK");
 
   let body: {
-    events: Array<{
+    events: {
       type: string;
       replyToken?: string;
       source?: { userId?: string; type?: string };
       message?: { type: string; text?: string };
-    }>;
+    }[];
   };
   try {
     body = JSON.parse(bodyStr);

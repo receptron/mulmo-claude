@@ -51,8 +51,8 @@ test.describe("session-history filter pills", () => {
   });
 
   test("switching filters updates the visible session set", async ({ page }) => {
-    await page.route(urlEndsWith("/api/sessions"), (route: Route) => {
-      return route.fulfill({
+    await page.route(urlEndsWith("/api/sessions"), (route: Route) =>
+      route.fulfill({
         json: {
           sessions: [
             { ...SESSION_A, origin: "bridge" },
@@ -61,8 +61,8 @@ test.describe("session-history filter pills", () => {
           cursor: "v1:0",
           deletedIds: [],
         },
-      });
-    });
+      }),
+    );
 
     await page.goto("/chat");
     await page.getByTestId("session-history-toggle-off").click();

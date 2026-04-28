@@ -12,7 +12,7 @@ import path from "node:path";
 import { provisionWikiHistoryHook } from "../../../server/workspace/wiki-history/provision.js";
 
 interface SettingsShape {
-  hooks?: { PostToolUse?: Array<Record<string, unknown>> };
+  hooks?: { PostToolUse?: Record<string, unknown>[] };
   [key: string]: unknown;
 }
 
@@ -29,7 +29,7 @@ describe("provisionWikiHistoryHook — first install", () => {
     const settings = await readSettings(root);
     const entries = settings.hooks?.PostToolUse ?? [];
     assert.equal(entries.length, 1);
-    const entry = entries[0] as { matcher?: string; hooks?: Array<{ command?: string; mulmoclaudeWikiHistory?: boolean }> };
+    const entry = entries[0] as { matcher?: string; hooks?: { command?: string; mulmoclaudeWikiHistory?: boolean }[] };
     assert.equal(entry.matcher, "Write|Edit");
     assert.equal(entry.hooks?.length, 1);
     const hook = entry.hooks?.[0];
@@ -116,7 +116,7 @@ describe("provisionWikiHistoryHook — preserves user-set keys", () => {
     const entries = settings.hooks?.PostToolUse ?? [];
     assert.ok(Array.isArray(entries), "PostToolUse should be normalised to an array");
     assert.equal(entries.length, 1, "our entry should be the sole entry after normalisation");
-    const ours = entries[0] as { matcher?: string; hooks?: Array<{ mulmoclaudeWikiHistory?: boolean }> };
+    const ours = entries[0] as { matcher?: string; hooks?: { mulmoclaudeWikiHistory?: boolean }[] };
     assert.equal(ours.matcher, "Write|Edit");
     assert.equal(ours.hooks?.[0]?.mulmoclaudeWikiHistory, true);
 
@@ -150,7 +150,7 @@ describe("provisionWikiHistoryHook — preserves user-set keys", () => {
     const fresh = await readSettings(root);
     const entries = fresh.hooks?.PostToolUse ?? [];
     assert.equal(entries.length, 1, "stale entry should be replaced, not duplicated");
-    const ours = entries[0] as { hooks?: Array<{ command?: string }> };
+    const ours = entries[0] as { hooks?: { command?: string }[] };
     const newCommand = ours.hooks?.[0]?.command ?? "";
     // Stale absolute path should be gone; new command must use the
     // portable $CLAUDE_PROJECT_DIR form (works in host + container).

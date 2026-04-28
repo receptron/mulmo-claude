@@ -182,7 +182,7 @@ test.describe("file explorer path in URL", () => {
   test("editing a markdown file via the rendered-mode editor saves via PUT /api/files/content", async ({ page }) => {
     // Capture the PUT request body so we can assert on exactly what
     // the editor sent to the server.
-    const putRequests: Array<{ path: string; content: string }> = [];
+    const putRequests: { path: string; content: string }[] = [];
     await page.route(
       (url) => url.pathname === API_ROUTES.files.content,
       async (route, req) => {

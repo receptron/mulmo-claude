@@ -62,17 +62,11 @@ const formData = computed<FormData | null>(() => {
   return null;
 });
 
-const viewState = computed<FormViewState | null>(() => {
-  return (props.result?.viewState as unknown as FormViewState) || null;
-});
+const viewState = computed<FormViewState | null>(() => (props.result?.viewState as unknown as FormViewState) || null);
 
-const fieldCount = computed(() => {
-  return formData.value?.fields.length || 0;
-});
+const fieldCount = computed(() => formData.value?.fields.length || 0);
 
-const isSubmitted = computed(() => {
-  return viewState.value?.submitted || false;
-});
+const isSubmitted = computed(() => viewState.value?.submitted || false);
 
 const completionPercentage = computed(() => {
   if (!formData.value || isSubmitted.value) return 100;

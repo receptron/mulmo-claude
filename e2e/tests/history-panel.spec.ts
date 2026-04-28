@@ -94,8 +94,8 @@ test.describe("session-history side panel", () => {
 
   test("clicking a filter hides non-matching sessions without leaving the panel", async ({ page }) => {
     // Override sessions with origin data
-    await page.route(urlEndsWith("/api/sessions"), (route: Route) => {
-      return route.fulfill({
+    await page.route(urlEndsWith("/api/sessions"), (route: Route) =>
+      route.fulfill({
         json: {
           sessions: [
             { ...SESSION_A, origin: "bridge" },
@@ -104,8 +104,8 @@ test.describe("session-history side panel", () => {
           cursor: "v1:0",
           deletedIds: [],
         },
-      });
-    });
+      }),
+    );
 
     await page.goto("/chat");
     await expect(page.getByText("MulmoClaude")).toBeVisible();

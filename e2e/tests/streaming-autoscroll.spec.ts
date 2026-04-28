@@ -38,15 +38,15 @@ function buildStreamingEvents(chunkCount: number, chunkBody: string) {
 // small gap between each send so Vue re-renders between chunks.
 async function streamEventsToSocket(webSocket: { send: (data: string) => void }, channel: string, events: readonly unknown[]): Promise<void> {
   for (const event of events) {
-    webSocket.send("42" + JSON.stringify(["data", { channel, data: event }]));
+    webSocket.send(`42${JSON.stringify(["data", { channel, data: event }])}`);
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  webSocket.send("42" + JSON.stringify(["data", { channel, data: { type: "session_finished" } }]));
+  webSocket.send(`42${JSON.stringify(["data", { channel, data: { type: "session_finished" } }])}`);
 }
 
 function handleSocketFrame(text: string, webSocket: { send: (data: string) => void }, events: readonly unknown[]): void {
   if (text === "2") return webSocket.send("3");
-  if (text === "40") return webSocket.send("40" + JSON.stringify({ sid: "mock-socket-sid" }));
+  if (text === "40") return webSocket.send(`40${JSON.stringify({ sid: "mock-socket-sid" })}`);
   if (!text.startsWith("42")) return;
   let parsed: unknown;
   try {
@@ -65,14 +65,13 @@ async function mockAgentWithPubSub(page: Page, events: readonly unknown[]): Prom
     (url) => url.pathname.startsWith("/ws/pubsub"),
     (webSocket) => {
       webSocket.send(
-        "0" +
-          JSON.stringify({
-            sid: "mock-sid",
-            upgrades: [],
-            pingInterval: 25000,
-            pingTimeout: 20000,
-            maxPayload: 1_000_000,
-          }),
+        `0${JSON.stringify({
+          sid: "mock-sid",
+          upgrades: [],
+          pingInterval: 25000,
+          pingTimeout: 20000,
+          maxPayload: 1_000_000,
+        })}`,
       );
       webSocket.onMessage((msg) => handleSocketFrame(String(msg), webSocket, events));
     },

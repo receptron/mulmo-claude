@@ -64,7 +64,7 @@ function validatePath(rawPath: string): string | null {
   if (path.isAbsolute(normalized)) return null;
 
   // Not a reserved system directory
-  if (RESERVED_DIRS.some((reservedDir) => normalized === reservedDir || normalized.startsWith(reservedDir + "/"))) {
+  if (RESERVED_DIRS.some((reservedDir) => normalized === reservedDir || normalized.startsWith(`${reservedDir}/`))) {
     return null;
   }
 

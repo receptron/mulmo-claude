@@ -95,7 +95,7 @@ export function filterByLabels<T extends { labels?: string[] }>(items: readonly 
 //
 // Sorted by count desc, then by the displayed label asc (case-
 // insensitive) for deterministic output.
-export function listLabelsWithCount(items: readonly { labels?: string[] }[]): Array<{ label: string; count: number }> {
+export function listLabelsWithCount(items: readonly { labels?: string[] }[]): { label: string; count: number }[] {
   const groups = new Map<string, { label: string; count: number }>();
   for (const item of items) {
     const seenInItem = new Set<string>();

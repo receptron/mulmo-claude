@@ -240,15 +240,13 @@ export function buildCliArgs(params: CliArgsParams): string[] {
 export async function buildUserMessageLine(message: string, attachments?: Attachment[]): Promise<string> {
   const all = attachments ?? [];
   if (all.length === 0) {
-    return (
-      JSON.stringify({
-        type: "user",
-        message: { role: "user", content: message },
-      }) + "\n"
-    );
+    return `${JSON.stringify({
+      type: "user",
+      message: { role: "user", content: message },
+    })}\n`;
   }
 
-  const blocks: Array<Record<string, unknown>> = [];
+  const blocks: Record<string, unknown>[] = [];
   const skippedReasons: string[] = [];
 
   for (const att of all) {
@@ -274,12 +272,10 @@ export async function buildUserMessageLine(message: string, attachments?: Attach
   }
 
   blocks.push({ type: "text", text: message });
-  return (
-    JSON.stringify({
-      type: "user",
-      message: { role: "user", content: blocks },
-    }) + "\n"
-  );
+  return `${JSON.stringify({
+    type: "user",
+    message: { role: "user", content: blocks },
+  })}\n`;
 }
 
 function buildNativeBlock(att: Attachment): Record<string, unknown> {

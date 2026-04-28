@@ -24,7 +24,8 @@ if (!zulipUrl || !email || !apiKey) {
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 const apiBase = `${zulipUrl.replace(/\/$/, "")}/api/v1`;
-const authHeader = "Basic " + Buffer.from(`${email}:${apiKey}`).toString("base64");
+const credentials = `${email}:${apiKey}`;
+const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
 
 mulmo.onPush((pushEvent) => {
   sendMessage(pushEvent.chatId, pushEvent.message).catch((err) => console.error(`[zulip] push send failed: ${err}`));

@@ -412,7 +412,7 @@ export function summarizeHelpContent(content: string): string {
     if (paragraph.length >= HELP_SUMMARY_PARAGRAPH_CAP) break;
   }
   if (paragraph.length > HELP_SUMMARY_PARAGRAPH_CAP) {
-    paragraph = paragraph.slice(0, HELP_SUMMARY_PARAGRAPH_CAP).trimEnd() + "…";
+    paragraph = `${paragraph.slice(0, HELP_SUMMARY_PARAGRAPH_CAP).trimEnd()}…`;
   }
 
   const parts: string[] = [];

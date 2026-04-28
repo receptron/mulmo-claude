@@ -30,7 +30,7 @@ function seedSession(sessionId: string): void {
       startedAt: "2026-04-12T10:00:00.000Z",
     }),
   );
-  writeFileSync(join(chatDir, `${sessionId}.jsonl`), JSON.stringify({ source: "user", type: "text", message: "hello" }) + "\n");
+  writeFileSync(join(chatDir, `${sessionId}.jsonl`), `${JSON.stringify({ source: "user", type: "text", message: "hello" })}\n`);
 }
 
 function stubSummarize(

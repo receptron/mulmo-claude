@@ -40,19 +40,19 @@ export interface PlatformPlugin {
   readonly webhookPath: string | null;
 
   /** Check if this platform is configured (env secrets present). */
-  isConfigured(env: Env): boolean;
+  isConfigured: (env: Env) => boolean;
 
   /**
    * Respond to a platform's GET webhook verification challenge (e.g. Meta hub.challenge).
    * Only needed for webhook platforms that require a GET verification step before POSTs.
    */
-  handleVerification?(request: Request, env: Env): Response;
+  handleVerification?: (request: Request, env: Env) => Response;
 
   /**
    * Handle an incoming webhook request.
    * Only called when mode=webhook. Parse + verify → RelayMessage[].
    */
-  handleWebhook?(request: Request, body: string, env: Env): Promise<RelayMessage[]>;
+  handleWebhook?: (request: Request, body: string, env: Env) => Promise<RelayMessage[]>;
 
   /**
    * Start a persistent connection or polling loop.
@@ -60,10 +60,10 @@ export interface PlatformPlugin {
    * The callback enqueues messages to the Durable Object.
    * Returns a cleanup function to stop the loop/connection.
    */
-  startIngestion?(env: Env, onMessage: (msg: RelayMessage) => Promise<void>): Promise<() => void>;
+  startIngestion?: (env: Env, onMessage: (msg: RelayMessage) => Promise<void>) => Promise<() => void>;
 
   /** Send a response back to the platform. */
-  sendResponse(chatId: string, text: string, env: Env, replyToken?: string): Promise<void>;
+  sendResponse: (chatId: string, text: string, env: Env, replyToken?: string) => Promise<void>;
 }
 
 // ── Plugin registry ─────────────────────────────────────────────

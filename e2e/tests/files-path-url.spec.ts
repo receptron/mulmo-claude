@@ -24,7 +24,7 @@ import { ONE_SECOND_MS } from "../../server/utils/time.ts";
 // filesystem can never produce one; the router layer doesn't need
 // to handle it. Raw `?` / `#` / `%` in a basename are legal on disk
 // but require URL-encoding in the address bar.
-const WEIRD_NAMES: ReadonlyArray<{ label: string; path: string }> = [
+const WEIRD_NAMES: readonly { label: string; path: string }[] = [
   { label: "ASCII baseline", path: "artifacts/documents/17c48329.md" },
   { label: "deep nesting (6 levels)", path: "a/b/c/d/e/f.md" },
   { label: "spaces in basename", path: "notes/my cool notes.md" },
@@ -69,7 +69,7 @@ function bodyFor(path: string): string {
 
 // ── Shared mock installation ────────────────────────────────────
 
-async function installFileMocks(page: Page, fixtures: ReadonlyArray<{ path: string }>): Promise<void> {
+async function installFileMocks(page: Page, fixtures: readonly { path: string }[]): Promise<void> {
   await mockAllApis(page);
 
   // Tree: empty but valid — the deep-link tests don't click through
@@ -125,7 +125,7 @@ async function installFileMocks(page: Page, fixtures: ReadonlyArray<{ path: stri
 // Each segment gets `encodeURIComponent` (which encodes `?#%&+=` among
 // others) and the slashes between segments stay raw.
 function buildPathUrl(path: string): string {
-  return "/files/" + path.split("/").map(encodeURIComponent).join("/");
+  return `/files/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 // ── Direct deep-link round-trip ─────────────────────────────────
@@ -200,7 +200,7 @@ test.describe("rejections", () => {
   // vector is percent-encoded `..` (`%2E%2E`), which survives browser
   // normalisation and is decoded by the router, at which point the
   // guard's `.includes("..")` check catches it.
-  const BAD_PATHS: ReadonlyArray<{ label: string; url: string }> = [
+  const BAD_PATHS: readonly { label: string; url: string }[] = [
     { label: "leading-slash path form (absolute)", url: "/files//etc/passwd" },
     { label: "parent traversal (percent-encoded)", url: "/files/..%2F..%2Fetc%2Fpasswd" },
     { label: "legacy query with traversal", url: "/files?path=../../../etc/passwd" },

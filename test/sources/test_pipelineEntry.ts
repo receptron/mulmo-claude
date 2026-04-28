@@ -80,7 +80,7 @@ function fakeFetcher(kind: FetcherKind, itemsBySlug: Record<string, SourceItem[]
     kind,
     async fetch(source) {
       const items = itemsBySlug[source.slug] ?? [];
-      return { items, cursor: { fake: "cursor-after-" + source.slug } };
+      return { items, cursor: { fake: `cursor-after-${source.slug}` } };
     },
   };
 }

@@ -21,9 +21,9 @@ export interface LogRecord {
 export interface Sink {
   name: string;
   level: LogLevel;
-  write(record: LogRecord): void;
+  write: (record: LogRecord) => void;
   // Drains any pending async I/O. Tests call this; production can ignore.
-  flush?(): Promise<void>;
+  flush?: () => Promise<void>;
 }
 
 export type Formatter = (record: LogRecord) => string;

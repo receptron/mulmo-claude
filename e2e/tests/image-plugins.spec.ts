@@ -20,8 +20,8 @@ async function setupImageSession(page: Page) {
 
   await page.route(
     (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
-    (route) => {
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         json: [
           {
             type: "session_meta",
@@ -69,18 +69,16 @@ async function setupImageSession(page: Page) {
             },
           },
         ],
-      });
-    },
+      }),
   );
 
   await page.route(
     (url) => url.pathname === "/api/files/raw" && typeof url.searchParams.get("path") === "string",
-    (route) => {
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         contentType: "image/png",
         body: Buffer.from(TINY_PNG, "base64"),
-      });
-    },
+      }),
   );
 }
 

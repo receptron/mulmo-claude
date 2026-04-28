@@ -63,7 +63,7 @@ export async function* runAgent(
 
   // --debug: dump the full system prompt on the first message of each session.
   if (!claudeSessionId && process.argv.includes("--debug")) {
-    log.info("agent", "system prompt for new session:\n" + fullSystemPrompt);
+    log.info("agent", `system prompt for new session:\n${fullSystemPrompt}`);
   }
 
   const mcpPaths = resolveMcpConfigPaths({

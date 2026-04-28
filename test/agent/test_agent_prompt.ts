@@ -432,8 +432,8 @@ describe("buildInlinedHelpFiles", () => {
   });
 
   it("summarizes + points to large help files", () => {
-    const bigBody = "\n\n" + "filler paragraph. ".repeat(200);
-    writeHelp("big.md", "# Big Help\n\nFirst real content paragraph explaining the feature." + bigBody);
+    const bigBody = `\n\n${"filler paragraph. ".repeat(200)}`;
+    writeHelp("big.md", `# Big Help\n\nFirst real content paragraph explaining the feature.${bigBody}`);
     const result = buildInlinedHelpFiles("See config/helps/big.md", workspace);
     assert.equal(result.length, 1);
     const section = result[0];

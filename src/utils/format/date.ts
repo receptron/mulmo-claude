@@ -5,9 +5,7 @@
 /** "Apr 11 06:32" — short month + day + 24h time. */
 export function formatDate(iso: string): string {
   const date = new Date(iso);
-  return (
-    date.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
+  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 /** "Apr 11 06:32" — same format as formatDate but from epoch ms. */

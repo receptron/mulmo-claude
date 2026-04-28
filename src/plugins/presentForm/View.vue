@@ -536,9 +536,7 @@ function isNearLimit(field: FormField): boolean {
   return currentLength / maxLength > 0.9;
 }
 
-const requiredFieldsCount = computed(() => {
-  return formData.value?.fields.filter((field) => field.required).length || 0;
-});
+const requiredFieldsCount = computed(() => formData.value?.fields.filter((field) => field.required).length || 0);
 
 const filledRequiredCount = computed(() => {
   if (!formData.value) return 0;
@@ -598,7 +596,7 @@ function renderValue(field: FormField, value: any): string {
   if (field.type === "checkbox") {
     const items: string[] = (value || []).map((idx: number) => singleLine(field.choices[idx]));
     if (items.length === 0) return empty;
-    return "\n  - " + items.join("\n  - ");
+    return `\n  - ${items.join("\n  - ")}`;
   }
   if (typeof value === "string") {
     const trimmed = value.trim();

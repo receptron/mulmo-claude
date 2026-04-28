@@ -38,7 +38,7 @@ export function createConsoleSink(config: ConsoleSinkConfig): Sink {
     write(record: LogRecord) {
       const stream = record.level === "error" || record.level === "warn" ? process.stderr : process.stdout;
       const fmt = colorEnabled(stream) ? colored : plain;
-      stream.write(fmt(record) + "\n");
+      stream.write(`${fmt(record)}\n`);
     },
   };
 }
@@ -93,7 +93,7 @@ export function createFileSink(config: FileSinkConfig, deps: FileSinkDeps = {}):
     write(record: LogRecord) {
       const nowDate = now();
       const rotated = maybeRotate(nowDate);
-      const line = fmt(record) + "\n";
+      const line = `${fmt(record)}\n`;
       const filePath = currentPath;
       enqueue(() => writeLine(filePath, line));
       // Enforce retention AFTER the write so maxFiles counts include

@@ -214,7 +214,7 @@ async function writeCursorFile(lastSeenAt: number): Promise<void> {
   try {
     await mkdir(dirname(cursorFile), { recursive: true });
     const tmp = `${cursorFile}.tmp`;
-    await writeFile(tmp, JSON.stringify({ lastSeenAt }) + "\n", "utf-8");
+    await writeFile(tmp, `${JSON.stringify({ lastSeenAt })}\n`, "utf-8");
     await rename(tmp, cursorFile);
   } catch (err) {
     console.warn(`[nostr] cursor write failed (${cursorFile}): ${err}`);

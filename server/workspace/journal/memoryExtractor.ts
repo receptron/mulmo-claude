@@ -71,9 +71,9 @@ export async function extractAndAppendMemory(deps: MemoryExtractionDeps): Promis
 export function buildUserPrompt(existingMemory: string, excerpts: string): string {
   const parts: string[] = [];
   if (existingMemory.trim()) {
-    parts.push("## Already known (do NOT repeat these):\n\n" + existingMemory);
+    parts.push(`## Already known (do NOT repeat these):\n\n${existingMemory}`);
   }
-  parts.push("## New chat excerpts:\n\n" + excerpts);
+  parts.push(`## New chat excerpts:\n\n${excerpts}`);
   parts.push("\nExtract any NEW user facts not already in the 'Already known' section above. If none, output: NONE");
   return parts.join("\n\n");
 }

@@ -108,7 +108,7 @@ function stepFence(line: string, state: FenceState): boolean {
 function flipMark(line: string, match: RegExpMatchArray): string {
   const [whole, prefix, bullet, sep, mark] = match;
   const flipped = mark === " " ? "x" : " ";
-  return `${prefix}${bullet}${sep}[${flipped}]` + line.slice(whole.length);
+  return `${prefix}${bullet}${sep}[${flipped}]${line.slice(whole.length)}`;
 }
 
 /** Find the source-line index of every task-list item, in document

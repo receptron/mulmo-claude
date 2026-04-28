@@ -150,9 +150,7 @@ async function fetchMarkdownContent(): Promise<void> {
 // Fetch on mount
 fetchMarkdownContent();
 
-const hasChanges = computed(() => {
-  return editableMarkdown.value !== markdownContent.value;
-});
+const hasChanges = computed(() => editableMarkdown.value !== markdownContent.value);
 
 // Frontmatter-aware view of the loaded content — separates the
 // `---\n...\n---` header (rendered as a properties panel) from the

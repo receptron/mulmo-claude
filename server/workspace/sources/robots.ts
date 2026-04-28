@@ -266,6 +266,6 @@ export function matchesPattern(pattern: string, path: string): number {
     .split("*")
     .map((chunk) => chunk.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join(".*");
-  const regex = new RegExp("^" + regexBody + (endAnchored ? "$" : ""));
+  const regex = new RegExp(`^${regexBody}${endAnchored ? "$" : ""}`);
   return regex.test(path) ? pattern.length : -1;
 }

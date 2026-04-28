@@ -27,8 +27,8 @@ async function setupSkillsSession(page: Page) {
   // is reachable by clicking the sidebar entry.
   await page.route(
     (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
-    (route) => {
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         json: [
           {
             type: "session_meta",
@@ -61,8 +61,7 @@ async function setupSkillsSession(page: Page) {
             },
           },
         ],
-      });
-    },
+      }),
   );
 
   // List endpoint used by the plugin execute() — same shape the
@@ -175,7 +174,7 @@ test.describe("manageSkills plugin", () => {
     // Capture the body of the agent POST so we can assert what
     // sendMessage forwarded. Registered AFTER mockAllApis so this
     // route wins (Playwright matches last-registered first).
-    const agentPosts: Array<Record<string, unknown>> = [];
+    const agentPosts: Record<string, unknown>[] = [];
     await page.route(urlEndsWith("/api/agent"), async (route: Route) => {
       if (route.request().method() === "POST") {
         agentPosts.push(route.request().postDataJSON());
@@ -224,8 +223,8 @@ async function setupSkillsWithProjectScope(page: Page) {
 
   await page.route(
     (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
-    (route) => {
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         json: [
           {
             type: "session_meta",
@@ -258,8 +257,7 @@ async function setupSkillsWithProjectScope(page: Page) {
             },
           },
         ],
-      });
-    },
+      }),
   );
 
   await page.route(

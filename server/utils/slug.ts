@@ -106,8 +106,8 @@ export function disambiguateSlug(base: string, existingIds: ReadonlySet<string>)
 }
 
 function hasNonHyphenChar(input: string): boolean {
-  for (let i = 0; i < input.length; i++) {
-    if (input[i] !== "-") return true;
+  for (const char of input) {
+    if (char !== "-") return true;
   }
   return false;
 }

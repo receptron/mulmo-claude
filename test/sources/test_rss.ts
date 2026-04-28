@@ -39,14 +39,14 @@ function makeState(over: Partial<SourceState> = {}): SourceState {
 }
 
 function makeFeed(
-  items: Array<{
+  items: {
     title: string;
     link: string | null;
     publishedAt?: string | null;
     summary?: string | null;
     content?: string | null;
     feedId?: string | null;
-  }>,
+  }[],
 ): ParsedFeed {
   return {
     kind: "rss",

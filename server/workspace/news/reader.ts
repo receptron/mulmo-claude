@@ -83,8 +83,8 @@ export function extractDailyJsonIndex(markdown: string): NewsItem[] | null {
   if (!Array.isArray(shape.items)) return null;
   // Defensive filter: drop entries that don't carry the fields the
   // viewer relies on.
-  return shape.items.filter((item): item is NewsItem => {
-    return (
+  return shape.items.filter(
+    (item): item is NewsItem =>
       typeof item === "object" &&
       item !== null &&
       typeof item.id === "string" &&
@@ -92,9 +92,8 @@ export function extractDailyJsonIndex(markdown: string): NewsItem[] | null {
       typeof item.url === "string" &&
       typeof item.publishedAt === "string" &&
       typeof item.sourceSlug === "string" &&
-      Array.isArray(item.categories)
-    );
-  });
+      Array.isArray(item.categories),
+  );
 }
 
 // Build the list of YYYY-MM-DD strings for the last `days` days

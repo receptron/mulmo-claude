@@ -12,8 +12,8 @@ interface RecordedResponse {
   jsonCalled: boolean;
 }
 interface MockResponse {
-  status(code: number): MockResponse;
-  json(body: unknown): MockResponse;
+  status: (code: number) => MockResponse;
+  json: (body: unknown) => MockResponse;
   _recorded: RecordedResponse;
 }
 function mockRes(): MockResponse {

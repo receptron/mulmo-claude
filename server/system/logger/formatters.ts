@@ -42,9 +42,7 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
 // with cyan or grey.
 const WHOLE_LINE_COLOR: ReadonlySet<LogLevel> = new Set(["error", "warn"]);
 
-export const formatText: Formatter = (record: LogRecord): string => {
-  return formatTextLine(record, false);
-};
+export const formatText: Formatter = (record: LogRecord): string => formatTextLine(record, false);
 
 /**
  * Same shape as {@link formatText} but wraps the output in ANSI colour
@@ -58,9 +56,7 @@ export const formatText: Formatter = (record: LogRecord): string => {
  * - `info` / `debug`: only the level word is coloured, keeping the
  *   chatty levels visually quiet.
  */
-export const formatTextColor: Formatter = (record: LogRecord): string => {
-  return formatTextLine(record, true);
-};
+export const formatTextColor: Formatter = (record: LogRecord): string => formatTextLine(record, true);
 
 function formatTextLine(record: LogRecord, color: boolean): string {
   const levelText = record.level.toUpperCase().padEnd(5);

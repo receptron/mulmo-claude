@@ -182,7 +182,7 @@ describe("extractErrorMessage", () => {
 // checks per case.
 interface HandlerSpy {
   handlers: MovieEventHandlers;
-  calls: Array<{ name: "onBeatImageDone"; beatIndex: number } | { name: "onBeatAudioDone"; beatIndex: number } | { name: "onDone"; moviePath: string }>;
+  calls: ({ name: "onBeatImageDone"; beatIndex: number } | { name: "onBeatAudioDone"; beatIndex: number } | { name: "onDone"; moviePath: string })[];
 }
 
 function makeSpy(): HandlerSpy {

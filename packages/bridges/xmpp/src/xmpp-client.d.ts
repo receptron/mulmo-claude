@@ -1,5 +1,6 @@
 // Minimal type declarations for @xmpp/client (the package ships CommonJS
 // without .d.ts). We only use the surface exercised by this bridge.
+/* eslint-disable @typescript-eslint/method-signature-style */
 
 declare module "@xmpp/client" {
   export interface XmlElement {

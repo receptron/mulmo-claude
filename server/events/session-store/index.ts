@@ -383,11 +383,11 @@ export async function pushToolResult(chatSessionId: string, result: unknown): Pr
 
   await appendFile(
     session.resultsFilePath,
-    JSON.stringify({
+    `${JSON.stringify({
       source: "tool",
       type: EVENT_TYPES.toolResult,
       result,
-    }) + "\n",
+    })}\n`,
   );
   publishToSessionChannel(chatSessionId, {
     type: EVENT_TYPES.toolResult,

@@ -164,14 +164,14 @@ export async function getSchedulerLogs(opts: { since?: string; taskId?: string; 
 }
 
 /** Get all task states — used by API routes. */
-export function getSchedulerTasks(): Array<{
+export function getSchedulerTasks(): {
   id: string;
   name: string;
   description: string;
   schedule: TaskDefinition["schedule"];
   missedRunPolicy: string;
   state: TaskExecutionState;
-}> {
+}[] {
   return systemTasks.map((taskDef) => ({
     id: taskDef.id,
     name: taskDef.name,

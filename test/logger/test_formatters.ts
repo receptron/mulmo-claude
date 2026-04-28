@@ -60,8 +60,8 @@ describe("formatTextColor", () => {
   it("wraps the entire line for error and warn (whole-row colour)", () => {
     for (const level of ["error", "warn"] as const) {
       const colored = formatTextColor(record({ level }));
-      assert.ok(colored.startsWith(ESC + "["), `expected ${level} line to start with an ANSI escape`);
-      assert.ok(colored.endsWith(ESC + "[0m"), `expected ${level} line to end with the ANSI reset`);
+      assert.ok(colored.startsWith(`${ESC}[`), `expected ${level} line to start with an ANSI escape`);
+      assert.ok(colored.endsWith(`${ESC}[0m`), `expected ${level} line to end with the ANSI reset`);
       // Exactly one open escape + the closing reset — no nested wraps
       // around the level word.
       const escapeCount = (colored.match(ANY_ANSI) ?? []).length;
@@ -75,7 +75,7 @@ describe("formatTextColor", () => {
     for (const level of ["info", "debug"] as const) {
       const colored = formatTextColor(record({ level }));
       // Should NOT start with an escape — the timestamp leads.
-      assert.ok(!colored.startsWith(ESC + "["), `expected ${level} line to start with the timestamp, not ANSI`);
+      assert.ok(!colored.startsWith(`${ESC}[`), `expected ${level} line to start with the timestamp, not ANSI`);
       // Exactly one wrapped slot: open + reset around the level word.
       const escapeCount = (colored.match(ANY_ANSI) ?? []).length;
       assert.equal(escapeCount, 2, `expected exactly one wrapped slot for ${level}`);

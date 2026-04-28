@@ -22,20 +22,20 @@ export interface TaskDefinition {
 }
 
 export interface ITaskManager {
-  registerTask(def: TaskDefinition): void;
-  removeTask(taskId: string): void;
+  registerTask: (def: TaskDefinition) => void;
+  removeTask: (taskId: string) => void;
   /** Update the schedule of an existing task. Returns false if not found. */
-  updateSchedule(taskId: string, schedule: TaskSchedule): boolean;
-  start(): void;
-  stop(): void;
+  updateSchedule: (taskId: string, schedule: TaskSchedule) => boolean;
+  start: () => void;
+  stop: () => void;
   /** Run one tick manually (for testing). */
-  tick(): Promise<void>;
-  listTasks(): Array<{
+  tick: () => Promise<void>;
+  listTasks: () => {
     id: string;
     description?: string;
     schedule: TaskSchedule;
     dependsOn?: string;
-  }>;
+  }[];
 }
 
 export interface TaskManagerOptions {

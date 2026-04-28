@@ -9,8 +9,8 @@ import { respondWithDispatchResult, type DispatchResult } from "../../server/api
 interface RecordedResponse {
   statusCode: number;
   body: unknown;
-  status(code: number): RecordedResponse;
-  json(payload: unknown): RecordedResponse;
+  status: (code: number) => RecordedResponse;
+  json: (payload: unknown) => RecordedResponse;
 }
 
 function makeRes(): RecordedResponse {

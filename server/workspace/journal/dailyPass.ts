@@ -45,7 +45,7 @@ export interface DailyPassResult {
   sessionsIngested: string[];
   topicsCreated: string[];
   topicsUpdated: string[];
-  skipped: Array<{ date: string; reason: string }>;
+  skipped: { date: string; reason: string }[];
 }
 
 export interface DailyPassPlan {

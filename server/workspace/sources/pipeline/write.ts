@@ -29,7 +29,7 @@ import { writeFileAtomic } from "../../../utils/files/index.js";
 export interface DailyJsonIndex {
   itemCount: number;
   byCategory: Record<string, number>;
-  items: Array<{
+  items: {
     id: string;
     title: string;
     url: string;
@@ -37,7 +37,7 @@ export interface DailyJsonIndex {
     categories: string[];
     sourceSlug: string;
     severity?: string;
-  }>;
+  }[];
 }
 
 export function buildDailyJsonIndex(items: readonly SourceItem[]): DailyJsonIndex {

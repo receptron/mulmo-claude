@@ -109,7 +109,7 @@ describe("checkNpmPackage — caching contract", () => {
 });
 
 describe("validateStdioPackages — walks user servers", () => {
-  function makeWarnSink(): { warns: Array<{ message: string; data?: Record<string, unknown> }>; restore: () => void } {
+  function makeWarnSink(): { warns: { message: string; data?: Record<string, unknown> }[]; restore: () => void } {
     // mcpHealth uses log.warn from server/system/logger; intercepting
     // via console is fragile because the real logger formats first.
     // We instead assert on prober calls — the prober is the side that

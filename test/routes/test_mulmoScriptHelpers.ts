@@ -7,8 +7,8 @@ interface RecordedResponse {
   statusCode: number;
   body: unknown;
   headersSent: boolean;
-  status(code: number): RecordedResponse;
-  json(payload: unknown): RecordedResponse;
+  status: (code: number) => RecordedResponse;
+  json: (payload: unknown) => RecordedResponse;
 }
 
 function makeRes(): RecordedResponse {

@@ -21,8 +21,8 @@ async function setupChartSession(page: Page) {
 
   await page.route(
     (url) => url.pathname.startsWith("/api/sessions/") && url.pathname !== "/api/sessions",
-    (route) => {
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         json: [
           {
             type: "session_meta",
@@ -71,8 +71,7 @@ async function setupChartSession(page: Page) {
             },
           },
         ],
-      });
-    },
+      }),
   );
 }
 

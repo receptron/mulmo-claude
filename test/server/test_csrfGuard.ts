@@ -116,8 +116,8 @@ interface FakeReq {
 interface FakeRes {
   statusCode: number;
   body: unknown;
-  status(code: number): FakeRes;
-  json(payload: unknown): FakeRes;
+  status: (code: number) => FakeRes;
+  json: (payload: unknown) => FakeRes;
 }
 
 function makeReq(method: string, origin?: string): FakeReq {

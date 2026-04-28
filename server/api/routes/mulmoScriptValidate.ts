@@ -17,7 +17,7 @@ function formatZodIssues(
   // Zod's `$ZodIssue.path` is `PropertyKey[]` (includes `symbol`).
   // Accept the wider type so callers can pass `safeParse().error.issues`
   // directly; stringify any non-string/number segments at format time.
-  issues: ReadonlyArray<{ message: string; path: ReadonlyArray<PropertyKey> }>,
+  issues: readonly { message: string; path: readonly PropertyKey[] }[],
 ): string {
   if (issues.length === 0) return "invalid shape";
   const head = issues

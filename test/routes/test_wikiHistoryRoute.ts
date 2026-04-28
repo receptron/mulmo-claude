@@ -17,7 +17,7 @@ type Handler = (req: Request, res: Response) => Promise<void> | void;
 interface StackFrame {
   route?: {
     path: string;
-    stack: Array<{ method: string; handle: Handler }>;
+    stack: { method: string; handle: Handler }[];
   };
 }
 interface RouterInternals {
@@ -36,7 +36,7 @@ function extractRouteHandler(mod: { default: unknown }, routePath: string, metho
 
 interface ResBody {
   slug?: string;
-  snapshots?: Array<{ stamp: string; reason?: string; editor?: string }>;
+  snapshots?: { stamp: string; reason?: string; editor?: string }[];
   snapshot?: { stamp: string; body?: string; meta?: Record<string, unknown> };
   restored?: { fromStamp: string };
   error?: string;

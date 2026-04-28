@@ -248,12 +248,12 @@ function summariseOutcomes(outcomes: readonly FetchOutcome[]): {
   success: number;
   noFetcher: number;
   errored: number;
-  failures: Array<{ sourceSlug: string; kind: "no-fetcher" | "error"; error: string }>;
+  failures: { sourceSlug: string; kind: "no-fetcher" | "error"; error: string }[];
 } {
   let success = 0;
   let noFetcher = 0;
   let errored = 0;
-  const failures: Array<{ sourceSlug: string; kind: "no-fetcher" | "error"; error: string }> = [];
+  const failures: { sourceSlug: string; kind: "no-fetcher" | "error"; error: string }[] = [];
   for (const outcome of outcomes) {
     if (outcome.kind === "success") {
       success++;

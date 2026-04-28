@@ -37,9 +37,9 @@ interface RelayResponse {
 }
 
 interface Logger {
-  info(prefix: string, msg: string, data?: unknown): void;
-  warn(prefix: string, msg: string, data?: unknown): void;
-  error(prefix: string, msg: string, data?: unknown): void;
+  info: (prefix: string, msg: string, data?: Record<string, unknown>) => void;
+  warn: (prefix: string, msg: string, data?: Record<string, unknown>) => void;
+  error: (prefix: string, msg: string, data?: Record<string, unknown>) => void;
 }
 
 export interface RelayClientDeps {
@@ -50,7 +50,7 @@ export interface RelayClientDeps {
 }
 
 export interface RelayClientHandle {
-  disconnect(): void;
+  disconnect: () => void;
 }
 
 // ── Constants ────────────────────────────────────────────────

@@ -17,7 +17,7 @@ type Handler = (req: Request, res: Response) => Promise<void> | void;
 interface StackFrame {
   route?: {
     path: string;
-    stack: Array<{ method: string; handle: Handler }>;
+    stack: { method: string; handle: Handler }[];
   };
 }
 interface RouterInternals {
