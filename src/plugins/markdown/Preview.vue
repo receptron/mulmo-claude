@@ -42,6 +42,12 @@ async function fetchContent(): Promise<void> {
 fetchContent();
 watch(() => props.result.data?.markdown, fetchContent);
 
+const resolvedMarkdown = computed(() => {
+  const raw = props.result.data?.markdown;
+  if (!raw) return "";
+  return isFilePath(raw) ? fetchedContent.value : raw;
+});
+
 const displayTitle = computed(() => {
   if (props.result.title) {
     return props.result.title;
@@ -52,12 +58,6 @@ const displayTitle = computed(() => {
     if (heading) return heading;
   }
   return "Markdown Document";
-});
-
-const resolvedMarkdown = computed(() => {
-  const raw = props.result.data?.markdown;
-  if (!raw) return "";
-  return isFilePath(raw) ? fetchedContent.value : raw;
 });
 
 function extractPreview(markdown: string): string {

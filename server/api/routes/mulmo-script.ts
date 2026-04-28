@@ -232,6 +232,13 @@ async function loadScriptFromDisk(filePath: string, res: Response): Promise<Scri
   };
 }
 
+// Module-level dedup so a foreground SSE call and a fire-and-forget
+// background call can't race on the same script. Keyed by the realpath
+// (absoluteFilePath) so two different wire spellings of the same file
+// still collide. The set is intentionally process-local — a multi-
+// process deployment would need an external lock; that's out of scope.
+const inFlightMovies = new Set<string>();
+
 function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): void {
   if (inFlightMovies.has(absoluteFilePath)) return;
   inFlightMovies.add(absoluteFilePath);
@@ -608,13 +615,6 @@ router.post(API_ROUTES.mulmoScript.renderBeat, async (req: Request<object, objec
     publishGeneration(chatSessionId, GENERATION_KINDS.beatImage, filePath, key, true, genError);
   }
 });
-
-// Module-level dedup so a foreground SSE call and a fire-and-forget
-// background call can't race on the same script. Keyed by the realpath
-// (absoluteFilePath) so two different wire spellings of the same file
-// still collide. The set is intentionally process-local — a multi-
-// process deployment would need an external lock; that's out of scope.
-const inFlightMovies = new Set<string>();
 
 type MovieGenerationResult = { ok: true; outputPath: string } | { ok: false; error: string };
 

@@ -135,6 +135,24 @@ export default [
           ],
         },
       ],
+      // Catch TDZ-style `use-before-define` (e.g. accessing a `const`
+      // before its declaration line). #920. Function declarations are
+      // exempt — TS hoists them safely, and top-down narrative-style
+      // (`main()` first, helpers below) is a common pattern in the
+      // codebase. Type references are also exempt: type position is
+      // erased at runtime, so the order doesn't affect execution.
+      "no-use-before-define": "off",
+      "@typescript-eslint/no-use-before-define": [
+        "error",
+        {
+          functions: false,
+          classes: true,
+          variables: true,
+          enums: true,
+          typedefs: false,
+          ignoreTypeReferences: true,
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",

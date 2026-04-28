@@ -145,6 +145,11 @@ const roleTheme = computed(() => {
 
 const hasChanges = computed(() => editedText.value !== editorSource.value);
 
+// `<details>` element ref. Declared together with the editing state
+// just below, but hoisted up here so `applyChanges` can close the
+// panel after a save without TDZ ordering trouble.
+const detailsEl = ref<HTMLDetailsElement>();
+
 function applyChanges() {
   if (!hasChanges.value) return;
 
@@ -189,7 +194,6 @@ function openLinksInNewTab(event: MouseEvent): void {
 
 const { pdfDownloading, pdfError, downloadPdf: rawDownloadPdf } = usePdfDownload();
 
-const detailsEl = ref<HTMLDetailsElement>();
 const editing = ref(false);
 
 function onDetailsToggle(event: Event) {

@@ -85,6 +85,17 @@ async function renewTokenViaPty(): Promise<boolean> {
     let responded = false;
     let buffer = "";
     let settled = false;
+    // Mutual reference: `finish`'s body needs `timeout` (clearTimeout)
+    // and `timeout`'s callback needs `finish`. Predeclared with `let`
+    // and assigned exactly once below. `prefer-const` would prefer a
+    // direct `const timeout = setTimeout(...)` form, but that needs
+    // `finish` already in scope inside the callback, which then
+    // forces `clearTimeout(timeout)` inside `finish`'s body to
+    // reference an undefined-at-textual-position const — i.e. the
+    // chicken-and-egg pair has no const-only spelling. The actual
+    // value is single-write at runtime; lint heuristic disagrees.
+    // eslint-disable-next-line prefer-const -- mutual-reference pair, see comment above
+    let timeout: ReturnType<typeof setTimeout>;
 
     const finish = (success: boolean) => {
       if (settled) return;
@@ -94,7 +105,7 @@ async function renewTokenViaPty(): Promise<boolean> {
       resolve(success);
     };
 
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       log.error("credentials", `Token renewal timed out after ${PTY_TIMEOUT_MS / ONE_SECOND_MS}s`);
       finish(false);
     }, PTY_TIMEOUT_MS);

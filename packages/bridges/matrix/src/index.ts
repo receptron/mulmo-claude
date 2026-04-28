@@ -36,14 +36,14 @@ const allowAll = allowedRooms.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
-mulmo.onPush((pushEvent) => {
-  matrixClient.sendTextMessage(pushEvent.chatId, pushEvent.message).catch((err: unknown) => console.error(`[matrix] push send failed: ${err}`));
-});
-
 const matrixClient: MatrixClient = createClient({
   baseUrl: homeserverUrl,
   accessToken,
   userId,
+});
+
+mulmo.onPush((pushEvent) => {
+  matrixClient.sendTextMessage(pushEvent.chatId, pushEvent.message).catch((err: unknown) => console.error(`[matrix] push send failed: ${err}`));
 });
 
 // The matrix-js-sdk event emitter types are narrowly typed; the

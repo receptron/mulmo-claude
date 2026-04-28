@@ -312,6 +312,7 @@ const props = defineProps<{
 }>();
 
 const localSources = ref<Source[] | null>(props.initialData?.sources ?? null);
+const sources = computed<Source[]>(() => localSources.value ?? []);
 const lastRebuild = ref<RebuildSummary | null>(props.initialData?.lastRebuild ?? null);
 const highlightSlugLocal = ref<string | null>(props.initialData?.highlightSlug ?? null);
 const actionMessage = ref("");
@@ -631,7 +632,6 @@ async function rebuildInline(): Promise<void> {
   await loadBrief(summary.isoDate);
 }
 
-const sources = computed<Source[]>(() => localSources.value ?? []);
 const highlightSlug = computed(() => highlightSlugLocal.value);
 
 // Filter chip state (#768). Single-select. `all` is the implicit

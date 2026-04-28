@@ -177,25 +177,12 @@ const backgroundImage = computed(() => {
 let uploadInFlight = false;
 let pendingSave = false;
 
-// Undo/redo kick off the library's async redraw; give it a tick to
-// composite before we snapshot-and-upload.
-const undo = () => {
-  canvasRef.value?.undo();
-  setTimeout(saveDrawing, 50);
-};
-const redo = () => {
-  canvasRef.value?.redo();
-  setTimeout(saveDrawing, 50);
-};
-const clear = () => {
-  canvasRef.value?.reset();
-  saveDrawing();
-};
-
 // Snapshot the current bitmap and PUT it back to the pre-allocated
 // file. No result mutation — the path is fixed from canvas creation,
-// so nothing upstream needs to know about saves.
-const saveDrawing = async (): Promise<void> => {
+// so nothing upstream needs to know about saves. `function` (not
+// `const`) so the undo/redo/clear handlers below can reference it
+// without TDZ ordering problems.
+async function saveDrawing(): Promise<void> {
   if (!canvasRef.value || !imagePath.value) return;
   if (uploadInFlight) {
     pendingSave = true;
@@ -219,6 +206,21 @@ const saveDrawing = async (): Promise<void> => {
       void saveDrawing();
     }
   }
+}
+
+// Undo/redo kick off the library's async redraw; give it a tick to
+// composite before we snapshot-and-upload.
+const undo = () => {
+  canvasRef.value?.undo();
+  setTimeout(saveDrawing, 50);
+};
+const redo = () => {
+  canvasRef.value?.redo();
+  setTimeout(saveDrawing, 50);
+};
+const clear = () => {
+  canvasRef.value?.reset();
+  saveDrawing();
 };
 
 const updateCanvasSize = () => {
