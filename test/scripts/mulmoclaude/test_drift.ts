@@ -231,7 +231,7 @@ describe("detectMulmobridgeDeps", () => {
     const names = await drift.detectMulmobridgeDeps({
       root: path.join(FIXTURES, "drift-drifted"),
     });
-    assert.deepEqual(names.sort(), ["client", "protocol"]);
+    assert.deepEqual(names.toSorted(), ["client", "protocol"]);
   });
 
   it("returns empty when the launcher has no bridge deps", async () => {

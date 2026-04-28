@@ -9,7 +9,7 @@ describe("findDirtySessions", () => {
       { id: "b", mtimeMs: 2000 },
     ];
     const { dirty, missing } = findDirtySessions(current, {});
-    assert.deepEqual(dirty.sort(), ["a", "b"]);
+    assert.deepEqual(dirty.toSorted(), ["a", "b"]);
     assert.deepEqual(missing, []);
   });
 
@@ -66,7 +66,7 @@ describe("findDirtySessions", () => {
       unchanged: { lastMtimeMs: 1000 },
       deleted: { lastMtimeMs: 100 },
     });
-    assert.deepEqual(dirty.sort(), ["changed", "new"]);
+    assert.deepEqual(dirty.toSorted(), ["changed", "new"]);
     assert.deepEqual(missing, ["deleted"]);
   });
 });

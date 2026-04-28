@@ -55,7 +55,7 @@ describe("interpolateMcpSpec — stdio", () => {
     const out = interpolateMcpSpec(template, {}, new Set(["A", "B", "C"]));
     assert.equal(out.ok, false);
     if (out.ok) return;
-    assert.deepEqual(out.missing.sort(), ["A", "B", "C"]);
+    assert.deepEqual(out.missing.toSorted(), ["A", "B", "C"]);
   });
 
   it("collapses optional placeholders to empty string when missing", () => {

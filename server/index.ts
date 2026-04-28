@@ -177,7 +177,7 @@ app.use(configRoutes);
 app.use(skillsRoutes);
 async function listSessionsForBridge(opts: { limit: number; offset: number }) {
   const rows = await loadAllSessions();
-  const sorted = rows.sort((leftSession, rightSession) => rightSession.changeMs - leftSession.changeMs);
+  const sorted = rows.toSorted((leftSession, rightSession) => rightSession.changeMs - leftSession.changeMs);
   const total = sorted.length;
   const sessions = sorted.slice(opts.offset, opts.offset + opts.limit).map((row) => ({
     id: row.summary.id,

@@ -99,12 +99,12 @@ function selectMostRecent(entries: TranscriptEntry[], maxChars: number): { kept:
     const entry = entries[i];
     const entrySize = entry.source.length + entry.text.length + 3; // ": " + "\n"
     if (size + entrySize > maxChars) {
-      return { kept: picked.reverse(), truncated: true };
+      return { kept: picked.toReversed(), truncated: true };
     }
     picked.push(entry);
     size += entrySize;
   }
-  return { kept: picked.reverse(), truncated: false };
+  return { kept: picked.toReversed(), truncated: false };
 }
 
 function formatPreamble(entries: TranscriptEntry[], truncated: boolean): string {

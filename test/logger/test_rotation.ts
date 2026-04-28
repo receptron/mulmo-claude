@@ -57,6 +57,6 @@ describe("listLogFiles / enforceMaxFiles", () => {
     await enforceMaxFiles(dir, 0);
     await enforceMaxFiles(dir, -5);
     const filesAfter = await readdir(dir);
-    assert.deepEqual(filesAfter.sort(), filesBefore.sort());
+    assert.deepEqual(filesAfter.toSorted(), filesBefore.toSorted());
   });
 });

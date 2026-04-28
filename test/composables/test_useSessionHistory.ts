@@ -139,7 +139,7 @@ describe("useSessionHistory — cursor-aware incremental fetch (#205)", () => {
     await fetchSessions();
 
     const ids = sessions.value.map((session) => session.id);
-    assert.deepEqual(ids.sort(), ["a", "b", "c"].sort(), "diff should upsert a/c while preserving untouched b");
+    assert.deepEqual(ids.toSorted(), ["a", "b", "c"].toSorted(), "diff should upsert a/c while preserving untouched b");
     const sessionA = sessions.value.find((session) => session.id === "a");
     assert.equal(sessionA?.preview, "updated", "a must have the diff's fields");
   });

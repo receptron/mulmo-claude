@@ -108,7 +108,7 @@ describe("runFetchPhase — success path", () => {
       deps: makeDeps(),
       getFetcher: makeGetFetcher([fetcher]),
     });
-    assert.deepEqual(callLog.sort(), ["a", "b"]);
+    assert.deepEqual(callLog.toSorted(), ["a", "b"]);
     assert.equal(result.outcomes.length, 2);
     for (const outcome of result.outcomes) {
       assert.equal(outcome.kind, "success");

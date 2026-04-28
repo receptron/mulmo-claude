@@ -139,7 +139,7 @@ export default [
       "@typescript-eslint/no-floating-promises": "warn",
       // Bug-detection-signal-positive sonarjs type-checked rules.
       "sonarjs/different-types-comparison": "warn",
-      "sonarjs/no-misleading-array-reverse": "warn",
+      "sonarjs/no-misleading-array-reverse": "error",
       "sonarjs/deprecation": "warn",
       // Stylistic / preference rules with low real-bug signal —
       // disabled to cut warning noise + lint cost.
