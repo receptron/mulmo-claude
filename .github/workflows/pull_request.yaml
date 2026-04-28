@@ -134,7 +134,12 @@ jobs:
       # lockfile.
       - name: yarn install (Yarn 4)
         env:
+          # CI auto-enables both: hardened mode (public-PR safety) and
+          # immutable-installs (treats CI=true as --immutable). Both
+          # forbid the v1 → v6 lockfile migration that has to happen
+          # to install at all.
           YARN_ENABLE_HARDENED_MODE: "false"
+          YARN_ENABLE_IMMUTABLE_INSTALLS: "false"
         run: yarn install
       - name: yarn build:packages (verifies the dev/build script chain has no pre* dependency)
         run: yarn build:packages
