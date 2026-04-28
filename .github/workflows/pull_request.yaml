@@ -145,9 +145,14 @@ jobs:
         run: yarn build:packages
       - name: yarn build
         run: yarn build
-      # `yarn typecheck` deliberately omitted — `typecheck:packages` uses
-      # `yarn workspaces run` (Yarn 1 syntax); Yarn 4 needs `workspaces
-      # foreach`. The lint_test matrix covers typecheck under Yarn 1.
+      - name: yarn lint
+        run: yarn lint
+      # Run the four typecheck pieces that are pure `tsc` calls; skip
+      # `typecheck:packages` (= `yarn workspaces run typecheck`) which is
+      # Yarn 1-only syntax. Same for `yarn test`'s tail
+      # (`yarn workspaces run test`) — covered by lint_test on Yarn 1.
+      - name: yarn typecheck (vue / server / test / e2e — skip :packages)
+        run: yarn typecheck:vue && yarn typecheck:server && yarn typecheck:test && yarn typecheck:e2e
 
   e2e:
     needs: changes
