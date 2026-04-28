@@ -163,6 +163,12 @@ export default [
         },
       ],
       "linebreak-style": ["error", "unix"],
+      // `==`/`!=` triggers JS coercion (`null == undefined` → true,
+      // `"" == 0` → true). `smart` keeps the `x == null` idiom (covers
+      // both null and undefined in one check) so existing
+      // null-or-undefined guards don't all need to be rewritten.
+      // #921.
+      eqeqeq: ["error", "smart"],
       quotes: "off",
       "no-shadow": "error",
       "no-param-reassign": "error",
