@@ -362,6 +362,125 @@ test.describe("manageSkills plugin — delete (phase 1)", () => {
     await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
   });
 
+  test("Schedule button opens dialog, posts to scheduler, and routes to /automations", async ({ page }) => {
+    // Capture the scheduler-task POST so we can assert the payload.
+    // Registered AFTER mockAllApis so this route wins.
+    const taskPosts: Array<Record<string, unknown>> = [];
+    await page.route(urlEndsWith("/api/scheduler/tasks"), (route: Route) => {
+      if (route.request().method() === "POST") {
+        taskPosts.push(route.request().postDataJSON());
+        return route.fulfill({
+          status: 201,
+          json: { task: { id: "scheduled-1" } },
+        });
+      }
+      // The /automations page lists tasks on mount — return an empty
+      // list so the redirect lands cleanly without a 501 from the
+      // catch-all mock.
+      if (route.request().method() === "GET") {
+        return route.fulfill({ json: { tasks: [] } });
+      }
+      return route.fallback();
+    });
+
+    await page.goto("/chat/skills-session");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await page.getByText("2 skills").first().click();
+    await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
+
+    // Auto-selected (user-only) — Schedule is available regardless of
+    // source (unlike Edit/Delete which are project-scope only).
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("user-only");
+    await page.getByTestId("skill-schedule-btn").click();
+
+    // Dialog appears, daily mode selected by default.
+    await expect(page.getByTestId("skill-schedule-dialog")).toBeVisible();
+    await expect(page.getByTestId("skill-schedule-daily-time")).toBeVisible();
+
+    // Set the time and submit.
+    await page.getByTestId("skill-schedule-daily-time").fill("09:30");
+    await page.getByTestId("skill-schedule-submit").click();
+
+    // POST landed with the right shape.
+    await expect.poll(() => taskPosts.length, { timeout: 5 * ONE_SECOND_MS }).toBeGreaterThan(0);
+    const post = taskPosts[0];
+    expect(post.name).toBe("user-only");
+    expect(post.prompt).toBe("/user-only");
+    const schedule = post.schedule as { type: string; time?: string };
+    expect(schedule.type).toBe("daily");
+    expect(typeof schedule.time).toBe("string");
+    expect(schedule.time).toMatch(/^\d{2}:\d{2}$/);
+
+    // After success: redirected to /automations.
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/automations");
+  });
+
+  test("Schedule dialog can switch to interval mode and submit minutes", async ({ page }) => {
+    const taskPosts: Array<Record<string, unknown>> = [];
+    await page.route(urlEndsWith("/api/scheduler/tasks"), (route: Route) => {
+      if (route.request().method() === "POST") {
+        taskPosts.push(route.request().postDataJSON());
+        return route.fulfill({
+          status: 201,
+          json: { task: { id: "scheduled-2" } },
+        });
+      }
+      if (route.request().method() === "GET") {
+        return route.fulfill({ json: { tasks: [] } });
+      }
+      return route.fallback();
+    });
+
+    await page.goto("/chat/skills-session");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await page.getByText("2 skills").first().click();
+    await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("user-only");
+
+    await page.getByTestId("skill-schedule-btn").click();
+    await expect(page.getByTestId("skill-schedule-dialog")).toBeVisible();
+
+    // Switch to interval mode.
+    await page.getByTestId("skill-schedule-type-interval").click();
+    await expect(page.getByTestId("skill-schedule-interval-amount")).toBeVisible();
+    await page.getByTestId("skill-schedule-interval-amount").fill("15");
+    await page.getByTestId("skill-schedule-interval-unit").selectOption("minutes");
+
+    await page.getByTestId("skill-schedule-submit").click();
+
+    await expect.poll(() => taskPosts.length, { timeout: 5 * ONE_SECOND_MS }).toBeGreaterThan(0);
+    const schedule = taskPosts[0]?.schedule as { type: string; intervalMs?: number };
+    expect(schedule.type).toBe("interval");
+    expect(schedule.intervalMs).toBe(15 * 60_000);
+  });
+
+  test("Schedule dialog cancel closes without posting", async ({ page }) => {
+    let posted = false;
+    await page.route(urlEndsWith("/api/scheduler/tasks"), (route: Route) => {
+      if (route.request().method() === "POST") {
+        posted = true;
+        return route.fulfill({ status: 201, json: { task: { id: "x" } } });
+      }
+      return route.fulfill({ json: { tasks: [] } });
+    });
+
+    await page.goto("/chat/skills-session");
+    await expect(page.getByText("MulmoClaude")).toBeVisible();
+    await page.getByText("2 skills").first().click();
+    await expect(page.getByTestId("skill-item-user-only")).toBeVisible();
+    await expect(page.getByTestId("skill-body-rendered")).toContainText("user-only");
+
+    await page.getByTestId("skill-schedule-btn").click();
+    await expect(page.getByTestId("skill-schedule-dialog")).toBeVisible();
+
+    await page.getByTestId("skill-schedule-cancel").click();
+
+    // Dialog gone, no post issued, still on /chat.
+    await expect(page.getByTestId("skill-schedule-dialog")).toHaveCount(0);
+    expect(posted).toBe(false);
+    expect(new URL(page.url()).pathname).toContain("/chat/");
+  });
+
   test("Edit button opens edit mode, saves changes, and returns to view mode", async ({ page }) => {
     // Mock PUT /api/skills/my-project-skill to return success.
     await page.route(

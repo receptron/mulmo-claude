@@ -96,10 +96,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { ScheduleSubmission } from "./scheduleSubmission";
-
-const ONE_MINUTE_MS = 60_000;
-const ONE_HOUR_MS = 60 * ONE_MINUTE_MS;
+import { buildScheduleSubmission, type ScheduleSubmission } from "./scheduleSubmission";
 
 const { t } = useI18n();
 
@@ -131,28 +128,14 @@ onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown);
 });
 
-// The daily-task wire format is UTC "HH:MM" (see formatSchedule.ts),
-// but `<input type="time">` returns local. Convert through a Date
-// anchored to today so DST is handled correctly.
-function localHHMMToUtcHHMM(local: string): string {
-  const [hourStr, minuteStr] = local.split(":");
-  const date = new Date();
-  date.setHours(Number(hourStr), Number(minuteStr), 0, 0);
-  const utcHour = String(date.getUTCHours()).padStart(2, "0");
-  const utcMinute = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${utcHour}:${utcMinute}`;
-}
-
 function submit(): void {
   if (props.submitting) return;
-  if (scheduleType.value === "daily") {
-    if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(dailyTime.value)) return;
-    emit("submit", { type: "daily", time: localHHMMToUtcHHMM(dailyTime.value) });
-    return;
-  }
-  const amount = Number(intervalAmount.value);
-  if (!Number.isFinite(amount) || amount < 1) return;
-  const unitMs = intervalUnit.value === "hours" ? ONE_HOUR_MS : ONE_MINUTE_MS;
-  emit("submit", { type: "interval", intervalMs: Math.floor(amount) * unitMs });
+  const payload = buildScheduleSubmission(
+    scheduleType.value,
+    { localTime: dailyTime.value },
+    { amount: Number(intervalAmount.value), unit: intervalUnit.value },
+  );
+  if (payload === null) return;
+  emit("submit", payload);
 }
 </script>
