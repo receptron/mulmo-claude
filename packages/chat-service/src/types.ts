@@ -77,9 +77,9 @@ export interface ChatServiceDeps {
   /** Subscribe to a session's event stream; returns an unsubscribe function. */
   onSessionEvent: OnSessionEventFn;
   /** All roles (built-in + custom). */
-  loadAllRoles: () => Role[];
+  loadAllRoles(): Role[];
   /** Look up a single role by id; MUST fall back to default if unknown. */
-  getRole: (roleId: string) => Role;
+  getRole(roleId: string): Role;
   /** Id used when a fresh transport chat has no role selected yet. */
   defaultRoleId: string;
   /** Absolute path to the transports workspace dir (one subdir per transportId). */
@@ -91,21 +91,21 @@ export interface ChatServiceDeps {
    * Omit in tests / unauth environments to skip the check. See
    * `attachChatSocket` in ./socket.ts.
    */
-  tokenProvider?: () => string | null;
+  tokenProvider?(): string | null;
   /**
    * List recent sessions from the server. Used by /sessions command.
    * Omit if session listing is not available (command will reply
    * "not available").
    */
-  listSessions?: (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+  listSessions?(opts: { limit: number; offset: number }): Promise<{ sessions: SessionSummary[]; total: number }>;
   /**
    * Get recent messages from a session. Used by /history command.
    * Returns newest-first array of {source, text} pairs.
    */
-  getSessionHistory?: (
+  getSessionHistory?(
     sessionId: string,
     opts: { limit: number; offset: number },
-  ) => Promise<{
+  ): Promise<{
     messages: Array<{ source: string; text: string }>;
     total: number;
   }>;
@@ -123,7 +123,7 @@ export interface ChatServiceDeps {
    * When omitted, every unknown slash is rejected and `/help` shows
    * only the built-in commands.
    */
-  listRegisteredSkills?: () => Promise<BridgeSkillSummary[]>;
+  listRegisteredSkills?(): Promise<BridgeSkillSummary[]>;
 }
 
 /** Minimal skill info the bridge command handler needs to render the

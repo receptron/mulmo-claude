@@ -32,6 +32,12 @@ export default [
       // import-extraction regex in scripts/mulmoclaude/deps.mjs.
       // They're inputs to a parser test, not production code.
       "test/scripts/mulmoclaude/fixtures",
+      // Outside any project tsconfig include — the type-checked
+      // parser services would error with "not found by the project
+      // service". They're linted by their own package-local config
+      // when published / checked by yarn typecheck:packages.
+      "packages/relay/**",
+      "packages/bridges/slack/test/**",
     ],
   },
   eslint.configs.recommended,
@@ -41,6 +47,37 @@ export default [
   ...tseslint.configs.stylistic,
   ...vuePlugin.configs["flat/recommended"],
   ...vueI18n.configs.recommended,
+  {
+    // Type-aware parsing for TS files. Without `projectService` the
+    // type-checked rules below silently no-op.
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    // Type-aware lint rules — kept at warn so a violation surfaces
+    // without blocking CI. Promote individually after a dedicated
+    // cleanup PR (analogous to #925's no-non-null-assertion staging).
+    files: ["**/*.{ts,tsx,vue}"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "warn",
+      "sonarjs/different-types-comparison": "warn",
+      "sonarjs/no-misleading-array-reverse": "warn",
+      "sonarjs/deprecation": "warn",
+      // Disabled pre-948: stylistic / preference rules with low real-bug
+      // signal that drown out the warn-level type-aware findings above.
+      "sonarjs/no-alphabetical-sort": "off",
+      "sonarjs/prefer-regexp-exec": "off",
+      "sonarjs/no-undefined-argument": "off",
+      "sonarjs/function-return-type": "off",
+      "sonarjs/no-redundant-optional": "off",
+      "sonarjs/no-selector-parameter": "off",
+    },
+  },
   {
     // Point `@intlify/vue-i18n/*` rules at the JSON cache generated
     // by `yarn dumpi18n` (which serialises src/lang/*.ts). Without
@@ -179,7 +216,6 @@ export default [
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-import-type-side-effects": "error",
       "@typescript-eslint/no-useless-empty-export": "error",
-      "@typescript-eslint/method-signature-style": ["error", "property"],
       "default-case-last": "error",
       "prefer-template": "error",
       "prefer-arrow-callback": "error",
@@ -293,6 +329,8 @@ export default [
         parser: tseslint.parser,
         sourceType: "module",
         extraFileExtensions: [".vue"],
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
       globals: {
         // Vue SFCs run in the browser; add globals so `document`,

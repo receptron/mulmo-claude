@@ -30,7 +30,7 @@ export interface FetcherDeps {
   http: HttpFetcherDeps;
   // Monotonic wall-clock. Fetchers timestamp new items and update
   // the cursor with it.
-  now: () => number;
+  now(): number;
   // Pipeline-wide abort (e.g. server shutdown). Separate from
   // the per-fetch timeout that lives inside `http`.
   signal?: AbortSignal;
@@ -47,7 +47,7 @@ export interface FetchResult {
 
 export interface SourceFetcher {
   readonly kind: FetcherKind;
-  fetch: (source: Source, state: SourceState, deps: FetcherDeps) => Promise<FetchResult>;
+  fetch(source: Source, state: SourceState, deps: FetcherDeps): Promise<FetchResult>;
 }
 
 // Registry of all known fetchers. Populated lazily via

@@ -18,19 +18,19 @@ export interface TaskDefinition {
    *  successfully in the current tick cycle. Enforces ordering like
    *  "news fetch → journal → memory extraction". */
   dependsOn?: string;
-  run: (ctx: TaskRunContext) => Promise<void>;
+  run(ctx: TaskRunContext): Promise<void>;
 }
 
 export interface ITaskManager {
-  registerTask: (def: TaskDefinition) => void;
-  removeTask: (taskId: string) => void;
+  registerTask(def: TaskDefinition): void;
+  removeTask(taskId: string): void;
   /** Update the schedule of an existing task. Returns false if not found. */
-  updateSchedule: (taskId: string, schedule: TaskSchedule) => boolean;
-  start: () => void;
-  stop: () => void;
+  updateSchedule(taskId: string, schedule: TaskSchedule): boolean;
+  start(): void;
+  stop(): void;
   /** Run one tick manually (for testing). */
-  tick: () => Promise<void>;
-  listTasks: () => {
+  tick(): Promise<void>;
+  listTasks(): {
     id: string;
     description?: string;
     schedule: TaskSchedule;
@@ -40,7 +40,7 @@ export interface ITaskManager {
 
 export interface TaskManagerOptions {
   tickMs?: number; // default: ONE_MINUTE_MS
-  now?: () => Date; // default: () => new Date()
+  now?(): Date; // default: () => new Date()
 }
 
 function isDue(now: Date, schedule: TaskSchedule, tickMs: number): boolean {
