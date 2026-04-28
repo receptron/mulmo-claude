@@ -28,7 +28,6 @@ export const TOOL_NAMES = {
   // a 1:1 mapping between tool name and domain.
   manageCalendar: "manageCalendar",
   manageAutomations: "manageAutomations",
-  manageRoles: "manageRoles",
   manageSkills: "manageSkills",
   manageSource: "manageSource",
   manageWiki: "manageWiki",

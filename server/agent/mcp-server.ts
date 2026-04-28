@@ -352,22 +352,6 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     return `Switching to ${args.roleId} role`;
   }
 
-  if (name === "manageRoles") {
-    const res = await postJson(API_ROUTES.roles.manage, args);
-    const result = await res.json();
-
-    // For the list action, push a visual canvas result so the viewer renders
-    if (args.action === "list" && result.success) {
-      await postJson(API_ROUTES.agent.internal.toolResult, {
-        toolName: "manageRoles",
-        uuid: makeUuid(),
-        ...result,
-      });
-    }
-
-    return result.message ?? (result.error ? `Error: ${result.error}` : "Done");
-  }
-
   if (name === "manageSkills") return handleManageSkills(args);
 
   // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly

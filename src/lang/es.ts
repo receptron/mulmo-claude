@@ -787,7 +787,6 @@ const esMessages = {
   pluginManageRoles: {
     heading: "Roles personalizados",
     roleCount: "{count} rol | {count} roles",
-    previewCount: "{count} rol personalizado | {count} roles personalizados",
     addButton: "+ Añadir",
     createPanel: "Crear nuevo rol",
     fieldId: "ID",

@@ -13,7 +13,6 @@ import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
 import { manageCalendarPlugin, manageAutomationsPlugin, legacyManageSchedulerEntry } from "../plugins/scheduler/index";
-import manageRolesPlugin from "../plugins/manageRoles/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
 import manageSourcePlugin from "../plugins/manageSource/index";
 import wikiPlugin from "../plugins/wiki/index";
@@ -31,7 +30,6 @@ const plugins: Record<string, PluginEntry> = {
   // the LLM (absent from server/agent/plugin-names.ts and
   // src/config/toolNames.ts) — strictly historical rendering.
   manageScheduler: legacyManageSchedulerEntry,
-  manageRoles: manageRolesPlugin,
   manageSkills: manageSkillsPlugin,
   manageSource: manageSourcePlugin,
   manageWiki: wikiPlugin,

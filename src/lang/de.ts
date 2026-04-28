@@ -786,7 +786,6 @@ const deMessages = {
   pluginManageRoles: {
     heading: "Benutzerdefinierte Rollen",
     roleCount: "{count} Rolle | {count} Rollen",
-    previewCount: "{count} benutzerdefinierte Rolle | {count} benutzerdefinierte Rollen",
     addButton: "+ Hinzufügen",
     createPanel: "Neue Rolle erstellen",
     fieldId: "ID",

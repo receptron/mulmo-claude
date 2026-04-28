@@ -779,7 +779,6 @@ const frMessages = {
   pluginManageRoles: {
     heading: "Rôles personnalisés",
     roleCount: "{count} rôle | {count} rôles",
-    previewCount: "{count} rôle personnalisé | {count} rôles personnalisés",
     addButton: "+ Ajouter",
     createPanel: "Créer un nouveau rôle",
     fieldId: "ID",

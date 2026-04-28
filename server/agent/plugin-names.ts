@@ -8,7 +8,6 @@ import TodoDef from "../../src/plugins/todo/definition.js";
 import ManageCalendarDef from "../../src/plugins/scheduler/calendarDefinition.js";
 import ManageAutomationsDef from "../../src/plugins/scheduler/automationsDefinition.js";
 import PresentMulmoScriptDef from "../../src/plugins/presentMulmoScript/definition.js";
-import ManageRolesDef from "../../src/plugins/manageRoles/definition.js";
 import ManageSkillsDef from "../../src/plugins/manageSkills/definition.js";
 import ManageSourceDef from "../../src/plugins/manageSource/definition.js";
 import WikiDef from "../../src/plugins/wiki/definition.js";
@@ -44,7 +43,6 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [PresentChartDef.name]: API_ROUTES.chart.present,
   [EditImageDef.name]: API_ROUTES.image.edit,
   [Present3DDef.name]: API_ROUTES.plugins.present3d,
-  [ManageRolesDef.name]: API_ROUTES.roles.manage,
   [ManageSkillsDef.name]: API_ROUTES.skills.create,
   [ManageSourceDef.name]: API_ROUTES.sources.manage,
   [PresentMulmoScriptDef.name]: API_ROUTES.mulmoScript.save,
@@ -68,7 +66,6 @@ export const PLUGIN_DEFS = [
   PresentChartDef,
   EditImageDef,
   Present3DDef,
-  ManageRolesDef,
   ManageSkillsDef,
   ManageSourceDef,
   WikiDef,

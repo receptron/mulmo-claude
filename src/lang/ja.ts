@@ -778,7 +778,6 @@ const jaMessages = {
   pluginManageRoles: {
     heading: "カスタムロール",
     roleCount: "{count} 件",
-    previewCount: "カスタムロール {count} 件",
     addButton: "+ 追加",
     createPanel: "新しいロールを作成",
     fieldId: "ID",

@@ -774,7 +774,6 @@ const zhMessages = {
   pluginManageRoles: {
     heading: "自定义角色",
     roleCount: "{count} 个角色",
-    previewCount: "{count} 个自定义角色",
     addButton: "+ 添加",
     createPanel: "创建新角色",
     fieldId: "ID",

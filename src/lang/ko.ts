@@ -778,7 +778,6 @@ const koMessages = {
   pluginManageRoles: {
     heading: "커스텀 역할",
     roleCount: "{count}개 역할",
-    previewCount: "{count}개 커스텀 역할",
     addButton: "+ 추가",
     createPanel: "새 역할 만들기",
     fieldId: "ID",

@@ -777,7 +777,6 @@ const ptBRMessages = {
   pluginManageRoles: {
     heading: "Papéis personalizados",
     roleCount: "{count} papel | {count} papéis",
-    previewCount: "{count} papel personalizado | {count} papéis personalizados",
     addButton: "+ Adicionar",
     createPanel: "Criar novo papel",
     fieldId: "ID",

@@ -1,21 +1,32 @@
 import { z } from "zod";
-import { ALL_TOOL_NAMES, type ToolName } from "./toolNames";
+import { ALL_TOOL_NAMES, isToolName, type ToolName } from "./toolNames";
 
 // `availablePlugins` accepts every literal listed in `TOOL_NAMES`.
-// Runtime: validate with a literal-union z.enum so a typo or an
-// unknown tool name (e.g. from a future user-defined role loaded off
-// disk) rejects at boundary instead of silently dropping at runtime.
 // Compile time: roles.ts static definitions below get typed as
 // `ToolName[]` via RoleSchema's zod inference, so `presentHTML` vs
 // `presentHtml` kind of typos are caught immediately.
+//
+// Runtime: take any string array and filter out unknown names
+// rather than failing the whole parse. A persisted custom role
+// file may still reference a tool that was removed in a later
+// release (e.g. `manageRoles` post-#949 / #951), and we want
+// such a role to keep loading with the dead reference silently
+// dropped — the alternative is `loadCustomRoles` swallowing the
+// whole role, which makes the user's edits disappear from
+// `/roles` for no obvious reason. Frontend create/update goes
+// through a plugin-picker UI that only emits valid names, so the
+// lenient parse doesn't weaken create-time validation.
 const toolNameEnum = z.enum(ALL_TOOL_NAMES as readonly [ToolName, ...ToolName[]]);
+const availablePluginsSchema = z
+  .union([z.array(z.string()), z.array(toolNameEnum)])
+  .transform((plugins) => plugins.filter((plugin): plugin is ToolName => isToolName(plugin)));
 
 export const RoleSchema = z.object({
   id: z.string(),
   name: z.string(),
   icon: z.string(),
   prompt: z.string(),
-  availablePlugins: z.array(toolNameEnum),
+  availablePlugins: availablePluginsSchema,
   queries: z.array(z.string()).optional(),
 });
 

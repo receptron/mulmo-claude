@@ -803,7 +803,6 @@ const enMessages = {
   pluginManageRoles: {
     heading: "Custom Roles",
     roleCount: "{count} role | {count} roles",
-    previewCount: "{count} custom role | {count} custom roles",
     addButton: "+ Add",
     createPanel: "Create new role",
     fieldId: "ID",

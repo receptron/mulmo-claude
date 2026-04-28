@@ -249,7 +249,7 @@ import AutomationsView from "./plugins/scheduler/AutomationsView.vue";
 import WikiView from "./plugins/wiki/View.vue";
 import { buildWikiRouteParams } from "./plugins/wiki/route";
 import SkillsView from "./plugins/manageSkills/View.vue";
-import RolesView from "./plugins/manageRoles/View.vue";
+import RolesView from "./components/RolesView.vue";
 import SourcesView from "./components/SourcesView.vue";
 import NewsView from "./components/NewsView.vue";
 import SettingsModal from "./components/SettingsModal.vue";
