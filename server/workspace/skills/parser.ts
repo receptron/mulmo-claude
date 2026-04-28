@@ -6,6 +6,7 @@
 // pulling in a YAML parser we do line-by-line extraction.
 
 import { TIME_UNIT_MS, ONE_SECOND_MS } from "../../utils/time.js";
+import { LEADING_BLANK_LINES_PATTERN } from "../../utils/regex.js";
 import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
 
 export interface SkillSchedule {
@@ -129,11 +130,8 @@ export function parseSkillFrontmatter(raw: string): ParsedSkill | null {
   const body = lines
     .slice(closeIdx + 1)
     .join("\n")
-    // Strip leading blank lines. `\s*\n` consumes one line with
-    // optional leading whitespace; outer `+` repeats over distinct
-    // lines so no overlap → linear in input length.
-    // eslint-disable-next-line security/detect-unsafe-regex -- linear blank-line stripper, no nested-quantifier overlap
-    .replace(/^(?:\s*\n)+/, "")
+    // Pattern + ReDoS-safety rationale lives in `server/utils/regex.ts`.
+    .replace(LEADING_BLANK_LINES_PATTERN, "")
     .trimEnd();
 
   const result: ParsedSkill = { description, body };

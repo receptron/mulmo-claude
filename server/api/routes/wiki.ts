@@ -15,6 +15,7 @@ import { previewSnippet } from "../../utils/logPreview.js";
 // different name avoids the no-shadow clash without renaming the
 // long-standing local.
 import { errorMessage as formatError } from "../../utils/errors.js";
+import { BULLET_LINK_PATTERN, BULLET_WIKI_LINK_PATTERN } from "../../utils/regex.js";
 
 const router = Router();
 
@@ -44,17 +45,12 @@ export function wikiSlugify(text: string): string {
 }
 
 const TABLE_SEPARATOR_PATTERN = /^\|[\s|:-]+\|$/;
-// Capture the href (group 2) alongside the title (group 1) so we can
-// derive the slug from the file name instead of re-slugifying the
-// title. This matters for non-ASCII titles like "さくらインターネット"
+// Bullet-link patterns (BULLET_LINK_PATTERN, BULLET_WIKI_LINK_PATTERN)
+// live in `server/utils/regex.ts` alongside other server regex audit
+// notes. Capture the href (group 2) alongside the title (group 1) so
+// we can derive the slug from the file name instead of re-slugifying
+// the title — important for non-ASCII titles like "さくらインターネット"
 // where `wikiSlugify` returns "" and the slug would otherwise be lost.
-// Each `[^x]+` runs over a fixed exclusion set with a hard delimiter
-// (`]`, `)`) — no nested-quantifier overlap, no ReDoS pathology even
-// on adversarial line input.
-// eslint-disable-next-line security/detect-unsafe-regex -- bullet-link parser; bounded captures with hard delimiters
-const BULLET_LINK_PATTERN = /^[-*]\s+\[([^\]]+)\]\(([^)]*)\)(?:\s*[—–-]\s*(.*))?/;
-// eslint-disable-next-line security/detect-unsafe-regex -- same shape as BULLET_LINK_PATTERN
-const BULLET_WIKI_LINK_PATTERN = /^[-*]\s+\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?/;
 // Unicode-aware tag body: any letter or number in any script
 // (so Japanese / Chinese / Korean tags like `#クラウド` or `#可視化`
 // work), plus `-` and `_` as internal joiners. First char is a
