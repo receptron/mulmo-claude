@@ -127,7 +127,7 @@ export function joinFrontmatterAndBody(meta: Record<string, unknown>, body: stri
 
 function formatYamlValue(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) return `[${value.map((v) => formatYamlValue(v)).join(", ")}]`;
+  if (Array.isArray(value)) return `[${value.map((item) => formatYamlValue(item)).join(", ")}]`;
   if (typeof value === "object") return JSON.stringify(value);
   if (typeof value === "string") {
     // Quote when needed — leading / trailing whitespace, special

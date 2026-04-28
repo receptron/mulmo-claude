@@ -35,9 +35,9 @@ describe("renderUnifiedDiff", () => {
     assert.equal(hunks.length, 1, "single change → single hunk");
     // The hunk shows ±3 context lines around the change.
     const kinds = hunks[0].lines.map((line) => line.kind);
-    assert.equal(kinds.filter((k) => k === "del").length, 1);
-    assert.equal(kinds.filter((k) => k === "add").length, 1);
-    assert.equal(kinds.filter((k) => k === "context").length, 6, "3 above + 3 below");
+    assert.equal(kinds.filter((kind) => kind === "del").length, 1);
+    assert.equal(kinds.filter((kind) => kind === "add").length, 1);
+    assert.equal(kinds.filter((kind) => kind === "context").length, 6, "3 above + 3 below");
 
     // Everything outside the ±3 window is hidden.
     assert.equal(hunks[0].hiddenBefore, 17, "20 head lines minus the 3 surfaced as context");
@@ -72,8 +72,8 @@ describe("renderUnifiedDiff", () => {
     // Each hunk should carry one add + one del.
     for (const hunk of hunks) {
       const kinds = hunk.lines.map((line) => line.kind);
-      assert.equal(kinds.filter((k) => k === "add").length, 1);
-      assert.equal(kinds.filter((k) => k === "del").length, 1);
+      assert.equal(kinds.filter((kind) => kind === "add").length, 1);
+      assert.equal(kinds.filter((kind) => kind === "del").length, 1);
     }
     // Gap between hunks (20 - 6 unchanged from each window = 14)
     // shows up as the second hunk's `hiddenBefore`.
@@ -88,9 +88,9 @@ describe("renderUnifiedDiff", () => {
     const hunks0 = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 0);
     const hunks5 = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 5);
     // 0 context = only the changed lines surface.
-    assert.equal(hunks0[0].lines.filter((l) => l.kind === "context").length, 0);
+    assert.equal(hunks0[0].lines.filter((line) => line.kind === "context").length, 0);
     // 5 context = 5 above + 5 below.
-    assert.equal(hunks5[0].lines.filter((l) => l.kind === "context").length, 10);
+    assert.equal(hunks5[0].lines.filter((line) => line.kind === "context").length, 10);
   });
 
   it("handles pure-add and pure-delete (one side is empty)", () => {
@@ -138,9 +138,9 @@ describe("joinFrontmatterAndBody", () => {
   });
 
   it("emits sorted frontmatter so key reordering doesn't show as a diff", () => {
-    const a = joinFrontmatterAndBody({ title: "X", created: "2026-01-01" }, "body\n");
-    const b = joinFrontmatterAndBody({ created: "2026-01-01", title: "X" }, "body\n");
-    assert.equal(a, b);
+    const first = joinFrontmatterAndBody({ title: "X", created: "2026-01-01" }, "body\n");
+    const second = joinFrontmatterAndBody({ created: "2026-01-01", title: "X" }, "body\n");
+    assert.equal(first, second);
   });
 
   it("renders array values in flow style", () => {

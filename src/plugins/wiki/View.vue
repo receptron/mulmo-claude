@@ -175,7 +175,9 @@
       <!-- Metadata bar (#895 PR B). One thin row that surfaces
            `created` / `updated` / `editor` / `tags` from the page's
            frontmatter. Hidden when the page has no header — keeps
-           the existing header-less content visually unchanged. -->
+           the existing header-less content visually unchanged.
+           Stays visible across both Content and History tabs (#944
+           Q11=C). -->
       <div
         v-if="action === 'page' && hasPageMeta"
         data-testid="wiki-page-metadata-bar"
@@ -205,11 +207,67 @@
           </button>
         </span>
       </div>
+
+      <!-- Per-page tab strip: Content | History (#763 PR 3 / #944).
+           Only mounted on the page view; log / lint reports keep
+           the legacy single-pane layout. -->
+      <div v-if="action === 'page' && content" data-testid="wiki-page-tabs" class="shrink-0 border-b border-gray-100 px-3 py-2 flex items-center gap-2">
+        <div class="flex border border-gray-300 rounded overflow-hidden">
+          <button
+            type="button"
+            :class="[
+              'h-8 px-2.5 flex items-center gap-1 transition-colors',
+              pageTab === 'content' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            data-testid="wiki-page-tab-content"
+            @click="pageTab = 'content'"
+          >
+            <span class="material-icons text-sm">article</span>
+            <span>{{ t("pluginWiki.history.tabContent") }}</span>
+          </button>
+          <button
+            type="button"
+            :class="[
+              'h-8 px-2.5 flex items-center gap-1 border-l border-gray-200 transition-colors',
+              pageTab === 'history' ? 'bg-blue-50 text-blue-600 font-medium' : 'bg-white text-gray-600 hover:bg-gray-50',
+            ]"
+            data-testid="wiki-page-tab-history"
+            @click="pageTab = 'history'"
+          >
+            <span class="material-icons text-sm">history</span>
+            <span>{{ t("pluginWiki.history.tabHistory") }}</span>
+          </button>
+        </div>
+        <!-- Restore success toast — transient banner emitted on the
+             Content tab after a successful history restore (Q7=B). -->
+        <span
+          v-if="restoreToastVisible"
+          data-testid="wiki-history-restore-toast"
+          class="text-sm text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1"
+        >
+          {{ t("pluginWiki.history.restoreSuccessToast") }}
+        </span>
+      </div>
+
+      <!-- Content tab body (or non-page action: log / lint_report) -->
       <div
+        v-show="action !== 'page' || pageTab === 'content'"
         ref="scrollRef"
         class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content"
         @click="handleContentClick"
         v-html="renderedContent"
+      />
+
+      <!-- History tab body (kept mounted across tab toggles for state
+           persistence, Q15=B). Mount only when we have a slug — the
+           list/detail components require it. -->
+      <HistoryTab
+        v-if="action === 'page' && content && currentSlug() !== null"
+        v-show="pageTab === 'history'"
+        :slug="currentSlug() ?? ''"
+        :current-body="mdDoc.body"
+        :current-meta="mdDoc.meta"
+        @restored="handleRestored"
       />
     </template>
 
@@ -218,9 +276,10 @@
          first" instruction — see AppApi.startNewChat. Hidden when
          WikiView is mounted as a manageWiki tool result inside /chat:
          the enclosing chat already has its own composer, and spawning
-         a nested new session from there is confusing. -->
+         a nested new session from there is confusing. Also hidden on
+         the History tab (#944 Q11=C). -->
     <PageChatComposer
-      v-if="action === 'page' && content && isStandaloneWikiRoute && currentSlug() !== null"
+      v-if="action === 'page' && content && isStandaloneWikiRoute && currentSlug() !== null && pageTab === 'content'"
       :key="currentSlug() ?? ''"
       :placeholder="t('pluginWiki.chatPlaceholder')"
       :prepend-text="`Before answering, read the wiki page at ${WIKI_PAGES_DIR}/${currentSlug()}.md.`"
@@ -254,6 +313,7 @@ import { API_ROUTES } from "../../config/apiRoutes";
 import { PAGE_ROUTES } from "../../router";
 import { WIKI_ACTION, WIKI_ROUTE_SECTION, buildWikiRouteParams, isSafeWikiSlug, readWikiRouteTarget, wikiActionFor, type WikiTarget } from "./route";
 import FilterChip from "../../components/FilterChip.vue";
+import HistoryTab from "./history/HistoryTab.vue";
 
 type WikiTabView = typeof WIKI_ACTION.log | typeof WIKI_ACTION.lintReport;
 
@@ -297,6 +357,35 @@ const selectedTag = ref<string | null>(null);
 // direct loads of /wiki and the fetch would never run.
 const navError = ref<string | null>(null);
 
+// Per-page tab state for the Content / History switcher (#763 PR
+// 3 / #944). Defaults to "content" on every page navigation
+// (Q14=A) — the watcher on `currentSlugReactive` resets it. Within
+// the same slug the History tab keeps its own selection state
+// across toggles (Q15=B) because both tabs are kept mounted via
+// v-show.
+const pageTab = ref<"content" | "history">("content");
+const restoreToastVisible = ref(false);
+const RESTORE_TOAST_MS = 4000;
+let restoreToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Computed slug used by the watcher and the template. Mirrors the
+// imperative `currentSlug()` body — declared up here so the
+// pageTab-reset watcher can pick up route + selectedResult changes
+// uniformly without re-walking each call site that mutates the
+// underlying state.
+const currentSlugReactive = computed<string | null>(() => {
+  const raw =
+    route.name === PAGE_ROUTES.wiki && route.params.section === WIKI_ROUTE_SECTION.pages && typeof route.params.slug === "string"
+      ? route.params.slug
+      : (props.selectedResult?.data?.pageName ?? null);
+  return isSafeWikiSlug(raw) ? raw : null;
+});
+
+watch(currentSlugReactive, (next, prev) => {
+  if (next === prev) return;
+  pageTab.value = "content";
+});
+
 const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
   // Slug-aware: when the view is currently showing a specific page,
   // fetch that page by slug; otherwise fetch the index. Reads the
@@ -318,6 +407,18 @@ const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({
     pageExists.value = data.pageExists ?? true;
   },
 });
+
+function handleRestored(): void {
+  pageTab.value = "content";
+  restoreToastVisible.value = true;
+  if (restoreToastTimer !== null) clearTimeout(restoreToastTimer);
+  restoreToastTimer = setTimeout(() => {
+    restoreToastVisible.value = false;
+    restoreToastTimer = null;
+  }, RESTORE_TOAST_MS);
+  // Refresh the page content so the restored body shows up.
+  void refresh();
+}
 
 onMounted(() => {
   // On /wiki, the route watcher below fires with `immediate: true` and

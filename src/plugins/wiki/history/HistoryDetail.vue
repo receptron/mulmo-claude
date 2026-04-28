@@ -88,6 +88,12 @@ async function loadPreviousSnapshot(): Promise<void> {
 
 const editorBadge = computed(() => editorBadgeFor(props.summary.editor));
 
+function markerFor(kind: "add" | "del" | "context"): string {
+  if (kind === "add") return "+";
+  if (kind === "del") return "-";
+  return " "; // non-breaking space — keeps the column aligned
+}
+
 function editorBadgeFor(editor: SnapshotSummary["editor"]): { label: string; className: string } {
   if (editor === "llm") {
     return { label: t("pluginWiki.history.editorBadgeLLM"), className: "bg-purple-50 text-purple-700" };
@@ -196,7 +202,7 @@ async function performRestore(): Promise<void> {
         <span class="text-gray-500" data-testid="wiki-history-detail-ts">
           {{ formatSmartTime(props.summary.ts) }}
         </span>
-        <span v-if="props.summary.reason" class="text-gray-700 truncate" data-testid="wiki-history-detail-reason"> — {{ props.summary.reason }} </span>
+        <span v-if="props.summary.reason" class="text-gray-700 truncate" data-testid="wiki-history-detail-reason">{{ ` — ${props.summary.reason}` }}</span>
       </div>
       <div class="flex border border-gray-300 rounded overflow-hidden text-sm">
         <button
@@ -256,10 +262,10 @@ async function performRestore(): Promise<void> {
             ]"
             :data-testid="`wiki-history-diff-line-${line.kind}`"
           >
-            <span v-if="line.kind === 'add'" class="text-green-600 mr-1">+</span>
-            <span v-else-if="line.kind === 'del'" class="text-red-600 mr-1">-</span>
-            <span v-else class="text-gray-300 mr-1">&nbsp;</span>
-            {{ line.text }}
+            <span
+              :class="['mr-1', line.kind === 'add' && 'text-green-600', line.kind === 'del' && 'text-red-600', line.kind === 'context' && 'text-gray-300']"
+              >{{ markerFor(line.kind) }}</span
+            >{{ line.text }}
           </div>
           <div v-if="hunkIdx === hunks.length - 1 && hunk.hiddenAfter > 0" class="text-gray-400 italic px-2 py-1 border-y border-gray-100 bg-gray-50">
             {{ t("pluginWiki.history.hiddenLines", { count: hunk.hiddenAfter }) }}

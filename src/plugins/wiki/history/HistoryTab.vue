@@ -151,7 +151,7 @@ function onRestored(): void {
         <span class="text-sm text-gray-700 shrink-0" :title="formatSmartTime(entry.ts)">
           {{ formatRelativeTime(entry.ts) }}
         </span>
-        <span v-if="entry.reason" class="text-sm text-gray-500 truncate"> — {{ entry.reason }} </span>
+        <span v-if="entry.reason" class="text-sm text-gray-500 truncate">{{ ` — ${entry.reason}` }}</span>
       </button>
     </div>
   </div>
