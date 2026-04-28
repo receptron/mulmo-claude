@@ -321,7 +321,7 @@ function buildIndexResponse(action: string): WikiResponse {
 // instructions distinctions that the GET and POST handlers share.
 export function buildPageResponseData(args: { action: string; pageName: string; resolvedTitle: string; content: string; exists: boolean }): WikiResponse {
   const { action, pageName, resolvedTitle, content, exists } = args;
-  const hasContent = !!content;
+  const hasContent = Boolean(content);
   // Three states:
   //   1. !exists              → page file is missing entirely.
   //   2. exists && !hasContent → page file exists but is empty (e.g.,
@@ -371,7 +371,7 @@ export function toPageResponse(args: { action: string; pageName: string; filePat
     pageName,
     resolvedTitle,
     content,
-    exists: !!filePath,
+    exists: Boolean(filePath),
   });
 }
 

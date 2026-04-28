@@ -50,7 +50,7 @@ const whatsappPlugin: PlatformPlugin = {
   webhookPath: "/webhook/whatsapp",
 
   isConfigured(env: Env): boolean {
-    return !!env.WHATSAPP_APP_SECRET && !!env.WHATSAPP_ACCESS_TOKEN;
+    return Boolean(env.WHATSAPP_APP_SECRET) && Boolean(env.WHATSAPP_ACCESS_TOKEN);
   },
 
   handleVerification(request: Request, env: Env): Response {

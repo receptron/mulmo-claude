@@ -38,7 +38,7 @@ function buildLiveSummary(live: ActiveSession, serverEntry: SessionSummary | und
   // OR them so any one is enough. `live.isRunning` is always defined on
   // an ActiveSession, so the summary always carries a boolean here.
   const pending = live.pendingGenerations ?? {};
-  const isRunning = !!serverEntry?.isRunning || live.isRunning || Object.keys(pending).length > 0;
+  const isRunning = Boolean(serverEntry?.isRunning) || live.isRunning || Object.keys(pending).length > 0;
   // Carry summary / keywords ONLY if the server already has them.
   // Object-spread with a conditional object keeps us from adding
   // `undefined` values that would otherwise show up as explicit

@@ -48,7 +48,7 @@ export async function generateGeminiImageContent(
   const client = getGeminiClient();
   log.debug("gemini", "generateContent: request", {
     model,
-    hasConfig: !!config,
+    hasConfig: Boolean(config),
     aspectRatio: config?.imageConfig?.aspectRatio,
   });
   let response;
@@ -71,8 +71,8 @@ export async function generateGeminiImageContent(
   log.debug("gemini", "generateContent: response", {
     model,
     parts: parts.length,
-    hasImage: !!result.imageData,
-    hasText: !!result.message,
+    hasImage: Boolean(result.imageData),
+    hasText: Boolean(result.message),
     finishReason: response.candidates?.[0]?.finishReason,
   });
   return result;

@@ -579,9 +579,11 @@ watch(currentSessionId, (sessionId) => {
   // event, leaving the session's busy indicator stuck on.
   if (previousSessionId && previousSessionId !== sessionId) {
     const prevSession = sessionMap.get(previousSessionId);
-    const prevBusy = !!prevSession && (prevSession.isRunning || Object.keys(prevSession.pendingGenerations ?? {}).length > 0);
-    if (prevSession && !prevBusy) {
-      unsubscribeSession(previousSessionId);
+    if (prevSession !== undefined) {
+      const prevBusy = prevSession.isRunning || Object.keys(prevSession.pendingGenerations ?? {}).length > 0;
+      if (!prevBusy) {
+        unsubscribeSession(previousSessionId);
+      }
     }
   }
   previousSessionId = sessionId;
@@ -775,7 +777,8 @@ function buildAgentEventContext(session: ActiveSession): AgentEventContext {
 
 function hasPendingGenerations(sessionId: string): boolean {
   const live = sessionMap.get(sessionId);
-  return !!live && Object.keys(live.pendingGenerations).length > 0;
+  if (live === undefined) return false;
+  return Object.keys(live.pendingGenerations).length > 0;
 }
 
 function handleSessionFinished(sessionId: string): void {

@@ -144,6 +144,7 @@ describe("withStoryContext — handler throws", () => {
       "stories/x.json",
       {},
       async () => {
+        // eslint-disable-next-line no-throw-literal -- intentional non-Error throw, asserting withStoryContext converts unknown rejections to 500
         throw "plain string";
       },
       {

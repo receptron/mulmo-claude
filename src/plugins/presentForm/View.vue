@@ -496,10 +496,9 @@ function validateField(fieldId: string): boolean {
       type: "custom",
     });
     return false;
-  } else {
-    fieldErrors.value.delete(fieldId);
-    return true;
   }
+  fieldErrors.value.delete(fieldId);
+  return true;
 }
 
 function handleBlur(fieldId: string): void {

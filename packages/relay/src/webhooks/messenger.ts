@@ -50,7 +50,7 @@ const messengerPlugin: PlatformPlugin = {
   webhookPath: "/webhook/messenger",
 
   isConfigured(env: Env): boolean {
-    return !!env.MESSENGER_APP_SECRET && !!env.MESSENGER_PAGE_ACCESS_TOKEN;
+    return Boolean(env.MESSENGER_APP_SECRET) && Boolean(env.MESSENGER_PAGE_ACCESS_TOKEN);
   },
 
   handleVerification(request: Request, env: Env): Response {
