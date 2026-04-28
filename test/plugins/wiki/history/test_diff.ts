@@ -52,7 +52,7 @@ describe("renderUnifiedDiff", () => {
     rightLines[6] = "G"; // Change line 'g'
     // Distance between changes = 4 lines. With contextLines=3 both
     // windows reach into each other → single merged hunk.
-    const hunks = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 3);
+    const hunks = renderUnifiedDiff(left, `${rightLines.join("\n")}\n`, 3);
     assert.equal(hunks.length, 1);
     const adds = hunks[0].lines.filter((line) => line.kind === "add");
     const dels = hunks[0].lines.filter((line) => line.kind === "del");
@@ -67,7 +67,7 @@ describe("renderUnifiedDiff", () => {
     rightLines[5] = "FIVE";
     rightLines[25] = "TWENTYFIVE";
     // Distance = 20 lines, well over 2*3 — windows don't overlap.
-    const hunks = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 3);
+    const hunks = renderUnifiedDiff(left, `${rightLines.join("\n")}\n`, 3);
     assert.equal(hunks.length, 2);
     // Each hunk should carry one add + one del.
     for (const hunk of hunks) {
@@ -85,8 +85,8 @@ describe("renderUnifiedDiff", () => {
     const left = `${lines.join("\n")}\n`;
     const rightLines = [...lines];
     rightLines[10] = "TEN";
-    const hunks0 = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 0);
-    const hunks5 = renderUnifiedDiff(left, rightLines.join("\n") + "\n", 5);
+    const hunks0 = renderUnifiedDiff(left, `${rightLines.join("\n")}\n`, 0);
+    const hunks5 = renderUnifiedDiff(left, `${rightLines.join("\n")}\n`, 5);
     // 0 context = only the changed lines surface.
     assert.equal(hunks0[0].lines.filter((line) => line.kind === "context").length, 0);
     // 5 context = 5 above + 5 below.
