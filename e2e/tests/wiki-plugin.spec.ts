@@ -15,7 +15,7 @@ const WIKI_PAGE = {
   action: "page",
   title: "Onboarding",
   pageName: "onboarding",
-  content: "# Onboarding\n\nSee the [[setup]] guide.\n\n" + "![flow](../images/flow.png)\n",
+  content: "# Onboarding\n\nSee the [[setup]] guide.\n\n![flow](../images/flow.png)\n",
 };
 
 test.describe("wiki plugin — rendering", () => {

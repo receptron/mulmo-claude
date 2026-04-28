@@ -305,7 +305,7 @@ describe("streamMovieEvents", () => {
   });
 
   it("skips comment / blank / malformed lines", async () => {
-    const chunks = [":keepalive\n" + "\n" + "not a data line\n" + "data: { not json\n" + `data: ${JSON.stringify({ type: "done", moviePath: "ok.mp4" })}\n`];
+    const chunks = [`:keepalive\n\nnot a data line\ndata: { not json\ndata: ${JSON.stringify({ type: "done", moviePath: "ok.mp4" })}\n`];
     const spy = makeSpy();
     await streamMovieEvents(streamFromChunks(chunks), spy.handlers);
     assert.deepEqual(spy.calls, [{ name: "onDone", moviePath: "ok.mp4" }]);

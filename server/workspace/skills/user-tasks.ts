@@ -10,11 +10,10 @@
 import { loadUserTasks as loadRaw, saveUserTasks } from "../../utils/files/user-tasks-io.js";
 import type { MissedRunPolicy } from "@receptron/task-scheduler";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
-import type { TaskSchedule as LocalTaskSchedule } from "../../events/task-manager/index.js";
+import type { TaskSchedule as LocalTaskSchedule, ITaskManager } from "../../events/task-manager/index.js";
 import { DEFAULT_ROLE_ID } from "../../../src/config/roles.js";
 import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
 import { log } from "../../system/logger/index.js";
-import type { ITaskManager } from "../../events/task-manager/index.js";
 import { isRecord } from "../../utils/types.js";
 import { makeUuid } from "../../utils/id.js";
 

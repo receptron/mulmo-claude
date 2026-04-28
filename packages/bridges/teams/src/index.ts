@@ -29,7 +29,7 @@ const PORT = Number(process.env.TEAMS_BRIDGE_PORT) || 3006;
 const appId = process.env.MICROSOFT_APP_ID;
 const appPassword = process.env.MICROSOFT_APP_PASSWORD;
 if (!appId || !appPassword) {
-  console.error("MICROSOFT_APP_ID and MICROSOFT_APP_PASSWORD are required.\n" + "See README for Azure Bot registration instructions.");
+  console.error("MICROSOFT_APP_ID and MICROSOFT_APP_PASSWORD are required.\nSee README for Azure Bot registration instructions.");
   process.exit(1);
 }
 

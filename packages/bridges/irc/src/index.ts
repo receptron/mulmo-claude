@@ -22,7 +22,7 @@ const server = process.env.IRC_SERVER;
 const nick = process.env.IRC_NICK;
 const channelsStr = process.env.IRC_CHANNELS;
 if (!server || !nick || !channelsStr) {
-  console.error("IRC_SERVER, IRC_NICK, and IRC_CHANNELS are required.\n" + "See README for setup instructions.");
+  console.error("IRC_SERVER, IRC_NICK, and IRC_CHANNELS are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

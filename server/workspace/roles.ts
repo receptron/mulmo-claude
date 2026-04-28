@@ -1,8 +1,7 @@
 import path from "node:path";
 import { BUILTIN_ROLES, RoleSchema, type Role } from "../../src/config/roles.js";
-import { WORKSPACE_DIRS } from "./paths.js";
+import { WORKSPACE_DIRS, workspacePath } from "./paths.js";
 import { readdirUnderSync, readTextUnderSync } from "../utils/files/workspace-io.js";
-import { workspacePath } from "./paths.js";
 
 function withSwitchRole(role: Role): Role {
   if (role.availablePlugins.includes("switchRole")) return role;

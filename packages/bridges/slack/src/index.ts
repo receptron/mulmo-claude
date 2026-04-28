@@ -32,7 +32,7 @@ const TRANSPORT_ID = "slack";
 const botToken = process.env.SLACK_BOT_TOKEN;
 const appToken = process.env.SLACK_APP_TOKEN;
 if (!botToken || !appToken) {
-  console.error("SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.\n" + "See README for setup instructions.");
+  console.error("SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

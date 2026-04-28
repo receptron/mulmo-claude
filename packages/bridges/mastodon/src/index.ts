@@ -33,7 +33,7 @@ const RECONNECT_MAX_MS = 60_000;
 const instanceUrl = process.env.MASTODON_INSTANCE_URL;
 const accessToken = process.env.MASTODON_ACCESS_TOKEN;
 if (!instanceUrl || !accessToken) {
-  console.error("MASTODON_INSTANCE_URL and MASTODON_ACCESS_TOKEN are required.\n" + "See README for setup instructions.");
+  console.error("MASTODON_INSTANCE_URL and MASTODON_ACCESS_TOKEN are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

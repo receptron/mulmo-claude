@@ -24,7 +24,7 @@ const PORT = Number(process.env.LINE_BRIDGE_PORT) || 3002;
 const channelSecret = process.env.LINE_CHANNEL_SECRET;
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 if (!channelSecret || !channelAccessToken) {
-  console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\n" + "See README for setup instructions.");
+  console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

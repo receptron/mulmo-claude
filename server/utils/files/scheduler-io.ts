@@ -1,5 +1,4 @@
-import { WORKSPACE_FILES } from "../../workspace/paths.js";
-import { workspacePath } from "../../workspace/paths.js";
+import { WORKSPACE_FILES, workspacePath } from "../../workspace/paths.js";
 import { resolvePath } from "./workspace-io.js";
 import { loadJsonFile } from "./json.js";
 import { writeFileAtomicSync } from "./atomic.js";

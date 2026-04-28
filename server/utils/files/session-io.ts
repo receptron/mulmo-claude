@@ -1,7 +1,6 @@
 import { appendFile } from "fs/promises";
 import path from "node:path";
-import { WORKSPACE_DIRS } from "../../workspace/paths.js";
-import { workspacePath } from "../../workspace/paths.js";
+import { WORKSPACE_DIRS, workspacePath } from "../../workspace/paths.js";
 import { readTextUnder, writeTextUnder, resolvePath, ensureWorkspaceDir } from "./workspace-io.js";
 
 const CHAT = WORKSPACE_DIRS.chat;

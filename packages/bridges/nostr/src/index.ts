@@ -51,7 +51,7 @@ const CURSOR_WRITE_DEBOUNCE_MS = 2_000;
 const rawKey = process.env.NOSTR_PRIVATE_KEY;
 const relayCsv = process.env.NOSTR_RELAYS;
 if (!rawKey || !relayCsv) {
-  console.error("NOSTR_PRIVATE_KEY and NOSTR_RELAYS are required.\n" + "See README for setup instructions.");
+  console.error("NOSTR_PRIVATE_KEY and NOSTR_RELAYS are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

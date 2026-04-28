@@ -37,7 +37,7 @@ const jid = process.env.XMPP_JID;
 const password = process.env.XMPP_PASSWORD;
 const service = process.env.XMPP_SERVICE;
 if (!jid || !password || !service) {
-  console.error("XMPP_JID, XMPP_PASSWORD, and XMPP_SERVICE are required.\n" + "See README for setup instructions.");
+  console.error("XMPP_JID, XMPP_PASSWORD, and XMPP_SERVICE are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

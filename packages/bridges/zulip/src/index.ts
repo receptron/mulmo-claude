@@ -18,7 +18,7 @@ const zulipUrl = process.env.ZULIP_URL;
 const email = process.env.ZULIP_EMAIL;
 const apiKey = process.env.ZULIP_API_KEY;
 if (!zulipUrl || !email || !apiKey) {
-  console.error("ZULIP_URL, ZULIP_EMAIL, and ZULIP_API_KEY are required.\n" + "See README for setup instructions.");
+  console.error("ZULIP_URL, ZULIP_EMAIL, and ZULIP_API_KEY are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

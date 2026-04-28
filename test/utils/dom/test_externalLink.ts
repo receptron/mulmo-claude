@@ -40,6 +40,7 @@ describe("isCrossOriginHttpUrl", () => {
   });
 
   it("returns false for javascript: links (defensive)", () => {
+    // eslint-disable-next-line no-script-url -- guard test fixture
     assert.equal(isCrossOriginHttpUrl("javascript:void(0)", ORIGIN), false);
   });
 

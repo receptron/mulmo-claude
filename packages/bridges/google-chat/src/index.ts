@@ -25,7 +25,7 @@ const PORT = Number(process.env.GOOGLE_CHAT_BRIDGE_PORT) || 3005;
 
 const projectNumber = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
 if (!projectNumber) {
-  console.error("GOOGLE_CHAT_PROJECT_NUMBER is required.\n" + "See README for setup instructions.");
+  console.error("GOOGLE_CHAT_PROJECT_NUMBER is required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

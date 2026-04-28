@@ -1,8 +1,7 @@
 // #824: two plugins share /api/scheduler — the server already dispatches per-action via TASK_ACTIONS, so each plugin
 // just differs in the tool definition (action enum the LLM sees) and the View component.
 
-import type { PluginEntry } from "../../tools/types";
-import type { ToolPlugin } from "../../tools/types";
+import type { PluginEntry, ToolPlugin } from "../../tools/types";
 import type { ToolResult } from "gui-chat-protocol";
 import CalendarView from "./CalendarView.vue";
 import AutomationsView from "./AutomationsView.vue";

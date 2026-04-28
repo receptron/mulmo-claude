@@ -1,7 +1,6 @@
 import type { ToolPlugin } from "../../tools/types";
 import type { ToolResult } from "gui-chat-protocol";
-import toolDefinition from "./definition";
-import { TOOL_NAME } from "./definition";
+import toolDefinition, { TOOL_NAME } from "./definition";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
 import { apiPost } from "../../utils/api";

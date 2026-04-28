@@ -271,6 +271,7 @@ async function pollLoop(): Promise<void> {
       console.log(`[email] IMAP connected ${imapHost}:${imapPort}`);
       backoffMs = RECONNECT_BASE_MS; // reset after a good connect
 
+      // eslint-disable-next-line no-unmodified-loop-condition -- mutated by the `client.on("close")` handler above
       while (!closed) {
         try {
           await processUnread(client);

@@ -33,7 +33,7 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 const apiToken = process.env.CHATWORK_API_TOKEN;
 if (!apiToken) {
-  console.error("CHATWORK_API_TOKEN is required.\n" + "See README for setup instructions.");
+  console.error("CHATWORK_API_TOKEN is required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

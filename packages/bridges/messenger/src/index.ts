@@ -23,7 +23,7 @@ const pageAccessToken = process.env.MESSENGER_PAGE_ACCESS_TOKEN;
 const verifyToken = process.env.MESSENGER_VERIFY_TOKEN;
 const appSecret = process.env.MESSENGER_APP_SECRET;
 if (!pageAccessToken || !verifyToken || !appSecret) {
-  console.error("MESSENGER_PAGE_ACCESS_TOKEN, MESSENGER_VERIFY_TOKEN, and MESSENGER_APP_SECRET are required.\n" + "See README for setup instructions.");
+  console.error("MESSENGER_PAGE_ACCESS_TOKEN, MESSENGER_VERIFY_TOKEN, and MESSENGER_APP_SECRET are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

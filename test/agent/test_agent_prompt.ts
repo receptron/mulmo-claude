@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
 import {
   buildMemoryContext,
@@ -16,7 +16,6 @@ import {
   formatPluginSection,
 } from "../../server/agent/prompt.js";
 import { WORKSPACE_FILES } from "../../server/workspace/paths.js";
-import { dirname } from "path";
 import type { Role } from "../../src/config/roles.js";
 
 function ensureDir(dirPath: string): void {

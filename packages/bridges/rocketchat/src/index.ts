@@ -27,7 +27,7 @@ const baseUrl = (process.env.ROCKETCHAT_URL ?? "").replace(/\/$/, "");
 const userId = process.env.ROCKETCHAT_USER_ID;
 const authToken = process.env.ROCKETCHAT_TOKEN;
 if (!baseUrl || !userId || !authToken) {
-  console.error("ROCKETCHAT_URL, ROCKETCHAT_USER_ID, and ROCKETCHAT_TOKEN are required.\n" + "See README for setup instructions.");
+  console.error("ROCKETCHAT_URL, ROCKETCHAT_USER_ID, and ROCKETCHAT_TOKEN are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

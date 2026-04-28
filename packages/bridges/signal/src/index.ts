@@ -28,7 +28,7 @@ const RECONNECT_MAX_MS = 60_000;
 const apiUrl = (process.env.SIGNAL_API_URL ?? "").replace(/\/$/, "");
 const botNumber = process.env.SIGNAL_NUMBER;
 if (!apiUrl || !botNumber) {
-  console.error("SIGNAL_API_URL and SIGNAL_NUMBER are required.\n" + "See README for setup instructions.");
+  console.error("SIGNAL_API_URL and SIGNAL_NUMBER are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

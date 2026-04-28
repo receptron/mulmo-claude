@@ -107,7 +107,7 @@ describe("buildTranscriptPreamble — filtering", () => {
   });
 
   it("skips malformed lines without throwing", () => {
-    const jsonl = `not json\n${jsonlLine("user", "still works")}\n` + `{also broken\n${jsonlLine("assistant", "reply")}\n`;
+    const jsonl = `not json\n${jsonlLine("user", "still works")}\n{also broken\n${jsonlLine("assistant", "reply")}\n`;
     const preamble = buildTranscriptPreamble(jsonl);
     assert.match(preamble, /User: still works/);
     assert.match(preamble, /Assistant: reply/);

@@ -14,8 +14,7 @@ import { mockAllApis } from "../fixtures/api";
 // A text-response whose markdown body contains a workspace-path link
 // (wiki page) and an external link.
 const TEXT_WITH_LINKS = {
-  text:
-    "Created page: [Test Page](data/wiki/pages/test-page.md)\n\n" + "Source: [External](https://example.com)\n\n" + "See also: [config](config/settings.json)",
+  text: "Created page: [Test Page](data/wiki/pages/test-page.md)\n\nSource: [External](https://example.com)\n\nSee also: [config](config/settings.json)",
   role: "assistant",
 };
 

@@ -1,7 +1,6 @@
 import path from "node:path";
 import { mkdirSync, statSync, unlinkSync } from "node:fs";
-import { WORKSPACE_DIRS } from "../../workspace/paths.js";
-import { workspacePath } from "../../workspace/paths.js";
+import { WORKSPACE_DIRS, workspacePath } from "../../workspace/paths.js";
 import { writeFileAtomicSync } from "./atomic.js";
 import { isEnoent } from "./safe.js";
 

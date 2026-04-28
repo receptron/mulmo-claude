@@ -22,7 +22,7 @@ const homeserverUrl = process.env.MATRIX_HOMESERVER_URL;
 const accessToken = process.env.MATRIX_ACCESS_TOKEN;
 const userId = process.env.MATRIX_USER_ID;
 if (!homeserverUrl || !accessToken || !userId) {
-  console.error("MATRIX_HOMESERVER_URL, MATRIX_ACCESS_TOKEN, and MATRIX_USER_ID are required.\n" + "See README for setup instructions.");
+  console.error("MATRIX_HOMESERVER_URL, MATRIX_ACCESS_TOKEN, and MATRIX_USER_ID are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

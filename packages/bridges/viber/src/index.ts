@@ -28,7 +28,7 @@ const VIBER_API = "https://chatapi.viber.com/pa";
 
 const authToken = process.env.VIBER_AUTH_TOKEN;
 if (!authToken) {
-  console.error("VIBER_AUTH_TOKEN is required.\n" + "See README for setup instructions.");
+  console.error("VIBER_AUTH_TOKEN is required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

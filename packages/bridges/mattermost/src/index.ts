@@ -19,7 +19,7 @@ const TRANSPORT_ID = "mattermost";
 const mmUrl = process.env.MATTERMOST_URL;
 const botToken = process.env.MATTERMOST_BOT_TOKEN;
 if (!mmUrl || !botToken) {
-  console.error("MATTERMOST_URL and MATTERMOST_BOT_TOKEN are required.\n" + "See README for setup instructions.");
+  console.error("MATTERMOST_URL and MATTERMOST_BOT_TOKEN are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 

@@ -28,7 +28,7 @@ const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 const appSecret = process.env.WHATSAPP_APP_SECRET;
 if (!accessToken || !phoneNumberId || !verifyToken || !appSecret) {
   console.error(
-    "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\n" + "See README for setup instructions.",
+    "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\nSee README for setup instructions.",
   );
   process.exit(1);
 }

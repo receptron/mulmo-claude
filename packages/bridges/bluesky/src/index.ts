@@ -30,7 +30,7 @@ const handle = process.env.BLUESKY_HANDLE;
 const appPassword = process.env.BLUESKY_APP_PASSWORD;
 const service = (process.env.BLUESKY_SERVICE ?? "https://bsky.social").replace(/\/$/, "");
 if (!handle || !appPassword) {
-  console.error("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD are required.\n" + "See README for setup instructions.");
+  console.error("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD are required.\nSee README for setup instructions.");
   process.exit(1);
 }
 
