@@ -317,14 +317,31 @@ router.post(API_ROUTES.sessions.markRead, async (req: Request<SessionIdParams>, 
 router.post(
   API_ROUTES.sessions.bookmark,
   async (
-    req: Request<SessionIdParams, { ok: boolean } | SessionErrorResponse, { bookmarked: boolean }>,
+    req: Request<SessionIdParams, { ok: boolean } | SessionErrorResponse, { bookmarked: unknown }>,
     res: Response<{ ok: boolean } | SessionErrorResponse>,
   ) => {
     const { id: sessionId } = req.params;
-    const bookmarked = Boolean(req.body?.bookmarked);
+    // Strict boolean check: `Boolean(x)` would coerce truthy strings
+    // like "false" to true, masking a malformed client payload as a
+    // valid set-bookmark.
+    const { bookmarked } = req.body ?? {};
+    if (typeof bookmarked !== "boolean") {
+      log.warn("sessions", "bookmark: invalid payload", { sessionId, bookmarked });
+      res.status(400).json({ error: "`bookmarked` must be a boolean" });
+      return;
+    }
     log.info("sessions", "bookmark: start", { sessionId, bookmarked });
     try {
-      await updateIsBookmarked(sessionId, bookmarked);
+      const wrote = await updateIsBookmarked(sessionId, bookmarked);
+      if (!wrote) {
+        // Meta sidecar missing — most often a stale session id (e.g.
+        // another tab hard-deleted it). Without this 404, the route
+        // would 200 silently and the client's optimistic flip would
+        // appear to persist until the next refetch wiped it.
+        log.warn("sessions", "bookmark: session not found", { sessionId });
+        notFound(res, `Session ${sessionId} not found`);
+        return;
+      }
       // Meta-mtime bumps on the write — cursor diff will pick up the
       // change on the next refetch — but every other tab also needs
       // to know to refetch right now.

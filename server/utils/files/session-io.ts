@@ -92,10 +92,16 @@ export async function updateHasUnread(sessionId: string, hasUnread: boolean, roo
   await writeSessionMeta(sessionId, { ...meta, hasUnread }, rootOverride);
 }
 
-export async function updateIsBookmarked(sessionId: string, isBookmarked: boolean, rootOverride?: string): Promise<void> {
+// Returns `true` when the meta sidecar existed and the flag was
+// written, `false` when no meta exists (caller should surface a 404
+// instead of silently claiming success — important for the bookmark
+// endpoint, where a stale id from another tab would otherwise look
+// like it persisted on the optimistic-update path).
+export async function updateIsBookmarked(sessionId: string, isBookmarked: boolean, rootOverride?: string): Promise<boolean> {
   const meta = await readSessionMeta(sessionId, rootOverride);
-  if (!meta) return;
+  if (!meta) return false;
   await writeSessionMeta(sessionId, { ...meta, isBookmarked }, rootOverride);
+  return true;
 }
 
 // Hard-deletes the session's .jsonl event log and .json meta sidecar.
