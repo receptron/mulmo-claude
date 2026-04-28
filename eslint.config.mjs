@@ -213,6 +213,33 @@ export default [
       "no-lonely-if": "error",
       "no-floating-decimal": "error",
       "no-unused-private-class-members": "error",
+      // `require-await` (and the type-checked variant) misfires on
+      // Playwright route handlers, Express middleware, and any
+      // framework-imposed async contract that returns a Promise
+      // without `await`-ing inside. Off — signal-to-noise too low
+      // without type information.
+      "require-await": "off",
+      "no-loop-func": "error",
+      "no-new": "error",
+      "no-undef-init": "error",
+      "no-useless-return": "error",
+      "prefer-regex-literals": "error",
+      "prefer-exponentiation-operator": "error",
+      "@typescript-eslint/consistent-type-assertions": "error",
+      "@typescript-eslint/no-require-imports": "error",
+      "@typescript-eslint/prefer-enum-initializers": "error",
+      "import/first": "error",
+      "import/newline-after-import": "error",
+      "import/no-anonymous-default-export": "error",
+      "import/no-mutable-exports": "error",
+      "import/no-self-import": "error",
+      "import/no-useless-path-segments": "error",
+      "consistent-return": "warn",
+      "class-methods-use-this": "warn",
+      "prefer-destructuring": "warn",
+      complexity: ["warn", { max: 15 }],
+      "max-depth": ["warn", { max: 4 }],
+      "max-params": ["warn", { max: 6 }],
       quotes: "off",
       "no-shadow": "error",
       "no-param-reassign": "error",
@@ -337,6 +364,10 @@ export default [
       // sanitised markdown. Warn so the justified usage doesn't
       // block CI — audit per-use at review time.
       "vue/no-v-html": "warn",
+      "vue/no-useless-mustaches": "error",
+      "vue/no-useless-v-bind": "error",
+      "vue/prefer-true-attribute-shorthand": "error",
+      "vue/no-empty-component-block": "error",
     },
   },
   eslintConfigPrettier,

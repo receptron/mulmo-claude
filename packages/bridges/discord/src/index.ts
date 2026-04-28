@@ -55,7 +55,7 @@ mulmo.onPush(async (pushEvent) => {
 
 discord.on("messageCreate", async (msg: Message) => {
   if (msg.author.bot) return;
-  const channelId = msg.channelId;
+  const { channelId } = msg;
   const text = msg.content.trim();
   if (!text) return;
   if (!allowAll && !allowedChannels.has(channelId)) return;

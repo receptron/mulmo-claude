@@ -258,7 +258,6 @@ router.post(API_ROUTES.sources.manage, async (req: Request<object, unknown, Mana
         return;
       case "rebuild":
         await handleRebuild(res);
-        return;
     }
   } catch (err) {
     log.warn("sources", "manage failed", { action, error: String(err) });

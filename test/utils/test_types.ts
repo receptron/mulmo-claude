@@ -205,7 +205,7 @@ describe("hasNumberProp", () => {
   it("narrows type correctly", () => {
     const val: unknown = { score: 99 };
     if (hasNumberProp(val, "score")) {
-      const score: number = val.score;
+      const { score } = val;
       assert.equal(score, 99);
     }
   });

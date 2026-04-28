@@ -294,14 +294,14 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-const { t } = useI18n();
-
 // UI-local representation of a configured server. Matches
 // server/config.ts#McpServerEntry. Re-declared in src/config/mcpTypes.ts
 // to avoid a cross-module type import from the server package.
 import type { HttpSpec, StdioSpec, McpServerSpec, McpServerEntry } from "../config/mcpTypes";
 import { MCP_CATALOG, requiredKeysOf, type McpCatalogEntry, type McpConfigField } from "../config/mcpCatalog";
 import { interpolateMcpSpec } from "../utils/mcp/interpolateSpec";
+
+const { t } = useI18n();
 
 // Re-exported for callers that imported these from the SFC before the
 // types moved out (#823 Phase 1).
@@ -350,7 +350,7 @@ function isInstalled(serverId: string): boolean {
 }
 
 function onCatalogToggle(entry: McpCatalogEntry, event: Event): void {
-  const checked = (event.target as HTMLInputElement).checked;
+  const { checked } = event.target as HTMLInputElement;
   if (checked) {
     if (entry.configSchema.length > 0) {
       openConfigForm(entry);

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { MCP_CATALOG, findCatalogEntry } from "../../src/config/mcpCatalog.js";
-import type { McpServerSpec } from "../../src/config/mcpTypes.js";
 
 // Catalog smoke tests for #823. Phase 1 (#825) shipped the two
 // upstream-pinned entries; Phase 2 (#852) adds 6 community-packaged
@@ -117,7 +116,7 @@ describe("MCP_CATALOG", () => {
   // would no longer be assignable to the spec union.
   it("spec is assignable to the shared McpServerSpec type", () => {
     for (const entry of MCP_CATALOG) {
-      const spec: McpServerSpec = entry.spec;
+      const { spec } = entry;
       assert.ok(spec.type === "stdio" || spec.type === "http");
     }
   });

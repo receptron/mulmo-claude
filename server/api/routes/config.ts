@@ -19,6 +19,12 @@ import { log } from "../../system/logger/index.js";
 import { loadCustomDirs, saveCustomDirs, ensureCustomDirs, validateCustomDirs, type CustomDirEntry } from "../../workspace/custom-dirs.js";
 import { loadReferenceDirs, saveReferenceDirs, validateReferenceDirs, type ReferenceDirEntry } from "../../workspace/reference-dirs.js";
 
+// ── Scheduler overrides (#493) ──────────────────────────────────
+
+import { loadSchedulerOverrides, saveSchedulerOverrides, UTC_HH_MM_RE, type ScheduleOverrides } from "../../utils/files/scheduler-overrides-io.js";
+import { applyScheduleOverride } from "../../events/scheduler-adapter.js";
+import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
+
 // Public surface of /api/config. GET returns the full config tree so
 // the client can render every section in one request. PUT surfaces are
 // per-section to keep payloads small and validation obvious.
@@ -96,7 +102,7 @@ function isPutConfigBody(value: unknown): value is PutConfigBody {
 }
 
 router.put(API_ROUTES.config.base, (req: Request<unknown, unknown, PutConfigBody>, res: ConfigRes) => {
-  const body = req.body;
+  const { body } = req;
   log.info("config", "PUT base: start");
   if (!isPutConfigBody(body)) {
     log.warn("config", "PUT base: invalid payload");
@@ -128,7 +134,7 @@ router.put(API_ROUTES.config.base, (req: Request<unknown, unknown, PutConfigBody
 });
 
 router.put(API_ROUTES.config.settings, (req: Request<unknown, unknown, AppSettings>, res: ConfigRes) => {
-  const body = req.body;
+  const { body } = req;
   log.info("config", "PUT settings: start");
   if (!isAppSettings(body)) {
     log.warn("config", "PUT settings: invalid payload");
@@ -143,7 +149,7 @@ router.put(API_ROUTES.config.settings, (req: Request<unknown, unknown, AppSettin
 });
 
 router.put(API_ROUTES.config.mcp, (req: Request<unknown, unknown, { servers: McpServerEntry[] }>, res: ConfigRes) => {
-  const body = req.body;
+  const { body } = req;
   log.info("config", "PUT mcp: start", { servers: Array.isArray(body?.servers) ? body.servers.length : undefined });
   if (!isMcpPutBody(body)) {
     log.warn("config", "PUT mcp: invalid envelope");
@@ -170,7 +176,7 @@ router.get(API_ROUTES.config.workspaceDirs, (_req: Request, res: Response<{ dirs
 router.put(
   API_ROUTES.config.workspaceDirs,
   (req: Request<unknown, unknown, { dirs: unknown }>, res: Response<{ dirs: CustomDirEntry[] } | ConfigErrorResponse>) => {
-    const body = req.body;
+    const { body } = req;
     log.info("config", "PUT workspace-dirs: start");
     if (!isRecord(body) || !("dirs" in body)) {
       log.warn("config", "PUT workspace-dirs: invalid envelope");
@@ -204,7 +210,7 @@ router.get(API_ROUTES.config.referenceDirs, (_req: Request, res: Response<{ dirs
 router.put(
   API_ROUTES.config.referenceDirs,
   (req: Request<unknown, unknown, { dirs: unknown }>, res: Response<{ dirs: ReferenceDirEntry[] } | ConfigErrorResponse>) => {
-    const body = req.body;
+    const { body } = req;
     log.info("config", "PUT reference-dirs: start");
     if (!isRecord(body) || !("dirs" in body)) {
       log.warn("config", "PUT reference-dirs: invalid envelope");
@@ -228,12 +234,6 @@ router.put(
   },
 );
 
-// ── Scheduler overrides (#493) ──────────────────────────────────
-
-import { loadSchedulerOverrides, saveSchedulerOverrides, UTC_HH_MM_RE, type ScheduleOverrides } from "../../utils/files/scheduler-overrides-io.js";
-import { applyScheduleOverride } from "../../events/scheduler-adapter.js";
-import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
-
 router.get(API_ROUTES.config.schedulerOverrides, (_req: Request, res: Response<{ overrides: ScheduleOverrides }>) => {
   res.json({ overrides: loadSchedulerOverrides() });
 });
@@ -241,7 +241,7 @@ router.get(API_ROUTES.config.schedulerOverrides, (_req: Request, res: Response<{
 router.put(
   API_ROUTES.config.schedulerOverrides,
   async (req: Request<unknown, unknown, { overrides: unknown }>, res: Response<{ overrides: ScheduleOverrides } | ConfigErrorResponse>) => {
-    const body = req.body;
+    const { body } = req;
     log.info("config", "PUT scheduler-overrides: start");
     if (!isRecord(body) || !("overrides" in body)) {
       log.warn("config", "PUT scheduler-overrides: invalid envelope");

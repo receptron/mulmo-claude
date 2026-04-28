@@ -269,7 +269,7 @@ async function readSnapshotEntries(dir: string): Promise<SnapshotEntry[]> {
     // reads would then surface the target through the bearer-authed
     // GET routes (codex review iter-2 #917).
     if (!dirent.isFile()) continue;
-    const name = dirent.name;
+    const { name } = dirent;
     const match = FILENAME_RE.exec(name);
     if (!match?.groups) continue;
     out.push({

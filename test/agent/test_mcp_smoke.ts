@@ -14,6 +14,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 const MCP_SERVER = path.join(PROJECT_ROOT, "server/agent/mcp-server.ts");
 // Use npx tsx so the shell resolves .cmd wrappers on Windows.

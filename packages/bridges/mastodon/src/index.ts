@@ -219,7 +219,7 @@ interface ParsedStatus {
 
 function parseMentionStatus(notification: JsonRecord): ParsedStatus | null {
   if (notification.type !== "mention") return null;
-  const status = notification.status;
+  const { status } = notification;
   if (!isObj(status)) return null;
   const statusId = typeof status.id === "string" ? status.id : "";
   const visibility = typeof status.visibility === "string" ? status.visibility : "public";

@@ -80,7 +80,7 @@ function parseTranscriptEntries(jsonlContent: string): TranscriptEntry[] {
     const record = entry;
     if (record.type !== EVENT_TYPES.text) continue;
     if (record.source !== "user" && record.source !== "assistant") continue;
-    const message = record.message;
+    const { message } = record;
     if (typeof message !== "string" || message.length === 0) continue;
     out.push({ source: record.source, text: message });
   }

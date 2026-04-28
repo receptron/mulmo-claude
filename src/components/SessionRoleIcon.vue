@@ -56,7 +56,7 @@ const spinClass = computed(() => (props.session.isRunning ? "animate-spin [anima
 const glyph = computed(() => roleIcon(props.roles, props.session.roleId));
 
 const originGlyph = computed(() => {
-  const origin = props.session.origin;
+  const { origin } = props.session;
   if (!origin || origin === SESSION_ORIGINS.human) return "";
   if (origin === SESSION_ORIGINS.scheduler) return "schedule";
   if (origin === SESSION_ORIGINS.skill) return "build";
@@ -65,7 +65,7 @@ const originGlyph = computed(() => {
 });
 
 const originTooltip = computed(() => {
-  const origin = props.session.origin;
+  const { origin } = props.session;
   if (!origin || origin === SESSION_ORIGINS.human) return "";
   return t(`sessionTabBar.origin.${origin}`);
 });

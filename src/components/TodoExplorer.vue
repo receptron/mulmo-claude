@@ -310,7 +310,7 @@ async function focusUrlItem(itemId: string): Promise<void> {
 }
 
 onMounted(() => {
-  const itemId = route.params.itemId;
+  const { itemId } = route.params;
   if (typeof itemId === "string" && itemId) {
     void focusUrlItem(itemId);
   }

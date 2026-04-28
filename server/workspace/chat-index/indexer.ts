@@ -115,7 +115,7 @@ export async function isFresh(workspaceRoot: string, sessionId: string, now: num
     const raw = await readFile(indexEntryPathFor(workspaceRoot, sessionId), "utf-8");
     const entry: unknown = JSON.parse(raw);
     if (!isRecord(entry)) return false;
-    const indexedAt = (entry as Record<string, unknown>).indexedAt;
+    const { indexedAt } = entry as Record<string, unknown>;
     if (typeof indexedAt !== "string") return false;
     const indexedTimestamp = Date.parse(indexedAt);
     if (Number.isNaN(indexedTimestamp)) return false;

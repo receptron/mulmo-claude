@@ -220,9 +220,9 @@ function extractMessage(body: unknown): ParsedMessage | null {
   const msg = body.message;
   if (!isObj(msg)) return null;
   if (typeof msg.text !== "string") return null;
-  const space = msg.space;
+  const { space } = msg;
   if (!isObj(space) || typeof space.name !== "string") return null;
-  const sender = msg.sender;
+  const { sender } = msg;
   const senderName = isObj(sender) && typeof sender.displayName === "string" ? sender.displayName : "unknown";
   return { spaceName: space.name, senderName, text: msg.text };
 }

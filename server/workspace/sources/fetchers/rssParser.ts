@@ -90,7 +90,7 @@ export function parseFeed(body: string): ParsedFeed | null {
 // --- RSS 2.0 ------------------------------------------------------------
 
 function parseRss(rss: Record<string, unknown>): ParsedFeed | null {
-  const channel = rss.channel;
+  const { channel } = rss;
   if (!isRecord(channel)) return null;
   const rawItems = Array.isArray(channel.item) ? channel.item : [];
   const items: ParsedFeedItem[] = [];

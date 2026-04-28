@@ -179,7 +179,7 @@ interface IncomingMessage {
 function parseMessageLog(log: JsonRecord, selfDid: string): IncomingMessage | null {
   if (log.$type !== "chat.bsky.convo.defs#logCreateMessage") return null;
   const convoId = asString(log.convoId);
-  const message = log.message;
+  const { message } = log;
   if (!isObj(message)) return null;
   const text = asString(message.text);
   if (!text) return null;

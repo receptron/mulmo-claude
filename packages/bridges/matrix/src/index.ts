@@ -58,7 +58,7 @@ mulmo.onPush((pushEvent) => {
   if (content.msgtype !== "m.text") return;
   if (typeof content.body !== "string") return;
 
-  const roomId = room.roomId;
+  const { roomId } = room;
   const text = content.body;
   if (!text.trim()) return;
 

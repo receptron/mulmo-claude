@@ -31,7 +31,7 @@ const manageSkillsPlugin: ToolPlugin<ManageSkillsData> = {
         error: `Failed to load skills: ${result.error}`,
       };
     }
-    const skills = result.data.skills;
+    const { skills } = result.data;
     return {
       toolName: TOOL_NAME,
       uuid: makeUuid(),

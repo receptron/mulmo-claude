@@ -135,7 +135,7 @@ describe("validateBeatJSON", () => {
   });
 
   it("passes the parsed object (not the raw string) to the schema", () => {
-    let received: unknown = undefined;
+    let received: unknown;
     const spy: SafeParseSchema = {
       safeParse(value) {
         received = value;

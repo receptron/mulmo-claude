@@ -281,7 +281,7 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
     const first = mockRes();
     await getHandler({ query: {} } as unknown as Request, first.res);
     assert.ok(first.state.body);
-    const cursor = first.state.body.cursor;
+    const { cursor } = first.state.body;
 
     const second = mockRes();
     await getHandler({ query: { since: cursor } } as unknown as Request, second.res);

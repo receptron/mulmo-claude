@@ -28,7 +28,7 @@ function isValidAction(action: unknown): boolean {
   if (!isRecord(action)) return false;
   if (action.type === NOTIFICATION_ACTION_TYPES.none) return true;
   if (action.type !== NOTIFICATION_ACTION_TYPES.navigate) return false;
-  const target = action.target;
+  const { target } = action;
   if (!isRecord(target)) return false;
   return typeof target.view === "string" && VALID_VIEWS.has(target.view);
 }

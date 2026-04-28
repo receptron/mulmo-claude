@@ -125,7 +125,7 @@
             :key="selected.id"
             :placeholder="t('pluginNews.chatPlaceholder')"
             :prepend-text="`Read this article. ${selected.url}`"
-            :allow-empty="true"
+            allow-empty
             test-id-prefix="news-page-chat"
           />
         </template>

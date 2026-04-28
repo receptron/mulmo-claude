@@ -61,7 +61,7 @@ export function requireSameOrigin(req: Request, res: Response, next: NextFunctio
     next();
     return;
   }
-  const origin = req.headers.origin;
+  const { origin } = req.headers;
   if (typeof origin !== "string") {
     // Missing Origin: non-browser caller (curl, MCP, Node HTTP
     // libraries). Trusted because the server binds to 127.0.0.1.

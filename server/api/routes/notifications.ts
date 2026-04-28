@@ -74,7 +74,7 @@ function parseAction(value: unknown): NotificationAction | undefined {
     return { type: NOTIFICATION_ACTION_TYPES.none };
   }
   if (value.type !== NOTIFICATION_ACTION_TYPES.navigate) return undefined;
-  const target = value.target;
+  const { target } = value;
   if (!isRecord(target) || typeof target.view !== "string" || !VIEW_SET.has(target.view)) {
     return undefined;
   }

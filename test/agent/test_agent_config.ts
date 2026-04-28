@@ -344,7 +344,7 @@ describe("prepareUserServers", () => {
       api: { type: "http", url: "http://localhost:8080/mcp" },
     };
     const out = prepareUserServers(servers, true, hostWs);
-    const api = out.api;
+    const { api } = out;
     assert.ok(api && api.type === "http");
     assert.equal(api.url, "http://host.docker.internal:8080/mcp");
   });
@@ -372,7 +372,7 @@ describe("prepareUserServers", () => {
       },
     };
     const out = prepareUserServers(servers, true, hostWs);
-    const bad = out.bad;
+    const { bad } = out;
     assert.ok(bad && bad.type === "stdio");
     assert.deepEqual(bad.args, ["/etc/hosts"]);
   });

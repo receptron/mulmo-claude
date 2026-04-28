@@ -28,7 +28,7 @@ async function focusUrlSlug(slug: string): Promise<void> {
 }
 
 onMounted(() => {
-  const slug = route.params.slug;
+  const { slug } = route.params;
   if (typeof slug === "string" && slug) {
     void focusUrlSlug(slug);
   }

@@ -24,6 +24,12 @@
 import { homedir } from "os";
 import path from "path";
 
+// Well-known individual files — imported from the shared
+// src/config/workspacePaths.ts (single source of truth for both
+// server and frontend). Re-exported so server callers keep the
+// same `import { WORKSPACE_FILES } from "./paths.js"` they use.
+import { WORKSPACE_FILES } from "../../src/config/workspacePaths.js";
+
 // Workspace root. Hard-coded to `~/mulmoclaude` — there is no
 // WORKSPACE_PATH env override today; changing the location
 // requires a code edit or a symlink. Re-exported by
@@ -86,12 +92,6 @@ export const WORKSPACE_DIRS = {
   // Development — git-cloned repositories (#256).
   github: "github",
 } as const;
-
-// Well-known individual files — imported from the shared
-// src/config/workspacePaths.ts (single source of truth for both
-// server and frontend). Re-exported so server callers keep the
-// same `import { WORKSPACE_FILES } from "./paths.js"` they use.
-import { WORKSPACE_FILES } from "../../src/config/workspacePaths.js";
 export { WORKSPACE_FILES };
 
 // Absolute paths, built once at module load from `workspacePath`.

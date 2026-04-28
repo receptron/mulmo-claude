@@ -50,7 +50,7 @@ export function useHealth(): {
     geminiAvailable.value = Boolean(result.data.geminiAvailable);
     sandboxEnabled.value = Boolean(result.data.sandboxEnabled);
     bootFetchCompleted = true;
-    const cpu = result.data.cpu;
+    const { cpu } = result.data;
     if (cpu && typeof cpu.load1 === "number" && Number.isFinite(cpu.load1) && typeof cpu.cores === "number" && cpu.cores > 0) {
       cpuLoad1.value = cpu.load1;
       cpuCores.value = cpu.cores;

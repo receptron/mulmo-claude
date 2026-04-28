@@ -24,4 +24,5 @@ export { samples } from "./samples";
 
 export { View, Preview };
 
-export default { plugin };
+const textResponsePlugin = { plugin };
+export default textResponsePlugin;

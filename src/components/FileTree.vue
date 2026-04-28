@@ -48,6 +48,7 @@ import { useExpandedDirs } from "../composables/useExpandedDirs";
 import { sortChildren } from "../utils/files/sortChildren";
 import { descriptorForPath, EDIT_POLICY_ICON_COLOR } from "../config/systemFileDescriptors";
 import type { FileSortMode } from "../composables/useFileSortMode";
+import type { TreeNode } from "../types/fileTree";
 
 const DEFAULT_FILE_ICON_COLOR = "text-gray-400";
 
@@ -57,7 +58,6 @@ const { t } = useI18n();
 // import it without depending on a .vue module. Re-export here so
 // existing `import { TreeNode } from "./FileTree.vue"` keeps working.
 export type { TreeNode } from "../types/fileTree";
-import type { TreeNode } from "../types/fileTree";
 
 const props = defineProps<{
   node: TreeNode;
@@ -124,7 +124,7 @@ const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a", ".ogg", ".oga", ".flac
 
 const fileIcon = computed(() => {
   if (props.node.type !== "file") return "description";
-  const name = props.node.name;
+  const { name } = props.node;
   const dot = name.lastIndexOf(".");
   if (dot < 0) return "description";
   const ext = name.slice(dot).toLowerCase();

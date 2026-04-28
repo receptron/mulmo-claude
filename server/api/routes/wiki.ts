@@ -535,7 +535,7 @@ async function handleSaveAction(
     badRequest(res, "pageName required for save action");
     return;
   }
-  const content = req.body.content;
+  const { content } = req.body;
   if (typeof content !== "string") {
     log.warn("wiki", "POST save: missing content", { pageNamePreview: previewSnippet(pageName) });
     badRequest(res, "content (string) required for save action");

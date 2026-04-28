@@ -1,10 +1,5 @@
 import { timingSafeEqual } from "crypto";
 
-function safeEqual(left: string, right: string): boolean {
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(Buffer.from(left), Buffer.from(right));
-}
-
 // Bearer token middleware (#272). Reject any `/api/*` request whose
 // `Authorization: Bearer <token>` header doesn't match the current
 // server token.
@@ -34,6 +29,11 @@ function safeEqual(left: string, right: string): boolean {
 import type { Request, Response, NextFunction } from "express";
 import { getCurrentToken } from "./token.js";
 import { unauthorized } from "../../utils/httpError.js";
+
+function safeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(Buffer.from(left), Buffer.from(right));
+}
 
 const BEARER_PREFIX = "Bearer ";
 

@@ -328,6 +328,7 @@ function sanitizeUserTimezone(zoneId: string | undefined): string | undefined {
   try {
     // Throws a RangeError if the zone isn't recognized by the ICU
     // data on this runtime.
+    // eslint-disable-next-line no-new -- side-effect probe to validate the time zone
     new Intl.DateTimeFormat("en-US", { timeZone: zoneId });
     return zoneId;
   } catch {

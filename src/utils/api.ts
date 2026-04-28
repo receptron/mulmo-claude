@@ -95,7 +95,7 @@ function buildHeaders(opts: { headers?: Record<string, string> }, hasBody: boole
 }
 
 async function extractError(res: Response): Promise<{ error: string; status: number }> {
-  const status = res.status;
+  const { status } = res;
   // Try to parse a `{ error: string }` body first — that's the server's
   // standard error shape. `in` narrowing lets us read `body.error`
   // without any type assertion.

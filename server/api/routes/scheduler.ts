@@ -108,7 +108,7 @@ async function handleTaskAction(action: string, input: Record<string, unknown>, 
         notFound(res, `task not found: ${taskId}`);
         return;
       }
-      const name = tasks[idx].name;
+      const { name } = tasks[idx];
       tasks.splice(idx, 1);
       await saveUserTasks(tasks);
       await refreshUserTasks();

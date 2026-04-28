@@ -19,6 +19,7 @@ import { execSync, spawn } from "node:child_process";
 import path from "node:path";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 
 function isDockerAvailable(): boolean {

@@ -19,11 +19,11 @@ import { mkdtemp, readFile, writeFile, rm } from "fs/promises";
 import path from "path";
 import { tmpdir } from "os";
 import { promisify } from "util";
-
-const execFileAsync = promisify(execFile);
 import type { Attachment } from "@mulmobridge/protocol";
 import { SUBPROCESS_PROBE_TIMEOUT_MS, SUBPROCESS_WORK_TIMEOUT_MS } from "../utils/time.js";
 import { errorMessage } from "../utils/errors.js";
+
+const execFileAsync = promisify(execFile);
 
 export interface ContentBlock {
   type: string;

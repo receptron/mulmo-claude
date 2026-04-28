@@ -80,8 +80,6 @@ import { computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import { formatScalarField, useMarkdownDoc } from "../../composables/useMarkdownDoc";
-
-const { t } = useI18n();
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
 import { rewriteMarkdownImageRefs } from "../../utils/image/rewriteMarkdownImageRefs";
@@ -92,6 +90,8 @@ import { API_ROUTES } from "../../config/apiRoutes";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
 import { buildPdfFilename } from "../../utils/files/filename";
 import { useAppApi } from "../../composables/useAppApi";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   selectedResult: ToolResult<MarkdownToolData>;
@@ -199,7 +199,7 @@ const editing = ref(false);
 const { copied, copy } = useClipboardCopy();
 
 function onDetailsToggle(event: Event) {
-  const open = (event.target as HTMLDetailsElement).open;
+  const { open } = event.target as HTMLDetailsElement;
   editing.value = open;
   if (!open) {
     editableMarkdown.value = markdownContent.value;
@@ -221,7 +221,7 @@ async function downloadPdf() {
   if (!markdownContent.value) return;
   const prefix = props.selectedResult.data?.filenamePrefix;
   const rawName = prefix || props.selectedResult.title || "";
-  const uuid = props.selectedResult.uuid;
+  const { uuid } = props.selectedResult;
   const filename = buildPdfFilename({
     name: rawName,
     fallback: "document",
@@ -321,7 +321,7 @@ async function persistTaskMarkdown(relativePath: string, markdown: string): Prom
 }
 
 function onMarkdownClick(event: MouseEvent): void {
-  const target = event.target;
+  const { target } = event;
   if (!(target instanceof HTMLInputElement)) return;
   if (target.type !== "checkbox") return;
   if (!target.classList.contains("md-task")) return;
@@ -348,7 +348,7 @@ function onMarkdownClick(event: MouseEvent): void {
   // frontmatter contents containing `- [ ]`-shaped YAML never
   // collide with task counting (#895 PR A). The prefix is
   // preserved byte-for-byte and re-attached after the toggle.
-  const body = mdDoc.value.body;
+  const { body } = mdDoc.value;
   const prefix = markdownContent.value.slice(0, markdownContent.value.length - body.length);
   const sourceTasks = findTaskLines(body);
   if (sourceTasks.length !== taskInputs.length) {

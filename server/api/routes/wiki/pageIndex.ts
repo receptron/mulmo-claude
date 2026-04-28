@@ -39,7 +39,7 @@ export async function getPageIndex(pagesDir: string): Promise<PageIndex> {
   const slugs = new Map<string, string>();
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const name = entry.name;
+    const { name } = entry;
     if (!name.endsWith(".md")) continue;
     slugs.set(name.slice(0, -".md".length), name);
   }

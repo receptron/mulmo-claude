@@ -259,6 +259,7 @@ const CASES: FixtureCase[] = [
 
 describe("pipeline integration with real fetchers", () => {
   for (const testCase of CASES) {
+    // eslint-disable-next-line no-loop-func -- `workspace` is set once per `before`, not mutated across iterations
     it(`${testCase.kind} source produces items end-to-end`, async () => {
       await writeSource(
         workspace,

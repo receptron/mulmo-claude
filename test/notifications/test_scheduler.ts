@@ -80,7 +80,7 @@ describe("scheduleTestNotification — fires once after the delay", () => {
 
     assert.equal(deps.publishCalls.length, 1);
     assert.equal(deps.publishCalls[0].channel, PUBSUB_CHANNELS.notifications);
-    const payload = deps.publishCalls[0].payload;
+    const { payload } = deps.publishCalls[0];
     assert.ok(isNotificationPayload(payload));
     assert.equal(payload.title, "my-msg");
     // Legacy bridge push uses custom transport/chat
@@ -105,7 +105,7 @@ describe("scheduleTestNotification — defaults", () => {
     assert.equal(scheduled.delaySeconds, 60);
     mock.timers.tick(60_000);
     assert.equal(deps.publishCalls.length, 1);
-    const payload = deps.publishCalls[0].payload;
+    const { payload } = deps.publishCalls[0];
     assert.ok(isNotificationPayload(payload));
     assert.equal(payload.title, DEFAULT_NOTIFICATION_MESSAGE);
     assert.deepEqual(deps.pushCalls, [

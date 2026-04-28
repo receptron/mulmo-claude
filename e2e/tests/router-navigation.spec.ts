@@ -3,6 +3,7 @@ import { mockAllApis } from "../fixtures/api";
 import { SESSION_A, SESSION_B } from "../fixtures/sessions";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+
 test.beforeEach(async ({ page }) => {
   await mockAllApis(page);
 });

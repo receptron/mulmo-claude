@@ -11,7 +11,7 @@ import { isRecord } from "../types";
 // when building the merged history list.
 export function isUserTextResponse(res: ToolResultComplete): boolean {
   if (res.toolName !== "text-response") return false;
-  const data = res.data;
+  const { data } = res;
   if (!isRecord(data)) return false;
   return data.role === "user";
 }

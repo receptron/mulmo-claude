@@ -33,12 +33,12 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
-
-const { t } = useI18n();
 import type { TodoData, TodoItem } from "./index";
 import { useFreshPluginData } from "../../composables/useFreshPluginData";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { colorForLabel } from "./labels";
+
+const { t } = useI18n();
 
 const props = defineProps<{ result: ToolResultComplete<TodoData> }>();
 

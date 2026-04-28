@@ -222,8 +222,8 @@ function parseActivity(body: unknown): TeamsMessage | null {
   if (body.type !== "message") return null;
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return null;
-  const conversation = body.conversation;
-  const from = body.from;
+  const { conversation } = body;
+  const { from } = body;
   const serviceUrl = typeof body.serviceUrl === "string" ? body.serviceUrl.trim() : "";
   const channelId = typeof body.channelId === "string" ? body.channelId.trim() : "";
   if (!isObj(conversation) || typeof conversation.id !== "string") return null;

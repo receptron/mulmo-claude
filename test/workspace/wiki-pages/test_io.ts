@@ -203,7 +203,7 @@ describe("wiki-pages/io — writeWikiPage", () => {
     // which because rename order is racey. We only assert that the
     // serialised body parses to `writer-a\n` or `writer-b\n`.
     const final = await readFile(wikiPagePath("race", { workspaceRoot }), "utf-8");
-    const body = parseFrontmatter(final).body;
+    const { body } = parseFrontmatter(final);
     assert.ok(body === "writer-a\n" || body === "writer-b\n", `unexpected body: ${body}`);
   });
 
@@ -305,7 +305,7 @@ describe("wiki-pages/io — classifyAsWikiPage symlink consistency", () => {
       // Windows requires admin / Developer Mode for unprivileged
       // symlinks. Skip on environments where that fails so CI
       // (windows-2022) doesn't hard-fail.
-      const code = (err as { code?: string }).code;
+      const { code } = err as { code?: string };
       if (code === "EPERM" || code === "EACCES") {
         symlinkSupported = false;
       } else {

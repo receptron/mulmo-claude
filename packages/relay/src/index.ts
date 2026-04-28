@@ -20,7 +20,7 @@ export { RelayDurableObject } from "./durable-object.js";
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ status: "ok", platforms: getConfiguredPlatforms(env) });
@@ -30,6 +30,8 @@ export default {
     return handleWebhookPost(request, env, url);
   },
 };
+
+export default worker;
 
 function handleVerificationRequest(request: Request, env: Env, url: URL): Response {
   const plugin = getPlatformByPath(url.pathname);

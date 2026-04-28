@@ -16,7 +16,7 @@ export function useMarkdownLinkHandler(selectedPath: Ref<string | null>, handler
   function handleMarkdownLinkClick(event: MouseEvent): void {
     if (event.button !== 0) return;
     if (event.ctrlKey || event.metaKey || event.shiftKey) return;
-    const target = event.target;
+    const { target } = event;
     if (!(target instanceof Element)) return;
     const anchor = target.closest("a");
     if (!anchor) return;

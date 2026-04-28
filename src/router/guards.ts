@@ -27,7 +27,7 @@ function isValidSessionId(value: unknown): boolean {
 export function installGuards(router: Router): void {
   router.beforeEach((dest) => {
     if (dest.name === "chat") {
-      const sessionId = dest.params.sessionId;
+      const { sessionId } = dest.params;
       if (isNonEmptyString(sessionId) && !isValidSessionId(sessionId)) {
         return { name: "chat", params: {}, query: {}, replace: true };
       }

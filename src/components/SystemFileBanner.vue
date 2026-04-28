@@ -23,7 +23,7 @@
         type="button"
         class="shrink-0 text-xs text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded px-1"
         :aria-label="collapsed ? t('systemFiles.showDetails') : t('systemFiles.hideDetails')"
-        :data-testid="`system-file-banner-toggle`"
+        data-testid="system-file-banner-toggle"
         @click="toggle"
       >
         {{ collapsed ? t("systemFiles.showDetails") : t("systemFiles.hideDetails") }}

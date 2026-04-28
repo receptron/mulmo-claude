@@ -12,6 +12,7 @@ import { mockAllApis } from "../fixtures/api";
 import { SESSION_A, SESSION_B } from "../fixtures/sessions";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }

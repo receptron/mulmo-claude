@@ -227,8 +227,6 @@
 import { ref, computed, watch, nextTick, onMounted, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
-
-const { t } = useI18n();
 import { getPlugin } from "./tools";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import RightSidebar from "./components/RightSidebar.vue";
@@ -296,6 +294,8 @@ import { useRoute, useRouter } from "vue-router";
 import { apiGet } from "./utils/api";
 import { API_ROUTES } from "./config/apiRoutes";
 import { classifyWorkspacePath } from "./utils/path/workspaceLinkRouter";
+
+const { t } = useI18n();
 
 // --- Per-session state ---
 // Declared early so that pub/sub callbacks and function declarations
@@ -476,7 +476,7 @@ function setSidePanelVisibleAndCollapse(value: boolean): void {
 // full-width views.
 const isChatPage = computed(() => route.name === PAGE_ROUTES.chat);
 const currentPage = computed<PageRouteName | null>(() => {
-  const name = route.name;
+  const { name } = route;
   return typeof name === "string" && isPageRouteName(name) ? name : null;
 });
 

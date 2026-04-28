@@ -130,7 +130,6 @@ export function applyMovieEvent(event: SSEEvent, handlers: MovieEventHandlers): 
     case "error":
       throw new Error(event.message);
     case "unknown":
-      return;
   }
 }
 

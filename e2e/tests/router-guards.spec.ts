@@ -31,7 +31,7 @@ test.describe("URL injection defence", () => {
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
     // URL must resolve to a valid /chat path, not a traversed location
-    const pathname = new URL(page.url()).pathname;
+    const { pathname } = new URL(page.url());
     expect(pathname).toMatch(VALID_CHAT_PATH);
   });
 
@@ -44,7 +44,7 @@ test.describe("URL injection defence", () => {
   test("unknown route → redirected to /chat, app loads", async ({ page }) => {
     await page.goto("/admin/secret");
     await expect(page.getByText("MulmoClaude")).toBeVisible();
-    const pathname = new URL(page.url()).pathname;
+    const { pathname } = new URL(page.url());
     expect(pathname).toMatch(VALID_CHAT_PATH);
   });
 

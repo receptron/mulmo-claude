@@ -2,12 +2,12 @@
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useNotifications } from "../composables/useNotifications";
-
-const { t } = useI18n();
 import { NOTIFICATION_ICONS } from "../types/notification";
 import type { NotificationPayload } from "../types/notification";
 import { ONE_SECOND_MS } from "../../server/utils/time";
 import { formatSmartTime } from "../utils/format/date";
+
+const { t } = useI18n();
 
 const AUTO_HIDE_MS = 5 * ONE_SECOND_MS;
 

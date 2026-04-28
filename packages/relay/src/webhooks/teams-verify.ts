@@ -49,7 +49,7 @@ export function validateTokenClaims(input: ValidateTokenClaimsInput): boolean {
 
   if (payload.iss !== expectedIssuer) return false;
 
-  const aud = payload.aud;
+  const { aud } = payload;
   const audMatches = typeof aud === "string" ? aud === appId : Array.isArray(aud) && aud.includes(appId);
   if (!audMatches) return false;
 

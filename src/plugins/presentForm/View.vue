@@ -411,6 +411,7 @@ function isValidEmail(email: string): boolean {
 
 function isValidUrl(url: string): boolean {
   try {
+    // eslint-disable-next-line no-new -- side-effect probe to validate URL syntax
     new URL(url);
     return true;
   } catch {
@@ -530,7 +531,7 @@ function showCharCount(field: FormField): boolean {
 
 function isNearLimit(field: FormField): boolean {
   if (field.type !== "text" && field.type !== "textarea") return false;
-  const maxLength = (field as TextField | TextareaField).maxLength;
+  const { maxLength } = field as TextField | TextareaField;
   if (!maxLength) return false;
   const currentLength = (formValues.value[field.id] || "").length;
   return currentLength / maxLength > 0.9;

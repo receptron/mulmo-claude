@@ -65,7 +65,6 @@ export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): 
       if (Object.keys(session.pendingGenerations).length === 0) {
         ctx.onGenerationsDrained();
       }
-      return;
     }
   }
 }

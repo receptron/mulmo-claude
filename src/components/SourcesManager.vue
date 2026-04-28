@@ -266,7 +266,7 @@
     <PageChatComposer
       v-if="mode === 'page'"
       :placeholder="t('pluginManageSource.chatPlaceholder')"
-      :prepend-text="`Before answering, read config/helps/sources.md for source-management conventions.`"
+      prepend-text="Before answering, read config/helps/sources.md for source-management conventions."
       :suggestions="SOURCE_SUGGESTIONS"
       test-id-prefix="sources-page-chat"
     />

@@ -15,7 +15,7 @@
                 @click="brushSize = size"
               >
                 <div
-                  :class="'bg-gray-800 rounded-full mx-auto'"
+                  class="bg-gray-800 rounded-full mx-auto"
                   :style="{
                     width: Math.max(2, size * 1) + 'px',
                     height: Math.max(2, size * 1) + 'px',
@@ -63,14 +63,14 @@
         :key="`${selectedResult?.uuid || 'default'}-${canvasRenderKey}`"
         :width="canvasWidth"
         :height="canvasHeight"
-        :stroke-type="'dash'"
-        :line-cap="'round'"
-        :line-join="'round'"
+        stroke-type="dash"
+        line-cap="round"
+        line-join="round"
         :fill-shape="false"
         :eraser="false"
         :line-width="brushSize"
         :color="brushColor"
-        :background-color="'#FFFFFF'"
+        background-color="#FFFFFF"
         :background-image="backgroundImage"
         :watermark="undefined"
         save-as="png"

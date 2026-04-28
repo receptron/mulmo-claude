@@ -111,7 +111,7 @@ router.get(API_ROUTES.news.readState, (_req: Request, res: Response<ReadState | 
 });
 
 router.put(API_ROUTES.news.readState, async (req: Request, res: Response<ReadState | { error: string }>) => {
-  const body = req.body;
+  const { body } = req;
   if (!isRecord(body) || !Array.isArray(body.readIds)) {
     badRequest(res, "expected { readIds: string[] }");
     return;

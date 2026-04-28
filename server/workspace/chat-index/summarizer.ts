@@ -86,7 +86,7 @@ export function extractText(jsonlContent: string): string {
     } catch {
       continue;
     }
-    const source = entry.source;
+    const { source } = entry;
     if ((source === "user" || source === "assistant") && entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
       parts.push(`[${source}] ${trimMessage(entry.message)}`);
     }

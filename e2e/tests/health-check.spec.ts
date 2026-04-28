@@ -8,6 +8,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+
 function urlEndsWith(suffix: string): (url: URL) => boolean {
   return (url) => url.pathname === suffix;
 }

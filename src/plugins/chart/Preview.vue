@@ -36,7 +36,7 @@ const hint = computed(() => {
 });
 
 function inferTypeFromOption(option: Record<string, unknown>): string | null {
-  const series = option.series;
+  const { series } = option;
   if (Array.isArray(series) && series.length > 0) {
     const first = series[0] as { type?: unknown };
     if (typeof first.type === "string") return first.type;

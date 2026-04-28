@@ -144,7 +144,7 @@ describe("runSourcesPipeline — happy path", () => {
     assert.equal(summaries.length, 1);
     assert.equal(summaries[0].length, 2);
     // Daily file exists and contains the JSON block.
-    const dailyPath = result.dailyPath;
+    const { dailyPath } = result;
     assert.equal(dailyPath, dailyNewsPath(workspace, toLocalIsoDate(FIXED_NOW_MS)));
     const daily = await readFile(dailyPath, "utf-8");
     assert.match(daily, /# Daily brief/);

@@ -258,7 +258,7 @@ function cancelEdit(): void {
 
 async function saveEdit(): Promise<void> {
   if (!detail.value) return;
-  const name = detail.value.name;
+  const { name } = detail.value;
   saving.value = true;
   detailError.value = null;
   const result = await apiPut<{ updated: boolean; path: string }>(API_ROUTES.skills.update.replace(":name", encodeURIComponent(name)), {
@@ -304,7 +304,7 @@ function runSkill(): void {
 // since the action is reversible by re-saving via the conversation.
 async function deleteSkill(): Promise<void> {
   if (!detail.value || detail.value.source !== "project") return;
-  const name = detail.value.name;
+  const { name } = detail.value;
   if (!window.confirm(t("pluginManageSkills.confirmDelete", { name }))) {
     return;
   }

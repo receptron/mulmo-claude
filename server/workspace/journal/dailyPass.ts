@@ -576,10 +576,10 @@ export function entryToExcerpt(entry: Record<string, unknown>): SessionEventExce
 // Tool-aware extraction: different plugins stash file paths in different places inside tool_result data.
 export function extractArtifactPaths(entry: Record<string, unknown>): string[] {
   if (entry.type !== "tool_result") return [];
-  const result = entry.result;
+  const { result } = entry;
   if (!isRecord(result)) return [];
   const resultRecord = result as Record<string, unknown>;
-  const data = resultRecord.data;
+  const { data } = resultRecord;
   if (!isRecord(data)) return [];
   const dataRecord = data as Record<string, unknown>;
   const paths: string[] = [];

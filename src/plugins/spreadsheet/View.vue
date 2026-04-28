@@ -534,7 +534,7 @@ function handleTableClick(event: MouseEvent) {
   const row = cell.parentElement as HTMLTableRowElement;
 
   const colIndex = cell.cellIndex;
-  const rowIndex = row.rowIndex;
+  const { rowIndex } = row;
 
   // Check if the main editor details is open
   const isEditorOpen = editorDetails.value?.open ?? false;

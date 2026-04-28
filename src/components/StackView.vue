@@ -97,8 +97,6 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { getPlugin } from "../tools";
-
-const { t } = useI18n();
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { View as TextResponseOriginalView } from "../plugins/textResponse/index";
 import { handleExternalLinkClick } from "../utils/dom/externalLink";
@@ -107,6 +105,8 @@ import { formatSmartTime } from "../utils/format/date";
 import { isRecord } from "../utils/types";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
 import type { LayoutMode } from "../utils/canvas/layoutMode";
+
+const { t } = useI18n();
 
 // Most plugin viewComponents use h-full internally, so a defined parent
 // height is required for them to render. text-response and the
@@ -206,7 +206,7 @@ function resizeOneIframe(iframe: HTMLIFrameElement): void {
 
 function isTextResponse(result: ToolResultComplete): result is ToolResultComplete<TextResponseData> {
   if (result.toolName !== "text-response") return false;
-  const data = result.data;
+  const { data } = result;
   if (!isRecord(data)) return false;
   return typeof data.text === "string";
 }

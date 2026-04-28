@@ -370,7 +370,7 @@ function itemsForDay(day: Date): ScheduledItem[] {
 const unscheduledItems = computed(() => items.value.filter((item) => !item.props.date));
 
 function itemTime(item: ScheduledItem): string {
-  const time = item.props.time;
+  const { time } = item.props;
   return typeof time === "string" ? time : "";
 }
 

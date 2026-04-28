@@ -162,7 +162,7 @@ export function handleCreate(items: TodoItem[], columns: StatusColumn[], input: 
   const resolved = resolveStatus(input, columns);
   if (resolved.kind === "error") return resolved;
 
-  const status = resolved.status;
+  const { status } = resolved;
   const item: TodoItem = {
     id: makeId("todo"),
     text: input.text.trim(),

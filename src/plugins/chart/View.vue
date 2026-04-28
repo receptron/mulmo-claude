@@ -74,7 +74,7 @@ function disposeAll(): void {
 // (zoomOnMouseWheel=true), which traps the scroll over the canvas.
 // Toolbox/slider/drag zoom still work — only the wheel is disabled.
 function disableWheelZoom(option: Record<string, unknown>): Record<string, unknown> {
-  const dataZoom = option.dataZoom;
+  const { dataZoom } = option;
   if (dataZoom === undefined || dataZoom === null) return option;
   const normalise = (entry: unknown): unknown => {
     if (!isRecord(entry)) return entry;
