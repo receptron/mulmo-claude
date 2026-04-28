@@ -113,6 +113,11 @@ function extractGroupId(dataMessage: JsonRecord): string {
   return "";
 }
 
+// E.164: `+` followed by 1-15 digits, first digit non-zero. Signal
+// accepts this exact shape; the bot can only reply to senders whose
+// phone is on file.
+const E164_PHONE = /^\+[1-9]\d{1,14}$/;
+
 function parseEnvelope(raw: string): IncomingSignal | null {
   let parsed: unknown;
   try {
@@ -139,11 +144,6 @@ function parseEnvelope(raw: string): IncomingSignal | null {
   const chatId = groupId ? `group.${groupId}` : sourceNumber;
   return { sourceNumber, chatId, isGroup: Boolean(groupId), text };
 }
-
-// E.164: `+` followed by 1-15 digits, first digit non-zero. Signal
-// accepts this exact shape; the bot can only reply to senders whose
-// phone is on file.
-const E164_PHONE = /^\+[1-9]\d{1,14}$/;
 
 async function handleEnvelope(raw: string): Promise<void> {
   const msg = parseEnvelope(raw);

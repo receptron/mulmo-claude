@@ -351,42 +351,74 @@
     </div>
 
     <!-- Lightbox -->
-    <div v-if="lightbox" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80" @click="closeLightbox">
-      <div class="flex items-center gap-4" @click.stop>
-        <button
-          v-if="!lightbox.isCharacter"
-          class="text-white/60 hover:text-white disabled:opacity-20 text-4xl leading-none"
-          :disabled="!hasPrev"
-          @click="lightboxMove(-1)"
-        >
-          ‹
-        </button>
-        <div class="flex flex-col items-center gap-3">
-          <img :src="lightbox.src" class="max-w-[80vw] max-h-[80vh] object-contain rounded shadow-2xl" />
-          <div class="flex items-center gap-4">
-            <p v-if="lightbox.text" class="max-w-[80vw] text-center text-white text-2xl leading-relaxed">
-              {{ lightbox.text }}
-            </p>
-            <button
-              v-if="beatAudios[lightbox.index]"
-              class="shrink-0 text-sm px-3 py-1 rounded border"
-              :class="
-                playingAudio?.index === lightbox.index ? 'border-red-400 text-red-400 hover:bg-red-400/20' : 'border-white/60 text-white/60 hover:bg-white/20'
-              "
-              @click="playAudio(lightbox.index)"
-            >
-              {{ playingAudio?.index === lightbox.index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
-            </button>
+    <div v-if="lightbox" class="fixed inset-0 z-50 bg-black/80 overflow-y-auto" @click="closeLightbox">
+      <button class="fixed top-2 right-4 z-10 text-white/60 hover:text-white text-3xl leading-none" :title="t('common.close')" @click.stop="closeLightbox">
+        ✕
+      </button>
+      <div class="flex flex-col items-center gap-4 pt-4 pb-8" @click.stop>
+        <div class="flex items-center gap-4">
+          <button
+            v-if="!lightbox.isCharacter"
+            class="text-white/60 hover:text-white disabled:opacity-20 text-5xl leading-none"
+            :disabled="!hasPrev"
+            @click="lightboxMove(-1)"
+          >
+            ‹
+          </button>
+          <div class="flex flex-col items-center">
+            <img :src="lightbox.src" class="max-w-[80vw] max-h-[85vh] object-contain rounded shadow-2xl" />
+            <div v-if="!lightbox.isCharacter && beats.length > 1" class="relative w-full h-1">
+              <div class="flex gap-1 h-full">
+                <div
+                  v-for="i in beats.length"
+                  :key="i - 1"
+                  class="group flex-1 cursor-pointer relative transition-colors"
+                  :class="
+                    i - 1 === lightbox.index
+                      ? 'bg-white/80 hover:bg-white'
+                      : i - 1 < lightbox.index
+                        ? 'bg-white/40 hover:bg-white/60'
+                        : 'bg-white/20 hover:bg-white/40'
+                  "
+                  @click="jumpToBeat(i - 1)"
+                >
+                  <span class="absolute -inset-y-3 inset-x-0" />
+                  <div
+                    v-if="beatTooltip(i - 1)"
+                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 px-2 py-1 rounded bg-black/90 text-white text-xs leading-tight w-48 max-h-[53px] overflow-hidden opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
+                  >
+                    {{ beatTooltip(i - 1) }}
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="playingAudio && playingAudio.index === lightbox.index"
+                class="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-white shadow ring-2 ring-black/30 -translate-y-1/2 -translate-x-1/2 pointer-events-none"
+                :style="{ left: `${((lightbox.index + audioProgress) / beats.length) * 100}%` }"
+              />
+            </div>
           </div>
+          <button
+            v-if="!lightbox.isCharacter"
+            class="text-white/60 hover:text-white disabled:opacity-20 text-5xl leading-none"
+            :disabled="!hasNext"
+            @click="lightboxMove(1)"
+          >
+            ›
+          </button>
         </div>
-        <button
-          v-if="!lightbox.isCharacter"
-          class="text-white/60 hover:text-white disabled:opacity-20 text-4xl leading-none"
-          :disabled="!hasNext"
-          @click="lightboxMove(1)"
-        >
-          ›
-        </button>
+        <div v-if="lightbox.text || beatAudios[lightbox.index]" class="relative w-screen flex justify-center px-16">
+          <p v-if="lightbox.text" class="max-w-[80vw] text-center text-white leading-relaxed text-[clamp(0.8rem,1.76vw,1.6rem)]">
+            {{ lightbox.text }}
+          </p>
+          <button
+            v-if="beatAudios[lightbox.index]"
+            class="absolute top-0 right-4 text-sm px-3 py-1 rounded border border-white/60 text-white/60 hover:bg-white/20"
+            @click="playAudio(lightbox.index)"
+          >
+            {{ playingAudio?.index === lightbox.index ? t("pluginMulmoScript.stop") : t("pluginMulmoScript.play") }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -466,6 +498,7 @@ const beatAudios = reactive<Record<number, string>>({});
 const audioState = reactive<Record<number, "generating" | "done" | "error">>({});
 const audioErrors = reactive<Record<number, string>>({});
 const playingAudio = ref<{ index: number; audio: HTMLAudioElement } | null>(null);
+const audioProgress = ref(0);
 const beatListEl = ref<HTMLElement | null>(null);
 const lightbox = ref<{
   src: string;
@@ -518,6 +551,7 @@ function stopPlayingAudio() {
   if (!playingAudio.value) return;
   playingAudio.value.audio.pause();
   playingAudio.value = null;
+  audioProgress.value = 0;
 }
 
 function openLightbox(index: number) {
@@ -582,6 +616,22 @@ const hasNext = computed(() => {
   }
   return false;
 });
+
+function jumpToBeat(index: number) {
+  if (!lightbox.value) return;
+  if (index === lightbox.value.index) return;
+  if (!renderedImages[index]) return;
+  const wasPlaying = playingAudio.value !== null;
+  openLightbox(index);
+  if (wasPlaying && beatAudios[index]) {
+    playAudio(index);
+  }
+}
+
+function beatTooltip(index: number): string {
+  const text = effectiveBeat(index).text ?? "";
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
+}
 
 function lightboxMove(delta: number) {
   if (!lightbox.value) return;
@@ -830,9 +880,15 @@ function playAudio(index: number) {
   if (!src) return;
   const audio = new Audio(src);
   playingAudio.value = { index, audio };
+  audioProgress.value = 0;
+  audio.addEventListener("timeupdate", () => {
+    if (playingAudio.value?.index !== index) return;
+    if (audio.duration > 0) audioProgress.value = audio.currentTime / audio.duration;
+  });
   audio.addEventListener("ended", () => {
     if (playingAudio.value?.index !== index) return;
     playingAudio.value = null;
+    audioProgress.value = 0;
     if (lightbox.value?.index === index) {
       lightboxMove(1);
       const nextIndex = lightbox.value?.index;

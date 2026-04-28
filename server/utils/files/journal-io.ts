@@ -136,6 +136,11 @@ export interface DailyFileEntry {
   day: string;
 }
 
+const YEAR_RE = /^\d{4}$/;
+const MONTH_RE = /^\d{2}$/;
+const isYearDir = (name: string) => YEAR_RE.test(name);
+const isMonthDir = (name: string) => MONTH_RE.test(name);
+
 export async function listDailyFiles(rootOverride?: string): Promise<DailyFileEntry[]> {
   const dailyRoot = path.join(summariesRoot(root(rootOverride)), DAILY_DIR);
   const years = await safeReaddir(dailyRoot);
@@ -146,11 +151,6 @@ export async function listDailyFiles(rootOverride?: string): Promise<DailyFileEn
   }
   return out;
 }
-
-const YEAR_RE = /^\d{4}$/;
-const MONTH_RE = /^\d{2}$/;
-const isYearDir = (name: string) => YEAR_RE.test(name);
-const isMonthDir = (name: string) => MONTH_RE.test(name);
 
 async function listDaysForYear(dailyRoot: string, year: string): Promise<DailyFileEntry[]> {
   const months = await safeReaddir(path.join(dailyRoot, year));

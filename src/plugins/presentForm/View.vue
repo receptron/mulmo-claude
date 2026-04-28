@@ -22,18 +22,18 @@
         </h3>
         <ul class="text-red-700 space-y-1">
           <li v-for="[fieldId, error] in fieldErrors" :key="fieldId">
-            <a :href="`#${fieldId}`" @click.prevent="focusField(fieldId)" class="hover:underline cursor-pointer">
+            <a :href="`#${fieldId}`" class="hover:underline cursor-pointer" @click.prevent="focusField(fieldId)">
               {{ error.message }}
             </a>
           </li>
         </ul>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="space-y-6">
+      <form class="space-y-6" @submit.prevent="handleSubmit">
         <div
           v-for="field in formData.fields"
-          :key="field.id"
           :id="field.id"
+          :key="field.id"
           class="form-field"
           :class="{ 'has-error': hasError(field.id) && touched.has(field.id) }"
         >
@@ -60,13 +60,13 @@
             :placeholder="field.placeholder"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @input="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @input="handleInput(field.id)"
           />
 
           <textarea
@@ -77,13 +77,13 @@
             :rows="field.rows || 4"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @input="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors resize-y"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @input="handleInput(field.id)"
           />
 
           <input
@@ -96,13 +96,13 @@
             :step="field.step"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @input="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @input="handleInput(field.id)"
           />
 
           <input
@@ -114,13 +114,13 @@
             :max="field.maxDate"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @change="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @change="handleInput(field.id)"
           />
 
           <input
@@ -130,13 +130,13 @@
             type="time"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @change="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @change="handleInput(field.id)"
           />
 
           <div
@@ -156,13 +156,13 @@
               }"
             >
               <input
+                v-model="formValues[field.id]"
                 type="radio"
                 :name="field.id"
                 :value="index"
-                v-model="formValues[field.id]"
+                class="mr-3 h-4 w-4 flex-shrink-0"
                 @change="handleInput(field.id)"
                 @blur="handleBlur(field.id)"
-                class="mr-3 h-4 w-4 flex-shrink-0"
               />
               <span class="text-gray-800">{{ choice }}</span>
             </label>
@@ -174,13 +174,13 @@
             v-model="formValues[field.id]"
             :aria-invalid="hasError(field.id) && touched.has(field.id)"
             :aria-describedby="hasError(field.id) && touched.has(field.id) ? `${field.id}-error` : undefined"
-            @blur="handleBlur(field.id)"
-            @change="handleInput(field.id)"
             class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors bg-white"
             :class="{
               'border-red-500 focus:ring-red-500': hasError(field.id) && touched.has(field.id),
               'border-gray-300': !hasError(field.id) || !touched.has(field.id),
             }"
+            @blur="handleBlur(field.id)"
+            @change="handleInput(field.id)"
           >
             <option :value="null" disabled>{{ t("pluginPresentForm.selectOption") }}</option>
             <option v-for="(choice, index) in field.choices" :key="index" :value="index">
@@ -205,12 +205,12 @@
               }"
             >
               <input
+                v-model="formValues[field.id]"
                 type="checkbox"
                 :value="index"
-                v-model="formValues[field.id]"
+                class="mr-3 h-4 w-4 flex-shrink-0"
                 @change="handleInput(field.id)"
                 @blur="handleBlur(field.id)"
-                class="mr-3 h-4 w-4 flex-shrink-0"
               />
               <span class="text-gray-800">{{ choice }}</span>
             </label>

@@ -161,6 +161,8 @@ export function resyncDoneMembership(items: TodoItem[], newDoneId: string): { it
 // so two columns being merged together (handleDeleteColumn's refuge
 // case) end up with unique, contiguous orders rather than colliding
 // 1000s from each side.
+const ORDER_STEP = 1000;
+
 function rebuildColumnOrder(items: TodoItem[], columnId: string): TodoItem[] {
   const inColumn = items.filter((item) => item.status === columnId).sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
   const newOrders = new Map<string, number>();
@@ -171,8 +173,6 @@ function rebuildColumnOrder(items: TodoItem[], columnId: string): TodoItem[] {
     return { ...item, order: newOrder };
   });
 }
-
-const ORDER_STEP = 1000;
 
 // ── Action handlers ───────────────────────────────────────────────
 

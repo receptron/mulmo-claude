@@ -56,7 +56,11 @@ function waitUntilReady(portNum, onReady) {
   const timeoutMs = 15000;
   const intervalMs = 300;
 
-  const attempt = () => {
+  // `function` declarations (not arrow consts) so the mutual
+  // reference between `attempt` and `retry` works without TDZ
+  // ordering problems. Both forms are hoisted to the top of the
+  // enclosing function scope.
+  function attempt() {
     const req = httpGet({ host: "127.0.0.1", port: portNum, path: "/", timeout: 1000 }, (res) => {
       res.resume();
       onReady();
@@ -66,12 +70,12 @@ function waitUntilReady(portNum, onReady) {
       req.destroy();
       retry();
     });
-  };
+  }
 
-  const retry = () => {
+  function retry() {
     if (Date.now() - startedAt > timeoutMs) return;
     setTimeout(attempt, intervalMs);
-  };
+  }
 
   attempt();
 }

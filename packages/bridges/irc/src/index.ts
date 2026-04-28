@@ -36,12 +36,12 @@ const password = process.env.IRC_PASSWORD;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
+const irc = new IrcClient();
+
 mulmo.onPush((pushEvent) => {
   // pushEvent.chatId is the channel name
   irc.say(pushEvent.chatId, pushEvent.message);
 });
-
-const irc = new IrcClient();
 
 irc.connect({
   host: server,

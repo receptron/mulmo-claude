@@ -268,6 +268,7 @@ const WIKI_DATA_DIR = "data/wiki";
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const appApi = useAppApi();
 
 const props = defineProps<{
   selectedResult?: ToolResultComplete<WikiData>;
@@ -599,7 +600,9 @@ function navigatePage(pageName: string) {
 }
 
 // --- Per-page chat composer ---
-const appApi = useAppApi();
+// (`appApi` itself is hoisted to the top of <script setup> alongside
+// route/router/t so the lint-by-line analysis is happy with earlier
+// uses in `startLintChat` etc.)
 
 const isStandaloneWikiRoute = computed(() => route.name === PAGE_ROUTES.wiki);
 
