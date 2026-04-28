@@ -1,0 +1,299 @@
+// Per-wiki-page edit-history snapshot pipeline (#763 PR 2).
+//
+// Every meaningful save through `writeWikiPage` deposits a
+// snapshot under `data/wiki/.history/<slug>/<stamp>-<shortId>.md`.
+// The file content is byte-identical to what was just written; the
+// snapshot's frontmatter carries `_snapshot_*` keys describing the
+// save itself (timestamp, editor, sessionId, reason).
+//
+// "Restore" reads the snapshot and writes it back through the
+// normal `writeWikiPage` path — no special restore primitive
+// needed, just frontmatter cleanup before the round-trip. This
+// makes restore a *safe, reversible* operation: it adds a new
+// snapshot rather than tearing the history apart.
+//
+// Garbage collection runs on every snapshot append. The retention
+// rule is **OR-keyed**: a snapshot survives as long as it is in
+// the newest 100 OR younger than 180 days; only entries failing
+// BOTH conditions get unlinked. There is no hard cap.
+
+import path from "node:path";
+import { promises as fsp } from "node:fs";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
+import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { shortId } from "../../utils/id.js";
+import { workspacePath as defaultWorkspacePath } from "../workspace.js";
+import { WORKSPACE_DIRS } from "../paths.js";
+import type { WikiPageEditor, WikiWriteMeta } from "./io.js";
+
+export const SNAPSHOT_RETAIN_COUNT = 100;
+export const SNAPSHOT_RETAIN_DAYS = 180;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface SnapshotPathOptions {
+  workspaceRoot?: string;
+  /** Injectable clock for deterministic tests. */
+  now?: () => Date;
+  /** Injectable id for deterministic tests. */
+  shortId?: () => string;
+}
+
+/** Directory holding all snapshots for a single slug. Returned even
+ *  when the dir doesn't exist yet; callers that read should tolerate
+ *  ENOENT (treat as "no history yet"). */
+export function historyDir(slug: string, opts: SnapshotPathOptions = {}): string {
+  const root = opts.workspaceRoot ?? defaultWorkspacePath;
+  return path.join(root, WORKSPACE_DIRS.wikiHistory, slug);
+}
+
+/** Snapshot summary as surfaced by `listSnapshots` and the history
+ *  routes. The body is intentionally NOT included so a 100-entry
+ *  page doesn't blow the response payload — call `readSnapshot` to
+ *  fetch a single snapshot's full content. */
+export interface SnapshotSummary {
+  /** Filesystem-safe ISO-ish timestamp encoded into the filename
+   *  (e.g. `2026-04-28T01-23-45-789Z`). Used as the route param to
+   *  read the snapshot back. */
+  stamp: string;
+  /** Bytes of the snapshot file (frontmatter + body, after write). */
+  bytes: number;
+  ts: string;
+  editor: WikiPageEditor;
+  sessionId?: string;
+  reason?: string;
+}
+
+export interface SnapshotContent extends SnapshotSummary {
+  /** Frontmatter of the saved page at this snapshot's instant —
+   *  with `_snapshot_*` keys *included*. Restore strips them. */
+  meta: Record<string, unknown>;
+  /** Body of the page at the snapshot instant. */
+  body: string;
+}
+
+// Filenames look like `<stamp>-<shortId>.md`. The stamp is
+// `YYYY-MM-DDTHH-mm-ss-sssZ` (colons swapped to hyphens). The
+// shortId tail disambiguates same-millisecond writes.
+const FILENAME_RE = /^(?<stamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(?<id>[a-z0-9]+)\.md$/i;
+
+function timestampToFilenameStamp(date: Date): string {
+  // 2026-04-28T01:23:45.789Z → 2026-04-28T01-23-45-789Z. Swap the
+  // colons (forbidden on Windows / awkward in URLs) and the period
+  // before milliseconds. Result is still strict-monotonic and
+  // sortable lexicographically.
+  return date.toISOString().replace(/:/g, "-").replace(".", "-");
+}
+
+function filenameStampToTimestamp(stamp: string): string | null {
+  // Inverse of `timestampToFilenameStamp`. Returns the canonical
+  // ISO 8601 form (with colons + period) for use in the
+  // _snapshot_ts frontmatter and the JSON wire shape. Returns null
+  // when the stamp doesn't match the expected shape — callers can
+  // skip the entry rather than throwing on a stray file.
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(stamp);
+  if (!match) return null;
+  const [, date, hour, min, sec, milli] = match;
+  return `${date}T${hour}:${min}:${sec}.${milli}Z`;
+}
+
+/** Path-safety check for the `:stamp` route param. The route layer
+ *  must reject anything that wouldn't survive being joined with
+ *  `historyDir(slug)` — same logic shape as `wiki-pages/io.ts`'s
+ *  `isSafeSlug`. Exported because the route does the validation
+ *  before calling readSnapshot / restoreSnapshot. */
+export function isSafeStamp(stamp: string): boolean {
+  return FILENAME_RE.test(`${stamp}-x.md`);
+}
+
+// Snapshot-meta keys carry strings only, so a plain
+// `Record<string, unknown>` matches `mergeFrontmatter`'s parameter
+// shape exactly. A named interface here would require a cast at
+// the merge call site without buying any extra type safety —
+// snapshot consumers re-validate the shape on read anyway.
+function buildSnapshotMetaPatch(meta: WikiWriteMeta, timestamp: string): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    _snapshot_ts: timestamp,
+    _snapshot_editor: meta.editor,
+  };
+  if (meta.sessionId !== undefined) patch._snapshot_session = meta.sessionId;
+  if (meta.reason !== undefined && meta.reason.length > 0) patch._snapshot_reason = meta.reason;
+  return patch;
+}
+
+const SNAPSHOT_KEYS = ["_snapshot_ts", "_snapshot_editor", "_snapshot_session", "_snapshot_reason"] as const;
+
+/** Strip `_snapshot_*` keys from a snapshot's frontmatter so the
+ *  resulting content can be written back through the normal
+ *  `writeWikiPage` path without polluting the live page with
+ *  history-internal metadata. */
+export function stripSnapshotMeta(meta: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if ((SNAPSHOT_KEYS as readonly string[]).includes(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+/** Write a snapshot file for a page that just changed. The
+ *  snapshot's content == the page's new content (byte-identical
+ *  body), with `_snapshot_*` meta merged in. The `_oldContent`
+ *  parameter is intentionally unused — kept in the signature for
+ *  symmetry with the call site so a future "diff snapshot" mode
+ *  doesn't have to thread a new parameter. */
+export async function appendSnapshot(
+  slug: string,
+  _oldContent: string | null,
+  newContent: string,
+  meta: WikiWriteMeta,
+  opts: SnapshotPathOptions = {},
+): Promise<void> {
+  const now = (opts.now ?? (() => new Date()))();
+  const isoTs = now.toISOString();
+  const filenameStamp = timestampToFilenameStamp(now);
+  const tail = (opts.shortId ?? shortId)();
+  const fileName = `${filenameStamp}-${tail}.md`;
+
+  // The new page already has its own frontmatter (writeWikiPage
+  // auto-stamps `created` / `updated` / `editor`). Merge the
+  // `_snapshot_*` patch on top so the snapshot file carries both
+  // the page's identity AND the save event.
+  const parsed = parseFrontmatter(newContent);
+  const merged = mergeFrontmatter(parsed.meta, buildSnapshotMetaPatch(meta, isoTs));
+  const snapshotContent = serializeWithFrontmatter(merged, parsed.body);
+
+  const dir = historyDir(slug, opts);
+  await writeFileAtomic(path.join(dir, fileName), snapshotContent);
+  await gcSnapshots(slug, now, opts);
+}
+
+/** Walk `historyDir(slug)` and unlink every snapshot that fails
+ *  BOTH retention rules: outside the newest `SNAPSHOT_RETAIN_COUNT`
+ *  AND older than `SNAPSHOT_RETAIN_DAYS` from `now`. Idempotent —
+ *  safe to run on a directory that doesn't exist (no-op).
+ *  Tolerant of stray files whose names don't match the expected
+ *  pattern; they are left alone. */
+export async function gcSnapshots(slug: string, now: Date, opts: SnapshotPathOptions = {}): Promise<void> {
+  const dir = historyDir(slug, opts);
+  const entries = await readSnapshotEntries(dir);
+  if (entries.length === 0) return;
+
+  // Sort newest-first by stamp. The stamp is lexicographically
+  // sortable because it's zero-padded ISO with colons swapped.
+  entries.sort((left, right) => (left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0));
+
+  const cutoffMs = now.getTime() - SNAPSHOT_RETAIN_DAYS * ONE_DAY_MS;
+
+  await Promise.all(
+    entries.map(async (entry, index) => {
+      const tsIso = filenameStampToTimestamp(entry.stamp);
+      if (tsIso === null) return; // shouldn't happen — readSnapshotEntries already filtered
+      const entryMs = Date.parse(tsIso);
+      const withinCount = index < SNAPSHOT_RETAIN_COUNT;
+      const withinAge = entryMs >= cutoffMs;
+      if (withinCount || withinAge) return;
+      await fsp.unlink(path.join(dir, entry.fileName)).catch(() => {});
+    }),
+  );
+}
+
+interface SnapshotEntry {
+  stamp: string;
+  fileName: string;
+}
+
+async function readSnapshotEntries(dir: string): Promise<SnapshotEntry[]> {
+  let names: string[];
+  try {
+    names = await fsp.readdir(dir);
+  } catch {
+    return [];
+  }
+  const out: SnapshotEntry[] = [];
+  for (const name of names) {
+    const match = FILENAME_RE.exec(name);
+    if (!match?.groups) continue;
+    out.push({ stamp: match.groups.stamp, fileName: name });
+  }
+  return out;
+}
+
+function entryStringField(meta: Record<string, unknown>, key: string): string | undefined {
+  const value = meta[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function entryEditor(meta: Record<string, unknown>): WikiPageEditor {
+  const value = meta._snapshot_editor;
+  if (value === "llm" || value === "user" || value === "system") return value;
+  // Default to "user" for files written by an older version of the
+  // pipeline that didn't stamp the field. Better than throwing on a
+  // stray legacy entry.
+  return "user";
+}
+
+/** List snapshots for a slug, newest-first. Returns an empty array
+ *  when the slug has no history dir yet. Each entry carries enough
+ *  meta (ts, editor, reason, sessionId) to render a list view; the
+ *  body is omitted — call `readSnapshot` for full content. */
+export async function listSnapshots(slug: string, opts: SnapshotPathOptions = {}): Promise<SnapshotSummary[]> {
+  const dir = historyDir(slug, opts);
+  const entries = await readSnapshotEntries(dir);
+  entries.sort((left, right) => (left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0));
+
+  const summaries: SnapshotSummary[] = [];
+  for (const entry of entries) {
+    try {
+      const filePath = path.join(dir, entry.fileName);
+      const raw = await fsp.readFile(filePath, "utf-8");
+      const stat = await fsp.stat(filePath);
+      const parsed = parseFrontmatter(raw);
+      const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(entry.stamp) ?? entry.stamp;
+      summaries.push({
+        stamp: entry.stamp,
+        bytes: stat.size,
+        ts: tsIso,
+        editor: entryEditor(parsed.meta),
+        sessionId: entryStringField(parsed.meta, "_snapshot_session"),
+        reason: entryStringField(parsed.meta, "_snapshot_reason"),
+      });
+    } catch {
+      // Skip unreadable entries — a corrupted snapshot shouldn't
+      // take down the whole list. The next GC run will clean it up.
+    }
+  }
+  return summaries;
+}
+
+/** Read a single snapshot. Returns null when the file is missing
+ *  or the stamp is malformed. */
+export async function readSnapshot(slug: string, stamp: string, opts: SnapshotPathOptions = {}): Promise<SnapshotContent | null> {
+  if (!isSafeStamp(stamp)) return null;
+  const dir = historyDir(slug, opts);
+  const entries = await readSnapshotEntries(dir);
+  const match = entries.find((entry) => entry.stamp === stamp);
+  if (!match) return null;
+
+  const filePath = path.join(dir, match.fileName);
+  let raw: string;
+  let stat: { size: number };
+  try {
+    raw = await fsp.readFile(filePath, "utf-8");
+    stat = await fsp.stat(filePath);
+  } catch {
+    return null;
+  }
+
+  const parsed = parseFrontmatter(raw);
+  const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(match.stamp) ?? match.stamp;
+  return {
+    stamp: match.stamp,
+    bytes: stat.size,
+    ts: tsIso,
+    editor: entryEditor(parsed.meta),
+    sessionId: entryStringField(parsed.meta, "_snapshot_session"),
+    reason: entryStringField(parsed.meta, "_snapshot_reason"),
+    meta: parsed.meta,
+    body: parsed.body,
+  };
+}

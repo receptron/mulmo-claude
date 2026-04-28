@@ -24,6 +24,7 @@ import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";
+import { appendSnapshot } from "./snapshot.js";
 
 export type WikiPageEditor = "llm" | "user" | "system";
 
@@ -116,7 +117,10 @@ export async function writeWikiPage(slug: string, content: string, meta: WikiWri
   // Compare bodies after parsing so a frontmatter-only diff in
   // auto-stamped fields doesn't trip the trigger.
   if (oldContent === null || hasMeaningfulChange(oldContent, finalContent)) {
-    await appendSnapshot(slug, oldContent, finalContent, meta);
+    await appendSnapshot(slug, oldContent, finalContent, meta, {
+      workspaceRoot: opts.workspaceRoot,
+      now: opts.now,
+    });
   }
 }
 
@@ -233,18 +237,7 @@ export function classifyAsWikiPage(absPath: string, opts: WikiPageWriteOptions =
   return { wiki: true, slug };
 }
 
-// ── Internal: snapshot stub ────────────────────────────────────
-//
-// Filled in by #763 PR 2. Kept here as a no-op so the call site is
-// already wired up and PR 2 is a pure internal change.
-//
-// Signature note: takes both old and new content so the snapshot
-// store can emit a diff or store the prior version directly. Meta
-// carries editor identity / session / reason so the snapshot can
-// be attributed.
-
-async function appendSnapshot(__slug: string, __oldContent: string | null, __newContent: string, __meta: WikiWriteMeta): Promise<void> {
-  // Intentionally empty — PR 2 (#763) replaces this with the
-  // actual snapshot pipeline. The wiring is in place so PR 2 is
-  // purely an internal change.
-}
+// Snapshot pipeline lives in `./snapshot.ts` (#763 PR 2). The
+// indirection keeps `io.ts` focused on the page write contract;
+// snapshot.ts owns retention policy, frontmatter shape, and the
+// history dir layout.

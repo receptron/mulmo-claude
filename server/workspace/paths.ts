@@ -78,6 +78,11 @@ export const WORKSPACE_DIRS = {
   // prompt hint.
   wikiPages: "data/wiki/pages",
   wikiSources: "data/wiki/sources",
+  // Per-page edit-history snapshots (#763 PR 2). Hidden by leading
+  // dot so a curious user listing `data/wiki/` doesn't trip over a
+  // peer directory of historical content. Each `<slug>/` underneath
+  // holds N snapshot .md files newest-first.
+  wikiHistory: "data/wiki/.history",
   // Development — git-cloned repositories (#256).
   github: "github",
 } as const;
@@ -119,6 +124,7 @@ export const WORKSPACE_PATHS = {
   // nested subdirs
   wikiPages: path.join(workspacePath, WORKSPACE_DIRS.wikiPages),
   wikiSources: path.join(workspacePath, WORKSPACE_DIRS.wikiSources),
+  wikiHistory: path.join(workspacePath, WORKSPACE_DIRS.wikiHistory),
   // files
   memory: path.join(workspacePath, WORKSPACE_FILES.memory),
   sessionToken: path.join(workspacePath, WORKSPACE_FILES.sessionToken),
