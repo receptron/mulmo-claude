@@ -7,7 +7,7 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync } from "fs";
-import { mkdtemp, readFile, rm } from "fs/promises";
+import { mkdtemp, readFile, rm, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import type { Request, Response } from "express";
@@ -101,10 +101,16 @@ after(async () => {
 });
 
 describe("GET /api/wiki/pages/:slug/history", () => {
-  it("returns 404 for an unknown slug", async () => {
+  it("returns an empty list for a slug with no live page (history outlives the page)", async () => {
+    // Codex iter-2 #917: gating this route on the live page existing
+    // would block restore for deleted/renamed pages — exactly when
+    // history is most needed. Empty 200 still answers "no history"
+    // unambiguously.
     const { state, res } = mockRes();
     await listHandler(makeReq({ slug: "does-not-exist" }), res);
-    assert.equal(state.status, 404);
+    assert.equal(state.status, 200);
+    assert.equal(state.body?.slug, "does-not-exist");
+    assert.deepEqual(state.body?.snapshots, []);
   });
 
   it("returns 400 on an unsafe slug", async () => {
@@ -131,6 +137,20 @@ describe("GET /api/wiki/pages/:slug/history", () => {
     const reasons = (state.body.snapshots ?? []).map((entry) => entry.reason);
     assert.equal(reasons[0], "revise");
     assert.equal(reasons[1], "draft");
+  });
+
+  it("still lists snapshots after the live page is deleted", async () => {
+    // Codex iter-2 #917: history must outlive the page so the user
+    // can find and restore deleted/renamed content.
+    const slug = "list-after-delete";
+    await writeWikiPage(slug, "doomed body\n", { editor: "user", reason: "before delete" });
+    await unlink(path.join(pagesDir, `${slug}.md`));
+
+    const { state, res } = mockRes();
+    await listHandler(makeReq({ slug }), res);
+    assert.equal(state.status, 200);
+    assert.equal(state.body?.slug, slug);
+    assert.ok((state.body?.snapshots ?? []).length >= 1, "snapshot of deleted page must remain visible");
   });
 });
 

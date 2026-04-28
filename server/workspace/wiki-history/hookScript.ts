@@ -13,13 +13,16 @@
 //      next server start re-provisions automatically (idempotent).
 //
 // Behaviour:
-//   - Read stdin JSON (claude CLI feeds tool_input + tool_response).
+//   - Read stdin JSON (claude CLI feeds tool_input + tool_response
+//     plus a top-level `session_id`).
 //   - If the touched file is `data/wiki/pages/<slug>.md` under the
 //     workspace root, POST `{ slug, sessionId? }` to the parent
 //     server's `/api/wiki/internal/snapshot` endpoint. We send the
 //     slug (not an absolute path) because in Docker mode the hook's
 //     view of the filesystem (`/home/node/mulmoclaude/...`) differs
 //     from the server's (`/Users/<user>/mulmoclaude/...`).
+//   - `sessionId` is Claude CLI's `session_id` so the snapshot
+//     carries the chat-session identifier of whoever wrote the page.
 //   - Anything else: silent no-op. The hook MUST NOT fail loud;
 //     a busted snapshot path can't be allowed to make `Write`
 //     itself look like it failed to the LLM.
@@ -113,6 +116,13 @@ async function main() {
   const port = readPortSafe();
   if (!token || !port) return; // server isn't reachable; silent no-op
 
+  // Claude CLI provides session_id at the top of every hook
+  // payload — forward it so the snapshot can later be traced back
+  // to the chat session that drove the write. Best-effort; missing
+  // / non-string values are simply omitted.
+  const sessionId = typeof payload?.session_id === "string" && payload.session_id.length > 0 ? payload.session_id : undefined;
+  const body = sessionId === undefined ? { slug } : { slug, sessionId };
+
   try {
     await fetch(\`http://\${SERVER_HOST}:\${port}/api/wiki/internal/snapshot\`, {
       method: "POST",
@@ -120,7 +130,7 @@ async function main() {
         "Content-Type": "application/json",
         Authorization: \`Bearer \${token}\`,
       },
-      body: JSON.stringify({ slug }),
+      body: JSON.stringify(body),
     });
   } catch {
     // Network / server down — drop silently. The wiki page write

@@ -122,7 +122,7 @@ describe("POST /api/wiki/internal/snapshot", () => {
     await writeFile(filePath, "---\ntitle: x\n---\n\nllm-written body\n", "utf-8");
 
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ slug, reason: "added section on Y" }), res);
+    await snapshotHandler(makeReq({ slug }), res);
     assert.equal(state.status, 200);
     assert.equal(state.body?.ok, true);
     assert.equal(state.body?.slug, slug);
@@ -130,7 +130,9 @@ describe("POST /api/wiki/internal/snapshot", () => {
     const snapshots = await listSnapshots(slug);
     assert.equal(snapshots.length, 1, "endpoint should have written exactly one snapshot");
     assert.equal(snapshots[0].editor, "llm", "hook always tags as llm — user-driven writes go through writeWikiPage");
-    assert.equal(snapshots[0].reason, "added section on Y");
+    // The hook never supplies `reason` (the LLM has no natural source
+    // for one) — the field is absent from this code path.
+    assert.equal(snapshots[0].reason, undefined);
   });
 
   it("propagates sessionId when the hook supplies one", async () => {

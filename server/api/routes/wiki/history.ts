@@ -13,7 +13,7 @@
 
 import { Router, type Request, type Response } from "express";
 import path from "node:path";
-import { writeWikiPage, readWikiPage } from "../../../workspace/wiki-pages/io.js";
+import { writeWikiPage } from "../../../workspace/wiki-pages/io.js";
 import { WORKSPACE_DIRS } from "../../../workspace/paths.js";
 import { isSafeStamp, listSnapshots, readSnapshot, stripSnapshotMeta } from "../../../workspace/wiki-pages/snapshot.js";
 import { mergeFrontmatter, serializeWithFrontmatter } from "../../../utils/markdown/frontmatter.js";
@@ -50,15 +50,11 @@ router.get("/pages/:slug/history", async (req: Request<{ slug: string }>, res: R
     badRequest(res, "Unsafe slug");
     return;
   }
-  // Confirm the page actually exists before exposing its history —
-  // otherwise a stray client request for a non-existent slug would
-  // get a 200 with `[]` and the caller couldn't tell "no history"
-  // from "wrong slug".
-  const live = await readWikiPage(slug);
-  if (live === null) {
-    notFound(res, `wiki page not found: ${slug}`);
-    return;
-  }
+  // Don't gate on the live page existing. Snapshots are non-destructive
+  // and outlive their page — gating here would make history disappear
+  // exactly when the user needs it (deleted/renamed page → can't see
+  // history → can't restore). An empty list still answers "no history"
+  // unambiguously (codex review iter-2 #917).
   const snapshots = await listSnapshots(slug);
   res.json({ slug, snapshots });
 });
@@ -135,17 +131,22 @@ router.post("/pages/:slug/history/:stamp/restore", async (req: Request<{ slug: s
 // either side to translate; sending the slug lets each side keep
 // its own filesystem view.
 //
+// `sessionId` lets the snapshot carry the chat-session identifier
+// that drove the write, surfaced from Claude CLI's `session_id`
+// hook payload field. There is no `reason` — the LLM doesn't
+// supply one, and in-process callers (writeWikiPage) attach
+// their own reasons through `WikiWriteMeta` directly.
+//
 // Bearer auth applies via the global `app.use("/api", bearerAuth)`
 // in server/index.ts; no extra check needed here.
 
 interface InternalSnapshotBody {
   slug?: string;
-  reason?: string;
   sessionId?: string;
 }
 
 router.post("/internal/snapshot", async (req: Request<object, unknown, InternalSnapshotBody>, res: Response) => {
-  const { slug, reason, sessionId } = req.body ?? {};
+  const { slug, sessionId } = req.body ?? {};
   if (typeof slug !== "string" || slug.length === 0) {
     badRequest(res, "slug required");
     return;
@@ -173,7 +174,6 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
     {
       editor: "llm",
       ...(typeof sessionId === "string" && sessionId.length > 0 && { sessionId }),
-      ...(typeof reason === "string" && reason.length > 0 && { reason }),
     },
     { workspaceRoot: workspacePath },
   );
