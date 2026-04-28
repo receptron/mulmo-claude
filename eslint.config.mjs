@@ -120,16 +120,9 @@ export default [
     // block to files that are in a tsconfig — excludes `.mjs`/`.cjs`/
     // `.cts` which are not part of any project's `include` array. Vue
     // SFCs get parserOptions set in their own block at the bottom.
-    // Type-checked rules need tsc-backed parser services. Scoped to
-    // production code only — test/ and e2e/ are excluded because:
-    //   1. type-checked lint roughly triples the cost on them and
-    //      they're the largest single share of LOC, so the time
-    //      savings are biggest here.
-    //   2. tests legitimately float promises (`expect(...).resolves`,
-    //      `setTimeout`-based delays) that would all need explicit
-    //      `void` annotation for low real-bug signal.
-    // Vue SFCs get parserOptions in their own block at the bottom.
-    files: ["{src,server,packages}/**/*.{ts,tsx}"],
+    // Type-checked rules need tsc-backed parser services. Vue SFCs
+    // get parserOptions in their own block at the bottom.
+    files: ["**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -141,7 +134,7 @@ export default [
     // Rules block — applies to both TS and Vue files. Type-checked
     // rules are demoted to warn pending dedicated cleanup PRs
     // (analogous to #925's no-non-null-assertion handling).
-    files: ["{src,server,packages}/**/*.{ts,tsx,vue}"],
+    files: ["**/*.{ts,tsx,vue}"],
     rules: {
       "@typescript-eslint/no-floating-promises": "warn",
       // Bug-detection-signal-positive sonarjs type-checked rules.
