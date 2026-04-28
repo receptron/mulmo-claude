@@ -37,7 +37,7 @@ export default [
   eslint.configs.recommended,
   sonarjs.configs.recommended,
   securityPlugin.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.strict,
   ...vuePlugin.configs["flat/recommended"],
   ...vueI18n.configs.recommended,
   {
@@ -173,6 +173,8 @@ export default [
       "no-implicit-coercion": ["error", { boolean: true, number: true, string: true, disallowTemplateShorthand: false }],
       "no-unneeded-ternary": ["error", { defaultAssignment: false }],
       "no-else-return": ["error", { allowElseIf: false }],
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-dynamic-delete": "warn",
       quotes: "off",
       "no-shadow": "error",
       "no-param-reassign": "error",

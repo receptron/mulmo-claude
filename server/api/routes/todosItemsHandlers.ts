@@ -291,7 +291,7 @@ export function handlePatch(items: TodoItem[], columns: StatusColumn[], itemId: 
   // Each step short-circuits on validation failure. Order matters:
   // status changes happen before completed-toggling so an explicit
   // completed: true alongside a non-done status doesn't fight itself.
-  const steps: Array<() => ItemsActionResult | null | void> = [
+  const steps: Array<() => ItemsActionResult | null | undefined> = [
     () => applyTextPatch(updated, input),
     () => applyNotePatch(updated, input),
     () => applyLabelsPatch(updated, input),

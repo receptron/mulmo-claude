@@ -82,7 +82,11 @@ function makeEvent(opts: Partial<FakeMouseEvent> = {}): FakeMouseEvent {
 }
 
 // Install a minimal Element constructor so `instanceof Element` passes
-// for anything whose prototype chain includes our base.
+// for anything whose prototype chain includes our base. An empty class
+// is the only way to get a constructor function that supports
+// `instanceof` checks; a const-bound function or module isn't usable
+// here.
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class -- need a real constructor for `instanceof` checks
 class FakeElementBase {}
 const originalElement = (globalThis as { Element?: unknown }).Element;
 
