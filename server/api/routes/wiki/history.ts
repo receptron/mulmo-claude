@@ -13,7 +13,8 @@
 
 import { Router, type Request, type Response } from "express";
 import path from "node:path";
-import { classifyAsWikiPage, writeWikiPage, readWikiPage } from "../../../workspace/wiki-pages/io.js";
+import { writeWikiPage, readWikiPage } from "../../../workspace/wiki-pages/io.js";
+import { WORKSPACE_DIRS } from "../../../workspace/paths.js";
 import { isSafeStamp, listSnapshots, readSnapshot, stripSnapshotMeta } from "../../../workspace/wiki-pages/snapshot.js";
 import { mergeFrontmatter, serializeWithFrontmatter } from "../../../utils/markdown/frontmatter.js";
 import { badRequest, notFound } from "../../../utils/httpError.js";
@@ -119,41 +120,43 @@ router.post("/pages/:slug/history/:stamp/restore", async (req: Request<{ slug: s
 //
 // Hit by `<workspace>/.claude/hooks/wiki-snapshot.mjs` after the
 // claude CLI completes a `Write` / `Edit` tool call. The hook
-// passes the absolute path; this handler validates it lives
-// under `data/wiki/pages/`, reads the current disk state, and
+// computes the slug from the file path it just touched and
+// passes it here; the server resolves the slug to its OWN
+// `data/wiki/pages/` filesystem location, reads disk state, and
 // drops a snapshot through the same `appendSnapshot` path the
 // in-process writers use. Always tagged `editor: "llm"` —
 // user-driven writes go through the regular `writeWikiPage`
 // path with their own editor identity.
 //
+// Why slug-not-absPath: in Docker mode the hook runs inside the
+// container where the workspace lives at `/home/node/mulmoclaude/`
+// while the server (running on the host) sees the same files at
+// `/Users/<user>/mulmoclaude/`. Sending the absolute path forces
+// either side to translate; sending the slug lets each side keep
+// its own filesystem view.
+//
 // Bearer auth applies via the global `app.use("/api", bearerAuth)`
 // in server/index.ts; no extra check needed here.
 
 interface InternalSnapshotBody {
-  absPath?: string;
+  slug?: string;
   reason?: string;
   sessionId?: string;
 }
 
 router.post("/internal/snapshot", async (req: Request<object, unknown, InternalSnapshotBody>, res: Response) => {
-  const { absPath, reason, sessionId } = req.body ?? {};
-  if (typeof absPath !== "string" || absPath.length === 0) {
-    badRequest(res, "absPath required");
+  const { slug, reason, sessionId } = req.body ?? {};
+  if (typeof slug !== "string" || slug.length === 0) {
+    badRequest(res, "slug required");
     return;
   }
-  // `path.resolve` collapses any embedded `..` segments before we
-  // ask `classifyAsWikiPage` whether it lives under the wiki dir.
-  // The classifier is path-string-only — it does NOT realpath the
-  // input, so the caller MUST already have a normalised absolute
-  // path. We accept whatever the LLM hook sent and re-resolve.
-  const resolved = path.resolve(absPath);
-  const classified = classifyAsWikiPage(resolved);
-  if (!classified.wiki) {
-    badRequest(res, "absPath is not a wiki page");
+  if (!isSafeSlug(slug)) {
+    badRequest(res, "slug is not safe");
     return;
   }
 
-  const content = await readTextOrNull(resolved);
+  const pagePath = path.join(workspacePath, WORKSPACE_DIRS.wikiPages, `${slug}.md`);
+  const content = await readTextOrNull(pagePath);
   if (content === null) {
     notFound(res, "wiki page not found on disk");
     return;
@@ -164,7 +167,7 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
   // go through writeWikiPage in-process and never reach here.
   const { appendSnapshot } = await import("../../../workspace/wiki-pages/snapshot.js");
   await appendSnapshot(
-    classified.slug,
+    slug,
     null,
     content,
     {
@@ -174,8 +177,8 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
     },
     { workspaceRoot: workspacePath },
   );
-  log.info("wiki", "internal snapshot recorded", { slug: classified.slug });
-  res.json({ slug: classified.slug, ok: true });
+  log.info("wiki", "internal snapshot recorded", { slug });
+  res.json({ slug, ok: true });
 });
 
 export default router;

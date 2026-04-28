@@ -15,8 +15,11 @@
 // Behaviour:
 //   - Read stdin JSON (claude CLI feeds tool_input + tool_response).
 //   - If the touched file is `data/wiki/pages/<slug>.md` under the
-//     workspace root, POST `{ absPath, reason? }` to the parent
-//     server's `/api/wiki/internal/snapshot` endpoint.
+//     workspace root, POST `{ slug, sessionId? }` to the parent
+//     server's `/api/wiki/internal/snapshot` endpoint. We send the
+//     slug (not an absolute path) because in Docker mode the hook's
+//     view of the filesystem (`/home/node/mulmoclaude/...`) differs
+//     from the server's (`/Users/<user>/mulmoclaude/...`).
 //   - Anything else: silent no-op. The hook MUST NOT fail loud;
 //     a busted snapshot path can't be allowed to make `Write`
 //     itself look like it failed to the LLM.
@@ -64,17 +67,19 @@ function extractFilePath(payload) {
   return null;
 }
 
-function isWikiPagePath(absPath) {
-  if (!absPath.endsWith(".md")) return false;
+function slugFromWikiPagePath(absPath) {
+  if (!absPath.endsWith(".md")) return null;
   if (!absPath.startsWith(WIKI_PAGES_DIR + path.sep) && !absPath.startsWith(WIKI_PAGES_DIR + "/")) {
-    return false;
+    return null;
   }
+  const rel = absPath.slice(WIKI_PAGES_DIR.length + 1);
   // Reject nested paths — a real wiki page lives directly under
   // pages/, not in pages/<sub>/<file>.md. Mirrors the server-side
   // \`classifyAsWikiPage\` rule.
-  const rel = absPath.slice(WIKI_PAGES_DIR.length + 1);
-  if (rel.includes(path.sep)) return false;
-  return true;
+  if (rel.includes(path.sep) || rel.includes("/") || rel.includes("\\\\")) return null;
+  const slug = rel.slice(0, -".md".length);
+  if (slug.length === 0 || slug === "." || slug === "..") return null;
+  return slug;
 }
 
 function readTokenSafe() {
@@ -100,7 +105,9 @@ async function main() {
   if (!payload) return;
 
   const filePath = extractFilePath(payload);
-  if (!filePath || !isWikiPagePath(filePath)) return;
+  if (!filePath) return;
+  const slug = slugFromWikiPagePath(filePath);
+  if (!slug) return;
 
   const token = readTokenSafe();
   const port = readPortSafe();
@@ -113,7 +120,7 @@ async function main() {
         "Content-Type": "application/json",
         Authorization: \`Bearer \${token}\`,
       },
-      body: JSON.stringify({ absPath: filePath }),
+      body: JSON.stringify({ slug }),
     });
   } catch {
     // Network / server down — drop silently. The wiki page write

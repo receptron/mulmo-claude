@@ -92,41 +92,37 @@ after(async () => {
 });
 
 describe("POST /api/wiki/internal/snapshot", () => {
-  it("returns 400 when absPath is missing", async () => {
+  it("returns 400 when slug is missing", async () => {
     const { state, res } = mockRes();
     await snapshotHandler(makeReq({}), res);
     assert.equal(state.status, 400);
   });
 
-  it("returns 400 when absPath is not under wiki/pages", async () => {
+  it("returns 400 when slug contains a path separator", async () => {
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ absPath: "/etc/passwd" }), res);
+    await snapshotHandler(makeReq({ slug: "../etc/passwd" }), res);
     assert.equal(state.status, 400);
   });
 
-  it("rejects path-traversal attempts that try to escape via ..", async () => {
-    const slug = "esc";
-    await writeFile(path.join(pagesDir, `${slug}.md`), "body\n", "utf-8");
-    // The ".." segment normalises away from wikiPages; classifier
-    // should reject because the resolved path leaves the wiki dir.
+  it("returns 400 for the literal `..` slug", async () => {
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ absPath: path.join(pagesDir, "..", "..", "..", "etc", "passwd") }), res);
+    await snapshotHandler(makeReq({ slug: ".." }), res);
     assert.equal(state.status, 400);
   });
 
-  it("returns 404 when the file doesn't exist on disk", async () => {
+  it("returns 404 when the slug's file doesn't exist on disk", async () => {
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ absPath: path.join(pagesDir, "missing.md") }), res);
+    await snapshotHandler(makeReq({ slug: "missing" }), res);
     assert.equal(state.status, 404);
   });
 
-  it("records a snapshot tagged editor=llm for a valid wiki page", async () => {
+  it("records a snapshot tagged editor=llm for a valid slug", async () => {
     const slug = "valid-llm-write";
     const filePath = path.join(pagesDir, `${slug}.md`);
     await writeFile(filePath, "---\ntitle: x\n---\n\nllm-written body\n", "utf-8");
 
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ absPath: filePath, reason: "added section on Y" }), res);
+    await snapshotHandler(makeReq({ slug, reason: "added section on Y" }), res);
     assert.equal(state.status, 200);
     assert.equal(state.body?.ok, true);
     assert.equal(state.body?.slug, slug);
@@ -143,7 +139,7 @@ describe("POST /api/wiki/internal/snapshot", () => {
     await writeFile(filePath, "body\n", "utf-8");
 
     const { state, res } = mockRes();
-    await snapshotHandler(makeReq({ absPath: filePath, sessionId: "chat-abc-123" }), res);
+    await snapshotHandler(makeReq({ slug, sessionId: "chat-abc-123" }), res);
     assert.equal(state.status, 200);
 
     const snapshots = await listSnapshots(slug);

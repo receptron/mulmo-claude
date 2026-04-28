@@ -21,6 +21,17 @@ import { WIKI_SNAPSHOT_HOOK_SCRIPT } from "./hookScript.js";
 
 const SETTINGS_REL = path.join(".claude", "settings.json");
 const HOOK_SCRIPT_REL = path.join(".claude", "hooks", "wiki-snapshot.mjs");
+// Forward-slash form for the shell command field — settings.json
+// is read by Claude CLI, and a hook command is interpreted by a
+// POSIX shell (Mac / Linux / inside the Docker container). We never
+// embed the workspace root directly: the same settings.json is
+// bind-mounted into the container, so a host-absolute path
+// (`/Users/.../mulmoclaude/...`) silently fails inside the container
+// where the workspace lives at `/home/node/mulmoclaude/...`. Claude
+// CLI exports `CLAUDE_PROJECT_DIR` to hooks, which resolves
+// correctly in both contexts.
+const HOOK_SCRIPT_REL_POSIX = ".claude/hooks/wiki-snapshot.mjs";
+const HOOK_COMMAND = `node "$CLAUDE_PROJECT_DIR/${HOOK_SCRIPT_REL_POSIX}"`;
 const OWNER_MARKER = "mulmoclaudeWikiHistory";
 
 interface HookCommandEntry {
@@ -56,7 +67,7 @@ export async function provisionWikiHistoryHook(opts: ProvisionOptions = {}): Pro
   const settingsPath = path.join(root, SETTINGS_REL);
 
   await writeHookScript(scriptPath);
-  const changed = await mergeHookIntoSettings(settingsPath, scriptPath);
+  const changed = await mergeHookIntoSettings(settingsPath);
   if (changed) {
     log.info("wiki-history", "provisioned wiki-snapshot hook", { settingsPath, scriptPath });
   }
@@ -69,13 +80,13 @@ async function writeHookScript(absPath: string): Promise<void> {
   await writeFileAtomic(absPath, WIKI_SNAPSHOT_HOOK_SCRIPT, { mode: 0o700 });
 }
 
-async function mergeHookIntoSettings(settingsPath: string, scriptAbsPath: string): Promise<boolean> {
+async function mergeHookIntoSettings(settingsPath: string): Promise<boolean> {
   const existingRaw = await readTextOrNull(settingsPath);
   const existing: SettingsShape = existingRaw ? safeParse(existingRaw) : {};
 
   const desiredHook: HookCommandEntry = {
     type: "command",
-    command: `node ${quoteForShell(scriptAbsPath)}`,
+    command: HOOK_COMMAND,
     [OWNER_MARKER]: true,
   };
 
@@ -131,11 +142,4 @@ function upsertOurHook(settings: SettingsShape, desiredHook: HookCommandEntry): 
 function entryHasOwnedHook(entry: HookMatcher): boolean {
   if (!Array.isArray(entry.hooks)) return false;
   return entry.hooks.some((hook) => hook[OWNER_MARKER] === true);
-}
-
-function quoteForShell(input: string): string {
-  // Single-quote-and-escape so paths with spaces survive the shell
-  // interpretation that Claude CLI applies to `command`. Embedded
-  // single quotes get the standard `'\''` dance.
-  return `'${input.replace(/'/g, "'\\''")}'`;
 }

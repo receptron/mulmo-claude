@@ -34,7 +34,10 @@ describe("provisionWikiHistoryHook — first install", () => {
     assert.equal(entry.hooks?.length, 1);
     const hook = entry.hooks?.[0];
     assert.equal(hook?.mulmoclaudeWikiHistory, true);
-    assert.match(hook?.command ?? "", /node .+wiki-snapshot\.mjs/);
+    // Command must use $CLAUDE_PROJECT_DIR so the same settings.json
+    // works on the host AND inside the Docker container, where the
+    // workspace lives at a different absolute path.
+    assert.match(hook?.command ?? "", /node "\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/wiki-snapshot\.mjs"/);
 
     const scriptPath = path.join(root, ".claude", "hooks", "wiki-snapshot.mjs");
     const scriptBody = await readFile(scriptPath, "utf-8");
@@ -123,9 +126,10 @@ describe("provisionWikiHistoryHook — preserves user-set keys", () => {
     assert.equal(entries.length, 1, "stale entry should be replaced, not duplicated");
     const ours = entries[0] as { hooks?: Array<{ command?: string }> };
     const newCommand = ours.hooks?.[0]?.command ?? "";
-    const escapedRoot = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const expectedPattern = new RegExp(`${escapedRoot}.*wiki-snapshot\\.mjs`);
-    assert.match(newCommand, expectedPattern, "command should point at the current workspace path");
+    // Stale absolute path should be gone; new command must use the
+    // portable $CLAUDE_PROJECT_DIR form (works in host + container).
+    assert.doesNotMatch(newCommand, /\/old\/path/);
+    assert.match(newCommand, /node "\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/wiki-snapshot\.mjs"/);
 
     await rm(root, { recursive: true, force: true });
   });
