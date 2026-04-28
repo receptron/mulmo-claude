@@ -125,10 +125,16 @@ jobs:
           corepack enable
           corepack prepare yarn@4.14.1 --activate
           yarn --version
-      # No --immutable: yarn.lock is v1 format (yarn 1 is the primary
-      # tool); Yarn 4 migrates in-memory. The smoke goal is "does the
-      # workspace install at all", not lockfile-format drift.
+      # yarn.lock is v1 format (yarn 1 is the primary tool); Yarn 4
+      # migrates it on install. Hardened mode auto-activates on public
+      # PR runs and forbids that migration, failing with YN0028. The
+      # smoke goal is "does the workspace install at all", not
+      # lockfile-format drift, so opt out for this cell only. Risk
+      # surface is unchanged: lint_test (yarn 1) covers the same
+      # lockfile.
       - name: yarn install (Yarn 4)
+        env:
+          YARN_ENABLE_HARDENED_MODE: "false"
         run: yarn install
       - name: yarn build:packages (verifies the dev/build script chain has no pre* dependency)
         run: yarn build:packages
