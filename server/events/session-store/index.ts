@@ -6,7 +6,7 @@
 
 import { appendFile } from "fs/promises";
 import type { IPubSub } from "../pub-sub/index.js";
-import { PUBSUB_CHANNELS, sessionChannel } from "../../../src/config/pubsubChannels.js";
+import { PUBSUB_CHANNELS, sessionChannel, type SessionsChannelPayload } from "../../../src/config/pubsubChannels.js";
 import { log } from "../../system/logger/index.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
 import { EVENT_TYPES, GENERATION_KINDS, type GenerationKind, type PendingGeneration, generationKey } from "../../../src/types/events.js";
@@ -111,9 +111,25 @@ export function getOrCreateSession(
   return session;
 }
 
-function removeSession(chatSessionId: string): void {
+function removeSession(chatSessionId: string, payload?: SessionsChannelPayload): void {
   store.delete(chatSessionId);
-  notifySessionsChanged();
+  notifySessionsChanged(payload);
+}
+
+// Public wrapper used by the sessions delete route — drops both the
+// in-memory entry and any storeless pending-generation tracking, then
+// publishes a `deletedIds` payload so subscribers can purge their
+// local caches (cursor diffs don't carry deletions).
+export function evictSession(chatSessionId: string): void {
+  storelessPending.delete(chatSessionId);
+  removeSession(chatSessionId, { deletedIds: [chatSessionId] });
+}
+
+/** Public wrapper around `notifySessionsChanged` — used by route
+ *  handlers that mutate session meta directly (e.g. bookmark) so the
+ *  sidebar refetches via the standard `sessions` channel. */
+export function publishSessionsChanged(payload?: SessionsChannelPayload): void {
+  notifySessionsChanged(payload);
 }
 
 // ── State mutations (publish to pub/sub) ───────────────────────
@@ -458,9 +474,12 @@ function publishToSessionChannel(chatSessionId: string, data: unknown): void {
   }
 }
 
-/** Notify all clients that session state has changed — refetch via REST. */
-function notifySessionsChanged(): void {
-  pubsub?.publish(PUBSUB_CHANNELS.sessions, {});
+/** Notify all clients that session state has changed. Empty payload
+ *  is a "refetch" hint; `deletedIds` lets subscribers prune their
+ *  local caches without a full refetch (cursor diffs don't carry
+ *  deletions). */
+function notifySessionsChanged(payload: SessionsChannelPayload = {}): void {
+  pubsub?.publish(PUBSUB_CHANNELS.sessions, payload);
 }
 
 function evictIdleSessions(): void {

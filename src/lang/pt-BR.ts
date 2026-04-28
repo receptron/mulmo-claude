@@ -38,6 +38,7 @@ const ptBRMessages = {
     filters: {
       all: "Todas",
       unread: "Não lidas",
+      bookmarked: "Favoritas",
       human: "Pessoa",
       scheduler: "Agendador",
       skill: "Skill",
@@ -50,6 +51,11 @@ const ptBRMessages = {
     running: "Em execução",
     noMessages: "(sem mensagens)",
     openRowAria: "Abrir sessão: {preview}",
+    rowMenuAria: "Ações da sessão",
+    bookmark: "Favoritar",
+    unbookmark: "Remover favorito",
+    delete: "Excluir",
+    deleteConfirm: "Excluir esta sessão?\n\n{preview}\n\nEsta ação não pode ser desfeita.",
   },
   notificationBell: {
     notifications: "Notificações",

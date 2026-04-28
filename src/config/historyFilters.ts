@@ -9,6 +9,7 @@ import { SESSION_ORIGINS } from "../types/session";
 export const HISTORY_FILTERS = {
   all: "all",
   unread: "unread",
+  bookmarked: "bookmarked",
   human: SESSION_ORIGINS.human,
   scheduler: SESSION_ORIGINS.scheduler,
   skill: SESSION_ORIGINS.skill,
@@ -17,12 +18,13 @@ export const HISTORY_FILTERS = {
 
 export type HistoryFilter = (typeof HISTORY_FILTERS)[keyof typeof HISTORY_FILTERS];
 
-// Display order for the pill row. `all` is always first; `unread` sits
-// between `all` and the origin filters to mirror the existing
-// hand-written order in SessionHistoryPanel.
+// Display order for the pill row. `all` is always first; `unread` and
+// `bookmarked` sit between `all` and the origin filters because they
+// are user-state filters, not origin sub-filters.
 export const HISTORY_FILTER_ORDER: readonly HistoryFilter[] = [
   HISTORY_FILTERS.all,
   HISTORY_FILTERS.unread,
+  HISTORY_FILTERS.bookmarked,
   HISTORY_FILTERS.human,
   HISTORY_FILTERS.scheduler,
   HISTORY_FILTERS.skill,

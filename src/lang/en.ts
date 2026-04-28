@@ -60,6 +60,7 @@ const enMessages = {
     filters: {
       all: "All",
       unread: "Unread",
+      bookmarked: "Bookmarked",
       human: "Human",
       scheduler: "Scheduler",
       skill: "Skill",
@@ -72,6 +73,11 @@ const enMessages = {
     running: "Running",
     noMessages: "(no messages)",
     openRowAria: "Open session: {preview}",
+    rowMenuAria: "Session actions",
+    bookmark: "Bookmark",
+    unbookmark: "Remove bookmark",
+    delete: "Delete",
+    deleteConfirm: "Delete this session?\n\n{preview}\n\nThis cannot be undone.",
   },
   notificationBell: {
     notifications: "Notifications",

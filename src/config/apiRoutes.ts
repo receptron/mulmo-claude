@@ -150,9 +150,10 @@ export const API_ROUTES = {
 
   sessions: {
     list: "/api/sessions",
-    // GET /api/sessions/:id + POST /api/sessions/:id/mark-read
+    // GET /api/sessions/:id (read) + DELETE /api/sessions/:id (hard delete)
     detail: "/api/sessions/:id",
     markRead: "/api/sessions/:id/mark-read",
+    bookmark: "/api/sessions/:id/bookmark",
   },
 
   skills: {

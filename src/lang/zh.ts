@@ -43,6 +43,7 @@ const zhMessages = {
     filters: {
       all: "全部",
       unread: "未读",
+      bookmarked: "已收藏",
       human: "人工",
       scheduler: "调度器",
       skill: "技能",
@@ -55,6 +56,11 @@ const zhMessages = {
     running: "运行中",
     noMessages: "(无消息)",
     openRowAria: "打开会话: {preview}",
+    rowMenuAria: "会话操作",
+    bookmark: "添加收藏",
+    unbookmark: "取消收藏",
+    delete: "删除",
+    deleteConfirm: "确定要删除该会话吗？\n\n{preview}\n\n此操作无法撤销。",
   },
   notificationBell: {
     notifications: "通知",

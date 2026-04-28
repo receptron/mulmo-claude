@@ -43,6 +43,7 @@ const esMessages = {
     filters: {
       all: "Todas",
       unread: "No leídas",
+      bookmarked: "Marcadas",
       human: "Persona",
       scheduler: "Programador",
       skill: "Skill",
@@ -55,6 +56,11 @@ const esMessages = {
     running: "En ejecución",
     noMessages: "(sin mensajes)",
     openRowAria: "Abrir sesión: {preview}",
+    rowMenuAria: "Acciones de sesión",
+    bookmark: "Marcar",
+    unbookmark: "Quitar marcador",
+    delete: "Eliminar",
+    deleteConfirm: "¿Eliminar esta sesión?\n\n{preview}\n\nEsta acción no se puede deshacer.",
   },
   notificationBell: {
     notifications: "Notificaciones",

@@ -1,4 +1,4 @@
-import { appendFile } from "fs/promises";
+import { appendFile, rm } from "fs/promises";
 import path from "node:path";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { workspacePath } from "../../workspace/paths.js";
@@ -25,6 +25,7 @@ export interface SessionMeta {
   firstUserMessage?: string;
   claudeSessionId?: string;
   hasUnread?: boolean;
+  isBookmarked?: boolean;
   origin?: "human" | "scheduler" | "skill" | "bridge";
   [key: string]: unknown;
 }
@@ -90,6 +91,20 @@ export async function updateHasUnread(sessionId: string, hasUnread: boolean, roo
   const meta = await readSessionMeta(sessionId, rootOverride);
   if (!meta) return;
   await writeSessionMeta(sessionId, { ...meta, hasUnread }, rootOverride);
+}
+
+export async function updateIsBookmarked(sessionId: string, isBookmarked: boolean, rootOverride?: string): Promise<void> {
+  const meta = await readSessionMeta(sessionId, rootOverride);
+  if (!meta) return;
+  await writeSessionMeta(sessionId, { ...meta, isBookmarked }, rootOverride);
+}
+
+// Hard-deletes the session's .jsonl event log and .json meta sidecar.
+// Missing files are tolerated — callers may invoke this for sessions
+// whose meta or jsonl was never written (e.g. a crash mid-create).
+export async function deleteSessionFiles(sessionId: string, rootOverride?: string): Promise<void> {
+  await rm(sessionJsonlAbsPath(sessionId, rootOverride), { force: true });
+  await rm(sessionMetaAbsPath(sessionId, rootOverride), { force: true });
 }
 
 export function sessionJsonlAbsPath(sessionId: string, rootOverride?: string): string {

@@ -3,8 +3,10 @@
        SessionHistoryPanel. Visual rules:
        - Running → yellow with a slow spin (the one place we keep
          colour because the state is load-bearing)
-       - Unread (not running) → darker gray so the row reads as
-         "something to look at"
+       - Bookmarked → green (user-set, sits below "running" because
+         status beats user-state)
+       - Unread (not running, not bookmarked) → darker gray so the row
+         reads as "something to look at"
        - Default → light gray
        - Origin (scheduler / skill / bridge) → tiny B&W badge on the
          top-right. Human / unknown origin → no badge. -->
@@ -47,6 +49,7 @@ const iconSizeClass = computed(() => (props.size === "sm" ? "text-sm" : "text-ba
 
 const stateClass = computed(() => {
   if (props.session.isRunning) return "text-yellow-400";
+  if (props.session.isBookmarked) return "text-green-600";
   if (props.session.hasUnread) return "text-gray-900";
   return "text-gray-400";
 });

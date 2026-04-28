@@ -22,12 +22,24 @@ export function sessionChannel(chatSessionId: string): string {
   return `session.${chatSessionId}`;
 }
 
+/** Payload published on `PUBSUB_CHANNELS.sessions`.
+ *  - Empty `{}` for ordinary "something changed, refetch" hints
+ *    (run/finish, mark-read, bookmark toggle).
+ *  - `{ deletedIds }` when sessions have been hard-deleted, so
+ *    subscribers can drop them from their local caches without a
+ *    full refetch (cursor diffs don't carry deletions). */
+export interface SessionsChannelPayload {
+  deletedIds?: string[];
+}
+
 /** Static pub/sub channel names. Factories for parameterised channels
  *  (e.g. `sessionChannel(id)`) live alongside as named helpers. */
 export const PUBSUB_CHANNELS = {
   /** Sidebar "a session updated, please refetch" notification.
-   *  Publisher: `server/session-store/index.ts#notifySessionsChanged`.
-   *  Subscriber: `src/App.vue`. */
+   *  Publisher: `server/session-store/index.ts#publishSessionsChanged`.
+   *  Subscribers: `useSessionHistory` (purges deletedIds from the
+   *  cached list), `useSessionSync` (purges deletedIds from
+   *  sessionMap; refetches summaries for live state). */
   sessions: "sessions",
   /** Server-side debug heartbeat — wired through the task-manager
    *  demo counter. Useful for sanity-checking that the WS pipe is

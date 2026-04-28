@@ -41,6 +41,8 @@ export interface SessionSummary {
   keywords?: string[];
   /** Where this session originated. Missing = "human" (backward compat). */
   origin?: SessionOrigin;
+  /** User-set bookmark flag. Persisted in the meta sidecar. */
+  isBookmarked?: boolean;
   // Live state from the server session store (present when the
   // session has an active in-memory entry on the server).
   isRunning?: boolean;

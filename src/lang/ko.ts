@@ -45,6 +45,7 @@ const koMessages = {
     filters: {
       all: "전체",
       unread: "읽지 않음",
+      bookmarked: "북마크",
       human: "사람",
       scheduler: "스케줄러",
       skill: "스킬",
@@ -57,6 +58,11 @@ const koMessages = {
     running: "실행 중",
     noMessages: "(메시지 없음)",
     openRowAria: "세션 열기: {preview}",
+    rowMenuAria: "세션 작업",
+    bookmark: "북마크 추가",
+    unbookmark: "북마크 해제",
+    delete: "삭제",
+    deleteConfirm: "이 세션을 삭제하시겠습니까?\n\n{preview}\n\n이 작업은 되돌릴 수 없습니다.",
   },
   notificationBell: {
     notifications: "알림",

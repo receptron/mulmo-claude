@@ -77,6 +77,8 @@
             :roles="roles"
             :error-message="historyError"
             @load-session="handleSessionSelect"
+            @toggle-bookmark="(id, bookmarked) => setBookmark(id, bookmarked)"
+            @delete-session="(id) => deleteSessionFromHistory(id)"
           />
           <SessionHistoryExpandButton :model-value="sidePanelExpanded" @update:model-value="(value: boolean) => (sidePanelExpanded = value)" />
         </div>
@@ -384,11 +386,17 @@ const userInput = ref("");
 const pastedFile = ref<PastedFile | null>(null);
 const activePane = ref<"sidebar" | "main">("sidebar");
 
-const { sessions, historyError, fetchSessions } = useSessionHistory();
+const { sessions, historyError, fetchSessions, setBookmark, deleteSession: deleteSessionFromHistory } = useSessionHistory();
 const { markSessionRead } = useSessionSync({
   sessionMap,
   currentSessionId,
   fetchSessions,
+  // Another tab hard-deleted the chat we're currently viewing. The
+  // sessionMap eviction has already cleared the in-memory state; the
+  // URL still points at the dead id. Mirror the URL→404 fallback on
+  // line ~366 by spinning up a fresh session so the user lands on a
+  // working /chat instead of a blank pane.
+  onCurrentSessionDeleted: () => createNewSession(),
 });
 const { geminiAvailable, sandboxEnabled, cpuLoadRatio, fetchHealth } = useHealth();
 

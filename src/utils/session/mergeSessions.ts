@@ -54,6 +54,9 @@ function buildLiveSummary(live: ActiveSession, serverEntry: SessionSummary | und
     // from the server list must keep it — the tab bar renders the
     // non-human glyph off this field.
     ...(serverEntry?.origin !== undefined && { origin: serverEntry.origin }),
+    ...(serverEntry?.isBookmarked !== undefined && {
+      isBookmarked: serverEntry.isBookmarked,
+    }),
     isRunning,
     ...(serverEntry?.hasUnread !== undefined && {
       hasUnread: serverEntry.hasUnread,

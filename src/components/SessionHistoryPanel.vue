@@ -44,13 +44,53 @@
         @keydown.space.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
       >
         <!-- Timestamp pill straddling the top border, mirroring the
-             SessionSidebar card design. The running indicator
-             still renders inline in the meta line below (it's a
-             status, not a time); unread is signalled solely through
-             previewClasses (bold text). -->
-        <span class="absolute top-0 right-2 -translate-y-1/2 bg-white px-1 text-[10px] text-gray-400 leading-none pointer-events-none">
-          {{ formatDate(session.updatedAt) }}
-        </span>
+             SessionSidebar card design. The kebab "..." button sits
+             next to it on the same border line — clicking opens a
+             popover with delete + bookmark actions. The running
+             indicator still renders inline in the meta line below
+             (it's a status, not a time); unread is signalled through
+             previewClasses (bold text); bookmark state is signalled
+             via the green role icon. -->
+        <div class="absolute top-0 right-2 -translate-y-1/2 flex items-center gap-1 bg-white px-1 leading-none">
+          <button
+            type="button"
+            class="flex items-center justify-center text-gray-400 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400 rounded"
+            :aria-label="t('sessionHistoryPanel.rowMenuAria')"
+            :data-testid="`session-row-menu-${session.id}`"
+            @click.stop="toggleMenu(session.id)"
+            @keydown.enter.stop
+            @keydown.space.stop
+          >
+            <span class="material-icons !text-[14px] leading-none" aria-hidden="true">more_horiz</span>
+          </button>
+          <span class="text-[10px] text-gray-400 pointer-events-none">{{ formatDate(session.updatedAt) }}</span>
+        </div>
+        <div
+          v-if="openMenuId === session.id"
+          class="absolute top-2 right-2 z-10 min-w-[140px] rounded border border-gray-200 bg-white shadow-md py-1 text-xs"
+          role="menu"
+          :data-testid="`session-row-menu-popover-${session.id}`"
+          @click.stop
+        >
+          <button
+            type="button"
+            role="menuitem"
+            class="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
+            :data-testid="`session-row-bookmark-${session.id}`"
+            @click.stop="onToggleBookmark(session)"
+          >
+            {{ session.isBookmarked ? t("sessionHistoryPanel.unbookmark") : t("sessionHistoryPanel.bookmark") }}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="block w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
+            :data-testid="`session-row-delete-${session.id}`"
+            @click.stop="onDelete(session)"
+          >
+            {{ t("sessionHistoryPanel.delete") }}
+          </button>
+        </div>
         <div class="flex items-center gap-1.5">
           <SessionRoleIcon :session="session" :roles="roles" size="sm" />
           <p class="truncate flex-1 min-w-0" :class="previewClasses(session)">
@@ -71,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary, SessionOrigin } from "../types/session";
@@ -83,10 +123,11 @@ import FilterChip from "./FilterChip.vue";
 
 const { t } = useI18n();
 
-// `unread` is mutually exclusive with origin pills — selecting it
-// shows every unread-flagged session regardless of origin, matching
-// the user expectation that "unread" is the primary question ("what
-// needs my attention?") rather than an origin sub-filter.
+// `unread` and `bookmarked` are mutually exclusive with origin pills —
+// selecting either shows every matching session regardless of origin,
+// matching the user expectation that those are the primary questions
+// ("what needs my attention?", "what did I save?") rather than origin
+// sub-filters.
 
 const props = defineProps<{
   sessions: SessionSummary[];
@@ -98,6 +139,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   loadSession: [id: string];
+  toggleBookmark: [id: string, bookmarked: boolean];
+  deleteSession: [id: string];
 }>();
 
 const root = ref<HTMLDivElement | null>(null);
@@ -115,16 +158,18 @@ function originOf(session: SessionSummary): SessionOrigin {
   return session.origin ?? SESSION_ORIGINS.human;
 }
 
-const filteredSessions = computed(() => {
-  if (activeFilter.value === HISTORY_FILTERS.all) return props.sessions;
-  if (activeFilter.value === HISTORY_FILTERS.unread) return props.sessions.filter((session) => session.hasUnread === true);
-  return props.sessions.filter((session) => originOf(session) === activeFilter.value);
-});
+function matchesFilter(session: SessionSummary, filter: HistoryFilter): boolean {
+  if (filter === HISTORY_FILTERS.all) return true;
+  if (filter === HISTORY_FILTERS.unread) return session.hasUnread === true;
+  if (filter === HISTORY_FILTERS.bookmarked) return session.isBookmarked === true;
+  return originOf(session) === filter;
+}
+
+const filteredSessions = computed(() => props.sessions.filter((session) => matchesFilter(session, activeFilter.value)));
 
 function countByOrigin(filterKey: HistoryFilter): number {
   if (filterKey === HISTORY_FILTERS.all) return props.sessions.length;
-  if (filterKey === HISTORY_FILTERS.unread) return props.sessions.filter((session) => session.hasUnread === true).length;
-  return props.sessions.filter((session) => originOf(session) === filterKey).length;
+  return props.sessions.filter((session) => matchesFilter(session, filterKey)).length;
 }
 
 function isSessionRunning(session: SessionSummary): boolean {
@@ -144,4 +189,41 @@ function previewClasses(session: SessionSummary): string {
   if (isSessionUnread(session)) return "text-gray-900 font-bold";
   return "text-gray-700";
 }
+
+// ── Row action menu ─────────────────────────────────────────
+//
+// Only one popover is open at a time, tracked by session id. A
+// document-level click listener closes it on any outside click; the
+// kebab button and popover stop propagation so clicks inside don't
+// trigger the closer (or the row's load-session handler).
+
+const openMenuId = ref<string | null>(null);
+
+function toggleMenu(sessionId: string): void {
+  openMenuId.value = openMenuId.value === sessionId ? null : sessionId;
+}
+
+function closeMenu(): void {
+  openMenuId.value = null;
+}
+
+function onToggleBookmark(session: SessionSummary): void {
+  emit("toggleBookmark", session.id, !session.isBookmarked);
+  closeMenu();
+}
+
+function onDelete(session: SessionSummary): void {
+  const ok = window.confirm(t("sessionHistoryPanel.deleteConfirm", { preview: session.preview || t("sessionHistoryPanel.noMessages") }));
+  if (!ok) return;
+  emit("deleteSession", session.id);
+  closeMenu();
+}
+
+onMounted(() => {
+  document.addEventListener("click", closeMenu);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeMenu);
+});
 </script>
