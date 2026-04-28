@@ -170,6 +170,7 @@ export default [
       // #921.
       eqeqeq: ["error", "smart"],
       "no-throw-literal": "error",
+      "no-implicit-coercion": ["error", { boolean: true, number: true, string: true, disallowTemplateShorthand: false }],
       quotes: "off",
       "no-shadow": "error",
       "no-param-reassign": "error",

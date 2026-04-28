@@ -21,7 +21,7 @@ export const mcpTools: McpTool[] = [readXPost, searchX, notify];
 const toolMap = new Map(mcpTools.map((tool) => [tool.definition.name, tool]));
 
 export function isMcpToolEnabled(tool: McpTool): boolean {
-  return (tool.requiredEnv ?? []).every((key) => !!process.env[key]);
+  return (tool.requiredEnv ?? []).every((key) => Boolean(process.env[key]));
 }
 
 export const mcpToolsRouter = Router();

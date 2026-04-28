@@ -21,7 +21,7 @@ const telegramPlugin: PlatformPlugin = {
   webhookPath: "/webhook/telegram",
 
   isConfigured(env: Env): boolean {
-    return !!env.TELEGRAM_BOT_TOKEN && !!env.TELEGRAM_WEBHOOK_SECRET;
+    return Boolean(env.TELEGRAM_BOT_TOKEN) && Boolean(env.TELEGRAM_WEBHOOK_SECRET);
   },
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {

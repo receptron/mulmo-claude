@@ -180,7 +180,7 @@ const googleChatPlugin: PlatformPlugin = {
   webhookPath: "/webhook/google-chat",
 
   isConfigured(env: Env): boolean {
-    return !!env.GOOGLE_CHAT_PROJECT_NUMBER;
+    return Boolean(env.GOOGLE_CHAT_PROJECT_NUMBER);
   },
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {

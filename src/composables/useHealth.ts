@@ -47,8 +47,8 @@ export function useHealth(): {
       }
       return;
     }
-    geminiAvailable.value = !!result.data.geminiAvailable;
-    sandboxEnabled.value = !!result.data.sandboxEnabled;
+    geminiAvailable.value = Boolean(result.data.geminiAvailable);
+    sandboxEnabled.value = Boolean(result.data.sandboxEnabled);
     bootFetchCompleted = true;
     const cpu = result.data.cpu;
     if (cpu && typeof cpu.load1 === "number" && Number.isFinite(cpu.load1) && typeof cpu.cores === "number" && cpu.cores > 0) {

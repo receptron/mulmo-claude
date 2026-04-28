@@ -1066,21 +1066,21 @@ async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
-  Object.keys(renderState).forEach((key) => delete renderState[+key]);
-  Object.keys(renderedImages).forEach((key) => delete renderedImages[+key]);
-  Object.keys(renderErrors).forEach((key) => delete renderErrors[+key]);
-  Object.keys(sourceOpen).forEach((key) => delete sourceOpen[+key]);
-  Object.keys(sourceText).forEach((key) => delete sourceText[+key]);
-  Object.keys(beatSaveErrors).forEach((key) => delete beatSaveErrors[+key]);
-  Object.keys(beatSaving).forEach((key) => delete beatSaving[+key]);
-  Object.keys(localOverrides).forEach((key) => delete localOverrides[+key]);
-  Object.keys(beatAudios).forEach((key) => delete beatAudios[+key]);
-  Object.keys(audioState).forEach((key) => delete audioState[+key]);
-  Object.keys(audioErrors).forEach((key) => delete audioErrors[+key]);
+  Object.keys(renderState).forEach((key) => delete renderState[Number(key)]);
+  Object.keys(renderedImages).forEach((key) => delete renderedImages[Number(key)]);
+  Object.keys(renderErrors).forEach((key) => delete renderErrors[Number(key)]);
+  Object.keys(sourceOpen).forEach((key) => delete sourceOpen[Number(key)]);
+  Object.keys(sourceText).forEach((key) => delete sourceText[Number(key)]);
+  Object.keys(beatSaveErrors).forEach((key) => delete beatSaveErrors[Number(key)]);
+  Object.keys(beatSaving).forEach((key) => delete beatSaving[Number(key)]);
+  Object.keys(localOverrides).forEach((key) => delete localOverrides[Number(key)]);
+  Object.keys(beatAudios).forEach((key) => delete beatAudios[Number(key)]);
+  Object.keys(audioState).forEach((key) => delete audioState[Number(key)]);
+  Object.keys(audioErrors).forEach((key) => delete audioErrors[Number(key)]);
   Object.keys(charRenderState).forEach((key) => delete charRenderState[key]);
   Object.keys(charImages).forEach((key) => delete charImages[key]);
   Object.keys(charErrors).forEach((key) => delete charErrors[key]);
-  Object.keys(beatDragOver).forEach((key) => delete beatDragOver[+key]);
+  Object.keys(beatDragOver).forEach((key) => delete beatDragOver[Number(key)]);
   moviePath.value = null;
   if (sourceDetails.value) sourceDetails.value.open = false;
 

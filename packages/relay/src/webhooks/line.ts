@@ -43,7 +43,7 @@ const linePlugin: PlatformPlugin = {
   webhookPath: "/webhook/line",
 
   isConfigured(env: Env): boolean {
-    return !!env.LINE_CHANNEL_SECRET;
+    return Boolean(env.LINE_CHANNEL_SECRET);
   },
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
