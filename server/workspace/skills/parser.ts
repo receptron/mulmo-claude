@@ -67,14 +67,24 @@ function parseScheduleValue(raw: string): SkillSchedule["parsed"] {
   return null;
 }
 
-/** Type guard — only string scalars are usable for the
- *  description / schedule / roleId fields. The shared util
- *  parses with FAILSAFE_SCHEMA so YAML ambiguous values (`true`,
- *  `2026-04-27`) arrive as strings, but a structured value
- *  (array / nested object) would still be unusable here. */
+/** Type guard — coerce the parsed-meta value at `key` into a
+ *  string, mirroring the legacy `parseScalar` semantics so this
+ *  refactor stays behaviour-neutral (codex review iter-1 #908):
+ *
+ *    - key absent          → null  (legacy bailed out the same way)
+ *    - string value        → as-is, including the empty string
+ *    - `null` value (from a bare `description:` line that js-yaml
+ *      returns as `null`)  → empty string, matching parseScalar's
+ *      "" return for an empty raw value
+ *    - structured / number → null  (legacy didn't accept either —
+ *      parseScalar's input is always a string slice)
+ */
 function metaString(meta: Record<string, unknown>, key: string): string | null {
+  if (!(key in meta)) return null;
   const value = meta[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+  if (typeof value === "string") return value;
+  if (value === null) return "";
+  return null;
 }
 
 /**

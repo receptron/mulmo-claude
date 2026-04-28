@@ -107,3 +107,27 @@ describe("parseSkillFrontmatter — schedule", () => {
     });
   });
 });
+
+// Legacy-compat regression guards added during PR C #908 codex
+// review iter-1. The pre-refactor parser accepted skills with an
+// empty `description:` value and let downstream validation decide.
+// Pin that semantic so the shared-util migration stays
+// behaviour-neutral.
+describe("parseSkillFrontmatter — legacy empty-description compat", () => {
+  it('accepts an explicit empty string `description: ""`', () => {
+    const result = parseSkillFrontmatter('---\ndescription: ""\n---\n\nBody');
+    assert.ok(result);
+    assert.equal(result.description, "");
+  });
+
+  it("accepts a bare `description:` line (js-yaml emits null, we coerce to empty string)", () => {
+    const result = parseSkillFrontmatter("---\ndescription:\n---\n\nBody");
+    assert.ok(result);
+    assert.equal(result.description, "");
+  });
+
+  it("still rejects a frontmatter without any `description` key", () => {
+    const result = parseSkillFrontmatter("---\nroleId: general\n---\n\nBody");
+    assert.equal(result, null);
+  });
+});
