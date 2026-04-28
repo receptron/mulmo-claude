@@ -54,11 +54,12 @@ const TOOL_ARGS_LOG_PREVIEW_MAX = 200;
 function previewJson(value: unknown): string {
   let serialised: string;
   try {
-    serialised = JSON.stringify(value);
+    // `?? ""` handles `JSON.stringify(undefined) === undefined` —
+    // the lib type lies; runtime can return undefined.
+    serialised = JSON.stringify(value) ?? "";
   } catch {
     return "[unserialisable]";
   }
-  if (serialised === undefined) return "";
   return serialised.length > TOOL_ARGS_LOG_PREVIEW_MAX ? `${serialised.slice(0, TOOL_ARGS_LOG_PREVIEW_MAX)}…` : serialised;
 }
 

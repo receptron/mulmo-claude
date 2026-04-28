@@ -40,6 +40,10 @@ function seedSession(
   writeFileSync(join(chatDir, `${sessionId}.json`), JSON.stringify({ roleId, startedAt }));
   const lines: string[] = [];
   for (let i = 0; i < Math.max(userMessages.length, assistantMessages.length); i++) {
+    // Out-of-bounds array access returns undefined at runtime even
+    // though TS types `arr[i]` as the element type (no
+    // noUncheckedIndexedAccess in tsconfig).
+    // eslint-disable-next-line sonarjs/different-types-comparison -- `arr[i]` is `string | undefined` at runtime
     if (userMessages[i] !== undefined) {
       lines.push(
         JSON.stringify({
@@ -49,6 +53,7 @@ function seedSession(
         }),
       );
     }
+    // eslint-disable-next-line sonarjs/different-types-comparison -- `arr[i]` is `string | undefined` at runtime
     if (assistantMessages[i] !== undefined) {
       lines.push(
         JSON.stringify({

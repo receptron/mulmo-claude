@@ -85,10 +85,14 @@ function buildQueryString(query: ApiQuery | undefined): string {
 
 function buildHeaders(opts: { headers?: Record<string, string> }, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
-  if (hasBody && headers["Content-Type"] === undefined) {
+  // `in` operator handles the missing-key case directly; using
+  // `headers[key] === undefined` triggers `different-types-comparison`
+  // because TS's Record indexed access lies (returns `string`,
+  // never `undefined`).
+  if (hasBody && !("Content-Type" in headers)) {
     headers["Content-Type"] = "application/json";
   }
-  if (authToken && headers["Authorization"] === undefined) {
+  if (authToken && !("Authorization" in headers)) {
     headers["Authorization"] = `Bearer ${authToken}`;
   }
   return headers;

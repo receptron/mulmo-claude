@@ -891,7 +891,11 @@ function playAudio(index: number) {
     audioProgress.value = 0;
     if (lightbox.value?.index === index) {
       lightboxMove(1);
+      // After `lightboxMove(1)` the reactive ref points at a new
+      // value; TS narrowing from the previous `?.index === index`
+      // check is stale, so the explicit re-read is intentional.
       const nextIndex = lightbox.value?.index;
+      // eslint-disable-next-line sonarjs/different-types-comparison -- nextIndex is `number | undefined` (reactive ref re-read; narrowing above is stale after lightboxMove)
       if (nextIndex !== undefined && nextIndex !== index && beatAudios[nextIndex]) {
         playAudio(nextIndex);
       }

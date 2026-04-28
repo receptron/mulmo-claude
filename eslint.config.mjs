@@ -116,13 +116,13 @@ export default [
     },
   },
   {
-    // Type-checked rules need tsc-backed parser services. Scope this
-    // block to files that are in a tsconfig — excludes `.mjs`/`.cjs`/
-    // `.cts` which are not part of any project's `include` array. Vue
-    // SFCs get parserOptions set in their own block at the bottom.
-    // Type-checked rules need tsc-backed parser services. Vue SFCs
+    // Type-checked rules need tsc-backed parser services. Scope to
+    // src/server/test/e2e — packages/ live in their own workspaces
+    // with separate tsconfigs and aren't worth the extra memory /
+    // wall-clock cost the project-service graph adds. `.mjs`/`.cjs`
+    // are also excluded (not in any tsconfig's `include`). Vue SFCs
     // get parserOptions in their own block at the bottom.
-    files: ["**/*.{ts,tsx}"],
+    files: ["{src,server,test,e2e}/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -134,11 +134,11 @@ export default [
     // Rules block — applies to both TS and Vue files. Type-checked
     // rules are demoted to warn pending dedicated cleanup PRs
     // (analogous to #925's no-non-null-assertion handling).
-    files: ["**/*.{ts,tsx,vue}"],
+    files: ["{src,server,test,e2e}/**/*.{ts,tsx,vue}"],
     rules: {
       "@typescript-eslint/no-floating-promises": "warn",
       // Bug-detection-signal-positive sonarjs type-checked rules.
-      "sonarjs/different-types-comparison": "warn",
+      "sonarjs/different-types-comparison": "error",
       "sonarjs/no-misleading-array-reverse": "warn",
       "sonarjs/deprecation": "warn",
       // Stylistic / preference rules with low real-bug signal —

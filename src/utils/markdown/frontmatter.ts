@@ -47,7 +47,7 @@ export function parseFrontmatter(raw: string): ParsedMarkdown {
   }
   const afterOpen = raw.replace(FRONTMATTER_OPEN, "");
   const closeMatch = FRONTMATTER_CLOSE.exec(afterOpen);
-  if (!closeMatch || closeMatch.index === undefined) {
+  if (!closeMatch) {
     return { meta: {}, body: raw, hasHeader: false };
   }
   const yamlText = afterOpen.slice(0, closeMatch.index);

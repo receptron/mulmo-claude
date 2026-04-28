@@ -48,12 +48,14 @@ export function interpolateMcpSpec(
   const replace = (input: string): string =>
     input.replace(PLACEHOLDER, (_match, key: string) => {
       seenPlaceholders.add(key);
-      const value = values[key];
-      if (value === undefined || value === "") {
+      // Indexed Record access lies in TS (returns the value type,
+      // not `T | undefined`). Use `in` to detect missing keys
+      // before reading.
+      if (!(key in values) || values[key] === "") {
         if (requiredKeys.has(key)) missing.add(key);
         return "";
       }
-      return value;
+      return values[key];
     });
 
   let resolved: McpServerSpec;

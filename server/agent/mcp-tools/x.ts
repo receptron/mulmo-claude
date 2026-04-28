@@ -73,10 +73,11 @@ function formatTweet(tweet: XTweet, author?: XUser, url?: string): string {
     ? `Likes: ${tweet.public_metrics.like_count} | Retweets: ${tweet.public_metrics.retweet_count} | Replies: ${tweet.public_metrics.reply_count}`
     : "";
   const link = url ?? "";
-  return [byline, "", tweet.text, "", metrics, link]
-    .filter((line) => line !== undefined)
-    .join("\n")
-    .trimEnd();
+  // Each entry is `string` (`?? ""` / ternary returns) — no undefined
+  // is possible, so the historical `.filter((line) => line !== undefined)`
+  // was dead code. `trimEnd` strips trailing blank-line padding from
+  // the empty separators when metrics/link are empty.
+  return [byline, "", tweet.text, "", metrics, link].join("\n").trimEnd();
 }
 
 export const readXPost = {

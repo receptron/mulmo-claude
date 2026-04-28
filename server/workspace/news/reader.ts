@@ -36,7 +36,11 @@ export interface NewsItem {
 interface DailyJsonShape {
   itemCount?: number;
   byCategory?: Record<string, number>;
-  items?: NewsItem[];
+  // `unknown[]` not `NewsItem[]` — the JSON is untrusted, so the
+  // defensive `.filter((item): item is NewsItem => …)` below has
+  // a real job to do. Pre-typing this as `NewsItem[]` made the
+  // runtime null/typeof checks look dead to ESLint.
+  items?: unknown[];
 }
 
 // Walk the markdown linearly to find the LAST ```json ... ``` fence
@@ -84,15 +88,15 @@ export function extractDailyJsonIndex(markdown: string): NewsItem[] | null {
   // Defensive filter: drop entries that don't carry the fields the
   // viewer relies on.
   return shape.items.filter((item): item is NewsItem => {
+    if (typeof item !== "object" || item === null) return false;
+    const obj = item as Record<string, unknown>;
     return (
-      typeof item === "object" &&
-      item !== null &&
-      typeof item.id === "string" &&
-      typeof item.title === "string" &&
-      typeof item.url === "string" &&
-      typeof item.publishedAt === "string" &&
-      typeof item.sourceSlug === "string" &&
-      Array.isArray(item.categories)
+      typeof obj.id === "string" &&
+      typeof obj.title === "string" &&
+      typeof obj.url === "string" &&
+      typeof obj.publishedAt === "string" &&
+      typeof obj.sourceSlug === "string" &&
+      Array.isArray(obj.categories)
     );
   });
 }

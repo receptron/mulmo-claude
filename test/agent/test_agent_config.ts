@@ -86,8 +86,11 @@ describe("buildCliArgs", () => {
     });
     const pIdx = args.indexOf("-p");
     // `-p` is followed by either another flag or end-of-args, never
-    // by a plain text message.
+    // by a plain text message. Out-of-bounds array access returns
+    // undefined at runtime even though TS types `args[i]` as
+    // `string` (no noUncheckedIndexedAccess in tsconfig).
     const afterP = args[pIdx + 1];
+    // eslint-disable-next-line sonarjs/different-types-comparison -- `afterP` is `string | undefined` at runtime
     assert.ok(afterP === undefined || afterP.startsWith("--"));
   });
 

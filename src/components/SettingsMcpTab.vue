@@ -388,9 +388,11 @@ function openConfigForm(entry: McpCatalogEntry): void {
   configFormErrors.value = [];
   configFormValues.value = readDraftFromStorage(entry.id);
   // Pre-fill any missing keys with empty strings so reactive bindings
-  // work without `v-model` warnings.
+  // work without `v-model` warnings. `in` operator handles missing
+  // keys correctly without triggering `different-types-comparison`
+  // (Record indexed access lies about being `T | undefined`).
   for (const field of entry.configSchema) {
-    if (configFormValues.value[field.key] === undefined) configFormValues.value[field.key] = "";
+    if (!(field.key in configFormValues.value)) configFormValues.value[field.key] = "";
   }
 }
 

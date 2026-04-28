@@ -70,12 +70,10 @@ function isValidChartEntry(value: unknown): value is ChartEntry {
 
 router.post(API_ROUTES.chart.present, async (req: Request<object, unknown, PresentChartBody>, res: Response<PresentChartResponse>) => {
   const { document, title } = req.body;
+  const charts = (document as { charts?: unknown[] } | null | undefined)?.charts;
   log.info("chart", "present: start", {
     titlePreview: typeof title === "string" ? previewSnippet(title) : undefined,
-    chartCount:
-      typeof document === "object" && document !== null && Array.isArray((document as { charts?: unknown[] }).charts)
-        ? (document as { charts: unknown[] }).charts.length
-        : undefined,
+    chartCount: Array.isArray(charts) ? charts.length : undefined,
   });
 
   if (!isValidChartDocument(document)) {

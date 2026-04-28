@@ -72,17 +72,20 @@ interface SaveMulmoScriptBody {
   autoGenerateMovie?: boolean;
 }
 
+// Express body types reflect the *untrusted JSON* shape: every
+// field is optional because the client can send anything. Runtime
+// guards in the handlers reject missing / wrong-shape fields.
 interface RenderBeatBody {
-  filePath: string;
-  beatIndex: number;
+  filePath?: string;
+  beatIndex?: number;
   force?: boolean;
   chatSessionId?: string;
 }
 
 interface UploadBeatImageBody {
-  filePath: string;
-  beatIndex: number;
-  imageData: string; // base64 data URI
+  filePath?: string;
+  beatIndex?: number;
+  imageData?: string; // base64 data URI
 }
 
 type ErrorResponse = { error: string };
@@ -119,7 +122,9 @@ interface ScriptOutcome {
 router.post(API_ROUTES.mulmoScript.save, async (req: Request<object, object, SaveMulmoScriptBody>, res: Response) => {
   const { script, filename, filePath, autoGenerateMovie } = req.body ?? {};
 
-  const hasScript = script !== undefined && script !== null;
+  // Loose `!= null` covers both `undefined` and `null`. The body
+  // is untrusted JSON so callers can send either.
+  const hasScript = script != null;
   const hasFilePath = typeof filePath === "string" && filePath !== "";
   if (hasScript === hasFilePath) {
     badRequest(
@@ -519,8 +524,9 @@ router.post(
       object,
       object,
       {
-        filePath: string;
-        beatIndex: number;
+        // Untrusted JSON — runtime guard below validates shape.
+        filePath?: string;
+        beatIndex?: number;
         force?: boolean;
         chatSessionId?: string;
       }
