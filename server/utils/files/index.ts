@@ -1,15 +1,5 @@
-// Consolidated workspace file I/O (#366).
-//
-// This barrel re-exports every public helper so call sites can do:
-//
-//   import { writeFileAtomic, readWorkspaceText } from "../utils/files/index.js";
-//
-// Grouped by concern:
-//
-//   atomic.ts        — write-then-rename primitives
-//   safe.ts          — ENOENT-swallowing wrappers (stat, readdir, readText, resolveWithinRoot)
-//   json.ts          — JSON sync read + async atomic write
-//   workspace-io.ts  — workspace-aware helpers (path resolve + I/O in one call)
+// #366: barrel for workspace file I/O. atomic = write-rename, safe = ENOENT-swallowing, json = sync read + atomic
+// write, workspace-io = path resolve + I/O in one call.
 
 export { writeFileAtomic, writeFileAtomicSync, type WriteAtomicOptions } from "./atomic.js";
 
@@ -36,7 +26,6 @@ export {
   ensureDirUnder,
 } from "./workspace-io.js";
 
-// ── Domain I/O ──────────────────────────────────────────────────
 export * from "./session-io.js";
 export * from "./todos-io.js";
 export * from "./scheduler-io.js";

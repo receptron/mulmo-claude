@@ -1,9 +1,3 @@
-// Composable that owns the MCP tool state used by the sidebar:
-// which tools are currently disabled, their per-tool prompts, and
-// the derived `availableTools` / `toolDescriptions` computeds. The
-// pure rules live in src/utils/mcpTools so they are unit-testable
-// independently of fetch / Vue.
-
 import { computed, ref, type ComputedRef } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
 import type { Role } from "../config/roles";
@@ -12,20 +6,14 @@ import { apiGet } from "../utils/api";
 
 interface UseMcpToolsOptions {
   currentRole: ComputedRef<Role>;
-  // Injection point for the in-app plugin registry lookup. Real
-  // callers pass `(name) => getPlugin(name)?.toolDefinition ?? null`,
-  // tests can stub it.
+  // Plugin-registry lookup, injectable so tests can stub it.
   getDefinition: (name: string) => ToolDefinitionMetadata | null;
 }
 
 export function useMcpTools(opts: UseMcpToolsOptions) {
   const disabledMcpTools = ref(new Set<string>());
   const mcpToolDescriptions = ref<Record<string, string>>({});
-  // Surfaces the most recent GET /api/mcp-tools failure so consumers
-  // (e.g. the Settings modal's MCP tab) can render a small warning.
-  // We intentionally keep the "all tools visible" fallback below so
-  // the UI stays usable; this ref lets the UI tell the user *why* the
-  // list looks incomplete / unfiltered.
+  // Surfaces /api/mcp-tools failures so the Settings MCP tab can explain *why* the list looks unfiltered.
   const mcpToolsError = ref<string | null>(null);
 
   const availableTools = computed(() => availableToolsFor(opts.currentRole.value.availablePlugins, disabledMcpTools.value));
@@ -46,8 +34,7 @@ export function useMcpTools(opts: UseMcpToolsOptions) {
     const result = await apiGet<McpToolStatus[]>(API_ROUTES.mcpTools.list);
     if (!result.ok) {
       mcpToolsError.value = result.error;
-      // Keep the "all tools visible" fallback — not clearing
-      // disabledMcpTools or descriptions means the UI remains usable.
+      // Don't clear disabledMcpTools / descriptions — falling back to "all tools visible" keeps the UI usable.
       return;
     }
     if (!Array.isArray(result.data)) {

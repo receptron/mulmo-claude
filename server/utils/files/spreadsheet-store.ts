@@ -8,9 +8,7 @@ import { resolveWithinRoot } from "./safe.js";
 
 const SPREADSHEETS_DIR = WORKSPACE_PATHS.spreadsheets;
 
-// Cached realpath of the spreadsheets directory. resolveWithinRoot
-// requires its root argument to be a realpath so symlinks are handled
-// correctly. Matches the pattern used in image-store.ts.
+// resolveWithinRoot needs a realpath as its root so symlinks resolve correctly (same pattern as image-store).
 let spreadsheetsDirReal: string | null = null;
 
 async function ensureSpreadsheetsDir(): Promise<string> {
@@ -20,13 +18,9 @@ async function ensureSpreadsheetsDir(): Promise<string> {
   return spreadsheetsDirReal;
 }
 
-// Resolve a workspace-relative spreadsheet path (e.g. "spreadsheets/abc.json")
-// into an absolute path guaranteed to be inside the spreadsheets directory.
-// Throws on traversal attempts.
+// Throws on traversal. Strips a leading "spreadsheets/" so callers can pass either the stored form or bare filename.
 async function safeResolve(relativePath: string): Promise<string> {
   const root = await ensureSpreadsheetsDir();
-  // Strip the leading "spreadsheets/" prefix so callers can pass either
-  // the stored form or just the filename.
   const name = relativePath.replace(new RegExp(`^${WORKSPACE_DIRS.spreadsheets}/`), "");
   const result = resolveWithinRoot(root, name);
   if (!result) {
@@ -35,11 +29,7 @@ async function safeResolve(relativePath: string): Promise<string> {
   return result;
 }
 
-/** Save sheets array as a JSON file. New files land under
- *  `spreadsheets/YYYY/MM/` (UTC) so the dir doesn't accumulate
- *  unbounded — see #764. Returns the workspace-relative path.
- *  Atomic: writeFileAtomic creates the partition dir and prevents
- *  half-written JSON on crash (#881 v1). */
+// #764 sharded under spreadsheets/YYYY/MM/ (UTC) so the dir doesn't grow unbounded; #881 atomic.
 export async function saveSpreadsheet(sheets: unknown[]): Promise<string> {
   await ensureSpreadsheetsDir();
   const partition = yearMonthUtc();
@@ -49,20 +39,15 @@ export async function saveSpreadsheet(sheets: unknown[]): Promise<string> {
   return path.posix.join(WORKSPACE_DIRS.spreadsheets, partition, filename);
 }
 
-/** Overwrite an existing spreadsheet file. Atomic — see {@link saveSpreadsheet}. */
 export async function overwriteSpreadsheet(relativePath: string, sheets: unknown[]): Promise<void> {
   const absPath = await safeResolve(relativePath);
   await writeFileAtomic(absPath, JSON.stringify(sheets));
 }
 
-/** Check if a string is a spreadsheet file path (not inline data).
- *  Rejects traversal attempts like "spreadsheets/../outside.json"
- *  so the caller can't rely on the prefix/suffix alone. */
+// Reject "spreadsheets/../outside.json" early; realpath check still runs server-side, but catch obvious cases here.
 export function isSpreadsheetPath(value: string): boolean {
   if (!value.startsWith(`${WORKSPACE_DIRS.spreadsheets}/`)) return false;
   if (!value.endsWith(".json")) return false;
-  // Forbid .. segments anywhere in the path — a realpath check still
-  // happens server-side, but this catches obvious cases early.
   const normalized = path.posix.normalize(value);
   if (normalized !== value) return false;
   if (normalized.includes("..")) return false;

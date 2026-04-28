@@ -1,30 +1,13 @@
-// Transport layer for the journal archivist: wraps the Claude Code
-// CLI as a subprocess so summarization runs against the user's
-// subscription quota rather than the API key budget.
-//
-// The pure data shapes (interfaces, prompts, validators) live in
-// `./archivist-schemas.ts`. This file is the only one that touches
-// `node:child_process`, kept thin so dependency injection in tests
-// never has to mock a subprocess.
+// Spawning the Claude Code CLI runs summarization against the user's subscription quota rather than the API-key budget.
 
 import { spawn } from "node:child_process";
 import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../utils/time.js";
 
-// (systemPrompt, userPrompt) → raw model output as a string.
-// The daily/optimization passes parse JSON out of the string
-// themselves; this layer stays transport-only.
 export type Summarize = (systemPrompt: string, userPrompt: string) => Promise<string>;
 
-// Wall-clock cap per CLI invocation. 5 minutes is comfortably above
-// the worst-case summarization run we've seen and still short enough
-// that a wedged subprocess doesn't tie up resources forever.
 const CLI_TIMEOUT_MS = CLI_SUBPROCESS_TIMEOUT_MS;
 
-// Sentinel thrown on ENOENT. Each subsystem catches this and decides
-// what to do — journal disables itself for the rest of the server
-// lifetime; chat-index / sources log and skip. The message is
-// subsystem-neutral so callers logging `err.message` verbatim (e.g.
-// chat-index) don't surface a misleading "journal disabled" warning.
+// Subsystem-neutral message: chat-index / sources also catch this and would otherwise log a misleading "journal disabled".
 export class ClaudeCliNotFoundError extends Error {
   constructor() {
     super("`claude` CLI is not available on PATH");
@@ -43,9 +26,7 @@ export class ClaudeCliFailedError extends Error {
   }
 }
 
-// Default summarizer. Spawns `claude -p` and pipes the combined
-// system + user prompt to stdin so we don't hit shell-argv limits
-// for large day excerpts.
+// Pipe the combined prompt via stdin to dodge shell-argv limits for large day excerpts.
 export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
   return new Promise((resolve, reject) => {
     const child = spawn("claude", ["-p", "--output-format", "text"], {
@@ -95,8 +76,7 @@ export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
       }
     });
 
-    // Surface stdin write errors (e.g. EPIPE if the child exited
-    // before we finished writing) instead of silently dropping them.
+    // Surface EPIPE etc. — child may exit before we finish writing.
     child.stdin.on("error", (err: Error) => {
       if (settled) return;
       settled = true;
@@ -104,12 +84,7 @@ export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) => {
       reject(err);
     });
 
-    // Send the full prompt in one write. If Node's stream layer
-    // signals backpressure (write returns false), wait for "drain"
-    // before calling end() so we don't close stdin while the buffer
-    // still has data to flush. For typical archivist prompts this
-    // path rarely fires, but very large session excerpts can reach
-    // it.
+    // Wait for "drain" on backpressure before end() so the buffer fully flushes — large excerpts can hit this path.
     const payload = `${systemPrompt}\n\n---\n\n${userPrompt}`;
     const flushed = child.stdin.write(payload);
     if (flushed) {

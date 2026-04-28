@@ -1,40 +1,18 @@
-// "Which sessions are new or have changed since the last journal
-// run?" — pure logic that takes in-memory representations of the
-// current filesystem and the persisted state, and returns the list
-// of session ids that need re-ingest.
-//
-// Extracted from the filesystem layer so tests can exercise it with
-// hand-rolled inputs instead of mocking `fs`.
-
 import type { JournalState, ProcessedSessionRecord } from "./state.js";
 
 export interface SessionFileMeta {
-  // Session id (matches the .jsonl filename without extension).
   id: string;
-  // mtime in ms since epoch. The only signal we use to detect
-  // appends — sessions don't have a version counter.
+  // mtime in ms — sessions have no version counter, so this is the only signal we have for "file changed".
   mtimeMs: number;
 }
 
 export interface DirtySessionDecision {
   dirty: string[];
-  // Sessions already in state whose files have vanished from disk.
-  // We keep them in the state record (no harm) but the caller may
-  // choose to prune them separately.
+  // Previously-processed sessions whose files have vanished — informational, not an error.
   missing: string[];
 }
 
-// Core diff. Given the current directory listing and the persisted
-// processed-sessions record, return:
-//   - `dirty`: sessions that were never seen, or whose mtime has
-//     advanced since we last ingested them, or whose mtime we don't
-//     have a record of (treat as dirty — safer to re-ingest than miss).
-//   - `missing`: sessions we had previously processed that no longer
-//     exist on disk. Not an error, just information.
-//
-// The caller may additionally exclude currently-active sessions
-// (whose jsonl could be mid-write); that's a separate concern and
-// kept out of the pure diff.
+// Treats unknown-mtime as dirty (safer to re-ingest than miss). Active mid-write sessions are filtered by the caller.
 export function findDirtySessions(current: readonly SessionFileMeta[], processed: Record<string, ProcessedSessionRecord>): DirtySessionDecision {
   const dirty: string[] = [];
   const seenNow = new Set<string>();
@@ -59,9 +37,6 @@ export function findDirtySessions(current: readonly SessionFileMeta[], processed
   return { dirty, missing };
 }
 
-// Produce the next processedSessions map after a successful ingest
-// of the given dirty ids. Pure — doesn't mutate input. Sessions not
-// in the dirty list keep their existing record.
 export function applyProcessed(previous: JournalState["processedSessions"], justProcessed: readonly SessionFileMeta[]): JournalState["processedSessions"] {
   const next: JournalState["processedSessions"] = { ...previous };
   for (const meta of justProcessed) {

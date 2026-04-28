@@ -39,25 +39,17 @@ export async function* runAgent(
   const activePlugins = getActivePlugins(role);
   const useDocker = await isDockerAvailable();
 
-  // User-defined MCP servers are read per invocation so Settings UI
-  // changes apply immediately. Disabled / malformed entries get
-  // filtered by prepareUserServers; remaining servers are merged into
-  // the --mcp-config payload below.
+  // Per-invocation read so Settings UI changes apply without a server restart.
   const userMcpRaw = loadMcpConfig().mcpServers;
   const userServers = prepareUserServers(userMcpRaw, useDocker, workspacePath);
   const hasUserServers = Object.keys(userServers).length > 0;
   const hasMcp = activePlugins.length > 0 || hasUserServers;
 
-  // Fire-and-forget pre-flight check: warn (don't block) when an
-  // npx-style stdio server points at a package npm doesn't resolve.
-  // Catches the "catalog entry pinned to a non-existent name" failure
-  // mode where Claude silently falls back to WebSearch because the
-  // MCP subprocess never starts. Cached per-package within the
-  // process lifetime — first invocation pays the network round-trip.
+  // Catches the "catalog entry pinned to a non-existent npm package" failure where the MCP subprocess never starts and
+  // Claude silently falls back to WebSearch. Fire-and-forget; per-package cache amortizes the network round-trip.
   validateStdioPackages(userServers).catch(() => {});
 
-  // On macOS sandbox, always refresh credentials from Keychain before each
-  // agent run so that expired OAuth tokens are replaced transparently.
+  // macOS sandbox: refresh from Keychain so expired OAuth tokens get replaced transparently.
   if (useDocker && process.platform === "darwin") {
     await refreshCredentials();
   }
@@ -69,8 +61,7 @@ export async function* runAgent(
     userTimezone,
   });
 
-  // In debug mode (--debug), dump the full system prompt on the first
-  // message of each session so developers can inspect what the LLM sees.
+  // --debug: dump the full system prompt on the first message of each session.
   if (!claudeSessionId && process.argv.includes("--debug")) {
     log.info("agent", "system prompt for new session:\n" + fullSystemPrompt);
   }
@@ -84,10 +75,7 @@ export async function* runAgent(
     await mkdir(dirname(mcpPaths.hostPath), { recursive: true });
   }
 
-  // Names of every MCP server (built-in + user-configured) merged
-  // into the --mcp-config payload. Only populated when `hasMcp` is
-  // true; surfaced in the spawn log under --debug so developers can
-  // verify Settings UI changes actually reach Claude Code.
+  // Surfaced in the --debug spawn log so developers can verify Settings UI changes reach Claude Code.
   let mcpServerNames: string[] = [];
   if (hasMcp) {
     const mcpConfig = buildMcpConfig({
@@ -99,21 +87,15 @@ export async function* runAgent(
       userServers,
     });
     mcpServerNames = Object.keys(mcpConfig.mcpServers).sort();
-    // Write atomically so a partially-written file can't be picked
-    // up by a concurrent claude spawn (they share the --mcp-config
-    // path under the session dir).
+    // Atomic so a concurrent claude spawn can't pick up a half-written file (they share the path under the session dir).
     await writeJsonAtomic(mcpPaths.hostPath, mcpConfig);
   }
 
-  // Fresh read on every invocation so the Settings UI can change
-  // allowedTools / MCP servers without a server restart.
+  // Per-invocation read so allowedTools / MCP-server changes apply without a server restart.
   const settings = loadSettings();
   const userServerAllowedTools = userServerAllowedToolNames(userServers, useDocker);
 
-  // Don't persist raw sessionId into log sinks (esp. the retained
-  // file sink). A boolean presence flag is enough for operational
-  // debugging and avoids writing identifiers that route back to a
-  // specific session into long-lived log files.
+  // Boolean presence flags only — never write raw sessionId into long-lived log sinks.
   const backend = getActiveBackend();
   const spawnLog: Record<string, unknown> = {
     backend: backend.id,
@@ -123,11 +105,7 @@ export async function* runAgent(
     resumed: Boolean(claudeSessionId),
     hasSessionId: Boolean(sessionId),
   };
-  // Under --debug only: dump the merged MCP server list so the
-  // developer can confirm Settings UI changes (catalog installs /
-  // removes, env updates) actually reach Claude Code on the next
-  // spawn. Kept out of the default log to avoid leaking server
-  // names into long-lived sinks.
+  // --debug only: kept off the default log to avoid leaking user MCP server names into long-lived sinks.
   if (process.argv.includes("--debug") && hasMcp) {
     spawnLog.mcpServers = mcpServerNames;
   }

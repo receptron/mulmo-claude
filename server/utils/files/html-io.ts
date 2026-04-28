@@ -1,8 +1,3 @@
-// Domain I/O: HTML scratch buffer
-//   artifacts/html-scratch/current.html
-//
-// Optional `root` for test DI.
-
 import path from "node:path";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { workspacePath } from "../../workspace/paths.js";

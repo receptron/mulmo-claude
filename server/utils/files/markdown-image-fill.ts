@@ -1,14 +1,5 @@
-// Replace `![alt](__too_be_replaced_image_path__)` placeholders in
-// markdown with real Gemini-generated images saved to the workspace.
-// Lives under `server/utils/files/` because it sits at the seam
-// between markdown content and on-disk image artifacts; route
-// handlers (e.g. `presentDocument`) just hand off the markdown.
-//
-// Logging policy: every image generation emits start / ok / failed /
-// no-data lines, and every batch emits a tally. Per the timeout-policy
-// comment in `server/agent/mcp-server.ts`, generative-AI work MUST be
-// observable — silent partial failures were the exact failure mode
-// that hid the 10 s bridge-timeout bug.
+// Per the timeout-policy comment in server/agent/mcp-server.ts, generative-AI work MUST be observable — silent
+// partial failures hid the 10s bridge-timeout bug. Every image emits start/ok/failed/no-data + per-batch tally.
 import { generateGeminiImageFromPrompt, isGeminiAvailable } from "../gemini.js";
 import { errorMessage } from "../errors.js";
 import { promptMeta } from "../promptMeta.js";
@@ -21,9 +12,7 @@ const LOG_PREFIX = "present-document";
 async function generateImageFile(prompt: string, index: number, total: number): Promise<string | null> {
   if (!isGeminiAvailable()) return null;
   const startedAt = Date.now();
-  // Prompt is user-controlled and may contain pasted URLs / emails /
-  // credentials, so we log a `{ length, sha256 }` fingerprint instead
-  // of a raw prefix. See `server/utils/promptMeta.ts`.
+  // Prompt is user-controlled and may contain credentials/PII; promptMeta logs {length, sha256} instead of raw bytes.
   const meta = promptMeta(prompt);
   log.info(LOG_PREFIX, "image gen start", {
     index,
@@ -71,33 +60,13 @@ function logBatchTally(results: PlaceholderResult[], total: number, batchStarted
 }
 
 export function buildReplacement(prompt: string, url: string | null): string {
-  // `url` is workspace-relative (e.g. "artifacts/images/2026/04/x.png").
-  // Emit a workspace-root absolute ref ("/...") so the resolution is
-  // independent of where the markdown file itself lands on disk.
-  // Since #764, documents shard under `artifacts/documents/YYYY/MM/`,
-  // and `rewriteMarkdownImageRefs` (front-end) treats a leading "/"
-  // as "rooted at workspace" — so a markdown reference like
-  // "![alt](/artifacts/images/...)" works regardless of the document's
-  // depth. A relative path computed against the unsharded root would
-  // instead be off by two directory levels and 404 in the canvas.
+  // Workspace-rooted "/…" so the ref resolves the same regardless of document depth (#764 sharded documents under
+  // artifacts/documents/YYYY/MM/; a relative path would be off by two directory levels).
   if (url) return `![${prompt}](/${url})`;
-  // No image: keep the alt text visible as an italic marker so the
-  // operator can still see what *would* have been generated.
+  // No image: leave the alt text as an italic marker so the operator can see what *would* have been generated.
   return `*🖼️ Image: ${prompt}*`;
 }
 
-/**
- * Replace every `![alt](__too_be_replaced_image_path__)` placeholder
- * in the input markdown with a real Gemini-generated image.
- *
- * - When `GEMINI_API_KEY` is unset, every placeholder degrades to an
- *   italic text marker (`*🖼️ Image: <alt>*`) so the document still
- *   renders without broken image refs.
- * - On per-image failure, the same fallback applies for that one
- *   placeholder. Other placeholders proceed independently.
- * - All generation runs in parallel via `Promise.all` — typical 9-image
- *   batches finish in 15-25 s rather than per-image-serial.
- */
 export async function fillMarkdownImagePlaceholders(markdown: string): Promise<string> {
   const matches = [...markdown.matchAll(IMAGE_PLACEHOLDER)];
   if (matches.length === 0) return markdown;

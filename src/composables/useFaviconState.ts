@@ -1,14 +1,5 @@
-// Dynamic favicon wiring.
-//
-// Assembles the full `FaviconContext` from reactive app signals
-// (`isRunning`, `sessionsUnreadCount`, a ticking clock, server CPU
-// load, optional user birthday), feeds it through the pure
-// `resolveFaviconColor` rule chain, and hands the resolved color
-// to `useDynamicFavicon` for painting.
-//
-// Every input is global: the user is frequently on /files or other
-// non-chat views where `activeSession` is undefined, so relying on
-// the on-screen session would silently miss background activity.
+// Inputs are global on purpose — on /files or other non-chat views activeSession is undefined, so an on-screen-only
+// signal would silently miss background activity.
 
 import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from "vue";
 import { useDynamicFavicon } from "./useDynamicFavicon";
@@ -17,9 +8,7 @@ import { resolveFaviconColor } from "./favicon/resolveColor";
 import { FAVICON_STATES, type FaviconContext, type FaviconState } from "./favicon/types";
 import type { SessionSummary } from "../types/session";
 
-// Ticking cadence for the clock context. Once per minute is enough
-// to cross the morning / late-night / weekend / running-long
-// boundaries — we don't need second-level precision in a tab icon.
+// One minute is enough to cross morning/late-night/weekend/running-long boundaries — no need for second-level precision.
 const FAVICON_TICK_MS = 60_000;
 
 export function useFaviconState(opts: {
@@ -35,35 +24,16 @@ export function useFaviconState(opts: {
 }) {
   const { isRunning, sessions, sessionsUnreadCount, cpuLoadRatio, userBirthdayMMDD } = opts;
 
-  // 4-state enum still drives state priority inside the resolver.
-  // `done` here means "somebody somewhere has an unread reply", not
-  // "the on-screen session finished" — the dot already communicates
-  // that per session in the sidebar.
+  // `done` means "somebody somewhere has an unread reply" — per-session done is already communicated by the sidebar dot.
   const faviconState = computed<FaviconState>(() => {
     if (isRunning.value) return FAVICON_STATES.running;
     if (sessionsUnreadCount.value > 0) return FAVICON_STATES.done;
     return FAVICON_STATES.idle;
   });
 
-  // Run-start timestamp — the **earliest** `updatedAt` across every
-  // running session. `updatedAt` is bumped the moment the user sends
-  // a message (right before a run begins) and stays pinned until the
-  // run ends, so it's a safe proxy for "this run started at…".
-  //
-  // Caller passes `mergedSessions` (live in-memory state OR'd with
-  // server summaries), so this scan picks up two things the raw
-  // server `sessions` list would miss until the next /api/sessions
-  // refetch:
-  //   • `beginUserTurn`'s synchronous `live.updatedAt` stamp, so the
-  //     runningLong clock is anchored to the actual user click, not
-  //     the refetch arrival time.
-  //   • `live.pendingGenerations` (folded into the merged summary's
-  //     `isRunning`), so a generation kicked off by the bridge or a
-  //     background tab counts the moment its event lands.
-  //
-  // Falls back to `Date.now()` only if no running session has a
-  // parseable `updatedAt` (brand-new session before the first
-  // server echo and before `beginUserTurn`).
+  // Earliest updatedAt across running sessions. updatedAt is bumped on user-send (before the run begins) and stays
+  // pinned until the run ends, so it's a safe "this run started at…" proxy. Caller passes mergedSessions (live OR
+  // server) so beginUserTurn's synchronous stamp + live.pendingGenerations land before the next /api/sessions refetch.
   const runningSinceMs = computed<number | null>(() => {
     if (!isRunning.value) return null;
     let earliest = Number.POSITIVE_INFINITY;
@@ -75,10 +45,8 @@ export function useFaviconState(opts: {
     return Number.isFinite(earliest) ? earliest : Date.now();
   });
 
-  // Per-minute tick so time-of-day rules (morning, late-night,
-  // weekend) pick up boundary crossings without the user needing to
-  // interact. Also re-evaluates running-long so the cyan shift lands
-  // within a minute of the 60-second mark.
+  // Per-minute tick: drives boundary crossings (morning/late-night/weekend) without needing user interaction, and lets
+  // running-long flip cyan within a minute of the 60-second mark.
   const clockTick = ref<Date>(new Date());
   const tickHandle = window.setInterval(() => {
     clockTick.value = new Date();
@@ -98,9 +66,7 @@ export function useFaviconState(opts: {
   });
 
   const { unreadCount: notificationUnreadCount } = useNotifications();
-  // Badge dot fires on either pub-sub notifications (scheduled
-  // tasks, etc.) or any session carrying unread chat messages —
-  // the dot itself doesn't distinguish source.
+  // The dot doesn't distinguish source: pub-sub notifications OR any session with unread chat both trigger it.
   const hasNotificationBadge = computed(() => notificationUnreadCount.value > 0 || sessionsUnreadCount.value > 0);
 
   useDynamicFavicon({

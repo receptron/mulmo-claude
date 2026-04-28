@@ -1,17 +1,10 @@
 <template>
   <div class="h-full bg-white flex flex-col">
-    <!-- API error banner — surfaces POST /api/scheduler failures so a
-         delete/add/replace that silently no-ops becomes diagnosable. -->
+    <!-- Surfaces POST /api/scheduler failures so silent no-ops are diagnosable. -->
     <div v-if="apiError" class="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700" role="alert" data-testid="scheduler-api-error">
       {{ t("pluginScheduler.apiError", { error: apiError }) }}
     </div>
-    <!-- Top-level tab bar: Calendar / Tasks. Hidden when the
-         component is mounted as a standalone page (`forceTab`
-         set by CalendarView / AutomationsView) — the page itself
-         already identifies which feature the user is on, so a
-         tab bar would duplicate that affordance. Still rendered
-         when the component appears as a `manageScheduler` tool
-         result inside /chat, where the user can switch freely. -->
+    <!-- Hidden when mounted as a standalone page (forceTab) — the page already identifies the feature. -->
     <div v-if="!forceTab" class="flex border-b border-gray-200 px-6">
       <button
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
@@ -31,19 +24,15 @@
       </button>
     </div>
 
-    <!-- Tasks tab -->
     <TasksTab v-if="activeTab === SCHEDULER_TAB.tasks" />
 
-    <!-- Calendar tab (existing content) -->
     <template v-if="activeTab === SCHEDULER_TAB.calendar">
-      <!-- Header -->
       <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100">
         <div class="flex items-center gap-2">
           <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginScheduler.heading") }}</h2>
           <span class="text-sm text-gray-500">{{ t("pluginScheduler.itemCount", items.length, { named: { count: items.length } }) }}</span>
         </div>
         <div class="flex items-center gap-2">
-          <!-- Navigation (calendar modes only) -->
           <template v-if="viewMode !== SCHEDULER_VIEW.list">
             <div class="flex gap-0.5">
               <button
@@ -70,7 +59,6 @@
             </div>
             <span class="text-sm text-gray-600 min-w-[140px] text-center">{{ headerLabel }}</span>
           </template>
-          <!-- View mode toggle -->
           <div class="flex border border-gray-300 rounded overflow-hidden">
             <button
               v-for="mode in VIEW_MODES"
@@ -86,7 +74,6 @@
         </div>
       </div>
 
-      <!-- List view -->
       <div v-if="viewMode === SCHEDULER_VIEW.list" class="flex-1 overflow-y-auto min-h-0">
         <div v-if="items.length === 0" class="flex items-center justify-center h-full text-gray-400">{{ t("pluginScheduler.noScheduled") }}</div>
 
@@ -124,11 +111,9 @@
         </ul>
       </div>
 
-      <!-- Week view -->
       <div v-else-if="viewMode === SCHEDULER_VIEW.week" class="flex-1 overflow-y-auto min-h-0">
         <div class="grid grid-cols-7 border-b border-gray-200">
           <div v-for="day in weekDays" :key="day.toISOString()" class="border-r last:border-r-0 border-gray-200 min-h-[200px] flex flex-col">
-            <!-- Day header -->
             <div class="px-2 py-1.5 text-center border-b border-gray-100 sticky top-0 bg-white" :class="isToday(day) ? 'bg-blue-50' : ''">
               <div class="text-xs text-gray-400">{{ dayLabel(day) }}</div>
               <div
@@ -138,7 +123,6 @@
                 {{ day.getDate() }}
               </div>
             </div>
-            <!-- Day items -->
             <div class="flex-1 p-1 space-y-0.5">
               <div
                 v-for="item in itemsForDay(day)"
@@ -153,7 +137,6 @@
             </div>
           </div>
         </div>
-        <!-- Unscheduled -->
         <div v-if="unscheduledItems.length > 0" class="p-3 border-t border-gray-200">
           <div class="text-xs text-gray-400 mb-1.5">{{ t("pluginScheduler.unscheduled") }}</div>
           <div class="flex flex-wrap gap-1">
@@ -170,15 +153,12 @@
         </div>
       </div>
 
-      <!-- Month view -->
       <div v-else class="flex-1 overflow-y-auto min-h-0">
-        <!-- Weekday headers -->
         <div class="grid grid-cols-7 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div v-for="label in WEEKDAY_LABELS" :key="label" class="text-xs text-center text-gray-400 py-1.5 border-r last:border-r-0 border-gray-100">
             {{ label }}
           </div>
         </div>
-        <!-- Month grid -->
         <div v-for="(week, wi) in monthGrid" :key="wi" class="grid grid-cols-7 border-b border-gray-100">
           <div
             v-for="day in week"
@@ -206,7 +186,6 @@
             </div>
           </div>
         </div>
-        <!-- Unscheduled -->
         <div v-if="unscheduledItems.length > 0" class="p-3 border-t border-gray-200">
           <div class="text-xs text-gray-400 mb-1.5">{{ t("pluginScheduler.unscheduled") }}</div>
           <div class="flex flex-wrap gap-1">
@@ -223,7 +202,6 @@
         </div>
       </div>
 
-      <!-- Item YAML editor -->
       <div v-if="selectedId" class="border-t border-blue-200 bg-blue-50 shrink-0">
         <div class="flex items-center justify-between px-4 py-2 text-sm font-medium text-blue-700">
           <span>{{ t("pluginScheduler.editItem") }}</span>
@@ -244,7 +222,6 @@
         </div>
       </div>
 
-      <!-- JSON source editor -->
       <details class="border-t border-gray-200 bg-gray-50 shrink-0">
         <summary class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">
           {{ t("pluginScheduler.editSource") }}
@@ -290,10 +267,7 @@ type YamlScalar = string | number | boolean | null;
 
 const props = defineProps<{
   selectedResult?: ToolResultComplete<SchedulerData>;
-  // Standalone page mode: when set, hides the tab bar and locks the
-  // view to the given tab. Used by CalendarView / AutomationsView
-  // wrappers (#758). Undefined in the /chat tool-result context, so
-  // there the tab-switcher stays interactive.
+  // Set by CalendarView / AutomationsView page wrappers (#758) to lock the tab; undefined in /chat tool-result context.
   forceTab?: SchedulerTab;
 }>();
 const emit = defineEmits<{ updateResult: [result: ToolResultComplete] }>();
@@ -307,8 +281,7 @@ function detectInitialTab(result?: ToolResultComplete<SchedulerData>): Scheduler
 }
 
 const activeTab = ref<SchedulerTab>(props.forceTab ?? detectInitialTab(props.selectedResult));
-// In standalone page mode the tab is locked; swapping routes should
-// re-lock so the view follows. No-op in tool-result mode.
+// Re-lock when forceTab swaps so route navigation follows; no-op in tool-result mode.
 watch(
   () => props.forceTab,
   (next) => {
@@ -337,15 +310,11 @@ watch(
   },
 );
 
-// ── View mode ──────────────────────────────────────────────────────────────
-
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_MONTH_ITEMS = 3;
 
 const viewMode = ref<ViewMode>(SCHEDULER_VIEW.month);
 const currentDate = ref(new Date());
-
-// ── Calendar utilities ─────────────────────────────────────────────────────
 
 function startOfWeek(date: Date): Date {
   const result = new Date(date);
@@ -409,8 +378,6 @@ function dayLabel(date: Date): string {
   return WEEKDAY_LABELS[date.getDay() === 0 ? 6 : date.getDay() - 1];
 }
 
-// ── Navigation ─────────────────────────────────────────────────────────────
-
 const weekDays = computed(() => getWeekDays(currentDate.value));
 
 const monthGrid = computed(() => getMonthGrid(currentDate.value.getFullYear(), currentDate.value.getMonth()));
@@ -450,8 +417,6 @@ function goNext() {
   }
   currentDate.value = next;
 }
-
-// ── YAML helpers ────────────────────────────────────────────────────────────
 
 function yamlStringValue(raw: string): string {
   const needsQuotes = raw === "" || /[:#[\]{},&*?|<>=!%@`]/.test(raw) || /^\s|\s$/.test(raw) || /^(true|false|null|~)$/i.test(raw) || /^\d/.test(raw);
@@ -510,8 +475,6 @@ function parseYaml(text: string): {
   return { title, props: itemProps };
 }
 
-// ── Item selection & YAML edit ───────────────────────────────────────────────
-
 const selectedId = ref<string | null>(null);
 const yamlText = ref("");
 const yamlError = ref("");
@@ -559,18 +522,15 @@ async function applyItemEdit() {
   if (success) selectedId.value = null;
 }
 
-// ── JSON source editor ───────────────────────────────────────────────────────
-
 function toJson(its: ScheduledItem[]) {
   return JSON.stringify(its, null, 2);
 }
 
-// Seed the editor text now that toJson is in scope (the ref itself
-// was declared earlier so the watcher above can reference it).
+// Seed editorText now that toJson is in scope; the ref itself was
+// declared earlier so the watcher above can reference it (#920).
 editorText.value = toJson(items.value);
 
-// Last POST /api/scheduler failure. Cleared on the next successful call
-// so the banner disappears as soon as things recover.
+// Cleared on the next successful POST so the banner disappears as soon as things recover.
 const apiError = ref<string | null>(null);
 const isModified = computed(() => editorText.value !== toJson(items.value));
 

@@ -79,8 +79,6 @@ function formatTweet(tweet: XTweet, author?: XUser, url?: string): string {
     .trimEnd();
 }
 
-// ── readXPost ──────────────────────────────────────────────────────────────────
-
 export const readXPost = {
   definition: {
     name: "readXPost",
@@ -124,8 +122,6 @@ export const readXPost = {
     return formatTweet(tweet, author, canonicalUrl);
   },
 };
-
-// ── searchX ───────────────────────────────────────────────────────────────────
 
 export const searchX = {
   definition: {

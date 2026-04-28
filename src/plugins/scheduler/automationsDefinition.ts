@@ -1,10 +1,3 @@
-// MCP tool definition for the automations half of the former
-// `manageScheduler` (#824). Keeps the same backend route
-// (`/api/scheduler`) — server-side dispatch already routes
-// task-prefixed actions through the user-task subsystem via
-// `TASK_ACTIONS`, so the only thing changing here is the LLM
-// prompt and the tool name surfaced in chat.
-
 import type { ToolDefinition } from "gui-chat-protocol";
 import { SCHEDULER_ACTIONS } from "../../config/schedulerActions";
 

@@ -1,25 +1,13 @@
-// Pure builder for summaries/_index.md. Takes in-memory listings of
-// the journal's current topic / daily files and returns the full
-// markdown for the index. All filesystem walking happens in the
-// caller; this function is deterministic and easy to snapshot-test.
-
 import { isoDateOnly } from "../../utils/date.js";
 
 export interface IndexTopicEntry {
-  // Filesystem slug (matches topics/<slug>.md).
   slug: string;
-  // Optional human-readable title extracted from the topic file's
-  // first H1 heading. Falls back to `slug` if absent so the index
-  // row always reads sensibly.
   title?: string;
-  // ISO timestamp of the last write to the topic file. Rendered
-  // for "stale topic" visibility.
   lastUpdatedIso?: string;
 }
 
 export interface IndexDailyEntry {
-  // YYYY-MM-DD in local time. Matches the folder layout.
-  date: string;
+  date: string; // YYYY-MM-DD local
 }
 
 export interface IndexInputs {
@@ -27,8 +15,6 @@ export interface IndexInputs {
   days: readonly IndexDailyEntry[];
   archivedTopicCount: number;
   builtAtIso: string;
-  // How many "Recent days" rows to list before collapsing the
-  // remainder. The full listing still lives under daily/ on disk.
   maxRecentDays?: number;
 }
 
@@ -56,8 +42,7 @@ export function renderTopicsSection(topics: readonly IndexTopicEntry[]): string[
     lines.push("_No topics yet._");
     return lines;
   }
-  // Newest-first by last update (topics with no timestamp sort
-  // last, ordered alphabetically among themselves for stability).
+  // Newest-first; topics with no timestamp sort last, alphabetical among themselves for stability.
   const sorted = [...topics].sort(compareTopicsNewestFirst);
   for (const topicEntry of sorted) {
     lines.push(renderTopicRow(topicEntry));
@@ -71,7 +56,6 @@ export function renderRecentDaysSection(days: readonly IndexDailyEntry[], maxRec
     lines.push("_No daily entries yet._");
     return lines;
   }
-  // Newest-first by date string (YYYY-MM-DD sorts lexically).
   const sorted = [...days].sort((leftDay, rightDay) => {
     if (leftDay.date < rightDay.date) return 1;
     if (leftDay.date > rightDay.date) return -1;
@@ -100,8 +84,7 @@ export function renderArchiveSection(archivedTopicCount: number): string[] {
   return lines;
 }
 
-// Parse an ISO timestamp into a numeric sort key. Invalid or missing
-// timestamps get -Infinity so they sort to the bottom (oldest).
+// Invalid/missing ISO → -Infinity so they sort to the bottom.
 function topicSortKey(entry: IndexTopicEntry): number {
   if (!entry.lastUpdatedIso) return -Infinity;
   const timestampMs = Date.parse(entry.lastUpdatedIso);
@@ -117,14 +100,10 @@ function compareBySlug(leftEntry: IndexTopicEntry, rightEntry: IndexTopicEntry):
 function compareTopicsNewestFirst(leftEntry: IndexTopicEntry, rightEntry: IndexTopicEntry): number {
   const leftKey = topicSortKey(leftEntry);
   const rightKey = topicSortKey(rightEntry);
-  // Both valid timestamps → compare numerically.
-  // One or both invalid (-Infinity) → valid wins; if both invalid,
-  // fall through to the slug tie-breaker.
   const leftIsValid = Number.isFinite(leftKey);
   const rightIsValid = Number.isFinite(rightKey);
   if (leftIsValid && rightIsValid && rightKey !== leftKey) return rightKey - leftKey;
   if (leftIsValid !== rightIsValid) return leftIsValid ? -1 : 1;
-  // Tie-break on slug for determinism.
   return compareBySlug(leftEntry, rightEntry);
 }
 

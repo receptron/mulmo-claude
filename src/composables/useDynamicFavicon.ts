@@ -1,40 +1,19 @@
-// Dynamic favicon that changes its backing color based on a rich
-// runtime context (#470 + palette expansion).
-//
-// Color selection moved to `./favicon/resolveColor.ts`; this module
-// is now a thin canvas renderer that takes the already-resolved
-// color and paints it behind the mascot. The split keeps the pixel-
-// level drawing code and the rule chain independently testable.
-//
-// Rendering details:
-// - The logo PNG has an opaque white background; on first load we
-//   pre-process the pixels, punching near-white to transparency so
-//   the resolved color shows through.
-// - If the PNG fails to load we fall back to a plain colored square
-//   with the letter "M" so the tab icon never blanks out.
+// #470: dynamic favicon. Logo PNG has an opaque white backing; on first load we punch near-white pixels to alpha so
+// the resolved color shows through. If the PNG fails to load we fall back to a plain colored square with letter "M".
 
 import { watch, type Ref, type ComputedRef } from "vue";
 import logoUrl from "../assets/mulmo_bw.png";
 
-// Keep the palette-independent display constants local to this file
-// — they describe pixel geometry, not semantics.
 const NOTIFICATION_DOT_COLOR = "#DC2626"; // red-600
 const ACTIVE_SESSION_DOT_COLOR = "#EAB308"; // yellow-500
 const SIZE = 32;
 const RADIUS = 6;
-// How much of the rounded square the mascot fills. 2 px of padding
-// on each side keeps it off the rounded corners and leaves room for
-// the colored backing to peek around the outline.
+// 2px on each side keeps the mascot off the rounded corners and lets the colored backing peek around the outline.
 const MASCOT_INSET = 2;
 
-// Pixels whose RGB channels are all above this are treated as the
-// PNG's white backing and punched to transparent. The PNG uses soft
-// pastels so the mascot itself never hits all three channels this
-// high.
+// Threshold for "is this the PNG's white backing?" — the mascot uses soft pastels so it never hits all three channels this high.
 const WHITE_TO_ALPHA_THRESHOLD = 235;
 const FEATHER_LOW = 205;
-
-// ── Asset loading ──────────────────────────────────────────────
 
 let logoCanvas: HTMLCanvasElement | null = null;
 let logoLoadFailed = false;
@@ -92,8 +71,6 @@ function buildTransparentLogoCanvas(img: HTMLImageElement): HTMLCanvasElement {
   return canvas;
 }
 
-// ── Drawing primitives ─────────────────────────────────────────
-
 function drawRoundedRect(ctx: CanvasRenderingContext2D, posX: number, posY: number, width: number, height: number, radius: number): void {
   ctx.beginPath();
   ctx.moveTo(posX + radius, posY);
@@ -138,8 +115,6 @@ function drawActiveSessionDot(ctx: CanvasRenderingContext2D): void {
   const dotR = 5;
   drawCornerDot(ctx, dotR + 1, dotR + 1, ACTIVE_SESSION_DOT_COLOR);
 }
-
-// ── Composition ────────────────────────────────────────────────
 
 function renderFallbackFavicon(ctx: CanvasRenderingContext2D, color: string, isRunning: boolean, hasNotification: boolean): void {
   drawRoundedRect(ctx, 1, 1, SIZE - 2, SIZE - 2, RADIUS);
@@ -226,6 +201,5 @@ export function useDynamicFavicon(opts: DynamicFaviconOpts): void {
   );
 }
 
-// Re-export the state enum from the new location so existing callers
-// continue to import from this file during the transition period.
+// Re-exported so existing callers of this file keep working during the resolveColor split's transition.
 export { FAVICON_STATES, type FaviconState } from "./favicon/types";

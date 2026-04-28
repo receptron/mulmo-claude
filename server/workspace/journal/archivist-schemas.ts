@@ -1,22 +1,8 @@
-// Data shapes, prompts, and validators for the journal archivist.
-// Pure module — no IO, no subprocess, no global state. The CLI
-// transport (subprocess wrapper, error classes, default Summarize)
-// lives in `./archivist-cli.ts`.
-//
-// Splitting these used to be one file (`archivist.ts`), but it had
-// grown to 386 lines mixing transport with schemas. Keeping prompts
-// + validators separate lets tests / future passes import the data
-// shapes without dragging in `node:child_process`.
-
 import { isRecord } from "../../utils/types.js";
-
-// --- Daily archivist contract ---------------------------------------
 
 export interface SessionEventExcerpt {
   source: string; // "user" | "assistant" | "tool" | ...
   type: string; // "text" | "tool_result" | ...
-  // One-line human-readable rendering of the event, already
-  // truncated to a sane length by the caller.
   content: string;
 }
 
@@ -24,10 +10,7 @@ export interface SessionExcerpt {
   sessionId: string;
   roleId: string;
   events: SessionEventExcerpt[];
-  // Workspace-relative file paths produced by the session's tool
-  // calls (e.g. "stories/foo.json", "HTMLs/bar.html",
-  // "wiki/pages/baz.md"). Surfaced so the archivist can emit
-  // navigable markdown links to them in the summaries.
+  // Workspace-relative paths the archivist links from the summary (e.g. "stories/foo.json", "wiki/pages/baz.md").
   artifactPaths: string[];
 }
 
@@ -56,9 +39,7 @@ export interface DailyArchivistOutput {
   topicUpdates: TopicUpdate[];
 }
 
-// System prompt for the daily pass. Written long-form because the
-// model does a much better job with explicit rules and an example
-// than with a terse instruction.
+// Long-form: the model does notably better with explicit rules + an example than with a terse instruction.
 export const DAILY_SYSTEM_PROMPT = `You are the journal archivist for a personal MulmoClaude workspace.
 Your job: given raw session excerpts for a single day, produce
 (1) a daily summary and (2) updates to long-running topic notes.
@@ -107,8 +88,6 @@ SESSION LINKS
 LANGUAGE
 - Match the language of the source sessions. Always.`;
 
-// Build the user-side prompt for one day's worth of content.
-// Pure string construction — safe to unit test if we ever want to.
 export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   const parts: string[] = [];
   parts.push(`DATE: ${input.date}`);
@@ -132,9 +111,7 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   }
   parts.push("");
 
-  // Union of all workspace-relative artifact paths the day's
-  // sessions produced, deduped and sorted. Given to the archivist
-  // so it can link to them from the summary text.
+  // Dedupe + sort artifact paths so the archivist can link to them from the summary.
   const allArtifacts = new Set<string>();
   for (const sessionExcerpt of input.sessionExcerpts) {
     for (const artifactPath of sessionExcerpt.artifactPaths) allArtifacts.add(artifactPath);
@@ -162,12 +139,9 @@ export function buildDailyUserPrompt(input: DailyArchivistInput): string {
   return parts.join("\n");
 }
 
-// --- Optimization archivist contract --------------------------------
-
 export interface OptimizationTopicSnapshot {
   slug: string;
-  // First ~500 chars of the topic file, enough for the model to
-  // judge similarity without blowing up prompt size.
+  // First ~500 chars — enough to judge similarity without blowing up prompt size.
   headContent: string;
 }
 
@@ -227,21 +201,9 @@ export function buildOptimizationUserPrompt(input: OptimizationInput): string {
   return parts.join("\n");
 }
 
-// --- JSON extraction ------------------------------------------------
-
-// Tolerant JSON extractor: prefers a ```json fenced block; falls back
-// to scanning for the first balanced `{ ... }` block. Returns `null`
-// on failure so callers can log-and-skip instead of crash.
-//
-// JSON extraction helpers moved to server/utils/json.ts.
-// Re-export here so journal callers (and existing tests) keep a
-// single import surface for the archivist contract.
+// Re-exported so journal callers + existing tests keep a single import surface for the archivist contract.
 export { extractJsonObject, findBalancedBraceBlock } from "../../utils/json.js";
 
-// --- Validators ------------------------------------------------------
-
-// Type guards used by callers to validate parsed output. Written as
-// guards rather than `as` casts per project conventions.
 export function isDailyArchivistOutput(value: unknown): value is DailyArchivistOutput {
   if (!isRecord(value)) return false;
   const recordValue = value as Record<string, unknown>;

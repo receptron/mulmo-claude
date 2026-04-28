@@ -1,8 +1,3 @@
-// MCP tool definition for the calendar half of the former
-// `manageScheduler` (#824). Keeps the same backend route
-// (`/api/scheduler`) — the action enum is just narrowed to the
-// calendar-only subset so the LLM's prompt is unambiguous.
-
 import type { ToolDefinition } from "gui-chat-protocol";
 import { SCHEDULER_ACTIONS } from "../../config/schedulerActions";
 

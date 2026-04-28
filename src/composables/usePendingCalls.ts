@@ -1,9 +1,5 @@
-// Composable that bundles the "minimum visible duration" trick for
-// pending tool call rows: while the agent is running, tick a counter
-// every 50ms so the `pendingCalls` computed re-evaluates and any
-// freshly-resolved call stays visible for at least PENDING_MIN_MS
-// before disappearing. After the run ends, schedule one final tick
-// so the computed clears the lingering rows.
+// "Minimum visible duration" trick: tick every 50ms while running so a freshly-resolved call stays on-screen for
+// PENDING_MIN_MS before clearing. One final tick after the run ends sweeps lingering rows out of the computed.
 
 import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { ToolCallHistoryItem } from "../types/toolCallHistory";
@@ -17,17 +13,14 @@ interface UsePendingCallsOptions {
 export function usePendingCalls(opts: UsePendingCallsOptions) {
   const displayTick = ref(0);
   let tickInterval: ReturnType<typeof setInterval> | null = null;
-  // Tracked so teardown can cancel the lingering "final tick" and we
-  // never mutate displayTick after the composable's owner unmounts.
+  // Tracked so teardown can cancel the trailing tick — never mutate displayTick after the owner unmounts.
   let delayedTickTimeout: ReturnType<typeof setTimeout> | null = null;
 
   watch(
     opts.isRunning,
     (running) => {
       if (running) {
-        // Guard against double-start: if the watcher fires twice with
-        // running=true (e.g. immediate + a synchronous flip), don't
-        // stack a second interval.
+        // Guard against double-start (immediate + a synchronous flip would otherwise stack intervals).
         if (tickInterval !== null) return;
         tickInterval = setInterval(() => {
           displayTick.value++;
@@ -35,9 +28,7 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
       } else if (tickInterval !== null) {
         clearInterval(tickInterval);
         tickInterval = null;
-        // One final tick so the computed clears after the minimum
-        // duration has elapsed. Cancel any previous pending one first
-        // so back-to-back start/stop runs do not stack timeouts.
+        // Cancel any previous trailing tick so back-to-back start/stop runs don't stack timeouts.
         if (delayedTickTimeout !== null) clearTimeout(delayedTickTimeout);
         delayedTickTimeout = setTimeout(() => {
           displayTick.value++;
@@ -45,24 +36,15 @@ export function usePendingCalls(opts: UsePendingCallsOptions) {
         }, PENDING_MIN_MS);
       }
     },
-    // immediate so a composable created while a run is already in
-    // flight (e.g. mounted mid-stream) starts ticking right away
-    // instead of waiting for the next isRunning flip.
+    // Immediate so a composable mounted mid-stream starts ticking right away instead of waiting for the next flip.
     { immediate: true },
   );
 
   const pendingCalls = computed(() => {
-    // Read displayTick to register the computed as a reactive
-    // dependency on it — that is how a freshly-resolved row stays
-    // visible for the minimum window. The `__` prefix tells ESLint
-    // (varsIgnorePattern: "^__") that the variable is intentionally
-    // unused.
+    // Reads displayTick purely to register a reactive dep — that's how rows linger for the minimum window.
     const __tickDep = displayTick.value;
     const now = Date.now();
-    // Project to a narrower shape that carries `elapsedMs` so the
-    // consumer doesn't need its own ticker for the per-tool badge —
-    // the 50ms re-evaluation here already drives the display
-    // (#731 PR2).
+    // #731 PR2: project to elapsedMs so the per-tool badge piggybacks on this 50ms ticker (no second ticker downstream).
     return opts.toolCallHistory.value
       .filter((entry) => __tickDep >= 0 && isCallStillPending(entry, now))
       .map((entry) => ({

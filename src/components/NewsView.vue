@@ -144,6 +144,7 @@ import { apiGet } from "../utils/api";
 import { formatSmartTime } from "../utils/format/date";
 import { useNewsItems } from "../composables/useNewsItems";
 import { useNewsReadState } from "../composables/useNewsReadState";
+import { parseFrontmatter } from "../utils/markdown/frontmatter";
 import FilterChip from "./FilterChip.vue";
 import PageChatComposer from "./PageChatComposer.vue";
 
@@ -191,7 +192,18 @@ const unreadCount = computed(() => items.value.filter((item) => !isRead(item.id)
 
 const selected = computed(() => items.value.find((item) => item.id === selectedId.value) ?? null);
 
-const renderedBody = computed(() => (body.value ? marked(body.value, { breaks: true, gfm: true }) : ""));
+// Strip frontmatter before marked() renders the body. RSS-derived
+// content typically has no `---\n...\n---` envelope, but a feed
+// that mirrors a markdown blog could carry one — and we don't
+// want it to surface as a stray `<hr>` plus key:value plain text.
+// `parseFrontmatter` is a no-op for header-less inputs, so this
+// is safe for the common case (#895 PR D — closes the issue's
+// "Vue 側 ... news ... frontmatter が body に出ない" requirement).
+const renderedBody = computed(() => {
+  if (!body.value) return "";
+  const { body: bodyOnly } = parseFrontmatter(body.value);
+  return marked(bodyOnly, { breaks: true, gfm: true });
+});
 
 function selectItem(itemId: string): void {
   selectedId.value = itemId;

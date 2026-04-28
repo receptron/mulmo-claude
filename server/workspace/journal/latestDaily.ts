@@ -1,14 +1,5 @@
-// Find the most recent existing daily summary file under
-// `conversations/summaries/daily/YYYY/MM/DD.md`. Used by the
-// top-bar "today's journal" shortcut (#876): when today's summary
-// hasn't been generated yet, the UI falls back to whatever the
-// most recent existing day is.
-//
-// Walks deepest-first with backtrack: list YYYY → list MM → list
-// DD.md. If a level is empty (e.g. `2026/05/` exists but has no
-// daily files yet), drop back and try the next-largest entry at
-// the parent level. Bounded I/O — at most O(years × months) readdir
-// calls in pathological cases, 3 in the common case.
+// #876 top-bar "today's journal" shortcut falls back to the most recent existing day when today's summary is missing.
+// Backtracks YYYY → MM → DD.md so an empty 2026/05/ still finds 2026/04. Bounded I/O: O(years × months) worst case.
 
 import path from "node:path";
 import fsp from "node:fs/promises";
@@ -50,7 +41,6 @@ export async function findLatestDaily(workspaceRoot: string): Promise<LatestDail
       if (days.length === 0) continue;
       const dayFile = days[0];
       const dayMatch = DAY_FILE_RE.exec(dayFile);
-      // Filter ensures the regex matches; this is a safety check.
       if (!dayMatch) continue;
       const day = dayMatch[1];
       const relPath = path.posix.join("conversations", "summaries", DAILY_DIR, year, month, dayFile);

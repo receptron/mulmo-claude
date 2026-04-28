@@ -1,50 +1,7 @@
-// Public entry point for the workspace journal. The agent route
-// calls `maybeRunJournal()` from its `finally` block — fire-and-
-// forget. This module decides whether a pass is actually due, holds
-// an in-process lock so concurrent sessions don't double-run,
-// orchestrates daily + optimization passes, and rebuilds _index.md.
-//
-// All failures are caught and logged here; nothing ever bubbles
-// back to the request handler.
-//
-// ── Architecture (#799) ──────────────────────────────────────────
-//
-// Two top-level passes hang off `maybeRunJournal()`, each with its
-// own cadence and its own state-machine slot. Memory extraction is
-// a sub-step of the daily pass, not a peer pipeline.
-//
-//   session-end
-//     │
-//     └─> maybeRunJournal()  [this file]
-//           │   gates by interval, holds the lock, traps errors
-//           │
-//           ├─> runDailyPass         (≥ 1 h since last)
-//           │     dailyPass.ts       finds new/changed sessions via
-//           │                        mtime, buckets events by local
-//           │                        date, calls `claude` CLI once
-//           │                        per day, writes daily summaries
-//           │                        + topics + state checkpoint.
-//           │     │
-//           │     │  early-returns when no dirty sessions; otherwise
-//           │     │  at the end of the per-day loop:
-//           │     │
-//           │     └─> extractAndAppendMemory
-//           │           memoryExtractor.ts  scans the day's new
-//           │                              daily file for memory-
-//           │                              worthy facts, appends to
-//           │                              the user's ~/.claude/
-//           │                              memory.md.
-//           │
-//           └─> runOptimizationPass  (≥ 7 d since last)
-//                 optimizationPass.ts reads existing topics, asks
-//                                    the LLM to merge duplicates /
-//                                    archive stale ones, writes back
-//                                    and updates archive/.
-//
-// _index.md is rebuilt at the end of every successful pass so the
-// UI's directory listing reflects whatever was just written.
-//
-// Audit + roadmap: `plans/audit-journal-subsystem.md` (#799).
+// Architecture (#799) — agent route calls maybeRunJournal() fire-and-forget from its finally block. The daily pass
+// (≥1h since last) walks chat/*.jsonl by mtime, buckets events by local date, writes daily summaries + topics, then
+// extractAndAppendMemory appends durable user facts to memory.md. The optimization pass (≥7d) merges/archives topics.
+// _index.md is rebuilt at the end of every successful pass. Roadmap: plans/audit-journal-subsystem.md.
 
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import {
@@ -64,42 +21,26 @@ import { log } from "../../system/logger/index.js";
 
 export { extractFirstH1 };
 
-// Module-level lock. A boolean is enough for the single-process
-// single-user MulmoClaude server; if two sessions finish at the
-// same instant, the second call returns immediately.
+// Single-process server, so a boolean is enough; a second concurrent call simply returns.
 let running = false;
 
-// Once we hit ENOENT on the `claude` CLI we disable the journal
-// for the rest of the server lifetime to avoid spamming warnings
-// on every session-end. Reset on server restart.
+// Latch off the journal for the rest of the process once the claude CLI is missing — avoids spamming on every session-end.
 let disabled = false;
 
-// Test-only reset for the module-level flags. The lock + disable
-// flags are intentionally module-scoped so a fresh server start
-// always begins from "neither running nor disabled"; a unit test
-// that exercises maybeRunJournal across multiple call sequences
-// needs a way to reproduce that fresh-start condition without
-// re-importing the module. Not exported via index — only consumers
-// importing this file directly should reach for it.
+// Reset module-level flags between unit-test runs without re-importing the module.
 export function __resetForTests(): void {
   running = false;
   disabled = false;
 }
 
-// The agent route calls this as `maybeRunJournal().catch(...)`.
 export interface MaybeRunJournalOptions {
   summarize?: Summarize;
   workspaceRoot?: string;
   activeSessionIds?: ReadonlySet<string>;
-  // Skip the interval check and run both passes unconditionally.
-  // Useful for debugging / CLI-driven manual runs — the feature's
-  // disable flags (claude CLI missing, in-process lock) still apply.
+  // Bypass the interval gate; the disable flags (CLI missing, in-process lock) still apply.
   force?: boolean;
 }
 
-// Everything inside swallows its own errors so the promise never
-// rejects in practice, but we still attach a catch at the call
-// site defensively.
 export async function maybeRunJournal(opts: MaybeRunJournalOptions = {}): Promise<void> {
   if (disabled) return;
   if (running) return;
@@ -128,9 +69,6 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
   const state = await readState(workspaceRoot);
   const now = Date.now();
 
-  // `force: true` bypasses the interval gate entirely so debug /
-  // startup flows can trigger a full pass even when nothing is
-  // technically due.
   const daily = opts.force === true || isDailyDue(state, now);
   const optimize = opts.force === true || isOptimizationDue(state, now);
   if (!daily && !optimize) return;
@@ -147,9 +85,7 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
       summarize,
       activeSessionIds,
     });
-    // Only advance lastDailyRunAt when no days were skipped —
-    // otherwise we'd wait a full interval before retrying a failed
-    // day, letting transient archivist failures silently lose events.
+    // Only bump lastDailyRunAt when no days were skipped — otherwise transient archivist failures silently lose events.
     nextState = {
       ...afterDaily,
       ...(result.skipped.length === 0 && {
@@ -168,11 +104,7 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
   if (optimize) {
     log.info("journal", "running optimization pass");
     const { nextState: afterOpt, result } = await runOptimizationPass(nextState, { workspaceRoot, summarize });
-    // Same rule as daily: only advance the timestamp when the pass
-    // actually ran to completion. A "skipped: too few topics" case
-    // is still considered successful — there was simply nothing to
-    // do — and we allow it to bump so we don't re-check on every
-    // session-end.
+    // Same rule as daily, except "fewer than 2 topics" is still success — bump so we don't re-check every session-end.
     const optimizationSucceeded = !result.skipped || result.skippedReason === "fewer than 2 topics";
     nextState = {
       ...afterOpt,
@@ -195,8 +127,6 @@ async function runJournalPass(opts: MaybeRunJournalOptions): Promise<void> {
   await rebuildIndex(workspaceRoot);
   await writeState(workspaceRoot, nextState);
 }
-
-// --- Index rebuild -------------------------------------------------
 
 async function rebuildIndex(workspaceRoot: string): Promise<void> {
   const topics = await walkTopics(workspaceRoot);
@@ -229,7 +159,6 @@ async function walkTopics(workspaceRoot: string): Promise<IndexTopicEntry[]> {
 
 const DAY_FILE_PATTERN = /^(\d{2})\.md$/;
 
-// Pure: returns the two-digit day if `name` matches `DD.md`, else null.
 export function parseDailyFilename(name: string): string | null {
   const match = DAY_FILE_PATTERN.exec(name);
   return match ? (match[1] ?? null) : null;

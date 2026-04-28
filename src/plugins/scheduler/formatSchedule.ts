@@ -1,11 +1,5 @@
-// Pure formatters for scheduler-task display. Extracted from
-// TasksTab.vue so the UTC → local conversion can be unit-tested
-// without spinning up Vue.
-//
-// Internally every task stores its daily trigger as `HH:MM` in UTC
-// (that's what the scheduler engine fires on). The UI should show the
-// same moment in the viewer's local timezone so a user in Tokyo sees
-// "Daily 05:00 JST" instead of "Daily 20:00 UTC".
+// Tasks store the daily trigger as `HH:MM` in UTC (that's what the engine fires on); the UI converts to the
+// viewer's local zone so a user in Tokyo sees "Daily 05:00 JST" instead of "Daily 20:00 UTC".
 
 export interface DailySchedule {
   type: "daily";
@@ -21,20 +15,12 @@ export type TaskSchedule = DailySchedule | IntervalSchedule | { type: string; [k
 
 const DAILY_TIME_RE = /^(\d{1,2}):(\d{2})$/;
 
-// Build a Date anchored to `now`'s local calendar day but at the
-// requested UTC wall-clock hour/minute. Using today's date (rather
-// than epoch 1970) makes the DST/TZ conversion accurate for the
-// viewer's current moment — "20:00 UTC every day" in Europe/London
-// can differ by an hour between summer and winter.
+// Anchor to today (not 1970) so DST conversion is accurate — "20:00 UTC daily" can differ by an hour summer/winter in London.
 function buildUtcInstant(utcHour: number, utcMinute: number, now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour, utcMinute));
 }
 
-// Intl formatter configured to surface HH:MM + the short timezone
-// name (e.g. "JST", "PDT"). When the browser can't resolve a zone
-// abbreviation it falls back to the offset string ("GMT+9"), which
-// is fine — the point is that the user doesn't have to mentally
-// convert from UTC.
+// Browsers without a zone abbreviation fall back to "GMT+9" — fine; the point is no manual UTC conversion.
 const LOCAL_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
@@ -49,8 +35,7 @@ function extractHourMinuteTz(date: Date): { hourMinute: string; tzLabel: string 
     const minute = parts.find((part) => part.type === "minute")?.value ?? "";
     const tzLabel = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
     if (!hour || !minute) return null;
-    // Intl returns "24" for midnight hour under `hour: "2-digit"` on
-    // some runtimes — normalize so "Daily 24:00 JST" never appears.
+    // Some runtimes return "24" for midnight under hour:"2-digit" — normalize so "Daily 24:00 JST" never appears.
     const normalizedHour = hour === "24" ? "00" : hour;
     return { hourMinute: `${normalizedHour}:${minute}`, tzLabel };
   } catch {
@@ -58,10 +43,7 @@ function extractHourMinuteTz(date: Date): { hourMinute: string; tzLabel: string 
   }
 }
 
-// Convert a UTC "HH:MM" into "Daily HH:MM <tz>" in the viewer's
-// local zone. Returns the original "Daily HH:MM UTC" string if the
-// input is malformed or the Intl machinery is unavailable — callers
-// never see `null`/throw for a scheduler entry.
+// Falls back to "Daily HH:MM UTC" on malformed input or missing Intl — callers never see null/throw.
 export function formatDailyLocal(utcHHMM: string, now: Date = new Date()): string {
   const match = DAILY_TIME_RE.exec(utcHHMM);
   if (!match) return `Daily ${utcHHMM} UTC`;

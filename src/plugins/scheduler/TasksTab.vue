@@ -1,21 +1,16 @@
 <template>
   <div class="flex-1 overflow-y-auto min-h-0 p-4">
-    <!-- Mutation error banner -->
     <div v-if="mutationError" class="mb-3 px-4 py-2 bg-red-50 text-red-700 rounded text-sm" data-testid="scheduler-task-error">
       {{ mutationError }}
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center h-32 text-gray-400">{{ t("common.loading") }}</div>
 
-    <!-- Error -->
     <div v-else-if="error" class="px-4 py-2 bg-red-50 text-red-700 rounded text-sm">
       {{ error }}
     </div>
 
-    <!-- Task list + frequency hints -->
     <div v-else>
-      <!-- Frequency hints reference -->
       <details class="mb-4 border border-gray-200 rounded-lg text-sm" data-testid="scheduler-frequency-hints">
         <summary class="px-3 py-2 cursor-pointer text-gray-600 font-medium select-none hover:bg-gray-50 rounded-lg">
           {{ t("pluginSchedulerTasks.recommendedFrequencies") }}
@@ -48,7 +43,6 @@
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
-              <!-- Origin badge -->
               <span class="text-xs px-1.5 py-0.5 rounded font-medium shrink-0" :class="originClass(task.origin)">
                 {{ originLabel(task.origin) }}
               </span>
@@ -57,7 +51,6 @@
               </span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <!-- Run now -->
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
@@ -68,7 +61,6 @@
               >
                 <span class="material-icons text-sm">play_arrow</span>
               </button>
-              <!-- Enable/disable toggle -->
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs rounded"
@@ -80,7 +72,6 @@
                   {{ task.enabled !== false ? "toggle_on" : "toggle_off" }}
                 </span>
               </button>
-              <!-- Delete -->
               <button
                 v-if="task.origin === 'user'"
                 class="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
@@ -94,7 +85,6 @@
             </div>
           </div>
 
-          <!-- Details row -->
           <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
             <span>{{ formatSchedule(task.schedule) }}</span>
             <span v-if="task.state?.lastRunResult" class="flex items-center gap-1">
@@ -104,16 +94,12 @@
             <span v-if="task.state?.nextScheduledAt">{{ t("pluginSchedulerTasks.nextRun", { time: formatShortTime(task.state.nextScheduledAt) }) }}</span>
           </div>
 
-          <!-- Description (full, not truncated — users need to know what
-               each task actually does). System tasks have only this
-               line; user / skill tasks have an expandable details
-               block below with the prompt + role. -->
+          <!-- Full (not truncated): users need to know what each task does. -->
           <div v-if="task.description" class="mt-1 text-xs text-gray-500 whitespace-pre-line">
             {{ task.description }}
           </div>
 
-          <!-- Prompt + role (user / skill tasks only). Collapsed by
-               default to keep the list compact; click to inspect. -->
+          <!-- Collapsed prompt + role for user/skill tasks; system tasks have neither. -->
           <details v-if="task.prompt" class="mt-2" :data-testid="`scheduler-task-details-${task.id}`">
             <summary class="text-xs text-gray-500 cursor-pointer select-none hover:text-gray-700">
               {{ t("pluginSchedulerTasks.detailsToggle") }}
@@ -171,18 +157,13 @@ interface SchedulerTask {
   origin: string;
   enabled?: boolean;
   state?: TaskState;
-  // user / skill tasks carry the agent prompt + role on the wire;
-  // system tasks omit them (their "what does this do" is the
-  // description text plus the source code behind the id).
+  // user / skill tasks carry prompt + role; system tasks omit them (their semantics are baked into the source).
   prompt?: string;
   roleId?: string;
   missedRunPolicy?: string;
 }
 
-// Hints showing common task cadences. Stored as structured schedules
-// (not pre-rendered strings) so the display routes through
-// formatTaskSchedule() and picks up the viewer's local timezone for
-// daily rows — the same conversion applied to real tasks below.
+// Structured (not pre-rendered) so daily rows route through formatTaskSchedule and pick up the viewer's local timezone.
 const FREQUENCY_HINTS: Array<{ label: string; schedule: FormatterTaskSchedule }> = [
   { label: "News / RSS fetch", schedule: { type: "interval", intervalMs: 3_600_000 } },
   { label: "Journal daily pass", schedule: { type: "daily", time: "23:00" } },
@@ -263,10 +244,7 @@ async function deleteTask(taskId: string): Promise<void> {
   await fetchTasks();
 }
 
-// When the user lands on /automations/:taskId (e.g. from a
-// notification), fetch the list, then scroll + flash the matching
-// row once it's rendered. Unknown IDs are a no-op — the list still
-// renders normally.
+// /automations/:taskId (e.g. from a notification) scrolls + flashes the matching row; unknown IDs are a no-op.
 const route = useRoute();
 
 async function focusUrlTask(taskId: string): Promise<void> {
@@ -282,9 +260,7 @@ onMounted(async () => {
   }
 });
 
-// Also react when the user is already on the page and the URL
-// changes (e.g. clicking a second notification without leaving the
-// Automations view).
+// Re-fire when the URL changes without unmounting — clicking a second notification while already on /automations.
 watch(
   () => route.params.taskId,
   (taskId) => {

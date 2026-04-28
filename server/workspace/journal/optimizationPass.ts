@@ -1,8 +1,3 @@
-// Weekly-ish topic optimization pass: merge near-duplicates, move
-// stale topics into archive/. Separate file from dailyPass so the
-// two can evolve independently and so the optimizer stays opt-in
-// from the top-level runner.
-
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { writeTopicFile, readAllTopicFiles, archiveTopic } from "../../utils/files/journal-io.js";
 import {
@@ -17,7 +12,6 @@ import { slugify } from "./paths.js";
 import type { JournalState } from "./state.js";
 import { log } from "../../system/logger/index.js";
 
-// How many characters of each topic file we hand to the optimizer.
 // Enough to judge duplication without blowing up the prompt.
 const OPTIMIZER_HEAD_CHARS = 500;
 
@@ -33,10 +27,7 @@ export interface OptimizationPassResult {
   skippedReason?: string;
 }
 
-// Pure planner: turns the optimizer's raw merge instructions into a
-// concrete list of slug-level operations. Empty merges (where every
-// source resolves to the merge target itself) are dropped, and slugs
-// are normalized via slugify so the I/O layer never has to.
+// Drops empty merges (every source resolves to the target itself); normalizes via slugify so the I/O layer never has to.
 export interface MergePlanItem {
   intoSlug: string;
   fromSlugs: string[];
@@ -60,8 +51,6 @@ export function planMerges(merges: readonly RawMerge[]): MergePlanItem[] {
   return plans;
 }
 
-// Pure transform: returns the next JournalState with any slug in
-// `removed` filtered out of knownTopics.
 export function applyRemovedTopics(state: JournalState, removed: ReadonlySet<string>): JournalState {
   return {
     ...state,
@@ -73,10 +62,7 @@ async function executeMergePlans(workspaceRoot: string, plans: MergePlanItem[], 
   for (const plan of plans) {
     await writeTopicFile(plan.intoSlug, plan.newContent, workspaceRoot);
     for (const src of plan.fromSlugs) {
-      // Only record the merge as successful if the source file
-      // actually moved. If archiveTopic fails (missing file, IO
-      // error) we leave the source out of the removed set so the
-      // in-memory knownTopics state stays accurate.
+      // Skip on archive failure so in-memory knownTopics stays accurate (the source file didn't actually move).
       if (!(await archiveTopic(src, workspaceRoot))) continue;
       removed.add(src);
       mergedSlugs.push(src);
@@ -107,9 +93,7 @@ export async function runOptimizationPass(
 
   const topics = await loadTopicHeads(workspaceRoot);
   if (topics.length < 2) {
-    // Nothing to optimise — need at least 2 topics for a merge to
-    // be meaningful, and archiving a single topic would leave an
-    // empty journal which feels wrong.
+    // Need at least 2 topics for a merge to be meaningful; archiving a sole topic would leave an empty journal.
     result.skipped = true;
     result.skippedReason = "fewer than 2 topics";
     return { nextState: { ...state }, result };
@@ -138,8 +122,7 @@ export async function runOptimizationPass(
 
   const removed = new Set<string>();
 
-  // Apply merges first, then archives (which skip slugs already
-  // removed by a merge).
+  // Merges first, then archives (which skip slugs already removed by a merge).
   await executeMergePlans(workspaceRoot, planMerges(parsed.merges), removed, result.mergedSlugs);
   await executeArchives(workspaceRoot, parsed.archives, removed, result.archivedSlugs);
 

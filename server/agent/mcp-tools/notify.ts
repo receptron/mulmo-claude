@@ -1,24 +1,5 @@
-// `notify` MCP tool — exposes the server's notification bus to the
-// agent so the user can ask "通知して" / "monitor the build and tell
-// me when it's done" and the agent has a direct way to fire.
-//
-// Calls `publishNotification` with `kind: "push"`, which fans out
-// to:
-//   - Web bell
-//   - Bridge (if a transportId is supplied — N/A from this entry
-//     point)
-//   - macOS Reminders (#789, on darwin unless the user has set
-//     DISABLE_MACOS_REMINDER_NOTIFICATIONS=1)
-//
-// No active-user gate. If the user asks for a notification, fire it.
-//
-// `body` is optional and only forwarded when non-empty. `title` is
-// required and trimmed.
-//
-// `publishNotification` is injected via `makeNotifyTool({ publish })`
-// (#803) so unit tests can pass a mock and stay free of macOS / bell
-// side effects. The default singleton `notify` wires the real
-// implementation.
+// `publishNotification` is injected (#803) so tests can mock the macOS /
+// bell side effects.
 
 import { publishNotification } from "../../events/notifications.js";
 import { NOTIFICATION_KINDS } from "../../../src/types/notification.js";
@@ -72,5 +53,4 @@ export function makeNotifyTool(deps: NotifyToolDeps) {
   };
 }
 
-// Production singleton wired with the real publishNotification.
 export const notify = makeNotifyTool({ publish: publishNotification });

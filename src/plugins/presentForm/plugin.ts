@@ -1,8 +1,5 @@
-// Local fork of @mulmochat-plugin/form (originally
-// ~/ss/llm/GUIChatPlugins/MulmoChatPluginForm). Forked so the form
-// submission payload (see View.vue:handleSubmit) renders as readable
-// markdown bullets in the chat history instead of a JSON-wrapped
-// object.
+// Forked from @mulmochat-plugin/form so handleSubmit can emit a markdown
+// bullet list instead of the upstream JSON-wrapped payload.
 
 import type { ToolContext, ToolResult } from "gui-chat-protocol";
 import type { FormData, FormArgs, FormField } from "./types";
@@ -31,9 +28,7 @@ function validateCheckboxRange(field: FormField & { type: "checkbox" }): void {
   if (maxSelections !== undefined && maxSelections > choices.length) {
     throw new Error(`Field '${id}': maxSelections cannot exceed number of choices`);
   }
-  // Without this lower-bound check, a form with minSelections > choices.length
-  // would render but be impossible to submit — the user can never satisfy the
-  // minimum because there aren't enough options to pick.
+  // Without this, a form would render but be unsubmittable.
   if (minSelections !== undefined && minSelections > choices.length) {
     throw new Error(`Field '${id}': minSelections cannot exceed number of choices`);
   }

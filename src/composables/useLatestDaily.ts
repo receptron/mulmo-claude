@@ -1,18 +1,5 @@
-// Top-bar "today's journal" shortcut wiring (#876).
-//
-// Calls GET /api/journal/latest-daily, then either navigates to the
-// returned md path through FilesView, or surfaces a notice via
-// window.alert. Three terminal states, each with its own user copy:
-//   - data is a path  → navigate to /files/<path>
-//   - data is null    → "no journal yet" (legitimate empty state)
-//   - response.ok=false → "load failed" with status code so a real
-//     auth/network/backend failure isn't silently misreported as
-//     "no journal yet" (Codex review iter 1)
-//
-// The alert is intentionally crude for v1 — a proper in-app toast
-// composable doesn't exist yet (see plans/feat-today-journal-shortcut.md
-// "Out of scope"). When that lands, swap the alert calls for the
-// toast helper without touching the branching above.
+// #876. Distinguish data===null ("no journal yet") from response.ok===false ("load failed") so a real auth/network/
+// backend failure isn't misreported as empty state (Codex review iter 1). Crude alerts pending a toast composable.
 
 import { ref } from "vue";
 import { useRouter } from "vue-router";
@@ -43,9 +30,6 @@ export function useLatestDaily() {
         window.alert(t("sidebarHeader.todayJournalNotFound"));
         return;
       }
-      // FilesView route is `/files/<workspace-relative-path>`; the
-      // path returned by the API is already workspace-relative
-      // (e.g. "conversations/summaries/daily/2026/04/26.md").
       await router.push(`/files/${response.data.path}`);
     } finally {
       loading.value = false;

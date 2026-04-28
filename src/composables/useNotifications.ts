@@ -1,18 +1,5 @@
-// Web-side subscriber for the `notifications` pub-sub channel.
-// Stores incoming NotificationPayloads for the bell badge + panel.
-//
-// Uses a singleton subscription pattern: the first component that
-// calls useNotifications() subscribes to the pub-sub channel; the
-// last one to unmount unsubscribes. All consumers share the same
-// module-level state (notifications + readIds).
-//
-// Read tracking is per-id via a Set. The unread badge decreases
-// only when the user **interacts** with a notification — either
-// clicking it (markRead) or dismissing it via × (dismiss removes
-// the notification entirely, so it leaves the unread tally as a
-// side effect). Opening the panel does NOT auto-mark everything
-// read; the user has to explicitly act on each item, or hit the
-// "Mark all read" button.
+// Singleton subscription, ref-counted across consumers; module-level state shared by every caller.
+// Opening the panel does NOT auto-mark everything read — user must click each item or hit "Mark all read".
 
 import { onUnmounted, ref, computed, type Ref, type ComputedRef } from "vue";
 import { PUBSUB_CHANNELS } from "../config/pubsubChannels";
@@ -36,10 +23,7 @@ function isNotificationPayload(value: unknown): value is NotificationPayload {
   return true;
 }
 
-// Tighter than a plain `typeof type === "string"` check — confirms
-// the discriminator is one we know AND, for `navigate`, that the
-// target carries a known view. Stops malformed payloads from
-// landing in the panel and crashing later in the click handler.
+// Stop malformed payloads from landing in the panel and crashing later in the click handler.
 function isValidAction(action: unknown): boolean {
   if (!isRecord(action)) return false;
   if (action.type === NOTIFICATION_ACTION_TYPES.none) return true;
@@ -49,14 +33,9 @@ function isValidAction(action: unknown): boolean {
   return typeof target.view === "string" && VALID_VIEWS.has(target.view);
 }
 
-// Module-level state so all components share the same list and the
-// same per-id read state.
 const notifications = ref<NotificationPayload[]>([]);
-// Set of notification ids the user has explicitly read (clicked or
-// dismissed-as-read). A Set so add/lookup are O(1) per entry.
 const readIds = ref<Set<string>>(new Set());
 
-// Singleton subscription — ref-counted across consumers.
 let subscriberCount = 0;
 let unsubscribeFn: (() => void) | null = null;
 
@@ -67,9 +46,7 @@ function ensureSubscribed(subscribe: ReturnType<typeof usePubSub>["subscribe"]):
     if (!isNotificationPayload(data)) return;
     const next = [data, ...notifications.value].slice(0, MAX_RECENT);
     notifications.value = next;
-    // Drop read-state entries for notifications that just rolled
-    // off the end of the bounded list — readIds is otherwise an
-    // unbounded leak across a long-lived session.
+    // Without pruning, readIds is an unbounded leak across a long-lived session.
     pruneReadIds(next);
   });
 }
@@ -81,8 +58,7 @@ function pruneReadIds(currentList: readonly NotificationPayload[]): void {
   for (const readId of readIds.value) {
     if (liveIds.has(readId)) next.add(readId);
   }
-  // Only assign when the contents actually changed — avoids
-  // unnecessary reactive churn when nothing rolled off.
+  // Skip the assignment when nothing rolled off, to avoid reactive churn.
   if (next.size !== readIds.value.size) {
     readIds.value = next;
   }
@@ -120,8 +96,7 @@ export function useNotifications(): {
 
   function markRead(notifId: string): void {
     if (readIds.value.has(notifId)) return;
-    // Replace the Set so Vue's reactivity fires on consumers that
-    // depend on `readIds` via `unreadCount` / `isRead`.
+    // Replace the Set so Vue's reactivity fires for unreadCount / isRead consumers.
     const next = new Set(readIds.value);
     next.add(notifId);
     readIds.value = next;
@@ -138,10 +113,7 @@ export function useNotifications(): {
 
   function dismiss(notifId: string): void {
     notifications.value = notifications.value.filter((notif) => notif.id !== notifId);
-    // Drop the matching readIds entry too. Without this, a long
-    // session that dismisses thousands of notifications leaks one
-    // ~36-char id per dismissal even though the user can't see
-    // them — pruneReadIds keeps the Set tied to `notifications`.
+    // Drop the matching readIds entry too — without it, dismissing thousands of notifications leaks ~36 chars each.
     if (readIds.value.has(notifId)) {
       const next = new Set(readIds.value);
       next.delete(notifId);

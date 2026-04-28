@@ -1,11 +1,5 @@
-// Extracts durable user facts from chat session excerpts and
-// appends them to memory.md. Called at the end of the journal
-// daily pass so new facts are picked up even if the agent didn't
-// write them during the conversation.
-//
-// Only appends facts that aren't already in memory.md — the LLM
-// receives the current memory content as context and is instructed
-// to return ONLY new facts.
+// Run at end of the journal daily pass so durable user facts are picked up even if the agent didn't memo them in-conversation.
+// LLM receives existing memory.md as context and is instructed to return ONLY new facts (we still de-dupe defensively).
 
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -40,16 +34,10 @@ Rules:
 
 export interface MemoryExtractionDeps {
   workspaceRoot: string;
-  /** The excerpts from today's dirty sessions, concatenated. */
   excerpts: string;
-  /** Spawns claude CLI and returns stdout. Injectable for tests. */
   summarize: (systemPrompt: string, userPrompt: string) => Promise<string>;
 }
 
-/**
- * Extract new user facts from chat excerpts and append to memory.md.
- * Returns the number of facts appended (0 if none found or on error).
- */
 export async function extractAndAppendMemory(deps: MemoryExtractionDeps): Promise<number> {
   const memoryPath = path.join(deps.workspaceRoot, WORKSPACE_FILES.memory);
   const existingMemory = existsSync(memoryPath) ? readFileSync(memoryPath, "utf-8") : "";
@@ -80,7 +68,6 @@ export async function extractAndAppendMemory(deps: MemoryExtractionDeps): Promis
   return factsToAppend.length;
 }
 
-/** Build the user prompt with existing memory + new excerpts. */
 export function buildUserPrompt(existingMemory: string, excerpts: string): string {
   const parts: string[] = [];
   if (existingMemory.trim()) {
@@ -91,7 +78,6 @@ export function buildUserPrompt(existingMemory: string, excerpts: string): strin
   return parts.join("\n\n");
 }
 
-/** Parse LLM output into a list of fact strings. */
 export function parseExtractedFacts(raw: string): string[] {
   const trimmed = raw.trim();
   if (trimmed === "NONE" || trimmed === "") return [];
@@ -106,7 +92,6 @@ function normalizeFact(fact: string): string {
   return fact.replace(/^- /, "").trim().toLowerCase();
 }
 
-/** Remove facts that already exist in the current memory content. */
 export function filterNewFacts(existingMemory: string, facts: readonly string[]): string[] {
   const seen = new Set(parseExtractedFacts(existingMemory).map(normalizeFact));
   const out: string[] = [];
@@ -119,7 +104,6 @@ export function filterNewFacts(existingMemory: string, facts: readonly string[])
   return out;
 }
 
-/** Append facts to existing memory content. */
 export function appendFacts(existing: string, facts: string[]): string {
   const trimmed = existing.trimEnd();
   const factsBlock = facts.join("\n");

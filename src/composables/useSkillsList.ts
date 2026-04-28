@@ -8,16 +8,8 @@ export interface SkillSummary {
   source: "user" | "project";
 }
 
-// Module-level shared state so consumers (ChatInput, PageChatComposer,
-// SuggestionsPanel) all see the same list. We do not cache: every
-// `refresh()` re-hits /api/skills. The first auto-fetch on mount is
-// a bootstrap so the panel has something to show on first open.
-//
-// Error policy: on a failed fetch we keep the previous `skills` value
-// (so a transient blip doesn't visually wipe the list) and surface the
-// failure through `error`. The Skills tab renders that as a banner so
-// the user can tell stale data from current data. A successful refresh
-// clears `error`.
+// Module-level shared state across consumers. Failed fetch keeps the previous list (no visual wipe on a blip) and
+// surfaces the message via `error` — the Skills tab renders that as a banner so stale vs current is distinguishable.
 const skills = ref<SkillSummary[]>([]);
 const error = ref<string | null>(null);
 let bootstrapped = false;
@@ -33,20 +25,13 @@ async function refresh(): Promise<void> {
         error.value = null;
         return;
       }
-      // Both branches below leave `skills` untouched (stale list
-      // is preferable to wiping it on transient blips) but we
-      // surface the failure on `error` AND log it so it's
-      // visible in DevTools — the prior version was silent on
-      // the non-ok path, which made "skills tab won't refresh"
-      // hard to diagnose without breakpoints.
+      // Leave `skills` untouched (stale > wiped); surface on `error` AND console.warn — silent failures here had
+      // historically made "Skills tab won't refresh" hard to diagnose without breakpoints.
       const message = !result.ok ? result.error || "Failed to load skills" : "Skills response missing `skills` array";
       error.value = message;
       console.warn("[useSkillsList] refresh failed:", message);
     } catch (err) {
-      // apiGet normally returns a discriminated union, but a
-      // runtime exception (network layer, unexpected await
-      // failure) must not become an unhandled rejection that the
-      // bootstrap caller (`void refresh()`) drops on the floor.
+      // Runtime throw must not become an unhandled rejection — the bootstrap call site is `void refresh()`.
       const message = err instanceof Error ? err.message : String(err);
       error.value = message;
       console.warn("[useSkillsList] refresh threw:", err);

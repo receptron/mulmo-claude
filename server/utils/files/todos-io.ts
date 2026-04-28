@@ -1,9 +1,3 @@
-// Domain I/O: todo items + status columns
-//   data/todos/todos.json     — items
-//   data/todos/columns.json   — status columns
-//
-// Sync API. Optional `root` for test DI.
-
 import { WORKSPACE_FILES } from "../../workspace/paths.js";
 import { workspacePath } from "../../workspace/paths.js";
 import { resolvePath } from "./workspace-io.js";

@@ -24,15 +24,12 @@ export function isMcpToolEnabled(tool: McpTool): boolean {
   return (tool.requiredEnv ?? []).every((key) => !!process.env[key]);
 }
 
-// Express router ──────────────────────────────────────────────────────────────
-
 export const mcpToolsRouter = Router();
 
 interface McpToolParams {
   tool: string;
 }
 
-// GET /api/mcp-tools — returns { name, enabled, requiredEnv } for each tool (used by the role builder UI)
 mcpToolsRouter.get(API_ROUTES.mcpTools.list, (_req: Request, res: Response) => {
   res.json(
     mcpTools.map((tool) => ({
@@ -44,7 +41,6 @@ mcpToolsRouter.get(API_ROUTES.mcpTools.list, (_req: Request, res: Response) => {
   );
 });
 
-// POST /api/mcp-tools/:tool — dispatches to the right handler
 mcpToolsRouter.post(API_ROUTES.mcpTools.invoke, async (req: Request<McpToolParams, unknown, Record<string, unknown>>, res: Response) => {
   const tool = toolMap.get(req.params.tool);
   if (!tool) {

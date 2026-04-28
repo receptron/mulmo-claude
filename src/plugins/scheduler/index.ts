@@ -1,10 +1,5 @@
-// Two plugins, one shared backend (#824). Both call /api/scheduler;
-// the server-side dispatcher already routes per-action via
-// TASK_ACTIONS, so the plugins are thin wrappers over the same
-// REST contract — they differ only in tool definition (the action
-// enum the LLM sees) and in the chat-side view (CalendarView vs
-// AutomationsView). The legacy unified `manageScheduler` plugin
-// went away with the rename; see plans/refactor-split-manageScheduler-824.md.
+// #824: two plugins share /api/scheduler — the server already dispatches per-action via TASK_ACTIONS, so each plugin
+// just differs in the tool definition (action enum the LLM sees) and the View component.
 
 import type { PluginEntry } from "../../tools/types";
 import type { ToolPlugin } from "../../tools/types";
@@ -31,9 +26,7 @@ export interface SchedulerData {
   items: ScheduledItem[];
 }
 
-// Shared executor for both plugins — backend dispatch is identical.
-// `toolName` is captured by closure so the tool result carries the
-// matching name through to the chat history and the View lookup.
+// `toolName` is captured so the result carries the matching name through to chat history and View lookup.
 function makeExecute(toolName: "manageCalendar" | "manageAutomations"): ToolPlugin<SchedulerData>["execute"] {
   return async function execute(_context, args) {
     const result = await apiPost<ToolResult<SchedulerData>>(API_ROUTES.scheduler.base, args);
@@ -67,25 +60,13 @@ export const manageAutomationsPlugin: ToolPlugin<SchedulerData> = {
   isEnabled: () => true,
   generatingMessage: "Managing automations...",
   viewComponent: AutomationsView,
-  // Previews must not share Preview.vue with manageCalendarPlugin —
-  // Preview.vue auto-refreshes from `/api/scheduler` which returns
-  // calendar items, so the automations sidebar would show calendar
-  // data after the first refresh tick (#828 follow-up).
+  // Cannot share Preview.vue with manageCalendar — Preview auto-refreshes from /api/scheduler (calendar items), and
+  // the automations sidebar would otherwise show calendar data after the first refresh tick (#828 follow-up).
   previewComponent: AutomationsPreview,
 };
 
-// View-only fallback for tool results saved under the pre-split
-// `manageScheduler` name. Registered in src/tools/index.ts so
-// `getPlugin("manageScheduler")` returns this entry and historical
-// chat sessions still render the rich view (LegacySchedulerView
-// dispatches to CalendarView or AutomationsView by data shape).
-//
-// Deliberately a `PluginEntry` (not a `ToolPlugin`) so the absence
-// of `execute` / `isEnabled` makes its view-only nature explicit:
-// no LLM exposure path, no fresh dispatch, just the historical
-// renderer. The tool name is also absent from
-// server/agent/plugin-names.ts and src/config/toolNames.ts, so
-// new sessions cannot pick it up.
+// View-only legacy fallback so historical sessions saved under the pre-split `manageScheduler` name still render.
+// `PluginEntry` (no execute/isEnabled) makes it explicit: no LLM exposure, no fresh dispatch, render-only.
 export const legacyManageSchedulerEntry: PluginEntry = {
   toolDefinition: {
     type: "function",

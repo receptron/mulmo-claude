@@ -86,8 +86,7 @@ defineExpose({ root });
 </script>
 
 <style scoped>
-/* Prevent rendered markdown links inside preview cards from navigating.
-   Clicking a sidebar card should select the result, not follow links. */
+/* Card click selects the result; rendered markdown links inside the preview must not navigate. */
 :deep(a) {
   pointer-events: none;
   color: inherit;

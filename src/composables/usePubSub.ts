@@ -8,15 +8,7 @@ interface PubSubMessage {
 type Callback = (data: unknown) => void;
 type Unsubscribe = () => void;
 
-// Socket.IO replaces the raw WebSocket + hand-rolled reconnect
-// state machine. One multiplexed connection; channels map to
-// socket.io rooms via `subscribe` / `unsubscribe` events.
-//
-// Reconnect / backoff / heartbeat are all handled by socket.io,
-// so there's no reconnectTimer / reconnectDelay here anymore. On
-// reconnect, `connect` fires again and we re-send every
-// subscription the client still cares about.
-
+// On reconnect we re-emit every live subscription so the rooms list survives the bounce.
 let socket: Socket | null = null;
 
 const listeners = new Map<string, Set<Callback>>();
@@ -32,9 +24,7 @@ function connect(): Socket {
 
   const sock = io({
     path: "/ws/pubsub",
-    // Match the server. Long-polling is fine as a fallback but
-    // the server refuses it, so don't negotiate it here either —
-    // fail fast if the WS upgrade doesn't go through.
+    // Server refuses long-polling fallback, so fail fast here too if the WS upgrade doesn't go through.
     transports: ["websocket"],
   });
 
@@ -65,9 +55,7 @@ export function usePubSub() {
 
     const sock = connect();
     if (sock.connected) sock.emit("subscribe", channel);
-    // If not yet connected, the "connect" handler replays every
-    // listener's subscription, so newly-added channels are
-    // covered without extra bookkeeping.
+    // If not yet connected, the "connect" handler replays every subscription — no extra bookkeeping needed.
 
     return () => {
       const cbs = listeners.get(channel);

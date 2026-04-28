@@ -1,21 +1,5 @@
-// "Copy to clipboard with a transient confirmation flag" — the
-// same 9-line pattern was copied into 3 plugin views
-// (markdown / presentMulmoScript / textResponse) before this
-// composable existed.
-//
-// Usage:
-//
-//   const { copied, copy } = useClipboardCopy();
-//
-//   async function copyText() {
-//     await copy(textToCopy.value);
-//   }
-//
-// `copied` flips to true on success and back to false after
-// `resetMs` (default 2000ms) so the UI can show a ✓ / "Copied!"
-// hint. Clipboard failures (permissions, insecure context) are
-// swallowed on purpose — there's no useful UI action beyond letting
-// the hint stay off, which is exactly what the ref signals.
+// Clipboard failures (permissions, insecure context) are swallowed on purpose: the UI just leaves the "Copied!" hint
+// off, which is what `copied=false` already signals.
 
 import { ref, type Ref } from "vue";
 
@@ -35,8 +19,7 @@ export function useClipboardCopy(resetMs = 2000): UseClipboardCopyHandle {
         copied.value = false;
       }, resetMs);
     } catch {
-      // Clipboard API may be blocked in some contexts (e.g. iframe
-      // without permissions, non-HTTPS origin). Leave `copied` false.
+      // Clipboard API blocked (iframe without permissions, non-HTTPS origin) — leave `copied` false.
     }
   }
 

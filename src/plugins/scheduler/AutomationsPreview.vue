@@ -17,14 +17,8 @@ import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SchedulerData } from "./index";
 
-// Sidebar preview for `manageAutomations` tool results. Deliberately
-// does NOT auto-refresh from `/api/scheduler` (which returns calendar
-// items, not tasks — see #828 follow-up). The post-action snapshot
-// in `props.result.data.items` is the right thing to show; tasks
-// have their own GET endpoint (`/api/scheduler/tasks`) but the
-// preview is a frozen time-slice of one tool call, so re-fetching
-// would either drift to wrong data (calendar) or duplicate state
-// the AutomationsView already owns.
+// No /api/scheduler auto-refresh: that endpoint returns calendar items, not tasks (#828). The preview is a frozen
+// snapshot of one tool call — re-fetching would either drift to wrong data or duplicate AutomationsView's state.
 
 const { t } = useI18n();
 

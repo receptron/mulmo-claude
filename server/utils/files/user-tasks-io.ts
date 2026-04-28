@@ -1,8 +1,3 @@
-// Domain I/O: user-created scheduled tasks
-//   config/scheduler/tasks.json
-//
-// Optional `root` parameter for test DI (defaults to workspacePath).
-
 import path from "path";
 import { mkdir } from "fs/promises";
 import { WORKSPACE_FILES } from "../../workspace/paths.js";

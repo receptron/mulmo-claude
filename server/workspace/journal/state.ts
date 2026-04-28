@@ -1,12 +1,3 @@
-// Journal state file schema + persistence. The state file tracks
-// what the archivist has already done so we only re-process new or
-// changed sessions on each run.
-//
-// The pure bits (default creation, schema validation, interval
-// arithmetic) live at the top of the file so tests can exercise
-// them without touching disk. Filesystem helpers at the bottom wrap
-// those pure functions with atomic read/write.
-
 import {
   readJournalState as readJournalStateRaw,
   writeJournalState as writeJournalStateRaw,
@@ -16,16 +7,12 @@ import { ONE_HOUR_MS, ONE_DAY_MS } from "../../utils/time.js";
 import { log } from "../../system/logger/index.js";
 import { isRecord } from "../../utils/types.js";
 
-// Bump this when the schema changes in a backwards-incompatible way.
-// Older state files are treated as corrupted and replaced with a
-// fresh default (ingest everything from scratch) — cheap because it
-// only costs one extra archivist pass.
+// Bump on backwards-incompatible schema changes — older state files
+// are discarded and rebuilt (one extra archivist pass).
 export const JOURNAL_STATE_VERSION = 1;
 
 export interface ProcessedSessionRecord {
-  // mtime (ms since epoch) of the session's .jsonl file when we
-  // last ingested it. If mtime advances on the next run, the session
-  // has appended events and needs re-ingest.
+  // mtime at last ingest; advance triggers re-ingest of appended events.
   lastMtimeMs: number;
 }
 
@@ -42,8 +29,6 @@ export interface JournalState {
 export const DEFAULT_DAILY_INTERVAL_HOURS = 1;
 export const DEFAULT_OPTIMIZATION_INTERVAL_DAYS = 7;
 
-// --- Pure helpers (unit-testable without disk) ---------------------
-
 export function defaultState(): JournalState {
   return {
     version: JOURNAL_STATE_VERSION,
@@ -56,17 +41,13 @@ export function defaultState(): JournalState {
   };
 }
 
-// Narrow an `unknown` into a JournalState. Accepts partial / missing
-// fields and fills defaults — users can hand-edit the file to change
-// intervals and we want to be forgiving.
+// Forgiving toward partial / hand-edited input — fill defaults instead of throwing.
 export function parseState(raw: unknown): JournalState {
   if (!isRecord(raw)) return defaultState();
   const obj = raw as Record<string, unknown>;
 
-  // Version mismatch → throw it all out. Cheap to rebuild — but
-  // surface the event in the log so a postmortem can distinguish a
-  // forced re-ingest from "first run after install" / a deleted
-  // state file. (#799 PR1)
+  // Log the version-mismatch reset (#799 PR1) so postmortems can tell
+  // it apart from a missing-file first run.
   if (obj.version !== JOURNAL_STATE_VERSION) {
     log.info("journal", "state schema version mismatch — resetting", {
       from: obj.version,
@@ -101,8 +82,6 @@ function parseProcessedSessions(raw: unknown): Record<string, ProcessedSessionRe
   return out;
 }
 
-// Has the configured daily interval elapsed since the last run? A
-// null lastDailyRunAt means "never run" → always due.
 export function isDailyDue(state: JournalState, nowMs: number): boolean {
   if (state.lastDailyRunAt === null) return true;
   const last = Date.parse(state.lastDailyRunAt);
@@ -118,8 +97,6 @@ export function isOptimizationDue(state: JournalState, nowMs: number): boolean {
   const intervalMs = state.optimizationIntervalDays * ONE_DAY_MS;
   return nowMs - last >= intervalMs;
 }
-
-// --- Filesystem helpers (delegated to journal-io) --------------------
 
 export async function readState(workspaceRoot: string): Promise<JournalState> {
   const raw = await readJournalStateRaw<unknown>(null, workspaceRoot);
