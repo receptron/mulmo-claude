@@ -391,6 +391,14 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
       : ["--user", `${uid}:${gid}`]),
     "-e",
     "HOME=/home/node",
+    // Wiki-history hook (#763 PR 2) runs inside this container after
+    // every Write/Edit and POSTs back to the parent server. Plain
+    // loopback fails — `127.0.0.1` is the container itself. Same
+    // resolution as MCP_HOST above; on Linux the corresponding
+    // `--add-host host.docker.internal:host-gateway` is appended via
+    // `extraHosts`.
+    "-e",
+    "MULMOCLAUDE_HOST=host.docker.internal",
     "-v",
     `${toDockerPath(projectRoot)}/node_modules:/app/node_modules:ro`,
     "-v",

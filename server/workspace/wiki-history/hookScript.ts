@@ -34,6 +34,12 @@ const WORKSPACE_ROOT = path.join(homedir(), "mulmoclaude");
 const WIKI_PAGES_DIR = path.join(WORKSPACE_ROOT, "data", "wiki", "pages");
 const TOKEN_PATH = path.join(WORKSPACE_ROOT, ".session-token");
 const PORT_PATH = path.join(WORKSPACE_ROOT, ".server-port");
+// In Docker mode the parent server runs on the host's 127.0.0.1
+// which the container can't reach via plain loopback. The Docker
+// spawn plumbing sets MULMOCLAUDE_HOST=host.docker.internal so
+// fetch() resolves to the host server. Outside Docker (or when the
+// var is unset) we fall back to the loopback address.
+const SERVER_HOST = process.env.MULMOCLAUDE_HOST || "127.0.0.1";
 
 async function readStdin() {
   const chunks = [];
@@ -101,7 +107,7 @@ async function main() {
   if (!token || !port) return; // server isn't reachable; silent no-op
 
   try {
-    await fetch(\`http://127.0.0.1:\${port}/api/wiki/internal/snapshot\`, {
+    await fetch(\`http://\${SERVER_HOST}:\${port}/api/wiki/internal/snapshot\`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
