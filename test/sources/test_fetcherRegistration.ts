@@ -28,8 +28,8 @@ describe("fetcher registration (production bootstrap)", () => {
     it(`has a registered fetcher for kind="${kind}"`, () => {
       const fetcher = getFetcher(kind);
       assert.ok(fetcher, `no fetcher registered for "${kind}" — did you forget to import it from server/workspace/sources/fetchers/registerAll.ts?`);
-      assert.equal(fetcher!.kind, kind);
-      assert.equal(typeof fetcher!.fetch, "function");
+      assert.equal(fetcher.kind, kind);
+      assert.equal(typeof fetcher.fetch, "function");
     });
   }
 });

@@ -85,7 +85,7 @@ describe("beginRun / endRun / cancelRun", () => {
     getOrCreateSession("s1", sessionOpts());
     const abort = () => {};
     assert.equal(beginRun("s1", abort), true);
-    assert.equal(getSession("s1")!.isRunning, true);
+    assert.equal(getSession("s1")?.isRunning, true);
   });
 
   it("beginRun rejects when session is already running (409 guard)", () => {
@@ -110,7 +110,8 @@ describe("beginRun / endRun / cancelRun", () => {
     // initSessionStore is needed for endRun to publish
     initSessionStore(stubPubSub());
     endRun("s1");
-    const sess = getSession("s1")!;
+    const sess = getSession("s1");
+    assert.ok(sess);
     assert.equal(sess.isRunning, false);
     assert.equal(sess.hasUnread, true);
   });

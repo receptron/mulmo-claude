@@ -168,7 +168,7 @@ test.describe("/sources page", () => {
     //
     // Hold the initial GET behind a promise we release manually so we
     // can observe the gating UI in isolation.
-    let releaseFirstGet: (() => void) | null = null;
+    let releaseFirstGet: () => void = () => {};
     const firstGetResolved = new Promise<void>((resolve) => {
       releaseFirstGet = resolve;
     });
@@ -194,7 +194,7 @@ test.describe("/sources page", () => {
     await expect(page.getByTestId("sources-empty")).toBeHidden();
 
     // Release the GET — list renders, loading indicator gone.
-    releaseFirstGet!();
+    releaseFirstGet();
     await expect(page.getByTestId("sources-initial-loading")).toBeHidden();
     await expect(page.getByTestId(`source-row-${SOURCE_A.slug}`)).toBeVisible();
   });

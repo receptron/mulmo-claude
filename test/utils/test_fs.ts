@@ -31,13 +31,13 @@ describe("statSafe", () => {
   it("returns Stats for an existing file", () => {
     const stats = statSafe(path.join(scratch, "file.txt"));
     assert.ok(stats);
-    assert.ok(stats!.isFile());
+    assert.ok(stats.isFile());
   });
 
   it("returns Stats for an existing directory", () => {
     const stats = statSafe(path.join(scratch, "subdir"));
     assert.ok(stats);
-    assert.ok(stats!.isDirectory());
+    assert.ok(stats.isDirectory());
   });
 
   it("returns null for a missing path (ENOENT)", () => {

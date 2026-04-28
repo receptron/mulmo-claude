@@ -164,9 +164,9 @@ describe("readManyStates / writeManyStates", () => {
     assert.deepEqual(errors, []);
 
     const reads = await readManyStates(workspace, ["a", "b", "c"]);
-    assert.equal(reads.get("a")!.consecutiveFailures, 1);
-    assert.equal(reads.get("b")!.consecutiveFailures, 2);
-    assert.equal(reads.get("c")!.consecutiveFailures, 3);
+    assert.equal(reads.get("a")?.consecutiveFailures, 1);
+    assert.equal(reads.get("b")?.consecutiveFailures, 2);
+    assert.equal(reads.get("c")?.consecutiveFailures, 3);
   });
 
   it("absorbs per-state write failures", async () => {
@@ -184,7 +184,7 @@ describe("readManyStates / writeManyStates", () => {
   it("returns default state for slugs not on disk", async () => {
     await writeSourceState(workspace, makeState({ slug: "has-state" }));
     const reads = await readManyStates(workspace, ["has-state", "no-state"]);
-    assert.equal(reads.get("has-state")!.consecutiveFailures, 1);
+    assert.equal(reads.get("has-state")?.consecutiveFailures, 1);
     assert.deepEqual(reads.get("no-state"), defaultSourceState("no-state"));
   });
 });

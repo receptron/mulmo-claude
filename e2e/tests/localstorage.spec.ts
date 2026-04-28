@@ -91,6 +91,6 @@ test.describe("localStorage state restoration", () => {
     await page.reload();
     await expect(page.getByText("MulmoClaude")).toBeVisible();
     const stored = await page.evaluate(() => localStorage.getItem("files_expanded_dirs"));
-    expect(JSON.parse(stored!)).toContain("wiki");
+    expect(JSON.parse(stored ?? "[]")).toContain("wiki");
   });
 });

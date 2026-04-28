@@ -366,6 +366,6 @@ describe("rssFetcher.fetch", () => {
     const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("rss");
     assert.ok(fetcher);
-    assert.equal(fetcher!.kind, "rss");
+    assert.equal(fetcher.kind, "rss");
   });
 });

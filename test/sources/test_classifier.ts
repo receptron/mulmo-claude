@@ -49,7 +49,7 @@ describe("buildClassifyPrompt — shape", () => {
     // Count only the chars inside the notes body.
     const notesMatch = /USER NOTES:\n([\s\S]*)$/.exec(prompt);
     assert.ok(notesMatch);
-    assert.ok(notesMatch![1].length <= 400);
+    assert.ok(notesMatch[1].length <= 400);
   });
 
   it("includes up to 5 sample titles", () => {
@@ -93,7 +93,7 @@ describe("buildClassifyPrompt — shape", () => {
     });
     const summaryLineMatch = /RECENT ITEM SUMMARIES:\n- (x+)/.exec(prompt);
     assert.ok(summaryLineMatch);
-    assert.ok(summaryLineMatch![1].length <= 200);
+    assert.ok(summaryLineMatch[1].length <= 200);
   });
 
   it("omits sample sections when arrays are empty", () => {

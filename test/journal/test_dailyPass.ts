@@ -39,8 +39,8 @@ describe("entryToExcerpt", () => {
       message: longMsg,
     });
     assert.ok(out);
-    assert.ok(out!.content.length < longMsg.length);
-    assert.ok(out!.content.endsWith("…"));
+    assert.ok(out.content.length < longMsg.length);
+    assert.ok(out.content.endsWith("…"));
   });
 
   it("converts a tool_result entry using toolName + title", () => {
@@ -54,7 +54,7 @@ describe("entryToExcerpt", () => {
       },
     });
     assert.ok(out);
-    assert.match(out!.content, /generateImage: a sunset/);
+    assert.match(out.content, /generateImage: a sunset/);
   });
 
   it("falls back to message when title is missing", () => {
@@ -67,7 +67,7 @@ describe("entryToExcerpt", () => {
       },
     });
     assert.ok(out);
-    assert.match(out!.content, /searchX: got 10 results/);
+    assert.match(out.content, /searchX: got 10 results/);
   });
 
   it("falls back to '(no message)' when both title and message are missing", () => {
@@ -77,7 +77,7 @@ describe("entryToExcerpt", () => {
       result: { toolName: "weird" },
     });
     assert.ok(out);
-    assert.match(out!.content, /weird: \(no message\)/);
+    assert.match(out.content, /weird: \(no message\)/);
   });
 
   it("returns null for unrecognised entry types", () => {
@@ -95,7 +95,7 @@ describe("entryToExcerpt", () => {
   it("handles missing source/type by using 'unknown'", () => {
     const out = entryToExcerpt({ message: "hi", type: "text" });
     assert.ok(out);
-    assert.equal(out!.source, "unknown");
+    assert.equal(out.source, "unknown");
   });
 });
 
@@ -210,14 +210,14 @@ describe("parseEntry", () => {
       },
     });
     assert.ok(parsed);
-    assert.match(parsed!.excerpt.content, /presentMulmoScript: story about a cat/);
-    assert.deepEqual(parsed!.artifactPaths, ["stories/cat.json"]);
+    assert.match(parsed.excerpt.content, /presentMulmoScript: story about a cat/);
+    assert.deepEqual(parsed.artifactPaths, ["stories/cat.json"]);
   });
 
   it("returns empty artifactPaths for a text entry", () => {
     const parsed = parseEntry({ source: "user", type: "text", message: "hi" });
     assert.ok(parsed);
-    assert.deepEqual(parsed!.artifactPaths, []);
+    assert.deepEqual(parsed.artifactPaths, []);
   });
 
   it("returns null for entries that don't produce an excerpt", () => {
@@ -255,9 +255,9 @@ describe("buildDayBuckets", () => {
     ]);
     const plan = buildDayBuckets(perSession);
     assert.equal(plan.dayBuckets.size, 2);
-    assert.equal(plan.dayBuckets.get("2026-04-10")!.length, 1);
-    assert.equal(plan.dayBuckets.get("2026-04-11")!.length, 1);
-    assert.deepEqual([...plan.sessionToDays.get("s1")!].sort(), ["2026-04-10", "2026-04-11"]);
+    assert.equal(plan.dayBuckets.get("2026-04-10")?.length, 1);
+    assert.equal(plan.dayBuckets.get("2026-04-11")?.length, 1);
+    assert.deepEqual([...(plan.sessionToDays.get("s1") ?? [])].sort(), ["2026-04-10", "2026-04-11"]);
   });
 
   it("merges multiple sessions that share a date into the same bucket", () => {
@@ -267,9 +267,9 @@ describe("buildDayBuckets", () => {
     ]);
     const plan = buildDayBuckets(perSession);
     assert.equal(plan.dayBuckets.size, 1);
-    assert.equal(plan.dayBuckets.get("2026-04-10")!.length, 2);
-    assert.equal(plan.sessionToDays.get("s1")!.has("2026-04-10"), true);
-    assert.equal(plan.sessionToDays.get("s2")!.has("2026-04-10"), true);
+    assert.equal(plan.dayBuckets.get("2026-04-10")?.length, 2);
+    assert.equal(plan.sessionToDays.get("s1")?.has("2026-04-10"), true);
+    assert.equal(plan.sessionToDays.get("s2")?.has("2026-04-10"), true);
   });
 
   it("tracks the full day-set for a session that spans many dates", () => {
@@ -278,7 +278,7 @@ describe("buildDayBuckets", () => {
       byDate.set(dateKey, mkExcerpt("s1", dateKey));
     }
     const plan = buildDayBuckets(new Map([["s1", byDate]]));
-    assert.equal(plan.sessionToDays.get("s1")!.size, 3);
+    assert.equal(plan.sessionToDays.get("s1")?.size, 3);
   });
 });
 
@@ -336,8 +336,8 @@ describe("parseArchivistOutput", () => {
     const raw = `Some preface\n\`\`\`json\n${JSON.stringify(validOutput)}\n\`\`\``;
     const out = parseArchivistOutput(raw);
     assert.ok(out);
-    assert.equal(out!.dailySummaryMarkdown, validOutput.dailySummaryMarkdown);
-    assert.equal(out!.topicUpdates.length, 1);
+    assert.equal(out.dailySummaryMarkdown, validOutput.dailySummaryMarkdown);
+    assert.equal(out.topicUpdates.length, 1);
   });
 
   it("returns null for missing JSON fence", () => {
@@ -387,7 +387,7 @@ describe("computeJustCompletedSessions", () => {
     const completed = computeJustCompletedSessions("2026-04-10", excerpts, sessionToDays, dirtyMetaById);
     assert.equal(completed.length, 0);
     assert.deepEqual(
-      [...sessionToDays.get("s1")!],
+      [...(sessionToDays.get("s1") ?? [])],
       ["2026-04-11"], // 2026-04-10 removed
     );
   });
@@ -409,7 +409,7 @@ describe("computeJustCompletedSessions", () => {
       ["s1"],
     );
     assert.equal(sessionToDays.has("s1"), false);
-    assert.deepEqual([...sessionToDays.get("s2")!], ["2026-04-11"]);
+    assert.deepEqual([...(sessionToDays.get("s2") ?? [])], ["2026-04-11"]);
   });
 
   it("silently skips sessions missing from sessionToDays", () => {
@@ -555,7 +555,8 @@ describe("bucketParsedEvents", () => {
   it("creates one bucket at the fallback date with all events", () => {
     const out = bucketParsedEvents([mkParsed("a"), mkParsed("b")], "s1", "general", "2026-04-12");
     assert.equal(out.size, 1);
-    const bucket = out.get("2026-04-12")!;
+    const bucket = out.get("2026-04-12");
+    assert.ok(bucket);
     assert.equal(bucket.sessionId, "s1");
     assert.equal(bucket.roleId, "general");
     assert.equal(bucket.events.length, 2);
@@ -572,7 +573,8 @@ describe("bucketParsedEvents", () => {
       "general",
       "2026-04-12",
     );
-    const bucket = out.get("2026-04-12")!;
+    const bucket = out.get("2026-04-12");
+    assert.ok(bucket);
     assert.deepEqual(bucket.artifactPaths, ["stories/one.json", "stories/two.json"]);
   });
 });

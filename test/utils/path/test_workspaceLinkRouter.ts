@@ -23,14 +23,14 @@ describe("classifyWorkspacePath", () => {
 
     it("does not classify wiki source files as wiki pages", () => {
       const result = classifyWorkspacePath("data/wiki/sources/my-source.md");
-      assert.notEqual(result, null);
-      assert.equal(result!.kind, "file");
+      assert.ok(result);
+      assert.equal(result.kind, "file");
     });
 
     it("does not classify wiki index as wiki page", () => {
       const result = classifyWorkspacePath("data/wiki/index.md");
-      assert.notEqual(result, null);
-      assert.equal(result!.kind, "file");
+      assert.ok(result);
+      assert.equal(result.kind, "file");
     });
   });
 
@@ -49,12 +49,14 @@ describe("classifyWorkspacePath", () => {
 
     it("does not classify nested paths under chat/ as session", () => {
       const result = classifyWorkspacePath("conversations/chat/sub/dir.jsonl");
-      assert.equal(result!.kind, "file");
+      assert.ok(result);
+      assert.equal(result.kind, "file");
     });
 
     it("does not classify non-jsonl files as session", () => {
       const result = classifyWorkspacePath("conversations/chat/abc-123.txt");
-      assert.equal(result!.kind, "file");
+      assert.ok(result);
+      assert.equal(result.kind, "file");
     });
   });
 

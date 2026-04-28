@@ -15,17 +15,17 @@ description: Enable CI for a repository
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "Enable CI for a repository");
-    assert.match(parsed!.body, /^## Steps/);
-    assert.match(parsed!.body, /Open a PR/);
+    assert.equal(parsed.description, "Enable CI for a repository");
+    assert.match(parsed.body, /^## Steps/);
+    assert.match(parsed.body, /Open a PR/);
   });
 
   it("tolerates CRLF line endings", () => {
     const raw = "---\r\ndescription: Hi\r\n---\r\n\r\nbody here\r\n";
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "Hi");
-    assert.match(parsed!.body, /body here/);
+    assert.equal(parsed.description, "Hi");
+    assert.match(parsed.body, /body here/);
   });
 
   it("strips quotes from a quoted description", () => {
@@ -37,7 +37,7 @@ body
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "Colons: are : fine");
+    assert.equal(parsed.description, "Colons: are : fine");
   });
 
   it("handles single-quoted descriptions", () => {
@@ -47,7 +47,7 @@ description: 'single quoted'
 body`;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "single quoted");
+    assert.equal(parsed.description, "single quoted");
   });
 
   it("keeps the first colon's value when the value itself contains colons", () => {
@@ -57,7 +57,7 @@ description: See helps/wiki.md for details
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "See helps/wiki.md for details");
+    assert.equal(parsed.description, "See helps/wiki.md for details");
   });
 
   it("skips unrelated keys inside the frontmatter", () => {
@@ -72,7 +72,7 @@ body
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.description, "Enable CI");
+    assert.equal(parsed.description, "Enable CI");
   });
 
   it("returns null when there is no frontmatter fence", () => {
@@ -106,7 +106,7 @@ description: Metadata only
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.body, "");
+    assert.equal(parsed.body, "");
   });
 
   it("trims leading blank lines and trailing whitespace from body", () => {
@@ -123,8 +123,8 @@ description: Keep the middle
 `;
     const parsed = parseSkillFrontmatter(raw);
     assert.ok(parsed);
-    assert.equal(parsed!.body.startsWith("  # Heading"), true);
-    assert.equal(parsed!.body.endsWith("content"), true);
+    assert.equal(parsed.body.startsWith("  # Heading"), true);
+    assert.equal(parsed.body.endsWith("content"), true);
   });
 
   it("returns null for empty input", () => {
@@ -144,7 +144,7 @@ followed by a divider in the body
     assert.ok(parsed);
     // The frontmatter closed at the expected spot; body contains the
     // stray divider verbatim.
-    assert.equal(parsed!.description, "Main");
-    assert.match(parsed!.body, /followed by a divider/);
+    assert.equal(parsed.description, "Main");
+    assert.match(parsed.body, /followed by a divider/);
   });
 });

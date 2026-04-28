@@ -97,10 +97,10 @@ describe("indexSession — happy path", () => {
     });
 
     assert.ok(entry !== null);
-    assert.equal(entry!.id, "sess-A");
-    assert.equal(entry!.title, "Plan a project");
-    assert.equal(entry!.roleId, "general");
-    assert.equal(entry!.startedAt, "2026-04-12T10:00:00.000Z");
+    assert.equal(entry.id, "sess-A");
+    assert.equal(entry.title, "Plan a project");
+    assert.equal(entry.roleId, "general");
+    assert.equal(entry.startedAt, "2026-04-12T10:00:00.000Z");
 
     // Per-session file exists.
     const perSession = JSON.parse(await readFile(indexEntryPathFor(workspace, "sess-A"), "utf-8"));

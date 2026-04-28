@@ -295,7 +295,8 @@ describe("computeNextState — on failure", () => {
       error: "boom",
     };
     const next = computeNextState(prev, outcome, now);
-    const gap = Date.parse(next.nextAttemptAt!) - now;
+    assert.ok(next.nextAttemptAt);
+    const gap = Date.parse(next.nextAttemptAt) - now;
     assert.equal(gap, BACKOFF_MAX_MS);
   });
 
@@ -344,7 +345,7 @@ describe("computeNextState — empty-success adaptive backoff", () => {
     const next = computeNextState(prev, outcome, now);
     assert.equal(next.consecutiveEmptyFetches, EMPTY_FETCH_THRESHOLD);
     assert.ok(next.emptyBackoffUntil, "emptyBackoffUntil should be set at threshold");
-    const gap = Date.parse(next.emptyBackoffUntil!) - now;
+    const gap = Date.parse(next.emptyBackoffUntil) - now;
     assert.equal(gap, 3_600_000); // 1h
   });
 

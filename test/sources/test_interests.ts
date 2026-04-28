@@ -183,11 +183,11 @@ describe("loadInterests", () => {
       }),
     );
     const result = loadInterests(tmpDir);
-    assert.notEqual(result, null);
-    assert.deepEqual(result!.keywords, ["AI", "ML"]);
-    assert.deepEqual(result!.categories, ["ai"]);
-    assert.equal(result!.minRelevance, 0.3);
-    assert.equal(result!.maxNotificationsPerRun, 10);
+    assert.ok(result);
+    assert.deepEqual(result.keywords, ["AI", "ML"]);
+    assert.deepEqual(result.categories, ["ai"]);
+    assert.equal(result.minRelevance, 0.3);
+    assert.equal(result.maxNotificationsPerRun, 10);
     rmSync(tmpDir, { recursive: true });
   });
 
@@ -217,9 +217,9 @@ describe("loadInterests", () => {
     mkdirSync(configDir, { recursive: true });
     writeFileSync(path.join(configDir, "interests.json"), JSON.stringify({ keywords: ["test"] }));
     const result = loadInterests(tmpDir);
-    assert.notEqual(result, null);
-    assert.equal(result!.minRelevance, 0.5);
-    assert.equal(result!.maxNotificationsPerRun, 5);
+    assert.ok(result);
+    assert.equal(result.minRelevance, 0.5);
+    assert.equal(result.maxNotificationsPerRun, 5);
     rmSync(tmpDir, { recursive: true });
   });
 
@@ -235,8 +235,8 @@ describe("loadInterests", () => {
       }),
     );
     const result = loadInterests(tmpDir);
-    assert.notEqual(result, null);
-    assert.deepEqual(result!.categories, ["ai", "security"]);
+    assert.ok(result);
+    assert.deepEqual(result.categories, ["ai", "security"]);
     rmSync(tmpDir, { recursive: true });
   });
 });

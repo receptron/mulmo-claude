@@ -114,13 +114,13 @@ Disallow: /googlenews
   it("picks the exact-match group first", () => {
     const group = selectGroup(robots, "Googlebot");
     assert.ok(group);
-    assert.deepEqual(group!.userAgents, ["googlebot"]);
+    assert.deepEqual(group.userAgents, ["googlebot"]);
   });
 
   it("is case-insensitive on the input agent", () => {
     const group = selectGroup(robots, "GOOGLEBOT");
     assert.ok(group);
-    assert.deepEqual(group!.userAgents, ["googlebot"]);
+    assert.deepEqual(group.userAgents, ["googlebot"]);
   });
 
   it("picks the longest-prefix group when no exact match", () => {
@@ -128,13 +128,13 @@ Disallow: /googlenews
     // longest matching prefix.
     const group = selectGroup(robots, "Googlebot-News-Images");
     assert.ok(group);
-    assert.deepEqual(group!.userAgents, ["googlebot-news"]);
+    assert.deepEqual(group.userAgents, ["googlebot-news"]);
   });
 
   it("falls back to `*` when no prefix matches", () => {
     const group = selectGroup(robots, "MyBot/1.0");
     assert.ok(group);
-    assert.deepEqual(group!.userAgents, ["*"]);
+    assert.deepEqual(group.userAgents, ["*"]);
   });
 
   it("returns null when robots has no groups at all", () => {
@@ -163,7 +163,7 @@ Disallow: /private
 `);
     const merged = selectGroup(duplicateGroupsRobots, "Googlebot");
     assert.ok(merged);
-    const kinds = merged!.rules.map((rule) => ({
+    const kinds = merged.rules.map((rule) => ({
       kind: rule.kind,
       pattern: rule.pattern,
     }));

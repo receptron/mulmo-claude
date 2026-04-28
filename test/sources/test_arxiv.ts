@@ -354,6 +354,6 @@ describe("arxivFetcher.fetch", () => {
     const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("arxiv");
     assert.ok(fetcher);
-    assert.equal(fetcher!.kind, "arxiv");
+    assert.equal(fetcher.kind, "arxiv");
   });
 });

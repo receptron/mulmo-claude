@@ -20,12 +20,13 @@ test.describe("ChatInput attach discoverability", () => {
   test("placeholder hints at file attachment", async ({ page }) => {
     const placeholder = await chatInput(page).getAttribute("placeholder");
     expect(placeholder).toBeTruthy();
+    if (placeholder === null) throw new Error("placeholder must be set");
     // Either language: the three affordances we want the user to
     // discover must all be named. Matches both EN ("drop / paste /
     // attach") and JA ("ドロップ・ペースト・添付").
-    const lower = placeholder!.toLowerCase();
+    const lower = placeholder.toLowerCase();
     const hasAllEn = lower.includes("drop") && lower.includes("paste") && lower.includes("attach");
-    const hasAllJa = placeholder!.includes("ドロップ") && placeholder!.includes("ペースト") && placeholder!.includes("添付");
+    const hasAllJa = placeholder.includes("ドロップ") && placeholder.includes("ペースト") && placeholder.includes("添付");
     expect(hasAllEn || hasAllJa, `placeholder "${placeholder}" should mention drop/paste/attach`).toBeTruthy();
   });
 
@@ -47,12 +48,12 @@ test.describe("ChatInput attach discoverability", () => {
     // Spot-check: the filter must cover images + PDFs + the
     // Office-document trio + text/*. These are the core formats the
     // server side converts today.
-    expect(accept!).toContain("image/");
-    expect(accept!).toContain("text/");
-    expect(accept!).toContain("application/pdf");
-    expect(accept!).toContain("wordprocessingml"); // DOCX
-    expect(accept!).toContain("spreadsheetml"); // XLSX
-    expect(accept!).toContain("presentationml"); // PPTX
+    expect(accept).toContain("image/");
+    expect(accept).toContain("text/");
+    expect(accept).toContain("application/pdf");
+    expect(accept).toContain("wordprocessingml"); // DOCX
+    expect(accept).toContain("spreadsheetml"); // XLSX
+    expect(accept).toContain("presentationml"); // PPTX
   });
 
   test("clicking the attach button opens the picker (fires a click on the hidden input)", async ({ page }) => {

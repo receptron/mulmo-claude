@@ -170,35 +170,35 @@ describe("parseGithubIssue", () => {
   it("extracts the fields we consume", () => {
     const parsed = parseGithubIssue(makeIssue());
     assert.ok(parsed);
-    assert.equal(parsed!.id, 42);
-    assert.equal(parsed!.number, 7);
-    assert.equal(parsed!.title, "Bug: thing broken");
-    assert.equal(parsed!.htmlUrl, "https://github.com/receptron/mulmoclaude/issues/7");
-    assert.equal(parsed!.updatedAt, "2026-04-10T10:00:00Z");
-    assert.equal(parsed!.state, "open");
-    assert.equal(parsed!.isPr, false);
+    assert.equal(parsed.id, 42);
+    assert.equal(parsed.number, 7);
+    assert.equal(parsed.title, "Bug: thing broken");
+    assert.equal(parsed.htmlUrl, "https://github.com/receptron/mulmoclaude/issues/7");
+    assert.equal(parsed.updatedAt, "2026-04-10T10:00:00Z");
+    assert.equal(parsed.state, "open");
+    assert.equal(parsed.isPr, false);
   });
 
   it("marks PRs via the pull_request field", () => {
     const parsed = parseGithubIssue(makePr());
     assert.ok(parsed);
-    assert.equal(parsed!.isPr, true);
+    assert.equal(parsed.isPr, true);
   });
 
   it("treats a pull_request field with an empty object as PR", () => {
     const parsed = parseGithubIssue({ ...makeIssue(), pull_request: {} });
     assert.ok(parsed);
-    assert.equal(parsed!.isPr, true);
+    assert.equal(parsed.isPr, true);
   });
 
   it("coerces missing fields to null, doesn't crash", () => {
     const parsed = parseGithubIssue({});
     assert.ok(parsed);
-    assert.equal(parsed!.id, null);
-    assert.equal(parsed!.number, null);
-    assert.equal(parsed!.title, null);
-    assert.equal(parsed!.htmlUrl, null);
-    assert.equal(parsed!.isPr, false);
+    assert.equal(parsed.id, null);
+    assert.equal(parsed.number, null);
+    assert.equal(parsed.title, null);
+    assert.equal(parsed.htmlUrl, null);
+    assert.equal(parsed.isPr, false);
   });
 
   it("returns null for non-objects", () => {
@@ -212,33 +212,39 @@ describe("parseGithubIssue", () => {
 
 describe("issueToSourceItem — title annotations", () => {
   it("annotates PRs with [PR]", () => {
-    const issue = parseGithubIssue(makePr())!;
+    const issue = parseGithubIssue(makePr());
+    assert.ok(issue);
     const params = { state: "open" as const, includePrs: true };
     const item = issueToSourceItem(issue, makeSource(), params, null);
     assert.ok(item);
-    assert.match(item!.title, /^\[PR\]/);
+    assert.match(item.title, /^\[PR\]/);
   });
 
   it("annotates closed items with [closed]", () => {
-    const issue = parseGithubIssue(makeIssue({ state: "closed" }))!;
+    const issue = parseGithubIssue(makeIssue({ state: "closed" }));
+    assert.ok(issue);
     const params = { state: "all" as const, includePrs: true };
     const item = issueToSourceItem(issue, makeSource(), params, null);
     assert.ok(item);
-    assert.match(item!.title, /^\[closed\]/);
+    assert.match(item.title, /^\[closed\]/);
   });
 
   it("combines annotations [PR] [closed] for closed PRs", () => {
-    const issue = parseGithubIssue(makePr({ state: "closed" }))!;
+    const issue = parseGithubIssue(makePr({ state: "closed" }));
+    assert.ok(issue);
     const params = { state: "all" as const, includePrs: true };
     const item = issueToSourceItem(issue, makeSource(), params, null);
-    assert.match(item!.title, /^\[PR\] \[closed\]/);
+    assert.ok(item);
+    assert.match(item.title, /^\[PR\] \[closed\]/);
   });
 
   it("falls back to `#<number>` when title is missing", () => {
-    const issue = parseGithubIssue(makeIssue({ title: null }))!;
+    const issue = parseGithubIssue(makeIssue({ title: null }));
+    assert.ok(issue);
     const params = { state: "open" as const, includePrs: true };
     const item = issueToSourceItem(issue, makeSource(), params, null);
-    assert.equal(item!.title, "#7");
+    assert.ok(item);
+    assert.equal(item.title, "#7");
   });
 });
 
@@ -246,26 +252,31 @@ describe("issueToSourceItem — filtering", () => {
   const params = { state: "open" as const, includePrs: true };
 
   it("drops PRs when includePrs is false", () => {
-    const prIssue = parseGithubIssue(makePr())!;
+    const prIssue = parseGithubIssue(makePr());
+    assert.ok(prIssue);
     const item = issueToSourceItem(prIssue, makeSource(), { state: "open", includePrs: false }, null);
     assert.equal(item, null);
   });
 
   it("drops when html_url or updated_at is missing", () => {
-    const noUrl = parseGithubIssue(makeIssue({ html_url: null }))!;
+    const noUrl = parseGithubIssue(makeIssue({ html_url: null }));
+    assert.ok(noUrl);
     assert.equal(issueToSourceItem(noUrl, makeSource(), params, null), null);
-    const noDate = parseGithubIssue(makeIssue({ updated_at: null }))!;
+    const noDate = parseGithubIssue(makeIssue({ updated_at: null }));
+    assert.ok(noDate);
     assert.equal(issueToSourceItem(noDate, makeSource(), params, null), null);
   });
 
   it("drops items at-or-older than the cursor (strict > filter)", () => {
-    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!;
+    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }));
+    assert.ok(issue);
     const atCursor = issueToSourceItem(issue, makeSource(), params, Date.parse("2026-04-10T10:00:00Z"));
     assert.equal(atCursor, null);
   });
 
   it("keeps items strictly newer than the cursor", () => {
-    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-11T10:00:00Z" }))!;
+    const issue = parseGithubIssue(makeIssue({ updated_at: "2026-04-11T10:00:00Z" }));
+    assert.ok(issue);
     const item = issueToSourceItem(issue, makeSource(), params, Date.parse("2026-04-10T10:00:00Z"));
     assert.ok(item);
   });
@@ -278,16 +289,19 @@ describe("updateIssuesCursor", () => {
 
   it("advances to the newest updated_at across the batch", () => {
     const issues = [
-      parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!,
-      parseGithubIssue(makeIssue({ updated_at: "2026-04-13T10:00:00Z" }))!,
-      parseGithubIssue(makeIssue({ updated_at: "2026-04-11T10:00:00Z" }))!,
-    ];
+      parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" })),
+      parseGithubIssue(makeIssue({ updated_at: "2026-04-13T10:00:00Z" })),
+      parseGithubIssue(makeIssue({ updated_at: "2026-04-11T10:00:00Z" })),
+    ].filter((issue) => issue !== null);
     const cursor = updateIssuesCursor({}, issues, params);
     assert.equal(cursor[ISSUES_CURSOR_KEY], "2026-04-13T10:00:00.000Z");
   });
 
   it("ignores PRs for cursor advancement when PRs are excluded", () => {
-    const issues = [parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" }))!, parseGithubIssue(makePr({ updated_at: "2026-04-13T10:00:00Z" }))!];
+    const issues = [
+      parseGithubIssue(makeIssue({ updated_at: "2026-04-10T10:00:00Z" })),
+      parseGithubIssue(makePr({ updated_at: "2026-04-13T10:00:00Z" })),
+    ].filter((issue) => issue !== null);
     const cursor = updateIssuesCursor({}, issues, {
       state: "open",
       includePrs: false,
@@ -298,7 +312,7 @@ describe("updateIssuesCursor", () => {
   });
 
   it("never rolls the cursor backwards", () => {
-    const issues = [parseGithubIssue(makeIssue({ updated_at: "2026-04-01T00:00:00Z" }))!];
+    const issues = [parseGithubIssue(makeIssue({ updated_at: "2026-04-01T00:00:00Z" }))].filter((issue) => issue !== null);
     const existing = { [ISSUES_CURSOR_KEY]: "2026-04-10T10:00:00Z" };
     const cursor = updateIssuesCursor(existing, issues, params);
     assert.equal(cursor[ISSUES_CURSOR_KEY], "2026-04-10T10:00:00Z");
@@ -407,6 +421,6 @@ describe("githubIssuesFetcher.fetch", () => {
     const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("github-issues");
     assert.ok(fetcher);
-    assert.equal(fetcher!.kind, "github-issues");
+    assert.equal(fetcher.kind, "github-issues");
   });
 });

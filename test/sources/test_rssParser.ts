@@ -30,15 +30,16 @@ describe("parseFeed — RSS 2.0", () => {
   it("parses basic RSS 2.0", () => {
     const feed = parseFeed(RSS_BASIC);
     assert.ok(feed);
-    assert.equal(feed!.kind, "rss");
-    assert.equal(feed!.title, "Example Feed");
-    assert.equal(feed!.items.length, 2);
-    assert.equal(feed!.items[0].title, "First post");
-    assert.equal(feed!.items[0].link, "https://example.com/1");
-    assert.equal(feed!.items[0].feedId, "https://example.com/1");
-    assert.equal(feed!.items[0].summary, "Short summary of first post.");
+    assert.equal(feed.kind, "rss");
+    assert.equal(feed.title, "Example Feed");
+    assert.equal(feed.items.length, 2);
+    assert.equal(feed.items[0].title, "First post");
+    assert.equal(feed.items[0].link, "https://example.com/1");
+    assert.equal(feed.items[0].feedId, "https://example.com/1");
+    assert.equal(feed.items[0].summary, "Short summary of first post.");
     // RFC 822 → ISO 8601 conversion
-    assert.match(feed!.items[0].publishedAt!, /2026-04-01T12:00:00/);
+    assert.ok(feed.items[0].publishedAt);
+    assert.match(feed.items[0].publishedAt, /2026-04-01T12:00:00/);
   });
 
   it("normalizes multiple date formats to ISO", () => {
@@ -57,7 +58,7 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items[0].publishedAt, "2026-04-01T12:00:00.000Z");
+    assert.equal(feed.items[0].publishedAt, "2026-04-01T12:00:00.000Z");
   });
 
   it("preserves the raw date string when parsing fails", () => {
@@ -75,7 +76,7 @@ describe("parseFeed — RSS 2.0", () => {
     const feed = parseFeed(xml);
     assert.ok(feed);
     // Fallback: passes the junk through rather than dropping.
-    assert.equal(feed!.items[0].publishedAt, "not-a-date");
+    assert.equal(feed.items[0].publishedAt, "not-a-date");
   });
 
   it("handles CDATA-wrapped description", () => {
@@ -92,7 +93,8 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.match(feed!.items[0].summary!, /HTML.*body/);
+    assert.ok(feed.items[0].summary);
+    assert.match(feed.items[0].summary, /HTML.*body/);
   });
 
   it("picks up content:encoded as the full content body", () => {
@@ -110,8 +112,9 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items[0].summary, "short summary");
-    assert.match(feed!.items[0].content!, /Full body/);
+    assert.equal(feed.items[0].summary, "short summary");
+    assert.ok(feed.items[0].content);
+    assert.match(feed.items[0].content, /Full body/);
   });
 
   it("drops entries with no title", () => {
@@ -130,8 +133,8 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items.length, 1);
-    assert.equal(feed!.items[0].title, "has title");
+    assert.equal(feed.items.length, 1);
+    assert.equal(feed.items[0].title, "has title");
   });
 
   it("handles feeds with a single item (not wrapped in array)", () => {
@@ -150,7 +153,7 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items.length, 1);
+    assert.equal(feed.items.length, 1);
   });
 
   it("falls back to link when guid is absent", () => {
@@ -166,7 +169,7 @@ describe("parseFeed — RSS 2.0", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items[0].feedId, "https://x.com/1");
+    assert.equal(feed.items[0].feedId, "https://x.com/1");
   });
 });
 
@@ -190,10 +193,10 @@ describe("parseFeed — RSS 1.0 (RDF)", () => {
 </rdf:RDF>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.kind, "rss");
-    assert.equal(feed!.title, "RDF Feed");
-    assert.equal(feed!.items.length, 1);
-    assert.equal(feed!.items[0].title, "RDF item");
+    assert.equal(feed.kind, "rss");
+    assert.equal(feed.title, "RDF Feed");
+    assert.equal(feed.items.length, 1);
+    assert.equal(feed.items[0].title, "RDF item");
   });
 });
 
@@ -217,20 +220,20 @@ describe("parseFeed — Atom 1.0", () => {
   it("parses basic Atom", () => {
     const feed = parseFeed(ATOM_BASIC);
     assert.ok(feed);
-    assert.equal(feed!.kind, "atom");
-    assert.equal(feed!.title, "Atom Feed");
-    assert.equal(feed!.items.length, 1);
-    assert.equal(feed!.items[0].title, "Atom post");
-    assert.equal(feed!.items[0].feedId, "urn:uuid:1");
-    assert.equal(feed!.items[0].summary, "short");
-    assert.equal(feed!.items[0].content, "full body");
+    assert.equal(feed.kind, "atom");
+    assert.equal(feed.title, "Atom Feed");
+    assert.equal(feed.items.length, 1);
+    assert.equal(feed.items[0].title, "Atom post");
+    assert.equal(feed.items[0].feedId, "urn:uuid:1");
+    assert.equal(feed.items[0].summary, "short");
+    assert.equal(feed.items[0].content, "full body");
   });
 
   it("prefers rel=alternate over rel=self for the link", () => {
     const feed = parseFeed(ATOM_BASIC);
     assert.ok(feed);
     // Alternate (web URL) wins; self (feed URL) is ignored.
-    assert.equal(feed!.items[0].link, "https://example.com/1");
+    assert.equal(feed.items[0].link, "https://example.com/1");
   });
 
   it("falls back to the first link when no rel=alternate present", () => {
@@ -247,7 +250,7 @@ describe("parseFeed — Atom 1.0", () => {
     const feed = parseFeed(xml);
     assert.ok(feed);
     // First link wins when none is "alternate".
-    assert.equal(feed!.items[0].link, "https://example.com/related");
+    assert.equal(feed.items[0].link, "https://example.com/related");
   });
 
   it("uses <updated> when <published> is missing", () => {
@@ -263,7 +266,7 @@ describe("parseFeed — Atom 1.0", () => {
 </feed>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items[0].publishedAt, "2026-04-01T12:00:00.000Z");
+    assert.equal(feed.items[0].publishedAt, "2026-04-01T12:00:00.000Z");
   });
 
   it("handles a plain <link>some-url</link> (no attrs)", () => {
@@ -279,7 +282,7 @@ describe("parseFeed — Atom 1.0", () => {
 </feed>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items[0].link, "https://example.com/1");
+    assert.equal(feed.items[0].link, "https://example.com/1");
   });
 });
 
@@ -313,7 +316,7 @@ describe("parseFeed — malformed / unusual input", () => {
 </rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.equal(feed!.items.length, 1);
+    assert.equal(feed.items.length, 1);
   });
 
   it("tolerates malformed XML that still has a feed-looking root", () => {
@@ -333,6 +336,6 @@ describe("parseFeed — malformed / unusual input", () => {
 <rss version="2.0"><channel><title>empty</title></channel></rss>`;
     const feed = parseFeed(xml);
     assert.ok(feed);
-    assert.deepEqual(feed!.items, []);
+    assert.deepEqual(feed.items, []);
   });
 });

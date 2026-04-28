@@ -189,7 +189,8 @@ describe("GET /api/sessions — full fetch (no ?since=)", () => {
     await getHandler({ query: {} } as unknown as Request, res);
 
     assert.equal(state.status, 200);
-    const body = state.body!;
+    const body = state.body;
+    assert.ok(body);
     assert.equal(body.sessions.length, 2);
     assert.deepEqual(body.deletedIds, [], "deletedIds is always [] today");
     assert.ok(body.cursor.startsWith("v1:"), `opaque cursor, got: ${body.cursor}`);
@@ -202,7 +203,8 @@ describe("GET /api/sessions — full fetch (no ?since=)", () => {
 
     const { state, res } = mockRes();
     await getHandler({ query: {} } as unknown as Request, res);
-    const ids = state.body!.sessions.map((sess) => sess.id);
+    assert.ok(state.body);
+    const ids = state.body.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["newer", "older"]);
   });
 });
@@ -219,7 +221,8 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
       } as unknown as Request,
       res,
     );
-    const ids = state.body!.sessions.map((sess) => sess.id);
+    assert.ok(state.body);
+    const ids = state.body.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["new"]);
   });
 
@@ -236,11 +239,12 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
       } as unknown as Request,
       res,
     );
-    const ids = state.body!.sessions.map((sess) => sess.id);
+    assert.ok(state.body);
+    const ids = state.body.sessions.map((sess) => sess.id);
     assert.deepEqual(ids, ["summarised"]);
     // The returned cursor must advance to the indexedAt time, not
     // just the mtime, so the next call won't re-fetch this row.
-    assert.equal(state.body!.cursor, encodeCursor(BASE_MS + 500_000_000));
+    assert.equal(state.body.cursor, encodeCursor(BASE_MS + 500_000_000));
   });
 
   it("returns an empty diff when nothing has changed since cursor", async () => {
@@ -253,11 +257,12 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
       } as unknown as Request,
       res,
     );
-    assert.deepEqual(state.body!.sessions, []);
+    assert.ok(state.body);
+    assert.deepEqual(state.body.sessions, []);
     // Cursor is echoed to the server's view of the max change —
     // same or higher than the client's — so subsequent idempotent
     // calls keep getting empty diffs.
-    assert.equal(state.body!.cursor, encodeCursor(BASE_MS));
+    assert.equal(state.body.cursor, encodeCursor(BASE_MS));
   });
 
   it("falls back to a full resend when the cursor is malformed", async () => {
@@ -266,7 +271,8 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
 
     const { state, res } = mockRes();
     await getHandler({ query: { since: "not-a-cursor" } } as unknown as Request, res);
-    assert.equal(state.body!.sessions.length, 2);
+    assert.ok(state.body);
+    assert.equal(state.body.sessions.length, 2);
   });
 
   it("round-trips: feed the returned cursor back in → empty diff", async () => {
@@ -274,11 +280,13 @@ describe("GET /api/sessions?since=<cursor> — incremental fetch", () => {
 
     const first = mockRes();
     await getHandler({ query: {} } as unknown as Request, first.res);
-    const cursor = first.state.body!.cursor;
+    assert.ok(first.state.body);
+    const cursor = first.state.body.cursor;
 
     const second = mockRes();
     await getHandler({ query: { since: cursor } } as unknown as Request, second.res);
-    assert.deepEqual(second.state.body!.sessions, []);
+    assert.ok(second.state.body);
+    assert.deepEqual(second.state.body.sessions, []);
   });
 });
 

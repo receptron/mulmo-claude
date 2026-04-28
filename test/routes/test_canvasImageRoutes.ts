@@ -171,8 +171,12 @@ describe("POST /api/canvas — pre-allocate image file", () => {
     const secondCall = mockRes();
     await canvasHandler(req({}), secondCall.res);
 
-    const firstPath = (firstCall.state.body as OpenCanvasBody).data!.imageData;
-    const secondPath = (secondCall.state.body as OpenCanvasBody).data!.imageData;
+    const firstBody = firstCall.state.body as OpenCanvasBody | undefined;
+    const secondBody = secondCall.state.body as OpenCanvasBody | undefined;
+    assert.ok(firstBody?.data);
+    assert.ok(secondBody?.data);
+    const firstPath = firstBody.data.imageData;
+    const secondPath = secondBody.data.imageData;
     assert.notEqual(firstPath, secondPath, "two consecutive opens must not share a filename");
 
     createdImagePaths.push(firstPath, secondPath);
@@ -184,7 +188,9 @@ describe("PUT /api/images/update — overwrite pre-allocated file", () => {
     // Allocate a canvas image the same way the client would.
     const { state: openState, res: openRes } = mockRes();
     await canvasHandler(req({}), openRes);
-    const relPath = (openState.body as OpenCanvasBody).data!.imageData;
+    const openBody = openState.body as OpenCanvasBody | undefined;
+    assert.ok(openBody?.data);
+    const relPath = openBody.data.imageData;
     createdImagePaths.push(relPath);
 
     const absPath = path.join(workspaceDir, relPath);
@@ -206,7 +212,9 @@ describe("PUT /api/images/update — overwrite pre-allocated file", () => {
   it("accepts raw base64 without a data-URI prefix (stripDataUri is a no-op)", async () => {
     const { state: openState, res: openRes } = mockRes();
     await canvasHandler(req({}), openRes);
-    const relPath = (openState.body as OpenCanvasBody).data!.imageData;
+    const openBody = openState.body as OpenCanvasBody | undefined;
+    assert.ok(openBody?.data);
+    const relPath = openBody.data.imageData;
     createdImagePaths.push(relPath);
 
     const { state, res } = mockRes();

@@ -306,7 +306,7 @@ describe("handleDeleteColumn", () => {
     assert.equal(result.kind, "success");
     if (result.kind !== "success") return;
     // All four items now live in "todo" with unique, contiguous orders.
-    const todoItems = result.items!.filter((i) => i.status === "todo").sort((itemX, itemY) => (itemX.order ?? 0) - (itemY.order ?? 0));
+    const todoItems = (result.items ?? []).filter((i) => i.status === "todo").sort((itemX, itemY) => (itemX.order ?? 0) - (itemY.order ?? 0));
     const orders = todoItems.map((i) => i.order);
     // No duplicates.
     assert.equal(new Set(orders).size, 4);

@@ -150,7 +150,8 @@ describe("runSourcesPipeline — happy path", () => {
     assert.match(daily, /# Daily brief/);
     assert.match(daily, /```json/);
     const jsonMatch = /```json\n([\s\S]*?)\n```/.exec(daily);
-    const parsed = JSON.parse(jsonMatch![1]);
+    assert.ok(jsonMatch);
+    const parsed = JSON.parse(jsonMatch[1]);
     assert.equal(parsed.itemCount, 2);
     // Archive files created per source.
     assert.equal(result.archiveWrittenPaths.length, 2);

@@ -95,13 +95,13 @@ describe("parseGithubRelease", () => {
   it("extracts the fields we actually consume", () => {
     const release = parseGithubRelease(makeRelease());
     assert.ok(release);
-    assert.equal(release!.id, 12345);
-    assert.equal(release!.tagName, "v1.2.3");
-    assert.equal(release!.name, "1.2.3 — Spring release");
-    assert.equal(release!.htmlUrl, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
-    assert.equal(release!.publishedAt, "2026-04-10T10:00:00Z");
-    assert.equal(release!.draft, false);
-    assert.equal(release!.prerelease, false);
+    assert.equal(release.id, 12345);
+    assert.equal(release.tagName, "v1.2.3");
+    assert.equal(release.name, "1.2.3 — Spring release");
+    assert.equal(release.htmlUrl, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
+    assert.equal(release.publishedAt, "2026-04-10T10:00:00Z");
+    assert.equal(release.draft, false);
+    assert.equal(release.prerelease, false);
   });
 
   it("returns null for non-objects", () => {
@@ -113,18 +113,19 @@ describe("parseGithubRelease", () => {
   it("coerces missing fields to null without failing the whole parse", () => {
     const release = parseGithubRelease({});
     assert.ok(release);
-    assert.equal(release!.id, null);
-    assert.equal(release!.name, null);
-    assert.equal(release!.htmlUrl, null);
-    assert.equal(release!.publishedAt, null);
-    assert.equal(release!.draft, false);
-    assert.equal(release!.prerelease, false);
+    assert.equal(release.id, null);
+    assert.equal(release.name, null);
+    assert.equal(release.htmlUrl, null);
+    assert.equal(release.publishedAt, null);
+    assert.equal(release.draft, false);
+    assert.equal(release.prerelease, false);
   });
 
   it("treats missing `draft` / `prerelease` as false (default)", () => {
     const release = parseGithubRelease({ id: 1 });
-    assert.equal(release!.draft, false);
-    assert.equal(release!.prerelease, false);
+    assert.ok(release);
+    assert.equal(release.draft, false);
+    assert.equal(release.prerelease, false);
   });
 });
 
@@ -154,63 +155,75 @@ describe("firstParagraph", () => {
 
 describe("releaseToSourceItem — happy path", () => {
   it("produces a well-formed SourceItem", () => {
-    const release = parseGithubRelease(makeRelease())!;
+    const release = parseGithubRelease(makeRelease());
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.ok(item);
-    assert.equal(item!.title, "1.2.3 — Spring release");
-    assert.equal(item!.url, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
-    assert.equal(item!.summary, "First paragraph summary.");
-    assert.equal(item!.content, "First paragraph summary.\n\nSecond paragraph with more detail.");
-    assert.deepEqual(item!.categories, ["dependencies", "ai"]);
-    assert.equal(item!.sourceSlug, "anthropic-releases");
+    assert.equal(item.title, "1.2.3 — Spring release");
+    assert.equal(item.url, "https://github.com/anthropics/claude-code/releases/tag/v1.2.3");
+    assert.equal(item.summary, "First paragraph summary.");
+    assert.equal(item.content, "First paragraph summary.\n\nSecond paragraph with more detail.");
+    assert.deepEqual(item.categories, ["dependencies", "ai"]);
+    assert.equal(item.sourceSlug, "anthropic-releases");
   });
 
   it("falls back to tag_name when name is missing", () => {
-    const release = parseGithubRelease(makeRelease({ name: null }))!;
+    const release = parseGithubRelease(makeRelease({ name: null }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
-    assert.equal(item!.title, "v1.2.3");
+    assert.ok(item);
+    assert.equal(item.title, "v1.2.3");
   });
 
   it("uses a default title when both name and tag_name are missing", () => {
-    const release = parseGithubRelease(makeRelease({ name: null, tag_name: null }))!;
+    const release = parseGithubRelease(makeRelease({ name: null, tag_name: null }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
-    assert.equal(item!.title, "Release");
+    assert.ok(item);
+    assert.equal(item.title, "Release");
   });
 
   it("annotates pre-releases with `[pre]` in the title", () => {
-    const release = parseGithubRelease(makeRelease({ prerelease: true }))!;
+    const release = parseGithubRelease(makeRelease({ prerelease: true }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
-    assert.match(item!.title, /^\[pre\]/);
+    assert.ok(item);
+    assert.match(item.title, /^\[pre\]/);
   });
 });
 
 describe("releaseToSourceItem — drops", () => {
   it("drops drafts (defensive; API usually hides them anyway)", () => {
-    const release = parseGithubRelease(makeRelease({ draft: true }))!;
+    const release = parseGithubRelease(makeRelease({ draft: true }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.equal(item, null);
   });
 
   it("drops when html_url is missing", () => {
-    const release = parseGithubRelease(makeRelease({ html_url: null }))!;
+    const release = parseGithubRelease(makeRelease({ html_url: null }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.equal(item, null);
   });
 
   it("drops when published_at is missing", () => {
-    const release = parseGithubRelease(makeRelease({ published_at: null }))!;
+    const release = parseGithubRelease(makeRelease({ published_at: null }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.equal(item, null);
   });
 
   it("drops when html_url doesn't parse", () => {
-    const release = parseGithubRelease(makeRelease({ html_url: "not a url" }))!;
+    const release = parseGithubRelease(makeRelease({ html_url: "not a url" }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), null);
     assert.equal(item, null);
   });
 
   it("drops releases at or older than the cursor", () => {
-    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-10T10:00:00Z" }))!;
+    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-10T10:00:00Z" }));
+    assert.ok(release);
     // Cursor at the exact same instant → drop.
     const atCursor = releaseToSourceItem(release, makeSource(), Date.parse("2026-04-10T10:00:00Z"));
     assert.equal(atCursor, null);
@@ -220,7 +233,8 @@ describe("releaseToSourceItem — drops", () => {
   });
 
   it("keeps releases strictly newer than the cursor", () => {
-    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-11T10:00:00Z" }))!;
+    const release = parseGithubRelease(makeRelease({ published_at: "2026-04-11T10:00:00Z" }));
+    assert.ok(release);
     const item = releaseToSourceItem(release, makeSource(), Date.parse("2026-04-10T10:00:00Z"));
     assert.ok(item);
   });
@@ -230,7 +244,9 @@ describe("releaseToSourceItem — drops", () => {
 
 describe("updateReleasesCursor", () => {
   function parsed(published_at: string | null, draft = false) {
-    return parseGithubRelease(makeRelease({ published_at, draft }))!;
+    const release = parseGithubRelease(makeRelease({ published_at, draft }));
+    assert.ok(release);
+    return release;
   }
 
   it("advances to the newest publishedAt across all non-draft releases", () => {
@@ -382,6 +398,6 @@ describe("githubReleasesFetcher.fetch", () => {
     const { getFetcher } = await import("../../server/workspace/sources/fetchers/index.js");
     const fetcher = getFetcher("github-releases");
     assert.ok(fetcher);
-    assert.equal(fetcher!.kind, "github-releases");
+    assert.equal(fetcher.kind, "github-releases");
   });
 });

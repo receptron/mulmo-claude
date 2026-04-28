@@ -43,10 +43,10 @@ describe("parseSourceFile", () => {
   it("extracts frontmatter and body", () => {
     const out = parseSourceFile(VALID_FRONTMATTER);
     assert.ok(out);
-    assert.equal(out!.fields.get("slug"), "hn-front-page");
-    assert.equal(out!.fields.get("title"), "Hacker News front page");
-    assert.deepEqual(out!.fields.get("categories"), ["tech-news", "general", "english"]);
-    assert.match(out!.body, /# Notes/);
+    assert.equal(out.fields.get("slug"), "hn-front-page");
+    assert.equal(out.fields.get("title"), "Hacker News front page");
+    assert.deepEqual(out.fields.get("categories"), ["tech-news", "general", "english"]);
+    assert.match(out.body, /# Notes/);
   });
 
   it("returns null for a file with no frontmatter", () => {
@@ -61,7 +61,7 @@ describe("parseSourceFile", () => {
     const crlf = VALID_FRONTMATTER.replace(/\n/g, "\r\n");
     const out = parseSourceFile(crlf);
     assert.ok(out);
-    assert.equal(out!.fields.get("slug"), "hn-front-page");
+    assert.equal(out.fields.get("slug"), "hn-front-page");
   });
 
   it("ignores comment lines in frontmatter", () => {
@@ -79,7 +79,7 @@ added_at: 2026-04-13T00:00:00Z
 `;
     const out = parseSourceFile(raw);
     assert.ok(out);
-    assert.equal(out!.fields.get("slug"), "x");
+    assert.equal(out.fields.get("slug"), "x");
   });
 
   it("handles empty string values", () => {
@@ -96,7 +96,7 @@ added_at: 2026-04-13T00:00:00Z
 `;
     const out = parseSourceFile(raw);
     assert.ok(out);
-    assert.deepEqual(out!.fields.get("categories"), []);
+    assert.deepEqual(out.fields.get("categories"), []);
   });
 
   // Codex review iter-2 #908: legacy line-by-line parser stored a
@@ -119,7 +119,7 @@ github_repo:
 `;
     const out = parseSourceFile(raw);
     assert.ok(out);
-    assert.equal(out!.fields.get("github_repo"), "");
+    assert.equal(out.fields.get("github_repo"), "");
   });
 });
 
@@ -140,13 +140,13 @@ describe("buildSource — validation", () => {
   it("builds a valid Source from well-formed fields", () => {
     const source = buildSource(base(), "body");
     assert.ok(source);
-    assert.equal(source!.slug, "hn");
-    assert.equal(source!.title, "HN");
-    assert.equal(source!.fetcherKind, "rss");
-    assert.equal(source!.schedule, "daily");
-    assert.deepEqual(source!.categories, ["tech-news"]);
-    assert.equal(source!.maxItemsPerFetch, 30);
-    assert.equal(source!.notes, "body");
+    assert.equal(source.slug, "hn");
+    assert.equal(source.title, "HN");
+    assert.equal(source.fetcherKind, "rss");
+    assert.equal(source.schedule, "daily");
+    assert.deepEqual(source.categories, ["tech-news"]);
+    assert.equal(source.maxItemsPerFetch, 30);
+    assert.equal(source.notes, "body");
   });
 
   it("returns null for missing slug", () => {
@@ -196,7 +196,7 @@ describe("buildSource — validation", () => {
     front.set("categories", ["ai", "bogus", "security"]);
     const source = buildSource(front, "");
     assert.ok(source);
-    assert.deepEqual(source!.categories, ["ai", "security"]);
+    assert.deepEqual(source.categories, ["ai", "security"]);
   });
 
   it("falls back to the default max_items_per_fetch for invalid values", () => {
@@ -204,15 +204,15 @@ describe("buildSource — validation", () => {
     front.set("max_items_per_fetch", "not-a-number");
     const source = buildSource(front, "");
     assert.ok(source);
-    assert.equal(source!.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
+    assert.equal(source.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
   });
 
   it("falls back to the default for a zero / negative max", () => {
     const front = base();
     front.set("max_items_per_fetch", "0");
-    assert.equal(buildSource(front, "")!.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
+    assert.equal(buildSource(front, "")?.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
     front.set("max_items_per_fetch", "-10");
-    assert.equal(buildSource(front, "")!.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
+    assert.equal(buildSource(front, "")?.maxItemsPerFetch, DEFAULT_MAX_ITEMS_PER_FETCH);
   });
 
   it("collects unrecognized keys into fetcherParams", () => {
@@ -221,7 +221,7 @@ describe("buildSource — validation", () => {
     front.set("arxiv_query", "cs.CL");
     const source = buildSource(front, "");
     assert.ok(source);
-    assert.deepEqual(source!.fetcherParams, {
+    assert.deepEqual(source.fetcherParams, {
       github_repo: "anthropics/claude-code",
       arxiv_query: "cs.CL",
     });
@@ -232,7 +232,7 @@ describe("buildSource — validation", () => {
     front.set("weird_array", ["a", "b"]);
     const source = buildSource(front, "");
     assert.ok(source);
-    assert.equal(source!.fetcherParams["weird_array"], undefined);
+    assert.equal(source.fetcherParams["weird_array"], undefined);
   });
 });
 
@@ -260,7 +260,7 @@ describe("serializeSource — round trip", () => {
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
     assert.ok(parsed);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
     assert.ok(rebuilt);
     assert.deepEqual(rebuilt, source);
   });
@@ -272,7 +272,9 @@ describe("serializeSource — round trip", () => {
     });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
     assert.deepEqual(rebuilt, source);
   });
 
@@ -282,8 +284,10 @@ describe("serializeSource — round trip", () => {
     });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
-    assert.equal(rebuilt!.notes, source.notes);
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
+    assert.equal(rebuilt.notes, source.notes);
   });
 
   it("quotes values that would confuse the flat-YAML parser", () => {
@@ -294,8 +298,10 @@ describe("serializeSource — round trip", () => {
     });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
-    assert.equal(rebuilt!.title, "Weekly: The Best of the Web");
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
+    assert.equal(rebuilt.title, "Weekly: The Best of the Web");
   });
 
   it("quotes values that look like reserved YAML atoms", () => {
@@ -305,8 +311,10 @@ describe("serializeSource — round trip", () => {
     const source = makeRoundTripSource({ title: "true" });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
-    assert.equal(rebuilt!.title, "true");
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
+    assert.equal(rebuilt.title, "true");
   });
 
   it("sorts fetcherParams alphabetically for stable diffs", () => {
@@ -328,8 +336,10 @@ describe("serializeSource — round trip", () => {
     const source = makeRoundTripSource({ title: 'He said "hi"' });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
-    assert.equal(rebuilt!.title, 'He said "hi"');
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
+    assert.equal(rebuilt.title, 'He said "hi"');
   });
 
   it("round-trips values with backslashes", () => {
@@ -338,8 +348,10 @@ describe("serializeSource — round trip", () => {
     const source = makeRoundTripSource({ title: "C:\\tmp\\data" });
     const serialized = serializeSource(source);
     const parsed = parseSourceFile(serialized);
-    const rebuilt = buildSource(parsed!.fields, parsed!.body);
-    assert.equal(rebuilt!.title, "C:\\tmp\\data");
+    assert.ok(parsed);
+    const rebuilt = buildSource(parsed.fields, parsed.body);
+    assert.ok(rebuilt);
+    assert.equal(rebuilt.title, "C:\\tmp\\data");
   });
 });
 
@@ -411,7 +423,8 @@ describe("writeSource + readSource — filesystem round trip", () => {
     const second: Source = { ...first, title: "Hacker News (updated)" };
     await writeSource(workspace, second);
     const read = await readSource(workspace, "hn");
-    assert.equal(read!.title, "Hacker News (updated)");
+    assert.ok(read);
+    assert.equal(read.title, "Hacker News (updated)");
   });
 
   it("does not leave a .tmp file behind after a successful write", async () => {

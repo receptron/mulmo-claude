@@ -77,7 +77,7 @@ describe("assembleDailyFile", () => {
     // JSON block must parse.
     const jsonMatch = /```json\n([\s\S]*?)\n```/.exec(file);
     assert.ok(jsonMatch);
-    const parsed = JSON.parse(jsonMatch![1]);
+    const parsed = JSON.parse(jsonMatch[1]);
     assert.equal(parsed.itemCount, 1);
     assert.equal(parsed.items[0].title, "A thing");
   });
@@ -136,15 +136,15 @@ describe("groupItemsForArchive", () => {
       }),
     ];
     const groups = groupItemsForArchive(items, "2026-04");
-    assert.equal(groups.get("hn::2026-04")!.length, 2);
-    assert.equal(groups.get("hn::2026-05")!.length, 1);
-    assert.equal(groups.get("reddit::2026-04")!.length, 1);
+    assert.equal(groups.get("hn::2026-04")?.length, 2);
+    assert.equal(groups.get("hn::2026-05")?.length, 1);
+    assert.equal(groups.get("reddit::2026-04")?.length, 1);
   });
 
   it("uses the fallback month for items with malformed publishedAt", () => {
     const items = [makeItem({ id: "1", sourceSlug: "hn", publishedAt: "bogus" })];
     const groups = groupItemsForArchive(items, "2026-04");
-    assert.equal(groups.get("hn::2026-04")!.length, 1);
+    assert.equal(groups.get("hn::2026-04")?.length, 1);
   });
 });
 
