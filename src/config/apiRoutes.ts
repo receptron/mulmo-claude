@@ -190,5 +190,11 @@ export const API_ROUTES = {
 
   wiki: {
     base: "/api/wiki",
+    /** History routes (#763 PR 2). `:slug` and `:stamp` are filled in
+     *  by the caller — the constants stay route-pattern shaped so the
+     *  Express router and the Vue API layer share one source of truth. */
+    pageHistory: "/api/wiki/pages/:slug/history",
+    pageHistorySnapshot: "/api/wiki/pages/:slug/history/:stamp",
+    pageHistoryRestore: "/api/wiki/pages/:slug/history/:stamp/restore",
   },
 } as const;

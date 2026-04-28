@@ -17,6 +17,7 @@ import rolesRoutes from "./api/routes/roles.js";
 import { DEFAULT_ROLE_ID } from "../src/config/roles.js";
 import mulmoScriptRoutes from "./api/routes/mulmo-script.js";
 import wikiRoutes from "./api/routes/wiki.js";
+import wikiHistoryRoutes from "./api/routes/wiki/history.js";
 import pdfRoutes from "./api/routes/pdf.js";
 import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
@@ -165,6 +166,9 @@ app.use(chartRoutes);
 app.use(rolesRoutes);
 app.use(mulmoScriptRoutes);
 app.use(wikiRoutes);
+// Mounted under /api/wiki so the inner router's relative paths
+// (`/pages/:slug/history`) line up with API_ROUTES.wiki.pageHistory.
+app.use("/api/wiki", wikiHistoryRoutes);
 app.use(pdfRoutes);
 app.use(filesRoutes);
 app.use(configRoutes);
