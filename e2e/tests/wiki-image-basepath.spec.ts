@@ -13,6 +13,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
+import { API_ROUTES } from "../../src/config/apiRoutes";
 
 const PAGE_RELATIVE_UP = {
   action: "page",
@@ -42,22 +43,29 @@ const PAGE_MAP: Record<string, unknown> = {
   imagepage2: PAGE_SAME_DIR,
 };
 
+function resolveWikiGetPayload(reqUrl: string): unknown {
+  const slug = new URL(reqUrl).searchParams.get("slug");
+  return slug && PAGE_MAP[slug] ? PAGE_MAP[slug] : INDEX_WITH_IMAGE;
+}
+
+function resolveWikiPostPayload(body: { action?: string; pageName?: string }): unknown {
+  if (body.action === "page" && body.pageName && PAGE_MAP[body.pageName]) {
+    return PAGE_MAP[body.pageName];
+  }
+  return INDEX_WITH_IMAGE;
+}
+
 async function mockWikiApi(page: Page): Promise<void> {
   await page.route(
-    (url) => url.pathname === "/api/wiki",
+    (url) => url.pathname === API_ROUTES.wiki.base,
     async (route) => {
       const req = route.request();
       if (req.method() === "GET") {
-        const slug = new URL(req.url()).searchParams.get("slug");
-        const data = slug && PAGE_MAP[slug] ? PAGE_MAP[slug] : INDEX_WITH_IMAGE;
-        return route.fulfill({ json: { data } });
+        return route.fulfill({ json: { data: resolveWikiGetPayload(req.url()) } });
       }
       if (req.method() === "POST") {
         const body = (req.postDataJSON() ?? {}) as { action?: string; pageName?: string };
-        if (body.action === "page" && body.pageName && PAGE_MAP[body.pageName]) {
-          return route.fulfill({ json: { data: PAGE_MAP[body.pageName] } });
-        }
-        return route.fulfill({ json: { data: INDEX_WITH_IMAGE } });
+        return route.fulfill({ json: { data: resolveWikiPostPayload(body) } });
       }
       return route.fallback();
     },
@@ -69,7 +77,7 @@ async function mockWikiApi(page: Page): Promise<void> {
 function rawPathOf(src: string | null): string {
   expect(src).not.toBeNull();
   const url = new URL(src as string, "http://localhost");
-  expect(url.pathname).toBe("/api/files/raw");
+  expect(url.pathname).toBe(API_ROUTES.files.raw);
   return url.searchParams.get("path") ?? "";
 }
 
