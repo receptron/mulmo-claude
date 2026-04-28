@@ -205,12 +205,14 @@
           </button>
         </span>
       </div>
+      <!-- eslint-disable vue/no-v-html -- renderedContent is trusted HTML from marked.parse + renderWikiLinks -->
       <div
         ref="scrollRef"
         class="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none wiki-content"
         @click="handleContentClick"
         v-html="renderedContent"
       />
+      <!-- eslint-enable vue/no-v-html -->
     </template>
 
     <!-- Per-page chat composer (standalone /wiki route only). Sending

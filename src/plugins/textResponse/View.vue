@@ -21,6 +21,7 @@
                   <span class="font-medium text-gray-700">{{ speakerLabel }}</span>
                   <span v-if="transportKind" class="italic">{{ transportKind }}</span>
                 </div>
+                <!-- eslint-disable-next-line vue/no-v-html -- renderedHtml is trusted HTML from marked.parse -->
                 <div class="markdown-content prose prose-slate max-w-none leading-relaxed text-gray-900" v-html="renderedHtml"></div>
               </div>
             </div>

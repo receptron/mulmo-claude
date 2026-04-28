@@ -51,6 +51,7 @@
                up every interactive checkbox inserted by v-html. We
                cannot bind @click directly on each `<input>` because
                v-html bypasses Vue's template compiler. -->
+          <!-- eslint-disable-next-line vue/no-v-html -- renderedHtml is trusted HTML from marked.parse -->
           <div class="markdown-content prose prose-slate max-w-none" @click="onMarkdownClick" v-html="renderedHtml"></div>
         </div>
       </div>
