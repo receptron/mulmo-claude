@@ -143,4 +143,40 @@ test.describe("/news page", () => {
     await expect(page.getByTestId(`news-item-${ITEM_B.id}`)).toBeVisible();
     await expect(page.getByTestId(`news-item-${ITEM_A.id}`)).toBeHidden();
   });
+
+  test("renders body without raw `---` fence when an item carries frontmatter (#895 PR D)", async ({ page }) => {
+    // Regression guard for the NewsView frontmatter strip added in
+    // PR D. RSS feeds normally don't carry markdown frontmatter, but
+    // a feed mirroring a markdown blog could — and `marked()` would
+    // otherwise render the fence as `<hr>` plus the YAML keys as
+    // plain body text. The strip via `parseFrontmatter` is defensive
+    // and a no-op for header-less inputs; this test pins it.
+    const state = await installNewsMocks(page, [ITEM_A]);
+    state.bodies[ITEM_A.id] = [
+      "---",
+      "title: Alpha headline",
+      "tags: [demo]",
+      "---",
+      "",
+      "# Real Body Heading",
+      "",
+      "This is the article body itself.",
+      "",
+    ].join("\n");
+
+    await page.goto("/news");
+    await page.getByTestId(`news-item-${ITEM_A.id}`).click();
+
+    // The body's H1 text comes from `# Real Body Heading` (post-strip).
+    await expect(page.getByText("Real Body Heading")).toBeVisible();
+    await expect(page.getByText("This is the article body itself.")).toBeVisible();
+
+    // Pre-strip the fence would have rendered as `<hr>` and
+    // `title: Alpha headline` would appear as visible text. After
+    // strip, neither remains in the rendered detail pane.
+    const detailPane = page.getByTestId("news-detail");
+    const detailText = await detailPane.innerText();
+    expect(detailText).not.toContain("title: Alpha headline");
+    expect(detailText).not.toMatch(/^---$/m);
+  });
 });
