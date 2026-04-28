@@ -384,6 +384,13 @@ const currentSlugReactive = computed<string | null>(() => {
 watch(currentSlugReactive, (next, prev) => {
   if (next === prev) return;
   pageTab.value = "content";
+  // Drop any in-flight restore-success toast so it doesn't bleed
+  // onto a different page (codex iter-1 #946).
+  restoreToastVisible.value = false;
+  if (restoreToastTimer !== null) {
+    clearTimeout(restoreToastTimer);
+    restoreToastTimer = null;
+  }
 });
 
 const { refresh, abort: abortFreshFetch } = useFreshPluginData<WikiData>({

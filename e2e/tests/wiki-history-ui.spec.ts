@@ -163,6 +163,69 @@ test.describe("wiki history UI (#763 PR 3 / #944)", () => {
     expect(state.restoreCalls).toBe(1);
   });
 
+  test("restore-success toast does NOT bleed onto a different page (#946 iter-1)", async ({ page }) => {
+    // Codex iter-1 #946: the toast lives in View.vue with a 4 s
+    // timer. If the user navigates before the timer fires the
+    // toast must be cleared so it doesn't appear pinned to a
+    // different page that wasn't restored.
+    const state: WikiState = { livePageBody: ORIGINAL_BODY, restoreCalls: 0 };
+    await mockAllApis(page);
+    await setupRoutes(page, state);
+    await page.route(
+      (url) => url.pathname === "/api/wiki/pages/another-page/history",
+      (route) => route.fulfill({ json: { slug: "another-page", snapshots: [] } }),
+    );
+    // /api/wiki must answer for both slugs the test visits.
+    await page.unroute((url) => url.pathname === "/api/wiki");
+    await page.route(
+      (url) => url.pathname === "/api/wiki",
+      (route) => {
+        const req = route.request();
+        if (req.method() !== "GET" && req.method() !== "POST") return route.fallback();
+        const url = new URL(req.url());
+        const slug = req.method() === "GET" ? url.searchParams.get("slug") : ((req.postDataJSON() ?? {}) as { pageName?: string }).pageName;
+        if (slug === "another-page") {
+          return route.fulfill({
+            json: {
+              data: {
+                action: "page",
+                title: "Another Page",
+                pageName: "another-page",
+                pageExists: true,
+                content: "# Another\n\nNothing special.\n",
+              },
+            },
+          });
+        }
+        return route.fulfill({
+          json: {
+            data: {
+              action: "page",
+              title: "History Demo",
+              pageName: SLUG,
+              pageExists: true,
+              content: state.livePageBody,
+            },
+          },
+        });
+      },
+    );
+
+    await page.goto(`/wiki/pages/${SLUG}`);
+    await page.getByTestId("wiki-page-tab-history").click();
+    await page.getByTestId(`wiki-history-row-${SNAPSHOT_NEWER.stamp}`).click();
+    await page.getByTestId("wiki-history-restore-button").click();
+    await page.getByTestId("wiki-history-restore-confirm-action").click();
+
+    // Toast is up.
+    await expect(page.getByTestId("wiki-history-restore-toast")).toBeVisible();
+
+    // Navigate to a different page BEFORE the 4 s timer fires.
+    await page.goto("/wiki/pages/another-page");
+    // Toast must be gone — the slug-change watcher cleared it.
+    await expect(page.getByTestId("wiki-history-restore-toast")).toHaveCount(0);
+  });
+
   test("empty-history slug shows the empty-state copy", async ({ page }) => {
     await mockAllApis(page);
 

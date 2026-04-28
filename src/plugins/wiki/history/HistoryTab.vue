@@ -30,6 +30,13 @@ const snapshots = ref<SnapshotSummary[]>([]);
  *  the History tab mounted via `v-show`. */
 const selectedStamp = ref<string | null>(null);
 
+// Stale-response guard (codex iter-1 #946). A user who switches
+// slugs faster than the network responds would otherwise see a
+// late list arrive and overwrite the new slug's state. Each load
+// bumps the counter; resolutions whose token has been superseded
+// drop on the floor.
+let loadToken = 0;
+
 onMounted(async () => {
   await loadList();
 });
@@ -44,9 +51,11 @@ watch(
 );
 
 async function loadList(): Promise<void> {
+  const myToken = ++loadToken;
   loading.value = true;
   fetchError.value = null;
   const result = await fetchHistoryList(props.slug);
+  if (myToken !== loadToken) return;
   loading.value = false;
   if (!result.ok) {
     fetchError.value = result.error;

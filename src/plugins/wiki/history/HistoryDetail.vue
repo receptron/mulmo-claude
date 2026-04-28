@@ -42,6 +42,14 @@ const restoring = ref(false);
 const restoreError = ref<string | null>(null);
 const confirmOpen = ref(false);
 
+// Stale-response guards (codex iter-1 #946). A user who clicks a
+// different snapshot before the previous fetch returns would
+// otherwise see the slow response overwrite the new selection.
+// Two separate tokens because the "current" and "previous" fetches
+// are independent.
+let loadToken = 0;
+let previousLoadToken = 0;
+
 onMounted(async () => {
   await loadThisSnapshot();
 });
@@ -61,6 +69,7 @@ watch(compareTarget, async (target) => {
 });
 
 async function loadThisSnapshot(): Promise<void> {
+  const myToken = ++loadToken;
   loading.value = true;
   fetchError.value = null;
   snapshot.value = null;
@@ -68,6 +77,7 @@ async function loadThisSnapshot(): Promise<void> {
   compareTarget.value = "current";
   restoreError.value = null;
   const result = await fetchHistorySnapshot(props.slug, props.summary.stamp);
+  if (myToken !== loadToken) return;
   loading.value = false;
   if (!result.ok) {
     fetchError.value = result.error;
@@ -78,7 +88,9 @@ async function loadThisSnapshot(): Promise<void> {
 
 async function loadPreviousSnapshot(): Promise<void> {
   if (props.previousSummary === null) return;
+  const myToken = ++previousLoadToken;
   const result = await fetchHistorySnapshot(props.slug, props.previousSummary.stamp);
+  if (myToken !== previousLoadToken) return;
   if (!result.ok) {
     fetchError.value = result.error;
     return;
