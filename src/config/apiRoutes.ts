@@ -196,5 +196,10 @@ export const API_ROUTES = {
     pageHistory: "/api/wiki/pages/:slug/history",
     pageHistorySnapshot: "/api/wiki/pages/:slug/history/:stamp",
     pageHistoryRestore: "/api/wiki/pages/:slug/history/:stamp/restore",
+    /** Internal endpoint hit by the LLM-write hook script
+     *  (`<workspace>/.claude/hooks/wiki-snapshot.mjs`). Re-reads
+     *  the just-written file from disk and routes it into the
+     *  snapshot pipeline. Never called by the Vue client. */
+    internalSnapshot: "/api/wiki/internal/snapshot",
   },
 } as const;

@@ -42,32 +42,50 @@ after(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-async function writeRawSnapshot(workspaceRoot: string, slug: string, stamp: string, body: string, meta: Record<string, unknown> = {}): Promise<void> {
+async function writeRawSnapshot(
+  workspaceRoot: string,
+  slug: string,
+  filenameStamp: string,
+  body: string,
+  meta: Record<string, unknown> = {},
+  shortIdTail = "fixedid",
+): Promise<string> {
   // Direct filesystem write so tests can seed history with arbitrary
   // timestamps (even stamps in the past, where appendSnapshot would
-  // refuse to step backwards). Mirrors the on-disk shape that
-  // appendSnapshot would produce.
-  const fileName = `${stamp}-fixedid.md`;
+  // refuse to step backwards). Returns the full public stamp
+  // (`<filenameStamp>-<shortId>`) the production code now exposes.
+  const stamp = `${filenameStamp}-${shortIdTail}`;
+  const fileName = `${stamp}.md`;
   const dir = path.join(workspaceRoot, WORKSPACE_DIRS.wikiHistory, slug);
   await mkdir(dir, { recursive: true });
-  const text = ["---", `_snapshot_ts: "${stampToIso(stamp)}"`, `_snapshot_editor: ${meta._snapshot_editor ?? "user"}`, "---", "", body].join("\n");
+  const text = ["---", `_snapshot_ts: "${filenameStampToIso(filenameStamp)}"`, `_snapshot_editor: ${meta._snapshot_editor ?? "user"}`, "---", "", body].join(
+    "\n",
+  );
   await writeFile(path.join(dir, fileName), text, "utf-8");
+  return stamp;
 }
 
-function stampToIso(stamp: string): string {
+function filenameStampToIso(filenameStamp: string): string {
   // 2026-04-28T01-23-45-789Z → 2026-04-28T01:23:45.789Z
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(stamp);
-  if (!match) throw new Error(`bad stamp ${stamp}`);
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(filenameStamp);
+  if (!match) throw new Error(`bad filenameStamp ${filenameStamp}`);
   return `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`;
 }
 
-function dateToStamp(date: Date): string {
+function dateToFilenameStamp(date: Date): string {
   return date.toISOString().replace(/:/g, "-").replace(".", "-");
 }
 
 describe("isSafeStamp", () => {
-  it("accepts the canonical filename stamp shape", () => {
-    assert.equal(isSafeStamp("2026-04-28T01-23-45-789Z"), true);
+  it("accepts the full <filenameStamp>-<shortId> shape", () => {
+    assert.equal(isSafeStamp("2026-04-28T01-23-45-789Z-abc12345"), true);
+  });
+
+  it("rejects the bare time-only stamp (must include shortId tail)", () => {
+    // Codex iter-1: exposing only the time part would alias two
+    // same-millisecond writes. The route param must include the
+    // shortId so listSnapshots / readSnapshot can resolve unambiguously.
+    assert.equal(isSafeStamp("2026-04-28T01-23-45-789Z"), false);
   });
 
   it("rejects path-traversal attempts", () => {
@@ -77,8 +95,8 @@ describe("isSafeStamp", () => {
   });
 
   it("rejects shape that's missing the trailing Z or millisecond block", () => {
-    assert.equal(isSafeStamp("2026-04-28T01-23-45"), false);
-    assert.equal(isSafeStamp("2026-04-28T01:23:45.789Z"), false); // colons
+    assert.equal(isSafeStamp("2026-04-28T01-23-45-abc"), false);
+    assert.equal(isSafeStamp("2026-04-28T01:23:45.789Z-abc"), false); // colons
   });
 });
 
@@ -123,7 +141,9 @@ describe("appendSnapshot — write + retrieve", () => {
 
     const snapshots = await listSnapshots(SLUG, { workspaceRoot });
     assert.equal(snapshots.length, 1);
-    assert.equal(snapshots[0].stamp, "2026-04-28T01-23-45-789Z");
+    // Public stamp is `<filenameStamp>-<shortId>` to disambiguate
+    // same-millisecond writes (codex iter-1).
+    assert.equal(snapshots[0].stamp, "2026-04-28T01-23-45-789Z-fixedid");
     assert.equal(snapshots[0].editor, "user");
     assert.equal(snapshots[0].reason, "first save");
     assert.equal(snapshots[0].ts, "2026-04-28T01:23:45.789Z");
@@ -144,11 +164,12 @@ describe("appendSnapshot — write + retrieve", () => {
     // dir-listing order is OS-dependent so we rely on the in-helper
     // sort to surface the canonical newest-first ordering.
     const seeds = ["2026-04-26T00-00-00-000Z", "2026-04-28T00-00-00-000Z", "2026-04-27T00-00-00-000Z"];
-    for (const stamp of seeds) await writeRawSnapshot(workspaceRoot, SLUG, stamp, "body");
+    for (const filenameStamp of seeds) await writeRawSnapshot(workspaceRoot, SLUG, filenameStamp, "body");
 
     const snapshots = await listSnapshots(SLUG, { workspaceRoot });
     const stamps = snapshots.map((entry) => entry.stamp);
-    assert.deepEqual(stamps, ["2026-04-28T00-00-00-000Z", "2026-04-27T00-00-00-000Z", "2026-04-26T00-00-00-000Z"]);
+    // Public stamp = `<filenameStamp>-fixedid` (writeRawSnapshot's default tail).
+    assert.deepEqual(stamps, ["2026-04-28T00-00-00-000Z-fixedid", "2026-04-27T00-00-00-000Z-fixedid", "2026-04-26T00-00-00-000Z-fixedid"]);
 
     await rm(workspaceRoot, { recursive: true, force: true });
   });
@@ -164,7 +185,7 @@ describe("appendSnapshot — write + retrieve", () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "snapshot-miss-"));
     await writeRawSnapshot(workspaceRoot, SLUG, "2026-04-28T01-23-45-789Z", "body");
 
-    const miss = await readSnapshot(SLUG, "2099-01-01T00-00-00-000Z", { workspaceRoot });
+    const miss = await readSnapshot(SLUG, "2099-01-01T00-00-00-000Z-fakeid", { workspaceRoot });
     assert.equal(miss, null);
 
     await rm(workspaceRoot, { recursive: true, force: true });
@@ -202,11 +223,11 @@ describe("gcSnapshots — retention rule", () => {
     // outside the count window after sorting newest-first).
     for (let i = 0; i < 100; i++) {
       const date = new Date(now.getTime() - i * 60 * 1000); // 1-minute spacing
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `recent-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `recent-${i}`);
     }
     for (let i = 0; i < 10; i++) {
       const date = new Date(now.getTime() - 365 * ONE_DAY_MS - i * 60 * 1000);
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `ancient-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `ancient-${i}`);
     }
 
     await gcSnapshots(SLUG, now, { workspaceRoot });
@@ -223,11 +244,11 @@ describe("gcSnapshots — retention rule", () => {
 
     for (let i = 0; i < 30; i++) {
       const date = new Date(now.getTime() - (200 + i) * ONE_DAY_MS);
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `old-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `old-${i}`);
     }
     for (let i = 0; i < 20; i++) {
       const date = new Date(now.getTime() - i * ONE_DAY_MS);
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `recent-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `recent-${i}`);
     }
 
     await gcSnapshots(SLUG, now, { workspaceRoot });
@@ -244,7 +265,7 @@ describe("gcSnapshots — retention rule", () => {
     for (let i = 0; i < 200; i++) {
       // Spread across 90 days — well within 180.
       const date = new Date(now.getTime() - i * 12 * 60 * 60 * 1000);
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `entry-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `entry-${i}`);
     }
 
     await gcSnapshots(SLUG, now, { workspaceRoot });
@@ -255,12 +276,12 @@ describe("gcSnapshots — retention rule", () => {
   it("does not touch other slugs' history", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "gc-isolation-"));
     const now = new Date("2026-04-28T00:00:00.000Z");
-    const oldStamp = dateToStamp(new Date(now.getTime() - 400 * ONE_DAY_MS));
+    const oldStamp = dateToFilenameStamp(new Date(now.getTime() - 400 * ONE_DAY_MS));
 
     // Seed an ancient snapshot under "other-slug" that *would* be
     // GC'd if any code path mistakenly walked the wrong dir.
     await writeRawSnapshot(workspaceRoot, "other-slug", oldStamp, "irrelevant");
-    await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(now), "fresh");
+    await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(now), "fresh");
 
     await gcSnapshots(SLUG, now, { workspaceRoot });
 
@@ -277,13 +298,13 @@ describe("gcSnapshots — retention rule", () => {
     await writeFile(path.join(dir, "README"), "stray", "utf-8");
     await writeFile(path.join(dir, "notes.txt"), "also stray", "utf-8");
     // One real ancient entry that *would* be GC'd to confirm GC ran.
-    const ancient = dateToStamp(new Date("2024-01-01T00:00:00.000Z"));
+    const ancient = dateToFilenameStamp(new Date("2024-01-01T00:00:00.000Z"));
     await writeRawSnapshot(workspaceRoot, SLUG, ancient, "ancient");
     // Force the count window to exclude `ancient` by adding 100 fresh.
     const now = new Date("2026-04-28T00:00:00.000Z");
     for (let i = 0; i < 100; i++) {
       const date = new Date(now.getTime() - i * 60 * 1000);
-      await writeRawSnapshot(workspaceRoot, SLUG, dateToStamp(date), `fresh-${i}`);
+      await writeRawSnapshot(workspaceRoot, SLUG, dateToFilenameStamp(date), `fresh-${i}`);
     }
 
     await gcSnapshots(SLUG, now, { workspaceRoot });

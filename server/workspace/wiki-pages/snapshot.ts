@@ -51,9 +51,13 @@ export function historyDir(slug: string, opts: SnapshotPathOptions = {}): string
  *  page doesn't blow the response payload — call `readSnapshot` to
  *  fetch a single snapshot's full content. */
 export interface SnapshotSummary {
-  /** Filesystem-safe ISO-ish timestamp encoded into the filename
-   *  (e.g. `2026-04-28T01-23-45-789Z`). Used as the route param to
-   *  read the snapshot back. */
+  /** Unique identifier for this snapshot, used as the `:stamp`
+   *  route param. Shape: `<filenameStamp>-<shortId>`, e.g.
+   *  `2026-04-28T01-23-45-789Z-abc12345`. The shortId tail is
+   *  REQUIRED — two saves landing in the same millisecond would
+   *  otherwise share an identifier and listSnapshots / readSnapshot
+   *  could return either one nondeterministically (codex iter-1
+   *  finding). */
   stamp: string;
   /** Bytes of the snapshot file (frontmatter + body, after write). */
   bytes: number;
@@ -71,10 +75,13 @@ export interface SnapshotContent extends SnapshotSummary {
   body: string;
 }
 
-// Filenames look like `<stamp>-<shortId>.md`. The stamp is
-// `YYYY-MM-DDTHH-mm-ss-sssZ` (colons swapped to hyphens). The
-// shortId tail disambiguates same-millisecond writes.
-const FILENAME_RE = /^(?<stamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(?<id>[a-z0-9]+)\.md$/i;
+// Filenames look like `<filenameStamp>-<shortId>.md`. The
+// filenameStamp is `YYYY-MM-DDTHH-mm-ss-sssZ` (colons swapped to
+// hyphens). The shortId tail disambiguates same-millisecond
+// writes. The public `stamp` identifier (route param) joins both
+// — codex iter-1 noted that exposing only the time part would
+// alias two simultaneous writes.
+const FILENAME_RE = /^(?<filenameStamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(?<id>[a-z0-9]+)\.md$/i;
 
 function timestampToFilenameStamp(date: Date): string {
   // 2026-04-28T01:23:45.789Z → 2026-04-28T01-23-45-789Z. Swap the
@@ -84,25 +91,25 @@ function timestampToFilenameStamp(date: Date): string {
   return date.toISOString().replace(/:/g, "-").replace(".", "-");
 }
 
-function filenameStampToTimestamp(stamp: string): string | null {
+function filenameStampToTimestamp(filenameStamp: string): string | null {
   // Inverse of `timestampToFilenameStamp`. Returns the canonical
   // ISO 8601 form (with colons + period) for use in the
   // _snapshot_ts frontmatter and the JSON wire shape. Returns null
-  // when the stamp doesn't match the expected shape — callers can
-  // skip the entry rather than throwing on a stray file.
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(stamp);
+  // when the filenameStamp doesn't match the expected shape —
+  // callers can skip the entry rather than throwing on a stray
+  // file.
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(filenameStamp);
   if (!match) return null;
   const [, date, hour, min, sec, milli] = match;
   return `${date}T${hour}:${min}:${sec}.${milli}Z`;
 }
 
-/** Path-safety check for the `:stamp` route param. The route layer
- *  must reject anything that wouldn't survive being joined with
- *  `historyDir(slug)` — same logic shape as `wiki-pages/io.ts`'s
- *  `isSafeSlug`. Exported because the route does the validation
- *  before calling readSnapshot / restoreSnapshot. */
+/** Path-safety check for the `:stamp` route param. Accepts the
+ *  full `<filenameStamp>-<shortId>` form; the bare time-only stamp
+ *  is rejected because it would alias same-millisecond writes
+ *  (codex iter-1 finding). */
 export function isSafeStamp(stamp: string): boolean {
-  return FILENAME_RE.test(`${stamp}-x.md`);
+  return FILENAME_RE.test(`${stamp}.md`);
 }
 
 // Snapshot-meta keys carry strings only, so a plain
@@ -178,15 +185,22 @@ export async function gcSnapshots(slug: string, now: Date, opts: SnapshotPathOpt
   const entries = await readSnapshotEntries(dir);
   if (entries.length === 0) return;
 
-  // Sort newest-first by stamp. The stamp is lexicographically
-  // sortable because it's zero-padded ISO with colons swapped.
-  entries.sort((left, right) => (left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0));
+  // Sort newest-first by filenameStamp (the time part). It's
+  // lexicographically sortable because it's zero-padded ISO with
+  // colons swapped. Same-millisecond writes resolve via the
+  // shortId tail in `stamp` for tie-break consistency.
+  entries.sort((left, right) => {
+    if (left.filenameStamp !== right.filenameStamp) {
+      return left.filenameStamp < right.filenameStamp ? 1 : -1;
+    }
+    return left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0;
+  });
 
   const cutoffMs = now.getTime() - SNAPSHOT_RETAIN_DAYS * ONE_DAY_MS;
 
   await Promise.all(
     entries.map(async (entry, index) => {
-      const tsIso = filenameStampToTimestamp(entry.stamp);
+      const tsIso = filenameStampToTimestamp(entry.filenameStamp);
       if (tsIso === null) return; // shouldn't happen — readSnapshotEntries already filtered
       const entryMs = Date.parse(tsIso);
       const withinCount = index < SNAPSHOT_RETAIN_COUNT;
@@ -198,7 +212,13 @@ export async function gcSnapshots(slug: string, now: Date, opts: SnapshotPathOpt
 }
 
 interface SnapshotEntry {
+  /** The unique public identifier for this snapshot (filename
+   *  body without `.md`). Includes the shortId tail so two
+   *  same-millisecond writes don't alias. */
   stamp: string;
+  /** Just the time part of the filename — used to derive the ISO
+   *  `_snapshot_ts` when the frontmatter doesn't carry one. */
+  filenameStamp: string;
   fileName: string;
 }
 
@@ -213,7 +233,11 @@ async function readSnapshotEntries(dir: string): Promise<SnapshotEntry[]> {
   for (const name of names) {
     const match = FILENAME_RE.exec(name);
     if (!match?.groups) continue;
-    out.push({ stamp: match.groups.stamp, fileName: name });
+    out.push({
+      stamp: name.slice(0, -".md".length),
+      filenameStamp: match.groups.filenameStamp,
+      fileName: name,
+    });
   }
   return out;
 }
@@ -239,7 +263,12 @@ function entryEditor(meta: Record<string, unknown>): WikiPageEditor {
 export async function listSnapshots(slug: string, opts: SnapshotPathOptions = {}): Promise<SnapshotSummary[]> {
   const dir = historyDir(slug, opts);
   const entries = await readSnapshotEntries(dir);
-  entries.sort((left, right) => (left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0));
+  entries.sort((left, right) => {
+    if (left.filenameStamp !== right.filenameStamp) {
+      return left.filenameStamp < right.filenameStamp ? 1 : -1;
+    }
+    return left.stamp < right.stamp ? 1 : left.stamp > right.stamp ? -1 : 0;
+  });
 
   const summaries: SnapshotSummary[] = [];
   for (const entry of entries) {
@@ -248,7 +277,7 @@ export async function listSnapshots(slug: string, opts: SnapshotPathOptions = {}
       const raw = await fsp.readFile(filePath, "utf-8");
       const stat = await fsp.stat(filePath);
       const parsed = parseFrontmatter(raw);
-      const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(entry.stamp) ?? entry.stamp;
+      const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(entry.filenameStamp) ?? entry.stamp;
       summaries.push({
         stamp: entry.stamp,
         bytes: stat.size,
@@ -285,7 +314,7 @@ export async function readSnapshot(slug: string, stamp: string, opts: SnapshotPa
   }
 
   const parsed = parseFrontmatter(raw);
-  const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(match.stamp) ?? match.stamp;
+  const tsIso = entryStringField(parsed.meta, "_snapshot_ts") ?? filenameStampToTimestamp(match.filenameStamp) ?? match.stamp;
   return {
     stamp: match.stamp,
     bytes: stat.size,

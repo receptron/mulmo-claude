@@ -35,6 +35,13 @@ export interface WikiWriteMeta {
   sessionId?: string;
   /** Free-form short reason. LLM-supplied or user-supplied. */
   reason?: string;
+  /** Force a snapshot to be recorded even when the body and
+   *  user-supplied meta haven't changed. Used by the restore
+   *  route so a "restore to current version" still leaves an
+   *  audit trail entry — without this the `hasMeaningfulChange`
+   *  gate would silently swallow the restore (codex iter-1
+   *  finding). Default: false. */
+  forceSnapshot?: boolean;
 }
 
 export interface WikiPageWriteOptions {
@@ -116,7 +123,7 @@ export async function writeWikiPage(slug: string, content: string, meta: WikiWri
   // saves where nothing the user cares about actually changed.
   // Compare bodies after parsing so a frontmatter-only diff in
   // auto-stamped fields doesn't trip the trigger.
-  if (oldContent === null || hasMeaningfulChange(oldContent, finalContent)) {
+  if (meta.forceSnapshot === true || oldContent === null || hasMeaningfulChange(oldContent, finalContent)) {
     await appendSnapshot(slug, oldContent, finalContent, meta, {
       workspaceRoot: opts.workspaceRoot,
       now: opts.now,

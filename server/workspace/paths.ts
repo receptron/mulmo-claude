@@ -128,6 +128,7 @@ export const WORKSPACE_PATHS = {
   // files
   memory: path.join(workspacePath, WORKSPACE_FILES.memory),
   sessionToken: path.join(workspacePath, WORKSPACE_FILES.sessionToken),
+  serverPort: path.join(workspacePath, WORKSPACE_FILES.serverPort),
   wikiIndex: path.join(workspacePath, WORKSPACE_FILES.wikiIndex),
   wikiLog: path.join(workspacePath, WORKSPACE_FILES.wikiLog),
   wikiSchema: path.join(workspacePath, WORKSPACE_FILES.wikiSchema),

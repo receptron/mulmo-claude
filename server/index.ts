@@ -18,6 +18,7 @@ import { DEFAULT_ROLE_ID } from "../src/config/roles.js";
 import mulmoScriptRoutes from "./api/routes/mulmo-script.js";
 import wikiRoutes from "./api/routes/wiki.js";
 import wikiHistoryRoutes from "./api/routes/wiki/history.js";
+import { provisionWikiHistoryHook } from "./workspace/wiki-history/provision.js";
 import pdfRoutes from "./api/routes/pdf.js";
 import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
@@ -167,7 +168,8 @@ app.use(rolesRoutes);
 app.use(mulmoScriptRoutes);
 app.use(wikiRoutes);
 // Mounted under /api/wiki so the inner router's relative paths
-// (`/pages/:slug/history`) line up with API_ROUTES.wiki.pageHistory.
+// (`/pages/:slug/history`, `/internal/snapshot`) line up with the
+// API_ROUTES.wiki.* constants.
 app.use("/api/wiki", wikiHistoryRoutes);
 app.use(pdfRoutes);
 app.use(filesRoutes);
@@ -559,12 +561,35 @@ process.on("SIGTERM", () => {
   sandboxEnabled = await setupSandbox();
   logMcpStatus();
 
+  // Provision the LLM-write hook in the workspace's
+  // `.claude/settings.json` (#763 PR 2). Idempotent — safe on every
+  // startup. Done BEFORE the agent ever spawns a claude CLI subprocess
+  // so the hook is in place from the first turn.
+  await provisionWikiHistoryHook().catch((err) => {
+    log.warn("wiki-history", "hook provisioning failed; LLM wiki edits will not be snapshotted this session", {
+      error: String(err),
+    });
+  });
+
   // Bind to localhost-only. Using `0.0.0.0` would expose the dev
   // server to the entire LAN (anyone on the same Wi-Fi could reach
   // `http://<laptop-ip>:3001/api/*`), which combined with the
   // workspace file API is a credential-theft risk. Personal dev
   // tool — localhost is the right default.
-  const httpServer = app.listen(port, "127.0.0.1", () => {
+  const httpServer = app.listen(port, "127.0.0.1", async () => {
+    // Publish the actually-bound port so the hook script can
+    // address us — the requested PORT may have walked forward
+    // off a busy default. Use writeFile (not writeFileAtomic)
+    // because the file is tiny + ephemeral and the .tmp dance
+    // serves no purpose for a single-process write at boot.
+    try {
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(WORKSPACE_PATHS.serverPort, `${port}\n`, { mode: 0o600 });
+    } catch (err) {
+      log.warn("server", "failed to write .server-port; LLM wiki-write hook will be unable to reach the server", {
+        error: String(err),
+      });
+    }
     startRuntimeServices(httpServer, port);
   });
 })();

@@ -39,6 +39,7 @@ describe("WORKSPACE_DIRS expected keys", () => {
     "todos",
     "transports",
     "wiki",
+    "wikiHistory",
     "wikiPages",
     "wikiSources",
   ];

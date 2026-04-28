@@ -11,6 +11,11 @@
 export const WORKSPACE_FILES = {
   memory: "conversations/memory.md",
   sessionToken: ".session-token",
+  /** Port the parent server bound to. Written at `app.listen` so
+   *  out-of-process helpers (currently the LLM wiki-write hook —
+   *  #763) can address the server without guessing whether `PORT`
+   *  walked forward off a busy default. Mode 0600 to stay private. */
+  serverPort: ".server-port",
   wikiIndex: "data/wiki/index.md",
   wikiLog: "data/wiki/log.md",
   wikiSchema: "data/wiki/SCHEMA.md",

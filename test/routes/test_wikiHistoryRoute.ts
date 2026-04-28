@@ -159,7 +159,7 @@ describe("GET /api/wiki/pages/:slug/history/:stamp", () => {
   it("returns 404 for an unknown stamp on a known slug", async () => {
     const slug = "miss-test";
     await writeWikiPage(slug, "body\n", { editor: "user" });
-    const fakeStamp = "2099-01-01T00-00-00-000Z";
+    const fakeStamp = "2099-01-01T00-00-00-000Z-fakeid";
     const { state, res } = mockRes();
     await readHandler(makeReq({ slug, stamp: fakeStamp }), res);
     assert.equal(state.status, 404);
@@ -203,7 +203,7 @@ describe("POST /api/wiki/pages/:slug/history/:stamp/restore", () => {
     await writeWikiPage(slug, "body\n", { editor: "user" });
 
     const { state, res } = mockRes();
-    await restoreHandler(makeReq({ slug, stamp: "2099-01-01T00-00-00-000Z" }), res);
+    await restoreHandler(makeReq({ slug, stamp: "2099-01-01T00-00-00-000Z-fakeid" }), res);
     assert.equal(state.status, 404);
   });
 });

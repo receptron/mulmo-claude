@@ -7,10 +7,19 @@ Builds on:
 
 ## Outcome
 
-Every meaningful save through `writeWikiPage` writes a snapshot under
-`data/wiki/.history/<slug>/<ISO>-<shortId>.md`. Three new routes
-expose list / read / restore, gated by `hasMeaningfulChange` so
-auto-stamped no-op saves don't pollute history.
+Every meaningful save through `writeWikiPage` AND every LLM-driven
+`Write` / `Edit` to `data/wiki/pages/<slug>.md` deposits a snapshot
+under `data/wiki/.history/<slug>/<filenameStamp>-<shortId>.md`.
+Three public routes expose list / read / restore.
+
+The LLM path is what makes this useful — claude CLI's built-in
+Write / Edit tools bypass `writeWikiPage`, so an in-process choke
+point alone catches almost nothing. We close that gap with a
+PostToolUse hook (`<workspace>/.claude/hooks/wiki-snapshot.mjs`)
+that calls back into `POST /api/wiki/internal/snapshot` whenever
+the LLM touches a wiki page. The hook script + `.claude/settings.json`
+entry are provisioned at server startup, idempotent, and never
+touch `~/.claude` (the user's global config).
 
 ## Decisions (from review on chat 2026-04-28)
 
@@ -18,11 +27,18 @@ auto-stamped no-op saves don't pollute history.
 |---|---|---|
 | 1 | Storage | File snapshots, not git, not jsonl |
 | 2 | Scope | Wiki pages only (skill / role / settings deferred) |
-| 3 | Reason | Optional `reason?` carried through `WikiWriteMeta` (already in shape) |
-| 4 | GC | Keep snapshots in newest 100 OR newer than 180 days; delete only when BOTH conditions are violated. No hard cap. |
+| 3 | Reason | Optional `reason?` carried through `WikiWriteMeta` |
+| 4 | GC | Keep newest 100 OR newer than 180 days; delete only when BOTH violated. No hard cap. |
 | 5 | Diff UI | Line-unified for v1 (PR 3, not this PR) |
 | 6 | Restore | "Restore as new edit" — past version becomes the next write, history is non-destructive |
 | 7 | Size cap | None |
+
+Codex iter-1 (during chat review) added two more:
+
+| # | Topic | Decision |
+|---|---|---|
+| 8 | Same-millisecond stamp collisions | Public `stamp` is `<filenameStamp>-<shortId>`, not just the time part. Two same-ms writes are addressable independently. |
+| 9 | Restore-to-current-content no-op | `WikiWriteMeta.forceSnapshot` bypasses the `hasMeaningfulChange` gate so a restore always lands an audit entry. |
 
 ## Snapshot file shape
 
@@ -30,16 +46,16 @@ auto-stamped no-op saves don't pollute history.
 data/wiki/.history/<slug>/2026-04-28T01-23-45-789Z-abc12345.md
 ```
 
-- File name: full ISO timestamp with `:` replaced by `-` (filesystem-safe), plus a `shortId()` to disambiguate sub-millisecond collisions.
-- Content: byte-identical to **the just-written page** (i.e. the *new* state). The current page on disk == the latest snapshot. This invariant simplifies restore (just write a snapshot's content back through `writeWikiPage`).
-- Frontmatter: the page's existing canonical frontmatter (title / created / updated / editor / tags / ...) **plus** the snapshot-meta fields below, prefixed `_snapshot_`. Restore strips these before writing back.
+- File name: ISO timestamp with `:` replaced by `-` (filesystem-safe), plus a `shortId()` to disambiguate sub-millisecond collisions.
+- Content: byte-identical to **the just-written page** (i.e. the *new* state). The current page on disk == the latest snapshot. Restore writes the snapshot's body back through `writeWikiPage` (with `forceSnapshot: true`).
+- Frontmatter: the page's existing canonical frontmatter **plus** the snapshot-meta fields below, prefixed `_snapshot_`. Restore strips these before writing back.
 
 ```yaml
 ---
 title: ...
 created: ...
 updated: 2026-04-28T01:23:45.789Z
-editor: user
+editor: user                                # or "llm" for hook-driven captures
 _snapshot_ts: 2026-04-28T01:23:45.789Z
 _snapshot_session: <chat session uuid>     # only when meta.sessionId set
 _snapshot_reason: 典拠リンク追加              # only when meta.reason set
@@ -48,57 +64,54 @@ _snapshot_reason: 典拠リンク追加              # only when meta.reason set
 (body of the page as just written)
 ```
 
-The `_snapshot_` prefix is chosen because:
-- doesn't collide with any existing canonical key
-- one underscore (not two) keeps it short while still signalling "internal" — the bar is just visual disambiguation
-- `mergeFrontmatter` will strip these when restoring back to the page proper
-
 ## Implementation
 
 ### `server/workspace/wiki-pages/snapshot.ts` (new)
 
-- `appendSnapshot(slug, oldContent, newContent, meta, opts)` — writes the snapshot file via `writeFileAtomic`, then runs GC. `oldContent` parameter is kept for symmetry with the stub signature but isn't currently used (the snapshot stores `newContent`). Could be used later for "diff snapshot" mode without breaking the call site.
-- `gcSnapshots(slug, now, opts)` — readdir, parse `_snapshot_ts`, sort newest-first, retain newest 100 OR within 180 days, unlink the rest. Idempotent.
-- `historyDir(slug, opts)` — path helper, mirrors `wikiPagePath`.
-- `listSnapshots(slug, opts)` — list snapshot files newest-first with their meta (parsed from frontmatter).
-- `readSnapshot(slug, stamp, opts)` — read a single snapshot.
+- `appendSnapshot(slug, oldContent, newContent, meta, opts)` — writes the snapshot file via `writeFileAtomic`, then runs GC.
+- `gcSnapshots(slug, now, opts)` — readdir, sort newest-first, retain by OR-rule, unlink the rest. Idempotent.
+- `historyDir`, `listSnapshots`, `readSnapshot`, `isSafeStamp`, `stripSnapshotMeta` — helpers.
 
-### Wire `appendSnapshot` from `wiki-pages/io.ts`
+### `server/workspace/wiki-pages/io.ts` (modified)
 
-The stub already exists and is called only when `hasMeaningfulChange` is true. Replace the stub body with a call into `snapshot.ts`.
+- Imports `appendSnapshot` from `snapshot.ts`.
+- `WikiWriteMeta.forceSnapshot?: boolean` — bypass the `hasMeaningfulChange` gate; restore uses this so an "identical content restore" still lands an audit entry.
+- Threads `workspaceRoot` + `now` into `appendSnapshot` so tests can inject deterministic clocks.
 
 ### `server/api/routes/wiki/history.ts` (new)
 
-- `GET /api/wiki/pages/:slug/history` — list snapshots (just the meta, no body)
-- `GET /api/wiki/pages/:slug/history/:stamp` — read a single snapshot (full content + meta)
-- `POST /api/wiki/pages/:slug/history/:stamp/restore` — read snapshot at `:stamp`, strip `_snapshot_*` keys from its frontmatter, route through `writeWikiPage(slug, content, { editor: "user", reason: "Restored from <stamp>" })`. The new save itself becomes a snapshot too.
+- `GET /api/wiki/pages/:slug/history` — list snapshots (meta, no body)
+- `GET /api/wiki/pages/:slug/history/:stamp` — read one (full content + meta)
+- `POST /api/wiki/pages/:slug/history/:stamp/restore` — round-trip the snapshot through `writeWikiPage` with `editor: "user"`, `reason: "Restored from <stamp>"`, `forceSnapshot: true`.
+- `POST /api/wiki/internal/snapshot` — internal endpoint hit by the LLM-write hook. Validates `absPath` lives under `data/wiki/pages/`, reads disk, calls `appendSnapshot` with `editor: "llm"`. Bearer auth applies via the global middleware.
 
-The slug + stamp params get the same safety check as `wikiPagePath` (`isSafeSlug`) plus a stamp-shape regex so a hostile `:stamp` can't escape.
+### `server/workspace/wiki-history/{hookScript.ts, provision.ts}` (new)
 
-### Tests
+- `hookScript.ts` exports `WIKI_SNAPSHOT_HOOK_SCRIPT` — the Node ESM source code that gets written to `<workspace>/.claude/hooks/wiki-snapshot.mjs` at provisioning time. Reads stdin JSON from claude CLI, path-filters for `data/wiki/pages/`, POSTs to the internal endpoint with bearer from `<workspace>/.session-token` and port from `<workspace>/.server-port`.
+- `provision.ts` exports `provisionWikiHistoryHook(opts)` — idempotent: writes the script and merges a PostToolUse entry into `<workspace>/.claude/settings.json`. Tagged `mulmoclaudeWikiHistory: true` so we can find and update our own entry without clobbering user-set hooks.
 
-- `test/workspace/wiki-pages/test_snapshot.ts` — unit
-  - appends a snapshot file with the correct frontmatter
-  - reads it back identically
-  - GC keeps newest-100 OR within-180-days, deletes only the both-violated set
-  - `listSnapshots` returns newest-first
-  - GC doesn't touch siblings (separate slugs untouched)
-  - GC tolerates malformed snapshot filenames (skips, doesn't throw)
-- `test/routes/test_wikiHistoryRoute.ts` — integration via supertest
-  - 3-step round trip: write → list → read → restore → list (now has new entry)
-  - 404 on unknown slug / stamp
-  - Path-traversal attempts rejected
+### `server/index.ts` (modified)
+
+- `provisionWikiHistoryHook()` runs after `initWorkspace()` so the hook is in place before any agent spawn.
+- `app.listen` callback writes `<workspace>/.server-port` (mode 0600) so the hook script can address the actually-bound port.
+
+## Tests
+
+- `test/workspace/wiki-pages/test_snapshot.ts` — appendSnapshot round-trip, GC OR-rule edge cases, isolation across slugs, stray-file tolerance, `isSafeStamp` shape (full `<stamp>-<id>` pattern), `stripSnapshotMeta`, integration via `writeWikiPage`.
+- `test/routes/test_wikiHistoryRoute.ts` — list / read / restore happy paths, 4xx for unsafe slug + unsafe stamp, 404 for unknown slug + unknown stamp, `_snapshot_*` doesn't leak into the live page on restore.
+- `test/routes/test_wikiInternalSnapshotRoute.ts` — 400 on missing / non-wiki / traversal absPath, 404 when file missing, snapshot tagged `editor: "llm"`, sessionId propagation.
+- `test/workspace/wiki-history/test_provision.ts` — first install creates settings + script, idempotent on re-run, preserves user-set keys, replaces stale owned entry instead of duplicating.
 
 ## Out of scope (PR 3 / later)
 
 - UI (History tab, unified diff, restore button) — PR 3
-- LLM-vs-user editor disambiguation — separate concern, currently every save is `editor: "user"`
 - Page deletion → history cleanup — no DELETE route exists today; revisit when one is added
 - Word-level diff
-- `manageWiki` MCP `reason` parameter — `WikiWriteMeta` already has the field; surfacing it through MCP is a UI / tool-schema change to do later
+- `manageWiki` MCP `reason` parameter — `WikiWriteMeta` already has the field; surfacing it through MCP is a tool-schema change
 
 ## Verification
 
 - `yarn typecheck / lint / format / build / test` clean
-- `grep -rn "appendSnapshot" server/` confirms only one impl + the call site
-- new routes wired into `server/api/routes/index.ts`
+- `grep -rn "appendSnapshot" server/` shows only the impl + call sites
+- New routes wired in `server/index.ts`
+- New file constants added to `WORKSPACE_DIRS.wikiHistory`, `WORKSPACE_FILES.serverPort`, `API_ROUTES.wiki.{pageHistory,pageHistorySnapshot,pageHistoryRestore,internalSnapshot}`
