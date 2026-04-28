@@ -101,6 +101,10 @@ export function buildWikiRouteParams(target: WikiTarget): Record<string, string>
       return { section: WIKI_ROUTE_SECTION.log, slug: "" };
     case "lint_report":
       return { section: WIKI_ROUTE_SECTION.lintReport, slug: "" };
+    default: {
+      const exhaustive: never = target;
+      throw new Error(`unreachable WikiTarget kind: ${JSON.stringify(exhaustive)}`);
+    }
   }
 }
 
@@ -117,5 +121,9 @@ export function wikiActionFor(target: WikiTarget): WikiAction {
       return WIKI_ACTION.log;
     case "lint_report":
       return WIKI_ACTION.lintReport;
+    default: {
+      const exhaustive: never = target;
+      throw new Error(`unreachable WikiTarget kind: ${JSON.stringify(exhaustive)}`);
+    }
   }
 }

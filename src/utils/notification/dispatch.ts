@@ -45,6 +45,8 @@ function routeForTarget(target: NotificationTarget): NotificationRoute {
       return { name: PAGE_ROUTES.files, params: { pathMatch: target.path ? target.path.split("/") : [] } };
     case NOTIFICATION_VIEWS.wiki:
       return buildWikiRoute(target);
+    default:
+      return null;
   }
 }
 

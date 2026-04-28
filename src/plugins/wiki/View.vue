@@ -525,7 +525,7 @@ const allTags = computed<[string, number][]>(() => {
     .filter(([, count]) => count > 1)
     .sort(([tagA, countA], [tagB, countB]) => countB - countA || tagA.localeCompare(tagB));
   if (meaningful.length <= TARGET_FILTER_CHIPS) return meaningful;
-  const cutoff = meaningful[TARGET_FILTER_CHIPS - 1][1];
+  const [, cutoff] = meaningful[TARGET_FILTER_CHIPS - 1];
   return meaningful.filter(([, count]) => count >= cutoff);
 });
 

@@ -468,7 +468,7 @@ function parseYaml(text: string): {
     const rawVal = line.slice(colonIdx + 2).trim();
     result[key] = parseYamlValue(rawVal);
   }
-  const title = result["title"];
+  const { title } = result;
   if (typeof title !== "string" || !title) return null;
   const itemProps = { ...result };
   delete itemProps["title"];

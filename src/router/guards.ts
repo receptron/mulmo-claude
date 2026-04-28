@@ -76,5 +76,6 @@ export function installGuards(router: Router): void {
         };
       }
     }
+    return undefined;
   });
 }

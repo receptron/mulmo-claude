@@ -51,7 +51,7 @@ function primarySubtagIfSupported(tag: string): Locale | null {
   for (const supported of SUPPORTED_LOCALES) {
     if (supported.toLowerCase() === lower) return supported;
   }
-  const primary = lower.split("-")[0];
+  const [primary] = lower.split("-");
   return isSupported(primary) ? primary : null;
 }
 

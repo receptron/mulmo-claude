@@ -194,6 +194,10 @@ function sortValueOf(item: TodoItem, key: SortKey): unknown {
       return item.dueDate;
     case "createdAt":
       return item.createdAt;
+    default: {
+      const exhaustive: never = key;
+      throw new Error(`unreachable SortKey: ${String(exhaustive)}`);
+    }
   }
 }
 

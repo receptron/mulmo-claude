@@ -71,7 +71,7 @@ function stepFence(line: string, state: FenceState): boolean {
   const content = quoteMatch ? line.slice(quoteMatch[0].length) : line;
   const fenceMatch = content.match(FENCE_LINE);
   if (fenceMatch) {
-    const marker = fenceMatch[2];
+    const [, , marker] = fenceMatch;
     if (!state.inFence) {
       // Openers may carry an info string after the marker
       // (e.g. "```ts"). We don't need to keep it — just enter

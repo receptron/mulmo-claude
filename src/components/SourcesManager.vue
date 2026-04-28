@@ -432,7 +432,7 @@ function buildRegisterPayload(input: DraftState): RegisterPayload | BuildError {
       }
       let hostname: string;
       try {
-        hostname = new URL(primary).hostname;
+        ({ hostname } = new URL(primary));
       } catch {
         return { errorKey: "pluginManageSource.errRssUrlInvalid" };
       }
@@ -662,6 +662,10 @@ function filterChipLabel(key: SourceFilterKey): string {
       return t("pluginManageSource.filter.scheduleWeekly");
     case "schedule:manual":
       return t("pluginManageSource.filter.scheduleManual");
+    default: {
+      const exhaustive: never = key;
+      throw new Error(`unreachable SourceFilterKey: ${String(exhaustive)}`);
+    }
   }
 }
 
@@ -705,6 +709,10 @@ function kindLabel(kind: Source["fetcherKind"]): string {
       return t("pluginManageSource.kindGithubIss");
     case "arxiv":
       return t("pluginManageSource.kindArxiv");
+    default: {
+      const exhaustive: never = kind;
+      throw new Error(`unreachable fetcherKind: ${String(exhaustive)}`);
+    }
   }
 }
 
@@ -718,6 +726,10 @@ function kindBadgeClass(kind: Source["fetcherKind"]): string {
       return "bg-indigo-100 text-indigo-700";
     case "arxiv":
       return "bg-emerald-100 text-emerald-700";
+    default: {
+      const exhaustive: never = kind;
+      throw new Error(`unreachable fetcherKind: ${String(exhaustive)}`);
+    }
   }
 }
 
