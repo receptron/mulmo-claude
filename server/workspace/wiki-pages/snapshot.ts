@@ -81,7 +81,7 @@ export interface SnapshotContent extends SnapshotSummary {
 // writes. The public `stamp` identifier (route param) joins both
 // — codex iter-1 noted that exposing only the time part would
 // alias two simultaneous writes.
-const FILENAME_RE = /^(?<filenameStamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(?<id>[a-z0-9]+)\.md$/i;
+const FILENAME_RE = /^(?<filenameStamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-[a-z0-9]+\.md$/i;
 
 function timestampToFilenameStamp(date: Date): string {
   // 2026-04-28T01:23:45.789Z → 2026-04-28T01-23-45-789Z. Swap the
