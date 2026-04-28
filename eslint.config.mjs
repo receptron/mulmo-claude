@@ -169,6 +169,7 @@ export default [
       // null-or-undefined guards don't all need to be rewritten.
       // #921.
       eqeqeq: ["error", "smart"],
+      "no-throw-literal": "error",
       quotes: "off",
       "no-shadow": "error",
       "no-param-reassign": "error",

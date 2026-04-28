@@ -191,6 +191,7 @@ describe("runFetchPhase — failure isolation (Q8)", () => {
 
   it("converts non-Error throws to string error messages", async () => {
     const fetcher = fakeFetcher("rss", async () => {
+      // eslint-disable-next-line no-throw-literal -- intentional non-Error throw, asserting runFetchPhase converts unknown rejections to string messages
       throw "string error";
     });
     const result = await runFetchPhase({

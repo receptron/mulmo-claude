@@ -214,6 +214,7 @@ describe("respondWithDispatchResult — persist throws", () => {
         shouldPersist: true,
         instructions: "x",
         persist: () => {
+          // eslint-disable-next-line no-throw-literal -- intentional non-Error throw, asserting respondWithDispatchResult handles unknown thrown values
           throw "string thrown directly";
         },
       },
