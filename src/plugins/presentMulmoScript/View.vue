@@ -372,11 +372,23 @@
                 <div
                   v-for="i in beats.length"
                   :key="i - 1"
-                  class="flex-1 cursor-pointer relative"
-                  :class="i - 1 === lightbox.index ? 'bg-white/80' : i - 1 < lightbox.index ? 'bg-white/40' : 'bg-white/20'"
+                  class="group flex-1 cursor-pointer relative transition-colors"
+                  :class="
+                    i - 1 === lightbox.index
+                      ? 'bg-white/80 hover:bg-white'
+                      : i - 1 < lightbox.index
+                        ? 'bg-white/40 hover:bg-white/60'
+                        : 'bg-white/20 hover:bg-white/40'
+                  "
                   @click="jumpToBeat(i - 1)"
                 >
                   <span class="absolute -inset-y-3 inset-x-0" />
+                  <div
+                    v-if="beatTooltip(i - 1)"
+                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 px-2 py-1 rounded bg-black/90 text-white text-xs leading-tight w-48 max-h-[53px] overflow-hidden opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
+                  >
+                    {{ beatTooltip(i - 1) }}
+                  </div>
                 </div>
               </div>
               <div
@@ -614,6 +626,11 @@ function jumpToBeat(index: number) {
   if (wasPlaying && beatAudios[index]) {
     playAudio(index);
   }
+}
+
+function beatTooltip(index: number): string {
+  const text = effectiveBeat(index).text ?? "";
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
 function lightboxMove(delta: number) {
