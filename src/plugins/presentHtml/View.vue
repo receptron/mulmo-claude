@@ -28,6 +28,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
+import { rewriteHtmlImageRefs } from "../../utils/image/rewriteHtmlImageRefs";
 
 const { t } = useI18n();
 
@@ -42,7 +43,11 @@ const PRINT_STYLE = `<style>@media print {
 }</style>`;
 
 const data = computed(() => props.selectedResult.data);
-const rawHtml = computed(() => data.value?.html ?? "");
+// LLM-generated HTML often emits <img src="/artifacts/images/…"> using
+// the web convention where `/` is the site root. Inside the iframe
+// srcdoc that resolves to the SPA origin, which does not serve
+// /artifacts. Route those through the workspace file server.
+const rawHtml = computed(() => rewriteHtmlImageRefs(data.value?.html ?? ""));
 const html = computed(() => (rawHtml.value.includes("</head>") ? rawHtml.value.replace("</head>", `${PRINT_STYLE}</head>`) : `${PRINT_STYLE}${rawHtml.value}`));
 const title = computed(() => data.value?.title);
 
