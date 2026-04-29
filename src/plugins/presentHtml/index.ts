@@ -8,7 +8,6 @@ import { API_ROUTES } from "../../config/apiRoutes";
 import { makeUuid } from "../../utils/id";
 
 export interface PresentHtmlData {
-  html: string;
   title?: string;
   filePath: string;
 }

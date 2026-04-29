@@ -678,6 +678,8 @@ const deMessages = {
     untitled: "HTML-Seite",
     hideSource: "Quelltext ausblenden <>",
     showSource: "Quelltext anzeigen <>",
+    loadingSource: "Quelltext wird geladen…",
+    sourceError: "Quelltext konnte nicht geladen werden: {error}",
   },
   pluginNews: {
     title: "Nachrichten",

@@ -28,11 +28,66 @@ PR #980 (`fix/files-html-preview-relative-paths`) で `/artifacts/html` の path
 | レイヤー | 変更 |
 |---|---|
 | `server/api/routes/presentHtml.ts` | レスポンスの `data` から `html` を削る。`{ message, instructions, data: { title, filePath } }` を返す |
+| `src/plugins/presentHtml/definition.ts` | tool description に **relative-path ルール** を明記(§0 参照) |
 | `src/plugins/presentHtml/index.ts` | `PresentHtmlData` から `html` を削除 |
 | `src/plugins/presentHtml/View.vue` | `srcdoc` 経路を削除、`:src=htmlPreviewUrlFor(filePath)` 一本化。`sandbox="allow-scripts"`。`Show Source` を遅延 fetch に。`printToPdf` を fetch+modify+自走 print に書き換え |
 | `src/plugins/presentHtml/Preview.vue` | (要確認)`data.html` を使っているなら filePath ベースに変更 |
 | `src/utils/image/rewriteHtmlImageRefs.ts` | View.vue から呼び出しが消えれば delete(他参照を grep して確認) |
 | `test/composables/test_useImageErrorRepair.ts` | 既存維持(Stage 3 のグローバル修復は他経路で必要なので残す) |
+
+---
+
+## 0. ツール定義に書き込む LLM 向けルール
+
+`presentHtml` で生成された HTML ファイルは `artifacts/html/<YYYY>/<MM>/<slug>-<ts>.html` に保存される(`buildArtifactPath`)。同じ会話で `presentImage` 等が返してくる workspace パス(例: `artifacts/images/2026/04/foo.png`)を `<img>` で参照したくなる。
+
+**重要な制約**: 生成 HTML はホスト OS のブラウザで `file://` 経由でも開けるべき(ユーザがファイルマネージャからダブルクリックする / 別マシンに送る等)。サーバ origin は前提にできない。
+
+**ルール**: ワークスペース内のリソースは **相対パス** で参照する。HTML ファイル自身が `artifacts/html/<YYYY>/<MM>/` に居るので、他の `artifacts/<kind>/<YYYY>/<MM>/...` に届くには **3 段** 上がる:
+
+```html
+<!-- GOOD -->
+<img src="../../../images/2026/04/foo.png">
+<img src="../../../charts/2026/04/bar.svg">
+
+<!-- BAD: file:// で開いた時に filesystem root を見て壊れる -->
+<img src="/artifacts/images/2026/04/foo.png">
+
+<!-- BAD: html/<YYYY>/<MM>/ から見ると間違った階層を指す -->
+<img src="artifacts/images/2026/04/foo.png">
+```
+
+`presentImage` 等が返すパスは `artifacts/images/2026/04/foo.png` 形式なので、LLM は **先頭の `artifacts/` を `../../../` に置換** すれば良い。
+
+これは preview / print / file:// のすべてで一貫して動く:
+
+| 経路 | base URL | `../../../images/...` の解決先 |
+|---|---|---|
+| preview iframe (`/artifacts/html/<rest>` static mount) | `<server>/artifacts/html/<YYYY>/<MM>/page.html` | `<server>/artifacts/images/<YYYY>/<MM>/...` ✓ |
+| print iframe (srcdoc + 注入 `<base href="/artifacts/html/<dir>/">`) | `<base href>` の値 | `<server>/artifacts/images/<YYYY>/<MM>/...` ✓ |
+| `file://` (ホストブラウザでダブルクリック) | `file:///.../artifacts/html/<YYYY>/<MM>/page.html` | `file:///.../artifacts/images/<YYYY>/<MM>/...` ✓ |
+
+`definition.ts` の `html` parameter description を以下のように改訂:
+
+```ts
+html: {
+  type: "string",
+  description: [
+    "Complete, self-contained HTML string. CSS and JavaScript must be inline or loaded via CDN.",
+    "Must be a full document (include <!DOCTYPE html> and <html>/<body> tags).",
+    "",
+    "FILE LOCATION: this HTML is saved to `artifacts/html/<YYYY>/<MM>/<slug>-<timestamp>.html`.",
+    "",
+    "REFERENCING WORKSPACE FILES (images, charts, other artifacts): use RELATIVE paths with exactly three `../` to climb out of `html/<YYYY>/<MM>/`. The file must remain portable — the user may open it directly from disk via file://, where absolute URLs do not work.",
+    "  GOOD: <img src=\"../../../images/2026/04/foo.png\">",
+    "  BAD:  <img src=\"/artifacts/images/2026/04/foo.png\">  (breaks under file://)",
+    "  BAD:  <img src=\"artifacts/images/2026/04/foo.png\">    (resolves wrong from html/YYYY/MM/)",
+    "Workspace paths returned by other tools (e.g. presentImage returns `artifacts/images/2026/04/foo.png`): replace the leading `artifacts/` with `../../../`, giving `../../../images/2026/04/foo.png`.",
+  ].join("\n"),
+},
+```
+
+`title` description は変更なし。
 
 ---
 

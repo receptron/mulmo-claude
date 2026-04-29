@@ -670,6 +670,8 @@ const ptBRMessages = {
     untitled: "Página HTML",
     hideSource: "Ocultar fonte <>",
     showSource: "Mostrar fonte <>",
+    loadingSource: "Carregando fonte…",
+    sourceError: "Falha ao carregar a fonte: {error}",
   },
   pluginNews: {
     title: "Notícias",

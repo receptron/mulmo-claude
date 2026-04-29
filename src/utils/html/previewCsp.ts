@@ -44,6 +44,29 @@ export function buildHtmlPreviewCsp(cdns: readonly string[] = HTML_PREVIEW_CSP_A
   ].join("; ");
 }
 
+/**
+ * Build the CSP string for the print-mode hidden iframe (presentHtml's
+ * printToPdf). The print iframe loads via `srcdoc`, so its document
+ * has an opaque origin: `'self'` no longer matches the server origin
+ * and same-origin `<img src="/artifacts/images/...">` would be blocked.
+ *
+ * Same shape as `buildHtmlPreviewCsp` but with `img-src` widened from
+ * `'self'` to the explicit `${origin}` so workspace images keep
+ * loading after the `<base href>` injection rewrites their relative
+ * URLs to absolute server URLs.
+ */
+export function buildPrintCspContent(origin: string, cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS): string {
+  const cdnList = cdns.join(" ");
+  return [
+    "default-src 'none'",
+    `script-src 'unsafe-inline' ${cdnList}`,
+    `style-src 'unsafe-inline' ${cdnList}`,
+    `font-src ${cdnList}`,
+    `img-src ${origin} ${cdnList} data: blob:`,
+    "connect-src 'none'",
+  ].join("; ");
+}
+
 const CSP_META_NONCE = ""; // reserved for future use (per-render nonce)
 
 /**

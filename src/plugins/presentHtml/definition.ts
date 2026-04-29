@@ -12,8 +12,18 @@ const toolDefinition: ToolDefinition = {
     properties: {
       html: {
         type: "string",
-        description:
-          "Complete, self-contained HTML string. All CSS and JavaScript must be inline or loaded via CDN. Must be a full document (include <!DOCTYPE html> and <html>/<body> tags).",
+        description: [
+          "Complete, self-contained HTML string. All CSS and JavaScript must be inline or loaded via CDN.",
+          "Must be a full document (include <!DOCTYPE html> and <html>/<body> tags).",
+          "",
+          "FILE LOCATION: this HTML is saved to `artifacts/html/<YYYY>/<MM>/<slug>-<timestamp>.html`.",
+          "",
+          "REFERENCING WORKSPACE FILES (images, charts, other artifacts): use RELATIVE paths with exactly three `../` to climb out of `html/<YYYY>/<MM>/`. The generated file must remain portable — the user may open it directly from disk via file://, where absolute URLs do not work.",
+          '  GOOD: <img src="../../../images/2026/04/foo.png">',
+          '  BAD:  <img src="/artifacts/images/2026/04/foo.png">  (breaks under file://)',
+          '  BAD:  <img src="artifacts/images/2026/04/foo.png">    (resolves wrong from html/YYYY/MM/)',
+          "Workspace paths returned by other tools (e.g. presentImage returns `artifacts/images/2026/04/foo.png`): replace the leading `artifacts/` with `../../../`, giving `../../../images/2026/04/foo.png`.",
+        ].join("\n"),
       },
       title: {
         type: "string",

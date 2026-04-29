@@ -677,6 +677,8 @@ const esMessages = {
     untitled: "Página HTML",
     hideSource: "Ocultar código <>",
     showSource: "Mostrar código <>",
+    loadingSource: "Cargando código…",
+    sourceError: "Error al cargar el código: {error}",
   },
   pluginNews: {
     title: "Noticias",
