@@ -35,7 +35,9 @@
 | API | `mockAllApis(page)` で全モック | 実 Claude API + 実ファイル I/O |
 | 用途 | UI ロジック・ルーティング・状態管理・ガード | 生成系・E2E 経路・LLM 応答品質 |
 | 実行頻度 | CI（毎 PR） | 手動・定期（週次想定） |
-| 実行環境 | headless | **headed**（QA が画面で見る） |
+| 実行環境 | headless | **通常**: headless / **デバッグ**: `HEADED=1` で headed |
+| 失敗時の確認 | trace なし | trace + video + HTML レポートで動画リプレイ |
+| 出力先 | `test-results/`, `playwright-report/` | `test-results-live/`, `playwright-report-live/`（共に gitignore） |
 | 実行時間 | 数十秒 | 数分〜数十分 |
 | timeout | 短（30s） | 長（生成系で 5 分） |
 | trigger | `yarn test:e2e` | `yarn test:e2e:live` or `/e2e-live` skill |
@@ -350,25 +352,35 @@ playwright.live.config.ts   ← 別 config（headed, 長 timeout, workers=1）
 ```ts
 export default defineConfig({
   testDir: 'e2e-live',
+  outputDir: 'test-results-live',                              // ← 既存 e2e と分離
   timeout: 600_000,        // 10 分
   workers: 1,              // 直列実行
   retries: 0,              // コスト節約のため自動リトライしない
   reporter: [
-    ['list'],                                       // ターミナル進捗
+    ['list'],                                                  // ターミナル進捗
     ['html', { outputFolder: 'playwright-report-live', open: 'on-failure' }],
   ],
   use: {
     baseURL: 'http://localhost:5173',
-    headless: false,        // ← QA が画面で動作確認できる
+    headless: process.env.HEADED !== '1',                      // ← 環境変数で headed 切替
     launchOptions: {
-      slowMo: 200,          // ← 動作が目で追える速度
+      slowMo: process.env.HEADED === '1' ? 200 : 0,            // ← headed 時のみ動作可視化
     },
-    trace: 'on',            // ← 全テスト trace 取得（後でリプレイ可能）
+    trace: 'on',                                                // ← 失敗リプレイ用に常時取得
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
 });
 ```
+
+### `.gitignore` 追記
+
+```
+test-results-live/
+playwright-report-live/
+```
+
+→ PR #2 に含める（既存 `test-results/` `playwright-report/` の隣に追加）。
 
 ### `package.json` scripts
 
@@ -385,15 +397,46 @@ export default defineConfig({
 }
 ```
 
-### 実行モード（headed + background）
+### 実行モード（段階運用 + リプレイ可能）
+
+| 観点 | デフォルト | デバッグ時 |
+|---|---|---|
+| 表示 | headless（速い、リソース節約） | `HEADED=1` で headed + slowMo 200ms |
+| trace | `on`（常時取得） | 同左 |
+| 動画 | `retain-on-failure` | 同左 |
+| 出力先 | `test-results-live/` `playwright-report-live/` | 同左（gitignore 済） |
+
+#### 失敗時の確認方法（A: テスト後リプレイ）
+
+1. **ターミナル**: `list` reporter でリアルタイム失敗通知
+2. **HTML レポート**: 失敗時 `open: 'on-failure'` で `playwright-report-live/index.html` が自動オープン
+3. **動画リプレイ**: HTML レポート内のプレイヤーで `.webm` を再生
+4. **trace viewer**: `npx playwright show-trace test-results-live/<spec>/trace.zip` でステップ単位の DOM スナップショットを確認
+
+#### デバッグ時（B: 画面で動作を見ながら実行）
+
+```bash
+HEADED=1 yarn test:e2e:live:media   # Chromium ウィンドウが開き、slowMo 200ms で動作可視化
+```
+
+- 新規シナリオ実装中・既存シナリオ修正時に使用
+- 通常の定期実行は headless で OK
+
+#### Claude / skill 側の実行
 
 | 観点 | やり方 | 理由 |
 |---|---|---|
-| skill 内 Bash 実行 | `run_in_background: true` | Claude が並行作業可能 |
-| 画面表示 | Playwright `headless: false` + `slowMo: 200` | QA が動作を目で追える |
-| ログ | `list` reporter でターミナル出力 | リアルタイム進捗確認 |
-| 失敗時 | trace + video + screenshot | HTML レポートで完全リプレイ可能 |
-| 中断 | KillBash で停止 | 長時間放置しても止められる |
+| skill 内 Bash 実行 | `run_in_background: true` | Claude 並行作業可、長時間放置可 |
+| 中断 | KillBash で停止 | 時間管理 |
+| ログ取得 | BashOutput | 進捗確認 |
+
+#### 段階的運用フェーズ
+
+| フェーズ | デフォルト | 用途 |
+|---|---|---|
+| **PR #2〜10（実装期）** | `HEADED=1` 推奨 | 各シナリオの動作を目視確認しながら実装 |
+| **30 シナリオ完成後** | headless | 通常運用は速度優先、失敗は trace/video でリプレイ |
+| **デバッグ時** | `HEADED=1` 切替 | 新規追加・既存修正時 |
 
 ### 親 skill `/e2e-live` の両モード巡回フロー
 
@@ -432,9 +475,13 @@ yarn test:e2e:live:media
 
 ## 期待結果
 - L-01〜L-05 が全て pass
-- 画面に Chromium ウィンドウが表示され、QA が動作を目で確認可能
-- 結果は playwright-report-live/ に出力
-- 失敗時は内部バグ ID（B-XX）を確認
+- 結果は `playwright-report-live/index.html` で確認（失敗時は自動オープン）
+- 失敗時の動画: `test-results-live/<spec>/video.webm`
+- 失敗時の trace: `npx playwright show-trace test-results-live/<spec>/trace.zip`
+- 各失敗を内部バグ ID（B-XX）と照合
+
+## デバッグ時
+HEADED=1 yarn test:e2e:live:media   ← Chromium ウィンドウで動作を目視
 ```
 
 親 `/e2e-live` は `yarn test:e2e:live` を呼んだ後、両モード巡回フロー（上記）を案内する。
@@ -444,7 +491,7 @@ yarn test:e2e:live:media
 | PR | 内容 | 規模 |
 |---|---|---|
 | **#1** | このファイル `plans/feat-e2e-live.md` のみ（設計合意） | 小 |
-| **#2** | 基盤: `e2e-live/fixtures/`, `playwright.live.config.ts`, `package.json` scripts, `/e2e-live` 親 skill, `/e2e-live-media` skill, **L-01 サンプル 1 本** | 中 |
+| **#2** | 基盤: `e2e-live/fixtures/`, `playwright.live.config.ts`, `package.json` scripts, **`.gitignore` に `test-results-live/` `playwright-report-live/` 追記**, `/e2e-live` 親 skill, `/e2e-live-media` skill, **L-01 サンプル 1 本** | 中 |
 | #3 | media 残り（L-02〜L-05） | 中 |
 | #4 | roles 全部（L-06〜L-10）+ `/e2e-live-roles` skill | 中 |
 | #5 | session 全部（L-11〜L-13）+ `/e2e-live-session` skill | 小 |
