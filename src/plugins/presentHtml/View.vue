@@ -29,6 +29,7 @@ import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
 import { rewriteHtmlImageRefs } from "../../utils/image/rewriteHtmlImageRefs";
+import { IMAGE_REPAIR_INLINE_SCRIPT } from "../../composables/useImageErrorRepair";
 
 const { t } = useI18n();
 
@@ -42,13 +43,26 @@ const PRINT_STYLE = `<style>@media print {
   @page { margin: 10mm; }
 }</style>`;
 
+// Inline repair script: a 404 on a rewritten <img> inside the iframe
+// retries against /artifacts/images/<rest> — same rule as
+// useImageErrorRepair on the parent doc.
+//
+// The closing tag uses a Unicode-escape for the slash so the literal
+// 9-char sequence does not appear in the source bytes — otherwise the
+// Vue SFC HTML parser would treat it as the end of THIS file's
+// <script setup> block.
+const REPAIR_SCRIPT = `<script>${IMAGE_REPAIR_INLINE_SCRIPT}<\u002Fscript>`;
+
 const data = computed(() => props.selectedResult.data);
 // LLM-generated HTML often emits <img src="/artifacts/images/…"> using
 // the web convention where `/` is the site root. Inside the iframe
 // srcdoc that resolves to the SPA origin, which does not serve
 // /artifacts. Route those through the workspace file server.
 const rawHtml = computed(() => rewriteHtmlImageRefs(data.value?.html ?? ""));
-const html = computed(() => (rawHtml.value.includes("</head>") ? rawHtml.value.replace("</head>", `${PRINT_STYLE}</head>`) : `${PRINT_STYLE}${rawHtml.value}`));
+const headInjection = `${PRINT_STYLE}${REPAIR_SCRIPT}`;
+const html = computed(() =>
+  rawHtml.value.includes("</head>") ? rawHtml.value.replace("</head>", `${headInjection}</head>`) : `${headInjection}${rawHtml.value}`,
+);
 const title = computed(() => data.value?.title);
 
 const sourceOpen = ref(false);
