@@ -91,6 +91,7 @@ import { API_ROUTES } from "../../config/apiRoutes";
 import { useClipboardCopy } from "../../composables/useClipboardCopy";
 import { buildPdfFilename } from "../../utils/files/filename";
 import { useAppApi } from "../../composables/useAppApi";
+import { useFileChange } from "../../composables/useFileChange";
 
 const { t } = useI18n();
 
@@ -153,6 +154,35 @@ fetchMarkdownContent();
 
 const hasChanges = computed(() => editableMarkdown.value !== markdownContent.value);
 
+// Subscribe to per-file change events so any tab / browser / agent run
+// that overwrites the file refreshes this view automatically. The path
+// passed in is the workspace-relative `data.markdown` (only valid when
+// `isFilePath` — inline legacy content has no on-disk twin).
+const watchedPath = computed(() => {
+  const raw = props.selectedResult.data?.markdown;
+  return typeof raw === "string" && isFilePath(raw) ? raw : null;
+});
+const { version: fileVersion } = useFileChange(watchedPath);
+
+// Declared early so the `fileVersion` watcher below can reach into the
+// `<details>` element to close the editor when a remote write lands.
+const sourceDetails = ref<HTMLDetailsElement>();
+
+// Remote write: refetch so the rendered view tracks disk. If the
+// editor is open we close it first — `fileVersion` only fires once
+// per remote write, so leaving the panel open and skipping the fetch
+// would strand the view on stale content until the next write
+// (#1001 P1). Discarding in-progress edits is rare enough to be
+// acceptable; a "remote changed" banner is queued for a follow-up —
+// see plans/feat-file-change-pubsub.md.
+watch(fileVersion, (current, previous) => {
+  if (current === 0 || current === previous) return;
+  if (sourceDetails.value?.open) {
+    sourceDetails.value.open = false;
+  }
+  void fetchMarkdownContent();
+});
+
 // Frontmatter-aware view of the loaded content — separates the
 // `---\n...\n---` header (rendered as a properties panel) from the
 // markdown body (passed to marked). Without this split the header
@@ -195,7 +225,6 @@ watch(
   },
 );
 
-const sourceDetails = ref<HTMLDetailsElement>();
 const editing = ref(false);
 const { copied, copy } = useClipboardCopy();
 

@@ -14,6 +14,7 @@ import { saveSpreadsheet, overwriteSpreadsheet, isSpreadsheetPath } from "../../
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
+import { publishFileChange } from "../../events/file-change.js";
 
 const router = Router();
 
@@ -142,6 +143,7 @@ router.put(
     try {
       await overwriteMarkdown(relativePath, markdown);
       log.info("plugins", "updateMarkdown: ok", { pathPreview: previewSnippet(relativePath), bytes: markdown.length });
+      void publishFileChange(relativePath);
       res.json({ path: relativePath });
     } catch (err) {
       log.error("plugins", "updateMarkdown: threw", { pathPreview: previewSnippet(relativePath), error: errorMessage(err) });

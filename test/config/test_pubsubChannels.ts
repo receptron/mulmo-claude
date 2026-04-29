@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { PUBSUB_CHANNELS, sessionChannel } from "../../src/config/pubsubChannels.js";
+import { PUBSUB_CHANNELS, fileChannel, sessionChannel } from "../../src/config/pubsubChannels.js";
 
 describe("sessionChannel", () => {
   it("prefixes the session id with `session.`", () => {
@@ -18,6 +18,23 @@ describe("sessionChannel", () => {
     // Edge case — not something callers should rely on, but the
     // factory shouldn't surprise them with a throw.
     assert.equal(sessionChannel(""), "session.");
+  });
+});
+
+describe("fileChannel", () => {
+  it("prefixes the path with `file:` and uses POSIX separators", () => {
+    assert.equal(fileChannel("artifacts/html/2026/04/foo.html"), "file:artifacts/html/2026/04/foo.html");
+  });
+
+  it("normalises backslashes to forward slashes (Windows-published, Linux-subscribed)", () => {
+    assert.equal(fileChannel("artifacts\\html\\2026\\foo.html"), "file:artifacts/html/2026/foo.html");
+  });
+
+  it("collapses runs of separators so a sloppy caller can't drift the channel name", () => {
+    // Publisher and subscriber both pass the same string through the
+    // factory, so a literal "//" in either side would still match —
+    // but the audit trail in logs is cleaner without doubles.
+    assert.equal(fileChannel("artifacts//html///foo.html"), "file:artifacts/html/foo.html");
   });
 });
 

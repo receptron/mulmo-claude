@@ -29,6 +29,7 @@ import { type NotificationDeps, initNotifications } from "./events/notifications
 import { createChatService } from "@mulmobridge/chat-service";
 import { readSessionJsonl } from "./utils/files/session-io.js";
 import { onSessionEvent, initSessionStore } from "./events/session-store/index.js";
+import { initFileChangePublisher } from "./events/file-change.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { discoverSkills } from "./workspace/skills/index.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
@@ -593,6 +594,11 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: n
 
   // --- Session Store ---
   initSessionStore(pubsub);
+
+  // --- File-change publisher ---
+  // Wired here (not at first publish) so the very first save after
+  // boot already sees a live publisher.
+  initFileChangePublisher(pubsub);
 
   // --- Task Manager ---
   const taskManager = createTaskManager({

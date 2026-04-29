@@ -53,6 +53,7 @@ import { apiFetchRaw, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
 import { buildPrintCspContent } from "../../utils/html/previewCsp";
+import { useFileChange } from "../../composables/useFileChange";
 
 const { t } = useI18n();
 
@@ -82,9 +83,10 @@ const data = computed(() => props.selectedResult.data);
 const title = computed(() => data.value?.title);
 const filePath = computed(() => data.value?.filePath ?? null);
 
-// Bumped after a successful save so the iframe refetches the freshly
-// written file instead of showing the stale cached version.
-const previewVersion = ref(0);
+// `version` bumps to the post-write `mtimeMs` whenever any tab (or
+// browser, or the agent loop) writes this file. Wired to the iframe
+// `:src` as `?v=<mtime>` so the browser cache-busts the stale page.
+const { version: previewVersion } = useFileChange(filePath);
 const previewUrl = computed(() => {
   const base = htmlPreviewUrlFor(filePath.value);
   if (!base) return null;
@@ -173,20 +175,49 @@ async function applyHtml() {
     saveError.value = result.error;
     return;
   }
-  // Commit the new canonical source and force the iframe to refetch.
+  // Commit the just-saved text as the canonical source so the editor
+  // doesn't refetch over its own write when the file-change event
+  // arrives. Iframe cache-bust happens via `previewVersion` when the
+  // event lands.
   sourceCache.value = { ...sourceCache.value, [path]: editableHtml.value };
-  previewVersion.value += 1;
   if (sourceDetails.value) sourceDetails.value.open = false;
 }
 
 // When the user navigates to a different result, reset the editor so
-// stale text from the previous file doesn't carry over.
+// stale text from the previous file doesn't carry over. `previewVersion`
+// resets inside the composable when `filePath` flips.
 watch(filePath, () => {
   if (sourceDetails.value) sourceDetails.value.open = false;
   editableHtml.value = "";
   saveError.value = null;
   sourceError.value = null;
-  previewVersion.value = 0;
+});
+
+// Remote write detected: invalidate the editor's cached source so the
+// next read goes back to disk. If the edit panel is open AND the user
+// has no pending changes, silently refresh `editableHtml` to the new
+// on-disk text. If they have unsaved edits, leave `editableHtml` alone
+// — `cachedSource` becomes the newly-fetched text, `hasChanges` stays
+// true, and pressing Apply overwrites the remote change. (Surfacing a
+// "remote changed" banner is a follow-up — see
+// plans/feat-file-change-pubsub.md.)
+watch(previewVersion, async (current, previous) => {
+  if (current === 0 || current === previous) return;
+  const path = filePath.value;
+  if (!path) return;
+  // Snapshot dirtiness BEFORE invalidating the cache — `hasChanges`
+  // depends on `cachedSource`, which flips to `null` the moment we
+  // delete the entry.
+  const wasDirty = hasChanges.value;
+  const next = { ...sourceCache.value };
+  Reflect.deleteProperty(next, path);
+  sourceCache.value = next;
+  if (sourceDetails.value?.open === true) {
+    const fresh = await fetchSource();
+    if (fresh !== null && !wasDirty) {
+      editableHtml.value = fresh;
+    }
+  }
 });
 
 // Build the print-mode HTML by injecting four pieces into <head>:

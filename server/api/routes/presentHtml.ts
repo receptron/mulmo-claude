@@ -8,6 +8,7 @@ import { badRequest, serverError } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
+import { publishFileChange } from "../../events/file-change.js";
 
 const router = Router();
 
@@ -44,6 +45,8 @@ router.post(API_ROUTES.html.present, async (req: Request<object, unknown, Presen
     const filePath = buildArtifactPath(WORKSPACE_DIRS.htmls, title, ".html", "page");
     await writeWorkspaceText(filePath, html);
     log.info("html", "present: ok", { filePath, bytes: html.length });
+    // Fire-and-forget: any subscribed View tab refetches via cache-bust.
+    void publishFileChange(filePath);
     res.json({
       message: `Saved HTML to ${filePath}`,
       instructions: "Acknowledge that the HTML page has been presented to the user.",
@@ -95,6 +98,7 @@ router.put(
     try {
       await overwriteHtml(relativePath, html);
       log.info("html", "update: ok", { pathPreview: previewSnippet(relativePath), bytes: html.length });
+      void publishFileChange(relativePath);
       res.json({ path: relativePath });
     } catch (err) {
       log.error("html", "update: threw", { pathPreview: previewSnippet(relativePath), error: errorMessage(err) });
