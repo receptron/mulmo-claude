@@ -79,7 +79,7 @@
          body below so the History tab stays reachable when the
          live page is missing or empty (codex review iter-2 #946 —
          history outlives the page). -->
-    <div v-if="!content && !navError && action !== 'page'" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
+    <div v-if="!content && !navError && action !== 'page' && action !== 'page-edit'" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
       <div class="text-center space-y-2">
         <span class="material-icons text-4xl text-gray-300">menu_book</span>
         <p>{{ t("pluginWiki.empty") }}</p>
@@ -498,6 +498,19 @@ onMounted(() => {
   // the index payload — if it resolves last, it clobbers log / lint /
   // page state. Cancel it here so the two can't race.
   if (route.name === PAGE_ROUTES.wiki) abortFreshFetch();
+  // page-edit toolResults source their content from the snapshot
+  // endpoint via loadPageEditData. Cancel the mount fetch (which
+  // targets /api/wiki) so it can't clobber state, and kick the
+  // loader directly — the selectedResult watcher only fires on
+  // subsequent uuid changes, not on the initial mount, so this is
+  // the only place to seed page-edit content (#963).
+  const data = props.selectedResult?.data;
+  if (data?.action === "page-edit") {
+    abortFreshFetch();
+    if (data.slug && data.stamp) {
+      void loadPageEditData(data.slug, data.stamp);
+    }
+  }
 });
 
 watch(
