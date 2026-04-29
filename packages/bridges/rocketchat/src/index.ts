@@ -23,13 +23,17 @@ const TRANSPORT_ID = "rocketchat";
 const MAX_MSG_LEN = 4_000;
 const FETCH_TIMEOUT_MS = 15_000;
 
-const baseUrl = (process.env.ROCKETCHAT_URL ?? "").replace(/\/$/, "");
-const userId = process.env.ROCKETCHAT_USER_ID;
-const authToken = process.env.ROCKETCHAT_TOKEN;
-if (!baseUrl || !userId || !authToken) {
-  console.error("ROCKETCHAT_URL, ROCKETCHAT_USER_ID, and ROCKETCHAT_TOKEN are required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { baseUrl: string; userId: string; authToken: string } {
+  const baseUrl = (process.env.ROCKETCHAT_URL ?? "").replace(/\/$/, "");
+  const userId = process.env.ROCKETCHAT_USER_ID;
+  const authToken = process.env.ROCKETCHAT_TOKEN;
+  if (!baseUrl || !userId || !authToken) {
+    console.error("ROCKETCHAT_URL, ROCKETCHAT_USER_ID, and ROCKETCHAT_TOKEN are required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { baseUrl, userId, authToken };
 }
+const { baseUrl, userId, authToken } = readRequiredEnv();
 
 const allowedUsers = new Set(
   (process.env.ROCKETCHAT_ALLOWED_USERS ?? "")
@@ -57,8 +61,8 @@ function isObj(value: unknown): value is JsonRecord {
 
 function authHeaders(): Record<string, string> {
   return {
-    "X-Auth-Token": authToken!,
-    "X-User-Id": userId!,
+    "X-Auth-Token": authToken,
+    "X-User-Id": userId,
   };
 }
 
@@ -236,11 +240,13 @@ async function pollLoop(): Promise<void> {
         // /im.history call. A pure `new Date().toISOString()` cursor
         // would place the `oldest` boundary at or after the first
         // message's ts, dropping it with `inclusive: "false"`.
-        if (!cursors.has(roomId)) {
-          cursors.set(roomId, new Date(Date.now() - pollIntervalSec * 1000).toISOString());
+        let cursor = cursors.get(roomId);
+        if (!cursor) {
+          cursor = new Date(Date.now() - pollIntervalSec * 1000).toISOString();
+          cursors.set(roomId, cursor);
         }
         try {
-          const newestIso = await pollRoom(roomId, cursors.get(roomId)!);
+          const newestIso = await pollRoom(roomId, cursor);
           cursors.set(roomId, newestIso);
         } catch (err) {
           console.error(`[rocketchat] pollRoom ${roomId} error: ${err}`);

@@ -21,12 +21,16 @@ import { createBridgeClient, chunkText } from "@mulmobridge/client";
 const TRANSPORT_ID = "line";
 const PORT = Number(process.env.LINE_BRIDGE_PORT) || 3002;
 
-const channelSecret = process.env.LINE_CHANNEL_SECRET;
-const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-if (!channelSecret || !channelAccessToken) {
-  console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { channelSecret: string; channelAccessToken: string } {
+  const channelSecret = process.env.LINE_CHANNEL_SECRET;
+  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!channelSecret || !channelAccessToken) {
+    console.error("LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN are required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { channelSecret, channelAccessToken };
 }
+const { channelSecret, channelAccessToken } = readRequiredEnv();
 
 const client = createBridgeClient({ transportId: TRANSPORT_ID });
 
@@ -70,7 +74,7 @@ async function pushMessage(userId: string, text: string): Promise<void> {
 // ── Signature verification ──────────────────────────────────────
 
 function verifySignature(body: string, signature: string): boolean {
-  const expected = crypto.createHmac("SHA256", channelSecret!).update(body).digest("base64");
+  const expected = crypto.createHmac("SHA256", channelSecret).update(body).digest("base64");
   if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }

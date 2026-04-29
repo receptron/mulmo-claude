@@ -26,12 +26,16 @@ const TRANSPORT_ID = "teams";
 const MAX_TEAMS_TEXT = 28_000; // Teams message limit is 40k; leave headroom for formatting
 const PORT = Number(process.env.TEAMS_BRIDGE_PORT) || 3006;
 
-const appId = process.env.MICROSOFT_APP_ID;
-const appPassword = process.env.MICROSOFT_APP_PASSWORD;
-if (!appId || !appPassword) {
-  console.error("MICROSOFT_APP_ID and MICROSOFT_APP_PASSWORD are required.\nSee README for Azure Bot registration instructions.");
-  process.exit(1);
+function readRequiredEnv(): { appId: string; appPassword: string } {
+  const appId = process.env.MICROSOFT_APP_ID;
+  const appPassword = process.env.MICROSOFT_APP_PASSWORD;
+  if (!appId || !appPassword) {
+    console.error("MICROSOFT_APP_ID and MICROSOFT_APP_PASSWORD are required.\nSee README for Azure Bot registration instructions.");
+    process.exit(1);
+  }
+  return { appId, appPassword };
 }
+const { appId, appPassword } = readRequiredEnv();
 
 const allowedUsers = new Set(
   (process.env.TEAMS_ALLOWED_USERS ?? "")
@@ -74,7 +78,7 @@ mulmo.onPush((pushEvent) => {
     return;
   }
   adapter
-    .continueConversationAsync(appId!, ref, async (context) => {
+    .continueConversationAsync(appId, ref, async (context) => {
       await sendChunked(context, pushEvent.message);
     })
     .catch((err) => console.error(`[teams] push send failed: ${err}`));
