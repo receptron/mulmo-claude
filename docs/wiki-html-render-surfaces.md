@@ -108,14 +108,32 @@ mulmoclaude は画像を workspace の `data/` や `artifacts/images/` に置く
 
 ## 6. CSP / iframe sandbox の効き方
 
-| サーフェス | 隔離 | CSP 配信 |
-|---|---|---|
-| Files: `artifacts/html/` | iframe `sandbox="allow-scripts"`(opaque origin) | サーバー HTTP ヘッダ(`connect-src 'none'`、CDN ゲート、`img-src 'self' data: blob:`) |
-| Files: それ以外 HTML | iframe `sandbox="allow-scripts"` | クライアント側 `<meta>` 注入(`wrapHtmlWithPreviewCsp()`) |
-| presentHtml | iframe `sandbox="allow-scripts allow-same-origin allow-modals"`(現状)→ PR #982 で `allow-scripts` のみに絞る予定 | iframe `srcdoc` 内に `<meta>` 注入 |
-| その他(`v-html` 系) | 隔離なし(親と同じ origin・DOM・CSS) | アプリ全体の CSP のみ |
+| サーフェス | 隔離 | CSP 配信 | `img-src` |
+|---|---|---|---|
+| Files: `artifacts/html/` | iframe `sandbox="allow-scripts"`(opaque origin) | サーバー HTTP ヘッダ | **明示オリジン**(PR #991)+ CDN ゲート + `data: blob:` |
+| Files: それ以外 HTML | iframe `sandbox="allow-scripts"` | クライアント側 `<meta>` 注入(`wrapHtmlWithPreviewCsp()`) | `'self'`(srcdoc では機能限定的、§ 6.2 参照) |
+| presentHtml | iframe `sandbox="allow-scripts"`(PR #982 で絞り込み済)+ path-based mount | サーバー HTTP ヘッダ(Files と共通ルート) | **明示オリジン**(PR #991) |
+| presentHtml の印刷経路 | iframe `srcdoc` | iframe 内 `<meta>` 注入 | **明示オリジン**(PR #982 で対応済) |
+| その他(`v-html` 系) | 隔離なし(親と同じ origin・DOM・CSS) | アプリ全体の CSP のみ | N/A(親ページの CSP に従う) |
 
 `allow-same-origin` を付けると iframe が親と同じ origin になり、sandbox の隔離メリットを大きく失います。CSP もファイル内 `<meta>` で書き換えられる余地が出ます。**できる限り `allow-scripts` のみ**が原則。
+
+### 6.1 `connect-src 'none'` / CDN ゲート / `unsafe-inline` の意図
+
+- `connect-src 'none'`:プレビュー内の `fetch` / XHR / WebSocket をすべてブロック。LLM 出力に紛れ込んだ「外に情報を投げる」コードを止める。
+- CDN ゲート(`cdn.jsdelivr.net`、`unpkg.com`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`):LLM が頻用する CDN だけ許可。広げるときは `HTML_PREVIEW_CSP_ALLOWED_CDNS` を編集して PR で監査。
+- `script-src` と `style-src` は `'unsafe-inline'`:LLM 出力の HTML はインライン `<script>` / `<style>` を多用するため。
+
+### 6.2 Safari の opaque-origin と `'self'` の罠(PR #982 / #991)
+
+CSP 仕様上、sandbox で opaque-origin になったドキュメントでも `'self'` は「ドキュメント URL のスキーム/ホスト/ポート」にマッチすべきですが、**Safari/WebKit は `'self'` をオリジン・タプルに対して評価**します。opaque origin に同一オリジン URL は決してマッチしないため、`/artifacts/images/...` への参照がすべて拒否されます。Chrome は仕様準拠でドキュメント URL に対してマッチするため動いてしまう ── ブラウザ間でズレる。
+
+**対策**(現状の実装):
+
+- サーバーが配るヘッダ(`/artifacts/html/`)では `'self'` をやめて、ブラウザ可視のオリジン(`http://localhost:5173` 等)を `img-src` に直書き。dev では Vite proxy が `Host` を書き換えるので、サーバー側で `X-Forwarded-Host` / `X-Forwarded-Proto` を尊重し、Vite proxy 設定に `xfwd: true` を入れて元値を渡す。
+- `presentHtml` のプレビュー(`/artifacts/html/` mount 経由)も同じヘッダ経路で利益を受けます。
+- **印刷経路**(`srcdoc` で iframe を作って `print()` する独立パス)は元から明示オリジンを使う `buildPrintCspContent` で組み立て済(PR #982)。
+- **未対応**:Files Explorer の「`artifacts/html/` 外の HTML」は依然として `<meta>` CSP に `'self'` が入る経路。`srcdoc` で base URL が `about:srcdoc` のため相対パスは元から壊れていて副作用が見えにくいが、ファイル内に `/api/files/raw?path=...` のような絶対同一オリジン URL が書かれていると Safari でブロックされる。§ 8 で gap として扱う。
 
 ---
 
@@ -148,10 +166,13 @@ PR #980 / #981 / #982 / #983 のレビューや実装観察から見えている
 4. **presentHtml の sandbox が広い** — `allow-scripts allow-same-origin allow-modals`。Files HTML は `allow-scripts` のみで運用できているので、presentHtml も寄せたい(PR #982 で対応中)。
 5. **Wiki タスクチェックボックスは page view だけ persist** — log / lint view 上のチェックボックスは visual だけ反応してクリックは捨てられる(read-only 扱い)。
 6. **Files: `artifacts/html/` 外の HTML は相対画像が出ない** — `srcdoc` の base URL 制約。直すなら server mount を全 HTML に広げるか、iframe 内に `<base href>` を注入するかの2択。
+7. **Files: `artifacts/html/` 外の HTML、Safari 上で絶対同一オリジン URL がブロックされる** — `wrapHtmlWithPreviewCsp()` が出す meta CSP が `'self'` のままで、Safari の opaque-origin 解釈と噛み合わない(§ 6.2)。実害は薄い(相対 path が元から壊れているため絶対 URL を書く HTML は稀)が、PR #991 と同じパターンで `buildHtmlPreviewCsp()` に origin を渡せるようになっているので、この経路にも明示オリジンを通す手は同じ。
 
 ---
 
 ## 9. 参考 PR
 
 - #980 — Files Explorer `artifacts/html/` の path-based mount(merged)
-- #981 / #982 / #983 — image path 関連の継続調整(#982 は presentHtml の `srcdoc → src` 移行と sandbox 絞り込み)
+- #982 — presentHtml の `srcdoc → src` 移行 + sandbox `allow-scripts` への絞り込み + 印刷経路の `buildPrintCspContent(origin)`
+- #983 — image path 関連の追加調整
+- #991 — presentHtml プレビューの CSP `'self'` 問題を Safari 向けに修正(`buildHtmlPreviewCsp(origin)`、`X-Forwarded-Host` 尊重、Vite proxy `xfwd: true`)
