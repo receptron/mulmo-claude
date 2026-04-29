@@ -657,7 +657,7 @@ function createNewSession(roleId?: string): ActiveSession {
   navigateToSession(session.id, replace);
   chatInputRef.value?.collapseSuggestions();
   nextTick(() => focusChatInput());
-  return sessionMap.get(session.id)!;
+  return session;
 }
 
 function onRoleChange(roleId: string) {

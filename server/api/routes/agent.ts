@@ -431,17 +431,17 @@ async function runAgentInBackground(params: BackgroundRunParams): Promise<void> 
   try {
     while (true) {
       let staleSessionDetected = false;
-      for await (const event of runAgent(
-        currentMessage,
+      for await (const event of runAgent({
+        message: currentMessage,
         role,
         workspacePath,
-        chatSessionId,
-        PORT,
-        currentClaudeSessionId,
+        sessionId: chatSessionId,
+        port: PORT,
+        claudeSessionId: currentClaudeSessionId,
         abortSignal,
         attachments,
         userTimezone,
-      )) {
+      })) {
         if (failoverAttemptsRemaining > 0 && event.type === EVENT_TYPES.error && typeof event.message === "string" && isStaleSessionError(event.message)) {
           // Swallow the error — we're about to recover. `break`
           // abandons the current generator; since the event is only

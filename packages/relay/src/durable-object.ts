@@ -117,11 +117,13 @@ export class RelayDurableObject implements DurableObject {
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this -- Cloudflare DurableObject lifecycle hook; signature dictated by the runtime, this body has nothing per-instance to clean up
   async webSocketClose(__ws: WebSocket, __code: number, __reason: string, __wasClean: boolean): Promise<void> {
     // No-op: getSocket() derives state from the runtime, not an
     // instance field, so there is nothing to clear.
   }
 
+  // eslint-disable-next-line class-methods-use-this -- same rationale as webSocketClose above
   async webSocketError(__ws: WebSocket, __error: unknown): Promise<void> {
     // No-op: same as webSocketClose.
   }

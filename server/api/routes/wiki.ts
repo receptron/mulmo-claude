@@ -234,8 +234,9 @@ async function resolvePagePath(pageName: string): Promise<string | null> {
   const indexContent = readFileOrEmpty(indexFile());
   const entries = parseIndexEntries(indexContent);
   const titleMatch = entries.find((entry) => entry.title === pageName);
-  if (titleMatch && slugs.has(titleMatch.slug)) {
-    return path.join(dir, slugs.get(titleMatch.slug)!);
+  if (titleMatch) {
+    const file = slugs.get(titleMatch.slug);
+    if (file) return path.join(dir, file);
   }
 
   return null;
