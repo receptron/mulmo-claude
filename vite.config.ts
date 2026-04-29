@@ -72,6 +72,15 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true
       },
+      // Static-mount on the backend (server/index.ts: app.use('/artifacts/html', ...)).
+      // Without this proxy, Vite's HTML transform injects `/@vite/client` and
+      // `/src/main.ts` into the response, which the iframe (opaque origin) then
+      // tries to load and the browser blocks via CORS. Forwarding to Express
+      // returns the file untouched plus the CSP HTTP header.
+      '/artifacts/html': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      },
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true

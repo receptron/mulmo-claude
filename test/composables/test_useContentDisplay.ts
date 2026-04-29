@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ref } from "vue";
-import { useContentDisplay } from "../../src/composables/useContentDisplay.ts";
+import { useContentDisplay, htmlPreviewUrlFor } from "../../src/composables/useContentDisplay.ts";
 import type { FileContent } from "../../src/composables/useFileSelection.ts";
 
 function textContent(path: string, body: string): FileContent {
@@ -84,6 +84,58 @@ describe("useContentDisplay — sandboxedHtml", () => {
     const content = ref<FileContent | null>(null);
     const { sandboxedHtml } = useContentDisplay(selectedPath, content);
     assert.equal(sandboxedHtml.value, "");
+  });
+});
+
+describe("htmlPreviewUrlFor", () => {
+  it("returns the /artifacts/html/<rest> URL for HTML files under artifacts/html/", () => {
+    assert.equal(htmlPreviewUrlFor("artifacts/html/malaga.html"), "/artifacts/html/malaga.html");
+    assert.equal(htmlPreviewUrlFor("artifacts/html/sub/dir/page.htm"), "/artifacts/html/sub/dir/page.htm");
+  });
+
+  it("encodes path segments but preserves slashes", () => {
+    assert.equal(htmlPreviewUrlFor("artifacts/html/has space.html"), "/artifacts/html/has%20space.html");
+    assert.equal(htmlPreviewUrlFor("artifacts/html/日本語.html"), `/artifacts/html/${encodeURIComponent("日本語")}.html`);
+  });
+
+  it("returns null for HTML files outside artifacts/html/", () => {
+    assert.equal(htmlPreviewUrlFor("data/wiki/pages/foo.html"), null);
+    assert.equal(htmlPreviewUrlFor("artifacts/html-scratch/current.html"), null);
+    assert.equal(htmlPreviewUrlFor("foo.html"), null);
+  });
+
+  it("returns null for non-HTML extensions", () => {
+    assert.equal(htmlPreviewUrlFor("artifacts/html/notes.md"), null);
+    assert.equal(htmlPreviewUrlFor("artifacts/html/data.json"), null);
+  });
+
+  it("returns null for null / empty / directory-only paths", () => {
+    assert.equal(htmlPreviewUrlFor(null), null);
+    assert.equal(htmlPreviewUrlFor(""), null);
+    assert.equal(htmlPreviewUrlFor("artifacts/html/"), null);
+  });
+});
+
+describe("useContentDisplay — htmlPreviewUrl", () => {
+  it("returns the /artifacts/html URL when selection is HTML under artifacts/html/", () => {
+    const selectedPath = ref<string | null>("artifacts/html/malaga.html");
+    const fileContent = ref<FileContent | null>(textContent("artifacts/html/malaga.html", "<p>hi</p>"));
+    const { htmlPreviewUrl } = useContentDisplay(selectedPath, fileContent);
+    assert.equal(htmlPreviewUrl.value, "/artifacts/html/malaga.html");
+  });
+
+  it("is null when the HTML file lives outside artifacts/html/", () => {
+    const selectedPath = ref<string | null>("data/wiki/pages/foo.html");
+    const fileContent = ref<FileContent | null>(textContent("data/wiki/pages/foo.html", "<p>hi</p>"));
+    const { htmlPreviewUrl } = useContentDisplay(selectedPath, fileContent);
+    assert.equal(htmlPreviewUrl.value, null);
+  });
+
+  it("is null when the file isn't HTML", () => {
+    const selectedPath = ref<string | null>("artifacts/html/notes.md");
+    const fileContent = ref<FileContent | null>(textContent("artifacts/html/notes.md", "# hi"));
+    const { htmlPreviewUrl } = useContentDisplay(selectedPath, fileContent);
+    assert.equal(htmlPreviewUrl.value, null);
   });
 });
 

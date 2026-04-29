@@ -693,6 +693,8 @@ const enMessages = {
     untitled: "HTML Page",
     hideSource: "Hide Source <>",
     showSource: "Show Source <>",
+    loadingSource: "Loading source…",
+    sourceError: "Failed to load source: {error}",
   },
   pluginNews: {
     title: "News",

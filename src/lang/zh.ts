@@ -664,6 +664,8 @@ const zhMessages = {
     untitled: "HTML 页面",
     hideSource: "隐藏源代码 <>",
     showSource: "显示源代码 <>",
+    loadingSource: "正在加载源代码…",
+    sourceError: "加载源代码失败：{error}",
   },
   pluginNews: {
     title: "新闻",

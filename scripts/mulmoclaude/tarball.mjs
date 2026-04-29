@@ -267,15 +267,24 @@ async function killGracefully(child) {
 
 // End-to-end smoke. Returns `{ ok, ... }` — never throws unless the
 // caller passes a malformed `root`. Cleanup is best-effort: the
-// tarball, the work dir, and the process are all tidied up in a
-// finally block before returning.
+// work dir and the child process are tidied up in a finally block
+// before returning.
 //
-// Cleanup policy: on **success** we remove the tarball and, if we
-// allocated the work dir ourselves, remove it too — keeping the
-// workspace tidy across repeated local runs. On **failure** we
-// leave both in place so investigators can inspect the installed
-// tree and the packed artifact. A caller-provided `workDir` is
-// always left alone (CI typically uploads it as an artifact).
+// Cleanup policy: the **work dir** under `os.tmpdir()` is removed
+// on success when we allocated it ourselves (keeps repeated local
+// runs tidy). On failure we leave it so investigators can inspect
+// the installed tree. A caller-provided `workDir` is always left
+// alone (CI typically uploads it as an artifact).
+//
+// The **tarball** at `packages/mulmoclaude/mulmoclaude-<X.Y.Z>.tgz`
+// is intentionally left in place on both success and failure:
+//   - CI's `upload-artifact` step picks it up as a smoke-verified
+//     downloadable for release-prep validation.
+//   - `packTarball()` (run at the start of every smoke) already
+//     deletes any stale `mulmoclaude-*.tgz` first, so leftover
+//     tarballs don't pile up across runs.
+//   - `*.tgz` is gitignored, so local leftovers never reach a
+//     commit.
 export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, bootTimeoutMs, packTimeoutMs, installTimeoutMs, port } = {}) {
   const weAllocatedWorkDir = !workDir;
   const runDir = workDir ?? (await mkdtemp(path.join(os.tmpdir(), "mc-smoke-")));
@@ -321,13 +330,8 @@ export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, 
     };
   } finally {
     if (child) await killGracefully(child);
-    if (succeeded) {
-      if (tarballPath) {
-        await rm(tarballPath, { force: true }).catch(() => {});
-      }
-      if (weAllocatedWorkDir) {
-        await rm(runDir, { recursive: true, force: true }).catch(() => {});
-      }
+    if (succeeded && weAllocatedWorkDir) {
+      await rm(runDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 }

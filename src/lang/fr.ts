@@ -671,6 +671,8 @@ const frMessages = {
     untitled: "Page HTML",
     hideSource: "Masquer la source <>",
     showSource: "Afficher la source <>",
+    loadingSource: "Chargement de la source…",
+    sourceError: "Échec du chargement de la source : {error}",
   },
   pluginNews: {
     title: "Actualités",

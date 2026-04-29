@@ -8,6 +8,8 @@ export { readBridgeEnvOptions } from "./options.js";
 
 export { chunkText } from "./text.js";
 
+export { formatAckReply } from "./reply.js";
+
 export {
   mimeFromExtension,
   isImageMime,

@@ -22,7 +22,7 @@
 import "dotenv/config";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
-import { createBridgeClient } from "@mulmobridge/client";
+import { createBridgeClient, formatAckReply } from "@mulmobridge/client";
 import { buildExternalChatId, effectiveThreadTs, parseExternalChatId, parseGranularity } from "./sessionId.js";
 import { parseAckReaction } from "./ackReaction.js";
 import { redactUser } from "./redactUser.js";
@@ -108,18 +108,7 @@ socketMode.on("message", async ({ event, ack }) => {
 
   try {
     const ackResult = await client.send(externalChatId, text);
-    if (ackResult.ok) {
-      await sendChunked(channelId, threadTs, ackResult.reply ?? "");
-    } else {
-      const status = ackResult.status ? ` (${ackResult.status})` : "";
-      await web.chat
-        .postMessage({
-          channel: channelId,
-          text: `Error${status}: ${ackResult.error ?? "unknown"}`,
-          ...(threadTs ? { thread_ts: threadTs } : {}),
-        })
-        .catch((err) => console.error(`[slack] error notification failed: ${err}`));
-    }
+    await sendChunked(channelId, threadTs, formatAckReply(ackResult));
   } catch (err) {
     console.error(`[slack] message handling failed: ${err}`);
   }

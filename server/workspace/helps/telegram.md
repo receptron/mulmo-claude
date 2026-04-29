@@ -108,6 +108,7 @@ These are typed directly into the Telegram chat. They mirror the CLI:
 - `/roles` — list available roles.
 - `/role <id>` — switch to a specific role (e.g. `/role office`).
 - `/status` — show the current session info (session ID, current role).
+- `//<skill> [args...]` — shortcut for `/reset` followed by `/<skill> [args...]`: start a fresh session and run the skill (with any args) in one tap (e.g. `//mag2 https://example.com/post`).
 
 Any other text is treated as a message to the assistant.
 

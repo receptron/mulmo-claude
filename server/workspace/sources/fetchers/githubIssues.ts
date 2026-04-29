@@ -93,6 +93,17 @@ export function parseGithubIssue(raw: unknown): ParsedIssue | null {
   };
 }
 
+// Title annotations: `[PR]` for pulls, `[closed]` for closed
+// state so the daily summary makes state visible at a glance.
+// Pure — exported for unit tests.
+export function formatIssueTitle(issue: ParsedIssue): string {
+  const parts: string[] = [];
+  if (issue.isPr) parts.push("[PR]");
+  if (issue.state === "closed") parts.push("[closed]");
+  const baseTitle = issue.title ?? `#${issue.number ?? "?"}`;
+  return parts.length > 0 ? `${parts.join(" ")} ${baseTitle}` : baseTitle;
+}
+
 // Build a SourceItem from a parsed issue + the parent Source.
 // Returns null when the item should be skipped (missing URL,
 // cursor-old, PR when PRs excluded).
@@ -110,21 +121,12 @@ export function issueToSourceItem(issue: ParsedIssue, source: Source, params: Is
 
   const normalizedUrl = normalizeUrl(issue.htmlUrl);
   if (!normalizedUrl) return null;
-  const itemId = stableItemId(normalizedUrl);
-
-  // Title annotations: `[PR]` for pulls, `[closed]` for closed
-  // state so the daily summary makes state visible at a glance.
-  const parts: string[] = [];
-  if (issue.isPr) parts.push("[PR]");
-  if (issue.state === "closed") parts.push("[closed]");
-  const baseTitle = issue.title ?? `#${issue.number ?? "?"}`;
-  const title = parts.length > 0 ? `${parts.join(" ")} ${baseTitle}` : baseTitle;
 
   const summary = issue.body ? firstParagraph(issue.body) : null;
 
   return {
-    id: itemId,
-    title,
+    id: stableItemId(normalizedUrl),
+    title: formatIssueTitle(issue),
     url: normalizedUrl,
     publishedAt: new Date(updatedTs).toISOString(),
     ...(summary !== null && { summary }),

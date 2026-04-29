@@ -668,6 +668,8 @@ const koMessages = {
     untitled: "HTML 페이지",
     hideSource: "소스 숨기기 <>",
     showSource: "소스 표시 <>",
+    loadingSource: "소스를 불러오는 중…",
+    sourceError: "소스 로드 실패: {error}",
   },
   pluginNews: {
     title: "뉴스",

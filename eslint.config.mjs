@@ -234,11 +234,11 @@ export default [
       "import/no-mutable-exports": "error",
       "import/no-self-import": "error",
       "import/no-useless-path-segments": "error",
-      "consistent-return": "warn",
+      "consistent-return": "error",
       "class-methods-use-this": "error",
-      "prefer-destructuring": "warn",
+      "prefer-destructuring": "error",
       complexity: ["warn", { max: 15 }],
-      "max-depth": ["warn", { max: 4 }],
+      "max-depth": ["error", { max: 4 }],
       "max-params": ["error", { max: 6 }],
       quotes: "off",
       "no-shadow": "error",
@@ -360,10 +360,11 @@ export default [
       // (`src/plugins/<name>/View.vue`). The Vue-recommended rule
       // against single-word names fights that on purpose.
       "vue/multi-word-component-names": "off",
-      // `wiki/View.vue` uses `v-html` intentionally to render
-      // sanitised markdown. Warn so the justified usage doesn't
-      // block CI — audit per-use at review time.
-      "vue/no-v-html": "warn",
+      // Legitimate v-html usages (sanitised markdown / app-owned
+      // HTML) carry per-line eslint-disable comments with a
+      // rationale. Promote to error so any new unjustified usage
+      // fails CI.
+      "vue/no-v-html": "error",
       "vue/no-useless-mustaches": "error",
       "vue/no-useless-v-bind": "error",
       "vue/prefer-true-attribute-shorthand": "error",

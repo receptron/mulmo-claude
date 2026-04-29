@@ -668,6 +668,8 @@ const jaMessages = {
     untitled: "HTML ページ",
     hideSource: "ソースを隠す <>",
     showSource: "ソースを表示 <>",
+    loadingSource: "ソースを読み込み中…",
+    sourceError: "ソースの読み込みに失敗しました: {error}",
   },
   pluginNews: {
     title: "ニュース",

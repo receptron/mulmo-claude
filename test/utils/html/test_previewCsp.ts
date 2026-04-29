@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { HTML_PREVIEW_CSP_ALLOWED_CDNS, buildHtmlPreviewCsp, wrapHtmlWithPreviewCsp } from "../../../src/utils/html/previewCsp";
+import { HTML_PREVIEW_CSP_ALLOWED_CDNS, buildHtmlPreviewCsp, buildPrintCspContent, wrapHtmlWithPreviewCsp } from "../../../src/utils/html/previewCsp";
 
 describe("buildHtmlPreviewCsp", () => {
   it("defaults to the exported CDN whitelist", () => {
@@ -44,6 +44,31 @@ describe("buildHtmlPreviewCsp", () => {
   it("accepts a custom CDN list", () => {
     const csp = buildHtmlPreviewCsp(["https://example.com"]);
     assert.ok(csp.includes("script-src 'unsafe-inline' https://example.com"));
+    assert.ok(!csp.includes("jsdelivr"));
+  });
+});
+
+describe("buildPrintCspContent", () => {
+  it("substitutes origin for 'self' in img-src", () => {
+    const csp = buildPrintCspContent("http://localhost:3001");
+    assert.ok(csp.includes("img-src http://localhost:3001 https://cdn.jsdelivr.net"));
+    // Make sure 'self' did NOT leak into the print policy.
+    assert.ok(!csp.includes("img-src 'self'"));
+  });
+
+  it("keeps every other directive identical to the preview policy", () => {
+    const print = buildPrintCspContent("http://localhost:3001");
+    const preview = buildHtmlPreviewCsp();
+    for (const directive of ["default-src 'none'", "script-src 'unsafe-inline'", "font-src", "connect-src 'none'"]) {
+      assert.ok(print.includes(directive), `print CSP should include ${directive}`);
+      assert.ok(preview.includes(directive), `preview CSP should include ${directive}`);
+    }
+  });
+
+  it("accepts a custom CDN list", () => {
+    const csp = buildPrintCspContent("http://localhost:5173", ["https://example.com"]);
+    assert.ok(csp.includes("script-src 'unsafe-inline' https://example.com"));
+    assert.ok(csp.includes("img-src http://localhost:5173 https://example.com"));
     assert.ok(!csp.includes("jsdelivr"));
   });
 });

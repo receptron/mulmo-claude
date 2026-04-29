@@ -18,7 +18,7 @@ interface PresentHtmlBody {
 interface PresentHtmlSuccessResponse {
   message: string;
   instructions: string;
-  data: { html: string; title?: string; filePath: string };
+  data: { title?: string; filePath: string };
 }
 
 interface PresentHtmlErrorResponse {
@@ -46,7 +46,7 @@ router.post(API_ROUTES.html.present, async (req: Request<object, unknown, Presen
     res.json({
       message: `Saved HTML to ${filePath}`,
       instructions: "Acknowledge that the HTML page has been presented to the user.",
-      data: { html, title, filePath },
+      data: { title, filePath },
     });
   } catch (err) {
     log.error("html", "present: threw", { error: errorMessage(err) });

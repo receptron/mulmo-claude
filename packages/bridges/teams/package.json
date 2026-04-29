@@ -16,7 +16,7 @@
     "build": "tsc",
     "prepack": "yarn build",
     "typecheck": "tsc --noEmit",
-    "test": "echo no tests yet"
+    "test": "tsx --test test/test_*.ts"
   },
   "license": "MIT",
   "author": "Receptron Team",
@@ -30,6 +30,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
 }

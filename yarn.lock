@@ -5912,10 +5912,10 @@ matrix-js-sdk@*:
     unhomoglyph "^1.0.6"
     uuid "13"
 
-matrix-js-sdk@^41.4.0-rc.0:
-  version "41.4.0-rc.0"
-  resolved "https://registry.yarnpkg.com/matrix-js-sdk/-/matrix-js-sdk-41.4.0-rc.0.tgz#614e2ded8d7fa4291ae9022229b1a1fc3a3fc174"
-  integrity sha512-LhxRnqDhrI7qmZZ2N8EFnyxLBZqc4npqOXNPpxzVwlb/McL98sNjOXCcbR4KL0L/76j5nK43V536/+evP+rSwA==
+matrix-js-sdk@^41.4.0:
+  version "41.4.0"
+  resolved "https://registry.yarnpkg.com/matrix-js-sdk/-/matrix-js-sdk-41.4.0.tgz#d9f4ca7dd233de9a12a5c82d9d763b7032349618"
+  integrity sha512-xlYXXb91T89rELlnZCRfrDd4Gpkv+F0owvsaSZ8709jR1upf/zVMpOK8d3jpvW9KFkrCkoSwTRE+zqmLqzYfhA==
   dependencies:
     "@babel/runtime" "^7.12.5"
     "@matrix-org/matrix-sdk-crypto-wasm" "^18.1.0"

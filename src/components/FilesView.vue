@@ -36,6 +36,7 @@
         :is-jsonl="isJsonl"
         :md-raw-mode="mdRawMode"
         :sandboxed-html="sandboxedHtml"
+        :html-preview-url="htmlPreviewUrl"
         :json-tokens="jsonTokens"
         :jsonl-lines="jsonlLines"
         :md-frontmatter="mdFrontmatter"
@@ -87,7 +88,7 @@ const { mdRawMode, toggleMdRaw } = useMarkdownMode();
 
 const { sortMode, setSortMode } = useFileSortMode();
 
-const { isMarkdown, isHtml, isJson, isJsonl, sandboxedHtml, jsonTokens, jsonlLines, mdFrontmatter } = useContentDisplay(selectedPath, content);
+const { isMarkdown, isHtml, isJson, isJsonl, sandboxedHtml, htmlPreviewUrl, jsonTokens, jsonlLines, mdFrontmatter } = useContentDisplay(selectedPath, content);
 
 // Save-error banner shown above the Rendered-mode markdown editor.
 // Cleared on every new file load and on the next successful save.
