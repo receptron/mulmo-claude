@@ -31,7 +31,7 @@ const MIN_PDF_BYTES = 500;
 test.describe.configure({ mode: "parallel" });
 
 test.describe("media (real LLM)", () => {
-  test("L-01: presentHtml の <img src='/artifacts/images/...'> が静的マウント経由で描画される", async ({ page }) => {
+  test("L-01: presentHtml の <img src='../../../images/...'> が /artifacts/html 経由で描画される", async ({ page }) => {
     test.setTimeout(L01_TIMEOUT_MS);
 
     // Spec-unique workspace path so concurrent runs do not stomp
@@ -43,19 +43,22 @@ test.describe("media (real LLM)", () => {
       await startNewSession(page);
 
       // Ask the LLM to call presentHtml with an <img> whose src
-      // points at the workspace path we just populated. Stage 1
-      // of plans/feat-image-path-routing.md mounts artifacts/images
-      // as Express static, so this URL is served verbatim — there
-      // is no /api/files/raw rewrite anymore. The end-to-end
-      // success criterion is `naturalWidth > 0`: if anything in
-      // the chain (rewriter, mount, path-traversal guard, etc.)
-      // breaks, the image stays 0×0, which is exactly the failure
-      // mode B-18 produced before #969 / #972.
+      // points at the workspace path we just populated. PR #982
+      // (plans/feat-presenthtml-filepath-only.md) switched
+      // presentHtml to render via `<iframe :src="/artifacts/html/...">`
+      // and trains the LLM to use **relative paths** — the HTML
+      // file is saved at `artifacts/html/<YYYY>/<MM>/page.html`
+      // so reaching `artifacts/images/<file>` is `../../../images/<file>`.
+      // The end-to-end success criterion is `naturalWidth > 0`:
+      // if anything in the chain (saved HTML, the
+      // /artifacts/html mount, the /artifacts/images mount, or
+      // the path-traversal guard) breaks, the image stays 0×0 —
+      // exactly the failure mode B-18 produced before #969 / #972.
       const message = [
         "以下の HTML を presentHtml ツールでそのまま表示してください。",
         "",
         "<h1>e2e-live L-01 test</h1>",
-        '<img src="/artifacts/images/e2e-live-l01.png" alt="sample" />',
+        '<img src="../../../images/e2e-live-l01.png" alt="sample" />',
       ].join("\n");
       await sendChatMessage(page, message);
 
@@ -68,9 +71,12 @@ test.describe("media (real LLM)", () => {
 
       const src = await readImgSrcInPresentHtml(page, 'img[alt="sample"]');
       expect(src, "presentHtml iframe should contain <img alt='sample'>").not.toBeNull();
-      expect(src!).toContain("/artifacts/images/");
+      // Per PR #982 the LLM keeps the relative `../../../images/...`
+      // path verbatim — the browser resolves it against the iframe's
+      // src (the /artifacts/html/... mount). Asserting the unresolved
+      // attribute keeps us decoupled from that resolution.
       expect(src!).toContain("e2e-live-l01.png");
-      expect(src!, "static-mount routing means no /api/files/raw rewrite").not.toContain("/api/files/raw");
+      expect(src!, "the LLM must follow the relative-path convention from PR #982").not.toMatch(/^\/artifacts\//);
 
       // The URL must resolve to the actual fixture file. A broken
       // image leaves naturalWidth at 0, which is the failure mode

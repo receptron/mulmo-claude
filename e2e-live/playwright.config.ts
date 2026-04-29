@@ -21,9 +21,16 @@ import { ONE_MINUTE_MS } from "../server/utils/time.ts";
 
 const HEADED = process.env.HEADED === "1";
 
+// Per-category output isolation. The parent /e2e-live skill writes
+// into the bare directories; each /e2e-live-<category> skill sets
+// E2E_LIVE_REPORT_SUBDIR=<category> so its run lives in its own
+// subdirectory and does not stomp the parent's report.
+const REPORT_SUBDIR = process.env.E2E_LIVE_REPORT_SUBDIR ?? "";
+const REPORT_SUFFIX = REPORT_SUBDIR ? `/${REPORT_SUBDIR}` : "";
+
 export default defineConfig({
   testDir: "./tests",
-  outputDir: "../test-results-live",
+  outputDir: `../test-results-live${REPORT_SUFFIX}`,
   timeout: 10 * ONE_MINUTE_MS,
   // The mulmoclaude server processes chat sessions concurrently
   // (each Playwright worker gets its own session id), so running
@@ -33,7 +40,7 @@ export default defineConfig({
   // long-running tool call.
   workers: 3,
   retries: 0,
-  reporter: [["list"], ["html", { outputFolder: "../playwright-report-live", open: "on-failure" }]],
+  reporter: [["list"], ["html", { outputFolder: `../playwright-report-live${REPORT_SUFFIX}`, open: "on-failure" }]],
   use: {
     baseURL: process.env.E2E_LIVE_BASE_URL ?? "http://localhost:5173",
     headless: !HEADED,

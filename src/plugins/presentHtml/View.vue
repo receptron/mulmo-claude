@@ -22,13 +22,7 @@
       </div>
       <textarea :value="textareaValue" readonly class="w-full text-xs text-gray-600 bg-gray-50 p-3 font-mono resize-none outline-none" rows="16" />
     </div>
-    <iframe
-      v-if="previewUrl"
-      data-testid="present-html-iframe"
-      :src="previewUrl"
-      sandbox="allow-scripts"
-      class="flex-1 w-full border-0"
-    />
+    <iframe v-if="previewUrl" data-testid="present-html-iframe" :src="previewUrl" sandbox="allow-scripts" class="flex-1 w-full border-0" />
     <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-500">
       {{ t("pluginPresentHtml.untitled") }}
     </div>

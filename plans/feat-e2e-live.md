@@ -111,13 +111,13 @@ playwright.live.config.ts   ← 別 config（headed, 長 timeout, workers=1）
 - カバー: B-17, B-18
 - 重要度: **S** / Docker: `both` / 画像: fixture
 - 実装: `e2e-live/tests/media.spec.ts`
-- 操作: 新規セッション → fixture 画像を `artifacts/images/e2e-live-l01.png` に配置 → 「`/artifacts/images/e2e-live-l01.png` を `<img>` で埋め込んだ HTML を presentHtml で」と LLM に依頼
+- 操作: 新規セッション → fixture 画像を `artifacts/images/e2e-live-l01.png` に配置 → 「`<img src="../../../images/e2e-live-l01.png">` を含む HTML を presentHtml で」と LLM に依頼（PR #982 で導入された **相対パス convention** に従う）
 - 検証:
   - presentHtml の iframe 内に `<img>` が visible
-  - `src` が `/artifacts/images/` を含む（PR #969 / #972 以降の static-mount 仕様）
-  - `src` が `/api/files/raw` を含まない（旧リライトの再発を防ぐ regression guard）
-  - `naturalWidth > 0`（mount + path-traversal guard を抜けて実際に描画される）
-- 失敗例: B-18（path-traversal 防御の副作用で 404 → naturalWidth 0）
+  - `src` 属性が `e2e-live-l01.png` を含む（リテラル一致）
+  - `src` が `/artifacts/...` で始まら**ない**（LLM が新ルール違反していないかの guard）
+  - `naturalWidth > 0`（HTML mount + 画像 mount + path-traversal guard を抜けて実際に描画される）
+- 失敗例: B-18（path-traversal 防御の副作用で 404 → naturalWidth 0）、 LLM が古い絶対パス convention に戻る
 
 #### L-02: Markdown 応答を PDF DL ✅ 実装済
 
@@ -380,12 +380,28 @@ playwright.live.config.ts   ← 別 config（headed, 長 timeout, workers=1）
 - **実生成 1 枚**（L-05）: generateImage 経路自体を検証するため、実際に画像生成
 - workspace の path は spec 名を含める（例: `artifacts/images/e2e-live-l01.png`）。複数 worker が並列実行されてもファイル名衝突しない
 
-### 画像 URL の現仕様（PR #969 / #972 以降）
+### 画像 URL / presentHtml の現仕様（PR #969 / #972 / #982 以降）
 
-- `artifacts/images/...` で始まる path は Express **静的マウント**で配信される（URL がそのまま）
-- 旧 `/api/files/raw?path=...` リライトは廃止
-- presentHtml の rewriter (`src/utils/image/rewriteHtmlImageRefs.ts` → `resolveImageSrc`) は `artifacts/images/` prefix の URL をそのまま返す
-- L-01 の assert は `src` が `/artifacts/images/` を含むこと + `naturalWidth > 0` を確認
+最新仕様（PR #982 = `feat-presenthtml-filepath-only`）:
+
+- `presentHtml` は `data.html` を返さず `data.filePath` のみ。 サーバが `~/mulmoclaude/artifacts/html/<YYYY>/<MM>/<slug>-<ts>.html` として保存
+- View.vue の iframe は `<iframe :src="/artifacts/html/<rest>">` （静的マウント経由配信）。 `srcdoc` 経路は廃止
+- `sandbox` は `allow-scripts` のみ（`allow-same-origin` / `allow-modals` 削除）
+- `rewriteHtmlImageRefs` は **削除済**
+
+LLM への新ルール（`presentHtml/definition.ts` の tool description に明記）:
+
+- ワークスペース内のリソースは **相対パス** で参照する
+- HTML が `artifacts/html/<YYYY>/<MM>/` に保存されるので、 `artifacts/<kind>/...` への相対は `../../../<kind>/...` （3 段上がる）
+- `<img src="/artifacts/...">` のような絶対パスは BAD（`file://` で開くと壊れる）
+
+L-01 の検証ポイント:
+
+- `src` 属性が `e2e-live-l01.png` を含むこと（リテラル一致）
+- `src` が `/artifacts/...` で始まら**ない**こと（LLM が新ルール違反していないかの guard）
+- `naturalWidth > 0`（end-to-end の本質的な signal — 画像が実際に decode されたか）
+
+`/artifacts/images/...` は依然 Express 静的マウントで配信されているので、 ブラウザは `<base href>` (= iframe の `src` の親ディレクトリ `/artifacts/html/<YYYY>/<MM>/`) に対して `../../../images/<file>` を解決して `/artifacts/images/<file>` を fetch する。
 
 ### LLM 応答のばらつき吸収
 
@@ -399,6 +415,36 @@ playwright.live.config.ts   ← 別 config（headed, 長 timeout, workers=1）
 - bearer token は SPA と同じ経路で取得: `<meta name="mulmoclaude-auth" content="...">` を `page.evaluate` 内で読む
 - 起動前の認証状態検証は省略（dev サーバ起動時点で必ず token があるので、`yarn dev` 動いてれば OK）
 - timeout: 単一 LLM 応答 60s、生成系（PDF/動画）5 分
+
+### レポート出力先（カテゴリ別 subdir）
+
+`E2E_LIVE_REPORT_SUBDIR` 環境変数で出力先サブディレクトリを切替できる:
+
+- 親 `/e2e-live`（env なし）→ `playwright-report-live/index.html` + `test-results-live/`（全 spec の結果が 1 つの HTML レポートに並ぶ）
+- 子 `/e2e-live-media`（`E2E_LIVE_REPORT_SUBDIR=media`）→ `playwright-report-live/media/index.html` + `test-results-live/media/`
+- 同様に各カテゴリ skill が固有の subdir を使う
+
+これにより:
+
+- 親 skill 1 回実行で全カテゴリの結果が **1 つのレポート** に並ぶ（ユーザー要件の「全部の結果が残る」を満たす）
+- 子 skill を後から個別実行しても、 親レポートを **上書きしない**
+- 子 skill 同士も互いに独立（`media/` と `roles/` は別ディレクトリ）
+
+`package.json` の各カテゴリ script に `cross-env E2E_LIVE_REPORT_SUBDIR=<category>` を入れて切替する。
+
+### Docker on / off matrix（人間依頼方式）
+
+mulmoclaude の Docker サンドボックスは `DISABLE_SANDBOX=1 yarn dev` で off 切替で、 dev サーバ再起動が必要。 Claude が自動制御することはできない。
+
+親 `/e2e-live` skill の手順書（`.claude/skills/e2e-live/SKILL.md`）には:
+
+1. 現在モードで `yarn test:e2e:live`
+2. 結果サマリ
+3. **次は反対モード** で回したいので dev を再起動してください、 と明示的にユーザーへ案内（off / on どちらに切り替えるかも具体コマンド付きで提示）
+4. ユーザーから "再起動した" の合図を待つ（勝手にテスト開始しない）
+5. 反対モードで再度 `yarn test:e2e:live` → 両モードの結果を統合サマリ
+
+artifact mode（次 PR）でも launcher 再起動が必要なため、 同じ「人間依頼」方式を踏襲する。
 
 ### 画像戦略
 
