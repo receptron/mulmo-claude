@@ -3,11 +3,46 @@
 // install any API mocks — the real Claude API runs end-to-end. Use
 // these helpers from specs in `e2e-live/tests/`.
 
-import { readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { type Download, type FrameLocator, type Page, expect } from "@playwright/test";
 
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
+
+const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Resolve the user's mulmoclaude workspace. Honours the env override
+ * the server itself respects so the tests still work when a custom
+ * workspace is in use.
+ */
+function workspaceRoot(): string {
+  return process.env.MULMOCLAUDE_WORKSPACE ?? path.join(homedir(), "mulmoclaude");
+}
+
+/**
+ * Copy a fixture file (relative to `e2e-live/fixtures/`) into the
+ * workspace at the given relative path. Creates intermediate dirs.
+ * Returns the absolute destination path so the spec can pass it on
+ * to {@link removeFromWorkspace} for cleanup. The destination
+ * filename should be unique per spec to avoid stomping on real
+ * user data.
+ */
+export async function placeFixtureInWorkspace(fixtureRel: string, workspaceRel: string): Promise<string> {
+  const src = path.join(FIXTURES_DIR, fixtureRel);
+  const dst = path.join(workspaceRoot(), workspaceRel);
+  await mkdir(path.dirname(dst), { recursive: true });
+  await copyFile(src, dst);
+  return dst;
+}
+
+/** Best-effort delete; never throws if the file is already gone. */
+export async function removeFromWorkspace(workspaceRel: string): Promise<void> {
+  await rm(path.join(workspaceRoot(), workspaceRel), { force: true });
+}
 
 const PRESENT_HTML_IFRAME_SELECTOR = '[data-testid="present-html-iframe"]';
 
@@ -72,6 +107,22 @@ export async function readImgSrcInPresentHtml(page: Page, imgSelector: string): 
   const img = frame.locator(imgSelector).first();
   if ((await img.count()) === 0) return null;
   return await img.getAttribute("src");
+}
+
+/**
+ * Read `naturalWidth` and `naturalHeight` for an `<img>` inside the
+ * presentHtml iframe. Both are 0 when the image is broken (404,
+ * blocked by sandbox, etc.), so the caller can assert that the
+ * rewritten URL actually resolves to a real, decodable image.
+ */
+export async function readImgNaturalSize(page: Page, imgSelector: string): Promise<{ width: number; height: number } | null> {
+  const frame = page.frameLocator(PRESENT_HTML_IFRAME_SELECTOR).first();
+  const img = frame.locator(imgSelector).first();
+  if ((await img.count()) === 0) return null;
+  return await img.evaluate((node) => {
+    if (!(node instanceof HTMLImageElement)) return { width: 0, height: 0 };
+    return { width: node.naturalWidth, height: node.naturalHeight };
+  });
 }
 
 const PDF_MAGIC = Buffer.from("%PDF-", "ascii");
