@@ -276,6 +276,7 @@ import { useViewLayout } from "./composables/useViewLayout";
 import { useSessionSync } from "./composables/useSessionSync";
 import { useSessionDerived } from "./composables/useSessionDerived";
 import { useFaviconState } from "./composables/useFaviconState";
+import { useGlobalImageErrorRepair } from "./composables/useImageErrorRepair";
 import { useMergedSessions } from "./composables/useMergedSessions";
 import { useLayoutMode } from "./composables/useLayoutMode";
 import { useSidePanelVisible } from "./composables/useSidePanelVisible";
@@ -454,6 +455,7 @@ const { mergedSessions, tabSessions } = useMergedSessions({
 // very same tick as `isRunning` flips, without waiting for the next
 // /api/sessions refetch.
 useFaviconState({ isRunning, sessions: mergedSessions, sessionsUnreadCount: unreadCount, cpuLoadRatio });
+useGlobalImageErrorRepair();
 
 const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
