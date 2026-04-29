@@ -55,7 +55,8 @@ export function createRelay(deps: RelayDeps): RelayFn {
   const { store, handleCommand, startChat, onSessionEvent, getRole, defaultRoleId, logger } = deps;
 
   return async function relayMessage(params: RelayParams): Promise<RelayResult> {
-    const { transportId, externalChatId, text, attachments, bridgeOptions } = params;
+    const { transportId, externalChatId, attachments, bridgeOptions } = params;
+    let { text } = params;
 
     // Log attachment summary (count + mimeTypes) — NEVER log raw
     // base64 data (performance, log size, information leak risk).
@@ -85,7 +86,14 @@ export function createRelay(deps: RelayDeps): RelayFn {
 
     const commandResult = await handleCommand(text, transportId, chatState);
     if (commandResult) {
-      return { kind: "ok", reply: commandResult.reply };
+      // `forwardAs` means "reset/mutate state AND continue into the
+      // agent with rewritten text" (see //{skill} shortcut). Without
+      // it, short-circuit with the canned reply.
+      if (!commandResult.forwardAs) {
+        return { kind: "ok", reply: commandResult.reply };
+      }
+      if (commandResult.nextState) chatState = commandResult.nextState;
+      text = commandResult.forwardAs;
     }
 
     const result = await startChat({

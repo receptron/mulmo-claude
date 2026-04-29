@@ -13,6 +13,11 @@ import type { ChatStateStore, TransportChatState } from "./chat-state.js";
 export interface CommandResult {
   reply: string;
   nextState?: TransportChatState;
+  /** When set, the relay must NOT short-circuit with `reply`. It
+   *  adopts `nextState` as the active chat state and forwards
+   *  `forwardAs` to the agent as the user message. Used by the
+   *  `//{skill}` shortcut: reset + run skill in one bridge turn. */
+  forwardAs?: string;
 }
 
 export type CommandHandler = (text: string, transportId: string, chatState: TransportChatState) => Promise<CommandResult | null>;
@@ -109,6 +114,7 @@ export function createCommandHandler(opts: {
     ];
     if (skills.length > 0) {
       lines.push("", "Skills:", ...skills.map((s) => `  /${s.name} — ${s.description}`));
+      lines.push("", "Tip: //<skill> [args...] starts a fresh session and runs the skill in one shot.");
     }
     lines.push("", "Send any other text to chat with the assistant.");
     return lines.join("\n");
@@ -270,6 +276,27 @@ export function createCommandHandler(opts: {
 
   const handleCommand: CommandHandler = async (text, transportId, chatState) => {
     if (!text.startsWith("/")) return null;
+
+    // `//{skill} [args...]` shortcut — start a new session AND run
+    // the skill in one bridge turn. Args after the skill name are
+    // forwarded verbatim, so `//mag2 https://x.com/post` resets and
+    // runs `/mag2 https://x.com/post`.
+    if (text.startsWith("//")) {
+      const skills = await fetchSkills();
+      const [head, ...rest] = text.split(/\s+/);
+      const skillName = head.slice(2);
+      if (skillName && skills.some((s) => s.name === skillName)) {
+        const nextState = await resetChatState(transportId, chatState.externalChatId, chatState.roleId);
+        const forwardAs = rest.length > 0 ? `/${skillName} ${rest.join(" ")}` : `/${skillName}`;
+        return {
+          reply: `Session reset. Running ${forwardAs}`,
+          nextState,
+          forwardAs,
+        };
+      }
+      return { reply: `Unknown command: ${text}\n\n${buildHelpText(skills)}` };
+    }
+
     const [command, ...args] = text.split(/\s+/);
 
     switch (command) {

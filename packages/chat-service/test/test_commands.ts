@@ -253,6 +253,102 @@ describe("unknown slash command", () => {
   });
 });
 
+describe("//{skill} shortcut", () => {
+  it("returns forwardAs and resets state when the skill is registered", async () => {
+    const resetCalls: Array<{ transportId: string; chatId: string; roleId: string }> = [];
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: (id) => roles.find((r) => r.id === id) ?? roles[0],
+      resetChatState: async (transportId, chatId, roleId) => {
+        resetCalls.push({ transportId, chatId, roleId });
+        return makeState({ roleId, sessionId: "sess-new" });
+      },
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "shiritori", description: "Play shiritori" }],
+    });
+    const result = await handler("//shiritori", "telegram", makeState({ roleId: "office" }));
+    assert.ok(result);
+    assert.equal(result.forwardAs, "/shiritori");
+    assert.ok(result.nextState);
+    assert.equal(result.nextState?.sessionId, "sess-new");
+    assert.equal(resetCalls.length, 1);
+    assert.equal(resetCalls[0].roleId, "office");
+  });
+
+  it("rejects // with a skill that is not registered", async () => {
+    let resetCalled = false;
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => {
+        resetCalled = true;
+        return makeState({ roleId });
+      },
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "shiritori", description: "Play shiritori" }],
+    });
+    const result = await handler("//notaskill", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, undefined);
+    assert.ok(result.reply.includes("Unknown command: //notaskill"));
+    assert.equal(resetCalled, false);
+  });
+
+  it("rejects bare // (empty skill name never matches)", async () => {
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId }),
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "", description: "wat" }],
+    });
+    const result = await handler("//", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, undefined);
+    assert.ok(result.reply.includes("Unknown command: //"));
+  });
+
+  it("forwards args after the skill name verbatim", async () => {
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId, sessionId: "sess-new" }),
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "mag2", description: "Write a newsletter from a URL" }],
+    });
+    const result = await handler("//mag2 https://example.com/post", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, "/mag2 https://example.com/post");
+    assert.equal(result.nextState?.sessionId, "sess-new");
+  });
+
+  it("forwards multi-token args after the skill name", async () => {
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId }),
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "mag2", description: "Write a newsletter" }],
+    });
+    const result = await handler("//mag2 https://x.com/u/1 in Japanese", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, "/mag2 https://x.com/u/1 in Japanese");
+  });
+
+  it("rejects // when no skill list is wired", async () => {
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId }),
+      connectSession: async () => makeState(),
+    });
+    const result = await handler("//shiritori", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, undefined);
+    assert.ok(result.reply.includes("Unknown command: //shiritori"));
+  });
+});
+
 describe("/help command", () => {
   it("omits the Skills section when no skill list is wired", async () => {
     const handler = createCommandHandler({
@@ -296,5 +392,19 @@ describe("/help command", () => {
     assert.ok(result.reply.includes("Skills:"));
     assert.ok(result.reply.includes("/shiritori — Play shiritori"));
     assert.ok(result.reply.includes("/haiku — Compose a haiku"));
+    assert.ok(result.reply.includes("//<skill>"));
+  });
+
+  it("omits the //<skill> tip when no skills are registered", async () => {
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId }),
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [],
+    });
+    const result = await handler("/help", "telegram", makeState());
+    assert.ok(result);
+    assert.ok(!result.reply.includes("//<skill>"));
   });
 });
