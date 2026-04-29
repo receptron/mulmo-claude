@@ -180,7 +180,7 @@ router.get(API_ROUTES.scheduler.logs, async (req: Request<object, unknown, objec
   const MAX_LIMIT = 500;
   const rawLimitStr = getOptionalStringQuery(req, "limit");
   const rawLimit = rawLimitStr ? parseInt(rawLimitStr, 10) : undefined;
-  const limit = Number.isFinite(rawLimit) && rawLimit! > 0 ? Math.min(rawLimit!, MAX_LIMIT) : undefined;
+  const limit = rawLimit !== undefined && Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIMIT) : undefined;
   const taskId = getOptionalStringQuery(req, "taskId");
   log.info("scheduler-tasks", "logs: start", { taskId, limit });
   try {

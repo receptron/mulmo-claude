@@ -50,8 +50,12 @@ function maybeDisconnect(): void {
 
 export function usePubSub() {
   function subscribe(channel: string, callback: Callback): Unsubscribe {
-    if (!listeners.has(channel)) listeners.set(channel, new Set());
-    listeners.get(channel)!.add(callback);
+    let entry = listeners.get(channel);
+    if (!entry) {
+      entry = new Set();
+      listeners.set(channel, entry);
+    }
+    entry.add(callback);
 
     const sock = connect();
     if (sock.connected) sock.emit("subscribe", channel);

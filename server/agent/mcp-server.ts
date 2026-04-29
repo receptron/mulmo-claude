@@ -373,12 +373,13 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
 
   const tool = tools.find((toolDef) => toolDef.name === name);
   if (!tool) throw new Error(`Unknown tool: ${name}`);
+  if (!tool.endpoint) throw new Error(`Tool has no endpoint: ${name}`);
 
   // Plugin handlers can fan out to generative AI (image batches via
   // presentDocument, future video). The bridge MUST wait long enough
   // for the slowest realistic completion — see PLUGIN_BRIDGE_TIMEOUT_MS
   // and the timeout-policy comment on `postJson`.
-  const res = await postJson(tool.endpoint!, args, { timeoutMs: PLUGIN_BRIDGE_TIMEOUT_MS });
+  const res = await postJson(tool.endpoint, args, { timeoutMs: PLUGIN_BRIDGE_TIMEOUT_MS });
   const result = await res.json();
 
   // Push visual ToolResult to the frontend via the session

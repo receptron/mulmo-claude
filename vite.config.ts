@@ -66,6 +66,12 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true
       },
+      // Static-mount on the backend (server/index.ts: app.use('/artifacts/images', ...)).
+      // Without this proxy, dev's Vite catch-all returns the SPA index.html instead.
+      '/artifacts/images': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      },
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true
