@@ -42,9 +42,18 @@ describe("buildHtmlPreviewCsp", () => {
   });
 
   it("accepts a custom CDN list", () => {
-    const csp = buildHtmlPreviewCsp(["https://example.com"]);
+    const csp = buildHtmlPreviewCsp(undefined, ["https://example.com"]);
     assert.ok(csp.includes("script-src 'unsafe-inline' https://example.com"));
     assert.ok(!csp.includes("jsdelivr"));
+  });
+
+  it("substitutes the explicit origin for 'self' in img-src when provided", () => {
+    // Required for Safari: the preview iframe is sandbox="allow-scripts"
+    // only, so its document has an opaque origin and 'self' fails to
+    // match same-origin /artifacts/images/... requests.
+    const csp = buildHtmlPreviewCsp("http://localhost:5173");
+    assert.ok(csp.includes("img-src http://localhost:5173 https://cdn.jsdelivr.net"));
+    assert.ok(!csp.includes("img-src 'self'"));
   });
 });
 

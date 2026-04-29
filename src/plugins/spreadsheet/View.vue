@@ -123,6 +123,7 @@ import {
   type CellValue,
 } from "./engine";
 import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
+import { getArrowKeyOffset, isWithinSheetBounds } from "./keyboardNav";
 import { errorMessage as formatErrorMessage } from "../../utils/errors";
 
 // Import all spreadsheet functions to populate the function registry
@@ -628,56 +629,24 @@ watch(
   { flush: "post" },
 );
 
-// Keyboard navigation handler
-function handleKeyboardNavigation(event: KeyboardEvent) {
-  // Only handle arrow keys when mini editor is open and not focused on input
-  if (!miniEditorOpen.value || !miniEditorCell.value) return;
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+}
 
-  // Don't interfere if user is typing in an input field
-  const target = event.target as HTMLElement;
-  if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-    return;
-  }
+function handleKeyboardNavigation(event: KeyboardEvent) {
+  if (!miniEditorOpen.value || !miniEditorCell.value) return;
+  if (isEditableTarget(event.target)) return;
 
   const { row, col } = miniEditorCell.value;
-  let newRow = row;
-  let newCol = col;
+  const next = getArrowKeyOffset(event.key, row, col);
+  if (!next) return;
 
-  // Determine new position based on arrow key
-  switch (event.key) {
-    case "ArrowUp":
-      newRow = Math.max(0, row - 1);
-      break;
-    case "ArrowDown":
-      newRow = row + 1;
-      break;
-    case "ArrowLeft":
-      newCol = Math.max(0, col - 1);
-      break;
-    case "ArrowRight":
-      newCol = col + 1;
-      break;
-    default:
-      return; // Not an arrow key, ignore
-  }
-
-  // Get current sheet data to validate bounds
   try {
     const sheets = JSON.parse(editableData.value);
-    const currentSheet = sheets[activeSheetIndex.value];
-
-    if (!currentSheet || !currentSheet.data) return;
-
-    // Validate new position is within bounds
-    if (newRow < 0 || newRow >= currentSheet.data.length || newCol < 0 || !currentSheet.data[newRow] || newCol >= currentSheet.data[newRow].length) {
-      return; // Out of bounds, ignore
-    }
-
-    // Prevent default scrolling behavior
+    if (!isWithinSheetBounds(sheets[activeSheetIndex.value], next.row, next.col)) return;
     event.preventDefault();
-
-    // Move to new cell
-    openMiniEditor(newRow, newCol);
+    openMiniEditor(next.row, next.col);
   } catch (error) {
     console.error("Failed to navigate cells:", error);
   }

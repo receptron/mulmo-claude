@@ -357,7 +357,7 @@ function updatePendingGenerations(session: ServerSession, type: string, event: R
   if (type === EVENT_TYPES.generationStarted) {
     session.pendingGenerations[mapKey] = payload;
   } else {
-    delete session.pendingGenerations[mapKey];
+    Reflect.deleteProperty(session.pendingGenerations, mapKey);
   }
 
   const isEmpty = Object.keys(session.pendingGenerations).length === 0;

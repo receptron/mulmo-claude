@@ -16,12 +16,16 @@ import { createBridgeClient, chunkText } from "@mulmobridge/client";
 
 const TRANSPORT_ID = "mattermost";
 
-const mmUrl = process.env.MATTERMOST_URL;
-const botToken = process.env.MATTERMOST_BOT_TOKEN;
-if (!mmUrl || !botToken) {
-  console.error("MATTERMOST_URL and MATTERMOST_BOT_TOKEN are required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { mmUrl: string; botToken: string } {
+  const mmUrl = process.env.MATTERMOST_URL;
+  const botToken = process.env.MATTERMOST_BOT_TOKEN;
+  if (!mmUrl || !botToken) {
+    console.error("MATTERMOST_URL and MATTERMOST_BOT_TOKEN are required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { mmUrl, botToken };
 }
+const { mmUrl, botToken } = readRequiredEnv();
 
 const allowedChannels = new Set(
   (process.env.MATTERMOST_ALLOWED_CHANNELS ?? "")
@@ -78,7 +82,7 @@ async function postMessage(channelId: string, text: string): Promise<void> {
 // ── WebSocket event stream ──────────────────────────────────────
 
 function connectWebSocket(): void {
-  const wsUrl = mmUrl!.replace(/^http/, "ws").replace(/\/$/, "");
+  const wsUrl = mmUrl.replace(/^http/, "ws").replace(/\/$/, "");
   const webSocket = new WebSocket(`${wsUrl}/api/v4/websocket`, {
     headers: { Authorization: `Bearer ${botToken}` },
   });

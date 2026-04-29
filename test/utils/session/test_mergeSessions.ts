@@ -4,7 +4,13 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mergeSessionLists, applySessionDiff, compareSessionsByRecency } from "../../../src/utils/session/mergeSessions.js";
+import {
+  mergeSessionLists,
+  applySessionDiff,
+  compareSessionsByRecency,
+  pickServerOverrides,
+  computeLiveIsRunning,
+} from "../../../src/utils/session/mergeSessions.js";
 import type { ActiveSession, SessionSummary } from "../../../src/types/session.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
@@ -318,5 +324,91 @@ describe("applySessionDiff — sort + immutability", () => {
     applySessionDiff(cache, diff, ["a"]);
     assert.deepEqual(cache, cacheSnap);
     assert.deepEqual(diff, diffSnap);
+  });
+});
+
+describe("pickServerOverrides", () => {
+  it("returns an empty object when serverEntry is undefined", () => {
+    assert.deepEqual(pickServerOverrides(undefined), {});
+  });
+
+  it("returns an empty object when none of the override fields are set", () => {
+    // makeSummary only sets id/roleId/startedAt/updatedAt/preview —
+    // none of those are override keys, so nothing should be picked.
+    assert.deepEqual(pickServerOverrides(makeSummary()), {});
+  });
+
+  it("picks every override field that is defined", () => {
+    const out = pickServerOverrides(
+      makeSummary({
+        summary: "AI summary",
+        keywords: ["a", "b"],
+        origin: "scheduler",
+        isBookmarked: true,
+        hasUnread: false,
+        statusMessage: "running…",
+      }),
+    );
+    assert.deepEqual(out, {
+      summary: "AI summary",
+      keywords: ["a", "b"],
+      origin: "scheduler",
+      isBookmarked: true,
+      hasUnread: false,
+      statusMessage: "running…",
+    });
+  });
+
+  it("preserves false / empty-string / empty-array — only `undefined` is filtered", () => {
+    const out = pickServerOverrides(makeSummary({ isBookmarked: false, hasUnread: false, statusMessage: "", keywords: [] }));
+    assert.deepEqual(out, { isBookmarked: false, hasUnread: false, statusMessage: "", keywords: [] });
+  });
+
+  it("ignores fields explicitly set to undefined", () => {
+    const out = pickServerOverrides(makeSummary({ summary: undefined, keywords: undefined }));
+    assert.deepEqual(out, {});
+  });
+
+  it("does not pick fields outside the override allowlist (e.g. preview, id)", () => {
+    // `preview` and `id` are sidebar-row identity, not server-only
+    // overrides; they're handled separately by `buildLiveSummary`.
+    const out = pickServerOverrides(makeSummary({ preview: "ignored here" }));
+    assert.equal("preview" in out, false);
+    assert.equal("id" in out, false);
+  });
+});
+
+describe("computeLiveIsRunning", () => {
+  const makeLive = (overrides: Partial<Pick<ActiveSession, "isRunning" | "pendingGenerations">> = {}) => ({
+    isRunning: false,
+    pendingGenerations: {},
+    ...overrides,
+  });
+
+  it("false when no source signals running", () => {
+    assert.equal(computeLiveIsRunning(undefined, makeLive()), false);
+    assert.equal(computeLiveIsRunning(makeSummary(), makeLive()), false);
+  });
+
+  it("true when serverEntry.isRunning is true", () => {
+    assert.equal(computeLiveIsRunning(makeSummary({ isRunning: true }), makeLive()), true);
+  });
+
+  it("true when live.isRunning is true", () => {
+    assert.equal(computeLiveIsRunning(undefined, makeLive({ isRunning: true })), true);
+  });
+
+  it("true when at least one pending generation is queued", () => {
+    assert.equal(computeLiveIsRunning(undefined, makeLive({ pendingGenerations: { gen1: { startedAt: "now" } as never } })), true);
+  });
+
+  it("false for an empty pendingGenerations object", () => {
+    assert.equal(computeLiveIsRunning(undefined, makeLive({ pendingGenerations: {} })), false);
+  });
+
+  it("treats missing pendingGenerations as no-pending", () => {
+    // ActiveSession always has pendingGenerations in practice, but
+    // the helper is defensive — exercise the `?? {}` branch.
+    assert.equal(computeLiveIsRunning(undefined, makeLive({ pendingGenerations: undefined as never })), false);
   });
 });

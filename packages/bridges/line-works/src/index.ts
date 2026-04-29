@@ -35,21 +35,23 @@ const JWT_TTL_SEC = 3_600;
 const TOKEN_REFRESH_MARGIN_SEC = 60;
 const PORT = Number(process.env.LINEWORKS_WEBHOOK_PORT) || 3013;
 
-const clientId = process.env.LINEWORKS_CLIENT_ID;
-const clientSecret = process.env.LINEWORKS_CLIENT_SECRET;
-const serviceAccount = process.env.LINEWORKS_SERVICE_ACCOUNT;
-const botId = process.env.LINEWORKS_BOT_ID;
-const botSecret = process.env.LINEWORKS_BOT_SECRET;
-
-const privateKeyPem = resolvePrivateKey();
-
-if (!clientId || !clientSecret || !serviceAccount || !botId || !botSecret || !privateKeyPem) {
-  console.error(
-    "Required: LINEWORKS_CLIENT_ID, LINEWORKS_CLIENT_SECRET, LINEWORKS_SERVICE_ACCOUNT, LINEWORKS_BOT_ID, LINEWORKS_BOT_SECRET, and one of LINEWORKS_PRIVATE_KEY / LINEWORKS_PRIVATE_KEY_FILE.\n" +
-      "See README for setup instructions.",
-  );
-  process.exit(1);
+function readRequiredEnv(): { clientId: string; clientSecret: string; serviceAccount: string; botId: string; botSecret: string; privateKeyPem: string } {
+  const clientId = process.env.LINEWORKS_CLIENT_ID;
+  const clientSecret = process.env.LINEWORKS_CLIENT_SECRET;
+  const serviceAccount = process.env.LINEWORKS_SERVICE_ACCOUNT;
+  const botId = process.env.LINEWORKS_BOT_ID;
+  const botSecret = process.env.LINEWORKS_BOT_SECRET;
+  const privateKeyPem = resolvePrivateKey();
+  if (!clientId || !clientSecret || !serviceAccount || !botId || !botSecret || !privateKeyPem) {
+    console.error(
+      "Required: LINEWORKS_CLIENT_ID, LINEWORKS_CLIENT_SECRET, LINEWORKS_SERVICE_ACCOUNT, LINEWORKS_BOT_ID, LINEWORKS_BOT_SECRET, and one of LINEWORKS_PRIVATE_KEY / LINEWORKS_PRIVATE_KEY_FILE.\n" +
+        "See README for setup instructions.",
+    );
+    process.exit(1);
+  }
+  return { clientId, clientSecret, serviceAccount, botId, botSecret, privateKeyPem };
 }
+const { clientId, clientSecret, serviceAccount, botId, botSecret, privateKeyPem } = readRequiredEnv();
 
 function resolvePrivateKey(): string | null {
   const inline = process.env.LINEWORKS_PRIVATE_KEY;
@@ -111,7 +113,7 @@ function buildAssertion(): string {
     }),
   );
   const data = `${header}.${payload}`;
-  const sig = crypto.createSign("RSA-SHA256").update(data).sign(privateKeyPem!);
+  const sig = crypto.createSign("RSA-SHA256").update(data).sign(privateKeyPem);
   return `${data}.${base64Url(sig)}`;
 }
 
@@ -120,8 +122,8 @@ async function fetchAccessToken(): Promise<TokenCache> {
   const form = new URLSearchParams({
     assertion,
     grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    client_id: clientId!,
-    client_secret: clientSecret!,
+    client_id: clientId,
+    client_secret: clientSecret,
     scope: "bot bot.message",
   });
   const res = await fetch("https://auth.worksmobile.com/oauth2/v2.0/token", {
@@ -157,7 +159,7 @@ async function sendLineWorks(userId: string, text: string): Promise<void> {
   for (const chunk of chunks) {
     let res: Response;
     try {
-      res = await fetch(`https://www.worksapis.com/v1.0/bots/${encodeURIComponent(botId!)}/users/${encodeURIComponent(userId)}/messages`, {
+      res = await fetch(`https://www.worksapis.com/v1.0/bots/${encodeURIComponent(botId)}/users/${encodeURIComponent(userId)}/messages`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ content: { type: "text", text: chunk } }),
@@ -177,7 +179,7 @@ async function sendLineWorks(userId: string, text: string): Promise<void> {
 // ── Webhook signature verification ─────────────────────────────
 
 function verifySignature(rawBody: string, signature: string): boolean {
-  const expected = crypto.createHmac("sha256", botSecret!).update(rawBody).digest("base64");
+  const expected = crypto.createHmac("sha256", botSecret).update(rawBody).digest("base64");
   if (expected.length !== signature.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));

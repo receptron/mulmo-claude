@@ -31,11 +31,15 @@ const API_BASE = "https://api.chatwork.com/v2";
 const MAX_MSG_LEN = 40_000; // Chatwork's practical limit is generous; chunk conservatively
 const FETCH_TIMEOUT_MS = 15_000;
 
-const apiToken = process.env.CHATWORK_API_TOKEN;
-if (!apiToken) {
-  console.error("CHATWORK_API_TOKEN is required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { apiToken: string } {
+  const apiToken = process.env.CHATWORK_API_TOKEN;
+  if (!apiToken) {
+    console.error("CHATWORK_API_TOKEN is required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { apiToken };
 }
+const { apiToken } = readRequiredEnv();
 
 const allowedRooms = new Set(
   (process.env.CHATWORK_ALLOWED_ROOMS ?? "")
@@ -89,7 +93,7 @@ function parseRetryAfter(headerValue: string | null): number {
 
 async function cwFetch(method: "GET" | "POST" | "PUT", path: string, form?: Record<string, string>): Promise<unknown> {
   await waitForRateLimit();
-  const headers: Record<string, string> = { "X-ChatWorkToken": apiToken! };
+  const headers: Record<string, string> = { "X-ChatWorkToken": apiToken };
   let body: string | undefined;
   if (form) {
     headers["Content-Type"] = "application/x-www-form-urlencoded";

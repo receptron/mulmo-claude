@@ -67,6 +67,7 @@ interface PresentDocumentBody {
 
 interface PresentDocumentSuccess {
   message: string;
+  instructions: string;
   title: string;
   data: { markdown: string; filenamePrefix: string };
 }
@@ -93,7 +94,8 @@ router.post(
     const markdownPath = await saveMarkdown(filledMarkdown, filenamePrefix);
     log.info("plugins", "presentDocument: ok", { markdownPath, bytes: filledMarkdown.length });
     res.json({
-      message: `Document "${title}" is ready.`,
+      message: `Saved markdown to ${markdownPath}`,
+      instructions: "Acknowledge that the document has been presented to the user.",
       title,
       data: { markdown: markdownPath, filenamePrefix },
     });

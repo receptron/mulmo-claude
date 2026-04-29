@@ -746,7 +746,7 @@ function effectiveBeat(index: number): Beat {
 function toggleSource(index: number) {
   if (!sourceOpen[index]) {
     sourceText[index] = JSON.stringify(effectiveBeat(index), null, 2);
-    delete beatSaveErrors[index];
+    Reflect.deleteProperty(beatSaveErrors, index);
   }
   sourceOpen[index] = !sourceOpen[index];
 }
@@ -765,14 +765,14 @@ async function updateBeat(index: number) {
   }
   const prevImage = JSON.stringify(effectiveBeat(index).image);
 
-  delete beatSaveErrors[index];
+  Reflect.deleteProperty(beatSaveErrors, index);
   beatSaving[index] = true;
   const response = await apiPost<unknown>(API_ROUTES.mulmoScript.updateBeat, {
     filePath: filePath.value,
     beatIndex: index,
     beat,
   });
-  delete beatSaving[index];
+  Reflect.deleteProperty(beatSaving, index);
   if (!response.ok) {
     beatSaveErrors[index] = { kind: "saveFailed", error: response.error };
     return;
@@ -782,7 +782,7 @@ async function updateBeat(index: number) {
   sourceOpen[index] = false;
 
   if (JSON.stringify(beat.image) !== prevImage) {
-    delete renderedImages[index];
+    Reflect.deleteProperty(renderedImages, index);
     renderBeat(index);
   }
 }
@@ -810,7 +810,7 @@ async function renderBeat(index: number) {
 }
 
 async function regenerateBeat(index: number) {
-  delete renderedImages[index];
+  Reflect.deleteProperty(renderedImages, index);
   renderState[index] = "rendering";
   const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.renderBeat, {
     filePath: filePath.value,
@@ -852,7 +852,7 @@ async function loadExistingBeatAudio(index: number) {
 
 async function generateAudio(index: number) {
   audioState[index] = "generating";
-  delete audioErrors[index];
+  Reflect.deleteProperty(audioErrors, index);
   const response = await apiPost<{ audio?: string; error?: string }>(API_ROUTES.mulmoScript.generateBeatAudio, {
     filePath: filePath.value,
     beatIndex: index,
@@ -920,7 +920,7 @@ async function onBeatDrop(event: DragEvent, index: number) {
   if (!file || !file.type.startsWith("image/")) return;
 
   renderState[index] = "rendering";
-  delete renderErrors[index];
+  Reflect.deleteProperty(renderErrors, index);
   let imageData: string;
   try {
     imageData = await new Promise<string>((resolve, reject) => {
@@ -970,7 +970,7 @@ async function onCharDrop(event: DragEvent, key: string) {
   if (!file || !file.type.startsWith("image/")) return;
 
   charRenderState[key] = "rendering";
-  delete charErrors[key];
+  Reflect.deleteProperty(charErrors, key);
   let imageData: string;
   try {
     imageData = await new Promise<string>((resolve, reject) => {
@@ -1027,7 +1027,7 @@ function refreshMissingCharacterImages() {
 
 async function renderCharacter(key: string, force: boolean) {
   charRenderState[key] = "rendering";
-  delete charErrors[key];
+  Reflect.deleteProperty(charErrors, key);
   const response = await apiPost<{ image?: string; error?: string }>(API_ROUTES.mulmoScript.renderCharacter, {
     filePath: filePath.value,
     key,
@@ -1069,21 +1069,21 @@ async function initializeScript() {
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
   // Reset per-script state
-  Object.keys(renderState).forEach((key) => delete renderState[Number(key)]);
-  Object.keys(renderedImages).forEach((key) => delete renderedImages[Number(key)]);
-  Object.keys(renderErrors).forEach((key) => delete renderErrors[Number(key)]);
-  Object.keys(sourceOpen).forEach((key) => delete sourceOpen[Number(key)]);
-  Object.keys(sourceText).forEach((key) => delete sourceText[Number(key)]);
-  Object.keys(beatSaveErrors).forEach((key) => delete beatSaveErrors[Number(key)]);
-  Object.keys(beatSaving).forEach((key) => delete beatSaving[Number(key)]);
-  Object.keys(localOverrides).forEach((key) => delete localOverrides[Number(key)]);
-  Object.keys(beatAudios).forEach((key) => delete beatAudios[Number(key)]);
-  Object.keys(audioState).forEach((key) => delete audioState[Number(key)]);
-  Object.keys(audioErrors).forEach((key) => delete audioErrors[Number(key)]);
-  Object.keys(charRenderState).forEach((key) => delete charRenderState[key]);
-  Object.keys(charImages).forEach((key) => delete charImages[key]);
-  Object.keys(charErrors).forEach((key) => delete charErrors[key]);
-  Object.keys(beatDragOver).forEach((key) => delete beatDragOver[Number(key)]);
+  Object.keys(renderState).forEach((key) => Reflect.deleteProperty(renderState, key));
+  Object.keys(renderedImages).forEach((key) => Reflect.deleteProperty(renderedImages, key));
+  Object.keys(renderErrors).forEach((key) => Reflect.deleteProperty(renderErrors, key));
+  Object.keys(sourceOpen).forEach((key) => Reflect.deleteProperty(sourceOpen, key));
+  Object.keys(sourceText).forEach((key) => Reflect.deleteProperty(sourceText, key));
+  Object.keys(beatSaveErrors).forEach((key) => Reflect.deleteProperty(beatSaveErrors, key));
+  Object.keys(beatSaving).forEach((key) => Reflect.deleteProperty(beatSaving, key));
+  Object.keys(localOverrides).forEach((key) => Reflect.deleteProperty(localOverrides, key));
+  Object.keys(beatAudios).forEach((key) => Reflect.deleteProperty(beatAudios, key));
+  Object.keys(audioState).forEach((key) => Reflect.deleteProperty(audioState, key));
+  Object.keys(audioErrors).forEach((key) => Reflect.deleteProperty(audioErrors, key));
+  Object.keys(charRenderState).forEach((key) => Reflect.deleteProperty(charRenderState, key));
+  Object.keys(charImages).forEach((key) => Reflect.deleteProperty(charImages, key));
+  Object.keys(charErrors).forEach((key) => Reflect.deleteProperty(charErrors, key));
+  Object.keys(beatDragOver).forEach((key) => Reflect.deleteProperty(beatDragOver, key));
   moviePath.value = null;
   if (sourceDetails.value) sourceDetails.value.open = false;
 
@@ -1166,15 +1166,15 @@ async function reflectGenerationFinish(entry: PendingGeneration): Promise<void> 
   if (entry.kind === GENERATION_KINDS.beatImage) {
     const idx = Number(entry.key);
     await loadExistingBeatImage(idx);
-    if (renderState[idx] === "rendering") delete renderState[idx];
+    if (renderState[idx] === "rendering") Reflect.deleteProperty(renderState, idx);
   } else if (entry.kind === GENERATION_KINDS.beatAudio) {
     const idx = Number(entry.key);
     await loadExistingBeatAudio(idx);
-    if (audioState[idx] === "generating") delete audioState[idx];
+    if (audioState[idx] === "generating") Reflect.deleteProperty(audioState, idx);
   } else if (entry.kind === GENERATION_KINDS.characterImage) {
     await loadExistingCharacterImage(entry.key);
     if (charRenderState[entry.key] === "rendering") {
-      delete charRenderState[entry.key];
+      Reflect.deleteProperty(charRenderState, entry.key);
     }
   } else if (entry.kind === GENERATION_KINDS.movie) {
     movieGenerating.value = false;
