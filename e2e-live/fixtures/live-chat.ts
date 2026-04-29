@@ -44,6 +44,42 @@ export async function removeFromWorkspace(workspaceRel: string): Promise<void> {
   await rm(path.join(workspaceRoot(), workspaceRel), { force: true });
 }
 
+/**
+ * Pull the chat session id out of the current URL. Returns null if
+ * the page is not on a /chat/<id> route (e.g. before the first
+ * navigation, or while sitting on /wiki).
+ */
+export function getCurrentSessionId(page: Page): string | null {
+  const match = /\/chat\/([^/?#]+)/.exec(page.url());
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Best-effort hard-delete a chat session through the server's
+ * DELETE /api/sessions/:id endpoint — same path the kebab → 削除
+ * button hits in the UI. Used as cleanup so the test does not
+ * leave debug sessions piling up in the user's history.
+ *
+ * Never throws. Cleanup failures (page already closed, server
+ * restarting, session already gone) must not turn a passing test
+ * red.
+ */
+export async function deleteSession(page: Page, sessionId: string): Promise<void> {
+  if (page.isClosed()) return;
+  try {
+    await page.evaluate(async (target) => {
+      const meta = document.querySelector('meta[name="mulmoclaude-auth"]');
+      const token = meta?.getAttribute("content") ?? "";
+      await fetch(`/api/sessions/${encodeURIComponent(target)}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    }, sessionId);
+  } catch {
+    // best-effort
+  }
+}
+
 const PRESENT_HTML_IFRAME_SELECTOR = '[data-testid="present-html-iframe"]';
 
 /** Open the app root and start a fresh chat session. */

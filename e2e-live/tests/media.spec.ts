@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 import {
+  deleteSession,
+  getCurrentSessionId,
   placeFixtureInWorkspace,
   readImgNaturalSize,
   readImgSrcInPresentHtml,
@@ -15,7 +17,12 @@ import {
 
 const L01_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
 const L02_TIMEOUT_MS = 3 * ONE_MINUTE_MS;
-const MIN_PDF_BYTES = 1_000;
+// Floor for "the route returned a real PDF, not a stub". The actual
+// size depends on how verbose the LLM's reply happens to be that
+// run, so this is loose on purpose — `readPdfDownload` already
+// asserts the %PDF- magic bytes, this number just keeps obviously
+// empty stubs out.
+const MIN_PDF_BYTES = 500;
 
 // Each scenario opens its own chat session, so they do not share
 // state. Run them in parallel to cut wall time — the server happily
@@ -81,6 +88,8 @@ test.describe("media (real LLM)", () => {
       // regression that surfaces only at the end of the turn.
       await waitForAssistantResponseComplete(page);
     } finally {
+      const sessionId = getCurrentSessionId(page);
+      if (sessionId) await deleteSession(page, sessionId);
       await removeFromWorkspace(workspaceImageRel);
     }
   });
@@ -90,36 +99,41 @@ test.describe("media (real LLM)", () => {
 
     await startNewSession(page);
 
-    // Make Claude reply in plain Markdown (textResponse plugin)
-    // with a workspace image reference. The reply itself drives
-    // the textResponse view, which exposes the same /api/pdf
-    // endpoint that B-19 / B-20 broke. Hitting that endpoint via
-    // the real LLM-driven UI is the regression check.
-    const message = [
-      "次の Markdown を **そのまま** 1 ターンの返信本文として返してください。",
-      "ツールは何も呼ばないでください。前置きや締めの一文も付けないでください。",
-      "",
-      "# L-02 PDF DL test",
-      "",
-      "![sample](/artifacts/images/sample.png)",
-      "",
-      "本文サンプル。",
-    ].join("\n");
-    await sendChatMessage(page, message);
+    try {
+      // Make Claude reply in plain Markdown (textResponse plugin)
+      // with a workspace image reference. The reply itself drives
+      // the textResponse view, which exposes the same /api/pdf
+      // endpoint that B-19 / B-20 broke. Hitting that endpoint
+      // via the real LLM-driven UI is the regression check.
+      const message = [
+        "次の Markdown を **そのまま** 1 ターンの返信本文として返してください。",
+        "ツールは何も呼ばないでください。前置きや締めの一文も付けないでください。",
+        "",
+        "# L-02 PDF DL test",
+        "",
+        "![sample](/artifacts/images/sample.png)",
+        "",
+        "本文サンプル。",
+      ].join("\n");
+      await sendChatMessage(page, message);
 
-    // The PDF button only renders once the assistant turn is
-    // committed to the textResponse view, so wait for the full
-    // response before reaching for it.
-    await waitForAssistantResponseComplete(page);
+      // The PDF button only renders once the assistant turn is
+      // committed to the textResponse view, so wait for the full
+      // response before reaching for it.
+      await waitForAssistantResponseComplete(page);
 
-    const pdfBtn = page.getByTestId("text-response-pdf-button").first();
-    await expect(pdfBtn).toBeVisible({ timeout: ONE_MINUTE_MS });
+      const pdfBtn = page.getByTestId("text-response-pdf-button").first();
+      await expect(pdfBtn).toBeVisible({ timeout: ONE_MINUTE_MS });
 
-    const downloadPromise = page.waitForEvent("download");
-    await pdfBtn.click();
-    const download = await downloadPromise;
+      const downloadPromise = page.waitForEvent("download");
+      await pdfBtn.click();
+      const download = await downloadPromise;
 
-    const pdf = await readPdfDownload(download);
-    expect(pdf.length, "PDF should not be a near-empty stub").toBeGreaterThan(MIN_PDF_BYTES);
+      const pdf = await readPdfDownload(download);
+      expect(pdf.length, "PDF should not be a near-empty stub").toBeGreaterThan(MIN_PDF_BYTES);
+    } finally {
+      const sessionId = getCurrentSessionId(page);
+      if (sessionId) await deleteSession(page, sessionId);
+    }
   });
 });
