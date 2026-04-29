@@ -25,17 +25,29 @@ export interface RunAgentOptions {
   abortSignal?: AbortSignal;
 }
 
-export async function* runAgent(
-  message: string,
-  role: Role,
-  workspacePath: string,
-  sessionId: string,
-  port: number,
-  claudeSessionId?: string,
-  abortSignal?: AbortSignal,
-  attachments?: Attachment[],
-  userTimezone?: string,
-): AsyncGenerator<AgentEvent> {
+export interface RunAgentInput {
+  message: string;
+  role: Role;
+  workspacePath: string;
+  sessionId: string;
+  port: number;
+  claudeSessionId?: string;
+  abortSignal?: AbortSignal;
+  attachments?: Attachment[];
+  userTimezone?: string;
+}
+
+export async function* runAgent({
+  message,
+  role,
+  workspacePath,
+  sessionId,
+  port,
+  claudeSessionId,
+  abortSignal,
+  attachments,
+  userTimezone,
+}: RunAgentInput): AsyncGenerator<AgentEvent> {
   const activePlugins = getActivePlugins(role);
   const useDocker = await isDockerAvailable();
 
