@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/chat-service",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Server-side chat service for MulmoBridge — socket.io + REST bridge to Claude Code agents",
   "type": "module",
   "main": "./dist/index.js",
