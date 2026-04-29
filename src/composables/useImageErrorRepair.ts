@@ -51,7 +51,7 @@ export function repairImageSrc(img: HTMLImageElement): boolean {
 // document scope is safe — it never touches non-image-bearing UI.
 export function useGlobalImageErrorRepair(): void {
   function onError(event: Event): void {
-    const target = event.target;
+    const { target } = event;
     if (target instanceof HTMLImageElement) repairImageSrc(target);
   }
 
