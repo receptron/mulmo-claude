@@ -31,7 +31,7 @@
 // ── Publish ───────────────────────────────────────────────────
 //   cd packages/mulmoclaude && npm publish --access public
 
-import { cpSync, existsSync, rmSync } from "fs";
+import { copyFileSync, cpSync, existsSync, rmSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -42,10 +42,15 @@ const rootDir = join(pkgDir, "..", "..");
 // ── Clean ───────────────────────────────────────────────────
 
 // Include `dist` so leftovers from the older pre-built-JS layout are
-// wiped on re-run.
+// wiped on re-run. Stale sandbox files are removed too so a renamed
+// or deleted source file doesn't ride along into the tarball.
 for (const dir of ["dist", "client", "server", "src"]) {
   const target = join(pkgDir, dir);
   if (existsSync(target)) rmSync(target, { recursive: true });
+}
+for (const file of ["Dockerfile.sandbox", "sandbox-entrypoint.sh"]) {
+  const target = join(pkgDir, file);
+  if (existsSync(target)) rmSync(target);
 }
 
 // ── Client dist (Vite build output) ─────────────────────────
@@ -88,6 +93,17 @@ cpSync(join(rootDir, "src"), join(pkgDir, "src"), {
   filter: (src) => !src.endsWith(".map"),
 });
 console.log("✓ shared src/");
+
+// ── Sandbox build context ───────────────────────────────────
+// `server/system/docker.ts` builds the sandbox image via `docker build
+// -f Dockerfile.sandbox .` with cwd = pkgDir. The Dockerfile in turn
+// `COPY`s `sandbox-entrypoint.sh`, so both files must sit at pkgDir
+// or sandbox mode silently falls back to unrestricted execution.
+
+for (const file of ["Dockerfile.sandbox", "sandbox-entrypoint.sh"]) {
+  copyFileSync(join(rootDir, file), join(pkgDir, file));
+}
+console.log("✓ sandbox build context");
 
 console.log("\nReady to publish. Run:");
 console.log("  cd packages/mulmoclaude && npm publish --access public");

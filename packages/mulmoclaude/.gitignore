@@ -3,6 +3,8 @@
 client/
 server/
 src/
+Dockerfile.sandbox
+sandbox-entrypoint.sh
 node_modules/
 
 # npm pack output + accidental tarball expansions during local tests.

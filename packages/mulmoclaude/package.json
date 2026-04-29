@@ -1,6 +1,6 @@
 {
   "name": "mulmoclaude",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "MulmoClaude — GUI-chat with Claude Code + long-term memory. One command to start.",
   "type": "module",
   "bin": {
@@ -15,7 +15,9 @@
     "bin/",
     "client/",
     "server/",
-    "src/"
+    "src/",
+    "Dockerfile.sandbox",
+    "sandbox-entrypoint.sh"
   ],
   "dependencies": {
     "@google/genai": "^1.50.1",

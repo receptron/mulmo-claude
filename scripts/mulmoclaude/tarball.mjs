@@ -13,11 +13,19 @@
 // "install the whole launcher and boot it" costs more than it saves.
 
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile, readdir, appendFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readdir, appendFile, stat } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
+
+// Sandbox build context: `server/system/docker.ts` runs `docker build
+// -f Dockerfile.sandbox .` from the launcher's package dir, so both
+// the Dockerfile and the entrypoint script it COPYs must be inside
+// the published tarball. 0.5.2 silently shipped without them and
+// sandbox mode fell back to unrestricted execution at runtime — this
+// list is what the smoke verifies post-install.
+const REQUIRED_SANDBOX_FILES = ["Dockerfile.sandbox", "sandbox-entrypoint.sh"];
 
 const DEFAULT_BOOT_TIMEOUT_MS = 45_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
@@ -167,6 +175,24 @@ async function packTarball({ root, packTimeoutMs }) {
   return path.join(pkgDir, tarball);
 }
 
+// Verify the sandbox build context made it through `npm pack` / `npm
+// install`. Keeps the assertion out of `bootAndProbe` so a missing
+// file fails loudly with a precise reason instead of silently letting
+// sandbox mode degrade.
+export async function verifySandboxFiles({ workDir, files = REQUIRED_SANDBOX_FILES, statImpl = stat } = {}) {
+  const installedPkgDir = path.join(workDir, "node_modules", "mulmoclaude");
+  const missing = [];
+  for (const file of files) {
+    try {
+      const info = await statImpl(path.join(installedPkgDir, file));
+      if (!info.isFile()) missing.push(file);
+    } catch {
+      missing.push(file);
+    }
+  }
+  return { ok: missing.length === 0, missing, checkedDir: installedPkgDir };
+}
+
 // Lay out a throwaway install dir and `npm install` the tarball.
 async function installTarball({ workDir, tarballAbsolutePath, installTimeoutMs }) {
   const pkg = buildInstallerPackageJson({ tarballName: path.basename(tarballAbsolutePath) });
@@ -264,6 +290,10 @@ export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, 
   try {
     tarballPath = await packTarball({ root, packTimeoutMs });
     await installTarball({ workDir: runDir, tarballAbsolutePath: tarballPath, installTimeoutMs });
+    const sandboxCheck = await verifySandboxFiles({ workDir: runDir });
+    if (!sandboxCheck.ok) {
+      throw new Error(`sandbox build context missing from tarball: ${sandboxCheck.missing.join(", ")} (under ${sandboxCheck.checkedDir})`);
+    }
     const resolvedPort = port ?? (await allocateRandomPort());
     const booted = await bootAndProbe({ workDir: runDir, port: resolvedPort, bootTimeoutMs, logFile: resolvedLog });
     child = booted.child;
