@@ -10,6 +10,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [0.5.3] - 2026-04-29
+
+### Fixed
+
+- **Sandbox mode silently disabled in published npm package** — `Dockerfile.sandbox` and `sandbox-entrypoint.sh` were not bundled into the `mulmoclaude` tarball, so on `npx mulmoclaude` the server logged `Failed to set up sandbox, running unrestricted` and fell back to unrestricted execution. Both files are now copied by `prepare-dist.js` and listed in `files`, and `scripts/mulmoclaude/tarball.mjs` asserts their presence in the packed tarball to prevent regressions.
+- **`mulmoclaude --version` printed stale `0.5.1`** — the launcher had a hard-coded version string that drifted from `package.json` after 0.5.2. Now matches the published version.
+
+---
+
 ## [0.5.2] - 2026-04-29
 
 ### Fixed
