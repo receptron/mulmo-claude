@@ -1,12 +1,19 @@
 import { defineConfig } from "@playwright/test";
 import { ONE_MINUTE_MS } from "../server/utils/time.ts";
 
-// e2e-live runs against a live `yarn dev` instance on the default
-// port 5173 — it is *not* a self-contained suite like `e2e/`. The
-// real Claude API is exercised end-to-end (no mockAllApis), so this
-// config:
-//   - assumes the user already started `yarn dev`
-//   - runs serially with workers=1 to respect API rate limits
+// e2e-live runs against a live mulmoclaude instance — *not* a
+// self-contained suite like `e2e/`. The real Claude API is
+// exercised end-to-end (no mockAllApis). Two boot modes are
+// supported by overriding `E2E_LIVE_BASE_URL`:
+//
+//   - dev mode (default): the developer's `yarn dev` on
+//     http://localhost:5173, used for routine regression checks
+//   - pre-release mode: `npx mulmoclaude@<tarball>` (default port
+//     3001), used to verify the published artifact behaves the
+//     same way before a release goes out
+//
+// This config:
+//   - assumes a live server is already up on `E2E_LIVE_BASE_URL`
 //   - keeps full traces so failed runs can be replayed in the
 //     trace viewer (`npx playwright show-trace ...`)
 //   - defaults to headless; flip to headed with `HEADED=1` for QA
@@ -28,7 +35,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "../playwright-report-live", open: "on-failure" }]],
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: process.env.E2E_LIVE_BASE_URL ?? "http://localhost:5173",
     headless: !HEADED,
     launchOptions: { slowMo: HEADED ? 200 : 0 },
     trace: "on",
