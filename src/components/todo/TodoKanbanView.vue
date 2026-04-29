@@ -191,8 +191,12 @@ const itemsByStatus = computed(() => {
   for (const item of props.filteredItems) {
     const columnId = item.status ?? props.columns[0]?.id;
     if (!columnId) continue;
-    if (!map.has(columnId)) map.set(columnId, []);
-    map.get(columnId)!.push(item);
+    let bucket = map.get(columnId);
+    if (!bucket) {
+      bucket = [];
+      map.set(columnId, bucket);
+    }
+    bucket.push(item);
   }
   for (const list of map.values()) {
     list.sort((left, right) => (left.order ?? 0) - (right.order ?? 0));

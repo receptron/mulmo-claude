@@ -105,7 +105,8 @@ export function createTaskManager(options?: TaskManagerOptions): ITaskManager {
       progress = false;
       const next: TaskDefinition[] = [];
       for (const def of remaining) {
-        if (!succeeded.has(def.dependsOn!)) {
+        const dep = def.dependsOn;
+        if (!dep || !succeeded.has(dep)) {
           next.push(def);
           continue;
         }

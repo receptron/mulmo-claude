@@ -66,14 +66,18 @@ export function migrateItems(rawItems: TodoItem[], columns: StatusColumn[]): Tod
   const byStatus = new Map<string, TodoItem[]>();
   for (const item of withStatus) {
     const key = item.status ?? openId;
-    if (!byStatus.has(key)) byStatus.set(key, []);
-    byStatus.get(key)!.push(item);
+    let bucket = byStatus.get(key);
+    if (!bucket) {
+      bucket = [];
+      byStatus.set(key, bucket);
+    }
+    bucket.push(item);
   }
   const orderById = new Map<string, number>();
   for (const [, group] of byStatus) {
     const missing = group.filter((item) => typeof item.order !== "number");
     if (missing.length === 0) continue;
-    const existingMax = group.filter((item) => typeof item.order === "number").reduce((acc, item) => Math.max(acc, item.order!), 0);
+    const existingMax = group.filter((item) => typeof item.order === "number").reduce((acc, item) => Math.max(acc, item.order ?? 0), 0);
     const sorted = [...missing].sort((left, right) => left.createdAt - right.createdAt);
     sorted.forEach((item, i) => {
       orderById.set(item.id, existingMax + (i + 1) * ORDER_STEP);
@@ -370,7 +374,8 @@ export function handleMove(items: TodoItem[], columns: StatusColumn[], itemId: s
     if (newOrder !== undefined) return { ...item, order: newOrder };
     return item;
   });
-  const finalSelf = nextItems.find((item) => item.id === itemId)!;
+  const finalSelf = nextItems.find((item) => item.id === itemId);
+  if (!finalSelf) throw new Error(`reorder result missing item ${itemId}`);
   return { kind: "success", items: nextItems, item: finalSelf };
 }
 
