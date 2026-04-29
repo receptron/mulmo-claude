@@ -104,6 +104,28 @@ export function buildTableColumnMap(headerRow: string): Map<string, number> {
   return map;
 }
 
+interface TableColumnIndices {
+  slug: number;
+  title: number;
+  summary: number;
+  /** Undefined when the table has no `tags` column — caller skips
+   *  the tags lookup entirely and the row gets `tags: []`. */
+  tags: number | undefined;
+}
+
+/** Resolve the per-column indices the row parser needs. Falls back
+ *  to positional defaults (0/1/2) when the table has no header map.
+ *  "summary" is the canonical column name; "description" is accepted
+ *  as a legacy alias used by older fixtures. */
+function resolveTableColumnIndices(columnMap: Map<string, number> | null): TableColumnIndices {
+  return {
+    slug: columnMap?.get("slug") ?? 0,
+    title: columnMap?.get("title") ?? 1,
+    summary: columnMap?.get("summary") ?? columnMap?.get("description") ?? 2,
+    tags: columnMap?.get("tags"),
+  };
+}
+
 // Each parser returns the entry it produced (if any). The parent
 // loop tries them in order; the first non-null result wins.
 function parseTableRow(trimmed: string, columnMap: Map<string, number> | null): WikiPageEntry | null {
@@ -112,19 +134,14 @@ function parseTableRow(trimmed: string, columnMap: Map<string, number> | null): 
     .slice(1, -1)
     .map((column) => column.trim().replace(/^`|`$/g, ""));
   if (cols.length < 2) return null;
-  const slugIdx = columnMap?.get("slug") ?? 0;
-  const titleIdx = columnMap?.get("title") ?? 1;
-  // Accept either "summary" (the canonical column name in
-  // server/workspace/helps/wiki.md) or "description" (used by the
-  // existing unit test fixture). Fall back to column 2 when the
-  // table has no header map.
-  const summaryIdx = columnMap?.get("summary") ?? columnMap?.get("description") ?? 2;
-  const tagsIdx = columnMap?.get("tags");
-  const slug = cols[slugIdx] ?? "";
-  const title = cols[titleIdx] || slug;
-  const description = cols[summaryIdx] ?? "";
-  const tags = tagsIdx !== undefined ? parseTagsCell(cols[tagsIdx] ?? "") : [];
+
+  const idx = resolveTableColumnIndices(columnMap);
+  const slug = cols[idx.slug] ?? "";
+  const title = cols[idx.title] || slug;
   if (!slug || !title) return null;
+
+  const description = cols[idx.summary] ?? "";
+  const tags = idx.tags !== undefined ? parseTagsCell(cols[idx.tags] ?? "") : [];
   return { title, slug, description, tags };
 }
 

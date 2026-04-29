@@ -334,14 +334,16 @@ export default [
     },
   },
   {
-    // API-route override: cyclomatic `complexity` stays at `warn`
-    // here because the route handlers have several legitimately
-    // branchy functions (validation + auth + business logic in one
-    // place) that would need a coordinated split before they can
-    // graduate. Everything else under `server/` (utils, agent,
-    // workspace, …) is held to `error`; over time `server/api/routes/`
-    // should converge.
-    files: ["server/api/routes/**/*.{ts,js}"],
+    // Per-file complexity exemptions. These three route handlers
+    // each have one or more legitimately branchy functions
+    // (validation + auth + business logic in one place) that need a
+    // coordinated split. Until then keep the rule at `warn` for
+    // these files only — every other file in the repo is held to
+    // `error` so a regression elsewhere fails CI immediately.
+    //   - files.ts:    one ≥20 branch
+    //   - sessions.ts: two ≥15 branches
+    //   - wiki.ts:     parseTableRow ≥15
+    files: ["server/api/routes/files.ts", "server/api/routes/sessions.ts", "server/api/routes/wiki.ts"],
     rules: {
       complexity: ["warn", { max: 15 }],
     },
