@@ -201,11 +201,14 @@ app.use(
 // guard against cross-origin abuse.
 //
 // CSP delivered via HTTP header instead of injecting a `<meta>` tag —
-// keeps the served file pristine, and `'self'` finally matches the
-// server origin (which is what allows `<img src="../images/...">` to
-// reach `/artifacts/images/...`). Sandbox stays `allow-scripts` only,
-// so the iframe document is still opaque-origin and cannot read the
-// parent's cookies / localStorage / DOM.
+// keeps the served file pristine. The explicit request origin is
+// passed into `buildHtmlPreviewCsp` instead of relying on `'self'`:
+// the iframe is `sandbox="allow-scripts"` only, so its document has an
+// opaque origin and Safari/WebKit interprets `'self'` against that
+// (null) origin, blocking every same-origin `<img src="../images/...">`
+// reference. Substituting the absolute origin restores cross-browser
+// parity. Sandbox stays `allow-scripts` only, so the iframe document
+// still cannot read the parent's cookies / localStorage / DOM.
 const HTML_EXT_RE = /\.html?$/i;
 let htmlsDirReal: string | null = null;
 async function getHtmlsDirReal(): Promise<string | null> {
@@ -240,7 +243,17 @@ app.use(
       res.status(404).end();
       return;
     }
-    res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp());
+    // Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html` →
+    // `localhost:3001` with `changeOrigin: true`) emits the
+    // browser-visible origin (`localhost:5173`) rather than the upstream
+    // socket. In prod (no proxy) the headers are absent and we fall
+    // back to the raw `Host` / `req.protocol`.
+    const fwdHost = req.get("x-forwarded-host");
+    const fwdProto = req.get("x-forwarded-proto");
+    const host = fwdHost ?? req.get("host");
+    const proto = fwdProto ?? req.protocol;
+    const origin = `${proto}://${host}`;
+    res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp(origin));
     res.setHeader("X-Content-Type-Options", "nosniff");
     next();
   },

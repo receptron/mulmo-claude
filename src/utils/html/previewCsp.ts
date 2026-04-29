@@ -19,9 +19,19 @@ export const HTML_PREVIEW_CSP_ALLOWED_CDNS: readonly string[] = [
 /**
  * Build the CSP string. Split from the wrapper so tests can exercise
  * the policy without HTML-template noise.
+ *
+ * `origin`, when provided, replaces `'self'` in `img-src`. The preview
+ * iframe is `sandbox="allow-scripts"` only, so its document has an
+ * opaque origin: Safari/WebKit matches `'self'` against the (opaque)
+ * origin tuple and rejects every same-origin image request. Chrome
+ * matches `'self'` against the document URL and works either way. Pass
+ * the explicit server origin from HTTP-header callers; leave it
+ * undefined for the `srcdoc` fallback (where `'self'` is meaningless
+ * either way and there are no same-origin refs to resolve).
  */
-export function buildHtmlPreviewCsp(cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS): string {
+export function buildHtmlPreviewCsp(origin?: string, cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS): string {
   const cdnList = cdns.join(" ");
+  const imgSelf = origin ?? "'self'";
   return [
     "default-src 'none'",
     // LLM-authored HTML almost always uses inline <script> blocks
@@ -37,7 +47,7 @@ export function buildHtmlPreviewCsp(cdns: readonly string[] = HTML_PREVIEW_CSP_A
     // could exfiltrate data via image requests even with connect-src
     // blocked. Widen via HTML_PREVIEW_CSP_ALLOWED_CDNS if LLM output
     // legitimately needs more hosts.
-    `img-src 'self' ${cdnList} data: blob:`,
+    `img-src ${imgSelf} ${cdnList} data: blob:`,
     // Block XHR / fetch / WebSocket so previews can't phone home or
     // exfiltrate anything the inline scripts happen to compute.
     "connect-src 'none'",
@@ -46,25 +56,12 @@ export function buildHtmlPreviewCsp(cdns: readonly string[] = HTML_PREVIEW_CSP_A
 
 /**
  * Build the CSP string for the print-mode hidden iframe (presentHtml's
- * printToPdf). The print iframe loads via `srcdoc`, so its document
- * has an opaque origin: `'self'` no longer matches the server origin
- * and same-origin `<img src="/artifacts/images/...">` would be blocked.
- *
- * Same shape as `buildHtmlPreviewCsp` but with `img-src` widened from
- * `'self'` to the explicit `${origin}` so workspace images keep
- * loading after the `<base href>` injection rewrites their relative
- * URLs to absolute server URLs.
+ * printToPdf). Same policy as the preview header with the explicit
+ * server origin substituted for `'self'` — see `buildHtmlPreviewCsp`
+ * for why the substitution is required.
  */
 export function buildPrintCspContent(origin: string, cdns: readonly string[] = HTML_PREVIEW_CSP_ALLOWED_CDNS): string {
-  const cdnList = cdns.join(" ");
-  return [
-    "default-src 'none'",
-    `script-src 'unsafe-inline' ${cdnList}`,
-    `style-src 'unsafe-inline' ${cdnList}`,
-    `font-src ${cdnList}`,
-    `img-src ${origin} ${cdnList} data: blob:`,
-    "connect-src 'none'",
-  ].join("; ");
+  return buildHtmlPreviewCsp(origin, cdns);
 }
 
 const CSP_META_NONCE = ""; // reserved for future use (per-render nonce)
