@@ -190,8 +190,18 @@ app.use(
 // `about:srcdoc` as their base URL, which breaks every relative ref.
 // See plans/feat-files-html-preview-relative-paths.md.
 //
+// Allowlist covers `.html` / `.htm` plus common image extensions so
+// HTML files that reference sibling images (e.g. a shared logo placed
+// alongside a batch of LLM-generated pages) can resolve those refs
+// against the file's URL — same browser-equivalent behavior the user
+// gets when opening the file directly from disk. Non-image / non-html
+// requests are still rejected. CSS / JS are intentionally NOT in the
+// list: `'self'` is absent from `script-src` / `style-src` in the CSP
+// (`previewCsp.ts`) so allowing those extensions would only delivery-
+// vector for blocked resources.
+//
 // Same three-layer guard as `/artifacts/images`:
-//  1. `.html` / `.htm` extension allowlist.
+//  1. extension allowlist (`.html` / `.htm` plus image types).
 //  2. `resolveWithinRoot` symlink-aware traversal check.
 //  3. `dotfiles: deny` + `fallthrough: false` on `express.static`.
 //
@@ -203,10 +213,13 @@ app.use(
 // CSP delivered via HTTP header instead of injecting a `<meta>` tag —
 // keeps the served file pristine, and `'self'` finally matches the
 // server origin (which is what allows `<img src="../images/...">` to
-// reach `/artifacts/images/...`). Sandbox stays `allow-scripts` only,
-// so the iframe document is still opaque-origin and cannot read the
-// parent's cookies / localStorage / DOM.
-const HTML_EXT_RE = /\.html?$/i;
+// reach `/artifacts/images/...`). Header is set for HTML responses
+// only; image responses don't need it (CSP doesn't apply to image
+// MIME types loaded as subresources). Sandbox stays `allow-scripts`
+// only, so the iframe document is still opaque-origin and cannot
+// read the parent's cookies / localStorage / DOM.
+const HTML_PREVIEW_EXT_RE = /\.(html?|png|jpe?g|webp|gif|svg|ico)$/i;
+const HTML_DOCUMENT_EXT_RE = /\.html?$/i;
 let htmlsDirReal: string | null = null;
 async function getHtmlsDirReal(): Promise<string | null> {
   if (htmlsDirReal) return htmlsDirReal;
@@ -220,7 +233,7 @@ async function getHtmlsDirReal(): Promise<string | null> {
 app.use(
   "/artifacts/html",
   async (req, res, next) => {
-    if (!HTML_EXT_RE.test(req.path)) {
+    if (!HTML_PREVIEW_EXT_RE.test(req.path)) {
       res.status(404).end();
       return;
     }
@@ -240,7 +253,9 @@ app.use(
       res.status(404).end();
       return;
     }
-    res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp());
+    if (HTML_DOCUMENT_EXT_RE.test(req.path)) {
+      res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp());
+    }
     res.setHeader("X-Content-Type-Options", "nosniff");
     next();
   },
