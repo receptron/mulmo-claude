@@ -1,41 +1,55 @@
 <template>
-  <div class="h-full flex flex-col overflow-hidden">
+  <div class="html-container">
     <div class="px-4 py-2 border-b border-gray-100 shrink-0 flex items-center justify-between">
       <span class="text-sm font-medium text-gray-700 truncate">{{ title ?? t("pluginPresentHtml.untitled") }}</span>
-      <div class="flex items-center gap-2">
-        <button
-          class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
-          :title="t('pluginPresentHtml.saveAsPdf')"
-          @click="printToPdf"
-        >
-          <span class="material-icons text-sm align-middle">picture_as_pdf</span>
-          {{ t("pluginPresentHtml.pdf") }}
-        </button>
-        <button class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0" @click="toggleSource">
-          {{ sourceOpen ? t("pluginPresentHtml.hideSource") : t("pluginPresentHtml.showSource") }}
-        </button>
+      <button
+        class="px-2 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 shrink-0"
+        :title="t('pluginPresentHtml.saveAsPdf')"
+        @click="printToPdf"
+      >
+        <span class="material-icons text-sm align-middle">picture_as_pdf</span>
+        {{ t("pluginPresentHtml.pdf") }}
+      </button>
+    </div>
+    <div class="iframe-wrapper">
+      <iframe v-if="previewUrl" :src="previewUrl" sandbox="allow-scripts" class="w-full h-full border-0" />
+      <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">
+        {{ t("pluginPresentHtml.untitled") }}
       </div>
     </div>
-    <div v-if="sourceOpen" class="border-b border-gray-100 shrink-0">
-      <div v-if="sourceError" class="px-3 py-2 text-xs text-red-700 bg-red-50">
-        {{ t("pluginPresentHtml.sourceError", { error: sourceError }) }}
-      </div>
-      <textarea :value="textareaValue" readonly class="w-full text-xs text-gray-600 bg-gray-50 p-3 font-mono resize-none outline-none" rows="16" />
-    </div>
-    <iframe v-if="previewUrl" :src="previewUrl" sandbox="allow-scripts" class="flex-1 w-full border-0" />
-    <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-500">
-      {{ t("pluginPresentHtml.untitled") }}
+
+    <div class="bottom-bar-wrapper">
+      <details ref="sourceDetails" class="html-source" @toggle="onDetailsToggle">
+        <summary>{{ t("pluginPresentHtml.editSource") }}</summary>
+        <div v-if="sourceError" class="load-error-banner" role="alert">
+          {{ t("pluginPresentHtml.sourceError", { error: sourceError }) }}
+        </div>
+        <textarea
+          v-model="editableHtml"
+          :disabled="sourceLoading"
+          :placeholder="sourceLoading ? t('pluginPresentHtml.loadingSource') : ''"
+          spellcheck="false"
+          class="html-editor"
+        ></textarea>
+        <div class="editor-actions">
+          <button class="apply-btn" :disabled="!hasChanges || saving || sourceLoading" @click="applyHtml">
+            {{ saving ? t("pluginPresentHtml.saving") : t("pluginPresentHtml.applyChanges") }}
+          </button>
+          <button class="cancel-btn" @click="cancelEdit">{{ t("pluginPresentHtml.cancel") }}</button>
+        </div>
+        <p v-if="saveError" class="save-error" role="alert">{{ t("pluginPresentHtml.saveError", { error: saveError }) }}</p>
+      </details>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "./index";
 import { htmlPreviewUrlFor } from "../../composables/useContentDisplay";
-import { apiFetchRaw } from "../../utils/api";
+import { apiFetchRaw, apiPut } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { errorMessage } from "../../utils/errors";
 import { buildPrintCspContent } from "../../utils/html/previewCsp";
@@ -67,21 +81,29 @@ const PRINT_AUTO_SCRIPT = `${PRINT_SCRIPT_OPEN_TAG}addEventListener("load", () =
 const data = computed(() => props.selectedResult.data);
 const title = computed(() => data.value?.title);
 const filePath = computed(() => data.value?.filePath ?? null);
-const previewUrl = computed(() => htmlPreviewUrlFor(filePath.value));
 
-const sourceOpen = ref(false);
+// Bumped after a successful save so the iframe refetches the freshly
+// written file instead of showing the stale cached version.
+const previewVersion = ref(0);
+const previewUrl = computed(() => {
+  const base = htmlPreviewUrlFor(filePath.value);
+  if (!base) return null;
+  return previewVersion.value > 0 ? `${base}?v=${previewVersion.value}` : base;
+});
+
+const sourceDetails = ref<HTMLDetailsElement>();
+const editing = ref(false);
 // Keyed by filePath so a remounted/reused View instance with a
 // different selectedResult does not return stale source.
 const sourceCache = ref<Record<string, string>>({});
 const sourceLoading = ref(false);
 const sourceError = ref<string | null>(null);
+const editableHtml = ref("");
+const saving = ref(false);
+const saveError = ref<string | null>(null);
 
 const cachedSource = computed(() => (filePath.value ? (sourceCache.value[filePath.value] ?? null) : null));
-
-const textareaValue = computed(() => {
-  if (sourceLoading.value) return t("pluginPresentHtml.loadingSource");
-  return cachedSource.value ?? "";
-});
+const hasChanges = computed(() => cachedSource.value !== null && editableHtml.value !== cachedSource.value);
 
 async function fetchSource(): Promise<string | null> {
   const path = filePath.value;
@@ -98,6 +120,12 @@ async function fetchSource(): Promise<string | null> {
     // not navigated to a different file in the meantime.
     if (filePath.value === path) {
       sourceCache.value = { ...sourceCache.value, [path]: text };
+      // Seed the editor with the fresh source if the user hasn't
+      // started typing — avoids clobbering an in-progress edit if a
+      // refetch races with user input.
+      if (editableHtml.value === "") {
+        editableHtml.value = text;
+      }
     }
     return text;
   } catch (err) {
@@ -112,14 +140,54 @@ async function fetchSource(): Promise<string | null> {
   }
 }
 
-async function toggleSource() {
-  if (sourceOpen.value) {
-    sourceOpen.value = false;
+function onDetailsToggle(event: Event) {
+  const { open } = event.target as HTMLDetailsElement;
+  editing.value = open;
+  if (open) {
+    saveError.value = null;
+    editableHtml.value = cachedSource.value ?? "";
+    if (cachedSource.value === null) {
+      void fetchSource();
+    }
+  } else {
+    editableHtml.value = cachedSource.value ?? "";
+    saveError.value = null;
+  }
+}
+
+function cancelEdit() {
+  if (sourceDetails.value) sourceDetails.value.open = false;
+}
+
+async function applyHtml() {
+  const path = filePath.value;
+  if (!path) return;
+  saveError.value = null;
+  saving.value = true;
+  const result = await apiPut<{ path: string }>(API_ROUTES.html.update, {
+    relativePath: path,
+    html: editableHtml.value,
+  });
+  saving.value = false;
+  if (!result.ok) {
+    saveError.value = result.error;
     return;
   }
-  sourceOpen.value = true;
-  await fetchSource();
+  // Commit the new canonical source and force the iframe to refetch.
+  sourceCache.value = { ...sourceCache.value, [path]: editableHtml.value };
+  previewVersion.value += 1;
+  if (sourceDetails.value) sourceDetails.value.open = false;
 }
+
+// When the user navigates to a different result, reset the editor so
+// stale text from the previous file doesn't carry over.
+watch(filePath, () => {
+  if (sourceDetails.value) sourceDetails.value.open = false;
+  editableHtml.value = "";
+  saveError.value = null;
+  sourceError.value = null;
+  previewVersion.value = 0;
+});
 
 // Build the print-mode HTML by injecting four pieces into <head>:
 // (1) `<base href>` so relative refs in the LLM HTML
@@ -161,8 +229,9 @@ async function printToPdf() {
   const sourceHtml = await fetchSource();
   if (sourceHtml === null) {
     // Reuse the sourceError banner so the user sees the failure
-    // without shipping a second error UI.
-    sourceOpen.value = true;
+    // without shipping a second error UI. Open the edit panel so the
+    // banner is visible.
+    if (sourceDetails.value) sourceDetails.value.open = true;
     return;
   }
   const printable = buildPrintableHtml(sourceHtml, baseHrefDir);
@@ -177,3 +246,151 @@ async function printToPdf() {
   setTimeout(() => printFrame.remove(), 60_000);
 }
 </script>
+
+<style scoped>
+.html-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  overflow: hidden;
+}
+
+.iframe-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bottom-bar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.html-source {
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  font-family: monospace;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.html-source summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 0.5rem;
+  background: #e8e8e8;
+  border-radius: 4px;
+  font-weight: 500;
+  color: #333;
+}
+
+.html-source[open] summary {
+  margin-bottom: 0.5rem;
+}
+
+.html-source summary:hover {
+  background: #d8d8d8;
+}
+
+.html-editor {
+  width: 100%;
+  height: 40vh;
+  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  color: #333;
+  font-family: "Courier New", monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.html-editor:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.html-editor:disabled {
+  background: #f5f5f5;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.apply-btn {
+  padding: 0.5rem 1rem;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+
+.apply-btn:hover {
+  background: #45a049;
+}
+
+.apply-btn:active {
+  background: #3d8b40;
+}
+
+.apply-btn:disabled {
+  background: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.apply-btn:disabled:hover {
+  background: #cccccc;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.save-error {
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.6rem;
+  background: #fdecea;
+  color: #b71c1c;
+  border: 1px solid #f5c2c7;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.load-error-banner {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fdecea;
+  color: #b71c1c;
+  border: 1px solid #f5c2c7;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.cancel-btn {
+  padding: 0.5rem 1rem;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+
+.cancel-btn:hover {
+  background: #d0d0d0;
+}
+</style>

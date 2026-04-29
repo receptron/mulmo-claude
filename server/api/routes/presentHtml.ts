@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { writeWorkspaceText } from "../../utils/files/workspace-io.js";
 import { buildArtifactPath } from "../../utils/files/naming.js";
+import { overwriteHtml, isHtmlPath } from "../../utils/files/html-store.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -53,5 +54,53 @@ router.post(API_ROUTES.html.present, async (req: Request<object, unknown, Presen
     serverError(res, errorMessage(err));
   }
 });
+
+// Update html file on disk (user edits in View). Body carries the
+// workspace-relative path verbatim (e.g.
+// `artifacts/html/2026/04/page-abc.html`) so the route doesn't have to
+// reconstruct one from a basename — same shape as plugins.updateMarkdown.
+interface UpdateHtmlBody {
+  relativePath: string;
+  html: string;
+}
+
+interface UpdateHtmlSuccessResponse {
+  path: string;
+}
+
+interface UpdateHtmlErrorResponse {
+  error: string;
+}
+
+router.put(
+  API_ROUTES.html.update,
+  async (req: Request<object, unknown, UpdateHtmlBody>, res: Response<UpdateHtmlSuccessResponse | UpdateHtmlErrorResponse>) => {
+    const { relativePath, html } = req.body;
+    log.info("html", "update: start", {
+      pathPreview: typeof relativePath === "string" ? previewSnippet(relativePath) : undefined,
+      bytes: typeof html === "string" ? html.length : undefined,
+    });
+    if (!html) {
+      log.warn("html", "update: missing html");
+      badRequest(res, "html is required");
+      return;
+    }
+    if (!relativePath || !isHtmlPath(relativePath)) {
+      log.warn("html", "update: invalid relativePath", {
+        pathPreview: typeof relativePath === "string" ? previewSnippet(relativePath) : undefined,
+      });
+      badRequest(res, "invalid html relativePath");
+      return;
+    }
+    try {
+      await overwriteHtml(relativePath, html);
+      log.info("html", "update: ok", { pathPreview: previewSnippet(relativePath), bytes: html.length });
+      res.json({ path: relativePath });
+    } catch (err) {
+      log.error("html", "update: threw", { pathPreview: previewSnippet(relativePath), error: errorMessage(err) });
+      serverError(res, errorMessage(err));
+    }
+  },
+);
 
 export default router;

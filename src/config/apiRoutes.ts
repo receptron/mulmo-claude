@@ -65,6 +65,10 @@ export const API_ROUTES = {
     generate: "/api/generate-html",
     edit: "/api/edit-html",
     present: "/api/present-html",
+    // Body carries the workspace-relative path so the route doesn't
+    // have to reconstruct one from a basename — same shape as
+    // plugins.updateMarkdown / image.update.
+    update: "/api/htmls/update",
   },
 
   image: {
