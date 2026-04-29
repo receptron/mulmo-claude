@@ -70,31 +70,45 @@ const filePath = computed(() => data.value?.filePath ?? null);
 const previewUrl = computed(() => htmlPreviewUrlFor(filePath.value));
 
 const sourceOpen = ref(false);
-const sourceCache = ref<string | null>(null);
+// Keyed by filePath so a remounted/reused View instance with a
+// different selectedResult does not return stale source.
+const sourceCache = ref<Record<string, string>>({});
 const sourceLoading = ref(false);
 const sourceError = ref<string | null>(null);
 
+const cachedSource = computed(() => (filePath.value ? (sourceCache.value[filePath.value] ?? null) : null));
+
 const textareaValue = computed(() => {
   if (sourceLoading.value) return t("pluginPresentHtml.loadingSource");
-  return sourceCache.value ?? "";
+  return cachedSource.value ?? "";
 });
 
 async function fetchSource(): Promise<string | null> {
-  if (sourceCache.value !== null) return sourceCache.value;
-  if (!filePath.value) return null;
+  const path = filePath.value;
+  if (!path) return null;
+  const hit = sourceCache.value[path];
+  if (hit !== undefined) return hit;
   sourceLoading.value = true;
   sourceError.value = null;
   try {
-    const resp = await apiFetchRaw(API_ROUTES.files.raw, { query: { path: filePath.value } });
+    const resp = await apiFetchRaw(API_ROUTES.files.raw, { query: { path } });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
-    sourceCache.value = text;
+    // Stale-response guard: only commit the result if the user has
+    // not navigated to a different file in the meantime.
+    if (filePath.value === path) {
+      sourceCache.value = { ...sourceCache.value, [path]: text };
+    }
     return text;
   } catch (err) {
-    sourceError.value = errorMessage(err);
+    if (filePath.value === path) {
+      sourceError.value = errorMessage(err);
+    }
     return null;
   } finally {
-    sourceLoading.value = false;
+    if (filePath.value === path) {
+      sourceLoading.value = false;
+    }
   }
 }
 
@@ -114,14 +128,22 @@ async function toggleSource() {
 // srcdoc, so its origin is opaque and `'self'` would not match.
 // (3) PRINT_STYLE_CSS for color-exact print and tight margins.
 // (4) Auto-print script — fires `window.print()` once load completes.
+// Match `</head>` case-insensitively with optional whitespace before
+// the `>` — same convention as `wrapHtmlWithPreviewCsp` so uppercase
+// or weird whitespace LLM HTML still gets the injection.
+const HEAD_CLOSE_RE = /<\/head\s*>/i;
+
 function buildPrintableHtml(sourceHtml: string, baseHrefDir: string): string {
   const cspContent = buildPrintCspContent(window.location.origin);
   const cspMeta = `<meta http-equiv="Content-Security-Policy" content="${cspContent}">`;
   const baseTag = `<base href="${baseHrefDir}">`;
   const styleTag = `<style>${PRINT_STYLE_CSS}</style>`;
   const injection = `${baseTag}${cspMeta}${styleTag}${PRINT_AUTO_SCRIPT}`;
-  const headClose = "</head>";
-  return sourceHtml.includes(headClose) ? sourceHtml.replace(headClose, `${injection}${headClose}`) : `<head>${injection}${headClose}${sourceHtml}`;
+  const match = HEAD_CLOSE_RE.exec(sourceHtml);
+  if (match) {
+    return sourceHtml.replace(match[0], `${injection}${match[0]}`);
+  }
+  return `<head>${injection}</head>${sourceHtml}`;
 }
 
 function printableBaseHrefDir(filePathValue: string): string | null {
