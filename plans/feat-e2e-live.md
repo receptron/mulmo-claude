@@ -62,7 +62,7 @@ e2e-live/
   skills.spec.ts            ← Skill/Tool
   docker.spec.ts            ← Docker 環境特有のバグ検証
 
-playwright.live.config.ts   ← 別 config（headed, 長 timeout, workers=1）
+e2e-live/playwright.config.ts   ← 別 config（headed, 長 timeout, workers=1）
 
 .claude/skills/
   e2e-live/SKILL.md           ← 親（全カテゴリ実行）
@@ -446,18 +446,15 @@ mulmoclaude の Docker サンドボックスは `DISABLE_SANDBOX=1 yarn dev` で
 
 artifact mode（次 PR）でも launcher 再起動が必要なため、 同じ「人間依頼」方式を踏襲する。
 
-### 画像戦略
+### 画像戦略 — 効果（補足）
 
-- **fixture 再利用**（L-01〜L-04, L-06）: `e2e-live/fixtures/images/sample.png` を workspace に配置 → LLM に「このファイルを `<img>` で参照する HTML / Markdown を作って」と依頼
-- **実生成 1 枚**（L-05）: generateImage 経路自体を検証するため、実際に画像生成
-- 元データ: `src/assets/mulmo_bw.png` を fixture としてコピー
+上の「画像戦略」 で書いた fixture 再利用 + 単発実生成の構成を採るメリット:
 
-これにより：
 - LLM 応答ばらつきを吸収（画像内容は決定論的）
 - 実行時間短縮
 - path-traversal 防御の検証は fixture 経由でも十分可能
 
-### `playwright.live.config.ts`
+### `e2e-live/playwright.config.ts`
 
 ```ts
 export default defineConfig({
@@ -490,7 +487,7 @@ export default defineConfig({
 
 ### `.gitignore` 追記
 
-```
+```text
 test-results-live/
 playwright-report-live/
 ```
@@ -501,14 +498,14 @@ playwright-report-live/
 
 ```json
 {
-  "test:e2e:live": "playwright test --config=playwright.live.config.ts",
-  "test:e2e:live:media": "playwright test --config=playwright.live.config.ts media.spec.ts",
-  "test:e2e:live:roles": "playwright test --config=playwright.live.config.ts roles.spec.ts",
-  "test:e2e:live:session": "playwright test --config=playwright.live.config.ts session.spec.ts",
-  "test:e2e:live:wiki": "playwright test --config=playwright.live.config.ts wiki.spec.ts",
-  "test:e2e:live:ui": "playwright test --config=playwright.live.config.ts ui.spec.ts",
-  "test:e2e:live:skills": "playwright test --config=playwright.live.config.ts skills.spec.ts",
-  "test:e2e:live:docker": "playwright test --config=playwright.live.config.ts docker.spec.ts"
+  "test:e2e:live": "playwright test --config e2e-live/playwright.config.ts",
+  "test:e2e:live:media": "playwright test --config e2e-live/playwright.config.ts media.spec.ts",
+  "test:e2e:live:roles": "playwright test --config e2e-live/playwright.config.ts roles.spec.ts",
+  "test:e2e:live:session": "playwright test --config e2e-live/playwright.config.ts session.spec.ts",
+  "test:e2e:live:wiki": "playwright test --config e2e-live/playwright.config.ts wiki.spec.ts",
+  "test:e2e:live:ui": "playwright test --config e2e-live/playwright.config.ts ui.spec.ts",
+  "test:e2e:live:skills": "playwright test --config e2e-live/playwright.config.ts skills.spec.ts",
+  "test:e2e:live:docker": "playwright test --config e2e-live/playwright.config.ts docker.spec.ts"
 }
 ```
 
@@ -555,7 +552,7 @@ HEADED=1 yarn test:e2e:live:media   # Chromium ウィンドウが開き、slowMo
 
 ### 親 skill `/e2e-live` の両モード巡回フロー
 
-```
+```text
 [Step 1] 現在モード（例: docker-off）で 30 シナリオを実行
     ↓
 [Step 2] 結果サマリ表示（pass/fail カウント、失敗詳細）
@@ -659,7 +656,7 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 
 ### skill 設計案
 
-```
+```text
 .claude/skills/e2e-live-pre-release/SKILL.md
   1. 最新 publish smoke run の artifact を gh run download
   2. /tmp に npm install で展開
@@ -682,7 +679,7 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 | PR | 内容 | 規模 |
 |---|---|---|
 | **#1** | このファイル `plans/feat-e2e-live.md` のみ（設計合意） | 小 |
-| **#2** | 基盤: `e2e-live/fixtures/`, `playwright.live.config.ts`, `package.json` scripts, **`.gitignore` に `test-results-live/` `playwright-report-live/` 追記**, `/e2e-live` 親 skill, `/e2e-live-media` skill, **L-01 サンプル 1 本** | 中 |
+| **#2** | 基盤: `e2e-live/fixtures/`, `e2e-live/playwright.config.ts`, `package.json` scripts, **`.gitignore` に `test-results-live/` `playwright-report-live/` 追記**, `/e2e-live` 親 skill, `/e2e-live-media` skill, **L-01 サンプル 1 本** | 中 |
 | #3 | media 残り（L-02〜L-05） | 中 |
 | #4 | roles 全部（L-06〜L-10）+ `/e2e-live-roles` skill | 中 |
 | #5 | session 全部（L-11〜L-13）+ `/e2e-live-session` skill | 小 |

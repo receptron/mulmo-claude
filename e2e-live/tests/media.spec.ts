@@ -70,21 +70,28 @@ test.describe("media (real LLM)", () => {
       await waitForImgInPresentHtml(page, 'img[alt="sample"]');
 
       const src = await readImgSrcInPresentHtml(page, 'img[alt="sample"]');
-      expect(src, "presentHtml iframe should contain <img alt='sample'>").not.toBeNull();
+      // Use an explicit guard rather than non-null assertions so a
+      // null surface produces a clear test failure and downstream
+      // assertions can use `src` without `!`.
+      if (src === null) {
+        throw new Error("presentHtml iframe should contain <img alt='sample'>");
+      }
       // Per PR #982 the LLM keeps the relative `../../../images/...`
       // path verbatim — the browser resolves it against the iframe's
       // src (the /artifacts/html/... mount). Asserting the unresolved
       // attribute keeps us decoupled from that resolution.
-      expect(src!).toContain("e2e-live-l01.png");
-      expect(src!, "the LLM must follow the relative-path convention from PR #982").not.toMatch(/^\/artifacts\//);
+      expect(src).toContain("e2e-live-l01.png");
+      expect(src, "the LLM must follow the relative-path convention from PR #982").not.toMatch(/^\/artifacts\//);
 
       // The URL must resolve to the actual fixture file. A broken
       // image leaves naturalWidth at 0, which is the failure mode
       // B-18 produced.
       const size = await readImgNaturalSize(page, 'img[alt="sample"]');
-      expect(size, "naturalSize should be readable").not.toBeNull();
-      expect(size!.width, "image must actually decode (B-18 regression)").toBeGreaterThan(0);
-      expect(size!.height).toBeGreaterThan(0);
+      if (size === null) {
+        throw new Error("naturalSize should be readable");
+      }
+      expect(size.width, "image must actually decode (B-18 regression)").toBeGreaterThan(0);
+      expect(size.height).toBeGreaterThan(0);
 
       // Let the assistant finish its full turn before ending the
       // test so the trace / video captures the final text reply

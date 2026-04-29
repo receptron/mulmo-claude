@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { type Download, type FrameLocator, type Page, expect } from "@playwright/test";
 
+import { API_ROUTES } from "../../src/config/apiRoutes";
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 
 const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +25,21 @@ function workspaceRoot(): string {
 }
 
 /**
+ * Resolve a workspace-relative path to an absolute path inside the
+ * workspace root, refusing anything that escapes the root via `..`
+ * or absolute paths. Defensive guard so a mistyped fixture target
+ * cannot delete arbitrary files on the host.
+ */
+function resolveWorkspacePath(workspaceRel: string): string {
+  const root = path.resolve(workspaceRoot());
+  const target = path.resolve(root, workspaceRel);
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new Error(`Workspace-relative path escapes workspace root: ${workspaceRel}`);
+  }
+  return target;
+}
+
+/**
  * Copy a fixture file (relative to `e2e-live/fixtures/`) into the
  * workspace at the given relative path. Creates intermediate dirs.
  * Returns the absolute destination path so the spec can pass it on
@@ -33,7 +49,7 @@ function workspaceRoot(): string {
  */
 export async function placeFixtureInWorkspace(fixtureRel: string, workspaceRel: string): Promise<string> {
   const src = path.join(FIXTURES_DIR, fixtureRel);
-  const dst = path.join(workspaceRoot(), workspaceRel);
+  const dst = resolveWorkspacePath(workspaceRel);
   await mkdir(path.dirname(dst), { recursive: true });
   await copyFile(src, dst);
   return dst;
@@ -41,7 +57,7 @@ export async function placeFixtureInWorkspace(fixtureRel: string, workspaceRel: 
 
 /** Best-effort delete; never throws if the file is already gone. */
 export async function removeFromWorkspace(workspaceRel: string): Promise<void> {
-  await rm(path.join(workspaceRoot(), workspaceRel), { force: true });
+  await rm(resolveWorkspacePath(workspaceRel), { force: true });
 }
 
 /**
@@ -66,17 +82,32 @@ export function getCurrentSessionId(page: Page): string | null {
  */
 export async function deleteSession(page: Page, sessionId: string): Promise<void> {
   if (page.isClosed()) return;
+  // Build the route from the shared API_ROUTES table on the Node
+  // side so this stays in sync with the server when the route
+  // template changes.
+  const url = API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId));
   try {
     await page.evaluate(async (target) => {
       const meta = document.querySelector('meta[name="mulmoclaude-auth"]');
       const token = meta?.getAttribute("content") ?? "";
-      await fetch(`/api/sessions/${encodeURIComponent(target)}`, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-    }, sessionId);
+      try {
+        const response = await fetch(target, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+          // eslint-disable-next-line no-console -- surface cleanup
+          // failures so a chronically broken delete is visible in
+          // the test log without failing the suite
+          console.warn(`deleteSession: ${target} returned HTTP ${response.status}`);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`deleteSession: network error for ${target}`, err);
+      }
+    }, url);
   } catch {
-    // best-effort
+    // best-effort: page already closed, server restarting, etc.
   }
 }
 
