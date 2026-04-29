@@ -122,7 +122,10 @@ export function normalizeColumns(raw: unknown): StatusColumn[] {
 // normalizeColumns.
 export function doneColumnId(columns: StatusColumn[]): string {
   const done = columns.find((column) => column.isDone);
-  return done ? done.id : columns[columns.length - 1]!.id;
+  if (done) return done.id;
+  const last = columns[columns.length - 1];
+  if (!last) throw new Error("doneColumnId: empty columns array (normalizeColumns invariant violated)");
+  return last.id;
 }
 
 // id of the first non-done column, used as the default status when
@@ -328,6 +331,10 @@ export function handleReorderColumns(columns: StatusColumn[], ids: string[]): Co
     seen.add(columnId);
   }
   const byId = new Map(columns.map((column) => [column.id, column]));
-  const next = ids.map((columnId) => byId.get(columnId)!);
+  const next = ids.map((columnId) => {
+    const column = byId.get(columnId);
+    if (!column) throw new Error(`reorderColumns: missing column for id "${columnId}" (set-equality check above missed it)`);
+    return column;
+  });
   return { kind: "success", columns: next };
 }

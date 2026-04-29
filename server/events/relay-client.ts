@@ -272,7 +272,7 @@ export function connectRelay(deps: RelayClientDeps): RelayClientHandle {
     });
     while (responseQueue.length > 0) {
       if (!socket || socket.readyState !== WebSocket.OPEN) break;
-      const response = responseQueue[0]!;
+      const [response] = responseQueue;
       if (!trySend(response)) break;
       responseQueue.shift();
     }
