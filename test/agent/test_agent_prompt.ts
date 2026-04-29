@@ -218,6 +218,21 @@ describe("buildSystemPrompt", () => {
     assert.ok(result.includes(`Workspace directory: ${workspace}`));
   });
 
+  it("contains the image-reference convention (stage 2 of plans/feat-image-path-routing)", () => {
+    const role = makeRole();
+    const result = buildSystemPrompt({
+      role,
+      workspacePath: workspace,
+      useDocker: false,
+    });
+    assert.ok(result.includes("Image references in markdown / HTML"));
+    // Each rule in the section must appear so a future refactor that
+    // accidentally drops a bullet trips this test.
+    assert.match(result, /relative path/i);
+    assert.ok(result.includes("/artifacts/images/"));
+    assert.match(result, /never write `\/api\/files\/raw\?path=\.\.\.` urls/i);
+  });
+
   it("contains today's date", () => {
     const role = makeRole();
     const result = buildSystemPrompt({
