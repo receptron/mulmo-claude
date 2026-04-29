@@ -6,152 +6,217 @@ Tracking: #963
 
 Claude Code's built-in Write/Edit tools let the LLM modify wiki pages
 (`data/wiki/pages/*.md`) directly, bypassing the `manageWiki` MCP tool
-that historically owned wiki I/O. Today the chat history renders these
-tool calls as generic JSON — the user can't see the wiki page that was
-just written.
+that historically owned wiki I/O. Today the chat history shows
+nothing for these tool calls — built-in tools (Write/Edit/Read/Bash)
+appear only in the right sidebar's `toolCallHistory`, which is
+**not persisted** to the session JSONL.
 
-PR #955 introduced a PostToolUse snapshot hook that captures the page
-at the moment of every Write/Edit. The snapshot files at
-`data/wiki/.history/<slug>/<stamp>-<shortId>.md` carry the full body +
-frontmatter as it existed at that instant.
+PR #955 added a PostToolUse snapshot hook that captures the page at
+the moment of every Write/Edit. Files at
+`data/wiki/.history/<slug>/<filenameStamp>-<shortId>.md` carry the
+full body + frontmatter as it existed at that instant.
 
-Stage 3a wires those two together: detect wiki Writes in the chat,
-fetch the matching snapshot, render it inline in the assistant bubble.
+Stage 3a:
 
-Once Stage 3a is in place, `manageWiki` no longer needs to exist as a
-display tool — Stage 3b will remove it.
+1. The same hook → server endpoint also publishes a synthetic
+   `wikiPageWrite` toolResult into the active chat session.
+2. The toolResult is persisted in JSONL (existing `pushToolResult`
+   pipeline) and broadcast to the live SSE stream, so canvas updates
+   in real time AND replays correctly on reload.
+3. A new `wikiPageWrite` plugin (View component only — not an MCP
+   tool) receives the toolResult, fetches the snapshot file by stamp,
+   and renders via the `<WikiPageBody>` extracted in step 1.
+4. If the snapshot has been GC'd, render falls back to reading the
+   current page file via the recorded `pagePath`, with a banner
+   noting the fallback.
+
+Stage 3b (separate PR) then removes the `manageWiki` MCP tool.
 
 ## Scope
 
-### In scope
-1. Extract a pure `<WikiPagePreview>` component from
-   `src/plugins/wiki/View.vue` (props: `slug`, `body`, `frontmatter?`).
-   The existing `View.vue` continues to use it — no behavior change.
-2. Server: confirm or add an endpoint that lists snapshots for a slug
-   (so the client can pick the right one by timestamp).
-   `readSnapshot(slug, stamp)` already exists.
-3. Client tool-result detection: in the chat-history renderer, when a
-   tool call has `toolName ∈ {Write, Edit}` and
-   `toolInput.file_path` matches `data/wiki/pages/*.md`, render
-   `<WikiWriteResult>` instead of the generic JSON view.
-4. `<WikiWriteResult>` fetches the historical snapshot whose
-   `_snapshot_ts` is the smallest `>= toolResultTs` for that slug, and
-   renders it via `<WikiPagePreview>`.
-5. Snapshot missing / not yet written → fall back to current page
-   content with a small "showing latest" banner.
-6. Tests: component test for `<WikiPagePreview>`, unit test for the
-   snapshot-lookup matching logic, e2e for "LLM writes wiki → preview
-   shows in chat".
+### In scope (this PR)
+1. **Already done — step 1**: Pure `<WikiPageBody>` extracted from
+   `View.vue`. Commit `f6e1c2e6`.
+2. **Already verified — step 2**: history endpoints
+   `GET /api/wiki/pages/:slug/history` (list) +
+   `/:stamp` (single) exist with the shape we need.
+3. **Server side — emit synthetic toolResult on snapshot**: extend
+   `POST /api/wiki/internal/snapshot` (in
+   `server/api/routes/wiki/history.ts`) so that after `appendSnapshot`
+   completes, it also calls `pushToolResult(sessionId, ...)` with a
+   `wikiPageWrite` toolResult. Skipped silently when no `sessionId`
+   was supplied (e.g. ad-hoc CLI invocation, no chat to update).
+4. **Client side — register plugin + render**: new
+   `src/plugins/wikiPageWrite/` directory with `index.ts` (plugin
+   record), `View.vue`, optional `Preview.vue`. Registered in
+   `src/tools/index.ts`. Not MCP-callable (no `definition.ts`).
+5. **Render flow**: View receives `{slug, stamp, pagePath}`. Tries
+   snapshot lookup; on 404 (snapshot GC'd) falls back to reading
+   the current page; on both-fail shows "page deleted".
+6. **i18n**: new strings ("snapshot expired", "page deleted")
+   added to all 8 locales.
+7. **Tests**: route test for the snapshot-emits-toolResult path, unit
+   test for the View's three render branches (snapshot / fallback /
+   missing), e2e for "LLM Writes wiki page → canvas timeline shows
+   inline preview".
 
-### Out of scope (Stage 3b)
-- Removing the `manageWiki` MCP tool definition
-- Updating role prompts (the lint_report instruction etc.)
-- Help docs (`server/workspace/helps/wiki.md`) updates
-- StackView / dailyPass cleanup of `manageWiki` references
+### Out of scope (future)
+- **Read tool**: PostToolUse on Read could surface "LLM read this
+  page" inline, but Read doesn't take a snapshot, so the data path
+  differs. Defer to a follow-up.
+- **Removing `manageWiki`** — Stage 3b.
+- **Updating role prompts** — Stage 3b.
+- **Help docs cleanup** — Stage 3b.
 
-## Steps
+## Concrete data shape
 
-### Step 1 — extract `<WikiPagePreview>` (refactor only)
-- Pull the page-rendering markup out of `View.vue` into
-  `src/plugins/wiki/components/WikiPagePreview.vue`
-- Props: `{ slug: string, body: string, frontmatter?: Record<string, unknown> }`
-- View.vue keeps its current data flow (calls `useFreshPluginData`,
-  pulls the latest content) but renders the markup via the new
-  component
-- No behavior change; existing tests pass
+ToolResult `data` payload published from the snapshot endpoint:
 
-### Step 2 — snapshot lookup (server)
-- Audit existing endpoints under `/api/wiki/pages/:slug/history/*`
-- If a "list snapshots for slug" endpoint is missing, add one that
-  returns `[{ stamp, _snapshot_ts, _snapshot_editor, _snapshot_session }]`
-  (metadata only — body comes from the per-stamp endpoint)
-- Single-snapshot read endpoint already covered by `readSnapshot`
-
-### Step 3 — `<WikiWriteResult>` component
-- New component under `src/plugins/wiki/components/WikiWriteResult.vue`
-- Props: `{ toolResult: ToolResultComplete }`
-- Logic:
-  1. Extract `slug` from `toolResult.toolInput.file_path`
-  2. Fetch list of snapshots for slug (cache by slug)
-  3. Pick the snapshot with smallest `_snapshot_ts >= toolResult.timestamp`
-  4. Fetch that snapshot's body+meta (cache by slug+stamp)
-  5. Render via `<WikiPagePreview>`
-- Fallback: if no snapshot ≥ tool timestamp exists yet (race), show
-  current page with banner
-
-### Step 4 — wire into chat tool-result rendering
-- Find the chat tool-result render dispatch (likely near `StackView.vue`
-  or wherever per-tool customization could be inserted today)
-- Add a per-tool dispatcher: `toolName === "Write" || "Edit"` AND path
-  match → `<WikiWriteResult>`. Otherwise fall through to current
-  generic JSON view
-- Keep dispatcher pluggable so future per-tool views can join cleanly
-
-### Step 5 — tests
-- `test/plugins/wiki/test_wikiPagePreview.ts` — component test
-- `test/plugins/wiki/test_snapshotLookup.ts` — match smallest
-  `_snapshot_ts >= toolTs`, handle empty list, handle race (snapshot
-  arrives later)
-- `e2e/tests/chat-wiki-preview.spec.ts` — mock LLM Write on a wiki
-  path, assert preview component visible, assert content matches
-  snapshot (not "current") when snapshot differs
-
-### Step 6 — i18n & docs
-- New strings (banner text "showing latest content (snapshot pending)")
-  added to all 8 locales in `src/lang/`
-- `docs/ui-cheatsheet.md` updated if a new chat surface region warrants
-  it (likely a small block next to the existing chat layout)
-- `CLAUDE.md` not updated (no new convention)
-
-## Snapshot timing — matching algorithm
-
-The snapshot hook fires **after** the Write completes, so the
-snapshot's `_snapshot_ts` is always slightly later than the tool
-call's wire timestamp. Matching:
-
-```
-candidates = list_snapshots(slug)
-            .filter(s => s._snapshot_ts >= toolResult.timestamp)
-            .sort_by(s => s._snapshot_ts)
-match = candidates[0]
+```ts
+interface WikiPageWriteData {
+  /** Wiki page slug, e.g. "design-shops". */
+  slug: string;
+  /** Snapshot identifier (filenameStamp + shortId), e.g.
+   *  "2026-04-29T12-34-56-789Z-abc12345". Used to fetch the
+   *  historical body via /api/wiki/pages/:slug/history/:stamp. */
+  stamp: string;
+  /** Workspace-relative path to the live wiki page, e.g.
+   *  "data/wiki/pages/design-shops.md". Stored as a fallback so
+   *  rendering still works after the snapshot is GC'd. */
+  pagePath: string;
+}
 ```
 
-Edge cases:
+The full `ToolResultComplete` shape:
 
-| Case | Behavior |
-|---|---|
-| No snapshots at all | Banner: "showing latest content (snapshot pending)", render current |
-| Tool happened before #955 ship date | Same as above |
-| Multiple Writes in same chat, same slug | Each tool call matches the next snapshot ≥ its own timestamp; correct ordering preserved |
-| Hook failed to fire | Same as "no snapshots", graceful fallback |
-| Snapshot arrives mid-render | One-time fetch on mount; banner stays until next reload |
+```ts
+{
+  uuid: <generated>,
+  toolName: "wikiPageWrite",
+  title: <slug>,
+  data: WikiPageWriteData,
+}
+```
 
-## Open questions to resolve during implementation
-- Where does the per-tool dispatcher live cleanly? `StackView.vue`
-  likely needs a small refactor to invite extension. Resolve by
-  reading the file before Step 4.
-- Should the preview show the snapshot's `_snapshot_editor` /
-  `_snapshot_session` metadata in a small footer? Default: no,
-  keep visual noise low. Add only if user asks.
+JSONL bytes per write: ~150 bytes — negligible.
+
+## Implementation steps
+
+### Step 3 — server emits synthetic toolResult
+
+File: `server/api/routes/wiki/history.ts`
+
+After `appendSnapshot(...)` succeeds in the
+`/internal/snapshot` handler:
+
+```ts
+if (typeof sessionId === "string" && sessionId.length > 0) {
+  const stamp = /* return value or last-listed stamp from appendSnapshot */;
+  await pushToolResult(sessionId, {
+    uuid: randomUUID(),
+    toolName: "wikiPageWrite",
+    title: slug,
+    data: {
+      slug,
+      stamp,
+      pagePath: path.posix.join(WORKSPACE_DIRS.wikiPages, `${slug}.md`),
+    },
+  });
+}
+```
+
+`appendSnapshot` may need a small tweak: it currently returns
+`Promise<void>`; we need it to return the stamp it just wrote so we
+can pass it through. Check the existing return shape — if it's
+already there or trivial to add, fold into this step.
+
+Skipped when `sessionId` is absent — keeps the endpoint usable for
+ad-hoc / CLI invocations without breaking on a missing chat session.
+
+### Step 4 — client plugin
+
+New directory `src/plugins/wikiPageWrite/`:
+
+- `index.ts` — exports the plugin record (no `definition` field —
+  not LLM-callable). Register in `src/tools/index.ts` next to
+  `manageWiki`.
+- `View.vue` — receives `selectedResult: ToolResultComplete<WikiPageWriteData>`.
+  Workflow:
+    1. On mount / when `result.uuid` changes, fetch
+       `GET /api/wiki/pages/:slug/history/:stamp` via `apiGet`
+    2. On 200: render `<WikiPageBody body={snapshot.body} baseDir="data/wiki/pages">`.
+       Show meta bar from `snapshot.meta` (created/updated/editor/tags).
+       Header line: "Wiki edit · {slug}" + timestamp from
+       `snapshot.ts`.
+    3. On 404: fall back to `apiGet("/api/wiki?slug=" + slug)`.
+       Show a small banner: "Snapshot expired — showing current
+       page" (i18n key: `pluginWikiPageWrite.snapshotExpired`).
+    4. On both 404: render "Page deleted" placeholder.
+- `Preview.vue` — minimal placeholder; the canvas render is the
+  primary view.
+
+### Step 5 — i18n
+
+Add to `src/lang/en.ts` (then mirror into the other 7 locales):
+
+```ts
+pluginWikiPageWrite: {
+  header: "Wiki edit",
+  snapshotExpired: "Snapshot expired — showing current page",
+  pageDeleted: "Page deleted",
+}
+```
+
+### Step 6 — tests
+
+- `test/api/test_wikiInternalSnapshotRoute.ts` (existing) — extend
+  to assert `pushToolResult` is called when `sessionId` is supplied,
+  with the expected shape; NOT called when `sessionId` is absent.
+- `test/plugins/wikiPageWrite/test_view.ts` — three render branches
+  (snapshot present / 404 → fallback / both 404 → page deleted).
+- `e2e/tests/chat-wiki-write-inline.spec.ts` — mock LLM Write on a
+  wiki page (via the snapshot endpoint), assert the canvas shows
+  the inline preview with the snapshot body.
+
+### Step 7 — docs
+
+- `docs/ui-cheatsheet.md`: small update if a new chat surface
+  region warrants. Likely adds a `[wikiPageWrite]` entry under
+  the canvas section.
+
+## Render fallback flow
+
+```
+                   ┌─ snapshot exists ─→ render snapshot body + meta
+fetch /history/:stamp ┤
+                   └─ 404 ─┐
+                          fetch /api/wiki?slug=X
+                          ├─ 200 ─→ render current body, banner: "snapshot expired"
+                          └─ 404 ─→ "page deleted" placeholder
+```
 
 ## Definition of done
-- Existing `/wiki` UI and `manageWiki` tool calls behave identically to
-  before (no regression)
-- A fresh chat where LLM writes a wiki page shows the rendered wiki
-  inline in the assistant bubble
-- Replaying an older chat with manageWiki tool results still renders
-  via `View.vue` (untouched)
+- Existing `/wiki` UI and `manageWiki` tool calls behave identically
+  to before (no regression — manageWiki not touched in this PR)
+- A fresh chat where the LLM writes a wiki page shows the rendered
+  wiki inline in the canvas timeline, sourced from the snapshot file
+- Snapshot GC'd → renders current page with banner
+- Both gone → "page deleted" placeholder
+- Reload of an old session replays correctly (toolResult was
+  persisted in JSONL)
 - All 8 locales updated
 - Lint / typecheck / build / unit / e2e green
 - Codex cross-review LGTM
 
-## Test plan (for the eventual PR description)
-- [ ] Unit: `<WikiPagePreview>` renders body and frontmatter correctly
-- [ ] Unit: snapshot lookup picks the smallest ≥ toolTs candidate
-- [ ] Unit: snapshot lookup falls back gracefully on empty list
-- [ ] E2E: LLM Write on wiki page → preview visible in assistant bubble
-- [ ] E2E: LLM Edit on existing wiki page → preview shows post-edit body
-- [ ] E2E: replay older chat with `manageWiki` action='page' result still
-      renders correctly (regression check)
-- [ ] Manual: open `/wiki` UI route — index, page view, lint_report all
-      still work
+## Test plan (for the PR description)
+- [ ] Unit: snapshot endpoint pushes toolResult when sessionId
+      present
+- [ ] Unit: snapshot endpoint skips push when sessionId absent
+- [ ] Unit: View renders snapshot body when snapshot found
+- [ ] Unit: View falls back to current page on snapshot 404
+- [ ] Unit: View shows "page deleted" placeholder on both 404
+- [ ] E2E: LLM Write on wiki page → canvas shows inline preview
+- [ ] E2E: replay older session with `manageWiki action='page'`
+      result still renders correctly (regression check)
+- [ ] Manual: open `/wiki` UI route — index, page view,
+      lint_report, history tab all still work
