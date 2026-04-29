@@ -1,4 +1,4 @@
-import { GoogleGenAI, type GenerateContentParameters } from "@google/genai";
+import { GoogleGenAI, type GenerateContentParameters, type GenerateContentResponse, type Part } from "@google/genai";
 import { env } from "../system/env.js";
 import { log } from "../system/logger/index.js";
 import { errorMessage } from "./errors.js";
@@ -27,6 +27,32 @@ export interface GeminiImageResult {
   // Optional text part returned alongside the image (or in lieu of
   // it). Used as a fallback message when imageData is empty.
   message?: string;
+}
+
+// Pull the first candidate's `content.parts` array out of a Gemini
+// response, defaulting to `[]` when any layer of the optional chain is
+// absent. Pure — exported for unit tests.
+export function firstCandidateParts(response: GenerateContentResponse): readonly Part[] {
+  return response.candidates?.[0]?.content?.parts ?? [];
+}
+
+// Pull the first candidate's `finishReason` (used in debug logs).
+// Pure — exported for unit tests.
+export function firstFinishReason(response: GenerateContentResponse): string | undefined {
+  return response.candidates?.[0]?.finishReason;
+}
+
+// Reduce a Gemini response's `parts` array down to the {imageData,
+// message} pair the rest of the app cares about. Last text wins; last
+// inline-image wins. Parts without text or `inlineData.data` are
+// skipped. Pure — exported for unit tests.
+export function extractImageResult(parts: readonly Part[]): GeminiImageResult {
+  const result: GeminiImageResult = {};
+  for (const part of parts) {
+    if (part.text) result.message = part.text;
+    if (part.inlineData?.data) result.imageData = part.inlineData.data;
+  }
+  return result;
 }
 
 // Low-level wrapper around `ai.models.generateContent` that pulls
@@ -62,18 +88,14 @@ export async function generateGeminiImageContent(
     log.debug("gemini", "generateContent: SDK threw", { model, error: errorMessage(err) });
     throw err;
   }
-  const parts = response.candidates?.[0]?.content?.parts ?? [];
-  const result: GeminiImageResult = {};
-  for (const part of parts) {
-    if (part.text) result.message = part.text;
-    if (part.inlineData?.data) result.imageData = part.inlineData.data;
-  }
+  const parts = firstCandidateParts(response);
+  const result = extractImageResult(parts);
   log.debug("gemini", "generateContent: response", {
     model,
     parts: parts.length,
     hasImage: Boolean(result.imageData),
     hasText: Boolean(result.message),
-    finishReason: response.candidates?.[0]?.finishReason,
+    finishReason: firstFinishReason(response),
   });
   return result;
 }

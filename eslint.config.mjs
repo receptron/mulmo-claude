@@ -334,13 +334,14 @@ export default [
     },
   },
   {
-    // Server-side override: cyclomatic `complexity` stays at `warn`
-    // here because the API route handlers have several legitimately
+    // API-route override: cyclomatic `complexity` stays at `warn`
+    // here because the route handlers have several legitimately
     // branchy functions (validation + auth + business logic in one
     // place) that would need a coordinated split before they can
-    // graduate. Frontend / shared `src/` code has no such concentration
-    // and is held to `error`; over time `server/` should converge.
-    files: ["server/**/*.{ts,js}"],
+    // graduate. Everything else under `server/` (utils, agent,
+    // workspace, …) is held to `error`; over time `server/api/routes/`
+    // should converge.
+    files: ["server/api/routes/**/*.{ts,js}"],
     rules: {
       complexity: ["warn", { max: 15 }],
     },
