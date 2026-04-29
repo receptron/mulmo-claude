@@ -10,6 +10,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [0.5.2] - 2026-04-29
+
+### Fixed
+
+- **Image rendering in HTML / PDF** — LLM-generated content emitting `<img src="/artifacts/images/…">` (web-rooted convention) now renders correctly. The path-traversal hardening from #384 was correct but didn't recognise the leading-slash form, so:
+  - PDF generation logged `image path escapes workspace` and produced a broken `<img>`.
+  - presentHtml plugin's iframe srcdoc 404'd the image because `/artifacts/` isn't served at the SPA origin.
+  Both paths now treat leading-slash as workspace-rooted while keeping the workspace boundary check intact (e.g. `/etc/passwd` is still rejected). (#961)
+
+---
+
 ## [0.5.1] - 2026-04-27
 
 ### Fixed
