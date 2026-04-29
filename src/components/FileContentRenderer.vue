@@ -63,10 +63,25 @@
              `allow-same-origin`, so the iframe keeps a null
              origin — it can't read MulmoClaude's cookies,
              localStorage, or the parent window's DOM.
-             A CSP meta tag is injected via wrapHtmlWithPreviewCsp
-             to restrict script loads to a vetted CDN whitelist +
-             inline; connect-src is `'none'` so the page can't
-             phone home. See src/utils/html/previewCsp.ts. -->
+
+             Two branches:
+              - Files under `artifacts/html/` load via iframe `src=`
+                pointing at the `/artifacts/html` static mount, so the
+                browser resolves relative `<img src="../images/...">`
+                against the file's real URL. CSP arrives as an HTTP
+                header on the response.
+              - Anything else falls back to `srcdoc` with a CSP meta
+                tag injected by `wrapHtmlWithPreviewCsp`. Relative
+                paths don't resolve under `srcdoc` (base URL is
+                `about:srcdoc`), but that's the historical behavior
+                for non-`artifacts/html/` HTML. -->
+        <iframe
+          v-else-if="isHtml && htmlPreviewUrl"
+          :src="htmlPreviewUrl"
+          class="w-full h-full border-0"
+          sandbox="allow-scripts"
+          :title="t('fileContentRenderer.htmlPreview')"
+        />
         <iframe
           v-else-if="isHtml"
           :srcdoc="sandboxedHtml"
@@ -156,6 +171,7 @@ const props = defineProps<{
   isJsonl: boolean;
   mdRawMode: boolean;
   sandboxedHtml: string;
+  htmlPreviewUrl: string | null;
   jsonTokens: JsonToken[];
   jsonlLines: JsonlLine[];
   mdFrontmatter: MarkdownDocView | null;

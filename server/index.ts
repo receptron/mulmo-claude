@@ -64,6 +64,7 @@ import { registerUserTasks } from "./workspace/skills/user-tasks.js";
 import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../src/types/events.js";
 import { SESSION_ORIGINS } from "../src/types/session.js";
+import { buildHtmlPreviewCsp } from "../src/utils/html/previewCsp.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "./utils/port.mjs";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
@@ -180,6 +181,70 @@ app.use(
     next();
   },
   express.static(WORKSPACE_PATHS.images, { dotfiles: "deny", fallthrough: false }),
+);
+
+// Static mount for HTML artifacts. The Files-view preview iframe
+// switched from `srcdoc` to `src=/artifacts/html/<name>.html` so the
+// browser can resolve relative `<img src="../images/...">` paths
+// against the file's actual URL — `srcdoc` documents have
+// `about:srcdoc` as their base URL, which breaks every relative ref.
+// See plans/feat-files-html-preview-relative-paths.md.
+//
+// Same three-layer guard as `/artifacts/images`:
+//  1. `.html` / `.htm` extension allowlist.
+//  2. `resolveWithinRoot` symlink-aware traversal check.
+//  3. `dotfiles: deny` + `fallthrough: false` on `express.static`.
+//
+// Bearer auth skipped for the same reason as /artifacts/images and
+// /api/files/*: an iframe `src` request can't carry an Authorization
+// header. `requireSameOrigin` and the loopback-only listener still
+// guard against cross-origin abuse.
+//
+// CSP delivered via HTTP header instead of injecting a `<meta>` tag —
+// keeps the served file pristine, and `'self'` finally matches the
+// server origin (which is what allows `<img src="../images/...">` to
+// reach `/artifacts/images/...`). Sandbox stays `allow-scripts` only,
+// so the iframe document is still opaque-origin and cannot read the
+// parent's cookies / localStorage / DOM.
+const HTML_EXT_RE = /\.html?$/i;
+let htmlsDirReal: string | null = null;
+async function getHtmlsDirReal(): Promise<string | null> {
+  if (htmlsDirReal) return htmlsDirReal;
+  try {
+    htmlsDirReal = await fsRealpath(WORKSPACE_PATHS.htmls);
+    return htmlsDirReal;
+  } catch {
+    return null;
+  }
+}
+app.use(
+  "/artifacts/html",
+  async (req, res, next) => {
+    if (!HTML_EXT_RE.test(req.path)) {
+      res.status(404).end();
+      return;
+    }
+    const root = await getHtmlsDirReal();
+    if (!root) {
+      res.status(404).end();
+      return;
+    }
+    let relPath: string;
+    try {
+      relPath = decodeURIComponent(req.path.replace(/^\//, ""));
+    } catch {
+      res.status(404).end();
+      return;
+    }
+    if (!resolveWithinRoot(root, relPath)) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp());
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    next();
+  },
+  express.static(WORKSPACE_PATHS.htmls, { dotfiles: "deny", fallthrough: false }),
 );
 
 app.get(API_ROUTES.health, (_req: Request, res: Response) => {
