@@ -61,7 +61,7 @@ export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): 
     }
     case EVENT_TYPES.generationFinished: {
       const mapKey = generationKey(event.kind, event.filePath, event.key);
-      delete session.pendingGenerations[mapKey];
+      Reflect.deleteProperty(session.pendingGenerations, mapKey);
       if (Object.keys(session.pendingGenerations).length === 0) {
         ctx.onGenerationsDrained();
       }

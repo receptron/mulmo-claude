@@ -181,7 +181,7 @@ export default [
       "no-unneeded-ternary": ["error", { defaultAssignment: false }],
       "no-else-return": ["error", { allowElseIf: false }],
       "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/no-dynamic-delete": "warn",
+      "@typescript-eslint/no-dynamic-delete": "error",
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-import-type-side-effects": "error",
       "@typescript-eslint/no-useless-empty-export": "error",
@@ -343,17 +343,6 @@ export default [
     files: ["server/**/*.{ts,js}"],
     rules: {
       complexity: ["warn", { max: 15 }],
-    },
-  },
-  {
-    // `packages/` and `server/` are now clean of dynamic-delete; hold
-    // both to `error` so a future regression fails CI immediately. The
-    // remaining ~30 `src/` violations are concentrated in
-    // `presentMulmoScript/View.vue` and stay at `warn` until that file
-    // lands its own cleanup PR — at which point this override widens.
-    files: ["packages/**/*.{ts,js}", "server/**/*.{ts,js}"],
-    rules: {
-      "@typescript-eslint/no-dynamic-delete": "error",
     },
   },
   {
