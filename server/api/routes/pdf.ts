@@ -56,7 +56,7 @@ const MIME_BY_EXT: Record<string, string> = {
 // Realpath of the workspace, resolved once at module load. Used to
 // validate that image paths resolved relative to markdowns/ stay
 // inside the workspace after symlink resolution.
-const workspaceReal = realpathSync(resolveWorkspacePath(""));
+const defaultWorkspaceRoot = realpathSync(resolveWorkspacePath(""));
 
 /**
  * Inline local images as base64 data URIs so Puppeteer can render them.
@@ -67,25 +67,33 @@ const workspaceReal = realpathSync(resolveWorkspacePath(""));
  * so an attacker-controlled <img src="../../../etc/passwd"> can't read
  * files outside the workspace.
  */
-function inlineImages(html: string): string {
-  const baseDir = path.join(workspaceReal, WORKSPACE_DIRS.markdowns);
+export function inlineImages(html: string, workspaceRoot: string = defaultWorkspaceRoot): string {
+  const baseDir = path.join(workspaceRoot, WORKSPACE_DIRS.markdowns);
   return html.replace(/(<img\s[^>]*src=")([^"]+)(")/g, (_match, before: string, src: string, after: string) => {
     if (src.startsWith("data:") || src.startsWith("http")) {
       return _match;
     }
-    // Resolve the image path relative to markdowns/ but require the
-    // final realpath to stay inside the workspace root. markdowns/
-    // references like "../images/foo.png" are common so we can't
-    // restrict to markdowns/ itself.
-    const unsafeAbs = path.resolve(baseDir, src);
+    // LLM-generated HTML often emits leading-slash workspace-rooted
+    // paths like "/artifacts/images/2026/04/foo.png" (web convention).
+    // Treat those as workspace-relative; otherwise path.resolve below
+    // sees the slash as host-absolute and the safe-resolve rejects.
+    const workspaceRooted = src.startsWith("/");
+    const resolveBase = workspaceRooted ? workspaceRoot : baseDir;
+    const relSrc = workspaceRooted ? src.slice(1) : src;
+    // Resolve the image path relative to markdowns/ (or workspace root
+    // for the leading-slash case) but require the final realpath to
+    // stay inside the workspace root. markdowns/ references like
+    // "../images/foo.png" are common so we can't restrict to markdowns/
+    // itself.
+    const unsafeAbs = path.resolve(resolveBase, relSrc);
     // Make unsafeAbs relative to the workspace for the
     // resolveWithinRoot check (it expects a relative path).
-    const relToWorkspace = path.relative(workspaceReal, unsafeAbs);
+    const relToWorkspace = path.relative(workspaceRoot, unsafeAbs);
     if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
       log.warn("pdf", "image path escapes workspace", { src });
       return _match;
     }
-    const abs = resolveWithinRoot(workspaceReal, relToWorkspace);
+    const abs = resolveWithinRoot(workspaceRoot, relToWorkspace);
     if (!abs) {
       log.warn("pdf", "image path rejected by safe-resolve", { src });
       return _match;
