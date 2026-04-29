@@ -18,7 +18,13 @@ export default defineConfig({
   testDir: "./tests",
   outputDir: "../test-results-live",
   timeout: 10 * ONE_MINUTE_MS,
-  workers: 1,
+  // The mulmoclaude server processes chat sessions concurrently
+  // (each Playwright worker gets its own session id), so running
+  // multiple specs in parallel cuts wall time roughly linearly. 3
+  // is a conservative ceiling that stays comfortably within Claude
+  // subscription rate limits even when every scenario fires off a
+  // long-running tool call.
+  workers: 3,
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "../playwright-report-live", open: "on-failure" }]],
   use: {

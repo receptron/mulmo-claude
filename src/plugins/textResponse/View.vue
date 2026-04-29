@@ -4,6 +4,7 @@
       <button
         class="h-8 px-2.5 flex items-center gap-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
         :disabled="pdfDownloading"
+        data-testid="text-response-pdf-button"
         @click="downloadPdf"
       >
         <span class="material-icons text-base">{{ pdfDownloading ? "hourglass_empty" : "download" }}</span>

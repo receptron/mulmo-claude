@@ -3,7 +3,9 @@
 // install any API mocks — the real Claude API runs end-to-end. Use
 // these helpers from specs in `e2e-live/tests/`.
 
-import { type FrameLocator, type Page, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+
+import { type Download, type FrameLocator, type Page, expect } from "@playwright/test";
 
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 
@@ -74,4 +76,25 @@ export async function readImgSrcInPresentHtml(page: Page, imgSelector: string): 
   const img = frame.locator(imgSelector).first();
   if ((await img.count()) === 0) return null;
   return await img.getAttribute("src");
+}
+
+const PDF_MAGIC = Buffer.from("%PDF-", "ascii");
+
+/**
+ * Read a Playwright `Download` into memory and check that it is a
+ * real PDF rather than an HTML error page or empty stub. Returns
+ * the buffer so the caller can run extra assertions (file size,
+ * inline image search, etc.).
+ */
+export async function readPdfDownload(download: Download): Promise<Buffer> {
+  const downloadPath = await download.path();
+  if (!downloadPath) {
+    throw new Error("Download has no on-disk path; was failOnStatusCode triggered?");
+  }
+  const buf = await readFile(downloadPath);
+  if (!buf.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
+    const head = buf.subarray(0, 64).toString("utf8");
+    throw new Error(`Downloaded file is not a PDF (first bytes: ${JSON.stringify(head)})`);
+  }
+  return buf;
 }
