@@ -708,18 +708,22 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
 
 type PutContentValidation =
   | { ok: true; relPath: string; content: string; bytes: number }
-  | { ok: false; logMsg: string; logExtra: Record<string, unknown>; message: string };
+  | { ok: false; logMsg: string; logExtra?: Record<string, unknown>; message: string };
 
 // Runtime-shape gate for PUT /api/files/content's body. Returns either
 // the narrowed inputs + their byte length (computed once and reused
 // downstream), or a structured rejection carrying the log message,
 // log extras, and the response message — so the caller can fan them
-// out into log.warn + badRequest without rebuilding context.
+// out into log.warn + badRequest without rebuilding context. `logExtra`
+// is optional so the missing-path branch can omit it: passing `{}` to
+// `log.warn` would emit `data: {}` (an observable change vs the
+// pre-refactor no-third-arg call); passing `undefined` skips the
+// `data` field entirely.
 function validatePutContentRequest(body: unknown): PutContentValidation {
   const obj = (body ?? {}) as { path?: unknown; content?: unknown };
   const { path: relPathRaw, content: contentRaw } = obj;
   if (typeof relPathRaw !== "string" || relPathRaw.length === 0) {
-    return { ok: false, logMsg: "PUT content: missing path", logExtra: {}, message: "path required" };
+    return { ok: false, logMsg: "PUT content: missing path", message: "path required" };
   }
   if (typeof contentRaw !== "string") {
     return {
