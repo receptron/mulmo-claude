@@ -23,7 +23,7 @@ const FILE_POINTER_TOOLS = new Set(["Read", "Write", "Edit"]);
 // Image-generation MCP tools. The tool result already carries the
 // saved path so we extract it; the raw bytes/base64 never leave the
 // agent stream memory.
-const IMAGE_TOOLS = new Set(["generateImage", "editImage"]);
+const IMAGE_TOOLS = new Set(["generateImage", "editImages"]);
 
 // Tool name we always route through `writeSearch.ts` before
 // classifying. Exposed so callers know which tools need a

@@ -18,7 +18,7 @@ npm install @mulmobridge/protocol
 | `CHAT_SOCKET_PATH` | Socket.io endpoint path (`"/ws/chat"`) |
 | `ChatSocketEvent` | Union type of socket event names |
 | `CHAT_SERVICE_ROUTES` | REST endpoint patterns for the bridge API |
-| `Attachment` | File attachment interface (`mimeType` + base64 `data` + optional `filename`) |
+| `Attachment` | File attachment interface — either inline base64 `data` or workspace `path`, with optional `mimeType`/`filename` |
 
 ## Usage
 

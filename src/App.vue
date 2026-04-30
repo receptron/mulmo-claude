@@ -840,11 +840,12 @@ async function sendMessage(text?: string) {
   const fileSnapshot = pastedFile.value;
   pastedFile.value = null;
 
-  // Pasted/dropped images get pre-uploaded to a workspace file so the
-  // server (and the LLM downstream) sees a relative path, not a data:
-  // URI. Non-image attachments still flow as data URIs through the
-  // legacy mergeAttachments() path. On upload failure, restore both
-  // userInput and pastedFile so the user can retry without retyping.
+  // Pasted / dropped files are pre-uploaded to a workspace file so
+  // the server (and the LLM downstream) sees a relative path — never
+  // a data: URI. The path then rides on `attachments[]` (path-only
+  // entries) alongside any sidebar-picked image. On upload failure,
+  // restore both userInput and pastedFile so the user can retry
+  // without retyping.
   let attachmentForRequest: string | undefined;
   if (fileSnapshot) {
     const resolved = await resolvePastedAttachment(fileSnapshot);
@@ -863,6 +864,8 @@ async function sendMessage(text?: string) {
 
   beginUserTurn(session, message);
   const selectedRes = session.toolResults.find((result) => result.uuid === session.selectedResultUuid) ?? undefined;
+  const sidebarPickedPath = extractImageData(selectedRes);
+  const attachmentPaths = [attachmentForRequest, sidebarPickedPath].filter((value): value is string => typeof value === "string" && value.length > 0);
 
   ensureSessionSubscription(session);
 
@@ -871,7 +874,7 @@ async function sendMessage(text?: string) {
       message,
       role: sessionRole.value,
       chatSessionId: session.id,
-      selectedImageData: attachmentForRequest ?? extractImageData(selectedRes),
+      attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : undefined,
     }),
   );
   if (!result.ok) {

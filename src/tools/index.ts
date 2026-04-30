@@ -8,7 +8,7 @@ import generateImagePlugin from "../plugins/generateImage/index";
 import QuizPlugin from "@mulmochat-plugin/quiz/vue";
 import presentFormPlugin from "../plugins/presentForm/index";
 import canvasPlugin from "../plugins/canvas/index";
-import editImagePlugin from "../plugins/editImage/index";
+import editImagesPlugin from "../plugins/editImages/index";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
 import WeatherPlugin from "@gui-chat-plugin/weather/vue";
 import todoPlugin from "../plugins/todo/index";
@@ -43,7 +43,7 @@ const plugins: Record<string, PluginEntry> = {
   openCanvas: canvasPlugin,
   presentHtml: presentHtmlPlugin,
   presentChart: presentChartPlugin,
-  editImage: editImagePlugin,
+  editImages: editImagesPlugin,
   present3D: Present3DPlugin.plugin,
   weather: WeatherPlugin.plugin,
 };
