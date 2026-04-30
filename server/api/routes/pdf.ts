@@ -201,7 +201,10 @@ export function inlineImages(html: string, options: InlineImagesOptions = {}): s
   const sourceDir = dirIsSafe && hasRequestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
   const baseDir = path.join(workspaceRoot, sourceDir);
   return transformResolvableUrlsInHtml(html, (url) => {
-    if (url.startsWith("data:") || url.startsWith("http")) return null;
+    // Narrow to exact `http://` / `https://` prefixes so a relative
+    // path like `http-assets/logo.png` isn't misclassified as
+    // external (CR follow-up on #1023).
+    if (url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) return null;
     // Skip media (mp4 / mp3 / webm / ...) — see PDF_SKIP_MEDIA_EXT_RE
     // comment. `<video poster="x.png">` still inlines because the
     // poster value's pathname ends in an image extension. The

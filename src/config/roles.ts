@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ALL_TOOL_NAMES, isToolName, type ToolName } from "./toolNames";
+import { ALL_TOOL_NAMES, TOOL_NAMES, isToolName, type ToolName } from "./toolNames";
 
 // `availablePlugins` accepts every literal listed in `TOOL_NAMES`.
 // Compile time: roles.ts static definitions below get typed as
@@ -48,16 +48,16 @@ export const ROLES: Role[] = [
       "- **Browse / lint**: direct the user to the `/wiki` UI — catalog at `/wiki`, a specific page at `/wiki/pages/<slug>`, activity log at `/wiki/log`, or the Lint button on `/wiki` for a health check.\n\n" +
       "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. The page-list section of `index.md` is a flat, recency-ordered log: prepend new pages at the top, and when a page is updated (content, description, tags, or rename) move its entry to the top — don't group by category. The Tags section (if present) still needs its per-tag page lists updated on add / rename / delete, but the tag order itself is not reordered by recency. Read `config/helps/wiki.md` for full details.",
     availablePlugins: [
-      "manageTodoList",
-      "manageCalendar",
-      "presentDocument",
-      "presentForm",
-      "presentMulmoScript",
-      "generateImage",
-      "presentHtml",
-      "readXPost",
-      "searchX",
-      "notify",
+      TOOL_NAMES.manageTodoList,
+      TOOL_NAMES.manageCalendar,
+      TOOL_NAMES.presentDocument,
+      TOOL_NAMES.presentForm,
+      TOOL_NAMES.presentMulmoScript,
+      TOOL_NAMES.generateImage,
+      TOOL_NAMES.presentHtml,
+      TOOL_NAMES.readXPost,
+      TOOL_NAMES.searchX,
+      TOOL_NAMES.notify,
     ],
     queries: [
       "Tell me about this app, MulmoClaude.",
@@ -82,17 +82,17 @@ export const ROLES: Role[] = [
       "- **UI / layout**: Tailwind CSS — https://cdn.tailwindcss.com\n" +
       "- **Data visualization**: D3.js — https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js",
     availablePlugins: [
-      "presentDocument",
-      "presentSpreadsheet",
-      "presentForm",
-      "presentMulmoScript",
-      "createMindMap",
-      "generateImage",
-      "presentHtml",
-      "presentChart",
-      "readXPost",
-      "searchX",
-      "notify",
+      TOOL_NAMES.presentDocument,
+      TOOL_NAMES.presentSpreadsheet,
+      TOOL_NAMES.presentForm,
+      TOOL_NAMES.presentMulmoScript,
+      TOOL_NAMES.createMindMap,
+      TOOL_NAMES.generateImage,
+      TOOL_NAMES.presentHtml,
+      TOOL_NAMES.presentChart,
+      TOOL_NAMES.readXPost,
+      TOOL_NAMES.searchX,
+      TOOL_NAMES.notify,
     ],
     queries: [
       "Show me the discount cash flow analysis of monthly income of $10,000 for two years. Make it possible to change the discount rate and monthly income.",
@@ -118,7 +118,7 @@ export const ROLES: Role[] = [
       '3. CREATE THE DOCUMENT: Call presentDocument with a well-structured document — open with an overview, use numbered steps or section-by-section structure, add `<a id="step-1"></a>` anchors, embed images via `![prompt](__too_be_replaced_image_path__)`, and close with tips or follow-up recommendations. Per-type document structure is in guide.md.\n\n' +
       "4. FOLLOW-UP ASSISTANCE: Offer to read any step aloud (scrollToAnchor first, then narrate), answer follow-up questions, or adjust the plan based on feedback.\n\n" +
       "TONE: Warm, enthusiastic, encouraging. Adapt vocabulary to the user's stated experience level.",
-    availablePlugins: ["presentForm", "presentDocument", "generateImage", "presentChart"],
+    availablePlugins: [TOOL_NAMES.presentForm, TOOL_NAMES.presentDocument, TOOL_NAMES.generateImage, TOOL_NAMES.presentChart],
     queries: [
       "Give me the recipe for omelette",
       "I want to plan a trip to Paris",
@@ -135,7 +135,7 @@ export const ROLES: Role[] = [
       "You are a creative visual artist assistant. Help users generate and edit images, work on visual compositions on the canvas, and create interactive generative art.\n\n" +
       "Use generateImage to create new images from descriptions, editImages to modify or combine one or more existing images, and openCanvas to set up a visual workspace.\n\n" +
       'Use presentHtml for interactive and generative art — p5.js is an excellent choice for sketches, animations, particle systems, and algorithmic visuals. Load it via CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>. Always make the canvas fill the full viewport (createCanvas(windowWidth, windowHeight)) and call windowResized() to handle resize.',
-    availablePlugins: ["generateImage", "editImages", "openCanvas", "present3D", "presentHtml"],
+    availablePlugins: [TOOL_NAMES.generateImage, TOOL_NAMES.editImages, TOOL_NAMES.openCanvas, TOOL_NAMES.present3D, TOOL_NAMES.presentHtml],
     queries: [
       "Open canvas",
       "Turn this drawing into Ghibli style image",
@@ -150,7 +150,15 @@ export const ROLES: Role[] = [
     icon: "school",
     prompt:
       "You are an experienced tutor who adapts to each student's level. Before teaching any topic, you MUST first evaluate the student's current knowledge by asking them 4-5 relevant questions about the topic by calling the putQuestions API. Based on their answers, adjust your teaching approach to match their understanding level. When explaining something to the student, choose the best presentation method for the topic: use presentHTML for topics that benefit from interactive or visual elements (e.g. diagrams, animations, interactive demos, math visualizations, maps, timelines), and use presentDocument for topics that are best explained with structured text and sections (e.g. definitions, historical facts, step-by-step processes). Use generateImage to create visual aids when appropriate. Always encourage critical thinking by asking follow-up questions and checking for understanding throughout the lesson. To evaluate the student's understanding, you can use the presentForm API to create a form that the student can fill out.",
-    availablePlugins: ["putQuestions", "presentDocument", "presentForm", "generateImage", "presentHtml", "presentChart", "manageSkills"],
+    availablePlugins: [
+      TOOL_NAMES.putQuestions,
+      TOOL_NAMES.presentDocument,
+      TOOL_NAMES.presentForm,
+      TOOL_NAMES.generateImage,
+      TOOL_NAMES.presentHtml,
+      TOOL_NAMES.presentChart,
+      TOOL_NAMES.manageSkills,
+    ],
     queries: [
       "I want to learn about Humpback whales",
       "Teach me how the solar system works",
@@ -174,7 +182,7 @@ export const ROLES: Role[] = [
       "5. For EVERY beat, set `imageNames` (array of character keys appearing in the beat) and write an `imagePrompt` describing the scene (setting, action, mood, composition).\n" +
       "6. Write a concise 1–2 sentence synopsis and put it in the top-level 'description' field.\n" +
       "7. Call presentMulmoScript with the assembled script.",
-    availablePlugins: ["presentMulmoScript"],
+    availablePlugins: [TOOL_NAMES.presentMulmoScript],
     queries: [
       "Tell a story about two siblings — a bold older sister and a shy younger brother — who get lost in an enchanted forest. Use a Studio Ghibli anime style.",
       "Create a story with three characters: a grumpy wizard, his loyal cat, and a young apprentice who must work together to break a curse. Use a dark fantasy oil painting style.",
@@ -192,7 +200,7 @@ export const ROLES: Role[] = [
       "- **manageSkills**: create, edit, list, or delete skills (reusable instructions stored as SKILL.md files in the workspace).\n" +
       "- **manageAutomations**: schedule and manage recurring or one-off tasks. When suggesting cadences, prefer hourly for news polling, daily for digests, weekly for cleanup.\n\n" +
       "When several options are involved, use presentForm to gather configuration cleanly. Confirm what you've changed at the end so the user can verify.",
-    availablePlugins: ["manageSource", "manageSkills", "manageAutomations", "presentForm"],
+    availablePlugins: [TOOL_NAMES.manageSource, TOOL_NAMES.manageSkills, TOOL_NAMES.manageAutomations, TOOL_NAMES.presentForm],
     queries: [
       "Register an RSS feed for AI news",
       "Show me my registered information sources",
