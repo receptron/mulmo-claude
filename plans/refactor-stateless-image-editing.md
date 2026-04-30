@@ -59,31 +59,43 @@
 
 ---
 
-## Stage 1: paste/drop 画像の事前 upload（path 化）
+## Stage 1: paste/drop 画像の事前 upload + path hint 投入（PR #1045）
 
-`selectedImageData` に **常に path が入る**ようにクライアントを揃える。サーバ側は何も変えない（`isImagePath()` 分岐がそのまま path 側に倒れるだけ）。
+クライアント側で paste/drop 画像を `/api/images` に事前 upload して `selectedImageData` を **常に path** にし、サーバ側は path 受信時に (a) ファイルを読んで Claude に bytes を見せる + (b) `[Selected image: <path>]` をユーザーメッセージ先頭に prepend して LLM に path を見せる。**「path hint の prepend」は当初 Stage 3 の予定だったが、Stage 1 で paste 経路の data URI → path 切り替えに伴って `parseDataUrl()` が失敗して bytes が Claude に届かなくなる回帰が出たので、回帰修正と同時に hint も Stage 1 に前倒し**（Codex レビュー指摘）。
 
 ### 変更ファイル
 
 | ファイル | 変更内容 |
 |---|---|
-| `src/App.vue` (`sendMessage` 845-861 付近) | `fileSnapshot?.dataUrl` をそのまま渡す代わりに、`apiPost(API_ROUTES.image.upload, { imageData: fileSnapshot.dataUrl })` を await してから path を `selectedImageData` に渡す。upload 失敗時は `pastedFile.value = fileSnapshot` を戻して error toast |
-| `src/components/ChatInput.vue` | （変更なし。data URI を作る責務は維持。upload は send 時。）|
-| `src/utils/api.ts` 周辺 | upload helper に薄いラッパが要れば追加 |
+| `src/App.vue` (`sendMessage`) | `fileSnapshot.dataUrl` をそのまま渡す代わりに `resolvePastedAttachment()` 経由で画像のみ事前 upload、結果の path を `selectedImageData` に渡す。upload 失敗時は `userInput` / `pastedFile` を復元 + チャットにエラー |
+| `src/utils/agent/pastedAttachment.ts` (新規) | 画像 → POST `/api/images` で path 取得、画像以外 → data URL を素通し |
+| `src/types/pastedFile.ts` (新規) | `PastedFile` 型を `.vue` から切り出し（test tsconfig が `*.vue` を ambient shim でしか見られない問題回避） |
+| `src/components/ChatInput.vue` | `PastedFile` を `src/types/pastedFile` から re-export（既存呼び出しは維持） |
+| `server/api/routes/agent.ts` `mergeAttachments` → `prepareRequestExtras` | path 受信時は `loadImageBase64()` で読んで `image/png` の Attachment を作る + `selectedImagePath` を返す。データ URL は従来通り `parseDataUrl()` 経由 |
+| `server/api/routes/agent.ts` `startChat` | `decoratedMessage` の頭に `[Selected image: <path>]\n\n` を prepend（path 受信時のみ）。jsonl への永続化や UI へのブロードキャストは raw `message` のまま |
+| `server/agent/prompt.ts` | system prompt に「`[Selected image: <path>]` マーカーの解釈ルール」セクションを追加 |
 
-`/api/images` (`server/api/routes/image.ts:188`) は既に POST で base64 を受けて path を返すので**サーバ側は無改修**。
+### Stage 1 で固まった設計上の決定
+
+- **path hint 形式**: 1 行目に `[Selected image: <workspace-relative path>]` + 空行 + 本文。複数画像はサポートしない（現状 UI が単一選択のみ）。
+- **bytes も並行供給**: vision 用途のために `image/png` の Attachment ブロックも引き続き渡す。`saveImage()` が拡張子 `.png` 固定で書くので、loaded 時の MIME も `image/png` で揃える。実バイトが JPEG / WebP の場合のミスマッチは pre-existing 問題で本リファクタの範囲外。
+- **ファイル読込失敗時**: warn ログ + bytes は付けない、ただし path hint は出す（LLM は最低限 path を知っており、必要なら Read で読みに行ける）。
+- **データ URL 経路は温存**: 画像以外（PDF / DOCX / XLSX / PPTX / text 等）は引き続き data URL → `parseDataUrl()` → Attachment。これらの path 統一は Stage 4（別プラン候補、下記参照）。
 
 ### 受け入れ条件
 
-- [ ] 画像を貼り付けて送信すると、`/api/agent` のリクエストボディに data URI ではなく `artifacts/images/YYYY/MM/<id>.png` 形式の path が乗っている（devtools Network で確認）
-- [ ] `editImage` が貼り付け画像に対しても通る（`isImagePath()` 分岐が path 側に倒れる）
-- [ ] upload 失敗時に「再度貼り付けてください」相当の UI フィードバック
-- [ ] e2e の chat-paste 系テスト緑（無ければ最低 1 本追加）
+- [x] 画像を貼り付けて送信すると、`/api/agent` のリクエストボディに data URI ではなく `artifacts/images/YYYY/MM/<id>.png` 形式の path が乗っている
+- [x] `editImage` が貼り付け画像に対しても通る（`isImagePath()` 分岐が path 側に倒れる）
+- [x] 「この画像を説明して」が引き続き動く（bytes が attachment として届く）
+- [x] LLM 入力メッセージの 1 行目に `[Selected image: <path>]` が乗っている
+- [x] upload 失敗時に `userInput` / `pastedFile` が復元される
+- [x] `yarn format && yarn lint && yarn typecheck && yarn build && yarn test` 全緑
 
-### Out of scope
+### Out of scope（Stage 2 以降に持ち越し）
 
-- `selectedImageData` の rename（stage 3）
-- `editImage` のパラメータ追加（stage 2）
+- `selectedImageData` の rename（Stage 3）
+- `editImage` のパラメータ追加（Stage 2）
+- session-store からの選択画像状態の削除（Stage 3）
 
 ---
 
@@ -153,25 +165,14 @@ session ストアから「選択画像」状態を完全削除。body の field 
 
 | ファイル | 変更内容 |
 |---|---|
-| `server/api/routes/agent.ts` `startChat` | (1) body の `pickedImagePath` を受け取り、`loadImageBase64()` で読んで `Attachment` を作って `attachments` に push; (2) `decoratedMessage` の頭に `[Selected image: ${pickedImagePath}]\n\n` を prepend して LLM に hint |
 | `server/api/routes/agent.ts` `AgentBody` / `StartChatParams` | `pickedImagePath?: string` を追加（rename） |
 | `src/utils/agent/request.ts` | `pickedImagePath?: string` を追加 |
-| `src/App.vue:855` | `selectedImageData` → `pickedImagePath`、値は stage 1 で確定済みの path |
+| `src/App.vue:855` | `selectedImageData` → `pickedImagePath`、値は Stage 1 で確定済みの path |
 | `packages/chat-service/src/types.ts` | `pickedImagePath?: string` を追加（bridge protocol 互換性は major bump の判断要、下記 Open Question） |
 | `server/api/routes/image.ts:138-184` | session fallback ブロック削除、`imagePath` 必須化。`!imagePath` で 400 |
 | `src/plugins/editImage/definition.ts` | `imagePath` を `required` のまま維持 |
 
-### hint prepend の形式
-
-```
-[Selected image: artifacts/images/2026/04/abc-123.png]
-
-<ユーザーが入力した本文>
-```
-
-- prepend は **server side** で行う（client 側でやると bridge クライアントが取り残される）
-- `pickedImagePath` が undefined のときは prepend しない
-- system prompt 側に「メッセージ冒頭に `[Selected image: <path>]` がある場合、その path はユーザーが現在選択している画像。`editImage` 等を呼ぶ際の `imagePath` パラメータに使うこと」という解釈ルールを 1 段落追加
+注記: `prepareRequestExtras` の path → bytes loading + path hint prepend は **Stage 1 で既に投入済み**（PR #1045）。Stage 3 では `selectedImageData` という field 名を `pickedImagePath` に rename するだけで、ロジック本体は Stage 1 の実装をそのまま流用する。
 
 ### 受け入れ条件
 
@@ -187,11 +188,24 @@ session ストアから「選択画像」状態を完全削除。body の field 
 
 ## Rollout 順序
 
-1. **Stage 1** を独立 PR で merge（client 側のみ、サーバ無改修）→ 1〜2 日モニタ
+1. **Stage 1** PR #1045（事前 upload + path hint + bytes loading、回帰修正含む）→ 1〜2 日モニタ
 2. **Stage 2** を独立 PR で merge（tool 契約拡張、session fallback 残す）→ LLM 出力サンプル目視 → prompt 微調整
 3. **Stage 3** を独立 PR で merge（session 全廃、rename）→ 全動線回帰確認
 
-各 stage は前段が完全動作している前提で次に進む。**stage 2 だけ merge して止めても**「LLM が path を渡せるようになった、session fallback もまだ残っている」という安全な中間状態。
+各 stage は前段が完全動作している前提で次に進む。**Stage 2 だけ merge して止めても**「LLM が path を渡せるようになった、session fallback もまだ残っている」という安全な中間状態。
+
+## Future direction: 全 attachment の path 統一（別プラン候補）
+
+Stage 1〜3 は **画像** に限った話だが、PDF / DOCX / XLSX / PPTX / text を貼り付けた場合は依然として data URI 経由でサーバまで運ばれている（`prepareRequestExtras` のデータ URI 分岐 + `attachmentConverter`）。これも `data/attachments/YYYY/MM/<id>.<ext>` 等に事前保存して path 統一すれば、`prepareRequestExtras` のデータ URI 分岐が消えて完全に「path-first な agent 入力」になる。
+
+ただし以下の論点があり、本リファクタには含めず別プラン化する:
+
+- **置き場所**: 既存の `data/sources/`（sources プラグイン管理）と意味が混じるので別ディレクトリが必要
+- **保持ポリシー / プライバシー**: data URI は「その場限り」だがディスク永続化に変えると workspace に残る。Files パネル可視化 / 削除 UI / 自動 GC のいずれかが要る
+- **変換タイミング**: DOCX / XLSX / PPTX は今 `buildUserMessageLine` で on-demand 変換。upload 時に eager 変換するか、build 時に path から lazy 変換するかの設計判断
+- **bridge protocol**: bridge クライアントは現在 `attachments[]` で base64 を送る。サーバ側で受信時に同じ `data/attachments/` に保存する形に揃える必要
+
+→ **新プラン `feat-attachments-as-paths.md` を Stage 3 完了後に起こすこと**を推奨。
 
 ## Risks / Open Questions
 

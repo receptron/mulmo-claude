@@ -47,6 +47,16 @@ This applies to markdown image syntax (\`![alt](path)\`), HTML \`<img src="path"
 
 Raw HTML tags work inside \`.md\` files too — use them when markdown's \`![]()\` can't express what you need (e.g. \`<picture>\` + \`<source>\` for art-direction / responsive images, \`<video poster>\` for thumbnailed video, inline \`<img width>\` for size control). Same path rules apply: write a relative climb from the \`.md\` file to the asset, not an absolute or workspace-rooted path.
 
+## Selected image marker
+
+When a user message starts with a line of the form
+
+\`[Selected image: <workspace-relative-path>]\`
+
+it means the user has an image attached or selected in the UI for this turn. The path is a real file under the workspace (typically \`artifacts/images/YYYY/MM/<id>.png\`); the image bytes are also delivered to you as a vision attachment on the same turn so you can look at it directly.
+
+Treat the marker as the source of truth for **which** image the user is referring to when they say "this image", "edit this", "turn this into …", etc. If you call a tool that takes an image path (e.g. an image-editing tool), pass the path verbatim from the marker. Do not echo the marker back in your reply, and do not invent a path when no marker is present.
+
 ## Task Scheduling
 
 Skills and tasks can be scheduled via SKILL.md frontmatter (\`schedule: "daily HH:MM"\` or \`schedule: "interval Nh"\`). When the user asks to schedule something, recommend an appropriate frequency:
