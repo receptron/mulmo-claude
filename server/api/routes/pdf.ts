@@ -195,11 +195,16 @@ function inlineSingleImg(match: SrcAttrMatch, workspaceRoot: string, baseDir: st
 export function inlineImages(html: string, options: InlineImagesOptions = {}): string {
   const workspaceRoot = options.workspaceRoot ?? defaultWorkspaceRoot;
   const requestedDir = options.sourceDir;
-  const dirIsSafe = !requestedDir || isSafeSourceDir(requestedDir);
-  if (requestedDir && !dirIsSafe) {
+  // Distinguish "explicitly empty" (= workspace root, e.g. a top-
+  // level `README.md`) from "absent" (= legacy `markdowns/` default
+  // for chat callers). Without this, the `||` collapse would route
+  // every workspace-root file through the legacy default.
+  const hasRequestedDir = requestedDir !== undefined;
+  const dirIsSafe = !hasRequestedDir || isSafeSourceDir(requestedDir);
+  if (hasRequestedDir && !dirIsSafe) {
     log.warn("pdf", "rejecting unsafe sourceDir, falling back to default", { sourceDir: requestedDir });
   }
-  const sourceDir = dirIsSafe && requestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
+  const sourceDir = dirIsSafe && hasRequestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
   const baseDir = path.join(workspaceRoot, sourceDir);
   return html.replace(IMG_TAG_RE, (tag) =>
     // Walk each attribute. Only `src` (case-insensitive, namespaced

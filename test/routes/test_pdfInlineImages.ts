@@ -116,6 +116,29 @@ describe("inlineImages — sourceDir parameter (Stage F: Wiki PDF)", () => {
     const out = inlineImages(html, { workspaceRoot, sourceDir: "../escape/me" });
     assert.match(out, /data:image\/png;base64/);
   });
+
+  it("treats sourceDir='' as workspace root (top-level files like README.md)", () => {
+    // Codex iter-1 finding (#1036): the previous `requestedDir` truthy
+    // check collapsed empty strings to "absent" → server fell back to
+    // `markdowns/` for top-level files. Distinguish the two so a
+    // top-level README's relative `<img src="docs/foo.png">` resolves
+    // to workspaceRoot/docs/foo.png, not artifacts/documents/docs/...
+    const docsDir = path.join(workspaceRoot, "docs");
+    mkdirSync(docsDir, { recursive: true });
+    const png = path.join(docsDir, "top.png");
+    writeFileSync(png, PNG_BYTES);
+    const html = '<img src="docs/top.png">';
+    const out = inlineImages(html, { workspaceRoot, sourceDir: "" });
+    assert.match(out, /data:image\/png;base64/);
+  });
+
+  it("undefined sourceDir still falls back to legacy default (chat callers)", () => {
+    // Make sure the `hasRequestedDir` distinction doesn't accidentally
+    // break the legacy chat path that doesn't pass sourceDir.
+    const html = '<img src="../images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /data:image\/png;base64/);
+  });
 });
 
 describe("inlineImages — quote-form coverage (Stage F)", () => {

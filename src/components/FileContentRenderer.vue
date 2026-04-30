@@ -189,11 +189,6 @@ function rawUrl(filePath: string): string {
   return `${API_ROUTES.files.raw}?path=${encodeURIComponent(filePath)}`;
 }
 
-// Wiki pages live under `data/wiki/pages/` and always carry a
-// frontmatter envelope. Stripping it from the PDF avoids the YAML
-// header showing up as plain text on page 1.
-const WIKI_PAGES_DIR = "data/wiki/pages";
-
 function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   // Rewrite `![alt](path)` refs BEFORE handing the markdown to
   // TextResponseView so workspace-relative image paths resolve via
@@ -202,7 +197,16 @@ function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   const slash = current.lastIndexOf("/");
   const basePath = slash >= 0 ? current.slice(0, slash) : "";
   const rewritten = rewriteMarkdownImageRefs(text, basePath);
-  const isWikiPage = basePath === WIKI_PAGES_DIR;
+  // The displayed text strips frontmatter (rendered separately as a
+  // metadata bar above) — but the PDF source must keep the original
+  // markdown so the server can decide what to keep / strip via the
+  // `pdfStripFrontmatter` flag. Otherwise non-wiki files with
+  // frontmatter would silently lose it from the PDF too.
+  const fullSource = props.content?.kind === "text" ? props.content.content : text;
+  // Strip frontmatter from the PDF whenever the UI shows it as a
+  // separate metadata panel — otherwise the YAML duplicates as plain
+  // text on page 1 of the PDF.
+  const hasFrontmatter = props.mdFrontmatter !== null;
   return {
     uuid: "files-preview",
     toolName: "text-response",
@@ -212,13 +216,15 @@ function markdownResult(text: string): ToolResultComplete<TextResponseData> {
       text: rewritten,
       role: "assistant",
       transportKind: "text-rest",
-      // Send the un-rewritten source to the PDF endpoint so the
-      // server-side image inliner can resolve relative refs against
-      // `pdfBaseDir`. Without this, the rewritten `/api/files/raw?…`
-      // URLs would not match anything on disk.
-      pdfSourceText: text,
-      pdfBaseDir: basePath || undefined,
-      pdfStripFrontmatter: isWikiPage,
+      // `pdfSourceText`: un-rewritten markdown so the server-side
+      // image inliner resolves against on-disk paths, not the
+      // `/api/files/raw?…` URLs the display layer produces.
+      pdfSourceText: fullSource,
+      // Pass basePath as-is (including empty string for top-level
+      // files like README.md). The server distinguishes empty
+      // (= workspace root) from undefined (= legacy default).
+      pdfBaseDir: basePath,
+      pdfStripFrontmatter: hasFrontmatter,
     },
   };
 }
