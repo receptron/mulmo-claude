@@ -146,8 +146,14 @@ export default [
       // before its declaration line). #920. Function declarations are
       // exempt — TS hoists them safely, and top-down narrative-style
       // (`main()` first, helpers below) is a common pattern in the
-      // codebase. Type references are also exempt: type position is
-      // erased at runtime, so the order doesn't affect execution.
+      // codebase. Runtime type references are exempt via
+      // `ignoreTypeReferences` — type position is erased at runtime,
+      // so order doesn't affect execution.
+      //
+      // `typedefs: true` graduated to error after measuring zero
+      // violations across the codebase — the codebase already orders
+      // type/interface declarations correctly, so the rule is free
+      // value going forward (catches future drift without churn).
       "no-use-before-define": "off",
       "@typescript-eslint/no-use-before-define": [
         "error",
@@ -156,7 +162,7 @@ export default [
           classes: true,
           variables: true,
           enums: true,
-          typedefs: false,
+          typedefs: true,
           ignoreTypeReferences: true,
         },
       ],

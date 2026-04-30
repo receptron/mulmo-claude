@@ -230,13 +230,22 @@ async function copyText() {
 }
 
 async function downloadPdf() {
-  const text = props.selectedResult.data?.text ?? "";
+  const { data } = props.selectedResult;
+  // Display text and PDF source can diverge: Files Explorer's .md
+  // preview pre-rewrites image refs to `/api/files/raw?...` for
+  // browser display, but the server PDF inliner can't resolve those
+  // back to disk. Use the original source when the caller passes it.
+  const pdfText = data?.pdfSourceText ?? data?.text ?? "";
+  const displayText = data?.text ?? "";
   const filename = buildPdfFilename({
-    name: extractTextResponseTitle(text),
+    name: extractTextResponseTitle(displayText),
     fallback: "chat",
     timestampMs: appApi.getResultTimestamp(props.selectedResult.uuid),
   });
-  await rawDownloadPdf(text, filename);
+  await rawDownloadPdf(pdfText, filename, {
+    baseDir: data?.pdfBaseDir,
+    stripFrontmatter: data?.pdfStripFrontmatter,
+  });
 }
 </script>
 

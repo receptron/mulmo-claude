@@ -215,6 +215,9 @@ const jaMessages = {
     pdfPreview: "PDF プレビュー",
     parseError: "パースエラー",
   },
+  filesView: {
+    chatPlaceholder: "このファイルについて質問…",
+  },
   systemFiles: {
     schemaLabel: "スキーマ",
     showDetails: "詳細を表示",

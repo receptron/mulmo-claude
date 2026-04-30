@@ -39,6 +39,40 @@ function formatRelativeTime(isoDate: string): string {
   return `${days}d ago`;
 }
 
+/**
+ * Split a `//{skill} [args...]` shortcut into the skill name and the
+ * verbatim argument text.
+ *
+ * The separator between the skill name and args is the FIRST run of
+ * whitespace (a single space, multiple spaces, a tab, a CRLF — the
+ * bridge can't disambiguate "long separator" from "short separator
+ * plus leading whitespace in args", so the simple choice is to drop
+ * the whole leading run as one logical separator). Whitespace INSIDE
+ * the args (after the first run) is preserved verbatim, so doubled
+ * spaces, tabs, and newlines pasted into a multi-line prompt all
+ * survive.
+ *
+ * Exported for unit tests; callers in the handler use it directly.
+ *
+ * Examples:
+ *   "//mag2"               → { skillName: "mag2", argsVerbatim: "" }
+ *   "//mag2 url"           → { skillName: "mag2", argsVerbatim: "url" }
+ *   "//mag2  url"          → { skillName: "mag2", argsVerbatim: "url" }
+ *   "//mag2\r\nurl"        → { skillName: "mag2", argsVerbatim: "url" }
+ *   "//mag2 a  b\tc"       → { skillName: "mag2", argsVerbatim: "a  b\tc" }
+ */
+export function parseSkillShortcut(text: string): { skillName: string; argsVerbatim: string } {
+  const sepIdx = text.search(/\s/);
+  if (sepIdx < 0) return { skillName: text.slice(2), argsVerbatim: "" };
+  const head = text.slice(0, sepIdx);
+  // Strip the full leading whitespace run — \s in JS already matches
+  // \r, \n, \t, \v, \f, NBSP (U+00A0), and the rest of Unicode whitespace,
+  // so CRLF separators collapse to nothing instead of leaving an orphan
+  // \n in argsVerbatim (Codex review iter-1).
+  const argsVerbatim = text.slice(sepIdx).replace(/^\s+/, "");
+  return { skillName: head.slice(2), argsVerbatim };
+}
+
 // ── Factory ──────────────────────────────────────────────────
 
 export function createCommandHandler(opts: {
@@ -279,15 +313,16 @@ export function createCommandHandler(opts: {
 
     // `//{skill} [args...]` shortcut — start a new session AND run
     // the skill in one bridge turn. Args after the skill name are
-    // forwarded verbatim, so `//mag2 https://x.com/post` resets and
-    // runs `/mag2 https://x.com/post`.
+    // forwarded verbatim — split at the FIRST whitespace character
+    // and preserve everything after it (including doubled spaces /
+    // tabs) so payloads like a URL with internal whitespace, or
+    // multi-paragraph prompts, aren't silently rewritten.
     if (text.startsWith("//")) {
       const skills = await fetchSkills();
-      const [head, ...rest] = text.split(/\s+/);
-      const skillName = head.slice(2);
+      const { skillName, argsVerbatim } = parseSkillShortcut(text);
       if (skillName && skills.some((s) => s.name === skillName)) {
         const nextState = await resetChatState(transportId, chatState.externalChatId, chatState.roleId);
-        const forwardAs = rest.length > 0 ? `/${skillName} ${rest.join(" ")}` : `/${skillName}`;
+        const forwardAs = argsVerbatim.length > 0 ? `/${skillName} ${argsVerbatim}` : `/${skillName}`;
         return {
           reply: `Session reset. Running ${forwardAs}`,
           nextState,

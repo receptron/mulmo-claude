@@ -14,6 +14,7 @@
 import { Router, type Request, type Response } from "express";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { TOOL_NAMES } from "../../../../src/config/toolNames.js";
 import { hasMeaningfulChange, writeWikiPage } from "../../../workspace/wiki-pages/io.js";
 import { WORKSPACE_DIRS } from "../../../workspace/paths.js";
 import { isSafeStamp, listSnapshots, readSnapshot, stripSnapshotMeta } from "../../../workspace/wiki-pages/snapshot.js";
@@ -228,8 +229,14 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
     try {
       const outcome = await pushToolResult(sessionId, {
         uuid: randomUUID(),
-        toolName: "manageWiki",
+        toolName: TOOL_NAMES.manageWiki,
         data: {
+          // `"page-edit"` is the action discriminator the wiki
+          // plugin's `View.vue` switches on. It's repeated in the
+          // plugin and in `src/plugins/wiki/pageEditLoader.ts`; a
+          // shared `WIKI_ACTIONS` const would be the cleaner home
+          // but that's a multi-file refactor — out of scope for
+          // this CR follow-up.
           action: "page-edit",
           title: slug,
           slug,
