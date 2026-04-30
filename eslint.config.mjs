@@ -334,14 +334,10 @@ export default [
     },
   },
   {
-    // API-route override: cyclomatic `complexity` stays at `warn`
-    // here because the route handlers have several legitimately
-    // branchy functions (validation + auth + business logic in one
-    // place) that would need a coordinated split before they can
-    // graduate. Everything else under `server/` (utils, agent,
-    // workspace, …) is held to `error`; over time `server/api/routes/`
-    // should converge.
-    files: ["server/api/routes/**/*.{ts,js}"],
+    // Per-file complexity exemptions. Only the route handlers that
+    // still exceed the threshold stay at `warn`; the rest of
+    // `server/api/routes/` is held to `error`.
+    files: ["server/api/routes/files.ts", "server/api/routes/sessions.ts"],
     rules: {
       complexity: ["warn", { max: 15 }],
     },

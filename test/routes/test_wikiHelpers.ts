@@ -195,6 +195,17 @@ describe("parseIndexEntries", () => {
     assert.equal(entries[0]?.description, "summary");
   });
 
+  it("falls back to positional columns when the header has no recognized names", () => {
+    const markdown = ["| alpha | beta | gamma |", "|-------|------|-------|", "| `slug-1` | Title 1 | Summary 1 |"].join("\n");
+    const entries = parseIndexEntries(markdown);
+    assert.deepEqual(entries[0], {
+      slug: "slug-1",
+      title: "Title 1",
+      description: "Summary 1",
+      tags: [],
+    });
+  });
+
   it("is case- and whitespace-tolerant for the Tags header name", () => {
     const markdown = ["| slug |  TAGS  | title |", "|------|--------|-------|", "| foo | a, b | Foo |"].join("\n");
     const entries = parseIndexEntries(markdown);
