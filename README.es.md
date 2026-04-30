@@ -51,6 +51,10 @@ Abre [http://localhost:5173](http://localhost:5173). Y listo — empieza a chate
 | "Ingiere este artículo: URL"                | Página de wiki con `[[enlaces]]` para memoria a largo plazo |
 | "Programa un resumen diario de noticias"    | Tarea recurrente que se ejecuta automáticamente             |
 | "Genera una imagen de un atardecer"         | Imagen generada por IA (Gemini)                             |
+| "Suscríbete a este feed RSS"                | Fuente registrada en `/sources`, recogida por programación  |
+| "¿Qué hay nuevo en mis fuentes?"            | Bandeja de no leídos en `/news` con chat por artículo       |
+
+> **Páginas a las que puedes acceder directamente**: `/wiki` (explorar + Lint), `/news` (bandeja de no leídos), `/sources` (gestión de fuentes), `/automations` (tareas recurrentes), `/calendar`, `/files`, `/skills`, `/roles`. Cada una incluye un compositor de chat propio que arranca una conversación nueva ya consciente del contexto de la página.
 
 > **¿Quieres hackear MulmoClaude?** Consulta [`docs/developer.md`](docs/developer.md) para variables de entorno, scripts y arquitectura.
 

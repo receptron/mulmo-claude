@@ -234,6 +234,38 @@ markup is identical:
 Tabs / PDF / chat composer / create-update buttons are hidden —
 this is a moment-in-time view, not the live page.
 
+## /news — news viewer
+
+`/news` reads the items the sources pipeline has fetched and presents them as a two-pane reader (list + detail) with unread tracking. Per-article chat composer lets the user spawn a new chat that's already aware of the article.
+
+```text
+┌─[<NewsView> data-testid="news-view"]─────────────────────────────────────┐
+│ Header row:                                                              │
+│   [news-counts] (e.g. "23 unread of 142")                                │
+│   Filters: [news-filter-all] [news-filter-unread]  [news-mark-all-read]  │
+│   Source selector: [news-source-<slug>] (one button per source)          │
+│                                                                          │
+│ ┌─[news-list] (left pane, 320px)────┐ ┌─[news-detail] (right pane)─────┐ │
+│ │ [news-item-<id>] · headline       │ │ Article title + metadata       │ │
+│ │ ◯ unread / ⚪ read                │ │ Author, source, published date │ │
+│ │ source · published date           │ │                                │ │
+│ │ ─────────────────────────────────  │ │ ┌─Article body (markdown)──┐  │ │
+│ │ ...                               │ │ │ ...                      │  │ │
+│ │                                   │ │ └──────────────────────────┘  │ │
+│ │                                   │ │ [news-open-original] (↗︎)      │ │
+│ │                                   │ │                                │ │
+│ │                                   │ │ Per-article chat composer:    │ │
+│ │                                   │ │ [news-article-chat-input]      │ │
+│ │                                   │ │ [news-article-chat-send]       │ │
+│ │                                   │ │ → spawns a new chat with a    │ │
+│ │                                   │ │ "read this article first"     │ │
+│ │                                   │ │ prepend                       │ │
+│ └───────────────────────────────────┘ └────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+Clicking a list row marks it read (badge decrements). The "Mark all read" button zeroes the counter for the current filter scope.
+
 ## /sources — registered news/RSS feeds
 
 ```

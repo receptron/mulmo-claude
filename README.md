@@ -51,6 +51,10 @@ Open [http://localhost:5173](http://localhost:5173). That's it — start chattin
 | "Ingest this article: URL"      | Wiki page with `[[links]]` for long-term memory |
 | "Schedule a daily news digest"  | Recurring task that runs automatically          |
 | "Generate an image of a sunset" | AI-generated image (Gemini)                     |
+| "Subscribe to this RSS feed"    | Source on `/sources`, fetched on a schedule     |
+| "What's new in my feeds?"       | Unread inbox at `/news` with per-article chat   |
+
+> **Pages you can visit directly**: `/wiki` (browse + lint), `/news` (unread inbox), `/sources` (manage feeds), `/automations` (recurring tasks), `/calendar`, `/files`, `/skills`, `/roles`. Each has its own scoped chat composer that spawns a fresh chat already aware of the page context.
 
 > **Hacking on MulmoClaude?** See [`docs/developer.md`](docs/developer.md) for environment variables, scripts, and architecture.
 

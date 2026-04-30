@@ -51,6 +51,10 @@ yarn dev
 | "抓取这篇文章：URL"  | 带 `[[链接]]` 的 wiki 页面，用作长期记忆 |
 | "安排每日新闻摘要"   | 自动运行的周期性任务                     |
 | "生成一张日落的图片" | AI 生成的图片 (Gemini)                   |
+| "订阅这个 RSS 源"    | 在 `/sources` 中注册并按计划抓取         |
+| "我的源有什么新内容?" | `/news` 的未读收件箱，每篇文章带聊天    |
+
+> **可直接访问的页面**: `/wiki`（浏览 + Lint）、`/news`（未读收件箱）、`/sources`（管理源）、`/automations`（周期任务）、`/calendar`、`/files`、`/skills`、`/roles`。每个页面都有自带页面上下文的聊天编辑器，可启动新会话。
 
 > **参与 MulmoClaude 开发？** 请参考 [`docs/developer.md`](docs/developer.md) 了解环境变量、脚本和架构。
 

@@ -51,6 +51,10 @@ Abra [http://localhost:5173](http://localhost:5173). É isso — comece a conver
 | "Ingerir este artigo: URL"                          | Página do wiki com `[[links]]` para memória de longo prazo |
 | "Agende um resumo diário de notícias"               | Tarefa recorrente executada automaticamente                |
 | "Gere uma imagem de um pôr do sol"                  | Imagem gerada por IA (Gemini)                              |
+| "Assine este feed RSS"                              | Fonte registrada em `/sources`, coletada em horários       |
+| "O que há de novo nos meus feeds?"                  | Caixa de não lidos em `/news` com chat por artigo          |
+
+> **Páginas que você pode acessar diretamente**: `/wiki` (navegar + Lint), `/news` (caixa de não lidos), `/sources` (gerenciar fontes), `/automations` (tarefas recorrentes), `/calendar`, `/files`, `/skills`, `/roles`. Cada uma tem um compositor de chat próprio que inicia uma conversa nova já ciente do contexto da página.
 
 > **Mexendo no MulmoClaude?** Consulte [`docs/developer.md`](docs/developer.md) para variáveis de ambiente, scripts e arquitetura.
 

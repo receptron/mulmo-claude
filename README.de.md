@@ -51,6 +51,10 @@ yarn dev
 | „Nimm diesen Artikel auf: URL"                            | Wiki-Seite mit `[[links]]` für das Langzeitgedächtnis |
 | „Plane eine tägliche Nachrichtenübersicht"                | Wiederkehrende Aufgabe, die automatisch läuft         |
 | „Erzeuge ein Bild eines Sonnenuntergangs"                 | KI-generiertes Bild (Gemini)                          |
+| „Abonniere diesen RSS-Feed"                               | Quelle in `/sources` registriert, geplante Abrufe     |
+| „Was gibt es Neues in meinen Feeds?"                      | Ungelesen-Inbox unter `/news` mit Chat pro Artikel    |
+
+> **Direkt erreichbare Seiten**: `/wiki` (Durchsuchen + Lint), `/news` (Ungelesen-Inbox), `/sources` (Feed-Verwaltung), `/automations` (wiederkehrende Aufgaben), `/calendar`, `/files`, `/skills`, `/roles`. Jede Seite hat einen eigenen Chat-Composer, der einen neuen Chat startet, der den Seitenkontext bereits kennt.
 
 > **Sie arbeiten an MulmoClaude?** Siehe [`docs/developer.md`](docs/developer.md) für Umgebungsvariablen, Skripte und Architektur.
 

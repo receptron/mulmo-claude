@@ -8,6 +8,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Highlights
+
+- **Wiki edits show inline in chat** (#989) — when the LLM `Write`s/`Edit`s a `data/wiki/pages/*.md`, the canvas now renders the page automatically, sourced from the snapshot taken at that exact moment of the edit. Persisted in the session JSONL so reloads of older chats replay correctly. The `manageWiki` MCP tool is **removed from the LLM's palette** in the same release; the plugin record stays for canvas dispatch + historical replay only.
+- **`presentHtml` becomes editable** (#988, #1001) — the agent can iteratively edit a generated HTML doc instead of regenerating from scratch. New `filepath-only` mode (#982) lets `presentHtml` point at an existing artifact instead of inlining the source.
+- **Image rendering pipeline reworked across three stages** (#969 stage 1 / #972 stage 2 / #974 stage 3) — workspace-relative `![]()` references are mounted, prompted, and `onerror`-recovered through a unified path so PDF, presentHtml iframes, and the chat canvas all render the same images consistently.
+
+### Added
+
+- **`tool_result` payloads carry an `artifactPath`** field (#983) — downstream consumers (notifications, journal, rich previews) can navigate from a tool-result card directly to the underlying file without re-deriving the path.
+- **Bridge skill shortcut** (#967) — bridge messages whose body starts with an unknown `/<slash>` command are routed to the matching saved skill instead of being passed through as plain text. Lets phone-side users invoke skills with one keystroke.
+
+### Changed
+
+- **`manageWiki` MCP tool removed** — the LLM no longer has a `manageWiki` tool. Browse / lint flows are answered by directing the user at the `/wiki` UI; page edits render inline (see Highlights). The General role's `availablePlugins` is updated and the role prompt rewritten accordingly. View-only `PluginEntry` retained in the registry so historical chat sessions still render their `manageWiki` tool-result cards (#989).
+- **General / Office role plugin lists** — minor cleanup to drop dead entries (#1004, #1006).
+
+### Fixed
+
+- **`presentHtml` Safari CSP** (#991) — the iframe `srcdoc` CSP previously blocked Safari's inline bootstrap scripts; now allows them while keeping the same exfiltration boundary on cross-origin requests.
+- **`/files` HTML preview relative paths** (#980) — relative `<img src="…">` and `<a href="…">` resolve against the previewed file's directory.
+- **`artifacts/html` mount allows sibling images** (#981) — image refs from `artifacts/html/<doc>.html` now resolve to images alongside.
+- **Wiki page-edit toolResult publish failure no longer 500s the snapshot route** — the snapshot is already on disk by the time the publish runs; a publish error is logged as a warning instead of failing the response (CodeRabbit follow-up on #989).
+- **`parseTableRow` complexity** in `server/api/routes/wiki.ts` reduced under the project's `complexity: 15` rule via a small `resolveTableColumnIndices` helper (#1002).
+
+### Breaking Changes
+
+- **`manageWiki` MCP tool definition removed** (#989). Custom roles whose `availablePlugins` lists `manageWiki` keep loading — the lenient zod parse silently filters the now-unknown name out — but the LLM can no longer call it. Agents that needed `manageWiki action='page'` to display a page in the canvas no longer need that call: a wiki Write/Edit auto-renders. For browse / lint flows, the role prompt directs the user at `/wiki`.
+
+### Packages published during this cycle
+
+- `@mulmobridge/client@0.1.5` (#994), `@mulmobridge/chat-service@0.1.3` (#993).
+
 ---
 
 ## [0.5.3] - 2026-04-29

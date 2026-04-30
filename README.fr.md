@@ -51,6 +51,10 @@ Ouvrez [http://localhost:5173](http://localhost:5173). C'est tout — commencez 
 | « Ingère cet article : URL »                         | Page de wiki avec des `[[links]]` pour la mémoire à long terme |
 | « Planifie une revue de presse quotidienne »         | Tâche récurrente exécutée automatiquement                      |
 | « Génère une image d'un coucher de soleil »          | Image générée par IA (Gemini)                                  |
+| « Abonne-toi à ce flux RSS »                         | Source enregistrée dans `/sources`, récupérée à intervalles    |
+| « Quoi de neuf dans mes flux ? »                     | Boîte des non-lus à `/news` avec chat par article              |
+
+> **Pages accessibles directement** : `/wiki` (parcourir + Lint), `/news` (boîte des non-lus), `/sources` (gestion des flux), `/automations` (tâches récurrentes), `/calendar`, `/files`, `/skills`, `/roles`. Chaque page possède son propre composeur de chat qui démarre une nouvelle conversation déjà contextualisée par la page.
 
 > **Vous bidouillez MulmoClaude ?** Consultez [`docs/developer.md`](docs/developer.md) pour les variables d'environnement, les scripts et l'architecture.
 
