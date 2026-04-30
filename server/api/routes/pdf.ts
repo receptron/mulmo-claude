@@ -184,12 +184,21 @@ export function shouldSkipMediaForPdf(url: string): boolean {
  */
 export function inlineImages(html: string, options: InlineImagesOptions = {}): string {
   const workspaceRoot = options.workspaceRoot ?? defaultWorkspaceRoot;
-  const requestedDir = options.sourceDir;
-  const dirIsSafe = !requestedDir || isSafeSourceDir(requestedDir);
-  if (requestedDir && !dirIsSafe) {
+  // Defensive type guard: a malformed request body could send
+  // `baseDir: null` / `baseDir: 42` / etc. Coerce anything non-
+  // string to undefined so the legacy default kicks in instead of
+  // `path.join` throwing on a non-string.
+  const requestedDir = typeof options.sourceDir === "string" ? options.sourceDir : undefined;
+  // Distinguish "explicitly empty" (= workspace root, e.g. a top-
+  // level `README.md`) from "absent" (= legacy `markdowns/` default
+  // for chat callers). Without this, the `||` collapse would route
+  // every workspace-root file through the legacy default.
+  const hasRequestedDir = requestedDir !== undefined;
+  const dirIsSafe = !hasRequestedDir || isSafeSourceDir(requestedDir);
+  if (hasRequestedDir && !dirIsSafe) {
     log.warn("pdf", "rejecting unsafe sourceDir, falling back to default", { sourceDir: requestedDir });
   }
-  const sourceDir = dirIsSafe && requestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
+  const sourceDir = dirIsSafe && hasRequestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
   const baseDir = path.join(workspaceRoot, sourceDir);
   return transformResolvableUrlsInHtml(html, (url) => {
     if (url.startsWith("data:") || url.startsWith("http")) return null;
@@ -259,7 +268,25 @@ interface PdfMarkdownBody {
 }
 
 router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
-  const { markdown, filename = "document.pdf", format = "Letter", baseDir, stripFrontmatter = false } = req.body;
+  const { body } = req;
+  // Express only sets `req.body` after `express.json()` parses a JSON
+  // payload. A client that sends raw JSON `null`, an array, or omits
+  // the body entirely would land here with body = null / [] / undefined,
+  // and the per-field guards below would throw on the first property
+  // dereference. Bail out cleanly with a 400 instead.
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    badRequest(res, "request body must be a JSON object");
+    return;
+  }
+  // Defensive type guards: a malformed JSON body could send
+  // `baseDir: null` / `stripFrontmatter: "yes"` / etc. Coerce
+  // anything off-shape to its safe default rather than letting a
+  // downstream `path.join` / boolean check throw.
+  const markdown = typeof body.markdown === "string" ? body.markdown : "";
+  const filename = typeof body.filename === "string" ? body.filename : "document.pdf";
+  const format: "Letter" | "A4" = body.format === "A4" ? "A4" : "Letter";
+  const baseDir = typeof body.baseDir === "string" ? body.baseDir : undefined;
+  const stripFrontmatter = body.stripFrontmatter === true;
 
   if (!markdown) {
     badRequest(res, "markdown is required");
