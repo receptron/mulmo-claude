@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 import {
@@ -20,9 +20,12 @@ const L02_TIMEOUT_MS = 3 * ONE_MINUTE_MS;
 // Floor for "the route returned a real PDF, not a stub". The actual
 // size depends on how verbose the LLM's reply happens to be that
 // run, so this is loose on purpose — `readPdfDownload` already
-// asserts the %PDF- magic bytes, this number just keeps obviously
-// empty stubs out.
+// asserts the %PDF- magic bytes plus %%EOF tail, this number just
+// keeps obviously empty stubs out.
 const MIN_PDF_BYTES = 500;
+
+const L01_IMG_ALT = "sample";
+const L01_IMG_LOCATOR = `img[alt="${L01_IMG_ALT}"]`;
 
 // Each scenario opens its own chat session, so they do not share
 // state. Run them in parallel to cut wall time — the server happily
@@ -33,125 +36,118 @@ test.describe.configure({ mode: "parallel" });
 test.describe("media (real LLM)", () => {
   test("L-01: presentHtml の <img src='../../../images/...'> が /artifacts/html 経由で描画される", async ({ page }) => {
     test.setTimeout(L01_TIMEOUT_MS);
-
-    // Spec-unique workspace path so concurrent runs do not stomp
-    // each other and we never delete a real user image by accident.
-    // Flat `artifacts/images/<file>` (no YYYY/MM shard) is what
-    // makes `../../../images/<file>` correct from
-    // `artifacts/html/<YYYY>/<MM>/page.html`. If the saved HTML
-    // moves to a different depth, this relative path needs to
-    // shift in lock step.
+    // Spec-unique flat path — see comment in seedL01Fixture.
     const workspaceImageRel = "artifacts/images/e2e-live-l01.png";
-    await placeFixtureInWorkspace("images/sample.png", workspaceImageRel);
-
+    await seedL01Fixture(workspaceImageRel);
     try {
       await startNewSession(page);
-
-      // Ask the LLM to call presentHtml with an <img> whose src
-      // points at the workspace path we just populated. PR #982
-      // (plans/feat-presenthtml-filepath-only.md) switched
-      // presentHtml to render via `<iframe :src="/artifacts/html/...">`
-      // and trains the LLM to use **relative paths** — the HTML
-      // file is saved at `artifacts/html/<YYYY>/<MM>/page.html`
-      // so reaching `artifacts/images/<file>` is `../../../images/<file>`.
-      // The end-to-end success criterion is `naturalWidth > 0`:
-      // if anything in the chain (saved HTML, the
-      // /artifacts/html mount, the /artifacts/images mount, or
-      // the path-traversal guard) breaks, the image stays 0×0 —
-      // exactly the failure mode B-18 produced before #969 / #972.
-      const message = [
-        "以下の HTML を presentHtml ツールでそのまま表示してください。",
-        "",
-        "<h1>e2e-live L-01 test</h1>",
-        '<img src="../../../images/e2e-live-l01.png" alt="sample" />',
-      ].join("\n");
-      await sendChatMessage(page, message);
-
-      // Wait for the LLM to respond *and* presentHtml to render
-      // the <img> inside the iframe. We wait on the inner <img>
-      // rather than just the iframe element because the iframe
-      // is appended to the DOM before its srcdoc finishes
-      // rendering.
-      await waitForImgInPresentHtml(page, 'img[alt="sample"]');
-
-      const src = await readImgSrcInPresentHtml(page, 'img[alt="sample"]');
-      // Use an explicit guard rather than non-null assertions so a
-      // null surface produces a clear test failure and downstream
-      // assertions can use `src` without `!`.
-      if (src === null) {
-        throw new Error("presentHtml iframe should contain <img alt='sample'>");
-      }
-      // Per PR #982 the LLM keeps the relative `../../../images/...`
-      // path verbatim — the browser resolves it against the iframe's
-      // src (the /artifacts/html/... mount). Asserting the unresolved
-      // attribute keeps us decoupled from that resolution.
-      expect(src).toContain("e2e-live-l01.png");
-      expect(src, "the LLM must follow the relative-path convention from PR #982").not.toMatch(/^\/artifacts\//);
-
-      // The URL must resolve to the actual fixture file. A broken
-      // image leaves naturalWidth at 0, which is the failure mode
-      // B-18 produced.
-      const size = await readImgNaturalSize(page, 'img[alt="sample"]');
-      if (size === null) {
-        throw new Error("naturalSize should be readable");
-      }
-      expect(size.width, "image must actually decode (B-18 regression)").toBeGreaterThan(0);
-      expect(size.height).toBeGreaterThan(0);
-
-      // Let the assistant finish its full turn before ending the
-      // test so the trace / video captures the final text reply
-      // too. The iframe assertion above can pass before the LLM
-      // finishes streaming the closing message; without this wait
-      // the recording would cut off mid-response and hide any
-      // regression that surfaces only at the end of the turn.
+      await sendL01Prompt(page, workspaceImageRel);
+      await assertL01PresentHtml(page);
       await waitForAssistantResponseComplete(page);
     } finally {
-      const sessionId = getCurrentSessionId(page);
-      if (sessionId) await deleteSession(page, sessionId);
-      await removeFromWorkspace(workspaceImageRel);
+      await cleanupSessionAndWorkspace(page, workspaceImageRel);
     }
   });
 
   test("L-02: 画像参照を含む Markdown 応答が PDF として DL できる", async ({ page }) => {
     test.setTimeout(L02_TIMEOUT_MS);
-
-    await startNewSession(page);
-
+    // Seeding the image makes B-19 / B-20 actually exercisable —
+    // without it, /api/pdf/markdown can return a "PDF with broken
+    // image" that still passes magic-bytes + size checks.
+    const workspaceImageRel = "artifacts/images/e2e-live-l02.png";
+    await placeFixtureInWorkspace("images/sample.png", workspaceImageRel);
     try {
-      // Make Claude reply in plain Markdown (textResponse plugin)
-      // with a workspace image reference. The reply itself drives
-      // the textResponse view, which exposes the same /api/pdf
-      // endpoint that B-19 / B-20 broke. Hitting that endpoint
-      // via the real LLM-driven UI is the regression check.
-      const message = [
-        "次の Markdown を **そのまま** 1 ターンの返信本文として返してください。",
-        "ツールは何も呼ばないでください。前置きや締めの一文も付けないでください。",
-        "",
-        "# L-02 PDF DL test",
-        "",
-        "![sample](/artifacts/images/sample.png)",
-        "",
-        "本文サンプル。",
-      ].join("\n");
-      await sendChatMessage(page, message);
-
-      // The PDF button only renders once the assistant turn is
-      // committed to the textResponse view, so wait for the full
-      // response before reaching for it.
+      await startNewSession(page);
+      await sendL02Prompt(page, workspaceImageRel);
       await waitForAssistantResponseComplete(page);
-
-      const pdfBtn = page.getByTestId("text-response-pdf-button").first();
-      await expect(pdfBtn).toBeVisible({ timeout: ONE_MINUTE_MS });
-
-      const downloadPromise = page.waitForEvent("download");
-      await pdfBtn.click();
-      const download = await downloadPromise;
-
-      const pdf = await readPdfDownload(download);
-      expect(pdf.length, "PDF should not be a near-empty stub").toBeGreaterThan(MIN_PDF_BYTES);
+      await downloadAndAssertPdf(page);
     } finally {
-      const sessionId = getCurrentSessionId(page);
-      if (sessionId) await deleteSession(page, sessionId);
+      await cleanupSessionAndWorkspace(page, workspaceImageRel);
     }
   });
 });
+
+/**
+ * Place the fixture image at a flat `artifacts/images/<file>` path.
+ * Flat (no YYYY/MM shard) is what makes `../../../images/<file>`
+ * correct from the saved `artifacts/html/<YYYY>/<MM>/page.html`. If
+ * presentHtml's save depth ever changes, the relative path in the
+ * prompt below has to shift in lock step.
+ */
+async function seedL01Fixture(workspaceImageRel: string): Promise<void> {
+  await placeFixtureInWorkspace("images/sample.png", workspaceImageRel);
+}
+
+async function sendL01Prompt(page: Page, workspaceImageRel: string): Promise<void> {
+  // Filename only — the relative-path prefix below pulls the LLM
+  // toward the convention introduced in PR #982.
+  const filename = workspaceImageRel.split("/").pop() ?? "";
+  const message = [
+    "以下の HTML を presentHtml ツールでそのまま表示してください。",
+    "",
+    "<h1>e2e-live L-01 test</h1>",
+    `<img src="../../../images/${filename}" alt="${L01_IMG_ALT}" />`,
+  ].join("\n");
+  await sendChatMessage(page, message);
+}
+
+/**
+ * Verify that the rendered iframe contains the image, that the LLM
+ * kept the relative-path convention from PR #982, and that the
+ * mount + path-traversal guard chain actually serves the file
+ * (`naturalWidth > 0` is the end-to-end signal — B-18's failure
+ * mode is `naturalWidth = 0`).
+ */
+async function assertL01PresentHtml(page: Page): Promise<void> {
+  await waitForImgInPresentHtml(page, L01_IMG_LOCATOR);
+  const src = await readImgSrcInPresentHtml(page, L01_IMG_LOCATOR);
+  if (src === null) {
+    throw new Error(`presentHtml iframe should contain ${L01_IMG_LOCATOR}`);
+  }
+  expect(src).toContain("e2e-live-l01.png");
+  expect(src, "the LLM must follow the relative-path convention from PR #982").not.toMatch(/^\/artifacts\//);
+  const size = await readImgNaturalSize(page, L01_IMG_LOCATOR);
+  if (size === null) {
+    throw new Error("naturalSize should be readable");
+  }
+  expect(size.width, "image must actually decode (B-18 regression)").toBeGreaterThan(0);
+  expect(size.height).toBeGreaterThan(0);
+}
+
+async function sendL02Prompt(page: Page, workspaceImageRel: string): Promise<void> {
+  // textResponse plugin's PDF download route inlines images on the
+  // server (B-19 / B-20 fix). Pointing the markdown at the seeded
+  // workspace path is what exercises that inline path end-to-end.
+  const absPath = `/${workspaceImageRel}`;
+  const message = [
+    "次の Markdown を **そのまま** 1 ターンの返信本文として返してください。",
+    "ツールは何も呼ばないでください。前置きや締めの一文も付けないでください。",
+    "",
+    "# L-02 PDF DL test",
+    "",
+    `![sample](${absPath})`,
+    "",
+    "本文サンプル。",
+  ].join("\n");
+  await sendChatMessage(page, message);
+}
+
+async function downloadAndAssertPdf(page: Page): Promise<void> {
+  const pdfBtn = page.getByTestId("text-response-pdf-button").first();
+  await expect(pdfBtn).toBeVisible({ timeout: ONE_MINUTE_MS });
+  const downloadPromise = page.waitForEvent("download");
+  await pdfBtn.click();
+  const pdf = await readPdfDownload(await downloadPromise);
+  expect(pdf.length, "PDF should not be a near-empty stub").toBeGreaterThan(MIN_PDF_BYTES);
+}
+
+/**
+ * Best-effort teardown — never throws. Removes the session from
+ * history (so the user's chat list isn't littered with debug runs)
+ * and deletes the seeded fixture file.
+ */
+async function cleanupSessionAndWorkspace(page: Page, workspaceImageRel: string): Promise<void> {
+  const sessionId = getCurrentSessionId(page);
+  if (sessionId) await deleteSession(page, sessionId);
+  await removeFromWorkspace(workspaceImageRel);
+}
