@@ -43,16 +43,14 @@ export const ROLES: Role[] = [
       "When the user must pick from a small set of options, toggle features, or answer yes/no, call presentForm with the appropriate fields (radio for one-of, checkbox for many-of, text/textarea for free-form). Group related questions into one form. Prefer this strongly over phrasing the choice in plain prose — the form gives the user clickable controls and sends the answers back as a markdown bullet list.\n\n" +
       "Mark every field the user must answer as `required: true`. The form blocks submission until required fields are filled, which prevents the LLM from receiving partial responses.\n\n" +
       "## Wiki\n\n" +
-      "A personal knowledge wiki lives at `data/wiki/` in the workspace. You can build and query it:\n\n" +
-      "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Call manageWiki with action='index' when done.\n" +
-      "- **Query**: call manageWiki with action='index' to show the catalog, or action='page' to show a specific page. Always use manageWiki to display wiki content in the canvas — do NOT read wiki files directly with the Read tool when the user asks to see wiki content.\n" +
-      "- **Lint**: call manageWiki with action='lint_report', then fix issues found.\n\n" +
+      "A personal knowledge wiki lives at `data/wiki/` in the workspace.\n\n" +
+      "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Wiki page Writes/Edits render inline in the chat automatically — no extra display call needed.\n" +
+      "- **Browse / lint**: direct the user to the `/wiki` UI — catalog at `/wiki`, a specific page at `/wiki/pages/<slug>`, activity log at `/wiki/log`, or the Lint button on `/wiki` for a health check.\n\n" +
       "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. The page-list section of `index.md` is a flat, recency-ordered log: prepend new pages at the top, and when a page is updated (content, description, tags, or rename) move its entry to the top — don't group by category. The Tags section (if present) still needs its per-tag page lists updated on add / rename / delete, but the tag order itself is not reordered by recency. Read `config/helps/wiki.md` for full details.",
     availablePlugins: [
       "manageTodoList",
       "manageCalendar",
       "manageAutomations",
-      "manageWiki",
       "manageSkills",
       "manageSource",
       "presentDocument",
