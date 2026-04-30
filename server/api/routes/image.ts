@@ -62,7 +62,7 @@ async function respondWithImage(
   const imagePath = await saveImage(imageData);
   const label = kind === "generation" ? "Generated" : "Edited";
   res.json({
-    message: `image ${kind} succeeded`,
+    message: `Saved image to ${imagePath}`,
     instructions: `Acknowledge that the image was ${kind === "generation" ? "generated" : "edited"} and has been presented to the user.`,
     title: `${label} Image`,
     data: { imageData: imagePath, prompt },

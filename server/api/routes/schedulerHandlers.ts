@@ -86,7 +86,7 @@ function applyPropPatch(current: ScheduledItem["props"], patch: Record<string, s
   const next: ScheduledItem["props"] = { ...current };
   for (const [key, value] of Object.entries(patch)) {
     if (value === null) {
-      delete next[key];
+      Reflect.deleteProperty(next, key);
     } else {
       next[key] = value;
     }

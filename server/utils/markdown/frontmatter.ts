@@ -84,7 +84,7 @@ export function mergeFrontmatter(existing: Record<string, unknown>, patch: Recor
   const out: Record<string, unknown> = { ...existing };
   for (const [key, value] of Object.entries(patch)) {
     if (value === null || value === undefined) {
-      delete out[key];
+      Reflect.deleteProperty(out, key);
     } else {
       out[key] = value;
     }

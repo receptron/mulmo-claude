@@ -22,16 +22,20 @@ const TRANSPORT_ID = "whatsapp";
 const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT) || 3003;
 const FETCH_TIMEOUT_MS = 30_000;
 
-const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
-const appSecret = process.env.WHATSAPP_APP_SECRET;
-if (!accessToken || !phoneNumberId || !verifyToken || !appSecret) {
-  console.error(
-    "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\nSee README for setup instructions.",
-  );
-  process.exit(1);
+function readRequiredEnv(): { accessToken: string; phoneNumberId: string; verifyToken: string; appSecret: string } {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!accessToken || !phoneNumberId || !verifyToken || !appSecret) {
+    console.error(
+      "WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, and WHATSAPP_APP_SECRET are required.\nSee README for setup instructions.",
+    );
+    process.exit(1);
+  }
+  return { accessToken, phoneNumberId, verifyToken, appSecret };
 }
+const { accessToken, phoneNumberId, verifyToken, appSecret } = readRequiredEnv();
 
 const allowedNumbers = new Set(
   (process.env.WHATSAPP_ALLOWED_NUMBERS ?? "")
@@ -87,7 +91,7 @@ async function sendWhatsAppMessage(recipientId: string, text: string): Promise<v
 // ── Signature verification (x-hub-signature-256) ────────────────
 
 function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const expected = crypto.createHmac("sha256", appSecret!).update(rawBody).digest("hex");
+  const expected = crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const provided = signature.replace("sha256=", "");
   if (expected.length !== provided.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));

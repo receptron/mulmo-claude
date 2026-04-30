@@ -11,7 +11,9 @@ import {
   getActiveSessionIds,
   getSessionImageData,
   initSessionStore,
+  pushSessionEvent,
 } from "../../server/events/session-store/index.ts";
+import { EVENT_TYPES, GENERATION_KINDS, generationKey } from "../../src/types/events.ts";
 
 const NOW = "2026-04-17T00:00:00.000Z";
 
@@ -196,5 +198,38 @@ describe("getSessionImageData", () => {
 
   it("returns undefined for unknown session", () => {
     assert.equal(getSessionImageData("nope"), undefined);
+  });
+});
+
+describe("pushSessionEvent — pendingGenerations lifecycle", () => {
+  // Pin the start → finish round-trip so the in-store pending map
+  // both gains and loses the entry. Prior to the no-dynamic-delete
+  // fix the finish path used `delete obj[key]`; this test guards
+  // against a future regression of the equivalent
+  // `Reflect.deleteProperty` call.
+  beforeEach(() => {
+    initSessionStore(stubPubSub());
+  });
+
+  function makeGenerationEvent(type: string) {
+    return { type, kind: GENERATION_KINDS.beatImage, filePath: "/tmp/foo.png", key: "k1" };
+  }
+
+  it("adds a pendingGenerations entry on generationStarted", () => {
+    getOrCreateSession("s1", sessionOpts());
+    pushSessionEvent("s1", makeGenerationEvent(EVENT_TYPES.generationStarted));
+    const pending = getSession("s1")?.pendingGenerations ?? {};
+    const expectedKey = generationKey(GENERATION_KINDS.beatImage, "/tmp/foo.png", "k1");
+    assert.ok(expectedKey in pending, "key should be present after start");
+  });
+
+  it("removes the entry on generationFinished (no leftover key)", () => {
+    getOrCreateSession("s1", sessionOpts());
+    pushSessionEvent("s1", makeGenerationEvent(EVENT_TYPES.generationStarted));
+    pushSessionEvent("s1", makeGenerationEvent(EVENT_TYPES.generationFinished));
+    const pending = getSession("s1")?.pendingGenerations ?? {};
+    const expectedKey = generationKey(GENERATION_KINDS.beatImage, "/tmp/foo.png", "k1");
+    assert.equal(expectedKey in pending, false, "key should be gone after finish");
+    assert.equal(Object.keys(pending).length, 0, "no leftover keys");
   });
 });

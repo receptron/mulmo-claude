@@ -29,6 +29,7 @@ import { type NotificationDeps, initNotifications } from "./events/notifications
 import { createChatService } from "@mulmobridge/chat-service";
 import { readSessionJsonl } from "./utils/files/session-io.js";
 import { onSessionEvent, initSessionStore } from "./events/session-store/index.js";
+import { initFileChangePublisher } from "./events/file-change.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { discoverSkills } from "./workspace/skills/index.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
@@ -190,8 +191,18 @@ app.use(
 // `about:srcdoc` as their base URL, which breaks every relative ref.
 // See plans/feat-files-html-preview-relative-paths.md.
 //
+// Allowlist covers `.html` / `.htm` plus common image extensions so
+// HTML files that reference sibling images (e.g. a shared logo placed
+// alongside a batch of LLM-generated pages) can resolve those refs
+// against the file's URL — same browser-equivalent behavior the user
+// gets when opening the file directly from disk. Non-image / non-html
+// requests are still rejected. CSS / JS are intentionally NOT in the
+// list: `'self'` is absent from `script-src` / `style-src` in the CSP
+// (`previewCsp.ts`) so allowing those extensions would only delivery-
+// vector for blocked resources.
+//
 // Same three-layer guard as `/artifacts/images`:
-//  1. `.html` / `.htm` extension allowlist.
+//  1. extension allowlist (`.html` / `.htm` plus image types).
 //  2. `resolveWithinRoot` symlink-aware traversal check.
 //  3. `dotfiles: deny` + `fallthrough: false` on `express.static`.
 //
@@ -201,12 +212,22 @@ app.use(
 // guard against cross-origin abuse.
 //
 // CSP delivered via HTTP header instead of injecting a `<meta>` tag —
-// keeps the served file pristine, and `'self'` finally matches the
-// server origin (which is what allows `<img src="../images/...">` to
-// reach `/artifacts/images/...`). Sandbox stays `allow-scripts` only,
-// so the iframe document is still opaque-origin and cannot read the
-// parent's cookies / localStorage / DOM.
-const HTML_EXT_RE = /\.html?$/i;
+// keeps the served file pristine. The explicit request origin is
+// passed into `buildHtmlPreviewCsp` instead of relying on `'self'`:
+// the iframe is `sandbox="allow-scripts"` only, so its document has an
+// opaque origin and Safari/WebKit interprets `'self'` against that
+// (null) origin, blocking every same-origin `<img src="../images/...">`
+// reference. Substituting the absolute origin restores cross-browser
+// parity. Sandbox stays `allow-scripts` only, so the iframe document
+// still cannot read the parent's cookies / localStorage / DOM.
+//
+// `HTML_PREVIEW_EXT_RE` widens the allowlist to images so inline
+// `<img src="...png">` references resolve through this same mount
+// (no separate /artifacts/images round-trip). The CSP header is
+// only set for HTML responses (`HTML_DOCUMENT_EXT_RE`); CSP doesn't
+// apply to image subresources.
+const HTML_PREVIEW_EXT_RE = /\.(html?|png|jpe?g|webp|gif|svg|ico)$/i;
+const HTML_DOCUMENT_EXT_RE = /\.html?$/i;
 let htmlsDirReal: string | null = null;
 async function getHtmlsDirReal(): Promise<string | null> {
   if (htmlsDirReal) return htmlsDirReal;
@@ -220,7 +241,7 @@ async function getHtmlsDirReal(): Promise<string | null> {
 app.use(
   "/artifacts/html",
   async (req, res, next) => {
-    if (!HTML_EXT_RE.test(req.path)) {
+    if (!HTML_PREVIEW_EXT_RE.test(req.path)) {
       res.status(404).end();
       return;
     }
@@ -240,7 +261,21 @@ app.use(
       res.status(404).end();
       return;
     }
-    res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp());
+    if (HTML_DOCUMENT_EXT_RE.test(req.path)) {
+      // Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html`
+      // → `localhost:3001` with `changeOrigin: true`) emits the
+      // browser-visible origin (`localhost:5173`) rather than the
+      // upstream socket. In prod (no proxy) the headers are absent
+      // and we fall back to the raw `Host` / `req.protocol`. CSP
+      // header only on HTML responses — image subresources don't
+      // need it.
+      const fwdHost = req.get("x-forwarded-host");
+      const fwdProto = req.get("x-forwarded-proto");
+      const host = fwdHost ?? req.get("host");
+      const proto = fwdProto ?? req.protocol;
+      const origin = `${proto}://${host}`;
+      res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp(origin));
+    }
     res.setHeader("X-Content-Type-Options", "nosniff");
     next();
   },
@@ -559,6 +594,11 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: n
 
   // --- Session Store ---
   initSessionStore(pubsub);
+
+  // --- File-change publisher ---
+  // Wired here (not at first publish) so the very first save after
+  // boot already sees a live publisher.
+  initFileChangePublisher(pubsub);
 
   // --- Task Manager ---
   const taskManager = createTaskManager({

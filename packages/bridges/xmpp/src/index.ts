@@ -26,7 +26,8 @@
 
 import "dotenv/config";
 import xmppPkg, { type XmlElement } from "@xmpp/client";
-import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { createBridgeClient, chunkText, formatAckReply } from "@mulmobridge/client";
+import { splitJid, parseStanzaFields } from "./parse.js";
 
 const { client, xml } = xmppPkg;
 
@@ -62,17 +63,6 @@ if (!username || !domain) {
   process.exit(1);
 }
 
-function splitJid(fullJid: string): { username: string; domain: string } {
-  const atIdx = fullJid.indexOf("@");
-  if (atIdx < 0) return { username: "", domain: "" };
-  return { username: fullJid.slice(0, atIdx), domain: fullJid.slice(atIdx + 1) };
-}
-
-function bareJid(fullJid: string): string {
-  const slashIdx = fullJid.indexOf("/");
-  return (slashIdx < 0 ? fullJid : fullJid.slice(0, slashIdx)).toLowerCase();
-}
-
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
 const xmpp = client({ service, domain, username, password, resource });
@@ -97,17 +87,15 @@ async function sendChat(toJid: string, text: string): Promise<void> {
 // ── Receive ─────────────────────────────────────────────────────
 
 async function handleStanza(stanza: XmlElement): Promise<void> {
-  if (!stanza.is("message")) return;
-  const stanzaType = stanza.attrs.type ?? "";
-  if (stanzaType !== "chat" && stanzaType !== "normal") return;
-
-  const from = typeof stanza.attrs.from === "string" ? stanza.attrs.from : "";
-  const body = stanza.getChildText("body");
-  if (!from || !body) return;
-
-  const senderBare = bareJid(from);
-  const selfBare = `${username}@${domain}`.toLowerCase();
-  if (senderBare === selfBare) return; // ignore echo
+  const parsed = parseStanzaFields({
+    isMessage: stanza.is("message"),
+    type: stanza.attrs.type,
+    from: stanza.attrs.from,
+    body: stanza.getChildText("body"),
+    selfBare: `${username}@${domain}`.toLowerCase(),
+  });
+  if (!parsed) return;
+  const { from, senderBare, body } = parsed;
 
   if (!allowAll && !allowedJids.has(senderBare)) {
     console.log(`[xmpp] denied from=${senderBare}`);
@@ -125,12 +113,7 @@ async function handleStanza(stanza: XmlElement): Promise<void> {
 
   try {
     const ack = await mulmo.send(senderBare, body);
-    if (ack.ok) {
-      await sendChat(replyTo, ack.reply ?? "");
-    } else {
-      const status = ack.status ? ` (${ack.status})` : "";
-      await sendChat(replyTo, `Error${status}: ${ack.error ?? "unknown"}`);
-    }
+    await sendChat(replyTo, formatAckReply(ack));
   } catch (err) {
     console.error(`[xmpp] handleStanza error: ${err}`);
   }

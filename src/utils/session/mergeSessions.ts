@@ -11,6 +11,43 @@
 import { isUserTextResponse } from "../tools/result";
 import type { SessionSummary, ActiveSession } from "../../types/session";
 
+// Server-side fields the sidebar inherits when present. `summary` /
+// `keywords` are AI-generated; `origin` distinguishes scheduler /
+// skill / bridge / human sessions; `isBookmarked` / `hasUnread` /
+// `statusMessage` are server-tracked flags. None of these have a
+// local fallback — copy them only when the server has actually set
+// them, otherwise they'd surface as explicit `undefined` in shallow
+// copies downstream.
+const SERVER_OVERRIDE_KEYS = ["summary", "keywords", "origin", "isBookmarked", "hasUnread", "statusMessage"] as const;
+
+export function pickServerOverrides(serverEntry: SessionSummary | undefined): Partial<SessionSummary> {
+  if (!serverEntry) return {};
+  const overrides: Partial<SessionSummary> = {};
+  for (const key of SERVER_OVERRIDE_KEYS) {
+    const value = serverEntry[key];
+    if (value !== undefined) {
+      Object.assign(overrides, { [key]: value });
+    }
+  }
+  return overrides;
+}
+
+// Fold every in-memory signal into isRunning so the sidebar spinner
+// reacts as fast as the fastest source:
+//   - serverEntry.isRunning: authoritative but arrives on a /api/sessions
+//     refetch
+//   - live.isRunning: mirrored from the server via refreshSessionStates;
+//     may be ahead during the refetch window, and covers live-only
+//     sessions with no serverEntry yet
+//   - live.pendingGenerations: updates on the socket round-trip of a
+//     generationStarted event, before any REST refetch
+// OR them so any one is enough. `live.isRunning` is always defined on
+// an ActiveSession, so the summary always carries a boolean here.
+export function computeLiveIsRunning(serverEntry: SessionSummary | undefined, live: Pick<ActiveSession, "isRunning" | "pendingGenerations">): boolean {
+  const pendingCount = Object.keys(live.pendingGenerations ?? {}).length;
+  return Boolean(serverEntry?.isRunning) || live.isRunning || pendingCount > 0;
+}
+
 // Build the summary shape the sidebar expects for a single live
 // session. Server-side data (AI-generated title, summary,
 // keywords) takes precedence over the local first-user-message
@@ -19,51 +56,14 @@ import type { SessionSummary, ActiveSession } from "../../types/session";
 function buildLiveSummary(live: ActiveSession, serverEntry: SessionSummary | undefined): SessionSummary {
   const firstUserMsg = live.toolResults.find(isUserTextResponse);
   const preview = serverEntry?.preview || (firstUserMsg?.message ?? "");
-  const base: SessionSummary = {
+  return {
     id: live.id,
     roleId: live.roleId,
     startedAt: live.startedAt,
     updatedAt: live.updatedAt,
     preview,
-  };
-  // Fold every in-memory signal into isRunning so the sidebar spinner
-  // reacts as fast as the fastest source:
-  //   - serverEntry.isRunning: authoritative but arrives on a /api/sessions
-  //     refetch
-  //   - live.isRunning: mirrored from the server via refreshSessionStates;
-  //     may be ahead during the refetch window, and covers live-only
-  //     sessions with no serverEntry yet
-  //   - live.pendingGenerations: updates on the socket round-trip of a
-  //     generationStarted event, before any REST refetch
-  // OR them so any one is enough. `live.isRunning` is always defined on
-  // an ActiveSession, so the summary always carries a boolean here.
-  const pending = live.pendingGenerations ?? {};
-  const isRunning = Boolean(serverEntry?.isRunning) || live.isRunning || Object.keys(pending).length > 0;
-  // Carry summary / keywords ONLY if the server already has them.
-  // Object-spread with a conditional object keeps us from adding
-  // `undefined` values that would otherwise show up as explicit
-  // `summary: undefined` in a later shallow-copy.
-  return {
-    ...base,
-    ...(serverEntry?.summary !== undefined && { summary: serverEntry.summary }),
-    ...(serverEntry?.keywords !== undefined && {
-      keywords: serverEntry.keywords,
-    }),
-    // `origin` is set once by the server when the session is created
-    // (scheduler / skill / bridge / human). A live session promoted
-    // from the server list must keep it — the tab bar renders the
-    // non-human glyph off this field.
-    ...(serverEntry?.origin !== undefined && { origin: serverEntry.origin }),
-    ...(serverEntry?.isBookmarked !== undefined && {
-      isBookmarked: serverEntry.isBookmarked,
-    }),
-    isRunning,
-    ...(serverEntry?.hasUnread !== undefined && {
-      hasUnread: serverEntry.hasUnread,
-    }),
-    ...(serverEntry?.statusMessage !== undefined && {
-      statusMessage: serverEntry.statusMessage,
-    }),
+    ...pickServerOverrides(serverEntry),
+    isRunning: computeLiveIsRunning(serverEntry, live),
   };
 }
 

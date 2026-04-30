@@ -26,11 +26,15 @@ const FETCH_TIMEOUT_MS = 15_000;
 const PORT = Number(process.env.VIBER_WEBHOOK_PORT) || 3012;
 const VIBER_API = "https://chatapi.viber.com/pa";
 
-const authToken = process.env.VIBER_AUTH_TOKEN;
-if (!authToken) {
-  console.error("VIBER_AUTH_TOKEN is required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { authToken: string } {
+  const authToken = process.env.VIBER_AUTH_TOKEN;
+  if (!authToken) {
+    console.error("VIBER_AUTH_TOKEN is required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { authToken };
 }
+const { authToken } = readRequiredEnv();
 
 const senderName = process.env.VIBER_SENDER_NAME ?? "MulmoClaude";
 const allowedUsers = new Set(
@@ -70,7 +74,7 @@ async function sendViber(receiverId: string, text: string): Promise<void> {
     try {
       res = await fetch(`${VIBER_API}/send_message`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Viber-Auth-Token": authToken! },
+        headers: { "Content-Type": "application/json", "X-Viber-Auth-Token": authToken },
         body: JSON.stringify({
           receiver: receiverId,
           type: "text",
@@ -99,7 +103,7 @@ async function sendViber(receiverId: string, text: string): Promise<void> {
 // ── Signature verification ─────────────────────────────────────
 
 function verifySignature(rawBody: string, signature: string): boolean {
-  const expected = crypto.createHmac("sha256", authToken!).update(rawBody).digest("hex");
+  const expected = crypto.createHmac("sha256", authToken).update(rawBody).digest("hex");
   if (expected.length !== signature.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));

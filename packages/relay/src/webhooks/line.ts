@@ -5,7 +5,7 @@ import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { makeUuid } from "../utils/id.js";
 
-interface LineEvent {
+export interface LineEvent {
   type: string;
   message?: { type: string; text?: string; id?: string };
   source?: { userId?: string; groupId?: string; roomId?: string };
@@ -18,6 +18,28 @@ interface LineWebhookBody {
 
 const MAX_LINE_MESSAGES_PER_REQUEST = 5;
 const MAX_LINE_TEXT = 5000;
+
+export interface ParsedLineEvent {
+  chatId: string;
+  senderId: string;
+  text: string;
+  replyToken?: string;
+}
+
+/**
+ * Pure: reduce a LINE webhook event to the actionable
+ * chatId / senderId / text triple, or null when the event isn't a
+ * deliverable text message. Group / room source IDs win over the
+ * sender's userId so a single LINE chat session maps to one
+ * MulmoClaude chatId.
+ */
+export function parseLineMessageEvent(event: LineEvent): ParsedLineEvent | null {
+  if (event.type !== "message" || event.message?.type !== "text") return null;
+  if (!event.message.text) return null;
+  const chatId = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId ?? "unknown";
+  const senderId = event.source?.userId ?? "unknown";
+  return { chatId, senderId, text: event.message.text, replyToken: event.replyToken };
+}
 
 // ── Signature verification ──────────────────────────────────────
 
@@ -57,19 +79,16 @@ const linePlugin: PlatformPlugin = {
     const messages: RelayMessage[] = [];
 
     for (const event of parsed.events) {
-      if (event.type !== "message" || event.message?.type !== "text") continue;
-      if (!event.message.text) continue;
-
-      const chatId = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId ?? "unknown";
-
+      const parsedEvent = parseLineMessageEvent(event);
+      if (!parsedEvent) continue;
       messages.push({
         id: makeUuid(),
         platform: PLATFORMS.line,
-        senderId: event.source?.userId ?? "unknown",
-        chatId,
-        text: event.message.text,
+        senderId: parsedEvent.senderId,
+        chatId: parsedEvent.chatId,
+        text: parsedEvent.text,
         receivedAt: new Date().toISOString(),
-        replyToken: event.replyToken,
+        replyToken: parsedEvent.replyToken,
       });
     }
 

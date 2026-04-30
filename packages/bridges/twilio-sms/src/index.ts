@@ -34,13 +34,17 @@ const MAX_SMS_LEN = 1_600; // Twilio concatenates segments up to 1600 chars
 const FETCH_TIMEOUT_MS = 15_000;
 const PORT = Number(process.env.TWILIO_WEBHOOK_PORT) || 3010;
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const fromNumber = process.env.TWILIO_FROM_NUMBER;
-if (!accountSid || !authToken || !fromNumber) {
-  console.error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER are required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { accountSid: string; authToken: string; fromNumber: string } {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_FROM_NUMBER;
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER are required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { accountSid, authToken, fromNumber };
 }
+const { accountSid, authToken, fromNumber } = readRequiredEnv();
 
 const publicUrl = process.env.TWILIO_PUBLIC_URL?.replace(/\/$/, "");
 const allowUnverified = process.env.TWILIO_ALLOW_UNVERIFIED === "1";
@@ -75,7 +79,7 @@ function expectedSignature(url: string, params: Record<string, string>): string 
   // Twilio: sort params by key, concat key+value, prepend URL, sign with auth token.
   const sortedKeys = Object.keys(params).sort();
   const data = sortedKeys.reduce((acc, key) => acc + key + params[key], url);
-  const hmac = crypto.createHmac("sha1", authToken!);
+  const hmac = crypto.createHmac("sha1", authToken);
   hmac.update(data);
   return hmac.digest("base64");
 }
@@ -96,7 +100,7 @@ async function sendSms(toNumber: string, text: string): Promise<void> {
   const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
   const chunks = chunkText(text, MAX_SMS_LEN);
   for (const chunk of chunks) {
-    const form = new URLSearchParams({ From: fromNumber!, To: toNumber, Body: chunk });
+    const form = new URLSearchParams({ From: fromNumber, To: toNumber, Body: chunk });
     let res: Response;
     try {
       res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {

@@ -4,6 +4,7 @@ import {
   githubIssuesFetcher,
   parseGithubIssue,
   issueToSourceItem,
+  formatIssueTitle,
   updateIssuesCursor,
   processIssuesResponse,
   resolveIssuesParams,
@@ -205,6 +206,63 @@ describe("parseGithubIssue", () => {
     assert.equal(parseGithubIssue("str"), null);
     assert.equal(parseGithubIssue([1, 2]), null);
     assert.equal(parseGithubIssue(null), null);
+  });
+});
+
+// --- formatIssueTitle (pure helper) --------------------------------------
+
+describe("formatIssueTitle", () => {
+  // Build a minimal ParsedIssue. We don't go through parseGithubIssue
+  // because the helper's contract is over the ParsedIssue shape, not
+  // the raw GitHub payload.
+  function makeParsed(overrides: Partial<Parameters<typeof formatIssueTitle>[0]> = {}): Parameters<typeof formatIssueTitle>[0] {
+    return {
+      id: 1,
+      number: 7,
+      title: "fix the thing",
+      htmlUrl: "https://example.test/i/7",
+      body: null,
+      updatedAt: "2026-04-30T00:00:00Z",
+      createdAt: "2026-04-29T00:00:00Z",
+      isPr: false,
+      state: "open",
+      ...overrides,
+    };
+  }
+
+  it("returns the bare title for a plain open issue", () => {
+    assert.equal(formatIssueTitle(makeParsed()), "fix the thing");
+  });
+
+  it("prefixes [PR] for pull requests", () => {
+    assert.equal(formatIssueTitle(makeParsed({ isPr: true })), "[PR] fix the thing");
+  });
+
+  it("prefixes [closed] for closed items", () => {
+    assert.equal(formatIssueTitle(makeParsed({ state: "closed" })), "[closed] fix the thing");
+  });
+
+  it("combines [PR] [closed] in that order for closed PRs", () => {
+    assert.equal(formatIssueTitle(makeParsed({ isPr: true, state: "closed" })), "[PR] [closed] fix the thing");
+  });
+
+  it("falls back to `#<number>` when the title is missing", () => {
+    assert.equal(formatIssueTitle(makeParsed({ title: null })), "#7");
+  });
+
+  it("combines annotation and number fallback", () => {
+    assert.equal(formatIssueTitle(makeParsed({ title: null, isPr: true })), "[PR] #7");
+  });
+
+  it("falls back to `#?` when both title and number are missing", () => {
+    assert.equal(formatIssueTitle(makeParsed({ title: null, number: null })), "#?");
+  });
+
+  it("treats unknown state as not-closed (no [closed] prefix)", () => {
+    // GitHub only returns "open" / "closed" today, but the field is
+    // typed `string | null` so we should not annotate anything else.
+    assert.equal(formatIssueTitle(makeParsed({ state: "draft" })), "fix the thing");
+    assert.equal(formatIssueTitle(makeParsed({ state: null })), "fix the thing");
   });
 });
 

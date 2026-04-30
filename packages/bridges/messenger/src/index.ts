@@ -19,13 +19,17 @@ import { createBridgeClient, chunkText } from "@mulmobridge/client";
 const TRANSPORT_ID = "messenger";
 const PORT = Number(process.env.MESSENGER_BRIDGE_PORT) || 3004;
 
-const pageAccessToken = process.env.MESSENGER_PAGE_ACCESS_TOKEN;
-const verifyToken = process.env.MESSENGER_VERIFY_TOKEN;
-const appSecret = process.env.MESSENGER_APP_SECRET;
-if (!pageAccessToken || !verifyToken || !appSecret) {
-  console.error("MESSENGER_PAGE_ACCESS_TOKEN, MESSENGER_VERIFY_TOKEN, and MESSENGER_APP_SECRET are required.\nSee README for setup instructions.");
-  process.exit(1);
+function readRequiredEnv(): { pageAccessToken: string; verifyToken: string; appSecret: string } {
+  const pageAccessToken = process.env.MESSENGER_PAGE_ACCESS_TOKEN;
+  const verifyToken = process.env.MESSENGER_VERIFY_TOKEN;
+  const appSecret = process.env.MESSENGER_APP_SECRET;
+  if (!pageAccessToken || !verifyToken || !appSecret) {
+    console.error("MESSENGER_PAGE_ACCESS_TOKEN, MESSENGER_VERIFY_TOKEN, and MESSENGER_APP_SECRET are required.\nSee README for setup instructions.");
+    process.exit(1);
+  }
+  return { pageAccessToken, verifyToken, appSecret };
 }
+const { pageAccessToken, verifyToken, appSecret } = readRequiredEnv();
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
 
@@ -63,7 +67,7 @@ async function sendTextMessage(recipientId: string, text: string): Promise<void>
 // ── Signature verification ──────────────────────────────────────
 
 function verifySignature(rawBody: string, signature: string): boolean {
-  const expected = crypto.createHmac("sha256", appSecret!).update(rawBody).digest("hex");
+  const expected = crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const provided = signature.replace("sha256=", "");
   if (expected.length !== provided.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
