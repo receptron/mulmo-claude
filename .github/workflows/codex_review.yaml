@@ -96,7 +96,12 @@ jobs:
           # Default to a known Azure API version; override with
           # `AZURE_OPENAI_API_VERSION` secret if a newer deployment
           # demands a different one.
-          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION || '2025-04-01-preview' }}
+          # `2024-10-21` is the latest GA API version that broadly
+          # supports Chat Completions on Azure deployments. Override
+          # via the optional `AZURE_OPENAI_API_VERSION` secret if
+          # the deployment needs a newer preview (e.g. for the
+          # Responses API).
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION || '2024-10-21' }}
           # Deployment name on the Azure resource (the LLM model
           # alias the workspace administrator created). Codex passes
           # this through as `model = ...` in the request body.
@@ -113,7 +118,12 @@ jobs:
           name = "Azure OpenAI"
           base_url = "${BASE_URL}/openai/v1"
           env_key = "OPENAI_API_KEY"
-          wire_api = "responses"
+          # Chat Completions is GA on every Azure deployment. The
+          # Responses API (wire_api = "responses") requires a newer
+          # API version that is not enabled on every Azure resource
+          # by default — switch back via the AZURE_OPENAI_API_VERSION
+          # secret + this field once confirmed available.
+          wire_api = "chat"
           query_params = { "api-version" = "${AZURE_API_VERSION}" }
           TOML
           # Sanity log: print the config without the URL host so we
