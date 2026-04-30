@@ -97,6 +97,20 @@
 - `editImage` のパラメータ追加（Stage 2）
 - session-store からの選択画像状態の削除（Stage 3）
 
+### Follow-up: i18n（Stage 1 に取り残された TODO）
+
+CodeRabbit 指摘 (#1045): `src/App.vue` の upload 失敗時メッセージ `` `Failed to attach image: ${resolved.error}` `` が **ハードコード英語**で残っている。CLAUDE.md の「i18n — all 8 locales in lockstep」ルールに従い、`src/lang/en.ts` の `chatInput` セクションにキーを追加し、`ja / zh / ko / es / pt-BR / fr / de` の 7 ファイルへ展開する必要がある。
+
+**作業内容**:
+
+| ファイル | 変更 |
+|---|---|
+| `src/lang/en.ts` (`chatInput`) | `attachUploadFailed: "Failed to attach image: {error}"` を追加 |
+| `src/lang/{ja,zh,ko,es,pt-BR,fr,de}.ts` | 同位置にローカライズ済み翻訳を追加（`{error}` プレースホルダはそのまま） |
+| `src/App.vue` (`sendMessage`) | `pushErrorMessage(recoverySession, t("chatInput.attachUploadFailed", { error: resolved.error }))` に置換 |
+
+Stage 1 の単独 PR にしなかった理由は、回帰修正と切り分けて i18n だけの follow-up PR で扱うため。Stage 2 に着手する前に片付けること。
+
 ---
 
 ## Stage 2: `editImage` に `imagePath` パラメータ追加 — LLM が path を渡す
