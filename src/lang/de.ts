@@ -71,6 +71,8 @@ const deMessages = {
     todayJournal: "Heutige Zusammenfassung",
     todayJournalNotFound: "Noch keine Zusammenfassung — chatte etwas und das Journal erstellt eine.",
     todayJournalLoadFailed: "Journal konnte nicht geladen werden (Status {status}): {error}",
+    copyMarkdown: "Chat als Markdown kopieren",
+    copiedMarkdown: "Kopiert!",
   },
   rightSidebar: {
     toggleSystemPrompt: "System-Prompt umschalten",

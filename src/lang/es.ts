@@ -76,6 +76,8 @@ const esMessages = {
     todayJournal: "Resumen de hoy",
     todayJournalNotFound: "Aún no hay resumen — chatea un rato y el journal lo generará.",
     todayJournalLoadFailed: "Error al cargar el journal (status {status}): {error}",
+    copyMarkdown: "Copiar la conversación como Markdown",
+    copiedMarkdown: "¡Copiado!",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",
