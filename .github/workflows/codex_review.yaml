@@ -14,9 +14,15 @@
 #     the prior tarball + skips the network on warm runs
 #
 # Auth: Azure OpenAI via the OpenAI-compatible `/openai/v1` endpoint.
-# `OPENAI_BASE_URL` + `OPENAI_API_KEY` are picked up by Codex CLI
-# directly — no `~/.codex/config.toml` provider stanza needed (verified
-# locally on codex-cli 0.125.0).
+# Codex CLI 0.125.0 does NOT honour `OPENAI_BASE_URL` directly —
+# the iter-1 attempt 401'd against `api.openai.com` because the env
+# var was silently ignored. Workflow now writes an explicit
+# `~/.codex/config.toml` with `[model_providers.azure]` before the
+# `codex exec` invocation. Required secrets:
+#   - AZURE_OPENAI_API_KEY        (the Azure key)
+#   - AZURE_OPENAI_BASE_URL       (e.g. https://<resource>.openai.azure.com — no path)
+#   - AZURE_OPENAI_DEPLOYMENT     (optional; defaults to gpt-5.4-mini)
+#   - AZURE_OPENAI_API_VERSION    (optional; defaults to 2025-04-01-preview)
 #
 # Manual testing: `workflow_dispatch` lets you run the workflow
 # against an arbitrary open PR after this file lands on `main`. The
@@ -27,13 +33,12 @@
 name: Codex auto-review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "plans/**"
-      - "**/*.md"
+  # Manual-only trigger while we sort out Azure OpenAI provider
+  # config. The first attempt at auto-firing on `pull_request`
+  # exposed that Codex CLI 0.125.0 ignores `OPENAI_BASE_URL` and
+  # falls back to `api.openai.com`, which 401s with an Azure key.
+  # Re-enable the `pull_request` trigger once a clean
+  # `workflow_dispatch` run lands on a real PR end-to-end.
   workflow_dispatch:
     inputs:
       pr_number:
@@ -85,10 +90,40 @@ jobs:
       - name: Install codex CLI (pinned)
         run: npm install -g "@openai/codex@${CODEX_VERSION}"
 
+      - name: Configure Codex for Azure OpenAI
+        env:
+          AZURE_BASE_URL: ${{ secrets.AZURE_OPENAI_BASE_URL }}
+          # Default to a known Azure API version; override with
+          # `AZURE_OPENAI_API_VERSION` secret if a newer deployment
+          # demands a different one.
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION || '2025-04-01-preview' }}
+          # Deployment name on the Azure resource (the LLM model
+          # alias the workspace administrator created). Codex passes
+          # this through as `model = ...` in the request body.
+          AZURE_MODEL: ${{ secrets.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.4-mini' }}
+        run: |
+          mkdir -p "$HOME/.codex"
+          # Strip trailing slash so concatenation never doubles up.
+          BASE_URL="${AZURE_BASE_URL%/}"
+          cat > "$HOME/.codex/config.toml" <<TOML
+          model_provider = "azure"
+          model = "${AZURE_MODEL}"
+
+          [model_providers.azure]
+          name = "Azure OpenAI"
+          base_url = "${BASE_URL}/openai/v1"
+          env_key = "OPENAI_API_KEY"
+          wire_api = "responses"
+          query_params = { "api-version" = "${AZURE_API_VERSION}" }
+          TOML
+          # Sanity log: print the config without the URL host so we
+          # can see the structure landed correctly without leaking
+          # the resource name in logs.
+          sed 's|https://[^/]*|<azure-host>|g' "$HOME/.codex/config.toml"
+
       - name: Run codex review
         env:
           OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.AZURE_OPENAI_BASE_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           REPO: ${{ github.repository }}
