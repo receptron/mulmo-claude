@@ -12,7 +12,7 @@
       </button>
     </div>
     <div class="iframe-wrapper">
-      <iframe v-if="previewUrl" :src="previewUrl" sandbox="allow-scripts" class="w-full h-full border-0" />
+      <iframe v-if="previewUrl" data-testid="present-html-iframe" :src="previewUrl" sandbox="allow-scripts" class="w-full h-full border-0" />
       <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">
         {{ t("pluginPresentHtml.untitled") }}
       </div>

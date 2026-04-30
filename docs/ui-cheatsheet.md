@@ -117,6 +117,18 @@ Click on a row → `useNotifications.markRead(id)` → badge decrements. The �
 
 The right canvas binds to `currentSession.selectedResultUuid`. Clicking a tool-call card on the left sets the uuid; the right pane re-renders via plugin lookup (`getPlugin(toolName).viewComponent`).
 
+### Canvas plugin views — primary testids
+
+Stable hooks for tests / chat references when a tool result is selected on the right canvas:
+
+| Plugin | testid | What it points at |
+|---|---|---|
+| `presentHtml` | `[present-html-iframe]` | The `<iframe :src="/artifacts/html/...">` rendering the saved HTML page |
+| `textResponse` | `[text-response-pdf-button]` | The "PDF" button on an assistant text response (`usePdfDownload` → `/api/pdf/markdown`) |
+| `textResponse` | `[text-response-edit]` / `[text-response-edit-summary]` / `[text-response-edit-textarea]` / `[text-response-apply-btn]` | The collapsible source editor on an assistant text response |
+
+(Other plugin views — `<CalendarView>`, `<MarkdownView>`, `<SpreadsheetView>`, `<ChartView>`, etc. — are documented in their own sections below or are direct components without a stable testid yet.)
+
 ## /calendar — calendar of dated items
 
 ```

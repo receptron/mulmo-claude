@@ -14,5 +14,7 @@ server/logs/
 .vscode/
 playwright-report/
 test-results/
+playwright-report-live/
+test-results-live/
 .playwright-mcp/
 .mcp.json
