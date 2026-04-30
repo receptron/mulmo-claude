@@ -11,7 +11,6 @@ describe("@mulmobridge/protocol exports", () => {
       "toolCall",
       "toolCallResult",
       "toolResult",
-      "switchRole",
       "error",
       "claudeSessionId",
       "sessionFinished",

@@ -5,7 +5,6 @@ import { isDockerAvailable } from "../system/docker.js";
 import { refreshCredentials } from "../system/credentials.js";
 import { loadMcpConfig, loadSettings } from "../system/config.js";
 import type { Role } from "../../src/config/roles.js";
-import { loadAllRoles } from "../workspace/roles.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { CONTAINER_WORKSPACE_PATH, buildMcpConfig, getActivePlugins, prepareUserServers, resolveMcpConfigPaths, userServerAllowedToolNames } from "./config.js";
 import { validateStdioPackages } from "./mcpHealth.js";
@@ -94,7 +93,6 @@ export async function* runAgent({
       chatSessionId: sessionId,
       port,
       activePlugins,
-      roleIds: loadAllRoles().map((loadedRole) => loadedRole.id),
       useDocker,
       userServers,
     });

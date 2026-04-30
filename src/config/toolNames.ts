@@ -44,7 +44,7 @@ export const TOOL_NAMES = {
   // Creation / generation
   createMindMap: "createMindMap",
   generateImage: "generateImage",
-  editImage: "editImage",
+  editImages: "editImages",
   openCanvas: "openCanvas",
 
   // Interactive / media
@@ -57,9 +57,6 @@ export const TOOL_NAMES = {
   readXPost: "readXPost",
   searchX: "searchX",
   notify: "notify",
-
-  // Built-in (handled specially by the MCP stdio bridge).
-  switchRole: "switchRole",
 } as const;
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];

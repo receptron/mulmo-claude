@@ -530,6 +530,8 @@ const jaMessages = {
     redo: "やり直し",
     clear: "クリア",
     styleLabel: "スタイル:",
+    stylePromptWithPath: "`{path}` の画像を {style} スタイルの画像に変換してください。",
+    stylePromptNoPath: "キャンバスに描いた絵を {style} スタイルの画像に変換してください。",
   },
   pluginChart: {
     untitled: "チャート",

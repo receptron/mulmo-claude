@@ -96,8 +96,7 @@ describe("MCP server subprocess smoke test", () => {
     const env: Record<string, string> = {
       SESSION_ID: "test-smoke",
       PORT: "0",
-      PLUGIN_NAMES: "manageTodoList,presentMulmoScript,switchRole",
-      ROLE_IDS: "general",
+      PLUGIN_NAMES: "manageTodoList,presentMulmoScript",
     };
 
     const responses = await sendAndReceive(
@@ -142,8 +141,6 @@ describe("MCP server subprocess smoke test", () => {
     assert.ok(toolNames.includes("manageTodoList"), `manageTodoList not in tools: ${toolNames.join(", ")}`);
     assert.ok(toolNames.includes("presentMulmoScript"), `presentMulmoScript not in tools: ${toolNames.join(", ")}`);
 
-    // switchRole should always be included.
-    assert.ok(toolNames.includes("switchRole"), `switchRole not in tools: ${toolNames.join(", ")}`);
     // manageWiki is intentionally absent (#963 Stage 3b) — the MCP
     // tool definition was removed; the plugin record stays for
     // canvas dispatch only, not for LLM-side calls.

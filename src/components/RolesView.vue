@@ -312,7 +312,7 @@ interface PluginEntry {
 }
 
 // Plugins the user can assign — exclude internal/auto-managed ones
-const EXCLUDED = new Set(["text-response", "switchRole"]);
+const EXCLUDED = new Set(["text-response"]);
 const guiPlugins: PluginEntry[] = getAllPluginNames()
   .filter((name) => !EXCLUDED.has(name))
   .map((name) => ({ name, enabled: true, requiredEnv: [] }));
@@ -419,7 +419,7 @@ function selectRole(role: CustomRole) {
     name: role.name,
     icon: role.icon,
     prompt: role.prompt,
-    selectedPlugins: role.availablePlugins.filter((plugin) => plugin !== "switchRole"),
+    selectedPlugins: [...role.availablePlugins],
     queriesText: (role.queries ?? []).join("\n"),
   };
 }

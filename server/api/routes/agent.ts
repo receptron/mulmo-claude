@@ -42,6 +42,9 @@ import { isSessionOrigin, type SessionOrigin } from "../../../src/types/session.
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "@mulmobridge/client";
+import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
+import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension } from "../../utils/files/attachment-store.js";
+import { errorMessage } from "../../utils/errors.js";
 
 const router = Router();
 const PORT = env.port;
@@ -73,20 +76,6 @@ router.post(API_ROUTES.agent.internal.toolResult, async (req: Request<object, un
   res.json({ ok: outcome.kind === "processed" });
 });
 
-// Called by the MCP server to trigger a role switch on the frontend
-interface SwitchRoleBody {
-  roleId: string;
-}
-
-router.post(API_ROUTES.agent.internal.switchRole, async (req: Request<object, unknown, SwitchRoleBody>, res: Response<OkResponse>) => {
-  const chatSessionId = getSessionQuery(req);
-  pushSessionEvent(chatSessionId, {
-    type: EVENT_TYPES.switchRole,
-    roleId: req.body.roleId,
-  });
-  res.json({ ok: true });
-});
-
 // Cancel a running agent session by killing the Claude CLI process.
 interface CancelBody {
   chatSessionId: string;
@@ -111,6 +100,14 @@ export interface StartChatParams {
   message: string;
   roleId: string;
   chatSessionId: string;
+  /** Bridge-only legacy carrier for "the user picked this image".
+   *  No in-tree bridge sets it today; it remains on the type so
+   *  external bridge clients that populate it from older protocol
+   *  versions continue to work. The Vue UI never sets this — paste/
+   *  drop and sidebar picks ride on `attachments[]` as path-only
+   *  entries instead. When set, `startChat` normalises the value
+   *  into a synthetic `Attachment` and prepends it to `attachments`
+   *  before any downstream processing. */
   selectedImageData?: string;
   attachments?: Attachment[];
   /** Where this session originates (#486). Accepts string for
@@ -133,6 +130,10 @@ export type StartChatResult = { kind: "started"; chatSessionId: string } | { kin
 
 export async function startChat(params: StartChatParams): Promise<StartChatResult> {
   const { message, roleId, chatSessionId, selectedImageData, attachments, userTimezone } = params;
+  // Bridge-only compat: external bridge clients may still populate
+  // `selectedImageData`. Fold it into `attachments` so the rest of
+  // this function only deals with one input shape.
+  const normalisedAttachments = mergeBridgeSelectedImage(selectedImageData, attachments);
 
   if (!message || !roleId || !chatSessionId) {
     return {
@@ -159,7 +160,6 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   getOrCreateSession(chatSessionId, {
     roleId,
     resultsFilePath,
-    selectedImageData,
     startedAt: now,
     updatedAt: now,
     hasUnread: persistedHasUnread,
@@ -213,7 +213,21 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     resumed: Boolean(claudeSessionId),
   });
 
-  const decoratedMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
+  // Roll the run back if attachment prep throws (e.g. malformed
+  // HTTP body where `attachments` isn't an array). beginRun already
+  // committed; without endRun + abort the session is stuck and every
+  // future turn is rejected with 409.
+  let extras: RequestExtras;
+  try {
+    extras = await prepareRequestExtras(normalisedAttachments);
+  } catch (err) {
+    log.warn("agent", "prepareRequestExtras failed — rolling back run", { chatSessionId, error: errorMessage(err) });
+    abortController.abort();
+    endRun(chatSessionId);
+    return { kind: "error", error: "Invalid attachments payload", status: 400 };
+  }
+  const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
+  const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePaths);
 
   runAgentInBackground({
     decoratedMessage,
@@ -224,7 +238,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     resultsFilePath,
     requestStartedAt,
     toolArgsCache: createArgsCache(),
-    attachments: mergeAttachments(selectedImageData, attachments),
+    attachments: extras.attachments,
     userTimezone,
     origin: validOrigin,
   });
@@ -234,35 +248,152 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Convert legacy `selectedImageData` (data URL from the Vue UI) into
- *  the generic Attachment format, then merge with any explicitly-
- *  provided attachments from the bridge protocol. Returns undefined
- *  when there's nothing to attach. */
-function mergeAttachments(selectedImageData: string | undefined, explicit: Attachment[] | undefined): Attachment[] | undefined {
+interface RequestExtras {
+  attachments: Attachment[] | undefined;
+  /** Workspace-relative paths of every file the user attached or
+   *  selected for this turn, in declaration order. Surfaced to the
+   *  LLM via one `[Attached file: <path>]` line per entry, prepended
+   *  to the user message so path-passing tools (e.g. `editImages`)
+   *  and the LLM itself can reference each file by path. Empty when
+   *  the request carried only inline bridge bytes (no paths) or
+   *  nothing at all. */
+  attachedFilePaths: string[];
+}
+
+/** Bridge-only compat: external bridge clients may still ship a
+ *  picked image via `StartChatParams.selectedImageData`. Convert
+ *  that single value to a synthetic `Attachment` and prepend it to
+ *  the explicit `attachments` array so downstream code only has to
+ *  understand one input shape. The Vue UI never reaches this branch
+ *  — it sends path-only attachments directly. */
+function mergeBridgeSelectedImage(selectedImageData: string | undefined, attachments: Attachment[] | undefined): Attachment[] | undefined {
+  const synthetic = synthesiseBridgeAttachment(selectedImageData);
+  if (!synthetic) return attachments;
+  return attachments && attachments.length > 0 ? [synthetic, ...attachments] : [synthetic];
+}
+
+function synthesiseBridgeAttachment(selectedImageData: string | undefined): Attachment | undefined {
+  if (!selectedImageData) return undefined;
+  if (isAttachmentPath(selectedImageData) || isImagePath(selectedImageData)) {
+    return { path: selectedImageData };
+  }
+  const parsed = parseDataUrl(selectedImageData);
+  if (parsed) return { mimeType: parsed.mimeType, data: parsed.data };
+  log.warn("agent", "bridge selectedImageData is neither a known path nor a data: URL — dropping", {
+    valuePreview: selectedImageData.slice(0, 64),
+  });
+  return undefined;
+}
+
+/** Walk `attachments[]` once, loading bytes from disk for any
+ *  path-only entry, and collect every path-bearing entry so the
+ *  caller can emit one `[Attached file: <path>]` marker per file.
+ *  Two path roots are accepted:
+ *
+ *    - `data/attachments/...` — paste/drop/file-picker uploads (any
+ *      MIME type from the chat input's accept list). MIME is inferred
+ *      from the extension chosen at save time.
+ *    - `artifacts/images/...png` — generated / canvas / edited images
+ *      a user picked from the sidebar. Always image/png.
+ *
+ *  Bytes are loaded so Claude still "sees" each file as a content
+ *  block on this turn, AND every path is returned separately so the
+ *  caller marks them in the LLM-bound message. If a file can't be
+ *  read, its path hint is still emitted — the LLM knows what was
+ *  attached and can call Read to load it. Multi-file flows (e.g.
+ *  paste one image + pick another in the sidebar → "combine these")
+ *  rely on every path showing up in the marker so `editImages` can
+ *  receive the full list in `imagePaths`. */
+async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
+  if (!attachments || attachments.length === 0) {
+    return { attachments: undefined, attachedFilePaths: [] };
+  }
   const result: Attachment[] = [];
-  if (selectedImageData) {
-    const parsed = parseDataUrl(selectedImageData);
-    if (parsed) {
-      result.push({ mimeType: parsed.mimeType, data: parsed.data });
+  const attachedFilePaths: string[] = [];
+  for (const att of attachments) {
+    const resolved = await resolveAttachment(att);
+    if (resolved) result.push(resolved);
+    if (typeof att.path === "string" && att.path.length > 0) {
+      attachedFilePaths.push(att.path);
     }
   }
-  if (explicit) {
-    result.push(...explicit);
+  return {
+    attachments: result.length > 0 ? result : undefined,
+    attachedFilePaths,
+  };
+}
+
+async function resolveAttachment(att: Attachment): Promise<Attachment | undefined> {
+  if (typeof att.path === "string" && att.path.length > 0) {
+    return loadFromPath(att.path, att.mimeType);
   }
-  return result.length > 0 ? result : undefined;
+  if (typeof att.data === "string" && att.data.length > 0) {
+    return att;
+  }
+  log.warn("agent", "attachment has neither path nor data — dropping");
+  return undefined;
+}
+
+async function loadFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  if (isAttachmentPath(value)) return loadAttachmentFromPath(value, declaredMimeType);
+  if (isImagePath(value)) return loadImageFromPath(value, declaredMimeType);
+  log.warn("agent", "attachment path is outside allowed roots — dropping", { path: value });
+  return undefined;
+}
+
+async function loadAttachmentFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  const mimeType = declaredMimeType ?? inferMimeFromExtension(value);
+  if (!mimeType) {
+    log.warn("agent", "attachment path has unknown extension — skipping bytes", { path: value });
+    return undefined;
+  }
+  try {
+    const data = await loadAttachmentBase64(value);
+    return { mimeType, data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load attachment bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
+}
+
+async function loadImageFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  try {
+    const data = await loadImageBase64(value);
+    return { mimeType: declaredMimeType ?? "image/png", data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load selected-image bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
+}
+
+/** Marker prepended to the LLM-bound user message that tells the
+ *  model which workspace files are attached / selected for this turn.
+ *  One `[Attached file: <path>]` line is emitted per path so multi-
+ *  file flows (e.g. paste one image + pick another → "combine these")
+ *  surface every path to the model — `editImages` then receives the
+ *  full list in `imagePaths`. The user's persisted (jsonl) and
+ *  broadcast (UI) message is the raw text — these marker lines are
+ *  added strictly on the path to Claude. The system prompt teaches
+ *  the model how to interpret them. */
+export function withAttachedFileMarker(message: string, attachedFilePaths: string[]): string {
+  if (attachedFilePaths.length === 0) return message;
+  const markerLines = attachedFilePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
+  return `${markerLines}\n\n${message}`;
 }
 
 // ── HTTP route ──────────────────────────────────────────────────────
 
-// HTTP route body — used by the Vue UI only. `selectedImageData` is
-// the legacy data-URL path; new bridge clients send `attachments`
-// via the socket relay instead. mergeAttachments() unifies both
-// paths inside startChat(). See #382 for the rationale.
+// HTTP route body — used by the Vue UI only. Paste/drop and sidebar
+// pick both ride on `attachments[]` as path-only entries; the server
+// reads bytes from disk and emits the `[Attached file: <path>]`
+// marker. Bridges go through the socket relay (see chat-service)
+// and supply attachments with inline base64 bytes; both shapes
+// share the same `Attachment` type. See plans/refactor-edit-images-array.md.
 interface AgentBody {
   message: string;
   roleId: string;
   chatSessionId: string;
-  selectedImageData?: string;
+  attachments?: Attachment[];
   userTimezone?: string;
 }
 

@@ -555,6 +555,8 @@ const enMessages = {
     redo: "Redo",
     clear: "Clear",
     styleLabel: "Style:",
+    stylePromptWithPath: "Turn the image at `{path}` into a {style} style image.",
+    stylePromptNoPath: "Turn my drawing on the canvas into a {style} style image.",
   },
   pluginChart: {
     untitled: "Chart",

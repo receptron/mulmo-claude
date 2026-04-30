@@ -273,6 +273,27 @@ export async function readImgNaturalSize(page: Page, imgSelector: string): Promi
   });
 }
 
+/**
+ * Detect whether the in-iframe onerror self-repair (PR #974) fired
+ * on an `<img>`. The repair script tags the element with
+ * `data-image-repair-tried="1"` before rewriting `src` to
+ * `/artifacts/images/<rest>`, so the marker's presence after the
+ * image has loaded is a direct signal that the original LLM-emitted
+ * src was broken and the browser silently rescued it.
+ *
+ * Without this check, an LLM regression that emits a path containing
+ * the `artifacts/images/` segment behind a wrong prefix would still
+ * pass `naturalWidth > 0` because self-repair masks the 404. Reading
+ * the marker preserves the suite's ability to catch convention drift.
+ */
+export async function readImgRepairAttempted(page: Page, imgSelector: string): Promise<boolean | null> {
+  const frame = page.frameLocator(PRESENT_HTML_IFRAME_SELECTOR).first();
+  const img = frame.locator(imgSelector).first();
+  if ((await img.count()) === 0) return null;
+  const marker = await img.getAttribute("data-image-repair-tried");
+  return marker !== null;
+}
+
 const PDF_MAGIC = Buffer.from("%PDF-", "ascii");
 const PDF_EOF = Buffer.from("%%EOF", "ascii");
 // PDF spec writes %%EOF in the last few hundred bytes; widen to

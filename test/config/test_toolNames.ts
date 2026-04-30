@@ -25,7 +25,6 @@ describe("TOOL_NAMES", () => {
     assert.equal(TOOL_NAMES.manageTodoList, "manageTodoList");
     assert.equal(TOOL_NAMES.presentDocument, "presentDocument");
     assert.equal(TOOL_NAMES.presentHtml, "presentHtml");
-    assert.equal(TOOL_NAMES.switchRole, "switchRole");
   });
 });
 

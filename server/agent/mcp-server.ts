@@ -37,7 +37,6 @@ const isJsonRpcMessage = (value: unknown): value is JsonRpcMessage => isRecord(v
 const SESSION_ID = env.mcpSessionId;
 const PORT = env.port;
 const PLUGIN_NAMES = env.mcpPluginNames;
-const ROLE_IDS = env.mcpRoleIds;
 const MCP_HOST = env.mcpHost;
 const BASE_URL = `http://${MCP_HOST}:${PORT}`;
 
@@ -57,7 +56,7 @@ interface ToolDef {
   name: string;
   description: string;
   inputSchema: object;
-  endpoint?: string; // absent for tools handled specially (e.g. switchRole)
+  endpoint?: string;
 }
 
 // Combine `description` (one-liner) and `prompt` (detailed usage
@@ -95,21 +94,6 @@ const mcpToolDefs: Record<string, ToolDef> = Object.fromEntries(
 const ALL_TOOLS: Record<string, ToolDef> = {
   ...mcpToolDefs,
   ...Object.fromEntries(PLUGIN_DEFS.map((def) => [def.name, fromPackage(def, TOOL_ENDPOINTS[def.name])])),
-  switchRole: {
-    name: "switchRole",
-    description: "Switch to a different AI role, resetting the conversation context. Use when the user's request is better served by another role.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        roleId: {
-          type: "string",
-          enum: ROLE_IDS,
-          description: "The ID of the role to switch to.",
-        },
-      },
-      required: ["roleId"],
-    },
-  },
 };
 
 const tools = PLUGIN_NAMES.map((name) => ALL_TOOLS[name]).filter(Boolean);
@@ -345,13 +329,6 @@ async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<
 }
 
 async function handleToolCall(name: string, args: Record<string, unknown>): Promise<string> {
-  if (name === "switchRole") {
-    await postJson(API_ROUTES.agent.internal.switchRole, {
-      roleId: args.roleId,
-    });
-    return `Switching to ${args.roleId} role`;
-  }
-
   if (name === "manageSkills") return handleManageSkills(args);
 
   // Pure MCP tools — call via /api/mcp-tools/:tool, return text directly

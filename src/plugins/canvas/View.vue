@@ -130,10 +130,6 @@ const artStyles = [
   { id: "pixelart", label: "Pixel Art" },
 ];
 
-const applyStyle = (style: { id: string; label: string }) => {
-  props.sendTextMessage?.(`Turn my drawing on the canvas into a ${style.label} style image.`);
-};
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const canvasRef = ref<any>(null);
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -157,6 +153,16 @@ const imagePath = computed(() => {
   if (!stored || stored.startsWith("data:")) return "";
   return stored;
 });
+
+const applyStyle = (style: { id: string; label: string }) => {
+  // Embed the canvas image's workspace path directly so the LLM has
+  // it in plain text and can quote it back as `imagePaths` to the
+  // editImages tool. Falls back to the path-less phrasing only when
+  // openCanvas hasn't been linked to a saved file yet.
+  const path = imagePath.value;
+  const text = path ? t("pluginCanvas.stylePromptWithPath", { path, style: style.label }) : t("pluginCanvas.stylePromptNoPath", { style: style.label });
+  props.sendTextMessage?.(text);
+};
 
 // Per-mount cache buster for the VueDrawingCanvas child. The URL
 // must be stable for the lifetime of one canvas instance — if it

@@ -46,6 +46,7 @@ See [Wiki](helps/wiki.md) for details on how it works.
 - [Storyteller Template](helps/storyteller.md) — MulmoScript template and rules for character-driven narrated stories in the Storyteller role
 - [Guide & Planner Templates](helps/guide.md) — document structures and form-field hints per guide type for the Guide & Planner role
 - [Spreadsheet](helps/spreadsheet.md) — cell format, formulas, date handling, and format codes for the presentSpreadsheet plugin
+- [presentHtml](helps/presenthtml.md) — self-contained HTML rules and the three-`../` relative-path convention used by the presentHtml plugin to keep generated files portable under `file://`
 - [Sandbox](helps/sandbox.md) — how the Docker sandbox isolates the agent, what it can access, and how to disable it
 - [Telegram Bridge](helps/telegram.md) — how to talk to MulmoClaude from the Telegram app: creating a bot, starting the bridge, allowlisting chat IDs, commands, and troubleshooting
 - [Information Sources](helps/sources.md) — registering RSS feeds / GitHub repos / arXiv queries, the daily-brief pipeline, and where its files live on disk

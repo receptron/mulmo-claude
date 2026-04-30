@@ -104,14 +104,7 @@ function saveRoleResult(input: ManageRolesInput, sessionId: string): Record<stri
   const { role, isRename } = validated;
   const { action, oldRoleId } = input;
 
-  // Strip switchRole before saving — it is injected at load time by server/roles.ts
-  const pluginsToSave = role.availablePlugins ?? [];
-  const roleToSave = {
-    ...role,
-    availablePlugins: pluginsToSave.filter((plugin) => plugin !== "switchRole"),
-  };
-
-  saveRole(role.id, roleToSave);
+  saveRole(role.id, role);
   // On rename, remove the old file even if its id matches a built-in —
   // a file at `config/roles/<builtin>.json` is a user-created override,
   // not the built-in itself (which lives in BUILTIN_ROLES). Leaving it

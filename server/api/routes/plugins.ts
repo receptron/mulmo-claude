@@ -248,7 +248,7 @@ router.post(
   API_ROUTES.plugins.canvas,
   wrapPluginExecute(async () => {
     const imagePath = await saveImage(BLANK_PNG_BASE64);
-    const base = await executeOpenCanvas();
+    const base = await executeOpenCanvas(imagePath);
     return { ...base, data: { imageData: imagePath, prompt: "" } };
   }),
 );

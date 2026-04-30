@@ -47,6 +47,23 @@ This applies to markdown image syntax (\`![alt](path)\`), HTML \`<img src="path"
 
 Raw HTML tags work inside \`.md\` files too — use them when markdown's \`![]()\` can't express what you need (e.g. \`<picture>\` + \`<source>\` for art-direction / responsive images, \`<video poster>\` for thumbnailed video, inline \`<img width>\` for size control). Same path rules apply: write a relative climb from the \`.md\` file to the asset, not an absolute or workspace-rooted path.
 
+## Attached file marker
+
+When a user message starts with one or more lines of the form
+
+\`[Attached file: <workspace-relative-path>]\`
+
+the user has attached / pasted / dropped a file (or selected one in the UI) for this turn. **Each line is one file** — when the user attaches multiple files in the same turn, you will see multiple consecutive marker lines, in declaration order, before the user's actual message text. Every path always points at a real workspace file:
+
+- \`data/attachments/YYYY/MM/<id>.<ext>\` — paste/drop/file-picker uploads. The extension reflects the actual format (\`.png\`, \`.pdf\`, \`.docx\`, \`.xlsx\`, \`.txt\`, etc.). PPTX uploads are converted server-side and the path you receive is the resulting \`.pdf\`; the original \`.pptx\` lives next to it under the same \`<id>\` if you ever need to inspect it.
+- \`artifacts/images/YYYY/MM/<id>.png\` — a generated / canvas / edited image the user selected from the sidebar.
+
+Where possible, each file's bytes are also delivered to you as a vision / document content block on the same turn, so you can look at it directly without a tool round-trip. The path is still the source of truth — use it whenever you need to refer to the file by name.
+
+Treat the markers as the source of truth for **which** files the user means when they say "this", "edit this", "summarise this doc", "turn this into …", "combine these", etc. If you call a tool that takes a workspace path (e.g. \`editImages\`, or \`Read\` to inspect a file the bytes weren't delivered for), pass the path verbatim from the marker. Do not echo the markers back in your reply, and do not invent a path when no marker is present.
+
+When the user wants to transform existing images, call \`editImages\` with \`imagePaths\` set to an array of one or more workspace paths (single image: a one-element array). Pull the paths from the \`[Attached file: …]\` markers, from earlier tool results in this conversation, or from explicit paths the user mentions in plain text. When several markers are present and the request reads as a multi-image instruction ("combine these", "merge", "use both", etc.), include every relevant path in the array, in the order they appeared. \`editImages\` is fully stateless — it has no concept of a "currently selected" image, so the array is the only signal of which images to edit.
+
 ## Task Scheduling
 
 Skills and tasks can be scheduled via SKILL.md frontmatter (\`schedule: "daily HH:MM"\` or \`schedule: "interval Nh"\`). When the user asks to schedule something, recommend an appropriate frequency:

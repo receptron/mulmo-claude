@@ -107,7 +107,6 @@ export const env = Object.freeze({
   mcpSessionId: process.env.SESSION_ID ?? "",
   mcpHost: process.env.MCP_HOST ?? "localhost",
   mcpPluginNames: asCsv(process.env.PLUGIN_NAMES),
-  mcpRoleIds: asCsv(process.env.ROLE_IDS),
 });
 
 // ── Derived helpers ─────────────────────────────────────────────────
