@@ -446,6 +446,68 @@ mulmoclaude の Docker サンドボックスは `DISABLE_SANDBOX=1 yarn dev` で
 
 artifact mode（次 PR）でも launcher 再起動が必要なため、 同じ「人間依頼」方式を踏襲する。
 
+### Docker on/off 自動化検討（次 PR で実装、 推奨案 C）
+
+人間依頼方式で動いてはいるが、 自動化要望が出ている。 検討した案と却下理由を記録する。
+
+#### 不安定なので採らない案
+
+**案 A: AI が `docker stop mulmoclaude-sandbox` でコンテナを kill して再 test**
+
+- mulmoclaude dev サーバは起動時に `DISABLE_SANDBOX` env を見て「サンドボックスを使う / 使わない」 を決める
+- 起動後に `docker stop` してもサーバ側設定はそのまま → 次の agent spawn で「サンドボックス使うつもりなのに居ない」 状態になり失敗
+- **dev 再起動なしでは挙動が壊れる**
+
+**案 B: AI が `yarn dev` 自体を kill → 別 env で再起動 → test**
+
+- ユーザーターミナルで動いている dev process を AI が止めるのは destructive
+- port 5173 の TIME_WAIT (~30s)、 Mac keychain locking、 docker daemon 状態の race で再起動が不安定
+- 失敗時の復旧が AI から困難
+
+#### 採る案: 案 C (別 workspace + 別 port で並走)
+
+ユーザーの dev には触らず、 AI 制御の dev process を 2 つ background で起動する:
+
+```bash
+# Docker off モード: workspace と port を完全分離
+MULMOCLAUDE_WORKSPACE=/tmp/mc-e2e-off MULMOCLAUDE_PORT=5174 \
+  DISABLE_SANDBOX=1 yarn dev:server &
+
+# Docker on モード: 同様に別領域で起動
+MULMOCLAUDE_WORKSPACE=/tmp/mc-e2e-on MULMOCLAUDE_PORT=5175 \
+  yarn dev:server &
+```
+
+spec 側はすでに `E2E_LIVE_BASE_URL` で baseURL を切り替えられるので、 同じ spec を 2 ポートに対して順次叩く:
+
+```bash
+E2E_LIVE_BASE_URL=http://localhost:5174 yarn test:e2e:live  # off
+E2E_LIVE_BASE_URL=http://localhost:5175 yarn test:e2e:live  # on
+```
+
+skill 終了時に 2 process を kill + `/tmp/mc-e2e-{on,off}/` を削除。
+
+利点:
+
+- ユーザー dev (port 5173) に**完全に触らない**
+- workspace 分離でセッション / wiki / index の collision なし
+- 起動オーダーは並列 OK（ready 待ちは wait-on で）
+
+欠点:
+
+- 起動コスト（dev:server を 2 回 ~10s ずつ）
+- process 管理コードが必要（PID 追跡 / cleanup）
+- claude credentials は両 workspace で共有する必要（HOME 経由なので OK のはず、 要検証）
+
+#### 案 D との関係
+
+artifact mode (`/e2e-live-pre-release`) と案 C は**枠組みが同じ** — 「別 workspace + 別 port で AI 制御の server を起動」。 違いは:
+
+- 案 C: `yarn dev:server` を起動（dev mode、 ソース直 / TypeScript）
+- 案 D: `npx mulmoclaude@<tarball>` を起動（prod build / artifact）
+
+なので **launcher 抽象化 → mode (dev / artifact) × Docker (on / off) の 2 軸 matrix を 1 つの skill `/e2e-live-matrix` で扱う** のが最終形。 実装は別 PR で。
+
 ### 画像戦略 — 効果（補足）
 
 上の「画像戦略」 で書いた fixture 再利用 + 単発実生成の構成を採るメリット:

@@ -36,6 +36,11 @@ test.describe("media (real LLM)", () => {
 
     // Spec-unique workspace path so concurrent runs do not stomp
     // each other and we never delete a real user image by accident.
+    // Flat `artifacts/images/<file>` (no YYYY/MM shard) is what
+    // makes `../../../images/<file>` correct from
+    // `artifacts/html/<YYYY>/<MM>/page.html`. If the saved HTML
+    // moves to a different depth, this relative path needs to
+    // shift in lock step.
     const workspaceImageRel = "artifacts/images/e2e-live-l01.png";
     await placeFixtureInWorkspace("images/sample.png", workspaceImageRel);
 

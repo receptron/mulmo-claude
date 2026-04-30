@@ -19,6 +19,12 @@ const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url));
  * Resolve the user's mulmoclaude workspace. Honours the env override
  * the server itself respects so the tests still work when a custom
  * workspace is in use.
+ *
+ * Caveat: if you set `MULMOCLAUDE_WORKSPACE` in your shell to point
+ * tests at a sandbox dir, `unset` it before running mulmoclaude
+ * itself — fixture cleanup writes inside whatever this resolves to,
+ * and a stale env in the parent shell will silently target the
+ * wrong workspace.
  */
 function workspaceRoot(): string {
   return process.env.MULMOCLAUDE_WORKSPACE ?? path.join(homedir(), "mulmoclaude");

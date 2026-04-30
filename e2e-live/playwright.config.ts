@@ -45,8 +45,9 @@ export default defineConfig({
   // multiple specs in parallel cuts wall time roughly linearly. 3
   // is a conservative ceiling that stays comfortably within Claude
   // subscription rate limits even when every scenario fires off a
-  // long-running tool call.
-  workers: 3,
+  // long-running tool call. Higher Claude tiers and CI tuning can
+  // override via `E2E_LIVE_WORKERS=<n>`.
+  workers: Number(process.env.E2E_LIVE_WORKERS ?? 3),
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: REPORT_OUTPUT_DIR, open: "on-failure" }]],
   use: {
