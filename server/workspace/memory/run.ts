@@ -9,14 +9,19 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { runClaudeCli, ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
-import { loadAllMemoryEntries } from "./io.js";
+import { runClaudeCli, ClaudeCliNotFoundError, type Summarize } from "../journal/archivist-cli.js";
 import { makeLlmMemoryClassifier } from "./llm-classifier.js";
 import { migrateLegacyMemory } from "./migrate.js";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
 
-export async function runMemoryMigrationOnce(workspaceRoot: string): Promise<void> {
+export interface RunMigrationDeps {
+  /** Override the summarize callback (useful for tests). Defaults to
+   *  the production `runClaudeCli` which spawns the Claude CLI. */
+  summarize?: Summarize;
+}
+
+export async function runMemoryMigrationOnce(workspaceRoot: string, deps: RunMigrationDeps = {}): Promise<void> {
   const legacyPath = path.join(workspaceRoot, "conversations", "memory.md");
   if (!existsSync(legacyPath)) {
     log.debug("memory", "migration: no legacy file, skipping");
@@ -30,20 +35,26 @@ export async function runMemoryMigrationOnce(workspaceRoot: string): Promise<voi
     log.info("memory", "migration: legacy file is below the placeholder threshold, skipping");
     return;
   }
-  // If the typed memory dir already has entries, the workspace is
-  // post-migration (or the user has been editing typed entries
-  // directly). Re-running on a populated dir would re-classify the
-  // same legacy bullets and create duplicates next to the existing
-  // typed entries. Leave the legacy file alone — the user can
-  // manually move or delete it.
-  const existing = await loadAllMemoryEntries(workspaceRoot);
-  if (existing.length > 0) {
-    log.info("memory", "migration: typed entries already present, skipping legacy run", {
-      existingCount: existing.length,
+  // The rename to `.backup` is the final step of `migrateLegacyMemory`,
+  // so its presence is the "migration completed" marker. A workspace
+  // where both `memory.md` AND `memory.md.backup` exist means the
+  // user re-introduced the legacy file after a previous successful
+  // migration (probably by mistake or by extracting the backup).
+  // Re-running here would re-classify the bullets and could clobber
+  // typed entries the user has been editing in place; skip with a
+  // clear log instead. The interrupted-migration retry case still
+  // works because no `.backup` exists in that state — the rename
+  // never ran.
+  const backupPath = `${legacyPath}.backup`;
+  if (existsSync(backupPath)) {
+    log.info("memory", "migration: legacy file present but .backup also exists — refusing to re-run", {
+      legacyPath,
+      backupPath,
     });
     return;
   }
-  const classifier = makeLlmMemoryClassifier({ summarize: runClaudeCli });
+  const summarize = deps.summarize ?? runClaudeCli;
+  const classifier = makeLlmMemoryClassifier({ summarize });
   log.info("memory", "migration: starting", { legacyPath });
   try {
     const result = await migrateLegacyMemory(workspaceRoot, classifier);

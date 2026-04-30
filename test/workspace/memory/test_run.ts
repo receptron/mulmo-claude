@@ -1,10 +1,15 @@
 // Unit tests for runMemoryMigrationOnce's idempotency guards
 // (#1029 PR-B). The Claude CLI summarize callback is not exercised
 // here — these tests verify that the runner short-circuits in the
-// states where re-running would cause harm:
-//   - no legacy file
-//   - legacy file too small to be real (placeholder threshold)
-//   - typed dir already populated (post-migration / hand-edited)
+// states where re-running would cause harm, and that it does NOT
+// short-circuit in the interrupted-migration recovery state:
+//   - no legacy file → skip
+//   - legacy file too small to be real (placeholder threshold) → skip
+//   - both legacy file AND .backup present (user re-introduced
+//     legacy after a prior successful run) → skip
+//   - legacy file present + typed dir partially populated +
+//     no .backup yet → DO NOT skip; this is the interrupted-
+//     migration retry case the plan promises.
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -13,6 +18,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { runMemoryMigrationOnce } from "../../../server/workspace/memory/run.js";
+import type { Summarize } from "../../../server/workspace/journal/archivist-cli.js";
 
 describe("memory/run — idempotency guards", () => {
   let scoped: string;
@@ -54,30 +60,83 @@ describe("memory/run — idempotency guards", () => {
     }
   });
 
-  it("is a no-op when typed entries are already present (post-migration / hand-edited)", async () => {
-    // The legacy file is large enough to pass the placeholder
-    // threshold, but the typed dir already has an entry — so the
-    // workspace is already post-migration (or the user has been
-    // editing typed entries directly). Re-classifying the legacy
-    // bullets here would create duplicates.
-    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-mem-run-postmig-"));
+  it("skips when memory.md.backup also exists (user re-introduced the legacy file after a prior successful run)", async () => {
+    // The .backup is the "migration completed" marker (rename is the
+    // final step of `migrateLegacyMemory`). When BOTH the legacy
+    // file and the backup are present, the user must have restored
+    // memory.md after success. Re-running here would re-classify
+    // bullets and could clobber typed entries the user has been
+    // editing in place.
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-mem-run-replay-"));
     try {
       const legacyPath = path.join(fresh, "conversations", "memory.md");
       await mkdir(path.dirname(legacyPath), { recursive: true });
       await writeFile(legacyPath, ["# Memory", "", "## Preferences", "- yarn を使う", "- Emacs", "## Travel", "- planning Egypt", ""].join("\n"), "utf-8");
-
-      const memDir = path.join(fresh, "conversations", "memory");
-      await mkdir(memDir, { recursive: true });
-      await writeFile(path.join(memDir, "preference_yarn.md"), "---\nname: yarn を使う\ndescription: npm 不可\ntype: preference\n---\n\nyarn 固定\n", "utf-8");
+      // Pretend a prior successful run finished and renamed the
+      // legacy file. The user has since restored memory.md from
+      // somewhere.
+      await writeFile(`${legacyPath}.backup`, "older legacy contents\n", "utf-8");
 
       await runMemoryMigrationOnce(fresh);
 
-      // Legacy file must NOT have been renamed to .backup — that
-      // signals migration ran. The skip path leaves it alone.
+      // memory.md left in place verbatim; .backup unchanged.
       const legacy = await readFile(legacyPath, "utf-8");
-      assert.match(legacy, /yarn を使う/, "legacy file should be left in place verbatim");
-      const backup = await stat(`${legacyPath}.backup`).catch(() => null);
-      assert.equal(backup, null, "skip path should not produce a backup");
+      assert.match(legacy, /yarn を使う/);
+      const backup = await readFile(`${legacyPath}.backup`, "utf-8");
+      assert.match(backup, /older legacy contents/);
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT skip on interrupted-migration retry (typed dir partially populated, no .backup yet)", async () => {
+    // The plan's retry-on-restart promise: an interrupted run resumes
+    // on next start. Signal: legacy file present, typed dir already
+    // has some entries from the partial run, but no .backup (the
+    // final rename never executed). The runner must not short-
+    // circuit here — it must re-enter migration.
+    //
+    // We pass a stubbed summarize so the test does not invoke the
+    // real Claude CLI. The classifier always picks `preference`,
+    // letting us assert: migration ran (legacy renamed to .backup,
+    // typed entry overwritten with the migration's classification).
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-mem-run-resume-"));
+    try {
+      const legacyPath = path.join(fresh, "conversations", "memory.md");
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      // Pad past the 64-byte placeholder threshold so the runner
+      // doesn't short-circuit on size before reaching the real
+      // migration call.
+      await writeFile(
+        legacyPath,
+        ["# Memory", "", "Distilled facts about you and your work.", "", "## Preferences", "- yarn を使う（npm は使わない）", "- Emacs を愛用", ""].join("\n"),
+        "utf-8",
+      );
+
+      // A typed entry already exists from a prior interrupted run.
+      const memDir = path.join(fresh, "conversations", "memory");
+      await mkdir(memDir, { recursive: true });
+      await writeFile(
+        path.join(memDir, "preference_yarn.md"),
+        "---\nname: yarn\ndescription: from prior partial run\ntype: preference\n---\n\nold body\n",
+        "utf-8",
+      );
+
+      // No .backup yet — that's the retry signal.
+      const backupBefore = await stat(`${legacyPath}.backup`).catch(() => null);
+      assert.equal(backupBefore, null);
+
+      const summarize: Summarize = async () => '{"type":"preference","description":"npm 不可"}';
+      await runMemoryMigrationOnce(fresh, { summarize });
+
+      // Migration ran: legacy renamed to .backup. (The early-skip
+      // path would have left the legacy file in place with no
+      // .backup created — this is the proof we did NOT short-
+      // circuit on the .backup-present guard.)
+      const legacyAfter = await stat(legacyPath).catch(() => null);
+      const backupAfter = await stat(`${legacyPath}.backup`).catch(() => null);
+      assert.equal(legacyAfter, null, "legacy file should have been renamed");
+      assert.ok(backupAfter !== null && backupAfter.isFile(), ".backup should exist post-migration");
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }
