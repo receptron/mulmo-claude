@@ -93,13 +93,19 @@ function isSafeSourceDir(dir: string): boolean {
 // Logs the reason so the developer can grep when a PDF image is
 // missing.
 function resolveImageAbsPath(src: string, workspaceRoot: string, baseDir: string): string | null {
+  // Strip query / fragment before any filesystem-level resolution —
+  // a `<img src="foo.png?v=123">` cache-bust must still find the
+  // file at `foo.png` on disk. Without this strip, `path.resolve`
+  // bakes the `?v=123` into the candidate path and the safe-resolve
+  // / readBinarySafeSync reject (codex review iter-2 #1028).
+  const pathPart = urlPathname(src);
   // LLM-generated HTML often emits leading-slash workspace-rooted
   // paths like "/artifacts/images/2026/04/foo.png" (web convention).
   // Treat those as workspace-relative; otherwise path.resolve below
   // sees the slash as host-absolute and the safe-resolve rejects.
-  const workspaceRooted = src.startsWith("/");
+  const workspaceRooted = pathPart.startsWith("/");
   const resolveBase = workspaceRooted ? workspaceRoot : baseDir;
-  const relSrc = workspaceRooted ? src.slice(1) : src;
+  const relSrc = workspaceRooted ? pathPart.slice(1) : pathPart;
   const unsafeAbs = path.resolve(resolveBase, relSrc);
   const relToWorkspace = path.relative(workspaceRoot, unsafeAbs);
   if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {

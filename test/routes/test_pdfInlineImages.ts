@@ -276,6 +276,22 @@ describe("inlineImages — extended tag coverage (Stage B)", () => {
     const out = inlineImages(html, { workspaceRoot });
     assert.equal(out, html);
   });
+
+  it("inlines a PNG with cache-bust query string end-to-end (codex iter-2 #1028)", () => {
+    // The skip regex correctly recognises this as an image (codex
+    // iter-1 fix), but the resolver must also strip the query before
+    // hitting the filesystem — otherwise a real `<img src="…png?v=1">`
+    // still fails to inline. End-to-end test pins both paths.
+    const html = '<img src="/artifacts/images/2026/04/foo.png?cacheBust=clip.mp4">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
+  });
+
+  it("inlines a PNG with fragment end-to-end", () => {
+    const html = '<img src="/artifacts/images/2026/04/foo.png#anchor">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
+  });
 });
 
 describe("shouldSkipMediaForPdf", () => {
