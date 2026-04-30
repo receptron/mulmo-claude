@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { inlineImages } from "../../server/api/routes/pdf.js";
+import { inlineImages, shouldSkipMediaForPdf } from "../../server/api/routes/pdf.js";
 
 let workspaceRoot: string;
 let imagesDir: string;
@@ -275,5 +275,33 @@ describe("inlineImages — extended tag coverage (Stage B)", () => {
     const html = '<video src="/artifacts/images/2026/04/clip.mp4?v=123"></video>';
     const out = inlineImages(html, { workspaceRoot });
     assert.equal(out, html);
+  });
+});
+
+describe("shouldSkipMediaForPdf", () => {
+  it("returns true for plain media extensions", () => {
+    assert.equal(shouldSkipMediaForPdf("/artifacts/images/2026/04/clip.mp4"), true);
+    assert.equal(shouldSkipMediaForPdf("/track.mp3"), true);
+    assert.equal(shouldSkipMediaForPdf("/v.webm"), true);
+  });
+
+  it("returns true for media URL with query / fragment", () => {
+    assert.equal(shouldSkipMediaForPdf("/clip.mp4?v=123"), true);
+    assert.equal(shouldSkipMediaForPdf("/clip.mp4#t=10"), true);
+  });
+
+  it("returns false for image URL even when query string mentions media (codex iter-1 #1028)", () => {
+    // `foo.png?cacheBust=clip.mp4` is a PNG. Without pathname slicing
+    // the regex over the whole URL would false-positive on `.mp4`
+    // at the end. With slicing, only `foo.png` is tested -> no skip.
+    assert.equal(shouldSkipMediaForPdf("/artifacts/images/2026/04/foo.png?cacheBust=clip.mp4"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.png#anchor.mp4"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.jpg?ref=bar.mp3"), false);
+  });
+
+  it("returns false for non-media extensions", () => {
+    assert.equal(shouldSkipMediaForPdf("/foo.png"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.jpg"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.svg"), false);
   });
 });

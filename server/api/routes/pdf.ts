@@ -134,7 +134,29 @@ function loadImageAsDataUri(abs: string): string | null {
 // src>` / `<source src>` (in a `<video>`) / `<audio src>` URL is
 // left as the original relative path; puppeteer's fetch will fail
 // quickly and `networkidle0` still resolves.
-const PDF_SKIP_MEDIA_EXT_RE = /\.(mp4|webm|mov|m4v|ogv|mp3|ogg|oga|wav|m4a|aac)(\?|#|$)/i;
+//
+// Anchored at end-of-pathname (callers strip query / fragment first
+// via `urlPathname` below) so a query-string-only mention of the
+// extension doesn't false-positive — e.g. `foo.png?clip.mp4` must
+// inline the PNG, not be treated as an mp4 (codex review iter-1).
+const PDF_SKIP_MEDIA_EXT_RE = /\.(mp4|webm|mov|m4v|ogv|mp3|ogg|oga|wav|m4a|aac)$/i;
+
+function urlPathname(url: string): string {
+  const queryStart = url.indexOf("?");
+  const fragStart = url.indexOf("#");
+  const limit = [queryStart, fragStart].filter((idx) => idx >= 0).reduce((min, idx) => Math.min(min, idx), url.length);
+  return url.slice(0, limit);
+}
+
+/** Whether a URL points at a video / audio file that should NOT be
+ *  base64-inlined into a PDF. Exported for direct unit testing —
+ *  filesystem-level resolver checks (`resolveImageAbsPath`) can mask
+ *  the regex's behaviour because a missing file also returns null,
+ *  so the in-line callback's output looks identical for "skip" vs
+ *  "resolve-failed". */
+export function shouldSkipMediaForPdf(url: string): boolean {
+  return PDF_SKIP_MEDIA_EXT_RE.test(urlPathname(url));
+}
 
 /**
  * Inline local images as base64 data URIs so Puppeteer can render
@@ -167,8 +189,10 @@ export function inlineImages(html: string, options: InlineImagesOptions = {}): s
     if (url.startsWith("data:") || url.startsWith("http")) return null;
     // Skip media (mp4 / mp3 / webm / ...) — see PDF_SKIP_MEDIA_EXT_RE
     // comment. `<video poster="x.png">` still inlines because the
-    // poster value's URL ends in an image extension.
-    if (PDF_SKIP_MEDIA_EXT_RE.test(url)) return null;
+    // poster value's pathname ends in an image extension. The
+    // pathname slice means `foo.png?cacheBust=clip.mp4` correctly
+    // routes through the PNG inline path (codex iter-1).
+    if (shouldSkipMediaForPdf(url)) return null;
     const abs = resolveImageAbsPath(url, workspaceRoot, baseDir);
     if (!abs) return null;
     return loadImageAsDataUri(abs);
