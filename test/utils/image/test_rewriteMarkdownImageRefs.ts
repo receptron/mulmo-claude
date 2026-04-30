@@ -531,6 +531,37 @@ describe("rewriteImgSrcAttrsInHtml — adversarial input", () => {
     const out = rewriteImgSrcAttrsInHtml(html, "");
     assert.equal(out, html);
   });
+
+  it("does not rewrite a `src=` substring inside another attribute's quoted value", () => {
+    // Codex review of #1023 caught this: a free-form `src=` lookbehind
+    // would rewrite the alt-internal `src=oops` and corrupt the tag.
+    // Attribute-iterator parsing handles it correctly — the alt value
+    // is consumed as a unit, and the real `src=` is matched separately.
+    const html = '<img alt="x src=oops" src="real.png">';
+    const out = rewriteImgSrcAttrsInHtml(html, "");
+    assert.ok(out.includes('alt="x src=oops"'));
+    assert.ok(out.includes('src="/api/files/raw?path=real.png"'));
+  });
+
+  it("does not rewrite namespaced attrs like xml:src or xlink:src", () => {
+    const xml = '<img xml:src="ignored.png" src="real.png">';
+    const xlink = '<img xlink:src="ignored.png" src="real.png">';
+    const xmlOut = rewriteImgSrcAttrsInHtml(xml, "");
+    const xlinkOut = rewriteImgSrcAttrsInHtml(xlink, "");
+    assert.ok(xmlOut.includes('xml:src="ignored.png"'));
+    assert.ok(xmlOut.includes('src="/api/files/raw?path=real.png"'));
+    assert.ok(xlinkOut.includes('xlink:src="ignored.png"'));
+    assert.ok(xlinkOut.includes('src="/api/files/raw?path=real.png"'));
+  });
+
+  it("preserves a quoted value that itself contains the substring 'src='", () => {
+    // Pathological mocking-pattern: the alt explicitly mentions src=…
+    // so users can write tutorials. The rewriter must NOT touch it.
+    const html = '<img alt="docs example: src=foo.png" src="real.png">';
+    const out = rewriteImgSrcAttrsInHtml(html, "");
+    assert.ok(out.includes('alt="docs example: src=foo.png"'));
+    assert.ok(out.includes('src="/api/files/raw?path=real.png"'));
+  });
 });
 
 // Top-level rewriteMarkdownImageRefs adversarial cases — same

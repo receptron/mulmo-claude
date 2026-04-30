@@ -145,26 +145,51 @@ function rewriteImageToken(token: Tokens.Image, basePath: string): string | null
 //     too — harmless because the rewritten URL is encoded safely, and
 //     the rewrite makes the embedded reference resolve correctly if
 //     it's later inserted into the DOM by JS.
+// Attribute iterator for the inner pass — see the comment block on
+// `IMG_ATTR_RE` in `server/api/routes/pdf.ts` for the rationale on
+// parsing attribute-by-attribute (handles `src=` text inside another
+// attribute's value, namespaced attrs like `xml:src`).
+//
+// Capture groups:
+//   1: leading whitespace
+//   2: attribute name
+//   3: `=` with surrounding spaces (only when value present)
+//   4: full quoted/unquoted value
+//   5: double-quoted value (without quotes)
+//   6: single-quoted value (without quotes)
+//   7: unquoted value (refuses leading quote so malformed
+//      `<img src="aaaa` doesn't capture the stray quote)
+//
+// All quantifiers bounded — verified ReDoS-safe by 100KB test in
+// test_rewriteMarkdownImageRefs.ts. The disables silence sonarjs's
+// alternation-counting heuristic.
+// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded quantifiers, ReDoS-safe (test in test_rewriteMarkdownImageRefs.ts)
+const IMG_ATTR_ITER_RE = /(\s+)([A-Za-z][\w:-]*)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*)))?/g;
+
+function rewriteSrcAttr(captures: unknown[], basePath: string): string {
+  const [full, leading, name, eqWithSpaces, , doubleQuoted, singleQuoted, bare] = captures as [
+    string,
+    string,
+    string,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+  ];
+  if (!eqWithSpaces || name.toLowerCase() !== "src") return full;
+  const url = (doubleQuoted ?? singleQuoted ?? bare ?? "").trim();
+  if (!url || shouldSkip(url)) return full;
+  const resolved = resolveWorkspacePath(basePath, url);
+  if (resolved === null) return full;
+  const newUrl = resolveImageSrc(resolved);
+  const quote = doubleQuoted !== undefined ? '"' : singleQuoted !== undefined ? "'" : '"';
+  return `${leading}${name}${eqWithSpaces}${quote}${newUrl}${quote}`;
+}
+
 export function rewriteImgSrcAttrsInHtml(html: string, basePath: string): string {
   if (!html) return html;
-  return html.replace(/<img\b[^>]*\/?>/gi, (tag) =>
-    tag.replace(
-      // (?<![-\w])  ── ensure the matched `src` isn't part of another  attribute name
-      //                like `data-src` / `xlink:src` / etc. `\b` alone would still
-      //                match `data-src` because `-` is a non-word char.
-      // double-quoted ─┐  single-quoted ─┐  unquoted (no leading "/' to defang malformed input) ─┐
-      /((?<![-\w])src\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*))/i,
-      (full, prefix: string, _val: string, doubleQuoted?: string, singleQuoted?: string, bare?: string) => {
-        const url = (doubleQuoted ?? singleQuoted ?? bare ?? "").trim();
-        if (!url || shouldSkip(url)) return full;
-        const resolved = resolveWorkspacePath(basePath, url);
-        if (resolved === null) return full;
-        const newUrl = resolveImageSrc(resolved);
-        const quote = doubleQuoted !== undefined ? '"' : singleQuoted !== undefined ? "'" : '"';
-        return `${prefix}${quote}${newUrl}${quote}`;
-      },
-    ),
-  );
+  return html.replace(/<img\b[^>]*\/?>/gi, (tag) => tag.replace(IMG_ATTR_ITER_RE, (...captures: unknown[]) => rewriteSrcAttr(captures, basePath)));
 }
 
 function isSkippable(token: Token): boolean {

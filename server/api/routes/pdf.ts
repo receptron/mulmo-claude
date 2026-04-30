@@ -77,12 +77,33 @@ export interface InlineImagesOptions {
 // Outer regex: linear scan to the first `>` of an `<img>` tag.
 // `[^>]` bounds the run so no input drives exponential backtracking.
 const IMG_TAG_RE = /<img\b[^>]*\/?>/gi;
-// Inner regex: extract the `src` attribute value, with a (?<![-\w])
-// lookbehind so `data-src=` / `xlink:src=` don't false-match. The
-// unquoted alternative refuses leading `"` / `'` so a malformed
-// `<img src="aaaa  ` doesn't capture the stray quote as the value.
-// Mirrors the shape used by `rewriteImgSrcAttrsInHtml` (PR #1013).
-const IMG_SRC_RE = /((?<![-\w])src\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*))/i;
+// Attribute iterator: walks each `name=value` pair inside a tag. The
+// leading `\s+` ensures we only match real attribute boundaries, not
+// `src=` text embedded inside another attribute's quoted value (e.g.
+// `<img alt="x src=oops" src="real.png">` — the alt-internal `src=`
+// has no whitespace prefix from the regex's POV because we parse
+// attribute-by-attribute, never against the free-form tag body).
+// Namespaced attrs (`xml:src`, `xlink:src`) match as their full name
+// and are filtered below by `name.toLowerCase() !== "src"`.
+// Capture groups:
+//   1: leading whitespace
+//   2: attribute name
+//   3: `=` with surrounding spaces (only when value present)
+//   4: full quoted/unquoted value
+//   5: double-quoted value (without quotes)
+//   6: single-quoted value (without quotes)
+//   7: unquoted value — refuses leading `"` / `'` so a malformed
+//      `<img src="aaaa` (no closing quote) doesn't capture the stray
+//      quote as the value
+//
+// Why the disables: this regex has 3 alternation branches plus an
+// optional value group, which trips sonarjs/regex-complexity (rule
+// counts disjunctions). All quantifiers are bounded by `\s` or
+// character-class negations — verified ReDoS-safe by the 100KB test
+// (`test_pdfInlineImages.ts`). Refactoring to multiple passes would
+// be slower and harder to read.
+// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded quantifiers, ReDoS-safe (test in test_pdfInlineImages.ts)
+const IMG_ATTR_RE = /(\s+)([A-Za-z][\w:-]*)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*)))?/g;
 
 function isSafeSourceDir(dir: string): boolean {
   if (!dir) return true;
@@ -128,7 +149,10 @@ function loadImageAsDataUri(abs: string): string | null {
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
-interface SrcMatch {
+interface SrcAttrMatch {
+  /** The portion of the matched attribute that we keep verbatim:
+   *  leading whitespace + attribute name + `=` (with surrounding
+   *  spaces). Only the value part is replaced. */
   prefix: string;
   doubleQuoted?: string;
   singleQuoted?: string;
@@ -136,7 +160,7 @@ interface SrcMatch {
   full: string;
 }
 
-function inlineSingleImg(match: SrcMatch, workspaceRoot: string, baseDir: string): string {
+function inlineSingleImg(match: SrcAttrMatch, workspaceRoot: string, baseDir: string): string {
   const src = (match.doubleQuoted ?? match.singleQuoted ?? match.bare ?? "").trim();
   if (!src) return match.full;
   if (src.startsWith("data:") || src.startsWith("http")) return match.full;
@@ -170,10 +194,29 @@ export function inlineImages(html: string, options: InlineImagesOptions = {}): s
   const sourceDir = dirIsSafe && requestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
   const baseDir = path.join(workspaceRoot, sourceDir);
   return html.replace(IMG_TAG_RE, (tag) =>
-    tag.replace(IMG_SRC_RE, (full, prefix: string, _val: string, doubleQuoted?: string, singleQuoted?: string, bare?: string) =>
-      inlineSingleImg({ prefix, doubleQuoted, singleQuoted, bare, full }, workspaceRoot, baseDir),
-    ),
+    // Walk each attribute. Only `src` (case-insensitive, namespaced
+    // attrs like `xml:src` / `xlink:src` filtered out) gets the
+    // value rewritten. Other attributes — and `src=`-shaped text
+    // inside their quoted values — are preserved verbatim because
+    // we parse attribute-by-attribute, not by free-form regex.
+    tag.replace(IMG_ATTR_RE, (...captures: unknown[]) => replaceSrcAttr(captures, workspaceRoot, baseDir)),
   );
+}
+
+function replaceSrcAttr(captures: unknown[], workspaceRoot: string, baseDir: string): string {
+  const [full, leading, name, eqWithSpaces, , doubleQuoted, singleQuoted, bare] = captures as [
+    string,
+    string,
+    string,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+  ];
+  if (!eqWithSpaces || name.toLowerCase() !== "src") return full;
+  const prefix = `${leading}${name}${eqWithSpaces}`;
+  return inlineSingleImg({ prefix, doubleQuoted, singleQuoted, bare, full }, workspaceRoot, baseDir);
 }
 
 function wrapHtml(body: string, css: string): string {
@@ -220,10 +263,17 @@ interface PdfMarkdownBody {
    *  `markdowns/` default. Validated server-side; absolute paths
    *  and `..` segments are rejected. */
   baseDir?: string;
+  /** When true, strip a leading YAML frontmatter envelope before
+   *  rendering so `title:` / `tags:` etc don't appear as plain text
+   *  on page 1 of the PDF. Wiki pages use this. Markdown / Text
+   *  Response callers omit (default false) so a chat-generated
+   *  document that *literally* starts with `---\n…\n---\n` is
+   *  preserved verbatim. */
+  stripFrontmatter?: boolean;
 }
 
 router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
-  const { markdown, filename = "document.pdf", format = "Letter", baseDir } = req.body;
+  const { markdown, filename = "document.pdf", format = "Letter", baseDir, stripFrontmatter = false } = req.body;
 
   if (!markdown) {
     badRequest(res, "markdown is required");
@@ -231,11 +281,9 @@ router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMar
   }
 
   try {
-    log.info("pdf", "markdown", { filename, length: markdown.length, baseDir });
-    // Strip frontmatter so YAML headers (Wiki pages emit them) don't
-    // appear as plain text on page 1 of the PDF.
-    const { body } = parseFrontmatter(markdown);
-    const html = inlineImages(await marked.parse(body), { sourceDir: baseDir });
+    log.info("pdf", "markdown", { filename, length: markdown.length, baseDir, stripFrontmatter });
+    const source = stripFrontmatter ? parseFrontmatter(markdown).body : markdown;
+    const html = inlineImages(await marked.parse(source), { sourceDir: baseDir });
     const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
     sendPdf(res, buffer, filename);
   } catch (err) {

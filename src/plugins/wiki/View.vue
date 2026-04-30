@@ -757,8 +757,10 @@ async function downloadPdf() {
   });
   // Wiki pages live under data/wiki/pages/ — pass the source dir so
   // the server resolves relative `<img>` refs (`../../../artifacts/...`)
-  // against the same base the browser uses.
-  await rawDownloadPdf(content.value, filename, { baseDir: "data/wiki/pages" });
+  // against the same base the browser uses. Wiki pages always carry
+  // a frontmatter envelope (#895), so opt in to stripping it from the
+  // PDF output.
+  await rawDownloadPdf(content.value, filename, { baseDir: "data/wiki/pages", stripFrontmatter: true });
 }
 
 async function callApi(body: Record<string, unknown>) {

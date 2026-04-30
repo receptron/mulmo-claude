@@ -19,6 +19,12 @@ export interface DownloadPdfOptions {
    *  resolve relative `<img>` references to the right base path
    *  before inlining. Omit for the legacy `markdowns/` default. */
   baseDir?: string;
+  /** When true, the server strips a leading YAML frontmatter envelope
+   *  (`---\n…\n---\n`) before rendering, so the YAML header doesn't
+   *  appear as plain text on page 1 of the PDF. Wiki pages set this.
+   *  Other callers leave it false so a chat-generated document that
+   *  literally starts with `---` is preserved. */
+  stripFrontmatter?: boolean;
 }
 
 export interface UsePdfDownloadHandle {
@@ -41,7 +47,7 @@ export function usePdfDownload(): UsePdfDownloadHandle {
       const response = await apiFetchRaw(API_ROUTES.pdf.markdown, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown, filename, baseDir: options.baseDir }),
+        body: JSON.stringify({ markdown, filename, baseDir: options.baseDir, stripFrontmatter: options.stripFrontmatter }),
       });
       if (!response.ok) {
         const errText = await response.text().catch(() => "");

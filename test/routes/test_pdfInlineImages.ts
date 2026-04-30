@@ -159,3 +159,31 @@ describe("inlineImages — quote-form coverage (Stage F)", () => {
     assert.ok(elapsedMs < 1000, `expected <1s, got ${elapsedMs}ms`);
   });
 });
+
+describe("inlineImages — attribute-boundary correctness (Codex #1023 review)", () => {
+  it("does not rewrite a src= substring inside another attribute's quoted value", () => {
+    // Without attribute-iterator parsing, the alt-internal `src=oops`
+    // would be rewritten, corrupting the surrounding alt attribute
+    // and the tag itself. The attribute walker consumes the alt
+    // value as a unit so the real `src=` is the only one rewritten.
+    const html = '<img alt="x src=oops" src="/artifacts/images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.ok(out.includes('alt="x src=oops"'));
+    assert.match(out, /src="data:image\/png;base64,[^"]+"/);
+  });
+
+  it("does not rewrite namespaced attrs like xml:src or xlink:src", () => {
+    const html = '<img xml:src="ignored.png" xlink:src="ignored2.png" src="/artifacts/images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.ok(out.includes('xml:src="ignored.png"'));
+    assert.ok(out.includes('xlink:src="ignored2.png"'));
+    assert.match(out, /\bsrc="data:image\/png;base64,[^"]+"/);
+  });
+
+  it("preserves a tutorial-style alt that mentions src=", () => {
+    const html = '<img alt="example: src=foo.png" src="/artifacts/images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.ok(out.includes('alt="example: src=foo.png"'));
+    assert.match(out, /\bsrc="data:image\/png;base64,/);
+  });
+});
