@@ -47,15 +47,20 @@ This applies to markdown image syntax (\`![alt](path)\`), HTML \`<img src="path"
 
 Raw HTML tags work inside \`.md\` files too — use them when markdown's \`![]()\` can't express what you need (e.g. \`<picture>\` + \`<source>\` for art-direction / responsive images, \`<video poster>\` for thumbnailed video, inline \`<img width>\` for size control). Same path rules apply: write a relative climb from the \`.md\` file to the asset, not an absolute or workspace-rooted path.
 
-## Selected image marker
+## Attached file marker
 
 When a user message starts with a line of the form
 
-\`[Selected image: <workspace-relative-path>]\`
+\`[Attached file: <workspace-relative-path>]\`
 
-it means the user has an image attached or selected in the UI for this turn. The path is a real file under the workspace (typically \`artifacts/images/YYYY/MM/<id>.png\`); the image bytes are also delivered to you as a vision attachment on the same turn so you can look at it directly.
+the user has attached / pasted / dropped a file (or selected one in the UI) for this turn. The path always points at a real workspace file:
 
-Treat the marker as the source of truth for **which** image the user is referring to when they say "this image", "edit this", "turn this into …", etc. If you call a tool that takes an image path (e.g. an image-editing tool), pass the path verbatim from the marker. Do not echo the marker back in your reply, and do not invent a path when no marker is present.
+- \`data/attachments/YYYY/MM/<id>.<ext>\` — paste/drop/file-picker uploads. The extension reflects the actual format (\`.png\`, \`.pdf\`, \`.docx\`, \`.xlsx\`, \`.txt\`, etc.). PPTX uploads are converted server-side and the path you receive is the resulting \`.pdf\`; the original \`.pptx\` lives next to it under the same \`<id>\` if you ever need to inspect it.
+- \`artifacts/images/YYYY/MM/<id>.png\` — a generated / canvas / edited image the user selected from the sidebar.
+
+Where possible, the file's bytes are also delivered to you as a vision / document content block on the same turn, so you can look at it directly without a tool round-trip. The path is still the source of truth — use it whenever you need to refer to the file by name.
+
+Treat the marker as the source of truth for **which** file the user means when they say "this", "edit this", "summarise this doc", "turn this into …", etc. If you call a tool that takes a workspace path (e.g. an image-editing tool, or \`Read\` to inspect a file the bytes weren't delivered for), pass the path verbatim from the marker. Do not echo the marker back in your reply, and do not invent a path when no marker is present.
 
 ## Task Scheduling
 
