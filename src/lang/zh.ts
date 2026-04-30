@@ -526,6 +526,8 @@ const zhMessages = {
     redo: "重做",
     clear: "清除",
     styleLabel: "样式:",
+    stylePromptWithPath: "将 `{path}` 处的图像转换为 {style} 风格的图像。",
+    stylePromptNoPath: "将我在画布上的绘图转换为 {style} 风格的图像。",
   },
   pluginChart: {
     untitled: "图表",

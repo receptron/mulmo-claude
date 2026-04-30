@@ -213,7 +213,19 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     resumed: Boolean(claudeSessionId),
   });
 
-  const extras = await prepareRequestExtras(normalisedAttachments);
+  // Roll the run back if attachment prep throws (e.g. malformed
+  // HTTP body where `attachments` isn't an array). beginRun already
+  // committed; without endRun + abort the session is stuck and every
+  // future turn is rejected with 409.
+  let extras: RequestExtras;
+  try {
+    extras = await prepareRequestExtras(normalisedAttachments);
+  } catch (err) {
+    log.warn("agent", "prepareRequestExtras failed — rolling back run", { chatSessionId, error: errorMessage(err) });
+    abortController.abort();
+    endRun(chatSessionId);
+    return { kind: "error", error: "Invalid attachments payload", status: 400 };
+  }
   const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
   const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePaths);
 
@@ -323,31 +335,35 @@ async function resolveAttachment(att: Attachment): Promise<Attachment | undefine
 }
 
 async function loadFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
-  if (isAttachmentPath(value)) {
-    const mimeType = declaredMimeType ?? inferMimeFromExtension(value);
-    if (!mimeType) {
-      log.warn("agent", "attachment path has unknown extension — skipping bytes", { path: value });
-      return undefined;
-    }
-    try {
-      const data = await loadAttachmentBase64(value);
-      return { mimeType, data, path: value };
-    } catch (err) {
-      log.warn("agent", "failed to load attachment bytes from path", { path: value, error: errorMessage(err) });
-      return undefined;
-    }
-  }
-  if (isImagePath(value)) {
-    try {
-      const data = await loadImageBase64(value);
-      return { mimeType: declaredMimeType ?? "image/png", data, path: value };
-    } catch (err) {
-      log.warn("agent", "failed to load selected-image bytes from path", { path: value, error: errorMessage(err) });
-      return undefined;
-    }
-  }
+  if (isAttachmentPath(value)) return loadAttachmentFromPath(value, declaredMimeType);
+  if (isImagePath(value)) return loadImageFromPath(value, declaredMimeType);
   log.warn("agent", "attachment path is outside allowed roots — dropping", { path: value });
   return undefined;
+}
+
+async function loadAttachmentFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  const mimeType = declaredMimeType ?? inferMimeFromExtension(value);
+  if (!mimeType) {
+    log.warn("agent", "attachment path has unknown extension — skipping bytes", { path: value });
+    return undefined;
+  }
+  try {
+    const data = await loadAttachmentBase64(value);
+    return { mimeType, data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load attachment bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
+}
+
+async function loadImageFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  try {
+    const data = await loadImageBase64(value);
+    return { mimeType: declaredMimeType ?? "image/png", data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load selected-image bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
 }
 
 /** Marker prepended to the LLM-bound user message that tells the

@@ -160,7 +160,7 @@ const applyStyle = (style: { id: string; label: string }) => {
   // editImages tool. Falls back to the path-less phrasing only when
   // openCanvas hasn't been linked to a saved file yet.
   const path = imagePath.value;
-  const text = path ? `Turn the image at \`${path}\` into a ${style.label} style image.` : `Turn my drawing on the canvas into a ${style.label} style image.`;
+  const text = path ? t("pluginCanvas.stylePromptWithPath", { path, style: style.label }) : t("pluginCanvas.stylePromptNoPath", { style: style.label });
   props.sendTextMessage?.(text);
 };
 

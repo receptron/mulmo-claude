@@ -9,7 +9,7 @@ A single key unlocks all three capabilities (images, TTS audio, video) — you d
 ### Images
 
 - **`generateImage`** — creates images from text prompts. The heart of the **Artist** role.
-- **`editImages`** — transforms, restyles, or combines one or more existing images ("convert to Ghibli style", "remove the background", "merge these two photos into one"). Also **Artist**.
+- **`editImages`** — transforms, restyles, or combines up to 8 existing images per call ("convert to Ghibli style", "remove the background", "merge these two photos into one"). Also **Artist**.
 - **Inline document images** — roles that produce rich documents (**Guide & Planner**, **Tutor**, Recipe Guide, Trip Planner, …) embed generated images directly into the page via `presentDocument`. Without a key, those image slots fall back to italic "🖼️ Image: &lt;prompt&gt;" text markers — the prompt is preserved, but no picture renders.
 - **MulmoScript image beats** — `presentMulmoScript` uses Gemini image models for `imagePrompt` beats. **Storyteller Plus** additionally uses them for consistent-character scenes across a storyboard.
 
