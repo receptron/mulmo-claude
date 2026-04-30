@@ -122,8 +122,9 @@ git checkout -b feat/e2e-live-<topic>
 
 ```bash
 yarn format
-yarn typecheck:e2e-live
 yarn lint
+yarn typecheck:e2e-live
+yarn build
 yarn test:e2e:live:<category>   # 該当カテゴリだけ
 ```
 
