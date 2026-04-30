@@ -59,7 +59,7 @@ Set `speechOptions.instruction` on the Narrator speaker to match the story's ton
   },
   "imageParams": {
     "provider": "google",
-    "model": "gemini-2.5-flash-image",
+    "model": "gemini-3.1-flash-image",
     "style": "painterly watercolor illustration",
     "images": {
       "mara": {
@@ -72,7 +72,11 @@ Set `speechOptions.instruction` on the Narrator speaker to match the story's ton
       }
     }
   },
-  "movieParams": { "transition": { "type": "fade", "duration": 0.5 } },
+  "movieParams": {
+    "provider": "google",
+    "model": "veo-3.1-generate",
+    "transition": { "type": "fade", "duration": 0.5 }
+  },
   "beats": [
     {
       "speaker": "Narrator",
