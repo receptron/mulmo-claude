@@ -102,8 +102,73 @@ function rewriteImageToken(token: Tokens.Image, basePath: string): string | null
   return `![${alt}](${newHref})`;
 }
 
+// Rewrite the `src` attribute of every `<img>` tag inside an HTML
+// fragment, applying the same basePath / shouldSkip / resolveImageSrc
+// pipeline used for `![alt](url)` markdown images. Other attributes
+// (alt, class, style, id, …) are preserved verbatim.
+//
+// Handles the common quoting variations:
+//   - <img src="path">              double-quoted
+//   - <img src='path'>              single-quoted
+//   - <img src=path>                unquoted (HTML5 allows this when
+//                                   the value has no spaces / quotes
+//                                   / `>` / `=` / backticks)
+//   - <img alt="x" src="..." />     attribute order doesn't matter
+//   - <img\n  src="..." />          newlines inside the tag work
+//
+// Tags without a `src`, or with a `src` that already passes
+// `shouldSkip` (data: URI / http / /api/), are returned untouched.
+//
+// Robustness / safety notes:
+//
+//   - All regex quantifiers are bounded by `[^>]` or character-class
+//     negations so no input can drive exponential backtracking.
+//     A 100KB-no-closing-> probe runs in linear time.
+//   - The unquoted-value branch refuses to start with `"` or `'`. So
+//     malformed input like `<img src="aaaa alt=x>` (missing closing
+//     quote) is left alone instead of capturing `"aaaa` as the value.
+//   - Output URLs come from `resolveImageSrc`, which either returns a
+//     mount-rooted path (`/artifacts/images/<file>`) or runs the input
+//     through `encodeURIComponent`. `"` becomes `%22`, `'` becomes
+//     `%27`, `<` / `>` are encoded — the rewritten attribute can't
+//     break out of its own quotes or close the tag.
+//   - Defensive against `token.raw` being unexpectedly empty: an
+//     empty string short-circuits the outer replace.
+//
+// Known limitations (acceptable for #1011 Stage A):
+//
+//   - Only `<img>` is matched. `<picture><source>` / `<video poster>` /
+//     SVG `<image>` / CSS `url()` are tracked under #1011 Stage B / E.
+//   - A regex can't perfectly distinguish a real `<img>` tag from a
+//     `<img>` substring embedded inside another attribute, e.g.
+//     `<div data-x="<img src='foo.png'>">`. Such cases get rewritten
+//     too — harmless because the rewritten URL is encoded safely, and
+//     the rewrite makes the embedded reference resolve correctly if
+//     it's later inserted into the DOM by JS.
+export function rewriteImgSrcAttrsInHtml(html: string, basePath: string): string {
+  if (!html) return html;
+  return html.replace(/<img\b[^>]*\/?>/gi, (tag) =>
+    tag.replace(
+      // (?<![-\w])  ── ensure the matched `src` isn't part of another  attribute name
+      //                like `data-src` / `xlink:src` / etc. `\b` alone would still
+      //                match `data-src` because `-` is a non-word char.
+      // double-quoted ─┐  single-quoted ─┐  unquoted (no leading "/' to defang malformed input) ─┐
+      /((?<![-\w])src\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*))/i,
+      (full, prefix: string, _val: string, doubleQuoted?: string, singleQuoted?: string, bare?: string) => {
+        const url = (doubleQuoted ?? singleQuoted ?? bare ?? "").trim();
+        if (!url || shouldSkip(url)) return full;
+        const resolved = resolveWorkspacePath(basePath, url);
+        if (resolved === null) return full;
+        const newUrl = resolveImageSrc(resolved);
+        const quote = doubleQuoted !== undefined ? '"' : singleQuoted !== undefined ? "'" : '"';
+        return `${prefix}${quote}${newUrl}${quote}`;
+      },
+    ),
+  );
+}
+
 function isSkippable(token: Token): boolean {
-  return token.type === "code" || token.type === "codespan" || token.type === "html";
+  return token.type === "code" || token.type === "codespan";
 }
 
 function getContainerChildren(token: Token): Token[] | null {
@@ -135,11 +200,14 @@ function renderContainerChildren(raw: string, children: Token[], basePath: strin
 }
 
 // Recursively render a token back to markdown, rewriting image refs
-// in-place. Code / codespan / html tokens are emitted verbatim so
-// image-ref syntax inside them stays literal. Token-tree recursion
-// uses the lexer's structural knowledge and never crosses a skip
-// boundary — unlike the earlier `indexOf` splice which could rewrite
-// a code-block literal when the same ref appeared in real markdown.
+// in-place. Code / codespan tokens are emitted verbatim so image-ref
+// syntax inside them stays literal. HTML tokens get a separate pass
+// (`rewriteImgSrcAttrsInHtml`) so raw `<img>` tags route through the
+// same basePath + shouldSkip pipeline as the markdown image syntax.
+// Token-tree recursion uses the lexer's structural knowledge and never
+// crosses a skip boundary — unlike the earlier `indexOf` splice which
+// could rewrite a code-block literal when the same ref appeared in
+// real markdown.
 function renderToken(token: Token, basePath: string, out: string[]): void {
   if (isSkippable(token)) {
     out.push(token.raw);
@@ -148,6 +216,16 @@ function renderToken(token: Token, basePath: string, out: string[]): void {
   if (token.type === "image") {
     const replacement = rewriteImageToken(token as Tokens.Image, basePath);
     out.push(replacement ?? token.raw);
+    return;
+  }
+  if (token.type === "html") {
+    // Block / inline HTML — rewrite raw <img> tags inside before
+    // emitting. Markdown image syntax (![alt](url)) is handled by the
+    // image-token branch above; this branch covers the HTML-fallback
+    // path (#1011 Stage A). Fall back to verbatim raw if `raw` is
+    // unexpectedly missing — defensive against future marked changes.
+    const raw = (token as { raw?: string }).raw ?? "";
+    out.push(rewriteImgSrcAttrsInHtml(raw, basePath));
     return;
   }
   const raw = (token as { raw?: string }).raw ?? "";
@@ -167,12 +245,16 @@ function renderToken(token: Token, basePath: string, out: string[]): void {
  *   file (e.g. `"wiki/pages"` for `wiki/pages/foo.md`). Omit or pass
  *   `""` when resolving refs against the workspace root.
  *
+ * Also rewrites the `src` attribute of raw `<img>` tags inside HTML
+ * blocks / inline HTML so a page mixing both syntaxes resolves the
+ * same way. Markdown image syntax inside code blocks / inline code
+ * spans is left alone.
+ *
  * Absolute URLs, data URIs, and existing API paths pass through
  * untouched. Refs that would escape the workspace root (more `..`
  * than `basePath` depth) also pass through untouched — they would
  * 404 regardless, and passing through lets the user see the broken
- * ref instead of silently re-pointing it. Image-ref syntax inside
- * code blocks / inline code spans is left alone.
+ * ref instead of silently re-pointing it.
  */
 export function rewriteMarkdownImageRefs(markdown: string, basePath = ""): string {
   const tokens = marked.lexer(markdown);
