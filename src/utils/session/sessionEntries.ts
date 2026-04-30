@@ -20,7 +20,7 @@ export function parseSessionEntries(entries: readonly SessionEntry[]): ToolResul
   for (const entry of entries) {
     if (entry.type === EVENT_TYPES.sessionMeta) continue;
     if (isTextEntry(entry)) {
-      out.push(makeTextResult(entry.message, entry.source));
+      out.push(makeTextResult(entry.message, entry.source, entry.attachments));
     } else if (isToolResultEntry(entry)) {
       out.push(entry.result);
     }

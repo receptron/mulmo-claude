@@ -57,10 +57,13 @@ export interface StartChatParams {
   /** Bridge-only legacy carrier for "the user picked this image".
    *  No in-tree bridge populates this today; the field stays on the
    *  type so external bridge clients on older protocol versions still
-   *  type-check. Accepts either a workspace path or a `data:` URL —
-   *  the host app's `startChat` folds it into `attachments[]` before
-   *  any other processing. The Vue UI never sets this; it sends
-   *  path-only attachments via `attachments[]` instead. */
+   *  type-check. Only workspace paths are accepted — `data:` URLs
+   *  are no longer supported and the host app drops them with a
+   *  warn. Bridges that need to ship raw bytes should use the
+   *  modern `attachments[]` field with `{ mimeType, data }` entries;
+   *  the host app persists those to `data/attachments/YYYY/MM/`
+   *  server-side and rewrites them as path-bearing attachments
+   *  before any other processing. */
   selectedImageData?: string;
   attachments?: Attachment[];
   /** Session origin — application-defined (e.g. "human", "bridge") */

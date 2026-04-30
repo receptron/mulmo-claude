@@ -862,10 +862,15 @@ async function sendMessage(text?: string) {
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
 
-  beginUserTurn(session, message);
+  // Compute attachment paths up-front so they can be persisted on
+  // the user message AND sent to the agent. The sidebar-picked image
+  // lives on the currently-selected result and is read off `session`
+  // before beginUserTurn appends the new user turn.
   const selectedRes = session.toolResults.find((result) => result.uuid === session.selectedResultUuid) ?? undefined;
   const sidebarPickedPath = extractImageData(selectedRes);
   const attachmentPaths = [attachmentForRequest, sidebarPickedPath].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  beginUserTurn(session, message, attachmentPaths.length > 0 ? attachmentPaths : undefined);
 
   ensureSessionSubscription(session);
 

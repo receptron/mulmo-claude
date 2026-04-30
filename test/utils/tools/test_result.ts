@@ -109,4 +109,23 @@ describe("makeTextResult", () => {
     const result2 = makeTextResult("x", "user");
     assert.notEqual(result1.uuid, result2.uuid);
   });
+
+  it("attaches workspace paths when provided", () => {
+    const result = makeTextResult("hello", "user", ["data/attachments/2026/04/abc.png"]);
+    assert.deepEqual(result.data, {
+      text: "hello",
+      role: "user",
+      transportKind: "text-rest",
+      attachments: ["data/attachments/2026/04/abc.png"],
+    });
+  });
+
+  it("omits attachments key when array is empty", () => {
+    const result = makeTextResult("hello", "user", []);
+    assert.deepEqual(result.data, {
+      text: "hello",
+      role: "user",
+      transportKind: "text-rest",
+    });
+  });
 });

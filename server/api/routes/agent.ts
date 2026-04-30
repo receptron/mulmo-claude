@@ -41,9 +41,8 @@ import { isSessionOrigin, type SessionOrigin } from "../../../src/types/session.
 // import { publishNotification } from "../../events/notifications.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import { parseDataUrl } from "@mulmobridge/client";
 import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
-import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension } from "../../utils/files/attachment-store.js";
+import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension, saveAttachment } from "../../utils/files/attachment-store.js";
 import { errorMessage } from "../../utils/errors.js";
 
 const router = Router();
@@ -103,11 +102,15 @@ export interface StartChatParams {
   /** Bridge-only legacy carrier for "the user picked this image".
    *  No in-tree bridge sets it today; it remains on the type so
    *  external bridge clients that populate it from older protocol
-   *  versions continue to work. The Vue UI never sets this — paste/
-   *  drop and sidebar picks ride on `attachments[]` as path-only
-   *  entries instead. When set, `startChat` normalises the value
-   *  into a synthetic `Attachment` and prepends it to `attachments`
-   *  before any downstream processing. */
+   *  versions continue to work. Only workspace paths
+   *  (`data/attachments/...` or `artifacts/images/...`) are accepted
+   *  — `data:` URLs are no longer supported and are dropped with a
+   *  warn. Bridges that need to ship raw bytes should use the
+   *  modern `attachments[]` field with `{ mimeType, data }` entries;
+   *  those get persisted to `data/attachments/YYYY/MM/` server-side
+   *  and rewritten as path-bearing attachments. The Vue UI never
+   *  sets this — paste/drop and sidebar picks ride on
+   *  `attachments[]` as path-only entries directly. */
   selectedImageData?: string;
   attachments?: Attachment[];
   /** Where this session originates (#486). Accepts string for
@@ -176,10 +179,40 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     return { kind: "error", error: "Session is already running", status: 409 };
   }
 
-  // Run is committed. Now persist the user message so callers (and
-  // other tabs) see the turn. Metadata first — it powers the sidebar
-  // title cache; the append follows so the jsonl is always a
-  // superset of what metadata advertised.
+  // Run is committed. Process attachments next so any failure here
+  // rolls the run back via `endRun` before we persist or broadcast a
+  // user message — leaving an orphan turn on disk when the request
+  // ultimately rejects would mislead every viewer of this session.
+  // Three things happen in this block, all guarded together:
+  //   1. Bridge inline-bytes (`{ data, mimeType }`) get saved to
+  //      `data/attachments/YYYY/MM/` and rewritten as path-bearing
+  //      attachments. After this every Attachment has a `path`.
+  //   2. `collectAttachedPaths` extracts the workspace paths to
+  //      persist on the user JSONL line and broadcast on the SSE
+  //      event so the UI can render chips for the turn.
+  //   3. `prepareRequestExtras` loads bytes off disk for the LLM
+  //      request. With (1) above this is now a pure path-only walk.
+  // A malformed body (e.g. `attachments` not an array) or a
+  // filesystem I/O failure is logged and converted to a 400 here;
+  // beginRun is rolled back so subsequent turns aren't rejected with
+  // 409 forever.
+  let attachedPaths: string[];
+  let extras: RequestExtras;
+  try {
+    const persistedAttachments = await persistInlineBytesAsPaths(normalisedAttachments);
+    attachedPaths = collectAttachedPaths(persistedAttachments);
+    extras = await prepareRequestExtras(persistedAttachments);
+  } catch (err) {
+    log.warn("agent", "attachment processing failed — rolling back run", { chatSessionId, error: errorMessage(err) });
+    abortController.abort();
+    endRun(chatSessionId);
+    return { kind: "error", error: "Invalid attachments payload", status: 400 };
+  }
+
+  // Now persist the user message so callers (and other tabs) see the
+  // turn. Metadata first — it powers the sidebar title cache; the
+  // append follows so the jsonl is always a superset of what metadata
+  // advertised.
   const validOrigin = isSessionOrigin(params.origin) ? params.origin : undefined;
   if (isFirstTurn) {
     await createSessionMeta(chatSessionId, roleId, message, undefined, validOrigin);
@@ -191,7 +224,10 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   }
 
   // Append user message for this turn
-  await appendSessionLine(chatSessionId, JSON.stringify({ source: "user", type: EVENT_TYPES.text, message }));
+  await appendSessionLine(
+    chatSessionId,
+    JSON.stringify({ source: "user", type: EVENT_TYPES.text, message, ...(attachedPaths.length > 0 ? { attachments: attachedPaths } : {}) }),
+  );
 
   // Broadcast the user message so other tabs viewing this session
   // see the input in real time. Runs AFTER beginRun so a 409 never
@@ -200,6 +236,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     type: EVENT_TYPES.text,
     source: "user",
     message,
+    ...(attachedPaths.length > 0 ? { attachments: attachedPaths } : {}),
   });
 
   const role = getRole(roleId);
@@ -213,19 +250,6 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     resumed: Boolean(claudeSessionId),
   });
 
-  // Roll the run back if attachment prep throws (e.g. malformed
-  // HTTP body where `attachments` isn't an array). beginRun already
-  // committed; without endRun + abort the session is stuck and every
-  // future turn is rejected with 409.
-  let extras: RequestExtras;
-  try {
-    extras = await prepareRequestExtras(normalisedAttachments);
-  } catch (err) {
-    log.warn("agent", "prepareRequestExtras failed — rolling back run", { chatSessionId, error: errorMessage(err) });
-    abortController.abort();
-    endRun(chatSessionId);
-    return { kind: "error", error: "Invalid attachments payload", status: 400 };
-  }
   const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
   const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePaths);
 
@@ -254,10 +278,34 @@ interface RequestExtras {
    *  selected for this turn, in declaration order. Surfaced to the
    *  LLM via one `[Attached file: <path>]` line per entry, prepended
    *  to the user message so path-passing tools (e.g. `editImages`)
-   *  and the LLM itself can reference each file by path. Empty when
-   *  the request carried only inline bridge bytes (no paths) or
-   *  nothing at all. */
+   *  and the LLM itself can reference each file by path.
+   *  `persistInlineBytesAsPaths` ensures every well-formed attachment
+   *  carries a path before this runs, so this is empty only when the
+   *  request had no attachments at all (or every entry was malformed
+   *  and dropped). */
   attachedFilePaths: string[];
+}
+
+/** Pluck workspace-relative paths out of `attachments[]`. Used for
+ *  persistence + broadcast of the user message: the Vue UI renders
+ *  these as attachment chips next to the chat bubble.
+ *  `persistInlineBytesAsPaths` runs first, so by the time we get
+ *  here every well-formed entry already carries a `path` and chips
+ *  round-trip for bridge attachments too — not just Vue uploads.
+ *  Order matches declaration order so chip order matches the order
+ *  the user attached them.
+ *
+ *  Defensive: `Array.isArray` guards against a malformed HTTP body
+ *  where `attachments` is a truthy non-array. Without it `for...of`
+ *  would throw and bypass the rollback path that calls `endRun`,
+ *  leaving the session locked as running (#1052 review). */
+export function collectAttachedPaths(attachments: Attachment[] | undefined): string[] {
+  if (!Array.isArray(attachments) || attachments.length === 0) return [];
+  const paths: string[] = [];
+  for (const att of attachments) {
+    if (typeof att.path === "string" && att.path.length > 0) paths.push(att.path);
+  }
+  return paths;
 }
 
 /** Bridge-only compat: external bridge clients may still ship a
@@ -272,27 +320,79 @@ function mergeBridgeSelectedImage(selectedImageData: string | undefined, attachm
   return attachments && attachments.length > 0 ? [synthetic, ...attachments] : [synthetic];
 }
 
+/** Convert a legacy `selectedImageData` carrier to an `Attachment`.
+ *  Only workspace paths (`data/attachments/...` or `artifacts/images/
+ *  ...`) are accepted — `data:` URLs are no longer supported. A
+ *  bridge that still wants to ship raw bytes should populate the
+ *  modern `attachments[]` field with `{ mimeType, data }` instead;
+ *  `persistInlineBytesAsPaths` then writes those to
+ *  `data/attachments/YYYY/MM/` and turns them into path-bearing
+ *  entries before any other processing. */
 function synthesiseBridgeAttachment(selectedImageData: string | undefined): Attachment | undefined {
   if (!selectedImageData) return undefined;
   if (isAttachmentPath(selectedImageData) || isImagePath(selectedImageData)) {
     return { path: selectedImageData };
   }
-  const parsed = parseDataUrl(selectedImageData);
-  if (parsed) return { mimeType: parsed.mimeType, data: parsed.data };
-  log.warn("agent", "bridge selectedImageData is neither a known path nor a data: URL — dropping", {
+  log.warn("agent", "bridge selectedImageData is not a workspace path — dropping (data: URLs are no longer supported)", {
     valuePreview: selectedImageData.slice(0, 64),
   });
   return undefined;
 }
 
-/** Walk `attachments[]` once, loading bytes from disk for any
- *  path-only entry, and collect every path-bearing entry so the
- *  caller can emit one `[Attached file: <path>]` marker per file.
- *  Two path roots are accepted:
+/** Persist any inline-bytes attachment to disk as a path-bearing
+ *  entry. Bridges over the socket transport (Telegram, LINE, ...)
+ *  ship raw bytes via `Attachment.data` + `Attachment.mimeType`; the
+ *  Vue UI uploads to disk before posting and already carries a
+ *  `path`. By rewriting inline bytes into
+ *  `data/attachments/YYYY/MM/<id>.<ext>` here we get two properties
+ *  the rest of the pipeline relies on:
+ *
+ *    1. Every well-formed attachment carries a workspace path, so
+ *       chips can round-trip for bridge turns the same way they do
+ *       for Vue paste/drop turns (no `data:` chips, no special
+ *       cases downstream).
+ *    2. `prepareRequestExtras` becomes a path-only walk — the inline
+ *       (`{ data, mimeType }`) shape no longer flows past this layer.
+ *
+ *  Defensive: `Array.isArray` mirrors the guard in
+ *  `collectAttachedPaths` so a malformed payload doesn't throw and
+ *  bypass `endRun`. Per-attachment failures are logged and the
+ *  offending entry is dropped — a single bad upload mustn't poison
+ *  the rest of the turn. */
+async function persistInlineBytesAsPaths(attachments: Attachment[] | undefined): Promise<Attachment[] | undefined> {
+  if (!Array.isArray(attachments) || attachments.length === 0) return undefined;
+  const result: Attachment[] = [];
+  for (const att of attachments) {
+    if (typeof att.path === "string" && att.path.length > 0) {
+      result.push(att);
+      continue;
+    }
+    if (typeof att.data === "string" && att.data.length > 0 && typeof att.mimeType === "string" && att.mimeType.length > 0) {
+      try {
+        const saved = await saveAttachment(att.data, att.mimeType);
+        result.push({ path: saved.relativePath, mimeType: saved.mimeType });
+      } catch (err) {
+        log.warn("agent", "failed to persist inline attachment to disk — dropping", {
+          mimeType: att.mimeType,
+          error: errorMessage(err),
+        });
+      }
+      continue;
+    }
+    log.warn("agent", "attachment has neither path nor inline bytes — dropping");
+  }
+  return result.length > 0 ? result : undefined;
+}
+
+/** Walk `attachments[]` once, loading bytes from disk for every
+ *  path-bearing entry, and collect every path so the caller can emit
+ *  one `[Attached file: <path>]` marker per file. Two path roots
+ *  are accepted:
  *
  *    - `data/attachments/...` — paste/drop/file-picker uploads (any
- *      MIME type from the chat input's accept list). MIME is inferred
- *      from the extension chosen at save time.
+ *      MIME type from the chat input's accept list) and the persisted
+ *      form of bridge inline-bytes attachments. MIME is inferred from
+ *      the extension chosen at save time.
  *    - `artifacts/images/...png` — generated / canvas / edited images
  *      a user picked from the sidebar. Always image/png.
  *
@@ -303,35 +403,30 @@ function synthesiseBridgeAttachment(selectedImageData: string | undefined): Atta
  *  attached and can call Read to load it. Multi-file flows (e.g.
  *  paste one image + pick another in the sidebar → "combine these")
  *  rely on every path showing up in the marker so `editImages` can
- *  receive the full list in `imagePaths`. */
+ *  receive the full list in `imagePaths`.
+ *
+ *  Inline (`{ data, mimeType }`) entries no longer reach this layer —
+ *  `persistInlineBytesAsPaths` rewrites them as path-bearing entries
+ *  before this runs. */
 async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
-  if (!attachments || attachments.length === 0) {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
     return { attachments: undefined, attachedFilePaths: [] };
   }
   const result: Attachment[] = [];
   const attachedFilePaths: string[] = [];
   for (const att of attachments) {
-    const resolved = await resolveAttachment(att);
-    if (resolved) result.push(resolved);
-    if (typeof att.path === "string" && att.path.length > 0) {
-      attachedFilePaths.push(att.path);
+    if (typeof att.path !== "string" || att.path.length === 0) {
+      log.warn("agent", "attachment has no path after normalisation — dropping");
+      continue;
     }
+    const resolved = await loadFromPath(att.path, att.mimeType);
+    if (resolved) result.push(resolved);
+    attachedFilePaths.push(att.path);
   }
   return {
     attachments: result.length > 0 ? result : undefined,
     attachedFilePaths,
   };
-}
-
-async function resolveAttachment(att: Attachment): Promise<Attachment | undefined> {
-  if (typeof att.path === "string" && att.path.length > 0) {
-    return loadFromPath(att.path, att.mimeType);
-  }
-  if (typeof att.data === "string" && att.data.length > 0) {
-    return att;
-  }
-  log.warn("agent", "attachment has neither path nor data — dropping");
-  return undefined;
 }
 
 async function loadFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
