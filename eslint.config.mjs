@@ -180,7 +180,7 @@ export default [
       "no-implicit-coercion": ["error", { boolean: true, number: true, string: true, disallowTemplateShorthand: false }],
       "no-unneeded-ternary": ["error", { defaultAssignment: false }],
       "no-else-return": ["error", { allowElseIf: false }],
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/no-dynamic-delete": "error",
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-import-type-side-effects": "error",
