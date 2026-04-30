@@ -115,7 +115,7 @@ async function tryDockerLibreOffice(): Promise<boolean> {
   }
 }
 
-async function convertPptxToPdf(data: string): Promise<Buffer | null> {
+export async function convertPptxToPdf(data: string): Promise<Buffer | null> {
   const tmpDir = await mkdtemp(path.join(tmpdir(), "pptx-"));
   const inputPath = path.join(tmpDir, "input.pptx");
   const outputPath = path.join(tmpDir, "input.pdf");

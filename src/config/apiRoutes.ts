@@ -80,6 +80,16 @@ export const API_ROUTES = {
     update: "/api/images/update",
   },
 
+  // Generic attachment store (paste/drop/file-picker uploads). Saves
+  // the file under data/attachments/YYYY/MM/<id>.<ext> and returns
+  // the workspace-relative path. PPTX uploads also save a companion
+  // .pdf; the PDF path is what the route returns so the LLM never
+  // needs to know about the original PPTX. Image uploads use this
+  // same route now — image.upload remains for canvas drawings.
+  attachments: {
+    upload: "/api/attachments",
+  },
+
   mcpTools: {
     list: "/api/mcp-tools",
     invoke: "/api/mcp-tools/:tool",

@@ -43,6 +43,7 @@ import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
 import { parseDataUrl } from "@mulmobridge/client";
 import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
+import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension } from "../../utils/files/attachment-store.js";
 import { errorMessage } from "../../utils/errors.js";
 
 const router = Router();
@@ -203,7 +204,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
   const extras = await prepareRequestExtras(selectedImageData, attachments);
   const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
-  const decoratedMessage = withSelectedImageMarker(baseMessage, extras.selectedImagePath);
+  const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePath);
 
   runAgentInBackground({
     decoratedMessage,
@@ -226,58 +227,102 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
 interface RequestExtras {
   attachments: Attachment[] | undefined;
-  /** Workspace-relative path of the user-selected image, when one is
-   *  attached as a path (not a data URL). Surfaced to the LLM via a
-   *  `[Selected image: <path>]` marker prepended to the user message,
-   *  so Stage 2's path-passing `editImage` knows what to reference. */
-  selectedImagePath: string | undefined;
+  /** Workspace-relative path of the file the user attached / has
+   *  selected for this turn. Surfaced to the LLM via an
+   *  `[Attached file: <path>]` marker prepended to the user
+   *  message so path-passing tools (e.g. `editImage`) and the LLM
+   *  itself can reference the file by path. Undefined when the
+   *  request carried only inline data (legacy bridge client) or
+   *  nothing at all. */
+  attachedFilePath: string | undefined;
 }
 
-/** Convert `selectedImageData` (workspace-relative image path since
- *  stage 1 of the stateless-image-editing refactor; data URL for
- *  non-image paste/drop and for legacy bridge clients) into the
- *  generic Attachment format and a path hint, then merge with any
- *  explicitly-provided attachments from the bridge protocol.
+/** Convert `selectedImageData` (workspace-relative path of a file
+ *  the user attached / selected, or — for legacy bridge clients —
+ *  a `data:` URL) into the generic Attachment format and a path
+ *  hint, then merge with any explicitly-provided attachments from
+ *  the bridge protocol.
  *
- *  Path form: bytes are loaded from disk so Claude can still "see"
- *  the image for vision use cases, AND the path string is returned
- *  separately so the caller can mark it in the user message. If the
- *  file can't be read, the path hint is still emitted — the LLM at
- *  least knows what was selected and can call Read to load it. */
+ *  Two path roots are accepted:
+ *    - `data/attachments/...` — paste/drop/file-picker uploads (any
+ *      MIME type from the chat input's accept list). MIME is inferred
+ *      from the extension chosen at save time.
+ *    - `artifacts/images/...png` — generated / canvas / edited images
+ *      a user picked from the sidebar. Always image/png.
+ *
+ *  Bytes are loaded from disk so Claude still "sees" the file as a
+ *  content block on this turn, AND the path is returned separately
+ *  so the caller marks it in the LLM-bound message. If the file
+ *  can't be read, the path hint is still emitted — the LLM knows
+ *  what was attached and can call Read to load it. */
 async function prepareRequestExtras(selectedImageData: string | undefined, explicit: Attachment[] | undefined): Promise<RequestExtras> {
+  const primary = selectedImageData ? await resolvePrimaryAttachment(selectedImageData) : undefined;
   const result: Attachment[] = [];
-  let selectedImagePath: string | undefined;
-  if (selectedImageData) {
-    if (isImagePath(selectedImageData)) {
-      selectedImagePath = selectedImageData;
-      try {
-        const data = await loadImageBase64(selectedImageData);
-        result.push({ mimeType: "image/png", data });
-      } catch (err) {
-        log.warn("agent", "failed to load selected-image bytes from path", {
-          path: selectedImageData,
-          error: errorMessage(err),
-        });
-      }
-    } else {
-      const parsed = parseDataUrl(selectedImageData);
-      if (parsed) result.push({ mimeType: parsed.mimeType, data: parsed.data });
-    }
-  }
+  if (primary?.attachment) result.push(primary.attachment);
   if (explicit) result.push(...explicit);
   return {
     attachments: result.length > 0 ? result : undefined,
-    selectedImagePath,
+    attachedFilePath: primary?.attachedFilePath,
   };
 }
 
-/** Marker prepended to the user message that tells the LLM which
- *  image is currently selected (only the LLM-bound message — the
- *  user's persisted/displayed message is the raw text). The system
- *  prompt teaches the LLM to read this and pass the path to
- *  `editImage` etc. */
-function withSelectedImageMarker(message: string, selectedImagePath: string | undefined): string {
-  return selectedImagePath ? `[Selected image: ${selectedImagePath}]\n\n${message}` : message;
+interface PrimaryAttachment {
+  attachment: Attachment | undefined;
+  attachedFilePath: string | undefined;
+}
+
+async function resolvePrimaryAttachment(value: string): Promise<PrimaryAttachment> {
+  if (isAttachmentPath(value)) {
+    return { attachment: await loadFromAttachmentPath(value), attachedFilePath: value };
+  }
+  if (isImagePath(value)) {
+    return { attachment: await loadFromImagePath(value), attachedFilePath: value };
+  }
+  const parsed = parseDataUrl(value);
+  return {
+    attachment: parsed ? { mimeType: parsed.mimeType, data: parsed.data } : undefined,
+    attachedFilePath: undefined,
+  };
+}
+
+async function loadFromAttachmentPath(value: string): Promise<Attachment | undefined> {
+  const mimeType = inferMimeFromExtension(value);
+  if (!mimeType) {
+    log.warn("agent", "attachment path has unknown extension — skipping bytes", { path: value });
+    return undefined;
+  }
+  try {
+    const data = await loadAttachmentBase64(value);
+    return { mimeType, data };
+  } catch (err) {
+    log.warn("agent", "failed to load attachment bytes from path", {
+      path: value,
+      error: errorMessage(err),
+    });
+    return undefined;
+  }
+}
+
+async function loadFromImagePath(value: string): Promise<Attachment | undefined> {
+  try {
+    const data = await loadImageBase64(value);
+    return { mimeType: "image/png", data };
+  } catch (err) {
+    log.warn("agent", "failed to load selected-image bytes from path", {
+      path: value,
+      error: errorMessage(err),
+    });
+    return undefined;
+  }
+}
+
+/** Marker prepended to the LLM-bound user message that tells the
+ *  model which workspace file is attached / selected for this turn.
+ *  The user's persisted (jsonl) and broadcast (UI) message is the
+ *  raw text — this marker is added strictly on the path to Claude.
+ *  The system prompt teaches the model how to interpret it. */
+function withAttachedFileMarker(message: string, attachedFilePath: string | undefined): string {
+  return attachedFilePath ? `[Attached file: ${attachedFilePath}]\n\n${message}` : message;
 }
 
 // ── HTTP route ──────────────────────────────────────────────────────
