@@ -100,11 +100,16 @@ async function main(): Promise<void> {
   const port = readPortSafe();
   if (!token || port === null) return; // server isn't reachable; silent no-op
 
-  // Claude CLI provides session_id at the top of every hook
-  // payload — forward it so the snapshot can later be traced
-  // back to the chat session that drove the write. Best-effort;
-  // missing / non-string values are simply omitted.
-  const sessionId = typeof payload.session_id === "string" && payload.session_id.length > 0 ? payload.session_id : undefined;
+  // Prefer our chat-session id from the spawn env (#963) — the
+  // server's session store keys by chatSessionId, not by Claude
+  // CLI's internal session_id, so the toolResult publish on the
+  // server side only matches when we forward our own id. Fall back
+  // to Claude CLI's `session_id` (still useful as a tracing token
+  // in the snapshot frontmatter) when the env var is absent — e.g.
+  // an older mulmoclaude server spawning a newer hook bundle.
+  const envChatSessionId = process.env.MULMOCLAUDE_CHAT_SESSION_ID;
+  const payloadSessionId = typeof payload.session_id === "string" && payload.session_id.length > 0 ? payload.session_id : undefined;
+  const sessionId = envChatSessionId && envChatSessionId.length > 0 ? envChatSessionId : payloadSessionId;
   const body = sessionId === undefined ? { slug } : { slug, sessionId };
 
   try {

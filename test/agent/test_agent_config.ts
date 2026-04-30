@@ -189,6 +189,7 @@ describe("buildDockerSpawnArgs", () => {
       platform: "darwin" as Platform,
       projectRoot: "/proj",
       homeDir: "/home/user",
+      chatSessionId: "chat-test-session",
     };
   }
 
@@ -258,6 +259,13 @@ describe("buildDockerSpawnArgs", () => {
     const idx = args.indexOf("--add-host");
     assert.ok(idx >= 0);
     assert.equal(args[idx + 1], "host.docker.internal:host-gateway");
+  });
+
+  it("forwards MULMOCLAUDE_CHAT_SESSION_ID into the container for the wiki-history hook (#963)", async () => {
+    const args = buildDockerSpawnArgs({ ...baseParams(), chatSessionId: "chat-abc-123" });
+    // -e flag arg pairs: `["-e", "KEY=value", ...]`
+    const envIdx = args.findIndex((arg, idx) => arg === "-e" && args[idx + 1] === "MULMOCLAUDE_CHAT_SESSION_ID=chat-abc-123");
+    assert.ok(envIdx >= 0, "expected MULMOCLAUDE_CHAT_SESSION_ID to be forwarded");
   });
 
   it("does not add host mapping on darwin", async () => {

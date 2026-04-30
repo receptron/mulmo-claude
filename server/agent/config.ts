@@ -319,6 +319,13 @@ export interface DockerSpawnArgsParams {
   uid: number;
   gid: number;
   platform: Platform;
+  /** Our app's chat session id. Forwarded into the container as
+   *  `MULMOCLAUDE_CHAT_SESSION_ID` so the wiki-history PostToolUse
+   *  hook can publish a `page-edit` toolResult to the right chat
+   *  session — Claude CLI's own `session_id` (in the hook payload)
+   *  is the *CLI* session, not our chat session, so the session
+   *  store would never find a match (#963). */
+  chatSessionId: string;
   projectRoot?: string;
   homeDir?: string;
   /** Extra `-v` / `-e` tokens for opt-in host credentials (#259).
@@ -395,6 +402,12 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     // `extraHosts`.
     "-e",
     "MULMOCLAUDE_HOST=host.docker.internal",
+    // Chat session id for the wiki-history hook (#963). The hook
+    // POSTs `{slug, sessionId}` to the parent server; the server
+    // looks up the chat session by this id to publish a `page-edit`
+    // toolResult into its timeline.
+    "-e",
+    `MULMOCLAUDE_CHAT_SESSION_ID=${params.chatSessionId}`,
     "-v",
     `${toDockerPath(projectRoot)}/node_modules:/app/node_modules:ro`,
     "-v",

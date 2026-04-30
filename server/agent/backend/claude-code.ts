@@ -22,11 +22,16 @@ import type { AgentInput, LLMBackend } from "./types.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
-function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[]): ClaudeProc {
+function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[], chatSessionId: string): ClaudeProc {
   if (!useDocker) {
+    // MULMOCLAUDE_CHAT_SESSION_ID is the chat-session id our wiki-history
+    // PostToolUse hook needs to publish a `page-edit` toolResult back to
+    // the right session (#963). Claude CLI's own hook payload carries
+    // its internal session_id, which doesn't match our session store.
     return spawn("claude", cliArgs, {
       cwd: workspacePath,
       stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, MULMOCLAUDE_CHAT_SESSION_ID: chatSessionId },
     });
   }
   const sandboxAuth = resolveSandboxAuth({
@@ -39,6 +44,7 @@ function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[
   const dockerArgs = buildDockerSpawnArgs({
     workspacePath,
     cliArgs,
+    chatSessionId,
     uid: process.getuid?.() ?? 1000,
     gid: process.getgid?.() ?? 1000,
     platform: process.platform,
@@ -139,7 +145,7 @@ async function* runClaudeAgent(input: AgentInput): AsyncGenerator<AgentEvent> {
     extraAllowedTools: input.extraAllowedTools,
   });
 
-  const proc = spawnClaude(input.useDocker, input.workspacePath, cliArgs);
+  const proc = spawnClaude(input.useDocker, input.workspacePath, cliArgs, input.sessionId);
 
   // stream-json input mode: stream the user turn as a single JSON
   // line to stdin, then close the pipe so the CLI knows no further
