@@ -217,7 +217,7 @@ the active session. The canvas (StackView) renders it via the
 same `<WikiView>` component as `action: "page"`, so the body
 markup is identical:
 
-```
+```text
 ┌─[<WikiView> action="page-edit" — canvas only]─────────────────┐
 │ ▮ Wiki edit · <slug> · 2026-04-30 12:00                       │
 │ ┌─[wiki-page-metadata-bar]────────────────────────────────┐   │

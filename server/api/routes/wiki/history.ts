@@ -190,20 +190,34 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
   // the snapshot reference, not the body. `pagePath` is a GC
   // fallback: if the snapshot is gc'd before render, the View
   // falls back to reading the live page file.
+  // Wrapped in try/catch so a publish failure (e.g. JSONL append
+  // throws) doesn't fail the whole route — the snapshot was
+  // already written, and the hook is fire-and-forget. Without
+  // this guard the route would 500 even though the wiki write
+  // itself succeeded; the next save would still snapshot fine,
+  // but the canvas would silently lose this one preview
+  // (CodeRabbit review).
   if (typeof sessionId === "string" && sessionId.length > 0) {
-    const outcome = await pushToolResult(sessionId, {
-      uuid: randomUUID(),
-      toolName: "manageWiki",
-      data: {
-        action: "page-edit",
-        title: slug,
+    try {
+      const outcome = await pushToolResult(sessionId, {
+        uuid: randomUUID(),
+        toolName: "manageWiki",
+        data: {
+          action: "page-edit",
+          title: slug,
+          slug,
+          stamp,
+          pagePath: path.posix.join(WORKSPACE_DIRS.wikiPages, `${slug}.md`),
+        },
+      });
+      if (outcome.kind === "skipped") {
+        log.warn("wiki", "page-edit toolResult publish skipped", { slug, reason: outcome.reason });
+      }
+    } catch (err) {
+      log.warn("wiki", "page-edit toolResult publish failed", {
         slug,
-        stamp,
-        pagePath: path.posix.join(WORKSPACE_DIRS.wikiPages, `${slug}.md`),
-      },
-    });
-    if (outcome.kind === "skipped") {
-      log.warn("wiki", "page-edit toolResult publish skipped", { slug, reason: outcome.reason });
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

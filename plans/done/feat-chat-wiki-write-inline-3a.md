@@ -162,7 +162,7 @@ File: `src/plugins/wiki/View.vue`.
 
 Inside the View's data-loading helper for `page-edit`:
 
-```
+```text
                    ┌─ snapshot exists ─→ render snapshot body + meta
 fetch /history/:stamp ┤
                    └─ 404 ─┐
