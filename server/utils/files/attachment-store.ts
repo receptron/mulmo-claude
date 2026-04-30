@@ -39,10 +39,11 @@ async function safeResolve(relativePath: string): Promise<string> {
   return result;
 }
 
-// MIME ↔ extension mapping. Kept narrow on purpose — anything not
-// in this table falls back to `.bin` so we don't have to guess.
-// `inferMimeFromExtension()` is the inverse, used when reading a
-// stored file back to build a Claude content block.
+// MIME ↔ extension mapping. Used as a fallback when the upload has
+// no usable filename — saveAttachment() prefers the original file's
+// extension so types outside this table (e.g. text/x-python → .py)
+// still round-trip. `inferMimeFromExtension()` is the inverse, used
+// when reading a stored file back to build a Claude content block.
 const MIME_EXT: Readonly<Record<string, string>> = {
   "image/png": ".png",
   "image/jpeg": ".jpg",
@@ -96,9 +97,37 @@ export function extensionForMime(mimeType: string): string {
   return MIME_EXT[mimeType] ?? ".bin";
 }
 
+// Pick the on-disk extension. Prefer the original filename's
+// extension when present and well-formed — this preserves types
+// outside MIME_EXT (e.g. text/x-python → `.py`) so the round-trip
+// through inferMimeFromExtension() succeeds. We only honour the
+// filename extension when we can read it back unambiguously: either
+// it's already a known extension, or the upload's MIME is text/* (so
+// the text/plain fallback below is safe). Image/* MIMEs we don't
+// recognise (e.g. image/heic) still fall through to MIME_EXT —
+// returning `.bin` is better than writing binary bytes the loader
+// would later interpret as text.
+function pickExtension(filename: string | undefined, mimeType: string): string {
+  if (filename) {
+    const ext = path.posix.extname(filename).toLowerCase();
+    if (/^\.[a-z0-9]+$/.test(ext) && (EXT_MIME[ext] || mimeType.startsWith("text/"))) {
+      return ext;
+    }
+  }
+  return extensionForMime(mimeType);
+}
+
+// Map an on-disk filename back to a MIME type. Known extensions
+// resolve via EXT_MIME. Unknown extensions fall back to text/plain
+// because saveAttachment() only writes a non-EXT_MIME extension when
+// the source was text/*. `.bin` (anything we couldn't classify on
+// save) returns undefined so the agent loop skips bytes rather than
+// shipping binary as text.
 export function inferMimeFromExtension(filename: string): string | undefined {
   const ext = path.extname(filename).toLowerCase();
-  return EXT_MIME[ext];
+  if (EXT_MIME[ext]) return EXT_MIME[ext];
+  if (ext === ".bin") return undefined;
+  return "text/plain";
 }
 
 export interface SavedAttachment {
@@ -111,11 +140,14 @@ export interface SavedAttachment {
 
 /** Save a single attachment under data/attachments/YYYY/MM/. The
  *  caller picks the ID; companions (e.g. PPTX → PDF) reuse it via
- *  `saveCompanion()` so they share the same numeric prefix. */
-export async function saveAttachment(base64Data: string, mimeType: string): Promise<SavedAttachment> {
+ *  `saveCompanion()` so they share the same numeric prefix.
+ *  `originalFilename` (when supplied) drives the on-disk extension
+ *  so types outside MIME_EXT — e.g. `script.py` (text/x-python) —
+ *  preserve their extension instead of collapsing to `.bin`. */
+export async function saveAttachment(base64Data: string, mimeType: string, originalFilename?: string): Promise<SavedAttachment> {
   await ensureAttachmentsDir();
   const partition = yearMonthUtc();
-  const ext = extensionForMime(mimeType);
+  const ext = pickExtension(originalFilename, mimeType);
   const filename = `${shortId()}${ext}`;
   const absPath = path.join(ATTACHMENTS_DIR, partition, filename);
   await writeFileAtomic(absPath, Buffer.from(base64Data, "base64"));
