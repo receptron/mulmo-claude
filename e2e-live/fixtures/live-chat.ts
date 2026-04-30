@@ -86,32 +86,40 @@ export function getCurrentSessionId(page: Page): string | null {
  * restarting, session already gone) must not turn a passing test
  * red.
  */
+/** Build the workspace-relative DELETE URL from the shared API_ROUTES table. */
+function buildSessionDeleteUrl(sessionId: string): string {
+  return API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId));
+}
+
+/**
+ * Issue the DELETE call from inside the page so the SPA's
+ * bearer-auth meta tag is reachable. Logs HTTP / network failures
+ * via console.warn to keep the suite running.
+ */
+async function performInPageSessionDelete(page: Page, url: string): Promise<void> {
+  await page.evaluate(async (target) => {
+    const meta = document.querySelector('meta[name="mulmoclaude-auth"]');
+    const token = meta?.getAttribute("content") ?? "";
+    try {
+      const response = await fetch(target, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        // eslint-disable-next-line no-console -- visible cleanup signal
+        console.warn(`deleteSession: ${target} returned HTTP ${response.status}`);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`deleteSession: network error for ${target}`, err);
+    }
+  }, url);
+}
+
 export async function deleteSession(page: Page, sessionId: string): Promise<void> {
   if (page.isClosed()) return;
-  // Build the route from the shared API_ROUTES table on the Node
-  // side so this stays in sync with the server when the route
-  // template changes.
-  const url = API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId));
   try {
-    await page.evaluate(async (target) => {
-      const meta = document.querySelector('meta[name="mulmoclaude-auth"]');
-      const token = meta?.getAttribute("content") ?? "";
-      try {
-        const response = await fetch(target, {
-          method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) {
-          // eslint-disable-next-line no-console -- surface cleanup
-          // failures so a chronically broken delete is visible in
-          // the test log without failing the suite
-          console.warn(`deleteSession: ${target} returned HTTP ${response.status}`);
-        }
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn(`deleteSession: network error for ${target}`, err);
-      }
-    }, url);
+    await performInPageSessionDelete(page, buildSessionDeleteUrl(sessionId));
   } catch {
     // best-effort: page already closed, server restarting, etc.
   }
@@ -199,10 +207,17 @@ export async function readImgNaturalSize(page: Page, imgSelector: string): Promi
 }
 
 const PDF_MAGIC = Buffer.from("%PDF-", "ascii");
+const PDF_EOF = Buffer.from("%%EOF", "ascii");
+// PDF spec writes %%EOF in the last few hundred bytes; widen to
+// 2 KiB so trailing whitespace, line endings, or `<startxref>`
+// blocks don't shift it past our search window.
+const PDF_EOF_TAIL_BYTES = 2048;
 
 /**
  * Read a Playwright `Download` into memory and check that it is a
- * real PDF rather than an HTML error page or empty stub. Returns
+ * real PDF rather than an HTML error page or a truncated stream.
+ * Validates both the `%PDF-` header and the `%%EOF` tail marker,
+ * so a connection that drops mid-response is rejected. Returns
  * the buffer so the caller can run extra assertions (file size,
  * inline image search, etc.).
  */
@@ -215,6 +230,10 @@ export async function readPdfDownload(download: Download): Promise<Buffer> {
   if (!buf.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
     const head = buf.subarray(0, 64).toString("utf8");
     throw new Error(`Downloaded file is not a PDF (first bytes: ${JSON.stringify(head)})`);
+  }
+  const tail = buf.subarray(Math.max(0, buf.length - PDF_EOF_TAIL_BYTES));
+  if (tail.indexOf(PDF_EOF) === -1) {
+    throw new Error(`Downloaded PDF appears truncated (missing %%EOF marker, length ${buf.length})`);
   }
   return buf;
 }
