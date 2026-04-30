@@ -246,6 +246,79 @@ interface SessionErrorResponse {
   error: string;
 }
 
+// Narrow type predicate for the presentMulmoScript tool-result shape
+// the enrichment helper inspects. Returning `entry is …` lets the
+// caller drop the redundant nested checks once the predicate passes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isPresentMulmoScriptToolResult(entry: any): entry is {
+  source: "tool";
+  type: string;
+  result: { toolName: "presentMulmoScript"; data: { filePath: string } & Record<string, unknown> };
+} & Record<string, unknown> {
+  return (
+    entry?.source === "tool" &&
+    entry?.type === EVENT_TYPES.toolResult &&
+    entry?.result?.toolName === "presentMulmoScript" &&
+    typeof entry?.result?.data?.filePath === "string"
+  );
+}
+
+// Re-read the MulmoScript JSON pointed at by `entry.result.data.filePath`
+// and merge it into a copy of the entry. Returns the original entry on
+// any failure (missing file, traversal escape, parse error, absolute
+// path) so the detail route never breaks because of a single rotted
+// link. Path-traversal guard is realpath-based — see
+// resolveWithinRoot for why.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function enrichWithMulmoScript(entry: any): Promise<any> {
+  try {
+    const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
+    let storiesReal: string;
+    try {
+      storiesReal = realpathSync(storiesDir);
+    } catch {
+      return entry;
+    }
+    const scriptRelPath: string = entry.result.data.filePath;
+    if (path.isAbsolute(scriptRelPath)) return entry;
+    const relFromStories = scriptRelPath.startsWith("stories/") ? scriptRelPath.slice("stories/".length) : scriptRelPath;
+    const scriptPath = resolveWithinRoot(storiesReal, relFromStories);
+    if (!scriptPath) return entry;
+    const scriptJson = (await readTextSafe(scriptPath)) ?? "";
+    return {
+      ...entry,
+      result: {
+        ...entry.result,
+        data: {
+          ...entry.result.data,
+          script: JSON.parse(scriptJson),
+        },
+      },
+    };
+  } catch {
+    return entry;
+  }
+}
+
+// Parse one JSONL line into a session entry, applying the legacy-meta
+// skip and the presentMulmoScript enrichment in one place. Returns
+// null when the line should not appear in the response (parse error
+// or legacy meta).
+async function parseSessionEntry(line: string): Promise<unknown> {
+  let entry: unknown;
+  try {
+    entry = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  // Skip legacy metadata entries now stored in .json
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const typed = entry as any;
+  if (typed?.type === EVENT_TYPES.sessionMeta || typed?.type === EVENT_TYPES.claudeSessionId) return null;
+  if (isPresentMulmoScriptToolResult(typed)) return enrichWithMulmoScript(typed);
+  return typed;
+}
+
 router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<unknown[] | SessionErrorResponse>) => {
   const { id: sessionId } = req.params;
   const chatDir = WORKSPACE_PATHS.chat;
@@ -258,65 +331,7 @@ router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res
       notFound(res, `Session ${sessionId} not found`);
       return;
     }
-    const entries = (
-      await Promise.all(
-        content
-          .split("\n")
-          .filter(Boolean)
-          .map(async (line) => {
-            try {
-              const entry = JSON.parse(line);
-              // Skip legacy metadata entries now stored in .json
-              if (entry.type === EVENT_TYPES.sessionMeta || entry.type === EVENT_TYPES.claudeSessionId) return null;
-              // For presentMulmoScript results, re-read the script from disk
-              if (
-                entry.source === "tool" &&
-                entry.type === EVENT_TYPES.toolResult &&
-                entry.result?.toolName === "presentMulmoScript" &&
-                entry.result?.data?.filePath
-              ) {
-                try {
-                  // Realpath-based traversal check defeats symlink
-                  // escapes — see resolveWithinRoot in utils/fs.ts.
-                  // Resolve the stories dir's realpath so the
-                  // boundary check works even when stories/ itself
-                  // is a legitimate symlink to another disk.
-                  const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
-                  let storiesReal: string;
-                  try {
-                    storiesReal = realpathSync(storiesDir);
-                  } catch {
-                    return entry;
-                  }
-                  const scriptRelPath: string = entry.result.data.filePath;
-                  if (path.isAbsolute(scriptRelPath)) return entry;
-                  // Strip optional "stories/" prefix so the
-                  // remainder is relative to storiesReal.
-                  const relFromStories = scriptRelPath.startsWith("stories/") ? scriptRelPath.slice("stories/".length) : scriptRelPath;
-                  const scriptPath = resolveWithinRoot(storiesReal, relFromStories);
-                  if (!scriptPath) return entry;
-                  const scriptJson = (await readTextSafe(scriptPath)) ?? "";
-                  return {
-                    ...entry,
-                    result: {
-                      ...entry.result,
-                      data: {
-                        ...entry.result.data,
-                        script: JSON.parse(scriptJson),
-                      },
-                    },
-                  };
-                } catch {
-                  // file missing — return original entry
-                }
-              }
-              return entry;
-            } catch {
-              return null;
-            }
-          }),
-      )
-    ).filter(Boolean);
+    const entries = (await Promise.all(content.split("\n").filter(Boolean).map(parseSessionEntry))).filter(Boolean);
     // Prepend metadata as session_meta entry for the frontend
     const result = meta ? [{ type: EVENT_TYPES.sessionMeta, ...meta }, ...entries] : entries;
     log.info("sessions", "detail: ok", { sessionId, entries: result.length });
