@@ -83,14 +83,11 @@ import { useI18n } from "vue-i18n";
 import ChatAttachmentPreview from "./ChatAttachmentPreview.vue";
 import SuggestionsPanel from "./SuggestionsPanel.vue";
 import { useImeAwareEnter } from "../composables/useImeAwareEnter";
+import type { PastedFile } from "../types/pastedFile";
+
+export type { PastedFile };
 
 const { t } = useI18n();
-
-export interface PastedFile {
-  dataUrl: string;
-  name: string;
-  mime: string;
-}
 
 withDefaults(
   defineProps<{

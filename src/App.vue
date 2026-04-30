@@ -261,6 +261,7 @@ import type { SessionEntry, ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
 import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
+import { resolvePastedAttachment } from "./utils/agent/pastedAttachment";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
 import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
 import { roleName, roleIcon } from "./utils/role/icon";
@@ -839,6 +840,24 @@ async function sendMessage(text?: string) {
   const fileSnapshot = pastedFile.value;
   pastedFile.value = null;
 
+  // Pasted/dropped images get pre-uploaded to a workspace file so the
+  // server (and the LLM downstream) sees a relative path, not a data:
+  // URI. Non-image attachments still flow as data URIs through the
+  // legacy mergeAttachments() path. On upload failure, restore both
+  // userInput and pastedFile so the user can retry without retyping.
+  let attachmentForRequest: string | undefined;
+  if (fileSnapshot) {
+    const resolved = await resolvePastedAttachment(fileSnapshot);
+    if (!resolved.ok) {
+      userInput.value = message;
+      pastedFile.value = fileSnapshot;
+      const recoverySession = sessionMap.get(currentSessionId.value);
+      if (recoverySession) pushErrorMessage(recoverySession, `Failed to attach image: ${resolved.error}`);
+      return;
+    }
+    attachmentForRequest = resolved.value;
+  }
+
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
 
@@ -852,7 +871,7 @@ async function sendMessage(text?: string) {
       message,
       role: sessionRole.value,
       chatSessionId: session.id,
-      selectedImageData: fileSnapshot?.dataUrl ?? extractImageData(selectedRes),
+      selectedImageData: attachmentForRequest ?? extractImageData(selectedRes),
     }),
   );
   if (!result.ok) {
