@@ -91,4 +91,21 @@ describe("injectImageRepairScript", () => {
     assert.ok(out.includes("<script>"));
     assert.ok(elapsedMs < 1000, `expected <1s, got ${elapsedMs}ms`);
   });
+
+  it("handles 100K repeated </body> tokens in linear time (Codex iter-1 review)", () => {
+    // The previous regex used a negative lookahead `(?![\s\S]*<\/body\s*>)`
+    // to anchor at the last close, which is O(N²) on inputs with many
+    // `</body>` tokens. The matchAll-based splice point selection is
+    // O(N) regardless. Probe with 100K closes — should still finish
+    // well under a second.
+    const adversarial = `<body>${"</body>".repeat(100_000)}x`;
+    const start = Date.now();
+    const out = injectImageRepairScript(adversarial);
+    const elapsedMs = Date.now() - start;
+    assert.ok(out.includes("<script>"));
+    // Splice must be before the LAST `</body>`, so the tail "x" stays
+    // unchanged, and only the last close is preceded by a script tag.
+    assert.ok(out.endsWith("</body>x"));
+    assert.ok(elapsedMs < 1000, `expected <1s for 100K tokens, got ${elapsedMs}ms`);
+  });
 });

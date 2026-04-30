@@ -78,26 +78,38 @@ document.addEventListener("error", function (event) {
 // concatenation, not a per-request `<script>...</script>` rebuild.
 const IMAGE_REPAIR_SCRIPT_TAG = `<script>${IMAGE_REPAIR_INLINE_SCRIPT}</script>`;
 
-// Last `</body>` (case-insensitive). Anchoring at the LAST close means
-// nested `</body>` inside e.g. a CDATA-style attribute (extremely
-// unusual) doesn't fool us into splicing too early. `\s*` between
-// `body` and `>` accepts `</body >` style whitespace.
-const BODY_CLOSE_RE = /<\/body\s*>(?![\s\S]*<\/body\s*>)/i;
+// `</body>` (case-insensitive, whitespace-tolerant). The previous
+// implementation paired this with a `(?![\s\S]*<\/body\s*>)` negative
+// lookahead to anchor at the LAST occurrence — but that lookahead is
+// O(N²) on inputs with many `</body>` tokens (an adversarial / unusual
+// input shape, but cheap to defang). The current implementation runs
+// `matchAll` once over the input (linear) and takes the last hit, so
+// the splice point selection is O(N) regardless of input shape.
+const BODY_CLOSE_RE = /<\/body\s*>/gi;
 
 /** Splice `<script>${IMAGE_REPAIR_INLINE_SCRIPT}</script>` into an
- *  HTML document just before its closing `</body>`. If the document
- *  has no `</body>` (malformed but possible — fragments, hand-written
- *  HTML), append the tag at the end so the script still loads.
+ *  HTML document just before its **last** closing `</body>`.
+ *  Anchoring at the last close means nested `</body>` inside e.g.
+ *  literal example text inside `<pre>` doesn't fool us into splicing
+ *  too early. If the document has no `</body>` (fragments, hand-
+ *  written HTML), append the tag at the end so the script still
+ *  loads.
  *
  *  Pure string operation — safe to call on any HTML payload, no
- *  DOM parsing, no allocation beyond the result string. Idempotent:
+ *  DOM parsing, no allocation beyond the result string. Linear time
+ *  in input length even on adversarial inputs (verified by the
+ *  `processes 100K </body> tokens in linear time` test). Idempotent:
  *  calling on already-spliced output appends a second copy (the
  *  script is one-shot per element so duplicates are harmless), so
  *  callers should splice exactly once per response. */
 export function injectImageRepairScript(html: string): string {
   if (!html) return html;
-  const match = BODY_CLOSE_RE.exec(html);
-  if (!match) return html + IMAGE_REPAIR_SCRIPT_TAG;
-  const idx = match.index;
+  // matchAll → spread into an array → take the last entry. One linear
+  // pass over the input regardless of how many `</body>` tokens it
+  // contains.
+  const matches = [...html.matchAll(BODY_CLOSE_RE)];
+  if (matches.length === 0) return html + IMAGE_REPAIR_SCRIPT_TAG;
+  const idx = matches[matches.length - 1].index;
+  if (idx === undefined) return html + IMAGE_REPAIR_SCRIPT_TAG;
   return `${html.slice(0, idx)}${IMAGE_REPAIR_SCRIPT_TAG}${html.slice(idx)}`;
 }
