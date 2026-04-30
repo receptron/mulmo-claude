@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
       <div class="flex items-center gap-2 min-w-0">
         <button
-          v-if="action !== 'index'"
+          v-if="action !== 'index' && isStandaloneWikiRoute"
           class="h-8 w-8 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           :title="t('pluginWiki.backToIndex')"
           @click="router.back()"
