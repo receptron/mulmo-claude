@@ -37,40 +37,54 @@ description: e2e-live スイートを継続メンテする。`plans/feat-e2e-liv
    - #991 Safari preview iframe CSP → webkit project 追加が TODO 残
 4. ユーザーから chat で追加要望が来ていれば、 上記 3 つに統合する。
 
-## Phase 2: 着手項目の合意
+## Phase 2: 着手項目の自動選定
 
-Phase 1 の結果を踏まえ、 ユーザーに以下フォーマットで提示:
+Phase 1 の結果から、 以下ルールで 1 PR 分の着手項目を **1 つ自動選定する**。 確認待ちで止まらない（auto mode 親和、 ユーザーは Phase 3〜4 進行中いつでも 「やっぱり L-04 で」 と redirect 可）。
+
+### 選定優先度（上から順に試す）
+
+1. **C. ユーザー追加要望** — skill 起動プロンプトに項目指定（「L-03 で」 「webkit project 追加」 等）があれば最優先で採用
+2. **B. config / 基盤改善** — main 動向の 「要対応」 に未消化があれば 1 つ（webkit project / self-repair 緩和 等）。 規模が小さく副作用も spec 不変で reversible なので先に消化
+3. **A. 未実装シナリオ** — `plans/feat-e2e-live.md` の 「実装ステータス」 で未実装のうち、 重要度 S → A → B 順、 同レベル内では番号若い順で 1 つ
+
+### 境界条件
+
+- **現在ブランチが別目的**（skill 自身の修正、 別シナリオの作業中、 等）の場合: branch 名と差分から判断し、 同 PR に積めるかを評価。 積めなければ Phase 3 で新 branch を切る前提で進める
+- **候補ゼロ**（全 ✅）の場合: 「全シナリオ実装済 — main 動向監視 mode へ移行を提案します」 と伝えて終了 → 「保守 mode への自己改修」 セクション発火を提案
+- **複数候補が引き分け**（例: 重要度 A の未実装が並ぶ）: 番号若い順で 1 つに決める。 迷わない
+
+### Phase 3 へ移る前のログ出力（必須）
 
 ```text
-## 着手候補
-
-### A. 未実装シナリオ
-- L-03 mulmoScript 動画 DL（B-21）
-- L-04 animation:true（B-46）
-- ...
-
-### B. config / 基盤改善（main 動向起点）
-- webkit project 追加（PR #991 対応）
-- self-repair 緩和策（PR #974 対応）
-
-### C. ユーザー追加要望
-- （あれば）
-
-→ どれをこの PR に入れますか？ 推奨: A から 1〜2 個 + B から 0〜1 個（PR を中規模に保つ）
+着手: <項目（例: B1 webkit project 追加 / L-05 generateImage 実画像）>
+理由: <選定根拠（例: PR #991 要対応かつ未実装 / B カテゴリ空のため A 最高優先度を採用）>
+PR 規模: <小 / 中 / 大>
+ブランチ方針: <新規 feat/e2e-live-<topic> を切る / 既存 <branch> に積む>
 ```
 
-ユーザーの選択を待つ。 勝手に進めない。
+このログを出してから Phase 3 へ自動的に進む。 ユーザーが redirect したい場合はこのログ表示の隙間に介入できる（Phase 3 の `git checkout` 前で一拍置く程度の感覚で OK）。
 
-## Phase 3: ブランチ作成
+## Phase 3: ブランチ準備
 
-合意できたら branch を切る:
+Phase 2 で決めた 「ブランチ方針」 に従う。
+
+### 新規ブランチを切る場合
 
 ```bash
 git checkout main && git pull --ff-only
 git checkout -b feat/e2e-live-<topic>
 ```
 
-`<topic>` は内容を表す短い英語（例: `l03-movie-dl`, `webkit-project`, `self-repair-guard`）。
+`<topic>` は内容を表す短い英語（例: `l03-movie-dl`, `webkit-project`, `self-repair-guard`）。 SSH passphrase が必要な環境では pull は Claude 側から動かないので、 失敗したらユーザーに依頼する。
+
+### 既存ブランチに積む場合
+
+ユーザーが 「この branch のまま」 と指示している、 もしくは Phase 2 の 「ブランチ方針」 で 「既存に積む」 を選定したケース。 何もしない（現在ブランチで Phase 4 へ）。 ただし以下のリスクをログに残す:
+
+- PR scope が混ざる（例: skill 追加 PR に L-XX spec 実装を相乗り）
+- 同 PR の review 範囲が広がり、 bot レビューで指摘が増える可能性
+
+ユーザーが意図的にそうしている場合は問題なし。 不意に積まれていそうなら一度確認する。
 
 ## Phase 4: 実装
 
