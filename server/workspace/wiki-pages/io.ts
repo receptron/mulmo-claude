@@ -122,8 +122,13 @@ export async function writeWikiPage(slug: string, content: string, meta: WikiWri
  *  Auto-stamps land on every save; without this guard the
  *  snapshot pipeline (#763 PR 2) would record a snapshot per
  *  no-op save. The check compares (body) and (meta minus the
- *  auto-stamped keys). */
-function hasMeaningfulChange(oldContent: string, newContent: string): boolean {
+ *  auto-stamped keys).
+ *
+ *  Exported so the LLM-write hook callback (`/api/wiki/internal/
+ *  snapshot`) can apply the same dedupe before recording a
+ *  snapshot — without this, the hook records one snapshot per
+ *  Write/Edit even when the LLM only re-stamped `updated`. */
+export function hasMeaningfulChange(oldContent: string, newContent: string): boolean {
   const oldDoc = parseFrontmatter(oldContent);
   const newDoc = parseFrontmatter(newContent);
   if (oldDoc.body !== newDoc.body) return true;

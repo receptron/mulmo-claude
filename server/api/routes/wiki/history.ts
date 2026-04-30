@@ -14,7 +14,7 @@
 import { Router, type Request, type Response } from "express";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { writeWikiPage } from "../../../workspace/wiki-pages/io.js";
+import { hasMeaningfulChange, writeWikiPage } from "../../../workspace/wiki-pages/io.js";
 import { WORKSPACE_DIRS } from "../../../workspace/paths.js";
 import { isSafeStamp, listSnapshots, readSnapshot, stripSnapshotMeta } from "../../../workspace/wiki-pages/snapshot.js";
 import { mergeFrontmatter, serializeWithFrontmatter } from "../../../utils/markdown/frontmatter.js";
@@ -44,6 +44,19 @@ function isSafeSlug(slug: string): boolean {
 // every other UI-driven save today.
 function restoreReason(stamp: string): string {
   return `Restored from ${stamp}`;
+}
+
+// Re-build the previous snapshot's content as a single
+// frontmatter+body string for `hasMeaningfulChange` to compare
+// against. `_snapshot_*` keys are stripped first — those are
+// snapshot-event metadata, not part of the page itself, and
+// keeping them in the diff would always flag a difference.
+async function loadPreviousSnapshotContent(slug: string): Promise<string | null> {
+  const recent = await listSnapshots(slug, { workspaceRoot: workspacePath });
+  if (recent.length === 0) return null;
+  const latest = await readSnapshot(slug, recent[0].stamp, { workspaceRoot: workspacePath });
+  if (latest === null) return null;
+  return serializeWithFrontmatter(stripSnapshotMeta(latest.meta), latest.body);
 }
 
 router.get("/pages/:slug/history", async (req: Request<{ slug: string }>, res: Response) => {
@@ -162,6 +175,20 @@ router.post("/internal/snapshot", async (req: Request<object, unknown, InternalS
   const content = await readTextOrNull(pagePath);
   if (content === null) {
     notFound(res, "wiki page not found on disk");
+    return;
+  }
+
+  // Dedupe against the most recent snapshot — Write/Edit hooks
+  // fire for every tool call, including ones that only re-stamp
+  // `updated` / `editor` without touching the body. Without this
+  // guard the history page accumulates duplicate entries (user
+  // report 2026-04-30: two identical bodies snapped 2.6s apart).
+  // `hasMeaningfulChange` already drives the in-process
+  // `writeWikiPage` path; reusing it keeps both paths aligned.
+  const previousContent = await loadPreviousSnapshotContent(slug);
+  if (previousContent !== null && !hasMeaningfulChange(previousContent, content)) {
+    log.info("wiki", "internal snapshot skipped — no meaningful change since previous snapshot", { slug });
+    res.json({ slug, ok: true, skipped: "no-meaningful-change" });
     return;
   }
 

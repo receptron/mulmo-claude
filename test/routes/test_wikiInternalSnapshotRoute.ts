@@ -188,6 +188,33 @@ describe("POST /api/wiki/internal/snapshot", () => {
     assert.equal(result.data?.pagePath, `data/wiki/pages/${slug}.md`);
   });
 
+  it("skips snapshot + toolResult when the new content matches the previous snapshot (sans auto-stamps)", async () => {
+    const slug = "no-meaningful-change";
+    const filePath = path.join(pagesDir, `${slug}.md`);
+    await writeFile(filePath, "---\ntitle: x\nupdated: '2026-04-30T00:00:00.000Z'\neditor: llm\n---\n\nbody A\n", "utf-8");
+
+    // First call records the baseline.
+    const first = mockRes();
+    await snapshotHandler(makeReq({ slug }), first.res);
+    assert.equal(first.state.status, 200);
+    assert.equal((await listSnapshots(slug)).length, 1, "first call should record baseline");
+
+    // Second call with only `updated` re-stamped → must be a no-op.
+    await writeFile(filePath, "---\ntitle: x\nupdated: '2026-04-30T00:01:00.000Z'\neditor: llm\n---\n\nbody A\n", "utf-8");
+    const second = mockRes();
+    await snapshotHandler(makeReq({ slug }), second.res);
+    assert.equal(second.state.status, 200);
+    assert.equal((second.state.body as Record<string, unknown> | undefined)?.skipped, "no-meaningful-change");
+    assert.equal((await listSnapshots(slug)).length, 1, "no second snapshot for an updated-only diff");
+
+    // Third call with a real body change → must record.
+    await writeFile(filePath, "---\ntitle: x\nupdated: '2026-04-30T00:02:00.000Z'\neditor: llm\n---\n\nbody B\n", "utf-8");
+    const third = mockRes();
+    await snapshotHandler(makeReq({ slug }), third.res);
+    assert.equal(third.state.status, 200);
+    assert.equal((await listSnapshots(slug)).length, 2, "real body change must record");
+  });
+
   it("does not publish a toolResult when sessionId is absent", async () => {
     const slug = "no-publish-without-session";
     await writeFile(path.join(pagesDir, `${slug}.md`), "body\n", "utf-8");
