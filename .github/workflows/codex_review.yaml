@@ -1,0 +1,91 @@
+# Auto-review every non-draft PR using OpenAI Codex CLI pointed at
+# Azure OpenAI. Runs alongside CodeRabbit + Sourcery; the verdict
+# marker (`CODEX VERDICT: LGTM` / `CHANGES REQUESTED`) matches the
+# `/codex-cross-review` skill so both human-driven and automated
+# reviews speak the same protocol.
+#
+# Cost control:
+#   - draft PRs are skipped
+#   - paths-ignore mirrors `pull_request.yaml` so docs-only / plan-only
+#     PRs don't burn tokens
+#   - `concurrency` cancels superseded runs so a quick push burst
+#     produces one review against the latest commit, not N reviews
+#
+# Auth: Azure OpenAI via the OpenAI-compatible `/openai/v1` endpoint.
+# `OPENAI_BASE_URL` + `OPENAI_API_KEY` are picked up by Codex CLI
+# directly — no `~/.codex/config.toml` provider stanza needed (verified
+# locally on codex-cli 0.125.0).
+
+name: Codex auto-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "plans/**"
+      - "**/*.md"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: codex-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Codex needs full history to inspect the PR diff via `gh`.
+          fetch-depth: 0
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Run codex review
+        env:
+          OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.AZURE_OPENAI_BASE_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          codex exec --sandbox workspace-write "$(cat <<'PROMPT'
+          Review PR #${PR_NUMBER} at ${PR_URL}.
+
+          Use the gh CLI to inspect the diff, then post inline review
+          comments on specific lines via:
+            gh api repos/${REPO}/pulls/${PR_NUMBER}/comments
+          or top-level comments via:
+            gh pr comment ${PR_NUMBER}
+
+          Focus on: correctness, edge cases, security (XSS / SSRF /
+          path traversal / prompt injection), accessibility, i18n
+          lockstep (this repo has 8 locales under src/lang/), test
+          coverage for the happy path + boundary cases, and
+          consistency with the rest of the codebase. Skip stylistic
+          nits unless they hide a real bug.
+
+          At the END of your work, ALWAYS post ONE final top-level
+          comment that starts with a verdict marker on its own line:
+            - 'CODEX VERDICT: LGTM' if you have no outstanding concerns
+            - 'CODEX VERDICT: CHANGES REQUESTED' followed by a
+              bulleted summary of remaining issues
+
+          Do not apply any fixes yourself — only review and post findings.
+          PROMPT
+          )"
