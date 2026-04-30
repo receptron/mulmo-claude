@@ -215,7 +215,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
   const extras = await prepareRequestExtras(normalisedAttachments);
   const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
-  const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePath);
+  const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePaths);
 
   runAgentInBackground({
     decoratedMessage,
@@ -238,13 +238,14 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
 interface RequestExtras {
   attachments: Attachment[] | undefined;
-  /** Workspace-relative path of the first file the user attached or
-   *  selected for this turn. Surfaced to the LLM via an
-   *  `[Attached file: <path>]` marker prepended to the user message
-   *  so path-passing tools (e.g. `editImages`) and the LLM itself
-   *  can reference the file by path. Undefined when the request
-   *  carried only inline bridge bytes (no path) or nothing at all. */
-  attachedFilePath: string | undefined;
+  /** Workspace-relative paths of every file the user attached or
+   *  selected for this turn, in declaration order. Surfaced to the
+   *  LLM via one `[Attached file: <path>]` line per entry, prepended
+   *  to the user message so path-passing tools (e.g. `editImages`)
+   *  and the LLM itself can reference each file by path. Empty when
+   *  the request carried only inline bridge bytes (no paths) or
+   *  nothing at all. */
+  attachedFilePaths: string[];
 }
 
 /** Bridge-only compat: external bridge clients may still ship a
@@ -273,9 +274,9 @@ function synthesiseBridgeAttachment(selectedImageData: string | undefined): Atta
 }
 
 /** Walk `attachments[]` once, loading bytes from disk for any
- *  path-only entry, and pick the first path-bearing entry as the
- *  `[Attached file: <path>]` marker source. Two path roots are
- *  accepted:
+ *  path-only entry, and collect every path-bearing entry so the
+ *  caller can emit one `[Attached file: <path>]` marker per file.
+ *  Two path roots are accepted:
  *
  *    - `data/attachments/...` — paste/drop/file-picker uploads (any
  *      MIME type from the chat input's accept list). MIME is inferred
@@ -283,27 +284,30 @@ function synthesiseBridgeAttachment(selectedImageData: string | undefined): Atta
  *    - `artifacts/images/...png` — generated / canvas / edited images
  *      a user picked from the sidebar. Always image/png.
  *
- *  Bytes are loaded so Claude still "sees" the file as a content
- *  block on this turn, AND the path is returned separately so the
- *  caller marks it in the LLM-bound message. If the file can't be
- *  read, the path hint is still emitted — the LLM knows what was
- *  attached and can call Read to load it. */
+ *  Bytes are loaded so Claude still "sees" each file as a content
+ *  block on this turn, AND every path is returned separately so the
+ *  caller marks them in the LLM-bound message. If a file can't be
+ *  read, its path hint is still emitted — the LLM knows what was
+ *  attached and can call Read to load it. Multi-file flows (e.g.
+ *  paste one image + pick another in the sidebar → "combine these")
+ *  rely on every path showing up in the marker so `editImages` can
+ *  receive the full list in `imagePaths`. */
 async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
   if (!attachments || attachments.length === 0) {
-    return { attachments: undefined, attachedFilePath: undefined };
+    return { attachments: undefined, attachedFilePaths: [] };
   }
   const result: Attachment[] = [];
-  let attachedFilePath: string | undefined;
+  const attachedFilePaths: string[] = [];
   for (const att of attachments) {
     const resolved = await resolveAttachment(att);
     if (resolved) result.push(resolved);
-    if (!attachedFilePath && typeof att.path === "string" && att.path.length > 0) {
-      attachedFilePath = att.path;
+    if (typeof att.path === "string" && att.path.length > 0) {
+      attachedFilePaths.push(att.path);
     }
   }
   return {
     attachments: result.length > 0 ? result : undefined,
-    attachedFilePath,
+    attachedFilePaths,
   };
 }
 
@@ -347,12 +351,18 @@ async function loadFromPath(value: string, declaredMimeType: string | undefined)
 }
 
 /** Marker prepended to the LLM-bound user message that tells the
- *  model which workspace file is attached / selected for this turn.
- *  The user's persisted (jsonl) and broadcast (UI) message is the
- *  raw text — this marker is added strictly on the path to Claude.
- *  The system prompt teaches the model how to interpret it. */
-function withAttachedFileMarker(message: string, attachedFilePath: string | undefined): string {
-  return attachedFilePath ? `[Attached file: ${attachedFilePath}]\n\n${message}` : message;
+ *  model which workspace files are attached / selected for this turn.
+ *  One `[Attached file: <path>]` line is emitted per path so multi-
+ *  file flows (e.g. paste one image + pick another → "combine these")
+ *  surface every path to the model — `editImages` then receives the
+ *  full list in `imagePaths`. The user's persisted (jsonl) and
+ *  broadcast (UI) message is the raw text — these marker lines are
+ *  added strictly on the path to Claude. The system prompt teaches
+ *  the model how to interpret them. */
+export function withAttachedFileMarker(message: string, attachedFilePaths: string[]): string {
+  if (attachedFilePaths.length === 0) return message;
+  const markerLines = attachedFilePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
+  return `${markerLines}\n\n${message}`;
 }
 
 // ── HTTP route ──────────────────────────────────────────────────────
