@@ -66,7 +66,7 @@ router.post(
       bytes: Math.floor((parsed.base64.length * 3) / 4),
     });
     try {
-      const original = await saveAttachment(parsed.base64, parsed.mimeType);
+      const original = await saveAttachment(parsed.base64, parsed.mimeType, filename);
       if (parsed.mimeType === PPTX_MIME) {
         const pdfBuf = await convertPptxToPdf(parsed.base64);
         if (!pdfBuf) {
