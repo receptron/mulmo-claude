@@ -106,11 +106,9 @@ async function performInPageSessionDelete(page: Page, url: string): Promise<void
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) {
-        // eslint-disable-next-line no-console -- visible cleanup signal
         console.warn(`deleteSession: ${target} returned HTTP ${response.status}`);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(`deleteSession: network error for ${target}`, err);
     }
   }, url);
