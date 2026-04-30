@@ -38,6 +38,7 @@ import { serverError } from "./utils/httpError.js";
 import { makeUuid } from "./utils/id.js";
 import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
+import { runMemoryMigrationOnce } from "./workspace/memory/run.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
 import { existsSync, readFileSync } from "fs";
@@ -80,6 +81,17 @@ const __dirname = path.dirname(__filename);
 const debugMode = process.argv.includes("--debug");
 
 initWorkspace();
+
+// Fire-and-forget legacy-memory migration (#1029). Idempotent: a
+// no-op when there's no `conversations/memory.md` to migrate. We
+// don't await — migration calls Claude per bullet and can take
+// minutes, but the agent can serve traffic in parallel. The brief
+// race window is documented in plans/feat-memory-storage-wire.md.
+// The runner logs failures internally; the outer .then(noop, noop)
+// keeps the floating-promises rule happy without smuggling in a
+// `void` (banned by sonarjs/void-use).
+const noop = (): void => {};
+runMemoryMigrationOnce(workspacePath).then(noop, noop);
 
 let sandboxEnabled = false;
 
