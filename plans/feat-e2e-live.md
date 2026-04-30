@@ -48,21 +48,17 @@
 e2e-live/
   fixtures/
     live-chat.ts            ← 実 chat fixture（mockAllApis を使わない）
-    helpers.ts              ← PDF 解析、画像描画チェック等の検証ユーティリティ
-    env.ts                  ← Claude 認証状態の事前確認
     images/
-      sample.png            ← src/assets/mulmo_bw.png をコピー（path-traversal 検証用）
-    markdown/
-      with-image.md         ← 画像入り Markdown テンプレ（PDF 検証用）
-  media.spec.ts             ← 画像/PDF/動画
-  roles.spec.ts             ← ロール別 sample query
-  session.spec.ts           ← セッション/履歴
-  wiki.spec.ts              ← Wiki/Router
-  ui.spec.ts                ← UI/通知/プラグイン
-  skills.spec.ts            ← Skill/Tool
-  docker.spec.ts            ← Docker 環境特有のバグ検証
-
-e2e-live/playwright.config.ts   ← 別 config（headed, 長 timeout, workers=1）
+      sample.png            ← src/assets/mulmo_bw.png のコピー（L-01/L-02 が workspace に配置）
+  tests/
+    media.spec.ts           ← 画像/PDF/動画（L-01 / L-02 実装済）
+    roles.spec.ts           ← ロール別 sample query（未実装）
+    session.spec.ts         ← セッション/履歴（未実装）
+    wiki.spec.ts            ← Wiki/Router（未実装）
+    ui.spec.ts              ← UI/通知/プラグイン（未実装）
+    skills.spec.ts          ← Skill/Tool（未実装）
+    docker.spec.ts          ← Docker 環境特有のバグ検証（未実装）
+  playwright.config.ts      ← 別 config（headless 既定 + HEADED=1、 workers=3 + parallel、 trace 常時）
 
 .claude/skills/
   e2e-live/SKILL.md           ← 親（全カテゴリ実行）
@@ -649,7 +645,7 @@ yarn test:e2e:live:media
 
 ## 期待結果
 - L-01〜L-05 が全て pass
-- 結果は `playwright-report-live/index.html` で確認（失敗時は自動オープン）
+- 結果は `playwright-report-live/media/index.html` で確認（媒体カテゴリ専用 subdir、 失敗時は自動オープン。 親 `/e2e-live` の総合レポート `playwright-report-live/index.html` は上書きしない）
 - 失敗時の動画: `test-results-live/<spec>/video.webm`
 - 失敗時の trace: `npx playwright show-trace test-results-live/<spec>/trace.zip`
 - 各失敗を内部バグ ID（B-XX）と照合
