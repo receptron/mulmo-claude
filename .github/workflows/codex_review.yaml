@@ -10,11 +10,19 @@
 #     PRs don't burn tokens
 #   - `concurrency` cancels superseded runs so a quick push burst
 #     produces one review against the latest commit, not N reviews
+#   - `~/.npm` is cached, so `npm install -g @openai/codex` reuses
+#     the prior tarball + skips the network on warm runs
 #
 # Auth: Azure OpenAI via the OpenAI-compatible `/openai/v1` endpoint.
 # `OPENAI_BASE_URL` + `OPENAI_API_KEY` are picked up by Codex CLI
 # directly — no `~/.codex/config.toml` provider stanza needed (verified
 # locally on codex-cli 0.125.0).
+#
+# Manual testing: `workflow_dispatch` lets you run the workflow
+# against an arbitrary open PR after this file lands on `main`. The
+# `pull_request` trigger sources its workflow from the BASE branch,
+# so it can't review the PR that introduces it — use the dispatch
+# button + a `pr_number` input to validate the first time.
 
 name: Codex auto-review
 
@@ -26,19 +34,33 @@ on:
       - "docs/**"
       - "plans/**"
       - "**/*.md"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review (required for workflow_dispatch)"
+        required: true
+        type: string
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
 
+# Pin the Codex CLI version so the cache key is deterministic and
+# upgrades are explicit. Bump together with cache-version when
+# moving to a new Codex release.
+env:
+  CODEX_VERSION: "0.125.0"
+
 concurrency:
-  group: codex-review-pr-${{ github.event.pull_request.number }}
+  group: codex-review-pr-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
-    if: github.event.pull_request.draft == false
+    # Skip drafts on `pull_request`; `workflow_dispatch` always runs
+    # because the user explicitly triggered it.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -52,23 +74,33 @@ jobs:
         with:
           node-version: 22.x
 
-      - name: Install codex CLI
-        run: npm install -g @openai/codex
+      - name: Cache global npm tarballs
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: codex-cli-${{ env.CODEX_VERSION }}-node22
+          restore-keys: |
+            codex-cli-${{ env.CODEX_VERSION }}-
+
+      - name: Install codex CLI (pinned)
+        run: npm install -g "@openai/codex@${CODEX_VERSION}"
 
       - name: Run codex review
         env:
           OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.AZURE_OPENAI_BASE_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           REPO: ${{ github.repository }}
         run: |
-          codex exec --sandbox workspace-write "$(cat <<'PROMPT'
-          Review PR #${PR_NUMBER} at ${PR_URL}.
+          codex exec --sandbox workspace-write "$(cat <<PROMPT
+          Review PR #${PR_NUMBER} in ${REPO}.
 
-          Use the gh CLI to inspect the diff, then post inline review
-          comments on specific lines via:
+          Use the gh CLI to inspect the diff:
+            gh pr view ${PR_NUMBER} --json title,body,headRefName
+            gh pr diff ${PR_NUMBER}
+
+          Then post inline review comments on specific lines via:
             gh api repos/${REPO}/pulls/${PR_NUMBER}/comments
           or top-level comments via:
             gh pr comment ${PR_NUMBER}
