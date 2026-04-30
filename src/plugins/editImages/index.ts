@@ -8,7 +8,7 @@ import { apiPost } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
 import { makeUuid } from "../../utils/id";
 
-const editImagePlugin: ToolPlugin<ImageToolData> = {
+const editImagesPlugin: ToolPlugin<ImageToolData> = {
   toolDefinition,
 
   async execute(_context, args) {
@@ -28,10 +28,10 @@ const editImagePlugin: ToolPlugin<ImageToolData> = {
   },
 
   isEnabled: () => true,
-  generatingMessage: "Editing image...",
+  generatingMessage: "Editing images...",
   viewComponent: View,
   previewComponent: Preview,
 };
 
-export default editImagePlugin;
+export default editImagesPlugin;
 export { TOOL_NAME };

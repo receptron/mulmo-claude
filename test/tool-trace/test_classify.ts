@@ -82,9 +82,9 @@ describe("classifyToolResult — image tools", () => {
     });
   });
 
-  it("editImage with path key in content → pointer", () => {
+  it("editImages with path key in content → pointer", () => {
     const result = classifyToolResult({
-      toolName: "editImage",
+      toolName: "editImages",
       args: {},
       content: '{"path": "images/edit-abc.png"}',
     });

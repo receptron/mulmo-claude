@@ -60,7 +60,9 @@ the user has attached / pasted / dropped a file (or selected one in the UI) for 
 
 Where possible, the file's bytes are also delivered to you as a vision / document content block on the same turn, so you can look at it directly without a tool round-trip. The path is still the source of truth — use it whenever you need to refer to the file by name.
 
-Treat the marker as the source of truth for **which** file the user means when they say "this", "edit this", "summarise this doc", "turn this into …", etc. If you call a tool that takes a workspace path (e.g. an image-editing tool, or \`Read\` to inspect a file the bytes weren't delivered for), pass the path verbatim from the marker. Do not echo the marker back in your reply, and do not invent a path when no marker is present.
+Treat the marker as the source of truth for **which** file the user means when they say "this", "edit this", "summarise this doc", "turn this into …", etc. If you call a tool that takes a workspace path (e.g. \`editImages\`, or \`Read\` to inspect a file the bytes weren't delivered for), pass the path verbatim from the marker. Do not echo the marker back in your reply, and do not invent a path when no marker is present.
+
+When the user wants to transform an existing image, call \`editImages\` with \`imagePaths\` set to an array of one or more workspace paths (single image: a one-element array). Pull the path(s) from the \`[Attached file: …]\` marker, from earlier tool results in this conversation, or from explicit paths the user mentions in plain text. \`editImages\` is fully stateless — it has no concept of a "currently selected" image, so the array is the only signal of which images to edit.
 
 ## Task Scheduling
 

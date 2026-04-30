@@ -19,7 +19,7 @@ import GenerateImageDef from "../../src/plugins/generateImage/definition.js";
 import { TOOL_DEFINITION as QuizDef } from "@mulmochat-plugin/quiz";
 import { TOOL_DEFINITION as FormDef } from "../../src/plugins/presentForm/definition.js";
 import CanvasDef from "../../src/plugins/canvas/definition.js";
-import EditImageDef from "../../src/plugins/editImage/definition.js";
+import EditImagesDef from "../../src/plugins/editImages/definition.js";
 import { TOOL_DEFINITION as Present3DDef } from "@gui-chat-plugin/present3d";
 import { API_ROUTES } from "../../src/config/apiRoutes.js";
 
@@ -40,7 +40,7 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
   [CanvasDef.name]: API_ROUTES.plugins.canvas,
   [PresentHtmlDef.name]: API_ROUTES.html.present,
   [PresentChartDef.name]: API_ROUTES.chart.present,
-  [EditImageDef.name]: API_ROUTES.image.edit,
+  [EditImagesDef.name]: API_ROUTES.image.edit,
   [Present3DDef.name]: API_ROUTES.plugins.present3d,
   [ManageSkillsDef.name]: API_ROUTES.skills.create,
   [ManageSourceDef.name]: API_ROUTES.sources.manage,
@@ -62,7 +62,7 @@ export const PLUGIN_DEFS = [
   CanvasDef,
   PresentHtmlDef,
   PresentChartDef,
-  EditImageDef,
+  EditImagesDef,
   Present3DDef,
   ManageSkillsDef,
   ManageSourceDef,

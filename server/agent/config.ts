@@ -247,6 +247,13 @@ export async function buildUserMessageLine(message: string, attachments?: Attach
   const skippedReasons: string[] = [];
 
   for (const att of all) {
+    // Defensive: prepareRequestExtras normalises path-only entries to
+    // bytes before we get here, so `data` + `mimeType` should always
+    // be set. Skip with a reason if a malformed entry slipped through.
+    if (!att.data || !att.mimeType) {
+      skippedReasons.push(att.path ? `attachment "${att.path}" missing bytes/mimeType after normalisation` : "attachment missing bytes/mimeType");
+      continue;
+    }
     // Native types: image and PDF go directly as content blocks
     if (isNativeAttachmentMime(att.mimeType)) {
       blocks.push(buildNativeBlock(att));
@@ -276,13 +283,15 @@ export async function buildUserMessageLine(message: string, attachments?: Attach
 }
 
 function buildNativeBlock(att: Attachment): Record<string, unknown> {
-  const blockType = isImageMime(att.mimeType) ? "image" : "document";
+  const mimeType = att.mimeType ?? "application/octet-stream";
+  const data = att.data ?? "";
+  const blockType = isImageMime(mimeType) ? "image" : "document";
   return {
     type: blockType,
     source: {
       type: "base64",
-      media_type: att.mimeType,
-      data: att.data,
+      media_type: mimeType,
+      data,
     },
   };
 }
