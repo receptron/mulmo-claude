@@ -244,3 +244,9 @@ HTML プレビュー周辺:
 - #982 — presentHtml の `srcdoc → src` 移行 + sandbox `allow-scripts` への絞り込み + 印刷経路の `buildPrintCspContent(origin)`
 - #983 — image path 関連の追加調整
 - #991 — presentHtml プレビューの CSP `'self'` 問題を Safari 向けに修正(`buildHtmlPreviewCsp(origin)`、`X-Forwarded-Host` 尊重、Vite proxy `xfwd: true`)
+
+Wiki render 経路再編:
+
+- #955 — Wiki snapshot history(編集時点の content を保存)
+- #963 — Stage 3a の元 plan
+- #989 — Stage 3a + 3b: LLM の Write/Edit auto-render + `manageWiki` MCP ツール削除 + 共有 `WikiPageBody` / `renderWikiPageHtml` への抽出
