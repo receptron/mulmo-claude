@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createCommandHandler } from "../src/commands.ts";
+import { createCommandHandler, parseSkillShortcut } from "../src/commands.ts";
 import type { TransportChatState } from "../src/chat-state.ts";
 import type { SessionSummary } from "../src/types.ts";
 
@@ -253,6 +253,44 @@ describe("unknown slash command", () => {
   });
 });
 
+describe("parseSkillShortcut (pure helper)", () => {
+  it("returns skill name and empty args for a bare `//skill`", () => {
+    assert.deepEqual(parseSkillShortcut("//mag2"), { skillName: "mag2", argsVerbatim: "" });
+  });
+
+  it("splits at the first whitespace and preserves args verbatim", () => {
+    assert.deepEqual(parseSkillShortcut("//mag2 https://x.com/post"), { skillName: "mag2", argsVerbatim: "https://x.com/post" });
+  });
+
+  it("collapses the leading separator run while preserving doubled whitespace inside args", () => {
+    // Two-space separator before first arg → drop both. Internal
+    // doubled spaces between subsequent tokens stay verbatim.
+    assert.deepEqual(parseSkillShortcut("//mag2  url  with  spaces"), { skillName: "mag2", argsVerbatim: "url  with  spaces" });
+  });
+
+  it("preserves tabs and newlines inside the args", () => {
+    assert.deepEqual(parseSkillShortcut("//mag2 line one\n\nline two\twith tab"), {
+      skillName: "mag2",
+      argsVerbatim: "line one\n\nline two\twith tab",
+    });
+  });
+
+  it("collapses a CRLF separator (Codex iter-1 — Windows-style paste)", () => {
+    // Input from a Windows clipboard / Telegram desktop client. The
+    // \r\n is one logical line break between skill name and args;
+    // dropping only \r would leave an orphan \n at the head of args.
+    assert.deepEqual(parseSkillShortcut("//mag2\r\nurl"), { skillName: "mag2", argsVerbatim: "url" });
+  });
+
+  it("returns an empty skill name for bare `//`", () => {
+    assert.deepEqual(parseSkillShortcut("//"), { skillName: "", argsVerbatim: "" });
+  });
+
+  it("returns an empty skill name for `// args` (caller treats empty skill as unknown)", () => {
+    assert.deepEqual(parseSkillShortcut("// args"), { skillName: "", argsVerbatim: "args" });
+  });
+});
+
 describe("//{skill} shortcut", () => {
   it("returns forwardAs and resets state when the skill is registered", async () => {
     const resetCalls: Array<{ transportId: string; chatId: string; roleId: string }> = [];
@@ -333,6 +371,23 @@ describe("//{skill} shortcut", () => {
     const result = await handler("//mag2 https://x.com/u/1 in Japanese", "telegram", makeState());
     assert.ok(result);
     assert.equal(result.forwardAs, "/mag2 https://x.com/u/1 in Japanese");
+  });
+
+  it("preserves doubled whitespace and tabs inside the args verbatim", async () => {
+    // Earlier implementation used `text.split(/\s+/)` + `rest.join(" ")`
+    // which collapsed every whitespace run to a single space. That
+    // breaks the "verbatim" promise for payloads that intentionally
+    // contain doubled spaces, tabs, or newlines (CodeRabbit on #967).
+    const handler = createCommandHandler({
+      loadAllRoles: () => roles,
+      getRole: () => roles[0],
+      resetChatState: async (_t, _c, roleId) => makeState({ roleId, sessionId: "sess-new" }),
+      connectSession: async () => makeState(),
+      listRegisteredSkills: async () => [{ name: "mag2", description: "Write a newsletter from a URL" }],
+    });
+    const result = await handler("//mag2 line one\n\nline two\twith tab", "telegram", makeState());
+    assert.ok(result);
+    assert.equal(result.forwardAs, "/mag2 line one\n\nline two\twith tab");
   });
 
   it("rejects // when no skill list is wired", async () => {
