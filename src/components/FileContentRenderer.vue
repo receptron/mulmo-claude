@@ -189,6 +189,11 @@ function rawUrl(filePath: string): string {
   return `${API_ROUTES.files.raw}?path=${encodeURIComponent(filePath)}`;
 }
 
+// Wiki pages live under `data/wiki/pages/` and always carry a
+// frontmatter envelope. Stripping it from the PDF avoids the YAML
+// header showing up as plain text on page 1.
+const WIKI_PAGES_DIR = "data/wiki/pages";
+
 function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   // Rewrite `![alt](path)` refs BEFORE handing the markdown to
   // TextResponseView so workspace-relative image paths resolve via
@@ -197,13 +202,24 @@ function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   const slash = current.lastIndexOf("/");
   const basePath = slash >= 0 ? current.slice(0, slash) : "";
   const rewritten = rewriteMarkdownImageRefs(text, basePath);
+  const isWikiPage = basePath === WIKI_PAGES_DIR;
   return {
     uuid: "files-preview",
     toolName: "text-response",
     message: rewritten,
     title: props.selectedPath ?? "",
-    // role: "user" hides the PDF download button in TextResponseView
-    data: { text: rewritten, role: "user", transportKind: "text-rest" },
+    data: {
+      text: rewritten,
+      role: "assistant",
+      transportKind: "text-rest",
+      // Send the un-rewritten source to the PDF endpoint so the
+      // server-side image inliner can resolve relative refs against
+      // `pdfBaseDir`. Without this, the rewritten `/api/files/raw?…`
+      // URLs would not match anything on disk.
+      pdfSourceText: text,
+      pdfBaseDir: basePath || undefined,
+      pdfStripFrontmatter: isWikiPage,
+    },
   };
 }
 </script>
