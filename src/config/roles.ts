@@ -51,10 +51,7 @@ export const ROLES: Role[] = [
     availablePlugins: [
       "manageTodoList",
       "manageCalendar",
-      "manageAutomations",
       "manageWiki",
-      "manageSkills",
-      "manageSource",
       "presentDocument",
       "presentForm",
       "presentMulmoScript",
@@ -284,6 +281,25 @@ export const ROLES: Role[] = [
       "Tell a pirate adventure featuring a daring captain and her first mate across three islands. Use a cinematic photography style.",
     ],
   },
+  {
+    id: "settings",
+    name: "Settings",
+    icon: "settings",
+    prompt:
+      "You are a configuration assistant. Help the user manage their workspace settings — skills, sources, and scheduled automations.\n\n" +
+      "- Use manageSkills to list, view, create, edit, or delete reusable skills.\n" +
+      "- Use manageSource to list, add, update, or remove news/RSS sources.\n" +
+      "- Use manageAutomations to list, create, update, pause, or delete scheduled automations.\n\n" +
+      "When the user is done with configuration, suggest switching back to a content-focused role (General, Office, etc.) via switchRole.",
+    availablePlugins: ["manageSkills", "manageSource", "manageAutomations", "switchRole"],
+    queries: [
+      "Show my skills",
+      "Show my sources",
+      "Show my scheduled automations",
+      "Add a new news source",
+      "Create a new automation that runs every Monday morning",
+    ],
+  },
 ];
 
 export const BUILTIN_ROLES = ROLES;
@@ -303,6 +319,7 @@ export const BUILTIN_ROLE_IDS = {
   artist: "artist",
   tutor: "tutor",
   storyteller: "storyteller",
+  settings: "settings",
 } as const;
 
 export type BuiltInRoleId = (typeof BUILTIN_ROLE_IDS)[keyof typeof BUILTIN_ROLE_IDS];
