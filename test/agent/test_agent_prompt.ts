@@ -234,6 +234,10 @@ describe("buildSystemPrompt", () => {
     assert.match(result, /never use an \*\*absolute path\*\*/i);
     assert.match(result, /never use a workspace-rooted, no-leading-slash form/i);
     assert.match(result, /never write `\/api\/files\/raw\?path=\.\.\.` urls/i);
+    // Stage D (#1011): explicit OK to use raw HTML tags inside .md
+    // files when markdown's ![]() can't express what's needed
+    // (`<picture>`, `<video poster>`, `<img width>`). Same path rules.
+    assert.match(result, /raw html tags work inside `\.md` files/i);
   });
 
   it("contains today's date", () => {

@@ -45,6 +45,8 @@ When you write a \`.md\` or \`.html\` file that embeds images, follow this conve
 
 This applies to markdown image syntax (\`![alt](path)\`), HTML \`<img src="path">\`, and any other element that takes a path to an image (\`<source>\`, \`<video poster>\`, CSS \`url()\`).
 
+Raw HTML tags work inside \`.md\` files too — use them when markdown's \`![]()\` can't express what you need (e.g. \`<picture>\` + \`<source>\` for art-direction / responsive images, \`<video poster>\` for thumbnailed video, inline \`<img width>\` for size control). Same path rules apply: write a relative climb from the \`.md\` file to the asset, not an absolute or workspace-rooted path.
+
 ## Task Scheduling
 
 Skills and tasks can be scheduled via SKILL.md frontmatter (\`schedule: "daily HH:MM"\` or \`schedule: "interval Nh"\`). When the user asks to schedule something, recommend an appropriate frequency:
