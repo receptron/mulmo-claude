@@ -217,6 +217,9 @@ const esMessages = {
     pdfPreview: "Vista previa PDF",
     parseError: "error al analizar",
   },
+  filesView: {
+    chatPlaceholder: "Pregunta sobre este archivo…",
+  },
   systemFiles: {
     schemaLabel: "Esquema",
     showDetails: "Mostrar detalles",

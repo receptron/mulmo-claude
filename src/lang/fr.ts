@@ -211,6 +211,9 @@ const frMessages = {
     pdfPreview: "Aperçu PDF",
     parseError: "erreur d'analyse",
   },
+  filesView: {
+    chatPlaceholder: "Posez une question sur ce fichier…",
+  },
   systemFiles: {
     schemaLabel: "Schéma",
     showDetails: "Afficher les détails",
