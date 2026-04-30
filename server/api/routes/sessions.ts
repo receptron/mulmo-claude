@@ -107,74 +107,98 @@ const router = Router();
 // SESSIONS_LIST_WINDOW_DAYS to override (0 = no cutoff).
 const WINDOW_MS = env.sessionsListWindowDays * ONE_DAY_MS;
 
+interface SessionRowContext {
+  chatDir: string;
+  cutoff: number;
+  indexById: Map<string, ChatIndexEntry>;
+}
+
+interface SessionRow {
+  summary: SessionSummary;
+  changeMs: number;
+}
+
+// Build a SessionSummary from the gathered inputs. Conditional spreads
+// honour the server tsconfig's `exactOptionalPropertyTypes`; that's
+// why each optional field is set with `if (… !== undefined)` rather
+// than spread into the object literal directly.
+function buildSessionSummary(
+  sessionId: string,
+  meta: SessionMeta,
+  indexEntry: ChatIndexEntry | undefined,
+  fileStat: { mtimeMs: number },
+  live: ReturnType<typeof getSession>,
+): SessionSummary {
+  // Prefer AI title → meta.firstUserMessage → empty.
+  const preview = indexEntry?.title ?? meta.firstUserMessage ?? "";
+  const summary: SessionSummary = {
+    id: sessionId,
+    roleId: meta.roleId,
+    startedAt: meta.startedAt,
+    updatedAt: new Date(fileStat.mtimeMs).toISOString(),
+    preview,
+    hasUnread: live?.hasUnread ?? meta.hasUnread ?? false,
+  };
+  if (meta.origin) summary.origin = meta.origin;
+  if (meta.isBookmarked) summary.isBookmarked = true;
+  if (indexEntry?.summary !== undefined) summary.summary = indexEntry.summary;
+  if (indexEntry?.keywords !== undefined) summary.keywords = indexEntry.keywords;
+  if (live) {
+    // Background generations (image/audio/movie) keep the session
+    // "busy" even when the agent turn has ended, so the sidebar
+    // indicator stays lit across view navigation.
+    summary.isRunning = live.isRunning || Object.keys(live.pendingGenerations).length > 0;
+    summary.statusMessage = live.statusMessage;
+  }
+  return summary;
+}
+
+// Load one session's row, or null when the session should be skipped
+// (cutoff window, missing meta, any I/O error). The `metaMtimeMs`
+// fallback lets a brand-new session contribute 0 to its changeMs
+// instead of crashing the whole listing.
+async function loadSessionRow(sessionId: string, ctx: SessionRowContext): Promise<SessionRow | null> {
+  try {
+    // stat only — no readFile on .jsonl content
+    const fileStat = await stat(sessionJsonlAbsPath(sessionId));
+    if (ctx.cutoff > 0 && fileStat.mtimeMs < ctx.cutoff) return null;
+
+    const meta = await readSessionMeta(ctx.chatDir, sessionId);
+    if (!meta) return null;
+
+    // The meta sidecar bumps its mtime on hasUnread / origin writes —
+    // feed it into changeMs so cursor-based refetches pick up drains
+    // of background generations (which only touch meta, not the
+    // jsonl).
+    const metaMtimeMs = await stat(sessionMetaAbsPath(sessionId))
+      .then((stats) => stats.mtimeMs)
+      .catch(() => 0);
+
+    const indexEntry = ctx.indexById.get(sessionId);
+    const live = getSession(sessionId);
+    return {
+      summary: buildSessionSummary(sessionId, meta, indexEntry, fileStat, live),
+      changeMs: sessionChangeMs(fileStat.mtimeMs, indexEntry?.indexedAt, metaMtimeMs),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Read the full session list off disk. Each row carries its
 // `changeMs` — the later of the jsonl mtime and the chat-index
 // `indexedAt` — so the handler can filter against `?since=` and
 // compute the new cursor without re-statting anything.
-export async function loadAllSessions(): Promise<{ summary: SessionSummary; changeMs: number }[]> {
+export async function loadAllSessions(): Promise<SessionRow[]> {
   const chatDir = WORKSPACE_PATHS.chat;
   const manifest = await readManifest(workspacePath);
   const indexById = new Map<string, ChatIndexEntry>(manifest.entries.map((entry) => [entry.id, entry]));
   const cutoff = WINDOW_MS > 0 ? Date.now() - WINDOW_MS : 0;
+  const ctx: SessionRowContext = { chatDir, cutoff, indexById };
 
   const files = (await readdir(chatDir)).filter((fileName) => fileName.endsWith(".jsonl"));
-  const rows = await Promise.all(
-    files.map(async (file) => {
-      const sessionId = file.replace(".jsonl", "");
-      try {
-        // stat only — no readFile on .jsonl content
-        const fileStat = await stat(sessionJsonlAbsPath(sessionId));
-        if (cutoff > 0 && fileStat.mtimeMs < cutoff) return null;
-
-        const meta = await readSessionMeta(chatDir, sessionId);
-        if (!meta) return null;
-
-        // The meta sidecar bumps its mtime on hasUnread / origin
-        // writes — feed it into changeMs so cursor-based refetches
-        // pick up drains of background generations (which only touch
-        // meta, not the jsonl). Missing stat (brand-new session
-        // before its first meta write) contributes 0.
-        const metaMtimeMs = await stat(sessionMetaAbsPath(sessionId))
-          .then((stats) => stats.mtimeMs)
-          .catch(() => 0);
-
-        const indexEntry = indexById.get(sessionId);
-        // Prefer AI title → meta.firstUserMessage → empty.
-        // `summary` and `keywords` are spread conditionally
-        // to respect the server tsconfig's
-        // exactOptionalPropertyTypes.
-        const preview = indexEntry?.title ?? meta.firstUserMessage ?? "";
-
-        const live = getSession(sessionId);
-        const summary: SessionSummary = {
-          id: sessionId,
-          roleId: meta.roleId,
-          startedAt: meta.startedAt,
-          updatedAt: new Date(fileStat.mtimeMs).toISOString(),
-          preview,
-          hasUnread: live?.hasUnread ?? meta.hasUnread ?? false,
-        };
-        if (meta.origin) summary.origin = meta.origin;
-        if (meta.isBookmarked) summary.isBookmarked = true;
-        if (indexEntry?.summary !== undefined) summary.summary = indexEntry.summary;
-        if (indexEntry?.keywords !== undefined) summary.keywords = indexEntry.keywords;
-        if (live) {
-          // Background generations (image/audio/movie) keep the session
-          // "busy" even when the agent turn has ended, so the sidebar
-          // indicator stays lit across view navigation.
-          summary.isRunning = live.isRunning || Object.keys(live.pendingGenerations).length > 0;
-          summary.statusMessage = live.statusMessage;
-        }
-        return {
-          summary,
-          changeMs: sessionChangeMs(fileStat.mtimeMs, indexEntry?.indexedAt, metaMtimeMs),
-        };
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return rows.filter((row): row is { summary: SessionSummary; changeMs: number } => row !== null);
+  const rows = await Promise.all(files.map((file) => loadSessionRow(file.replace(".jsonl", ""), ctx)));
+  return rows.filter((row): row is SessionRow => row !== null);
 }
 
 router.get(API_ROUTES.sessions.list, async (req: Request<object, SessionsResponse, object, SessionsQuery>, res: Response<SessionsResponse>) => {
