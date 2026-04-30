@@ -3,7 +3,7 @@
 // install any API mocks — the real Claude API runs end-to-end. Use
 // these helpers from specs in `e2e-live/tests/`.
 
-import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +64,75 @@ export async function placeFixtureInWorkspace(fixtureRel: string, workspaceRel: 
 /** Best-effort delete; never throws if the file is already gone. */
 export async function removeFromWorkspace(workspaceRel: string): Promise<void> {
   await rm(resolveWorkspacePath(workspaceRel), { force: true });
+}
+
+/**
+ * Drop a wiki page directly onto disk at `data/wiki/pages/<slug>.md`.
+ * The wiki view fetches /api/wiki?slug=<slug> on navigate, which
+ * reads the same file — so seeding the file is enough to make a page
+ * accessible via the standalone /wiki/pages/<slug> route. Spec-unique
+ * slugs only; do not stomp real user pages.
+ */
+export async function placeWikiPage(slug: string, body: string): Promise<void> {
+  const target = resolveWorkspacePath(`data/wiki/pages/${slug}.md`);
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, body, "utf8");
+}
+
+export async function removeWikiPage(slug: string): Promise<void> {
+  await removeFromWorkspace(`data/wiki/pages/${slug}.md`);
+}
+
+const WIKI_PAGE_BODY_SELECTOR = '[data-testid="wiki-page-body"]';
+
+/**
+ * Open a wiki page directly via its standalone route. The SPA's wiki
+ * router fetches /api/wiki?slug=... and renders the page body into
+ * `[data-testid="wiki-page-body"]` (the v-html surface inside
+ * `WikiPageBody.vue`). Used as the entry point for L-W-S-* specs.
+ */
+export async function navigateToWikiPage(page: Page, slug: string): Promise<void> {
+  await page.goto(`/wiki/pages/${encodeURIComponent(slug)}`);
+}
+
+/**
+ * Wait for an `<img>` matching `imgSelector` to appear inside the
+ * rendered wiki page body. Counterpart to `waitForImgInPresentHtml`
+ * for the markdown surface — no iframe boundary, the body is a
+ * direct DOM child of the page.
+ */
+export async function waitForImgInWiki(page: Page, imgSelector: string, timeoutMs: number = ONE_MINUTE_MS): Promise<void> {
+  const body = page.locator(WIKI_PAGE_BODY_SELECTOR);
+  await expect(body.locator(imgSelector)).toBeVisible({ timeout: timeoutMs });
+}
+
+/**
+ * Read the unresolved `src` attribute of the first matching `<img>`
+ * in the wiki body. Lets the caller assert the rewriter produced the
+ * expected `/api/files/raw?path=...` path (or, for self-repair tests,
+ * the final repaired URL).
+ */
+export async function readImgSrcInWiki(page: Page, imgSelector: string): Promise<string | null> {
+  const body = page.locator(WIKI_PAGE_BODY_SELECTOR);
+  const img = body.locator(imgSelector).first();
+  if ((await img.count()) === 0) return null;
+  return await img.getAttribute("src");
+}
+
+/**
+ * Read `naturalWidth` / `naturalHeight` of the first matching `<img>`
+ * in the wiki body. Both 0 means the rewritten URL did not resolve to
+ * a decodable image — that's the failure mode every L-W-S-* spec
+ * guards against.
+ */
+export async function readImgNaturalSizeInWiki(page: Page, imgSelector: string): Promise<{ width: number; height: number } | null> {
+  const body = page.locator(WIKI_PAGE_BODY_SELECTOR);
+  const img = body.locator(imgSelector).first();
+  if ((await img.count()) === 0) return null;
+  return await img.evaluate((node) => {
+    if (!(node instanceof HTMLImageElement)) return { width: 0, height: 0 };
+    return { width: node.naturalWidth, height: node.naturalHeight };
+  });
 }
 
 /**

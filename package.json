@@ -41,6 +41,7 @@
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:e2e:live": "playwright test --config e2e-live/playwright.config.ts",
     "test:e2e:live:media": "cross-env E2E_LIVE_REPORT_SUBDIR=media playwright test --config e2e-live/playwright.config.ts media.spec.ts",
+    "test:e2e:live:wiki": "cross-env E2E_LIVE_REPORT_SUBDIR=wiki playwright test --config e2e-live/playwright.config.ts wiki.spec.ts",
     "test:coverage": "tsx --test --experimental-test-coverage ./test/*/test_*.ts ./test/*/*/test_*.ts && yarn workspaces run test",
     "sandbox:remove": "docker rmi mulmoclaude-sandbox",
     "sandbox:login": "security find-generic-password -s 'Claude Code-credentials' -w > ~/.claude/.credentials.json && echo 'Credentials exported to ~/.claude/.credentials.json'",
