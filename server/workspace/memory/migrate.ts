@@ -53,6 +53,19 @@ export interface MigrationResult {
   writeErrors: number;
 }
 
+// Number of in-flight `classify` calls. Each call spawns the Claude
+// CLI, so there's a real cost to going wide; 4 is empirically a
+// sweet spot — well above the 1-at-a-time baseline (~10× faster on
+// real legacy files) while staying polite to the user's machine and
+// to Claude's quota. The classifier callback is the only awaited
+// step, so this is the dominant knob.
+const CLASSIFY_CONCURRENCY = 4;
+
+// Progress logs emitted every N processed candidates. A long legacy
+// file (50+ bullets) takes minutes; without periodic logging it
+// looks frozen.
+const PROGRESS_LOG_INTERVAL = 5;
+
 export async function migrateLegacyMemory(workspaceRoot: string, classify: MemoryClassifier): Promise<MigrationResult> {
   const sourcePath = path.join(workspaceRoot, "conversations", "memory.md");
   const raw = await readTextSafe(sourcePath);
@@ -61,32 +74,71 @@ export async function migrateLegacyMemory(workspaceRoot: string, classify: Memor
   }
 
   const candidates = parseCandidates(raw);
+  log.info("memory", "migration: classifying candidates", {
+    candidateCount: candidates.length,
+    concurrency: CLASSIFY_CONCURRENCY,
+  });
+  const classifications = await classifyInParallel(classify, candidates);
+
   const result = emptyResult(false);
   const usedSlugs = new Set<string>();
 
-  for (const candidate of candidates) {
-    const classification = await safeClassify(classify, candidate);
+  for (let index = 0; index < candidates.length; index += 1) {
+    const classification = classifications[index];
+    const candidate = candidates[index];
     if (!classification) {
       result.skippedByClassifier += 1;
-      continue;
+    } else {
+      const entry = buildEntry(candidate, classification, usedSlugs);
+      try {
+        await writeMemoryEntry(workspaceRoot, entry);
+        usedSlugs.add(entry.slug);
+        result.written[entry.type] += 1;
+      } catch (err) {
+        log.warn("memory", "migration: write failed", {
+          slug: entry.slug,
+          error: errorMessage(err),
+        });
+        result.writeErrors += 1;
+      }
     }
-    const entry = buildEntry(candidate, classification, usedSlugs);
-    try {
-      await writeMemoryEntry(workspaceRoot, entry);
-      usedSlugs.add(entry.slug);
-      result.written[entry.type] += 1;
-    } catch (err) {
-      log.warn("memory", "migration: write failed", {
-        slug: entry.slug,
-        error: errorMessage(err),
+    const processed = index + 1;
+    if (processed % PROGRESS_LOG_INTERVAL === 0 || processed === candidates.length) {
+      log.info("memory", "migration: progress", {
+        processed,
+        total: candidates.length,
+        written: result.written,
+        skippedByClassifier: result.skippedByClassifier,
+        writeErrors: result.writeErrors,
       });
-      result.writeErrors += 1;
     }
   }
 
   await regenerateIndex(workspaceRoot);
   await renameToBackup(sourcePath);
   return result;
+}
+
+// Classify candidates with bounded concurrency. Workers pull
+// indices off a shared cursor and write into a pre-allocated array
+// so `result[i]` matches `candidates[i]`. Each await falls inside
+// `safeClassify`, which already swallows individual classifier
+// throws (logging once); a concurrent failure can therefore not
+// poison the rest of the batch.
+async function classifyInParallel(classify: MemoryClassifier, candidates: readonly MemoryCandidate[]): Promise<(MemoryClassification | null)[]> {
+  const results: (MemoryClassification | null)[] = new Array(candidates.length).fill(null);
+  let nextIndex = 0;
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= candidates.length) return;
+      results[index] = await safeClassify(classify, candidates[index]);
+    }
+  };
+  const workers = Array.from({ length: Math.min(CLASSIFY_CONCURRENCY, candidates.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 function emptyResult(noop: boolean): MigrationResult {
