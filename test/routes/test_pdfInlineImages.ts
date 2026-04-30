@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { inlineImages } from "../../server/api/routes/pdf.js";
+import { inlineImages, shouldSkipMediaForPdf } from "../../server/api/routes/pdf.js";
 
 let workspaceRoot: string;
 let imagesDir: string;
@@ -209,5 +209,115 @@ describe("inlineImages — attribute-boundary correctness (Codex #1023 review)",
     assert.ok(out.includes('alt="x>y>z"'));
     assert.ok(out.includes('title="p>q"'));
     assert.match(out, /\bsrc="data:image\/png;base64,/);
+  });
+});
+
+describe("inlineImages — extended tag coverage (Stage B)", () => {
+  it("inlines <source src> on a video child", () => {
+    const html = '<video controls><source src="/artifacts/images/2026/04/foo.png" type="image/png"></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /<source src="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
+  });
+
+  it("inlines <video poster>", () => {
+    const html = '<video poster="/artifacts/images/2026/04/foo.png" controls></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /<video poster="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
+  });
+
+  it("inlines <audio src>", () => {
+    // The asset is a PNG but the `<audio>` tag still routes through
+    // the same resolver — the Stage B change is purely about which
+    // tag/attribute pairs get scanned, not MIME validation.
+    const html = '<audio src="/artifacts/images/2026/04/foo.png"></audio>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /<audio src="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
+  });
+
+  it("inlines both <video poster> and <video src> on the same tag", () => {
+    const html = '<video poster="/artifacts/images/2026/04/foo.png" src="/artifacts/images/2026/04/foo.png"></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /poster="data:image\/png;base64,/);
+    assert.match(out, /src="data:image\/png;base64,/);
+  });
+
+  it("does NOT touch <source srcset> (deferred)", () => {
+    const html = '<source srcset="/artifacts/images/2026/04/foo.png 2x" type="image/png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html);
+  });
+
+  it("does NOT inline <video src=mp4> — poster image is what shows in PDF", () => {
+    // The actual file doesn't have to exist; the URL extension is
+    // what gates the skip. Inlining a 100MB mp4 as base64 would
+    // blow up puppeteer's page-load timeout.
+    const html = '<video src="/artifacts/images/2026/04/clip.mp4"></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html, ".mp4 must NOT be inlined in PDF");
+  });
+
+  it("inlines <video poster> while leaving <video src=mp4> alone", () => {
+    // Poster is an image → inlined. The mp4 src → left as relative
+    // URL; puppeteer's fetch fails quickly, `networkidle0` resolves.
+    const html = '<video poster="/artifacts/images/2026/04/foo.png" src="/artifacts/images/2026/04/clip.mp4"></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /poster="data:image\/png;base64,/);
+    assert.match(out, /src="\/artifacts\/images\/2026\/04\/clip\.mp4"/);
+  });
+
+  it("does NOT inline <audio src=mp3>", () => {
+    const html = '<audio src="/artifacts/images/2026/04/track.mp3"></audio>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html);
+  });
+
+  it("skips media URL with query string (?v=…cache-bust)", () => {
+    const html = '<video src="/artifacts/images/2026/04/clip.mp4?v=123"></video>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html);
+  });
+
+  it("inlines a PNG with cache-bust query string end-to-end (codex iter-2 #1028)", () => {
+    // The skip regex correctly recognises this as an image (codex
+    // iter-1 fix), but the resolver must also strip the query before
+    // hitting the filesystem — otherwise a real `<img src="…png?v=1">`
+    // still fails to inline. End-to-end test pins both paths.
+    const html = '<img src="/artifacts/images/2026/04/foo.png?cacheBust=clip.mp4">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
+  });
+
+  it("inlines a PNG with fragment end-to-end", () => {
+    const html = '<img src="/artifacts/images/2026/04/foo.png#anchor">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
+  });
+});
+
+describe("shouldSkipMediaForPdf", () => {
+  it("returns true for plain media extensions", () => {
+    assert.equal(shouldSkipMediaForPdf("/artifacts/images/2026/04/clip.mp4"), true);
+    assert.equal(shouldSkipMediaForPdf("/track.mp3"), true);
+    assert.equal(shouldSkipMediaForPdf("/v.webm"), true);
+  });
+
+  it("returns true for media URL with query / fragment", () => {
+    assert.equal(shouldSkipMediaForPdf("/clip.mp4?v=123"), true);
+    assert.equal(shouldSkipMediaForPdf("/clip.mp4#t=10"), true);
+  });
+
+  it("returns false for image URL even when query string mentions media (codex iter-1 #1028)", () => {
+    // `foo.png?cacheBust=clip.mp4` is a PNG. Without pathname slicing
+    // the regex over the whole URL would false-positive on `.mp4`
+    // at the end. With slicing, only `foo.png` is tested -> no skip.
+    assert.equal(shouldSkipMediaForPdf("/artifacts/images/2026/04/foo.png?cacheBust=clip.mp4"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.png#anchor.mp4"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.jpg?ref=bar.mp3"), false);
+  });
+
+  it("returns false for non-media extensions", () => {
+    assert.equal(shouldSkipMediaForPdf("/foo.png"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.jpg"), false);
+    assert.equal(shouldSkipMediaForPdf("/foo.svg"), false);
   });
 });

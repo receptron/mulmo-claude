@@ -11,6 +11,7 @@ import { resolveWorkspacePath } from "../../utils/files/workspace-io.js";
 import { parseFrontmatter } from "../../utils/markdown/frontmatter.js";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
+import { transformResolvableUrlsInHtml } from "../../../src/utils/image/htmlSrcAttrs.js";
 
 const router = Router();
 
@@ -74,44 +75,11 @@ export interface InlineImagesOptions {
   sourceDir?: string;
 }
 
-// Outer regex: scan an `<img>` tag, respecting quoted attribute values
-// so `>` characters that appear inside `alt="x > y"` don't terminate
-// the tag prematurely (Codex iter-2 finding). The body is one of:
-//   - any non-`>` non-quote char     `[^>"']`
-//   - a complete double-quoted span  `"[^"]*"`
-//   - a complete single-quoted span  `'[^']*'`
-// All branches are bounded — no nested quantifiers, no overlap. The
-// 100KB ReDoS test pins linear time.
-//
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded alternatives, ReDoS-safe (test in test_pdfInlineImages.ts)
-const IMG_TAG_RE = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*\/?>/gi;
-// Attribute iterator: walks each `name=value` pair inside a tag. The
-// leading `\s+` ensures we only match real attribute boundaries, not
-// `src=` text embedded inside another attribute's quoted value (e.g.
-// `<img alt="x src=oops" src="real.png">` — the alt-internal `src=`
-// has no whitespace prefix from the regex's POV because we parse
-// attribute-by-attribute, never against the free-form tag body).
-// Namespaced attrs (`xml:src`, `xlink:src`) match as their full name
-// and are filtered below by `name.toLowerCase() !== "src"`.
-// Capture groups:
-//   1: leading whitespace
-//   2: attribute name
-//   3: `=` with surrounding spaces (only when value present)
-//   4: full quoted/unquoted value
-//   5: double-quoted value (without quotes)
-//   6: single-quoted value (without quotes)
-//   7: unquoted value — refuses leading `"` / `'` so a malformed
-//      `<img src="aaaa` (no closing quote) doesn't capture the stray
-//      quote as the value
-//
-// Why the disables: this regex has 3 alternation branches plus an
-// optional value group, which trips sonarjs/regex-complexity (rule
-// counts disjunctions). All quantifiers are bounded by `\s` or
-// character-class negations — verified ReDoS-safe by the 100KB test
-// (`test_pdfInlineImages.ts`). Refactoring to multiple passes would
-// be slower and harder to read.
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded quantifiers, ReDoS-safe (test in test_pdfInlineImages.ts)
-const IMG_ATTR_RE = /(\s+)([A-Za-z][\w:-]*)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*)))?/g;
+// Tag scanning + attribute iteration live in the shared helper
+// (`src/utils/image/htmlSrcAttrs.ts`) so the Markdown surface
+// (`rewriteImgSrcAttrsInHtml`) and this PDF surface stay in lockstep.
+// Adding a tag / attribute (Stage B's `<source>` / `<video poster>`
+// / `<audio src>`) updates both surfaces with one diff (#1011 Stage B).
 
 function isSafeSourceDir(dir: string): boolean {
   if (!dir) return true;
@@ -125,13 +93,19 @@ function isSafeSourceDir(dir: string): boolean {
 // Logs the reason so the developer can grep when a PDF image is
 // missing.
 function resolveImageAbsPath(src: string, workspaceRoot: string, baseDir: string): string | null {
+  // Strip query / fragment before any filesystem-level resolution —
+  // a `<img src="foo.png?v=123">` cache-bust must still find the
+  // file at `foo.png` on disk. Without this strip, `path.resolve`
+  // bakes the `?v=123` into the candidate path and the safe-resolve
+  // / readBinarySafeSync reject (codex review iter-2 #1028).
+  const pathPart = urlPathname(src);
   // LLM-generated HTML often emits leading-slash workspace-rooted
   // paths like "/artifacts/images/2026/04/foo.png" (web convention).
   // Treat those as workspace-relative; otherwise path.resolve below
   // sees the slash as host-absolute and the safe-resolve rejects.
-  const workspaceRooted = src.startsWith("/");
+  const workspaceRooted = pathPart.startsWith("/");
   const resolveBase = workspaceRooted ? workspaceRoot : baseDir;
-  const relSrc = workspaceRooted ? src.slice(1) : src;
+  const relSrc = workspaceRooted ? pathPart.slice(1) : pathPart;
   const unsafeAbs = path.resolve(resolveBase, relSrc);
   const relToWorkspace = path.relative(workspaceRoot, unsafeAbs);
   if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
@@ -157,43 +131,56 @@ function loadImageAsDataUri(abs: string): string | null {
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
-interface SrcAttrMatch {
-  /** The portion of the matched attribute that we keep verbatim:
-   *  leading whitespace + attribute name + `=` (with surrounding
-   *  spaces). Only the value part is replaced. */
-  prefix: string;
-  doubleQuoted?: string;
-  singleQuoted?: string;
-  bare?: string;
-  full: string;
+// Video / audio extensions Stage B (#1011) added to the rewriter.
+// In PDF rendering puppeteer can't play them, so inlining a large
+// `.mp4` as base64 just blows up the HTML and times out the page
+// load (`Navigation timeout of 30000 ms exceeded`). The `<video
+// poster>` attribute IS an image and stays inlined — that's the
+// only thing the user actually sees in a PDF anyway. The `<video
+// src>` / `<source src>` (in a `<video>`) / `<audio src>` URL is
+// left as the original relative path; puppeteer's fetch will fail
+// quickly and `networkidle0` still resolves.
+//
+// Anchored at end-of-pathname (callers strip query / fragment first
+// via `urlPathname` below) so a query-string-only mention of the
+// extension doesn't false-positive — e.g. `foo.png?clip.mp4` must
+// inline the PNG, not be treated as an mp4 (codex review iter-1).
+const PDF_SKIP_MEDIA_EXT_RE = /\.(mp4|webm|mov|m4v|ogv|mp3|ogg|oga|wav|m4a|aac)$/i;
+
+function urlPathname(url: string): string {
+  const queryStart = url.indexOf("?");
+  const fragStart = url.indexOf("#");
+  const limit = [queryStart, fragStart].filter((idx) => idx >= 0).reduce((min, idx) => Math.min(min, idx), url.length);
+  return url.slice(0, limit);
 }
 
-function inlineSingleImg(match: SrcAttrMatch, workspaceRoot: string, baseDir: string): string {
-  const src = (match.doubleQuoted ?? match.singleQuoted ?? match.bare ?? "").trim();
-  if (!src) return match.full;
-  // Skip URLs the browser fetches directly. Narrow to exact
-  // `http://` / `https://` prefixes so a relative path like
-  // `http-assets/logo.png` isn't misclassified as external (CR on #1023).
-  if (src.startsWith("data:") || src.startsWith("http://") || src.startsWith("https://")) return match.full;
-  const abs = resolveImageAbsPath(src, workspaceRoot, baseDir);
-  if (!abs) return match.full;
-  const dataUri = loadImageAsDataUri(abs);
-  if (!dataUri) return match.full;
-  const quote = match.doubleQuoted !== undefined ? '"' : match.singleQuoted !== undefined ? "'" : '"';
-  return `${match.prefix}${quote}${dataUri}${quote}`;
+/** Whether a URL points at a video / audio file that should NOT be
+ *  base64-inlined into a PDF. Exported for direct unit testing —
+ *  filesystem-level resolver checks (`resolveImageAbsPath`) can mask
+ *  the regex's behaviour because a missing file also returns null,
+ *  so the in-line callback's output looks identical for "skip" vs
+ *  "resolve-failed". */
+export function shouldSkipMediaForPdf(url: string): boolean {
+  return PDF_SKIP_MEDIA_EXT_RE.test(urlPathname(url));
 }
 
 /**
- * Inline local images as base64 data URIs so Puppeteer can render them.
- * Resolves `<img>` `src` references against `sourceDir` (workspace-
- * relative); for example, a Wiki page (`data/wiki/pages/X.md`)
- * referencing `../../../artifacts/images/foo.png` resolves to
+ * Inline local images as base64 data URIs so Puppeteer can render
+ * them. Resolves URL-bearing attributes (currently `<img src>`,
+ * `<source src>`, `<video poster|src>`, `<audio src>`) against
+ * `sourceDir` (workspace-relative); for example, a Wiki page
+ * (`data/wiki/pages/X.md`) referencing
+ * `../../../artifacts/images/foo.png` resolves to
  * `artifacts/images/foo.png`.
  *
- * Handles double-quoted, single-quoted, and unquoted `src` values.
- * Skips data: URIs and http(s) URLs. Refuses values that escape the
+ * Handles double-quoted, single-quoted, and unquoted values. Skips
+ * `data:` URIs and `http(s)` URLs. Refuses values that escape the
  * workspace root after resolution — the workspace boundary is
  * enforced by `resolveWithinRoot`, regardless of `sourceDir`.
+ *
+ * Tag + attribute coverage is shared with the browser markdown
+ * surface (`rewriteImgSrcAttrsInHtml`) via `RESOLVABLE_TAG_ATTRS` in
+ * `src/utils/image/htmlSrcAttrs.ts`.
  */
 export function inlineImages(html: string, options: InlineImagesOptions = {}): string {
   const workspaceRoot = options.workspaceRoot ?? defaultWorkspaceRoot;
@@ -204,30 +191,21 @@ export function inlineImages(html: string, options: InlineImagesOptions = {}): s
   }
   const sourceDir = dirIsSafe && requestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
   const baseDir = path.join(workspaceRoot, sourceDir);
-  return html.replace(IMG_TAG_RE, (tag) =>
-    // Walk each attribute. Only `src` (case-insensitive, namespaced
-    // attrs like `xml:src` / `xlink:src` filtered out) gets the
-    // value rewritten. Other attributes — and `src=`-shaped text
-    // inside their quoted values — are preserved verbatim because
-    // we parse attribute-by-attribute, not by free-form regex.
-    tag.replace(IMG_ATTR_RE, (...captures: unknown[]) => replaceSrcAttr(captures, workspaceRoot, baseDir)),
-  );
-}
-
-function replaceSrcAttr(captures: unknown[], workspaceRoot: string, baseDir: string): string {
-  const [full, leading, name, eqWithSpaces, , doubleQuoted, singleQuoted, bare] = captures as [
-    string,
-    string,
-    string,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-  ];
-  if (!eqWithSpaces || name.toLowerCase() !== "src") return full;
-  const prefix = `${leading}${name}${eqWithSpaces}`;
-  return inlineSingleImg({ prefix, doubleQuoted, singleQuoted, bare, full }, workspaceRoot, baseDir);
+  return transformResolvableUrlsInHtml(html, (url) => {
+    // Narrow to exact `http://` / `https://` prefixes so a relative
+    // path like `http-assets/logo.png` isn't misclassified as
+    // external (CR follow-up on #1023).
+    if (url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) return null;
+    // Skip media (mp4 / mp3 / webm / ...) — see PDF_SKIP_MEDIA_EXT_RE
+    // comment. `<video poster="x.png">` still inlines because the
+    // poster value's pathname ends in an image extension. The
+    // pathname slice means `foo.png?cacheBust=clip.mp4` correctly
+    // routes through the PNG inline path (codex iter-1).
+    if (shouldSkipMediaForPdf(url)) return null;
+    const abs = resolveImageAbsPath(url, workspaceRoot, baseDir);
+    if (!abs) return null;
+    return loadImageAsDataUri(abs);
+  });
 }
 
 function wrapHtml(body: string, css: string): string {

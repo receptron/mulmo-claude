@@ -46,11 +46,13 @@ const TEXT_MIME_TYPES = new Set([
   "application/toml",
 ]);
 
-function isTextMime(mime: string): boolean {
+function isTextMime(mime: string | undefined): boolean {
+  if (!mime) return false;
   return mime.startsWith("text/") || TEXT_MIME_TYPES.has(mime);
 }
 
-function decodeBase64Text(data: string): string {
+function decodeBase64Text(data: string | undefined): string {
+  if (!data) return "";
   return Buffer.from(data, "base64").toString("utf-8");
 }
 
@@ -115,7 +117,7 @@ async function tryDockerLibreOffice(): Promise<boolean> {
   }
 }
 
-async function convertPptxToPdf(data: string): Promise<Buffer | null> {
+export async function convertPptxToPdf(data: string): Promise<Buffer | null> {
   const tmpDir = await mkdtemp(path.join(tmpdir(), "pptx-"));
   const inputPath = path.join(tmpDir, "input.pptx");
   const outputPath = path.join(tmpDir, "input.pdf");
@@ -168,6 +170,7 @@ function textBlocks(att: Attachment, content: string): ContentBlock[] {
 }
 
 async function tryConvertDocx(att: Attachment): Promise<ConversionResult> {
+  if (!att.data) return { kind: "skipped", reason: "DOCX attachment has no inline bytes" };
   try {
     return {
       kind: "converted",
@@ -182,6 +185,7 @@ async function tryConvertDocx(att: Attachment): Promise<ConversionResult> {
 }
 
 function tryConvertXlsx(att: Attachment): ConversionResult {
+  if (!att.data) return { kind: "skipped", reason: "XLSX attachment has no inline bytes" };
   try {
     return {
       kind: "converted",
@@ -196,6 +200,7 @@ function tryConvertXlsx(att: Attachment): ConversionResult {
 }
 
 async function tryConvertPptx(att: Attachment): Promise<ConversionResult> {
+  if (!att.data) return { kind: "skipped", reason: "PPTX attachment has no inline bytes" };
   const pdfBuf = await convertPptxToPdf(att.data);
   if (!pdfBuf) {
     const name = att.filename ?? "presentation.pptx";

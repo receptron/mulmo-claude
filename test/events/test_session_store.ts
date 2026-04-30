@@ -9,7 +9,6 @@ import {
   cancelRun,
   markRead,
   getActiveSessionIds,
-  getSessionImageData,
   initSessionStore,
   pushSessionEvent,
 } from "../../server/events/session-store/index.ts";
@@ -63,16 +62,14 @@ describe("getSession / getOrCreateSession", () => {
     assert.equal(sessionB.roleId, "general"); // not overwritten
   });
 
-  it("updates selectedImageData and updatedAt on re-access", () => {
+  it("updates updatedAt on re-access", () => {
     getOrCreateSession("s1", sessionOpts());
     const updated = getOrCreateSession(
       "s1",
       sessionOpts({
-        selectedImageData: "base64...",
         updatedAt: "2026-04-17T01:00:00Z",
       }),
     );
-    assert.equal(updated.selectedImageData, "base64...");
     assert.equal(updated.updatedAt, "2026-04-17T01:00:00Z");
   });
 
@@ -187,17 +184,6 @@ describe("getActiveSessionIds", () => {
   it("returns empty set when nothing is running", () => {
     getOrCreateSession("s1", sessionOpts());
     assert.equal(getActiveSessionIds().size, 0);
-  });
-});
-
-describe("getSessionImageData", () => {
-  it("returns the selectedImageData for an existing session", () => {
-    getOrCreateSession("s1", sessionOpts({ selectedImageData: "img" }));
-    assert.equal(getSessionImageData("s1"), "img");
-  });
-
-  it("returns undefined for unknown session", () => {
-    assert.equal(getSessionImageData("nope"), undefined);
   });
 });
 

@@ -674,3 +674,48 @@ describe("rewriteMarkdownImageRefs — adversarial markdown", () => {
     assert.ok(!out.includes("<script>alert(1)</script>") || out.includes(markdownSource));
   });
 });
+
+describe("rewriteImgSrcAttrsInHtml — extended tag coverage (Stage B)", () => {
+  it("rewrites <source src> on a video child", () => {
+    const html = '<video controls><source src="video.mp4" type="video/mp4"></video>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.match(out, /<source src="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Fvideo\.mp4"/);
+  });
+
+  it("rewrites <video poster>", () => {
+    const html = '<video poster="thumb.png" controls></video>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.match(out, /<video poster="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Fthumb\.png"/);
+  });
+
+  it("rewrites <video src>", () => {
+    const html = '<video src="movie.webm"></video>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.match(out, /<video src="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Fmovie\.webm"/);
+  });
+
+  it("rewrites <audio src>", () => {
+    const html = '<audio src="track.ogg" controls></audio>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.match(out, /<audio src="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Ftrack\.ogg"/);
+  });
+
+  it("rewrites all attributes on <video poster> + <video src> together", () => {
+    const html = '<video poster="thumb.png" src="movie.mp4"></video>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.match(out, /poster="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Fthumb\.png"/);
+    assert.match(out, /src="\/api\/files\/raw\?path=data%2Fwiki%2Fpages%2Fmovie\.mp4"/);
+  });
+
+  it("does NOT rewrite <source srcset> (deferred to follow-up)", () => {
+    const html = '<source srcset="hi.png 2x, lo.png 1x" type="image/png">';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.equal(out, html, "srcset is comma-separated descriptor list — Stage B follow-up");
+  });
+
+  it("leaves <video poster> unchanged when http(s)", () => {
+    const html = '<video poster="https://cdn.example.com/poster.jpg"></video>';
+    const out = rewriteImgSrcAttrsInHtml(html, "data/wiki/pages");
+    assert.equal(out, html);
+  });
+});

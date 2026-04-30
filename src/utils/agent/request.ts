@@ -6,18 +6,36 @@ import { apiFetchRaw } from "../api";
 import { errorMessage } from "../errors";
 import { isNonEmptyString } from "../types";
 
+/** Single attachment entry sent by the Vue UI on `POST /api/agent`.
+ *  Path-only — the Vue side never ships base64 bytes anymore. The
+ *  server reads the file from disk, infers the MIME type from the
+ *  extension, and produces a content block for Claude. Bridges
+ *  (Telegram / LINE / etc.) still send `{ mimeType, data }` over the
+ *  socket transport; both shapes share the same `Attachment` type
+ *  in `@mulmobridge/protocol`. */
+export interface ClientAttachment {
+  /** Workspace-relative path that exists under one of the allowed
+   *  roots (`artifacts/images/...` or `data/attachments/...`). */
+  path: string;
+}
+
 export interface AgentRequestBodyParams {
   message: string;
   role: Role;
   chatSessionId: string;
-  selectedImageData?: string;
+  /** Workspace-relative paths the user has attached or selected for
+   *  this turn, in declaration order. The first entry is also surfaced
+   *  to the LLM as an `[Attached file: <path>]` marker on the user
+   *  message so path-passing tools (e.g. `editImages`) can quote it
+   *  back. Empty / undefined when no file is attached. */
+  attachmentPaths?: string[];
 }
 
 export interface AgentRequestBody {
   message: string;
   roleId: string;
   chatSessionId: string;
-  selectedImageData: string | undefined;
+  attachments: ClientAttachment[] | undefined;
   // IANA identifier (e.g. "Asia/Tokyo", "America/New_York"). The
   // server uses this to interpret bare time expressions in the user's
   // message without asking for clarification every turn. Undefined if
@@ -38,12 +56,23 @@ function resolveBrowserTimezone(): string | undefined {
   }
 }
 
+function buildAttachments(paths: string[] | undefined): ClientAttachment[] | undefined {
+  if (!paths || paths.length === 0) return undefined;
+  const entries: ClientAttachment[] = [];
+  for (const candidate of paths) {
+    if (typeof candidate === "string" && candidate.length > 0) {
+      entries.push({ path: candidate });
+    }
+  }
+  return entries.length > 0 ? entries : undefined;
+}
+
 export function buildAgentRequestBody(params: AgentRequestBodyParams): AgentRequestBody {
   return {
     message: params.message,
     roleId: params.role.id,
     chatSessionId: params.chatSessionId,
-    selectedImageData: params.selectedImageData,
+    attachments: buildAttachments(params.attachmentPaths),
     userTimezone: resolveBrowserTimezone(),
   };
 }

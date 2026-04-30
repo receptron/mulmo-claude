@@ -11,6 +11,7 @@ import sourcesRoutes from "./api/routes/sources.js";
 import newsRoutes from "./api/routes/news.js";
 import pluginsRoutes from "./api/routes/plugins.js";
 import imageRoutes from "./api/routes/image.js";
+import attachmentRoutes from "./api/routes/attachment.js";
 import presentHtmlRoutes from "./api/routes/presentHtml.js";
 import chartRoutes from "./api/routes/chart.js";
 import rolesRoutes from "./api/routes/roles.js";
@@ -133,15 +134,21 @@ app.use("/api", (req, res, next) => {
 // stays loopback-only.
 //
 // Three-layer guard:
-//  1. Extension allowlist — reject anything that isn't an image
-//     extension (saveImage currently writes `.png` only; the list
-//     stays slightly wider so future formats don't reopen the review).
+//  1. Extension allowlist — reject anything that isn't an image,
+//     video, or audio extension. `saveImage` currently writes `.png`
+//     only, but Stage B (#1011) extends the markdown / wiki rewriter
+//     to `<source>` / `<video poster|src>` / `<audio src>`; an LLM
+//     placing a `.mp4` poster's source video alongside its image at
+//     `artifacts/images/<id>.mp4` (or any user-dropped media file
+//     under that dir) needs to round-trip through this mount the
+//     same way image refs do — otherwise the rewritten URL hits this
+//     mount and 404s before `express.static` gets a chance.
 //  2. realpath-based traversal check via `resolveWithinRoot` — same
 //     guard `/api/files/raw` uses. Catches symlinks pointing outside
 //     the images dir, which `express.static` would otherwise follow.
 //  3. `dotfiles: deny` + `fallthrough: false` on `express.static`
 //     itself, plus its built-in `..` normalize for path traversal.
-const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|svg)$/i;
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|svg|mp4|webm|mov|m4v|ogv|mp3|ogg|oga|wav|m4a|aac)$/i;
 let imagesDirReal: string | null = null;
 async function getImagesDirReal(): Promise<string | null> {
   if (imagesDirReal) return imagesDirReal;
@@ -221,12 +228,15 @@ app.use(
 // parity. Sandbox stays `allow-scripts` only, so the iframe document
 // still cannot read the parent's cookies / localStorage / DOM.
 //
-// `HTML_PREVIEW_EXT_RE` widens the allowlist to images so inline
-// `<img src="...png">` references resolve through this same mount
-// (no separate /artifacts/images round-trip). The CSP header is
-// only set for HTML responses (`HTML_DOCUMENT_EXT_RE`); CSP doesn't
-// apply to image subresources.
-const HTML_PREVIEW_EXT_RE = /\.(html?|png|jpe?g|webp|gif|svg|ico)$/i;
+// `HTML_PREVIEW_EXT_RE` widens the allowlist to images, video and
+// audio so inline `<img src="...png">` / `<source>` / `<video src>` /
+// `<audio src>` references resolve through this same mount (no
+// separate /artifacts/images round-trip). The CSP header is only set
+// for HTML responses (`HTML_DOCUMENT_EXT_RE`); CSP doesn't apply to
+// image / media subresources.
+//
+// eslint-disable-next-line sonarjs/regex-complexity -- flat extension allowlist with no nested quantifiers, ReDoS-safe; complexity is just the disjunction count
+const HTML_PREVIEW_EXT_RE = /\.(html?|png|jpe?g|webp|gif|svg|ico|mp4|webm|mov|m4v|ogv|mp3|ogg|oga|wav|m4a|aac)$/i;
 const HTML_DOCUMENT_EXT_RE = /\.html?$/i;
 let htmlsDirReal: string | null = null;
 async function getHtmlsDirReal(): Promise<string | null> {
@@ -327,6 +337,7 @@ app.use(sourcesRoutes);
 app.use(newsRoutes);
 app.use(pluginsRoutes);
 app.use(imageRoutes);
+app.use(attachmentRoutes);
 app.use(presentHtmlRoutes);
 app.use(chartRoutes);
 app.use(rolesRoutes);

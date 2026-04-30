@@ -24,7 +24,6 @@ describe("buildMcpConfig", () => {
       chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList", "presentDocument"],
-      roleIds: ["assistant", "cook"],
     }) as Record<string, unknown>;
 
     assert.ok(config.mcpServers);
@@ -39,22 +38,19 @@ describe("buildMcpConfig", () => {
     assert.equal(env.SESSION_ID, "s1");
     assert.equal(env.PORT, "3001");
     assert.equal(env.PLUGIN_NAMES, "manageTodoList,presentDocument");
-    assert.equal(env.ROLE_IDS, "assistant,cook");
   });
 
-  it("handles empty plugins and roles", async () => {
+  it("handles empty plugins", async () => {
     const config = buildMcpConfig({
       chatSessionId: "s2",
       port: 4000,
       activePlugins: [],
-      roleIds: [],
     }) as Record<string, unknown>;
 
     const servers = config.mcpServers as Record<string, unknown>;
     const server = servers.mulmoclaude as Record<string, unknown>;
     const env = server.env as Record<string, string>;
     assert.equal(env.PLUGIN_NAMES, "");
-    assert.equal(env.ROLE_IDS, "");
   });
 });
 
@@ -434,7 +430,6 @@ describe("buildMcpConfig — user servers", () => {
       chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList"],
-      roleIds: ["assistant"],
       userServers: {
         gmail: {
           type: "http",
@@ -452,7 +447,6 @@ describe("buildMcpConfig — user servers", () => {
       chatSessionId: "s1",
       port: 3001,
       activePlugins: ["manageTodoList"],
-      roleIds: ["assistant"],
       userServers: {
         mulmoclaude: {
           type: "http",
@@ -608,7 +602,6 @@ describe("buildMcpConfig — bearer token env (#325)", () => {
       chatSessionId: "s1",
       port: 3001,
       activePlugins: [],
-      roleIds: [],
     }) as Record<string, unknown>;
 
     const servers = config.mcpServers as Record<string, unknown>;
@@ -623,7 +616,6 @@ describe("buildMcpConfig — bearer token env (#325)", () => {
       chatSessionId: "s1",
       port: 3001,
       activePlugins: [],
-      roleIds: [],
     }) as Record<string, unknown>;
 
     const servers = config.mcpServers as Record<string, unknown>;

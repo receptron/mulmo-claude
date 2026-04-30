@@ -334,7 +334,7 @@ e2e-live/
 
 | シナリオ | 状態 | 備考 |
 |---|---|---|
-| **L-01** presentHtml 画像描画 | ✅ 実装済 | media.spec.ts、fixture 画像を workspace に配置 → naturalWidth > 0 |
+| **L-01** presentHtml 画像描画 | ✅ 実装済 | media.spec.ts、fixture 画像を workspace に配置 → naturalWidth > 0、self-repair guard (readImgRepairAttempted) 追加済 |
 | **L-02** PDF DL | ✅ 実装済 | media.spec.ts、textResponse の PDF ボタン経由 |
 | L-03〜L-30 | 未実装 | カテゴリごとの後続 PR で順次 |
 
@@ -400,6 +400,7 @@ L-01 の検証ポイント:
 - `src` 属性が `e2e-live-l01.png` を含むこと（リテラル一致）
 - `src` が `/artifacts/...` で始まら**ない**こと（LLM が新ルール違反していないかの guard）
 - `naturalWidth > 0`（end-to-end の本質的な signal — 画像が実際に decode されたか）
+- `readImgRepairAttempted` が `false`（PR #974 の onerror self-repair が発火していないこと — self-repair は `/artifacts/images/...` の絶対パスを修正するため、LLM が絶対パスを吐いても naturalWidth > 0 になって false-pass になる罠を防ぐ）
 
 `/artifacts/images/...` は依然 Express 静的マウントで配信されているので、 ブラウザは `<base href>` (= iframe の `src` の親ディレクトリ `/artifacts/html/<YYYY>/<MM>/`) に対して `../../../images/<file>` を解決して `/artifacts/images/<file>` を fetch する。
 
@@ -789,11 +790,10 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 
 ### 要対応（PR #971 には未反映、 後続 PR で見直し）
 
-- **#974 onerror self-repair (Stage 3)**: `<img>` が 404 した時にブラウザ側で `src` を `/artifacts/images/<rest>` に書き換えて自動 retry する。 これは **L-01 の `naturalWidth > 0` チェックが甘くなる** リスク:
-  - LLM が古い絶対パス convention に戻っても、 self-repair で表示は救われる
-  - assert がパスしてしまい、 「LLM が convention を守っているか」 を検出できない
-  - 緩和策: console error 監視 / `page.on("requestfailed")` で初回 fetch の 404 をフェイルさせる / `<img>` の `src` 変更を検出する MutationObserver
-  - 重要度: **中**（B-18 系の本質的な regression は naturalWidth で拾えるが、 LLM 退行の検知力は落ちる）
+- **#974 onerror self-repair (Stage 3)** ✅ guard 反映済: `<img>` が 404 した時にブラウザ側で `src` を `/artifacts/images/<rest>` に書き換えて自動 retry する仕組みで、 そのままだと **L-01 の `naturalWidth > 0` チェックが甘くなる** （LLM が `artifacts/images/` を含む間違った prefix を emit しても表示が救われ assert がパスする）。
+  - 採用ガード: self-repair が発火すると repair script が `<img>` に `data-image-repair-tried="1"` マーカを付ける。 L-01 の assertion で `naturalWidth > 0` 確認後に **マーカ未セット** を assert する形に変更。 helper `readImgRepairAttempted` を `e2e-live/fixtures/live-chat.ts` に追加。
+  - 既存の `not.toMatch(/^\/artifacts\//)` 絶対パス退行 guard と直交する（こちらは self-repair が発火しない 「直接 200 が返る絶対パス」 を検出、 マーカ guard は self-repair に救われた間接退行を検出）。
+  - 検討した他案: console error 監視 / `page.on("requestfailed")` / `<img>.src` MutationObserver。 マーカ参照が最も直接的（「self-repair が発火した」 = 「LLM が convention 違反した」 そのもの）かつ実装が局所的なので採用。
 - **#983 presentDocument / generateImage の path 入り message**: tool result の message 文字列に `Saved … to <path>` が乗るようになり LLM が path を正しく扱える。 → **L-05 (generateImage)** の prompt から `<path>` キャプチャが楽になる（spec 実装時に活用）
 - **#991 Safari preview iframe CSP** ✅ webkit project 追加 + 動作確認済: `e2e-live/playwright.config.ts` の projects に `webkit` を追加 (`testMatch: "media.spec.ts"` で対象 spec を絞り、 `e2e/playwright.config.ts` の chromium+webkit 分割を踏襲)。 spec 側は手を入れていない。
   - **当初の誤観測**: webkit 走行で L-01 が `naturalWidth=0` で fail し、 #991 の fix が e2e-live 経路に届いていないと推定して issue #1015 を起票した。
@@ -809,7 +809,7 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 - [ ] 実行時間実測 → 30 シナリオ × 2 モードで何分か
 - [ ] CI 化のタイミング（手動運用が安定したら GitHub Actions 検討）
 - [ ] L-22 で使う skill の選定（dry-run 可能なものに絞る）
-- [ ] **#974 self-repair で L-01 の `naturalWidth > 0` が甘くなる件の緩和策決定**（console error 監視 / requestfailed リスナ / src MutationObserver のいずれか）
+- [x] ~~**#974 self-repair で L-01 の `naturalWidth > 0` が甘くなる件の緩和策決定**~~ → `data-image-repair-tried` マーカ参照 guard を採用（上記 「要対応」 セクション参照）
 - [x] ~~**Safari (webkit) project の追加**~~ → 反映済（`e2e-live/playwright.config.ts` に `webkit` project + `testMatch: "media.spec.ts"`）
 - [x] ~~**webkit で L-01 が `naturalWidth=0` で fail する件の調査と修正**~~ → #1015 close 済（real bug ではなく dev server stale だっただけ。 上の 「真の原因」 セクション参照。 dev 再起動後に webkit L-01 + L-02 pass 確認）
 - [ ] **L-05 (generateImage)** 実装時に #983 の path-in-message を活用（path のキャプチャが容易になる）

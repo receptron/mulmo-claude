@@ -539,6 +539,8 @@ const esMessages = {
     redo: "Rehacer",
     clear: "Limpiar",
     styleLabel: "Estilo:",
+    stylePromptWithPath: "Convierte la imagen en `{path}` en una imagen de estilo {style}.",
+    stylePromptNoPath: "Convierte mi dibujo en el lienzo en una imagen de estilo {style}.",
   },
   pluginChart: {
     untitled: "Gráfico",

@@ -1,10 +1,9 @@
 import { Router, Request, Response } from "express";
-import { getOptionalStringQuery } from "../../utils/request.js";
-import { getSessionImageData } from "../../events/session-store/index.js";
 import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../../utils/gemini.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
+import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension } from "../../utils/files/attachment-store.js";
 import { promptMeta } from "../../utils/promptMeta.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
@@ -131,52 +130,93 @@ router.post(API_ROUTES.image.generate, async (req: Request<object, unknown, Gene
   }
 });
 
-interface EditImageBody {
+interface EditImagesBody {
   prompt: string;
+  imagePaths: string[];
 }
 
-router.post(API_ROUTES.image.edit, async (req: Request<object, unknown, EditImageBody>, res: Response<ImageResponse>) => {
-  const { prompt } = req.body;
-  const session = getOptionalStringQuery(req, "session");
-  if (!prompt) {
-    log.warn("image", "edit: missing prompt", { session });
+// Hard upper bound on how many source images a single edit call may
+// reference. Gemini's image-edit endpoint accepts multi-image inputs
+// but quality degrades quickly past a small number, and a runaway
+// LLM passing dozens of paths would burn tokens / disk reads on
+// every retry. Tune up if real workloads need more.
+const MAX_EDIT_IMAGES = 8;
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.length > 0);
+}
+
+interface SourceImage {
+  data: string;
+  mimeType: string;
+}
+
+async function loadSourceImage(imagePath: string): Promise<SourceImage> {
+  if (isImagePath(imagePath)) {
+    const data = await loadImageBase64(imagePath);
+    return { data, mimeType: "image/png" };
+  }
+  if (isAttachmentPath(imagePath)) {
+    const mimeType = inferMimeFromExtension(imagePath);
+    if (!mimeType || !mimeType.startsWith("image/")) {
+      throw new Error(`attachment is not a recognised image: ${imagePath}`);
+    }
+    const data = await loadAttachmentBase64(imagePath);
+    return { data, mimeType };
+  }
+  throw new Error(`imagePath must live under artifacts/images/ or data/attachments/: ${imagePath}`);
+}
+
+router.post(API_ROUTES.image.edit, async (req: Request<object, unknown, EditImagesBody>, res: Response<ImageResponse>) => {
+  const { prompt, imagePaths } = req.body;
+  if (typeof prompt !== "string" || prompt.length === 0) {
+    log.warn("image", "edit: missing prompt");
     res.status(400).json({ success: false, message: "prompt is required" });
     return;
   }
-  const currentImageData = session ? getSessionImageData(session) : undefined;
-  if (!currentImageData) {
-    log.warn("image", "edit: no source image selected", { session });
+  if (!isStringArray(imagePaths) || imagePaths.length === 0) {
+    log.warn("image", "edit: missing imagePaths");
     res.status(400).json({
       success: false,
-      message: "No image is selected. Please click an image in the sidebar first, then ask me to edit it.",
+      message: "imagePaths must be a non-empty array of workspace-relative paths",
     });
     return;
   }
-  log.info("image", "edit: start", { prompt: promptMeta(prompt), session, sourceKind: isImagePath(currentImageData) ? "path" : "dataUri" });
+  if (imagePaths.length > MAX_EDIT_IMAGES) {
+    log.warn("image", "edit: too many imagePaths", { count: imagePaths.length });
+    res.status(400).json({
+      success: false,
+      message: `imagePaths exceeds the maximum of ${MAX_EDIT_IMAGES} entries`,
+    });
+    return;
+  }
+
+  log.info("image", "edit: start", { prompt: promptMeta(prompt), imageCount: imagePaths.length });
   try {
-    // Resolve input image to raw base64 — supports both file paths and legacy data URIs
-    const base64Data = isImagePath(currentImageData) ? await loadImageBase64(currentImageData) : stripDataUri(currentImageData);
+    const sources: SourceImage[] = [];
+    for (const imagePath of imagePaths) {
+      sources.push(await loadSourceImage(imagePath));
+    }
     // /edit-image deliberately omits `config` (no aspectRatio) so
-    // Gemini preserves the input image's dimensions.
-    const { imageData, message } = await generateGeminiImageContent([
-      {
-        parts: [{ inlineData: { mimeType: "image/png", data: base64Data } }, { text: prompt }],
-      },
-    ]);
+    // Gemini preserves the input image's dimensions. Multiple
+    // inlineData parts before the text instruct Gemini to combine
+    // / edit the inputs as a single composition.
+    const parts = [...sources.map((src) => ({ inlineData: { mimeType: src.mimeType, data: src.data } })), { text: prompt }];
+    const { imageData, message } = await generateGeminiImageContent([{ parts }]);
     if (!imageData) {
       log.warn("image", "edit: gemini returned no image data", {
         prompt: promptMeta(prompt),
-        session,
+        imageCount: imagePaths.length,
         fallbackMessage: message,
       });
     } else {
-      log.info("image", "edit: ok", { prompt: promptMeta(prompt), session, bytes: imageData.length });
+      log.info("image", "edit: ok", { prompt: promptMeta(prompt), imageCount: imagePaths.length, bytes: imageData.length });
     }
     await respondWithImage(res, imageData, message, prompt, "edit");
   } catch (err) {
     log.error("image", "edit: gemini call threw", {
       prompt: promptMeta(prompt),
-      session,
+      imageCount: imagePaths.length,
       error: errorMessage(err),
     });
     res.status(500).json({ success: false, message: errorMessage(err) });

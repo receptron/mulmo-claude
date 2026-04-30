@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import type { Token, Tokens } from "marked";
 import { resolveImageSrc } from "./resolve";
+import { transformResolvableUrlsInHtml } from "./htmlSrcAttrs";
 
 // Pre-`marked` pass that rewrites workspace-relative image references
 // in markdown source so they render through the backend file server.
@@ -102,101 +103,39 @@ function rewriteImageToken(token: Tokens.Image, basePath: string): string | null
   return `![${alt}](${newHref})`;
 }
 
-// Rewrite the `src` attribute of every `<img>` tag inside an HTML
-// fragment, applying the same basePath / shouldSkip / resolveImageSrc
-// pipeline used for `![alt](url)` markdown images. Other attributes
-// (alt, class, style, id, …) are preserved verbatim.
+// Rewrite URL-bearing attributes of every recognised tag inside an
+// HTML fragment, applying the same basePath / shouldSkip /
+// resolveImageSrc pipeline used for `![alt](url)` markdown images.
+// Other attributes (alt, class, style, id, …) are preserved verbatim.
 //
-// Handles the common quoting variations:
-//   - <img src="path">              double-quoted
-//   - <img src='path'>              single-quoted
-//   - <img src=path>                unquoted (HTML5 allows this when
-//                                   the value has no spaces / quotes
-//                                   / `>` / `=` / backticks)
-//   - <img alt="x" src="..." />     attribute order doesn't matter
-//   - <img\n  src="..." />          newlines inside the tag work
+// Tags + attributes covered (single source of truth at
+// `htmlSrcAttrs.ts:RESOLVABLE_TAG_ATTRS`): `<img src>`, `<source src>`,
+// `<video poster|src>`, `<audio src>`. Add a row there to extend
+// coverage; both this rewriter and the server-side PDF rewriter pick
+// it up automatically (#1011 Stage B).
 //
-// Tags without a `src`, or with a `src` that already passes
-// `shouldSkip` (data: URI / http / /api/), are returned untouched.
+// Output URLs come from `resolveImageSrc`, which either returns a
+// mount-rooted path (`/artifacts/images/<file>`) or runs the input
+// through `encodeURIComponent`. `"` becomes `%22`, `'` becomes `%27`,
+// `<` / `>` are encoded — the rewritten attribute can't break out of
+// its own quotes or close the tag.
 //
-// Robustness / safety notes:
-//
-//   - All regex quantifiers are bounded by `[^>]` or character-class
-//     negations so no input can drive exponential backtracking.
-//     A 100KB-no-closing-> probe runs in linear time.
-//   - The unquoted-value branch refuses to start with `"` or `'`. So
-//     malformed input like `<img src="aaaa alt=x>` (missing closing
-//     quote) is left alone instead of capturing `"aaaa` as the value.
-//   - Output URLs come from `resolveImageSrc`, which either returns a
-//     mount-rooted path (`/artifacts/images/<file>`) or runs the input
-//     through `encodeURIComponent`. `"` becomes `%22`, `'` becomes
-//     `%27`, `<` / `>` are encoded — the rewritten attribute can't
-//     break out of its own quotes or close the tag.
-//   - Defensive against `token.raw` being unexpectedly empty: an
-//     empty string short-circuits the outer replace.
-//
-// Known limitations (acceptable for #1011 Stage A):
-//
-//   - Only `<img>` is matched. `<picture><source>` / `<video poster>` /
-//     SVG `<image>` / CSS `url()` are tracked under #1011 Stage B / E.
-//   - A regex can't perfectly distinguish a real `<img>` tag from a
-//     `<img>` substring embedded inside another attribute, e.g.
-//     `<div data-x="<img src='foo.png'>">`. Such cases get rewritten
-//     too — harmless because the rewritten URL is encoded safely, and
-//     the rewrite makes the embedded reference resolve correctly if
-//     it's later inserted into the DOM by JS.
-// Attribute iterator for the inner pass — see the comment block on
-// `IMG_ATTR_RE` in `server/api/routes/pdf.ts` for the rationale on
-// parsing attribute-by-attribute (handles `src=` text inside another
-// attribute's value, namespaced attrs like `xml:src`).
-//
-// Capture groups:
-//   1: leading whitespace
-//   2: attribute name
-//   3: `=` with surrounding spaces (only when value present)
-//   4: full quoted/unquoted value
-//   5: double-quoted value (without quotes)
-//   6: single-quoted value (without quotes)
-//   7: unquoted value (refuses leading quote so malformed
-//      `<img src="aaaa` doesn't capture the stray quote)
-//
-// All quantifiers bounded — verified ReDoS-safe by 100KB test in
-// test_rewriteMarkdownImageRefs.ts. The disables silence sonarjs's
-// alternation-counting heuristic.
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded quantifiers, ReDoS-safe (test in test_rewriteMarkdownImageRefs.ts)
-const IMG_ATTR_ITER_RE = /(\s+)([A-Za-z][\w:-]*)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*)))?/g;
-
-function rewriteSrcAttr(captures: unknown[], basePath: string): string {
-  const [full, leading, name, eqWithSpaces, , doubleQuoted, singleQuoted, bare] = captures as [
-    string,
-    string,
-    string,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-  ];
-  if (!eqWithSpaces || name.toLowerCase() !== "src") return full;
-  const url = (doubleQuoted ?? singleQuoted ?? bare ?? "").trim();
-  if (!url || shouldSkip(url)) return full;
-  const resolved = resolveWorkspacePath(basePath, url);
-  if (resolved === null) return full;
-  const newUrl = resolveImageSrc(resolved);
-  const quote = doubleQuoted !== undefined ? '"' : singleQuoted !== undefined ? "'" : '"';
-  return `${leading}${name}${eqWithSpaces}${quote}${newUrl}${quote}`;
-}
-
-// Outer regex: respects quoted attribute values so a `>` inside
-// `alt="x > y"` doesn't terminate the tag early (Codex iter-2
-// finding on #1023). All branches bounded; ReDoS-safe.
-//
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded alternatives, ReDoS-safe (test in test_rewriteMarkdownImageRefs.ts)
-const IMG_TAG_OUTER_RE = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*\/?>/gi;
-
+// Limitations:
+//   - `srcset` (comma-separated descriptor list) is deferred —
+//     tracked under #1011 Stage B follow-up.
+//   - SVG `<image href>` and CSS `url()` are deferred per plan
+//     §修正提案 P3-A.
+//   - A regex can't perfectly distinguish a real tag from one
+//     embedded in another attribute's value; embedded matches get
+//     rewritten too. Harmless because the rewritten URL is encoded
+//     safely.
 export function rewriteImgSrcAttrsInHtml(html: string, basePath: string): string {
-  if (!html) return html;
-  return html.replace(IMG_TAG_OUTER_RE, (tag) => tag.replace(IMG_ATTR_ITER_RE, (...captures: unknown[]) => rewriteSrcAttr(captures, basePath)));
+  return transformResolvableUrlsInHtml(html, (url) => {
+    if (shouldSkip(url)) return null;
+    const resolved = resolveWorkspacePath(basePath, url);
+    if (resolved === null) return null;
+    return resolveImageSrc(resolved);
+  });
 }
 
 function isSkippable(token: Token): boolean {

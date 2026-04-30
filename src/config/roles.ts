@@ -58,7 +58,6 @@ export const ROLES: Role[] = [
       TOOL_NAMES.readXPost,
       TOOL_NAMES.searchX,
       TOOL_NAMES.notify,
-      TOOL_NAMES.switchRole,
     ],
     queries: [
       "Tell me about this app, MulmoClaude.",
@@ -94,7 +93,6 @@ export const ROLES: Role[] = [
       TOOL_NAMES.readXPost,
       TOOL_NAMES.searchX,
       TOOL_NAMES.notify,
-      TOOL_NAMES.switchRole,
     ],
     queries: [
       "Show me the discount cash flow analysis of monthly income of $10,000 for two years. Make it possible to change the discount rate and monthly income.",
@@ -120,7 +118,7 @@ export const ROLES: Role[] = [
       '3. CREATE THE DOCUMENT: Call presentDocument with a well-structured document — open with an overview, use numbered steps or section-by-section structure, add `<a id="step-1"></a>` anchors, embed images via `![prompt](__too_be_replaced_image_path__)`, and close with tips or follow-up recommendations. Per-type document structure is in guide.md.\n\n' +
       "4. FOLLOW-UP ASSISTANCE: Offer to read any step aloud (scrollToAnchor first, then narrate), answer follow-up questions, or adjust the plan based on feedback.\n\n" +
       "TONE: Warm, enthusiastic, encouraging. Adapt vocabulary to the user's stated experience level.",
-    availablePlugins: [TOOL_NAMES.presentForm, TOOL_NAMES.presentDocument, TOOL_NAMES.generateImage, TOOL_NAMES.presentChart, TOOL_NAMES.switchRole],
+    availablePlugins: [TOOL_NAMES.presentForm, TOOL_NAMES.presentDocument, TOOL_NAMES.generateImage, TOOL_NAMES.presentChart],
     queries: [
       "Give me the recipe for omelette",
       "I want to plan a trip to Paris",
@@ -135,16 +133,9 @@ export const ROLES: Role[] = [
     icon: "palette",
     prompt:
       "You are a creative visual artist assistant. Help users generate and edit images, work on visual compositions on the canvas, and create interactive generative art.\n\n" +
-      "Use generateImage to create new images from descriptions, editImage to modify existing images, and openCanvas to set up a visual workspace.\n\n" +
+      "Use generateImage to create new images from descriptions, editImages to modify or combine one or more existing images, and openCanvas to set up a visual workspace.\n\n" +
       'Use presentHtml for interactive and generative art — p5.js is an excellent choice for sketches, animations, particle systems, and algorithmic visuals. Load it via CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>. Always make the canvas fill the full viewport (createCanvas(windowWidth, windowHeight)) and call windowResized() to handle resize.',
-    availablePlugins: [
-      TOOL_NAMES.generateImage,
-      TOOL_NAMES.editImage,
-      TOOL_NAMES.openCanvas,
-      TOOL_NAMES.present3D,
-      TOOL_NAMES.presentHtml,
-      TOOL_NAMES.switchRole,
-    ],
+    availablePlugins: [TOOL_NAMES.generateImage, TOOL_NAMES.editImages, TOOL_NAMES.openCanvas, TOOL_NAMES.present3D, TOOL_NAMES.presentHtml],
     queries: [
       "Open canvas",
       "Turn this drawing into Ghibli style image",
@@ -167,7 +158,6 @@ export const ROLES: Role[] = [
       TOOL_NAMES.presentHtml,
       TOOL_NAMES.presentChart,
       TOOL_NAMES.manageSkills,
-      TOOL_NAMES.switchRole,
     ],
     queries: [
       "I want to learn about Humpback whales",
@@ -192,7 +182,7 @@ export const ROLES: Role[] = [
       "5. For EVERY beat, set `imageNames` (array of character keys appearing in the beat) and write an `imagePrompt` describing the scene (setting, action, mood, composition).\n" +
       "6. Write a concise 1–2 sentence synopsis and put it in the top-level 'description' field.\n" +
       "7. Call presentMulmoScript with the assembled script.",
-    availablePlugins: [TOOL_NAMES.presentMulmoScript, TOOL_NAMES.switchRole],
+    availablePlugins: [TOOL_NAMES.presentMulmoScript],
     queries: [
       "Tell a story about two siblings — a bold older sister and a shy younger brother — who get lost in an enchanted forest. Use a Studio Ghibli anime style.",
       "Create a story with three characters: a grumpy wizard, his loyal cat, and a young apprentice who must work together to break a curse. Use a dark fantasy oil painting style.",
@@ -210,7 +200,7 @@ export const ROLES: Role[] = [
       "- **manageSkills**: create, edit, list, or delete skills (reusable instructions stored as SKILL.md files in the workspace).\n" +
       "- **manageAutomations**: schedule and manage recurring or one-off tasks. When suggesting cadences, prefer hourly for news polling, daily for digests, weekly for cleanup.\n\n" +
       "When several options are involved, use presentForm to gather configuration cleanly. Confirm what you've changed at the end so the user can verify.",
-    availablePlugins: [TOOL_NAMES.manageSource, TOOL_NAMES.manageSkills, TOOL_NAMES.manageAutomations, TOOL_NAMES.presentForm, TOOL_NAMES.switchRole],
+    availablePlugins: [TOOL_NAMES.manageSource, TOOL_NAMES.manageSkills, TOOL_NAMES.manageAutomations, TOOL_NAMES.presentForm],
     queries: [
       "Register an RSS feed for AI news",
       "Show me my registered information sources",

@@ -10,7 +10,6 @@ export const EVENT_TYPES = {
   toolCall: "tool_call",
   toolCallResult: "tool_call_result",
   toolResult: "tool_result",
-  switchRole: "switch_role",
   error: "error",
   claudeSessionId: "claude_session_id",
   sessionFinished: "session_finished",

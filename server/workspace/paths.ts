@@ -55,6 +55,11 @@ export const WORKSPACE_DIRS = {
   contacts: "data/contacts",
   scheduler: "data/scheduler",
   sources: "data/sources",
+  // Pasted/dropped chat attachments — saved at upload time so the
+  // LLM can be handed a stable workspace path instead of inline
+  // base64. Conversion artefacts (e.g. PPTX → PDF) live alongside
+  // the original under the same YYYY/MM partition.
+  attachments: "data/attachments",
   transports: "data/transports",
   // artifacts/
   charts: "artifacts/charts",
@@ -115,6 +120,7 @@ export const WORKSPACE_PATHS = {
   wiki: path.join(workspacePath, WORKSPACE_DIRS.wiki),
   news: path.join(workspacePath, WORKSPACE_DIRS.news),
   sources: path.join(workspacePath, WORKSPACE_DIRS.sources),
+  attachments: path.join(workspacePath, WORKSPACE_DIRS.attachments),
   summaries: path.join(workspacePath, WORKSPACE_DIRS.summaries),
   searches: path.join(workspacePath, WORKSPACE_DIRS.searches),
   htmls: path.join(workspacePath, WORKSPACE_DIRS.htmls),

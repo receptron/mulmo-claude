@@ -4,7 +4,6 @@ export type AgentEvent =
   | { type: typeof EVENT_TYPES.status; message: string }
   | { type: typeof EVENT_TYPES.text; message: string }
   | { type: typeof EVENT_TYPES.toolResult; result: unknown }
-  | { type: typeof EVENT_TYPES.switchRole; roleId: string }
   | { type: typeof EVENT_TYPES.error; message: string }
   | {
       type: typeof EVENT_TYPES.toolCall;

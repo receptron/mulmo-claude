@@ -31,7 +31,6 @@ export interface ServerSession {
   statusMessage: string;
   toolCallHistory: ToolCallHistoryItem[];
   resultsFilePath: string;
-  selectedImageData?: string;
   startedAt: string;
   updatedAt: string;
   /** Kills the spawned Claude CLI process for this session. */
@@ -82,7 +81,6 @@ export function getOrCreateSession(
   opts: {
     roleId: string;
     resultsFilePath: string;
-    selectedImageData?: string;
     startedAt: string;
     updatedAt: string;
     hasUnread?: boolean;
@@ -90,7 +88,6 @@ export function getOrCreateSession(
 ): ServerSession {
   const existing = store.get(chatSessionId);
   if (existing) {
-    existing.selectedImageData = opts.selectedImageData;
     existing.updatedAt = opts.updatedAt;
     return existing;
   }
@@ -102,7 +99,6 @@ export function getOrCreateSession(
     statusMessage: "",
     toolCallHistory: [],
     resultsFilePath: opts.resultsFilePath,
-    selectedImageData: opts.selectedImageData,
     startedAt: opts.startedAt,
     updatedAt: opts.updatedAt,
     pendingGenerations: {},
@@ -413,10 +409,6 @@ export async function pushToolResult(chatSessionId: string, result: unknown): Pr
 }
 
 // ── Query helpers ──────────────────────────────────────────────
-
-export function getSessionImageData(chatSessionId: string): string | undefined {
-  return store.get(chatSessionId)?.selectedImageData;
-}
 
 export function getActiveSessionIds(): Set<string> {
   const ids = new Set<string>();

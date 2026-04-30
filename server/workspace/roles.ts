@@ -3,14 +3,6 @@ import { BUILTIN_ROLES, RoleSchema, type Role } from "../../src/config/roles.js"
 import { WORKSPACE_DIRS, workspacePath } from "./paths.js";
 import { readdirUnderSync, readTextUnderSync } from "../utils/files/workspace-io.js";
 
-function withSwitchRole(role: Role): Role {
-  if (role.availablePlugins.includes("switchRole")) return role;
-  return {
-    ...role,
-    availablePlugins: [...role.availablePlugins, "switchRole"],
-  };
-}
-
 export function loadCustomRoles(): Role[] {
   return readdirUnderSync(workspacePath, WORKSPACE_DIRS.roles)
     .filter((fileName) => fileName.endsWith(".json"))
@@ -18,7 +10,7 @@ export function loadCustomRoles(): Role[] {
       try {
         const raw = readTextUnderSync(workspacePath, path.posix.join(WORKSPACE_DIRS.roles, fileName));
         if (!raw) return [];
-        return [withSwitchRole(RoleSchema.parse(JSON.parse(raw)))];
+        return [RoleSchema.parse(JSON.parse(raw))];
       } catch {
         return [];
       }

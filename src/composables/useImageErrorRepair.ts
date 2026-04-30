@@ -37,28 +37,28 @@ const SRCSET_TOKEN_RE = /[^\s,]+/g;
 // `useGlobalImageErrorRepair` is active in the app shell.
 export const IMAGE_REPAIR_INLINE_SCRIPT = `
 document.addEventListener("error", function (event) {
-  var target = event.target;
+  const target = event.target;
   if (!target) return;
-  var pattern = ${IMAGE_REPAIR_PATTERN.toString()};
+  const pattern = ${IMAGE_REPAIR_PATTERN.toString()};
   function fixImg(img) {
     if (img.dataset.imageRepairTried) return;
-    var m = String(img.src).match(pattern);
+    const m = String(img.src).match(pattern);
     if (!m) return;
     img.dataset.imageRepairTried = "1";
     img.src = "/" + m[0];
   }
   function fixSource(src) {
     if (src.dataset.imageRepairTried) return;
-    var changed = false;
-    var srcAttr = src.getAttribute("src");
+    let changed = false;
+    const srcAttr = src.getAttribute("src");
     if (srcAttr) {
-      var m = srcAttr.match(pattern);
+      const m = srcAttr.match(pattern);
       if (m) { src.setAttribute("src", "/" + m[0]); changed = true; }
     }
     if (src.srcset) {
-      var orig = src.srcset;
-      var next = orig.replace(/[^\\s,]+/g, function (tok) {
-        var mm = tok.match(pattern);
+      const orig = src.srcset;
+      const next = orig.replace(/[^\\s,]+/g, function (tok) {
+        const mm = tok.match(pattern);
         return mm ? "/" + mm[0] : tok;
       });
       if (next !== orig) { src.srcset = next; changed = true; }
@@ -67,16 +67,12 @@ document.addEventListener("error", function (event) {
   }
   if (target.tagName === "IMG") {
     fixImg(target);
-    var pic = target.closest && target.closest("picture");
-    if (pic) {
-      var sources = pic.querySelectorAll("source");
-      for (var i = 0; i < sources.length; i++) fixSource(sources[i]);
-    }
+    const pic = target.closest && target.closest("picture");
+    if (pic) for (const s of pic.querySelectorAll("source")) fixSource(s);
   } else if (target.tagName === "SOURCE") {
     fixSource(target);
   } else if (target.tagName === "AUDIO" || target.tagName === "VIDEO") {
-    var mediaSources = target.querySelectorAll(":scope > source");
-    for (var j = 0; j < mediaSources.length; j++) fixSource(mediaSources[j]);
+    for (const s of target.querySelectorAll(":scope > source")) fixSource(s);
   }
 }, true);
 `.trim();

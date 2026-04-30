@@ -23,11 +23,6 @@ export interface SseStatus {
   message: string;
 }
 
-export interface SseSwitchRole {
-  type: typeof EVENT_TYPES.switchRole;
-  roleId: string;
-}
-
 export interface SseText {
   type: typeof EVENT_TYPES.text;
   message: string;
@@ -80,7 +75,6 @@ export type SseEvent =
   | SseToolCall
   | SseToolCallResult
   | SseStatus
-  | SseSwitchRole
   | SseText
   | SseToolResult
   | SseRolesUpdated
