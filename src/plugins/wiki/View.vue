@@ -755,7 +755,10 @@ async function downloadPdf() {
     fallback: "wiki",
     timestampMs: uuid ? appApi.getResultTimestamp(uuid) : undefined,
   });
-  await rawDownloadPdf(content.value, filename);
+  // Wiki pages live under data/wiki/pages/ — pass the source dir so
+  // the server resolves relative `<img>` refs (`../../../artifacts/...`)
+  // against the same base the browser uses.
+  await rawDownloadPdf(content.value, filename, { baseDir: "data/wiki/pages" });
 }
 
 async function callApi(body: Record<string, unknown>) {

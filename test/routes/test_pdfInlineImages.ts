@@ -31,32 +31,32 @@ beforeEach(() => {
 describe("inlineImages — workspace-rooted leading-slash form", () => {
   it("inlines /artifacts/... paths (the LLM web-convention shape)", () => {
     const html = '<img src="/artifacts/images/2026/04/foo.png">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
   });
 
   it("inlines paths without leading slash (markdowns-relative shape)", () => {
     // markdowns/ references go up to artifacts/, then into images/.
     const html = '<img src="../images/2026/04/foo.png">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
   });
 
   it("leaves data: URIs untouched", () => {
     const html = '<img src="data:image/png;base64,AAAA">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.equal(out, html);
   });
 
   it("leaves http(s):// URLs untouched", () => {
     const html = '<img src="https://example.com/foo.png">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.equal(out, html);
   });
 
   it("rejects path traversal that escapes the workspace", () => {
     const html = '<img src="../../../../etc/passwd">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     // Original tag preserved (not inlined). Browser will 404 — better
     // than leaking arbitrary host files into the rendered PDF.
     assert.equal(out, html);
@@ -67,20 +67,95 @@ describe("inlineImages — workspace-rooted leading-slash form", () => {
     // workspace-relative. It doesn't exist under workspaceRoot, so
     // safe-resolve rejects it and the tag passes through unchanged.
     const html = '<img src="/etc/passwd">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.equal(out, html);
   });
 
   it("preserves attributes around src", () => {
     const html = '<img alt="cat" src="/artifacts/images/2026/04/foo.png" width="100">';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     assert.match(out, /^<img alt="cat" src="data:image\/png;base64,[^"]+" width="100">$/);
   });
 
   it("transforms multiple <img> tags in one pass", () => {
     const html = '<p><img src="/artifacts/images/2026/04/foo.png"><img src="../images/2026/04/foo.png"></p>';
-    const out = inlineImages(html, workspaceRoot);
+    const out = inlineImages(html, { workspaceRoot });
     const matches = out.match(/data:image\/png;base64,/g) ?? [];
     assert.equal(matches.length, 2, "both tags should be rewritten");
+  });
+});
+
+describe("inlineImages — sourceDir parameter (Stage F: Wiki PDF)", () => {
+  it("resolves ../../../artifacts/... from data/wiki/pages/", () => {
+    // Wiki page directory needs to exist for path.resolve to behave
+    // normally — although resolve doesn't actually stat. Create it
+    // anyway for realism.
+    mkdirSync(path.join(workspaceRoot, "data", "wiki", "pages"), { recursive: true });
+    const html = '<img src="../../../artifacts/images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot, sourceDir: "data/wiki/pages" });
+    assert.match(out, /^<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">$/);
+  });
+
+  it("falls back to legacy markdowns/ when sourceDir is omitted", () => {
+    const html = '<img src="../images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /data:image\/png;base64/);
+  });
+
+  it("rejects an absolute sourceDir, falls back to legacy default", () => {
+    // path.isAbsolute("/etc") returns true. The function should
+    // defang and still try the markdowns/ fallback (which DOES
+    // contain ../images/foo.png because of the test's mkdirSync).
+    const html = '<img src="../images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot, sourceDir: "/etc" });
+    assert.match(out, /data:image\/png;base64/);
+  });
+
+  it("rejects a sourceDir containing .. segments, falls back to default", () => {
+    const html = '<img src="../images/2026/04/foo.png">';
+    const out = inlineImages(html, { workspaceRoot, sourceDir: "../escape/me" });
+    assert.match(out, /data:image\/png;base64/);
+  });
+});
+
+describe("inlineImages — quote-form coverage (Stage F)", () => {
+  it("inlines a single-quoted src", () => {
+    const html = "<img src='/artifacts/images/2026/04/foo.png'>";
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src='data:image\/png;base64,[^']+'>$/);
+  });
+
+  it("inlines an unquoted src", () => {
+    const html = "<img src=/artifacts/images/2026/04/foo.png>";
+    const out = inlineImages(html, { workspaceRoot });
+    // Output uses double quotes for the canonical form.
+    assert.match(out, /^<img src="data:image\/png;base64,[^"]+">$/);
+  });
+
+  it("inlines a self-closing <img />", () => {
+    const html = '<img src="/artifacts/images/2026/04/foo.png" />';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.match(out, /^<img src="data:image\/png;base64,[^"]+" \/>$/);
+  });
+
+  it("does NOT match data-src= (lookbehind defends against false matches)", () => {
+    const html = '<img data-src="/artifacts/images/2026/04/foo.png" alt="y">';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html);
+  });
+
+  it('leaves a malformed <img src="... (no closing quote) untouched', () => {
+    const html = '<img src="aaaaa.png alt=broken>';
+    const out = inlineImages(html, { workspaceRoot });
+    assert.equal(out, html);
+  });
+
+  it("processes 100KB of input in linear time (no ReDoS)", () => {
+    const html = `<img ${"a".repeat(100_000)}`;
+    const start = Date.now();
+    const out = inlineImages(html, { workspaceRoot });
+    const elapsedMs = Date.now() - start;
+    assert.equal(out, html);
+    assert.ok(elapsedMs < 1000, `expected <1s, got ${elapsedMs}ms`);
   });
 });

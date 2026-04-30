@@ -8,6 +8,7 @@ import { badRequest, serverError } from "../../utils/httpError.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { resolveWithinRoot, readBinarySafeSync } from "../../utils/files/safe.js";
 import { resolveWorkspacePath } from "../../utils/files/workspace-io.js";
+import { parseFrontmatter } from "../../utils/markdown/frontmatter.js";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 
@@ -58,55 +59,121 @@ const MIME_BY_EXT: Record<string, string> = {
 // inside the workspace after symlink resolution.
 const defaultWorkspaceRoot = realpathSync(resolveWorkspacePath(""));
 
+export interface InlineImagesOptions {
+  /** Workspace root absolute path. Defaults to the lazily-resolved
+   *  realpath of the configured workspace. */
+  workspaceRoot?: string;
+  /** Workspace-relative directory the markdown source lives in,
+   *  used to resolve `../foo.png`-style references. e.g.
+   *  `"data/wiki/pages"` for Wiki page PDFs. Defaults to
+   *  `WORKSPACE_DIRS.markdowns` for legacy callers. Inputs are
+   *  rejected if they're absolute or contain `..` segments — the
+   *  workspace boundary is enforced anyway by `resolveWithinRoot`,
+   *  but rejecting up-front gives a clearer log line than a
+   *  silently-broken image. */
+  sourceDir?: string;
+}
+
+// Outer regex: linear scan to the first `>` of an `<img>` tag.
+// `[^>]` bounds the run so no input drives exponential backtracking.
+const IMG_TAG_RE = /<img\b[^>]*\/?>/gi;
+// Inner regex: extract the `src` attribute value, with a (?<![-\w])
+// lookbehind so `data-src=` / `xlink:src=` don't false-match. The
+// unquoted alternative refuses leading `"` / `'` so a malformed
+// `<img src="aaaa  ` doesn't capture the stray quote as the value.
+// Mirrors the shape used by `rewriteImgSrcAttrsInHtml` (PR #1013).
+const IMG_SRC_RE = /((?<![-\w])src\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*))/i;
+
+function isSafeSourceDir(dir: string): boolean {
+  if (!dir) return true;
+  if (path.isAbsolute(dir)) return false;
+  return !dir.split(/[/\\]/).some((segment) => segment === "..");
+}
+
+// Resolve a workspace-rooted-or-relative `src` value to an absolute
+// path on disk, validated to stay inside the workspace root. Returns
+// null on any failure (escape attempt, missing file, malformed path).
+// Logs the reason so the developer can grep when a PDF image is
+// missing.
+function resolveImageAbsPath(src: string, workspaceRoot: string, baseDir: string): string | null {
+  // LLM-generated HTML often emits leading-slash workspace-rooted
+  // paths like "/artifacts/images/2026/04/foo.png" (web convention).
+  // Treat those as workspace-relative; otherwise path.resolve below
+  // sees the slash as host-absolute and the safe-resolve rejects.
+  const workspaceRooted = src.startsWith("/");
+  const resolveBase = workspaceRooted ? workspaceRoot : baseDir;
+  const relSrc = workspaceRooted ? src.slice(1) : src;
+  const unsafeAbs = path.resolve(resolveBase, relSrc);
+  const relToWorkspace = path.relative(workspaceRoot, unsafeAbs);
+  if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
+    log.warn("pdf", "image path escapes workspace", { src });
+    return null;
+  }
+  const abs = resolveWithinRoot(workspaceRoot, relToWorkspace);
+  if (!abs) {
+    log.warn("pdf", "image path rejected by safe-resolve", { src });
+    return null;
+  }
+  return abs;
+}
+
+function loadImageAsDataUri(abs: string): string | null {
+  const buf = readBinarySafeSync(abs);
+  if (!buf) {
+    log.warn("pdf", "could not read image", { abs });
+    return null;
+  }
+  const ext = path.extname(abs).toLowerCase();
+  const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+  return `data:${mime};base64,${buf.toString("base64")}`;
+}
+
+interface SrcMatch {
+  prefix: string;
+  doubleQuoted?: string;
+  singleQuoted?: string;
+  bare?: string;
+  full: string;
+}
+
+function inlineSingleImg(match: SrcMatch, workspaceRoot: string, baseDir: string): string {
+  const src = (match.doubleQuoted ?? match.singleQuoted ?? match.bare ?? "").trim();
+  if (!src) return match.full;
+  if (src.startsWith("data:") || src.startsWith("http")) return match.full;
+  const abs = resolveImageAbsPath(src, workspaceRoot, baseDir);
+  if (!abs) return match.full;
+  const dataUri = loadImageAsDataUri(abs);
+  if (!dataUri) return match.full;
+  const quote = match.doubleQuoted !== undefined ? '"' : match.singleQuoted !== undefined ? "'" : '"';
+  return `${match.prefix}${quote}${dataUri}${quote}`;
+}
+
 /**
  * Inline local images as base64 data URIs so Puppeteer can render them.
- * Markdown files live in workspace/artifacts/documents/ and reference
- * images as "../images/xyz.png" → workspace/artifacts/images/xyz.png.
+ * Resolves `<img>` `src` references against `sourceDir` (workspace-
+ * relative); for example, a Wiki page (`data/wiki/pages/X.md`)
+ * referencing `../../../artifacts/images/foo.png` resolves to
+ * `artifacts/images/foo.png`.
  *
- * Paths are validated against the workspace root via resolveWithinRoot
- * so an attacker-controlled <img src="../../../etc/passwd"> can't read
- * files outside the workspace.
+ * Handles double-quoted, single-quoted, and unquoted `src` values.
+ * Skips data: URIs and http(s) URLs. Refuses values that escape the
+ * workspace root after resolution — the workspace boundary is
+ * enforced by `resolveWithinRoot`, regardless of `sourceDir`.
  */
-export function inlineImages(html: string, workspaceRoot: string = defaultWorkspaceRoot): string {
-  const baseDir = path.join(workspaceRoot, WORKSPACE_DIRS.markdowns);
-  return html.replace(/(<img\s[^>]*src=")([^"]+)(")/g, (_match, before: string, src: string, after: string) => {
-    if (src.startsWith("data:") || src.startsWith("http")) {
-      return _match;
-    }
-    // LLM-generated HTML often emits leading-slash workspace-rooted
-    // paths like "/artifacts/images/2026/04/foo.png" (web convention).
-    // Treat those as workspace-relative; otherwise path.resolve below
-    // sees the slash as host-absolute and the safe-resolve rejects.
-    const workspaceRooted = src.startsWith("/");
-    const resolveBase = workspaceRooted ? workspaceRoot : baseDir;
-    const relSrc = workspaceRooted ? src.slice(1) : src;
-    // Resolve the image path relative to markdowns/ (or workspace root
-    // for the leading-slash case) but require the final realpath to
-    // stay inside the workspace root. markdowns/ references like
-    // "../images/foo.png" are common so we can't restrict to markdowns/
-    // itself.
-    const unsafeAbs = path.resolve(resolveBase, relSrc);
-    // Make unsafeAbs relative to the workspace for the
-    // resolveWithinRoot check (it expects a relative path).
-    const relToWorkspace = path.relative(workspaceRoot, unsafeAbs);
-    if (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) {
-      log.warn("pdf", "image path escapes workspace", { src });
-      return _match;
-    }
-    const abs = resolveWithinRoot(workspaceRoot, relToWorkspace);
-    if (!abs) {
-      log.warn("pdf", "image path rejected by safe-resolve", { src });
-      return _match;
-    }
-    const buf = readBinarySafeSync(abs);
-    if (!buf) {
-      log.warn("pdf", "could not read image", { abs });
-      return _match;
-    }
-    const ext = path.extname(abs).toLowerCase();
-    const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
-    return `${before}data:${mime};base64,${buf.toString("base64")}${after}`;
-  });
+export function inlineImages(html: string, options: InlineImagesOptions = {}): string {
+  const workspaceRoot = options.workspaceRoot ?? defaultWorkspaceRoot;
+  const requestedDir = options.sourceDir;
+  const dirIsSafe = !requestedDir || isSafeSourceDir(requestedDir);
+  if (requestedDir && !dirIsSafe) {
+    log.warn("pdf", "rejecting unsafe sourceDir, falling back to default", { sourceDir: requestedDir });
+  }
+  const sourceDir = dirIsSafe && requestedDir ? requestedDir : WORKSPACE_DIRS.markdowns;
+  const baseDir = path.join(workspaceRoot, sourceDir);
+  return html.replace(IMG_TAG_RE, (tag) =>
+    tag.replace(IMG_SRC_RE, (full, prefix: string, _val: string, doubleQuoted?: string, singleQuoted?: string, bare?: string) =>
+      inlineSingleImg({ prefix, doubleQuoted, singleQuoted, bare, full }, workspaceRoot, baseDir),
+    ),
+  );
 }
 
 function wrapHtml(body: string, css: string): string {
@@ -147,10 +214,16 @@ interface PdfMarkdownBody {
   markdown: string;
   filename?: string;
   format?: "Letter" | "A4";
+  /** Workspace-relative source directory of the markdown (e.g.
+   *  `"data/wiki/pages"` for Wiki pages). Used to resolve relative
+   *  `<img>` references against the right base. Omit for the legacy
+   *  `markdowns/` default. Validated server-side; absolute paths
+   *  and `..` segments are rejected. */
+  baseDir?: string;
 }
 
 router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMarkdownBody>, res: Response) => {
-  const { markdown, filename = "document.pdf", format = "Letter" } = req.body;
+  const { markdown, filename = "document.pdf", format = "Letter", baseDir } = req.body;
 
   if (!markdown) {
     badRequest(res, "markdown is required");
@@ -158,8 +231,11 @@ router.post(API_ROUTES.pdf.markdown, async (req: Request<object, unknown, PdfMar
   }
 
   try {
-    log.info("pdf", "markdown", { filename, length: markdown.length });
-    const html = inlineImages(await marked.parse(markdown));
+    log.info("pdf", "markdown", { filename, length: markdown.length, baseDir });
+    // Strip frontmatter so YAML headers (Wiki pages emit them) don't
+    // appear as plain text on page 1 of the PDF.
+    const { body } = parseFrontmatter(markdown);
+    const html = inlineImages(await marked.parse(body), { sourceDir: baseDir });
     const buffer = await renderPdf(wrapHtml(html, MARKDOWN_CSS), format);
     sendPdf(res, buffer, filename);
   } catch (err) {
