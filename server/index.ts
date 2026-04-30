@@ -67,6 +67,7 @@ import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../src/types/events.js";
 import { SESSION_ORIGINS } from "../src/types/session.js";
 import { buildHtmlPreviewCsp } from "../src/utils/html/previewCsp.js";
+import { readAndInjectHtmlArtifact } from "./utils/html/htmlArtifactSplicer.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "./utils/port.mjs";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
@@ -248,6 +249,19 @@ async function getHtmlsDirReal(): Promise<string | null> {
     return null;
   }
 }
+
+// Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html` →
+// `localhost:3001` with `changeOrigin: true`) emits the browser-
+// visible origin (`localhost:5173`) rather than the upstream socket.
+// In prod (no proxy) the headers are absent and we fall back to the
+// raw `Host` / `req.protocol`.
+function browserVisibleOrigin(req: Request): string {
+  const fwdHost = req.get("x-forwarded-host");
+  const fwdProto = req.get("x-forwarded-proto");
+  const host = fwdHost ?? req.get("host");
+  const proto = fwdProto ?? req.protocol;
+  return `${proto}://${host}`;
+}
 app.use(
   "/artifacts/html",
   async (req, res, next) => {
@@ -272,19 +286,17 @@ app.use(
       return;
     }
     if (HTML_DOCUMENT_EXT_RE.test(req.path)) {
-      // Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html`
-      // → `localhost:3001` with `changeOrigin: true`) emits the
-      // browser-visible origin (`localhost:5173`) rather than the
-      // upstream socket. In prod (no proxy) the headers are absent
-      // and we fall back to the raw `Host` / `req.protocol`. CSP
-      // header only on HTML responses — image subresources don't
-      // need it.
-      const fwdHost = req.get("x-forwarded-host");
-      const fwdProto = req.get("x-forwarded-proto");
-      const host = fwdHost ?? req.get("host");
-      const proto = fwdProto ?? req.protocol;
-      const origin = `${proto}://${host}`;
+      const origin = browserVisibleOrigin(req);
       res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp(origin));
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      const spliced = await readAndInjectHtmlArtifact(root, relPath);
+      if (spliced === null) {
+        res.status(404).end();
+        return;
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(spliced);
+      return;
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
     next();
