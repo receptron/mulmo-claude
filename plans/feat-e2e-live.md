@@ -795,11 +795,9 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
   - 緩和策: console error 監視 / `page.on("requestfailed")` で初回 fetch の 404 をフェイルさせる / `<img>` の `src` 変更を検出する MutationObserver
   - 重要度: **中**（B-18 系の本質的な regression は naturalWidth で拾えるが、 LLM 退行の検知力は落ちる）
 - **#983 presentDocument / generateImage の path 入り message**: tool result の message 文字列に `Saved … to <path>` が乗るようになり LLM が path を正しく扱える。 → **L-05 (generateImage)** の prompt から `<path>` キャプチャが楽になる（spec 実装時に活用）
-- **#991 (open) Safari preview iframe CSP**: `sandbox="allow-scripts"` の opaque origin 上で CSP `'self'` が Safari で null origin と判定されて `<img>` が reject される。 Chromium のみで spec を回している現状では **検出不可能**。 反映方針:
-  - e2e-live の `playwright.config.ts` に **webkit project** を追加して L-01 を Safari でも回す
-  - 既存 e2e の `ime-enter.spec.ts` と同じく `testMatch` で対象 spec を絞る or 全 spec で webkit を回す（コスト次第）
-  - 重要度: **高**（Safari ユーザー向けに最重要シナリオが壊れる class のバグ）
-  - 別 PR で実装（spec の手は入れず config の追加のみ）
+- **#991 Safari preview iframe CSP** ✅ webkit project 追加済: `e2e-live/playwright.config.ts` の projects に `webkit` を追加 (`testMatch: "media.spec.ts"` で対象 spec を絞り、 `e2e/playwright.config.ts` の chromium+webkit 分割を踏襲)。 spec 側は手を入れていない。
+  - **観測**: webkit 走行で **L-01 が `naturalWidth=0` で fail**（page snapshot 上では `<img alt="sample">` が iframe 内に visible だが画像が decode されない）。 #991 自体は merged 済だが、 fix の対象（dev proxy + CSP 調整）が e2e-live が叩く `localhost:5173` 経由の `/artifacts/html` mount にまで効いているかは未確認。
+  - **判断**: 「webkit project 追加（config のみ）」 と「Safari L-01 失敗の本質修正」 は別 PR に分ける（plans のアンチパターン例に従う）。 webkit L-01 の root cause 調査と修正は別 issue を切って対応する → 下 TODO に追加。
 
 ## 未確定事項 / TODO
 
@@ -811,7 +809,8 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 - [ ] CI 化のタイミング（手動運用が安定したら GitHub Actions 検討）
 - [ ] L-22 で使う skill の選定（dry-run 可能なものに絞る）
 - [ ] **#974 self-repair で L-01 の `naturalWidth > 0` が甘くなる件の緩和策決定**（console error 監視 / requestfailed リスナ / src MutationObserver のいずれか）
-- [ ] **Safari (webkit) project の追加**（PR #991 のような Chromium 通過 / Safari 失敗 class のバグを catch するため）
+- [x] ~~**Safari (webkit) project の追加**~~ → 反映済（`e2e-live/playwright.config.ts` に `webkit` project + `testMatch: "media.spec.ts"`）
+- [ ] **webkit で L-01 が `naturalWidth=0` で fail する件の調査と修正**（PR #991 merged 済にも関わらず e2e-live 経路で同 class の事象が観測された。 fix が `localhost:5173` 直叩き経路 + `/artifacts/html` static mount にまで効いているかを確認し、 必要なら CSP / sandbox 設定を見直す。 spec 側は手を入れない）
 - [ ] **L-05 (generateImage)** 実装時に #983 の path-in-message を活用（path のキャプチャが容易になる）
 
 ---
