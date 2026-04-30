@@ -326,6 +326,10 @@ e2e-live/
 - 操作: `~/.claude/skills` を symlink で管理した状態で Docker 起動 → skill 一覧確認
 - 検証: skill が表示され、各 sample query が実行可能
 
+## メンテ skill 化済 — `/make-e2e-live` を起点にする
+
+このスイートを継続メンテするための skill `/make-e2e-live` を `.claude/skills/make-e2e-live/SKILL.md` に用意した。 次セッション以降、 未実装シナリオの追加・main 動向への追従（webkit project, self-repair 緩和等）・既存 spec 修正は **このファイルを起点にして** Phase 1〜6 のフロー（状況把握 → 着手項目合意 → ブランチ → 実装 → PR → plans 反映）で進める。 1 PR の規模は 1〜3 シナリオ or 1 config 改善に絞ること。 実行用 `/e2e-live` skill とは別物（実行 = 既存スイートを回す、 メンテ = スイートを育てる）。
+
 ## 実装ステータス
 
 | シナリオ | 状態 | 備考 |
