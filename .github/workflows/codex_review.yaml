@@ -100,6 +100,19 @@ jobs:
             gh pr view ${PR_NUMBER} --json title,body,headRefName
             gh pr diff ${PR_NUMBER}
 
+          Before posting your own findings, look at what's already
+          on the PR — this PR may have had earlier review iterations
+          (yours or another bot's) that are already addressed by
+          later commits. Read the existing thread:
+            gh api repos/${REPO}/issues/${PR_NUMBER}/comments --paginate
+            gh api repos/${REPO}/pulls/${PR_NUMBER}/comments --paginate
+          For every prior 'CODEX VERDICT: CHANGES REQUESTED' bullet,
+          check the current diff to decide whether the concern is
+          now resolved (don't re-flag) or still present (re-flag and
+          point at the new line). Don't echo back findings other
+          bots have already covered identically — focus on the
+          marginal value you can add over the existing thread.
+
           Then post inline review comments on specific lines via:
             gh api repos/${REPO}/pulls/${PR_NUMBER}/comments
           or top-level comments via:
