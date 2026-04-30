@@ -171,7 +171,10 @@ interface SrcAttrMatch {
 function inlineSingleImg(match: SrcAttrMatch, workspaceRoot: string, baseDir: string): string {
   const src = (match.doubleQuoted ?? match.singleQuoted ?? match.bare ?? "").trim();
   if (!src) return match.full;
-  if (src.startsWith("data:") || src.startsWith("http")) return match.full;
+  // Skip URLs the browser fetches directly. Narrow to exact
+  // `http://` / `https://` prefixes so a relative path like
+  // `http-assets/logo.png` isn't misclassified as external (CR on #1023).
+  if (src.startsWith("data:") || src.startsWith("http://") || src.startsWith("https://")) return match.full;
   const abs = resolveImageAbsPath(src, workspaceRoot, baseDir);
   if (!abs) return match.full;
   const dataUri = loadImageAsDataUri(abs);
