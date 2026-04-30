@@ -216,6 +216,9 @@ const koMessages = {
     pdfPreview: "PDF 미리보기",
     parseError: "파싱 오류",
   },
+  filesView: {
+    chatPlaceholder: "이 파일에 대해 질문하세요…",
+  },
   systemFiles: {
     schemaLabel: "스키마",
     showDetails: "자세히 보기",

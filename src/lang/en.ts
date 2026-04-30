@@ -232,6 +232,9 @@ const enMessages = {
     pdfPreview: "PDF preview",
     parseError: "parse error",
   },
+  filesView: {
+    chatPlaceholder: "Ask about this file…",
+  },
   // SystemFileBanner copy. Each id matches a descriptor in
   // src/config/systemFileDescriptors.ts. `title` is the chip-style
   // headline above the file body; `summary` is one or two sentences

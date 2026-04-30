@@ -211,6 +211,9 @@ const deMessages = {
     pdfPreview: "PDF-Vorschau",
     parseError: "Parse-Fehler",
   },
+  filesView: {
+    chatPlaceholder: "Frage zu dieser Datei stellen…",
+  },
   systemFiles: {
     schemaLabel: "Schema",
     showDetails: "Details anzeigen",

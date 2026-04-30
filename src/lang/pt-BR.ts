@@ -210,6 +210,9 @@ const ptBRMessages = {
     pdfPreview: "Pré-visualização PDF",
     parseError: "erro de análise",
   },
+  filesView: {
+    chatPlaceholder: "Pergunte sobre este arquivo…",
+  },
   systemFiles: {
     schemaLabel: "Esquema",
     showDetails: "Mostrar detalhes",

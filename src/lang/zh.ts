@@ -212,6 +212,9 @@ const zhMessages = {
     pdfPreview: "PDF 预览",
     parseError: "解析错误",
   },
+  filesView: {
+    chatPlaceholder: "询问关于此文件的问题…",
+  },
   systemFiles: {
     schemaLabel: "架构",
     showDetails: "显示详情",
