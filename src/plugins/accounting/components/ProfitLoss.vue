@@ -64,10 +64,11 @@
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getProfitLoss, type ProfitLoss } from "../api";
+import { formatAmount as formatAmountWithCurrency } from "../currencies";
 
 const { t } = useI18n();
 
-const props = defineProps<{ bookId: string; version: number }>();
+const props = defineProps<{ bookId: string; currency: string; version: number }>();
 
 function startOfYear(): string {
   return `${new Date().getFullYear()}-01-01`;
@@ -83,7 +84,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 function formatAmount(value: number): string {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatAmountWithCurrency(value, props.currency);
 }
 
 async function refresh(): Promise<void> {

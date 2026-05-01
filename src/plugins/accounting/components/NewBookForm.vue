@@ -5,7 +5,7 @@
        createBook directly; on success it emits the new book and
        its id, leaving the parent to wire activeBookId / refetch. -->
   <div class="fixed inset-0 z-50 bg-black/20 flex items-center justify-center" data-testid="accounting-new-book-modal" @click.self="onCancel">
-    <form class="bg-white p-4 rounded shadow-lg w-80 flex flex-col gap-3" data-testid="accounting-new-book-form" @submit.prevent="onSubmit">
+    <form class="bg-white p-4 rounded shadow-lg w-96 flex flex-col gap-3" data-testid="accounting-new-book-form" @submit.prevent="onSubmit">
       <h3 class="text-base font-semibold">{{ t("pluginAccounting.bookSwitcher.newBook") }}</h3>
       <p v-if="firstRun" class="text-xs text-gray-500" data-testid="accounting-new-book-firstrun">{{ t("pluginAccounting.bookSwitcher.firstRunHint") }}</p>
       <label class="text-sm flex flex-col gap-1">
@@ -14,7 +14,9 @@
       </label>
       <label class="text-sm flex flex-col gap-1">
         {{ t("pluginAccounting.bookSwitcher.currencyLabel") }}
-        <input v-model="currency" class="h-8 px-2 rounded border border-gray-300 text-sm" data-testid="accounting-new-book-currency" placeholder="USD" />
+        <select v-model="currency" class="h-8 px-2 rounded border border-gray-300 text-sm bg-white" data-testid="accounting-new-book-currency">
+          <option v-for="opt in options" :key="opt.code" :value="opt.code">{{ opt.label }}</option>
+        </select>
       </label>
       <p v-if="error" class="text-xs text-red-500" data-testid="accounting-new-book-error">{{ error }}</p>
       <div class="flex justify-end gap-2 mt-1">
@@ -35,21 +37,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { createBook, type BookSummary } from "../api";
+import { SUPPORTED_CURRENCY_CODES, localizedCurrencyName } from "../currencies";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = withDefaults(
   defineProps<{
-    /** Show the first-run hint copy and hide the cancel button (the
-     *  user can still create one later anyway, but the empty state
-     *  asks them to commit to a name + currency before proceeding). */
     firstRun?: boolean;
-    /** When false, the cancel button is hidden — first-run mode
-     *  uses this to avoid an "X" that lands on a blank empty state
-     *  the user can't act from. */
     cancelable?: boolean;
   }>(),
   { firstRun: false, cancelable: true },
@@ -61,9 +58,21 @@ const emit = defineEmits<{
 }>();
 
 const name = ref("");
-const currency = ref("USD");
+const currency = ref<string>("USD");
 const creating = ref(false);
 const error = ref<string | null>(null);
+
+interface CurrencyOption {
+  code: string;
+  label: string;
+}
+
+const options = computed<CurrencyOption[]>(() =>
+  SUPPORTED_CURRENCY_CODES.map((code) => ({
+    code,
+    label: `${code} — ${localizedCurrencyName(code, locale.value)}`,
+  })),
+);
 
 function onCancel(): void {
   if (!props.cancelable) return;
@@ -75,7 +84,7 @@ async function onSubmit(): Promise<void> {
   creating.value = true;
   error.value = null;
   try {
-    const result = await createBook({ name: name.value.trim(), currency: currency.value.trim() || "USD" });
+    const result = await createBook({ name: name.value.trim(), currency: currency.value });
     if (!result.ok) {
       error.value = result.error;
       return;

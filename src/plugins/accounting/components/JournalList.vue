@@ -72,10 +72,11 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listEntries, voidEntry, type Account, type JournalEntry, type JournalEntryKind } from "../api";
+import { formatAmount } from "../currencies";
 
 const { t } = useI18n();
 
-const props = defineProps<{ bookId: string; accounts: Account[]; version: number }>();
+const props = defineProps<{ bookId: string; accounts: Account[]; currency: string; version: number }>();
 const emit = defineEmits<{ changed: [] }>();
 
 const from = ref("");
@@ -92,15 +93,11 @@ function kindLabel(kind: JournalEntryKind): string {
   return t("pluginAccounting.journalList.kind.normal");
 }
 
-function formatAmount(value: number): string {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 function formatDebit(value: number): string {
-  return `DR ${formatAmount(value)}`;
+  return `DR ${formatAmount(value, props.currency)}`;
 }
 function formatCredit(value: number): string {
-  return `CR ${formatAmount(value)}`;
+  return `CR ${formatAmount(value, props.currency)}`;
 }
 function formatAccountLabel(account: Account): string {
   return `${account.code} — ${account.name}`;

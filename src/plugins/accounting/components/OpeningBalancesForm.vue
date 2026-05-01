@@ -30,7 +30,7 @@
             <input
               v-model.number="rows[account.code].debit"
               type="number"
-              step="0.01"
+              :step="step"
               min="0"
               class="h-8 px-2 w-full rounded border border-gray-300 text-sm text-right"
               :data-testid="`accounting-opening-debit-${account.code}`"
@@ -41,7 +41,7 @@
             <input
               v-model.number="rows[account.code].credit"
               type="number"
-              step="0.01"
+              :step="step"
               min="0"
               class="h-8 px-2 w-full rounded border border-gray-300 text-sm text-right"
               :data-testid="`accounting-opening-credit-${account.code}`"
@@ -76,10 +76,11 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getOpeningBalances, setOpeningBalances, type Account, type JournalEntry, type JournalLine } from "../api";
+import { formatAmount, inputStepFor } from "../currencies";
 
 const { t } = useI18n();
 
-const props = defineProps<{ bookId: string; accounts: Account[]; version: number }>();
+const props = defineProps<{ bookId: string; accounts: Account[]; currency: string; version: number }>();
 const emit = defineEmits<{ submitted: [] }>();
 
 interface OpeningRow {
@@ -128,7 +129,8 @@ const hasAnyNonzero = computed(() => {
   return false;
 });
 const balanced = computed(() => Math.abs(imbalance.value) <= 0.005 && hasAnyNonzero.value);
-const imbalanceText = computed(() => imbalance.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const imbalanceText = computed(() => formatAmount(imbalance.value, props.currency));
+const step = computed(() => inputStepFor(props.currency));
 
 function toApiLines(): JournalLine[] {
   const out: JournalLine[] = [];

@@ -30,18 +30,32 @@
       <p v-if="!activeBookId && !loadingBooks" class="text-sm text-gray-500" data-testid="accounting-no-book">{{ t("pluginAccounting.noBook") }}</p>
       <p v-else-if="loadingBooks" class="text-sm text-gray-400">{{ t("pluginAccounting.common.loading") }}</p>
       <template v-else-if="activeBookId">
-        <JournalList v-if="currentTab === 'journal'" :book-id="activeBookId" :accounts="accounts" :version="bookVersion" @changed="bumpLocalVersion" />
-        <JournalEntryForm v-else-if="currentTab === 'newEntry'" :book-id="activeBookId" :accounts="accounts" @submitted="onEntrySubmitted" />
+        <JournalList
+          v-if="currentTab === 'journal'"
+          :book-id="activeBookId"
+          :accounts="accounts"
+          :currency="activeCurrency"
+          :version="bookVersion"
+          @changed="bumpLocalVersion"
+        />
+        <JournalEntryForm
+          v-else-if="currentTab === 'newEntry'"
+          :book-id="activeBookId"
+          :accounts="accounts"
+          :currency="activeCurrency"
+          @submitted="onEntrySubmitted"
+        />
         <OpeningBalancesForm
           v-else-if="currentTab === 'opening'"
           :book-id="activeBookId"
           :accounts="accounts"
+          :currency="activeCurrency"
           :version="bookVersion"
           @submitted="onEntrySubmitted"
         />
-        <Ledger v-else-if="currentTab === 'ledger'" :book-id="activeBookId" :accounts="accounts" :version="bookVersion" />
-        <BalanceSheet v-else-if="currentTab === 'balanceSheet'" :book-id="activeBookId" :version="bookVersion" />
-        <ProfitLoss v-else-if="currentTab === 'profitLoss'" :book-id="activeBookId" :version="bookVersion" />
+        <Ledger v-else-if="currentTab === 'ledger'" :book-id="activeBookId" :accounts="accounts" :currency="activeCurrency" :version="bookVersion" />
+        <BalanceSheet v-else-if="currentTab === 'balanceSheet'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
+        <ProfitLoss v-else-if="currentTab === 'profitLoss'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
         <BookSettings
           v-else-if="currentTab === 'settings'"
           :book-id="activeBookId"
@@ -125,7 +139,9 @@ const firstRunHandled = ref(false);
 // uniformly.
 const localVersion = ref(0);
 
-const activeBookName = computed(() => books.value.find((book) => book.id === activeBookId.value)?.name ?? "");
+const activeBook = computed(() => books.value.find((book) => book.id === activeBookId.value) ?? null);
+const activeBookName = computed(() => activeBook.value?.name ?? "");
+const activeCurrency = computed(() => activeBook.value?.currency ?? "USD");
 
 const { version: pubsubVersion } = useAccountingChannel(activeBookId);
 useAccountingBooksChannel(() => void refetchBooks());
