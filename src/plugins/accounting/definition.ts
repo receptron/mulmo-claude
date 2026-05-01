@@ -38,7 +38,6 @@ const toolDefinition: ToolDefinition = {
           "getOpeningBalances",
           "setOpeningBalances",
           "getReport",
-          "getBookMeta",
           "rebuildSnapshots",
         ],
         description:

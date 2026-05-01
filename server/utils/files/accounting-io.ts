@@ -14,7 +14,7 @@ import path from "node:path";
 
 import { workspacePath, WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { writeFileAtomic } from "./atomic.js";
-import type { AccountingConfig, Account, BookMeta, JournalEntry, MonthSnapshot } from "../../accounting/types.js";
+import type { AccountingConfig, Account, JournalEntry, MonthSnapshot } from "../../accounting/types.js";
 
 const root = (workspaceRoot?: string): string => workspaceRoot ?? workspacePath;
 
@@ -53,10 +53,6 @@ export function bookRoot(bookId: string, workspaceRoot?: string): string {
 
 function accountsPath(bookId: string, workspaceRoot?: string): string {
   return path.join(bookRoot(bookId, workspaceRoot), "accounts.json");
-}
-
-function metaPath(bookId: string, workspaceRoot?: string): string {
-  return path.join(bookRoot(bookId, workspaceRoot), "meta.json");
 }
 
 function journalDir(bookId: string, workspaceRoot?: string): string {
@@ -121,16 +117,6 @@ export async function readAccounts(bookId: string, workspaceRoot?: string): Prom
 
 export async function writeAccounts(bookId: string, accounts: Account[], workspaceRoot?: string): Promise<void> {
   await writeFileAtomic(accountsPath(bookId, workspaceRoot), JSON.stringify(accounts, null, 2));
-}
-
-// ── meta.json ──────────────────────────────────────────────────────
-
-export async function readMeta(bookId: string, workspaceRoot?: string): Promise<BookMeta | null> {
-  return readJsonOrNull<BookMeta>(metaPath(bookId, workspaceRoot));
-}
-
-export async function writeMeta(bookId: string, meta: BookMeta, workspaceRoot?: string): Promise<void> {
-  await writeFileAtomic(metaPath(bookId, workspaceRoot), JSON.stringify(meta, null, 2));
 }
 
 // ── journal/YYYY-MM.jsonl (append-only) ────────────────────────────

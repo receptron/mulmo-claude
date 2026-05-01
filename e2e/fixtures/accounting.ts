@@ -97,11 +97,12 @@ function handleOpenApp(state: AccountingState, body: DispatchBody): MockResponse
       kind: "accounting-app",
       bookId,
       initialTab,
+      books: state.books,
       message:
         "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
     });
   }
-  return ok({ kind: "accounting-app", bookId, initialTab });
+  return ok({ kind: "accounting-app", bookId, initialTab, books: state.books });
 }
 
 function handleGetBooks(state: AccountingState): MockResponse {
@@ -123,10 +124,11 @@ function handleDeleteBook(state: AccountingState, body: DispatchBody): MockRespo
   if (body.confirm !== true) return err(400, "deleteBook requires confirm: true");
   const idx = state.books.findIndex((book) => book.id === bookId);
   if (idx < 0) return err(404, `book ${JSON.stringify(bookId)} not found`);
+  const target = state.books[idx];
   state.books.splice(idx, 1);
   state.accountsByBook.delete(bookId);
   state.entriesByBook.delete(bookId);
-  return ok({ deletedBookId: bookId });
+  return ok({ deletedBookId: bookId, deletedBookName: target.name });
 }
 
 function handleGetAccounts(state: AccountingState, body: DispatchBody): MockResponse {
@@ -234,7 +236,7 @@ function handleSetOpening(state: AccountingState, body: DispatchBody): MockRespo
   return ok({ bookId, openingEntry: opening, replacedExisting: false });
 }
 
-function handleGetReport(state: AccountingState, body: DispatchBody): MockResponse {
+function handleGetReport(_state: AccountingState, body: DispatchBody): MockResponse {
   const bookId = bookIdFrom(body);
   if (bookId === null) return missingBookId();
   const kind = typeof body.kind === "string" ? body.kind : "balance";
@@ -259,11 +261,6 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   getOpeningBalances: handleGetOpening,
   setOpeningBalances: handleSetOpening,
   getReport: handleGetReport,
-  getBookMeta: (_state, body) => {
-    const bookId = bookIdFrom(body);
-    if (bookId === null) return missingBookId();
-    return ok({ bookId, meta: null });
-  },
   rebuildSnapshots: (_state, body) => {
     const bookId = bookIdFrom(body);
     if (bookId === null) return missingBookId();

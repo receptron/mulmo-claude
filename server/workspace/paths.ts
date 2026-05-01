@@ -68,9 +68,9 @@ export const WORKSPACE_DIRS = {
   transports: "data/transports",
   // Accounting plugin (opt-in, custom-Role only). Books live under
   // `accounting/books/<bookId>/{accounts.json, journal/YYYY-MM.jsonl,
-  //  snapshots/YYYY-MM.json, meta.json}`. The directory is created
-  // lazily on first createBook so default workspaces don't get a
-  // stub `accounting/` they never use.
+  //  snapshots/YYYY-MM.json}`. The directory is created lazily on
+  // first createBook so default workspaces don't get a stub
+  // `accounting/` they never use.
   accounting: "data/accounting",
   accountingBooks: "data/accounting/books",
   // artifacts/

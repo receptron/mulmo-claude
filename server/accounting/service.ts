@@ -28,11 +28,9 @@ import {
   readAccounts,
   readConfig,
   readJournalMonth,
-  readMeta,
   removeBookDir,
   writeAccounts,
   writeConfig,
-  writeMeta,
 } from "../utils/files/accounting-io.js";
 import { findActiveOpening, validateOpening } from "./openingBalances.js";
 import { localDateString, makeEntry, makeVoidEntries, validateEntry, voidedIdSet } from "./journal.js";
@@ -124,6 +122,9 @@ export async function listBooks(workspaceRoot?: string): Promise<{ books: BookSu
 }
 
 export async function createBook(input: { id?: string; name: string; currency?: string }, workspaceRoot?: string): Promise<{ book: BookSummary }> {
+  if (typeof input.name !== "string" || input.name.trim() === "") {
+    throw new AccountingError(400, "name is required");
+  }
   const config = await loadOrInitConfig(workspaceRoot);
   // Auto-generate when no caller id is supplied — every book,
   // including the very first one, gets a generated id. Explicit
@@ -132,8 +133,8 @@ export async function createBook(input: { id?: string; name: string; currency?: 
   // adopt it.
   const bookId = input.id ?? (await generateBookId(config, workspaceRoot));
   // Guard against caller-supplied path-traversal ids before any
-  // fs touch (createBook → ensureBookDir → writeAccounts /
-  // writeMeta → writeConfig). Auto-generated ids always pass.
+  // fs touch (createBook → ensureBookDir → writeAccounts →
+  // writeConfig). Auto-generated ids always pass.
   if (!isSafeBookId(bookId)) {
     throw new AccountingError(400, `invalid book id ${JSON.stringify(bookId)} — allowed characters are A-Z a-z 0-9 _ - (1-64 chars; cannot start with _ or -)`);
   }
@@ -151,19 +152,22 @@ export async function createBook(input: { id?: string; name: string; currency?: 
   };
   await ensureBookDir(bookId, workspaceRoot);
   await writeAccounts(bookId, [...DEFAULT_ACCOUNTS], workspaceRoot);
-  await writeMeta(bookId, { createdAt: book.createdAt }, workspaceRoot);
   const nextConfig: AccountingConfig = { books: [...config.books, book] };
   await writeConfig(nextConfig, workspaceRoot);
   publishBooksChanged();
   return { book };
 }
 
-export async function deleteBook(input: { bookId: string; confirm: boolean }, workspaceRoot?: string): Promise<{ deletedBookId: string }> {
+export async function deleteBook(
+  input: { bookId: string; confirm: boolean },
+  workspaceRoot?: string,
+): Promise<{ deletedBookId: string; deletedBookName: string }> {
   if (!input.confirm) {
     throw new AccountingError(400, "deleteBook requires confirm: true");
   }
   const config = await loadOrInitConfig(workspaceRoot);
-  if (!findBook(config, input.bookId)) {
+  const target = findBook(config, input.bookId);
+  if (!target) {
     throw new AccountingError(404, `book ${JSON.stringify(input.bookId)} not found`);
   }
   // Stop any in-flight rebuild before removing the directory; otherwise
@@ -175,7 +179,9 @@ export async function deleteBook(input: { bookId: string; confirm: boolean }, wo
   const remaining = config.books.filter((book) => book.id !== input.bookId);
   await writeConfig({ books: remaining }, workspaceRoot);
   publishBooksChanged();
-  return { deletedBookId: input.bookId };
+  // Capture the name BEFORE the splice so the LLM-facing message
+  // can reference the human-readable book the user just deleted.
+  return { deletedBookId: input.bookId, deletedBookName: target.name };
 }
 
 // ── accounts ───────────────────────────────────────────────────────
@@ -186,7 +192,10 @@ export async function listAccounts(input: { bookId?: string }, workspaceRoot?: s
   return { bookId, accounts: await readAccounts(bookId, workspaceRoot) };
 }
 
-export async function upsertAccount(input: { bookId?: string; account: Account }, workspaceRoot?: string): Promise<{ bookId: string; accounts: Account[] }> {
+export async function upsertAccount(
+  input: { bookId?: string; account: Account },
+  workspaceRoot?: string,
+): Promise<{ bookId: string; account: Account; accounts: Account[] }> {
   const config = await loadOrInitConfig(workspaceRoot);
   const bookId = resolveBookId(config, input.bookId);
   // Account codes starting with `_` are reserved for synthetic
@@ -219,7 +228,7 @@ export async function upsertAccount(input: { bookId?: string; account: Account }
     await invalidateAllSnapshots(bookId, workspaceRoot);
   }
   publishBookChange(bookId, { kind: ACCOUNTING_BOOK_EVENT_KINDS.accounts });
-  return { bookId, accounts: next };
+  return { bookId, account: { ...input.account }, accounts: next };
 }
 
 // ── journal entries ────────────────────────────────────────────────
@@ -449,14 +458,6 @@ export async function rebuildSnapshots(input: { bookId?: string }, workspaceRoot
   const result = await rebuildAllSnapshots(bookId, workspaceRoot);
   publishBookChange(bookId, { kind: ACCOUNTING_BOOK_EVENT_KINDS.snapshotsReady });
   return { bookId, rebuilt: result.rebuilt };
-}
-
-// ── meta (read-only convenience) ───────────────────────────────────
-
-export async function getBookMeta(input: { bookId?: string }, workspaceRoot?: string): Promise<{ bookId: string; meta: Awaited<ReturnType<typeof readMeta>> }> {
-  const config = await loadOrInitConfig(workspaceRoot);
-  const bookId = resolveBookId(config, input.bookId);
-  return { bookId, meta: await readMeta(bookId, workspaceRoot) };
 }
 
 // Direct access for tests / lazy paths that want to bypass the

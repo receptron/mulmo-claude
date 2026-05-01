@@ -5,7 +5,6 @@
 //   data/accounting/books/<id>/accounts.json    ← Account[]
 //   data/accounting/books/<id>/journal/YYYY-MM.jsonl  ← JournalEntry per line
 //   data/accounting/books/<id>/snapshots/YYYY-MM.json ← MonthSnapshot (cache)
-//   data/accounting/books/<id>/meta.json        ← BookMeta
 //
 // Snapshots are cache only — journal is the single source of truth.
 
@@ -27,16 +26,6 @@ export interface Account {
   /** Optional free-form note (tax bucket, parent group, …). Not
    *  interpreted by the engine — passes through verbatim. */
   note?: string;
-}
-
-export interface BookMeta {
-  /** Fiscal year start as MM-DD (e.g. "01-01" or "04-01"). Cosmetic
-   *  for now; report period selectors use the calendar year, not the
-   *  fiscal year. */
-  fiscalYearStart?: string;
-  createdAt: string; // ISO timestamp
-  /** Free-form description of the book purpose. */
-  description?: string;
 }
 
 export interface BookSummary {

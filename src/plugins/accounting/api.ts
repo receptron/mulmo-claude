@@ -111,7 +111,7 @@ export function createBook(input: { name: string; currency?: string }): Promise<
   return call("createBook", input);
 }
 
-export function deleteBook(bookId: string): Promise<ApiResult<{ deletedBookId: string }>> {
+export function deleteBook(bookId: string): Promise<ApiResult<{ deletedBookId: string; deletedBookName: string }>> {
   return call("deleteBook", { bookId, confirm: true });
 }
 
@@ -121,7 +121,7 @@ export function getAccounts(bookId: string): Promise<ApiResult<{ bookId: string;
   return call("getAccounts", { bookId });
 }
 
-export function upsertAccount(account: Account, bookId: string): Promise<ApiResult<{ bookId: string; accounts: Account[] }>> {
+export function upsertAccount(account: Account, bookId: string): Promise<ApiResult<{ bookId: string; account: Account; accounts: Account[] }>> {
   return call("upsertAccount", { account, bookId });
 }
 

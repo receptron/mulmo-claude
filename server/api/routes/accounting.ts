@@ -18,7 +18,6 @@ import {
   createBook,
   deleteBook,
   getBalanceSheetReport,
-  getBookMeta,
   getLedgerReport,
   getOpeningBalances,
   getProfitLossReport,
@@ -30,6 +29,7 @@ import {
   upsertAccount,
   voidEntry,
 } from "../../accounting/service.js";
+import type { BookSummary } from "../../accounting/types.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
 
@@ -57,6 +57,10 @@ interface OpenAppToolResult {
    *  full-page first-run form and prompts the user to create one. */
   bookId: string | null;
   initialTab?: string;
+  /** Same shape getBooks returns — included so an LLM that calls
+   *  openApp doesn't need a follow-up getBooks round-trip to learn
+   *  what books exist before its next action. */
+  books: BookSummary[];
   message?: string;
 }
 
@@ -87,11 +91,12 @@ async function handleOpenApp(rest: ActionRest): Promise<OpenAppToolResult> {
       kind: "accounting-app",
       bookId,
       initialTab,
+      books: list.books,
       message:
         "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
     };
   }
-  return { kind: "accounting-app", bookId, initialTab };
+  return { kind: "accounting-app", bookId, initialTab, books: list.books };
 }
 
 async function handleGetReport(rest: ActionRest): Promise<unknown> {
@@ -165,7 +170,6 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       memo: rest.memo as string | undefined,
     }),
   getReport: handleGetReport,
-  getBookMeta: (rest) => getBookMeta({ bookId: rest.bookId as string | undefined }),
   rebuildSnapshots: (rest) => rebuildSnapshots({ bookId: rest.bookId as string | undefined }),
 };
 
@@ -187,25 +191,59 @@ const VIEW_VISIBLE_TRAILER = "The accounting view is shown to the user.";
 type MessageBuilder = (fields: Record<string, unknown>) => string;
 
 const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
-  openApp: () => "Mounted the accounting app in the canvas.",
-  createBook: (fields) => {
-    const book = fields.book as { name?: string } | undefined;
-    const subject = book?.name ? `A new book named ${JSON.stringify(book.name)}` : "A new book";
-    return `${subject} has been created.`;
+  openApp: (fields) => {
+    // Include the books list inline so the LLM doesn't need a
+    // follow-up getBooks round-trip before deciding what to do
+    // next (pick a book, create one, etc.).
+    const { books } = fields;
+    const booksFragment = Array.isArray(books) ? ` Books available: ${JSON.stringify(books)}.` : "";
+    return `Mounted the accounting app in the canvas.${booksFragment}`;
   },
-  upsertAccount: () => "Updated the chart of accounts.",
+  createBook: (fields) => {
+    const book = fields.book as { id?: string; name?: string } | undefined;
+    const subject = book?.name ? `A new book named ${JSON.stringify(book.name)}` : "A new book";
+    // The LLM needs book.id to call any follow-up action on this
+    // book (getAccounts, addEntry, etc.), so include it in the
+    // status message instead of forcing a round-trip via getBooks.
+    const idFragment = book?.id ? ` (id: ${book.id})` : "";
+    return `${subject} has been created${idFragment}.`;
+  },
+  upsertAccount: (fields) => {
+    const account = fields.account as { code?: string; name?: string } | undefined;
+    if (account?.code && account?.name) {
+      return `Upserted account ${account.code} ${JSON.stringify(account.name)}.`;
+    }
+    return "Updated the chart of accounts.";
+  },
   addEntry: (fields) => {
-    const entry = fields.entry as { date?: string } | undefined;
-    return `Posted a journal entry on ${entry?.date ?? "the requested date"}.`;
+    const entry = fields.entry as { id?: string; date?: string } | undefined;
+    const idFragment = entry?.id ? ` (id: ${entry.id})` : "";
+    // The LLM needs the entry id to act on this entry later (e.g.
+    // voidEntry), so return it as part of the status message.
+    return `Posted a journal entry on ${entry?.date ?? "the requested date"}${idFragment}.`;
   },
   voidEntry: (fields) => {
     const reverse = fields.reverseEntry as { date?: string } | undefined;
     return `Voided the entry; a reversing pair was posted on ${reverse?.date ?? "today"}.`;
   },
   setOpeningBalances: (fields) => {
-    const opening = fields.openingEntry as { date?: string } | undefined;
+    const opening = fields.openingEntry as { date?: string; lines?: unknown } | undefined;
     const verb = fields.replacedExisting === true ? "replaced" : "set";
-    return `Opening balances were ${verb} as of ${opening?.date ?? "the requested date"}.`;
+    const date = opening?.date ?? "the requested date";
+    // Surface the actual lines so the LLM can answer follow-up
+    // questions like "what's my opening cash?" without a separate
+    // getOpeningBalances round-trip. An empty-marker opening
+    // (zero lines, used to unlock the gate) gets no fragment.
+    const lines = Array.isArray(opening?.lines) ? (opening.lines as unknown[]) : [];
+    const linesFragment = lines.length > 0 ? ` Lines: ${JSON.stringify(lines)}.` : "";
+    return `Opening balances were ${verb} as of ${date}.${linesFragment}`;
+  },
+  deleteBook: (fields) => {
+    const bookId = fields.deletedBookId as string | undefined;
+    const name = fields.deletedBookName as string | undefined;
+    const subject = name ? `the book ${JSON.stringify(name)}` : "the book";
+    const idFragment = bookId ? ` (id: ${bookId})` : "";
+    return `Deleted ${subject}${idFragment}.`;
   },
 };
 
@@ -213,14 +251,6 @@ function previewMessage(action: string, fields: Record<string, unknown>): string
   const head = MESSAGE_BUILDERS[action]?.(fields);
   return head ? `${head} ${VIEW_VISIBLE_TRAILER}` : VIEW_VISIBLE_TRAILER;
 }
-
-// Read actions where the LLM needs the actual payload as the tool's
-// text result (the MCP bridge only forwards `message` / `instructions`
-// to the model — `data` and `jsonData` reach the view but not the
-// LLM). Without an explicit message these actions resolve to "Done"
-// from the model's perspective, which is useless for queries the
-// LLM needs to reason about.
-const PAYLOAD_AS_MESSAGE_ACTIONS = new Set<string>(["getJournalEntries", "getBooks", "getAccounts"]);
 
 async function dispatch(body: AccountingActionBody): Promise<unknown> {
   const { action, ...rest } = body;
@@ -240,18 +270,24 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
   // into it for the actions that should render a card; leave it
   // off for silent ones so the gate suppresses the preview.
   const dataField = PREVIEW_ACTIONS.has(action) ? { data: { action, ...handlerFields } } : {};
-  // Attach an LLM-facing `message` for YES actions only — but let a
-  // handler-set message win (handleOpenApp uses one to flag the
-  // empty-workspace first-run state, which has tighter wording than
-  // the generic "view is shown" trailer).
+  // The MCP bridge only forwards `message` / `instructions` to the
+  // LLM (`data` / `jsonData` reach the view but not the model). So
+  // every action MUST set a message — silence resolves to "Done"
+  // and gives the LLM nothing to reason about. Resolution order:
+  //   1. handler-set `message` wins (handleOpenApp uses this to flag
+  //      the empty-workspace first-run state with tighter wording);
+  //   2. an action with a registered MESSAGE_BUILDER gets the
+  //      per-action human-friendly summary; this is decoupled from
+  //      PREVIEW_ACTIONS so silent ops like deleteBook can still
+  //      narrate without earning a card;
+  //   3. everything else returns the JSON-stringified handler
+  //      payload so the LLM can read the raw data.
   const handlerMessage = typeof handlerFields.message === "string" ? handlerFields.message : undefined;
   const messageField = handlerMessage
     ? {}
-    : PREVIEW_ACTIONS.has(action)
+    : MESSAGE_BUILDERS[action]
       ? { message: previewMessage(action, handlerFields) }
-      : PAYLOAD_AS_MESSAGE_ACTIONS.has(action)
-        ? { message: JSON.stringify(handlerFields) }
-        : {};
+      : { message: JSON.stringify(handlerFields) };
   return { action, ...handlerFields, ...messageField, ...dataField };
 }
 
