@@ -156,8 +156,12 @@ export const API_ROUTES = {
     runtimeDispatch: "/api/plugins/runtime/:pkg/dispatch",
     /** Static-mount of the extracted plugin tree. The URL pkg is the
      *  un-encoded npm name plus version dir. Used by the frontend
-     *  loader's dynamic `import()` to fetch `dist/vue.js`. */
-    runtimeAsset: "/api/plugins/runtime/:pkg/:version/*",
+     *  loader's dynamic `import()` to fetch `dist/vue.js`.
+     *
+     *  Express 5 path-to-regexp uses `/{*name}` for catch-all
+     *  wildcards (the bare `*` from Express 4 throws at registration).
+     *  Handler reads the wildcard via `req.params.splat`. */
+    runtimeAsset: "/api/plugins/runtime/:pkg/:version/{*splat}",
   },
 
   roles: {

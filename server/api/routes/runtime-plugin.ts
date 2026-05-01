@@ -81,21 +81,66 @@ router.post(API_ROUTES.plugins.runtimeDispatch, async (req: Request<{ pkg: strin
 });
 
 // Static-mount of the extracted plugin cache. Express resolves
-// `:pkg/:version/*` with the wildcard available on `req.params[0]`.
-// Uses `resolveWithinRoot` (realpath-based) so a symlink inside the
-// extracted tree pointing at host files (e.g. /etc/passwd) cannot
-// escape the plugin's cache directory — a textual `startsWith` check
-// would not catch that. Same hardening pattern as the rest of the
-// repo's static-mount endpoints.
-router.get(API_ROUTES.plugins.runtimeAsset, async (req: Request<{ pkg: string; version: string; "0": string }>, res: Response) => {
-  const pkg = decodeURIComponent(req.params.pkg);
-  const version = decodeURIComponent(req.params.version);
-  const { 0: subPath } = req.params;
-  const root = path.join(WORKSPACE_PATHS.pluginCache, pkg, version);
+// `:pkg/:version/*` with the wildcard on `req.params[0]`. Two
+// realpath checks are required:
+//
+//   1. The plugin's own root (`pluginCache/<pkg>/<version>`) must
+//      itself be inside the cache root. `decodeURIComponent` happens
+//      after route matching, so a percent-encoded `../` in either
+//      segment (`%2E%2E%2F`) reaches `path.join` and could otherwise
+//      escape the cache root entirely. The bearer-auth exemption in
+//      `server/index.ts` makes this an unauthenticated path, so this
+//      anchor is the load-bearing check.
+//   2. The asset within the plugin (`subPath`) must stay inside the
+//      plugin's root after symlink resolution.
+//
+// Cache-root realpath is computed per request rather than memoised
+// at module load: the dir is created lazily on first install, and a
+// memoised "" would lock the route into permanent 404. One extra
+// stat per request is negligible.
+/** Resolve a plugin's cache directory against the cache-root anchor.
+ *  Returns the realpath of `pluginCache/<pkg>/<version>` ONLY if it
+ *  is inside the cache root; null otherwise. Exported for tests.
+ *
+ *  Why this is load-bearing: `decodeURIComponent` runs AFTER Express
+ *  route matching and the bearer-auth exemption in `server/index.ts`,
+ *  so percent-encoded `../` in `pkg` or `version` (e.g.
+ *  `%2E%2E%2F%2E%2E`) reaches `path.join` and could otherwise point
+ *  `root` anywhere on the filesystem (e.g. `/etc`). The downstream
+ *  `resolveWithinRoot(subPath)` only constrains the subpath relative
+ *  to whatever root we hand it — it doesn't know the root itself
+ *  was escaped. This anchor is the check that catches it. */
+export function resolvePluginRoot(pkg: string, version: string): string | null {
+  let cacheRootReal: string;
+  try {
+    cacheRootReal = realpathSync(WORKSPACE_PATHS.pluginCache);
+  } catch {
+    return null;
+  }
+  const candidate = path.join(WORKSPACE_PATHS.pluginCache, pkg, version);
   let rootReal: string;
   try {
-    rootReal = realpathSync(root);
+    rootReal = realpathSync(candidate);
   } catch {
+    return null;
+  }
+  if (rootReal !== cacheRootReal && !rootReal.startsWith(cacheRootReal + path.sep)) {
+    return null;
+  }
+  return rootReal;
+}
+
+router.get(API_ROUTES.plugins.runtimeAsset, async (req: Request<{ pkg: string; version: string; splat?: string | string[] }>, res: Response) => {
+  const pkg = decodeURIComponent(req.params.pkg);
+  const version = decodeURIComponent(req.params.version);
+  // Express 5 returns `splat` as `string[]` when the wildcard
+  // matched multiple segments, `string` for a single segment, and
+  // empty/undefined for an empty wildcard. Normalise to the joined
+  // path so downstream `path.join` works on every shape.
+  const rawSplat = req.params.splat;
+  const subPath = Array.isArray(rawSplat) ? rawSplat.join("/") : (rawSplat ?? "");
+  const rootReal = resolvePluginRoot(pkg, version);
+  if (!rootReal) {
     notFound(res, "asset not found");
     return;
   }
