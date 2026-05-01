@@ -4,14 +4,14 @@
 # `/codex-cross-review` skill so both human-driven and automated
 # reviews speak the same protocol.
 #
-# Cost control:
-#   - draft PRs are skipped
-#   - paths-ignore mirrors `pull_request.yaml` so docs-only / plan-only
-#     PRs don't burn tokens
+# Cost control (intentionally minimal — user wants every PR
+# reviewed regardless of draft / path):
 #   - `concurrency` cancels superseded runs so a quick push burst
 #     produces one review against the latest commit, not N reviews
 #   - `~/.npm` is cached, so `npm install -g @openai/codex` reuses
 #     the prior tarball + skips the network on warm runs
+#   - Azure deployment SKU caps TPM (5000 currently); throttling
+#     happens at the model layer, not the workflow layer
 #
 # Auth: Azure OpenAI via the OpenAI-compatible `/openai/v1` endpoint.
 # Codex CLI 0.125.0 does NOT honour `OPENAI_BASE_URL` directly —
@@ -31,22 +31,15 @@
 name: Codex auto-review
 
 on:
-  # Auto-fire on every non-draft PR. Validated end-to-end via
-  # `workflow_dispatch` on PR #1061 (run 25195061234) — Codex
-  # posted a real `CODEX VERDICT: CHANGES REQUESTED` with two
-  # specific findings, and the iteration-aware prompt correctly
-  # read prior comments before adding new ones.
+  # Auto-fire on EVERY PR — including drafts and docs-only diffs.
+  # The user's directive: "極力制限しないでどんどんつかえる". Cost is
+  # bounded anyway by `concurrency.cancel-in-progress` (a push burst
+  # collapses to one review against the final commit) and the Azure
+  # deployment's 5000 TPM ceiling. A docs-only PR review is cheap
+  # and occasionally catches a typo or broken link the bots missed.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
-    # Match `pull_request.yaml`'s ignore list so docs / plan / md
-    # only PRs don't burn tokens. (Workflow files themselves are
-    # NOT in this ignore list — a change to `.github/workflows/`
-    # should still get reviewed.)
-    paths-ignore:
-      - "docs/**"
-      - "plans/**"
-      - "**/*.md"
   # Manual escalation: run on demand against any PR (re-review,
   # one-off check on a closed PR, etc.).
   workflow_dispatch:
@@ -73,9 +66,6 @@ concurrency:
 
 jobs:
   codex-review:
-    # Skip drafts on `pull_request`; `workflow_dispatch` always runs
-    # because the user explicitly triggered it.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
