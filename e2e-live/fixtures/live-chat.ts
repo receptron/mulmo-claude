@@ -325,3 +325,35 @@ export async function readPdfDownload(download: Download): Promise<Buffer> {
   }
   return buf;
 }
+
+// presentMulmoScript downloads always land as `<id>.mp4` (see
+// downloadMovie in plugins/presentMulmoScript/View.vue), and the
+// MP4 container always tags bytes 4..7 with the `ftyp` box marker
+// regardless of brand (isom / mp42 / etc.). Checking that marker
+// rejects HTML error pages, empty stubs, and any other format that
+// might slip through if the route accidentally returned a different
+// payload.
+const MP4_FTYP = Buffer.from("ftyp", "ascii");
+
+/**
+ * Read a Playwright `Download` for a mulmoScript movie and check
+ * that it is a real MP4. Validates the `ftyp` box at offset 4, so an
+ * HTML error response or a near-empty stub fails fast. Returns the
+ * buffer so the caller can layer additional assertions (size floor,
+ * stream parsing, etc.).
+ */
+export async function readMovieDownload(download: Download): Promise<Buffer> {
+  const downloadPath = await download.path();
+  if (!downloadPath) {
+    throw new Error("Download has no on-disk path; was failOnStatusCode triggered?");
+  }
+  const buf = await readFile(downloadPath);
+  if (buf.length < 8) {
+    throw new Error(`Downloaded movie too small to inspect (${buf.length} bytes)`);
+  }
+  if (!buf.subarray(4, 8).equals(MP4_FTYP)) {
+    const head = buf.subarray(0, 16).toString("hex");
+    throw new Error(`Downloaded file is not an MP4 (expected 'ftyp' at offset 4, got hex: ${head})`);
+  }
+  return buf;
+}

@@ -1,5 +1,9 @@
+import { execSync } from "node:child_process";
+import path from "node:path";
+
 import { type Page, expect, test } from "@playwright/test";
 
+import { TOOL_NAME as PRESENT_MULMO_SCRIPT_TOOL } from "../../src/plugins/presentMulmoScript/definition.ts";
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 import {
   deleteSession,
@@ -8,6 +12,7 @@ import {
   readImgNaturalSize,
   readImgRepairAttempted,
   readImgSrcInPresentHtml,
+  readMovieDownload,
   readPdfDownload,
   removeFromWorkspace,
   sendChatMessage,
@@ -18,12 +23,22 @@ import {
 
 const L01_TIMEOUT_MS = 2 * ONE_MINUTE_MS;
 const L02_TIMEOUT_MS = 3 * ONE_MINUTE_MS;
+// L-03 has to absorb both the LLM authoring the script and the
+// server-side TTS + ffmpeg compose. 2-beat scripts in practice
+// finish in a couple of minutes; the 10-minute ceiling leaves
+// headroom for the slowest TTS provider on a cold cache.
+const L03_TIMEOUT_MS = 10 * ONE_MINUTE_MS;
+const L03_GENERATION_TIMEOUT_MS = 8 * ONE_MINUTE_MS;
 // Floor for "the route returned a real PDF, not a stub". The actual
 // size depends on how verbose the LLM's reply happens to be that
 // run, so this is loose on purpose — `readPdfDownload` already
 // asserts the %PDF- magic bytes plus %%EOF tail, this number just
 // keeps obviously empty stubs out.
 const MIN_PDF_BYTES = 500;
+// Same idea for the movie: `readMovieDownload` already validates
+// the MP4 `ftyp` marker, so we just need a floor that excludes
+// truncated stubs. 1 KiB is well below any real 2-beat output.
+const MIN_MOVIE_BYTES = 1024;
 
 const L01_IMG_ALT = "sample";
 const L01_IMG_LOCATOR = `img[alt="${L01_IMG_ALT}"]`;
@@ -64,6 +79,53 @@ test.describe("media (real LLM)", () => {
       await downloadAndAssertPdf(page);
     } finally {
       await cleanupSessionAndWorkspace(page, workspaceImageRel);
+    }
+  });
+
+  test("L-03: 既存 mulmoScript → 動画生成 → 動画 DL が成功する", async ({ page }, testInfo) => {
+    test.setTimeout(L03_TIMEOUT_MS);
+    // mulmocast spawns system ffmpeg via fluent-ffmpeg (not bundled).
+    // Without it, movie compose fails silently and the test times
+    // out at the 8-minute mark. Skip with a loud reason instead so
+    // teammates know to install ffmpeg locally — see issue #1049
+    // for the matching docs gap on the user-facing side.
+    test.skip(!isFFmpegAvailable(), "ffmpeg not in PATH; required for the mulmoScript movie compose pipeline (see issue #1049)");
+    // L-03 is scoped to B-21 (download-movie bearer-auth flow). To
+    // remove LLM-script-authoring drift and skip TTS / image-gen
+    // APIs entirely, we seed a pre-built mulmoScript fixture and
+    // ask the LLM only to re-display it via filePath mode. Empty
+    // beat `text` plus textSlide images means: no API calls, no
+    // GEMINI key needed, just ffmpeg locally composing two short
+    // silent slides.
+    //
+    // Disk lives under artifacts/stories/ (WORKSPACE_DIRS.stories);
+    // the wire form passed to the LLM keeps the canonical
+    // "stories/<file>" prefix that the server's resolveStoryPath
+    // strips before resolving against artifacts/stories/.
+    //
+    // Suffixing the filename with the Playwright project name
+    // keeps chromium and webkit from contending for the same
+    // absoluteFilePath inside server's inFlightMovies guard —
+    // without this they race and only one worker's generateMovie
+    // SSE stream completes (the loser hangs for the full timeout).
+    const slug = testInfo.project.name;
+    const fixtureBasename = `e2e-live-l03-${slug}.json`;
+    // path.posix.join keeps the separator forward-slash on every
+    // host so the wire form matches the server's POSIX-shaped
+    // resolveStoryPath input regardless of the runner OS.
+    const workspaceScriptRel = path.posix.join("artifacts/stories", fixtureBasename);
+    const wireFilePath = path.posix.join("stories", fixtureBasename);
+    await placeFixtureInWorkspace("mulmo/l03-two-beat.json", workspaceScriptRel);
+    try {
+      await startNewSession(page);
+      await sendL03FilePathPrompt(page, wireFilePath);
+      await waitForMulmoScriptViewReady(page);
+      await waitForAssistantResponseComplete(page);
+      await generateAndDownloadMovie(page);
+    } finally {
+      const sessionId = getCurrentSessionId(page);
+      if (sessionId) await deleteSession(page, sessionId);
+      await removeFromWorkspace(workspaceScriptRel);
     }
   });
 });
@@ -154,6 +216,62 @@ async function downloadAndAssertPdf(page: Page): Promise<void> {
   await pdfBtn.click();
   const pdf = await readPdfDownload(await downloadPromise);
   expect(pdf.length, "PDF should not be a near-empty stub").toBeGreaterThan(MIN_PDF_BYTES);
+}
+
+/**
+ * Ask the LLM to re-display the seeded mulmoScript via filePath.
+ * Reduces script-authoring drift to "the LLM picked the right tool
+ * and passed one argument" — both of which are reliable. The
+ * fixture itself controls beats / TTS / image type.
+ */
+async function sendL03FilePathPrompt(page: Page, workspaceScriptRel: string): Promise<void> {
+  const message = [
+    `\`${PRESENT_MULMO_SCRIPT_TOOL}\` ツールに \`filePath: "${workspaceScriptRel}"\` を渡して、 既存スクリプトをそのまま表示してください。`,
+    "",
+    "- ツールには filePath だけを渡し、 script は省略してください",
+    "- 動画生成 (Generate Movie / generateMovie ツール) は呼ばないでください — テスト側でボタンを押します",
+  ].join("\n");
+  await sendChatMessage(page, message);
+}
+
+/**
+ * mulmocast's video pipeline shells out to system ffmpeg via
+ * fluent-ffmpeg, so the host needs ffmpeg on PATH. We probe with
+ * `which ffmpeg` and skip the test cleanly when it's missing.
+ */
+function isFFmpegAvailable(): boolean {
+  try {
+    execSync("which ffmpeg", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wait until presentMulmoScript has rendered the script panel with
+ * no movie attached yet — that's the moment the Generate Movie pill
+ * becomes the visible action. If the LLM refuses to call the tool
+ * and just drops markdown, this never appears and the test fails
+ * cleanly on the timeout instead of misleading downstream errors.
+ */
+async function waitForMulmoScriptViewReady(page: Page): Promise<void> {
+  await expect(page.getByTestId("mulmo-script-generate-movie-button").first()).toBeVisible({ timeout: ONE_MINUTE_MS });
+}
+
+/**
+ * Drive the Generate → Download flow end-to-end. The Download pill
+ * only appears once the server has finished compose, so its
+ * visibility doubles as a "generation complete" signal.
+ */
+async function generateAndDownloadMovie(page: Page): Promise<void> {
+  await page.getByTestId("mulmo-script-generate-movie-button").first().click();
+  const downloadBtn = page.getByTestId("mulmo-script-download-movie-button").first();
+  await expect(downloadBtn).toBeVisible({ timeout: L03_GENERATION_TIMEOUT_MS });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadBtn.click();
+  const movie = await readMovieDownload(await downloadPromise);
+  expect(movie.length, "movie should not be a near-empty stub").toBeGreaterThan(MIN_MOVIE_BYTES);
 }
 
 /**

@@ -47,6 +47,7 @@
           v-if="moviePath && !movieGenerating"
           class="h-8 px-2.5 flex items-center gap-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           :disabled="movieDownloading"
+          data-testid="mulmo-script-download-movie-button"
           @click="downloadMovie"
         >
           <span class="material-icons text-base">download</span>
@@ -60,6 +61,7 @@
           class="h-8 w-8 flex items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
           :title="t('pluginMulmoScript.regenerateMovie')"
           :aria-label="t('pluginMulmoScript.regenerateMovie')"
+          data-testid="mulmo-script-regenerate-movie-button"
           @click="generateMovie"
         >
           <span class="material-icons text-base">refresh</span>
@@ -71,6 +73,7 @@
           v-else
           class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           :disabled="movieGenerating"
+          data-testid="mulmo-script-generate-movie-button"
           @click="generateMovie"
         >
           <svg v-if="movieGenerating" class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
