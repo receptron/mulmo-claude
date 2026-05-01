@@ -5,6 +5,7 @@ import { installGuards } from "./router/guards";
 import i18n from "./lib/vue-i18n";
 import { setAuthToken } from "./utils/api";
 import { readAuthTokenFromMeta } from "./utils/dom/authTokenMeta";
+import { loadRuntimePlugins } from "./tools/runtimeLoader";
 import "./index.css";
 import "material-icons/iconfont/material-icons.css";
 import "material-symbols/outlined.css";
@@ -19,6 +20,12 @@ import.meta.glob(["../node_modules/@gui-chat-plugin/*/dist/style.css", "../node_
 // requests will 401 — that's the intended dev-time signal when the
 // server isn't running.
 setAuthToken(readAuthTokenFromMeta());
+
+// Runtime-loaded plugins (#1043 C-2). Fetch the install list and
+// dynamic-import each plugin's Vue chunk before mount, so the first
+// render already sees the workspace-installed tool names. Failures
+// log a warning but never block boot — broken plugins are skipped.
+await loadRuntimePlugins();
 
 installGuards(router);
 

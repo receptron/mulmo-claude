@@ -1,5 +1,6 @@
 import type { PluginEntry } from "./types";
 import { LEGACY_VIEW_ONLY_PLUGIN_NAMES } from "./legacyPluginNames";
+import { getRuntimePluginEntry, getRuntimeToolNames } from "./runtimeLoader";
 import textResponsePlugin from "../plugins/textResponse/index";
 import markdownPlugin from "../plugins/markdown/index";
 import spreadsheetPlugin from "../plugins/spreadsheet/index";
@@ -52,9 +53,14 @@ const plugins: Record<string, PluginEntry> = {
 };
 
 export function getPlugin(name: string): PluginEntry | null {
-  return plugins[name] ?? null;
+  // Static (build-time) plugins win on collision — runtime plugins
+  // are registered in mcp-server.ts only when their tool name does
+  // not already exist in the static set, so this lookup order keeps
+  // the contracts symmetric across server and frontend.
+  return plugins[name] ?? getRuntimePluginEntry(name);
 }
 
 export function getAllPluginNames(): string[] {
-  return Object.keys(plugins).filter((name) => !LEGACY_VIEW_ONLY_PLUGIN_NAMES.has(name));
+  const staticNames = Object.keys(plugins).filter((name) => !LEGACY_VIEW_ONLY_PLUGIN_NAMES.has(name));
+  return [...staticNames, ...getRuntimeToolNames()];
 }
