@@ -259,7 +259,6 @@ import { PAGE_ROUTES, type PageRouteName } from "./router";
 import type { SseEvent } from "./types/sse";
 import type { SessionEntry, ActiveSession } from "./types/session";
 import { EVENT_TYPES } from "./types/events";
-import { extractImageData } from "./utils/tools/result";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import { resolvePastedAttachment } from "./utils/agent/pastedAttachment";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
@@ -842,10 +841,9 @@ async function sendMessage(text?: string) {
 
   // Pasted / dropped files are pre-uploaded to a workspace file so
   // the server (and the LLM downstream) sees a relative path — never
-  // a data: URI. The path then rides on `attachments[]` (path-only
-  // entries) alongside any sidebar-picked image. On upload failure,
-  // restore both userInput and pastedFile so the user can retry
-  // without retyping.
+  // a data: URI. The path then rides on `attachments[]` as a path-only
+  // entry. On upload failure, restore both userInput and pastedFile so
+  // the user can retry without retyping.
   let attachmentForRequest: string | undefined;
   if (fileSnapshot) {
     const resolved = await resolvePastedAttachment(fileSnapshot);
@@ -862,15 +860,14 @@ async function sendMessage(text?: string) {
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
 
-  // Compute attachment paths up-front so they can be persisted on
-  // the user message AND sent to the agent. The sidebar-picked image
-  // lives on the currently-selected result and is read off `session`
-  // before beginUserTurn appends the new user turn.
-  const selectedRes = session.toolResults.find((result) => result.uuid === session.selectedResultUuid) ?? undefined;
-  const sidebarPickedPath = extractImageData(selectedRes);
-  const attachmentPaths = [attachmentForRequest, sidebarPickedPath].filter((value): value is string => typeof value === "string" && value.length > 0);
+  // Only files the user explicitly attached this turn (paste / drop /
+  // file-picker) ride on the message. Do NOT auto-attach whatever
+  // image happens to be selected in the sidebar — selection moves to
+  // the latest generated image automatically, which would silently
+  // glue the previous picture onto every follow-up comment.
+  const attachmentPaths = attachmentForRequest ? [attachmentForRequest] : undefined;
 
-  beginUserTurn(session, message, attachmentPaths.length > 0 ? attachmentPaths : undefined);
+  beginUserTurn(session, message, attachmentPaths);
 
   ensureSessionSubscription(session);
 
@@ -879,7 +876,7 @@ async function sendMessage(text?: string) {
       message,
       role: sessionRole.value,
       chatSessionId: session.id,
-      attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : undefined,
+      attachmentPaths,
     }),
   );
   if (!result.ok) {
