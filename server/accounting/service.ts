@@ -100,6 +100,20 @@ export async function listBooks(workspaceRoot?: string): Promise<{ activeBookId:
   return { activeBookId: config.activeBookId, books: config.books };
 }
 
+/** First-run bootstrap: if no books exist, create a "Default" book
+ *  with id "default" and currency USD. The accounting plan promises
+ *  one book out of the box so the user lands directly in the
+ *  Journal tab on the first openApp call instead of facing an empty
+ *  state. The user can delete and recreate with a different
+ *  currency / name before booking any entries. Idempotent: returns
+ *  bookCreated=false when at least one book already exists. */
+export async function ensureFirstBook(workspaceRoot?: string): Promise<{ activeBookId: string; bookCreated: boolean }> {
+  const config = await loadOrInitConfig(workspaceRoot);
+  if (config.books.length > 0) return { activeBookId: config.activeBookId, bookCreated: false };
+  const created = await createBook({ name: "Default", currency: DEFAULT_CURRENCY }, workspaceRoot);
+  return { activeBookId: created.book.id, bookCreated: true };
+}
+
 export async function createBook(input: { id?: string; name: string; currency?: string }, workspaceRoot?: string): Promise<{ book: BookSummary }> {
   const config = await loadOrInitConfig(workspaceRoot);
   // First book defaults to id "default" so a typical user with a

@@ -9,6 +9,7 @@ import {
   addEntry,
   createBook,
   deleteBook,
+  ensureFirstBook,
   getBalanceSheetReport,
   getOpeningBalances,
   getProfitLossReport,
@@ -27,6 +28,29 @@ function makeTmp(): string {
 }
 after(() => {
   for (const dir of created) rmSync(dir, { recursive: true, force: true });
+});
+
+describe("ensureFirstBook", () => {
+  it("creates a Default book when the workspace is empty", async () => {
+    const root = makeTmp();
+    const result = await ensureFirstBook(root);
+    assert.equal(result.bookCreated, true);
+    assert.equal(result.activeBookId, "default");
+    const list = await listBooks(root);
+    assert.equal(list.books.length, 1);
+    assert.equal(list.books[0].id, "default");
+    assert.equal(list.books[0].name, "Default");
+    assert.equal(list.books[0].currency, "USD");
+  });
+  it("is idempotent — returns bookCreated=false when a book already exists", async () => {
+    const root = makeTmp();
+    await createBook({ name: "Personal", id: "personal" }, root);
+    const result = await ensureFirstBook(root);
+    assert.equal(result.bookCreated, false);
+    const list = await listBooks(root);
+    assert.equal(list.books.length, 1);
+    assert.equal(list.books[0].id, "personal");
+  });
 });
 
 describe("books lifecycle", () => {
