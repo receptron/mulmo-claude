@@ -22,23 +22,33 @@
 #   - AZURE_OPENAI_API_KEY        (the Azure key)
 #   - AZURE_OPENAI_BASE_URL       (e.g. https://<resource>.openai.azure.com — no path)
 #   - AZURE_OPENAI_DEPLOYMENT     (optional; defaults to gpt-5.4-mini)
-#   - AZURE_OPENAI_API_VERSION    (optional; defaults to 2025-04-01-preview)
+#   - AZURE_OPENAI_API_VERSION    (optional; defaults to `preview`)
 #
-# Manual testing: `workflow_dispatch` lets you run the workflow
-# against an arbitrary open PR after this file lands on `main`. The
-# `pull_request` trigger sources its workflow from the BASE branch,
-# so it can't review the PR that introduces it — use the dispatch
-# button + a `pr_number` input to validate the first time.
+# `workflow_dispatch` is also kept for manual re-runs (e.g.
+# requesting a re-review after argument changes, or running on a
+# closed PR for forensics).
 
 name: Codex auto-review
 
 on:
-  # Manual-only trigger while we sort out Azure OpenAI provider
-  # config. The first attempt at auto-firing on `pull_request`
-  # exposed that Codex CLI 0.125.0 ignores `OPENAI_BASE_URL` and
-  # falls back to `api.openai.com`, which 401s with an Azure key.
-  # Re-enable the `pull_request` trigger once a clean
-  # `workflow_dispatch` run lands on a real PR end-to-end.
+  # Auto-fire on every non-draft PR. Validated end-to-end via
+  # `workflow_dispatch` on PR #1061 (run 25195061234) — Codex
+  # posted a real `CODEX VERDICT: CHANGES REQUESTED` with two
+  # specific findings, and the iteration-aware prompt correctly
+  # read prior comments before adding new ones.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    # Match `pull_request.yaml`'s ignore list so docs / plan / md
+    # only PRs don't burn tokens. (Workflow files themselves are
+    # NOT in this ignore list — a change to `.github/workflows/`
+    # should still get reviewed.)
+    paths-ignore:
+      - "docs/**"
+      - "plans/**"
+      - "**/*.md"
+  # Manual escalation: run on demand against any PR (re-review,
+  # one-off check on a closed PR, etc.).
   workflow_dispatch:
     inputs:
       pr_number:
@@ -145,7 +155,16 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           REPO: ${{ github.repository }}
         run: |
-          codex exec --sandbox workspace-write "$(cat <<PROMPT
+          # `--sandbox danger-full-access` skips bubblewrap entirely.
+          # The default `workspace-write` sandbox tries to create a
+          # network namespace via bwrap, which fails on GitHub
+          # Actions runners with `RTM_NEWADDR: Operation not
+          # permitted` — the runner kernel restricts unprivileged
+          # `unshare` for namespaces. Without bwrap, codex can't
+          # spawn ANY shell command, including `gh`. The runner VM
+          # is itself ephemeral + isolated per job, so dropping the
+          # nested sandbox is safe in this context.
+          codex exec --sandbox danger-full-access "$(cat <<PROMPT
           Review PR #${PR_NUMBER} in ${REPO}.
 
           Use the gh CLI to inspect the diff:
