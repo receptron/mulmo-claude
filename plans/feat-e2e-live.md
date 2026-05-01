@@ -382,6 +382,66 @@ e2e-live/
 - **実生成 1 枚**（L-05）: generateImage 経路自体を検証するため、実際に画像生成
 - workspace の path は spec 名を含める（例: `artifacts/images/e2e-live-l01.png`）。複数 worker が並列実行されてもファイル名衝突しない
 
+### mulmoScript fixture + filePath パターン（L-03 で確立）
+
+L-03 を実装するなかで、 mulmoScript シナリオで再利用可能なパターンが固まった。 動画系 / mulmoScript 系の後続シナリオ（L-04 animation:true, mulmocast 関連の bridge / pre-release matrix など）で同じ枠を踏襲する。
+
+#### 1. fixture json を repo に持つ（LLM に script を作らせない）
+
+LLM に mulmoScript JSON を生成させると揺れが大きい（image / imagePrompt / textSlide / markdown / animation の選択、 speakers / model 設定、 description フィールドの省略など）。 spec の本旨が「DL 経路」 「動画 compose」 等であれば script の中身は決定論的で良いので、 `e2e-live/fixtures/mulmo/<scenario>.json` を repo に置き、 LLM には **`presentMulmoScript({ filePath: "stories/<...>" })` を呼んでくれ** と一文だけ指示する。 1 ツール 1 引数の単純呼出なので LLM はほぼ確実に従う。
+
+#### 2. disk path と LLM wire form の **二重化** に注意
+
+mulmoclaude では `WORKSPACE_DIRS.stories = "artifacts/stories"`（`server/workspace/paths.ts`）なので:
+
+- **disk 上**: `~/mulmoclaude/artifacts/stories/<file>.json`（fixture seed 先）
+- **LLM wire form**: `stories/<file>.json`（presentMulmoScript の filePath 引数に渡す形式、 server の `resolveStoryPath` が `STORIES_PREFIX` を strip して `artifacts/stories/` 配下を resolve する）
+
+spec 内では別変数で持つ（`workspaceScriptRel` と `wireFilePath`）。 同一に書くと server が 404 を返してテストが「mulmoScript view 未表示で 1 分 timeout」 する罠（L-03 開発初期に踏んだ）。
+
+#### 3. TTS / 画像生成 API を呼ばない fixture の作り方
+
+mulmocast schema より:
+
+- `text: z.string().optional().default("").describe("If empty, the audio is not generated.")`
+- `duration: z.number().optional().describe("Used only when the text is empty")`
+
+→ **全 beat で `text: ""` + `duration: <秒数>`** にすれば TTS API は呼ばれない。 image は **local-render type のみ** で揃える:
+
+| image type | API 呼ぶ |
+|---|---|
+| `textSlide` / `markdown` / `chart` / `mermaid` / `html_tailwind` | ❌ ローカル合成 |
+| `imagePrompt` / `moviePrompt`（top-level field） | ✅ image / video gen API |
+
+L-03 fixture (`e2e-live/fixtures/mulmo/l03-two-beat.json`) は textSlide 2 beat + text 空 + duration 1 で TTS / image API ともに 0 呼出 → cost 数円以下、 `GEMINI_API_KEY` 不要。
+
+#### 4. 並列 worker の衝突回避（project slug suffix）
+
+server `mulmo-script.ts` の `runMovieGeneration` は `inFlightMovies` set で `absoluteFilePath` 単位で動画生成の重複起動を防ぐ。 chromium / webkit が同じ fixture path を共有すると **片方の worker がガードに弾かれて Download Movie button が visible にならず 8 分 timeout** する。
+
+回避: spec 内で fixture filename に `testInfo.project.name` を埋める。
+
+```ts
+test("...", async ({ page }, testInfo) => {
+  const slug = testInfo.project.name; // "chromium" or "webkit"
+  const workspaceScriptRel = `artifacts/stories/<scenario>-${slug}.json`;
+  const wireFilePath = `stories/<scenario>-${slug}.json`;
+  // ...
+});
+```
+
+L-03 で「chromium pass / webkit 8 分 timeout」 という mixed result を見たら同じ症状を疑う。
+
+#### 5. ffmpeg system 依存（test.skip で逃がす）
+
+mulmocast は `fluent-ffmpeg` で **system ffmpeg を spawn** する（npm pkg に bundle されていない）。 ffmpeg のない端末では動画 compose が無音失敗する。 spec 冒頭で `which ffmpeg` を `execSync` してチェックし、 missing なら `test.skip(true, "...")` で逃がす。 PATH に ffmpeg が無いだけで赤くなるのを防ぐ + 何が足りないかを skip メッセージで明示。
+
+一般ユーザー側 (`npx mulmoclaude` で動画生成を試す導線) で ffmpeg 要件が docs に未記載な件は別件 issue #1049 で起票済み。
+
+#### 6. 検証は magic bytes + サイズ floor（中身の正しさは別 spec）
+
+DL 経路 (B-21) の sanity 確認は `readMovieDownload` helper の **MP4 `ftyp` box at offset 4** + 1 KiB floor で十分。 「動画が本当に再生できるか」 「想定 beat 数か」 「audio track があるか」 は L-04 / 別 spec の責任分担にする（spec ごとにスコープを 1 つに絞る）。
+
 ### 画像 URL / presentHtml の現仕様（PR #969 / #972 / #982 以降）
 
 最新仕様（PR #982 = `feat-presenthtml-filepath-only`）:
