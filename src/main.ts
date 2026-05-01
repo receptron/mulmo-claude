@@ -21,11 +21,22 @@ import.meta.glob(["../node_modules/@gui-chat-plugin/*/dist/style.css", "../node_
 // server isn't running.
 setAuthToken(readAuthTokenFromMeta());
 
-// Runtime-loaded plugins (#1043 C-2). Fetch the install list and
-// dynamic-import each plugin's Vue chunk before mount, so the first
-// render already sees the workspace-installed tool names. Failures
-// log a warning but never block boot — broken plugins are skipped.
-await loadRuntimePlugins();
+// Runtime-loaded plugins (#1043 C-2). Fire-and-forget: kick off the
+// list fetch + dynamic imports immediately but do NOT block mount.
+// Static plugins are bundled and ready synchronously; runtime
+// plugins fill in over the next ~100ms while the app is rendering
+// its first paint. By the time the LLM actually calls a runtime
+// tool (which requires at least one user message round-trip), the
+// registry is fully populated.
+//
+// Awaiting here would delay first paint even when there are no
+// runtime plugins installed (every workspace today), and it shifted
+// the timing of `page.goto("/chat")` enough to break the
+// today-journal-button E2E spec, which captured the URL before
+// app mount completed.
+loadRuntimePlugins().catch((err: unknown) => {
+  console.warn("[runtime-plugin] boot loader threw", err);
+});
 
 installGuards(router);
 
