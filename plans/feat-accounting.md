@@ -55,9 +55,11 @@
   - 全 path は `WORKSPACE_PATHS.accounting` から組み立て（`server/workspace/paths.ts` に追加）。
 - `server/accounting/journal.ts` — 仕訳の整合性検証（借方=貸方、勘定科目存在チェック、日付範囲）。`kind: "opening"` の特別仕訳に対しては追加検証（B/S 科目限定、asOfDate 以前に他の仕訳が無いこと）。
 - `server/accounting/openingBalances.ts` — 期首残高（opening balances）専用の処理：既存 opening の検出 / void / 新規 opening の append。書き込み後、`invalidateSnapshotsFrom(bookId, asOfMonth)` を呼ぶ。
-- `server/accounting/snapshotCache.ts` — スナップショットの遅延再生成と無効化制御。
-  - `getOrBuildSnapshot(bookId, period)` ← 存在すれば返す、無ければ前月スナップショット + その月の journal から構築して書き出して返す（前月もなければ再帰的に最古から build）。
-  - 全書き込み系パス（`addEntry` / `voidEntry` / `setOpeningBalances` / `upsertAccount` で科目区分が変わるケース）は最後に `invalidateSnapshotsFrom` を呼ぶ。
+- `server/accounting/snapshotCache.ts` — スナップショットの**非同期バックグラウンド再生成**と無効化制御。
+  - `getOrBuildSnapshot(bookId, period)` ← 存在すれば返す、無ければ前月スナップショット + その月の journal から構築して書き出して返す（lazy fallback、後述）。
+  - `scheduleRebuild(bookId, fromPeriod)` ← 書き込みハンドラから呼ばれる。in-process queue（`Map<bookId, Promise>`）で同一 book の rebuild を直列化し、各月完了ごとに `accountingBookChannel(bookId)` に `{kind: "snapshots-ready", period}` を publish。
+  - 全書き込み系パス（`addEntry` / `voidEntry` / `setOpeningBalances` / `upsertAccount` で科目区分が変わるケース）は同期で `invalidateSnapshotsFrom` を呼んだ後、`scheduleRebuild` を発火して即時 return する。
+- `server/accounting/eventPublisher.ts`（または既存の pub/sub 層を直接 import）— `accountingBookChannel(bookId)` / `PUBSUB_CHANNELS.accountingBooks` への publish ヘルパ。書き込みハンドラはここ経由で publish し、payload type を間違えないようにする。
 - `server/accounting/report.ts` — 残高試算表 / B/S / P/L / 勘定元帳の集計。`snapshotCache.getOrBuildSnapshot` を起点に、対象期間の JSONL を上から積む。`kind: "opening"` エントリは B/S・元帳には自然に含まれるが、「アクティビティ一覧」「P/L」からはフラグで除外。
 
 ## Plugin API surface
@@ -119,26 +121,108 @@ UI（`src/plugins/accounting/`）：
 - `components/OpeningBalancesForm.vue` を新設：B/S 科目を asset / liability / equity でグルーピング、各行に借方／貸方欄、リアルタイムにアンバランス額（Σ借方 - Σ貸方）を表示し、ゼロになるまで保存ボタン無効化。
 - 保存時は `setOpeningBalances` を REST 直叩き。差し替えの場合は確認ダイアログ。
 
-## Snapshot cache invalidation
+## Architecture principle: file system is truth, view is reactive
 
-スナップショットはあくまで**キャッシュ**で、journal が単一の真実。過去への書き込みが起きたら、それ以降のキャッシュは無効化して遅延再生成する。これを徹底しないと「仕訳を追加・修正・期首を直したのに B/S が古いまま」というバグになる。
+このプラグインの基本方針は MulmoClaude のアーキテクチャそのまま：
 
-無効化トリガ（全部 `invalidateSnapshotsFrom(bookId, fromPeriod)` を呼ぶ）：
+- **ファイルシステムが唯一の真実**。journal JSONL と `accounts.json` / `config.json` がそれ。snapshots/ はあくまでキャッシュ。
+- **キャッシュの整合性管理は全てサーバ側**。書き込みに伴う無効化と非同期再生成は、書き込みを起こした API ハンドラの責務。View は一切関与しない。
+- **View はサーバが返す現在のデータを描画するだけ**。ローカルでの楽観的更新（optimistic update）も、ローカルキャッシュ管理もしない。
+- **変化は pub/sub で View に通知される**。View は購読し、通知を受けたら自分が表示中のデータだけ refetch する。これによってマルチウィンドウ・別プロセス・将来のリレー越しでも勝手に整合性が取れる。
 
-| 操作 | `fromPeriod` |
-|---|---|
-| `addEntry({date})` | `date` の月 |
-| `voidEntry` | 元仕訳の月（void エントリ自体は当月の append だが、影響は元仕訳の月から） |
-| `setOpeningBalances({asOfDate})` | `asOfDate` の月（実質、その帳簿の全期間が無効化される） |
-| `upsertAccount` で科目区分（type）が変わる場合 | 当該科目が初登場した月（保守的に最古へ） |
-| `rebuildSnapshots({from?})` | 明示の `from`（省略時は全期間） |
+既存の `presentHtml` / `markdown` の View が `useFileChange(filePath)` でファイル書き込みを購読しているのと同じ流儀。
+
+### Pub/sub channels
+
+`src/config/pubsubChannels.ts` に以下を追加：
+
+```ts
+/** "Some accounting data in this book changed — refetch what you're
+ *  showing." One channel per book. Publishers: every write path in
+ *  server/api/routes/accounting.ts (addEntry / voidEntry /
+ *  setOpeningBalances / upsertAccount), plus the background snapshot
+ *  rebuilder. Subscribers: src/plugins/accounting/View.vue (one
+ *  subscription per mounted instance, scoped to the active bookId).
+ */
+export function accountingBookChannel(bookId: string): string {
+  return `accounting:${bookId}`;
+}
+
+export interface AccountingBookChannelPayload {
+  kind:
+    | "journal"              // addEntry / voidEntry が走った
+    | "opening"              // setOpeningBalances が走った
+    | "accounts"             // upsertAccount が走った
+    | "snapshots-rebuilding" // 過去無効化、バックグラウンド再構築開始
+    | "snapshots-ready";     // 再構築完了
+  period?: string; // YYYY-MM、関係する場合
+}
+```
+
+加えて `PUBSUB_CHANNELS` に static で 1 本：
+
+```ts
+/** "The book list changed" — createBook / deleteBook / setActiveBook.
+ *  Subscribers: BookSwitcher.vue (re-fetch dropdown contents). */
+accountingBooks: "accounting:books",
+```
+
+### Snapshot cache invalidation（async, server-driven）
+
+スナップショットはあくまで**キャッシュ**で、journal が単一の真実。過去への書き込みが起きたら、それ以降のキャッシュは無効化して**バックグラウンドで再生成**する。View はキャッシュの存在自体を気にしない。
+
+書き込みハンドラの典型フロー：
+
+1. **同期**: 入力検証 → journal append（atomic）→ `invalidateSnapshotsFrom(bookId, fromPeriod)` でスナップショットファイル削除 → `accountingBookChannel(bookId)` に `{kind: "journal" | "opening" | …, period}` を publish → ハンドラ即時 return。
+2. **同期 publish**（無効化直後）: `{kind: "snapshots-rebuilding", period: fromPeriod}` を publish。View はこれを見て「集計が一時的にゆっくりかも」というインジケータを出すなら出す（出さなくてもいい）。
+3. **非同期（background）**: 削除されたスナップショットを最古から順に再構築（前月スナップショット起点のインクリメンタル）→ 各月完了ごとに、または最終完了時に `{kind: "snapshots-ready", period: fromPeriod}` を publish。View はこれを受けて、現在表示中のレポート期間に該当すれば再 fetch。
+4. **安全網（lazy fallback）**: もし View が rebuild 完了前に `getReport` を呼んでスナップショットが無ければ、サーバはその場で journal フルスキャンから集計して返す（遅いが必ず正しい）。バックグラウンド rebuild は別途進行し、完了したらキャッシュ書き出し。
+
+無効化トリガ：
+
+| 操作 | `fromPeriod` | publish する payload kind |
+|---|---|---|
+| `addEntry({date})` | `date` の月 | `journal` |
+| `voidEntry` | 元仕訳の月 | `journal` |
+| `setOpeningBalances({asOfDate})` | `asOfDate` の月（実質全期間） | `opening` |
+| `upsertAccount` で科目区分（type）が変わる場合 | 当該科目が初登場した月（保守的に最古へ） | `accounts` |
+| `rebuildSnapshots({from?})` | 明示の `from`（省略時は全期間） | `snapshots-rebuilding` → `snapshots-ready` |
 
 実装の指針：
 
-- **削除は同期、再生成は遅延**。書き込み時にスナップショットファイルを物理削除（`fs.rm` で複数ファイル）し、即時返す。次に `getReport` が呼ばれたとき `snapshotCache.getOrBuildSnapshot` が「無いから build」と判断して再生成 → 書き出し → 返す。書き込みパスを軽く保つことで UI のレスポンスを犠牲にしない。
-- **再生成は前月スナップショットを起点にインクリメンタル**。前月も無ければ再帰的に最古へ遡る。最古まで無いケースは「journal の最古エントリの月から空の B/S を起点に積む」。
-- **整合性の自己検証**：snapshot ありのレポート結果と、snapshot を全部消してから取った結果が**バイト一致する**ことをユニットテストで保証（不変性の証明）。
+- **背景 rebuild の起動方式**：書き込みハンドラ内で `setImmediate` / `queueMicrotask` で発火する単純な in-process queue で十分。同一 bookId に対する rebuild は直列化（後の書き込みで上書きされた古い rebuild を無駄に走らせない）— `Map<bookId, Promise>` で「いま走っている rebuild」を追跡し、新規書き込みがあったら現行を待ってから次を起動、または現行を中断して新規で再起動する。
+- **インクリメンタル構築**：前月スナップショットを起点に当月 journal を積む。前月も無ければ再帰的に最古へ遡る。最古まで無いケースは「空の B/S を起点に最古から積む」。
+- **不変性の自己検証**（テスト）：snapshot ありのレポート結果と、snapshot を全部消してから取った結果が**バイト一致**すること。
 - **管理ツール**：`rebuildSnapshots` action を MCP / REST で公開。journal を直接手で編集したケースや、開発中にロジックが変わってフォーマット差分が出たケースで使う。`View.vue` の設定タブにも「スナップショット再構築」ボタンを置く（試験運用フェーズのデバッグ用）。
+
+### View 側の購読パターン
+
+`View.vue` および各サブコンポーネント（`JournalList.vue` / `BalanceSheet.vue` / `Ledger.vue` 等）は、自分が表示しているデータが何の変化で動くかを宣言的に書く：
+
+```ts
+// View.vue 概念コード
+const { activeBookId } = useAccountingState();
+usePubSub(
+  computed(() => accountingBookChannel(activeBookId.value)),
+  (payload: AccountingBookChannelPayload) => {
+    // 自分が表示中のタブ・期間に関係する変化だけ refetch
+    if (payload.kind === "journal" || payload.kind === "snapshots-ready") {
+      if (payload.period === currentPeriod.value) refetchReport();
+      refetchJournalList();
+    } else if (payload.kind === "opening") {
+      refetchOpening();
+      refetchReport(); // 全期間に影響
+    } else if (payload.kind === "accounts") {
+      refetchAccounts();
+    }
+    // "snapshots-rebuilding" は表示用フラグだけ立てる、実害無し
+  },
+);
+```
+
+`BookSwitcher.vue` は `PUBSUB_CHANNELS.accountingBooks` を購読して、ドロップダウンの中身を最新化。
+
+ローカル編集中の入力フォーム（`JournalEntryForm.vue` / `OpeningBalancesForm.vue`）は購読しない（自分の入力が他からの通知で吹き飛ばされないよう）。submit 後はサーバから帰ってきた成功レスポンスでフォームを閉じ、購読側の View が pub/sub で更新を受け取る。
 
 ## Tool name registration
 
@@ -168,7 +252,8 @@ UI（`src/plugins/accounting/`）：
     - `BalanceSheet.vue` / `ProfitLoss.vue` — B/S / P/L サマリ
 - **マウント経路**：`manageAccounting` の `openApp` action が、ツール結果として「accounting アプリを開け」というシリアライズ可能なペイロード（type 識別子 + 初期 props: `{bookId, initialTab}`）を返す。tool-result レンダラー（`presentChart` 等と同じ層）がそのペイロードの type を見て `View.vue` を `<Suspense>` でマウントする。コンパクト結果の戻り値は同じディスパッチで `Preview.vue` に流れる。
 - **データ通信は直接 REST**：マウント後の `View.vue` は `apiPost("/api/accounting", { action, ... })` で `/api/accounting` を直接叩く。タブ切替・フィルタ変更・仕訳追加・残高再計算は LLM を介さない（ラウンドトリップ無し）。
-- **状態管理**：ローカル状態は `View.vue` 内の reactive state。session を跨いだ「現在見ていた帳簿」は `config.json.activeBookId` をサーバ側に持つので、再度 `openApp` を呼んだときに自然に復元される。canvas の同じ tool-result が再レンダリングされても、サーバ状態から再構築できる（ローカル UI 状態は失われて良い）。
+- **データの真実はファイルシステム、変化は pub/sub で知る**：View は楽観的更新もローカルキャッシュ管理もしない。サーバが書き込み後に `accountingBookChannel(bookId)` に publish し、View は `usePubSub` で購読して該当データだけ refetch する（後述「Architecture principle」セクション参照）。
+- **状態管理**：UI 状態（現在のタブ・フィルタ・スクロール位置）だけが View 内の reactive state。データ自体はサーバから取ったものをそのまま描画する。session を跨いだ「現在見ていた帳簿」は `config.json.activeBookId` をサーバ側に持つので、再度 `openApp` を呼んだときに自然に復元される。canvas の同じ tool-result が再レンダリングされても、サーバ状態から再構築できる（ローカル UI 状態は失われて良い）。
 - **PluginLauncher の TARGETS には追加しない**（ハード制約 2）。**ルート登録もしない**（ハード制約 3）。`View.vue` は tool-result の文脈の外からはマウントされない。
 - **i18n**：`src/lang/en.ts` に `accounting.*` のキー（タブ名、フォームラベル、エラー文言、確認ダイアログ等）を追加し、**8 ロケール全部**に同じキーを入れる（CLAUDE.md の i18n ルール）。Launcher 用文字列は不要（ボタン無し、ルート無し）。
 
@@ -187,6 +272,7 @@ UI（`src/plugins/accounting/`）：
 
 - `server/workspace/paths.ts` に `WORKSPACE_PATHS.accounting` / `WORKSPACE_DIRS.accountingBooks` などを追加。raw string concat 禁止（CLAUDE.md ルール）。
 - `src/config/apiRoutes.ts` の `API_ROUTES` に `accounting: "/api/accounting"` を追加（REST エンドポイントの定数）。**UI ルート（router の path）は追加しない**（ハード制約 3）。
+- `src/config/pubsubChannels.ts` に `accountingBookChannel(bookId)` ファクトリと `AccountingBookChannelPayload` 型、および `PUBSUB_CHANNELS.accountingBooks` static を追加（既存の `fileChannel` / `sessionChannel` と同パターン）。
 - ツール結果レンダラーが識別する payload type（例: `"accounting-app"`）を `src/types/toolResults.ts`（または既存のレンダラー判定箇所）に登録。type は `as const` で集中管理し、生文字列の散在を防ぐ。
 - 時間定数は使用箇所が出たら `server/utils/time.ts` から import。
 
@@ -214,11 +300,18 @@ UI（`src/plugins/accounting/`）：
   - 既存 opening を `setOpeningBalances` で差し替えると、元 opening が void になり新 opening が当該月に append され、両方が `listEntries` から（void フラグ付きで）見える。
   - opening 設定後の B/S が期首残高を始点にした値を返す。
 - `snapshotCache.test.ts`
-  - 過去日付 `addEntry` → 該当月以降のスナップショットファイルが消える。
-  - 次の `getReport` で遅延再生成され、結果は journal フルスキャンと一致。
-  - `setOpeningBalances` 差し替え → 全期間のスナップショットが再構築されること（asOfMonth 以降の物理ファイルが一旦消える）。
-  - `voidEntry` → 元仕訳の月以降のスナップショットが消える。
+  - 過去日付 `addEntry` → 該当月以降のスナップショットファイルが**同期で**消える。
+  - バックグラウンド rebuild が完走して、該当月以降のスナップショットファイルが書き戻る。
+  - rebuild 完走前に `getReport` を呼ぶと lazy fallback（journal フルスキャン）で正しい結果が返る。
+  - `setOpeningBalances` 差し替え → 全期間のスナップショットが一旦消え、rebuild 後に書き戻る。
+  - `voidEntry` → 元仕訳の月以降のスナップショットが消える / 戻る。
   - `rebuildSnapshots({from})` で明示再構築できる。
+  - 同一 bookId に書き込みが連発しても rebuild が直列化される（Promise キュー検証）。
+- `eventPublisher.test.ts`
+  - `addEntry` 後に `accountingBookChannel(bookId)` に `{kind: "journal", period}` が 1 回だけ publish される。
+  - rebuild 完走後に `{kind: "snapshots-ready", period}` が publish される。
+  - `setOpeningBalances` で `{kind: "opening"}` と `{kind: "snapshots-rebuilding"}` の順序を検証。
+  - `createBook` で `PUBSUB_CHANNELS.accountingBooks` に publish されること。
 - `multi-book.test.ts`
   - book A の仕訳は book B に漏れない（snapshot キャッシュも独立）。
   - `setActiveBook` 後に `bookId` 省略 API がそちらを向く。
@@ -234,6 +327,7 @@ UI（`src/plugins/accounting/`）：
   - チャットで「家計簿を開いて」相当のプロンプトを送る → `manageAccounting({action:"openApp"})` がモックで呼ばれる → `<AccountingApp>` が canvas にマウントされる。
   - マウントされたアプリ内で、帳簿作成 → 期首残高入力（OpeningBalancesForm が balance 0 まで保存ボタン無効）→ 仕訳入力 → 一覧で確認 → B/S 表示の golden path。各操作が `/api/accounting` を直接叩いていること（LLM ラウンドトリップ無し）を network 観察で確認。
   - 帳簿スイッチャーで book を切替えると仕訳一覧が入れ替わる。
+  - **Pub/sub 反映**：仕訳を追加すると、（手動 refetch 操作なしに）pub/sub 経由で B/S と仕訳一覧が自動更新される。サーバ側からテスト用に直接書き込んでも同様に更新される（マルチライター想定）。
   - 期首残高を一度入れた後に修正 → 再度同じ画面に戻ると新しい opening の値が出る（古い値が残らない）。
   - チャットで「先月の売上は？」相当のプロンプトを送る → `getReport` のコンパクト結果がチャットに inline 表示される（アプリは開かない）。
 
@@ -256,12 +350,13 @@ PR landing 時：
 
 - [ ] `manageAccounting` ツール登録（toolNames / src/tools / mcp-server）— action 一覧に `openApp` / `setOpeningBalances` / `getOpeningBalances` / `rebuildSnapshots` を含む
 - [ ] `/api/accounting` REST ルート + `accounting-io.ts` ドメインモジュール（`invalidateSnapshotsFrom` 含む）
-- [ ] `server/accounting/{journal,openingBalances,snapshotCache,report}.ts`
+- [ ] `server/accounting/{journal,openingBalances,snapshotCache,report,eventPublisher}.ts`
 - [ ] `WORKSPACE_PATHS.accounting` + 関連パス定数
-- [ ] `src/plugins/accounting/{definition,index,View,Preview}.vue` + `components/` サブコンポーネント一式（`OpeningBalancesForm.vue` 含む）
+- [ ] `src/config/pubsubChannels.ts` に `accountingBookChannel(bookId)` + payload 型 + `PUBSUB_CHANNELS.accountingBooks` を追加
+- [ ] `src/plugins/accounting/{definition,index,View,Preview}.vue` + `components/` サブコンポーネント一式（`OpeningBalancesForm.vue` 含む）。View 側は `usePubSub` 購読で refetch、楽観的更新は禁止。
 - [ ] tool-result レンダラーが `"accounting-app"` ペイロードを認識して `View.vue` をマウントする結線（既存の plugin 登録パターンに乗る）
 - [ ] i18n 8 ロケール（`accounting.*` キー、launcher 用文字列は無し）
-- [ ] Unit + E2E テスト一式（隔離リグレッション + 機能テスト + opening + snapshot invalidation）
+- [ ] Unit + E2E テスト一式（隔離リグレッション + 機能テスト + opening + snapshot invalidation + pub/sub 反映）
 - [ ] `docs/manual-testing.md` に試験運用手順
 - [ ] `docs/ui-cheatsheet.md` に accounting プラグインの `View.vue` 区画を追加（GA 前でも、開発者向けに）。「ルート無し・tool-result 経由」の経路も明記。
 - [ ] **隔離の再確認** — PR チェック項目として：
