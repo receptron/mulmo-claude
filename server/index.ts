@@ -46,7 +46,7 @@ import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
 import { existsSync, readFileSync } from "fs";
 import { realpath as fsRealpath } from "fs/promises";
-import { resolveWithinRoot } from "./utils/files/safe.js";
+import { containsDotfileSegment, resolveWithinRoot } from "./utils/files/safe.js";
 import { cpus, homedir, loadavg } from "os";
 import { isDockerAvailable, ensureSandboxImage } from "./system/docker.js";
 import { maybeRunJournal } from "./workspace/journal/index.js";
@@ -317,6 +317,18 @@ app.use(
       return;
     }
     if (!resolveWithinRoot(root, relPath)) {
+      res.status(404).end();
+      return;
+    }
+    // Dotfile deny — `express.static` below enforces this for the
+    // non-HTML branch via `dotfiles: "deny"`, but the HTML short-
+    // circuit added in #1056 was bypassing the guard and would
+    // happily serve `/artifacts/html/.hidden.html` (Codex review on
+    // #1056). Apply the same policy uniformly so both branches
+    // refuse any path component starting with `.`. The helper
+    // splits on both `/` and `\` so an encoded backslash (`%5C`)
+    // can't sneak a `dir\.hidden.html` past the check on Windows.
+    if (containsDotfileSegment(relPath)) {
       res.status(404).end();
       return;
     }

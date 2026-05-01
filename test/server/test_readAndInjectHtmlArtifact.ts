@@ -76,4 +76,16 @@ describe("readAndInjectHtmlArtifact", () => {
     assert.ok(out !== null);
     assert.match(out, /x<script>[\s\S]+<\/script><\/body>/);
   });
+
+  it("would happily serve a dotfile if asked — the dotfile-deny policy lives in the middleware, not here", async () => {
+    // Documents the contract split: `readAndInjectHtmlArtifact` is
+    // "pure read + splice". Dotfile rejection is enforced upstream
+    // in `server/index.ts` for parity with `express.static`'s
+    // `dotfiles: "deny"`. If you call this helper directly with a
+    // dotfile name, it WILL serve it.
+    await writeFile(path.join(htmlsRoot, ".hidden.html"), "<body>secret</body>", "utf8");
+    const out = await readAndInjectHtmlArtifact(htmlsRoot, ".hidden.html");
+    assert.ok(out !== null);
+    assert.match(out, /secret<script>/);
+  });
 });
