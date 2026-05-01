@@ -6,6 +6,10 @@
 // NOT auto-run: the whole point of staging is to give the user a
 // chance to inspect.
 //
+// CLEANUP 2026-07-01: see `topic-run.ts` — this file is part of
+// the one-shot atomic → topic migration chain and goes when the
+// chain goes.
+//
 // Swap mechanics:
 //   memory/             →  memory/.atomic-backup-<ts>/
 //   memory.next/        →  memory/

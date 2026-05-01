@@ -4,14 +4,27 @@
 // memory.md flow.
 //
 // Idempotent: returns immediately when there is nothing to do —
-// the workspace is already topic-format, staging is already present
-// (so the user is mid-review), or there are no atomic entries to
-// migrate. Failures from the clusterer are logged and swallowed so
-// the server can continue serving traffic.
+// the workspace is already topic-format, there are no atomic
+// entries to migrate, or the legacy `memory.md` is still in
+// flight. When staging is already present from a prior crash mid-
+// swap, this runner retries the swap rather than burning another
+// LLM cluster call. Failures are logged and swallowed so the
+// server can continue serving traffic.
 //
 // Concurrency: cluster runs in the background while the agent
 // continues serving requests. Atomic-format reads / writes stay in
-// effect until the user runs the swap helper.
+// effect right up until the swap completes; the next request after
+// the swap sees the new topic layout.
+//
+// CLEANUP 2026-07-01: this is one-shot migration code for the
+// atomic → topic transition (#1070). After every active workspace
+// has been swapped to the topic format, this file plus
+// `topic-migrate.ts`, `topic-cluster.ts`, `topic-swap.ts`, the CLI
+// helper at `scripts/memory-swap-topic-staging.ts`, the
+// `yarn memory:swap` script, and the migration call in
+// `server/index.ts` can be deleted in one sweep. Topic-format
+// reading / writing (`topic-types.ts`, `topic-io.ts`,
+// `topic-detect.ts` — minus the atomic-format branch) stays.
 
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
@@ -20,6 +33,7 @@ import { runClaudeCli, ClaudeCliNotFoundError, type Summarize } from "../journal
 import { loadAllMemoryEntries } from "./io.js";
 import { makeLlmMemoryClusterer } from "./topic-cluster.js";
 import { clusterAtomicIntoStaging, topicStagingPath } from "./topic-migrate.js";
+import { swapStagingIntoMemory } from "./topic-swap.js";
 import { hasTopicFormat } from "./topic-detect.js";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
@@ -36,8 +50,13 @@ export async function runTopicMigrationOnce(workspaceRoot: string, deps: RunTopi
     return;
   }
   const stagingPath = topicStagingPath(workspaceRoot);
+  // If staging is left over from a prior run that crashed between
+  // cluster and swap, just retry the swap. Re-clustering would burn
+  // another LLM call and (because clusterAtomicIntoStaging wipes
+  // staging up front) discard the prior cluster result.
   if (existsSync(stagingPath)) {
-    log.info("memory", "topic-run: staging already present (review pending), skipping", { stagingPath });
+    log.info("memory", "topic-run: existing staging detected, retrying swap", { stagingPath });
+    await runSwap(workspaceRoot);
     return;
   }
   // Don't trip over an in-progress legacy `memory.md` migration from
@@ -69,16 +88,37 @@ export async function runTopicMigrationOnce(workspaceRoot: string, deps: RunTopi
   log.info("memory", "topic-run: starting", { entryCount: entries.length });
   try {
     const result = await clusterAtomicIntoStaging(workspaceRoot, clusterer);
-    log.info("memory", "topic-run: staging ready — review with `diff -r conversations/memory conversations/memory.next` then run `yarn memory:swap`", {
+    log.info("memory", "topic-run: staged", {
       stagingPath: result.stagingPath,
       topicCounts: result.topicCounts,
       bulletsLost: result.bulletsLost,
     });
+    if (!result.noop) {
+      await runSwap(workspaceRoot);
+    }
   } catch (err) {
     if (err instanceof ClaudeCliNotFoundError) {
       log.warn("memory", "topic-run: claude CLI not on PATH; topic restructure deferred");
       return;
     }
-    log.error("memory", "topic-run: threw", { error: errorMessage(err) });
+    log.error("memory", "topic-run: cluster threw", { error: errorMessage(err) });
+  }
+}
+
+// Swap staging into the live memory dir. The atomic format is
+// parked under `memory/.atomic-backup/<ts>/` so misclassified
+// migrations can be rolled back by hand without losing data.
+// Failures leave staging in place; the next server start hits the
+// "existing staging detected" branch above and retries.
+async function runSwap(workspaceRoot: string): Promise<void> {
+  const result = await swapStagingIntoMemory(workspaceRoot);
+  if (result.swapped) {
+    log.info("memory", "topic-run: swap complete — workspace now uses topic format", {
+      backupPath: result.backupPath,
+    });
+  } else {
+    log.warn("memory", "topic-run: swap did not complete, leaving staging in place for retry", {
+      reason: result.reason ?? "unknown",
+    });
   }
 }

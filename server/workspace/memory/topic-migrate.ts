@@ -8,6 +8,10 @@
 //
 // Library only — `runTopicMigrationOnce` (in PR-B) decides when
 // to call this from server startup.
+//
+// CLEANUP 2026-07-01: see `topic-run.ts` — this file is part of
+// the one-shot atomic → topic migration chain and goes when the
+// chain goes.
 
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";

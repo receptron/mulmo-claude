@@ -146,6 +146,15 @@ export function prependJournalPointer(message: string, workspacePath: string): s
 // during the brief window between PR-B shipping and migration
 // finishing. Once migration completes the legacy file is renamed to
 // `.backup` and only the typed format contributes.
+//
+// CLEANUP 2026-07-01: the `else` branch below (atomic + legacy
+// readers) and the `ATOMIC_MEMORY_MANAGEMENT` constant are part of
+// the one-shot migration scaffolding for #1029 + #1070. After every
+// active workspace has flipped to the topic format, drop the
+// branch / constant and inline the topic path. Helpers
+// `readTypedMemoryEntries` / `readLegacyMemoryFile` /
+// `formatMemoryEntryForPrompt` go with them. See
+// `server/index.ts` for the full cleanup sweep.
 export function buildMemoryContext(workspacePath: string): string {
   const parts: string[] = [];
 

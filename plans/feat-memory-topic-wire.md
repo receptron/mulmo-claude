@@ -3,16 +3,21 @@
 PR-A (#1072) landed the storage utilities (schema / IO / clusterer /
 staging migration / swap helper). PR-B wires them into runtime:
 
-- server startup kicks off a one-shot cluster migration to a staging
-  dir if the workspace is still in #1029 atomic format
+- server startup kicks off a one-shot cluster migration if the
+  workspace is still in #1029 atomic format
+- the migration auto-swaps once staging is ready, so `memory.next/`
+  is short-lived in practice; the user does not have to run anything
+  manually
 - agent prompt builds for the active format (topic or atomic),
   detected at request time
-- a `yarn` script + CLI helper performs the swap when the user has
-  reviewed the staging diff
+- a `yarn memory:swap` script remains as a manual fallback for
+  failure recovery and for users who want to hand-edit the staging
+  tree before promoting it
 
-The transition is two-step on purpose: the LLM clusterer's output is
-worth eyeballing before the runtime flips. Once the user runs swap,
-the workspace permanently uses the topic format.
+The atomic format isn't deleted on swap — it's parked under
+`memory/.atomic-backup/<ts>/` so a misclassified cluster can be
+recovered by hand without losing data. The user gets transparent
+auto-migration with a safety net.
 
 ## Scope (this PR)
 

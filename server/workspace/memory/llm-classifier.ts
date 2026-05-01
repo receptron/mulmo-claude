@@ -5,6 +5,10 @@
 // the system prompt so the LLM can pick consistently across
 // candidates.
 //
+// CLEANUP 2026-07-01: see `run.ts` — this file is part of the
+// one-shot `memory.md` → atomic migration chain and goes when the
+// chain goes.
+//
 // The function is intentionally one-call-per-candidate (not a batch
 // classify): batching saves tokens but couples failures together, so
 // a single malformed verdict could poison the whole batch. Migration

@@ -4,6 +4,10 @@
 // path so the conversion happens once on first start after the new
 // layout ships.
 //
+// CLEANUP 2026-07-01: see `run.ts` — this file is part of the
+// one-shot `memory.md` → atomic migration chain and goes when the
+// chain goes.
+//
 // Steps:
 //   1. Read existing `conversations/memory.md`. Absent → no-op.
 //   2. Split by `## ` (H2). Each H2 block becomes a candidate entry

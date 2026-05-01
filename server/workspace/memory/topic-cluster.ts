@@ -3,6 +3,10 @@
 // Library only — `topic-migrate` is the one that calls it and writes
 // to staging. The clusterer is pure async function shape so tests
 // can substitute a deterministic stub without touching the LLM.
+//
+// CLEANUP 2026-07-01: see `topic-run.ts` — this file is part of
+// the one-shot atomic → topic migration chain and goes when the
+// chain goes.
 
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";

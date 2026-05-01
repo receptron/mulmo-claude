@@ -45,30 +45,30 @@ describe("memory/topic-run — idempotency guards", () => {
     }
   });
 
-  it("is a no-op when staging is already pending review", async () => {
+  it("retries the swap (no LLM call) when staging is left over from a prior crashed run", async () => {
     const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-topic-run-staged-"));
     try {
-      await writeMemoryEntry(fresh, {
-        name: "yarn",
-        description: "npm 不可",
-        type: "preference",
-        body: "yarn",
-        slug: "preference_yarn",
-      });
-      // Pre-create a stale staging tree the user is about to review.
+      // Pre-create a complete staging tree as if a previous run
+      // clustered successfully but crashed before swap.
       const stagingPath = topicStagingPath(fresh);
       await mkdir(path.join(stagingPath, "preference"), { recursive: true });
-      await writeFile(path.join(stagingPath, "preference", "old.md"), "---\ntype: preference\ntopic: old\n---\n\n# Old", "utf-8");
+      await writeFile(path.join(stagingPath, "preference", "dev.md"), "---\ntype: preference\ntopic: dev\n---\n\n# Dev\n\n- yarn", "utf-8");
+      await writeFile(path.join(stagingPath, "MEMORY.md"), "# Memory Index\n", "utf-8");
       let summarizeCalled = false;
       const summarize: Summarize = async () => {
         summarizeCalled = true;
         return "{}";
       };
       await runTopicMigrationOnce(fresh, { summarize });
-      assert.equal(summarizeCalled, false, "must not re-run while staging is pending review");
-      // Staging file untouched.
-      const oldFile = await stat(path.join(stagingPath, "preference", "old.md"));
-      assert.ok(oldFile.isFile());
+
+      // No LLM call — the runner short-circuits to swap.
+      assert.equal(summarizeCalled, false, "existing staging must skip the cluster step");
+      // Staging is gone (renamed into memory/).
+      const stagingExists = await stat(stagingPath).catch(() => null);
+      assert.equal(stagingExists, null, "swap must have promoted the staging tree");
+      // Topic format active in memory/.
+      const moved = await stat(path.join(fresh, "conversations", "memory", "preference", "dev.md"));
+      assert.ok(moved.isFile());
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }
@@ -140,14 +140,18 @@ describe("memory/topic-run — idempotency guards", () => {
         slug: "preference_yarn",
       });
       await runTopicMigrationOnce(fresh, { summarize: stubSummarize });
-      const stagingExists = await stat(topicStagingPath(fresh));
-      assert.ok(stagingExists.isDirectory(), "topic migration must run when legacy is past completion (`.backup` exists)");
+      // Auto-swap leaves the workspace on the topic format —
+      // staging is gone, `<type>/` subdirs exist under memory/.
+      const stagingExists = await stat(topicStagingPath(fresh)).catch(() => null);
+      assert.equal(stagingExists, null, "auto-swap must remove staging");
+      const subdir = await stat(path.join(fresh, "conversations", "memory", "preference"));
+      assert.ok(subdir.isDirectory(), "topic format must be active in memory/");
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }
   });
 
-  it("proceeds and writes staging when atomic entries are present and no other guard fires", async () => {
+  it("proceeds and auto-swaps when atomic entries are present and no other guard fires", async () => {
     const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-topic-run-go-"));
     try {
       await writeMemoryEntry(fresh, {
@@ -158,10 +162,15 @@ describe("memory/topic-run — idempotency guards", () => {
         slug: "preference_yarn",
       });
       await runTopicMigrationOnce(fresh, { summarize: stubSummarize });
-      const stagingExists = await stat(topicStagingPath(fresh));
-      assert.ok(stagingExists.isDirectory());
-      const written = await stat(path.join(topicStagingPath(fresh), "preference", "dev.md"));
-      assert.ok(written.isFile(), "expected the clustered topic file to land in staging");
+      // memory.next/ is gone (auto-swapped).
+      const stagingExists = await stat(topicStagingPath(fresh)).catch(() => null);
+      assert.equal(stagingExists, null);
+      // Topic format active in memory/.
+      const written = await stat(path.join(fresh, "conversations", "memory", "preference", "dev.md"));
+      assert.ok(written.isFile(), "expected the clustered topic file to land in memory/ post-swap");
+      // Atomic backup parked in `.atomic-backup/`.
+      const atomicBackup = await stat(path.join(fresh, "conversations", "memory", ".atomic-backup"));
+      assert.ok(atomicBackup.isDirectory(), "expected atomic files preserved under .atomic-backup/");
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }

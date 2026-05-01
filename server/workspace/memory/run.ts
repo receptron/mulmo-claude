@@ -5,6 +5,16 @@
 // Concurrency: the agent may serve requests before this finishes.
 // The brief race window is documented in
 // `plans/done/feat-memory-storage-wire.md`.
+//
+// CLEANUP 2026-07-01: this is one-shot migration code for the
+// `memory.md` → atomic transition (#1029). After every active
+// workspace has run through both `runMemoryMigrationOnce` and the
+// follow-on `runTopicMigrationOnce`, this file plus the rest of
+// the migration chain (`migrate.ts`, `llm-classifier.ts`, the
+// atomic-aware branches in `prompt.ts`, the chain in
+// `server/index.ts`) can be deleted in one sweep. Workspaces that
+// have not migrated by then will need a manual conversion path —
+// document the recovery before removing the code.
 
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";

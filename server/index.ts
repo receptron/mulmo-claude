@@ -99,6 +99,16 @@ initWorkspace();
 // without smuggling in a `void` (banned by sonarjs/void-use). Each
 // runner logs its own failures; the chain's outer rejection
 // handler is therefore a hard backstop only.
+//
+// CLEANUP 2026-07-01: this whole chain is one-shot migration code
+// for #1029 + #1070. After every active workspace has flipped to
+// the topic format, delete the chain plus the runners under
+// `server/workspace/memory/` (run.ts / migrate.ts /
+// llm-classifier.ts / topic-run.ts / topic-migrate.ts /
+// topic-cluster.ts / topic-swap.ts) and the
+// `scripts/memory-swap-topic-staging.ts` helper. Topic-format
+// reading / writing (`topic-types.ts`, `topic-io.ts`,
+// `topic-detect.ts`) plus the topic branch in `prompt.ts` stays.
 const noop = (): void => {};
 runMemoryMigrationOnce(workspacePath)
   .then(() => runTopicMigrationOnce(workspacePath))
