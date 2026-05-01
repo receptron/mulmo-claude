@@ -7,6 +7,7 @@
 // See plans/done/feat-tool-trace-persistence.md for the design rationale.
 
 import { isRecord } from "../../utils/types.js";
+import { TOOL_NAMES } from "../../../src/config/toolNames.js";
 
 export type Classification = { kind: "pointer"; contentRef: string } | { kind: "inline"; content: string; truncated: boolean };
 
@@ -23,7 +24,7 @@ const FILE_POINTER_TOOLS = new Set(["Read", "Write", "Edit"]);
 // Image-generation MCP tools. The tool result already carries the
 // saved path so we extract it; the raw bytes/base64 never leave the
 // agent stream memory.
-const IMAGE_TOOLS = new Set(["generateImage", "editImage"]);
+const IMAGE_TOOLS = new Set<string>([TOOL_NAMES.generateImage, TOOL_NAMES.editImages]);
 
 // Tool name we always route through `writeSearch.ts` before
 // classifying. Exposed so callers know which tools need a

@@ -76,6 +76,8 @@ const esMessages = {
     todayJournal: "Resumen de hoy",
     todayJournalNotFound: "Aún no hay resumen — chatea un rato y el journal lo generará.",
     todayJournalLoadFailed: "Error al cargar el journal (status {status}): {error}",
+    copyMarkdown: "Copiar la conversación como Markdown",
+    copiedMarkdown: "¡Copiado!",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",
@@ -216,6 +218,9 @@ const esMessages = {
     htmlPreview: "Vista previa HTML",
     pdfPreview: "Vista previa PDF",
     parseError: "error al analizar",
+  },
+  filesView: {
+    chatPlaceholder: "Pregunta sobre este archivo…",
   },
   systemFiles: {
     schemaLabel: "Esquema",
@@ -539,6 +544,8 @@ const esMessages = {
     redo: "Rehacer",
     clear: "Limpiar",
     styleLabel: "Estilo:",
+    stylePromptWithPath: "Convierte la imagen en `{path}` en una imagen de estilo {style}.",
+    stylePromptNoPath: "Convierte mi dibujo en el lienzo en una imagen de estilo {style}.",
   },
   pluginChart: {
     untitled: "Gráfico",

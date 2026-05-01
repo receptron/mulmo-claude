@@ -43,6 +43,11 @@ export const workspacePath = path.join(homedir(), "mulmoclaude");
 export const WORKSPACE_DIRS = {
   // conversations/
   chat: "conversations/chat",
+  // Typed memory entries (#1029). One markdown file per fact, indexed
+  // by `MEMORY.md` (= WORKSPACE_FILES.memoryIndex). Replaces the
+  // single-file `memory.md`; the legacy file is kept as
+  // `memory.md.backup` after migration.
+  memoryDir: "conversations/memory",
   summaries: "conversations/summaries",
   // Tool-trace output for WebSearch (one .md per search, referenced
   // from chat JSONL `contentRef`). Lives alongside chat/ so search
@@ -55,6 +60,11 @@ export const WORKSPACE_DIRS = {
   contacts: "data/contacts",
   scheduler: "data/scheduler",
   sources: "data/sources",
+  // Pasted/dropped chat attachments — saved at upload time so the
+  // LLM can be handed a stable workspace path instead of inline
+  // base64. Conversion artefacts (e.g. PPTX → PDF) live alongside
+  // the original under the same YYYY/MM partition.
+  attachments: "data/attachments",
   transports: "data/transports",
   // artifacts/
   charts: "artifacts/charts",
@@ -115,6 +125,8 @@ export const WORKSPACE_PATHS = {
   wiki: path.join(workspacePath, WORKSPACE_DIRS.wiki),
   news: path.join(workspacePath, WORKSPACE_DIRS.news),
   sources: path.join(workspacePath, WORKSPACE_DIRS.sources),
+  attachments: path.join(workspacePath, WORKSPACE_DIRS.attachments),
+  memoryDir: path.join(workspacePath, WORKSPACE_DIRS.memoryDir),
   summaries: path.join(workspacePath, WORKSPACE_DIRS.summaries),
   searches: path.join(workspacePath, WORKSPACE_DIRS.searches),
   htmls: path.join(workspacePath, WORKSPACE_DIRS.htmls),
@@ -127,6 +139,7 @@ export const WORKSPACE_PATHS = {
   wikiHistory: path.join(workspacePath, WORKSPACE_DIRS.wikiHistory),
   // files
   memory: path.join(workspacePath, WORKSPACE_FILES.memory),
+  memoryIndex: path.join(workspacePath, WORKSPACE_FILES.memoryIndex),
   sessionToken: path.join(workspacePath, WORKSPACE_FILES.sessionToken),
   serverPort: path.join(workspacePath, WORKSPACE_FILES.serverPort),
   wikiIndex: path.join(workspacePath, WORKSPACE_FILES.wikiIndex),

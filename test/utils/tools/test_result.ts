@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isUserTextResponse, extractImageData, makeTextResult } from "../../../src/utils/tools/result.js";
+import { isUserTextResponse, makeTextResult } from "../../../src/utils/tools/result.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
 function makeResult(over: Partial<ToolResultComplete>): ToolResultComplete {
@@ -58,30 +58,6 @@ describe("isUserTextResponse", () => {
   });
 });
 
-describe("extractImageData", () => {
-  it("returns the imageData string when present", () => {
-    const toolResult = makeResult({ data: { imageData: "BASE64..." } });
-    assert.equal(extractImageData(toolResult), "BASE64...");
-  });
-
-  it("returns undefined when imageData is missing", () => {
-    assert.equal(extractImageData(makeResult({ data: { foo: "bar" } })), undefined);
-  });
-
-  it("returns undefined when imageData is not a string", () => {
-    const toolResult = makeResult({ data: { imageData: 42 } });
-    assert.equal(extractImageData(toolResult), undefined);
-  });
-
-  it("returns undefined when result is undefined", () => {
-    assert.equal(extractImageData(undefined), undefined);
-  });
-
-  it("returns undefined when data is null", () => {
-    assert.equal(extractImageData(makeResult({ data: null })), undefined);
-  });
-});
-
 describe("makeTextResult", () => {
   it("creates a user text-response", () => {
     const result = makeTextResult("hello", "user");
@@ -108,5 +84,24 @@ describe("makeTextResult", () => {
     const result1 = makeTextResult("x", "user");
     const result2 = makeTextResult("x", "user");
     assert.notEqual(result1.uuid, result2.uuid);
+  });
+
+  it("attaches workspace paths when provided", () => {
+    const result = makeTextResult("hello", "user", ["data/attachments/2026/04/abc.png"]);
+    assert.deepEqual(result.data, {
+      text: "hello",
+      role: "user",
+      transportKind: "text-rest",
+      attachments: ["data/attachments/2026/04/abc.png"],
+    });
+  });
+
+  it("omits attachments key when array is empty", () => {
+    const result = makeTextResult("hello", "user", []);
+    assert.deepEqual(result.data, {
+      text: "hello",
+      role: "user",
+      transportKind: "text-rest",
+    });
   });
 });

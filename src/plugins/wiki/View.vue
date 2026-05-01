@@ -14,7 +14,7 @@
         <h2 class="text-lg font-semibold text-gray-800 truncate">{{ displayTitle }}</h2>
       </div>
       <div class="flex items-center gap-2">
-        <template v-if="action === 'page' && content">
+        <template v-if="(action === 'page' || action === 'page-edit') && content">
           <button
             class="h-8 px-2.5 flex items-center gap-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             :disabled="pdfDownloading"

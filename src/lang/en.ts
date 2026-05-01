@@ -93,6 +93,8 @@ const enMessages = {
     todayJournal: "Today's journal",
     todayJournalNotFound: "No journal summary yet — chat for a while and the journal will generate one.",
     todayJournalLoadFailed: "Failed to load journal (status {status}): {error}",
+    copyMarkdown: "Copy chat as Markdown",
+    copiedMarkdown: "Copied!",
   },
   rightSidebar: {
     toggleSystemPrompt: "Toggle system prompt",
@@ -231,6 +233,9 @@ const enMessages = {
     htmlPreview: "HTML preview",
     pdfPreview: "PDF preview",
     parseError: "parse error",
+  },
+  filesView: {
+    chatPlaceholder: "Ask about this file…",
   },
   // SystemFileBanner copy. Each id matches a descriptor in
   // src/config/systemFileDescriptors.ts. `title` is the chip-style
@@ -555,6 +560,8 @@ const enMessages = {
     redo: "Redo",
     clear: "Clear",
     styleLabel: "Style:",
+    stylePromptWithPath: "Turn the image at `{path}` into a {style} style image.",
+    stylePromptNoPath: "Turn my drawing on the canvas into a {style} style image.",
   },
   pluginChart: {
     untitled: "Chart",

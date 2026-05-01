@@ -41,8 +41,8 @@ import { isSessionOrigin, type SessionOrigin } from "../../../src/types/session.
 // import { publishNotification } from "../../events/notifications.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
-import { parseDataUrl } from "@mulmobridge/client";
 import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
+import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension, saveAttachment } from "../../utils/files/attachment-store.js";
 import { errorMessage } from "../../utils/errors.js";
 
 const router = Router();
@@ -99,6 +99,18 @@ export interface StartChatParams {
   message: string;
   roleId: string;
   chatSessionId: string;
+  /** Bridge-only legacy carrier for "the user picked this image".
+   *  No in-tree bridge sets it today; it remains on the type so
+   *  external bridge clients that populate it from older protocol
+   *  versions continue to work. Only workspace paths
+   *  (`data/attachments/...` or `artifacts/images/...`) are accepted
+   *  — `data:` URLs are no longer supported and are dropped with a
+   *  warn. Bridges that need to ship raw bytes should use the
+   *  modern `attachments[]` field with `{ mimeType, data }` entries;
+   *  those get persisted to `data/attachments/YYYY/MM/` server-side
+   *  and rewritten as path-bearing attachments. The Vue UI never
+   *  sets this — paste/drop and sidebar picks ride on
+   *  `attachments[]` as path-only entries directly. */
   selectedImageData?: string;
   attachments?: Attachment[];
   /** Where this session originates (#486). Accepts string for
@@ -121,6 +133,10 @@ export type StartChatResult = { kind: "started"; chatSessionId: string } | { kin
 
 export async function startChat(params: StartChatParams): Promise<StartChatResult> {
   const { message, roleId, chatSessionId, selectedImageData, attachments, userTimezone } = params;
+  // Bridge-only compat: external bridge clients may still populate
+  // `selectedImageData`. Fold it into `attachments` so the rest of
+  // this function only deals with one input shape.
+  const normalisedAttachments = mergeBridgeSelectedImage(selectedImageData, attachments);
 
   if (!message || !roleId || !chatSessionId) {
     return {
@@ -147,7 +163,6 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   getOrCreateSession(chatSessionId, {
     roleId,
     resultsFilePath,
-    selectedImageData,
     startedAt: now,
     updatedAt: now,
     hasUnread: persistedHasUnread,
@@ -164,10 +179,40 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     return { kind: "error", error: "Session is already running", status: 409 };
   }
 
-  // Run is committed. Now persist the user message so callers (and
-  // other tabs) see the turn. Metadata first — it powers the sidebar
-  // title cache; the append follows so the jsonl is always a
-  // superset of what metadata advertised.
+  // Run is committed. Process attachments next so any failure here
+  // rolls the run back via `endRun` before we persist or broadcast a
+  // user message — leaving an orphan turn on disk when the request
+  // ultimately rejects would mislead every viewer of this session.
+  // Three things happen in this block, all guarded together:
+  //   1. Bridge inline-bytes (`{ data, mimeType }`) get saved to
+  //      `data/attachments/YYYY/MM/` and rewritten as path-bearing
+  //      attachments. After this every Attachment has a `path`.
+  //   2. `collectAttachedPaths` extracts the workspace paths to
+  //      persist on the user JSONL line and broadcast on the SSE
+  //      event so the UI can render chips for the turn.
+  //   3. `prepareRequestExtras` loads bytes off disk for the LLM
+  //      request. With (1) above this is now a pure path-only walk.
+  // A malformed body (e.g. `attachments` not an array) or a
+  // filesystem I/O failure is logged and converted to a 400 here;
+  // beginRun is rolled back so subsequent turns aren't rejected with
+  // 409 forever.
+  let attachedPaths: string[];
+  let extras: RequestExtras;
+  try {
+    const persistedAttachments = await persistInlineBytesAsPaths(normalisedAttachments);
+    attachedPaths = collectAttachedPaths(persistedAttachments);
+    extras = await prepareRequestExtras(persistedAttachments);
+  } catch (err) {
+    log.warn("agent", "attachment processing failed — rolling back run", { chatSessionId, error: errorMessage(err) });
+    abortController.abort();
+    endRun(chatSessionId);
+    return { kind: "error", error: "Invalid attachments payload", status: 400 };
+  }
+
+  // Now persist the user message so callers (and other tabs) see the
+  // turn. Metadata first — it powers the sidebar title cache; the
+  // append follows so the jsonl is always a superset of what metadata
+  // advertised.
   const validOrigin = isSessionOrigin(params.origin) ? params.origin : undefined;
   if (isFirstTurn) {
     await createSessionMeta(chatSessionId, roleId, message, undefined, validOrigin);
@@ -179,7 +224,10 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
   }
 
   // Append user message for this turn
-  await appendSessionLine(chatSessionId, JSON.stringify({ source: "user", type: EVENT_TYPES.text, message }));
+  await appendSessionLine(
+    chatSessionId,
+    JSON.stringify({ source: "user", type: EVENT_TYPES.text, message, ...(attachedPaths.length > 0 ? { attachments: attachedPaths } : {}) }),
+  );
 
   // Broadcast the user message so other tabs viewing this session
   // see the input in real time. Runs AFTER beginRun so a 409 never
@@ -188,6 +236,7 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     type: EVENT_TYPES.text,
     source: "user",
     message,
+    ...(attachedPaths.length > 0 ? { attachments: attachedPaths } : {}),
   });
 
   const role = getRole(roleId);
@@ -201,9 +250,8 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
     resumed: Boolean(claudeSessionId),
   });
 
-  const extras = await prepareRequestExtras(selectedImageData, attachments);
   const baseMessage = claudeSessionId ? message : prependJournalPointer(message, workspacePath);
-  const decoratedMessage = withSelectedImageMarker(baseMessage, extras.selectedImagePath);
+  const decoratedMessage = withAttachedFileMarker(baseMessage, extras.attachedFilePaths);
 
   runAgentInBackground({
     decoratedMessage,
@@ -226,71 +274,221 @@ export async function startChat(params: StartChatParams): Promise<StartChatResul
 
 interface RequestExtras {
   attachments: Attachment[] | undefined;
-  /** Workspace-relative path of the user-selected image, when one is
-   *  attached as a path (not a data URL). Surfaced to the LLM via a
-   *  `[Selected image: <path>]` marker prepended to the user message,
-   *  so Stage 2's path-passing `editImage` knows what to reference. */
-  selectedImagePath: string | undefined;
+  /** Workspace-relative paths of every file the user attached or
+   *  selected for this turn, in declaration order. Surfaced to the
+   *  LLM via one `[Attached file: <path>]` line per entry, prepended
+   *  to the user message so path-passing tools (e.g. `editImages`)
+   *  and the LLM itself can reference each file by path.
+   *  `persistInlineBytesAsPaths` ensures every well-formed attachment
+   *  carries a path before this runs, so this is empty only when the
+   *  request had no attachments at all (or every entry was malformed
+   *  and dropped). */
+  attachedFilePaths: string[];
 }
 
-/** Convert `selectedImageData` (workspace-relative image path since
- *  stage 1 of the stateless-image-editing refactor; data URL for
- *  non-image paste/drop and for legacy bridge clients) into the
- *  generic Attachment format and a path hint, then merge with any
- *  explicitly-provided attachments from the bridge protocol.
+/** Pluck workspace-relative paths out of `attachments[]`. Used for
+ *  persistence + broadcast of the user message: the Vue UI renders
+ *  these as attachment chips next to the chat bubble.
+ *  `persistInlineBytesAsPaths` runs first, so by the time we get
+ *  here every well-formed entry already carries a `path` and chips
+ *  round-trip for bridge attachments too — not just Vue uploads.
+ *  Order matches declaration order so chip order matches the order
+ *  the user attached them.
  *
- *  Path form: bytes are loaded from disk so Claude can still "see"
- *  the image for vision use cases, AND the path string is returned
- *  separately so the caller can mark it in the user message. If the
- *  file can't be read, the path hint is still emitted — the LLM at
- *  least knows what was selected and can call Read to load it. */
-async function prepareRequestExtras(selectedImageData: string | undefined, explicit: Attachment[] | undefined): Promise<RequestExtras> {
+ *  Defensive: `Array.isArray` guards against a malformed HTTP body
+ *  where `attachments` is a truthy non-array. Without it `for...of`
+ *  would throw and bypass the rollback path that calls `endRun`,
+ *  leaving the session locked as running (#1052 review). */
+export function collectAttachedPaths(attachments: Attachment[] | undefined): string[] {
+  if (!Array.isArray(attachments) || attachments.length === 0) return [];
+  const paths: string[] = [];
+  for (const att of attachments) {
+    if (typeof att.path === "string" && att.path.length > 0) paths.push(att.path);
+  }
+  return paths;
+}
+
+/** Bridge-only compat: external bridge clients may still ship a
+ *  picked image via `StartChatParams.selectedImageData`. Convert
+ *  that single value to a synthetic `Attachment` and prepend it to
+ *  the explicit `attachments` array so downstream code only has to
+ *  understand one input shape. The Vue UI never reaches this branch
+ *  — it sends path-only attachments directly. */
+function mergeBridgeSelectedImage(selectedImageData: string | undefined, attachments: Attachment[] | undefined): Attachment[] | undefined {
+  const synthetic = synthesiseBridgeAttachment(selectedImageData);
+  if (!synthetic) return attachments;
+  return attachments && attachments.length > 0 ? [synthetic, ...attachments] : [synthetic];
+}
+
+/** Convert a legacy `selectedImageData` carrier to an `Attachment`.
+ *  Only workspace paths (`data/attachments/...` or `artifacts/images/
+ *  ...`) are accepted — `data:` URLs are no longer supported. A
+ *  bridge that still wants to ship raw bytes should populate the
+ *  modern `attachments[]` field with `{ mimeType, data }` instead;
+ *  `persistInlineBytesAsPaths` then writes those to
+ *  `data/attachments/YYYY/MM/` and turns them into path-bearing
+ *  entries before any other processing. */
+function synthesiseBridgeAttachment(selectedImageData: string | undefined): Attachment | undefined {
+  if (!selectedImageData) return undefined;
+  if (isAttachmentPath(selectedImageData) || isImagePath(selectedImageData)) {
+    return { path: selectedImageData };
+  }
+  log.warn("agent", "bridge selectedImageData is not a workspace path — dropping (data: URLs are no longer supported)", {
+    valuePreview: selectedImageData.slice(0, 64),
+  });
+  return undefined;
+}
+
+/** Persist any inline-bytes attachment to disk as a path-bearing
+ *  entry. Bridges over the socket transport (Telegram, LINE, ...)
+ *  ship raw bytes via `Attachment.data` + `Attachment.mimeType`; the
+ *  Vue UI uploads to disk before posting and already carries a
+ *  `path`. By rewriting inline bytes into
+ *  `data/attachments/YYYY/MM/<id>.<ext>` here we get two properties
+ *  the rest of the pipeline relies on:
+ *
+ *    1. Every well-formed attachment carries a workspace path, so
+ *       chips can round-trip for bridge turns the same way they do
+ *       for Vue paste/drop turns (no `data:` chips, no special
+ *       cases downstream).
+ *    2. `prepareRequestExtras` becomes a path-only walk — the inline
+ *       (`{ data, mimeType }`) shape no longer flows past this layer.
+ *
+ *  Defensive: `Array.isArray` mirrors the guard in
+ *  `collectAttachedPaths` so a malformed payload doesn't throw and
+ *  bypass `endRun`. Per-attachment failures are logged and the
+ *  offending entry is dropped — a single bad upload mustn't poison
+ *  the rest of the turn. */
+async function persistInlineBytesAsPaths(attachments: Attachment[] | undefined): Promise<Attachment[] | undefined> {
+  if (!Array.isArray(attachments) || attachments.length === 0) return undefined;
   const result: Attachment[] = [];
-  let selectedImagePath: string | undefined;
-  if (selectedImageData) {
-    if (isImagePath(selectedImageData)) {
-      selectedImagePath = selectedImageData;
+  for (const att of attachments) {
+    if (typeof att.path === "string" && att.path.length > 0) {
+      result.push(att);
+      continue;
+    }
+    if (typeof att.data === "string" && att.data.length > 0 && typeof att.mimeType === "string" && att.mimeType.length > 0) {
       try {
-        const data = await loadImageBase64(selectedImageData);
-        result.push({ mimeType: "image/png", data });
+        const saved = await saveAttachment(att.data, att.mimeType);
+        result.push({ path: saved.relativePath, mimeType: saved.mimeType });
       } catch (err) {
-        log.warn("agent", "failed to load selected-image bytes from path", {
-          path: selectedImageData,
+        log.warn("agent", "failed to persist inline attachment to disk — dropping", {
+          mimeType: att.mimeType,
           error: errorMessage(err),
         });
       }
-    } else {
-      const parsed = parseDataUrl(selectedImageData);
-      if (parsed) result.push({ mimeType: parsed.mimeType, data: parsed.data });
+      continue;
     }
+    log.warn("agent", "attachment has neither path nor inline bytes — dropping");
   }
-  if (explicit) result.push(...explicit);
+  return result.length > 0 ? result : undefined;
+}
+
+/** Walk `attachments[]` once, loading bytes from disk for every
+ *  path-bearing entry, and collect every path so the caller can emit
+ *  one `[Attached file: <path>]` marker per file. Two path roots
+ *  are accepted:
+ *
+ *    - `data/attachments/...` — paste/drop/file-picker uploads (any
+ *      MIME type from the chat input's accept list) and the persisted
+ *      form of bridge inline-bytes attachments. MIME is inferred from
+ *      the extension chosen at save time.
+ *    - `artifacts/images/...png` — generated / canvas / edited images
+ *      a user picked from the sidebar. Always image/png.
+ *
+ *  Bytes are loaded so Claude still "sees" each file as a content
+ *  block on this turn, AND every path is returned separately so the
+ *  caller marks them in the LLM-bound message. If a file can't be
+ *  read, its path hint is still emitted — the LLM knows what was
+ *  attached and can call Read to load it. Multi-file flows (e.g.
+ *  paste one image + pick another in the sidebar → "combine these")
+ *  rely on every path showing up in the marker so `editImages` can
+ *  receive the full list in `imagePaths`.
+ *
+ *  Inline (`{ data, mimeType }`) entries no longer reach this layer —
+ *  `persistInlineBytesAsPaths` rewrites them as path-bearing entries
+ *  before this runs. */
+async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return { attachments: undefined, attachedFilePaths: [] };
+  }
+  const result: Attachment[] = [];
+  const attachedFilePaths: string[] = [];
+  for (const att of attachments) {
+    if (typeof att.path !== "string" || att.path.length === 0) {
+      log.warn("agent", "attachment has no path after normalisation — dropping");
+      continue;
+    }
+    const resolved = await loadFromPath(att.path, att.mimeType);
+    if (resolved) result.push(resolved);
+    attachedFilePaths.push(att.path);
+  }
   return {
     attachments: result.length > 0 ? result : undefined,
-    selectedImagePath,
+    attachedFilePaths,
   };
 }
 
-/** Marker prepended to the user message that tells the LLM which
- *  image is currently selected (only the LLM-bound message — the
- *  user's persisted/displayed message is the raw text). The system
- *  prompt teaches the LLM to read this and pass the path to
- *  `editImage` etc. */
-function withSelectedImageMarker(message: string, selectedImagePath: string | undefined): string {
-  return selectedImagePath ? `[Selected image: ${selectedImagePath}]\n\n${message}` : message;
+async function loadFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  if (isAttachmentPath(value)) return loadAttachmentFromPath(value, declaredMimeType);
+  if (isImagePath(value)) return loadImageFromPath(value, declaredMimeType);
+  log.warn("agent", "attachment path is outside allowed roots — dropping", { path: value });
+  return undefined;
+}
+
+async function loadAttachmentFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  const mimeType = declaredMimeType ?? inferMimeFromExtension(value);
+  if (!mimeType) {
+    log.warn("agent", "attachment path has unknown extension — skipping bytes", { path: value });
+    return undefined;
+  }
+  try {
+    const data = await loadAttachmentBase64(value);
+    return { mimeType, data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load attachment bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
+}
+
+async function loadImageFromPath(value: string, declaredMimeType: string | undefined): Promise<Attachment | undefined> {
+  try {
+    const data = await loadImageBase64(value);
+    return { mimeType: declaredMimeType ?? "image/png", data, path: value };
+  } catch (err) {
+    log.warn("agent", "failed to load selected-image bytes from path", { path: value, error: errorMessage(err) });
+    return undefined;
+  }
+}
+
+/** Marker prepended to the LLM-bound user message that tells the
+ *  model which workspace files are attached / selected for this turn.
+ *  One `[Attached file: <path>]` line is emitted per path so multi-
+ *  file flows (e.g. paste one image + pick another → "combine these")
+ *  surface every path to the model — `editImages` then receives the
+ *  full list in `imagePaths`. The user's persisted (jsonl) and
+ *  broadcast (UI) message is the raw text — these marker lines are
+ *  added strictly on the path to Claude. The system prompt teaches
+ *  the model how to interpret them. */
+export function withAttachedFileMarker(message: string, attachedFilePaths: string[]): string {
+  if (attachedFilePaths.length === 0) return message;
+  const markerLines = attachedFilePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
+  return `${markerLines}\n\n${message}`;
 }
 
 // ── HTTP route ──────────────────────────────────────────────────────
 
-// HTTP route body — used by the Vue UI only. `selectedImageData` is
-// the legacy data-URL path; new bridge clients send `attachments`
-// via the socket relay instead. mergeAttachments() unifies both
-// paths inside startChat(). See #382 for the rationale.
+// HTTP route body — used by the Vue UI only. Paste/drop and sidebar
+// pick both ride on `attachments[]` as path-only entries; the server
+// reads bytes from disk and emits the `[Attached file: <path>]`
+// marker. Bridges go through the socket relay (see chat-service)
+// and supply attachments with inline base64 bytes; both shapes
+// share the same `Attachment` type. See plans/refactor-edit-images-array.md.
 interface AgentBody {
   message: string;
   roleId: string;
   chatSessionId: string;
-  selectedImageData?: string;
+  attachments?: Attachment[];
   userTimezone?: string;
 }
 

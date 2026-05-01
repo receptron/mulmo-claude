@@ -78,6 +78,8 @@ const jaMessages = {
     todayJournal: "今日のまとめ",
     todayJournalNotFound: "まだまとめがありません — しばらく会話するとjournalが生成します。",
     todayJournalLoadFailed: "journal の読み込みに失敗しました (status {status}): {error}",
+    copyMarkdown: "チャットを Markdown としてコピー",
+    copiedMarkdown: "コピーしました",
   },
   rightSidebar: {
     toggleSystemPrompt: "システムプロンプトの表示切替",
@@ -214,6 +216,9 @@ const jaMessages = {
     htmlPreview: "HTML プレビュー",
     pdfPreview: "PDF プレビュー",
     parseError: "パースエラー",
+  },
+  filesView: {
+    chatPlaceholder: "このファイルについて質問…",
   },
   systemFiles: {
     schemaLabel: "スキーマ",
@@ -530,6 +535,8 @@ const jaMessages = {
     redo: "やり直し",
     clear: "クリア",
     styleLabel: "スタイル:",
+    stylePromptWithPath: "`{path}` の画像を {style} スタイルの画像に変換してください。",
+    stylePromptNoPath: "キャンバスに描いた絵を {style} スタイルの画像に変換してください。",
   },
   pluginChart: {
     untitled: "チャート",

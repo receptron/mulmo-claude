@@ -116,6 +116,14 @@ jobs:
     # (Codex review iter-1 #955.)
     - name: Verify built hook bundle is up-to-date
       run: git diff --exit-code -- server/workspace/wiki-history/hook/snapshot.mjs
+    # Same drift guard as the hook bundle above, applied to the
+    # generated plugin registry. `config/plugins.registry.ts` is the
+    # manifest; `server/agent/plugin-names.ts` is regenerated from it
+    # by `yarn generate:plugins`. If a developer edits the manifest
+    # but forgets to commit the regenerated file (or hand-edits the
+    # generated file directly), this step fails. Phase 1a of #1043.
+    - name: Verify generated plugin registry is up-to-date
+      run: yarn generate:plugins && git diff --exit-code -- server/agent/plugin-names.ts
     - run: yarn run test:coverage
 
   # Single Yarn 4 cell — Yarn 1 stays the primary tool for the lint_test

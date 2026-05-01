@@ -76,6 +76,8 @@ const zhMessages = {
     todayJournal: "今日总结",
     todayJournalNotFound: "暂无总结 — 多聊一会儿，journal 会自动生成。",
     todayJournalLoadFailed: "加载 journal 失败 (status {status}): {error}",
+    copyMarkdown: "将对话复制为 Markdown",
+    copiedMarkdown: "已复制",
   },
   rightSidebar: {
     toggleSystemPrompt: "切换系统提示词",
@@ -211,6 +213,9 @@ const zhMessages = {
     htmlPreview: "HTML 预览",
     pdfPreview: "PDF 预览",
     parseError: "解析错误",
+  },
+  filesView: {
+    chatPlaceholder: "询问关于此文件的问题…",
   },
   systemFiles: {
     schemaLabel: "架构",
@@ -526,6 +531,8 @@ const zhMessages = {
     redo: "重做",
     clear: "清除",
     styleLabel: "样式:",
+    stylePromptWithPath: "将 `{path}` 处的图像转换为 {style} 风格的图像。",
+    stylePromptNoPath: "将我在画布上的绘图转换为 {style} 风格的图像。",
   },
   pluginChart: {
     untitled: "图表",

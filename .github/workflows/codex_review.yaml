@@ -1,0 +1,197 @@
+# Auto-review every non-draft PR using OpenAI Codex CLI pointed at
+# Azure OpenAI. Runs alongside CodeRabbit + Sourcery; the verdict
+# marker (`CODEX VERDICT: LGTM` / `CHANGES REQUESTED`) matches the
+# `/codex-cross-review` skill so both human-driven and automated
+# reviews speak the same protocol.
+#
+# Cost control (intentionally minimal — user wants every PR
+# reviewed regardless of draft / path):
+#   - `concurrency` cancels superseded runs so a quick push burst
+#     produces one review against the latest commit, not N reviews
+#   - `~/.npm` is cached, so `npm install -g @openai/codex` reuses
+#     the prior tarball + skips the network on warm runs
+#   - Azure deployment SKU caps TPM (5000 currently); throttling
+#     happens at the model layer, not the workflow layer
+#
+# Auth: Azure OpenAI via the OpenAI-compatible `/openai/v1` endpoint.
+# Codex CLI 0.125.0 does NOT honour `OPENAI_BASE_URL` directly —
+# the iter-1 attempt 401'd against `api.openai.com` because the env
+# var was silently ignored. Workflow now writes an explicit
+# `~/.codex/config.toml` with `[model_providers.azure]` before the
+# `codex exec` invocation. Required secrets:
+#   - AZURE_OPENAI_API_KEY        (the Azure key)
+#   - AZURE_OPENAI_BASE_URL       (e.g. https://<resource>.openai.azure.com — no path)
+#   - AZURE_OPENAI_DEPLOYMENT     (optional; defaults to gpt-5.4-mini)
+#   - AZURE_OPENAI_API_VERSION    (optional; defaults to `preview`)
+#
+# `workflow_dispatch` is also kept for manual re-runs (e.g.
+# requesting a re-review after argument changes, or running on a
+# closed PR for forensics).
+
+name: Codex auto-review
+
+on:
+  # Auto-fire on EVERY PR — including drafts and docs-only diffs.
+  # The user's directive: "極力制限しないでどんどんつかえる". Cost is
+  # bounded anyway by `concurrency.cancel-in-progress` (a push burst
+  # collapses to one review against the final commit) and the Azure
+  # deployment's 5000 TPM ceiling. A docs-only PR review is cheap
+  # and occasionally catches a typo or broken link the bots missed.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  # Manual escalation: run on demand against any PR (re-review,
+  # one-off check on a closed PR, etc.).
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review (required for workflow_dispatch)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# Pin the Codex CLI version so the cache key is deterministic and
+# upgrades are explicit. Bump together with cache-version when
+# moving to a new Codex release.
+env:
+  CODEX_VERSION: "0.125.0"
+
+concurrency:
+  group: codex-review-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Codex needs full history to inspect the PR diff via `gh`.
+          fetch-depth: 0
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Cache global npm tarballs
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: codex-cli-${{ env.CODEX_VERSION }}-node22
+          restore-keys: |
+            codex-cli-${{ env.CODEX_VERSION }}-
+
+      - name: Install codex CLI (pinned)
+        run: npm install -g "@openai/codex@${CODEX_VERSION}"
+
+      - name: Configure Codex for Azure OpenAI
+        env:
+          AZURE_BASE_URL: ${{ secrets.AZURE_OPENAI_BASE_URL }}
+          # Default to a known Azure API version; override with
+          # `AZURE_OPENAI_API_VERSION` secret if a newer deployment
+          # demands a different one.
+          # Azure exposes Codex's required Responses API on the
+          # `/openai/v1/responses` compat endpoint with the magic
+          # `api-version=preview` — dated previews
+          # (`2024-10-01-preview` … `2025-04-01-preview`) all return
+          # `400 API version not supported` on the `mulmo-sweden`
+          # resource. Override via `AZURE_OPENAI_API_VERSION` if a
+          # newer Azure resource pins a dated preview.
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION || 'preview' }}
+          # Deployment name on the Azure resource (the LLM model
+          # alias the workspace administrator created). Codex passes
+          # this through as `model = ...` in the request body.
+          # Default `gpt-5.3-codex` is the codex-optimized GPT-5.3
+          # variant (deployed on `mulmo-sweden` 2026-04-30) — the
+          # MSFT-documented choice for Codex CLI agentic-coding
+          # workloads. Older `gpt-4o` still works as a fallback if
+          # the codex variant isn't deployed; override via secret.
+          AZURE_MODEL: ${{ secrets.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.3-codex' }}
+        run: |
+          mkdir -p "$HOME/.codex"
+          # Strip trailing slash so concatenation never doubles up.
+          BASE_URL="${AZURE_BASE_URL%/}"
+          cat > "$HOME/.codex/config.toml" <<TOML
+          model_provider = "azure"
+          model = "${AZURE_MODEL}"
+
+          [model_providers.azure]
+          name = "Azure OpenAI"
+          base_url = "${BASE_URL}/openai/v1"
+          env_key = "OPENAI_API_KEY"
+          # Codex CLI 0.125.0 only supports `responses` (Chat
+          # Completions wire was removed). On Azure this needs
+          # `api-version = 2025-03-01-preview` or newer + a
+          # deployment that exposes the Responses surface (recent
+          # gpt-4o / gpt-4.1 / gpt-5 family does).
+          wire_api = "responses"
+          query_params = { "api-version" = "${AZURE_API_VERSION}" }
+          TOML
+          # Sanity log: print the config without the URL host so we
+          # can see the structure landed correctly without leaking
+          # the resource name in logs.
+          sed 's|https://[^/]*|<azure-host>|g' "$HOME/.codex/config.toml"
+
+      - name: Run codex review
+        env:
+          OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # `--sandbox danger-full-access` skips bubblewrap entirely.
+          # The default `workspace-write` sandbox tries to create a
+          # network namespace via bwrap, which fails on GitHub
+          # Actions runners with `RTM_NEWADDR: Operation not
+          # permitted` — the runner kernel restricts unprivileged
+          # `unshare` for namespaces. Without bwrap, codex can't
+          # spawn ANY shell command, including `gh`. The runner VM
+          # is itself ephemeral + isolated per job, so dropping the
+          # nested sandbox is safe in this context.
+          codex exec --sandbox danger-full-access "$(cat <<PROMPT
+          Review PR #${PR_NUMBER} in ${REPO}.
+
+          Use the gh CLI to inspect the diff:
+            gh pr view ${PR_NUMBER} --json title,body,headRefName
+            gh pr diff ${PR_NUMBER}
+
+          Before posting your own findings, look at what's already
+          on the PR — this PR may have had earlier review iterations
+          (yours or another bot's) that are already addressed by
+          later commits. Read the existing thread:
+            gh api repos/${REPO}/issues/${PR_NUMBER}/comments --paginate
+            gh api repos/${REPO}/pulls/${PR_NUMBER}/comments --paginate
+          For every prior 'CODEX VERDICT: CHANGES REQUESTED' bullet,
+          check the current diff to decide whether the concern is
+          now resolved (don't re-flag) or still present (re-flag and
+          point at the new line). Don't echo back findings other
+          bots have already covered identically — focus on the
+          marginal value you can add over the existing thread.
+
+          Then post inline review comments on specific lines via:
+            gh api repos/${REPO}/pulls/${PR_NUMBER}/comments
+          or top-level comments via:
+            gh pr comment ${PR_NUMBER}
+
+          Focus on: correctness, edge cases, security (XSS / SSRF /
+          path traversal / prompt injection), accessibility, i18n
+          lockstep (this repo has 8 locales under src/lang/), test
+          coverage for the happy path + boundary cases, and
+          consistency with the rest of the codebase. Skip stylistic
+          nits unless they hide a real bug.
+
+          At the END of your work, ALWAYS post ONE final top-level
+          comment that starts with a verdict marker on its own line:
+            - 'CODEX VERDICT: LGTM' if you have no outstanding concerns
+            - 'CODEX VERDICT: CHANGES REQUESTED' followed by a
+              bulleted summary of remaining issues
+
+          Do not apply any fixes yourself — only review and post findings.
+          PROMPT
+          )"

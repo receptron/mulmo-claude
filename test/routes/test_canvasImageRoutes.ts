@@ -161,6 +161,12 @@ describe("POST /api/canvas — pre-allocate image file", () => {
     // Also surfaces the human-readable fields from executeOpenCanvas.
     assert.equal(body.title, "Drawing Canvas");
     assert.equal(typeof body.message, "string");
+    // message must surface the same imagePath the route allocated, so the
+    // LLM can reference the file when reading it back later.
+    assert.ok(body.message?.includes(body.data.imageData), `message should embed the allocated imagePath; got: ${body.message}`);
+    // instructions must read as pre-draw — the canvas was just shown, the
+    // user has not drawn yet. Guards against reverting to past-tense wording.
+    assert.match(body.instructions ?? "", /about to draw/i, `instructions should be pre-draw tense; got: ${body.instructions}`);
 
     createdImagePaths.push(body.data.imageData);
   });

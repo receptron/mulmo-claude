@@ -11,6 +11,7 @@ import sourcesRoutes from "./api/routes/sources.js";
 import newsRoutes from "./api/routes/news.js";
 import pluginsRoutes from "./api/routes/plugins.js";
 import imageRoutes from "./api/routes/image.js";
+import attachmentRoutes from "./api/routes/attachment.js";
 import presentHtmlRoutes from "./api/routes/presentHtml.js";
 import chartRoutes from "./api/routes/chart.js";
 import rolesRoutes from "./api/routes/roles.js";
@@ -37,6 +38,7 @@ import { serverError } from "./utils/httpError.js";
 import { makeUuid } from "./utils/id.js";
 import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { initWorkspace, workspacePath } from "./workspace/workspace.js";
+import { runMemoryMigrationOnce } from "./workspace/memory/run.js";
 import { env, isGeminiAvailable } from "./system/env.js";
 import { buildSandboxStatus } from "./api/sandboxStatus.js";
 import { existsSync, readFileSync } from "fs";
@@ -66,6 +68,7 @@ import { API_ROUTES } from "../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../src/types/events.js";
 import { SESSION_ORIGINS } from "../src/types/session.js";
 import { buildHtmlPreviewCsp } from "../src/utils/html/previewCsp.js";
+import { readAndInjectHtmlArtifact } from "./utils/html/htmlArtifactSplicer.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS, ONE_HOUR_MS } from "./utils/time.js";
 import { isPortFree, findAvailablePort, MAX_PORT_PROBES } from "./utils/port.mjs";
 import { SCHEDULE_TYPES, MISSED_RUN_POLICIES } from "@receptron/task-scheduler";
@@ -78,6 +81,17 @@ const __dirname = path.dirname(__filename);
 const debugMode = process.argv.includes("--debug");
 
 initWorkspace();
+
+// Fire-and-forget legacy-memory migration (#1029). Idempotent: a
+// no-op when there's no `conversations/memory.md` to migrate. We
+// don't await — migration calls Claude per bullet and can take
+// minutes, but the agent can serve traffic in parallel. The brief
+// race window is documented in plans/done/feat-memory-storage-wire.md.
+// The runner logs failures internally; the outer .then(noop, noop)
+// keeps the floating-promises rule happy without smuggling in a
+// `void` (banned by sonarjs/void-use).
+const noop = (): void => {};
+runMemoryMigrationOnce(workspacePath).then(noop, noop);
 
 let sandboxEnabled = false;
 
@@ -195,7 +209,7 @@ app.use(
 // browser can resolve relative `<img src="../images/...">` paths
 // against the file's actual URL — `srcdoc` documents have
 // `about:srcdoc` as their base URL, which breaks every relative ref.
-// See plans/feat-files-html-preview-relative-paths.md.
+// See plans/done/feat-files-html-preview-relative-paths.md.
 //
 // Allowlist covers `.html` / `.htm` plus common image extensions so
 // HTML files that reference sibling images (e.g. a shared logo placed
@@ -247,6 +261,19 @@ async function getHtmlsDirReal(): Promise<string | null> {
     return null;
   }
 }
+
+// Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html` →
+// `localhost:3001` with `changeOrigin: true`) emits the browser-
+// visible origin (`localhost:5173`) rather than the upstream socket.
+// In prod (no proxy) the headers are absent and we fall back to the
+// raw `Host` / `req.protocol`.
+function browserVisibleOrigin(req: Request): string {
+  const fwdHost = req.get("x-forwarded-host");
+  const fwdProto = req.get("x-forwarded-proto");
+  const host = fwdHost ?? req.get("host");
+  const proto = fwdProto ?? req.protocol;
+  return `${proto}://${host}`;
+}
 app.use(
   "/artifacts/html",
   async (req, res, next) => {
@@ -271,19 +298,17 @@ app.use(
       return;
     }
     if (HTML_DOCUMENT_EXT_RE.test(req.path)) {
-      // Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html`
-      // → `localhost:3001` with `changeOrigin: true`) emits the
-      // browser-visible origin (`localhost:5173`) rather than the
-      // upstream socket. In prod (no proxy) the headers are absent
-      // and we fall back to the raw `Host` / `req.protocol`. CSP
-      // header only on HTML responses — image subresources don't
-      // need it.
-      const fwdHost = req.get("x-forwarded-host");
-      const fwdProto = req.get("x-forwarded-proto");
-      const host = fwdHost ?? req.get("host");
-      const proto = fwdProto ?? req.protocol;
-      const origin = `${proto}://${host}`;
+      const origin = browserVisibleOrigin(req);
       res.setHeader("Content-Security-Policy", buildHtmlPreviewCsp(origin));
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      const spliced = await readAndInjectHtmlArtifact(root, relPath);
+      if (spliced === null) {
+        res.status(404).end();
+        return;
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(spliced);
+      return;
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
     next();
@@ -336,6 +361,7 @@ app.use(sourcesRoutes);
 app.use(newsRoutes);
 app.use(pluginsRoutes);
 app.use(imageRoutes);
+app.use(attachmentRoutes);
 app.use(presentHtmlRoutes);
 app.use(chartRoutes);
 app.use(rolesRoutes);

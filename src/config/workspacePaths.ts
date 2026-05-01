@@ -10,6 +10,7 @@
 /** Well-known individual files. Values are workspace-relative paths. */
 export const WORKSPACE_FILES = {
   memory: "conversations/memory.md",
+  memoryIndex: "conversations/memory/MEMORY.md",
   sessionToken: ".session-token",
   /** Port the parent server bound to. Written at `app.listen` so
    *  out-of-process helpers (currently the LLM wiki-write hook —

@@ -197,13 +197,35 @@ function markdownResult(text: string): ToolResultComplete<TextResponseData> {
   const slash = current.lastIndexOf("/");
   const basePath = slash >= 0 ? current.slice(0, slash) : "";
   const rewritten = rewriteMarkdownImageRefs(text, basePath);
+  // The displayed text strips frontmatter (rendered separately as a
+  // metadata bar above) — but the PDF source must keep the original
+  // markdown so the server can decide what to keep / strip via the
+  // `pdfStripFrontmatter` flag. Otherwise non-wiki files with
+  // frontmatter would silently lose it from the PDF too.
+  const fullSource = props.content?.kind === "text" ? props.content.content : text;
+  // Strip frontmatter from the PDF whenever the UI shows it as a
+  // separate metadata panel — otherwise the YAML duplicates as plain
+  // text on page 1 of the PDF.
+  const hasFrontmatter = props.mdFrontmatter !== null;
   return {
     uuid: "files-preview",
     toolName: "text-response",
     message: rewritten,
     title: props.selectedPath ?? "",
-    // role: "user" hides the PDF download button in TextResponseView
-    data: { text: rewritten, role: "user", transportKind: "text-rest" },
+    data: {
+      text: rewritten,
+      role: "assistant",
+      transportKind: "text-rest",
+      // `pdfSourceText`: un-rewritten markdown so the server-side
+      // image inliner resolves against on-disk paths, not the
+      // `/api/files/raw?…` URLs the display layer produces.
+      pdfSourceText: fullSource,
+      // Pass basePath as-is (including empty string for top-level
+      // files like README.md). The server distinguishes empty
+      // (= workspace root) from undefined (= legacy default).
+      pdfBaseDir: basePath,
+      pdfStripFrontmatter: hasFrontmatter,
+    },
   };
 }
 </script>

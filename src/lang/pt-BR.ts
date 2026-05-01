@@ -71,6 +71,8 @@ const ptBRMessages = {
     todayJournal: "Resumo de hoje",
     todayJournalNotFound: "Ainda sem resumo — converse um pouco e o journal será gerado.",
     todayJournalLoadFailed: "Falha ao carregar o journal (status {status}): {error}",
+    copyMarkdown: "Copiar conversa como Markdown",
+    copiedMarkdown: "Copiado!",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",
@@ -209,6 +211,9 @@ const ptBRMessages = {
     htmlPreview: "Pré-visualização HTML",
     pdfPreview: "Pré-visualização PDF",
     parseError: "erro de análise",
+  },
+  filesView: {
+    chatPlaceholder: "Pergunte sobre este arquivo…",
   },
   systemFiles: {
     schemaLabel: "Esquema",
@@ -532,6 +537,8 @@ const ptBRMessages = {
     redo: "Refazer",
     clear: "Limpar",
     styleLabel: "Estilo:",
+    stylePromptWithPath: "Transforme a imagem em `{path}` em uma imagem no estilo {style}.",
+    stylePromptNoPath: "Transforme meu desenho na tela em uma imagem no estilo {style}.",
   },
   pluginChart: {
     untitled: "Gráfico",

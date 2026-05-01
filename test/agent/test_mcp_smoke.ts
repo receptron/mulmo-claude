@@ -14,6 +14,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+import { TOOL_NAMES } from "../../src/config/toolNames.ts";
 
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 const MCP_SERVER = path.join(PROJECT_ROOT, "server/agent/mcp-server.ts");
@@ -96,7 +97,7 @@ describe("MCP server subprocess smoke test", () => {
     const env: Record<string, string> = {
       SESSION_ID: "test-smoke",
       PORT: "0",
-      PLUGIN_NAMES: "manageTodoList,presentMulmoScript",
+      PLUGIN_NAMES: [TOOL_NAMES.manageTodoList, TOOL_NAMES.presentMulmoScript].join(","),
     };
 
     const responses = await sendAndReceive(
@@ -138,12 +139,12 @@ describe("MCP server subprocess smoke test", () => {
 
     // The tools we requested via PLUGIN_NAMES should be present.
     const toolNames = toolsResp.result.tools.map((tool: { name: string }) => tool.name);
-    assert.ok(toolNames.includes("manageTodoList"), `manageTodoList not in tools: ${toolNames.join(", ")}`);
-    assert.ok(toolNames.includes("presentMulmoScript"), `presentMulmoScript not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes(TOOL_NAMES.manageTodoList), `${TOOL_NAMES.manageTodoList} not in tools: ${toolNames.join(", ")}`);
+    assert.ok(toolNames.includes(TOOL_NAMES.presentMulmoScript), `${TOOL_NAMES.presentMulmoScript} not in tools: ${toolNames.join(", ")}`);
 
     // manageWiki is intentionally absent (#963 Stage 3b) — the MCP
     // tool definition was removed; the plugin record stays for
     // canvas dispatch only, not for LLM-side calls.
-    assert.ok(!toolNames.includes("manageWiki"), `manageWiki should not be exposed via MCP: ${toolNames.join(", ")}`);
+    assert.ok(!toolNames.includes(TOOL_NAMES.manageWiki), `${TOOL_NAMES.manageWiki} should not be exposed via MCP: ${toolNames.join(", ")}`);
   });
 });

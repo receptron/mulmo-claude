@@ -3,8 +3,8 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { log } from "../system/logger/index.js";
-import { EAGER_WORKSPACE_DIRS, WORKSPACE_FILES, WORKSPACE_PATHS, workspacePath } from "./paths.js";
-import { existsInWorkspace, readWorkspaceTextSync, writeWorkspaceTextSync } from "../utils/files/workspace-io.js";
+import { EAGER_WORKSPACE_DIRS, WORKSPACE_PATHS, workspacePath } from "./paths.js";
+import { readWorkspaceTextSync, writeWorkspaceTextSync } from "../utils/files/workspace-io.js";
 import { loadCustomDirs, ensureCustomDirs } from "./custom-dirs.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,10 +24,14 @@ export function initWorkspace(): string {
     mkdirSync(WORKSPACE_PATHS[key], { recursive: true });
   }
 
-  // Create memory.md if it doesn't exist
-  if (!existsInWorkspace(WORKSPACE_FILES.memory)) {
-    writeWorkspaceTextSync(WORKSPACE_FILES.memory, "# Memory\n\nDistilled facts about you and your work.\n");
-  }
+  // Ensure the typed-memory directory exists (#1029). Individual
+  // entry files are written by the agent or by the legacy-memory
+  // migration; init just guarantees the directory is there so the
+  // reader and migration both have a place to write to. The legacy
+  // `conversations/memory.md` is no longer auto-created — migration
+  // converts it on first start and the new layout becomes the source
+  // of truth thereafter.
+  mkdirSync(WORKSPACE_PATHS.memoryDir, { recursive: true });
 
   // Always sync all files from server/helps/ into workspace/helps/
   mkdirSync(WORKSPACE_PATHS.helps, { recursive: true });

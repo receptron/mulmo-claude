@@ -44,7 +44,7 @@ export const TOOL_NAMES = {
   // Creation / generation
   createMindMap: "createMindMap",
   generateImage: "generateImage",
-  editImage: "editImage",
+  editImages: "editImages",
   openCanvas: "openCanvas",
 
   // Interactive / media

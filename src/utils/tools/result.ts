@@ -16,25 +16,21 @@ export function isUserTextResponse(res: ToolResultComplete): boolean {
   return data.role === "user";
 }
 
-// Pull out the optional base64 image attached to a tool result, if
-// any. Returns `undefined` for results that have no `data.imageData`
-// or where it isn't a string.
-export function extractImageData(result: ToolResultComplete | undefined): string | undefined {
-  const data = result?.data;
-  if (isRecord(data) && typeof data.imageData === "string") {
-    return data.imageData;
-  }
-  return undefined;
-}
-
 // Build a synthetic text-response result for either a user or
 // assistant turn. Used by sendMessage and the chat history UI.
-export function makeTextResult(text: string, role: "user" | "assistant"): ToolResultComplete {
+// `attachments` is optional and only meaningful on user turns —
+// they're the workspace paths the user attached for this message
+// and surface as chips next to the bubble.
+export function makeTextResult(text: string, role: "user" | "assistant", attachments?: readonly string[]): ToolResultComplete {
+  const data: Record<string, unknown> = { text, role, transportKind: "text-rest" };
+  if (attachments && attachments.length > 0) {
+    data.attachments = [...attachments];
+  }
   return {
     uuid: uuidv4(),
     toolName: "text-response",
     message: text,
     title: role === "user" ? "You" : "Assistant",
-    data: { text, role, transportKind: "text-rest" },
+    data,
   };
 }

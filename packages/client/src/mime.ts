@@ -34,20 +34,23 @@ export function mimeFromExtension(ext: string, fallback = "application/octet-str
   return EXT_TO_MIME[ext.toLowerCase()] ?? fallback;
 }
 
-/** True when the MIME type is an image Claude can see via vision. */
-export function isImageMime(mimeType: string): boolean {
-  return mimeType.startsWith("image/");
+/** True when the MIME type is an image Claude can see via vision.
+ *  Tolerates `undefined` so callers can pass an attachment's optional
+ *  `mimeType` directly. */
+export function isImageMime(mimeType: string | undefined): boolean {
+  return typeof mimeType === "string" && mimeType.startsWith("image/");
 }
 
 /** True when the MIME type is a PDF document Claude can read natively
- *  via `type: "document"` content blocks. */
-export function isPdfMime(mimeType: string): boolean {
+ *  via `type: "document"` content blocks. Tolerates `undefined`. */
+export function isPdfMime(mimeType: string | undefined): boolean {
   return mimeType === "application/pdf";
 }
 
 /** True when the attachment can be sent to Claude directly as a
- *  native content block (image or PDF) — no conversion needed. */
-export function isNativeAttachmentMime(mimeType: string): boolean {
+ *  native content block (image or PDF) — no conversion needed.
+ *  Tolerates `undefined`. */
+export function isNativeAttachmentMime(mimeType: string | undefined): boolean {
   return isImageMime(mimeType) || isPdfMime(mimeType);
 }
 

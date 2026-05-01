@@ -28,10 +28,13 @@ export function pushErrorMessage(session: ActiveSession, message: string): void 
   session.selectedResultUuid = errorResult.uuid;
 }
 
-/** Append the user's message so it renders immediately. */
-export function beginUserTurn(session: ActiveSession, message: string): void {
+/** Append the user's message so it renders immediately. `attachments`
+ *  carries the workspace-relative paths the user attached for this
+ *  turn (paste/drop/file-picker) so the chat bubble can render an
+ *  icon / thumbnail chip alongside the text. */
+export function beginUserTurn(session: ActiveSession, message: string, attachments?: readonly string[]): void {
   session.updatedAt = new Date().toISOString();
-  pushResult(session, makeTextResult(message, "user"));
+  pushResult(session, makeTextResult(message, "user", attachments));
   session.runStartIndex = session.toolResults.length;
 }
 
@@ -59,11 +62,13 @@ function isDuplicateUserText(session: ActiveSession, message: string): boolean {
 /** Handle an incoming text event (user or assistant) from the
  *  agent's SSE/pubsub stream. Deduplicates user messages,
  *  streams assistant text into the last card, and selects the
- *  result when appropriate. */
-export function applyTextEvent(session: ActiveSession, message: string, source: "user" | "assistant"): void {
+ *  result when appropriate. `attachments` is forwarded for cross-tab
+ *  user-text broadcasts so observing tabs render chips identically
+ *  to the originating tab. */
+export function applyTextEvent(session: ActiveSession, message: string, source: "user" | "assistant", attachments?: readonly string[]): void {
   if (source === "user") {
     if (!isDuplicateUserText(session, message)) {
-      pushResult(session, makeTextResult(message, "user"));
+      pushResult(session, makeTextResult(message, "user", attachments));
       session.runStartIndex = session.toolResults.length;
     }
     return;

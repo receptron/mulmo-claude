@@ -34,7 +34,7 @@ export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): 
       await ctx.refreshRoles();
       return;
     case EVENT_TYPES.text:
-      applyTextEvent(session, event.message, event.source ?? "assistant");
+      applyTextEvent(session, event.message, event.source ?? "assistant", event.attachments);
       return;
     case EVENT_TYPES.toolResult:
       applyToolResultToSession(session, event.result);

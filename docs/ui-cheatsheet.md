@@ -43,7 +43,8 @@ The `w-80` left column inside the chat page (and any other view that mounts it).
 ```
 ┌─<SessionSidebar>──────────────────────────────┐
 │ ┌─[sidebar-role-header]─────────────────────┐ │
-│ │ ⭐ General                       🔧  ▦/▥  │ │  ← role icon + name
+│ │ ⭐ General              [copy-chat-md] 🔧 ▦/▥│ │  ← role icon + name
+│ │                                            │ │     copy session as Markdown (content_copy)
 │ │                                            │ │     toggle right sidebar (build icon)
 │ │                                            │ │     <CanvasViewToggle> single/stack
 │ └────────────────────────────────────────────┘ │
@@ -64,7 +65,7 @@ The `w-80` left column inside the chat page (and any other view that mounts it).
 └────────────────────────────────────────────────┘
 ```
 
-In **Stack layout** this sidebar isn't rendered; the same data flows through `<StackView>` which inlines result bodies into the main column. Only single layout shows the preview list.
+In **Stack layout** this sidebar isn't rendered; the same data flows through `<StackView>` which inlines result bodies into the main column. Only single layout shows the preview list. `<StackView>`'s own header (`[stack-role-header]`) carries the same control cluster — `[copy-chat-md]` (content_copy → check on success), tool-call-history toggle, and `<CanvasViewToggle>` — so the affordance lives in the same visual slot regardless of layout.
 
 ## NotificationBell expanded
 

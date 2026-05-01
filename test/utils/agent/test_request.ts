@@ -28,7 +28,7 @@ describe("buildAgentRequestBody — happy path", () => {
       message: "hello",
       role,
       chatSessionId: "sess-1",
-      selectedImageData: "data:image/png;base64,AAA",
+      attachmentPaths: ["artifacts/images/2026/04/abc.png"],
     });
     // `userTimezone` depends on the host's Intl runtime, so only
     // assert shape on the fields we control directly and check the
@@ -38,7 +38,7 @@ describe("buildAgentRequestBody — happy path", () => {
       message: "hello",
       roleId: "coder",
       chatSessionId: "sess-1",
-      selectedImageData: "data:image/png;base64,AAA",
+      attachments: [{ path: "artifacts/images/2026/04/abc.png" }],
     });
     // The builder must call Intl — node test runners always expose a
     // recognizable IANA id (even "UTC" in minimal builds). Guard with
@@ -46,13 +46,45 @@ describe("buildAgentRequestBody — happy path", () => {
     assert.ok(typeof userTimezone === "string" && userTimezone.length > 0, `expected a resolved timezone, got ${String(userTimezone)}`);
   });
 
-  it("leaves selectedImageData as undefined when not provided", () => {
+  it("packs multiple paths into the attachments array in order", () => {
+    const body = buildAgentRequestBody({
+      message: "compare",
+      role: makeRole(),
+      chatSessionId: "s",
+      attachmentPaths: ["data/attachments/2026/04/foo.png", "artifacts/images/2026/04/bar.png"],
+    });
+    assert.deepEqual(body.attachments, [{ path: "data/attachments/2026/04/foo.png" }, { path: "artifacts/images/2026/04/bar.png" }]);
+  });
+
+  it("leaves attachments undefined when no paths are provided", () => {
     const body = buildAgentRequestBody({
       message: "hi",
       role: makeRole(),
       chatSessionId: "s",
     });
-    assert.equal(body.selectedImageData, undefined);
+    assert.equal(body.attachments, undefined);
+  });
+
+  it("treats an empty paths array as no attachments", () => {
+    const body = buildAgentRequestBody({
+      message: "hi",
+      role: makeRole(),
+      chatSessionId: "s",
+      attachmentPaths: [],
+    });
+    assert.equal(body.attachments, undefined);
+  });
+
+  it("filters out empty / non-string entries before building the array", () => {
+    const body = buildAgentRequestBody({
+      message: "hi",
+      role: makeRole(),
+      chatSessionId: "s",
+      // Cast through unknown so the test exercises the runtime
+      // filter even though the type annotation forbids non-strings.
+      attachmentPaths: ["artifacts/images/2026/04/x.png", "", undefined as unknown as string],
+    });
+    assert.deepEqual(body.attachments, [{ path: "artifacts/images/2026/04/x.png" }]);
   });
 });
 

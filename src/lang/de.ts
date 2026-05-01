@@ -71,6 +71,8 @@ const deMessages = {
     todayJournal: "Heutige Zusammenfassung",
     todayJournalNotFound: "Noch keine Zusammenfassung — chatte etwas und das Journal erstellt eine.",
     todayJournalLoadFailed: "Journal konnte nicht geladen werden (Status {status}): {error}",
+    copyMarkdown: "Chat als Markdown kopieren",
+    copiedMarkdown: "Kopiert!",
   },
   rightSidebar: {
     toggleSystemPrompt: "System-Prompt umschalten",
@@ -210,6 +212,9 @@ const deMessages = {
     htmlPreview: "HTML-Vorschau",
     pdfPreview: "PDF-Vorschau",
     parseError: "Parse-Fehler",
+  },
+  filesView: {
+    chatPlaceholder: "Frage zu dieser Datei stellen…",
   },
   systemFiles: {
     schemaLabel: "Schema",
@@ -539,6 +544,8 @@ const deMessages = {
     redo: "Wiederherstellen",
     clear: "Löschen",
     styleLabel: "Stil:",
+    stylePromptWithPath: "Wandle das Bild unter `{path}` in ein Bild im {style}-Stil um.",
+    stylePromptNoPath: "Wandle meine Zeichnung auf dem Canvas in ein Bild im {style}-Stil um.",
   },
   pluginChart: {
     untitled: "Diagramm",

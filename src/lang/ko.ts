@@ -78,6 +78,8 @@ const koMessages = {
     todayJournal: "오늘의 요약",
     todayJournalNotFound: "아직 요약이 없습니다 — 잠시 대화하면 journal이 생성합니다.",
     todayJournalLoadFailed: "journal 로드에 실패했습니다 (status {status}): {error}",
+    copyMarkdown: "대화를 Markdown으로 복사",
+    copiedMarkdown: "복사됨",
   },
   rightSidebar: {
     toggleSystemPrompt: "시스템 프롬프트 토글",
@@ -215,6 +217,9 @@ const koMessages = {
     htmlPreview: "HTML 미리보기",
     pdfPreview: "PDF 미리보기",
     parseError: "파싱 오류",
+  },
+  filesView: {
+    chatPlaceholder: "이 파일에 대해 질문하세요…",
   },
   systemFiles: {
     schemaLabel: "스키마",
@@ -530,6 +535,8 @@ const koMessages = {
     redo: "다시 실행",
     clear: "지우기",
     styleLabel: "스타일:",
+    stylePromptWithPath: "`{path}`의 이미지를 {style} 스타일 이미지로 변환해 주세요.",
+    stylePromptNoPath: "캔버스에 그린 그림을 {style} 스타일 이미지로 변환해 주세요.",
   },
   pluginChart: {
     untitled: "차트",

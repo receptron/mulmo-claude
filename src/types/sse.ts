@@ -27,6 +27,11 @@ export interface SseText {
   type: typeof EVENT_TYPES.text;
   message: string;
   source?: "user" | "assistant";
+  // Workspace-relative paths attached to this user turn. Forwarded
+  // verbatim from the server's user-text broadcast so observing tabs
+  // can render attachment chips matching the originating tab. Only
+  // populated when `source === "user"`.
+  attachments?: string[];
 }
 
 export interface SseToolResult {
