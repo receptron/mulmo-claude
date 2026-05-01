@@ -155,8 +155,19 @@ export async function loadAttachmentBytes(relativePath: string): Promise<Buffer>
   return readFile(absPath);
 }
 
+// Reject `.` and `..` segments split on either `/` or `\` so a
+// traversal-shaped value (`data/attachments/../secrets/key.pem`,
+// `data/attachments\..\foo.pdf`) doesn't pass the prefix check
+// and reach `[Attached file: ...]` markers / chat surface
+// (Codex review on PR #1084 follow-up to #1052).
+function hasTraversalSegment(value: string): boolean {
+  return value.split(/[/\\]/).some((segment) => segment === ".." || segment === ".");
+}
+
 export function isAttachmentPath(value: string): boolean {
-  return value.startsWith(`${WORKSPACE_DIRS.attachments}/`);
+  if (!value.startsWith(`${WORKSPACE_DIRS.attachments}/`)) return false;
+  if (hasTraversalSegment(value)) return false;
+  return true;
 }
 
 export function stripDataUri(dataUri: string): { mimeType: string; base64: string } | undefined {

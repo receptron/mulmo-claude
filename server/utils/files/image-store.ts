@@ -54,7 +54,17 @@ export function stripDataUri(dataUri: string): string {
   return dataUri.replace(/^data:image\/[^;]+;base64,/, "");
 }
 
+// Reject `.` / `..` segments split on either `/` or `\` so a
+// traversal-shaped value can't slip past the prefix/suffix gate
+// (Codex review on PR #1084 follow-up to #1052).
+function hasTraversalSegment(value: string): boolean {
+  return value.split(/[/\\]/).some((segment) => segment === ".." || segment === ".");
+}
+
 // Accepts arbitrary depth so saveImage's images/YYYY/MM/abc.png still validates.
 export function isImagePath(value: string): boolean {
-  return value.startsWith(`${WORKSPACE_DIRS.images}/`) && value.endsWith(".png");
+  if (!value.startsWith(`${WORKSPACE_DIRS.images}/`)) return false;
+  if (!value.endsWith(".png")) return false;
+  if (hasTraversalSegment(value)) return false;
+  return true;
 }

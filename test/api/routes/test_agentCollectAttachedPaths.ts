@@ -43,4 +43,46 @@ describe("collectAttachedPaths", () => {
     const attachments: Attachment[] = [{ path: "data/attachments/2026/04/foo.png" }, { mimeType: "image/png", data: "AAAA" }, { path: "" }];
     assert.deepEqual(collectAttachedPaths(attachments), ["data/attachments/2026/04/foo.png"]);
   });
+
+  it("rejects paths outside the allowed workspace roots", () => {
+    // Bogus paths posted directly by a malicious client. `loadFromPath`
+    // would refuse to read them, but the chip + JSONL line + LLM marker
+    // are emitted independently — they have to filter here too.
+    const attachments: Attachment[] = [
+      { path: "/etc/passwd" },
+      { path: "../escape.png" },
+      { path: "secrets/key.pem" },
+      { path: "data/attachments/2026/04/legit.png" },
+      { path: "artifacts/images/2026/04/legit.png" },
+    ];
+    assert.deepEqual(collectAttachedPaths(attachments), ["data/attachments/2026/04/legit.png", "artifacts/images/2026/04/legit.png"]);
+  });
+
+  it("rejects an image path that doesn't end in .png (matches isImagePath)", () => {
+    const attachments: Attachment[] = [{ path: "artifacts/images/2026/04/foo.gif" }];
+    assert.deepEqual(collectAttachedPaths(attachments), []);
+  });
+
+  it("rejects traversal-shaped paths that match the prefix (Codex review on #1084)", () => {
+    // The validators were prefix/suffix only before, so a value like
+    // `data/attachments/../secrets/key.pem` passed `startsWith("data/attachments/")`
+    // and reached the chat surface as `[Attached file: ...]` even
+    // though `loadFromPath` would later refuse to read it.
+    const attachments: Attachment[] = [
+      { path: "data/attachments/../secrets/key.pem" },
+      { path: "data/attachments/foo/../../bar.pdf" },
+      { path: "artifacts/images/../escape.png" },
+      // Windows / encoded backslash form. `decodeURIComponent` of `%5C`
+      // produces `\`, and `path.normalize` treats it as a separator
+      // on Windows — the validator must catch it before downstream
+      // resolves it.
+      { path: "data/attachments\\..\\secrets.pdf" },
+      // Single-dot segment: also rejected (defense-in-depth).
+      { path: "data/attachments/./foo.pdf" },
+      // Real entries should still pass.
+      { path: "data/attachments/2026/04/legit.pdf" },
+      { path: "artifacts/images/2026/04/legit.png" },
+    ];
+    assert.deepEqual(collectAttachedPaths(attachments), ["data/attachments/2026/04/legit.pdf", "artifacts/images/2026/04/legit.png"]);
+  });
 });

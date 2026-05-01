@@ -295,6 +295,12 @@ interface RequestExtras {
  *  Order matches declaration order so chip order matches the order
  *  the user attached them.
  *
+ *  Each path is validated against the same allow-list `loadFromPath`
+ *  uses (`data/attachments/...` or `artifacts/images/...png`). A
+ *  request can otherwise pin a bogus path on the chat record + SSE
+ *  + LLM marker even though `loadFromPath` would refuse to read it
+ *  (#1052 review).
+ *
  *  Defensive: `Array.isArray` guards against a malformed HTTP body
  *  where `attachments` is a truthy non-array. Without it `for...of`
  *  would throw and bypass the rollback path that calls `endRun`,
@@ -303,7 +309,9 @@ export function collectAttachedPaths(attachments: Attachment[] | undefined): str
   if (!Array.isArray(attachments) || attachments.length === 0) return [];
   const paths: string[] = [];
   for (const att of attachments) {
-    if (typeof att.path === "string" && att.path.length > 0) paths.push(att.path);
+    if (typeof att.path !== "string" || att.path.length === 0) continue;
+    if (!isAttachmentPath(att.path) && !isImagePath(att.path)) continue;
+    paths.push(att.path);
   }
   return paths;
 }
@@ -316,8 +324,8 @@ export function collectAttachedPaths(attachments: Attachment[] | undefined): str
  *  — it sends path-only attachments directly. */
 function mergeBridgeSelectedImage(selectedImageData: string | undefined, attachments: Attachment[] | undefined): Attachment[] | undefined {
   const synthetic = synthesiseBridgeAttachment(selectedImageData);
-  if (!synthetic) return attachments;
-  return attachments && attachments.length > 0 ? [synthetic, ...attachments] : [synthetic];
+  if (!synthetic) return Array.isArray(attachments) ? attachments : undefined;
+  return Array.isArray(attachments) && attachments.length > 0 ? [synthetic, ...attachments] : [synthetic];
 }
 
 /** Convert a legacy `selectedImageData` carrier to an `Attachment`.
@@ -356,9 +364,16 @@ function synthesiseBridgeAttachment(selectedImageData: string | undefined): Atta
  *
  *  Defensive: `Array.isArray` mirrors the guard in
  *  `collectAttachedPaths` so a malformed payload doesn't throw and
- *  bypass `endRun`. Per-attachment failures are logged and the
- *  offending entry is dropped — a single bad upload mustn't poison
- *  the rest of the turn. */
+ *  bypass `endRun`. A failed save bubbles up so the caller can
+ *  reject the turn — silently dropping the file would persist the
+ *  user message without the attachment they sent and breaks the
+ *  persistence/broadcast contract this layer is enforcing (#1052
+ *  review). The caller's try/catch wraps the whole attachment-prep
+ *  block and rolls the run back via `endRun`, so the failure path
+ *  is well-defined: the user gets a 400, the session unlocks, and
+ *  no orphan turn lands in jsonl. Entries with neither path nor
+ *  inline bytes are still dropped (warn) — that's a malformed entry,
+ *  not an I/O failure. */
 async function persistInlineBytesAsPaths(attachments: Attachment[] | undefined): Promise<Attachment[] | undefined> {
   if (!Array.isArray(attachments) || attachments.length === 0) return undefined;
   const result: Attachment[] = [];
@@ -368,15 +383,8 @@ async function persistInlineBytesAsPaths(attachments: Attachment[] | undefined):
       continue;
     }
     if (typeof att.data === "string" && att.data.length > 0 && typeof att.mimeType === "string" && att.mimeType.length > 0) {
-      try {
-        const saved = await saveAttachment(att.data, att.mimeType);
-        result.push({ path: saved.relativePath, mimeType: saved.mimeType });
-      } catch (err) {
-        log.warn("agent", "failed to persist inline attachment to disk — dropping", {
-          mimeType: att.mimeType,
-          error: errorMessage(err),
-        });
-      }
+      const saved = await saveAttachment(att.data, att.mimeType);
+      result.push({ path: saved.relativePath, mimeType: saved.mimeType });
       continue;
     }
     log.warn("agent", "attachment has neither path nor inline bytes — dropping");
@@ -408,7 +416,7 @@ async function persistInlineBytesAsPaths(attachments: Attachment[] | undefined):
  *  Inline (`{ data, mimeType }`) entries no longer reach this layer —
  *  `persistInlineBytesAsPaths` rewrites them as path-bearing entries
  *  before this runs. */
-async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
+export async function prepareRequestExtras(attachments: Attachment[] | undefined): Promise<RequestExtras> {
   if (!Array.isArray(attachments) || attachments.length === 0) {
     return { attachments: undefined, attachedFilePaths: [] };
   }
@@ -420,7 +428,11 @@ async function prepareRequestExtras(attachments: Attachment[] | undefined): Prom
       continue;
     }
     const resolved = await loadFromPath(att.path, att.mimeType);
-    if (resolved) result.push(resolved);
+    if (!resolved) continue;
+    // Only emit the `[Attached file: …]` marker when the file was
+    // actually loaded — otherwise the LLM gets told a bogus path
+    // exists (Codex review on PR #1084 follow-up to #1052).
+    result.push(resolved);
     attachedFilePaths.push(att.path);
   }
   return {
