@@ -336,7 +336,8 @@ e2e-live/
 |---|---|---|
 | **L-01** presentHtml 画像描画 | ✅ 実装済 | media.spec.ts、fixture 画像を workspace に配置 → naturalWidth > 0、self-repair guard (readImgRepairAttempted) 追加済 |
 | **L-02** PDF DL | ✅ 実装済 | media.spec.ts、textResponse の PDF ボタン経由 |
-| L-03〜L-30 | 未実装 | カテゴリごとの後続 PR で順次 |
+| **L-03** mulmoScript 動画 DL | ✅ 実装済 | media.spec.ts、 fixture json (`e2e-live/fixtures/mulmo/l03-two-beat.json`) を `artifacts/stories/e2e-live-l03-<project>.json` に seed → LLM に filePath 指示 → Generate Movie ボタン → Download Movie ボタン → MP4 `ftyp` magic bytes 検証 (B-21)。 全 beat `text: ""` + textSlide で TTS / image API 呼ばず、 ffmpeg 不在時は `which ffmpeg` で `test.skip`。 worker 衝突回避のため fixture 名に project slug を埋める |
+| L-04〜L-30 | 未実装 | カテゴリごとの後続 PR で順次 |
 
 ## 実装の詳細
 
@@ -353,6 +354,7 @@ e2e-live/
 | `readImgSrcInPresentHtml(page, imgSelector)` | iframe 内の `<img>` の `src` 属性を取得（リライト後の URL 検証用） |
 | `readImgNaturalSize(page, imgSelector)` | iframe 内の `<img>` の `naturalWidth/Height` を取得（実描画確認） |
 | `readPdfDownload(download)` | `Download` を読み込み `%PDF-` magic bytes を検証、Buffer 返す |
+| `readMovieDownload(download)` | `Download` を読み込み MP4 の `ftyp` magic bytes を検証、Buffer 返す（L-03 用） |
 | `placeFixtureInWorkspace(fixtureRel, workspaceRel)` | `e2e-live/fixtures/<fixtureRel>` を `~/mulmoclaude/<workspaceRel>` にコピー |
 | `removeFromWorkspace(workspaceRel)` | best-effort delete（finally で呼ぶ） |
 | `getCurrentSessionId(page)` | URL から `/chat/<id>` を抽出 |
@@ -360,7 +362,7 @@ e2e-live/
 
 ### testid 必要時の追加方針
 
-実装済の追加: `present-html-iframe`（`src/plugins/presentHtml/View.vue` の iframe）、`text-response-pdf-button`（`src/plugins/textResponse/View.vue` の PDF ボタン）。
+実装済の追加: `present-html-iframe`（`src/plugins/presentHtml/View.vue` の iframe）、`text-response-pdf-button`（`src/plugins/textResponse/View.vue` の PDF ボタン）、`mulmo-script-generate-movie-button` / `mulmo-script-download-movie-button` / `mulmo-script-regenerate-movie-button`（`src/plugins/presentMulmoScript/View.vue` の動画操作 3 ボタン、 L-03 用）。
 
 新規 testid を追加する時は:
 - `data-testid="<plugin>-<role>"` の kebab-case で命名（既存規則）
@@ -379,6 +381,66 @@ e2e-live/
 - **fixture 再利用**（L-01〜L-04, L-06）: `e2e-live/fixtures/images/sample.png`（`src/assets/mulmo_bw.png` のコピー）を spec ごとに **ユニークな workspace path** へコピー → LLM にそのパスを示して `<img>` / `![]()` で参照させる
 - **実生成 1 枚**（L-05）: generateImage 経路自体を検証するため、実際に画像生成
 - workspace の path は spec 名を含める（例: `artifacts/images/e2e-live-l01.png`）。複数 worker が並列実行されてもファイル名衝突しない
+
+### mulmoScript fixture + filePath パターン（L-03 で確立）
+
+L-03 を実装するなかで、 mulmoScript シナリオで再利用可能なパターンが固まった。 動画系 / mulmoScript 系の後続シナリオ（L-04 animation:true, mulmocast 関連の bridge / pre-release matrix など）で同じ枠を踏襲する。
+
+#### 1. fixture json を repo に持つ（LLM に script を作らせない）
+
+LLM に mulmoScript JSON を生成させると揺れが大きい（image / imagePrompt / textSlide / markdown / animation の選択、 speakers / model 設定、 description フィールドの省略など）。 spec の本旨が「DL 経路」 「動画 compose」 等であれば script の中身は決定論的で良いので、 `e2e-live/fixtures/mulmo/<scenario>.json` を repo に置き、 LLM には **`presentMulmoScript({ filePath: "stories/<...>" })` を呼んでくれ** と一文だけ指示する。 1 ツール 1 引数の単純呼出なので LLM はほぼ確実に従う。
+
+#### 2. disk path と LLM wire form の **二重化** に注意
+
+mulmoclaude では `WORKSPACE_DIRS.stories = "artifacts/stories"`（`server/workspace/paths.ts`）なので:
+
+- **disk 上**: `~/mulmoclaude/artifacts/stories/<file>.json`（fixture seed 先）
+- **LLM wire form**: `stories/<file>.json`（presentMulmoScript の filePath 引数に渡す形式、 server の `resolveStoryPath` が `STORIES_PREFIX` を strip して `artifacts/stories/` 配下を resolve する）
+
+spec 内では別変数で持つ（`workspaceScriptRel` と `wireFilePath`）。 同一に書くと server が 404 を返してテストが「mulmoScript view 未表示で 1 分 timeout」 する罠（L-03 開発初期に踏んだ）。
+
+#### 3. TTS / 画像生成 API を呼ばない fixture の作り方
+
+mulmocast schema より:
+
+- `text: z.string().optional().default("").describe("If empty, the audio is not generated.")`
+- `duration: z.number().optional().describe("Used only when the text is empty")`
+
+→ **全 beat で `text: ""` + `duration: <秒数>`** にすれば TTS API は呼ばれない。 image は **local-render type のみ** で揃える:
+
+| image type | API 呼ぶ |
+|---|---|
+| `textSlide` / `markdown` / `chart` / `mermaid` / `html_tailwind` | ❌ ローカル合成 |
+| `imagePrompt` / `moviePrompt`（top-level field） | ✅ image / video gen API |
+
+L-03 fixture (`e2e-live/fixtures/mulmo/l03-two-beat.json`) は textSlide 2 beat + text 空 + duration 1 で TTS / image API ともに 0 呼出 → cost 数円以下、 `GEMINI_API_KEY` 不要。
+
+#### 4. 並列 worker の衝突回避（project slug suffix）
+
+server `mulmo-script.ts` の `runMovieGeneration` は `inFlightMovies` set で `absoluteFilePath` 単位で動画生成の重複起動を防ぐ。 chromium / webkit が同じ fixture path を共有すると **片方の worker がガードに弾かれて Download Movie button が visible にならず 8 分 timeout** する。
+
+回避: spec 内で fixture filename に `testInfo.project.name` を埋める。
+
+```ts
+test("...", async ({ page }, testInfo) => {
+  const slug = testInfo.project.name; // "chromium" or "webkit"
+  const workspaceScriptRel = `artifacts/stories/<scenario>-${slug}.json`;
+  const wireFilePath = `stories/<scenario>-${slug}.json`;
+  // ...
+});
+```
+
+L-03 で「chromium pass / webkit 8 分 timeout」 という mixed result を見たら同じ症状を疑う。
+
+#### 5. ffmpeg system 依存（test.skip で逃がす）
+
+mulmocast は `fluent-ffmpeg` で **system ffmpeg を spawn** する（npm pkg に bundle されていない）。 ffmpeg のない端末では動画 compose が無音失敗する。 spec 冒頭で `which ffmpeg` を `execSync` してチェックし、 missing なら `test.skip(true, "...")` で逃がす。 PATH に ffmpeg が無いだけで赤くなるのを防ぐ + 何が足りないかを skip メッセージで明示。
+
+一般ユーザー側 (`npx mulmoclaude` で動画生成を試す導線) で ffmpeg 要件が docs に未記載な件は別件 issue #1049 で起票済み。
+
+#### 6. 検証は magic bytes + サイズ floor（中身の正しさは別 spec）
+
+DL 経路 (B-21) の sanity 確認は `readMovieDownload` helper の **MP4 `ftyp` box at offset 4** + 1 KiB floor で十分。 「動画が本当に再生できるか」 「想定 beat 数か」 「audio track があるか」 は L-04 / 別 spec の責任分担にする（spec ごとにスコープを 1 つに絞る）。
 
 ### 画像 URL / presentHtml の現仕様（PR #969 / #972 / #982 以降）
 
@@ -775,6 +837,10 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
   - 通知二重表示 (B-50)
   - Files view `?path=` クリーンアップ (B-30)
 - 関連 PR: #961（B-18 path-traversal 副作用 hotfix、進行中）
+- L-03 実装中に発見した周辺 issue:
+  - **#1049** mulmoclaude README に ffmpeg system 依存の明記がない（一般ユーザー向け docs gap、 動画生成は npx でも system ffmpeg 必要）
+  - **#1073** presentMulmoScript の Play ボタン: text 空 beat で次に自動送りされない（schema は `duration` 用意済、 frontend が audio end のみを cue にしている疑い）
+  - **#1074** presentMulmoScript: beat 編集後「更新」 した内容が別セッションに戻ると消えている疑い（要調査）
 
 ## 直近 main の動向 (#950〜#1000) と本テスト計画への反映
 
