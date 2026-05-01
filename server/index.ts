@@ -130,9 +130,23 @@ app.use(requireSameOrigin);
 //
 // /api/files/* is exempt because <img src="/api/files/raw?path=...">
 // tags in rendered markdown can't attach Authorization headers.
+// /api/plugins/runtime/<pkg>/<version>/<file> (#1043 C-2) is exempt
+// for the same reason: the frontend dynamic-imports plugin assets
+// (`import("/api/plugins/runtime/<pkg>/<ver>/dist/vue.js")`) and the
+// browser cannot attach Authorization headers to those module
+// requests. The pattern "4+ segments past /plugins/runtime/" only
+// matches asset GETs — `/plugins/runtime/list` (3 segments) and
+// `/plugins/runtime/<pkg>/dispatch` (3 segments) still require auth.
+// Path traversal is hardened separately by `resolveWithinRoot` in
+// the asset route handler.
 // The CSRF origin check + loopback-only binding still apply.
+const RUNTIME_PLUGIN_ASSET_PATH_RE = /^\/plugins\/runtime\/[^/]+\/[^/]+\//;
 app.use("/api", (req, res, next) => {
   if (req.path.startsWith("/files/")) {
+    next();
+    return;
+  }
+  if (req.method === "GET" && RUNTIME_PLUGIN_ASSET_PATH_RE.test(req.path)) {
     next();
     return;
   }
