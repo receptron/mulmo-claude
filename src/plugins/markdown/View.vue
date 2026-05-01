@@ -174,7 +174,7 @@ const sourceDetails = ref<HTMLDetailsElement>();
 // would strand the view on stale content until the next write
 // (#1001 P1). Discarding in-progress edits is rare enough to be
 // acceptable; a "remote changed" banner is queued for a follow-up —
-// see plans/feat-file-change-pubsub.md.
+// see plans/done/feat-file-change-pubsub.md.
 watch(fileVersion, (current, previous) => {
   if (current === 0 || current === previous) return;
   if (sourceDetails.value?.open) {

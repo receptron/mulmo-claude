@@ -1,7 +1,7 @@
 // Typed memory schema (#1029). Each entry is a markdown file with a
 // YAML frontmatter envelope. The directory layout, filename
 // convention, and field set are documented in
-// `plans/feat-memory-storage-utilities.md`.
+// `plans/done/feat-memory-storage-utilities.md`.
 //
 // `type` is the source of truth for an entry's classification —
 // filenames follow `<type>_<slug>.md` for ergonomics but the reader

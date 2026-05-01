@@ -200,7 +200,7 @@ watch(filePath, () => {
 // — `cachedSource` becomes the newly-fetched text, `hasChanges` stays
 // true, and pressing Apply overwrites the remote change. (Surfacing a
 // "remote changed" banner is a follow-up — see
-// plans/feat-file-change-pubsub.md.)
+// plans/done/feat-file-change-pubsub.md.)
 watch(previewVersion, async (current, previous) => {
   if (current === 0 || current === previous) return;
   const path = filePath.value;
