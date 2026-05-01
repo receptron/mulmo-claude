@@ -288,7 +288,7 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   // credentials: the user creates an OAuth client in their own Google
   // Cloud project, downloads `credentials.json`, and points the entry
   // at it. Avoids the verified-app / CASA-audit cost — see plan
-  // `plans/feat-mcp-catalog-community-expansion.md`.
+  // `plans/done/feat-mcp-catalog-community-expansion.md`.
   //
   // TODO(reviewer): pin the most-active Gmail MCP — as of 2026-04
   // `@gongrzhe/server-gmail-autoauth-mcp` is widely used; alternatives

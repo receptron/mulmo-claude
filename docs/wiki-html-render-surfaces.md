@@ -236,7 +236,7 @@ PR #980 / #981 / #982 / #983 のレビューや実装観察から見えている
 
 ## 9. 参考 PR
 
-`plans/feat-image-path-routing.md` を中心とする 4 段戦略(§ 2.1)はこの順で着地:
+`plans/done/feat-image-path-routing.md` を中心とする 4 段戦略(§ 2.1)はこの順で着地:
 
 - #969 — Stage 1: `/artifacts/images/` static mount + `resolveImageSrc()` の振り分け切替
 - #972 — Stage 2: system prompt に「Image references in markdown / HTML」節を追加(LLM 出力規約)

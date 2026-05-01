@@ -86,7 +86,7 @@ initWorkspace();
 // no-op when there's no `conversations/memory.md` to migrate. We
 // don't await — migration calls Claude per bullet and can take
 // minutes, but the agent can serve traffic in parallel. The brief
-// race window is documented in plans/feat-memory-storage-wire.md.
+// race window is documented in plans/done/feat-memory-storage-wire.md.
 // The runner logs failures internally; the outer .then(noop, noop)
 // keeps the floating-promises rule happy without smuggling in a
 // `void` (banned by sonarjs/void-use).
@@ -209,7 +209,7 @@ app.use(
 // browser can resolve relative `<img src="../images/...">` paths
 // against the file's actual URL — `srcdoc` documents have
 // `about:srcdoc` as their base URL, which breaks every relative ref.
-// See plans/feat-files-html-preview-relative-paths.md.
+// See plans/done/feat-files-html-preview-relative-paths.md.
 //
 // Allowlist covers `.html` / `.htm` plus common image extensions so
 // HTML files that reference sibling images (e.g. a shared logo placed
