@@ -4,6 +4,7 @@
       <span v-if="sessionRoleIcon" class="material-icons text-xs leading-none">{{ sessionRoleIcon }}</span>
       <span v-if="sessionRoleName" class="truncate">{{ sessionRoleName }}</span>
       <div class="ml-auto flex items-center gap-0.5 shrink-0">
+        <CopyChatButton :results="results" :result-timestamps="resultTimestamps" :session-role-name="sessionRoleName" />
         <button
           type="button"
           class="h-8 w-8 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
@@ -55,6 +56,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
 import { formatSmartTime } from "../utils/format/date";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
+import CopyChatButton from "./CopyChatButton.vue";
 import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();

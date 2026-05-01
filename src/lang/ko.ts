@@ -78,6 +78,8 @@ const koMessages = {
     todayJournal: "오늘의 요약",
     todayJournalNotFound: "아직 요약이 없습니다 — 잠시 대화하면 journal이 생성합니다.",
     todayJournalLoadFailed: "journal 로드에 실패했습니다 (status {status}): {error}",
+    copyMarkdown: "대화를 Markdown으로 복사",
+    copiedMarkdown: "복사됨",
   },
   rightSidebar: {
     toggleSystemPrompt: "시스템 프롬프트 토글",
