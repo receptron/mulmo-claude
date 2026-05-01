@@ -73,6 +73,20 @@ export async function readTextOrNull(file: string): Promise<string | null> {
   }
 }
 
+// True if any segment of `relPath` (split on either `/` or `\`)
+// starts with a dot — the same policy `express.static({ dotfiles:
+// "deny" })` applies. Splits on both separators because
+// `decodeURIComponent` of `%5C` produces a literal `\`, and on
+// Windows `path.normalize` (used downstream by `resolveWithinRoot`)
+// treats `\` as a separator. Without the dual split, a request like
+// `/dir%5C.hidden.html` decodes to `dir\.hidden.html` → splits on
+// `/` as one segment `dir\.hidden.html` (no leading dot) → bypasses
+// the guard on Windows even though `path.normalize` later resolves
+// it to `dir/.hidden.html`. (Codex review on PR #1082.)
+export function containsDotfileSegment(relPath: string): boolean {
+  return relPath.split(/[/\\]/).some((segment) => segment.startsWith("."));
+}
+
 // `rootReal` MUST already be a realpath. Returns null on traversal or if either path doesn't exist on disk.
 export function resolveWithinRoot(rootReal: string, relPath: string): string | null {
   const normalized = path.normalize(relPath || "");
