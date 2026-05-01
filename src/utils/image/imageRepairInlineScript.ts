@@ -17,7 +17,7 @@
 //     back-compat with existing test imports
 //
 // Stage 3 of the image-path-routing redesign — see
-// plans/feat-image-path-routing.md and #1025.
+// plans/done/feat-image-path-routing.md and #1025.
 
 // All Gemini / canvas / image-edit output lives at
 // `artifacts/images/YYYY/MM/<id>.png` (server/utils/files/image-store.ts).

@@ -4,7 +4,7 @@
 //
 // Concurrency: the agent may serve requests before this finishes.
 // The brief race window is documented in
-// `plans/feat-memory-storage-wire.md`.
+// `plans/done/feat-memory-storage-wire.md`.
 
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";

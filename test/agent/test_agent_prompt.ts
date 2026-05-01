@@ -218,7 +218,7 @@ describe("buildSystemPrompt", () => {
     assert.ok(result.includes(`Workspace directory: ${workspace}`));
   });
 
-  it("contains the image-reference convention (stage 2 of plans/feat-image-path-routing)", () => {
+  it("contains the image-reference convention (stage 2 of plans/done/feat-image-path-routing)", () => {
     const role = makeRole();
     const result = buildSystemPrompt({
       role,
