@@ -83,23 +83,26 @@ const debugMode = process.argv.includes("--debug");
 
 initWorkspace();
 
-// Fire-and-forget legacy-memory migration (#1029). Idempotent: a
-// no-op when there's no `conversations/memory.md` to migrate. We
-// don't await — migration calls Claude per bullet and can take
-// minutes, but the agent can serve traffic in parallel. The brief
-// race window is documented in plans/done/feat-memory-storage-wire.md.
-// The runner logs failures internally; the outer .then(noop, noop)
-// keeps the floating-promises rule happy without smuggling in a
-// `void` (banned by sonarjs/void-use).
+// Fire-and-forget memory migrations: legacy `memory.md` → atomic
+// (#1029), then atomic → topic-format staging (#1070). Chained so
+// that a fresh `memory.md` workspace lands in the topic format on
+// a SINGLE server start instead of needing two restarts (the topic
+// runner used to defer on the first start because legacy was still
+// in flight; now it picks up right after legacy completes).
+//
+// Both runners are idempotent: legacy no-ops when the source file
+// is gone, topic no-ops when the workspace already uses the topic
+// format or staging is already pending review. The agent can serve
+// traffic while the chain runs.
+//
+// `.then(noop, noop)` keeps the floating-promises rule happy
+// without smuggling in a `void` (banned by sonarjs/void-use). Each
+// runner logs its own failures; the chain's outer rejection
+// handler is therefore a hard backstop only.
 const noop = (): void => {};
-runMemoryMigrationOnce(workspacePath).then(noop, noop);
-
-// Fire-and-forget topic-restructure migration (#1070). Skips when
-// the workspace already uses the topic format, when staging is
-// pending review, or when there are no atomic entries yet (e.g.
-// fresh install + #1029 legacy migration still in flight). Same
-// floating-promises shape as the call above.
-runTopicMigrationOnce(workspacePath).then(noop, noop);
+runMemoryMigrationOnce(workspacePath)
+  .then(() => runTopicMigrationOnce(workspacePath))
+  .then(noop, noop);
 
 let sandboxEnabled = false;
 
