@@ -571,7 +571,7 @@ const enMessages = {
   },
   pluginAccounting: {
     title: "Accounting",
-    noBook: "No books yet — create one to get started.",
+    noBook: 'No books yet — click "+ New book" above to create your first one.',
     common: {
       cancel: "Cancel",
       loading: "Loading…",

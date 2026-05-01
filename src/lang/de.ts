@@ -555,7 +555,7 @@ const deMessages = {
   },
   pluginAccounting: {
     title: "Buchhaltung",
-    noBook: "Noch keine Bücher — legen Sie eines an.",
+    noBook: 'Noch keine Bücher — klicken Sie oben auf "+ Neues Buch", um das erste anzulegen.',
     common: {
       cancel: "Abbrechen",
       loading: "Lädt…",

@@ -542,7 +542,7 @@ const zhMessages = {
   },
   pluginAccounting: {
     title: "会计",
-    noBook: "尚无账簿 — 请先创建一个。",
+    noBook: '尚无账簿 — 点击上方 "+ 新建账簿" 创建第一个。',
     common: {
       cancel: "取消",
       loading: "加载中…",

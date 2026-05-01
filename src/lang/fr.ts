@@ -549,7 +549,7 @@ const frMessages = {
   },
   pluginAccounting: {
     title: "Comptabilité",
-    noBook: "Pas encore de livres — créez-en un pour commencer.",
+    noBook: 'Pas encore de livres — cliquez sur "+ Nouveau livre" en haut pour créer le premier.',
     common: {
       cancel: "Annuler",
       loading: "Chargement…",

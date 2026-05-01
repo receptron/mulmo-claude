@@ -548,7 +548,7 @@ const ptBRMessages = {
   },
   pluginAccounting: {
     title: "Contabilidade",
-    noBook: "Ainda não há livros — crie um para começar.",
+    noBook: 'Ainda não há livros — clique em "+ Novo livro" acima para criar o primeiro.',
     common: {
       cancel: "Cancelar",
       loading: "Carregando…",

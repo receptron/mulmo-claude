@@ -546,7 +546,7 @@ const jaMessages = {
   },
   pluginAccounting: {
     title: "会計",
-    noBook: "まだ帳簿がありません — 1冊作成してください。",
+    noBook: 'まだ帳簿がありません — 上の "+ 新しい帳簿" から作成してください。',
     common: {
       cancel: "キャンセル",
       loading: "読み込み中…",

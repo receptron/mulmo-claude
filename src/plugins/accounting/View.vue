@@ -9,7 +9,7 @@
         <span class="material-icons text-gray-600">account_balance</span>
         <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginAccounting.title") }}</h2>
       </div>
-      <BookSwitcher v-if="activeBookId" :model-value="activeBookId" :books="books" @update:model-value="onBookSelected" @books-changed="refetchBooks" />
+      <BookSwitcher v-if="!loadingBooks" :model-value="activeBookId ?? ''" :books="books" @update:model-value="onBookSelected" @books-changed="refetchBooks" />
     </header>
     <nav class="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 shrink-0 overflow-x-auto" data-testid="accounting-tabs">
       <button
@@ -131,16 +131,27 @@ function bumpLocalVersion(): void {
   localVersion.value += 1;
 }
 
+function pickActiveBookId(serverActiveBookId: string): string | null {
+  // Only ever point activeBookId at a book that actually exists on
+  // disk. Pre-creation, the server returns activeBookId="default"
+  // from emptyConfig() even though the books list is empty —
+  // trusting that produced the "book 'default' not found" error
+  // on the first openApp.
+  if (books.value.length === 0) return null;
+  const requested = initialPayload.value.bookId;
+  if (requested && books.value.some((book) => book.id === requested)) return requested;
+  if (books.value.some((book) => book.id === serverActiveBookId)) return serverActiveBookId;
+  return books.value[0].id;
+}
+
 async function refetchBooks(): Promise<void> {
   loadingBooks.value = true;
   try {
     const result = await listBooks();
     if (!result.ok) return;
     books.value = result.data.books;
-    if (!activeBookId.value || !books.value.some((book) => book.id === activeBookId.value)) {
-      const requested = initialPayload.value.bookId;
-      activeBookId.value = requested && books.value.some((book) => book.id === requested) ? requested : result.data.activeBookId || books.value[0]?.id || null;
-    }
+    const stillExists = activeBookId.value !== null && books.value.some((book) => book.id === activeBookId.value);
+    if (!stillExists) activeBookId.value = pickActiveBookId(result.data.activeBookId);
   } finally {
     loadingBooks.value = false;
   }

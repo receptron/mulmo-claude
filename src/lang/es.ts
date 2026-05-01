@@ -555,7 +555,7 @@ const esMessages = {
   },
   pluginAccounting: {
     title: "Contabilidad",
-    noBook: "Aún no hay libros — crea uno para empezar.",
+    noBook: 'Aún no hay libros — pulsa "+ Nuevo libro" arriba para crear el primero.',
     common: {
       cancel: "Cancelar",
       loading: "Cargando…",
