@@ -181,6 +181,43 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 // summarise reads in its text reply anyway.
 const PREVIEW_ACTIONS = new Set<string>(["openApp", "createBook", "setActiveBook", "upsertAccount", "addEntry", "voidEntry"]);
 
+// LLM-facing `message` tacked onto YES actions. The shared trailer
+// ("The accounting view is shown to the user.") tells the LLM that a
+// canvas / sidebar surface is already visible, so its text reply
+// shouldn't redundantly enumerate the result the user can see — it
+// should narrate what was *done*, not re-list what's on screen.
+const VIEW_VISIBLE_TRAILER = "The accounting view is shown to the user.";
+
+function previewMessage(action: string, fields: Record<string, unknown>): string {
+  switch (action) {
+    case "openApp":
+      return `Mounted the accounting app in the canvas. ${VIEW_VISIBLE_TRAILER}`;
+    case "createBook": {
+      const book = fields.book as { id?: string; name?: string } | undefined;
+      const name = book?.name ? JSON.stringify(book.name) : "a book";
+      return `Created ${name}. ${VIEW_VISIBLE_TRAILER}`;
+    }
+    case "setActiveBook": {
+      const bookId = fields.activeBookId as string | undefined;
+      return `Switched the active book to ${JSON.stringify(bookId ?? "")}. ${VIEW_VISIBLE_TRAILER}`;
+    }
+    case "upsertAccount":
+      return `Updated the chart of accounts. ${VIEW_VISIBLE_TRAILER}`;
+    case "addEntry": {
+      const entry = fields.entry as { date?: string } | undefined;
+      const date = entry?.date ?? "the requested date";
+      return `Posted a journal entry on ${date}. ${VIEW_VISIBLE_TRAILER}`;
+    }
+    case "voidEntry": {
+      const reverse = fields.reverseEntry as { date?: string } | undefined;
+      const date = reverse?.date ?? "today";
+      return `Voided the entry; a reversing pair was posted on ${date}. ${VIEW_VISIBLE_TRAILER}`;
+    }
+    default:
+      return VIEW_VISIBLE_TRAILER;
+  }
+}
+
 async function dispatch(body: AccountingActionBody): Promise<unknown> {
   const { action, ...rest } = body;
   const handler = ACTION_HANDLERS[action];
@@ -199,7 +236,13 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
   // into it for the actions that should render a card; leave it
   // off for silent ones so the gate suppresses the preview.
   const dataField = PREVIEW_ACTIONS.has(action) ? { data: { action, ...handlerFields } } : {};
-  return { action, ...handlerFields, ...dataField };
+  // Attach an LLM-facing `message` for YES actions only — but let a
+  // handler-set message win (handleOpenApp uses one to flag the
+  // empty-workspace first-run state, which has tighter wording than
+  // the generic "view is shown" trailer).
+  const handlerMessage = typeof handlerFields.message === "string" ? handlerFields.message : undefined;
+  const messageField = handlerMessage ? {} : PREVIEW_ACTIONS.has(action) ? { message: previewMessage(action, handlerFields) } : {};
+  return { action, ...handlerFields, ...messageField, ...dataField };
 }
 
 router.post(API_ROUTES.accounting.dispatch, async (req: Request<object, unknown, AccountingActionBody>, res: Response<unknown | AccountingErrorResponse>) => {
