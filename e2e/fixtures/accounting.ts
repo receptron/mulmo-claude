@@ -92,7 +92,19 @@ const noActiveBook = (): MockResponse => err(409, "no active book; create or sel
 function handleOpenApp(state: AccountingState, body: DispatchBody): MockResponse {
   const requested = typeof body.bookId === "string" ? body.bookId : null;
   const bookId = requested && state.books.some((book) => book.id === requested) ? requested : state.activeBookId;
-  return ok({ kind: "accounting-app", bookId, initialTab: typeof body.initialTab === "string" ? body.initialTab : undefined });
+  const initialTab = typeof body.initialTab === "string" ? body.initialTab : undefined;
+  if (state.books.length === 0) {
+    // Mirrors the server's no-book LLM-facing message — see
+    // server/api/routes/accounting.ts handleOpenApp.
+    return ok({
+      kind: "accounting-app",
+      bookId,
+      initialTab,
+      message:
+        "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
+    });
+  }
+  return ok({ kind: "accounting-app", bookId, initialTab });
 }
 
 function handleListBooks(state: AccountingState): MockResponse {

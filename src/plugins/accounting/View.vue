@@ -4,71 +4,79 @@
        the entry gate (this mount) runs through the LLM. Pub/sub
        refetches keep multi-tab / sibling-window views in sync. -->
   <div class="h-full bg-white flex flex-col" data-testid="accounting-app">
-    <header class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="material-icons text-gray-600">account_balance</span>
-        <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginAccounting.title") }}</h2>
-      </div>
-      <BookSwitcher v-if="!loadingBooks" :model-value="activeBookId ?? ''" :books="books" @update:model-value="onBookSelected" @books-changed="refetchBooks" />
-    </header>
-    <nav class="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 shrink-0 overflow-x-auto" data-testid="accounting-tabs">
-      <button
-        v-for="tab in TABS"
-        :key="tab.key"
-        :class="[
-          'h-8 px-2.5 flex items-center gap-1 rounded text-sm whitespace-nowrap',
-          currentTab === tab.key ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50',
-        ]"
-        :data-testid="`accounting-tab-${tab.key}`"
-        @click="currentTab = tab.key"
-      >
-        <span class="material-icons text-base">{{ tab.icon }}</span>
-        <span>{{ t(tab.labelKey) }}</span>
-      </button>
-    </nav>
-    <main class="flex-1 overflow-auto p-4">
-      <p v-if="loadingBooks" class="text-sm text-gray-400">{{ t("pluginAccounting.common.loading") }}</p>
-      <p v-else-if="bookLoadError" class="text-sm text-red-500" data-testid="accounting-load-error">
-        {{ t("pluginAccounting.common.error", { error: bookLoadError }) }}
-      </p>
-      <p v-else-if="!activeBookId" class="text-sm text-gray-500" data-testid="accounting-no-book">{{ t("pluginAccounting.noBook") }}</p>
-      <template v-else-if="activeBookId">
-        <JournalList
-          v-if="currentTab === 'journal'"
-          :book-id="activeBookId"
-          :accounts="accounts"
-          :currency="activeCurrency"
-          :version="bookVersion"
-          @changed="bumpLocalVersion"
-        />
-        <JournalEntryForm
-          v-else-if="currentTab === 'newEntry'"
-          :book-id="activeBookId"
-          :accounts="accounts"
-          :currency="activeCurrency"
-          @submitted="onEntrySubmitted"
-        />
-        <OpeningBalancesForm
-          v-else-if="currentTab === 'opening'"
-          :book-id="activeBookId"
-          :accounts="accounts"
-          :currency="activeCurrency"
-          :version="bookVersion"
-          @submitted="onEntrySubmitted"
-        />
-        <Ledger v-else-if="currentTab === 'ledger'" :book-id="activeBookId" :accounts="accounts" :currency="activeCurrency" :version="bookVersion" />
-        <BalanceSheet v-else-if="currentTab === 'balanceSheet'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
-        <ProfitLoss v-else-if="currentTab === 'profitLoss'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
-        <BookSettings
-          v-else-if="currentTab === 'settings'"
-          :book-id="activeBookId"
-          :book-name="activeBookName"
-          @deleted="onBookDeleted"
+    <NewBookForm v-if="showFirstRunForm" first-run full-page @created="onFirstBookCreated" />
+    <template v-else>
+      <header class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="material-icons text-gray-600">account_balance</span>
+          <h2 class="text-lg font-semibold text-gray-800">{{ t("pluginAccounting.title") }}</h2>
+        </div>
+        <BookSwitcher
+          v-if="!loadingBooks"
+          :model-value="activeBookId ?? ''"
+          :books="books"
+          @update:model-value="onBookSelected"
           @books-changed="refetchBooks"
         />
-      </template>
-    </main>
-    <NewBookForm v-if="showFirstRunForm" first-run cancelable @cancel="showFirstRunForm = false" @created="onFirstBookCreated" />
+      </header>
+      <nav class="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 shrink-0 overflow-x-auto" data-testid="accounting-tabs">
+        <button
+          v-for="tab in TABS"
+          :key="tab.key"
+          :class="[
+            'h-8 px-2.5 flex items-center gap-1 rounded text-sm whitespace-nowrap',
+            currentTab === tab.key ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50',
+          ]"
+          :data-testid="`accounting-tab-${tab.key}`"
+          @click="currentTab = tab.key"
+        >
+          <span class="material-icons text-base">{{ tab.icon }}</span>
+          <span>{{ t(tab.labelKey) }}</span>
+        </button>
+      </nav>
+      <main class="flex-1 overflow-auto p-4">
+        <p v-if="loadingBooks" class="text-sm text-gray-400">{{ t("pluginAccounting.common.loading") }}</p>
+        <p v-else-if="bookLoadError" class="text-sm text-red-500" data-testid="accounting-load-error">
+          {{ t("pluginAccounting.common.error", { error: bookLoadError }) }}
+        </p>
+        <p v-else-if="!activeBookId" class="text-sm text-gray-500" data-testid="accounting-no-book">{{ t("pluginAccounting.noBook") }}</p>
+        <template v-else-if="activeBookId">
+          <JournalList
+            v-if="currentTab === 'journal'"
+            :book-id="activeBookId"
+            :accounts="accounts"
+            :currency="activeCurrency"
+            :version="bookVersion"
+            @changed="bumpLocalVersion"
+          />
+          <JournalEntryForm
+            v-else-if="currentTab === 'newEntry'"
+            :book-id="activeBookId"
+            :accounts="accounts"
+            :currency="activeCurrency"
+            @submitted="onEntrySubmitted"
+          />
+          <OpeningBalancesForm
+            v-else-if="currentTab === 'opening'"
+            :book-id="activeBookId"
+            :accounts="accounts"
+            :currency="activeCurrency"
+            :version="bookVersion"
+            @submitted="onEntrySubmitted"
+          />
+          <Ledger v-else-if="currentTab === 'ledger'" :book-id="activeBookId" :accounts="accounts" :currency="activeCurrency" :version="bookVersion" />
+          <BalanceSheet v-else-if="currentTab === 'balanceSheet'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
+          <ProfitLoss v-else-if="currentTab === 'profitLoss'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
+          <BookSettings
+            v-else-if="currentTab === 'settings'"
+            :book-id="activeBookId"
+            :book-name="activeBookName"
+            @deleted="onBookDeleted"
+            @books-changed="refetchBooks"
+          />
+        </template>
+      </main>
+    </template>
   </div>
 </template>
 
@@ -128,11 +136,13 @@ const books = ref<BookSummary[]>([]);
 const activeBookId = ref<string | null>(null);
 const accounts = ref<Account[]>([]);
 const loadingBooks = ref(true);
-// First-run flow: when the user opens the app on a fresh workspace
-// (zero books), we auto-show the New Book modal so they have to
-// pick a name + currency before proceeding. The modal is the same
-// one used by BookSwitcher's "+ New book" button — extracted to
-// NewBookForm.vue so both call sites share it.
+// First-run flow: when the user opens the app on a fresh
+// workspace (zero books), we render NewBookForm in full-page
+// mode in place of the regular chrome (header + tabs + main),
+// so the user MUST pick a name + currency before proceeding —
+// no popup, no dismiss. Distinct from the modal opened via
+// BookSwitcher's "+ New book" sentinel option, which reuses the
+// same component but with the overlay layout.
 const showFirstRunForm = ref(false);
 const firstRunHandled = ref(false);
 // Distinct from "books is empty" so we don't show the "+ New
