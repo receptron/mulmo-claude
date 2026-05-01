@@ -568,6 +568,7 @@ const koMessages = {
       create: "생성",
       nameLabel: "이름",
       currencyLabel: "통화",
+      firstRunHint: "첫 장부의 이름과 통화를 선택하세요. 통화는 장부별로 설정되며 분개를 시작한 뒤에는 변경이 어렵습니다.",
     },
     journalList: {
       fromLabel: "시작",

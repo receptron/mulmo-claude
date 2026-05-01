@@ -568,6 +568,7 @@ const jaMessages = {
       create: "作成",
       nameLabel: "名前",
       currencyLabel: "通貨",
+      firstRunHint: "最初の帳簿の名前と通貨を選んでください。通貨は帳簿ごとに固定で、仕訳を入力した後の変更は難しくなります。",
     },
     journalList: {
       fromLabel: "開始日",

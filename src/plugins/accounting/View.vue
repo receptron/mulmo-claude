@@ -52,6 +52,7 @@
         />
       </template>
     </main>
+    <NewBookForm v-if="showFirstRunForm" first-run cancelable @cancel="showFirstRunForm = false" @created="onFirstBookCreated" />
   </div>
 </template>
 
@@ -59,6 +60,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import BookSwitcher from "./components/BookSwitcher.vue";
+import NewBookForm from "./components/NewBookForm.vue";
 import JournalList from "./components/JournalList.vue";
 import JournalEntryForm from "./components/JournalEntryForm.vue";
 import OpeningBalancesForm from "./components/OpeningBalancesForm.vue";
@@ -110,6 +112,13 @@ const books = ref<BookSummary[]>([]);
 const activeBookId = ref<string | null>(null);
 const accounts = ref<Account[]>([]);
 const loadingBooks = ref(true);
+// First-run flow: when the user opens the app on a fresh workspace
+// (zero books), we auto-show the New Book modal so they have to
+// pick a name + currency before proceeding. The modal is the same
+// one used by BookSwitcher's "+ New book" button — extracted to
+// NewBookForm.vue so both call sites share it.
+const showFirstRunForm = ref(false);
+const firstRunHandled = ref(false);
 // Local version bump that combines the pub/sub bump and explicit
 // child-driven refetches (e.g. after a void / submit). Used as the
 // `version` prop for sub-components so they `watch` and refetch
@@ -152,9 +161,22 @@ async function refetchBooks(): Promise<void> {
     books.value = result.data.books;
     const stillExists = activeBookId.value !== null && books.value.some((book) => book.id === activeBookId.value);
     if (!stillExists) activeBookId.value = pickActiveBookId(result.data.activeBookId);
+    // Auto-open the New Book modal exactly once on first arrival
+    // when the workspace is empty. After that, the user can still
+    // open it manually via the "+ New book" button.
+    if (!firstRunHandled.value && books.value.length === 0) {
+      firstRunHandled.value = true;
+      showFirstRunForm.value = true;
+    }
   } finally {
     loadingBooks.value = false;
   }
+}
+
+async function onFirstBookCreated(book: BookSummary): Promise<void> {
+  showFirstRunForm.value = false;
+  await refetchBooks();
+  activeBookId.value = book.id;
 }
 
 async function refetchAccounts(): Promise<void> {

@@ -570,6 +570,7 @@ const ptBRMessages = {
       create: "Criar",
       nameLabel: "Nome",
       currencyLabel: "Moeda",
+      firstRunHint: "Escolha o nome e a moeda do seu primeiro livro. A moeda é definida por livro e fica difícil alterar depois de começar a lançar.",
     },
     journalList: {
       fromLabel: "De",

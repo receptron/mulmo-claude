@@ -577,6 +577,8 @@ const esMessages = {
       create: "Crear",
       nameLabel: "Nombre",
       currencyLabel: "Moneda",
+      firstRunHint:
+        "Elige el nombre y la moneda de tu primer libro. La moneda se fija por libro y es difícil cambiarla una vez que empieces a registrar asientos.",
     },
     journalList: {
       fromLabel: "Desde",

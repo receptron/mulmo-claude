@@ -593,6 +593,7 @@ const enMessages = {
       create: "Create",
       nameLabel: "Name",
       currencyLabel: "Currency",
+      firstRunHint: "Pick a name and currency for your first book. The currency is set per-book and is hard to change once you start booking entries.",
     },
     journalList: {
       fromLabel: "From",

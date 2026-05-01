@@ -17,7 +17,6 @@ import {
   addEntry,
   createBook,
   deleteBook,
-  ensureFirstBook,
   getBalanceSheetReport,
   getBookMeta,
   getLedgerReport,
@@ -66,13 +65,12 @@ type ActionHandler = (rest: ActionRest) => Promise<unknown>;
 // validateOpening) so the adapters can stay one-liners.
 
 async function handleOpenApp(rest: ActionRest): Promise<OpenAppToolResult> {
-  // First-run bootstrap: create the "Default" book if none exist
-  // so the user lands directly in the Journal tab on first openApp.
-  // No-op when at least one book already exists. Resolving the
-  // bookId server-side also ensures the LLM's tool result
+  // Resolving the bookId server-side ensures the LLM's tool result
   // *describes* what's in the canvas (which book, which tab) so
-  // historical chat replays render accurately.
-  await ensureFirstBook();
+  // historical chat replays render accurately. The View handles
+  // the empty-state flow (auto-opening the New Book modal so the
+  // user can pick name + currency); the server doesn't try to
+  // bootstrap a default book.
   const list = await listBooks();
   const requested = typeof rest.bookId === "string" ? rest.bookId : undefined;
   const bookId = requested && list.books.some((book) => book.id === requested) ? requested : list.activeBookId;

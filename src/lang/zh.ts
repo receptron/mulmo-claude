@@ -564,6 +564,7 @@ const zhMessages = {
       create: "创建",
       nameLabel: "名称",
       currencyLabel: "货币",
+      firstRunHint: "请为第一本账簿选择名称和货币。货币按账簿固定,登账后再更改会比较困难。",
     },
     journalList: {
       fromLabel: "起始",

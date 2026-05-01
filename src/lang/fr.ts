@@ -571,6 +571,8 @@ const frMessages = {
       create: "Créer",
       nameLabel: "Nom",
       currencyLabel: "Devise",
+      firstRunHint:
+        "Choisissez le nom et la devise de votre premier livre. La devise est figée par livre et difficile à changer une fois les écritures commencées.",
     },
     journalList: {
       fromLabel: "Du",

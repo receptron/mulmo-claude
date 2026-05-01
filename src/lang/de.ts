@@ -577,6 +577,7 @@ const deMessages = {
       create: "Anlegen",
       nameLabel: "Name",
       currencyLabel: "Währung",
+      firstRunHint: "Wählen Sie Name und Währung für Ihr erstes Buch. Die Währung ist pro Buch fest und nach den ersten Buchungen schwer zu ändern.",
     },
     journalList: {
       fromLabel: "Von",
