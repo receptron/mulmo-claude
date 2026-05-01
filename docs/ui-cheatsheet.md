@@ -394,6 +394,65 @@ The preview pane reuses plugin views — clicking a `config/scheduler/items.json
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+## `<AccountingApp>` — opt-in plugin (no route)
+
+Mounted via the tool-result envelope `{ kind: "accounting-app" }`
+returned by `manageAccounting({action:"openApp"})`. **No `/accounting`
+route exists.** The default Role cannot reach this surface; only
+custom Roles whose `availablePlugins` include `manageAccounting` can
+trigger the mount.
+
+```
+┌─[<AccountingApp>] data-testid="accounting-app"───────────────────────┐
+│ ┌─Header───────────────────────────────────────────────────────────┐ │
+│ │  account_balance Accounting          [<BookSwitcher>]            │ │
+│ └──────────────────────────────────────────────────────────────────┘ │
+│ ┌─Tabs [accounting-tabs]───────────────────────────────────────────┐ │
+│ │ [accounting-tab-journal] [accounting-tab-newEntry]               │ │
+│ │ [accounting-tab-opening] [accounting-tab-ledger]                 │ │
+│ │ [accounting-tab-balanceSheet] [accounting-tab-profitLoss]        │ │
+│ │ [accounting-tab-settings]                                        │ │
+│ └──────────────────────────────────────────────────────────────────┘ │
+│ ┌─Body (one of)────────────────────────────────────────────────────┐ │
+│ │  • [accounting-no-book]    ← empty workspace                     │ │
+│ │  • <JournalList>           ← entries table; voided rows strike   │ │
+│ │  • <JournalEntryForm>                                            │ │
+│ │  • <OpeningBalancesForm>   ← save disabled until Σdr = Σcr       │ │
+│ │  • <Ledger>                                                      │ │
+│ │  • <BalanceSheet>                                                │ │
+│ │  • <ProfitLoss>                                                  │ │
+│ │  • <BookSettings>          ← rebuild snapshots / delete book     │ │
+│ └──────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Key testids and what they target:
+
+| testid | element | notes |
+|---|---|---|
+| `accounting-app` | root `<div>` of the View | mount probe |
+| `accounting-no-book` | empty-state branch | shows when `activeBookId` is null |
+| `accounting-tabs` | tab strip wrapper | |
+| `accounting-tab-{key}` | one per tab (journal / newEntry / …) | click target |
+| `accounting-book-select` | `<BookSwitcher>` `<select>` | book picker |
+| `accounting-journal-table` | `<JournalList>` `<table>` | entries grid |
+| `accounting-journal-row-{id}` / `accounting-journal-row-voided-{id}` | per-entry `<tr>` | voided rows use the `-voided-` variant **and** carry the strikeout class — bind to `voidedEntryIds` (server-side `voidedIdSet`), **not** to `kind === 'void'` |
+| `accounting-void-{id}` | per-row void button | only on `kind === 'normal'` rows |
+| `accounting-settings` | `<BookSettings>` root | settings tab body |
+| `accounting-settings-rebuild` | rebuild snapshots button | |
+| `accounting-settings-delete` | confirm-then-delete button | enabled once the typed name matches |
+
+Persistence: data lives at `~/mulmoclaude/data/accounting/books/<bookId>/`.
+Book ids are server-generated (`book-XXXXXXXX`); there is no magic
+`default` id. Empty workspace ⇒ `config.json#activeBookId === null`
+and the View renders `accounting-no-book`.
+
+Async snapshot rebuild: writes call `scheduleRebuild(bookId, fromPeriod)`
+after invalidating snapshot files. The View can subscribe to
+`accountingBookChannel(bookId)` and observe `snapshots-rebuilding` /
+`snapshots-ready` events; the lazy fallback in `getOrBuildSnapshot`
+guarantees correctness even if a report is requested mid-rebuild.
+
 ## How to use this doc in chat
 
 When asking Claude (or a teammate) to change the UI, name what you mean:
