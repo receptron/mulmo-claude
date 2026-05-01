@@ -61,11 +61,6 @@ import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
-function sourceLabel(result: ToolResultComplete): string {
-  if (result.toolName === "text-response") return result.title ?? "Assistant";
-  return result.toolName;
-}
-
 defineProps<{
   results: ToolResultComplete[];
   selectedUuid: string | null;
@@ -75,6 +70,11 @@ defineProps<{
   layoutMode: LayoutMode;
   showRightSidebar: boolean;
 }>();
+
+function sourceLabel(result: ToolResultComplete): string {
+  if (result.toolName === "text-response") return result.title ?? "Assistant";
+  return result.action ? `${result.toolName}(${result.action})` : result.toolName;
+}
 
 const emit = defineEmits<{
   select: [uuid: string];
