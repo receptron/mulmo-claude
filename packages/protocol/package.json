@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/protocol",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Shared types and constants for the MulmoBridge protocol",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,7 +15,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "MIGRATIONS.md"
   ],
   "scripts": {
     "build": "tsc",

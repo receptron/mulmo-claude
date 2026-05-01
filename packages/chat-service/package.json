@@ -27,7 +27,7 @@
   "license": "MIT",
   "author": "Receptron Team",
   "dependencies": {
-    "@mulmobridge/protocol": "^0.1.4"
+    "@mulmobridge/protocol": "^0.2.0"
   },
   "peerDependencies": {
     "express": "^5.0.0",

@@ -28,7 +28,7 @@
     "@gui-chat-plugin/weather": "^0.1.0",
     "@mulmobridge/chat-service": "^0.1.2",
     "@mulmobridge/client": "^0.1.4",
-    "@mulmobridge/protocol": "^0.1.4",
+    "@mulmobridge/protocol": "^0.2.0",
     "@mulmocast/types": "^2.6.9",
     "@mulmochat-plugin/quiz": "0.4.0",
     "@mulmochat-plugin/ui-image": "^0.3.0",

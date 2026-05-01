@@ -22,7 +22,7 @@
   "author": "Receptron Team",
   "dependencies": {
     "@mulmobridge/client": "^0.1.4",
-    "@mulmobridge/protocol": "^0.1.4",
+    "@mulmobridge/protocol": "^0.2.0",
     "dotenv": "^17.0.0",
     "imapflow": "^1.0.170",
     "mailparser": "^3.7.2",

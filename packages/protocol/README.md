@@ -48,6 +48,31 @@ const attachment: Attachment = {
 };
 ```
 
+## Versioning
+
+This package follows [Semantic Versioning 2.0](https://semver.org/spec/v2.0.0.html).
+External authors writing bridges or other consumers can rely on the rules below.
+
+| Bump | Triggered by |
+|---|---|
+| **MAJOR** | Breaking change to a published export — renaming or removing a field on `EVENT_TYPES` / `Attachment` / `CHAT_SOCKET_*` / `CHAT_SERVICE_ROUTES` / `GENERATION_*` / `BridgeOptions`, or any other type or constant exported from `index.ts`. |
+| **MINOR** | Additive change — new optional fields, new event/discriminant entries, new exported helpers. Always backwards-compatible. |
+| **PATCH** | Bug fixes, doc updates, build metadata. No public-API surface change. |
+
+Every release is recorded in [`CHANGELOG.md`](./CHANGELOG.md). Breaking
+releases also get a [`MIGRATIONS.md`](./MIGRATIONS.md) entry with concrete
+upgrade steps.
+
+**Pinning.** Pin against the caret (`^`) range that matches the semver tier
+you care about — e.g. `"@mulmobridge/protocol": "^0.2.0"`. This receives all
+backwards-compatible 0.2.x changes, and any future 0.3.0+ bump will require an
+explicit upgrade.
+
+**Pre-1.0.** While we are still on 0.x, a minor bump (`0.x → 0.(x+1)`) is
+treated as a breaking change per the SemVer 0.x convention. We declare the
+contract stable enough to depend on — but reserve the option to evolve it
+without going to 1.0.0 first.
+
 ## Part of the MulmoBridge ecosystem
 
 | Package | Description |
