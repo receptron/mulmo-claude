@@ -1,0 +1,27 @@
+{
+  "$mulmocast": { "version": "1.1" },
+  "title": "L-03 fixture",
+  "description": "Pre-built mulmoScript for L-03 download-movie route test. Each beat is a textSlide with empty text so mulmocast skips audio generation entirely (schema: `text` empty → audio is not generated). Local-render image type only — no image / movie / TTS API is touched.",
+  "lang": "en",
+  "speechParams": {
+    "speakers": {
+      "Presenter": {
+        "provider": "gemini",
+        "voiceId": "Kore",
+        "displayName": { "en": "Presenter" }
+      }
+    }
+  },
+  "imageParams": { "provider": "google", "model": "gemini-3.1-flash-image-preview" },
+  "movieParams": { "provider": "google", "model": "veo-3.1-generate" },
+  "beats": [
+    {
+      "image": { "type": "textSlide", "slide": { "title": "L-03 Beat 1", "subtitle": "fixture" } },
+      "duration": 1
+    },
+    {
+      "image": { "type": "textSlide", "slide": { "title": "L-03 Beat 2", "subtitle": "fixture" } },
+      "duration": 1
+    }
+  ]
+}
