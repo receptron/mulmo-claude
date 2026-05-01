@@ -29,6 +29,29 @@ after(() => {
   for (const dir of created) rmSync(dir, { recursive: true, force: true });
 });
 
+describe("createBook id validation", () => {
+  it("rejects path-traversal ids", async () => {
+    const root = makeTmp();
+    for (const malicious of ["../escape", "..", "/abs/path", "with/slash", "with\\backslash", ".hidden", "_internal"]) {
+      await assert.rejects(() => createBook({ id: malicious, name: "X" }, root), AccountingError, `should reject ${JSON.stringify(malicious)}`);
+    }
+  });
+  it("accepts the safe slug shape", async () => {
+    const root = makeTmp();
+    const result = await createBook({ id: "personal-2026", name: "Personal" }, root);
+    assert.equal(result.book.id, "personal-2026");
+  });
+});
+
+describe("upsertAccount synthetic-code guard", () => {
+  it("rejects account codes starting with _ (reserved for synthetic rows)", async () => {
+    const root = makeTmp();
+    await createBook({ name: "X" }, root);
+    const { upsertAccount } = await import("../../server/accounting/service.js");
+    await assert.rejects(() => upsertAccount({ account: { code: "_currentEarnings", name: "Synthetic", type: "equity" } }, root), AccountingError);
+  });
+});
+
 describe("books lifecycle", () => {
   it("createBook seeds default chart, lists, sets active, deletes (last book is rejected)", async () => {
     const root = makeTmp();

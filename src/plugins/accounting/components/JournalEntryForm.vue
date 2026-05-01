@@ -95,6 +95,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { addEntry, type Account, type JournalLine } from "../api";
 import { formatAmount, inputStepFor } from "../currencies";
+import { localDateString } from "../dates";
 
 const { t } = useI18n();
 
@@ -117,7 +118,7 @@ function blankLine(): FormLine {
   return { accountCode: "", debit: null, credit: null };
 }
 
-const date = ref(new Date().toISOString().slice(0, 10));
+const date = ref(localDateString());
 const memo = ref("");
 const lines = ref<FormLine[]>([blankLine(), blankLine()]);
 const submitting = ref(false);
@@ -202,16 +203,29 @@ async function onSubmit(): Promise<void> {
     lines.value = [blankLine(), blankLine()];
     memo.value = "";
     emit("submitted");
+  } catch (err) {
+    // apiPost normally folds network / HTTP failures into
+    // `result.ok = false`, so this branch should be rare. It's a
+    // belt-and-braces guard against a runtime failure leaving the
+    // submit button stuck — the user gets a visible error
+    // instead of an unhandled rejection.
+    error.value = err instanceof Error ? err.message : String(err);
   } finally {
     submitting.value = false;
   }
 }
 
-// Reset feedback when bookId switches under us (rare but possible
-// via BookSwitcher while the form is open).
+// Reset the entire draft when bookId switches under us (rare but
+// possible via BookSwitcher while the form is open). Carrying the
+// previous book's lines and account codes into the new book is
+// the worst kind of silent failure — the new book might not even
+// have the same chart of accounts.
 watch(
   () => props.bookId,
   () => {
+    lines.value = [blankLine(), blankLine()];
+    memo.value = "";
+    date.value = localDateString();
     error.value = null;
     successMessage.value = null;
   },

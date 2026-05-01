@@ -23,6 +23,7 @@ import {
   ensureBookDir,
   invalidateAllSnapshots,
   invalidateSnapshotsFrom,
+  isSafeBookId,
   listJournalPeriods,
   periodFromDate,
   readAccounts,
@@ -40,6 +41,7 @@ import { aggregateBalances, buildBalanceSheet, buildLedger, buildProfitLoss } fr
 import { balancesAtEndOf, getOrBuildSnapshot, rebuildAllSnapshots } from "./snapshotCache.js";
 import { publishBookChange, publishBooksChanged } from "./eventPublisher.js";
 import { DEFAULT_ACCOUNTS } from "./defaultAccounts.js";
+import { log } from "../system/logger/index.js";
 import type { Account, AccountingConfig, BookSummary, JournalEntry, JournalLine, ReportPeriod } from "./types.js";
 
 export class AccountingError extends Error {
@@ -87,8 +89,16 @@ async function readAllEntries(bookId: string, workspaceRoot?: string): Promise<J
   const periods = await listJournalPeriods(bookId, workspaceRoot);
   const all: JournalEntry[] = [];
   for (const monthKey of periods) {
-    const { entries } = await readJournalMonth(bookId, monthKey, workspaceRoot);
+    const { entries, skipped } = await readJournalMonth(bookId, monthKey, workspaceRoot);
     for (const entry of entries) all.push(entry);
+    if (skipped > 0) {
+      // Aggregations and reports built from a partial parse are
+      // misleading — log so an operator can spot a corrupted
+      // jsonl file. Reads still proceed with what we could parse;
+      // refusing here would lock the user out of the whole book
+      // for a single bad line.
+      log.warn("accounting", "journal month had unparseable lines", { bookId, period: monthKey, skipped });
+    }
   }
   return all;
 }
@@ -107,6 +117,12 @@ export async function createBook(input: { id?: string; name: string; currency?: 
   // the caller takes precedence and is kept verbatim — no slugification
   // — so users who want their own scheme can keep using it.
   const bookId = input.id ?? (config.books.length === 0 ? DEFAULT_BOOK_ID : `book-${randomUUID().slice(0, 8)}`);
+  // Guard against caller-supplied path-traversal ids before any
+  // fs touch (createBook → ensureBookDir → writeAccounts /
+  // writeMeta → writeConfig). Auto-generated ids always pass.
+  if (!isSafeBookId(bookId)) {
+    throw new AccountingError(400, `invalid book id ${JSON.stringify(bookId)} — allowed characters are A-Z a-z 0-9 _ - (1-64 chars; cannot start with _ or -)`);
+  }
   if (findBook(config, bookId)) {
     throw new AccountingError(409, `book ${JSON.stringify(bookId)} already exists`);
   }
@@ -174,6 +190,18 @@ export async function listAccounts(input: { bookId?: string }, workspaceRoot?: s
 export async function upsertAccount(input: { bookId?: string; account: Account }, workspaceRoot?: string): Promise<{ bookId: string; accounts: Account[] }> {
   const config = await loadOrInitConfig(workspaceRoot);
   const bookId = resolveBookId(config, input.bookId);
+  // Account codes starting with `_` are reserved for synthetic
+  // rows that the report layer injects (e.g. the
+  // `_currentEarnings` row added to the Equity section by
+  // buildBalanceSheet). Forbid user accounts in that namespace so
+  // a B/S can't display two rows with the same code or
+  // accidentally lose a real account behind the synthetic label.
+  if (typeof input.account?.code !== "string" || input.account.code.length === 0) {
+    throw new AccountingError(400, "account code is required");
+  }
+  if (input.account.code.startsWith("_")) {
+    throw new AccountingError(400, `account code ${JSON.stringify(input.account.code)} is reserved (codes starting with _ are used for synthetic report rows)`);
+  }
   const accounts = await readAccounts(bookId, workspaceRoot);
   const existingIdx = accounts.findIndex((account) => account.code === input.account.code);
   const next = [...accounts];
@@ -343,16 +371,29 @@ export async function getBalanceSheetReport(
   const config = await loadOrInitConfig(workspaceRoot);
   const bookId = resolveBookId(config, input.bookId);
   const accounts = await readAccounts(bookId, workspaceRoot);
-  const monthKey = input.period.kind === "month" ? input.period.period : input.period.to.slice(0, 7);
-  const snap = await getOrBuildSnapshot(bookId, monthKey, workspaceRoot);
+  const balances = await balancesAsOf(bookId, input.period, workspaceRoot);
   return {
     bookId,
     balanceSheet: buildBalanceSheet({
       accounts,
-      balances: snap.balances,
+      balances,
       asOf: endDateOfPeriod(input.period),
     }),
   };
+}
+
+/** Resolve closing balances at the end of a `ReportPeriod`. Month
+ *  periods hit the snapshot cache; range periods with a mid-month
+ *  `to` date have to filter the journal directly because the
+ *  end-of-month snapshot would include activity past `to`. */
+async function balancesAsOf(bookId: string, period: ReportPeriod, workspaceRoot?: string): Promise<ReturnType<typeof aggregateBalances>> {
+  if (period.kind === "month") {
+    const snap = await getOrBuildSnapshot(bookId, period.period, workspaceRoot);
+    return [...snap.balances];
+  }
+  const all = await readAllEntries(bookId, workspaceRoot);
+  const filtered = all.filter((entry) => entry.date <= period.to);
+  return aggregateBalances(filtered);
 }
 
 export async function getProfitLossReport(

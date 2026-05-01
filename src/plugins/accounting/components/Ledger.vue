@@ -83,6 +83,7 @@ function formatAccountLabel(account: Account): string {
 async function refresh(): Promise<void> {
   if (!accountCode.value) {
     ledger.value = null;
+    error.value = null;
     return;
   }
   loading.value = true;

@@ -27,8 +27,11 @@
       </button>
     </nav>
     <main class="flex-1 overflow-auto p-4">
-      <p v-if="!activeBookId && !loadingBooks" class="text-sm text-gray-500" data-testid="accounting-no-book">{{ t("pluginAccounting.noBook") }}</p>
-      <p v-else-if="loadingBooks" class="text-sm text-gray-400">{{ t("pluginAccounting.common.loading") }}</p>
+      <p v-if="loadingBooks" class="text-sm text-gray-400">{{ t("pluginAccounting.common.loading") }}</p>
+      <p v-else-if="bookLoadError" class="text-sm text-red-500" data-testid="accounting-load-error">
+        {{ t("pluginAccounting.common.error", { error: bookLoadError }) }}
+      </p>
+      <p v-else-if="!activeBookId" class="text-sm text-gray-500" data-testid="accounting-no-book">{{ t("pluginAccounting.noBook") }}</p>
       <template v-else-if="activeBookId">
         <JournalList
           v-if="currentTab === 'journal'"
@@ -133,6 +136,10 @@ const loadingBooks = ref(true);
 // NewBookForm.vue so both call sites share it.
 const showFirstRunForm = ref(false);
 const firstRunHandled = ref(false);
+// Distinct from "books is empty" so we don't show the "+ New
+// book" CTA when the real problem is a transport / server failure
+// fetching the list.
+const bookLoadError = ref<string | null>(null);
 // Local version bump that combines the pub/sub bump and explicit
 // child-driven refetches (e.g. after a void / submit). Used as the
 // `version` prop for sub-components so they `watch` and refetch
@@ -146,10 +153,11 @@ const activeCurrency = computed(() => activeBook.value?.currency ?? "USD");
 const { version: pubsubVersion } = useAccountingChannel(activeBookId);
 useAccountingBooksChannel(() => void refetchBooks());
 
-watch(pubsubVersion, () => {
-  bumpLocalVersion();
-});
-
+// `bookVersion` already aggregates `pubsubVersion` so any pub/sub
+// event reactively re-fires every child component's `watch` on
+// the version prop. A separate `watch(pubsubVersion, …)` that
+// bumps `localVersion` would refire every dependant a second time
+// in the same tick — pure busywork.
 const bookVersion = computed(() => pubsubVersion.value + localVersion.value);
 
 function bumpLocalVersion(): void {
@@ -171,9 +179,16 @@ function pickActiveBookId(serverActiveBookId: string): string | null {
 
 async function refetchBooks(): Promise<void> {
   loadingBooks.value = true;
+  bookLoadError.value = null;
   try {
     const result = await listBooks();
-    if (!result.ok) return;
+    if (!result.ok) {
+      // Surface load failures as a distinct error state so the user
+      // doesn't see "No books yet" (and the auto-open modal) when
+      // the real cause is a transport / server problem.
+      bookLoadError.value = result.error;
+      return;
+    }
     books.value = result.data.books;
     const stillExists = activeBookId.value !== null && books.value.some((book) => book.id === activeBookId.value);
     if (!stillExists) activeBookId.value = pickActiveBookId(result.data.activeBookId);
@@ -184,6 +199,8 @@ async function refetchBooks(): Promise<void> {
       firstRunHandled.value = true;
       showFirstRunForm.value = true;
     }
+  } catch (err) {
+    bookLoadError.value = err instanceof Error ? err.message : String(err);
   } finally {
     loadingBooks.value = false;
   }

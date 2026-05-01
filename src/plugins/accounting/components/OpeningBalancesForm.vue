@@ -77,6 +77,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getOpeningBalances, setOpeningBalances, type Account, type JournalEntry, type JournalLine } from "../api";
 import { formatAmount, inputStepFor } from "../currencies";
+import { localDateString } from "../dates";
 
 const { t } = useI18n();
 
@@ -88,7 +89,7 @@ interface OpeningRow {
   credit: number | null;
 }
 
-const asOfDate = ref(new Date().toISOString().slice(0, 10));
+const asOfDate = ref(localDateString());
 const rows = ref<Record<string, OpeningRow>>({});
 const existing = ref<JournalEntry | null>(null);
 const submitting = ref(false);
@@ -156,22 +157,32 @@ function toApiLines(): JournalLine[] {
   return out;
 }
 
+function freshRows(): Record<string, OpeningRow> {
+  const out: Record<string, OpeningRow> = {};
+  for (const account of bsAccounts.value) out[account.code] = { debit: null, credit: null };
+  return out;
+}
+
 async function loadExisting(): Promise<void> {
+  // Always start from a fresh row map so a book without an
+  // opening doesn't inherit the previous book's draft values.
+  const next = freshRows();
   const result = await getOpeningBalances(props.bookId);
   if (!result.ok) {
     existing.value = null;
+    rows.value = next;
     return;
   }
   existing.value = result.data.opening;
   if (result.data.opening) {
     asOfDate.value = result.data.opening.date;
-    const fresh: Record<string, OpeningRow> = {};
-    for (const account of bsAccounts.value) fresh[account.code] = { debit: null, credit: null };
     for (const line of result.data.opening.lines) {
-      fresh[line.accountCode] = { debit: line.debit ?? null, credit: line.credit ?? null };
+      next[line.accountCode] = { debit: line.debit ?? null, credit: line.credit ?? null };
     }
-    rows.value = fresh;
+  } else {
+    asOfDate.value = localDateString();
   }
+  rows.value = next;
 }
 
 async function onSubmit(): Promise<void> {
@@ -187,6 +198,8 @@ async function onSubmit(): Promise<void> {
     }
     successMessage.value = t("pluginAccounting.openingForm.success");
     emit("submitted");
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
   } finally {
     submitting.value = false;
   }

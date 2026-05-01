@@ -52,11 +52,13 @@ export function inputStepFor(currency: string): string {
 
 /** Locale-aware currency formatter — returns "¥1,130" / "$1,130.00"
  *  etc. Falls back to fixed-point formatting if the runtime can't
- *  resolve the currency code. */
+ *  resolve the currency code; the fallback still respects the
+ *  currency's natural fraction-digit count so JPY shows whole
+ *  numbers even on the slow path. */
 export function formatAmount(value: number, currency: string, locale?: string): string {
   try {
     return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
   } catch {
-    return value.toFixed(DEFAULT_FALLBACK_DIGITS);
+    return value.toFixed(fractionDigitsFor(currency));
   }
 }

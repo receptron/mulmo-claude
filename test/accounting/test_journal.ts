@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { makeEntry, makeVoidEntries, netBalance, validateEntry, voidedIdSet } from "../../server/accounting/journal.js";
+import { isValidCalendarDate, makeEntry, makeVoidEntries, netBalance, validateEntry, voidedIdSet } from "../../server/accounting/journal.js";
 import type { Account, JournalEntry, JournalLine } from "../../server/accounting/types.js";
 
 const ACCOUNTS: Account[] = [
@@ -27,6 +27,23 @@ describe("netBalance", () => {
       ]),
       20,
     );
+  });
+});
+
+describe("isValidCalendarDate", () => {
+  it("accepts real calendar dates", () => {
+    assert.equal(isValidCalendarDate("2026-04-15"), true);
+    assert.equal(isValidCalendarDate("2024-02-29"), true); // leap day
+  });
+  it("rejects shape-correct but impossible dates", () => {
+    assert.equal(isValidCalendarDate("2026-02-31"), false);
+    assert.equal(isValidCalendarDate("2026-13-01"), false);
+    assert.equal(isValidCalendarDate("2025-02-29"), false); // non-leap
+  });
+  it("rejects malformed strings", () => {
+    assert.equal(isValidCalendarDate("2026/04/15"), false);
+    assert.equal(isValidCalendarDate("not-a-date"), false);
+    assert.equal(isValidCalendarDate(""), false);
   });
 });
 

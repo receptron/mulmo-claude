@@ -85,8 +85,16 @@ function summariseFallback(json: Record<string, unknown>): string {
   return t("pluginAccounting.previewGeneric");
 }
 
+function asObject(value: unknown): Record<string, unknown> {
+  // Some renderers pass the structured payload via `data`, others
+  // via `jsonData`. Accept either so a tool-result like
+  // `{ entry: ... }` resolves to the right summariser regardless
+  // of which prop the host harness picks.
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
 const summary = computed<string>(() => {
-  const json = (props.jsonData ?? {}) as Record<string, unknown>;
+  const json = { ...asObject(props.data), ...asObject(props.jsonData) };
   return summariseError(json) ?? summariseEntry(json) ?? summarisePl(json) ?? summariseBs(json) ?? summariseBook(json) ?? summariseFallback(json);
 });
 </script>

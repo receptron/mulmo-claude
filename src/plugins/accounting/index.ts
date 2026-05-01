@@ -17,17 +17,18 @@ const accountingPlugin: ToolPlugin<AccountingActionData> = {
   toolDefinition,
 
   async execute(_context, args) {
+    const toolName = toolDefinition.name;
     const result = await apiPost<ToolResult<AccountingActionData>>(API_ROUTES.accounting.dispatch, args);
     if (!result.ok) {
       return {
-        toolName: "manageAccounting",
+        toolName,
         uuid: makeUuid(),
         message: result.error,
       };
     }
     return {
       ...result.data,
-      toolName: "manageAccounting",
+      toolName,
       uuid: result.data.uuid ?? makeUuid(),
     };
   },

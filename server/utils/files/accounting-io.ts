@@ -26,7 +26,28 @@ function configPath(workspaceRoot?: string): string {
   return path.join(accountingRoot(workspaceRoot), "config.json");
 }
 
+/** Allowed shape for a book id used as a directory name. Defense
+ *  against path traversal: a crafted id like "../../config" or
+ *  "/tmp/x" would otherwise let `bookRoot` escape the
+ *  `data/accounting/books/` tree, since every write path joins
+ *  `bookId` directly into the filesystem. The first character is
+ *  alphanumeric to forbid leading dashes / underscores that some
+ *  shells / docs render confusingly; `_` and `-` are allowed inside.
+ *  64 chars is plenty for any reasonable book name. */
+const SAFE_BOOK_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export function isSafeBookId(bookId: string): boolean {
+  return typeof bookId === "string" && SAFE_BOOK_ID_RE.test(bookId);
+}
+
+function assertSafeBookId(bookId: string): void {
+  if (!isSafeBookId(bookId)) {
+    throw new Error(`accounting: invalid bookId ${JSON.stringify(bookId)} (allowed: alphanumeric / _ / -; 1-64 chars; cannot start with _ or -)`);
+  }
+}
+
 export function bookRoot(bookId: string, workspaceRoot?: string): string {
+  assertSafeBookId(bookId);
   return path.join(root(workspaceRoot), WORKSPACE_DIRS.accountingBooks, bookId);
 }
 
@@ -126,24 +147,25 @@ export function periodFromDate(date: string): string {
   return date.slice(0, 7);
 }
 
-/** Append one entry to the appropriate month's JSONL. Implementation
- *  reads the existing content, appends the new line, then atomic-
- *  writes. This is slower than `fs.appendFile` but keeps writers safe
- *  from torn writes if the process is killed mid-append. The volume
- *  of writes (a personal/SMB ledger has hundreds of entries per
- *  month at most) makes the read-modify-write cost a non-issue. */
+/** Append one entry to the appropriate month's JSONL.
+ *
+ *  Uses POSIX append-only semantics (`fs.appendFile` → `O_APPEND`).
+ *  Two concurrent callers landing in the same month file are
+ *  serialised by the kernel — neither overwrites the other, which
+ *  is the bug the previous read-modify-write implementation had.
+ *
+ *  Crash mid-write: an entry shorter than `PIPE_BUF` (≥ 512 bytes
+ *  on every supported platform) writes atomically; a single
+ *  serialised `JournalEntry` is comfortably under that. If the
+ *  process is killed during the syscall the worst case is a torn
+ *  trailing line, which `readJournalMonth` already tolerates by
+ *  skipping unparseable lines and surfacing a `skipped` count to
+ *  the caller. */
 export async function appendJournal(bookId: string, entry: JournalEntry, workspaceRoot?: string): Promise<void> {
   const period = periodFromDate(entry.date);
   const file = journalFileFor(bookId, period, workspaceRoot);
   await fsPromises.mkdir(path.dirname(file), { recursive: true });
-  let existing = "";
-  try {
-    existing = await fsPromises.readFile(file, "utf-8");
-  } catch (err) {
-    if (!isMissingFile(err)) throw err;
-  }
-  const next = `${existing}${JSON.stringify(entry)}\n`;
-  await writeFileAtomic(file, next);
+  await fsPromises.appendFile(file, `${JSON.stringify(entry)}\n`, { encoding: "utf-8" });
 }
 
 /** Read a single month's JSONL. Malformed lines are skipped (logged

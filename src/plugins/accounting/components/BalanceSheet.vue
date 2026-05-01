@@ -46,16 +46,13 @@ import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getBalanceSheet, type BalanceSheet } from "../api";
 import { formatAmount as formatAmountWithCurrency } from "../currencies";
+import { localMonthString } from "../dates";
 
 const { t } = useI18n();
 
 const props = defineProps<{ bookId: string; currency: string; version: number }>();
 
-function defaultPeriod(): string {
-  return new Date().toISOString().slice(0, 7);
-}
-
-const period = ref(defaultPeriod());
+const period = ref(localMonthString());
 const balanceSheet = ref<BalanceSheet | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);

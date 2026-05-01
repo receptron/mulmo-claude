@@ -41,6 +41,19 @@ function isNonNegativeNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+/** Validate that `date` is both shaped as YYYY-MM-DD AND represents
+ *  a real calendar day. The bare regex accepts impossible values
+ *  like 2026-02-31 or 2026-13-01 which would then poison
+ *  `periodFromDate`, sort orders, and snapshot keys. We reparse
+ *  through the Date constructor and roundtrip-format to catch
+ *  silent normalisation (e.g. "2026-02-30" → Mar 02). */
+export function isValidCalendarDate(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [year, month, day] = date.split("-").map((segment) => parseInt(segment, 10));
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
 /** Returns Σ debit − Σ credit. Used by callers that need the actual
  *  imbalance value (e.g. the OpeningBalancesForm shows live diff). */
 export function netBalance(lines: readonly JournalLine[]): number {
@@ -72,8 +85,8 @@ function validateLine(line: JournalLine, idx: number, accountCodes: ReadonlySet<
 
 export function validateEntry(input: { date: string; lines: readonly JournalLine[]; accounts: readonly Account[] }): ValidationResult {
   const errors: ValidationError[] = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-    errors.push({ field: "date", message: `expected YYYY-MM-DD, got ${JSON.stringify(input.date)}` });
+  if (!isValidCalendarDate(input.date)) {
+    errors.push({ field: "date", message: `expected YYYY-MM-DD calendar date, got ${JSON.stringify(input.date)}` });
   }
   if (!Array.isArray(input.lines) || input.lines.length < 2) {
     errors.push({ field: "lines", message: "an entry needs at least two lines (one debit, one credit)" });

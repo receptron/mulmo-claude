@@ -65,20 +65,14 @@ import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getProfitLoss, type ProfitLoss } from "../api";
 import { formatAmount as formatAmountWithCurrency } from "../currencies";
+import { localDateString, localStartOfYearString } from "../dates";
 
 const { t } = useI18n();
 
 const props = defineProps<{ bookId: string; currency: string; version: number }>();
 
-function startOfYear(): string {
-  return `${new Date().getFullYear()}-01-01`;
-}
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-const from = ref(startOfYear());
-const toDate = ref(today());
+const from = ref(localStartOfYearString());
+const toDate = ref(localDateString());
 const profitLoss = ref<ProfitLoss | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);

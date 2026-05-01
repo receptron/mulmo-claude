@@ -14,7 +14,7 @@
 
 import type { Account, JournalEntry, JournalLine } from "./types.js";
 import { BALANCE_SHEET_ACCOUNT_TYPES } from "./types.js";
-import { netBalance, voidedIdSet } from "./journal.js";
+import { isValidCalendarDate, netBalance, voidedIdSet } from "./journal.js";
 
 const EQUALITY_TOLERANCE = 0.005;
 
@@ -93,8 +93,8 @@ function validateAsOfPredatesEverything(input: OpeningValidationInput, errors: O
  *  "asOfDate must precede every other entry" rule. */
 export function validateOpening(input: OpeningValidationInput): OpeningValidationResult {
   const errors: OpeningValidationError[] = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.asOfDate)) {
-    errors.push({ field: "asOfDate", message: `expected YYYY-MM-DD, got ${JSON.stringify(input.asOfDate)}` });
+  if (!isValidCalendarDate(input.asOfDate)) {
+    errors.push({ field: "asOfDate", message: `expected YYYY-MM-DD calendar date, got ${JSON.stringify(input.asOfDate)}` });
   }
   if (!Array.isArray(input.lines) || input.lines.length < 2) {
     errors.push({ field: "lines", message: "an opening needs at least two lines" });

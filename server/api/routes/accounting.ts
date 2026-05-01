@@ -81,11 +81,18 @@ async function handleOpenApp(rest: ActionRest): Promise<OpenAppToolResult> {
 async function handleGetReport(rest: ActionRest): Promise<unknown> {
   const kind = String(rest.kind ?? "");
   const periodInput = rest.period as { kind: "month"; period: string } | { kind: "range"; from: string; to: string } | undefined;
-  if (!periodInput) throw new AccountingError(400, "getReport: period is required");
   const bookId = rest.bookId as string | undefined;
-  if (kind === "balance") return getBalanceSheetReport({ bookId, period: periodInput });
-  if (kind === "pl") return getProfitLossReport({ bookId, period: periodInput });
+  if (kind === "balance") {
+    if (!periodInput) throw new AccountingError(400, "getReport balance: period is required");
+    return getBalanceSheetReport({ bookId, period: periodInput });
+  }
+  if (kind === "pl") {
+    if (!periodInput) throw new AccountingError(400, "getReport pl: period is required");
+    return getProfitLossReport({ bookId, period: periodInput });
+  }
   if (kind === "ledger") {
+    // period is optional for ledger — full-history view from the
+    // UI calls getLedger(accountCode, undefined, bookId).
     return getLedgerReport({ bookId, accountCode: String(rest.accountCode ?? ""), period: periodInput });
   }
   throw new AccountingError(400, `getReport: unknown kind ${JSON.stringify(kind)}`);
@@ -151,10 +158,19 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
 }
 
 router.post(API_ROUTES.accounting.dispatch, async (req: Request<object, unknown, AccountingActionBody>, res: Response<unknown | AccountingErrorResponse>) => {
-  const action = typeof req.body?.action === "string" ? req.body.action : "<missing>";
+  // Validate the body shape up front so a missing / non-object body
+  // surfaces as a 400 instead of crashing `dispatch` and bubbling
+  // through to the 500 catch-all.
+  const { body } = req;
+  if (!body || typeof body !== "object" || typeof body.action !== "string") {
+    log.warn("accounting", "POST dispatch: invalid body");
+    res.status(400).json({ error: "request body must be an object with a string `action` field" });
+    return;
+  }
+  const { action } = body;
   log.info("accounting", "POST dispatch: start", { action });
   try {
-    const result = await dispatch(req.body);
+    const result = await dispatch(body);
     log.info("accounting", "POST dispatch: ok", { action });
     res.json(result);
   } catch (err) {

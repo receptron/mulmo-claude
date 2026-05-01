@@ -546,7 +546,7 @@ const koMessages = {
   },
   pluginAccounting: {
     title: "회계",
-    noBook: '장부가 없습니다 — 위의 "+ 새 장부"를 눌러 첫 장부를 만드세요。',
+    noBook: '장부가 없습니다 — 위의 "+ 새 장부"를 눌러 첫 장부를 만드세요.',
     common: {
       cancel: "취소",
       loading: "불러오는 중…",

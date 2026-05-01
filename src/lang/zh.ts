@@ -653,7 +653,7 @@ const zhMessages = {
       cannotDeleteLastBook: "无法删除 — 这是仅剩的账簿。",
     },
     preview: {
-      entry: "已登录 {date} 的分录",
+      entry: "已记账 {date} 的分录",
       pl: "P&L {from} → {to}: 净额 {net}",
       bs: "{date} 资产负债表 · 资产 {assets}",
       bookCreated: '已创建账簿 "{name}" ({id})',

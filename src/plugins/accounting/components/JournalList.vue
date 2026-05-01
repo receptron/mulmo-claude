@@ -131,12 +131,16 @@ async function onVoid(entry: JournalEntry): Promise<void> {
   if (reason === null) return;
   const confirmed = window.confirm(t("pluginAccounting.journalList.voidConfirm"));
   if (!confirmed) return;
-  const result = await voidEntry({ entryId: entry.id, reason: reason || undefined, bookId: props.bookId });
-  if (!result.ok) {
-    error.value = result.error;
-    return;
+  try {
+    const result = await voidEntry({ entryId: entry.id, reason: reason || undefined, bookId: props.bookId });
+    if (!result.ok) {
+      error.value = result.error;
+      return;
+    }
+    emit("changed");
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
   }
-  emit("changed");
 }
 
 watch(() => [props.bookId, props.version, from.value, toDate.value, accountCode.value], refresh, { immediate: true });

@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "gui-chat-protocol";
+import { TOOL_NAMES } from "../../config/toolNames";
 
 // MCP tool definition for the accounting plugin.
 //
@@ -14,7 +15,7 @@ import type { ToolDefinition } from "gui-chat-protocol";
 
 const toolDefinition: ToolDefinition = {
   type: "function",
-  name: "manageAccounting",
+  name: TOOL_NAMES.manageAccounting,
   prompt:
     "When the user asks to open / view their books, or to record, look up, or summarise journal entries / balances / opening balances, use manageAccounting. Use action='openApp' to bring up the full accounting UI; use the specific action (addEntry / getReport / etc.) for narrowly-scoped operations the user asked about by name.",
   description:
