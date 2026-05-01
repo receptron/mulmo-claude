@@ -461,6 +461,14 @@ async function loadImageFromPath(value: string, declaredMimeType: string | undef
   }
 }
 
+// Drop any path containing characters that could break the
+// `[Attached file: <path>]` marker line (`\r`, `\n`) or its closing
+// bracket (`]`). Such a path would let request-controlled input
+// inject arbitrary text into the privileged prompt prefix — the
+// path itself reaches the marker straight from the request body.
+// CodeRabbit review on #1045.
+const UNSAFE_MARKER_CHARS_RE = /[\r\n\]]/;
+
 /** Marker prepended to the LLM-bound user message that tells the
  *  model which workspace files are attached / selected for this turn.
  *  One `[Attached file: <path>]` line is emitted per path so multi-
@@ -471,8 +479,9 @@ async function loadImageFromPath(value: string, declaredMimeType: string | undef
  *  added strictly on the path to Claude. The system prompt teaches
  *  the model how to interpret them. */
 export function withAttachedFileMarker(message: string, attachedFilePaths: string[]): string {
-  if (attachedFilePaths.length === 0) return message;
-  const markerLines = attachedFilePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
+  const safePaths = attachedFilePaths.filter((relPath) => !UNSAFE_MARKER_CHARS_RE.test(relPath));
+  if (safePaths.length === 0) return message;
+  const markerLines = safePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
   return `${markerLines}\n\n${message}`;
 }
 
