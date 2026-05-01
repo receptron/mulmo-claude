@@ -3,11 +3,12 @@
     <div class="shrink-0 flex items-center gap-1 text-xs text-gray-400 px-4 pt-3 pb-2" data-testid="stack-role-header">
       <span v-if="sessionRoleIcon" class="material-icons text-xs leading-none">{{ sessionRoleIcon }}</span>
       <span v-if="sessionRoleName">{{ sessionRoleName }}</span>
-      <div class="ml-auto flex items-center gap-1">
+      <div class="ml-auto flex items-center gap-0.5">
+        <CopyChatButton :results="toolResults" :result-timestamps="resultTimestamps" :session-role-name="sessionRoleName" />
         <button
           type="button"
-          class="text-gray-400 hover:text-gray-700"
-          :class="{ 'text-blue-500': showRightSidebar }"
+          class="h-8 w-8 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          :class="{ '!text-blue-500': showRightSidebar }"
           :title="t('sidebarHeader.toolCallHistory')"
           :aria-label="t('sidebarHeader.toolCallHistory')"
           :aria-pressed="showRightSidebar"
@@ -104,6 +105,7 @@ import type { TextResponseData } from "../plugins/textResponse/types";
 import { formatSmartTime } from "../utils/format/date";
 import { isRecord } from "../utils/types";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
+import CopyChatButton from "./CopyChatButton.vue";
 import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();

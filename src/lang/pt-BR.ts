@@ -71,6 +71,8 @@ const ptBRMessages = {
     todayJournal: "Resumo de hoje",
     todayJournalNotFound: "Ainda sem resumo — converse um pouco e o journal será gerado.",
     todayJournalLoadFailed: "Falha ao carregar o journal (status {status}): {error}",
+    copyMarkdown: "Copiar conversa como Markdown",
+    copiedMarkdown: "Copiado!",
   },
   rightSidebar: {
     toggleSystemPrompt: "Alternar system prompt",

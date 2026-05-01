@@ -78,6 +78,8 @@ const jaMessages = {
     todayJournal: "今日のまとめ",
     todayJournalNotFound: "まだまとめがありません — しばらく会話するとjournalが生成します。",
     todayJournalLoadFailed: "journal の読み込みに失敗しました (status {status}): {error}",
+    copyMarkdown: "チャットを Markdown としてコピー",
+    copiedMarkdown: "コピーしました",
   },
   rightSidebar: {
     toggleSystemPrompt: "システムプロンプトの表示切替",

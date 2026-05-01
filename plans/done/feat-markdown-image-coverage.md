@@ -268,7 +268,7 @@ PR 1 つ(text-only):
 ## 関連
 
 - `docs/wiki-html-render-surfaces.md` § 2.1 / § 3 / § 4 / § 8(画像パスルーティング 4 段戦略)
-- `plans/feat-image-path-routing.md`(stage 1〜3 の元 plan)
+- `plans/done/feat-image-path-routing.md`(stage 1〜3 の元 plan)
 - PR #969 / #972 / #974 / #980 / #982 / #991(直近の HTML 側 hot fix)
 - PR #971(e2e-live 基盤、Stage C の依存)
 - PR #955 / #963 / #989(Wiki snapshot history + LLM auto-render + `manageWiki` MCP 廃止 + 共有 `WikiPageBody` / `renderWikiPageHtml` への抽出。page-edit 経路の追加が本 plan の Wiki 側 surface を 1 増やすが、共有 pipeline により修正の効果は両経路に等しく届く)

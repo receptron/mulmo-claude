@@ -71,6 +71,8 @@ const frMessages = {
     todayJournal: "Résumé du jour",
     todayJournalNotFound: "Pas encore de résumé — discutez un peu et le journal en générera un.",
     todayJournalLoadFailed: "Échec du chargement du journal (status {status}) : {error}",
+    copyMarkdown: "Copier la conversation en Markdown",
+    copiedMarkdown: "Copié !",
   },
   rightSidebar: {
     toggleSystemPrompt: "Basculer le system prompt",

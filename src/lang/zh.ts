@@ -76,6 +76,8 @@ const zhMessages = {
     todayJournal: "今日总结",
     todayJournalNotFound: "暂无总结 — 多聊一会儿，journal 会自动生成。",
     todayJournalLoadFailed: "加载 journal 失败 (status {status}): {error}",
+    copyMarkdown: "将对话复制为 Markdown",
+    copiedMarkdown: "已复制",
   },
   rightSidebar: {
     toggleSystemPrompt: "切换系统提示词",
