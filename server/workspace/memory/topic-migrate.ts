@@ -38,6 +38,14 @@ export function topicStagingPath(workspaceRoot: string): string {
   return path.join(workspaceRoot, "conversations", STAGING_DIR_NAME);
 }
 
+interface WrittenTopic {
+  type: MemoryType;
+  topic: ClusterTopic;
+  /** Slug actually written. May differ from `topic.topic` when a
+   *  collision was resolved with a `-2` / `-3` suffix. */
+  writtenSlug: string;
+}
+
 export async function clusterAtomicIntoStaging(workspaceRoot: string, clusterer: MemoryClusterer): Promise<TopicMigrationResult> {
   const entries = await loadAllMemoryEntries(workspaceRoot);
   const stagingPath = topicStagingPath(workspaceRoot);
@@ -45,13 +53,25 @@ export async function clusterAtomicIntoStaging(workspaceRoot: string, clusterer:
     return emptyResult(stagingPath);
   }
   log.info("memory", "topic-migrate: clustering", { entryCount: entries.length });
-  const map = await clusterer(entries);
+  // Wipe stale staging BEFORE the cluster call. If the clusterer
+  // returns null or throws, we leave the workspace with no staging
+  // dir at all — that's the correct "migration didn't complete"
+  // signal. The earlier flow only cleared on success and could
+  // leave a stale tree in place after a failed run, which a later
+  // swap would happily promote.
+  await resetStaging(stagingPath);
+  let map: ClusterMap | null = null;
+  try {
+    map = await clusterer(entries);
+  } catch (err) {
+    log.error("memory", "topic-migrate: clusterer threw", { error: errorMessage(err) });
+  }
   if (!map) {
-    log.warn("memory", "topic-migrate: clusterer returned null");
+    if (map === null) log.warn("memory", "topic-migrate: clusterer returned null");
+    await rm(stagingPath, { recursive: true, force: true });
     return { ...emptyResult(stagingPath), inputCount: entries.length };
   }
 
-  await resetStaging(stagingPath);
   const result: TopicMigrationResult = {
     noop: false,
     inputCount: entries.length,
@@ -59,23 +79,39 @@ export async function clusterAtomicIntoStaging(workspaceRoot: string, clusterer:
     bulletsLost: countBulletsLost(entries, map),
     stagingPath,
   };
+  const written: WrittenTopic[] = [];
   for (const type of MEMORY_TYPES) {
+    const usedSlugs = new Set<string>();
     for (const topic of map[type]) {
+      const writtenSlug = pickUniqueSlug(topic.topic, usedSlugs);
       try {
-        await writeTopicFileToStaging(stagingPath, type, topic);
+        await writeTopicFileToStaging(stagingPath, type, topic, writtenSlug);
+        usedSlugs.add(writtenSlug);
+        written.push({ type, topic, writtenSlug });
         result.topicCounts[type] += 1;
       } catch (err) {
-        log.warn("memory", "topic-migrate: write failed", { type, topic: topic.topic, error: errorMessage(err) });
+        log.warn("memory", "topic-migrate: write failed", { type, topic: topic.topic, writtenSlug, error: errorMessage(err) });
       }
     }
   }
-  await writeStagingIndex(stagingPath, map);
+  await writeStagingIndex(stagingPath, written);
   log.info("memory", "topic-migrate: staging ready", {
     stagingPath,
     topicCounts: result.topicCounts,
     bulletsLost: result.bulletsLost,
   });
   return result;
+}
+
+// Pick a slug that hasn't been used yet within this type. The
+// clusterer may return two topics that would normalise to the same
+// slug (e.g. "Music" and "music"); without this guard the second
+// would silently overwrite the first.
+function pickUniqueSlug(base: string, used: Set<string>): string {
+  if (!used.has(base)) return base;
+  let counter = 2;
+  while (used.has(`${base}-${counter}`)) counter += 1;
+  return `${base}-${counter}`;
 }
 
 function emptyResult(stagingPath: string): TopicMigrationResult {
@@ -95,17 +131,17 @@ async function resetStaging(stagingPath: string): Promise<void> {
   await mkdir(stagingPath, { recursive: true });
 }
 
-async function writeTopicFileToStaging(stagingPath: string, type: MemoryType, topic: ClusterTopic): Promise<void> {
+async function writeTopicFileToStaging(stagingPath: string, type: MemoryType, topic: ClusterTopic, writtenSlug: string): Promise<void> {
   const dir = path.join(stagingPath, type);
   await mkdir(dir, { recursive: true });
-  const absPath = path.join(dir, `${topic.topic}.md`);
-  const body = renderTopicBody(topic);
-  const content = `---\ntype: ${type}\ntopic: ${topic.topic}\n---\n\n${body}`;
+  const absPath = path.join(dir, `${writtenSlug}.md`);
+  const body = renderTopicBody(topic, writtenSlug);
+  const content = `---\ntype: ${type}\ntopic: ${writtenSlug}\n---\n\n${body}`;
   await writeFileAtomic(absPath, content, { uniqueTmp: true });
 }
 
-function renderTopicBody(topic: ClusterTopic): string {
-  const heading = humaniseTopic(topic.topic);
+function renderTopicBody(topic: ClusterTopic, writtenSlug: string): string {
+  const heading = humaniseTopic(writtenSlug);
   const lines: string[] = [`# ${heading}`, ""];
   if (topic.unsectionedBullets && topic.unsectionedBullets.length > 0) {
     for (const bullet of topic.unsectionedBullets) {
@@ -135,27 +171,31 @@ function humaniseTopic(slug: string): string {
     .join(" ");
 }
 
-async function writeStagingIndex(stagingPath: string, map: ClusterMap): Promise<void> {
+// Build the staging-side `MEMORY.md` from the topics we successfully
+// wrote to disk. Using the cluster map directly would link to files
+// that failed to write (e.g. one bad slug would leave a broken index
+// entry that swap promotes); this list is the disk-truth.
+async function writeStagingIndex(stagingPath: string, written: WrittenTopic[]): Promise<void> {
   const lines: string[] = ["# Memory Index", ""];
   for (const type of MEMORY_TYPES) {
-    const topics = map[type];
-    if (topics.length === 0) continue;
+    const inType = written.filter((entry) => entry.type === type);
+    if (inType.length === 0) continue;
     lines.push(`## ${type}`, "");
-    const sortedTopics = [...topics].sort((left, right) => left.topic.localeCompare(right.topic));
-    for (const topic of sortedTopics) {
-      lines.push(formatStagingIndexLine(type, topic));
+    const sorted = [...inType].sort((left, right) => left.writtenSlug.localeCompare(right.writtenSlug));
+    for (const entry of sorted) {
+      lines.push(formatStagingIndexLine(entry));
     }
     lines.push("");
   }
-  if (Object.values(map).every((list) => list.length === 0)) {
+  if (written.length === 0) {
     lines.push("_(no entries yet)_", "");
   }
   await writeFileAtomic(path.join(stagingPath, "MEMORY.md"), lines.join("\n"), { uniqueTmp: true });
 }
 
-function formatStagingIndexLine(type: MemoryType, topic: ClusterTopic): string {
-  const link = `${type}/${topic.topic}.md`;
-  const headings = (topic.sections ?? []).map((section) => section.heading);
+function formatStagingIndexLine(entry: WrittenTopic): string {
+  const link = `${entry.type}/${entry.writtenSlug}.md`;
+  const headings = (entry.topic.sections ?? []).map((section) => section.heading);
   if (headings.length === 0) return `- ${link}`;
   return `- ${link} — ${headings.join(", ")}`;
 }

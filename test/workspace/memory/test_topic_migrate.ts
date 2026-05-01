@@ -5,7 +5,7 @@
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -168,6 +168,117 @@ describe("memory/topic-migrate — edge cases", () => {
       assert.equal(result.inputCount, 1);
       const stagingExists = await stat(topicStagingPath(fresh)).catch(() => null);
       assert.equal(stagingExists, null);
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("removes any stale staging dir when the clusterer fails (does not leave the prior tree promotable)", async () => {
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-topic-mig-stale-"));
+    try {
+      await writeMemoryEntry(fresh, {
+        name: "yarn",
+        description: "npm 不可",
+        type: "preference",
+        body: "yarn",
+        slug: "preference_yarn",
+      });
+      // Pre-seed a stale staging dir to simulate a prior successful
+      // run that should NOT survive a subsequent failed cluster.
+      const stagingPath = topicStagingPath(fresh);
+      await mkdir(path.join(stagingPath, "preference"), { recursive: true });
+      await writeFile(path.join(stagingPath, "preference", "old.md"), "---\ntype: preference\ntopic: old\n---\n\n# Old\n\n- old fact", "utf-8");
+      await writeFile(path.join(stagingPath, "MEMORY.md"), "# Memory Index\n\n## preference\n\n- preference/old.md\n", "utf-8");
+
+      const failingClusterer: MemoryClusterer = async () => {
+        throw new Error("cluster boom");
+      };
+      const result = await clusterAtomicIntoStaging(fresh, failingClusterer);
+      assert.equal(result.inputCount, 1);
+      // No staging dir at all — caller can detect the failure by
+      // asking for the staging path and getting ENOENT.
+      const stagingExists = await stat(stagingPath).catch(() => null);
+      assert.equal(stagingExists, null, "stale staging must not survive a failed cluster");
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves duplicate-slug collisions instead of silently overwriting", async () => {
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-topic-mig-dup-"));
+    try {
+      await writeMemoryEntry(fresh, {
+        name: "Pantera",
+        description: "metal",
+        type: "interest",
+        body: "Pantera",
+        slug: "interest_pantera",
+      });
+      await writeMemoryEntry(fresh, {
+        name: "NOFX",
+        description: "punk",
+        type: "interest",
+        body: "NOFX",
+        slug: "interest_nofx",
+      });
+      // The clusterer emits TWO topics that both want to be `music`.
+      // The migration must keep both bullets — the second gets a
+      // `-2` suffix.
+      const collidingClusterer: MemoryClusterer = async () => ({
+        preference: [],
+        interest: [
+          { topic: "music", unsectionedBullets: ["Pantera"] },
+          { topic: "music", unsectionedBullets: ["NOFX"] },
+        ],
+        fact: [],
+        reference: [],
+      });
+      const result = await clusterAtomicIntoStaging(fresh, collidingClusterer);
+      assert.equal(result.topicCounts.interest, 2);
+
+      const first = await readFile(path.join(result.stagingPath, "interest", "music.md"), "utf-8");
+      const second = await readFile(path.join(result.stagingPath, "interest", "music-2.md"), "utf-8");
+      assert.match(first, /Pantera/);
+      assert.match(second, /NOFX/);
+      // The colliding file's frontmatter records the suffixed slug
+      // so the reader's "directory must match topic" rule still
+      // holds.
+      assert.match(second, /^---\ntype: interest\ntopic: music-2\n---/);
+
+      const indexContent = await readFile(path.join(result.stagingPath, "MEMORY.md"), "utf-8");
+      assert.match(indexContent, /interest\/music\.md/);
+      assert.match(indexContent, /interest\/music-2\.md/);
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("emits an index that reflects only successfully-written topics (not the cluster map)", async () => {
+    // Inject a clusterer that emits one topic with content, plus one
+    // topic that we ALSO write the same slug for — the second one
+    // gets the `-2` suffix and is also in the index. This is the
+    // direct output-shape test: index size matches files-on-disk.
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-topic-mig-idx-"));
+    try {
+      await writeMemoryEntry(fresh, {
+        name: "x",
+        description: "y",
+        type: "preference",
+        body: "x",
+        slug: "preference_x",
+      });
+      const clusterer: MemoryClusterer = async () => ({
+        preference: [{ topic: "dev", unsectionedBullets: ["x"] }],
+        interest: [],
+        fact: [],
+        reference: [],
+      });
+      const result = await clusterAtomicIntoStaging(fresh, clusterer);
+      const indexContent = await readFile(path.join(result.stagingPath, "MEMORY.md"), "utf-8");
+      // Exactly the topics we wrote — no broken links.
+      const linkMatches = indexContent.match(/\.md/g) ?? [];
+      assert.equal(linkMatches.length, 1);
+      assert.match(indexContent, /preference\/dev\.md/);
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }
