@@ -8,6 +8,7 @@ import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS, MCP_PLUGIN_NAMES } from "./plugin-names.js";
 import { loadRuntimePlugins } from "../plugins/runtime-loader.js";
+import { loadPresetPlugins } from "../plugins/preset-loader.js";
 import { registerRuntimePlugins, getRuntimePlugins } from "../plugins/runtime-registry.js";
 import { errorMessage } from "../utils/errors.js";
 import { isNonEmptyString, isRecord } from "../utils/types.js";
@@ -122,8 +123,11 @@ const STATIC_TOOL_NAMES: ReadonlySet<string> = new Set([...MCP_PLUGIN_NAMES, ...
 // `runtimeReady.then(...)` and proceed.
 const runtimeReady: Promise<void> = (async () => {
   try {
-    const runtime = await loadRuntimePlugins();
-    registerRuntimePlugins(STATIC_TOOL_NAMES, runtime);
+    // Same merge order as the parent server (server/index.ts):
+    // presets first so they win the runtime-vs-runtime collision.
+    const presets = await loadPresetPlugins();
+    const userInstalled = await loadRuntimePlugins();
+    registerRuntimePlugins(STATIC_TOOL_NAMES, [...presets, ...userInstalled]);
     for (const plugin of getRuntimePlugins()) {
       const endpoint = `/api/plugins/runtime/${encodeURIComponent(plugin.name)}/dispatch`;
       ALL_TOOLS[plugin.definition.name] = fromPackage(plugin.definition, endpoint);
@@ -503,4 +507,16 @@ process.stdin.on("data", (chunk: Buffer) => {
   }
 });
 
-process.stdin.on("end", () => process.exit(0));
+// Drain pending responses before exiting. `tools/list` and `tools/call`
+// queue their replies on `runtimeReady.then(...)`, so a synchronous
+// `process.exit(0)` here can race them: if stdin closes before the
+// runtime plugin loader resolves, those `.then` callbacks never get
+// to write their response. Awaiting `runtimeReady` first lets the
+// pending replies flush, and setting `exitCode` (instead of calling
+// `exit`) lets the event loop drain the rest of the I/O before the
+// process leaves naturally.
+process.stdin.on("end", () => {
+  runtimeReady.finally(() => {
+    process.exitCode = 0;
+  });
+});

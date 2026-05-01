@@ -29,7 +29,6 @@ import { errorMessage } from "../../utils/errors.js";
 import { isRecord } from "../../utils/types.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
-import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 
 const LOG_PREFIX = "api/plugins/runtime";
 
@@ -80,54 +79,37 @@ router.post(API_ROUTES.plugins.runtimeDispatch, async (req: Request<{ pkg: strin
   }
 });
 
-// Static-mount of the extracted plugin cache. Express resolves
-// `:pkg/:version/*` with the wildcard on `req.params[0]`. Two
-// realpath checks are required:
+// Static-mount of an installed plugin's directory. Resolution flow:
 //
-//   1. The plugin's own root (`pluginCache/<pkg>/<version>`) must
-//      itself be inside the cache root. `decodeURIComponent` happens
-//      after route matching, so a percent-encoded `../` in either
-//      segment (`%2E%2E%2F`) reaches `path.join` and could otherwise
-//      escape the cache root entirely. The bearer-auth exemption in
-//      `server/index.ts` makes this an unauthenticated path, so this
-//      anchor is the load-bearing check.
-//   2. The asset within the plugin (`subPath`) must stay inside the
-//      plugin's root after symlink resolution.
+//   1. Look up `(pkg, version)` in the runtime registry. Presets and
+//      user-installed plugins are both registered server-side, with
+//      cachePath set from a trusted source (preset list or workspace
+//      ledger). If the URL doesn't match any registered entry, 404 —
+//      this is the trust boundary that prevents arbitrary-file reads
+//      via percent-encoded `../` in `pkg` / `version` (the bearer-
+//      auth exemption makes this an unauthenticated path).
+//   2. realpath the registered cachePath. Symlinks inside the
+//      extracted tree (e.g. dist/foo.js → /etc/passwd) cannot escape
+//      because `resolveWithinRoot(rootReal, subPath)` rejects any
+//      target that resolves outside the plugin's own root.
 //
-// Cache-root realpath is computed per request rather than memoised
-// at module load: the dir is created lazily on first install, and a
-// memoised "" would lock the route into permanent 404. One extra
-// stat per request is negligible.
-/** Resolve a plugin's cache directory against the cache-root anchor.
- *  Returns the realpath of `pluginCache/<pkg>/<version>` ONLY if it
- *  is inside the cache root; null otherwise. Exported for tests.
- *
- *  Why this is load-bearing: `decodeURIComponent` runs AFTER Express
- *  route matching and the bearer-auth exemption in `server/index.ts`,
- *  so percent-encoded `../` in `pkg` or `version` (e.g.
- *  `%2E%2E%2F%2E%2E`) reaches `path.join` and could otherwise point
- *  `root` anywhere on the filesystem (e.g. `/etc`). The downstream
- *  `resolveWithinRoot(subPath)` only constrains the subpath relative
- *  to whatever root we hand it — it doesn't know the root itself
- *  was escaped. This anchor is the check that catches it. */
+// The earlier "must be inside WORKSPACE_PATHS.pluginCache" anchor is
+// gone — presets live under `node_modules/<pkg>/`, not in the
+// workspace cache. The registry-membership check replaces that
+// anchor: the registry is server-set, so its cachePath values are
+// already trusted regardless of where on disk they point.
+/** Look up a registered plugin and return the realpath of its root.
+ *  Returns null when the (pkg, version) pair is not registered, when
+ *  the cachePath does not exist on disk, or when realpath fails.
+ *  Exported for tests. */
 export function resolvePluginRoot(pkg: string, version: string): string | null {
-  let cacheRootReal: string;
+  const plugin = getRuntimePlugins().find((entry) => entry.name === pkg && entry.version === version);
+  if (!plugin) return null;
   try {
-    cacheRootReal = realpathSync(WORKSPACE_PATHS.pluginCache);
+    return realpathSync(plugin.cachePath);
   } catch {
     return null;
   }
-  const candidate = path.join(WORKSPACE_PATHS.pluginCache, pkg, version);
-  let rootReal: string;
-  try {
-    rootReal = realpathSync(candidate);
-  } catch {
-    return null;
-  }
-  if (rootReal !== cacheRootReal && !rootReal.startsWith(cacheRootReal + path.sep)) {
-    return null;
-  }
-  return rootReal;
 }
 
 router.get(API_ROUTES.plugins.runtimeAsset, async (req: Request<{ pkg: string; version: string; splat?: string | string[] }>, res: Response) => {

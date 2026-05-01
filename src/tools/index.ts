@@ -11,7 +11,11 @@ import presentFormPlugin from "../plugins/presentForm/index";
 import canvasPlugin from "../plugins/canvas/index";
 import editImagesPlugin from "../plugins/editImages/index";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
-import WeatherPlugin from "@gui-chat-plugin/weather/vue";
+// `@gui-chat-plugin/weather` migrated to a runtime preset
+// (`config/preset-plugins.ts`, #1043 C-2 follow-up). The View now
+// loads via the dynamic-import path the runtimeLoader exercises, so
+// every fresh checkout runs the runtime pipeline end-to-end without
+// a manual `yarn plugin:install` step.
 import todoPlugin from "../plugins/todo/index";
 import { manageCalendarPlugin, manageAutomationsPlugin, legacyManageSchedulerEntry } from "../plugins/scheduler/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
@@ -49,7 +53,9 @@ const plugins: Record<string, PluginEntry> = {
   presentChart: presentChartPlugin,
   editImages: editImagesPlugin,
   present3D: Present3DPlugin.plugin,
-  weather: WeatherPlugin.plugin,
+  // weather: now a runtime preset (see import comment above). The
+  // runtime registry exposes it under its TOOL_DEFINITION.name
+  // (`fetchWeather`), and getPlugin() consults that registry.
 };
 
 export function getPlugin(name: string): PluginEntry | null {

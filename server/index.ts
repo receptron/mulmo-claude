@@ -27,6 +27,7 @@ import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
 import runtimePluginRoutes from "./api/routes/runtime-plugin.js";
 import { loadRuntimePlugins } from "./plugins/runtime-loader.js";
+import { loadPresetPlugins } from "./plugins/preset-loader.js";
 import { registerRuntimePlugins } from "./plugins/runtime-registry.js";
 import { MCP_PLUGIN_NAMES } from "./agent/plugin-names.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
@@ -832,16 +833,27 @@ process.on("SIGTERM", () => {
     });
   });
 
-  // Runtime-loaded plugins (#1043 C-2). Read the install ledger,
-  // extract any tgz that doesn't have a cache mirror yet, dynamic-
-  // import each plugin's TOOL_DEFINITION, and register with the
-  // collision policy from runtime-registry.ts. Failures don't abort
-  // boot — bad plugins are skipped, healthy ones still load. Static
-  // tool names (built-in MCP plugins) win every collision.
+  // Runtime-loaded plugins (#1043 C-2). Two sources, both producing
+  // the same RuntimePlugin shape:
+  //   1. Presets — `config/preset-plugins.ts` lists npm packages that
+  //      ship with the repo. Loaded from `node_modules/<pkg>/`. These
+  //      let the runtime path run end-to-end on a fresh checkout.
+  //   2. User-installed — `~/mulmoclaude/plugins/plugins.json` ledger.
+  //      Each entry's tgz is extracted to `.cache/<pkg>/<ver>/` if
+  //      not already cached.
+  //
+  // Presets are merged FIRST so they win the registry-internal
+  // tool-name collision (first-loaded wins; runtime-registry.ts).
+  // Static MCP built-ins still win over both, via MCP_PLUGIN_NAMES.
+  // Failures don't abort boot — bad plugins are skipped, healthy
+  // ones still load.
   try {
-    const runtime = await loadRuntimePlugins();
-    const result = registerRuntimePlugins(MCP_PLUGIN_NAMES, runtime);
+    const presets = await loadPresetPlugins();
+    const userInstalled = await loadRuntimePlugins();
+    const result = registerRuntimePlugins(MCP_PLUGIN_NAMES, [...presets, ...userInstalled]);
     log.info("plugins/runtime", "registered runtime plugins", {
+      presets: presets.length,
+      userInstalled: userInstalled.length,
       registered: result.registered.length,
       collisions: result.collisions.length,
     });
