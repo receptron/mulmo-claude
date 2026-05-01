@@ -183,16 +183,18 @@ function bumpLocalVersion(): void {
   localVersion.value += 1;
 }
 
-// localStorage key for "which book is the user currently looking
-// at." There's no server-side active-book state — every other tab /
-// browser keeps its own selection so nothing is shared implicitly.
+// sessionStorage key for "which book is the user currently looking
+// at." There's no server-side active-book state — sessionStorage is
+// scoped to a single browsing context, so each tab keeps its own
+// selection (localStorage would re-couple tabs through shared origin
+// storage and reintroduce the cross-tab interference we just removed).
 const BOOK_ID_STORAGE_KEY = "mulmoclaude.accounting.bookId";
 
 function readStoredBookId(): string | null {
   try {
-    return localStorage.getItem(BOOK_ID_STORAGE_KEY);
+    return sessionStorage.getItem(BOOK_ID_STORAGE_KEY);
   } catch {
-    // localStorage can throw in private-browsing or sandboxed iframes;
+    // sessionStorage can throw in private-browsing or sandboxed iframes;
     // a missing prior selection is fine, the picker just falls through.
     return null;
   }
@@ -200,8 +202,8 @@ function readStoredBookId(): string | null {
 
 function writeStoredBookId(bookId: string | null): void {
   try {
-    if (bookId) localStorage.setItem(BOOK_ID_STORAGE_KEY, bookId);
-    else localStorage.removeItem(BOOK_ID_STORAGE_KEY);
+    if (bookId) sessionStorage.setItem(BOOK_ID_STORAGE_KEY, bookId);
+    else sessionStorage.removeItem(BOOK_ID_STORAGE_KEY);
   } catch {
     // Best-effort — losing the persisted selection only means the
     // next mount picks a different default book.

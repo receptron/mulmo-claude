@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "gui-chat-protocol";
 import { TOOL_NAMES } from "../../config/toolNames";
+import { ACCOUNTING_ACTIONS } from "./actions";
 
 // MCP tool definition for the accounting plugin.
 //
@@ -25,21 +26,7 @@ const toolDefinition: ToolDefinition = {
     properties: {
       action: {
         type: "string",
-        enum: [
-          "openApp",
-          "getBooks",
-          "createBook",
-          "deleteBook",
-          "getAccounts",
-          "upsertAccount",
-          "addEntry",
-          "voidEntry",
-          "getJournalEntries",
-          "getOpeningBalances",
-          "setOpeningBalances",
-          "getReport",
-          "rebuildSnapshots",
-        ],
+        enum: Object.values(ACCOUNTING_ACTIONS),
         description:
           "Operation to perform. 'openApp' mounts the full UI; others perform a single read or write. Use 'openApp' when the user wants to browse / interact, and a specific action when the user named the operation.",
       },

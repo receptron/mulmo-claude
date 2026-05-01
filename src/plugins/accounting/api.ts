@@ -9,6 +9,7 @@
 
 import { apiPost, type ApiResult } from "../../utils/api";
 import { API_ROUTES } from "../../config/apiRoutes";
+import { ACCOUNTING_ACTIONS } from "./actions";
 
 export type AccountType = "asset" | "liability" | "equity" | "income" | "expense";
 export type JournalEntryKind = "normal" | "opening" | "void" | "void-marker";
@@ -104,25 +105,25 @@ function call<T>(action: string, args: Record<string, unknown> = {}): Promise<Ap
 // ── Books ────────────────────────────────────────────────────────────
 
 export function getBooks(): Promise<ApiResult<{ books: BookSummary[] }>> {
-  return call("getBooks");
+  return call(ACCOUNTING_ACTIONS.getBooks);
 }
 
 export function createBook(input: { name: string; currency?: string }): Promise<ApiResult<{ book: BookSummary }>> {
-  return call("createBook", input);
+  return call(ACCOUNTING_ACTIONS.createBook, input);
 }
 
 export function deleteBook(bookId: string): Promise<ApiResult<{ deletedBookId: string; deletedBookName: string }>> {
-  return call("deleteBook", { bookId, confirm: true });
+  return call(ACCOUNTING_ACTIONS.deleteBook, { bookId, confirm: true });
 }
 
 // ── Accounts ─────────────────────────────────────────────────────────
 
 export function getAccounts(bookId: string): Promise<ApiResult<{ bookId: string; accounts: Account[] }>> {
-  return call("getAccounts", { bookId });
+  return call(ACCOUNTING_ACTIONS.getAccounts, { bookId });
 }
 
 export function upsertAccount(account: Account, bookId: string): Promise<ApiResult<{ bookId: string; account: Account; accounts: Account[] }>> {
-  return call("upsertAccount", { account, bookId });
+  return call(ACCOUNTING_ACTIONS.upsertAccount, { account, bookId });
 }
 
 // ── Entries ──────────────────────────────────────────────────────────
@@ -133,7 +134,7 @@ export function addEntry(input: {
   memo?: string;
   bookId: string;
 }): Promise<ApiResult<{ bookId: string; entry: JournalEntry }>> {
-  return call("addEntry", input);
+  return call(ACCOUNTING_ACTIONS.addEntry, input);
 }
 
 export function voidEntry(input: {
@@ -141,7 +142,7 @@ export function voidEntry(input: {
   reason?: string;
   bookId: string;
 }): Promise<ApiResult<{ bookId: string; reverseEntry: JournalEntry; markerEntry: JournalEntry }>> {
-  return call("voidEntry", input);
+  return call(ACCOUNTING_ACTIONS.voidEntry, input);
 }
 
 export function getJournalEntries(input: {
@@ -150,13 +151,13 @@ export function getJournalEntries(input: {
   accountCode?: string;
   bookId: string;
 }): Promise<ApiResult<{ bookId: string; entries: JournalEntry[]; voidedEntryIds: string[] }>> {
-  return call("getJournalEntries", input);
+  return call(ACCOUNTING_ACTIONS.getJournalEntries, input);
 }
 
 // ── Opening balances ─────────────────────────────────────────────────
 
 export function getOpeningBalances(bookId: string): Promise<ApiResult<{ bookId: string; opening: JournalEntry | null }>> {
-  return call("getOpeningBalances", { bookId });
+  return call(ACCOUNTING_ACTIONS.getOpeningBalances, { bookId });
 }
 
 export function setOpeningBalances(input: {
@@ -165,25 +166,25 @@ export function setOpeningBalances(input: {
   memo?: string;
   bookId: string;
 }): Promise<ApiResult<{ bookId: string; openingEntry: JournalEntry; replacedExisting: boolean }>> {
-  return call("setOpeningBalances", input);
+  return call(ACCOUNTING_ACTIONS.setOpeningBalances, input);
 }
 
 // ── Reports ──────────────────────────────────────────────────────────
 
 export function getBalanceSheet(period: ReportPeriod, bookId: string): Promise<ApiResult<{ bookId: string; balanceSheet: BalanceSheet }>> {
-  return call("getReport", { kind: "balance", period, bookId });
+  return call(ACCOUNTING_ACTIONS.getReport, { kind: "balance", period, bookId });
 }
 
 export function getProfitLoss(period: ReportPeriod, bookId: string): Promise<ApiResult<{ bookId: string; profitLoss: ProfitLoss }>> {
-  return call("getReport", { kind: "pl", period, bookId });
+  return call(ACCOUNTING_ACTIONS.getReport, { kind: "pl", period, bookId });
 }
 
 export function getLedger(accountCode: string, period: ReportPeriod | undefined, bookId: string): Promise<ApiResult<{ bookId: string; ledger: Ledger }>> {
-  return call("getReport", { kind: "ledger", accountCode, period, bookId });
+  return call(ACCOUNTING_ACTIONS.getReport, { kind: "ledger", accountCode, period, bookId });
 }
 
 // ── Admin ────────────────────────────────────────────────────────────
 
 export function rebuildSnapshots(bookId: string): Promise<ApiResult<{ bookId: string; rebuilt: string[] }>> {
-  return call("rebuildSnapshots", { bookId });
+  return call(ACCOUNTING_ACTIONS.rebuildSnapshots, { bookId });
 }

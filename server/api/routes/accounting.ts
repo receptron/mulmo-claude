@@ -30,6 +30,7 @@ import {
   voidEntry,
 } from "../../accounting/service.js";
 import type { BookSummary } from "../../accounting/types.js";
+import { ACCOUNTING_ACTIONS } from "../../../src/plugins/accounting/actions.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { log } from "../../system/logger/index.js";
 
@@ -125,52 +126,52 @@ async function handleGetReport(rest: ActionRest): Promise<unknown> {
 }
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
-  openApp: handleOpenApp,
-  getBooks: () => listBooks(),
-  createBook: (rest) =>
+  [ACCOUNTING_ACTIONS.openApp]: handleOpenApp,
+  [ACCOUNTING_ACTIONS.getBooks]: () => listBooks(),
+  [ACCOUNTING_ACTIONS.createBook]: (rest) =>
     createBook({
       name: String(rest.name ?? ""),
       currency: typeof rest.currency === "string" ? rest.currency : undefined,
     }),
-  deleteBook: (rest) => deleteBook({ bookId: String(rest.bookId ?? ""), confirm: rest.confirm === true }),
-  getAccounts: (rest) => listAccounts({ bookId: rest.bookId as string | undefined }),
-  upsertAccount: (rest) =>
+  [ACCOUNTING_ACTIONS.deleteBook]: (rest) => deleteBook({ bookId: String(rest.bookId ?? ""), confirm: rest.confirm === true }),
+  [ACCOUNTING_ACTIONS.getAccounts]: (rest) => listAccounts({ bookId: rest.bookId as string | undefined }),
+  [ACCOUNTING_ACTIONS.upsertAccount]: (rest) =>
     upsertAccount({
       bookId: rest.bookId as string | undefined,
       // Service validates the shape — route doesn't reach into it.
       account: rest.account as never,
     }),
-  addEntry: (rest) =>
+  [ACCOUNTING_ACTIONS.addEntry]: (rest) =>
     addEntry({
       bookId: rest.bookId as string | undefined,
       date: String(rest.date ?? ""),
       lines: (rest.lines ?? []) as never,
       memo: rest.memo as string | undefined,
     }),
-  voidEntry: (rest) =>
+  [ACCOUNTING_ACTIONS.voidEntry]: (rest) =>
     voidEntry({
       bookId: rest.bookId as string | undefined,
       entryId: String(rest.entryId ?? ""),
       reason: rest.reason as string | undefined,
       voidDate: rest.voidDate as string | undefined,
     }),
-  getJournalEntries: (rest) =>
+  [ACCOUNTING_ACTIONS.getJournalEntries]: (rest) =>
     listEntries({
       bookId: rest.bookId as string | undefined,
       from: rest.from as string | undefined,
       to: rest.to as string | undefined,
       accountCode: rest.accountCode as string | undefined,
     }),
-  getOpeningBalances: (rest) => getOpeningBalances({ bookId: rest.bookId as string | undefined }),
-  setOpeningBalances: (rest) =>
+  [ACCOUNTING_ACTIONS.getOpeningBalances]: (rest) => getOpeningBalances({ bookId: rest.bookId as string | undefined }),
+  [ACCOUNTING_ACTIONS.setOpeningBalances]: (rest) =>
     setOpeningBalances({
       bookId: rest.bookId as string | undefined,
       asOfDate: String(rest.asOfDate ?? ""),
       lines: (rest.lines ?? []) as never,
       memo: rest.memo as string | undefined,
     }),
-  getReport: handleGetReport,
-  rebuildSnapshots: (rest) => rebuildSnapshots({ bookId: rest.bookId as string | undefined }),
+  [ACCOUNTING_ACTIONS.getReport]: handleGetReport,
+  [ACCOUNTING_ACTIONS.rebuildSnapshots]: (rest) => rebuildSnapshots({ bookId: rest.bookId as string | undefined }),
 };
 
 // Actions whose tool-result envelope should carry a `data` field so
@@ -179,7 +180,14 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 // Reads (lists / reports) and View-driven maintenance ops stay
 // silent — they're invoked from inside the canvas and the LLM will
 // summarise reads in its text reply anyway.
-const PREVIEW_ACTIONS = new Set<string>(["openApp", "createBook", "upsertAccount", "addEntry", "voidEntry", "setOpeningBalances"]);
+const PREVIEW_ACTIONS = new Set<string>([
+  ACCOUNTING_ACTIONS.openApp,
+  ACCOUNTING_ACTIONS.createBook,
+  ACCOUNTING_ACTIONS.upsertAccount,
+  ACCOUNTING_ACTIONS.addEntry,
+  ACCOUNTING_ACTIONS.voidEntry,
+  ACCOUNTING_ACTIONS.setOpeningBalances,
+]);
 
 // LLM-facing `message` tacked onto YES actions. The shared trailer
 // ("The accounting view is shown to the user.") tells the LLM that a
@@ -191,7 +199,7 @@ const VIEW_VISIBLE_TRAILER = "The accounting view is shown to the user.";
 type MessageBuilder = (fields: Record<string, unknown>) => string;
 
 const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
-  openApp: (fields) => {
+  [ACCOUNTING_ACTIONS.openApp]: (fields) => {
     // Include the books list inline so the LLM doesn't need a
     // follow-up getBooks round-trip before deciding what to do
     // next (pick a book, create one, etc.).
@@ -199,7 +207,7 @@ const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
     const booksFragment = Array.isArray(books) ? ` Books available: ${JSON.stringify(books)}.` : "";
     return `Mounted the accounting app in the canvas.${booksFragment}`;
   },
-  createBook: (fields) => {
+  [ACCOUNTING_ACTIONS.createBook]: (fields) => {
     const book = fields.book as { id?: string; name?: string } | undefined;
     const subject = book?.name ? `A new book named ${JSON.stringify(book.name)}` : "A new book";
     // The LLM needs book.id to call any follow-up action on this
@@ -208,25 +216,25 @@ const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
     const idFragment = book?.id ? ` (id: ${book.id})` : "";
     return `${subject} has been created${idFragment}.`;
   },
-  upsertAccount: (fields) => {
+  [ACCOUNTING_ACTIONS.upsertAccount]: (fields) => {
     const account = fields.account as { code?: string; name?: string } | undefined;
     if (account?.code && account?.name) {
       return `Upserted account ${account.code} ${JSON.stringify(account.name)}.`;
     }
     return "Updated the chart of accounts.";
   },
-  addEntry: (fields) => {
+  [ACCOUNTING_ACTIONS.addEntry]: (fields) => {
     const entry = fields.entry as { id?: string; date?: string } | undefined;
     const idFragment = entry?.id ? ` (id: ${entry.id})` : "";
     // The LLM needs the entry id to act on this entry later (e.g.
     // voidEntry), so return it as part of the status message.
     return `Posted a journal entry on ${entry?.date ?? "the requested date"}${idFragment}.`;
   },
-  voidEntry: (fields) => {
+  [ACCOUNTING_ACTIONS.voidEntry]: (fields) => {
     const reverse = fields.reverseEntry as { date?: string } | undefined;
     return `Voided the entry; a reversing pair was posted on ${reverse?.date ?? "today"}.`;
   },
-  setOpeningBalances: (fields) => {
+  [ACCOUNTING_ACTIONS.setOpeningBalances]: (fields) => {
     const opening = fields.openingEntry as { date?: string; lines?: unknown } | undefined;
     const verb = fields.replacedExisting === true ? "replaced" : "set";
     const date = opening?.date ?? "the requested date";
@@ -238,7 +246,7 @@ const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
     const linesFragment = lines.length > 0 ? ` Lines: ${JSON.stringify(lines)}.` : "";
     return `Opening balances were ${verb} as of ${date}.${linesFragment}`;
   },
-  deleteBook: (fields) => {
+  [ACCOUNTING_ACTIONS.deleteBook]: (fields) => {
     const bookId = fields.deletedBookId as string | undefined;
     const name = fields.deletedBookName as string | undefined;
     const subject = name ? `the book ${JSON.stringify(name)}` : "the book";
