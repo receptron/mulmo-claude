@@ -164,16 +164,14 @@ function bumpLocalVersion(): void {
   localVersion.value += 1;
 }
 
-function pickActiveBookId(serverActiveBookId: string): string | null {
+function pickActiveBookId(serverActiveBookId: string | null): string | null {
   // Only ever point activeBookId at a book that actually exists on
-  // disk. Pre-creation, the server returns activeBookId="default"
-  // from emptyConfig() even though the books list is empty —
-  // trusting that produced the "book 'default' not found" error
-  // on the first openApp.
+  // disk. Empty workspace returns null; the View renders its empty
+  // state and the auto-opening NewBookForm prompts for creation.
   if (books.value.length === 0) return null;
   const requested = initialPayload.value.bookId;
   if (requested && books.value.some((book) => book.id === requested)) return requested;
-  if (books.value.some((book) => book.id === serverActiveBookId)) return serverActiveBookId;
+  if (serverActiveBookId && books.value.some((book) => book.id === serverActiveBookId)) return serverActiveBookId;
   return books.value[0].id;
 }
 

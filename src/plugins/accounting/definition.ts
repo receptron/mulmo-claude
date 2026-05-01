@@ -52,7 +52,7 @@ const toolDefinition: ToolDefinition = {
       // openApp / createBook
       name: { type: "string", description: "For 'createBook': human-readable book name." },
       currency: { type: "string", description: "For 'createBook': ISO 4217 currency code (default USD). Single-currency per book." },
-      id: { type: "string", description: "For 'createBook': explicit book id (defaults to 'default' for the first book, otherwise auto-generated)." },
+      id: { type: "string", description: "For 'createBook': explicit book id. Omit to let the server auto-generate a unique id." },
       initialTab: { type: "string", description: "For 'openApp': initial tab to show (e.g. 'journal', 'opening', 'balanceSheet')." },
       confirm: { type: "boolean", description: "For 'deleteBook': must be true to actually delete (guard against accidental deletion)." },
       // accounts

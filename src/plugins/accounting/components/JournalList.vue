@@ -37,7 +37,8 @@
         <tr
           v-for="entry in filteredEntries"
           :key="entry.id"
-          :class="entry.kind === 'void' || entry.kind === 'void-marker' ? 'text-gray-400 line-through' : ''"
+          :class="voidedEntryIds.has(entry.id) ? 'text-gray-400 line-through' : ''"
+          :data-testid="voidedEntryIds.has(entry.id) ? `accounting-journal-row-voided-${entry.id}` : `accounting-journal-row-${entry.id}`"
           class="border-b border-gray-100 align-top"
         >
           <td class="py-1 px-2 whitespace-nowrap">{{ entry.date }}</td>
@@ -130,11 +131,25 @@ async function refresh(): Promise<void> {
 
 const filteredEntries = computed(() => entries.value);
 
+// Set of original entry ids that have been voided — derived from
+// every void-marker entry's voidedEntryId. Source of truth on the
+// server is `voidedIdSet()` in journal.ts; we recompute the same
+// shape here to drive the strikeout class binding (the original
+// entry, not the void/void-marker rows, is the cancelled one).
+const voidedEntryIds = computed(() => {
+  const set = new Set<string>();
+  for (const entry of entries.value) {
+    if (entry.kind === "void-marker" && entry.voidedEntryId) set.add(entry.voidedEntryId);
+  }
+  return set;
+});
+
 async function onVoid(entry: JournalEntry): Promise<void> {
+  // Single dialog: the prompt is the confirmation. Cancelling
+  // (returning null) cancels the void; entering empty text or a
+  // reason proceeds.
   const reason = window.prompt(t("pluginAccounting.journalList.voidReason"));
   if (reason === null) return;
-  const confirmed = window.confirm(t("pluginAccounting.journalList.voidConfirm"));
-  if (!confirmed) return;
   try {
     const result = await voidEntry({ entryId: entry.id, reason: reason || undefined, bookId: props.bookId });
     if (!result.ok) {

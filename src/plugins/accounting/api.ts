@@ -47,7 +47,9 @@ export interface BookSummary {
 
 export interface OpenAppPayload {
   kind: "accounting-app";
-  bookId: string;
+  /** `null` when the workspace has zero books — the View renders the
+   *  empty state and prompts for book creation. */
+  bookId: string | null;
   initialTab?: string;
 }
 
@@ -101,7 +103,7 @@ function call<T>(action: string, args: Record<string, unknown> = {}): Promise<Ap
 
 // ── Books ────────────────────────────────────────────────────────────
 
-export function listBooks(): Promise<ApiResult<{ activeBookId: string; books: BookSummary[] }>> {
+export function listBooks(): Promise<ApiResult<{ activeBookId: string | null; books: BookSummary[] }>> {
   return call("listBooks");
 }
 
@@ -113,7 +115,7 @@ export function setActiveBook(bookId: string): Promise<ApiResult<{ activeBookId:
   return call("setActiveBook", { bookId });
 }
 
-export function deleteBook(bookId: string): Promise<ApiResult<{ deletedBookId: string; activeBookId: string }>> {
+export function deleteBook(bookId: string): Promise<ApiResult<{ deletedBookId: string; activeBookId: string | null }>> {
   return call("deleteBook", { bookId, confirm: true });
 }
 
