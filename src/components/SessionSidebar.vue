@@ -27,7 +27,7 @@
       @mousedown="emit('activate')"
     >
       <div
-        v-for="result in results"
+        v-for="result in displayedResults"
         :key="result.uuid"
         class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
         :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
@@ -42,11 +42,7 @@
         >
           {{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}
         </span>
-        <component
-          :is="getPlugin(result.toolName)?.previewComponent"
-          v-if="getPlugin(result.toolName)?.previewComponent && result.data !== undefined"
-          :result="result"
-        />
+        <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
         <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
       </div>
     </div>
@@ -54,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
@@ -65,7 +61,7 @@ import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
-defineProps<{
+const props = defineProps<{
   results: ToolResultComplete[];
   selectedUuid: string | null;
   resultTimestamps: Map<string, number>;
@@ -74,6 +70,21 @@ defineProps<{
   layoutMode: LayoutMode;
   showRightSidebar: boolean;
 }>();
+
+// A plugin opts an action out of the sidebar by omitting `data` from
+// its tool result (see protocol: `data` is the view-side payload).
+// We hide the entire card — not just the preview body — so silent
+// actions (e.g. accounting reads, View-driven maintenance) don't
+// leave behind an empty card with just a source-label badge. The
+// LLM still sees the result via `message` / `jsonData`; this only
+// affects the visual sidebar list.
+const displayedResults = computed<ToolResultComplete[]>(() =>
+  props.results.filter((result) => {
+    const plugin = getPlugin(result.toolName);
+    if (!plugin?.previewComponent) return true;
+    return result.data !== undefined;
+  }),
+);
 
 function sourceLabel(result: ToolResultComplete): string {
   if (result.toolName === "text-response") return result.title ?? "Assistant";
