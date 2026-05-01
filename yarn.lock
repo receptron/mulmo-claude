@@ -4743,7 +4743,12 @@ groq-sdk@^0.30.0:
     formdata-node "^4.3.2"
     node-fetch "^2.6.7"
 
-gui-chat-protocol@0.1.0, gui-chat-protocol@^0.1.0:
+gui-chat-protocol@0.2.0:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-0.2.0.tgz#acd54ecb4d4943f528d1d6920122a7327ee98b45"
+  integrity sha512-w0CPpZMXTtYoJsX7nMBy+3fI6Qil1lLgiVwciGpNRPthuWwG+X5xACOPxrb4hR27VGmF4dQyXNK1HlM2Z35tSA==
+
+gui-chat-protocol@^0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-0.1.0.tgz#46c51b5bd45af81eb8c909ea7dfa23d93e687a4b"
   integrity sha512-e592yYijeU1hPVbe2g0Y728otN+NcRSj3yvBg7sRi6YmSPWEU/pEjnGhcI2td4myqzdYqiK+E/v/bUKCnV9QSw==

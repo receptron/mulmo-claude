@@ -55,18 +55,16 @@ import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
 import { formatSmartTime } from "../utils/format/date";
-import { pickCallArgLabel } from "../utils/agent/resultCallArgs";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
 import CopyChatButton from "./CopyChatButton.vue";
 import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
-const props = defineProps<{
+defineProps<{
   results: ToolResultComplete[];
   selectedUuid: string | null;
   resultTimestamps: Map<string, number>;
-  callArgs?: Map<string, unknown>;
   sessionRoleName?: string;
   sessionRoleIcon?: string;
   layoutMode: LayoutMode;
@@ -75,8 +73,7 @@ const props = defineProps<{
 
 function sourceLabel(result: ToolResultComplete): string {
   if (result.toolName === "text-response") return result.title ?? "Assistant";
-  const detail = pickCallArgLabel(props.callArgs?.get(result.uuid));
-  return detail ? `${result.toolName}(${detail})` : result.toolName;
+  return result.action ? `${result.toolName}(${result.action})` : result.toolName;
 }
 
 const emit = defineEmits<{

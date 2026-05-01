@@ -161,7 +161,15 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
   const { action, ...rest } = body;
   const handler = ACTION_HANDLERS[action];
   if (!handler) throw new AccountingError(400, `unknown action ${JSON.stringify(action)}`);
-  return handler(rest);
+  // Stamp the dispatch verb onto the response so the MCP bridge's
+  // spread `{ toolName, uuid, ...result }` surfaces it as
+  // `ToolResult.action`. The sidebar reads this to label cards as
+  // `manageAccounting(openApp)` etc., and it round-trips a refresh
+  // because the result envelope is persisted to the chat log.
+  // Direct browser callers (the AccountingApp view) ignore the field.
+  // Service responses that already set `action` win via the spread.
+  const result = await handler(rest);
+  return { action, ...(result && typeof result === "object" ? result : { value: result }) };
 }
 
 router.post(API_ROUTES.accounting.dispatch, async (req: Request<object, unknown, AccountingActionBody>, res: Response<unknown | AccountingErrorResponse>) => {

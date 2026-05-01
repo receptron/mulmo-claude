@@ -96,7 +96,6 @@
           :results="sidebarResults"
           :selected-uuid="selectedResultUuid"
           :result-timestamps="activeSession?.resultTimestamps ?? new Map()"
-          :call-args="sidebarCallArgs"
           :session-role-name="sessionRoleName"
           :session-role-icon="sessionRoleIcon"
           :layout-mode="layoutMode"
@@ -263,7 +262,6 @@ import { EVENT_TYPES } from "./types/events";
 import { buildAgentRequestBody, postAgentRun } from "./utils/agent/request";
 import { resolvePastedAttachment } from "./utils/agent/pastedAttachment";
 import { applyAgentEvent, type AgentEventContext } from "./utils/agent/eventDispatch";
-import { pairResultsWithCallArgs } from "./utils/agent/resultCallArgs";
 import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/sessionHelpers";
 import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
@@ -405,11 +403,6 @@ const { geminiAvailable, sandboxEnabled, cpuLoadRatio, fetchHealth } = useHealth
 
 const { activeSession, toolResults, sidebarResults, isRunning, activeSessionRunning, statusMessage, toolCallHistory, activeSessionCount, unreadCount } =
   useSessionDerived({ sessionMap, currentSessionId, sessions });
-
-// uuid → call args, so SessionSidebar can label each card with the
-// originating action (e.g. `manageAccounting(openApp)`). Pairing is
-// by arrival order; see resultCallArgs.ts for why.
-const sidebarCallArgs = computed(() => pairResultsWithCallArgs(sidebarResults.value, toolCallHistory.value));
 
 const { selectedResultUuid } = useSelectedResult({
   activeSession,
