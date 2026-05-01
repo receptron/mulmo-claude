@@ -48,15 +48,12 @@ test.describe("accounting plugin — flow", () => {
     await page.goto(`/chat/${SESSION_ID}`);
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
-    // Click the inline preview to expand the tool result into the
-    // canvas. The preview uses data-testid="accounting-preview".
-    await page.getByTestId("accounting-preview").first().click();
-
-    // The full View carries data-testid="accounting-app". When the
-    // workspace is empty (mock returns books=[]), View.vue renders
-    // its no-book branch and auto-opens NewBookForm. Assert both so
-    // a regression in either path actually fails this test.
+    // The accounting-app envelope auto-mounts on session load (no
+    // preview click needed — the empty-workspace path immediately
+    // shows the auto-opened NewBookForm modal, which would otherwise
+    // intercept any pointer events on the chat sidebar).
     await expect(page.getByTestId("accounting-app")).toBeVisible();
     await expect(page.getByTestId("accounting-no-book")).toBeVisible();
+    await expect(page.getByTestId("accounting-new-book-modal")).toBeVisible();
   });
 });
