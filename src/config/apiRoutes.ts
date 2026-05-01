@@ -24,6 +24,15 @@ export const API_ROUTES = {
   health: "/api/health",
   sandbox: "/api/sandbox",
 
+  // Accounting plugin (opt-in, custom-Role only). One dispatch
+  // endpoint per the action discriminator pattern (matches
+  // todos.dispatch). UI route registration is intentionally absent
+  // from src/router — the View is mounted via tool-result rendering,
+  // never via a URL path. See plans/feat-accounting.md.
+  accounting: {
+    dispatch: "/api/accounting",
+  },
+
   agent: {
     run: "/api/agent",
     cancel: "/api/agent/cancel",

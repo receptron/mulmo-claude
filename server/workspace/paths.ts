@@ -66,6 +66,13 @@ export const WORKSPACE_DIRS = {
   // the original under the same YYYY/MM partition.
   attachments: "data/attachments",
   transports: "data/transports",
+  // Accounting plugin (opt-in, custom-Role only). Books live under
+  // `accounting/books/<bookId>/{accounts.json, journal/YYYY-MM.jsonl,
+  //  snapshots/YYYY-MM.json, meta.json}`. The directory is created
+  // lazily on first createBook so default workspaces don't get a
+  // stub `accounting/` they never use.
+  accounting: "data/accounting",
+  accountingBooks: "data/accounting/books",
   // artifacts/
   charts: "artifacts/charts",
   // `markdowns` key preserved for call-site compatibility; on-disk
@@ -133,6 +140,8 @@ export const WORKSPACE_PATHS = {
   html: path.join(workspacePath, WORKSPACE_DIRS.html),
   transports: path.join(workspacePath, WORKSPACE_DIRS.transports),
   github: path.join(workspacePath, WORKSPACE_DIRS.github),
+  accounting: path.join(workspacePath, WORKSPACE_DIRS.accounting),
+  accountingBooks: path.join(workspacePath, WORKSPACE_DIRS.accountingBooks),
   // nested subdirs
   wikiPages: path.join(workspacePath, WORKSPACE_DIRS.wikiPages),
   wikiSources: path.join(workspacePath, WORKSPACE_DIRS.wikiSources),

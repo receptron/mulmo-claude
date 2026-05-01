@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import agentRoutes, { startChat } from "./api/routes/agent.js";
+import accountingRoutes from "./api/routes/accounting.js";
 import todosRoutes from "./api/routes/todos.js";
 import schedulerRoutes from "./api/routes/scheduler.js";
 import sessionsRoutes, { loadAllSessions } from "./api/routes/sessions.js";
@@ -31,6 +32,7 @@ import { createChatService } from "@mulmobridge/chat-service";
 import { readSessionJsonl } from "./utils/files/session-io.js";
 import { onSessionEvent, initSessionStore } from "./events/session-store/index.js";
 import { initFileChangePublisher } from "./events/file-change.js";
+import { initAccountingEventPublisher } from "./accounting/eventPublisher.js";
 import { getRole, loadAllRoles } from "./workspace/roles.js";
 import { discoverSkills } from "./workspace/skills/index.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
@@ -353,6 +355,7 @@ app.get(API_ROUTES.sandbox, (_req: Request, res: Response) => {
 // `app.use("/api", ...)` prefix was dropped when #289 part 1 moved
 // the `/api` literal into each `router.post(API_ROUTES.…)` call.
 app.use(agentRoutes);
+app.use(accountingRoutes);
 app.use(todosRoutes);
 app.use(schedulerRoutes);
 app.use(sessionsRoutes);
@@ -634,6 +637,7 @@ function startRuntimeServices(httpServer: ReturnType<typeof app.listen>, port: n
   // Wired here (not at first publish) so the very first save after
   // boot already sees a live publisher.
   initFileChangePublisher(pubsub);
+  initAccountingEventPublisher(pubsub);
 
   // --- Task Manager ---
   const taskManager = createTaskManager({

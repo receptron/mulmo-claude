@@ -31,6 +31,11 @@ export const TOOL_NAMES = {
   manageSkills: "manageSkills",
   manageSource: "manageSource",
   manageWiki: "manageWiki",
+  // Accounting plugin (opt-in, custom-Role only — see
+  // plans/feat-accounting.md). Registered here so the plugin-picker
+  // UI for custom Roles surfaces it; deliberately absent from every
+  // built-in Role's `availablePlugins`.
+  manageAccounting: "manageAccounting",
 
   // Presentational plugins
   presentMulmoScript: "presentMulmoScript",

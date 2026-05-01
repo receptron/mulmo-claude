@@ -17,6 +17,8 @@ describe("workspacePath", () => {
 // the author knows to update EAGER_WORKSPACE_DIRS / consumers.
 describe("WORKSPACE_DIRS expected keys", () => {
   const expectedKeys = [
+    "accounting",
+    "accountingBooks",
     "attachments",
     "calendar",
     "charts",

@@ -13,6 +13,7 @@
  */
 
 import ManageTodoListDef from "../../src/plugins/todo/definition.js";
+import ManageAccountingDef from "../../src/plugins/accounting/definition.js";
 import ManageCalendarDef from "../../src/plugins/scheduler/calendarDefinition.js";
 import ManageAutomationsDef from "../../src/plugins/scheduler/automationsDefinition.js";
 import PresentMulmoScriptDef from "../../src/plugins/presentMulmoScript/definition.js";
@@ -34,6 +35,7 @@ import { API_ROUTES } from "../../src/config/apiRoutes.js";
 /** Maps plugin tool name → REST API endpoint. */
 export const TOOL_ENDPOINTS: Record<string, string> = {
   [ManageTodoListDef.name]: API_ROUTES.todos.dispatch,
+  [ManageAccountingDef.name]: API_ROUTES.accounting.dispatch,
   [ManageCalendarDef.name]: API_ROUTES.scheduler.base,
   [ManageAutomationsDef.name]: API_ROUTES.scheduler.base,
   [PresentMulmoScriptDef.name]: API_ROUTES.mulmoScript.save,
@@ -55,6 +57,7 @@ export const TOOL_ENDPOINTS: Record<string, string> = {
 /** All ToolDefinition objects for package and local plugins. */
 export const PLUGIN_DEFS = [
   ManageTodoListDef,
+  ManageAccountingDef,
   ManageCalendarDef,
   ManageAutomationsDef,
   PresentMulmoScriptDef,

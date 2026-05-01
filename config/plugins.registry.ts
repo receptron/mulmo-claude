@@ -47,6 +47,11 @@ export interface PluginRegistration {
 export const PLUGIN_REGISTRY: readonly PluginRegistration[] = [
   // Internal plugins (default export of definition.ts)
   { id: "manageTodoList", endpointKey: "todos.dispatch", importFrom: "../../src/plugins/todo/definition", importStyle: "default" },
+  // Accounting plugin: opt-in only (see plans/feat-accounting.md).
+  // Registering it here is required for the MCP bridge to route
+  // tool calls — the gating happens at the Role level, not at
+  // registry level.
+  { id: "manageAccounting", endpointKey: "accounting.dispatch", importFrom: "../../src/plugins/accounting/definition", importStyle: "default" },
   { id: "manageCalendar", endpointKey: "scheduler.base", importFrom: "../../src/plugins/scheduler/calendarDefinition", importStyle: "default" },
   { id: "manageAutomations", endpointKey: "scheduler.base", importFrom: "../../src/plugins/scheduler/automationsDefinition", importStyle: "default" },
   { id: "presentMulmoScript", endpointKey: "mulmoScript.save", importFrom: "../../src/plugins/presentMulmoScript/definition", importStyle: "default" },

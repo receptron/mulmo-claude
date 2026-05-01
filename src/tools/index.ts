@@ -16,6 +16,8 @@ import { manageCalendarPlugin, manageAutomationsPlugin, legacyManageSchedulerEnt
 import manageSkillsPlugin from "../plugins/manageSkills/index";
 import manageSourcePlugin from "../plugins/manageSource/index";
 import wikiPlugin from "../plugins/wiki/index";
+import accountingPlugin from "../plugins/accounting/index";
+import { TOOL_NAMES } from "../config/toolNames";
 import presentMulmoScriptPlugin from "../plugins/presentMulmoScript/index";
 import presentHtmlPlugin from "../plugins/presentHtml/index";
 import presentChartPlugin from "../plugins/chart/index";
@@ -33,6 +35,7 @@ const plugins: Record<string, PluginEntry> = {
   manageSkills: manageSkillsPlugin,
   manageSource: manageSourcePlugin,
   manageWiki: wikiPlugin,
+  [TOOL_NAMES.manageAccounting]: accountingPlugin,
   presentMulmoScript: presentMulmoScriptPlugin,
   presentDocument: markdownPlugin,
   presentSpreadsheet: spreadsheetPlugin,
