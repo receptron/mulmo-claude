@@ -35,7 +35,7 @@ const toolDefinition: ToolDefinition = {
           "upsertAccount",
           "addEntry",
           "voidEntry",
-          "listEntries",
+          "getJournalEntries",
           "getOpeningBalances",
           "setOpeningBalances",
           "getReport",
@@ -88,10 +88,13 @@ const toolDefinition: ToolDefinition = {
       entryId: { type: "string", description: "For 'voidEntry': id of the entry to void. The reverse + marker pair is appended (journal stays append-only)." },
       reason: { type: "string", description: "For 'voidEntry': human-readable reason." },
       voidDate: { type: "string", description: "For 'voidEntry': YYYY-MM-DD date for the reverse entry (defaults to today)." },
-      // listEntries / getReport ranges
-      from: { type: "string", description: "For 'listEntries': inclusive YYYY-MM-DD lower bound." },
-      to: { type: "string", description: "For 'listEntries': inclusive YYYY-MM-DD upper bound." },
-      accountCode: { type: "string", description: "For 'listEntries' / 'getReport' (kind=ledger): filter to a specific account." },
+      // getJournalEntries / getReport ranges
+      from: { type: "string", description: "For 'getJournalEntries': inclusive YYYY-MM-DD lower bound on entry date." },
+      to: { type: "string", description: "For 'getJournalEntries': inclusive YYYY-MM-DD upper bound on entry date." },
+      accountCode: {
+        type: "string",
+        description: "For 'getJournalEntries' / 'getReport' (kind=ledger): filter to entries that touch a specific account code.",
+      },
       // opening
       asOfDate: {
         type: "string",

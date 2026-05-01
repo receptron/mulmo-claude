@@ -269,7 +269,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   setActiveBook: handleSetActiveBook,
   deleteBook: handleDeleteBook,
   listAccounts: handleListAccounts,
-  listEntries: handleListEntries,
+  getJournalEntries: handleListEntries,
   addEntry: handleAddEntry,
   voidEntry: handleVoidEntry,
   getOpeningBalances: handleGetOpening,

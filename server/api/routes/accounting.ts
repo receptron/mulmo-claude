@@ -152,7 +152,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       reason: rest.reason as string | undefined,
       voidDate: rest.voidDate as string | undefined,
     }),
-  listEntries: (rest) =>
+  getJournalEntries: (rest) =>
     listEntries({
       bookId: rest.bookId as string | undefined,
       from: rest.from as string | undefined,
@@ -224,7 +224,7 @@ function previewMessage(action: string, fields: Record<string, unknown>): string
 // LLM). Without an explicit message these actions resolve to "Done"
 // from the model's perspective, which is useless for queries the
 // LLM needs to reason about.
-const PAYLOAD_AS_MESSAGE_ACTIONS = new Set<string>(["listEntries"]);
+const PAYLOAD_AS_MESSAGE_ACTIONS = new Set<string>(["getJournalEntries"]);
 
 async function dispatch(body: AccountingActionBody): Promise<unknown> {
   const { action, ...rest } = body;

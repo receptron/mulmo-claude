@@ -148,13 +148,13 @@ export function voidEntry(input: {
   return call("voidEntry", input);
 }
 
-export function listEntries(input: {
+export function getJournalEntries(input: {
   from?: string;
   to?: string;
   accountCode?: string;
   bookId?: string;
 }): Promise<ApiResult<{ bookId: string; entries: JournalEntry[]; voidedEntryIds: string[] }>> {
-  return call("listEntries", input);
+  return call("getJournalEntries", input);
 }
 
 // ── Opening balances ─────────────────────────────────────────────────

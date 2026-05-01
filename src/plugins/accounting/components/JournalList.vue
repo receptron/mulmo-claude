@@ -72,7 +72,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { listEntries, voidEntry, type Account, type JournalEntry, type JournalEntryKind } from "../api";
+import { getJournalEntries, voidEntry, type Account, type JournalEntry, type JournalEntryKind } from "../api";
 import { formatAmount } from "../currencies";
 import { useLatestRequest } from "./useLatestRequest";
 
@@ -112,7 +112,7 @@ async function refresh(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const result = await listEntries({
+    const result = await getJournalEntries({
       bookId: props.bookId,
       from: from.value || undefined,
       to: toDate.value || undefined,
