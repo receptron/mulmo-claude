@@ -612,6 +612,8 @@ const ptBRMessages = {
       title: "Saldos iniciais",
       asOfLabel: "Em",
       explainer: "Apenas contas de balanço (ativo/passivo/patrimônio). Σ débito = Σ crédito; a diferença entra em Retained Earnings.",
+      emptyHint:
+        "Você pode salvar tudo em branco — os saldos iniciais podem ser atualizados depois. Basta ter uma abertura registrada para que as outras abas sejam liberadas.",
       explainer2: "Apenas contas de balanço.",
       submit: "Salvar saldos iniciais",
       replaceWarning: "Salvar substitui a abertura existente (a anterior é estornada no diário).",

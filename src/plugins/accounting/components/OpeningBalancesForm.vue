@@ -2,6 +2,7 @@
   <form class="flex flex-col gap-3" data-testid="accounting-opening-form" @submit.prevent="onSubmit">
     <h3 class="text-base font-semibold">{{ t("pluginAccounting.openingForm.title") }}</h3>
     <p class="text-xs text-gray-500">{{ t("pluginAccounting.openingForm.explainer") }}</p>
+    <p class="text-xs text-blue-600" data-testid="accounting-opening-empty-hint">{{ t("pluginAccounting.openingForm.emptyHint") }}</p>
     <div v-if="existing" class="text-xs text-gray-500" data-testid="accounting-opening-existing">
       {{ t("pluginAccounting.openingForm.setBy", { date: existing.date }) }}
       <span v-if="existing" class="text-amber-600 ml-2">{{ t("pluginAccounting.openingForm.replaceWarning") }}</span>
@@ -124,14 +125,10 @@ const imbalance = computed<number>(() => {
   }
   return sum;
 });
-const hasAnyNonzero = computed(() => {
-  for (const code of Object.keys(rows.value)) {
-    const row = rows.value[code];
-    if ((row.debit ?? 0) > 0 || (row.credit ?? 0) > 0) return true;
-  }
-  return false;
-});
-const balanced = computed(() => Math.abs(imbalance.value) <= 0.005 && hasAnyNonzero.value);
+// An all-empty form is valid: it submits as a zero-line opening
+// marker so the user can unlock the rest of the UI without
+// committing to specific balances on day one.
+const balanced = computed(() => Math.abs(imbalance.value) <= 0.005);
 const imbalanceText = computed(() => formatAmount(imbalance.value, props.currency));
 const step = computed(() => inputStepFor(props.currency));
 

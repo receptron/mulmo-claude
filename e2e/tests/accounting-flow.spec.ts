@@ -44,16 +44,18 @@ test.describe("accounting plugin — flow", () => {
     await setupSession(page);
   });
 
-  test("openApp envelope mounts <AccountingApp>; empty state surfaces no-book branch", async ({ page }) => {
+  test("openApp envelope mounts <AccountingApp>; empty workspace shows full-page first-run form", async ({ page }) => {
     await page.goto(`/chat/${SESSION_ID}`);
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 
-    // The accounting-app envelope auto-mounts on session load (no
-    // preview click needed — the empty-workspace path immediately
-    // shows the auto-opened NewBookForm modal, which would otherwise
-    // intercept any pointer events on the chat sidebar).
+    // The accounting-app envelope auto-mounts on session load. On
+    // an empty workspace the first-run NewBookForm replaces the
+    // chrome (header + tabs + main) entirely — the regular
+    // no-book empty-state branch does not render in this mode.
     await expect(page.getByTestId("accounting-app")).toBeVisible();
-    await expect(page.getByTestId("accounting-no-book")).toBeVisible();
     await expect(page.getByTestId("accounting-new-book-modal")).toBeVisible();
+    await expect(page.getByTestId("accounting-new-book-firstrun")).toBeVisible();
+    await expect(page.getByTestId("accounting-tabs")).not.toBeVisible();
+    await expect(page.getByTestId("accounting-no-book")).not.toBeVisible();
   });
 });

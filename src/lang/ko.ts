@@ -610,6 +610,8 @@ const koMessages = {
       title: "기초잔액",
       asOfLabel: "기준일",
       explainer: "재무상태표 계정(자산/부채/자본)만 입력 가능. Σ차변=Σ대변이 되어야 하며 차액은 Retained Earnings에 흡수됩니다.",
+      emptyHint:
+        "모두 비워둔 채 저장해도 괜찮습니다 — 기초잔액은 나중에 업데이트할 수 있습니다. 다른 탭을 사용하려면 일단 기초잔액 항목이 등록되어 있어야 합니다.",
       explainer2: "재무상태표 계정만.",
       submit: "기초잔액 저장",
       replaceWarning: "저장 시 기존 기초잔액은 분개장에서 취소됩니다.",

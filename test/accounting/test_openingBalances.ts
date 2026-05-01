@@ -24,6 +24,10 @@ describe("validateOpening", () => {
     const result = validateOpening({ asOfDate: "2026-01-01", lines: BALANCED, accounts: ACCOUNTS, existingEntries: [] });
     assert.equal(result.ok, true);
   });
+  it("accepts an empty opening (zero lines) as a no-op marker", () => {
+    const result = validateOpening({ asOfDate: "2026-01-01", lines: [], accounts: ACCOUNTS, existingEntries: [] });
+    assert.equal(result.ok, true);
+  });
   it("rejects income / expense accounts", () => {
     const result = validateOpening({
       asOfDate: "2026-01-01",

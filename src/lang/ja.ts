@@ -610,6 +610,8 @@ const jaMessages = {
       title: "期首残高",
       asOfLabel: "基準日",
       explainer: "B/S 科目（資産・負債・純資産）のみ入力可能。Σ借方=Σ貸方を満たす必要があり、差額は Retained Earnings に集約されます。",
+      emptyHint:
+        "すべて空欄のまま保存しても構いません — 期首残高は後から更新できます。他のタブを利用するには、いったん期首残高が登録されている必要があります。",
       explainer2: "B/S 科目のみ。",
       submit: "期首残高を保存",
       replaceWarning: "保存すると既存の期首残高は journal で取り消されます。",

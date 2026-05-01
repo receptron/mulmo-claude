@@ -619,6 +619,8 @@ const deMessages = {
       title: "Eröffnungsbilanz",
       asOfLabel: "Per",
       explainer: "Nur Bilanzkonten (Aktiva/Passiva/Eigenkapital). Σ Soll = Σ Haben; die Differenz fließt in Retained Earnings.",
+      emptyHint:
+        "Sie können das Formular leer speichern — die Eröffnungsbilanz lässt sich später aktualisieren. Es reicht, dass einmalig eine Eröffnung hinterlegt ist, damit die übrigen Tabs freigeschaltet werden.",
       explainer2: "Nur Bilanzkonten.",
       submit: "Eröffnungsbilanz speichern",
       replaceWarning: "Beim Speichern wird die bestehende Eröffnung ersetzt (die alte wird im Journal storniert).",

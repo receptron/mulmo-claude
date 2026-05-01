@@ -606,6 +606,7 @@ const zhMessages = {
       title: "期初余额",
       asOfLabel: "基准日",
       explainer: "仅允许 B/S 科目（资产 / 负债 / 权益）。Σ借方=Σ贷方，差额会落入 Retained Earnings。",
+      emptyHint: "可以全部留空保存——期初余额稍后再更新。账簿只需先存在一条期初记录，其他标签页才会解锁。",
       explainer2: "仅 B/S 科目。",
       submit: "保存期初余额",
       replaceWarning: "保存会替换现有期初余额（旧的会在日记账中冲销）。",

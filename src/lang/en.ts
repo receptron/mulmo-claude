@@ -626,6 +626,8 @@ const enMessages = {
       asOfLabel: "As of",
       explainer:
         "Enter your balance-sheet positions as of the start date. Income / expense accounts are not allowed here. Σ debit must equal Σ credit; the difference plug-in is Retained Earnings.",
+      emptyHint:
+        "It's fine to save with everything blank — you can update opening balances later. The book just needs an opening on file before other tabs unlock.",
       explainer2: "Balance-sheet accounts only.",
       submit: "Save opening balances",
       replaceWarning: "Saving replaces the existing opening (the old one is voided in the journal).",

@@ -9,14 +9,10 @@
       @change="onSelect"
     >
       <option v-for="book in books" :key="book.id" :value="book.id">{{ formatBookOption(book) }}</option>
+      <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -- decorative separator inside the books <select>, not user copy -->
+      <option disabled>──────────</option>
+      <option :value="NEW_BOOK_SENTINEL" data-testid="accounting-new-book-option">+ {{ t("pluginAccounting.bookSwitcher.newBook") }}</option>
     </select>
-    <button
-      class="h-8 px-2.5 flex items-center gap-1 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
-      data-testid="accounting-new-book"
-      @click="showNewBook = true"
-    >
-      <span class="material-icons text-base">add</span>{{ t("pluginAccounting.bookSwitcher.newBook") }}
-    </button>
     <NewBookForm v-if="showNewBook" @cancel="showNewBook = false" @created="onCreated" />
     <p v-if="switchError" class="text-xs text-red-500">{{ switchError }}</p>
   </div>
@@ -36,6 +32,12 @@ const emit = defineEmits<{
   "books-changed": [];
 }>();
 
+// Sentinel value for the "+ New book" option living inside the
+// books <select>. Picking it opens the modal and reverts the
+// select's displayed value to the active book — the option must
+// not collide with any real book id, which are nanoid-shaped.
+const NEW_BOOK_SENTINEL = "__new__";
+
 const showNewBook = ref(false);
 const switchError = ref<string | null>(null);
 
@@ -46,6 +48,11 @@ function formatBookOption(book: BookSummary): string {
 async function onSelect(event: Event): Promise<void> {
   const target = event.target as HTMLSelectElement;
   const bookId = target.value;
+  if (bookId === NEW_BOOK_SENTINEL) {
+    target.value = props.modelValue;
+    showNewBook.value = true;
+    return;
+  }
   if (bookId === props.modelValue) return;
   const result = await setActiveBook(bookId);
   if (!result.ok) {

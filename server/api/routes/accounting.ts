@@ -49,13 +49,16 @@ interface AccountingErrorResponse {
 // Tool-result envelope for the MCP-driven `openApp` action. The
 // frontend tool-result renderer keys off `kind: "accounting-app"`
 // to mount `<AccountingApp>` (vs the compact `Preview.vue` which
-// renders summaries for every other action).
+// renders summaries for every other action). `message` is picked
+// up by the MCP bridge and surfaced as the tool's text response
+// to the LLM (server/agent/mcp-server.ts).
 interface OpenAppToolResult {
   kind: "accounting-app";
   /** `null` when the workspace has zero books — the View shows its
-   *  empty state and prompts the user to create one. */
+   *  full-page first-run form and prompts the user to create one. */
   bookId: string | null;
   initialTab?: string;
+  message?: string;
 }
 
 type ActionRest = Omit<AccountingActionBody, "action">;
@@ -70,13 +73,26 @@ async function handleOpenApp(rest: ActionRest): Promise<OpenAppToolResult> {
   // Resolving the bookId server-side ensures the LLM's tool result
   // *describes* what's in the canvas (which book, which tab) so
   // historical chat replays render accurately. The View handles
-  // the empty-state flow (auto-opening the New Book modal so the
-  // user can pick name + currency); the server doesn't try to
-  // bootstrap a default book.
+  // the empty-state flow (full-page first-run form so the user
+  // can pick name + currency); the server doesn't try to bootstrap
+  // a default book.
   const list = await listBooks();
   const requested = typeof rest.bookId === "string" ? rest.bookId : undefined;
   const bookId = requested && list.books.some((book) => book.id === requested) ? requested : list.activeBookId;
   const initialTab = typeof rest.initialTab === "string" ? rest.initialTab : undefined;
+  if (list.books.length === 0) {
+    // No books yet — the canvas is showing the full-page first-run
+    // form which the user must complete before any accounting
+    // feature is usable. Tell the LLM via `message` so it knows to
+    // wait for the user rather than attempt follow-up actions.
+    return {
+      kind: "accounting-app",
+      bookId,
+      initialTab,
+      message:
+        "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
+    };
+  }
   return { kind: "accounting-app", bookId, initialTab };
 }
 

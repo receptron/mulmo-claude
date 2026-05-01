@@ -614,6 +614,8 @@ const frMessages = {
       title: "Soldes d'ouverture",
       asOfLabel: "Au",
       explainer: "Comptes de bilan uniquement (actif/passif/capitaux). Σ débit = Σ crédit ; le solde tombe sur Retained Earnings.",
+      emptyHint:
+        "Vous pouvez enregistrer en laissant tout vide — les soldes d'ouverture peuvent être mis à jour plus tard. Il suffit qu'une ouverture soit enregistrée pour débloquer les autres onglets.",
       explainer2: "Comptes de bilan uniquement.",
       submit: "Enregistrer les soldes d'ouverture",
       replaceWarning: "Enregistrer remplace l'ouverture existante (l'ancienne est contre-passée dans le journal).",

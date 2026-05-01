@@ -90,14 +90,18 @@ function validateAsOfPredatesEverything(input: OpeningValidationInput, errors: O
 
 /** Validate inputs for `setOpeningBalances`. Caller passes the full
  *  list of journal entries in the book so we can check the
- *  "asOfDate must precede every other entry" rule. */
+ *  "asOfDate must precede every other entry" rule. An opening with
+ *  zero lines is accepted as a no-op marker — it satisfies the
+ *  "book has an opening" gate the UI uses without committing the
+ *  user to specific balances on day one (they can replace it
+ *  later). */
 export function validateOpening(input: OpeningValidationInput): OpeningValidationResult {
   const errors: OpeningValidationError[] = [];
   if (!isValidCalendarDate(input.asOfDate)) {
     errors.push({ field: "asOfDate", message: `expected YYYY-MM-DD calendar date, got ${JSON.stringify(input.asOfDate)}` });
   }
-  if (!Array.isArray(input.lines) || input.lines.length < 2) {
-    errors.push({ field: "lines", message: "an opening needs at least two lines" });
+  if (!Array.isArray(input.lines)) {
+    errors.push({ field: "lines", message: "lines must be an array" });
     return { ok: false, errors };
   }
   validateLineAccountTypes(input, errors);

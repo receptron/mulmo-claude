@@ -620,6 +620,8 @@ const esMessages = {
       title: "Saldos de apertura",
       asOfLabel: "Al",
       explainer: "Solo cuentas de balance (activo/pasivo/patrimonio). Σ debe = Σ haber; la diferencia va a Retained Earnings.",
+      emptyHint:
+        "Puedes guardar todo en blanco — luego puedes actualizar los saldos de apertura. Solo hace falta tener una apertura registrada para desbloquear las demás pestañas.",
       explainer2: "Solo cuentas de balance.",
       submit: "Guardar saldos de apertura",
       replaceWarning: "Al guardar se reemplaza la apertura existente (la anterior se anula en el diario).",
