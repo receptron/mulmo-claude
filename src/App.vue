@@ -266,6 +266,7 @@ import { pushErrorMessage, beginUserTurn, updateResult } from "./utils/session/s
 import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
 import { buildLoadedSession, parseSessionEntries } from "./utils/session/sessionEntries";
+import { isSidebarVisible } from "./utils/tools/sidebarVisibleApp";
 import { resolveNotificationTarget } from "./utils/notification/dispatch";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { useRunElapsed } from "./composables/useRunElapsed";
@@ -746,6 +747,9 @@ async function loadSession(sessionId: string) {
     urlResult: typeof route.query.result === "string" ? route.query.result : null,
     serverSummary: sessions.value.find((summary) => summary.id === sessionId),
     nowIso: new Date().toISOString(),
+    // Skip sidebar-hidden results when auto-picking a selection so
+    // the restored session never lands on a card the user can't see.
+    isVisible: isSidebarVisible,
   });
   sessionMap.set(sessionId, newSession);
   activateSession(sessionId, replaced);

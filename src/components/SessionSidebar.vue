@@ -27,7 +27,7 @@
       @mousedown="emit('activate')"
     >
       <div
-        v-for="result in displayedResults"
+        v-for="result in results"
         :key="result.uuid"
         class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
         :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
@@ -61,7 +61,12 @@ import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
-const props = defineProps<{
+defineProps<{
+  // Already filtered to "what the user should see" by the parent's
+  // `sidebarResults` computed (see useSessionDerived.ts) — keyboard
+  // navigation, selection, and this render all consume the same
+  // visible-only list so a hidden result can't slip into selected
+  // state and leave the sidebar showing no highlight.
   results: ToolResultComplete[];
   selectedUuid: string | null;
   resultTimestamps: Map<string, number>;
@@ -70,21 +75,6 @@ const props = defineProps<{
   layoutMode: LayoutMode;
   showRightSidebar: boolean;
 }>();
-
-// A plugin opts an action out of the sidebar by omitting `data` from
-// its tool result (see protocol: `data` is the view-side payload).
-// We hide the entire card — not just the preview body — so silent
-// actions (e.g. accounting reads, View-driven maintenance) don't
-// leave behind an empty card with just a source-label badge. The
-// LLM still sees the result via `message` / `jsonData`; this only
-// affects the visual sidebar list.
-const displayedResults = computed<ToolResultComplete[]>(() =>
-  props.results.filter((result) => {
-    const plugin = getPlugin(result.toolName);
-    if (!plugin?.previewComponent) return true;
-    return result.data !== undefined;
-  }),
-);
 
 function sourceLabel(result: ToolResultComplete): string {
   if (result.toolName === "text-response") return result.title ?? "Assistant";

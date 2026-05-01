@@ -3,6 +3,7 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ActiveSession, SessionSummary } from "../types/session";
 import type { ToolCallHistoryItem } from "../types/toolCallHistory";
 import { deduplicateResults } from "../utils/tools/dedup";
+import { isSidebarVisible } from "../utils/tools/sidebarVisibleApp";
 
 export function useSessionDerived(opts: { sessionMap: Map<string, ActiveSession>; currentSessionId: Ref<string>; sessions: Ref<SessionSummary[]> }) {
   const { sessionMap, currentSessionId, sessions } = opts;
@@ -11,7 +12,12 @@ export function useSessionDerived(opts: { sessionMap: Map<string, ActiveSession>
 
   const toolResults = computed<ToolResultComplete[]>(() => activeSession.value?.toolResults ?? []);
 
-  const sidebarResults = computed(() => deduplicateResults(toolResults.value));
+  // `sidebarResults` is the canonical "what the user sees and can
+  // navigate through" list — keyboard nav (useKeyNavigation), the
+  // sidebar render, and StackView all consume it. Filtering hidden
+  // results here (rather than only inside <SessionSidebar>) keeps
+  // selection and navigation in sync with the visible list.
+  const sidebarResults = computed(() => deduplicateResults(toolResults.value).filter(isSidebarVisible));
 
   const currentSummary = computed(() => sessions.value.find((summary) => summary.id === currentSessionId.value));
 

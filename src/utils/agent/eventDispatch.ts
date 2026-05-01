@@ -6,6 +6,7 @@ import type { SseEvent } from "../../types/sse";
 import { EVENT_TYPES, generationKey } from "../../types/events";
 import { findPendingToolCall, toToolCallEntry } from "./toolCalls";
 import { pushErrorMessage, applyTextEvent, applyToolResultToSession } from "../session/sessionHelpers";
+import { isSidebarVisible } from "../tools/sidebarVisibleApp";
 
 export interface AgentEventContext {
   session: ActiveSession;
@@ -37,7 +38,9 @@ export async function applyAgentEvent(event: SseEvent, ctx: AgentEventContext): 
       applyTextEvent(session, event.message, event.source ?? "assistant", event.attachments);
       return;
     case EVENT_TYPES.toolResult:
-      applyToolResultToSession(session, event.result);
+      // Skip auto-select for sidebar-hidden results; otherwise the
+      // user's selection silently jumps to a card they can't see.
+      applyToolResultToSession(session, event.result, isSidebarVisible);
       return;
     case EVENT_TYPES.error:
       console.error("[agent] error event:", event.message);
