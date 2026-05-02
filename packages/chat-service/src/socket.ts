@@ -320,23 +320,34 @@ function parseAttachments(raw: unknown): Attachment[] | undefined {
   let totalBytes = 0;
   for (const item of raw) {
     if (valid.length >= MAX_ATTACHMENT_COUNT) break;
-    if (
-      item &&
-      typeof item === "object" &&
-      typeof (item as Record<string, unknown>).mimeType === "string" &&
-      typeof (item as Record<string, unknown>).data === "string"
-    ) {
-      const data = (item as Record<string, unknown>).data as string;
-      totalBytes += data.length;
+    const entry = parseOneAttachment(item);
+    if (!entry) continue;
+    if (entry.data) {
+      totalBytes += entry.data.length;
       if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) break;
-      const entry: Attachment = {
-        mimeType: (item as Record<string, unknown>).mimeType as string,
-        data,
-      };
-      const fn = (item as Record<string, unknown>).filename;
-      if (typeof fn === "string" && fn.length > 0) entry.filename = fn;
-      valid.push(entry);
     }
+    valid.push(entry);
   }
   return valid.length > 0 ? valid : undefined;
+}
+
+// Accept either the inline `{ data, mimeType }` shape (bridges
+// shipping raw bytes) or the path-only `{ path }` shape (Vue UI and
+// any bridge that uploads to `data/attachments/` first). Either is
+// valid per the exported `Attachment` type. The earlier parser only
+// recognised the first shape, so a typed `{ path }` payload from a
+// socket client passed type-check but got silently dropped at the
+// wire boundary (#1050 review).
+function parseOneAttachment(item: unknown): Attachment | null {
+  if (!item || typeof item !== "object") return null;
+  const record = item as Record<string, unknown>;
+  const filename = typeof record.filename === "string" && record.filename.length > 0 ? record.filename : undefined;
+  if (typeof record.mimeType === "string" && typeof record.data === "string") {
+    return { mimeType: record.mimeType, data: record.data, ...(filename ? { filename } : {}) };
+  }
+  if (typeof record.path === "string" && record.path.length > 0) {
+    const mimeType = typeof record.mimeType === "string" ? record.mimeType : undefined;
+    return { path: record.path, ...(mimeType ? { mimeType } : {}), ...(filename ? { filename } : {}) };
+  }
+  return null;
 }
