@@ -157,6 +157,8 @@ MulmoClaude 使用 Claude Code 作为 AI 后端，它可以访问包括 Bash 在
 如果没有安装 Docker，应用会显示警告横幅，并在无沙盒的情况下继续工作。
 
 > **调试模式**：即使已安装 Docker，若想在没有沙盒的情况下运行，请在启动服务器之前设置 `DISABLE_SANDBOX=1`。
+>
+> **工具调用历史**：设置 `PERSIST_TOOL_CALLS=1` 后,`tool_call` 事件(包含 `args`)将与 `tool_result` 一起被记录到会话 jsonl。默认关闭,因为 `args` 可能很大,并可能携带你不希望写入磁盘的负载字节(图像 base64、MulmoScript JSON);适合在页面刷新或服务器重启后进行调试。详见 [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096)。
 
 ## 日志
 

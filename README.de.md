@@ -155,6 +155,8 @@ Wenn die Docker-Sandbox auf macOS aktiv ist, werden Anmeldeinformationen automat
 Wenn Docker nicht installiert ist, zeigt die App einen Warnhinweis an und funktioniert weiterhin ohne Sandboxing.
 
 > **Debug-Modus**: Um auch bei installiertem Docker ohne Sandbox zu laufen, setzen Sie `DISABLE_SANDBOX=1` vor dem Start des Servers.
+>
+> **Tool-Call-Historie**: Setzen Sie `PERSIST_TOOL_CALLS=1`, damit `tool_call`-Ereignisse (inklusive `args`) zusätzlich zu `tool_result` im Sitzungs-jsonl protokolliert werden. Standardmäßig aus, weil `args` sehr groß werden und Payload-Bytes (Base64-Bilder, MulmoScript-JSON) enthalten können, die Sie nicht auf der Festplatte erwarten würden; nützlich zum Debuggen nach einem Seitenrefresh oder Server-Neustart. Siehe [Issue #1096](https://github.com/receptron/mulmoclaude/issues/1096).
 
 ## Logging
 

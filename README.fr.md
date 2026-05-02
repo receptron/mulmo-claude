@@ -157,6 +157,8 @@ Lorsque le bac à sable Docker est actif sur macOS, les identifiants sont géré
 Si Docker n'est pas installé, l'application affiche un bandeau d'avertissement et continue de fonctionner sans isolation.
 
 > **Mode débogage** : pour exécuter sans le bac à sable même si Docker est installé, définissez `DISABLE_SANDBOX=1` avant de démarrer le serveur.
+>
+> **Historique des appels d'outils** : définissez `PERSIST_TOOL_CALLS=1` pour enregistrer aussi les événements `tool_call` (avec leurs `args`) dans le jsonl de session aux côtés de `tool_result`. Désactivé par défaut car les `args` peuvent être volumineux et contenir des octets de charge utile (images en base64, JSON MulmoScript) que vous ne souhaitez pas écrire sur disque ; utile pour déboguer après un rafraîchissement de page ou un redémarrage du serveur. Voir [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096).
 
 ## Journalisation
 

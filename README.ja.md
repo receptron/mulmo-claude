@@ -157,6 +157,8 @@ macOS で Docker サンドボックスがアクティブなとき、資格情報
 Docker がインストールされていない場合、アプリは警告バナーを表示しますが、サンドボックスなしで引き続き動作します。
 
 > **デバッグモード**: Docker がインストールされている場合でもサンドボックスなしで実行するには、サーバー起動前に `DISABLE_SANDBOX=1` を設定してください。
+>
+> **ツール呼び出し履歴**: `PERSIST_TOOL_CALLS=1` を設定すると、`tool_result` と並んで `tool_call` イベント(`args` 含む)もセッション jsonl に記録されます。`args` は大きくなりがちで、ディスクに残したくないペイロード(画像 base64、MulmoScript JSON など)を含む可能性があるためデフォルトでは off。ページ更新やサーバー再起動後のデバッグに有用です。詳細は [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096) を参照。
 
 ## ロギング
 

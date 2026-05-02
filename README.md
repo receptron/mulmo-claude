@@ -155,6 +155,8 @@ When the Docker sandbox is active on macOS, credentials are managed automaticall
 If Docker is not installed, the app shows a warning banner and continues to work without sandboxing.
 
 > **Debug mode**: To run without the sandbox even when Docker is installed, set `DISABLE_SANDBOX=1` before starting the server.
+>
+> **Tool-call history**: Set `PERSIST_TOOL_CALLS=1` to also record `tool_call` events (with their `args`) in the per-session jsonl alongside `tool_result`. Off by default because `args` can be large and may carry payload bytes you didn't expect to land on disk; useful for debugging after a page refresh or server restart. See [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096).
 
 ## Logging
 

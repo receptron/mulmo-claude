@@ -8,6 +8,7 @@ import { appendFile } from "fs/promises";
 import type { IPubSub } from "../pub-sub/index.js";
 import { PUBSUB_CHANNELS, sessionChannel, type SessionsChannelPayload } from "../../../src/config/pubsubChannels.js";
 import { log } from "../../system/logger/index.js";
+import { env } from "../../system/env.js";
 import { updateHasUnread } from "../../utils/files/session-io.js";
 import { EVENT_TYPES, GENERATION_KINDS, type GenerationKind, type PendingGeneration, generationKey } from "../../../src/types/events.js";
 import { ONE_HOUR_MS, ONE_MINUTE_MS } from "../../utils/time.js";
@@ -317,6 +318,26 @@ function parseGenerationPayload(event: Record<string, unknown>): GenerationPaylo
   return { kind, filePath, key };
 }
 
+// Persist a single `tool_call` event to the session jsonl. Mirrors
+// the `tool_result` shape that `pushToolResult` already writes, so
+// downstream parsers (and humans grepping the file for debugging)
+// see a familiar event row. Opt-in via `PERSIST_TOOL_CALLS=1` —
+// see plans/feat-persist-tool-calls.md for the rationale.
+//
+// Exported for unit tests; the run-time hot path stays inside
+// `applyEventToSession`.
+export async function persistToolCallEvent(resultsFilePath: string, event: Record<string, unknown>): Promise<void> {
+  const line = `${JSON.stringify({
+    source: "agent",
+    type: EVENT_TYPES.toolCall,
+    toolUseId: event.toolUseId,
+    toolName: event.toolName,
+    args: event.args,
+    timestamp: Date.now(),
+  })}\n`;
+  await appendFile(resultsFilePath, line);
+}
+
 function applyEventToSession(session: ServerSession, type: string, event: Record<string, unknown>): GenerationDelta {
   if (type === EVENT_TYPES.toolCall) {
     session.toolCallHistory.push({
@@ -325,6 +346,18 @@ function applyEventToSession(session: ServerSession, type: string, event: Record
       args: event.args,
       timestamp: Date.now(),
     });
+    if (env.persistToolCalls) {
+      // Fire-and-forget: a write failure shouldn't block the live
+      // SSE flow. The in-memory `toolCallHistory` is the
+      // authoritative copy during the run; the jsonl line is a
+      // debug aid that survives refresh.
+      persistToolCallEvent(session.resultsFilePath, event).catch((err: unknown) => {
+        log.warn("session-store", "persist tool_call failed (non-fatal)", {
+          chatSessionId: session.chatSessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
   } else if (type === EVENT_TYPES.toolCallResult) {
     const entry = session.toolCallHistory.find((historyEntry) => historyEntry.toolUseId === event.toolUseId);
     if (entry) entry.result = event.content as string;
