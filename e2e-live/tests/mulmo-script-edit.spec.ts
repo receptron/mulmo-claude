@@ -19,14 +19,21 @@ const LEDIT_TIMEOUT_MS = 3 * ONE_MINUTE_MS;
 test.describe.configure({ mode: "parallel" });
 
 test.describe("mulmoScript edit (real workspace)", () => {
-  // Pending until issue #1074 is understood: the per-beat "Saving…"
+  // Pending until issue #1074 is fixed: the per-beat "Saving…"
   // button never flips back to enabled within 30s on chromium. The
   // observation matches the suspicion raised in #1074 (edits don't
   // round-trip cleanly), so this spec already encodes the failure
   // mode — keep it on disk as the regression net, but skip so the
   // suite stays green until the underlying save path is debugged.
+  //
+  // **Unskip trigger** (so this spec doesn't go permanently dormant):
+  // when issue #1074 is closed AND the merge that fixes it is
+  // available locally, run this spec by hand on chromium first
+  //     yarn test:e2e:live:mulmo-script-edit
+  // and only drop the `test.skip(true, ...)` line below if the run
+  // passes end-to-end. The TODO is owned by whoever closes #1074.
   test("L-EDIT: beat 編集 → 更新 → 別セッションへ移動 → 戻ると編集が永続化されている", async ({ page }, testInfo) => {
-    test.skip(true, "Pending issue #1074 — beat update button hangs on 'Saving…' for 30s+ on chromium");
+    test.skip(true, "Pending issue #1074 — drop this skip after #1074 closes and the spec passes once locally on chromium");
     test.setTimeout(LEDIT_TIMEOUT_MS);
     // Covers issue #1074 — beat edits made via the source-editor
     // textarea were reported to disappear after navigating away and

@@ -340,7 +340,7 @@ e2e-live/
 | **L-06** General role 1 ターン | ✅ 実装済 | roles.spec.ts、 `Reply with the single word: hello` で 1 ターン → role-selector が "General" + user-input enabled (B-15) + session id が払い出される (B-41) を検証 |
 | **L-11** session reload 復元 | ✅ 実装済 | session.spec.ts、 `Reply with the single word: pong` 後に reload → URL の session id が維持されていることを assert (B-14)。 visible-text は locale 依存になるので使わず、 構造的 signal (URL) のみで判定 |
 | **L-14** wiki 内部リンク | ✅ 実装済 | wiki-nav.spec.ts、 fixture wiki page 2 件 seed → wikilink `[[slug]]` を click → `/wiki/pages/<target>` に遷移 (B-23/B-24/B-25)、 catch-all で `/chat` に飛ばないこと |
-| **L-EDIT** beat 編集永続化 | 🟡 skip 中 | mulmo-script-edit.spec.ts、 #1074 で報告された「`Saving…` から戻らない」 症状を再現する spec として on disk。 issue #1074 が解決するまで `test.skip(true, ...)` で suite green を維持 |
+| **L-EDIT** beat 編集永続化 | 🟡 skip 中 | mulmo-script-edit.spec.ts、 #1074 で報告された「`Saving…` から戻らない」 症状を再現する spec として on disk。 **unskip trigger**: issue #1074 が close + その fix を merge した状態で `yarn test:e2e:live:mulmo-script-edit` を chromium で 1 回手動実行し、 pass が確認できたら `test.skip(true, ...)` を削除する。 dormant 化を防ぐオーナーは #1074 を close する人 |
 | L-04, L-05, L-07〜L-10, L-12〜L-30 | 未実装 | 後続 PR で順次。 横串で 「未登録系」 (リソース不在時の UI、 #1073 系) を機能別 spec として追加予定 |
 
 ## 実装の詳細
