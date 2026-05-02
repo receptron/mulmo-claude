@@ -18,14 +18,18 @@ test.describe("wiki navigation (real workspace)", () => {
     // the rendered <a> in the source page; the test fails if the URL
     // ever leaves the wiki surface.
     //
-    // Suffixing the slug with the Playwright project name keeps two
-    // benefits: chromium and webkit do not race on the same disk
-    // file during parallel runs, and the chance of clobbering a
-    // user-owned page that just happens to be named exactly
-    // `e2e-live-l14-source` drops to effectively zero.
+    // Slug uniqueness comes from two pieces:
+    //   * Playwright project name — chromium / webkit do not race on
+    //     the same disk file during parallel runs.
+    //   * per-run nonce (timestamp + small random suffix) — even if a
+    //     previous run was killed before its finally block fired, the
+    //     stale fixture file lives under a different slug, so this
+    //     run's cleanup only ever touches its own pages and never a
+    //     user-owned page that happens to share a static name.
     const projectSlug = testInfo.project.name;
-    const sourceSlug = `e2e-live-l14-source-${projectSlug}`;
-    const targetSlug = `e2e-live-l14-target-${projectSlug}`;
+    const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sourceSlug = `e2e-live-l14-source-${projectSlug}-${nonce}`;
+    const targetSlug = `e2e-live-l14-target-${projectSlug}-${nonce}`;
     const targetMarker = "L-14 target body marker";
     // mulmoclaude wiki uses double-bracket [[slug]] wikilinks (see
     // src/plugins/wiki/helpers.ts), not plain markdown links —
