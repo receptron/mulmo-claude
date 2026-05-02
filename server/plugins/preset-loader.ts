@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRESET_PLUGINS } from "./preset-list.js";
-import { loadPluginFromCacheDir, type RuntimePlugin } from "./runtime-loader.js";
+import { ensureInsideBase, loadPluginFromCacheDir, type RuntimePlugin } from "./runtime-loader.js";
 import { log } from "../system/logger/index.js";
 
 const LOG_PREFIX = "plugins/preset";
@@ -31,6 +31,14 @@ interface PackageJsonShape {
 
 async function loadOnePreset(packageName: string): Promise<RuntimePlugin | null> {
   const cachePath = path.join(NODE_MODULES, packageName);
+  // Same defence-in-depth as the user-installed loader: a preset list
+  // entry like `"../../etc"` would otherwise escape the node_modules
+  // base. Presets are server-controlled today, but the check is cheap
+  // and keeps the asset-route trust model uniform across both loaders.
+  if (!ensureInsideBase(cachePath, NODE_MODULES)) {
+    log.warn(LOG_PREFIX, "preset entry escapes node_modules — skipping", { packageName });
+    return null;
+  }
   if (!existsSync(cachePath)) {
     log.warn(LOG_PREFIX, "preset package missing from node_modules — run `yarn install`?", { packageName });
     return null;

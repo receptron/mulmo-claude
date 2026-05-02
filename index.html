@@ -24,8 +24,13 @@
       browser fetches `/src/_runtime/vue.ts` (Vite-transformed in dev
       to the host's Vue dep) so host and plugin share one Vue
       instance — reactivity flows across the boundary.
-      Production build does not yet rewrite this URL to the hashed
-      asset; that lands in Phase E.
+
+      In production builds this dev URL is replaced with the hashed
+      asset path by `runtimeImportmapBuildPlugin` in `vite.config.ts`
+      (build-only). The `runtime-vue` chunk is registered as a
+      separate Rollup input so Vite emits it instead of tree-shaking
+      it out (no static `import` references it — the importmap is
+      consumed by the browser, not by Vite's static analysis).
     -->
     <script type="importmap">
       {

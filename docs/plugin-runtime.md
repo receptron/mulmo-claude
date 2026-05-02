@@ -46,15 +46,21 @@ After restart, `[plugins/runtime] registered runtime plugins presets=1 userInsta
 
 Both sources merge into the same registry. The user-installed plugin sees presets and vice versa; on collision the preset wins.
 
-### Scenario 4: collision with a built-in MCP tool
+### Scenario 4: collisions
 
-A preset or user-installed plugin whose `TOOL_DEFINITION.name` matches a built-in MCP tool (`notify`, `readXPost`, `searchX`) or a static GUI plugin (everything in [`config/plugins.registry.ts`](../config/plugins.registry.ts)) is **rejected** at registration time. The boot log records this:
+There are three flavours of collision and the behaviour differs by source:
 
-```
-[plugins/registry] skipping runtime plugin — name collides with static tool plugin=@x/notify-clone tool=notify
-```
+1. **Runtime plugin name collides with a manifest-listed GUI plugin or a pure MCP tool** (everything fed into `MCP_PLUGIN_NAMES` plus `mcpToolDefs` keys: `notify`, `readXPost`, `searchX`, plus the manifest entries in [`config/plugins.registry.ts`](../config/plugins.registry.ts)). The runtime loader **rejects** the entry at registration time. The boot log records this:
 
-The user must rename their plugin's tool or uninstall.
+   ```
+   [plugins/registry] skipping runtime plugin — name collides with static tool plugin=@x/notify-clone tool=notify
+   ```
+
+2. **Runtime plugin name collides with a build-time-bundled GUI plugin that is NOT in the manifest** (the legacy entries in [`src/tools/index.ts`](../src/tools/index.ts) under keys like `"text-response"`, `manageScheduler`, etc. that aren't agent-callable). The runtime loader does NOT see these names; it accepts the runtime entry. The frontend's `getPlugin(name)` lookup checks the static map first, so the build-time entry shadows the runtime one for rendering. The runtime entry is still listed by `getAllPluginNames()` and visible to MCP, so this state is best avoided — use a different `TOOL_DEFINITION.name` for runtime plugins.
+
+3. **Runtime-vs-runtime collision** (preset and user-installed both register the same `TOOL_DEFINITION.name`, or two user-installed plugins do). First-loaded wins; presets are loaded before user-installed, so a preset always wins. The skipped entry is logged with `reason=runtime`.
+
+Future work (out of scope for this PR): reject case 2 at registration time too, by feeding the static-map keys into `MCP_PLUGIN_NAMES`-equivalent collision sets server-side.
 
 ## Test scenarios
 

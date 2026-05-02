@@ -12,4 +12,11 @@
 // of Vue (defineComponent, h, ref, computed, watch, …). Whitelisting
 // would force this file to track Vue's API. `export *` gives the
 // plugin the full surface it was compiled against.
+//
+// Build emit: registered as a Rollup input (`runtime-vue`) in
+// `vite.config.ts` so it survives tree-shaking even though no
+// static `import` references it. The build-only
+// `runtimeImportmapBuildPlugin` rewrites the dev importmap URL
+// (`/src/_runtime/vue.ts`) to the hashed asset filename in the
+// emitted `index.html`.
 export * from "vue";

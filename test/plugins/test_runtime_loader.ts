@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { loadPluginFromCacheDir, isCacheValid, EXTRACT_MARKER } from "../../server/plugins/runtime-loader.js";
+import { loadPluginFromCacheDir, isCacheValid, EXTRACT_MARKER, ensureInsideBase } from "../../server/plugins/runtime-loader.js";
 
 interface FixtureOpts {
   exportsImport?: string;
@@ -108,6 +108,34 @@ describe("loadPluginFromCacheDir", () => {
     writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "@x/empty", version: "1.0.0" }));
     const plugin = await loadPluginFromCacheDir("@x/empty", "1.0.0", dir);
     assert.equal(plugin, null);
+  });
+
+  it("ensureInsideBase: accepts paths inside the base", () => {
+    const base = path.join(tmpdir(), "mulmo-base-positive");
+    assert.equal(ensureInsideBase(path.join(base, "ok"), base), true);
+    assert.equal(ensureInsideBase(path.join(base, "a", "b"), base), true);
+    assert.equal(ensureInsideBase(base, base), true, "the base itself is inside the base");
+  });
+
+  it("ensureInsideBase: rejects lexical traversal escape", () => {
+    const base = path.join(tmpdir(), "mulmo-base-traversal");
+    // Mirrors what `path.join(base, ledgerName, version)` does when the
+    // ledger entry is `"../../etc"`.
+    assert.equal(ensureInsideBase(path.join(base, "..", "..", "etc"), base), false);
+    assert.equal(ensureInsideBase(path.join(base, "..", "sibling"), base), false);
+  });
+
+  it("ensureInsideBase: rejects an absolute path outside the base", () => {
+    const base = path.join(tmpdir(), "mulmo-base-absolute");
+    assert.equal(ensureInsideBase("/etc/passwd", base), false);
+  });
+
+  it("ensureInsideBase: a base-prefix without separator is not enough", () => {
+    // `/cache/foo` is NOT inside `/cache/fo`. Naive startsWith would
+    // accept it; the explicit `path.sep` boundary check rejects it.
+    const base = path.join(tmpdir(), "mulmo-base-prefix-fo");
+    const sibling = path.join(tmpdir(), "mulmo-base-prefix-foo");
+    assert.equal(ensureInsideBase(sibling, base), false);
   });
 
   it("isCacheValid: false on a directory missing the completion marker (partial extract)", () => {

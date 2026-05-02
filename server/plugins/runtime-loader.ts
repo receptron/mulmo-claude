@@ -147,6 +147,19 @@ export async function loadPluginFromCacheDir(name: string, version: string, cach
   }
 }
 
+/** Lexical anchor: confirm `candidate` resolves inside `base`. Catches
+ *  malformed ledger entries (`name` containing `../../etc`) before we
+ *  touch the disk. The asset route trusts registry membership, so a
+ *  registered cachePath that escaped the base would expose arbitrary
+ *  files via the unauthenticated GET — this check is the first
+ *  line of defence (defence-in-depth: realpath after extract is the
+ *  symlink-escape backstop). Exported for testing. */
+export function ensureInsideBase(candidate: string, base: string): boolean {
+  const resolvedCandidate = path.resolve(candidate);
+  const resolvedBase = path.resolve(base);
+  return resolvedCandidate === resolvedBase || resolvedCandidate.startsWith(resolvedBase + path.sep);
+}
+
 async function loadOne(entry: LedgerEntry): Promise<RuntimePlugin | null> {
   const tgzAbs = path.join(WORKSPACE_PATHS.plugins, entry.tgz);
   if (!existsSync(tgzAbs)) {
@@ -154,6 +167,13 @@ async function loadOne(entry: LedgerEntry): Promise<RuntimePlugin | null> {
     return null;
   }
   const cachePath = path.join(WORKSPACE_PATHS.pluginCache, entry.name, entry.version);
+  if (!ensureInsideBase(cachePath, WORKSPACE_PATHS.pluginCache)) {
+    log.warn(LOG_PREFIX, "ledger entry escapes plugin cache root — skipping", {
+      name: entry.name,
+      version: entry.version,
+    });
+    return null;
+  }
   if (!isCacheValid(cachePath)) {
     try {
       extractTgz(tgzAbs, cachePath);
