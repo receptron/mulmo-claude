@@ -1,6 +1,17 @@
 <template>
   <form class="flex flex-col gap-3" data-testid="accounting-opening-form" @submit.prevent="onSubmit">
-    <h3 class="text-base font-semibold">{{ t("pluginAccounting.openingForm.title") }}</h3>
+    <div class="flex items-center justify-between gap-2">
+      <h3 class="text-base font-semibold">{{ t("pluginAccounting.openingForm.title") }}</h3>
+      <button
+        type="button"
+        class="h-8 px-2.5 flex items-center gap-1 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+        data-testid="accounting-opening-manage-accounts"
+        @click="showAccountsModal = true"
+      >
+        <span class="material-icons text-base">tune</span>
+        <span>{{ t("pluginAccounting.accounts.manageButton") }}</span>
+      </button>
+    </div>
     <p class="text-xs text-gray-500">{{ t("pluginAccounting.openingForm.explainer") }}</p>
     <p class="text-xs text-blue-600" data-testid="accounting-opening-empty-hint">{{ t("pluginAccounting.openingForm.emptyHint") }}</p>
     <div v-if="existing" class="text-xs text-gray-500" data-testid="accounting-opening-existing">
@@ -70,6 +81,7 @@
         {{ submitting ? t("pluginAccounting.entryForm.submitting") : t("pluginAccounting.openingForm.submit") }}
       </button>
     </div>
+    <AccountsModal v-if="showAccountsModal" :book-id="bookId" :accounts="accounts" @close="showAccountsModal = false" @changed="emit('accountsChanged')" />
   </form>
 </template>
 
@@ -80,11 +92,14 @@ import { getOpeningBalances, setOpeningBalances, type Account, type JournalEntry
 import { formatAmount, inputStepFor } from "../currencies";
 import { localDateString } from "../dates";
 import { useLatestRequest } from "./useLatestRequest";
+import AccountsModal from "./AccountsModal.vue";
 
 const { t } = useI18n();
 
 const props = defineProps<{ bookId: string; accounts: Account[]; currency: string; version: number }>();
-const emit = defineEmits<{ submitted: [] }>();
+const emit = defineEmits<{ submitted: []; accountsChanged: [] }>();
+
+const showAccountsModal = ref(false);
 
 interface OpeningRow {
   debit: number | null;

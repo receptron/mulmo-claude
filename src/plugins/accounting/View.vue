@@ -56,6 +56,7 @@
             :accounts="accounts"
             :currency="activeCurrency"
             @submitted="onEntrySubmitted"
+            @accounts-changed="bumpLocalVersion"
           />
           <OpeningBalancesForm
             v-else-if="currentTab === 'opening'"
@@ -64,6 +65,7 @@
             :currency="activeCurrency"
             :version="bookVersion"
             @submitted="onEntrySubmitted"
+            @accounts-changed="bumpLocalVersion"
           />
           <Ledger v-else-if="currentTab === 'ledger'" :book-id="activeBookId" :accounts="accounts" :currency="activeCurrency" :version="bookVersion" />
           <BalanceSheet v-else-if="currentTab === 'balanceSheet'" :book-id="activeBookId" :currency="activeCurrency" :version="bookVersion" />
@@ -287,9 +289,19 @@ async function onBookDeleted(): Promise<void> {
   await refetchBooks();
 }
 
-watch(activeBookId, (next) => {
-  if (next) void refetchAccounts();
-});
+// Refetch the chart of accounts whenever the active book changes
+// or any pub/sub / child action bumps bookVersion (e.g. an
+// upsertAccount from the Manage Accounts modal, or an LLM-driven
+// upsert in another tab). The list is small JSON; the cost of
+// over-fetching on entry / void / opening events is negligible
+// against the staleness bug it removes.
+watch(
+  () => [activeBookId.value, bookVersion.value],
+  () => {
+    if (activeBookId.value) void refetchAccounts();
+  },
+  { immediate: true },
+);
 
 // Stash a target bookId that we want to land on but haven't been
 // able to apply yet (book not in `books` at the moment the

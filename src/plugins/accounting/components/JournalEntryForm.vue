@@ -1,6 +1,17 @@
 <template>
   <form class="flex flex-col gap-3" data-testid="accounting-entry-form" @submit.prevent="onSubmit">
-    <h3 class="text-base font-semibold">{{ t("pluginAccounting.entryForm.title") }}</h3>
+    <div class="flex items-center justify-between gap-2">
+      <h3 class="text-base font-semibold">{{ t("pluginAccounting.entryForm.title") }}</h3>
+      <button
+        type="button"
+        class="h-8 px-2.5 flex items-center gap-1 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+        data-testid="accounting-entry-manage-accounts"
+        @click="showAccountsModal = true"
+      >
+        <span class="material-icons text-base">tune</span>
+        <span>{{ t("pluginAccounting.accounts.manageButton") }}</span>
+      </button>
+    </div>
     <div class="flex flex-wrap gap-3">
       <label class="text-xs text-gray-500 flex flex-col gap-1">
         {{ t("pluginAccounting.entryForm.dateLabel") }}
@@ -87,6 +98,7 @@
         {{ submitting ? t("pluginAccounting.entryForm.submitting") : t("pluginAccounting.entryForm.submit") }}
       </button>
     </div>
+    <AccountsModal v-if="showAccountsModal" :book-id="bookId" :accounts="accounts" @close="showAccountsModal = false" @changed="emit('accountsChanged')" />
   </form>
 </template>
 
@@ -96,11 +108,14 @@ import { useI18n } from "vue-i18n";
 import { addEntry, type Account, type JournalLine } from "../api";
 import { formatAmount, inputStepFor } from "../currencies";
 import { localDateString } from "../dates";
+import AccountsModal from "./AccountsModal.vue";
 
 const { t } = useI18n();
 
 const props = defineProps<{ bookId: string; accounts: Account[]; currency: string }>();
-const emit = defineEmits<{ submitted: [] }>();
+const emit = defineEmits<{ submitted: []; accountsChanged: [] }>();
+
+const showAccountsModal = ref(false);
 
 const DASH = "—";
 
