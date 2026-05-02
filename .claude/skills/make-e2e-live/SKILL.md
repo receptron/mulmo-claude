@@ -39,13 +39,30 @@ description: e2e-live スイートを継続メンテする。`plans/feat-e2e-liv
 
 ## Phase 2: 着手項目の自動選定
 
-Phase 1 の結果から、 以下ルールで 1 PR 分の着手項目を **1 つ自動選定する**。 確認待ちで止まらない（auto mode 親和、 ユーザーは Phase 3〜4 進行中いつでも 「やっぱり L-04 で」 と redirect 可）。
+Phase 1 の結果から、 以下ルールで 1 PR 分の着手項目を自動選定する。 確認待ちで止まらない（auto mode 親和、 ユーザーは Phase 3〜4 進行中いつでも 「やっぱり L-04 で」 と redirect 可）。
+
+PR の規模（1 シナリオ vs 数シナリオ）はユーザー判断。 デフォルトは 1 シナリオ単位、 ユーザーが「カテゴリ別 1 つずつ採取」 や「5-6 個一気に」 と指示したらそれに従う。
 
 ### 選定優先度（上から順に試す）
 
-1. **C. ユーザー追加要望** — skill 起動プロンプトに項目指定（「L-03 で」 「webkit project 追加」 等）があれば最優先で採用
+1. **C. ユーザー追加要望** — skill 起動プロンプトに項目指定（「L-03 で」 「webkit project 追加」 「カテゴリ別 1 つずつ」 等）があれば最優先で採用
 2. **B. config / 基盤改善** — main 動向の 「要対応」 に未消化があれば 1 つ（webkit project / self-repair 緩和 等）。 規模が小さく副作用も spec 不変で reversible なので先に消化
 3. **A. 未実装シナリオ** — `plans/feat-e2e-live.md` の 「実装ステータス」 で未実装のうち、 重要度 S → A → B 順、 同レベル内では番号若い順で 1 つ
+
+### モード（C 系の頻出パターン）
+
+- **シングルモード（既定）**: 1 PR = 1 シナリオ。 上記優先度で 1 つ採取
+- **カテゴリ別採取モード**: ユーザーが「カテゴリ 1 つずつ」 「全カテゴリから 1 個ずつ」 等と言ったら、 plan の各カテゴリ（media / roles / session / wiki / ui / skills / docker）から重要度 A 優先・番号若い順で 1 シナリオずつ拾う。 ui / docker は重要度 B / docker-only も多いので、 ユーザー指示で skip 可
+- **バッチモード**: ユーザーが「5-6 個一気に」 「6 シナリオまとめて」 等と言ったら、 PR 規模を ignore してその数だけ author する。 個別 commit を細かく刻んで 1 PR にまとめる流れ
+
+### QA 観点で必ず取り込むシナリオ（横串）
+
+mulmoclaude の主要 plugin / 機能で「**編集系 (永続化)**」 と「**未登録系 (リソース不在時の表示)**」 は QA で繰り返し発覚しやすい弱点。 シナリオ選定時、 既存 plan に該当エントリが無ければ plan 側に追加して扱う:
+
+- **編集系**: 「コンテンツを編集 → 保存ボタンを押す → 別セッション or reload → 戻ったとき編集が残っている」 のフロー検証。 永続化 mech は編集の種類によらず共通なので **代表 1 種 (text 変更等) を 1 spec で見れば mech は満たせる**。 編集の種類を全部見たい場合は別 PR で粒度細かく
+- **未登録系**: 「リソース不在時に UI がどう振る舞うか」 の検証。 機能ごとに spec を 1 本ずつ立てる（audio 未登録時の play / image 未登録時のサムネ / movie 未登録時の Generate ボタン / character 未登録時の thumbnail / 等）。 「壊れる」 が NG、 「適切なエラー UI を出す」 「自然な fallback を取る」 が OK という assertion
+
+issue として #1073 (audio 未登録 → play stall) / #1074 (beat 編集が消える疑い) のように既出のものは spec 化候補として最優先
 
 ### 境界条件
 
@@ -171,7 +188,6 @@ yarn test:e2e:live:<category>   # 該当カテゴリだけ
 
 ## アンチパターン
 
-- ❌ 1 PR で 5 シナリオ以上を一気に追加 — review が破綻、 bot が rate-limit、 1 つこけると全部 revert
 - ❌ helper を spec 内に書いてから「あとで fixtures に切り出す」 — そのまま放置されて重複が増える。 「2 spec で使う」 が見えた時点で切り出す
 - ❌ `mockAllApis(page)` を呼ぶ — このスイートは実 LLM 経路の検証が目的、 mock すると意味がない
 - ❌ 応答テキストでの assertion — LLM 揺れに弱い。 DOM 状態（visible / `naturalWidth` / `src` 属性 / download magic bytes）で見る

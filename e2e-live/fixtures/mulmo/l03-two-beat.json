@@ -16,10 +16,12 @@
   "movieParams": { "provider": "google", "model": "veo-3.1-generate" },
   "beats": [
     {
+      "text": "",
       "image": { "type": "textSlide", "slide": { "title": "L-03 Beat 1", "subtitle": "fixture" } },
       "duration": 1
     },
     {
+      "text": "",
       "image": { "type": "textSlide", "slide": { "title": "L-03 Beat 2", "subtitle": "fixture" } },
       "duration": 1
     }

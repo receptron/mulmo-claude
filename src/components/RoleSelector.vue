@@ -4,6 +4,7 @@
       ref="button"
       class="flex-1 h-8 flex items-center gap-1 bg-white border border-gray-300 rounded px-2.5 text-sm text-gray-900 hover:bg-gray-50 text-left"
       data-testid="role-selector-btn"
+      :data-role="currentRoleId"
       @click="open = !open"
     >
       <span class="material-icons text-base text-gray-500">{{ roleIcon(roles, currentRoleId) }}</span>

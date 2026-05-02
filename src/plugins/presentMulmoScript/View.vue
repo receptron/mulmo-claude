@@ -280,7 +280,12 @@
                   {{ t("pluginMulmoScript.generateAudio") }}
                 </button>
               </div>
-              <button class="text-gray-400 hover:text-gray-600" :title="sourceOpen[index] ? 'Hide source' : 'Show source'" @click="toggleSource(index)">
+              <button
+                class="text-gray-400 hover:text-gray-600"
+                :title="sourceOpen[index] ? 'Hide source' : 'Show source'"
+                :data-testid="`mulmo-script-beat-source-toggle-${index}`"
+                @click="toggleSource(index)"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="w-3.5 h-3.5"
@@ -307,6 +312,7 @@
             :class="isValidBeat(index) ? 'outline-none' : 'outline outline-2 outline-red-400'"
             rows="8"
             spellcheck="false"
+            :data-testid="`mulmo-script-beat-source-textarea-${index}`"
           />
           <div class="flex items-center justify-end gap-2 px-2 pb-2">
             <span v-if="beatSaveErrors[index]" class="text-xs text-red-600" role="alert">{{
@@ -322,6 +328,7 @@
                   : 'border-gray-200 text-gray-300 cursor-not-allowed'
               "
               :disabled="!isValidBeat(index) || !!beatSaving[index]"
+              :data-testid="`mulmo-script-beat-update-button-${index}`"
               @click="updateBeat(index)"
             >
               {{ beatSaving[index] ? t("pluginMulmoScript.saving") : t("pluginMulmoScript.update") }}

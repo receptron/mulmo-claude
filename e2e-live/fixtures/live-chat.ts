@@ -10,7 +10,6 @@ import { fileURLToPath } from "node:url";
 
 import { type Download, type FrameLocator, type Page, expect } from "@playwright/test";
 
-import { API_ROUTES } from "../../src/config/apiRoutes";
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 
 const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -146,49 +145,54 @@ export function getCurrentSessionId(page: Page): string | null {
 }
 
 /**
- * Best-effort hard-delete a chat session through the server's
- * DELETE /api/sessions/:id endpoint — same path the kebab → 削除
- * button hits in the UI. Used as cleanup so the test does not
- * leave debug sessions piling up in the user's history.
+ * Best-effort hard-delete a chat session via the same UI gesture a
+ * human user performs — open the session row's kebab menu in the
+ * sidebar history, click the red 削除 item, and accept the
+ * `window.confirm` "このセッションを削除しますか？" prompt that the SPA
+ * raises. Used as cleanup so the test does not leave debug sessions
+ * piling up in the user's history.
  *
- * Never throws. Cleanup failures (page already closed, server
- * restarting, session already gone) must not turn a passing test
- * red.
+ * Without the `page.once("dialog", ...)` accept the prompt would
+ * stay pending and the SPA would never call DELETE — that was the
+ * silent-skip mode behind the leftover-history symptom we saw
+ * before this change.
+ *
+ * Never throws. Cleanup failures (page already closed, sidebar
+ * collapsed, session already gone) must not turn a passing test red.
  */
-/** Build the workspace-relative DELETE URL from the shared API_ROUTES table. */
-function buildSessionDeleteUrl(sessionId: string): string {
-  return API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId));
-}
-
-/**
- * Issue the DELETE call from inside the page so the SPA's
- * bearer-auth meta tag is reachable. Logs HTTP / network failures
- * via console.warn to keep the suite running.
- */
-async function performInPageSessionDelete(page: Page, url: string): Promise<void> {
-  await page.evaluate(async (target) => {
-    const meta = document.querySelector('meta[name="mulmoclaude-auth"]');
-    const token = meta?.getAttribute("content") ?? "";
-    try {
-      const response = await fetch(target, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) {
-        console.warn(`deleteSession: ${target} returned HTTP ${response.status}`);
-      }
-    } catch (err) {
-      console.warn(`deleteSession: network error for ${target}`, err);
-    }
-  }, url);
-}
+const DELETE_BUTTON_TIMEOUT_MS = 10_000;
 
 export async function deleteSession(page: Page, sessionId: string): Promise<void> {
   if (page.isClosed()) return;
   try {
-    await performInPageSessionDelete(page, buildSessionDeleteUrl(sessionId));
-  } catch {
-    // best-effort: page already closed, server restarting, etc.
+    // Step away from /chat/<id> first — the server's isRunning
+    // guard rejects DELETE on whichever session the page is
+    // currently sitting on (it's still in the active store right
+    // after the assistant turn). Routing to "/" detaches the
+    // SPA's hold so the cleanup flow lands on a quiescent record.
+    if (page.url().includes(`/chat/${sessionId}`)) {
+      await page.goto("/");
+    }
+    // The session-row kebab menu lives inside the session-history
+    // side panel, which is collapsed by default. Open it via the
+    // toggle button (testid switches between -off and -on) before
+    // looking up the row.
+    const toggleOff = page.getByTestId("session-history-toggle-off");
+    if ((await toggleOff.count()) > 0 && (await toggleOff.isVisible())) {
+      await toggleOff.click();
+    }
+    const menuButton = page.getByTestId(`session-row-menu-${sessionId}`);
+    await menuButton.click({ timeout: DELETE_BUTTON_TIMEOUT_MS });
+    // Auto-accept the SPA's `window.confirm("このセッションを削除しますか？")`
+    // prompt that fires from the delete button's @click handler.
+    page.once("dialog", (dialog) => {
+      dialog.accept().catch(() => undefined);
+    });
+    const deleteButton = page.getByTestId(`session-row-delete-${sessionId}`);
+    await deleteButton.click({ timeout: DELETE_BUTTON_TIMEOUT_MS });
+  } catch (err) {
+    // best-effort: page closing, sidebar collapsed, session already gone, etc.
+    console.warn(`deleteSession: UI cleanup skipped for session ${sessionId}`, err);
   }
 }
 
