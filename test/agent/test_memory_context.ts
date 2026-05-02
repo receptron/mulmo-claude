@@ -3,8 +3,12 @@
 // During the brief window between PR-B shipping and migration
 // finishing, both layouts can coexist on disk. The reader must pick
 // up either, both, or neither.
+//
+// Each case spins up its own workspace via `mkdtemp` so test order
+// can't make a leftover file from one case satisfy the assertions of
+// another (#1061 review).
 
-import { after, before, describe, it } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,55 +16,65 @@ import path from "node:path";
 
 import { buildMemoryContext } from "../../server/agent/prompt.js";
 
+async function scopedWorkspace<T>(label: string, body: (root: string) => Promise<T> | T): Promise<T> {
+  const root = await mkdtemp(path.join(tmpdir(), `mulmoclaude-mem-ctx-${label}-`));
+  try {
+    return await body(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 describe("buildMemoryContext", () => {
-  let scoped: string;
-
-  before(async () => {
-    scoped = await mkdtemp(path.join(tmpdir(), "mulmoclaude-mem-ctx-"));
-  });
-
-  after(async () => {
-    await rm(scoped, { recursive: true, force: true });
-  });
-
-  it("emits only the helps pointer on a fresh workspace (no memory layouts)", () => {
-    const out = buildMemoryContext(scoped);
-    assert.match(out, /## Memory/);
-    assert.match(out, /config\/helps\/index\.md/);
-    // No legacy text and no typed entries.
-    assert.doesNotMatch(out, /yarn/);
-    assert.doesNotMatch(out, /印象派/);
+  it("emits only the helps pointer on a fresh workspace (no memory layouts)", async () => {
+    await scopedWorkspace("fresh", (root) => {
+      const out = buildMemoryContext(root);
+      assert.match(out, /## Memory/);
+      assert.match(out, /config\/helps\/index\.md/);
+      assert.doesNotMatch(out, /yarn/);
+      assert.doesNotMatch(out, /印象派/);
+    });
   });
 
   it("includes legacy memory.md when present", async () => {
-    const legacyDir = path.join(scoped, "conversations");
-    await mkdir(legacyDir, { recursive: true });
-    await writeFile(path.join(legacyDir, "memory.md"), "## Preferences\n- yarn を使う\n", "utf-8");
+    await scopedWorkspace("legacy", async (root) => {
+      const legacyDir = path.join(root, "conversations");
+      await mkdir(legacyDir, { recursive: true });
+      await writeFile(path.join(legacyDir, "memory.md"), "## Preferences\n- yarn を使う\n", "utf-8");
 
-    const out = buildMemoryContext(scoped);
-    assert.match(out, /yarn を使う/);
+      const out = buildMemoryContext(root);
+      assert.match(out, /yarn を使う/);
+    });
   });
 
-  it("includes typed entries from conversations/memory/", async () => {
-    const memDir = path.join(scoped, "conversations", "memory");
-    await mkdir(memDir, { recursive: true });
-    await writeFile(
-      path.join(memDir, "interest_impressionism.md"),
-      "---\nname: 印象派\ndescription: 美術鑑賞の主軸\ntype: interest\n---\n\nMonet, Renoir, etc.\n",
-      "utf-8",
-    );
-    // The system-owned index file is skipped by the reader (otherwise
-    // the link list would appear twice).
-    await writeFile(path.join(memDir, "MEMORY.md"), "# Memory\n\n- [印象派](interest_impressionism.md) — 美術鑑賞の主軸\n", "utf-8");
+  it("includes typed entries from conversations/memory/ alongside legacy memory.md", async () => {
+    await scopedWorkspace("typed", async (root) => {
+      // Seed both layouts so we exercise the dual-mode reader's "both
+      // present" branch (the only branch that surfaced the previous
+      // test-order coupling).
+      const convDir = path.join(root, "conversations");
+      await mkdir(convDir, { recursive: true });
+      await writeFile(path.join(convDir, "memory.md"), "## Preferences\n- yarn を使う\n", "utf-8");
 
-    const out = buildMemoryContext(scoped);
-    assert.match(out, /印象派/);
-    assert.match(out, /Monet/);
-    // legacy text from the previous test still in there.
-    assert.match(out, /yarn を使う/);
-    // index file is not duplicated.
-    const occurrences = (out.match(/interest_impressionism\.md/g) ?? []).length;
-    assert.equal(occurrences, 0, "the index link target should not leak through the reader");
+      const memDir = path.join(convDir, "memory");
+      await mkdir(memDir, { recursive: true });
+      await writeFile(
+        path.join(memDir, "interest_impressionism.md"),
+        "---\nname: 印象派\ndescription: 美術鑑賞の主軸\ntype: interest\n---\n\nMonet, Renoir, etc.\n",
+        "utf-8",
+      );
+      // The system-owned index file is skipped by the reader (otherwise
+      // the link list would appear twice).
+      await writeFile(path.join(memDir, "MEMORY.md"), "# Memory\n\n- [印象派](interest_impressionism.md) — 美術鑑賞の主軸\n", "utf-8");
+
+      const out = buildMemoryContext(root);
+      assert.match(out, /印象派/);
+      assert.match(out, /Monet/);
+      assert.match(out, /yarn を使う/);
+      // index file is not duplicated.
+      const occurrences = (out.match(/interest_impressionism\.md/g) ?? []).length;
+      assert.equal(occurrences, 0, "the index link target should not leak through the reader");
+    });
   });
 
   it("skips dotfiles in the typed memory directory", async () => {

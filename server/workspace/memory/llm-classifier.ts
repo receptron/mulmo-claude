@@ -17,7 +17,7 @@
 import type { MemoryClassification, MemoryCandidate, MemoryClassifier } from "./migrate.js";
 import { isMemoryType, type MemoryType } from "./types.js";
 
-import type { Summarize } from "../journal/archivist-cli.js";
+import { ClaudeCliNotFoundError, type Summarize } from "../journal/archivist-cli.js";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
 
@@ -50,6 +50,14 @@ export function makeLlmMemoryClassifier(deps: DepsForLlmClassifier): MemoryClass
     try {
       raw = await deps.summarize(SYSTEM_PROMPT, userPrompt);
     } catch (err) {
+      // Let `ClaudeCliNotFoundError` escape so the caller can abort
+      // the whole migration. Without this, every candidate runs
+      // through the classifier, gets `null` back, and migrateLegacyMemory
+      // produces an empty result + (pre-#1091) renames the legacy file
+      // to `.backup`. Even with #1091 the user pays N classifier
+      // failures (each spawns claude) before realising the CLI is
+      // missing (#1061 review).
+      if (err instanceof ClaudeCliNotFoundError) throw err;
       log.warn("memory", "llm classifier: summarize threw", {
         preview: candidate.body.slice(0, 80),
         error: errorMessage(err),
@@ -87,7 +95,10 @@ export function parseClassifierVerdict(raw: string): MemoryClassification | null
   // The description is optional from the spec's perspective —
   // migrate.ts falls back to a body-derived description when missing.
   // But if present, normalise to a single line and cap length.
-  return desc.length > 0 ? { type: type as MemoryType, description: oneLine(desc).slice(0, 200) } : { type: type as MemoryType };
+  // Cap matches the prompt's `<=100 chars>` declaration so persisted
+  // entries never exceed the schema the classifier was told to follow
+  // (#1061 review).
+  return desc.length > 0 ? { type: type as MemoryType, description: oneLine(desc).slice(0, 100) } : { type: type as MemoryType };
 }
 
 function stripFenceAndWhitespace(raw: string): string {

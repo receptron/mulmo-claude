@@ -25,6 +25,7 @@ import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { readTextSafe } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { errorMessage } from "../../utils/errors.js";
+import { ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
 import { WORKSPACE_FILES } from "../paths.js";
 import { regenerateIndex, writeMemoryEntry } from "./io.js";
 import { isMemoryType, slugifyMemoryName, type MemoryEntry, type MemoryType } from "./types.js";
@@ -200,6 +201,12 @@ async function safeClassify(classify: MemoryClassifier, candidate: MemoryCandida
     if (verdict && isMemoryType(verdict.type)) return verdict;
     return null;
   } catch (err) {
+    // Startup-wide failures (CLI missing) MUST escape so
+    // `runMemoryMigrationOnce` can log once + leave the legacy file
+    // for retry. Without this, every candidate would silently degrade
+    // to `null` and look like normal classifier disagreement
+    // (#1061 review).
+    if (err instanceof ClaudeCliNotFoundError) throw err;
     log.warn("memory", "migration: classifier threw", {
       preview: candidate.body.slice(0, 80),
       error: errorMessage(err),
