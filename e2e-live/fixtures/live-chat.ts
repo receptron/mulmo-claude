@@ -147,22 +147,32 @@ export function getCurrentSessionId(page: Page): string | null {
 /**
  * Best-effort hard-delete a chat session via the same UI gesture a
  * human user performs — open the session row's kebab menu in the
- * sidebar history and click the delete item. Used as cleanup so the
- * test does not leave debug sessions piling up in the user's history.
+ * sidebar history, click the red 削除 item, and accept the
+ * `window.confirm` "このセッションを削除しますか？" prompt that the SPA
+ * raises. Used as cleanup so the test does not leave debug sessions
+ * piling up in the user's history.
  *
- * Fire-and-forget: the click hits the server's `/api/sessions/:id`
- * endpoint, but the row's actual disappearance depends on a
- * `notifySessionsChanged` broadcast whose timing isn't reliable at
- * test-shutdown. We don't wait for detach; if the click landed the
- * server accepts the delete, and if it doesn't (page closing,
- * sidebar collapsed, session already gone), the leftover row gets
- * deleted by hand — same outcome a human user would get.
+ * Without the `page.once("dialog", ...)` accept the prompt would
+ * stay pending and the SPA would never call DELETE — that was the
+ * silent-skip mode behind the leftover-history symptom we saw
+ * before this change.
+ *
+ * Never throws. Cleanup failures (page already closed, sidebar
+ * collapsed, session already gone) must not turn a passing test red.
  */
 const DELETE_BUTTON_TIMEOUT_MS = 10_000;
 
 export async function deleteSession(page: Page, sessionId: string): Promise<void> {
   if (page.isClosed()) return;
   try {
+    // Step away from /chat/<id> first — the server's isRunning
+    // guard rejects DELETE on whichever session the page is
+    // currently sitting on (it's still in the active store right
+    // after the assistant turn). Routing to "/" detaches the
+    // SPA's hold so the cleanup flow lands on a quiescent record.
+    if (page.url().includes(`/chat/${sessionId}`)) {
+      await page.goto("/");
+    }
     // The session-row kebab menu lives inside the session-history
     // side panel, which is collapsed by default. Open it via the
     // toggle button (testid switches between -off and -on) before
@@ -173,6 +183,11 @@ export async function deleteSession(page: Page, sessionId: string): Promise<void
     }
     const menuButton = page.getByTestId(`session-row-menu-${sessionId}`);
     await menuButton.click({ timeout: DELETE_BUTTON_TIMEOUT_MS });
+    // Auto-accept the SPA's `window.confirm("このセッションを削除しますか？")`
+    // prompt that fires from the delete button's @click handler.
+    page.once("dialog", (dialog) => {
+      dialog.accept().catch(() => undefined);
+    });
     const deleteButton = page.getByTestId(`session-row-delete-${sessionId}`);
     await deleteButton.click({ timeout: DELETE_BUTTON_TIMEOUT_MS });
   } catch (err) {
