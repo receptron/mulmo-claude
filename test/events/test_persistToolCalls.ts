@@ -16,7 +16,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { __resetForTests, getOrCreateSession, initSessionStore, persistToolCallEvent, pushSessionEvent } from "../../server/events/session-store/index.ts";
+import {
+  __resetForTests,
+  enqueueJsonlAppend,
+  getOrCreateSession,
+  initSessionStore,
+  persistToolCallEvent,
+  pushSessionEvent,
+} from "../../server/events/session-store/index.ts";
 import { EVENT_TYPES } from "../../src/types/events.ts";
 
 const NOW = "2026-04-17T00:00:00.000Z";
@@ -105,6 +112,48 @@ describe("persistToolCallEvent — schema", () => {
       const second = JSON.parse(lines[1]) as Record<string, unknown>;
       assert.equal(first.toolUseId, "u1");
       assert.equal(second.toolUseId, "u2");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("enqueueJsonlAppend — FIFO ordering across awaited / unawaited callers", () => {
+  it("preserves the call order even when the first enqueue is unawaited and the second is awaited", async () => {
+    // Reproduces the Codex review concern on PR #1101: if the first
+    // append is fire-and-forget (`tool_call` from
+    // `applyEventToSession`) and the second is awaited (`pushToolResult`),
+    // the second can hit disk before the first under raw `appendFile`.
+    // The fix routes both through `enqueueJsonlAppend`, whose internal
+    // promise chain forces FIFO order.
+    const dir = await mkdtemp(path.join(tmpdir(), "enqueue-fifo-"));
+    try {
+      const jsonlPath = path.join(dir, "fake.jsonl");
+      await writeFile(jsonlPath, "");
+
+      initSessionStore({ publish: () => {} });
+      const session = getOrCreateSession("chat-fifo", {
+        roleId: "general",
+        resultsFilePath: jsonlPath,
+        startedAt: NOW,
+        updatedAt: NOW,
+      });
+
+      // First enqueue — DON'T await. Mirrors the `tool_call`
+      // fire-and-forget path inside `applyEventToSession`.
+      const callPromise = enqueueJsonlAppend(session, `${JSON.stringify({ source: "agent", type: "tool_call", toolUseId: "u1" })}\n`);
+      // Second enqueue — await this one (mirrors `pushToolResult`).
+      // Without the queue, this could append before the first one
+      // resolves (the appendFile call had already been issued).
+      await enqueueJsonlAppend(session, `${JSON.stringify({ source: "tool", type: "tool_result", toolUseId: "u1" })}\n`);
+      // Drain the first enqueue so its rejection (if any) doesn't
+      // become unhandled.
+      await callPromise;
+
+      const lines = (await readFile(jsonlPath, "utf8")).trim().split("\n");
+      assert.equal(lines.length, 2);
+      assert.equal((JSON.parse(lines[0]) as Record<string, unknown>).type, "tool_call", "tool_call must land first");
+      assert.equal((JSON.parse(lines[1]) as Record<string, unknown>).type, "tool_result", "tool_result must land second");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

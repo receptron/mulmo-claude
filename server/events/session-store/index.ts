@@ -44,6 +44,13 @@ export interface ServerSession {
    * used to keep the busy indicator lit across view navigation.
    */
   pendingGenerations: Record<string, PendingGeneration>;
+  /**
+   * Per-session FIFO chain for jsonl appends. `persistToolCallEvent`
+   * (fire-and-forget from `applyEventToSession`) and `pushToolResult`
+   * (awaited) both enqueue here so a `tool_result` can't race ahead of
+   * its preceding `tool_call` to disk. Codex review on PR #1101.
+   */
+  jsonlWriteQueue: Promise<void>;
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -103,9 +110,30 @@ export function getOrCreateSession(
     startedAt: opts.startedAt,
     updatedAt: opts.updatedAt,
     pendingGenerations: {},
+    jsonlWriteQueue: Promise.resolve(),
   };
   store.set(chatSessionId, session);
   return session;
+}
+
+/** Chain a jsonl append onto this session's write queue so concurrent
+ *  callers see FIFO disk order. Returns the promise that resolves
+ *  when THIS append completes. The queue's tail is updated even on
+ *  rejection so a single failed append doesn't permanently poison
+ *  ordering for the rest of the session.
+ *
+ *  Exported for unit tests; the run-time hot path uses it from
+ *  `applyEventToSession` and `pushToolResult`. */
+export function enqueueJsonlAppend(session: ServerSession, line: string): Promise<void> {
+  const tail = session.jsonlWriteQueue.then(
+    () => appendFile(session.resultsFilePath, line),
+    () => appendFile(session.resultsFilePath, line),
+  );
+  session.jsonlWriteQueue = tail.then(
+    () => undefined,
+    () => undefined,
+  );
+  return tail;
 }
 
 function removeSession(chatSessionId: string, payload?: SessionsChannelPayload): void {
@@ -325,9 +353,11 @@ function parseGenerationPayload(event: Record<string, unknown>): GenerationPaylo
 // see plans/feat-persist-tool-calls.md for the rationale.
 //
 // Exported for unit tests; the run-time hot path stays inside
-// `applyEventToSession`.
-export async function persistToolCallEvent(resultsFilePath: string, event: Record<string, unknown>): Promise<void> {
-  const line = `${JSON.stringify({
+// `applyEventToSession` and goes through the per-session
+// `jsonlWriteQueue` so a `tool_result` cannot race ahead of its
+// preceding `tool_call` to disk (Codex review on #1101).
+export function buildToolCallLine(event: Record<string, unknown>): string {
+  return `${JSON.stringify({
     source: "agent",
     type: EVENT_TYPES.toolCall,
     toolUseId: event.toolUseId,
@@ -335,7 +365,10 @@ export async function persistToolCallEvent(resultsFilePath: string, event: Recor
     args: event.args,
     timestamp: Date.now(),
   })}\n`;
-  await appendFile(resultsFilePath, line);
+}
+
+export async function persistToolCallEvent(resultsFilePath: string, event: Record<string, unknown>): Promise<void> {
+  await appendFile(resultsFilePath, buildToolCallLine(event));
 }
 
 function applyEventToSession(session: ServerSession, type: string, event: Record<string, unknown>): GenerationDelta {
@@ -351,7 +384,14 @@ function applyEventToSession(session: ServerSession, type: string, event: Record
       // SSE flow. The in-memory `toolCallHistory` is the
       // authoritative copy during the run; the jsonl line is a
       // debug aid that survives refresh.
-      persistToolCallEvent(session.resultsFilePath, event).catch((err: unknown) => {
+      //
+      // Goes through `enqueueJsonlAppend` so this append precedes
+      // any `tool_result` for the same toolUseId — `pushToolResult`
+      // also enqueues, and the queue is FIFO. Without the queue, the
+      // awaited `tool_result` could hit disk before the unawaited
+      // `tool_call`, and a downstream reader assuming call-before-
+      // result ordering would mis-associate events.
+      enqueueJsonlAppend(session, buildToolCallLine(event)).catch((err: unknown) => {
         log.warn("session-store", "persist tool_call failed (non-fatal)", {
           chatSessionId: session.chatSessionId,
           error: err instanceof Error ? err.message : String(err),
@@ -421,13 +461,16 @@ export function publishGeneration(
 
 export type PushToolResultOutcome = { kind: "skipped"; reason: string } | { kind: "processed" };
 
-/** Persist a tool_result to JSONL, then publish to the session channel. */
+/** Persist a tool_result to JSONL, then publish to the session channel.
+ *  Routes through the session's FIFO `jsonlWriteQueue` so a result
+ *  can't beat its preceding `tool_call` to disk under
+ *  `PERSIST_TOOL_CALLS=1` (Codex review on #1101). */
 export async function pushToolResult(chatSessionId: string, result: unknown): Promise<PushToolResultOutcome> {
   const session = store.get(chatSessionId);
   if (!session) return { kind: "skipped", reason: "unknown session" };
 
-  await appendFile(
-    session.resultsFilePath,
+  await enqueueJsonlAppend(
+    session,
     `${JSON.stringify({
       source: "tool",
       type: EVENT_TYPES.toolResult,
