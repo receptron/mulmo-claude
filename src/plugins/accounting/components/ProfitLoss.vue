@@ -21,14 +21,16 @@
         <table class="w-full text-sm">
           <tbody>
             <tr v-for="row in profitLoss.income.rows" :key="row.accountCode" class="border-b border-gray-100">
-              <td class="py-1 px-1 font-mono text-xs">{{ row.accountCode }}</td>
-              <td class="py-1 px-1">{{ row.accountName }}</td>
+              <td class="py-1 px-1">
+                <span class="font-mono text-[10px] text-gray-400 mr-2">{{ row.accountCode }}</span
+                >{{ row.accountName }}
+              </td>
               <td class="py-1 px-1 text-right font-mono">{{ formatAmount(row.amount) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr class="font-semibold border-t border-gray-300">
-              <td colspan="2" class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
+              <td class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
               <td class="py-1 px-1 text-right">{{ formatAmount(profitLoss.income.total) }}</td>
             </tr>
           </tfoot>
@@ -39,14 +41,16 @@
         <table class="w-full text-sm">
           <tbody>
             <tr v-for="row in profitLoss.expense.rows" :key="row.accountCode" class="border-b border-gray-100">
-              <td class="py-1 px-1 font-mono text-xs">{{ row.accountCode }}</td>
-              <td class="py-1 px-1">{{ row.accountName }}</td>
+              <td class="py-1 px-1">
+                <span class="font-mono text-[10px] text-gray-400 mr-2">{{ row.accountCode }}</span
+                >{{ row.accountName }}
+              </td>
               <td class="py-1 px-1 text-right font-mono">{{ formatAmount(row.amount) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr class="font-semibold border-t border-gray-300">
-              <td colspan="2" class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
+              <td class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
               <td class="py-1 px-1 text-right">{{ formatAmount(profitLoss.expense.total) }}</td>
             </tr>
           </tfoot>

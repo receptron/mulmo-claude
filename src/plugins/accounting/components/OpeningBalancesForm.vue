@@ -23,8 +23,8 @@
       <tbody>
         <tr v-for="account in bsAccounts" :key="account.code" class="border-b border-gray-100">
           <td class="py-1 px-2">
-            <span class="font-mono text-xs">{{ account.code }}</span>
-            <span class="ml-2">{{ account.name }}</span>
+            <span class="font-mono text-[10px] text-gray-400 mr-2">{{ account.code }}</span>
+            <span>{{ account.name }}</span>
             <span class="ml-2 text-xs text-gray-400">{{ account.type }}</span>
           </td>
           <td class="py-1 px-2">

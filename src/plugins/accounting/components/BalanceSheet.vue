@@ -18,16 +18,16 @@
           <table class="w-full text-sm">
             <tbody>
               <tr v-for="row in section.rows" :key="row.accountCode" class="border-b border-gray-100" :class="isEarningsRow(row) ? 'italic text-gray-600' : ''">
-                <td class="py-1 px-1 font-mono text-xs">
-                  <span v-if="!isEarningsRow(row)">{{ row.accountCode }}</span>
+                <td class="py-1 px-1">
+                  <span v-if="!isEarningsRow(row)" class="font-mono text-[10px] text-gray-400 mr-2">{{ row.accountCode }}</span
+                  >{{ rowName(row) }}
                 </td>
-                <td class="py-1 px-1">{{ rowName(row) }}</td>
                 <td class="py-1 px-1 text-right font-mono">{{ formatAmount(row.balance) }}</td>
               </tr>
             </tbody>
             <tfoot>
               <tr class="font-semibold border-t border-gray-300">
-                <td colspan="2" class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
+                <td class="py-1 px-1">{{ t("pluginAccounting.balanceSheet.total") }}</td>
                 <td class="py-1 px-1 text-right">{{ formatAmount(section.total) }}</td>
               </tr>
             </tfoot>

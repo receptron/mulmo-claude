@@ -47,8 +47,9 @@
             <span v-if="entry.memo">{{ entry.memo }}</span>
           </td>
           <td class="py-1 px-2">
-            <div v-for="(line, idx) in entry.lines" :key="idx" class="text-xs flex gap-2">
-              <span class="font-mono">{{ line.accountCode }}</span>
+            <div v-for="(line, idx) in entry.lines" :key="idx" class="text-xs flex gap-2 items-baseline">
+              <span class="font-mono text-[10px] text-gray-400">{{ line.accountCode }}</span>
+              <span>{{ accountNameFor(line.accountCode) }}</span>
               <span v-if="line.debit">{{ formatDebit(line.debit) }}</span>
               <span v-if="line.credit">{{ formatCredit(line.credit) }}</span>
             </div>
@@ -113,6 +114,14 @@ function formatCredit(value: number): string {
 }
 function formatAccountLabel(account: Account): string {
   return `${account.code} — ${account.name}`;
+}
+const accountNameByCode = computed(() => {
+  const map = new Map<string, string>();
+  for (const account of props.accounts) map.set(account.code, account.name);
+  return map;
+});
+function accountNameFor(code: string): string {
+  return accountNameByCode.value.get(code) ?? code;
 }
 
 async function refresh(): Promise<void> {
