@@ -338,14 +338,30 @@ function parseAttachments(raw: unknown): Attachment[] | undefined {
 // recognised the first shape, so a typed `{ path }` payload from a
 // socket client passed type-check but got silently dropped at the
 // wire boundary (#1050 review).
-function parseOneAttachment(item: unknown): Attachment | null {
+//
+// Wire-boundary path guard: a malicious bridge can ship arbitrary
+// strings as `path`. The downstream `isAttachmentPath` enforcement
+// in the server is the authoritative gate, but defence-in-depth at
+// each layer is required for external code (#1099 review). Reject
+// absolute paths and any traversal segment up front so a payload
+// like `path: "../../etc/passwd"` never reaches the relay.
+function isSafeAttachmentPath(value: string): boolean {
+  if (value.length === 0) return false;
+  if (value.startsWith("/") || value.startsWith("\\")) return false;
+  for (const segment of value.split(/[/\\]/)) {
+    if (segment === "..") return false;
+  }
+  return true;
+}
+
+export function parseOneAttachment(item: unknown): Attachment | null {
   if (!item || typeof item !== "object") return null;
   const record = item as Record<string, unknown>;
   const filename = typeof record.filename === "string" && record.filename.length > 0 ? record.filename : undefined;
   if (typeof record.mimeType === "string" && typeof record.data === "string") {
     return { mimeType: record.mimeType, data: record.data, ...(filename ? { filename } : {}) };
   }
-  if (typeof record.path === "string" && record.path.length > 0) {
+  if (typeof record.path === "string" && isSafeAttachmentPath(record.path)) {
     const mimeType = typeof record.mimeType === "string" ? record.mimeType : undefined;
     return { path: record.path, ...(mimeType ? { mimeType } : {}), ...(filename ? { filename } : {}) };
   }

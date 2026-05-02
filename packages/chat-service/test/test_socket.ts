@@ -4,7 +4,7 @@ import http from "http";
 import express from "express";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Server as SocketServer } from "socket.io";
-import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH } from "../src/socket.js";
+import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, parseOneAttachment } from "../src/socket.js";
 import { createPushQueue } from "../src/push-queue.js";
 import type { RelayParams, RelayResult } from "../src/relay.js";
 import type { Logger } from "../src/types.js";
@@ -118,6 +118,92 @@ describe("chat-service socket — no auth", () => {
     assert.equal(harness.relayCalls[0].text, "hi");
 
     client.disconnect();
+  });
+
+  it("forwards a path-only attachment to relay unchanged (#1099)", async () => {
+    // Regression for #1050: the socket parser was inline-only and
+    // silently dropped `{ path }` payloads. Pin the wire shape so a
+    // future refactor can't reintroduce the drop.
+    const client = connectClient(harness.url, { transportId: "cli" });
+    await waitConnect(client);
+    const ack = await emitMessage(client, {
+      externalChatId: "terminal",
+      text: "look at this",
+      attachments: [{ path: "data/attachments/2026/05/x.png", mimeType: "image/png" }],
+    });
+    assert.equal(ack.ok, true);
+    assert.equal(harness.relayCalls.length, 1);
+    assert.deepEqual(harness.relayCalls[0].attachments, [{ path: "data/attachments/2026/05/x.png", mimeType: "image/png" }]);
+    client.disconnect();
+  });
+
+  it("forwards only the valid entries when the array mixes valid + invalid items", async () => {
+    const client = connectClient(harness.url, { transportId: "cli" });
+    await waitConnect(client);
+    const ack = await emitMessage(client, {
+      externalChatId: "terminal",
+      text: "mixed bag",
+      attachments: [
+        { path: "data/attachments/2026/05/a.png" },
+        { somethingElse: "wrong shape" },
+        { mimeType: "image/png" /* missing data + path */ },
+        { mimeType: "image/png", data: "AAAA" },
+      ],
+    });
+    assert.equal(ack.ok, true);
+    const forwarded = harness.relayCalls[0].attachments ?? [];
+    assert.equal(forwarded.length, 2);
+    assert.equal(forwarded[0].path, "data/attachments/2026/05/a.png");
+    assert.equal(forwarded[1].data, "AAAA");
+    client.disconnect();
+  });
+});
+
+describe("chat-service socket — parseOneAttachment", () => {
+  it("accepts the inline `{ data, mimeType }` shape", () => {
+    assert.deepEqual(parseOneAttachment({ mimeType: "image/png", data: "AAAA" }), { mimeType: "image/png", data: "AAAA" });
+  });
+
+  it("accepts the path-only `{ path }` shape", () => {
+    assert.deepEqual(parseOneAttachment({ path: "data/attachments/2026/05/x.png" }), { path: "data/attachments/2026/05/x.png" });
+  });
+
+  it("preserves optional `filename` and `mimeType` on path-only entries", () => {
+    assert.deepEqual(parseOneAttachment({ path: "data/attachments/2026/05/x.png", mimeType: "image/png", filename: "x.png" }), {
+      path: "data/attachments/2026/05/x.png",
+      mimeType: "image/png",
+      filename: "x.png",
+    });
+  });
+
+  it("rejects absolute paths (wire-boundary defence-in-depth, #1099)", () => {
+    assert.equal(parseOneAttachment({ path: "/etc/passwd" }), null);
+    assert.equal(parseOneAttachment({ path: "\\\\Windows\\\\System32\\\\config" }), null);
+  });
+
+  it("rejects any traversal segment", () => {
+    assert.equal(parseOneAttachment({ path: "../../etc/passwd" }), null);
+    assert.equal(parseOneAttachment({ path: "data/attachments/../../etc/shadow" }), null);
+    assert.equal(parseOneAttachment({ path: "data/attachments\\..\\..\\etc\\hosts" }), null);
+  });
+
+  it("rejects empty / non-string payload", () => {
+    assert.equal(parseOneAttachment(null), null);
+    assert.equal(parseOneAttachment("not-an-object"), null);
+    assert.equal(parseOneAttachment({ path: "" }), null);
+    assert.equal(parseOneAttachment({}), null);
+  });
+});
+
+describe("chat-service socket — no auth (cont)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await startHarness();
+  });
+
+  afterEach(async () => {
+    await stopHarness(harness);
   });
 
   it("rejects the handshake when transportId is missing", async () => {
