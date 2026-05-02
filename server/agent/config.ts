@@ -1,8 +1,9 @@
-import { join } from "path";
+import { dirname, join } from "path";
 import { homedir, tmpdir } from "os";
+import { createRequire } from "node:module";
 import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
-import { MCP_PLUGIN_NAMES } from "./plugin-names.js";
+import { getActiveToolDescriptors } from "./activeTools.js";
 import type { McpServerSpec } from "../system/config.js";
 import { getCurrentToken } from "../api/auth/token.js";
 import type { Attachment } from "@mulmobridge/protocol";
@@ -14,10 +15,13 @@ export const CONTAINER_WORKSPACE_PATH = "/home/node/mulmoclaude";
 
 const BASE_ALLOWED_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch"];
 
-const MCP_PLUGINS = new Set([...MCP_PLUGIN_NAMES, ...mcpTools.filter(isMcpToolEnabled).map((toolDef) => toolDef.definition.name)]);
-
+/** Tool names the agent is allowed to call this session. Drives
+ *  `PLUGIN_NAMES` env (the MCP child's filter) and the CLI's
+ *  `--allowedTools` arg. Static GUI / MCP plugins are gated by
+ *  `role.availablePlugins`; runtime plugins (#1043 C-2) are always
+ *  active. See `activeTools.ts` for the unified list. */
 export function getActivePlugins(role: Role): string[] {
-  return role.availablePlugins.filter((pluginName) => MCP_PLUGINS.has(pluginName));
+  return getActiveToolDescriptors(role).map((descriptor) => descriptor.name);
 }
 
 export interface McpConfigParams {
@@ -95,9 +99,29 @@ function collectMcpToolSentinelEnv(): Record<string, string> {
   return env;
 }
 
+// `process.cwd()` is unreliable: when launched via the package bin
+// (`npx mulmoclaude` / `node packages/mulmoclaude/bin/mulmoclaude.js`),
+// cwd is the package directory. Under yarn workspaces that dir's
+// `node_modules/` is empty (deps hoisted to repo root), so mounting it
+// into the sandbox at `/app/node_modules` causes the MCP child to
+// crash on startup with `Cannot find module 'express'` — silently,
+// because the failure happens before the MCP `initialize` handshake.
+// Resolving through a known npm dep lands on the populated
+// `node_modules/` in both dev (yarn workspace, repo root) and prod
+// (npx, package root with installed deps).
+function resolveProjectRoot(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    const expressPkgJson = req.resolve("express/package.json");
+    return dirname(dirname(dirname(expressPkgJson)));
+  } catch {
+    return process.cwd();
+  }
+}
+
 function buildMulmoclaudeServer(params: { chatSessionId: string; port: number; activePlugins: string[]; useDocker: boolean }): object {
   const { chatSessionId, port, activePlugins, useDocker } = params;
-  const projectRoot = process.cwd();
+  const projectRoot = resolveProjectRoot();
   const command = useDocker ? "tsx" : join(projectRoot, "node_modules/.bin/tsx");
   const mcpServerPath = useDocker ? "/app/server/agent/mcp-server.ts" : join(projectRoot, "server/agent/mcp-server.ts");
 
@@ -117,6 +141,13 @@ function buildMulmoclaudeServer(params: { chatSessionId: string; port: number; a
   const authEnv = token ? { MULMOCLAUDE_AUTH_TOKEN: token } : {};
 
   return {
+    // Claude Code 2.1.x requires the explicit `type: "stdio"` field
+    // for MCP servers it should spawn locally; without it the entry
+    // is silently skipped (no error, no log) and tools never reach
+    // the agent's tool registry. Older versions defaulted the type
+    // when absent, which is why this worked through Apr 2026 and
+    // started silently failing some time after the CLI update.
+    type: "stdio",
     command,
     args: [mcpServerPath],
     env: {
@@ -186,7 +217,13 @@ export function buildCliArgs(params: CliArgsParams): string[] {
   const { systemPrompt, activePlugins, claudeSessionId, mcpConfigPath, extraAllowedTools = [] } = params;
 
   const mcpToolNames = activePlugins.map((pluginName) => `mcp__mulmoclaude__${pluginName}`);
-  const allowedTools = [...BASE_ALLOWED_TOOLS, ...extraAllowedTools, ...mcpToolNames];
+  // DEBUG: also pass the wildcard form `mcp__mulmoclaude` so Claude
+  // CLI auto-discovers all tools the mulmoclaude MCP server publishes
+  // (matches the convention used for user-defined MCP servers).
+  // Claude's tool registry seems to require wildcard for runtime
+  // discovery; specific names alone register permissions but not
+  // the tool's existence.
+  const allowedTools = [...BASE_ALLOWED_TOOLS, ...extraAllowedTools, "mcp__mulmoclaude", ...mcpToolNames];
 
   // stream-json input mode: the user message is streamed through
   // stdin (see `writeUserMessage` in server/agent.ts) rather than
@@ -215,6 +252,16 @@ export function buildCliArgs(params: CliArgsParams): string[] {
 
   if (mcpConfigPath) {
     args.push("--mcp-config", mcpConfigPath);
+    // Without `--strict-mcp-config`, Claude Code 2.1.x merges in
+    // claude.ai account-level integrations (Canva / Gmail / Drive
+    // / Calendar) AND our local `--mcp-config` — and observed in
+    // practice (#1043 C-2 follow-up debug session) the merge silently
+    // drops the local mulmoclaude server entirely, so its tools
+    // never reach the agent's registry. With `--strict`, the local
+    // file is the only source — exactly what the parent server
+    // intends, since mulmoclaude itself is the broker for all the
+    // GUI plugin tools.
+    args.push("--strict-mcp-config");
   }
 
   return args;
@@ -355,7 +402,7 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     uid,
     gid,
     platform,
-    projectRoot = process.cwd(),
+    projectRoot = resolveProjectRoot(),
     homeDir = homedir(),
     sandboxAuthArgs = [],
     sshAgentForward = false,

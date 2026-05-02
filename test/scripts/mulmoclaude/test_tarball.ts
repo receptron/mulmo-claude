@@ -166,3 +166,109 @@ describe("buildInstallerPackageJson", () => {
     assert.deepEqual(pkg.dependencies, {});
   });
 });
+
+describe("readTokenFromLauncherLog", () => {
+  // The launcher tees stdout/stderr into the smoke's logFile. The
+  // server logs `INFO  [auth] bearer token written path=<absolute>
+  // source=...` exactly once per boot. Grep that line, then read the
+  // file at the captured path. Tests inject a fake reader so they
+  // don't touch the disk.
+  function fakeReader(map: Record<string, string | Error>): (filePath: string, encoding: "utf8") => Promise<string> {
+    return async (filePath) => {
+      const value = map[filePath];
+      if (value instanceof Error) throw value;
+      if (value === undefined) throw new Error(`fake reader: unmapped path ${filePath}`);
+      return value;
+    };
+  }
+
+  it("extracts the path and returns the trimmed token", async () => {
+    const logFile = "/tmp/log";
+    const tokenFile = "/tmp/ws/.session-token";
+    const readFileImpl = fakeReader({
+      [logFile]: `[out] 2026-05-02T...Z INFO  [auth] bearer token written path=${tokenFile} source=random\n[out] more...\n`,
+      [tokenFile]: "abc123\n",
+    });
+    const token = await tarball.readTokenFromLauncherLog({ logFile, readFileImpl });
+    assert.equal(token, "abc123");
+  });
+
+  it("returns null when the marker line is absent", async () => {
+    const readFileImpl = fakeReader({ "/tmp/log": "no token line in here\n" });
+    assert.equal(await tarball.readTokenFromLauncherLog({ logFile: "/tmp/log", readFileImpl }), null);
+  });
+
+  it("returns null when the log file itself is unreadable", async () => {
+    const readFileImpl = fakeReader({ "/tmp/log": new Error("ENOENT") });
+    assert.equal(await tarball.readTokenFromLauncherLog({ logFile: "/tmp/log", readFileImpl }), null);
+  });
+
+  it("returns null when the captured token path can't be read", async () => {
+    const readFileImpl = fakeReader({
+      "/tmp/log": "INFO bearer token written path=/tmp/ghost source=random\n",
+      "/tmp/ghost": new Error("ENOENT"),
+    });
+    assert.equal(await tarball.readTokenFromLauncherLog({ logFile: "/tmp/log", readFileImpl }), null);
+  });
+});
+
+describe("probeRuntimePlugins", () => {
+  function fakeFetch(handler: (url: string, init?: { headers?: Record<string, string> }) => Response | Promise<Response>): typeof globalThis.fetch {
+    return ((url: string, init?: { headers?: Record<string, string> }) => Promise.resolve(handler(url, init))) as unknown as typeof globalThis.fetch;
+  }
+
+  it("ok=true and plugins=N on a 200 with a non-empty list", async () => {
+    let seenAuth: string | undefined;
+    const fetchImpl = fakeFetch((_url, init) => {
+      seenAuth = init?.headers?.Authorization;
+      return new Response(JSON.stringify({ plugins: [{ name: "@example/installed" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: "tok", fetchImpl });
+    assert.equal(result.ok, true);
+    assert.equal(result.plugins, 1);
+    assert.equal(seenAuth, "Bearer tok", "Authorization header must be sent");
+  });
+
+  // Fresh install with no presets and no user-installed plugins is a
+  // legitimate state — the route still responds correctly. The probe
+  // verifies wiring (auth, route mount, JSON shape), not population.
+  it("ok=true on a 200 with an empty plugins array (fresh install, no plugins yet)", async () => {
+    const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ plugins: [] }), { status: 200, headers: { "content-type": "application/json" } }));
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: "tok", fetchImpl });
+    assert.equal(result.ok, true);
+    assert.equal(result.plugins, 0);
+    assert.equal(result.lastError, null);
+  });
+
+  it("ok=false on a 200 whose body is not the expected `{ plugins: [...] }` shape", async () => {
+    const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ unrelated: true }), { status: 200, headers: { "content-type": "application/json" } }));
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: "tok", fetchImpl });
+    assert.equal(result.ok, false);
+    assert.match(result.lastError ?? "", /not \{ plugins/);
+  });
+
+  it("ok=false with a status code on a non-200 response", async () => {
+    const fetchImpl = fakeFetch(() => new Response("Unauthorized", { status: 401 }));
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: "tok", fetchImpl });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 401);
+  });
+
+  it("ok=false when token is missing (extraction failed upstream)", async () => {
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: null });
+    assert.equal(result.ok, false);
+    assert.match(result.lastError ?? "", /no bearer token/);
+  });
+
+  it("ok=false when fetch throws (server still booting / wrong port)", async () => {
+    const fetchImpl = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as unknown as typeof globalThis.fetch;
+    const result = await tarball.probeRuntimePlugins({ port: 3099, token: "tok", fetchImpl });
+    assert.equal(result.ok, false);
+    assert.match(result.lastError ?? "", /ECONNREFUSED/);
+  });
+});

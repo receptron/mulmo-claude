@@ -292,6 +292,8 @@ describe("buildSystemPrompt", () => {
     // manageTodoList has a single-paragraph prompt in its
     // definition.ts, so it should render in the compact bullet form
     // (`- **name**: body`) under the "Plugin Instructions" heading.
+    // The bullet uses the fully-qualified id so the LLM can pass it
+    // verbatim to `tool_use` (#1043 C-2 follow-up).
     const role = makeRole({ availablePlugins: ["manageTodoList"] });
     const result = buildSystemPrompt({
       role,
@@ -299,10 +301,10 @@ describe("buildSystemPrompt", () => {
       useDocker: false,
     });
     assert.ok(result.includes("## Plugin Instructions"));
-    assert.ok(result.includes("- **manageTodoList**: "));
+    assert.ok(result.includes("- **mcp__mulmoclaude__manageTodoList**: "));
     assert.ok(result.includes("todo list"));
     // Compact form must not revert to the old heading layout.
-    assert.ok(!result.includes("### manageTodoList"));
+    assert.ok(!result.includes("### mcp__mulmoclaude__manageTodoList\n\n"), "compact bullet, not heading");
   });
 
   it("emits the Sandbox Tools hint when useDocker is true", () => {
@@ -487,11 +489,17 @@ describe("buildPluginPromptSections", () => {
   it("returns compact bullet form for a short single-paragraph plugin prompt", () => {
     // manageTodoList's real definition has a ~114-char single-paragraph
     // prompt, so it must collapse to the `- **name**: body` shape.
+    // The first entry is the MCP_PREFIX_HINT (#1043 C-2) — added when
+    // there's at least one plugin section so the LLM knows the
+    // mcp__<server>__<tool> shape for ToolSearch lookups.
+    // Section headers print the fully-qualified id so the LLM uses
+    // the exact tool name on tool_use.
     const role = makeRole({ availablePlugins: ["manageTodoList"] });
     const sections = buildPluginPromptSections(role);
-    assert.equal(sections.length, 1);
-    assert.ok(sections[0].startsWith("- **manageTodoList**: "));
-    assert.ok(!sections[0].includes("\n"));
+    assert.equal(sections.length, 2, "MCP-prefix hint + one plugin section");
+    assert.ok(sections[0].includes("mcp__mulmoclaude__"), "first entry is the prefix hint");
+    assert.ok(sections[1].startsWith("- **mcp__mulmoclaude__manageTodoList**: "));
+    assert.ok(!sections[1].includes("\n"));
   });
 
   it("returns heading form for a multi-paragraph plugin prompt", () => {
@@ -500,13 +508,16 @@ describe("buildPluginPromptSections", () => {
     // survives.
     const role = makeRole({ availablePlugins: ["presentDocument"] });
     const sections = buildPluginPromptSections(role);
-    assert.equal(sections.length, 1);
-    assert.ok(sections[0].startsWith("### presentDocument\n\n"));
+    assert.equal(sections.length, 2, "MCP-prefix hint + one plugin section");
+    assert.ok(sections[0].includes("mcp__mulmoclaude__"), "first entry is the prefix hint");
+    assert.ok(sections[1].startsWith("### mcp__mulmoclaude__presentDocument\n\n"));
     // Body retains its paragraph break
-    assert.ok(sections[0].includes("\n\n"));
+    assert.ok(sections[1].includes("\n\n"));
   });
 
-  it("returns empty array when the role has no matching plugins", () => {
+  it("returns empty array when the role has no matching plugins (no orphan hint)", () => {
+    // No plugins → no hint either. The prefix hint is meaningless on
+    // its own and clutters the prompt of a tool-less role.
     const role = makeRole({ availablePlugins: [] });
     assert.deepEqual(buildPluginPromptSections(role), []);
   });

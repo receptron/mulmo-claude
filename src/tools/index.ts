@@ -1,5 +1,6 @@
 import type { PluginEntry } from "./types";
 import { LEGACY_VIEW_ONLY_PLUGIN_NAMES } from "./legacyPluginNames";
+import { getRuntimePluginEntry, getRuntimeToolNames } from "./runtimeLoader";
 import textResponsePlugin from "../plugins/textResponse/index";
 import markdownPlugin from "../plugins/markdown/index";
 import spreadsheetPlugin from "../plugins/spreadsheet/index";
@@ -10,7 +11,14 @@ import presentFormPlugin from "../plugins/presentForm/index";
 import canvasPlugin from "../plugins/canvas/index";
 import editImagesPlugin from "../plugins/editImages/index";
 import Present3DPlugin from "@gui-chat-plugin/present3d/vue";
-import WeatherPlugin from "@gui-chat-plugin/weather/vue";
+// `@gui-chat-plugin/weather` is now installed via the user's
+// workspace ledger (`~/mulmoclaude/plugins/plugins.json`) rather
+// than as a build-time bundle. The View loads via the runtime-plugin
+// dynamic-import path; no static import here. (Briefly registered as
+// a preset in `server/plugins/preset-list.ts` — that wedged because
+// users who'd already installed it via the ledger then saw a
+// "name collides" warning on every boot. Until that double-source
+// case is handled cleanly, no presets ship by default.)
 import todoPlugin from "../plugins/todo/index";
 import { manageCalendarPlugin, manageAutomationsPlugin, legacyManageSchedulerEntry } from "../plugins/scheduler/index";
 import manageSkillsPlugin from "../plugins/manageSkills/index";
@@ -48,13 +56,21 @@ const plugins: Record<string, PluginEntry> = {
   presentChart: presentChartPlugin,
   [TOOL_NAMES.editImages]: editImagesPlugin,
   present3D: Present3DPlugin.plugin,
-  weather: WeatherPlugin.plugin,
+  // weather: not statically bundled. See the import comment above —
+  // the runtime registry exposes it under `fetchWeather` when the
+  // user has installed it via the workspace ledger, and getPlugin()
+  // consults that registry below.
 };
 
 export function getPlugin(name: string): PluginEntry | null {
-  return plugins[name] ?? null;
+  // Static (build-time) plugins win on collision — runtime plugins
+  // are registered in mcp-server.ts only when their tool name does
+  // not already exist in the static set, so this lookup order keeps
+  // the contracts symmetric across server and frontend.
+  return plugins[name] ?? getRuntimePluginEntry(name);
 }
 
 export function getAllPluginNames(): string[] {
-  return Object.keys(plugins).filter((name) => !LEGACY_VIEW_ONLY_PLUGIN_NAMES.has(name));
+  const staticNames = Object.keys(plugins).filter((name) => !LEGACY_VIEW_ONLY_PLUGIN_NAMES.has(name));
+  return [...staticNames, ...getRuntimeToolNames()];
 }

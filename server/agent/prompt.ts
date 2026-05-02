@@ -6,8 +6,7 @@ import { hasTopicFormat } from "../workspace/memory/topic-detect.js";
 import { loadAllTopicFilesSync } from "../workspace/memory/topic-io.js";
 import type { TopicMemoryFile } from "../workspace/memory/topic-types.js";
 import type { Role } from "../../src/config/roles.js";
-import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
-import { PLUGIN_DEFS } from "./plugin-names.js";
+import { getActiveToolDescriptors, MCP_SERVER_ID } from "./activeTools.js";
 import { WORKSPACE_DIRS, WORKSPACE_FILES } from "../workspace/paths.js";
 import { getCachedCustomDirs, buildCustomDirsPrompt } from "../workspace/custom-dirs.js";
 import { TOOL_NAMES } from "../../src/config/toolNames.js";
@@ -472,33 +471,41 @@ export function formatPluginSection(name: string, prompt: string): string {
   return `### ${name}\n\n${trimmed}`;
 }
 
+/** Header note explaining how to actually call the GUI plugin tools
+ *  documented below. Claude's Agent SDK exposes every MCP tool under
+ *  the `mcp__<server>__<tool>` form; the section headers print the
+ *  fully-qualified id so the LLM sees the exact string it must pass
+ *  to `tool_use` / `ToolSearch select:` (manual testing showed the
+ *  LLM otherwise tries either the bare short name — "No such tool
+ *  available" — or hallucinates the server prefix from the tool's
+ *  package name, e.g. `mcp__weather__fetchWeather`). */
+export const MCP_PREFIX_HINT = `Every tool described below is registered under MCP server \`${MCP_SERVER_ID}\`. Call them — both directly and via \`ToolSearch select:…\` — by the fully-qualified id shown in each section header (e.g. \`mcp__${MCP_SERVER_ID}__<short-name>\`). The short name alone (without the \`mcp__${MCP_SERVER_ID}__\` prefix) is not a valid tool name.`;
+
 export function buildPluginPromptSections(role: Role): string[] {
-  // Widen to Set<string> so the `.has()` checks accept arbitrary
-  // definition names (PLUGIN_DEFS entries and MCP tool names are
-  // typed as `string` upstream; role.availablePlugins is now the
-  // narrower `ToolName[]` after #292).
-  const allowedPlugins = new Set<string>(role.availablePlugins);
-
-  // Collect prompts from local plugin definitions (ToolDefinition.prompt).
-  // Some package plugins use an older gui-chat-protocol without the `prompt`
-  // field, so access it via `in` check to keep TypeScript happy.
-  const defPrompts = Object.fromEntries(
-    PLUGIN_DEFS.filter((definition) => "prompt" in definition && definition.prompt && allowedPlugins.has(definition.name)).map((definition) => [
-      definition.name,
-      (definition as unknown as { prompt: string }).prompt,
-    ]),
-  );
-
-  // Collect prompts from MCP tools
-  const mcpToolPrompts = Object.fromEntries(
-    mcpTools
-      .filter((toolDef) => toolDef.prompt && allowedPlugins.has(toolDef.definition.name) && isMcpToolEnabled(toolDef))
-      .map((toolDef) => [toolDef.definition.name, toolDef.prompt as string]),
-  );
-
-  // MCP tool prompts override definition prompts if both exist
-  const merged = { ...defPrompts, ...mcpToolPrompts };
-  return Object.entries(merged).map(([name, prompt]) => formatPluginSection(name, prompt));
+  // Single source of truth: `getActiveToolDescriptors(role)` produces
+  // the same list `getActivePlugins` and the MCP child agree on, so a
+  // tool surfaced in `--allowedTools` is also described here, and
+  // vice versa. Drift between the two would let the LLM see a tool
+  // it can't call (or invent calls to one it can but doesn't see in
+  // the prompt — observed during runtime-plugin manual testing).
+  //
+  // Section bodies prefer the plugin's own `prompt` field (richer
+  // usage instructions) and fall back to `description` (always
+  // present on a TOOL_DEFINITION). Without the fallback, runtime
+  // plugins that don't bother authoring a prompt would silently
+  // disappear from the system prompt — and the LLM, treating MCP
+  // tools as deferred, would never discover them.
+  //
+  // Section headers use the fully-qualified `mcp__<server>__<name>`
+  // form because that is the exact string the LLM must pass to
+  // `tool_use` (and to `ToolSearch select:…` for deferred lookups).
+  // The bare short name is NOT a valid tool id; printing the short
+  // form historically led the LLM to call `fetchWeather` literally
+  // and get "No such tool available". The MCP_PREFIX_HINT prepended
+  // below explains the convention once for the LLM's benefit.
+  const sections = getActiveToolDescriptors(role).map((descriptor) => formatPluginSection(descriptor.fullName, descriptor.prompt ?? descriptor.description));
+  if (sections.length === 0) return sections;
+  return [MCP_PREFIX_HINT, ...sections];
 }
 
 export interface SystemPromptParams {

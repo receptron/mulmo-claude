@@ -13,7 +13,7 @@
 // "install the whole launcher and boot it" costs more than it saves.
 
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile, readdir, appendFile, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readFile, readdir, appendFile, stat } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import net from "node:net";
@@ -175,6 +175,65 @@ async function packTarball({ root, packTimeoutMs }) {
   return path.join(pkgDir, tarball);
 }
 
+// Read the bearer token the launcher writes at boot. The token path
+// is logged on stdout/stderr (`bearer token written path=<absolute>
+// source=...`) and tee'd into `logFile` by `bootAndProbe`. We grep it
+// from there instead of guessing the workspace location, so this
+// works regardless of `$HOME` overrides or future workspace-path
+// changes. Returns the trimmed token string, or null when the line
+// or the file is unavailable.
+export async function readTokenFromLauncherLog({ logFile, readFileImpl = readFile } = {}) {
+  let logContents;
+  try {
+    logContents = await readFileImpl(logFile, "utf8");
+  } catch {
+    return null;
+  }
+  const match = logContents.match(/bearer token written path=(\S+)/);
+  if (!match) return null;
+  try {
+    const tokenContents = await readFileImpl(match[1], "utf8");
+    return tokenContents.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Hit `/api/plugins/runtime/list` with the launcher's bearer token to
+// confirm the runtime-plugin pipeline reaches the wire. We assert
+// status 200 + a JSON body shaped `{ plugins: [...] }` — that already
+// proves bearer auth is wired, the route is mounted, and Express is
+// serializing JSON correctly. A non-zero `plugins.length` means user-
+// installed plugins were resolved through the workspace ledger, but
+// is NOT required for ok=true: a fresh install (no presets, no user
+// ledger) legitimately reports zero. Plugin count is informational.
+export async function probeRuntimePlugins({ port, token, fetchImpl = globalThis.fetch } = {}) {
+  if (!token) {
+    return { ok: false, status: null, plugins: 0, lastError: "no bearer token (could not extract from launcher log)" };
+  }
+  let response;
+  try {
+    response = await fetchImpl(`http://127.0.0.1:${port}/api/plugins/runtime/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    return { ok: false, status: null, plugins: 0, lastError: `fetch failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (response.status !== 200) {
+    return { ok: false, status: response.status, plugins: 0, lastError: `status ${response.status}` };
+  }
+  let body;
+  try {
+    body = await response.json();
+  } catch (err) {
+    return { ok: false, status: 200, plugins: 0, lastError: `json parse failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (!Array.isArray(body?.plugins)) {
+    return { ok: false, status: 200, plugins: 0, lastError: "response body is not { plugins: [...] }" };
+  }
+  return { ok: true, status: 200, plugins: body.plugins.length, lastError: null };
+}
+
 // Verify the sandbox build context made it through `npm pack` / `npm
 // install`. Keeps the assertion out of `bootAndProbe` so a missing
 // file fails loudly with a precise reason instead of silently letting
@@ -306,16 +365,23 @@ export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, 
     const resolvedPort = port ?? (await allocateRandomPort());
     const booted = await bootAndProbe({ workDir: runDir, port: resolvedPort, bootTimeoutMs, logFile: resolvedLog });
     child = booted.child;
-    succeeded = booted.probe.ok;
+    let pluginProbe = null;
+    if (booted.probe.ok) {
+      const token = await readTokenFromLauncherLog({ logFile: resolvedLog });
+      pluginProbe = await probeRuntimePlugins({ port: resolvedPort, token });
+    }
+    const overallOk = booted.probe.ok && (pluginProbe?.ok ?? false);
+    succeeded = overallOk;
     return {
-      ok: booted.probe.ok,
+      ok: overallOk,
       port: resolvedPort,
       attempts: booted.probe.attempts,
       elapsedMs: booted.probe.elapsedMs,
-      lastError: booted.probe.ok ? null : booted.probe.lastError,
+      lastError: overallOk ? null : (pluginProbe && !pluginProbe.ok ? `runtime plugin probe failed: ${pluginProbe.lastError}` : booted.probe.lastError),
       tarballPath,
       workDir: runDir,
       logFile: resolvedLog,
+      pluginProbe,
     };
   } catch (err) {
     return {
@@ -327,6 +393,7 @@ export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, 
       tarballPath,
       workDir: runDir,
       logFile: resolvedLog,
+      pluginProbe: null,
     };
   } finally {
     if (child) await killGracefully(child);
@@ -339,7 +406,7 @@ export async function runTarballSmoke({ root = process.cwd(), workDir, logFile, 
 export async function main() {
   const result = await runTarballSmoke();
   if (result.ok) {
-    console.log(`[mulmoclaude:tarball] OK — HTTP 200 on port ${result.port} after ${result.attempts} attempt(s) (${result.elapsedMs}ms)`);
+    console.log(`[mulmoclaude:tarball] OK — HTTP 200 on port ${result.port} after ${result.attempts} attempt(s) (${result.elapsedMs}ms); runtime plugins=${result.pluginProbe?.plugins ?? 0}`);
     return 0;
   }
   console.error(`[mulmoclaude:tarball] FAIL — ${result.lastError}`);

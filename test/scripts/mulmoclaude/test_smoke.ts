@@ -33,6 +33,7 @@ function tarballReturning(overrides: Partial<{ ok: boolean; port: number; attemp
     tarballPath: "/tmp/mulmoclaude-0.0.0.tgz",
     workDir: "/tmp/mc-smoke-test",
     logFile: "/tmp/mc-smoke-test/launcher.log",
+    pluginProbe: { ok: true, status: 200 as number | null, plugins: 1, lastError: null },
   });
   return stub;
 }

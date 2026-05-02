@@ -28,4 +28,8 @@ export const WORKSPACE_FILES = {
   schedulerUserTasks: "config/scheduler/tasks.json",
   schedulerOverrides: "config/scheduler/overrides.json",
   newsReadState: "config/news-read-state.json",
+  /** Install ledger for runtime-loaded plugins (#1043 C-2). One row
+   *  per installed plugin; the tgz files sit alongside in `plugins/`,
+   *  extracted to `plugins/.cache/<name>/<version>/` on first boot. */
+  pluginsLedger: "plugins/plugins.json",
 } as const;

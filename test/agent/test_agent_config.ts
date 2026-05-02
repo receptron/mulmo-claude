@@ -1,6 +1,6 @@
 import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { unlinkSync } from "fs";
+import { existsSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { __resetForTests as resetTokenState, generateAndWriteToken } from "../../server/api/auth/token.js";
@@ -239,6 +239,36 @@ describe("buildDockerSpawnArgs", () => {
     assert.ok(args.includes("/proj/node_modules:/app/node_modules:ro"));
     assert.ok(args.includes("/proj/server:/app/server:ro"));
     assert.ok(args.includes("/proj/src:/app/src:ro"));
+  });
+
+  // The package bin script (`npx mulmoclaude` / `node packages/mulmoclaude/bin/...`)
+  // sets cwd to the package dir, where yarn-workspace dev installs leave an
+  // empty `node_modules/`. If the default falls back to `process.cwd()` the
+  // sandbox's `/app/node_modules` mount is empty and every MCP child crashes
+  // with "Cannot find module 'express'" — silently, before the `initialize`
+  // handshake. The default must instead resolve through an installed dep so
+  // it lands on the populated `node_modules/`.
+  it("default projectRoot resolves to a populated node_modules even when cwd is a yarn-workspace package", async () => {
+    const original = process.cwd();
+    const packageDir = join(original, "packages/mulmoclaude");
+    if (!existsSync(packageDir)) return; // not a workspace checkout — skip
+    try {
+      process.chdir(packageDir);
+      const args = buildDockerSpawnArgs({
+        workspacePath: "/ws",
+        cliArgs: [],
+        uid: 1000,
+        gid: 1000,
+        platform: "darwin" as Platform,
+        chatSessionId: "test",
+      });
+      const nmMount = args.find((arg) => typeof arg === "string" && arg.endsWith(":/app/node_modules:ro"));
+      assert.ok(nmMount, "expected a node_modules mount");
+      const hostPath = nmMount.replace(":/app/node_modules:ro", "");
+      assert.ok(existsSync(join(hostPath, "express")), `node_modules mount must point to a populated dir (got ${hostPath})`);
+    } finally {
+      process.chdir(original);
+    }
   });
 
   it("mounts the .claude credentials from the home dir", async () => {

@@ -25,7 +25,6 @@
     "@gui-chat-plugin/camera": "^0.4.0",
     "@gui-chat-plugin/mindmap": "^0.4.0",
     "@gui-chat-plugin/present3d": "^0.1.0",
-    "@gui-chat-plugin/weather": "^0.1.0",
     "@mulmobridge/chat-service": "^0.1.2",
     "@mulmobridge/client": "^0.1.4",
     "@mulmobridge/protocol": "^0.1.4",

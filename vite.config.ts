@@ -54,10 +54,74 @@ function mulmoclaudeAuthTokenPlugin(): Plugin {
   }
 }
 
+// Runtime-plugin importmap rewrite for production builds (#1043 C-2
+// Phase E). The dev importmap maps `"vue"` → `/src/_runtime/vue.ts`,
+// which Vite serves transformed and resolves to the host's Vue dep.
+// In `vite build` that dev URL no longer exists — Vite emits a
+// hashed asset for the runtime/vue chunk. This plugin (build-only)
+// finds the hashed filename in the bundle and rewrites the
+// importmap target so runtime-loaded plugins still share the host's
+// Vue instance after `yarn build` and `npx mulmoclaude` distribution.
+function runtimeImportmapBuildPlugin(): Plugin {
+  const DEV_IMPORTMAP_TARGET = '/src/_runtime/vue.ts'
+  return {
+    name: 'mulmoclaude-runtime-importmap',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        if (!ctx.bundle) return html
+        // The runtime/vue.ts entry input is registered in
+        // `build.rollupOptions.input` below; Vite emits it as a
+        // chunk whose `name` matches the input key.
+        let runtimeFile: string | null = null
+        for (const [fileName, chunk] of Object.entries(ctx.bundle)) {
+          if (chunk.type === 'chunk' && chunk.name === 'runtime-vue') {
+            runtimeFile = fileName
+            break
+          }
+        }
+        if (!runtimeFile) return html
+        // `replaceAll` (not `replace`) so both occurrences get
+        // rewritten — the importmap target AND the comment that
+        // documents where the dev URL lives. Otherwise `replace`
+        // only handles the first match (the comment, which precedes
+        // the importmap), and the actual `<script type="importmap">`
+        // body keeps the broken dev URL.
+        return html.replaceAll(DEV_IMPORTMAP_TARGET, `/${runtimeFile}`)
+      },
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), mulmoclaudeAuthTokenPlugin()],
+  plugins: [vue(), tailwindcss(), mulmoclaudeAuthTokenPlugin(), runtimeImportmapBuildPlugin()],
   build: {
     outDir: 'dist/client',
+    rollupOptions: {
+      // `index.html` is the SPA entry. `runtime-vue` is a side-entry
+      // that emits a separate chunk for the runtime importmap target
+      // (#1043 C-2 Phase E). Without it as an explicit input, Vite
+      // would tree-shake `src/_runtime/vue.ts` to nothing because no
+      // build-time `import` references it — the importmap is consumed
+      // by the BROWSER, not by Vite's static analysis.
+      input: {
+        index: path.resolve(__dirname, 'index.html'),
+        'runtime-vue': path.resolve(__dirname, 'src/_runtime/vue.ts'),
+      },
+      // Force every named re-export from `src/_runtime/vue.ts` to be
+      // preserved in the emitted chunk. Without `'strict'`, Rolldown
+      // tree-shakes the `export * from "vue"` re-exports (no static
+      // consumer in the build references them — the browser does,
+      // via the runtime importmap), shrinking the chunk to a 46-byte
+      // side-effect stub. A runtime-loaded plugin's
+      // `import { createCommentVNode } from "vue"` then fails with
+      // "does not provide an export named 'createCommentVNode'".
+      // `'strict'` is the public-library mode and matches what we
+      // want here: the entry's exports ARE the public surface for
+      // browser-side consumers.
+      preserveEntrySignatures: 'strict',
+    },
   },
   server: {
     host: true,

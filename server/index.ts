@@ -25,6 +25,11 @@ import pdfRoutes from "./api/routes/pdf.js";
 import filesRoutes from "./api/routes/files.js";
 import configRoutes from "./api/routes/config.js";
 import skillsRoutes from "./api/routes/skills.js";
+import runtimePluginRoutes from "./api/routes/runtime-plugin.js";
+import { loadRuntimePlugins } from "./plugins/runtime-loader.js";
+import { loadPresetPlugins } from "./plugins/preset-loader.js";
+import { registerRuntimePlugins } from "./plugins/runtime-registry.js";
+import { MCP_PLUGIN_NAMES } from "./agent/plugin-names.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
 import { createJournalRouter } from "./api/routes/journal.js";
 import { type NotificationDeps, initNotifications } from "./events/notifications.js";
@@ -149,9 +154,23 @@ app.use(requireSameOrigin);
 //
 // /api/files/* is exempt because <img src="/api/files/raw?path=...">
 // tags in rendered markdown can't attach Authorization headers.
+// /api/plugins/runtime/<pkg>/<version>/<file> (#1043 C-2) is exempt
+// for the same reason: the frontend dynamic-imports plugin assets
+// (`import("/api/plugins/runtime/<pkg>/<ver>/dist/vue.js")`) and the
+// browser cannot attach Authorization headers to those module
+// requests. The pattern "4+ segments past /plugins/runtime/" only
+// matches asset GETs — `/plugins/runtime/list` (3 segments) and
+// `/plugins/runtime/<pkg>/dispatch` (3 segments) still require auth.
+// Path traversal is hardened separately by `resolveWithinRoot` in
+// the asset route handler.
 // The CSRF origin check + loopback-only binding still apply.
+const RUNTIME_PLUGIN_ASSET_PATH_RE = /^\/plugins\/runtime\/[^/]+\/[^/]+\//;
 app.use("/api", (req, res, next) => {
   if (req.path.startsWith("/files/")) {
+    next();
+    return;
+  }
+  if (req.method === "GET" && RUNTIME_PLUGIN_ASSET_PATH_RE.test(req.path)) {
     next();
     return;
   }
@@ -424,6 +443,7 @@ app.use(pdfRoutes);
 app.use(filesRoutes);
 app.use(configRoutes);
 app.use(skillsRoutes);
+app.use(runtimePluginRoutes);
 async function listSessionsForBridge(opts: { limit: number; offset: number }) {
   const rows = await loadAllSessions();
   const sorted = rows.sort((leftSession, rightSession) => rightSession.changeMs - leftSession.changeMs);
@@ -825,6 +845,34 @@ process.on("SIGTERM", () => {
       error: String(err),
     });
   });
+
+  // Runtime-loaded plugins (#1043 C-2). Two sources, both producing
+  // the same RuntimePlugin shape:
+  //   1. Presets — `config/preset-plugins.ts` lists npm packages that
+  //      ship with the repo. Loaded from `node_modules/<pkg>/`. These
+  //      let the runtime path run end-to-end on a fresh checkout.
+  //   2. User-installed — `~/mulmoclaude/plugins/plugins.json` ledger.
+  //      Each entry's tgz is extracted to `.cache/<pkg>/<ver>/` if
+  //      not already cached.
+  //
+  // Presets are merged FIRST so they win the registry-internal
+  // tool-name collision (first-loaded wins; runtime-registry.ts).
+  // Static MCP built-ins still win over both, via MCP_PLUGIN_NAMES.
+  // Failures don't abort boot — bad plugins are skipped, healthy
+  // ones still load.
+  try {
+    const presets = await loadPresetPlugins();
+    const userInstalled = await loadRuntimePlugins();
+    const result = registerRuntimePlugins(MCP_PLUGIN_NAMES, [...presets, ...userInstalled]);
+    log.info("plugins/runtime", "registered runtime plugins", {
+      presets: presets.length,
+      userInstalled: userInstalled.length,
+      registered: result.registered.length,
+      collisions: result.collisions.length,
+    });
+  } catch (err) {
+    log.error("plugins/runtime", "registry init failed; runtime plugins disabled this session", { error: String(err) });
+  }
 
   // Bind to localhost-only. Using `0.0.0.0` would expose the dev
   // server to the entire LAN (anyone on the same Wi-Fi could reach

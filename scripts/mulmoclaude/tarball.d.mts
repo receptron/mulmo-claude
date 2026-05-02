@@ -51,6 +51,29 @@ export interface RunTarballSmokeOptions {
   port?: number;
 }
 
+/** Outcome of the runtime-plugin list probe. */
+export interface RuntimePluginProbeResult {
+  ok: boolean;
+  status: number | null;
+  plugins: number;
+  lastError: string | null;
+}
+
+export interface ProbeRuntimePluginsOptions {
+  port: number;
+  token: string | null;
+  fetchImpl?: typeof globalThis.fetch;
+}
+
+export function probeRuntimePlugins(options: ProbeRuntimePluginsOptions): Promise<RuntimePluginProbeResult>;
+
+export interface ReadTokenFromLauncherLogOptions {
+  logFile: string;
+  readFileImpl?: (filePath: string, encoding: "utf8") => Promise<string>;
+}
+
+export function readTokenFromLauncherLog(options: ReadTokenFromLauncherLogOptions): Promise<string | null>;
+
 /** Result of a full tarball smoke run — always resolves, never throws. */
 export interface TarballSmokeResult {
   ok: boolean;
@@ -61,6 +84,7 @@ export interface TarballSmokeResult {
   tarballPath: string | null;
   workDir: string;
   logFile: string;
+  pluginProbe: RuntimePluginProbeResult | null;
 }
 
 export function runTarballSmoke(options?: RunTarballSmokeOptions): Promise<TarballSmokeResult>;

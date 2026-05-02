@@ -736,13 +736,6 @@
     three-bvh-csg "^0.0.17"
     three-mesh-bvh "^0.9.7"
 
-"@gui-chat-plugin/weather@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/weather/-/weather-0.1.0.tgz#b3cd3bf0b3f3866bfdf08e66857853c5f2adcee4"
-  integrity sha512-SCI5zjmM56T/pLj8xFoCVXwwmpuUdpjuyNZJK+oqlqKqD+Sh6+b40IKH/fvHO9PRH3u4iAwIFwbpd27osHdmGQ==
-  dependencies:
-    gui-chat-protocol "^0.1.0"
-
 "@hono/node-server@^1.19.9":
   version "1.19.13"
   resolved "https://registry.yarnpkg.com/@hono/node-server/-/node-server-1.19.13.tgz#4838c766a1237253d4dde3281cf7d5c65186fd32"

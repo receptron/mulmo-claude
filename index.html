@@ -15,6 +15,30 @@
     -->
     <meta name="mulmoclaude-auth" content="__MULMOCLAUDE_AUTH_TOKEN__" />
     <title>MulmoClaude</title>
+    <!--
+      Importmap for runtime-loaded plugins (#1043 C-2). Workspace-
+      installed plugins are dynamic-imported at app boot from
+      `/api/plugins/runtime/<pkg>/<ver>/dist/vue.js`, which contains
+      bare `import { … } from "vue"`. Without an importmap the
+      browser would reject the bare specifier; with this in place the
+      browser fetches `/src/_runtime/vue.ts` (Vite-transformed in dev
+      to the host's Vue dep) so host and plugin share one Vue
+      instance — reactivity flows across the boundary.
+
+      In production builds this dev URL is replaced with the hashed
+      asset path by `runtimeImportmapBuildPlugin` in `vite.config.ts`
+      (build-only). The `runtime-vue` chunk is registered as a
+      separate Rollup input so Vite emits it instead of tree-shaking
+      it out (no static `import` references it — the importmap is
+      consumed by the browser, not by Vite's static analysis).
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "/src/_runtime/vue.ts"
+        }
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='30' height='30' x='1' y='1' rx='6' fill='%236B7280'/><text x='16' y='17' text-anchor='middle' dominant-baseline='central' font-family='sans-serif' font-weight='bold' font-size='20' fill='white'>M</text></svg>" />
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   </head>

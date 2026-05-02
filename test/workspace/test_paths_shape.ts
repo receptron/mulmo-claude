@@ -34,6 +34,8 @@ describe("WORKSPACE_DIRS expected keys", () => {
     "memoryDir",
     "memoryStaging",
     "news",
+    "pluginCache",
+    "plugins",
     "roles",
     "scheduler",
     "searches",

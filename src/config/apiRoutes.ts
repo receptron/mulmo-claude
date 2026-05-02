@@ -155,6 +155,22 @@ export const API_ROUTES = {
     form: "/api/form",
     canvas: "/api/canvas",
     present3d: "/api/present3d",
+    // Runtime-loaded plugins (#1043 C-2). One generic dispatch
+    // endpoint shared by every workspace-installed plugin; the URL
+    // pkg parameter is the URL-encoded npm package name (e.g.
+    // `%40gui-chat-plugin%2Fweather`). Matched against the runtime
+    // registry server-side; the registry's plugin.execute() handles
+    // the call.
+    runtimeList: "/api/plugins/runtime/list",
+    runtimeDispatch: "/api/plugins/runtime/:pkg/dispatch",
+    /** Static-mount of the extracted plugin tree. The URL pkg is the
+     *  un-encoded npm name plus version dir. Used by the frontend
+     *  loader's dynamic `import()` to fetch `dist/vue.js`.
+     *
+     *  Express 5 path-to-regexp uses `/{*name}` for catch-all
+     *  wildcards (the bare `*` from Express 4 throws at registration).
+     *  Handler reads the wildcard via `req.params.splat`. */
+    runtimeAsset: "/api/plugins/runtime/:pkg/:version/{*splat}",
   },
 
   roles: {
