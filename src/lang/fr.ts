@@ -33,6 +33,7 @@ const frMessages = {
     attachFile: "Joindre un fichier",
     fileTooLarge: "Fichier trop volumineux ({sizeMB} Mo). La limite est de 30 Mo.",
     unsupportedFileType: "Type de fichier non pris en charge. Acceptés : images, PDF, DOCX, XLSX, PPTX, fichiers texte.",
+    attachImageFailed: "Échec de l'attache de l'image : {error}",
   },
   sessionHistoryPanel: {
     filters: {
@@ -580,6 +581,7 @@ const frMessages = {
       accountLabel: "Compte",
       allAccounts: "Tous",
       void: "Annuler",
+      edit: "Modifier",
       voidConfirm: "Annuler cette écriture ? L'originale reste dans le journal ; une paire de contre-passation est ajoutée.",
       voidReason: "Motif (optionnel) :",
       columns: {

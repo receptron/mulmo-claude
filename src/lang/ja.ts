@@ -40,6 +40,7 @@ const jaMessages = {
     attachFile: "ファイルを添付",
     fileTooLarge: "ファイルが大きすぎます（{sizeMB} MB）。上限は 30 MB です。",
     unsupportedFileType: "対応していないファイル形式です。画像・PDF・DOCX・XLSX・PPTX・テキストファイルを使用してください。",
+    attachImageFailed: "画像の添付に失敗しました: {error}",
   },
   sessionHistoryPanel: {
     filters: {
@@ -576,6 +577,7 @@ const jaMessages = {
       accountLabel: "勘定科目",
       allAccounts: "すべての科目",
       void: "取消",
+      edit: "編集",
       voidConfirm: "この仕訳を取り消しますか？元の仕訳は journal に残り、逆仕訳が追記されます。",
       voidReason: "理由（任意）:",
       columns: {

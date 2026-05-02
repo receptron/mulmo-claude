@@ -21,15 +21,16 @@ import { parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown
 import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { readDirSafe, readDirSafeAsync, readTextSafe, readTextSafeSync } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
+import { WORKSPACE_DIRS, WORKSPACE_FILES } from "../paths.js";
 import { isMemoryType, MEMORY_TYPES, type MemoryType } from "./types.js";
 import { extractH2Sections, isSafeTopicSlug, type TopicMemoryFile } from "./topic-types.js";
 
 export function topicMemoryRoot(workspaceRoot: string): string {
-  return path.join(workspaceRoot, "conversations", "memory");
+  return path.join(workspaceRoot, WORKSPACE_DIRS.memoryDir);
 }
 
 export function topicMemoryIndexPath(workspaceRoot: string): string {
-  return path.join(topicMemoryRoot(workspaceRoot), "MEMORY.md");
+  return path.join(workspaceRoot, WORKSPACE_FILES.memoryIndex);
 }
 
 export function topicFilePath(workspaceRoot: string, type: MemoryType, topic: string): string {
@@ -92,7 +93,7 @@ export async function writeTopicFile(workspaceRoot: string, file: TopicMemoryFil
   const absPath = path.join(dir, `${file.topic}.md`);
   const content = serializeWithFrontmatter({ type: file.type, topic: file.topic }, file.body);
   await writeFileAtomic(absPath, content, { uniqueTmp: true });
-  return path.posix.join("conversations", "memory", file.type, `${file.topic}.md`);
+  return path.posix.join(WORKSPACE_DIRS.memoryDir, file.type, `${file.topic}.md`);
 }
 
 // Rebuild `MEMORY.md` from the live topic files. Sorted by type

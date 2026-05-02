@@ -15,6 +15,7 @@ import path from "node:path";
 
 import { parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
+import { WORKSPACE_DIRS, WORKSPACE_FILES } from "../paths.js";
 import { readDirSafe, readDirSafeAsync, readTextSafe, readTextSafeSync, statSafe, statSafeAsync } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { isMemoryType, type MemoryEntry, type MemoryType } from "./types.js";
@@ -22,11 +23,11 @@ import { isMemoryType, type MemoryEntry, type MemoryType } from "./types.js";
 // On-disk directory and index file for typed memory entries.
 // Callers pass the workspace root; this returns the absolute paths.
 export function memoryDirOf(workspaceRoot: string): string {
-  return path.join(workspaceRoot, "conversations", "memory");
+  return path.join(workspaceRoot, WORKSPACE_DIRS.memoryDir);
 }
 
 export function memoryIndexOf(workspaceRoot: string): string {
-  return path.join(memoryDirOf(workspaceRoot), "MEMORY.md");
+  return path.join(workspaceRoot, WORKSPACE_FILES.memoryIndex);
 }
 
 // Load every entry from `<workspaceRoot>/conversations/memory/`. The
@@ -61,7 +62,7 @@ export async function writeMemoryEntry(workspaceRoot: string, entry: MemoryEntry
   const absPath = path.join(dir, filename);
   const content = serializeWithFrontmatter({ name: entry.name, description: entry.description, type: entry.type }, entry.body);
   await writeFileAtomic(absPath, content, { uniqueTmp: true });
-  return path.posix.join("conversations", "memory", filename);
+  return path.posix.join(WORKSPACE_DIRS.memoryDir, filename);
 }
 
 // Slug shape gate. Allows arbitrary unicode (so non-ASCII names slug

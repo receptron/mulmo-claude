@@ -855,7 +855,7 @@ async function sendMessage(text?: string) {
       userInput.value = message;
       pastedFile.value = fileSnapshot;
       const recoverySession = sessionMap.get(currentSessionId.value);
-      if (recoverySession) pushErrorMessage(recoverySession, `Failed to attach image: ${resolved.error}`);
+      if (recoverySession) pushErrorMessage(recoverySession, t("chatInput.attachImageFailed", { error: resolved.error }));
       return;
     }
     attachmentForRequest = resolved.value;

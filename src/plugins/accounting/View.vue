@@ -21,16 +21,11 @@
       </header>
       <nav class="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 shrink-0 overflow-x-auto" data-testid="accounting-tabs">
         <button
-          v-for="tab in TABS"
+          v-for="tab in visibleTabs"
           :key="tab.key"
-          :disabled="isTabDisabled(tab.key)"
           :class="[
             'h-8 px-2.5 flex items-center gap-1 rounded text-sm whitespace-nowrap',
-            isTabDisabled(tab.key)
-              ? 'text-gray-300 cursor-not-allowed'
-              : currentTab === tab.key
-                ? 'bg-blue-50 text-blue-600 font-medium'
-                : 'text-gray-600 hover:bg-gray-50',
+            currentTab === tab.key ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50',
           ]"
           :data-testid="`accounting-tab-${tab.key}`"
           @click="currentTab = tab.key"
@@ -53,6 +48,7 @@
             :currency="activeCurrency"
             :version="bookVersion"
             @changed="bumpLocalVersion"
+            @edit-opening="currentTab = 'opening'"
           />
           <JournalEntryForm
             v-else-if="currentTab === 'newEntry'"
@@ -286,10 +282,14 @@ async function refetchOpening(): Promise<void> {
 // so the user can delete the book if they don't want to proceed.
 const openingGateActive = computed(() => activeBookId.value !== null && hasOpening.value === false);
 
-function isTabDisabled(key: TabKey): boolean {
-  if (!openingGateActive.value) return false;
-  return key !== "opening" && key !== "settings";
-}
+// Gated → only Opening + Settings render in the strip. Ungated →
+// Opening hides itself; users reach the form via the Edit button
+// on the active opening row in the journal, which transiently
+// switches `currentTab` to "opening" (kept visible while there).
+const visibleTabs = computed<readonly TabDef[]>(() => {
+  if (openingGateActive.value) return TABS.filter((tab) => tab.key === "opening" || tab.key === "settings");
+  return TABS.filter((tab) => tab.key !== "opening" || currentTab.value === "opening");
+});
 
 function onBookSelected(bookId: string): void {
   activeBookId.value = bookId;
@@ -308,8 +308,12 @@ function onEntrySubmitted(): void {
 }
 
 async function onBookDeleted(): Promise<void> {
-  await refetchBooks();
+  // Reset the tab BEFORE awaiting so a fast delete-then-create
+  // can't race: if the new book's gate engages while we're still
+  // awaiting refetchBooks, the gate watcher needs to see a
+  // non-"settings" currentTab to route the user to Opening.
   currentTab.value = "journal";
+  await refetchBooks();
 }
 
 watch(activeBookId, (next) => {
@@ -330,14 +334,20 @@ watch(
   { immediate: true },
 );
 
-// Force-route to the Opening tab whenever the gate engages. Tab
-// buttons are also `:disabled` so a stray click can't bypass it,
-// but this watcher handles the programmatic case (book switch,
-// initial mount with a no-opening book, LLM-supplied initialTab
-// pointing at a gated tab).
+// Force-route to the Opening tab whenever the gate engages.
+// Other tabs are hidden from the strip while gated, but this
+// watcher handles the programmatic case where currentTab still
+// points at a now-hidden tab (book switch, initial mount with a
+// no-opening book, LLM-supplied initialTab pointing at a gated
+// tab, or fresh-book creation right after deleting from the
+// settings tab) — without it, `<main>` would render nothing or
+// the user would be stranded on the prior book's settings view.
+// We don't exempt "settings" here: the user can still click back
+// to it from the (gated) tab strip if they want to delete the
+// new book instead of setting it up.
 watch(openingGateActive, (active) => {
   if (!active) return;
-  if (currentTab.value === "opening" || currentTab.value === "settings") return;
+  if (currentTab.value === "opening") return;
   currentTab.value = "opening";
 });
 

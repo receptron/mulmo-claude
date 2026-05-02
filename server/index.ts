@@ -290,12 +290,25 @@ async function getHtmlsDirReal(): Promise<string | null> {
 // visible origin (`localhost:5173`) rather than the upstream socket.
 // In prod (no proxy) the headers are absent and we fall back to the
 // raw `Host` / `req.protocol`.
+//
+// `X-Forwarded-*` values can be a comma-separated proxy chain (each
+// hop appends its own value). The CSP origin only needs the
+// outermost hop — the value the browser actually sees — so we take
+// the first entry and trim. Without this, a multi-hop deployment
+// would emit `https://a.example.com, b.example.com://x` and break
+// preview resource loading at the browser (#1056 review).
 function browserVisibleOrigin(req: Request): string {
-  const fwdHost = req.get("x-forwarded-host");
-  const fwdProto = req.get("x-forwarded-proto");
+  const fwdHost = firstForwardedValue(req.get("x-forwarded-host"));
+  const fwdProto = firstForwardedValue(req.get("x-forwarded-proto"));
   const host = fwdHost ?? req.get("host");
   const proto = fwdProto ?? req.protocol;
   return `${proto}://${host}`;
+}
+
+function firstForwardedValue(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const first = raw.split(",")[0]?.trim();
+  return first && first.length > 0 ? first : undefined;
 }
 app.use(
   "/artifacts/html",

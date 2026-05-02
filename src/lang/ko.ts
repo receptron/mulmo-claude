@@ -40,6 +40,7 @@ const koMessages = {
     attachFile: "파일 첨부",
     fileTooLarge: "파일이 너무 큽니다 ({sizeMB} MB). 최대 30 MB 까지 가능합니다.",
     unsupportedFileType: "지원되지 않는 파일 형식입니다. 이미지, PDF, DOCX, XLSX, PPTX, 텍스트 파일만 지원됩니다.",
+    attachImageFailed: "이미지를 첨부하지 못했습니다: {error}",
   },
   sessionHistoryPanel: {
     filters: {
@@ -576,6 +577,7 @@ const koMessages = {
       accountLabel: "계정",
       allAccounts: "모든 계정",
       void: "취소",
+      edit: "편집",
       voidConfirm: "이 분개를 취소하시겠습니까? 원 분개는 분개장에 남고 반대 분개가 추가됩니다.",
       voidReason: "사유(선택):",
       columns: {

@@ -48,6 +48,12 @@ export const WORKSPACE_DIRS = {
   // single-file `memory.md`; the legacy file is kept as
   // `memory.md.backup` after migration.
   memoryDir: "conversations/memory",
+  // Staging dir for the atomic→topic migration (#1070 PR-A). Cluster
+  // output lands here; the user reviews via `diff`, then `topic-swap`
+  // promotes it to `memoryDir`. The dir name is also matched verbatim
+  // by `topicStagingPath` and the swap-window detection in
+  // `topic-detect.ts`, so changes here ripple through both places.
+  memoryStaging: "conversations/memory.next",
   summaries: "conversations/summaries",
   // Tool-trace output for WebSearch (one .md per search, referenced
   // from chat JSONL `contentRef`). Lives alongside chat/ so search
@@ -134,6 +140,7 @@ export const WORKSPACE_PATHS = {
   sources: path.join(workspacePath, WORKSPACE_DIRS.sources),
   attachments: path.join(workspacePath, WORKSPACE_DIRS.attachments),
   memoryDir: path.join(workspacePath, WORKSPACE_DIRS.memoryDir),
+  memoryStaging: path.join(workspacePath, WORKSPACE_DIRS.memoryStaging),
   summaries: path.join(workspacePath, WORKSPACE_DIRS.summaries),
   searches: path.join(workspacePath, WORKSPACE_DIRS.searches),
   htmls: path.join(workspacePath, WORKSPACE_DIRS.htmls),
