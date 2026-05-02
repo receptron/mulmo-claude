@@ -165,7 +165,7 @@ Create a custom Role with the plugin enabled. Two paths, both supported:
   and restart the server.
 
 Switch to the new role in the role picker. Claude can now call
-`manageAccounting` and the `openApp` action mounts `<AccountingApp>`.
+`manageAccounting` and the `openBook` action mounts `<AccountingApp>`.
 
 ### Smoke checklist for a fresh book
 

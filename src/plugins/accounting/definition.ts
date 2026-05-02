@@ -9,7 +9,7 @@ import { ACCOUNTING_ACTIONS } from "./actions";
 // constraint 1). A user wanting access creates a custom Role and
 // includes `manageAccounting` in its plugin list.
 //
-// The `openApp` action returns an "accounting-app" tool-result
+// The `openBook` action returns an "accounting-app" tool-result
 // envelope that the frontend renderer mounts as the full
 // `<AccountingApp>` View. Every other action returns a compact
 // data payload that renders inline via `Preview.vue`.
@@ -18,9 +18,9 @@ const toolDefinition: ToolDefinition = {
   type: "function",
   name: TOOL_NAMES.manageAccounting,
   prompt:
-    "When the user asks to open / view their books, or to record, look up, or summarise journal entries / balances / opening balances, use manageAccounting. Use action='openApp' to bring up the full accounting UI; use the specific action (addEntry / getReport / etc.) for narrowly-scoped operations the user asked about by name.",
+    "When the user asks to open / view their books, or to record, look up, or summarise journal entries / balances / opening balances, use manageAccounting. Use action='openBook' (with the target bookId) to bring up the full accounting UI; use the specific action (addEntry / getReport / etc.) for narrowly-scoped operations the user asked about by name. On a fresh workspace call 'createBook' first, then 'openBook' with the new id.",
   description:
-    "Manage a double-entry accounting book stored in the workspace file system. Supports multiple books (entities), opening balances for adoption from existing books, journal entries, voiding (append-only — corrections are reversing pairs), and balance-sheet / profit-loss / ledger reports. Action='openApp' mounts the full accounting UI in the canvas; specific actions return compact results that render inline.",
+    "Manage a double-entry accounting book stored in the workspace file system. Supports multiple books (entities), opening balances for adoption from existing books, journal entries, voiding (append-only — corrections are reversing pairs), and balance-sheet / profit-loss / ledger reports. Action='openBook' mounts the full accounting UI in the canvas (requires bookId); specific actions return compact results that render inline.",
   parameters: {
     type: "object",
     properties: {
@@ -28,17 +28,17 @@ const toolDefinition: ToolDefinition = {
         type: "string",
         enum: Object.values(ACCOUNTING_ACTIONS),
         description:
-          "Operation to perform. 'openApp' mounts the full UI; others perform a single read or write. Use 'openApp' when the user wants to browse / interact, and a specific action when the user named the operation.",
+          "Operation to perform. 'openBook' mounts the full UI for a specific book; others perform a single read or write. Use 'openBook' when the user wants to browse / interact, and a specific action when the user named the operation.",
       },
       bookId: {
         type: "string",
         description:
-          "Target book id. Required for every action that reads or writes book data; call 'getBooks' first to enumerate available ids. The only actions that do NOT take a bookId are 'getBooks' and 'createBook' (which creates a fresh one).",
+          "Target book id. Required for every action that reads or writes book data, including 'openBook'; call 'getBooks' first to enumerate available ids. The only actions that do NOT take a bookId are 'getBooks' and 'createBook' (which creates a fresh one).",
       },
-      // openApp / createBook
+      // openBook / createBook
       name: { type: "string", description: "For 'createBook': human-readable book name." },
       currency: { type: "string", description: "For 'createBook': ISO 4217 currency code (default USD). Single-currency per book." },
-      initialTab: { type: "string", description: "For 'openApp': initial tab to show (e.g. 'journal', 'opening', 'balanceSheet')." },
+      initialTab: { type: "string", description: "For 'openBook': initial tab to show (e.g. 'journal', 'opening', 'balanceSheet')." },
       confirm: { type: "boolean", description: "For 'deleteBook': must be true to actually delete (guard against accidental deletion)." },
       // accounts
       account: {

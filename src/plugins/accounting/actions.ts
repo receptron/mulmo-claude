@@ -14,7 +14,7 @@
 // the call sites above.
 
 export const ACCOUNTING_ACTIONS = {
-  openApp: "openApp",
+  openBook: "openBook",
   getBooks: "getBooks",
   createBook: "createBook",
   deleteBook: "deleteBook",

@@ -94,23 +94,15 @@ function resolveBookId(state: AccountingState, body: DispatchBody): string | Moc
   return body.bookId;
 }
 
-function handleOpenApp(state: AccountingState, body: DispatchBody): MockResponse {
-  const requested = typeof body.bookId === "string" ? body.bookId : null;
-  const bookId = requested && state.books.some((book) => book.id === requested) ? requested : null;
-  const initialTab = typeof body.initialTab === "string" ? body.initialTab : undefined;
-  if (state.books.length === 0) {
-    // Mirrors the server's no-book LLM-facing message — see
-    // server/api/routes/accounting.ts handleOpenApp.
-    return ok({
-      kind: "accounting-app",
-      bookId,
-      initialTab,
-      books: state.books,
-      message:
-        "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
-    });
+function handleOpenBook(state: AccountingState, body: DispatchBody): MockResponse {
+  // Mirrors the server's required-bookId contract — see
+  // server/api/routes/accounting.ts handleOpenBook.
+  if (typeof body.bookId !== "string" || body.bookId === "") return missingBookId();
+  if (!state.books.some((book) => book.id === body.bookId)) {
+    return err(404, `book ${JSON.stringify(body.bookId)} not found`);
   }
-  return ok({ kind: "accounting-app", bookId, initialTab, books: state.books });
+  const initialTab = typeof body.initialTab === "string" ? body.initialTab : undefined;
+  return ok({ kind: "accounting-app", bookId: body.bookId, initialTab, books: state.books });
 }
 
 function handleGetBooks(state: AccountingState): MockResponse {
@@ -261,7 +253,7 @@ function handleGetReport(state: AccountingState, body: DispatchBody): MockRespon
 }
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
-  [ACCOUNTING_ACTIONS.openApp]: handleOpenApp,
+  [ACCOUNTING_ACTIONS.openBook]: handleOpenBook,
   [ACCOUNTING_ACTIONS.getBooks]: handleGetBooks,
   [ACCOUNTING_ACTIONS.createBook]: handleCreateBook,
   [ACCOUNTING_ACTIONS.deleteBook]: handleDeleteBook,

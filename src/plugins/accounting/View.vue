@@ -1,5 +1,5 @@
 <template>
-  <!-- Full <AccountingApp> mounted via the openApp tool result.
+  <!-- Full <AccountingApp> mounted via the openBook tool result.
        Talks to /api/accounting directly for browse / form ops; only
        the entry gate (this mount) runs through the LLM. Pub/sub
        refetches keep multi-tab / sibling-window views in sync. -->
@@ -182,7 +182,7 @@ function bumpLocalVersion(): void {
 
 function pickInitialBookId(): string | null {
   // Priority: explicit `initialPayload.bookId` (carried in the
-  // tool-result envelope by openApp / createBook / addEntry / …) →
+  // tool-result envelope by openBook / createBook / addEntry / …) →
   // first book in the list → null (empty workspace). The candidate
   // is validated against the live book list so a stale id from a
   // deleted book doesn't poison the View.

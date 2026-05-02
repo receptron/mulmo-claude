@@ -397,7 +397,7 @@ The preview pane reuses plugin views — clicking a `config/scheduler/items.json
 ## `<AccountingApp>` — opt-in plugin (no route)
 
 Mounted via the tool-result envelope `{ kind: "accounting-app" }`
-returned by `manageAccounting({action:"openApp"})`. **No `/accounting`
+returned by `manageAccounting({action:"openBook", bookId})`. **No `/accounting`
 route exists.** The default Role cannot reach this surface; only
 custom Roles whose `availablePlugins` include `manageAccounting` can
 trigger the mount.

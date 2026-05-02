@@ -1,6 +1,6 @@
 <template>
-  <!-- Compact inline summary for non-openApp tool results. The
-       openApp envelope routes to View.vue (full app) instead of
+  <!-- Compact inline summary for non-openBook tool results. The
+       openBook envelope routes to View.vue (full app) instead of
        this component; everything that lands here is a
        compact-result action (addEntry, getReport, …). -->
   <div class="text-sm text-gray-700" data-testid="accounting-preview">

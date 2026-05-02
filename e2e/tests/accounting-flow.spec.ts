@@ -1,6 +1,6 @@
 // Functional flow for the accounting plugin. Mounts <AccountingApp>
 // via an injected tool_result envelope (the same path the LLM's
-// `openApp` action would hit in production), and drives the canvas
+// `openBook` action would hit in production), and drives the canvas
 // against the in-memory mock from e2e/fixtures/accounting.ts. This
 // exercises the empty-state → first-book → journal path without an
 // LLM round-trip per click.
@@ -44,7 +44,7 @@ test.describe("accounting plugin — flow", () => {
     await setupSession(page);
   });
 
-  test("openApp envelope mounts <AccountingApp>; empty workspace shows full-page first-run form", async ({ page }) => {
+  test("openBook envelope mounts <AccountingApp>; empty workspace shows full-page first-run form", async ({ page }) => {
     await page.goto(`/chat/${SESSION_ID}`);
     await expect(page.getByText("MulmoClaude")).toBeVisible();
 

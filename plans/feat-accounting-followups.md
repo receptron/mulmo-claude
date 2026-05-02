@@ -154,7 +154,7 @@ File layout under `e2e/tests/accounting/`:
   - Direct navigation to `/accounting` does not match any route — assert the canvas falls back to whatever `/` shows (NotFound or default surface, whichever the router yields).
   - The default-Role MCP tool list does not include `manageAccounting`. Drive this by inspecting the rendered tool picker / role config UI rather than by mocking an LLM round-trip.
 - `flow.spec.ts` — runs with a **custom Role injected via `e2e/fixtures/`** that has `availablePlugins: ["manageAccounting"]`:
-  - Mock `manageAccounting({action:"openApp"})` to return the `accounting-app` envelope and assert `<View>` mounts on canvas.
+  - Mock `manageAccounting({action:"openBook", bookId})` to return the `accounting-app` envelope and assert `<View>` mounts on canvas.
   - Inside the mounted app, drive UI clicks for: create book → enter opening balances (assert save button stays disabled until Σ debit = Σ credit) → add a journal entry → see it in the journal list → switch to B/S tab and see the entry reflected.
   - Use Playwright's network observer to assert that every in-app click hits `/api/accounting` directly (no SSE / `/api/agent` round-trip).
   - **Pub/sub reflection**: with the app mounted, write a journal entry by hitting `/api/accounting` directly from the test (simulating a second writer), and assert the journal list and B/S refetch within a short timeout *without* a manual reload.

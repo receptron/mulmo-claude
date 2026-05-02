@@ -46,23 +46,20 @@ interface AccountingErrorResponse {
   details?: unknown;
 }
 
-// Tool-result envelope for the MCP-driven `openApp` action. The
+// Tool-result envelope for the MCP-driven `openBook` action. The
 // frontend tool-result renderer keys off `kind: "accounting-app"`
 // to mount `<AccountingApp>` (vs the compact `Preview.vue` which
 // renders summaries for every other action). `message` is picked
 // up by the MCP bridge and surfaced as the tool's text response
 // to the LLM (server/agent/mcp-server.ts).
-interface OpenAppToolResult {
+interface OpenBookToolResult {
   kind: "accounting-app";
-  /** `null` when the workspace has zero books — the View shows its
-   *  full-page first-run form and prompts the user to create one. */
-  bookId: string | null;
+  bookId: string;
   initialTab?: string;
   /** Same shape getBooks returns — included so an LLM that calls
-   *  openApp doesn't need a follow-up getBooks round-trip to learn
-   *  what books exist before its next action. */
+   *  openBook doesn't need a follow-up getBooks round-trip to learn
+   *  what other books exist before its next action. */
   books: BookSummary[];
-  message?: string;
 }
 
 type ActionRest = Omit<AccountingActionBody, "action">;
@@ -73,31 +70,19 @@ type ActionHandler = (rest: ActionRest) => Promise<unknown>;
 // itself lives inside the service layer (validateEntry,
 // validateOpening) so the adapters can stay one-liners.
 
-async function handleOpenApp(rest: ActionRest): Promise<OpenAppToolResult> {
-  // openApp resolves an explicit `bookId` (if the LLM passed one and
-  // it exists) or returns null — the View picks from getBooks +
-  // localStorage on its own. There's no server-side "active book"
-  // anymore; persisting that across calls would make tool replays
-  // ambiguous and couple multiple browser tabs to each other.
-  const list = await listBooks();
-  const requested = typeof rest.bookId === "string" ? rest.bookId : undefined;
-  const bookId = requested && list.books.some((book) => book.id === requested) ? requested : null;
-  const initialTab = typeof rest.initialTab === "string" ? rest.initialTab : undefined;
-  if (list.books.length === 0) {
-    // No books yet — the canvas is showing the full-page first-run
-    // form which the user must complete before any accounting
-    // feature is usable. Tell the LLM via `message` so it knows to
-    // wait for the user rather than attempt follow-up actions.
-    return {
-      kind: "accounting-app",
-      bookId,
-      initialTab,
-      books: list.books,
-      message:
-        "No books in this workspace yet. The accounting UI is showing a form asking the user to create their first book (name + currency) before any accounting feature can be used.",
-    };
+async function handleOpenBook(rest: ActionRest): Promise<OpenBookToolResult> {
+  // openBook requires an explicit `bookId` that resolves to an
+  // existing book. On a fresh workspace the LLM is expected to
+  // call `createBook` first and then `openBook` with the new id.
+  if (typeof rest.bookId !== "string" || rest.bookId === "") {
+    throw new AccountingError(400, "openBook: bookId is required. Call 'getBooks' to enumerate, or 'createBook' first on a fresh workspace.");
   }
-  return { kind: "accounting-app", bookId, initialTab, books: list.books };
+  const list = await listBooks();
+  if (!list.books.some((book) => book.id === rest.bookId)) {
+    throw new AccountingError(404, `openBook: book ${JSON.stringify(rest.bookId)} not found`);
+  }
+  const initialTab = typeof rest.initialTab === "string" ? rest.initialTab : undefined;
+  return { kind: "accounting-app", bookId: rest.bookId, initialTab, books: list.books };
 }
 
 async function handleGetReport(rest: ActionRest): Promise<unknown> {
@@ -126,7 +111,7 @@ async function handleGetReport(rest: ActionRest): Promise<unknown> {
 }
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
-  [ACCOUNTING_ACTIONS.openApp]: handleOpenApp,
+  [ACCOUNTING_ACTIONS.openBook]: handleOpenBook,
   [ACCOUNTING_ACTIONS.getBooks]: () => listBooks(),
   [ACCOUNTING_ACTIONS.createBook]: async (rest) => {
     // Surface bookId at the top level so the dispatch envelope's
@@ -186,7 +171,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 // silent — they're invoked from inside the canvas and the LLM will
 // summarise reads in its text reply anyway.
 const PREVIEW_ACTIONS = new Set<string>([
-  ACCOUNTING_ACTIONS.openApp,
+  ACCOUNTING_ACTIONS.openBook,
   ACCOUNTING_ACTIONS.createBook,
   ACCOUNTING_ACTIONS.upsertAccount,
   ACCOUNTING_ACTIONS.addEntry,
@@ -204,13 +189,14 @@ const VIEW_VISIBLE_TRAILER = "The accounting view is shown to the user.";
 type MessageBuilder = (fields: Record<string, unknown>) => string;
 
 const MESSAGE_BUILDERS: Record<string, MessageBuilder> = {
-  [ACCOUNTING_ACTIONS.openApp]: (fields) => {
+  [ACCOUNTING_ACTIONS.openBook]: (fields) => {
     // Include the books list inline so the LLM doesn't need a
     // follow-up getBooks round-trip before deciding what to do
-    // next (pick a book, create one, etc.).
-    const { books } = fields;
+    // next.
+    const { books, bookId } = fields;
     const booksFragment = Array.isArray(books) ? ` Books available: ${JSON.stringify(books)}.` : "";
-    return `Mounted the accounting app in the canvas.${booksFragment}`;
+    const idFragment = typeof bookId === "string" ? ` (book id: ${bookId})` : "";
+    return `Mounted the accounting app in the canvas${idFragment}.${booksFragment}`;
   },
   [ACCOUNTING_ACTIONS.createBook]: (fields) => {
     const book = fields.book as { id?: string; name?: string } | undefined;
@@ -272,7 +258,7 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
   // Stamp the dispatch verb onto the response so the MCP bridge's
   // spread `{ toolName, uuid, ...result }` surfaces it as
   // `ToolResult.action`. The sidebar reads this to label cards as
-  // `manageAccounting(openApp)` etc., and it round-trips a refresh
+  // `manageAccounting(openBook)` etc., and it round-trips a refresh
   // because the result envelope is persisted to the chat log.
   // Direct browser callers (the AccountingApp view) ignore the field.
   // Service responses that already set `action` win via the spread.
@@ -287,8 +273,8 @@ async function dispatch(body: AccountingActionBody): Promise<unknown> {
   // LLM (`data` / `jsonData` reach the view but not the model). So
   // every action MUST set a message — silence resolves to "Done"
   // and gives the LLM nothing to reason about. Resolution order:
-  //   1. handler-set `message` wins (handleOpenApp uses this to flag
-  //      the empty-workspace first-run state with tighter wording);
+  //   1. handler-set `message` wins (reserved for special-case
+  //      narration that the standard MESSAGE_BUILDER can't capture);
   //   2. an action with a registered MESSAGE_BUILDER gets the
   //      per-action human-friendly summary; this is decoupled from
   //      PREVIEW_ACTIONS so silent ops like deleteBook can still
