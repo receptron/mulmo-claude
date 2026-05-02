@@ -3,6 +3,7 @@ import { homedir, tmpdir } from "os";
 import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { MCP_PLUGIN_NAMES } from "./plugin-names.js";
+import { getRuntimePlugins } from "../plugins/runtime-registry.js";
 import type { McpServerSpec } from "../system/config.js";
 import { getCurrentToken } from "../api/auth/token.js";
 import type { Attachment } from "@mulmobridge/protocol";
@@ -17,7 +18,19 @@ const BASE_ALLOWED_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "We
 const MCP_PLUGINS = new Set([...MCP_PLUGIN_NAMES, ...mcpTools.filter(isMcpToolEnabled).map((toolDef) => toolDef.definition.name)]);
 
 export function getActivePlugins(role: Role): string[] {
-  return role.availablePlugins.filter((pluginName) => MCP_PLUGINS.has(pluginName));
+  const staticActive = role.availablePlugins.filter((pluginName) => MCP_PLUGINS.has(pluginName));
+  // Runtime plugins (#1043 C-2) are auto-included regardless of
+  // role.availablePlugins — the user explicitly installed them, so
+  // every role gets to use them. Without this, the Claude CLI's
+  // --allowedTools list misses the runtime tool name and the SDK
+  // returns "permission required" when the LLM tries to call it,
+  // even though the MCP server already exposes it via tools/list.
+  const runtimeActive = getRuntimePlugins().map((entry) => entry.definition.name);
+  // Dedupe in case a runtime plugin's tool name happens to match a
+  // built-in (collision policy already prevents this at registration,
+  // but the dedupe keeps --allowedTools clean if a future code path
+  // registers a static-named runtime entry).
+  return Array.from(new Set([...staticActive, ...runtimeActive]));
 }
 
 export interface McpConfigParams {

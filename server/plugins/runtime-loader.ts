@@ -41,6 +41,14 @@ export interface RuntimePlugin {
    *  shape matches static plugins in `plugin-names.ts`, so the same
    *  MCP merge / dispatch path applies. */
   definition: ToolDefinition;
+  /** Server-side handler the dispatch route calls. The convention
+   *  across @gui-chat-plugin packages is to export it under the same
+   *  key as `TOOL_DEFINITION.name` (e.g. weather → `fetchWeather`,
+   *  browse → `browse`); we capture it at load time so the dispatch
+   *  route doesn't have to re-resolve. `null` means the module
+   *  shipped a TOOL_DEFINITION but no matching handler — the
+   *  dispatch will 500 with a useful message. */
+  execute: ((args: unknown) => unknown) | null;
 }
 
 interface PackageJson {
@@ -140,7 +148,19 @@ export async function loadPluginFromCacheDir(name: string, version: string, cach
       log.warn(LOG_PREFIX, "no TOOL_DEFINITION export — skipping", { name, entrySpec });
       return null;
     }
-    return { name, version, cachePath, definition };
+    // The @gui-chat-plugin convention: the server-side handler is
+    // exported under the same key as `TOOL_DEFINITION.name` (weather
+    // → `fetchWeather`, browse → `browse`, camera → `takePhoto`).
+    // Captured here so the dispatch route doesn't have to re-import
+    // the module on every call. A missing handler is non-fatal — the
+    // plugin still appears in tools/list but the dispatch will fail
+    // with a clear server log + 500.
+    const handler = mod[definition.name];
+    const execute = typeof handler === "function" ? (handler as (args: unknown) => unknown) : null;
+    if (!execute) {
+      log.warn(LOG_PREFIX, "no execute handler matching TOOL_DEFINITION.name — dispatch will fail", { name, expectedExport: definition.name });
+    }
+    return { name, version, cachePath, definition, execute };
   } catch (err) {
     log.error(LOG_PREFIX, "import failed", { name, entrySpec, error: String(err) });
     return null;

@@ -61,14 +61,13 @@ router.post(API_ROUTES.plugins.runtimeDispatch, async (req: Request<{ pkg: strin
     notFound(res, `runtime plugin "${pkg}" not registered`);
     return;
   }
-  const def = plugin.definition as unknown as { execute?: (args: unknown) => unknown };
-  if (typeof def.execute !== "function") {
-    serverError(res, `runtime plugin "${pkg}" has no execute()`);
+  if (!plugin.execute) {
+    serverError(res, `runtime plugin "${pkg}" has no execute() — the package's dist/index.js must export a function under "${plugin.definition.name}"`);
     return;
   }
   const args = isRecord(req.body) ? req.body : {};
   try {
-    const result = await def.execute(args);
+    const result = await plugin.execute(args);
     // Forward whatever the plugin returns as the response body
     // (mirrors static plugin routes — see plugins.ts). MCP server
     // spreads this into the toolResult event downstream.

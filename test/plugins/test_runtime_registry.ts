@@ -22,6 +22,7 @@ const fakePlugin = (pkg: string, version: string, toolName: string): RuntimePlug
   version,
   cachePath: `/tmp/cache/${pkg}/${version}`,
   definition: fakeDef(toolName),
+  execute: null,
 });
 
 describe("runtime-registry", () => {

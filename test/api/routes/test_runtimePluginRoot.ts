@@ -56,6 +56,7 @@ const fakePlugin = (name: string, version: string, cachePath: string): RuntimePl
     description: "fixture",
     parameters: { type: "object", properties: {}, required: [] },
   },
+  execute: null,
 });
 
 describe("resolvePluginRoot — registry membership", () => {
