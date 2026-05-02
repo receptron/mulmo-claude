@@ -16,10 +16,11 @@ test.describe("session (real LLM)", () => {
     // for a one-word reply so the assistant never spins up TTS /
     // image generation; we only need a session to be created and
     // its URL to survive the reload.
+    const userPrompt = "Reply with the single word: pong";
     let sessionIdForCleanup: string | null = null;
     try {
       await startNewSession(page);
-      await sendChatMessage(page, "Reply with the single word: pong");
+      await sendChatMessage(page, userPrompt);
       await waitForAssistantResponseComplete(page);
       const sessionIdBeforeReload = getCurrentSessionId(page);
       expect(sessionIdBeforeReload, "session URL should be /chat/<id> after the first turn").not.toBeNull();
@@ -27,13 +28,24 @@ test.describe("session (real LLM)", () => {
 
       await page.reload();
 
-      // The session id surviving the reload is the structural
-      // signal that history was restored. Asserting visible text
-      // like "Start a conversation" would couple the test to the
-      // active locale (CLAUDE.md keeps eight UI dictionaries in
-      // lockstep), so it stays out of this spec — see Codex review
-      // iteration-1 for the rationale.
+      // Two complementary signals — together they cover B-14:
+      //  1. URL-level: the /chat/<id> route survived the reload.
+      //  2. DOM-level: the user's own prompt is back in the
+      //     transcript. The user-typed string is locale-agnostic
+      //     (the app never localizes user input), so this catches
+      //     "URL stayed but transcript failed to hydrate" without
+      //     coupling to UI dictionaries (CLAUDE.md keeps eight in
+      //     lockstep). See Codex review iter-1 / GHA review for
+      //     why visible-text assertions on chrome-side strings
+      //     stay out of this spec.
       expect(getCurrentSessionId(page), "session id must survive a reload").toBe(sessionIdBeforeReload);
+      // The same prompt text shows up in both the sidebar history
+      // preview and the main transcript bubble after rehydration —
+      // either rendering is enough to prove the record came back, so
+      // `.first()` keeps the locator out of strict-mode violation
+      // territory while still catching the "URL kept but transcript
+      // lost" failure mode Codex flagged.
+      await expect(page.getByText(userPrompt).first(), "user prompt must rehydrate after reload — B-14 transcript canary").toBeVisible();
     } finally {
       if (sessionIdForCleanup !== null) await deleteSession(page, sessionIdForCleanup);
     }

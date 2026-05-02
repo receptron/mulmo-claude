@@ -10,15 +10,22 @@ const L14_TIMEOUT_MS = ONE_MINUTE_MS;
 test.describe.configure({ mode: "parallel" });
 
 test.describe("wiki navigation (real workspace)", () => {
-  test("L-14: wiki ページ内の内部リンクで /chat にリダイレクトされず対象ページが開く", async ({ page }) => {
+  test("L-14: wiki ページ内の内部リンクで /chat にリダイレクトされず対象ページが開く", async ({ page }, testInfo) => {
     test.setTimeout(L14_TIMEOUT_MS);
     // Covers B-23 / B-24 / B-25: the catch-all router used to swallow
     // /wiki/pages/<slug> links and bounce them back to /chat. We seed
     // two pages directly on disk (no LLM authoring drift) and click
     // the rendered <a> in the source page; the test fails if the URL
     // ever leaves the wiki surface.
-    const sourceSlug = "e2e-live-l14-source";
-    const targetSlug = "e2e-live-l14-target";
+    //
+    // Suffixing the slug with the Playwright project name keeps two
+    // benefits: chromium and webkit do not race on the same disk
+    // file during parallel runs, and the chance of clobbering a
+    // user-owned page that just happens to be named exactly
+    // `e2e-live-l14-source` drops to effectively zero.
+    const projectSlug = testInfo.project.name;
+    const sourceSlug = `e2e-live-l14-source-${projectSlug}`;
+    const targetSlug = `e2e-live-l14-target-${projectSlug}`;
     const targetMarker = "L-14 target body marker";
     // mulmoclaude wiki uses double-bracket [[slug]] wikilinks (see
     // src/plugins/wiki/helpers.ts), not plain markdown links —

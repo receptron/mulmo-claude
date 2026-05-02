@@ -64,11 +64,15 @@ test.describe("mulmoScript edit (real workspace)", () => {
 
       await editBeat0Text(page, "L-EDIT marker via e2e-live");
 
-      // Switch to a brand-new chat session and come back. This is
-      // the exact navigation pattern reported in #1074: the route
-      // change + reload from /chat/<other> back to /chat/<original>
-      // is when the edit was disappearing.
-      await startNewSession(page);
+      // Navigate to /wiki and back. This still triggers the SPA
+      // route change + state reload that #1074 reported (the
+      // disappearing edit was tied to leaving and re-entering the
+      // chat surface), but it does NOT mint a second chat session
+      // the way startNewSession() would. Without this swap the
+      // cleanup branch would only delete the original session and
+      // leak the second one into the user's history every time.
+      await page.goto("/wiki");
+      await page.waitForURL(/\/wiki/);
       await page.goto(`/chat/${sessionId}`);
       await page.waitForURL(new RegExp(`/chat/${sessionId}$`));
       await expect(page.getByTestId("mulmo-script-generate-movie-button").first()).toBeVisible({ timeout: ONE_MINUTE_MS });
