@@ -162,16 +162,26 @@ export function ensureInsideBase(candidate: string, base: string): boolean {
 
 async function loadOne(entry: LedgerEntry): Promise<RuntimePlugin | null> {
   const tgzAbs = path.join(WORKSPACE_PATHS.plugins, entry.tgz);
-  if (!existsSync(tgzAbs)) {
-    log.warn(LOG_PREFIX, "tgz missing — skipping", { name: entry.name, tgz: entry.tgz });
+  const cachePath = path.join(WORKSPACE_PATHS.pluginCache, entry.name, entry.version);
+  // Anchor checks BEFORE any disk probe (`existsSync` / `realpath`).
+  // The ledger has two separate user-controlled fields — `tgz` and
+  // (`name`, `version`) — and each joins against a different base
+  // (`WORKSPACE_PATHS.plugins` vs. `pluginCache`). Both must stay
+  // inside their respective bases; otherwise even a stat-only probe
+  // would touch a path outside the intended roots.
+  if (!ensureInsideBase(tgzAbs, WORKSPACE_PATHS.plugins)) {
+    log.warn(LOG_PREFIX, "ledger entry tgz escapes plugins root — skipping", { name: entry.name, tgz: entry.tgz });
     return null;
   }
-  const cachePath = path.join(WORKSPACE_PATHS.pluginCache, entry.name, entry.version);
   if (!ensureInsideBase(cachePath, WORKSPACE_PATHS.pluginCache)) {
     log.warn(LOG_PREFIX, "ledger entry escapes plugin cache root — skipping", {
       name: entry.name,
       version: entry.version,
     });
+    return null;
+  }
+  if (!existsSync(tgzAbs)) {
+    log.warn(LOG_PREFIX, "tgz missing — skipping", { name: entry.name, tgz: entry.tgz });
     return null;
   }
   if (!isCacheValid(cachePath)) {

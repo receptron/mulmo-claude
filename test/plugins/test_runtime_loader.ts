@@ -130,6 +130,16 @@ describe("loadPluginFromCacheDir", () => {
     assert.equal(ensureInsideBase("/etc/passwd", base), false);
   });
 
+  it("ensureInsideBase: catches a malicious `tgz` ledger field too", () => {
+    // The ledger has TWO user-controlled fields that join against
+    // different bases: `tgz` (against WORKSPACE_PATHS.plugins) and
+    // (name, version) (against pluginCache). Both must be checked,
+    // not just one.
+    const pluginsRoot = path.join(tmpdir(), "mulmo-base-tgz");
+    const malicious = path.join(pluginsRoot, "..", "..", "etc", "passwd");
+    assert.equal(ensureInsideBase(malicious, pluginsRoot), false);
+  });
+
   it("ensureInsideBase: a base-prefix without separator is not enough", () => {
     // `/cache/foo` is NOT inside `/cache/fo`. Naive startsWith would
     // accept it; the explicit `path.sep` boundary check rejects it.
