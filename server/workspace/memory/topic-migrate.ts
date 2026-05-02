@@ -66,13 +66,21 @@ export async function clusterAtomicIntoStaging(workspaceRoot: string, clusterer:
   // swap would happily promote.
   await resetStaging(stagingPath);
   let map: ClusterMap | null = null;
+  let clustererThrew = false;
   try {
     map = await clusterer(entries);
   } catch (err) {
+    clustererThrew = true;
     log.error("memory", "topic-migrate: clusterer threw", { error: errorMessage(err) });
   }
   if (!map) {
-    if (map === null) log.warn("memory", "topic-migrate: clusterer returned null");
+    // Only warn about a graceful null return when the clusterer
+    // didn't already log a throw. Without this, a hard failure
+    // (claude CLI missing, schema mismatch, etc.) showed up as
+    // BOTH `clusterer threw` AND `clusterer returned null`, which
+    // misleads readers into thinking there were two distinct
+    // failure modes (#1072 review).
+    if (!clustererThrew) log.warn("memory", "topic-migrate: clusterer returned null");
     await rm(stagingPath, { recursive: true, force: true });
     return { ...emptyResult(stagingPath), inputCount: entries.length };
   }
