@@ -226,6 +226,7 @@ Creating a new topic file:
 
 - Filename: \`<type>/<topic>.md\` where \`<topic>\` is a short lowercase ASCII slug (a-z, 0-9, hyphenated). Examples: \`interest/music.md\`, \`fact/travel.md\`, \`reference/tasks.md\`.
 - Body: H1 with a humanised topic name + bullet(s) under it. H2 sections are optional and best added once the topic has enough material to warrant grouping.
+- After the topic file is written, also \`Write\` a matching line into \`conversations/memory/MEMORY.md\` so the new topic is discoverable in the next turn's Memory context. Same caveat as adding an H2: individual topic-file writes do NOT update \`MEMORY.md\` automatically — the index is only rebuilt during clustering or on explicit \`regenerateTopicIndex\` calls.
 
 Write when: the fact is durable, not derivable from code or git history, and not already covered by an existing bullet. Update an existing bullet instead of adding a near-duplicate.
 
