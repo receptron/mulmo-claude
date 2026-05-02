@@ -37,8 +37,12 @@ on:
   # collapses to one review against the final commit) and the Azure
   # deployment's 5000 TPM ceiling. A docs-only PR review is cheap
   # and occasionally catches a typo or broken link the bots missed.
+  # `ready_for_review` is intentionally NOT in `types`: `opened` already
+  # fires on draft PRs, so promoting draft → ready would otherwise re-run
+  # Codex on the identical SHA (no new commits to review). If a fresh
+  # take is wanted on draft promotion, use `workflow_dispatch` instead.
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
     branches: [main]
   # Manual escalation: run on demand against any PR (re-review,
   # one-off check on a closed PR, etc.).
