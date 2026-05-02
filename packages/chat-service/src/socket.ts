@@ -314,7 +314,7 @@ function parseMessagePayload(payload: MessagePayload): ParsedMessage {
 const MAX_ATTACHMENT_COUNT = 10;
 const MAX_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024; // 20 MB base64
 
-function parseAttachments(raw: unknown): Attachment[] | undefined {
+export function parseAttachments(raw: unknown): Attachment[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   const valid: Attachment[] = [];
   let totalBytes = 0;
@@ -345,9 +345,16 @@ function parseAttachments(raw: unknown): Attachment[] | undefined {
 // each layer is required for external code (#1099 review). Reject
 // absolute paths and any traversal segment up front so a payload
 // like `path: "../../etc/passwd"` never reaches the relay.
+// Windows-style drive-letter absolute path (`C:\…` or `C:/…`).
+// `isSafeAttachmentPath` rejects these too — a malicious bridge
+// can't ship a host-absolute path under any platform convention
+// (#1099 review iter-2).
+const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:[\\/]/;
+
 function isSafeAttachmentPath(value: string): boolean {
   if (value.length === 0) return false;
   if (value.startsWith("/") || value.startsWith("\\")) return false;
+  if (WINDOWS_DRIVE_PATH_RE.test(value)) return false;
   for (const segment of value.split(/[/\\]/)) {
     if (segment === "..") return false;
   }

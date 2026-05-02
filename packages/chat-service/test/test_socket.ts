@@ -4,7 +4,7 @@ import http from "http";
 import express from "express";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Server as SocketServer } from "socket.io";
-import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, parseOneAttachment } from "../src/socket.js";
+import { attachChatSocket, CHAT_SOCKET_EVENTS, CHAT_SOCKET_PATH, parseAttachments, parseOneAttachment } from "../src/socket.js";
 import { createPushQueue } from "../src/push-queue.js";
 import type { RelayParams, RelayResult } from "../src/relay.js";
 import type { Logger } from "../src/types.js";
@@ -157,6 +157,70 @@ describe("chat-service socket — no auth", () => {
     assert.equal(forwarded[1].data, "AAAA");
     client.disconnect();
   });
+
+  it("caps attachments at MAX_ATTACHMENT_COUNT regardless of shape (#1099 iter-2)", async () => {
+    // Send 12 items mixing both shapes. The internal cap is 10;
+    // entries past that point must be dropped on the floor — and the
+    // path-only items must count toward the cap exactly like inline
+    // ones (the count gate runs before the data-byte gate).
+    const client = connectClient(harness.url, { transportId: "cli" });
+    await waitConnect(client);
+    const items: unknown[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      items.push({ path: `data/attachments/2026/05/p${i}.png` });
+      items.push({ mimeType: "image/png", data: `D${i}` });
+    }
+    const ack = await emitMessage(client, { externalChatId: "terminal", text: "cap", attachments: items });
+    assert.equal(ack.ok, true);
+    const forwarded = harness.relayCalls[0].attachments ?? [];
+    assert.equal(forwarded.length, 10, "MAX_ATTACHMENT_COUNT must cap at 10");
+    client.disconnect();
+  });
+});
+
+// Unit-level coverage for the bytes / count caps. Going through the
+// socket harness for the bytes case is impractical — socket.io's
+// default `maxHttpBufferSize` is 1MB, so a 20+MB payload trips the
+// transport cap before reaching our parser. Calling `parseAttachments`
+// directly pins the same contract without that bottleneck.
+describe("chat-service socket — parseAttachments cap behavior", () => {
+  it("caps at MAX_ATTACHMENT_COUNT (10) regardless of shape", () => {
+    const items: unknown[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      items.push({ path: `data/attachments/2026/05/p${i}.png` });
+      items.push({ mimeType: "image/png", data: `D${i}` });
+    }
+    const out = parseAttachments(items) ?? [];
+    assert.equal(out.length, 10);
+  });
+
+  it("caps inline `data` byte total at MAX_ATTACHMENT_TOTAL_BYTES; path-only entries don't add to that budget (#1099 iter-2)", () => {
+    // First inline (11MB) accepted. A path-only entry between the
+    // two inlines is also accepted (its data size is 0). The second
+    // inline (11MB) would push the running total to 22MB and break
+    // the loop, so the trailing entries never get through.
+    const elevenMB = "A".repeat(11 * 1024 * 1024);
+    const out =
+      parseAttachments([
+        { mimeType: "image/png", data: elevenMB },
+        { path: "data/attachments/2026/05/path-only.png" },
+        { mimeType: "image/png", data: elevenMB },
+        { path: "data/attachments/2026/05/after-trip.png" },
+      ]) ?? [];
+    assert.equal(out.length, 2);
+    assert.equal(out[0].data?.length, elevenMB.length);
+    assert.equal(out[1].path, "data/attachments/2026/05/path-only.png");
+  });
+
+  it("returns undefined when given a non-array", () => {
+    assert.equal(parseAttachments(undefined), undefined);
+    assert.equal(parseAttachments(null), undefined);
+    assert.equal(parseAttachments({}), undefined);
+  });
+
+  it("returns undefined when every entry is invalid (no valid items left)", () => {
+    assert.equal(parseAttachments([{ wrongShape: true }, { path: "/etc/passwd" }, "string"]), undefined);
+  });
 });
 
 describe("chat-service socket — parseOneAttachment", () => {
@@ -179,6 +243,12 @@ describe("chat-service socket — parseOneAttachment", () => {
   it("rejects absolute paths (wire-boundary defence-in-depth, #1099)", () => {
     assert.equal(parseOneAttachment({ path: "/etc/passwd" }), null);
     assert.equal(parseOneAttachment({ path: "\\\\Windows\\\\System32\\\\config" }), null);
+  });
+
+  it("rejects Windows-style drive-letter absolute paths (#1099 iter-2)", () => {
+    assert.equal(parseOneAttachment({ path: "C:\\\\Windows\\\\System32\\\\config" }), null);
+    assert.equal(parseOneAttachment({ path: "C:/Windows/System32/config" }), null);
+    assert.equal(parseOneAttachment({ path: "z:/data" }), null);
   });
 
   it("rejects any traversal segment", () => {
