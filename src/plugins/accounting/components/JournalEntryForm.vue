@@ -98,8 +98,13 @@
         {{ submitting ? t("pluginAccounting.entryForm.submitting") : t("pluginAccounting.entryForm.submit") }}
       </button>
     </div>
-    <AccountsModal v-if="showAccountsModal" :book-id="bookId" :accounts="accounts" @close="showAccountsModal = false" @changed="emit('accountsChanged')" />
   </form>
+  <!-- Sibling of the parent <form> on purpose: the modal renders
+       its own <form @submit.prevent> for the inline editor, and
+       nesting <form>s is invalid HTML that breaks Enter-key submit
+       routing in some browsers. Vue 3 multi-root templates let us
+       keep the markup flat with no wrapper div. -->
+  <AccountsModal v-if="showAccountsModal" :book-id="bookId" :accounts="accounts" @close="showAccountsModal = false" @changed="emit('accountsChanged')" />
 </template>
 
 <script setup lang="ts">
