@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { runMemoryMigrationOnce } from "../../../server/workspace/memory/run.js";
-import type { Summarize } from "../../../server/workspace/journal/archivist-cli.js";
+import { ClaudeCliNotFoundError, type Summarize } from "../../../server/workspace/journal/archivist-cli.js";
 
 describe("memory/run — idempotency guards", () => {
   let scoped: string;
@@ -137,6 +137,45 @@ describe("memory/run — idempotency guards", () => {
       const backupAfter = await stat(`${legacyPath}.backup`).catch(() => null);
       assert.equal(legacyAfter, null, "legacy file should have been renamed");
       assert.ok(backupAfter !== null && backupAfter.isFile(), ".backup should exist post-migration");
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("aborts cleanly when the Claude CLI is missing — legacy left in place for a later retry", async () => {
+    // Reproduces the #1061 review concern: previously the classifier
+    // swallowed `ClaudeCliNotFoundError` per-candidate and returned
+    // null, so the migration ran to completion with zero writes,
+    // wrote an empty `MEMORY.md`, and renamed `memory.md` to
+    // `.backup` — losing the legacy text from the prompt entirely.
+    // After the fix, the error escapes, the runner catches it, logs
+    // a single warn, and leaves both files untouched.
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-mem-run-cli-missing-"));
+    try {
+      const legacyPath = path.join(fresh, "conversations", "memory.md");
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      // Same padding strategy as the prior test — get past the
+      // 64-byte placeholder threshold so the runner reaches the
+      // classifier path, where the CLI-missing error would otherwise
+      // have been silently swallowed.
+      await writeFile(
+        legacyPath,
+        ["# Memory", "", "Distilled facts about you and your work.", "", "## Preferences", "- yarn を使う（npm は使わない）", "- Emacs を愛用", ""].join("\n"),
+        "utf-8",
+      );
+
+      const summarize: Summarize = async () => {
+        throw new ClaudeCliNotFoundError();
+      };
+      await runMemoryMigrationOnce(fresh, { summarize });
+
+      // Legacy file untouched, no .backup created, no typed entries.
+      const legacyAfter = await stat(legacyPath).catch(() => null);
+      assert.ok(legacyAfter !== null && legacyAfter.isFile(), "legacy file must remain untouched when CLI is missing");
+      const backupAfter = await stat(`${legacyPath}.backup`).catch(() => null);
+      assert.equal(backupAfter, null, ".backup must NOT be created on CLI-missing");
+      const memDir = await stat(path.join(fresh, "conversations", "memory")).catch(() => null);
+      assert.equal(memDir, null, "no typed memory dir must be created on CLI-missing");
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }
