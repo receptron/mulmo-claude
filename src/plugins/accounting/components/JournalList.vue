@@ -49,7 +49,7 @@
           <td class="py-1 px-2">
             <div v-for="(line, idx) in entry.lines" :key="idx" class="text-xs flex gap-2 items-baseline">
               <span class="font-mono text-[10px] text-gray-400">{{ line.accountCode }}</span>
-              <span>{{ accountNameFor(line.accountCode) }}</span>
+              <span v-if="accountNameFor(line.accountCode)">{{ accountNameFor(line.accountCode) }}</span>
               <span v-if="line.debit">{{ formatDebit(line.debit) }}</span>
               <span v-if="line.credit">{{ formatCredit(line.credit) }}</span>
             </div>
@@ -120,8 +120,8 @@ const accountNameByCode = computed(() => {
   for (const account of props.accounts) map.set(account.code, account.name);
   return map;
 });
-function accountNameFor(code: string): string {
-  return accountNameByCode.value.get(code) ?? code;
+function accountNameFor(code: string): string | null {
+  return accountNameByCode.value.get(code) ?? null;
 }
 
 async function refresh(): Promise<void> {
