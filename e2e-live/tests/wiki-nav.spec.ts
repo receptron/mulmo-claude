@@ -37,13 +37,19 @@ test.describe("wiki navigation (real workspace)", () => {
     const sourceSlug = `e2e-live-l14-source-${projectSlug}-${nonce}`;
     const targetSlug = `e2e-live-l14-target-${projectSlug}-${nonce}`;
     const targetMarker = "L-14 target body marker";
+    // Both seed calls live inside the try block — if the second
+    // placeWikiPage throws (filesystem error, permission, etc.) we
+    // still hit finally and clean up the first page. removeWikiPage
+    // is rm({ force: true }) under the hood, so calling it for a
+    // slug that was never written is a no-op.
+    //
     // mulmoclaude wiki uses double-bracket [[slug]] wikilinks (see
     // src/plugins/wiki/helpers.ts), not plain markdown links —
     // markdown links would be rewritten as Files-view paths and
     // produce a "File not found" view instead of routing to /wiki.
-    await placeWikiPage(sourceSlug, [`# L-14 source`, ``, `[[${targetSlug}]]`, ``].join("\n"));
-    await placeWikiPage(targetSlug, [`# L-14 target`, ``, targetMarker, ``].join("\n"));
     try {
+      await placeWikiPage(sourceSlug, [`# L-14 source`, ``, `[[${targetSlug}]]`, ``].join("\n"));
+      await placeWikiPage(targetSlug, [`# L-14 target`, ``, targetMarker, ``].join("\n"));
       await navigateToWikiPage(page, sourceSlug);
       await page.locator(`.wiki-link[data-page="${targetSlug}"]`).first().click();
       await expect(page).toHaveURL(new RegExp(`/wiki/pages/${encodeURIComponent(targetSlug)}$`));
