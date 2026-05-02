@@ -586,6 +586,7 @@ const deMessages = {
       accountLabel: "Konto",
       allAccounts: "Alle Konten",
       void: "Stornieren",
+      edit: "Bearbeiten",
       voidConfirm: "Diesen Eintrag stornieren? Das Original bleibt im Journal; ein Stornopaar wird angehängt.",
       voidReason: "Grund (optional):",
       columns: {

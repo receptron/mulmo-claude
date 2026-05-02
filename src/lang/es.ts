@@ -587,6 +587,7 @@ const esMessages = {
       accountLabel: "Cuenta",
       allAccounts: "Todas",
       void: "Anular",
+      edit: "Editar",
       voidConfirm: "¿Anular esta entrada? La original permanece en el diario; se añade un par de reversión.",
       voidReason: "Motivo (opcional):",
       columns: {

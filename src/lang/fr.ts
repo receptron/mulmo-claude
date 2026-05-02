@@ -581,6 +581,7 @@ const frMessages = {
       accountLabel: "Compte",
       allAccounts: "Tous",
       void: "Annuler",
+      edit: "Modifier",
       voidConfirm: "Annuler cette écriture ? L'originale reste dans le journal ; une paire de contre-passation est ajoutée.",
       voidReason: "Motif (optionnel) :",
       columns: {

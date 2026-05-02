@@ -577,6 +577,7 @@ const jaMessages = {
       accountLabel: "勘定科目",
       allAccounts: "すべての科目",
       void: "取消",
+      edit: "編集",
       voidConfirm: "この仕訳を取り消しますか？元の仕訳は journal に残り、逆仕訳が追記されます。",
       voidReason: "理由（任意）:",
       columns: {

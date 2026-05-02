@@ -573,6 +573,7 @@ const zhMessages = {
       accountLabel: "科目",
       allAccounts: "所有科目",
       void: "冲销",
+      edit: "编辑",
       voidConfirm: "冲销此分录？原始分录保留在日记账中，会追加一对反向分录。",
       voidReason: "原因（可选）:",
       columns: {

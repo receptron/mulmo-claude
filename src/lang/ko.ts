@@ -577,6 +577,7 @@ const koMessages = {
       accountLabel: "계정",
       allAccounts: "모든 계정",
       void: "취소",
+      edit: "편집",
       voidConfirm: "이 분개를 취소하시겠습니까? 원 분개는 분개장에 남고 반대 분개가 추가됩니다.",
       voidReason: "사유(선택):",
       columns: {

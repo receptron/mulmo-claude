@@ -579,6 +579,7 @@ const ptBRMessages = {
       accountLabel: "Conta",
       allAccounts: "Todas as contas",
       void: "Estornar",
+      edit: "Editar",
       voidConfirm: "Estornar este lançamento? O original permanece no diário e um par de reversão é anexado.",
       voidReason: "Motivo (opcional):",
       columns: {

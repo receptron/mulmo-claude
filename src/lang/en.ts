@@ -602,6 +602,7 @@ const enMessages = {
       accountLabel: "Account",
       allAccounts: "All accounts",
       void: "Void",
+      edit: "Edit",
       voidConfirm: "Void this entry? The original stays in the journal; a reversing pair is appended.",
       voidReason: "Reason (optional):",
       columns: { date: "Date", kind: "Kind", memo: "Memo", lines: "Lines" },
