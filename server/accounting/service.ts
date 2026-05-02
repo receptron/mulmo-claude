@@ -220,7 +220,18 @@ export async function upsertAccount(
   // assumption keeps existing books' files unchanged.
   const stored: Account = { code: input.account.code, name: input.account.name, type: input.account.type };
   if (typeof input.account.note === "string" && input.account.note.length > 0) stored.note = input.account.note;
-  if (input.account.active === false) stored.active = false;
+  // Active-flag policy on update is opt-in to change:
+  //   - explicit `false` → store `false` (deactivate)
+  //   - explicit `true` → omit (reactivate; default-active)
+  //   - omitted (`undefined`) → inherit the existing flag, so a
+  //     caller editing only name/type/note doesn't accidentally
+  //     reactivate a soft-deleted account. This matters for
+  //     LLM-driven upserts (and any older client) that send only
+  //     code/name/type — without the inheritance, every such call
+  //     would silently flip the account back into entry/ledger
+  //     dropdowns.
+  const inheritInactive = input.account.active === undefined && existingIdx >= 0 && accounts[existingIdx].active === false;
+  if (input.account.active === false || inheritInactive) stored.active = false;
   if (existingIdx >= 0) {
     next[existingIdx] = stored;
   } else {

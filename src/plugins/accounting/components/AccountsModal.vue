@@ -28,6 +28,7 @@
       </header>
       <div class="flex-1 overflow-auto px-4 py-3 flex flex-col gap-3">
         <p v-if="successMessage" class="text-xs text-green-600" data-testid="accounting-accounts-success">{{ successMessage }}</p>
+        <p v-if="toggleError" class="text-xs text-red-500" data-testid="accounting-accounts-toggle-error">{{ toggleError }}</p>
         <section v-for="group in groups" :key="group.type" class="flex flex-col gap-1">
           <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ t(`pluginAccounting.accounts.sectionTitle.${group.type}`) }}</h4>
           <div v-if="group.accounts.length === 0" class="text-xs text-gray-400 italic px-1">{{ t("pluginAccounting.common.empty") }}</div>
@@ -108,6 +109,14 @@ const addingNew = ref(false);
 const draft = ref<AccountDraft>(emptyDraft("asset"));
 const saving = ref(false);
 const error = ref<string | null>(null);
+// Toggle (Deactivate / Reactivate) keeps its own state. Sharing
+// `saving` / `error` with the editor would (a) hide a toggle
+// failure when no editor is mounted to render `:error`, and (b)
+// blank out an in-progress editor's validation message and
+// freeze its Save button when the user fires a toggle on a
+// different row.
+const toggleSaving = ref(false);
+const toggleError = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
 const newEditorWrapper = ref<HTMLDivElement | null>(null);
@@ -215,10 +224,18 @@ async function onToggleActive(account: Account): Promise<void> {
   // on the same row, and historical entries are unaffected. A
   // confirm prompt was over-protective for an action that's a
   // single click to undo.
-  if (saving.value) return;
+  //
+  // Toggle uses its own `toggleSaving` / `toggleError` refs rather
+  // than the AccountEditor's shared `saving` / `error` so that:
+  //   1. a toggle while an editor is open doesn't clear the
+  //      editor's validation message or pin its Save button to
+  //      "Saving…", and
+  //   2. a toggle failure still surfaces (via the toggle banner)
+  //      when no editor is mounted to render `:error`.
+  if (toggleSaving.value) return;
   const willDeactivate = account.active !== false;
-  saving.value = true;
-  error.value = null;
+  toggleSaving.value = true;
+  toggleError.value = null;
   try {
     const next: Account = {
       code: account.code,
@@ -226,18 +243,23 @@ async function onToggleActive(account: Account): Promise<void> {
       type: account.type,
     };
     if (account.note !== undefined && account.note.length > 0) next.note = account.note;
-    if (willDeactivate) next.active = false;
+    // Send the active flag explicitly so the server can tell
+    // "user wants to (de)activate" apart from "user is editing
+    // and didn't mention active" — the latter inherits the
+    // existing flag and would otherwise turn Reactivate into a
+    // no-op.
+    next.active = !willDeactivate;
     const result = await upsertAccount(next, props.bookId);
     if (!result.ok) {
-      error.value = result.error;
+      toggleError.value = result.error;
       return;
     }
     showSuccess(t("pluginAccounting.accounts.success"));
     emit("changed");
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    toggleError.value = err instanceof Error ? err.message : String(err);
   } finally {
-    saving.value = false;
+    toggleSaving.value = false;
   }
 }
 
