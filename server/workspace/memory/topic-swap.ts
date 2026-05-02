@@ -22,6 +22,7 @@ import path from "node:path";
 
 import { log } from "../../system/logger/index.js";
 import { errorMessage } from "../../utils/errors.js";
+import { WORKSPACE_DIRS } from "../paths.js";
 import { topicStagingPath } from "./topic-migrate.js";
 
 export interface SwapResult {
@@ -35,7 +36,7 @@ export interface SwapResult {
 
 export async function swapStagingIntoMemory(workspaceRoot: string): Promise<SwapResult> {
   const stagingPath = topicStagingPath(workspaceRoot);
-  const memoryPath = path.join(workspaceRoot, "conversations", "memory");
+  const memoryPath = path.join(workspaceRoot, WORKSPACE_DIRS.memoryDir);
   const stagingExists = await pathExists(stagingPath);
   if (!stagingExists) {
     return { swapped: false, backupPath: null, reason: "staging dir not found" };

@@ -25,6 +25,7 @@ import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { readTextSafe } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { errorMessage } from "../../utils/errors.js";
+import { WORKSPACE_FILES } from "../paths.js";
 import { regenerateIndex, writeMemoryEntry } from "./io.js";
 import { isMemoryType, slugifyMemoryName, type MemoryEntry, type MemoryType } from "./types.js";
 
@@ -71,7 +72,7 @@ const CLASSIFY_CONCURRENCY = 4;
 const PROGRESS_LOG_INTERVAL = 5;
 
 export async function migrateLegacyMemory(workspaceRoot: string, classify: MemoryClassifier): Promise<MigrationResult> {
-  const sourcePath = path.join(workspaceRoot, "conversations", "memory.md");
+  const sourcePath = path.join(workspaceRoot, WORKSPACE_FILES.memory);
   const raw = await readTextSafe(sourcePath);
   if (raw === null) {
     return emptyResult(true);
@@ -249,7 +250,7 @@ async function renameToBackup(sourcePath: string): Promise<void> {
 // callers don't need this — `memory.md` is created by user activity
 // or by an older mulmoclaude version.
 export async function writeLegacyMemoryForTest(workspaceRoot: string, content: string): Promise<void> {
-  const sourcePath = path.join(workspaceRoot, "conversations", "memory.md");
+  const sourcePath = path.join(workspaceRoot, WORKSPACE_FILES.memory);
   await mkdir(path.dirname(sourcePath), { recursive: true });
   await writeFileAtomic(sourcePath, content);
 }

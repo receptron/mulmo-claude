@@ -32,6 +32,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 
+import { WORKSPACE_DIRS } from "../paths.js";
 import { MEMORY_TYPES } from "./types.js";
 
 function isDirectorySafe(absPath: string): boolean {
@@ -51,7 +52,7 @@ function hasAnyTypeSubdir(root: string): boolean {
 }
 
 export function hasTopicFormat(workspaceRoot: string): boolean {
-  const memoryRoot = path.join(workspaceRoot, "conversations", "memory");
+  const memoryRoot = path.join(workspaceRoot, WORKSPACE_DIRS.memoryDir);
   // Live tree wins: any `memory/<type>/` → post-swap topic mode.
   if (hasAnyTypeSubdir(memoryRoot)) return true;
   // If live `memory/` still exists (with atomic files at the root,
@@ -61,6 +62,6 @@ export function hasTopicFormat(workspaceRoot: string): boolean {
   if (isDirectorySafe(memoryRoot)) return false;
   // Live tree absent → could be the swap window OR a fresh
   // workspace. Consult staging.
-  const stagingRoot = path.join(workspaceRoot, "conversations", "memory.next");
+  const stagingRoot = path.join(workspaceRoot, WORKSPACE_DIRS.memoryStaging);
   return hasAnyTypeSubdir(stagingRoot);
 }

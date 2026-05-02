@@ -30,6 +30,7 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { runClaudeCli, ClaudeCliNotFoundError, type Summarize } from "../journal/archivist-cli.js";
+import { WORKSPACE_DIRS, WORKSPACE_FILES } from "../paths.js";
 import { loadAllMemoryEntries } from "./io.js";
 import { makeLlmMemoryClusterer } from "./topic-cluster.js";
 import { clusterAtomicIntoStaging, topicStagingPath } from "./topic-migrate.js";
@@ -52,7 +53,7 @@ export interface RunTopicMigrationDeps {
 // swap-in-progress or a crash mid-swap), the runner must drop into
 // the "existing staging detected" retry-swap branch below, not exit.
 function memoryTreeIsTopicFormat(workspaceRoot: string): boolean {
-  const memoryRoot = path.join(workspaceRoot, "conversations", "memory");
+  const memoryRoot = path.join(workspaceRoot, WORKSPACE_DIRS.memoryDir);
   for (const type of MEMORY_TYPES) {
     try {
       if (statSync(path.join(memoryRoot, type)).isDirectory()) return true;
@@ -99,7 +100,7 @@ export async function runTopicMigrationOnce(workspaceRoot: string, deps: RunTopi
   // so there's nothing to defer for; any other error is swallowed
   // and the runner proceeds — a permission glitch should never block
   // the topic restructure.
-  const legacyPath = path.join(workspaceRoot, "conversations", "memory.md");
+  const legacyPath = path.join(workspaceRoot, WORKSPACE_FILES.memory);
   let legacyStat: ReturnType<typeof statSync> | null;
   try {
     legacyStat = statSync(legacyPath);
