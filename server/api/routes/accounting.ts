@@ -128,11 +128,16 @@ async function handleGetReport(rest: ActionRest): Promise<unknown> {
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
   [ACCOUNTING_ACTIONS.openApp]: handleOpenApp,
   [ACCOUNTING_ACTIONS.getBooks]: () => listBooks(),
-  [ACCOUNTING_ACTIONS.createBook]: (rest) =>
-    createBook({
+  [ACCOUNTING_ACTIONS.createBook]: async (rest) => {
+    // Surface bookId at the top level so the dispatch envelope's
+    // `data` carries it like every other write action — the View
+    // uses it to preselect the new book on mount.
+    const result = await createBook({
       name: String(rest.name ?? ""),
       currency: typeof rest.currency === "string" ? rest.currency : undefined,
-    }),
+    });
+    return { bookId: result.book.id, ...result };
+  },
   [ACCOUNTING_ACTIONS.deleteBook]: (rest) => deleteBook({ bookId: String(rest.bookId ?? ""), confirm: rest.confirm === true }),
   [ACCOUNTING_ACTIONS.getAccounts]: (rest) => listAccounts({ bookId: rest.bookId as string | undefined }),
   [ACCOUNTING_ACTIONS.upsertAccount]: (rest) =>

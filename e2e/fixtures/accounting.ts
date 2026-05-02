@@ -124,7 +124,7 @@ function handleCreateBook(state: AccountingState, body: DispatchBody): MockRespo
   state.books.push(book);
   state.accountsByBook.set(book.id, [...SEED_ACCOUNTS]);
   state.entriesByBook.set(book.id, []);
-  return ok({ book });
+  return ok({ bookId: book.id, book });
 }
 
 function handleDeleteBook(state: AccountingState, body: DispatchBody): MockResponse {
