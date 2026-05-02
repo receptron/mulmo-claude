@@ -154,7 +154,12 @@ interface SourceImage {
 async function loadSourceImage(imagePath: string): Promise<SourceImage> {
   if (isImagePath(imagePath)) {
     const data = await loadImageBase64(imagePath);
-    return { data, mimeType: "image/png" };
+    // `isImagePath` only requires `.png`, but historically `saveImage`
+    // also wrote `.jpg` / `.webp`. Defer to extension inference and
+    // fall back to `image/png` so a workspace seeded by an older build
+    // still reports a sensible MIME (#1050 review).
+    const mimeType = inferMimeFromExtension(imagePath) ?? "image/png";
+    return { data, mimeType };
   }
   if (isAttachmentPath(imagePath)) {
     const mimeType = inferMimeFromExtension(imagePath);

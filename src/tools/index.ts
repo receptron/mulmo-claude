@@ -46,7 +46,7 @@ const plugins: Record<string, PluginEntry> = {
   openCanvas: canvasPlugin,
   presentHtml: presentHtmlPlugin,
   presentChart: presentChartPlugin,
-  editImages: editImagesPlugin,
+  [TOOL_NAMES.editImages]: editImagesPlugin,
   present3D: Present3DPlugin.plugin,
   weather: WeatherPlugin.plugin,
 };
