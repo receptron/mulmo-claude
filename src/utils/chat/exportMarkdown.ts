@@ -68,7 +68,12 @@ function formatHHMM(epochMs: number): string {
 /** Narrow `data?.role` to a known speaker label. Defaults to "assistant". */
 function roleOf(result: ToolResultComplete): Role {
   const { data } = result;
-  if (isRecord(data) && typeof data.role === "string" && data.role in ROLE_LABELS) {
+  // Own-property check via Object.prototype.hasOwnProperty so an
+  // inherited key on the runtime ROLE_LABELS object (e.g. `toString`,
+  // or anything that crawled in via Object.prototype pollution)
+  // can't satisfy the gate and produce a `## undefined` speaker line
+  // (#1065 review).
+  if (isRecord(data) && typeof data.role === "string" && Object.prototype.hasOwnProperty.call(ROLE_LABELS, data.role)) {
     return data.role as Role;
   }
   return "assistant";
@@ -86,7 +91,14 @@ function isTextResponse(result: ToolResultComplete): boolean {
   return result.toolName === TEXT_RESPONSE_TOOL;
 }
 
-const FENCE_RUN_RE = /^(`{3,}|~{3,})/;
+// Allow up to 3 leading spaces before the fence run, per GFM. A
+// 4-space indent is a regular indented code block and isn't a fence
+// in the first place; the heading-demotion path doesn't need to skip
+// inside those because they preserve the literal characters anyway,
+// but a real fence indented by 1-3 spaces (legal GFM) would
+// previously slip past `matchFenceRun` and any `# heading` line
+// inside got mistakenly demoted (#1065 review).
+const FENCE_RUN_RE = /^ {0,3}(`{3,}|~{3,})/;
 const ATX_HEADING_RE = /^(#{1,6})([ \t].*)$/;
 
 interface OpenFence {
@@ -94,9 +106,10 @@ interface OpenFence {
   len: number;
 }
 
-/** Match the leading run of fence characters on `line`, if any. Captures
- *  the fence char + length so the closing logic can apply GFM's rules
- *  (close fence must be the same char and at least as long as the open). */
+/** Match the leading run of fence characters on `line` (allowing up
+ *  to 3 leading spaces, per GFM), if any. Captures the fence char +
+ *  length so the closing logic can apply GFM's rules (close fence
+ *  must be the same char and at least as long as the open). */
 function matchFenceRun(line: string): OpenFence | null {
   const match = FENCE_RUN_RE.exec(line);
   if (!match) return null;
@@ -107,11 +120,14 @@ function matchFenceRun(line: string): OpenFence | null {
 /** A line closes `open` only when it uses the same fence char, has at
  *  least as many of them, and carries no info-string after the run.
  *  Anything else inside the fence is content (including a different
- *  fence type or a shorter run). */
+ *  fence type or a shorter run). The fence run can sit after up to
+ *  3 leading spaces; the closing check looks at content after the
+ *  fence run wherever it lands on the line. */
 function isClosingFence(line: string, fence: OpenFence, open: OpenFence): boolean {
   if (fence.char !== open.char) return false;
   if (fence.len < open.len) return false;
-  return line.slice(fence.len).trim() === "";
+  const runStart = line.search(/[`~]/);
+  return runStart >= 0 ? line.slice(runStart + fence.len).trim() === "" : false;
 }
 
 /** Demote every ATX heading inside `markdown` by `levels` (`#` → `#`+levels),

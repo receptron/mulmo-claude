@@ -62,6 +62,14 @@
             >
               {{ t("pluginAccounting.journalList.void") }}
             </button>
+            <button
+              v-else-if="entry.kind === 'opening' && !voidedEntryIds.has(entry.id)"
+              class="text-xs text-blue-600 hover:underline"
+              :data-testid="`accounting-edit-opening-${entry.id}`"
+              @click="emit('editOpening')"
+            >
+              {{ t("pluginAccounting.journalList.edit") }}
+            </button>
           </td>
         </tr>
       </tbody>
@@ -79,7 +87,7 @@ import { useLatestRequest } from "./useLatestRequest";
 const { t } = useI18n();
 
 const props = defineProps<{ bookId: string; accounts: Account[]; currency: string; version: number }>();
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; editOpening: [] }>();
 
 const from = ref("");
 const toDate = ref("");

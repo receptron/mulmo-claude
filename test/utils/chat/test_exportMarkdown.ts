@@ -73,6 +73,19 @@ describe("exportChatToMarkdown", () => {
     assert.match(out, /^#### After$/m);
   });
 
+  it("respects indented (1-3 space) GFM fences", async () => {
+    // GFM allows up to 3 leading spaces before the fence run. Without
+    // the indent allowance, the `# Inside` line below would be wrongly
+    // demoted because the indented fence wasn't recognised as opening
+    // a code block.
+    for (const indent of [" ", "  ", "   "]) {
+      const inner = `${indent}\`\`\`md\n# Inside\n${indent}\`\`\`\n\n## After`;
+      const out = await exportChatToMarkdown([textResult("assistant", inner)], { exportedAt: "2026-04-30T12:00:00Z" });
+      assert.match(out, /^# Inside$/m, `indent="${indent}": # Inside should stay untouched`);
+      assert.match(out, /^#### After$/m, `indent="${indent}": ## After should still demote`);
+    }
+  });
+
   it("renders a non-text tool call as a single `## ⬛︎ toolName HH:MM` heading line", async () => {
     const stamps = new Map<string, number>([["tool-1", Date.UTC(2026, 3, 30, 15, 17)]]);
     const out = await exportChatToMarkdown([textResult("user", "open it"), toolResult("openCanvas", "Untitled", "tool-1"), textResult("assistant", "done")], {

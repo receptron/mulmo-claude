@@ -33,6 +33,7 @@ const ptBRMessages = {
     attachFile: "Anexar arquivo",
     fileTooLarge: "Arquivo muito grande ({sizeMB} MB). O limite é 30 MB.",
     unsupportedFileType: "Tipo de arquivo não suportado. Aceitos: imagens, PDF, DOCX, XLSX, PPTX e arquivos de texto.",
+    attachImageFailed: "Falha ao anexar a imagem: {error}",
   },
   sessionHistoryPanel: {
     filters: {
@@ -578,6 +579,7 @@ const ptBRMessages = {
       accountLabel: "Conta",
       allAccounts: "Todas as contas",
       void: "Estornar",
+      edit: "Editar",
       voidConfirm: "Estornar este lançamento? O original permanece no diário e um par de reversão é anexado.",
       voidReason: "Motivo (opcional):",
       columns: {
