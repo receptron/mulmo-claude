@@ -296,8 +296,8 @@ export default [
       //     testid prefixes — controlled inputs, not attacker-supplied.
       //     27 warnings / 0 actionable.
       // The remaining rules (detect-eval-with-expression, detect-
-      // child-process, detect-unsafe-regex, detect-possible-timing-
-      // attacks, detect-non-literal-require, detect-pseudoRandomBytes,
+      // child-process, detect-possible-timing-attacks,
+      // detect-non-literal-require, detect-pseudoRandomBytes,
       // detect-buffer-noassert, detect-disable-mustache-escape,
       // detect-no-csrf-before-method-override, detect-bidi-characters,
       // detect-new-buffer) stay as warnings — tripwires for future
@@ -305,6 +305,11 @@ export default [
       "security/detect-non-literal-fs-filename": "off",
       "security/detect-object-injection": "off",
       "security/detect-non-literal-regexp": "off",
+      // `detect-unsafe-regex` is graduated to error: every legitimate
+      // site (currently the two regexes in `src/utils/image/htmlSrcAttrs.ts`)
+      // already has a `// eslint-disable-next-line` with a ReDoS-safety
+      // rationale and a unit test pinning the bound.
+      "security/detect-unsafe-regex": "error",
     },
     plugins: {
       prettier: prettierPlugin,

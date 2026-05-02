@@ -48,7 +48,7 @@ export const RESOLVABLE_TAG_ATTRS: Readonly<Record<string, readonly string[]>> =
 // alternation here. The unit test in test_htmlSrcAttrs.ts pins this
 // in lockstep so the two never disagree silently.
 //
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded alternatives, ReDoS-safe (test in test_htmlSrcAttrs.ts)
+// eslint-disable-next-line security/detect-unsafe-regex -- bounded alternatives, ReDoS-safe (test in test_htmlSrcAttrs.ts)
 const RESOLVABLE_TAG_OUTER_RE = /<(?:img|source|video|audio)\b(?:[^>"']|"[^"]*"|'[^']*')*\/?>/gi;
 // Tag-name extractor for the matched outer tag. Anchored so we only
 // read the leading `<name`, never an attribute value that happens to
@@ -70,7 +70,7 @@ const TAG_NAME_RE = /^<([a-z]+)/i;
 //      quote as the value
 //
 // All quantifiers bounded — verified ReDoS-safe in test_htmlSrcAttrs.ts.
-// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- bounded quantifiers, ReDoS-safe (test in test_htmlSrcAttrs.ts)
+// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity, security/detect-unsafe-regex -- bounded quantifiers, ReDoS-safe (test in test_htmlSrcAttrs.ts)
 const ATTR_ITER_RE = /(\s+)([A-Za-z][\w:-]*)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*)))?/g;
 
 /** Transform every URL-bearing attribute on a recognised tag.
