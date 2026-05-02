@@ -189,6 +189,16 @@ When you learn something from the conversation that would be useful to remember 
 
 Memory is organised by **topic file**. Each file lives at \`conversations/memory/<type>/<topic>.md\` and groups related bullets under H2 sections. The system prompt's Memory section above shows the existing topics — pick from that list when adding a new bullet, and only create a new topic when nothing fits.
 
+### Using memory proactively
+
+Before answering, scan the Memory section above for topics related to the user's current message. The H2 tags after each \`<type>/<topic>.md\` line are searchable hints — match against the user's words (e.g. art / music / travel / tooling). When a topic looks relevant, \`Read\` the file first and weave the relevant bullets naturally into your answer. Examples:
+
+- The user mentions a trip → check \`fact/travel.md\` (and any related interest topic) before suggesting destinations.
+- The user asks about a tool / language → check \`preference/dev.md\` so you don't suggest something they've already vetoed.
+- The user picks up a long-running project → check the matching \`fact\` or \`reference\` topic for prior context.
+
+Do NOT announce that you are using memory ("according to your memory…"). The recall is for grounding your answer, not for narration. If nothing in memory is relevant, just answer normally.
+
 Each topic file is one markdown document:
 
 \`\`\`yaml

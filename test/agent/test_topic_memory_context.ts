@@ -110,4 +110,16 @@ describe("memory/format-detect — topic workspace", () => {
     assert.match(out, /H2 sections/);
     assert.doesNotMatch(out, /<type>_<short-slug>\.md/);
   });
+
+  it("buildMemoryManagementSection includes the proactive-recall guidance (#1035)", () => {
+    // The recall paragraph turns the topic-mode prompt from
+    // "write here when something is durable" into "AND read this
+    // when answering". Without it, the agent has the index but no
+    // explicit cue to consult it before responding.
+    const out = buildMemoryManagementSection(scoped);
+    assert.match(out, /Using memory proactively/);
+    assert.match(out, /Before answering/);
+    // Recall must NOT instruct the agent to narrate its memory use.
+    assert.match(out, /Do NOT announce/);
+  });
 });
