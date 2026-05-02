@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { expect, test } from "@playwright/test";
 
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
@@ -27,7 +29,11 @@ test.describe("wiki navigation (real workspace)", () => {
     //     run's cleanup only ever touches its own pages and never a
     //     user-owned page that happens to share a static name.
     const projectSlug = testInfo.project.name;
-    const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // crypto.randomUUID over Math.random() — sonarjs/pseudo-random
+    // flags the latter even though uniqueness is the only requirement
+    // here (slugs aren't a security boundary). UUID is plenty unique
+    // and keeps lint clean.
+    const nonce = `${Date.now()}-${randomUUID().slice(0, 6)}`;
     const sourceSlug = `e2e-live-l14-source-${projectSlug}-${nonce}`;
     const targetSlug = `e2e-live-l14-target-${projectSlug}-${nonce}`;
     const targetMarker = "L-14 target body marker";
