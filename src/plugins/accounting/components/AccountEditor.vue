@@ -1,6 +1,6 @@
 <template>
   <!-- Inline editor used by AccountsModal both for "Edit" on an
-       existing row and "+ Add account" at the bottom. The parent
+       existing row and per-section "+ Add" buttons. The parent
        owns the open/closed state and the draft instance — this
        component is dumb. -->
   <form
@@ -16,17 +16,36 @@
           type="text"
           class="h-8 px-2 rounded border border-gray-300 text-sm font-mono disabled:bg-gray-100 disabled:text-gray-500"
           :disabled="!isNew"
-          :placeholder="isNew ? '' : ''"
           data-testid="accounting-accounts-form-code"
         />
       </label>
       <label class="text-xs text-gray-500 flex flex-col gap-1 grow min-w-[10rem]">
         {{ t("pluginAccounting.accounts.columnName") }}
-        <input v-model="local.name" type="text" required class="h-8 px-2 rounded border border-gray-300 text-sm" data-testid="accounting-accounts-form-name" />
+        <input
+          ref="nameInput"
+          v-model="local.name"
+          type="text"
+          required
+          class="h-8 px-2 rounded border border-gray-300 text-sm"
+          data-testid="accounting-accounts-form-name"
+        />
       </label>
       <label class="text-xs text-gray-500 flex flex-col gap-1 w-32">
         {{ t("pluginAccounting.accounts.columnType") }}
-        <select v-model="local.type" class="h-8 px-2 rounded border border-gray-300 text-sm bg-white" data-testid="accounting-accounts-form-type">
+        <!-- Type is locked for new accounts: the per-category
+             "+ Add" button already chose it (and the suggested
+             code is keyed off it). Allowing the user to flip the
+             type here would invalidate both the suggestion and
+             the editor's section placement. Existing-account
+             edits keep the select enabled — type changes there
+             are intentional and the server invalidates snapshots
+             when they happen. -->
+        <select
+          v-model="local.type"
+          class="h-8 px-2 rounded border border-gray-300 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500"
+          :disabled="isNew"
+          data-testid="accounting-accounts-form-type"
+        >
           <option v-for="option in TYPE_OPTIONS" :key="option" :value="option">
             {{ t(`pluginAccounting.accounts.typeOption.${option}`) }}
           </option>
@@ -61,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from "vue";
+import { nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { AccountType } from "../api";
 import type { AccountDraft } from "./accountDraft";
@@ -77,6 +96,7 @@ const TYPE_OPTIONS: readonly AccountType[] = ["asset", "liability", "equity", "i
 // user clicks Save. Cancelling reverts cleanly because the parent
 // just discards its draft.
 const local = reactive<AccountDraft>({ ...props.draft });
+const nameInput = ref<HTMLInputElement | null>(null);
 
 // Re-sync when the parent swaps which account is being edited
 // (e.g. user clicks Edit on a different row without first
@@ -91,6 +111,16 @@ watch(
     local.note = next.note;
   },
 );
+
+onMounted(() => {
+  // Land the cursor in the field the user actually has to fill in:
+  //   - new accounts: code is suggested and type is locked, so
+  //     Name is the only non-decorative input.
+  //   - edits: code is disabled, type is rarely the reason for
+  //     editing — Name is still the most likely target. Keeping
+  //     focus consistent across new/edit avoids surprise.
+  void nextTick(() => nameInput.value?.focus());
+});
 
 function onSubmit(): void {
   emit("save", { code: local.code, name: local.name, type: local.type, note: local.note });

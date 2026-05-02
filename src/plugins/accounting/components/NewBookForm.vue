@@ -14,7 +14,7 @@
       <p v-if="firstRun" class="text-xs text-gray-500" data-testid="accounting-new-book-firstrun">{{ t("pluginAccounting.bookSwitcher.firstRunHint") }}</p>
       <label class="text-sm flex flex-col gap-1">
         {{ t("pluginAccounting.bookSwitcher.nameLabel") }}
-        <input v-model="name" required class="h-8 px-2 rounded border border-gray-300 text-sm" data-testid="accounting-new-book-name" />
+        <input ref="nameInput" v-model="name" required class="h-8 px-2 rounded border border-gray-300 text-sm" data-testid="accounting-new-book-name" />
       </label>
       <label class="text-sm flex flex-col gap-1">
         {{ t("pluginAccounting.bookSwitcher.currencyLabel") }}
@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { createBook, type BookSummary } from "../api";
 import { SUPPORTED_CURRENCY_CODES, localizedCurrencyName } from "../currencies";
@@ -66,6 +66,15 @@ const name = ref("");
 const currency = ref<string>("USD");
 const creating = ref(false);
 const error = ref<string | null>(null);
+const nameInput = ref<HTMLInputElement | null>(null);
+
+onMounted(() => {
+  // Land focus in Name on open — the only required field; the
+  // currency select defaults to USD and the user usually leaves
+  // it. Without this the user has to click into the field before
+  // typing, which is friction for what should be a one-tap flow.
+  void nextTick(() => nameInput.value?.focus());
+});
 
 interface CurrencyOption {
   code: string;

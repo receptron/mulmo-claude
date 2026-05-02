@@ -5,7 +5,7 @@
         {{ t("pluginAccounting.ledger.selectAccount") }}
         <select v-model="accountCode" class="h-8 px-2 rounded border border-gray-300 text-sm bg-white" data-testid="accounting-ledger-account">
           <option value="">{{ DASH }}</option>
-          <option v-for="account in accounts" :key="account.code" :value="account.code">{{ formatAccountLabel(account) }}</option>
+          <option v-for="account in selectableAccounts" :key="account.code" :value="account.code">{{ formatAccountLabel(account) }}</option>
         </select>
       </label>
       <button class="h-8 px-2.5 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50" @click="refresh">
@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getLedger, type Account, type Ledger } from "../api";
 import { formatAmount as formatAmountWithCurrency } from "../currencies";
@@ -79,8 +79,16 @@ function formatAmount(value: number): string {
 }
 
 function formatAccountLabel(account: Account): string {
-  return `${account.code} — ${account.name}`;
+  // Name first so type-to-search in the <select> matches the
+  // human-meaningful word; the code goes in trailing parens.
+  return `${account.name} (${account.code})`;
 }
+
+// Hide deactivated accounts from the ledger picker; historical
+// entries on a soft-deleted account are still inspectable via
+// the journal-list filter (which intentionally shows every code
+// so the past stays queryable).
+const selectableAccounts = computed<Account[]>(() => props.accounts.filter((account) => account.active !== false));
 
 async function refresh(): Promise<void> {
   const token = beginRequest();

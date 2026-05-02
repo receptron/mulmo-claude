@@ -26,6 +26,13 @@ export interface Account {
   /** Optional free-form note (tax bucket, parent group, …). Not
    *  interpreted by the engine — passes through verbatim. */
   note?: string;
+  /** Soft-delete flag. When `false`, the account is hidden from
+   *  entry/ledger dropdowns but stays visible in Manage Accounts
+   *  and historical entries — accounting integrity requires that
+   *  a code referenced by a journal line never disappears. Omitted
+   *  (treated as active) by default to keep the JSON files clean
+   *  for books created before this field existed. */
+  active?: boolean;
 }
 
 export interface BookSummary {

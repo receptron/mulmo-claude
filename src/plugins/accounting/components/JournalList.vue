@@ -113,7 +113,10 @@ function formatCredit(value: number): string {
   return `CR ${formatAmount(value, props.currency)}`;
 }
 function formatAccountLabel(account: Account): string {
-  return `${account.code} — ${account.name}`;
+  // Name first so type-to-search in the <select> matches the
+  // human-meaningful word; the code goes in trailing parens.
+  // Same convention used by JournalEntryForm and Ledger pickers.
+  return `${account.name} (${account.code})`;
 }
 const accountNameByCode = computed(() => {
   const map = new Map<string, string>();

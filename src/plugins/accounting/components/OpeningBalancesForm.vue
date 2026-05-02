@@ -119,7 +119,9 @@ const error = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const { begin: beginLoad, isCurrent: isCurrentLoad } = useLatestRequest();
 
-const bsAccounts = computed(() => props.accounts.filter((account) => account.type === "asset" || account.type === "liability" || account.type === "equity"));
+const bsAccounts = computed(() =>
+  props.accounts.filter((account) => (account.type === "asset" || account.type === "liability" || account.type === "equity") && account.active !== false),
+);
 
 function ensureRows(): void {
   for (const account of bsAccounts.value) {
@@ -137,9 +139,14 @@ function onCreditInput(code: string): void {
 }
 
 const imbalance = computed<number>(() => {
+  // Iterate the live bsAccounts (already active-filtered) rather
+  // than rows.value keys so a row for a now-inactive account
+  // doesn't tilt `balanced` against what `toApiLines` will
+  // actually post.
   let sum = 0;
-  for (const code of Object.keys(rows.value)) {
-    const row = rows.value[code];
+  for (const account of bsAccounts.value) {
+    const row = rows.value[account.code];
+    if (!row) continue;
     if (typeof row.debit === "number") sum += row.debit;
     if (typeof row.credit === "number") sum -= row.credit;
   }
@@ -163,12 +170,20 @@ function isPositiveAmount(value: unknown): value is number {
 
 function toApiLines(): JournalLine[] {
   const out: JournalLine[] = [];
-  for (const code of Object.keys(rows.value)) {
-    const row = rows.value[code];
+  // Iterate the visible bsAccounts list (which already filters
+  // out inactive accounts) rather than `rows.value` keys. A row
+  // for an account that was active when the user typed amounts
+  // and then got deactivated mid-edit would otherwise still post —
+  // the row stays in the map even after the v-for stops rendering
+  // it, so iterating keys would silently land entries on a
+  // soft-deleted account.
+  for (const account of bsAccounts.value) {
+    const row = rows.value[account.code];
+    if (!row) continue;
     const debitOk = isPositiveAmount(row.debit);
     const creditOk = isPositiveAmount(row.credit);
     if (!debitOk && !creditOk) continue;
-    const line: JournalLine = { accountCode: code };
+    const line: JournalLine = { accountCode: account.code };
     if (debitOk) line.debit = row.debit as number;
     if (creditOk) line.credit = row.credit as number;
     out.push(line);

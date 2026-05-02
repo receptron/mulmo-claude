@@ -17,6 +17,7 @@
           :books="books"
           @update:model-value="onBookSelected"
           @books-changed="refetchBooks"
+          @book-created="onBookCreated"
         />
       </header>
       <nav class="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 shrink-0 overflow-x-auto" data-testid="accounting-tabs">
@@ -227,6 +228,30 @@ async function onFirstBookCreated(book: BookSummary): Promise<void> {
   showFirstRunForm.value = false;
   await refetchBooks();
   activeBookId.value = book.id;
+}
+
+// Optimistically insert the new book and set the selection
+// BEFORE the refetch round-trip. Two reasons this beats the
+// previous await-refetch-then-select shape:
+//   1. The pubsub handler `useAccountingBooksChannel` fires its
+//      own concurrent `refetchBooks` the instant the server
+//      publishes books-changed. With await-then-select, that
+//      concurrent refetch's stillExists guard reads the OLD
+//      activeBookId (we haven't updated it yet) and — because
+//      OLD is still in the books list — leaves the selection
+//      pointing at OLD. Our update lands AFTER, but BookSwitcher
+//      remounts under `v-if="!loadingBooks"` mid-flight, so the
+//      user sees the dropdown stick on OLD.
+//   2. With activeBookId already set to NEW and books pre-
+//      populated to include NEW, every concurrent refetch's
+//      stillExists check passes for NEW and leaves the selection
+//      alone — order-independent by construction.
+async function onBookCreated(book: BookSummary): Promise<void> {
+  if (!books.value.some((existing) => existing.id === book.id)) {
+    books.value = [...books.value, book];
+  }
+  activeBookId.value = book.id;
+  await refetchBooks();
 }
 
 async function refetchAccounts(): Promise<void> {

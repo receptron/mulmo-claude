@@ -2,7 +2,9 @@
 // function — no Vue / i18n / network. Mirrors the server's
 // `_`-prefix rule and the duplicate-code guard so the user sees the
 // localized message instead of round-tripping for an obvious
-// failure.
+// failure. Also covers the 4-digit / type-prefix numbering rule
+// the form enforces on new accounts (1xxx asset / 2xxx liability /
+// 3xxx equity / 4xxx income / 5xxx expense).
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +32,7 @@ describe("validateAccountDraft", () => {
     });
 
     it("trims surrounding whitespace before validating", () => {
-      assert.equal(validateAccountDraft(draft({ code: "  6000  ", name: "  Travel  " }), EXISTING, true), null);
+      assert.equal(validateAccountDraft(draft({ code: "  5800  ", name: "  Travel  " }), EXISTING, true), null);
     });
   });
 
@@ -53,12 +55,43 @@ describe("validateAccountDraft", () => {
       assert.equal(validateAccountDraft(draft({ code: "_synthetic" }), EXISTING, false), "reservedCode");
     });
 
-    it("only the leading `_` is reserved, not embedded ones", () => {
-      // The server's check is `startsWith("_")`, not "contains". A
-      // user-supplied code like "5_100" is fine — encoded here so a
-      // future tightening of the rule fires this test instead of
-      // surprising the user.
-      assert.equal(validateAccountDraft(draft({ code: "5_100" }), EXISTING, true), null);
+    it("checks reservedCode before invalidCodeFormat (reserved wins)", () => {
+      // `_synthetic` would also fail the 4-digit format check, but
+      // the reserved-prefix message is more actionable for the
+      // edge case of someone trying the namespace deliberately.
+      assert.equal(validateAccountDraft(draft({ code: "_synth" }), EXISTING, true), "reservedCode");
+    });
+  });
+
+  describe("invalidCodeFormat", () => {
+    it("rejects a code that isn't exactly 4 digits", () => {
+      assert.equal(validateAccountDraft(draft({ code: "55" }), EXISTING, true), "invalidCodeFormat");
+    });
+
+    it("rejects a code with embedded non-digits", () => {
+      assert.equal(validateAccountDraft(draft({ code: "5_10" }), EXISTING, true), "invalidCodeFormat");
+    });
+
+    it("does NOT enforce format on edit — preserves legacy codes from books created before the rule landed", () => {
+      assert.equal(validateAccountDraft(draft({ code: "55", name: "Legacy" }), EXISTING, false), null);
+    });
+  });
+
+  describe("codeTypeMismatch", () => {
+    it("rejects a 4-digit code whose leading digit doesn't match the type", () => {
+      // 1000 → asset prefix; type is expense → mismatch.
+      const next = draft({ code: "1500", type: "expense", name: "Mismatch" });
+      assert.equal(validateAccountDraft(next, EXISTING, true), "codeTypeMismatch");
+    });
+
+    it("does NOT enforce on edit — type changes on existing accounts are caller-controlled", () => {
+      assert.equal(validateAccountDraft(draft({ code: "1500", type: "expense", name: "Mismatch" }), EXISTING, false), null);
+    });
+
+    it("checks invalidCodeFormat before codeTypeMismatch (format wins)", () => {
+      // "12" fails the 4-digit check; without the precedence, the
+      // mismatch message would show first and confuse the user.
+      assert.equal(validateAccountDraft(draft({ code: "12" }), EXISTING, true), "invalidCodeFormat");
     });
   });
 
@@ -80,7 +113,7 @@ describe("validateAccountDraft", () => {
 
   describe("duplicateCode", () => {
     it("rejects a new entry with a code that already exists", () => {
-      assert.equal(validateAccountDraft(draft({ code: "1000" }), EXISTING, true), "duplicateCode");
+      assert.equal(validateAccountDraft(draft({ code: "5100" }), EXISTING, true), "duplicateCode");
     });
 
     it("does NOT flag duplicate when editing (isNew=false) — that's the upsert path", () => {
@@ -91,15 +124,15 @@ describe("validateAccountDraft", () => {
     });
 
     it("matches duplicate against the trimmed code", () => {
-      assert.equal(validateAccountDraft(draft({ code: "  1000  " }), EXISTING, true), "duplicateCode");
+      assert.equal(validateAccountDraft(draft({ code: "  5100  " }), EXISTING, true), "duplicateCode");
     });
 
-    it("checks reservedCode before duplicateCode (reserved wins)", () => {
-      // If a synthetic-prefix code somehow already exists (stale
-      // data, hand-edited file, etc.), the reserved-prefix message
-      // is more actionable than "already exists".
-      const withSynthetic: readonly Account[] = [...EXISTING, { code: "_synthetic", name: "X", type: "asset" }];
-      assert.equal(validateAccountDraft(draft({ code: "_synthetic" }), withSynthetic, true), "reservedCode");
+    it("checks codeTypeMismatch before duplicateCode (mismatch wins)", () => {
+      // 1000 is a duplicate of EXISTING[0] but with type=expense
+      // the prefix mismatch message fires first — same precedence
+      // logic as reserved-vs-duplicate: tell the user about the
+      // structural rule before the collision.
+      assert.equal(validateAccountDraft(draft({ code: "1000" }), EXISTING, true), "codeTypeMismatch");
     });
   });
 });

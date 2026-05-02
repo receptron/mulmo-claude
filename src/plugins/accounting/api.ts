@@ -19,6 +19,10 @@ export interface Account {
   name: string;
   type: AccountType;
   note?: string;
+  /** Soft-delete flag. When `false`, the account is hidden from
+   *  entry/ledger dropdowns but stays visible in Manage Accounts
+   *  and historical entries. */
+  active?: boolean;
 }
 
 export interface JournalLine {

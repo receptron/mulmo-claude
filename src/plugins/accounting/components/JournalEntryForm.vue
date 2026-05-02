@@ -40,7 +40,7 @@
               :data-testid="`accounting-entry-line-account-${idx}`"
             >
               <option value="">{{ DASH }}</option>
-              <option v-for="account in accounts" :key="account.code" :value="account.code">{{ formatAccountLabel(account) }}</option>
+              <option v-for="account in selectableAccounts" :key="account.code" :value="account.code">{{ formatAccountLabel(account) }}</option>
             </select>
           </td>
           <td class="py-1 px-2">
@@ -125,8 +125,17 @@ const showAccountsModal = ref(false);
 const DASH = "—";
 
 function formatAccountLabel(account: Account): string {
-  return `${account.code} — ${account.name}`;
+  // Name first so type-to-search in the <select> matches the
+  // human-meaningful word; the code goes in trailing parens.
+  return `${account.name} (${account.code})`;
 }
+
+// Hide deactivated accounts from the entry dropdown — accounting
+// integrity requires keeping them in the chart of accounts (any
+// historical journal line still references the code), but new
+// entries should not be able to land on a soft-deleted account.
+const selectableAccounts = computed<Account[]>(() => props.accounts.filter((account) => account.active !== false));
+const selectableAccountCodes = computed<Set<string>>(() => new Set(selectableAccounts.value.map((account) => account.code)));
 
 interface FormLine {
   accountCode: string;
@@ -197,6 +206,15 @@ function isPositiveAmount(value: unknown): value is number {
 
 function isPostable(line: FormLine): boolean {
   if (!line.accountCode) return false;
+  // Defence-in-depth against a code that was selectable when the
+  // user picked it but got deactivated mid-edit. Hiding the
+  // option from the dropdown alone isn't enough — the form's
+  // `accountCode` value is sticky, so a stale selection would
+  // still be POSTed if the user just hits submit. Gating
+  // postability here also flows through to `balanced` and
+  // `hasAtLeastTwoPostableLines`, so the submit button disables
+  // and the user gets immediate feedback.
+  if (!selectableAccountCodes.value.has(line.accountCode)) return false;
   return isPositiveAmount(line.debit) || isPositiveAmount(line.credit);
 }
 
@@ -259,6 +277,20 @@ watch(
     successMessage.value = null;
   },
 );
+
+// If an account the user already picked gets deactivated mid-edit
+// (e.g. via the Manage Accounts modal in this form, or from
+// another tab via pubsub), clear the line's accountCode so the
+// <select> visibly resets to "—". Without this, the option is
+// gone but the form's bound value still holds the stale code,
+// which (a) leaves the user staring at a blank-looking select and
+// (b) used to slip through to submit before the isPostable guard
+// landed. Belt + suspenders.
+watch(selectableAccountCodes, (codes) => {
+  for (const line of lines.value) {
+    if (line.accountCode && !codes.has(line.accountCode)) line.accountCode = "";
+  }
+});
 </script>
 
 <style scoped>

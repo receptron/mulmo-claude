@@ -12,10 +12,11 @@
 
 import type { Account } from "../api";
 import type { AccountDraft } from "./accountDraft";
+import { codeMatchesType, isValidAccountCode } from "./accountNumbering";
 
 export const RESERVED_PREFIX = "_";
 
-export type AccountValidationError = "emptyCode" | "reservedCode" | "emptyName" | "duplicateCode";
+export type AccountValidationError = "emptyCode" | "reservedCode" | "invalidCodeFormat" | "codeTypeMismatch" | "emptyName" | "duplicateCode";
 
 /**
  * Validate a draft about to be sent to `upsertAccount`. Returns
@@ -32,6 +33,12 @@ export function validateAccountDraft(draft: AccountDraft, existing: readonly Acc
   const trimmedName = draft.name.trim();
   if (trimmedCode.length === 0) return "emptyCode";
   if (trimmedCode.startsWith(RESERVED_PREFIX)) return "reservedCode";
+  // 4-digit numbering is enforced for new accounts only: pre-existing
+  // books may already hold legacy codes the user added before the
+  // rule landed, and changing the code would orphan their journal
+  // lines (codes are immutable once created — see codeReadOnlyHint).
+  if (isNew && !isValidAccountCode(trimmedCode)) return "invalidCodeFormat";
+  if (isNew && !codeMatchesType(trimmedCode, draft.type)) return "codeTypeMismatch";
   if (trimmedName.length === 0) return "emptyName";
   if (isNew && existing.some((account) => account.code === trimmedCode)) return "duplicateCode";
   return null;

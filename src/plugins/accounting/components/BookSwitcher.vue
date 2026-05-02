@@ -29,6 +29,7 @@ const props = defineProps<{ modelValue: string; books: BookSummary[] }>();
 const emit = defineEmits<{
   "update:modelValue": [bookId: string];
   "books-changed": [];
+  "book-created": [book: BookSummary];
 }>();
 
 // Sentinel value for the "+ New book" option living inside the
@@ -58,8 +59,14 @@ function onSelect(event: Event): void {
 }
 
 function onCreated(book: BookSummary): void {
+  // Hand the new book to the parent in one event so it can await
+  // its own refetch before setting the active selection. Splitting
+  // this into separate `books-changed` + `update:modelValue` emits
+  // races: the parent's async refetch runs concurrently with the
+  // selection update, and the stillExists guard inside refetch can
+  // snap the selection back to books[0] if the fetch happens to
+  // resolve before the new book is in the list.
   showNewBook.value = false;
-  emit("books-changed");
-  emit("update:modelValue", book.id);
+  emit("book-created", book);
 }
 </script>

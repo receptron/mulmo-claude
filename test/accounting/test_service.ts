@@ -72,6 +72,46 @@ describe("upsertAccount synthetic-code guard", () => {
   });
 });
 
+describe("upsertAccount active-flag policy", () => {
+  it("preserves an existing inactive flag when the caller omits it (no silent reactivation)", async () => {
+    // Why this test: the soft-delete UI sends `{...account, active: false}`
+    // to deactivate, but a downstream rename or note edit that only sends
+    // `{code, name, type}` (e.g. an LLM tool call, an older client) would
+    // otherwise drop the flag and silently re-expose the account in the
+    // entry/ledger dropdowns. Pin the inheritance so that path stays safe.
+    const root = makeTmp();
+    const book = await createBook({ name: "X" }, root);
+    const { upsertAccount } = await import("../../server/accounting/service.js");
+    await upsertAccount({ bookId: book.book.id, account: { code: "1500", name: "Equipment", type: "asset", active: false } }, root);
+    const updated = await upsertAccount({ bookId: book.book.id, account: { code: "1500", name: "Old Equipment", type: "asset" } }, root);
+    const renamed = updated.accounts.find((entry) => entry.code === "1500");
+    assert.ok(renamed);
+    assert.equal(renamed?.active, false, "rename without echoing active=false should keep the account inactive");
+    assert.equal(renamed?.name, "Old Equipment");
+  });
+
+  it("treats explicit active=true as a reactivate (omits the flag)", async () => {
+    const root = makeTmp();
+    const book = await createBook({ name: "X" }, root);
+    const { upsertAccount } = await import("../../server/accounting/service.js");
+    await upsertAccount({ bookId: book.book.id, account: { code: "1500", name: "Equipment", type: "asset", active: false } }, root);
+    const reactivated = await upsertAccount({ bookId: book.book.id, account: { code: "1500", name: "Equipment", type: "asset", active: true } }, root);
+    const account = reactivated.accounts.find((entry) => entry.code === "1500");
+    assert.ok(account);
+    assert.equal(account?.active, undefined, "explicit active=true should clear the persisted flag");
+  });
+
+  it("does not invent an active flag for accounts that never had one", async () => {
+    const root = makeTmp();
+    const book = await createBook({ name: "X" }, root);
+    const { upsertAccount } = await import("../../server/accounting/service.js");
+    const result = await upsertAccount({ bookId: book.book.id, account: { code: "1500", name: "Equipment", type: "asset" } }, root);
+    const account = result.accounts.find((entry) => entry.code === "1500");
+    assert.ok(account);
+    assert.equal(account?.active, undefined, "default-active accounts keep the field omitted");
+  });
+});
+
 describe("books lifecycle", () => {
   it("createBook generates ids, lists, and deletes books in sequence", async () => {
     const root = makeTmp();

@@ -33,6 +33,7 @@ import {
   writeConfig,
 } from "../utils/files/accounting-io.js";
 import { findActiveOpening, validateOpening } from "./openingBalances.js";
+import { normalizeStoredAccount } from "./accountNormalize.js";
 import { localDateString, makeEntry, makeVoidEntries, validateEntry, voidedIdSet } from "./journal.js";
 import { aggregateBalances, buildBalanceSheet, buildLedger, buildProfitLoss } from "./report.js";
 import { awaitRebuildIdle, balancesAtEndOf, cancelRebuild, getOrBuildSnapshot, rebuildAllSnapshots, scheduleRebuild } from "./snapshotCache.js";
@@ -214,10 +215,15 @@ export async function upsertAccount(
   const existingIdx = accounts.findIndex((account) => account.code === input.account.code);
   const next = [...accounts];
   const oldType = existingIdx >= 0 ? accounts[existingIdx].type : null;
+  // Whitelist + active-flag policy lives in normalizeStoredAccount
+  // (see ./accountNormalize.ts) so the rules are unit-testable in
+  // isolation and this service function stays focused on the
+  // file-IO + snapshot-invalidation orchestration.
+  const stored = normalizeStoredAccount(input.account, existingIdx >= 0 ? accounts[existingIdx] : undefined);
   if (existingIdx >= 0) {
-    next[existingIdx] = { ...input.account };
+    next[existingIdx] = stored;
   } else {
-    next.push({ ...input.account });
+    next.push(stored);
   }
   await writeAccounts(bookId, next, workspaceRoot);
   // Type changes affect aggregation across periods — drop every
