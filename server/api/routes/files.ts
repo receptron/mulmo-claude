@@ -12,6 +12,7 @@ import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
 import { classifyAsWikiPage, writeWikiPage } from "../../workspace/wiki-pages/io.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
+import { publishFileChange } from "../../events/file-change.js";
 
 const router = Router();
 
@@ -825,6 +826,11 @@ router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteC
     pathPreview: previewSnippet(relPath),
     bytes: fresh?.size ?? contentBytes,
   });
+  // Notify subscribers + run side-effect hooks (e.g. memory topic
+  // index regeneration in #1032). Fire-and-forget; the publisher
+  // logs failures internally and the user-facing write already
+  // succeeded.
+  void publishFileChange(relPath);
   res.json({
     path: relPath,
     size: fresh?.size ?? contentBytes,

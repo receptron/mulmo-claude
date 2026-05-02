@@ -19,28 +19,42 @@ import { regenerateTopicIndex } from "./topic-io.js";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
 import { MEMORY_TYPES } from "./types.js";
+import { isSafeTopicSlug } from "./topic-types.js";
 
 const TOPIC_PATH_PREFIXES: readonly string[] = MEMORY_TYPES.map((type) => `conversations/memory/${type}/`);
 
-// Returns true iff the relative path points at a file inside one of
-// the four topic-format type subdirs. Files at the memory root
-// itself (e.g. `conversations/memory/MEMORY.md`, the index this
-// helper writes) are excluded so we don't recurse.
+// Returns true iff the relative path points at a topic file —
+// `conversations/memory/<type>/<slug>.md` where `<slug>` passes
+// `isSafeTopicSlug` (the same shape gate the writer uses). Files at
+// the memory root itself (e.g. `conversations/memory/MEMORY.md`,
+// the index this helper writes) are excluded so the regen doesn't
+// recurse on its own writes.
 //
 // Path is expected POSIX-normalised (the caller in `file-change.ts`
-// already does this). Defensive: anything we can't classify as
-// topic-format is rejected.
+// already does this) and workspace-relative. We reject:
+//   - absolute paths (`/foo` / `C:\\foo`)
+//   - backslash-using paths (raw Windows separators)
+//   - non-`.md` files
+//   - dotdir subtrees (`.atomic-backup/`, `.archived/`)
+//   - nested paths under a type subdir (the layout is flat)
+//   - basenames that fail `isSafeTopicSlug` — same contract the
+//     writer enforces, so a malformed file dropped manually under a
+//     type subdir won't trigger a regen for an entry the loader
+//     would later skip anyway.
 export function isTopicFilePath(relativePath: string): boolean {
+  if (typeof relativePath !== "string" || relativePath.length === 0) return false;
+  if (relativePath.startsWith("/")) return false;
+  if (relativePath.includes("\\")) return false;
   if (!relativePath.endsWith(".md")) return false;
   if (relativePath.includes("/.atomic-backup/")) return false;
   if (relativePath.includes("/.archived/")) return false;
   for (const prefix of TOPIC_PATH_PREFIXES) {
-    if (relativePath.startsWith(prefix)) {
-      // Reject files that live in deeper subdirectories of the type
-      // dir (e.g. `interest/foo/bar.md`) — the layout is flat.
-      const tail = relativePath.slice(prefix.length);
-      if (!tail.includes("/")) return true;
-    }
+    if (!relativePath.startsWith(prefix)) continue;
+    const tail = relativePath.slice(prefix.length);
+    if (tail.includes("/")) return false;
+    const slug = tail.slice(0, -".md".length);
+    if (!isSafeTopicSlug(slug)) return false;
+    return true;
   }
   return false;
 }

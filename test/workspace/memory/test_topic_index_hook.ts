@@ -57,4 +57,26 @@ describe("memory/topic-index-hook — isTopicFilePath", () => {
     assert.equal(isTopicFilePath("conversations/memory_old/preference/dev.md"), false);
     assert.equal(isTopicFilePath("data/conversations/memory/fact/travel.md"), false);
   });
+
+  it("rejects basenames that fail the topic-slug shape gate", () => {
+    // Same contract the writer enforces (isSafeTopicSlug):
+    // lowercase alnum + `-` only, length 1–60. A malformed file
+    // dropped manually under a type subdir won't load anyway, so
+    // regen would just churn for an entry that's still missing
+    // from the index.
+    assert.equal(isTopicFilePath("conversations/memory/fact/Egypt Trip.md"), false); // space
+    assert.equal(isTopicFilePath("conversations/memory/fact/Travel.md"), false); // uppercase
+    assert.equal(isTopicFilePath("conversations/memory/fact/-leading.md"), false); // leading -
+    assert.equal(isTopicFilePath("conversations/memory/fact/trailing-.md"), false); // trailing -
+    assert.equal(isTopicFilePath(`conversations/memory/fact/${"a".repeat(61)}.md`), false); // too long
+  });
+
+  it("rejects absolute paths and backslash-using inputs (defensive — caller is expected POSIX-relative)", () => {
+    // `publishFileChange` already normalises to POSIX before
+    // calling, but a future caller routing the wrong shape in
+    // shouldn't trigger filesystem work outside the memory root.
+    assert.equal(isTopicFilePath("/conversations/memory/fact/travel.md"), false);
+    assert.equal(isTopicFilePath("conversations\\memory\\fact\\travel.md"), false);
+    assert.equal(isTopicFilePath("conversations/memory/fact\\travel.md"), false);
+  });
 });
