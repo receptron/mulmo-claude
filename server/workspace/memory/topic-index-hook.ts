@@ -59,19 +59,26 @@ export function isTopicFilePath(relativePath: string): boolean {
   return false;
 }
 
+/** Workspace-relative path to the index file the hook regenerates. */
+export const TOPIC_INDEX_RELATIVE_PATH = "conversations/memory/MEMORY.md";
+
 // Fire-and-forget index regeneration for a workspace-relative path.
-// Callers should `void`-call this from inside `publishFileChange`
-// — the work happens off the request thread and any failure logs
-// rather than throwing.
-export async function maybeRegenerateTopicIndex(relativePath: string): Promise<void> {
-  if (!isTopicFilePath(relativePath)) return;
+// Returns `true` when a regen actually ran — callers (specifically
+// `publishFileChange`) use this to decide whether to emit a follow-up
+// change event for the index file itself, so an open `MEMORY.md` tab
+// refreshes alongside the topic file the user just saved. Failures
+// log and resolve `false`.
+export async function maybeRegenerateTopicIndex(relativePath: string): Promise<boolean> {
+  if (!isTopicFilePath(relativePath)) return false;
   try {
     await regenerateTopicIndex(workspacePath);
     log.debug("memory", "topic-index-hook: regenerated", { trigger: relativePath });
+    return true;
   } catch (err) {
     log.warn("memory", "topic-index-hook: regenerate failed", {
       trigger: relativePath,
       error: errorMessage(err),
     });
+    return false;
   }
 }

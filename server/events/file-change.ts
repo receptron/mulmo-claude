@@ -15,7 +15,7 @@ import path from "node:path";
 import type { IPubSub } from "./pub-sub/index.js";
 import { fileChannel, toPosixWorkspacePath, type FileChannelPayload } from "../../src/config/pubsubChannels.js";
 import { workspacePath } from "../workspace/workspace.js";
-import { maybeRegenerateTopicIndex } from "../workspace/memory/topic-index-hook.js";
+import { maybeRegenerateTopicIndex, TOPIC_INDEX_RELATIVE_PATH } from "../workspace/memory/topic-index-hook.js";
 import { log } from "../system/logger/index.js";
 
 let pubsub: IPubSub | null = null;
@@ -66,7 +66,15 @@ export async function publishFileChange(relativePath: string): Promise<void> {
   // when a user edits a topic file via the file explorer (#1032).
   // No-op for non-topic paths. Fire-and-forget so the publish path
   // stays fast; errors log internally.
-  maybeRegenerateTopicIndex(posixPath).catch(() => {});
+  //
+  // When regen actually runs, also emit a change event for the
+  // index file itself so a FilesView tab pinned to MEMORY.md
+  // refreshes the moment the rebuild lands. The recursive call is
+  // bounded: `MEMORY.md` is excluded by `isTopicFilePath`, so the
+  // second pass returns false without triggering another regen.
+  maybeRegenerateTopicIndex(posixPath)
+    .then((didRegen) => (didRegen ? publishFileChange(TOPIC_INDEX_RELATIVE_PATH) : undefined))
+    .catch(() => {});
 }
 
 /** Test-only — clear the module singleton so each test starts clean. */

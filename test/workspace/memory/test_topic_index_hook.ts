@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { isTopicFilePath } from "../../../server/workspace/memory/topic-index-hook.js";
+import { isTopicFilePath, maybeRegenerateTopicIndex, TOPIC_INDEX_RELATIVE_PATH } from "../../../server/workspace/memory/topic-index-hook.js";
 
 describe("memory/topic-index-hook — isTopicFilePath", () => {
   it("matches files inside each of the four type subdirs", () => {
@@ -78,5 +78,24 @@ describe("memory/topic-index-hook — isTopicFilePath", () => {
     assert.equal(isTopicFilePath("/conversations/memory/fact/travel.md"), false);
     assert.equal(isTopicFilePath("conversations\\memory\\fact\\travel.md"), false);
     assert.equal(isTopicFilePath("conversations/memory/fact\\travel.md"), false);
+  });
+});
+
+describe("memory/topic-index-hook — maybeRegenerateTopicIndex", () => {
+  it("exports the canonical relative path of the index it rebuilds", () => {
+    // The relative path is the contract `publishFileChange` uses
+    // to emit a follow-up change event for the index file. Pinning
+    // it as a constant keeps caller and predicate aligned.
+    assert.equal(TOPIC_INDEX_RELATIVE_PATH, "conversations/memory/MEMORY.md");
+  });
+
+  it("returns false (no regen ran) for paths that fail the predicate", async () => {
+    // `publishFileChange` keys its follow-up index event off this
+    // boolean — callers MUST be able to distinguish "the predicate
+    // rejected the path" from "regen happened". We exercise the
+    // negative path here because it doesn't touch disk.
+    assert.equal(await maybeRegenerateTopicIndex("data/wiki/pages/foo.md"), false);
+    assert.equal(await maybeRegenerateTopicIndex("conversations/memory/MEMORY.md"), false);
+    assert.equal(await maybeRegenerateTopicIndex(""), false);
   });
 });
