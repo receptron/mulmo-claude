@@ -337,7 +337,11 @@ e2e-live/
 | **L-01** presentHtml 画像描画 | ✅ 実装済 | media.spec.ts、fixture 画像を workspace に配置 → naturalWidth > 0、self-repair guard (readImgRepairAttempted) 追加済 |
 | **L-02** PDF DL | ✅ 実装済 | media.spec.ts、textResponse の PDF ボタン経由 |
 | **L-03** mulmoScript 動画 DL | ✅ 実装済 | media.spec.ts、 fixture json (`e2e-live/fixtures/mulmo/l03-two-beat.json`) を `artifacts/stories/e2e-live-l03-<project>.json` に seed → LLM に filePath 指示 → Generate Movie ボタン → Download Movie ボタン → MP4 `ftyp` magic bytes 検証 (B-21)。 全 beat `text: ""` + textSlide で TTS / image API 呼ばず、 ffmpeg 不在時は `which ffmpeg` で `test.skip`。 worker 衝突回避のため fixture 名に project slug を埋める |
-| L-04〜L-30 | 未実装 | カテゴリごとの後続 PR で順次 |
+| **L-06** General role 1 ターン | ✅ 実装済 | roles.spec.ts、 `Reply with the single word: hello` で 1 ターン → role-selector が "General" + user-input enabled (B-15) + session id が払い出される (B-41) を検証 |
+| **L-11** session reload 復元 | ✅ 実装済 | session.spec.ts、 `Reply with the single word: pong` 後に reload → session id 一致 + 「Start a conversation」 が hidden (B-14) |
+| **L-14** wiki 内部リンク | ✅ 実装済 | wiki-nav.spec.ts、 fixture wiki page 2 件 seed → wikilink `[[slug]]` を click → `/wiki/pages/<target>` に遷移 (B-23/B-24/B-25)、 catch-all で `/chat` に飛ばないこと |
+| **L-EDIT** beat 編集永続化 | 🟡 skip 中 | mulmo-script-edit.spec.ts、 #1074 で報告された「`Saving…` から戻らない」 症状を再現する spec として on disk。 issue #1074 が解決するまで `test.skip(true, ...)` で suite green を維持 |
+| L-04, L-05, L-07〜L-10, L-12〜L-30 | 未実装 | 後続 PR で順次。 横串で 「未登録系」 (リソース不在時の UI、 #1073 系) を機能別 spec として追加予定 |
 
 ## 実装の詳細
 
@@ -840,7 +844,9 @@ artifact name: `mulmoclaude-tarball`（10 MB 程度、`.tgz`）。
 - L-03 実装中に発見した周辺 issue:
   - **#1049** mulmoclaude README に ffmpeg system 依存の明記がない（一般ユーザー向け docs gap、 動画生成は npx でも system ffmpeg 必要）
   - **#1073** presentMulmoScript の Play ボタン: text 空 beat で次に自動送りされない（schema は `duration` 用意済、 frontend が audio end のみを cue にしている疑い）
-  - **#1074** presentMulmoScript: beat 編集後「更新」 した内容が別セッションに戻ると消えている疑い（要調査）
+  - **#1074** presentMulmoScript: beat 編集後「更新」 した内容が別セッションに戻ると消えている疑い（要調査） / L-EDIT spec が `Saving…` 状態から戻らない症状を再現
+- L-06 / L-11 / L-14 (cross-category batch) 実装中に発見した周辺 issue:
+  - **#1102** wiki page で broken-prefix `<img>` の self-repair が発火しない (PR #974 / e2e-live L-W-S-04 chromium fail) — wiki カテゴリの既存 spec が chromium で fail する pre-existing 問題
 
 ## 直近 main の動向 (#950〜#1000) と本テスト計画への反映
 
