@@ -19,6 +19,7 @@ import path from "node:path";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { log } from "../../system/logger/index.js";
 import { errorMessage } from "../../utils/errors.js";
+import { WORKSPACE_DIRS } from "../paths.js";
 import { loadAllMemoryEntries } from "./io.js";
 import { MEMORY_TYPES, type MemoryEntry, type MemoryType } from "./types.js";
 import type { ClusterMap, ClusterTopic, MemoryClusterer } from "./topic-cluster.js";
@@ -37,10 +38,8 @@ export interface TopicMigrationResult {
   stagingPath: string;
 }
 
-export const STAGING_DIR_NAME = "memory.next";
-
 export function topicStagingPath(workspaceRoot: string): string {
-  return path.join(workspaceRoot, "conversations", STAGING_DIR_NAME);
+  return path.join(workspaceRoot, WORKSPACE_DIRS.memoryStaging);
 }
 
 interface WrittenTopic {
@@ -66,13 +65,21 @@ export async function clusterAtomicIntoStaging(workspaceRoot: string, clusterer:
   // swap would happily promote.
   await resetStaging(stagingPath);
   let map: ClusterMap | null = null;
+  let clustererThrew = false;
   try {
     map = await clusterer(entries);
   } catch (err) {
+    clustererThrew = true;
     log.error("memory", "topic-migrate: clusterer threw", { error: errorMessage(err) });
   }
   if (!map) {
-    if (map === null) log.warn("memory", "topic-migrate: clusterer returned null");
+    // Only warn about a graceful null return when the clusterer
+    // didn't already log a throw. Without this, a hard failure
+    // (claude CLI missing, schema mismatch, etc.) showed up as
+    // BOTH `clusterer threw` AND `clusterer returned null`, which
+    // misleads readers into thinking there were two distinct
+    // failure modes (#1072 review).
+    if (!clustererThrew) log.warn("memory", "topic-migrate: clusterer returned null");
     await rm(stagingPath, { recursive: true, force: true });
     return { ...emptyResult(stagingPath), inputCount: entries.length };
   }

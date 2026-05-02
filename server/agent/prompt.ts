@@ -220,12 +220,13 @@ Adding a new bullet:
 2. \`Read\` that topic file. Pick the H2 section the bullet fits under (or add a new H2 if none fits — H2 sections are optional, you may also append directly under H1 for a small / new topic).
 3. Append your bullet. Keep it short, one line ideally.
 4. \`Write\` the file back.
-5. The system regenerates \`MEMORY.md\` automatically — you do NOT need to update it by hand.
+5. \`MEMORY.md\` is rebuilt during clustering and on explicit \`regenerateTopicIndex\` calls; individual topic-file writes do NOT update the index immediately. If your bullet adds a new H2 that should appear in the index right away, also \`Write\` an updated \`MEMORY.md\` line for that topic.
 
 Creating a new topic file:
 
 - Filename: \`<type>/<topic>.md\` where \`<topic>\` is a short lowercase ASCII slug (a-z, 0-9, hyphenated). Examples: \`interest/music.md\`, \`fact/travel.md\`, \`reference/tasks.md\`.
 - Body: H1 with a humanised topic name + bullet(s) under it. H2 sections are optional and best added once the topic has enough material to warrant grouping.
+- After the topic file is written, also \`Write\` a matching line into \`conversations/memory/MEMORY.md\` so the new topic is discoverable in the next turn's Memory context. Same caveat as adding an H2: individual topic-file writes do NOT update \`MEMORY.md\` automatically — the index is only rebuilt during clustering or on explicit \`regenerateTopicIndex\` calls.
 
 Write when: the fact is durable, not derivable from code or git history, and not already covered by an existing bullet. Update an existing bullet instead of adding a near-duplicate.
 
