@@ -58,10 +58,12 @@ export async function swapStagingIntoMemory(workspaceRoot: string): Promise<Swap
   } catch (err) {
     log.error("memory", "topic-swap: staging rename failed", { from: stagingPath, to: memoryPath, error: errorMessage(err) });
     // Try to put the backup back so the workspace isn't left empty.
+    let rollbackFailed = false;
     if (backupPath) {
       try {
         await rename(backupPath, memoryPath);
       } catch (rollbackErr) {
+        rollbackFailed = true;
         log.error("memory", "topic-swap: rollback failed; manual intervention needed", {
           backupPath,
           memoryPath,
@@ -69,7 +71,12 @@ export async function swapStagingIntoMemory(workspaceRoot: string): Promise<Swap
         });
       }
     }
-    return { swapped: false, backupPath: null, reason: "staging rename failed" };
+    // When rollback ALSO fails, the prior data still lives at
+    // `backupPath`. Returning `backupPath: null` would tell callers
+    // "no recovery point exists" and they'd give up — surface the
+    // path so a human (or a retry loop) can move it back manually
+    // (#1072 review).
+    return { swapped: false, backupPath: rollbackFailed ? backupPath : null, reason: "staging rename failed" };
   }
 
   // Park the backup INSIDE the new memory dir so it travels with

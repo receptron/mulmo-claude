@@ -124,15 +124,27 @@ export async function runTopicMigrationOnce(workspaceRoot: string, deps: RunTopi
   log.info("memory", "topic-run: starting", { entryCount: entries.length });
   try {
     const result = await clusterAtomicIntoStaging(workspaceRoot, clusterer);
+    if (result.noop) {
+      // `clusterAtomicIntoStaging` already logged the failure cause
+      // (`clusterer threw` or `clusterer returned null`) and rm'd
+      // the staging dir. Logging "staged" here would tell the user
+      // to `diff` a directory that no longer exists (#1076 review).
+      log.warn("memory", "topic-run: cluster did not produce staging — see prior log entry");
+      return;
+    }
     log.info("memory", "topic-run: staged", {
       stagingPath: result.stagingPath,
       topicCounts: result.topicCounts,
       bulletsLost: result.bulletsLost,
     });
-    if (!result.noop) {
-      await runSwap(workspaceRoot);
-    }
+    await runSwap(workspaceRoot);
   } catch (err) {
+    // Defensive: `makeLlmMemoryClusterer` swallows summarize errors
+    // and returns null today, and `clusterAtomicIntoStaging` doesn't
+    // re-throw, so this branch is currently unreachable. Kept so a
+    // future change in the clusterer error contract surfaces a
+    // visible log instead of an unhandled rejection (the runner is
+    // invoked as a floating promise on startup).
     if (err instanceof ClaudeCliNotFoundError) {
       log.warn("memory", "topic-run: claude CLI not on PATH; topic restructure deferred");
       return;
