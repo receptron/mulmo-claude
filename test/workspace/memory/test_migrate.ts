@@ -139,4 +139,57 @@ describe("memory/migrate — edge cases", () => {
       await rm(fresh, { recursive: true, force: true });
     }
   });
+
+  it("leaves the legacy source in place when zero entries got written, so a later run can retry", async () => {
+    // Reproduces the #1058 review concern: if the classifier
+    // returned null for every candidate (or every write threw),
+    // the prior code still renamed `memory.md` → `.backup`,
+    // stranding the data unrecoverably.
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-memory-mig-noop-"));
+    try {
+      const sourcePath = path.join(fresh, "conversations", "memory.md");
+      await writeLegacyMemoryForTest(fresh, ["# Memory", "## Junk", "- one", "- two", ""].join("\n"));
+      await migrateLegacyMemory(fresh, async () => null);
+      // Source still present, no .backup yet.
+      const sourceStat = await stat(sourcePath);
+      assert.ok(sourceStat.isFile());
+      const backupGone = await stat(`${sourcePath}.backup`).catch(() => null);
+      assert.equal(backupGone, null, "backup must NOT exist when nothing was written");
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  it("seeds the slug-dedupe set from existing entries so a re-run can't overwrite a prior file", async () => {
+    // Reproduces the #1058 review concern: previously `usedSlugs`
+    // started empty, so a re-run that re-classified the same
+    // bullet would synthesize the same slug and `writeMemoryEntry`
+    // would happily overwrite the prior file.
+    const fresh = await mkdtemp(path.join(tmpdir(), "mulmoclaude-memory-mig-seed-"));
+    try {
+      // Seed an existing entry with the slug "preference_yarn".
+      const { writeMemoryEntry } = await import("../../../server/workspace/memory/io.js");
+      await writeMemoryEntry(fresh, {
+        name: "yarn (existing)",
+        description: "pinned",
+        type: "preference",
+        body: "yarn を使う",
+        slug: "preference_yarn",
+      });
+      // Now run migration on a memory.md that would synthesize the
+      // same slug.
+      await writeLegacyMemoryForTest(fresh, ["# Memory", "## Preferences", "- yarn を使う", ""].join("\n"));
+      const result = await migrateLegacyMemory(fresh, classifierFor({ yarn: "preference" }));
+      // Should still write, but under a deduped slug — and the
+      // prior file should remain unchanged.
+      const all = await loadAllMemoryEntries(fresh);
+      const yarn = all.find((entry) => entry.slug === "preference_yarn");
+      assert.ok(yarn, "the original `preference_yarn` entry must still be present");
+      assert.equal(yarn.name, "yarn (existing)", "the original entry's name must be preserved");
+      assert.equal(result.writeErrors, 0);
+      assert.equal(all.length, 2, "migration should add a deduped second entry, not overwrite the first");
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
 });

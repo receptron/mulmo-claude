@@ -26,8 +26,8 @@ import { readTextSafe } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";
 import { errorMessage } from "../../utils/errors.js";
 import { WORKSPACE_FILES } from "../paths.js";
-import { regenerateIndex, writeMemoryEntry } from "./io.js";
-import { isMemoryType, slugifyMemoryName, type MemoryEntry, type MemoryType } from "./types.js";
+import { loadAllMemoryEntries, regenerateIndex, writeMemoryEntry } from "./io.js";
+import { isMemoryType, MEMORY_TYPES, slugifyMemoryName, type MemoryEntry, type MemoryType } from "./types.js";
 
 export interface MemoryClassification {
   type: MemoryType;
@@ -74,9 +74,7 @@ const PROGRESS_LOG_INTERVAL = 5;
 export async function migrateLegacyMemory(workspaceRoot: string, classify: MemoryClassifier): Promise<MigrationResult> {
   const sourcePath = path.join(workspaceRoot, WORKSPACE_FILES.memory);
   const raw = await readTextSafe(sourcePath);
-  if (raw === null) {
-    return emptyResult(true);
-  }
+  if (raw === null) return emptyResult(true);
 
   const candidates = parseCandidates(raw);
   log.info("memory", "migration: classifying candidates", {
@@ -84,44 +82,87 @@ export async function migrateLegacyMemory(workspaceRoot: string, classify: Memor
     concurrency: CLASSIFY_CONCURRENCY,
   });
   const classifications = await classifyInParallel(classify, candidates);
+  const usedSlugs = await seedUsedSlugs(workspaceRoot);
+  const result = await processCandidates(workspaceRoot, candidates, classifications, usedSlugs);
+  await finalizeMigration(workspaceRoot, sourcePath, candidates.length, result);
+  return result;
+}
 
+// Pre-populate the slug-collision set with slugs that already
+// exist on disk. Without this, a re-run after a partial migration
+// (or after the user manually added a typed entry) can synthesize
+// the same slug and `writeMemoryEntry` would overwrite the prior
+// file (#1058 review).
+async function seedUsedSlugs(workspaceRoot: string): Promise<Set<string>> {
+  const existing = await loadAllMemoryEntries(workspaceRoot);
+  return new Set(existing.map((entry) => entry.slug));
+}
+
+async function processCandidates(
+  workspaceRoot: string,
+  candidates: readonly MemoryCandidate[],
+  classifications: readonly (MemoryClassification | null)[],
+  usedSlugs: Set<string>,
+): Promise<MigrationResult> {
   const result = emptyResult(false);
-  const usedSlugs = new Set<string>();
-
   for (let index = 0; index < candidates.length; index += 1) {
-    const classification = classifications[index];
-    const candidate = candidates[index];
-    if (!classification) {
-      result.skippedByClassifier += 1;
-    } else {
-      const entry = buildEntry(candidate, classification, usedSlugs);
-      try {
-        await writeMemoryEntry(workspaceRoot, entry);
-        usedSlugs.add(entry.slug);
-        result.written[entry.type] += 1;
-      } catch (err) {
-        log.warn("memory", "migration: write failed", {
-          slug: entry.slug,
-          error: errorMessage(err),
-        });
-        result.writeErrors += 1;
-      }
-    }
-    const processed = index + 1;
-    if (processed % PROGRESS_LOG_INTERVAL === 0 || processed === candidates.length) {
-      log.info("memory", "migration: progress", {
-        processed,
-        total: candidates.length,
-        written: result.written,
-        skippedByClassifier: result.skippedByClassifier,
-        writeErrors: result.writeErrors,
-      });
-    }
+    await migrateOneCandidate(workspaceRoot, candidates[index], classifications[index], usedSlugs, result);
+    logProgress(index + 1, candidates.length, result);
   }
+  return result;
+}
 
+async function migrateOneCandidate(
+  workspaceRoot: string,
+  candidate: MemoryCandidate,
+  classification: MemoryClassification | null,
+  usedSlugs: Set<string>,
+  result: MigrationResult,
+): Promise<void> {
+  if (!classification) {
+    result.skippedByClassifier += 1;
+    return;
+  }
+  const entry = buildEntry(candidate, classification, usedSlugs);
+  try {
+    await writeMemoryEntry(workspaceRoot, entry);
+    usedSlugs.add(entry.slug);
+    result.written[entry.type] += 1;
+  } catch (err) {
+    log.warn("memory", "migration: write failed", { slug: entry.slug, error: errorMessage(err) });
+    result.writeErrors += 1;
+  }
+}
+
+function logProgress(processed: number, total: number, result: MigrationResult): void {
+  if (processed % PROGRESS_LOG_INTERVAL !== 0 && processed !== total) return;
+  log.info("memory", "migration: progress", {
+    processed,
+    total,
+    written: result.written,
+    skippedByClassifier: result.skippedByClassifier,
+    writeErrors: result.writeErrors,
+  });
+}
+
+// Index regen + legacy backup are gated on "migration actually
+// produced something". If every candidate failed (classifier
+// returned null for all, or every write threw), leaving
+// `memory.md` in place lets a future server start retry without
+// manual recovery (#1058 review). Empty source (no candidates
+// parsed) still gets renamed — the source is exhausted regardless.
+async function finalizeMigration(workspaceRoot: string, sourcePath: string, candidateCount: number, result: MigrationResult): Promise<void> {
+  const totalWritten = MEMORY_TYPES.reduce((sum, type) => sum + result.written[type], 0);
+  if (totalWritten === 0 && candidateCount > 0) {
+    log.warn("memory", "migration: no entries written, leaving legacy source for retry", {
+      candidateCount,
+      skippedByClassifier: result.skippedByClassifier,
+      writeErrors: result.writeErrors,
+    });
+    return;
+  }
   await regenerateIndex(workspaceRoot);
   await renameToBackup(sourcePath);
-  return result;
 }
 
 // Classify candidates with bounded concurrency. Workers pull
