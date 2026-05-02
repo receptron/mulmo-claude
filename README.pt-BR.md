@@ -157,6 +157,8 @@ Quando o sandbox Docker está ativo no macOS, as credenciais são gerenciadas au
 Se o Docker não estiver instalado, o app exibe um banner de aviso e continua funcionando sem sandbox.
 
 > **Modo de depuração**: Para executar sem o sandbox mesmo quando o Docker estiver instalado, defina `DISABLE_SANDBOX=1` antes de iniciar o servidor.
+>
+> **Histórico de chamadas de ferramentas**: Defina `PERSIST_TOOL_CALLS=1` para também registrar eventos `tool_call` (com seus `args`) no jsonl da sessão, junto com `tool_result`. Desativado por padrão porque `args` pode ser grande e carregar bytes de payload (imagens em base64, JSON do MulmoScript) que você não esperaria gravar em disco; útil para depurar após um refresh da página ou reinicialização do servidor. Veja a [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096).
 
 ## Registro de logs
 

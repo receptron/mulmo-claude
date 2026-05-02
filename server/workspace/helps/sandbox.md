@@ -25,6 +25,13 @@ The container runs with `--cap-drop ALL` and as the host user's UID/GID, so it h
 
 Set the environment variable `DISABLE_SANDBOX=1` to always run the agent directly on the host, even when Docker is available.
 
+## Debug aids (opt-in env vars)
+
+These flags exist for development / debugging only. Off by default so production runs aren't surprised.
+
+- `DISABLE_SANDBOX=1` — see above. Bypasses the Docker sandbox.
+- `PERSIST_TOOL_CALLS=1` — also persist `tool_call` events to the session jsonl alongside `tool_result`. Useful for reading the args sent to a tool after the run is over (page refresh / server restart). Off by default because args can be large and may carry payload bytes (inline images, full MulmoScript JSON) you didn't expect to land in the jsonl. See [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096) for the rationale.
+
 ## Host Credentials (opt-in)
 
 The sandbox is credential-free by default. Two opt-in flags let you expose the minimum needed for `git` / `gh` to authenticate without leaking private keys into the container:
