@@ -24,7 +24,11 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   // Pairs with 2400 Sales Tax Payable for the tax-excluded (税抜)
   // booking method: input tax paid on purchases sits here as an
   // asset and is netted against output-tax collected at filing time.
-  { code: "1310", name: "Sales Tax Receivable", type: "asset", active: false },
+  // Active by default — most jurisdictions levy a consumption /
+  // sales / VAT tax, so flipping this on out of the box matches
+  // first-run expectations. Users in genuinely tax-free contexts
+  // can deactivate from Manage Accounts.
+  { code: "1310", name: "Sales Tax Receivable", type: "asset" },
   { code: "1500", name: "Equipment", type: "asset" },
   { code: "1510", name: "Furniture & Fixtures", type: "asset", active: false },
   { code: "1520", name: "Vehicles", type: "asset", active: false },
@@ -34,7 +38,8 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   { code: "2100", name: "Credit Card", type: "liability" },
   { code: "2200", name: "Loans Payable", type: "liability" },
   { code: "2300", name: "Accrued Expenses", type: "liability", active: false },
-  { code: "2400", name: "Sales Tax Payable", type: "liability", active: false },
+  // Active by default; pairs with 1310 Sales Tax Receivable.
+  { code: "2400", name: "Sales Tax Payable", type: "liability" },
   { code: "2500", name: "Payroll Liabilities", type: "liability", active: false },
   // Equity
   // Required for opening balances: setOpeningBalances dumps the
