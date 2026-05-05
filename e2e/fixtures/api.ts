@@ -65,6 +65,13 @@ export async function mockAllApis(page: Page, opts: MockApiOptions = {}): Promis
 
   await page.route(urlEndsWith("/api/roles"), (route) => route.fulfill({ json: DEFAULT_ROLES }));
 
+  // System config — `useSystemConfig` fetches this once on boot.
+  // Default to dev-mode-off so the Debug role doesn't surface in
+  // tests that don't care about it. Tests exercising the Debug role
+  // override this route with `{ devMode: true }` BEFORE calling
+  // mockAllApis (Playwright last-registered-first).
+  await page.route(urlEndsWith("/api/system/config"), (route) => route.fulfill({ json: { devMode: false } }));
+
   await page.route(urlEndsWith("/api/sessions"), (route) => {
     if (route.request().method() === "GET") {
       // Envelope shape from #205. Any test that wants to simulate

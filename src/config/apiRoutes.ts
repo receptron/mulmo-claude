@@ -144,6 +144,13 @@ const HOST_API_ROUTES = {
     translate: "/api/translation",
   },
 
+  // Lightweight runtime-config endpoint — currently exposes only
+  // `devMode` for the Debug-role gate. Future host-level runtime
+  // flags can join here without minting a new namespace per flag.
+  system: {
+    config: "/api/system/config",
+  },
+
   // Plugin-owned endpoints that don't follow a single naming pattern.
   // Names match the plugin tool name or the short verb the plugin uses.
   plugins: {

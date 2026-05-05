@@ -32,36 +32,45 @@ export const RoleSchema = z.object({
 
 export type Role = z.infer<typeof RoleSchema>;
 
+// Shared prompt + plugin set between General and Debug. Debug ships
+// the same surface as General so PR 2's `_*` test plugins (added to
+// `DEBUG_AVAILABLE_PLUGINS` once they exist) are the only difference
+// — keeps the developer-facing role identical to the user-facing one
+// for everything except the test surface under inspection.
+const GENERAL_PROMPT =
+  "You are a helpful assistant with access to the user's workspace. Help with tasks, answer questions, and use available tools when appropriate.\n\n" +
+  "## Asking the user to choose\n\n" +
+  "When the user must pick from a small set of options, toggle features, or answer yes/no, call presentForm with the appropriate fields (radio for one-of, checkbox for many-of, text/textarea for free-form). Group related questions into one form. Prefer this strongly over phrasing the choice in plain prose — the form gives the user clickable controls and sends the answers back as a markdown bullet list.\n\n" +
+  "Mark every field the user must answer as `required: true`. The form blocks submission until required fields are filled, which prevents the LLM from receiving partial responses.\n\n" +
+  "## Wiki\n\n" +
+  "A personal knowledge wiki lives at `data/wiki/` in the workspace.\n\n" +
+  "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Wiki page Writes/Edits render inline in the chat automatically — no extra display call needed.\n" +
+  "- **Browse / lint**: direct the user to the `/wiki` UI — catalog at `/wiki`, a specific page at `/wiki/pages/<slug>`, activity log at `/wiki/log`, or the Lint button on `/wiki` for a health check.\n\n" +
+  "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. The page-list section of `index.md` is a flat, recency-ordered log: prepend new pages at the top, and when a page is updated (content, description, tags, or rename) move its entry to the top — don't group by category. The Tags section (if present) still needs its per-tag page lists updated on add / rename / delete, but the tag order itself is not reordered by recency. Read `config/helps/wiki.md` for full details.";
+
+const GENERAL_AVAILABLE_PLUGINS = [
+  // manageTodoList: runtime plugin (`@mulmoclaude/todo-plugin`,
+  // #1145) — runtime-loaded plugins are auto-included in every
+  // role's active tool set regardless of `availablePlugins`, so
+  // it doesn't need to be listed here.
+  TOOL_NAMES.manageCalendar,
+  TOOL_NAMES.presentDocument,
+  TOOL_NAMES.presentForm,
+  TOOL_NAMES.presentMulmoScript,
+  TOOL_NAMES.generateImage,
+  TOOL_NAMES.presentHtml,
+  TOOL_NAMES.readXPost,
+  TOOL_NAMES.searchX,
+  TOOL_NAMES.notify,
+] as const satisfies readonly ToolName[];
+
 export const ROLES: Role[] = [
   {
     id: "general",
     name: "General",
     icon: "star",
-    prompt:
-      "You are a helpful assistant with access to the user's workspace. Help with tasks, answer questions, and use available tools when appropriate.\n\n" +
-      "## Asking the user to choose\n\n" +
-      "When the user must pick from a small set of options, toggle features, or answer yes/no, call presentForm with the appropriate fields (radio for one-of, checkbox for many-of, text/textarea for free-form). Group related questions into one form. Prefer this strongly over phrasing the choice in plain prose — the form gives the user clickable controls and sends the answers back as a markdown bullet list.\n\n" +
-      "Mark every field the user must answer as `required: true`. The form blocks submission until required fields are filled, which prevents the LLM from receiving partial responses.\n\n" +
-      "## Wiki\n\n" +
-      "A personal knowledge wiki lives at `data/wiki/` in the workspace.\n\n" +
-      "- **Ingest**: fetch or read the source, save raw to `data/wiki/sources/<slug>.md`, create/update pages in `data/wiki/pages/`, update `data/wiki/index.md`, append to `data/wiki/log.md`. Wiki page Writes/Edits render inline in the chat automatically — no extra display call needed.\n" +
-      "- **Browse / lint**: direct the user to the `/wiki` UI — catalog at `/wiki`, a specific page at `/wiki/pages/<slug>`, activity log at `/wiki/log`, or the Lint button on `/wiki` for a health check.\n\n" +
-      "Page format: YAML frontmatter (title, created, updated, tags) + markdown body + `[[wiki links]]` for cross-references. Slugs are lowercase hyphen-separated. Always keep `data/wiki/index.md` current and append to `data/wiki/log.md` after any change. The page-list section of `index.md` is a flat, recency-ordered log: prepend new pages at the top, and when a page is updated (content, description, tags, or rename) move its entry to the top — don't group by category. The Tags section (if present) still needs its per-tag page lists updated on add / rename / delete, but the tag order itself is not reordered by recency. Read `config/helps/wiki.md` for full details.",
-    availablePlugins: [
-      // manageTodoList: runtime plugin (`@mulmoclaude/todo-plugin`,
-      // #1145) — runtime-loaded plugins are auto-included in every
-      // role's active tool set regardless of `availablePlugins`, so
-      // it doesn't need to be listed here.
-      TOOL_NAMES.manageCalendar,
-      TOOL_NAMES.presentDocument,
-      TOOL_NAMES.presentForm,
-      TOOL_NAMES.presentMulmoScript,
-      TOOL_NAMES.generateImage,
-      TOOL_NAMES.presentHtml,
-      TOOL_NAMES.readXPost,
-      TOOL_NAMES.searchX,
-      TOOL_NAMES.notify,
-    ],
+    prompt: GENERAL_PROMPT,
+    availablePlugins: [...GENERAL_AVAILABLE_PLUGINS],
     queries: [
       "Tell me about this app, MulmoClaude.",
       "What is the wiki in this app and how do I use it?",
@@ -261,6 +270,20 @@ export const ROLES: Role[] = [
       "I posted yesterday's rent entry to the wrong account — fix it",
     ],
   },
+  // Dev-only role. Only surfaced in the dropdown when `DEV_MODE=1`
+  // (gated client-side by `useSystemConfig`). Same prompt + plugins
+  // as General; PR 2 adds `_*` test-plugin tool names to this role's
+  // `availablePlugins` so the engineer testing the Notifier engine
+  // has a real plugin to drive without it leaking into user-facing
+  // roles.
+  {
+    id: "debug",
+    name: "Debug",
+    icon: "code",
+    prompt: GENERAL_PROMPT,
+    availablePlugins: [...GENERAL_AVAILABLE_PLUGINS],
+    queries: [],
+  },
 ];
 
 export const BUILTIN_ROLES = ROLES;
@@ -282,6 +305,7 @@ export const BUILTIN_ROLE_IDS = {
   storyteller: "storyteller",
   settings: "settings",
   accounting: "accounting",
+  debug: "debug",
 } as const;
 
 export type BuiltInRoleId = (typeof BUILTIN_ROLE_IDS)[keyof typeof BUILTIN_ROLE_IDS];

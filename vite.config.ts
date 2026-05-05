@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
@@ -108,7 +108,23 @@ function runtimeImportmapBuildPlugin(): Plugin {
   }
 }
 
-export default defineConfig({
+// Mirrors `DEV_MODE` from `.env` / `process.env` to a baked-in
+// `import.meta.env.VITE_DEV_MODE` so a single env line drives both
+// the server (`server/system/env.ts` → `env.devMode`) and the
+// client. PR 2 will use the compile-time form to tree-shake test
+// plugin imports out of production bundles; PR 1 just needs it for
+// the Debug role's initial visibility (the `/api/system/config`
+// endpoint then confirms / overrides at runtime).
+function readDevMode(mode: string): "1" | "0" {
+  const fromEnvFile = loadEnv(mode, process.cwd(), '').DEV_MODE
+  const raw = process.env.DEV_MODE ?? fromEnvFile
+  return raw === '1' ? '1' : '0'
+}
+
+export default defineConfig(({ mode }) => ({
+  define: {
+    'import.meta.env.VITE_DEV_MODE': JSON.stringify(readDevMode(mode)),
+  },
   plugins: [vue(), tailwindcss(), mulmoclaudeAuthTokenPlugin(), runtimeImportmapBuildPlugin()],
   build: {
     outDir: 'dist/client',
@@ -178,4 +194,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

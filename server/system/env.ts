@@ -56,6 +56,12 @@ export const env = Object.freeze({
   nodeEnv: process.env.NODE_ENV ?? "development",
   isProduction: process.env.NODE_ENV === "production",
 
+  // Dev-mode flag. Surfaces the `Debug` role in the UI dropdown and
+  // (in PR 2) gates registration of `_*` test plugins. Off in
+  // production. Mirror to `VITE_DEV_MODE` is handled in
+  // `vite.config.ts` so a single `.env` line drives both sides.
+  devMode: asFlag(process.env.DEV_MODE),
+
   // Sandbox / Docker
   disableSandbox: asFlag(process.env.DISABLE_SANDBOX),
   // Debug aid: also persist `tool_call` events to the session
