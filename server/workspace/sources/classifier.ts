@@ -20,6 +20,7 @@
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
+import { claudeBinPath } from "../../utils/claudeBin.js";
 import { formatSpawnFailure } from "../../utils/spawn.js";
 import { ONE_MINUTE_MS } from "../../utils/time.js";
 import { CATEGORY_SLUGS, normalizeCategories, type CategorySlug } from "./taxonomy.js";
@@ -204,7 +205,7 @@ function spawnClaudeClassify(userPrompt: string, timeoutMs: number): Promise<str
     ];
     // Run from tmpdir so claude doesn't load the project's
     // CLAUDE.md / plugins / memory and inflate the context.
-    const proc = spawn("claude", args, {
+    const proc = spawn(claudeBinPath(), args, {
       cwd: tmpdir(),
       stdio: ["ignore", "pipe", "pipe"],
     });

@@ -18,6 +18,7 @@ import { readFile } from "node:fs/promises";
 import { formatSpawnFailure } from "../../utils/spawn.js";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../journal/archivist-cli.js";
+import { claudeBinPath } from "../../utils/claudeBin.js";
 import { errorMessage } from "../../utils/errors.js";
 import type { SummaryResult } from "./types.js";
 import { ONE_MINUTE_MS } from "../../utils/time.js";
@@ -195,7 +196,7 @@ function spawnClaudeSummarize(input: string, timeoutMs: number): Promise<string>
     ];
     // Run from tmpdir so claude does not load the project's
     // CLAUDE.md / plugins / memory and inflate the context.
-    const proc = spawn("claude", args, {
+    const proc = spawn(claudeBinPath(), args, {
       cwd: tmpdir(),
       stdio: ["ignore", "pipe", "pipe"],
     });

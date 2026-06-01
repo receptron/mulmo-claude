@@ -13,6 +13,7 @@
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { ClaudeCliNotFoundError } from "../../journal/archivist-cli.js";
+import { claudeBinPath } from "../../../utils/claudeBin.js";
 import { formatSpawnFailure } from "../../../utils/spawn.js";
 import { errorMessage } from "../../../utils/errors.js";
 import type { SourceItem } from "../types.js";
@@ -131,7 +132,7 @@ function spawnClaudeSummarize(userPrompt: string, timeoutMs: number): Promise<st
       "-p",
       userPrompt,
     ];
-    const proc = spawn("claude", args, {
+    const proc = spawn(claudeBinPath(), args, {
       cwd: tmpdir(),
       stdio: ["ignore", "pipe", "pipe"],
     });

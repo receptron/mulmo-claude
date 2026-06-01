@@ -12,6 +12,7 @@ import { errorMessage } from "../../utils/errors.js";
 import { formatSpawnFailure } from "../../utils/spawn.js";
 import { isRecord } from "../../utils/types.js";
 import { ClaudeCliNotFoundError } from "../../workspace/journal/archivist-cli.js";
+import { claudeBinPath } from "../../utils/claudeBin.js";
 import type { TranslateBatchFn } from "./types.js";
 
 const SYSTEM_PROMPT =
@@ -119,7 +120,7 @@ function spawnClaudeTranslate(promptInput: string, timeoutMs: number): Promise<s
   return new Promise<string>((resolve, reject) => {
     // Run from tmpdir so claude does not load the project's
     // CLAUDE.md / plugins / memory and inflate the context.
-    const proc = spawn("claude", buildArgs(promptInput), { cwd: tmpdir(), stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawn(claudeBinPath(), buildArgs(promptInput), { cwd: tmpdir(), stdio: ["ignore", "pipe", "pipe"] });
     const state: SpawnState = { stdout: "", stderr: "", settled: false };
     const timer = setTimeout(() => onTimeout(state, proc, reject, timeoutMs), timeoutMs);
     proc.stdout.on("data", (chunk: Buffer) => {

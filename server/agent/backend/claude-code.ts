@@ -12,6 +12,7 @@
 import { spawn, type ChildProcessByStdio } from "child_process";
 import type { Readable, Writable } from "stream";
 import { buildCliArgs, buildDockerSpawnArgs, buildUserMessageLine } from "../config.js";
+import { claudeBinPath } from "../../utils/claudeBin.js";
 import { resolveSandboxAuth } from "../sandboxMounts.js";
 import { getCachedReferenceDirs, referenceDirMountArgs } from "../../workspace/reference-dirs.js";
 import { createStreamParser, type AgentEvent, type RawStreamEvent } from "../stream.js";
@@ -29,7 +30,12 @@ function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[
     // PostToolUse hook needs to publish a `page-edit` toolResult back to
     // the right session (#963). Claude CLI's own hook payload carries
     // its internal session_id, which doesn't match our session store.
-    return spawn("claude", cliArgs, {
+    //
+    // Windows: see `server/utils/claudeBin.ts` — the npm `.cmd`
+    // wrapper trips Node's CVE-2024-27980 guard, and `shell: true`
+    // would hit cmd.exe's 8191-char limit. Path the real `.exe`
+    // directly (helper handles platform branching).
+    return spawn(claudeBinPath(), cliArgs, {
       cwd: workspacePath,
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, MULMOCLAUDE_CHAT_SESSION_ID: chatSessionId },

@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { CLI_SUBPROCESS_TIMEOUT_MS } from "../../utils/time.js";
+import { claudeBinPath } from "../../utils/claudeBin.js";
 
 export type Summarize = (systemPrompt: string, userPrompt: string) => Promise<string>;
 
@@ -29,7 +30,7 @@ export class ClaudeCliFailedError extends Error {
 // Pipe the combined prompt via stdin to dodge shell-argv limits for large day excerpts.
 export const runClaudeCli: Summarize = async (systemPrompt, userPrompt) =>
   new Promise((resolve, reject) => {
-    const child = spawn("claude", ["-p", "--output-format", "text"], {
+    const child = spawn(claudeBinPath(), ["-p", "--output-format", "text"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
