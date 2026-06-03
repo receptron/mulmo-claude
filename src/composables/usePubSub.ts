@@ -8,6 +8,13 @@ interface PubSubMessage {
 type Callback = (data: unknown) => void;
 type Unsubscribe = () => void;
 
+// E2E runs the Vite client with no backend (`yarn dev:client:e2e` sets
+// VITE_E2E=1) — HTTP is mocked at the Playwright layer, but the pubsub
+// socket would still dial `ws://localhost:3001` and spew ECONNREFUSED
+// reconnect noise. No live events arrive in e2e anyway, so skip the
+// socket entirely: subscriptions become no-ops.
+const PUBSUB_DISABLED = import.meta.env.VITE_E2E === "1";
+
 // On reconnect we re-emit every live subscription so the rooms list survives the bounce.
 let socket: Socket | null = null;
 
@@ -50,6 +57,9 @@ function maybeDisconnect(): void {
 
 export function usePubSub() {
   function subscribe(channel: string, callback: Callback): Unsubscribe {
+    // No backend in e2e — never open the socket (see PUBSUB_DISABLED).
+    if (PUBSUB_DISABLED) return () => {};
+
     let entry = listeners.get(channel);
     if (!entry) {
       entry = new Set();
