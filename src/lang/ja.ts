@@ -44,6 +44,10 @@ const jaMessages = {
     unsupportedFileType: "対応していないファイル形式です。画像・PDF・DOCX・XLSX・PPTX・テキストファイルを使用してください。",
     attachImageFailed: "画像の添付に失敗しました: {error}",
     dropHint: "ファイルをドロップして添付",
+    queueWhileRunning: "実行完了後に送信",
+    queuedHeading: "送信待ち: {count}",
+    queuedAttachmentBadge: "+{count} 添付",
+    queuedRemove: "キューから削除",
   },
   sessionHistoryPanel: {
     filters: {

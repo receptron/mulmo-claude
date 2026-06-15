@@ -44,6 +44,11 @@ test.describe("ChatInput attach discoverability", () => {
     expect(accept).toContain("wordprocessingml"); // DOCX
     expect(accept).toContain("spreadsheetml"); // XLSX
     expect(accept).toContain("presentationml"); // PPTX
+    // Multi-attach (plans/feat-chat-input-multi-attach.md): the picker
+    // must allow several files in a single open. Without `multiple`,
+    // the browser caps the selection at 1 and the multi-screenshot
+    // workflow regresses.
+    await expect(input).toHaveAttribute("multiple", "");
   });
 
   test("clicking the attach button opens the picker (fires a click on the hidden input)", async ({ page }) => {
@@ -68,6 +73,27 @@ test.describe("ChatInput attach discoverability", () => {
     await expect(banner).toBeVisible();
     const text = (await banner.textContent())?.trim() ?? "";
     expect(text.length).toBeGreaterThan(0);
+  });
+
+  test("dropping multiple accepted files surfaces a preview chip per file", async ({ page }) => {
+    // Multi-attach (plans/feat-chat-input-multi-attach.md): all three
+    // entry points — picker, paste, drop — should accept several
+    // files in one go. Drop is the easiest to drive synthetically;
+    // verify that the preview list grows to match.
+    const dropTarget = page.locator("[data-testid=user-input]").locator("..").locator("..");
+    await dropTarget.evaluate((element) => {
+      const transfer = new DataTransfer();
+      // Tiny 1x1 PNG so the FileReader actually parses something.
+      const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      transfer.items.add(new File([pngBytes], "first.png", { type: "image/png" }));
+      transfer.items.add(new File([pngBytes], "second.png", { type: "image/png" }));
+      element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    });
+    const previews = page.getByTestId("chat-attachment-preview");
+    await expect(previews).toHaveCount(2);
+    // Clicking the remove × on the first chip should leave one behind.
+    await page.getByTestId("chat-attachment-remove").first().click();
+    await expect(previews).toHaveCount(1);
   });
 
   test("dropping an oversized accepted file still shows the too-large error (regression)", async ({ page }) => {

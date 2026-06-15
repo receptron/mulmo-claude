@@ -37,6 +37,10 @@ const frMessages = {
     unsupportedFileType: "Type de fichier non pris en charge. Acceptés : images, PDF, DOCX, XLSX, PPTX, fichiers texte.",
     attachImageFailed: "Échec de l'attache de l'image : {error}",
     dropHint: "Déposez le fichier pour joindre",
+    queueWhileRunning: "Mettre en file pour après l'exécution en cours",
+    queuedHeading: "En attente : {count}",
+    queuedAttachmentBadge: "+{count} fichiers",
+    queuedRemove: "Retirer de la file",
   },
   sessionHistoryPanel: {
     filters: {

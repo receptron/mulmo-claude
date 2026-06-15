@@ -59,6 +59,10 @@ const enMessages = {
     unsupportedFileType: "File type not supported. Accepted: images, PDF, DOCX, XLSX, PPTX, text files.",
     attachImageFailed: "Failed to attach image: {error}",
     dropHint: "Drop file to attach",
+    queueWhileRunning: "Queue for after the current run",
+    queuedHeading: "Queued: {count}",
+    queuedAttachmentBadge: "+{count} files",
+    queuedRemove: "Remove from queue",
   },
   sessionHistoryPanel: {
     filters: {

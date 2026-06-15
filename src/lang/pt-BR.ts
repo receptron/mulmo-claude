@@ -37,6 +37,10 @@ const ptBRMessages = {
     unsupportedFileType: "Tipo de arquivo não suportado. Aceitos: imagens, PDF, DOCX, XLSX, PPTX e arquivos de texto.",
     attachImageFailed: "Falha ao anexar a imagem: {error}",
     dropHint: "Solte o arquivo para anexar",
+    queueWhileRunning: "Enfileirar para depois da execução atual",
+    queuedHeading: "Na fila: {count}",
+    queuedAttachmentBadge: "+{count} arquivos",
+    queuedRemove: "Remover da fila",
   },
   sessionHistoryPanel: {
     filters: {

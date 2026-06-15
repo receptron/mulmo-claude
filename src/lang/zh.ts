@@ -42,6 +42,10 @@ const zhMessages = {
     unsupportedFileType: "不支持的文件类型。支持:图像、PDF、DOCX、XLSX、PPTX、文本文件。",
     attachImageFailed: "附加图片失败：{error}",
     dropHint: "拖放文件以附加",
+    queueWhileRunning: "等运行结束后再发送",
+    queuedHeading: "排队中: {count}",
+    queuedAttachmentBadge: "+{count} 个文件",
+    queuedRemove: "从队列中移除",
   },
   sessionHistoryPanel: {
     filters: {

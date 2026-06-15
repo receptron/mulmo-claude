@@ -127,11 +127,16 @@
           class="border-t border-gray-100"
         />
 
+        <!-- Queued follow-ups, listed above the input box so they're
+             visible without scrolling. Auto-flushes on
+             `activeSessionRunning` → false (watcher in script). -->
+        <QueuedMessagesPanel :messages="queuedMessages" @remove="removeQueuedMessage" />
+
         <!-- Text input -->
         <ChatInput
           ref="chatInputRef"
           v-model="userInput"
-          v-model:pasted-file="pastedFile"
+          v-model:pasted-files="pastedFiles"
           :is-running="activeSessionRunning"
           :queries="sessionRoleQueries"
           @send="sendMessage()"
@@ -260,10 +265,11 @@
             :pending-calls="pendingCalls"
             class="border-t border-gray-100"
           />
+          <QueuedMessagesPanel :messages="queuedMessages" @remove="removeQueuedMessage" />
           <ChatInput
             ref="chatInputRef"
             v-model="userInput"
-            v-model:pasted-file="pastedFile"
+            v-model:pasted-files="pastedFiles"
             :is-running="activeSessionRunning"
             :queries="sessionRoleQueries"
             @send="sendMessage()"
@@ -312,6 +318,7 @@ import SidebarHeader from "./components/SidebarHeader.vue";
 import SessionHeaderControls from "./components/SessionHeaderControls.vue";
 import SessionTabBar from "./components/SessionTabBar.vue";
 import ChatInput, { type PastedFile } from "./components/ChatInput.vue";
+import QueuedMessagesPanel from "./components/QueuedMessagesPanel.vue";
 import FileDropOverlay from "./components/FileDropOverlay.vue";
 import SessionHistoryExpandButton from "./components/SessionHistoryExpandButton.vue";
 import SessionHistoryPanel from "./components/SessionHistoryPanel.vue";
@@ -452,7 +459,11 @@ const { roles, refreshRoles } = useRoles();
 const { currentRoleId } = useCurrentRole(roles);
 
 const userInput = ref("");
-const pastedFile = ref<PastedFile | null>(null);
+const pastedFiles = ref<PastedFile[]>([]);
+// Messages the user submitted while a previous run was still in
+// flight. Flushed FIFO when `activeSessionRunning` flips back to
+// false. See plans/feat-chat-input-queued-send.md.
+const queuedMessages = ref<{ text: string; files: PastedFile[] }[]>([]);
 const activePane = ref<"sidebar" | "main">("sidebar");
 
 const { sessions, historyError, fetchSessions, setBookmark, deleteSession: deleteSessionFromHistory } = useSessionHistory();
@@ -538,7 +549,7 @@ useGlobalImageErrorRepair();
 
 const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>(null);
 const canvasRef = ref<HTMLDivElement | null>(null);
-const chatInputRef = ref<{ focus: () => void; collapseSuggestions: () => void; readFile: (file: File) => void } | null>(null);
+const chatInputRef = ref<{ focus: () => void; collapseSuggestions: () => void; readFiles: (files: File[]) => Promise<void> } | null>(null);
 const { focusChatInput } = useChatScroll({
   sessionSidebarRef,
   toolResults,
@@ -560,8 +571,8 @@ const {
   onDragleave: onPanelDragleave,
   onDrop: onPanelDrop,
 } = useFileDropZone({
-  onFile: (file) => {
-    chatInputRef.value?.readFile(file);
+  onFiles: (files) => {
+    chatInputRef.value?.readFiles(files).catch(() => undefined);
   },
 });
 
@@ -974,45 +985,29 @@ function unsubscribeSession(chatSessionId: string): void {
   }
 }
 
-async function sendMessage(text?: string) {
-  const message = typeof text === "string" ? text : userInput.value.trim();
-  if (!message || activeSessionRunning.value) return;
-  userInput.value = "";
-  const fileSnapshot = pastedFile.value;
-  pastedFile.value = null;
+// Upload the attachments and return the resolved workspace paths.
+// Returns `{ failure }` on the first upload error so the caller can
+// surface it (and decide whether to restore the input draft).
+async function uploadAttachments(filesSnapshot: PastedFile[]): Promise<{ paths: string[] } | { failure: string }> {
+  if (filesSnapshot.length === 0) return { paths: [] };
+  const results = await Promise.all(filesSnapshot.map((file) => resolvePastedAttachment(file)));
+  const firstFailure = results.find((entry) => !entry.ok);
+  if (firstFailure && !firstFailure.ok) return { failure: firstFailure.error };
+  return { paths: results.flatMap((entry) => (entry.ok ? [entry.value] : [])) };
+}
 
-  // Pasted / dropped files are pre-uploaded to a workspace file so
-  // the server (and the LLM downstream) sees a relative path — never
-  // a data: URI. The path then rides on `attachments[]` as a path-only
-  // entry. On upload failure, restore both userInput and pastedFile so
-  // the user can retry without retyping.
-  let attachmentForRequest: string | undefined;
-  if (fileSnapshot) {
-    const resolved = await resolvePastedAttachment(fileSnapshot);
-    if (!resolved.ok) {
-      userInput.value = message;
-      pastedFile.value = fileSnapshot;
-      const recoverySession = sessionMap.get(currentSessionId.value);
-      if (recoverySession) pushErrorMessage(recoverySession, t("chatInput.attachImageFailed", { error: resolved.error }));
-      return;
-    }
-    attachmentForRequest = resolved.value;
-  }
-
+// Start the agent run for an already-resolved message + attachment
+// path set. Pure pipeline-driver: no UI ref reads / writes.
+async function postUserTurn(message: string, attachmentPaths: string[] | undefined): Promise<void> {
   const session = sessionMap.get(currentSessionId.value);
   if (!session) return;
-
   // Only files the user explicitly attached this turn (paste / drop /
   // file-picker) ride on the message. Do NOT auto-attach whatever
   // image happens to be selected in the sidebar — selection moves to
   // the latest generated image automatically, which would silently
   // glue the previous picture onto every follow-up comment.
-  const attachmentPaths = attachmentForRequest ? [attachmentForRequest] : undefined;
-
   beginUserTurn(session, message, attachmentPaths);
-
   ensureSessionSubscription(session);
-
   const result = await postAgentRun(
     buildAgentRequestBody({
       message,
@@ -1025,6 +1020,67 @@ async function sendMessage(text?: string) {
     pushErrorMessage(session, result.error);
     unsubscribeSession(session.id);
   }
+}
+
+async function sendMessage(text?: string) {
+  const message = typeof text === "string" ? text : userInput.value.trim();
+  if (!message) return;
+
+  // Queue the message while a previous run is still in flight. The
+  // watcher on `activeSessionRunning` (just below) flushes the queue
+  // FIFO once the run completes. plans/feat-chat-input-queued-send.md
+  // for the design rationale.
+  if (activeSessionRunning.value) {
+    queuedMessages.value.push({ text: message, files: [...pastedFiles.value] });
+    userInput.value = "";
+    pastedFiles.value = [];
+    return;
+  }
+
+  userInput.value = "";
+  const filesSnapshot = [...pastedFiles.value];
+  pastedFiles.value = [];
+
+  // Pasted / dropped files are pre-uploaded so the server sees a
+  // relative path. If ANY upload fails we restore text + files
+  // together so a retry doesn't lose the partial set the user
+  // assembled. plans/feat-chat-input-multi-attach.md
+  const upload = await uploadAttachments(filesSnapshot);
+  if ("failure" in upload) {
+    userInput.value = message;
+    pastedFiles.value = filesSnapshot;
+    const recoverySession = sessionMap.get(currentSessionId.value);
+    if (recoverySession) pushErrorMessage(recoverySession, t("chatInput.attachImageFailed", { error: upload.failure }));
+    return;
+  }
+  await postUserTurn(message, upload.paths.length > 0 ? upload.paths : undefined);
+}
+
+// Flush queued messages once the current run goes idle. Shifts one at
+// a time so the next dequeue waits for the freshly-started run to
+// finish — otherwise back-to-back posts would race the SSE-driven
+// `activeSessionRunning` flip and overlap.
+//
+// The queued path intentionally does NOT restore on upload failure:
+// those messages already left the input box, and resurrecting them
+// would clobber whatever the user has typed since. We surface the
+// error inline in chat and drop the queue entry instead.
+watch(activeSessionRunning, async (running, wasRunning) => {
+  if (!wasRunning || running) return;
+  if (queuedMessages.value.length === 0) return;
+  const next = queuedMessages.value.shift();
+  if (!next) return;
+  const upload = await uploadAttachments(next.files);
+  if ("failure" in upload) {
+    const recoverySession = sessionMap.get(currentSessionId.value);
+    if (recoverySession) pushErrorMessage(recoverySession, t("chatInput.attachImageFailed", { error: upload.failure }));
+    return;
+  }
+  await postUserTurn(next.text, upload.paths.length > 0 ? upload.paths : undefined);
+});
+
+function removeQueuedMessage(index: number): void {
+  queuedMessages.value.splice(index, 1);
 }
 
 // Route workspace-internal links (wiki pages, files, sessions) to the

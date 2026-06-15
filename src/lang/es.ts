@@ -42,6 +42,10 @@ const esMessages = {
     unsupportedFileType: "Tipo de archivo no admitido. Se aceptan: imágenes, PDF, DOCX, XLSX, PPTX y archivos de texto.",
     attachImageFailed: "No se pudo adjuntar la imagen: {error}",
     dropHint: "Suelta el archivo para adjuntar",
+    queueWhileRunning: "Encolar para después de la ejecución actual",
+    queuedHeading: "En cola: {count}",
+    queuedAttachmentBadge: "+{count} archivos",
+    queuedRemove: "Quitar de la cola",
   },
   sessionHistoryPanel: {
     filters: {

@@ -37,6 +37,10 @@ const deMessages = {
     unsupportedFileType: "Dateityp nicht unterstützt. Akzeptiert: Bilder, PDF, DOCX, XLSX, PPTX, Textdateien.",
     attachImageFailed: "Anhängen des Bildes fehlgeschlagen: {error}",
     dropHint: "Datei zum Anhängen ablegen",
+    queueWhileRunning: "Nach aktuellem Lauf in Warteschlange",
+    queuedHeading: "In Warteschlange: {count}",
+    queuedAttachmentBadge: "+{count} Dateien",
+    queuedRemove: "Aus Warteschlange entfernen",
   },
   sessionHistoryPanel: {
     filters: {

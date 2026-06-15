@@ -44,6 +44,10 @@ const koMessages = {
     unsupportedFileType: "지원되지 않는 파일 형식입니다. 이미지, PDF, DOCX, XLSX, PPTX, 텍스트 파일만 지원됩니다.",
     attachImageFailed: "이미지를 첨부하지 못했습니다: {error}",
     dropHint: "파일을 놓아서 첨부",
+    queueWhileRunning: "현재 실행 후 전송",
+    queuedHeading: "대기 중: {count}",
+    queuedAttachmentBadge: "+{count}개 첨부",
+    queuedRemove: "대기열에서 제거",
   },
   sessionHistoryPanel: {
     filters: {
