@@ -10,7 +10,7 @@
 //   data/attachments/YYYY/MM/<id>.<ext>            (original, always)
 //   data/attachments/YYYY/MM/<id>.pdf              (companion, PPTX only — same <id>)
 
-import { mkdir, readFile, realpath, writeFile } from "fs/promises";
+import { mkdir, readFile, realpath } from "fs/promises";
 import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { shortId } from "../id.js";
@@ -189,15 +189,30 @@ export async function saveAttachment(base64Data: string, mimeType: string): Prom
  *  raw Buffer — the converter already has bytes in hand and base64
  *  re-encoding would be wasted work. */
 export async function saveCompanion(originalRelativePath: string, buf: Buffer, ext: string): Promise<string> {
-  await ensureAttachmentsDir();
+  const root = await ensureAttachmentsDir();
+  // Validate the SOURCE path up front, string-only — BEFORE any fs op.
+  // The companion doesn't exist yet so it can't go through the
+  // realpath-based `safeResolve` (that ENOENTs on the missing leaf and
+  // masquerades as a traversal rejection — the bug that broke every
+  // PPTX upload). `isAttachmentPath` rejects a bad prefix or any `..`
+  // segment, so the `mkdir` below can't escape the root.
+  if (!isAttachmentPath(originalRelativePath)) {
+    throw new Error(`path traversal rejected: ${originalRelativePath}`);
+  }
   const dir = path.posix.dirname(originalRelativePath);
   const base = path.posix.basename(originalRelativePath, path.posix.extname(originalRelativePath));
   const filename = `${base}${ext}`;
   const relativePath = path.posix.join(dir, filename);
-  const absPath = await safeResolve(relativePath);
-  // mkdir-p inside safeResolve's confined root.
-  await mkdir(path.dirname(absPath), { recursive: true });
-  await writeFile(absPath, buf);
+  const dirName = dir.replace(new RegExp(`^${WORKSPACE_DIRS.attachments}/`), "");
+  await mkdir(path.join(root, dirName), { recursive: true });
+  // Defense-in-depth: realpath the now-existing dir to catch symlink
+  // escapes, and keep the leaf separator-free.
+  const dirReal = resolveWithinRoot(root, dirName);
+  if (!dirReal || hasTraversalSegment(filename) || /[/\\]/.test(filename)) {
+    throw new Error(`path traversal rejected: ${relativePath}`);
+  }
+  const absPath = path.join(dirReal, filename);
+  await writeFileAtomic(absPath, buf);
   return relativePath;
 }
 
