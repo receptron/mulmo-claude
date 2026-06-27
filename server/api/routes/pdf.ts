@@ -19,7 +19,7 @@ const router = Router();
 
 const MARKDOWN_CSS = `
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 13px;
     line-height: 1.6;
     color: #1f2937;
@@ -259,8 +259,9 @@ async function renderMarpPdf(markdown: string, baseDir?: string): Promise<Buffer
   });
   const inlinedHtml = inlineImages(html, { sourceDir: baseDir });
   const fullHtml = `<!doctype html>
-<html><head><meta charset="utf-8"><style>
-html,body { margin:0; padding:0; background:white; }
+<html><head><meta charset="utf-8">
+<style>
+html,body { margin:0; padding:0; background:white; font-family: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; }
 ${css}
 /* Match MarpView's preview rule. Cap inline images at 60cqh (60% of
    the section's container-query height) so an image-plus-text slide
