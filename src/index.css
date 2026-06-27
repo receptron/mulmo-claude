@@ -74,7 +74,7 @@
   padding: 0.1rem 0.3rem;
   border-radius: 0.25rem;
   font-size: 0.85em;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "MS Gothic", "BIZ UDGothic", monospace;
 }
 .markdown-content pre {
   background: #f3f4f6;
