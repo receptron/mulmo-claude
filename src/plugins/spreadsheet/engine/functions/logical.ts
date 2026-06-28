@@ -139,14 +139,14 @@ const ifsHandler: FunctionHandler = (args, context) => {
       }
     }
 
-    // Evaluate the condition
-    let conditionResult = false;
-
-    if (/>=|<=|>|<|==|!=/.test(condExpr)) {
-      conditionResult = eval(condExpr);
-    } else {
-      conditionResult = !!eval(condExpr);
-    }
+    // Evaluate the condition. `new Function(...)` instead of `eval(...)`
+    // because rolldown's direct-eval lint flags the bare `eval` call
+    // (it disables scope tree-shaking for the surrounding module).
+    // `Function` runs the expression in a fresh global scope — no
+    // closure capture — and lets the bundler keep optimizing. Both
+    // call shapes (comparison vs plain value) coerce to boolean the
+    // same way, so the original if/else collapses.
+    const conditionResult = Boolean(new Function(`return (${condExpr})`)());
 
     if (conditionResult) {
       // If result is a quoted string, return without quotes
