@@ -77,9 +77,9 @@
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
-    "@codemirror/lint": "^6.9.6",
-    "@codemirror/state": "^6.6.0",
-    "@codemirror/view": "^6.43.0",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.0",
+    "@codemirror/view": "^6.43.4",
     "@google/genai": "^2.2.0",
     "@gui-chat-plugin/browse": "^0.5.0",
     "@gui-chat-plugin/camera": "^0.5.0",
