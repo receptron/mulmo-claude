@@ -53,8 +53,14 @@ const REPLY_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function createRelay(deps: RelayDeps): RelayFn {
   const { store, handleCommand, startChat, onSessionEvent, getRole, defaultRoleId, logger } = deps;
+  const relayLocks = new Map<string, Promise<void>>();
 
   return async function relayMessage(params: RelayParams): Promise<RelayResult> {
+    const lockKey = JSON.stringify([params.transportId, params.externalChatId]);
+    return withRelayLock(relayLocks, lockKey, async () => relayMessageUnlocked(params));
+  };
+
+  async function relayMessageUnlocked(params: RelayParams): Promise<RelayResult> {
     const { transportId, externalChatId, attachments, bridgeOptions } = params;
     let { text } = params;
 
@@ -150,7 +156,7 @@ export function createRelay(deps: RelayDeps): RelayFn {
         message: "Error: failed to collect agent reply",
       };
     }
-  };
+  }
 }
 
 // ── Internals ────────────────────────────────────────────────
@@ -216,4 +222,26 @@ function collectAgentReply(onSessionEvent: OnSessionEventFn, chatSessionId: stri
       }
     });
   });
+}
+
+async function withRelayLock<T>(locks: Map<string, Promise<void>>, key: string, task: () => Promise<T>): Promise<T> {
+  const previous = locks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const ready = previous.catch(() => undefined);
+  const next = ready.then(() => current);
+
+  locks.set(key, next);
+  await ready;
+
+  try {
+    return await task();
+  } finally {
+    release();
+    if (locks.get(key) === next) {
+      locks.delete(key);
+    }
+  }
 }
