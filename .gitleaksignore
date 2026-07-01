@@ -30,3 +30,14 @@
 # prefix match. Not a real key.
 877b5911b33153ac3794a8d824ec49d2230006ae:test/plugins/test_map_integration.ts:generic-api-key:93
 877b5911b33153ac3794a8d824ec49d2230006ae:test/plugins/test_map_integration.ts:generic-api-key:109
+
+# src/config/firebaseConfig.ts holds the Firebase Web SDK config for
+# the shared `mulmoserver` project. Firebase's apiKey in a web config
+# is a project identifier, NOT a secret — access is gated by
+# Firestore security rules + Firebase Auth, not by keeping the key
+# hidden. Google explicitly documents this at
+# https://firebase.google.com/docs/projects/api-keys#apikey-restrictions
+# ("Firebase-related APIs do not use API keys for authorization").
+# gitleaks' generic gcp-api-key rule fires on the AIza… prefix, which
+# is unavoidable with this config shape.
+7332183f0e0e6f982fc151350e5a612bc0ed9303:src/config/firebaseConfig.ts:gcp-api-key:11
