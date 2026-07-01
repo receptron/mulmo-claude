@@ -1,5 +1,6 @@
-Windows 11でMulmoClaudeを30分で動かす完全ガイド（2026年版）
-はじめに
+# Windows 11でMulmoClaudeを30分で動かす完全ガイド（2026年版）
+
+## はじめに
 
 このガイドは、MulmoClaudeを初めて使う方のためのインストールガイドです。
 
@@ -9,19 +10,19 @@ Windows 11を利用している方を対象に、必要なソフトウェアの�
 
 このガイドは、実際にWindows 11環境でMulmoClaudeをセットアップした経験をもとに作成しました。インストール中に発生しやすいエラーや、その解決方法についても紹介しています。
 
-このガイドでできること
-Windows 11に必要なソフトウェアをインストールする
-MulmoClaudeをダウンロードして起動する
-Claude CodeとGemini APIを設定する
-よくあるエラーを解決する
-MulmoClaudeを継続して利用できる環境を構築する
-対象読者
+## このガイドでできること
+- Windows 11に必要なソフトウェアをインストールする
+- MulmoClaudeをダウンロードして起動する
+- Claude CodeとGemini APIを設定する
+- よくあるエラーを解決する
+- MulmoClaudeを継続して利用できる環境を構築する
+### 対象読者
 
 このガイドは、次のような方を対象としています。
 
-MulmoClaudeを初めて利用する方
-Windows 11でAI開発環境を構築したい方
-GitやNode.jsの経験が少ない方
-できるだけ短時間でMulmoClaudeを使い始めたい方
+- MulmoClaudeを初めて利用する方
+- Windows 11でAI開発環境を構築したい方
+- GitやNode.jsの経験が少ない方
+- できるだけ短時間でMulmoClaudeを使い始めたい方
 
 それでは、Windows 11でMulmoClaudeを動かすための準備から始めましょう。
