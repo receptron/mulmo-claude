@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Exclude runtime workspace data from Tailwind's automatic source
+   detection. The default workspace is `~/mulmoclaude`; when the repo
+   itself is cloned there (or MULMOCLAUDE_WORKSPACE_PATH points inside
+   the repo), the server writes conversations/, data/ and artifacts/
+   into the Vite project root. Without these exclusions Tailwind scans
+   those files for class candidates, registers them as dependencies of
+   this stylesheet, and answers every chat-log append with a
+   `full-reload` — the dev app reloads several times per agent turn
+   (#1940). Directories that don't exist are a no-op, so this is safe
+   for checkouts whose workspace lives elsewhere. */
+@source not "../conversations";
+@source not "../data";
+@source not "../artifacts";
+
 @layer base {
   /* Tailwind v4 removed the default `cursor: pointer` on <button>
      from preflight (https://tailwindcss.com/docs/upgrade-guide#buttons-use-the-default-cursor).
