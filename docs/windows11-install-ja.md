@@ -16,6 +16,7 @@ Windows 11を利用している方を対象に、必要なソフトウェアの�
 - Claude CodeとGemini APIを設定する
 - よくあるエラーを解決する
 - MulmoClaudeを継続して利用できる環境を構築する
+
 ### 対象読者
 
 このガイドは、次のような方を対象としています。
@@ -39,6 +40,7 @@ Windows 11を利用している方を対象に、必要なソフトウェアの�
 - 第8章 MulmoClaude の起動
 - 第9章 Windowsショートカットの作成
 - 第10章 トラブルシューティング
+
 
 # 第1章　必要なもの
 
@@ -65,6 +67,7 @@ Node.jsは、MulmoClaudeを動かすために必要なJavaScript実行環境で�
 Node.jsをインストールすると、npm（Node Package Manager）も同時に利用できるようになります。
 
 ---
+
 
 ## Git
 
@@ -99,6 +102,7 @@ GitHub Desktopは、Gitを分かりやすく操作できるWindows用アプリ�
 
 ---
 
+
 ## Claude Pro
 
 MulmoClaudeでは、Claude Codeを利用するためにClaudeアカウントが必要です。
@@ -125,6 +129,7 @@ Visual Studio Code（VS Code）は、設定ファイルやMarkdownファイル�
 
 ---
 
+
 ## この章で準備するもの
 
 次のものがそろえば、MulmoClaudeをセットアップする準備が整います。
@@ -149,6 +154,7 @@ MulmoClaudeは、Node.js上で動作するアプリケーションです。
 この章では、Windows 11へNode.js（LTS版）をインストールする手順を説明します。
 
 ---
+
 
 ## Node.jsとは
 
