@@ -692,3 +692,104 @@ Full documentation lives in [`docs/`](docs/README.md). Here are the key entry po
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+# 第1章　必要なもの
+
+MulmoClaudeを快適に利用するためには、事前にいくつかのソフトウェアやアカウントを準備する必要があります。
+
+この章では、それぞれの役割と、なぜ必要なのかを分かりやすく説明します。
+
+---
+
+## 1. Windows 11
+
+このガイドは、Windows 11（64ビット版）を対象としています。
+
+Windows 10でも動作する場合がありますが、本ガイドではWindows 11で動作確認を行っています。
+
+---
+
+## 2. Node.js（LTS版）
+
+Node.jsは、MulmoClaudeを動かすために必要なJavaScript実行環境です。
+
+インストールする際は、安定版である **LTS（Long Term Support）版** をおすすめします。
+
+Node.jsをインストールすると、npm（Node Package Manager）も同時に利用できるようになります。
+
+---
+
+## 3. Git
+
+Gitは、ソースコードの管理や更新を行うためのソフトウェアです。
+
+MulmoClaudeをGitHubから取得したり、最新版へ更新したり、オープンソースへ貢献（Pull Request）したりするために使用します。
+
+---
+
+## 4. GitHubアカウント
+
+GitHubアカウントは、MulmoClaudeのソースコードを取得したり、IssueやPull Requestを作成したりするために必要です。
+
+オープンソースへ参加するための入口となります。
+
+---
+
+## 5. GitHub Desktop
+
+GitHub Desktopは、Gitを分かりやすく操作できるWindows用アプリケーションです。
+
+コマンド操作に慣れていない方でも、
+
+- Clone
+- Commit
+- Push
+- Pull Request
+
+などを画面操作だけで行えます。
+
+本ガイドでもGitHub Desktopを利用して説明します。
+
+---
+
+## 6. Claude Pro
+
+MulmoClaudeでは、Claude Codeを利用するためにClaudeアカウントが必要です。
+
+本ガイドでは、Claude Proを利用したセットアップ手順を紹介します。
+
+---
+
+## 7. Gemini APIキー
+
+Gemini APIキーは、一部のAI機能を利用するために必要です。
+
+Google AI Studioで取得し、`.env` ファイルへ設定します。
+
+なお、APIキーは第三者へ公開しないよう十分注意してください。
+
+---
+
+## 8. Visual Studio Code
+
+Visual Studio Code（VS Code）は、設定ファイルやMarkdownファイルを編集するために使用します。
+
+本ガイドでは、Windows版VS Codeを利用して説明します。
+
+---
+
+## この章で準備するもの
+
+次のものがそろえば、MulmoClaudeをセットアップする準備が整います。
+
+- Windows 11
+- Node.js（LTS）
+- Git
+- GitHubアカウント
+- GitHub Desktop
+- Claude Pro
+- Gemini APIキー
+- Visual Studio Code
+
+それでは、次章から実際のインストールを始めましょう。
