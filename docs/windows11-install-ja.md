@@ -174,6 +174,8 @@ MulmoClaudeをはじめ、多くのAI開発ツールはNode.jsを利用して動
 
 https://nodejs.org/
 
+![Node.js公式サイト](images/windows11-install-ja/nodejs-home.png)
+
 ---
 
 ### 2. LTS版をダウンロード
@@ -182,11 +184,15 @@ https://nodejs.org/
 
 Current版ではなく、LTS版を選択してください。
 
+![Node.js LTS版ダウンロード](images/windows11-install-ja/nodejs-lts-download.png)
+
 ---
 
 ### 3. インストーラーを実行
 
 ダウンロードしたインストーラーを起動します。
+
+![Node.jsセットアップ開始](images/windows11-install-ja/nodejs-installer-welcome.png)
 
 基本的には、すべて既定（Next）で問題ありません。
 
@@ -227,7 +233,7 @@ v24.6.0
 ```powershell
 npm -v
 ```
-
+![Node.js動作確認](images/windows11-install-ja/node-npm-version-check.png)
 を実行します。
 
 こちらもバージョン番号が表示されれば正常です。
