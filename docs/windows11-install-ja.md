@@ -35,7 +35,7 @@ MulmoClaudeを快適に利用するためには、事前にいくつかのソフ
 
 ---
 
-## 1. Windows 11
+## Windows 11
 
 このガイドは、Windows 11（64ビット版）を対象としています。
 
@@ -43,7 +43,7 @@ Windows 10でも動作する場合がありますが、本ガイドではWindows
 
 ---
 
-## 2. Node.js（LTS版）
+## Node.js（LTS版）
 
 Node.jsは、MulmoClaudeを動かすために必要なJavaScript実行環境です。
 
@@ -53,7 +53,7 @@ Node.jsをインストールすると、npm（Node Package Manager）も同時�
 
 ---
 
-## 3. Git
+## Git
 
 Gitは、ソースコードの管理や更新を行うためのソフトウェアです。
 
@@ -61,7 +61,7 @@ MulmoClaudeをGitHubから取得したり、最新版へ更新したり、オー
 
 ---
 
-## 4. GitHubアカウント
+## GitHubアカウント
 
 GitHubアカウントは、MulmoClaudeのソースコードを取得したり、IssueやPull Requestを作成したりするために必要です。
 
@@ -69,7 +69,7 @@ GitHubアカウントは、MulmoClaudeのソースコードを取得したり、
 
 ---
 
-## 5. GitHub Desktop
+## GitHub Desktop
 
 GitHub Desktopは、Gitを分かりやすく操作できるWindows用アプリケーションです。
 
@@ -86,7 +86,7 @@ GitHub Desktopは、Gitを分かりやすく操作できるWindows用アプリ�
 
 ---
 
-## 6. Claude Pro
+## Claude Pro
 
 MulmoClaudeでは、Claude Codeを利用するためにClaudeアカウントが必要です。
 
@@ -94,7 +94,7 @@ MulmoClaudeでは、Claude Codeを利用するためにClaudeアカウントが�
 
 ---
 
-## 7. Gemini APIキー
+## Gemini APIキー
 
 Gemini APIキーは、一部のAI機能を利用するために必要です。
 
@@ -104,7 +104,7 @@ Google AI Studioで取得し、`.env` ファイルへ設定します。
 
 ---
 
-## 8. Visual Studio Code
+## Visual Studio Code
 
 Visual Studio Code（VS Code）は、設定ファイルやMarkdownファイルを編集するために使用します。
 
