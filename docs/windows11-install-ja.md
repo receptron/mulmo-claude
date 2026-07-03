@@ -196,19 +196,13 @@ Current版ではなく、LTS版を選択してください。
 
 基本的には、すべて既定（Next）で問題ありません。
 
-途中で
-
-```
-Add to PATH
-```
-
-が有効になっていることを確認してください。
+途中で表示される **Add to PATH** は既定のままで問題ありません。
 
 ---
 
 ### 4. インストール完了
 
-インストールが完了したら、Windowsを再起動することをおすすめします。
+インストール完了後は、PATHを確実に反映させるため、一度Windowsを再起動することをおすすめします。
 
 ---
 
@@ -225,7 +219,7 @@ node -v
 例
 
 ```text
-v24.6.0
+v24.18.0
 ```
 
 続いて、
@@ -233,7 +227,7 @@ v24.6.0
 ```powershell
 npm -v
 ```
-![Node.js動作確認](images/windows11-install-ja/node-npm-version-check.png)
+![node -v と npm -v の実行結果](images/windows11-install-ja/node-npm-version-check.png)
 を実行します。
 
 こちらもバージョン番号が表示されれば正常です。
@@ -241,7 +235,7 @@ npm -v
 例
 
 ```text
-11.5.1
+11.16.0
 ```
 
 ---
