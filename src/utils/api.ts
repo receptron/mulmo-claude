@@ -72,6 +72,62 @@ export function setAuthToken(token: string | null): void {
   authToken = token;
 }
 
+// ── Stale-token recovery ─────────────────────────────────────────────
+//
+// The server mints a fresh session token at every boot and embeds it
+// into index.html's `<meta name="mulmoclaude-auth">`. A tab that was
+// loaded BEFORE a server restart keeps sending the old bearer, so every
+// call 401s until the user figures out a manual reload — the raw
+// `Server error 401 {"error":"unauthorized"}` bubble gives no hint.
+//
+// Instead: on the first 401 we re-fetch "/" (no-store), pull the
+// CURRENT token out of the served HTML, swap it in, and retry the
+// request once. The refresh is single-flight so a burst of concurrent
+// 401s (boot fires many fetches) triggers exactly one "/" round trip.
+//
+// The meta tag is parsed with a regex rather than DOMParser on purpose:
+// this module deliberately avoids DOM lib globals (see the fetch-types
+// comment above). The attribute order is stable — it comes from our own
+// index.html template.
+
+const AUTH_META_RE = /<meta\s+name="mulmoclaude-auth"\s+content="([^"]*)"/;
+
+let tokenRefreshInflight: Promise<boolean> | null = null;
+
+/** Re-read the auth token from the served index.html. Resolves true
+ *  iff a non-empty token DIFFERENT from the current one was installed
+ *  (i.e. a retry is worth attempting). */
+function refreshStaleAuthToken(): Promise<boolean> {
+  tokenRefreshInflight ??= (async () => {
+    try {
+      const res = await fetch("/", { cache: "no-store", credentials: "same-origin" });
+      if (!res.ok) return false;
+      const fresh = AUTH_META_RE.exec(await res.text())?.[1] ?? "";
+      if (fresh === "" || fresh === authToken) return false;
+      authToken = fresh;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      // Re-arm for the future — the token can rotate again on the
+      // next server restart. Deferred so every awaiter of THIS
+      // refresh shares the same result first.
+      queueMicrotask(() => {
+        tokenRefreshInflight = null;
+      });
+    }
+  })();
+  return tokenRefreshInflight;
+}
+
+/** A body we can safely send twice. Streams are consumed by the first
+ *  attempt and must not be replayed; everything MulmoClaude actually
+ *  sends (JSON strings, FormData, Blob, undefined) is replayable. */
+function isReplayableBody(body: unknown): boolean {
+  if (body === undefined || body === null || typeof body === "string") return true;
+  return typeof (body as { getReader?: unknown }).getReader !== "function";
+}
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
@@ -193,6 +249,18 @@ export async function apiCall<T = unknown>(path: string, opts: ApiOptions = {}):
     lastBackendError.value = null;
   }
 
+  if (res.status === 401 && (await refreshStaleAuthToken())) {
+    // Token was stale (server restarted since this tab loaded). A
+    // fresh one is installed — replay the request once. JSON bodies
+    // are plain strings, so resending `init` verbatim is safe.
+    init.headers = buildHeaders(opts, hasBody);
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      return { ok: false, error: errorMessage(err), status: 0 };
+    }
+  }
+
   if (!res.ok) {
     const { error, status } = await extractError(res);
     return { ok: false, error, status };
@@ -260,5 +328,14 @@ export async function apiFetchRaw(path: string, opts: RawOptions = {}): Promise<
     body: opts.body,
     signal: opts.signal,
   };
-  return fetch(url, init);
+  const res = await fetch(url, init);
+  // Same stale-token recovery as apiCall — this path carries the chat
+  // send (`POST /api/agent`, SSE), which is exactly where users see the
+  // raw 401 bubble after a server restart. Streams can't be replayed;
+  // everything else (JSON strings, FormData, Blob) can.
+  if (res.status === 401 && isReplayableBody(opts.body) && (await refreshStaleAuthToken())) {
+    init.headers = buildHeaders(opts, false);
+    return fetch(url, init);
+  }
+  return res;
 }

@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { apiCall, apiGet, apiPost, apiPut, apiDelete, backendReachable, lastBackendError, setAuthToken } from "../../src/utils/api.ts";
+import { apiCall, apiGet, apiPost, apiPut, apiDelete, apiFetchRaw, backendReachable, lastBackendError, setAuthToken } from "../../src/utils/api.ts";
 
 // fetch mocking. Capture the URL + init passed by the api module, and
 // reply with a pre-scripted response. Each test installs its own mock
@@ -245,5 +245,80 @@ describe("apiCall — backendReachable signal", () => {
     assert.equal(result.ok, false);
     assert.equal(backendReachable.value, true);
     assert.equal(lastBackendError.value, null);
+  });
+});
+
+describe("stale-token recovery (401 → re-read token from index.html → retry once)", () => {
+  // Sequenced mock: each call shifts the next scripted response.
+  // Needed here because recovery involves three different exchanges
+  // (401 from the API, "/" serving fresh HTML, then the replay).
+  let seq: Response[] = [];
+  function installSeqMock(): void {
+    calls = [];
+    globalThis.fetch = ((url, init) => {
+      calls.push({ url: String(url), init });
+      const next = seq.shift() ?? new Response("", { status: 599 });
+      return Promise.resolve(next);
+    }) as typeof fetch;
+  }
+  afterEach(() => {
+    restoreMock();
+    setAuthToken(null);
+  });
+
+  function htmlWithToken(token: string): Response {
+    return new Response(`<!doctype html><head><meta name="mulmoclaude-auth" content="${token}" /></head>`, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  it("apiCall retries once with the fresh token and succeeds", async () => {
+    setAuthToken("stale-token");
+    installSeqMock();
+    seq = [jsonResponse(401, { error: "unauthorized" }), htmlWithToken("fresh-token"), jsonResponse(200, { fine: true })];
+
+    const result = await apiCall<{ fine: boolean }>("/api/anything");
+
+    assert.equal(result.ok, true);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[1].url, "/");
+    assert.equal(getHeader(calls[2], "Authorization"), "Bearer fresh-token");
+  });
+
+  it("does not retry when the served token is unchanged (genuine 401)", async () => {
+    setAuthToken("same-token");
+    installSeqMock();
+    seq = [jsonResponse(401, { error: "unauthorized" }), htmlWithToken("same-token")];
+
+    const result = await apiCall("/api/anything");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 401);
+    assert.equal(calls.length, 2);
+  });
+
+  it("surfaces the original 401 when the token refetch itself fails", async () => {
+    setAuthToken("stale-token");
+    installSeqMock();
+    seq = [jsonResponse(401, { error: "unauthorized" }), new Response("", { status: 500 })];
+
+    const result = await apiCall("/api/anything");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 401);
+    assert.equal(calls.length, 2);
+  });
+
+  it("apiFetchRaw (chat send path) recovers the same way", async () => {
+    setAuthToken("stale-token");
+    installSeqMock();
+    seq = [jsonResponse(401, { error: "unauthorized" }), htmlWithToken("fresh-token"), jsonResponse(200, { streaming: "ok" })];
+
+    const res = await apiFetchRaw("/api/agent", { method: "POST", body: JSON.stringify({ message: "hi" }) });
+
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 3);
+    assert.equal(getHeader(calls[2], "Authorization"), "Bearer fresh-token");
   });
 });
