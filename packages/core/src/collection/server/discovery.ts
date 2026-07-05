@@ -10,6 +10,7 @@ import path from "node:path";
 import { z } from "zod";
 import { log, getWorkspaceRoot, userSkillsDir, projectSkillsDir, feedsRoot } from "./host";
 import { INGEST_KINDS, AGENT_INGEST_KIND, FEED_SCHEDULES, isFieldDrivenEvery } from "../core/schema";
+import { isSortableField } from "../core/sortItems";
 import { SCHEMA_FILE, resolveDataDir, safeRecordId, safeSlugName } from "./paths";
 import type { LoadedCollection } from "./discoveredCollection";
 import { isSafeActionTemplatePath, isSafeCustomViewI18nPath, isSafeCustomViewPath } from "./templatePath";
@@ -604,6 +605,10 @@ export const CollectionSchemaZ = z
     // Data-driven launcher-icon override. Optional, so every existing
     // schema validates unchanged; `source` is required within it.
     dynamicIcon: DynamicIconSpecZ.optional(),
+    // Default table sort, applied only when the user has no stored sort of
+    // their own. `field` validated to name a real, sortable top-level field
+    // by a refine below. Optional, so every existing schema validates unchanged.
+    defaultSort: z.object({ field: z.string().trim().min(1), direction: z.enum(["asc", "desc"]) }).optional(),
   })
   // The singleton value becomes a record id (and thus a `<id>.json`
   // filename), so it must satisfy the SAME `safeRecordId` rule the
@@ -658,6 +663,17 @@ export const CollectionSchemaZ = z
     message: "schema `displayField` must name a top-level field declared in `fields`",
     path: ["displayField"],
   })
+  // `defaultSort.field` must name a real top-level field that is actually
+  // sortable (markdown / table / image / file / embed render no value, so the
+  // table offers them no sort button — defaulting to one would be a no-op).
+  .refine(
+    (schema) =>
+      schema.defaultSort === undefined || (schema.fields[schema.defaultSort.field] !== undefined && isSortableField(schema.fields[schema.defaultSort.field])),
+    {
+      message: "schema `defaultSort.field` must name a top-level sortable field declared in `fields`",
+      path: ["defaultSort"],
+    },
+  )
   // A field's `when.field` gates its visibility against a sibling's
   // value, so it must name a real top-level field — a typo would
   // silently keep the field hidden forever (the gate never matches).

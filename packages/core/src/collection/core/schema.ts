@@ -548,6 +548,12 @@ export interface CollectionSchema {
    *  behaviour. See `computeCollectionIcon` (server) and
    *  `selectDynamicRecord`/`resolveIcon` (pure resolver). */
   dynamicIcon?: DynamicIconSpec;
+  /** Optional default column sort for the table view, applied only when the
+   *  user has no stored (localStorage) sort of their own for this collection.
+   *  `field` must name a top-level SORTABLE field (not markdown / table /
+   *  image / file / embed). Absent ⇒ source order. Any sort the user sets
+   *  in-view overrides it and persists per browser. */
+  defaultSort?: { field: string; direction: "asc" | "desc" };
 }
 
 export interface CollectionSummary {

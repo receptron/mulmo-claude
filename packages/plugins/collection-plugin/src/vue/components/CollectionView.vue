@@ -985,13 +985,25 @@ function storedSortFor(slug: string | undefined): SortState | null {
   return (slug && readCollectionSort(slug)) || null;
 }
 const sortState = ref<SortState | null>(storedSortFor(activeSlug.value));
+// The schema's declared default sort, used only when the user has set no
+// explicit sort of their own. Ignored when it names a field the loaded schema
+// no longer has (e.g. renamed away) so a stale default can't wedge the table.
+const schemaDefaultSort = computed<SortState | null>(() => {
+  const def = collection.value?.schema.defaultSort;
+  return def && collection.value?.schema.fields[def.field] ? { field: def.field, direction: def.direction } : null;
+});
+// The sort actually applied to the table: an explicit user sort wins;
+// otherwise the schema default; otherwise none (source order). Persistence
+// still tracks only `sortState`, so we never write the schema default back
+// into the user's localStorage.
+const effectiveSort = computed<SortState | null>(() => sortState.value ?? schemaDefaultSort.value);
 // The column whose sort button is currently hovered (at most one). Hover
 // previews the NEXT click's state, so descending visibly fades back to the
 // light-grey "off" look — signalling the next click clears the sort.
 const hoveredSortKey = ref<string | null>(null);
 
 function sortDirectionFor(key: string): "asc" | "desc" | null {
-  return sortState.value?.field === key ? sortState.value.direction : null;
+  return effectiveSort.value?.field === key ? effectiveSort.value.direction : null;
 }
 
 /** The direction whose visuals to render: on hover, preview the next
@@ -1064,7 +1076,7 @@ function derivedSortValue(field: FieldSpec, key: string, item: CollectionItem): 
 }
 
 const sortedItems = computed<CollectionItem[]>(() => {
-  const state = sortState.value;
+  const state = effectiveSort.value;
   const field = state ? collection.value?.schema.fields[state.field] : undefined;
   if (!state || !field) return filteredItems.value;
   return sortItems(filteredItems.value, state.direction, (item) => sortValueOf(field, state.field, item));

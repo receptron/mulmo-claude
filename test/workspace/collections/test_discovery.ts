@@ -1566,3 +1566,51 @@ describe("loadCollection", () => {
     assert.equal(collection, null);
   });
 });
+
+describe("discoverCollections — defaultSort", () => {
+  const baseFields = {
+    id: { type: "string", label: "ID", primary: true, required: true },
+    status: { type: "enum", label: "Status", values: ["red", "green"] },
+    notes: { type: "markdown", label: "Notes" },
+  };
+
+  it("accepts a defaultSort naming a sortable field", async () => {
+    writeSkill("test-sort-ok", {
+      title: "Sortable",
+      icon: "sort",
+      dataPath: "data/sortok/items",
+      primaryKey: "id",
+      fields: baseFields,
+      defaultSort: { field: "status", direction: "asc" },
+    });
+    const collections = await listCollections();
+    assert.equal(collections.length, 1);
+    assert.deepEqual(collections[0]?.schema.defaultSort, { field: "status", direction: "asc" });
+  });
+
+  it("rejects a defaultSort naming a non-existent field", async () => {
+    writeSkill("test-sort-missing", {
+      title: "Missing Sort Field",
+      icon: "sort",
+      dataPath: "data/sortmissing/items",
+      primaryKey: "id",
+      fields: baseFields,
+      defaultSort: { field: "nope", direction: "asc" },
+    });
+    const collections = await listCollections();
+    assert.equal(collections.length, 0, "defaultSort pointing at a missing field must be skipped");
+  });
+
+  it("rejects a defaultSort naming a non-sortable field", async () => {
+    writeSkill("test-sort-nonsortable", {
+      title: "Non-sortable Sort Field",
+      icon: "sort",
+      dataPath: "data/sortnonsortable/items",
+      primaryKey: "id",
+      fields: baseFields,
+      defaultSort: { field: "notes", direction: "asc" }, // markdown → no sort button
+    });
+    const collections = await listCollections();
+    assert.equal(collections.length, 0, "defaultSort on a markdown field must be skipped");
+  });
+});
