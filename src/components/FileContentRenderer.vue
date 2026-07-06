@@ -447,7 +447,12 @@ async function openInOs(): Promise<void> {
   openInOsBusy.value = true;
   openInOsError.value = null;
   try {
-    const result = await apiPost<{ ok: boolean }>(API_ROUTES.files.open, { path: props.selectedPath });
+    // Send path in BOTH the body and the query — the server accepts
+    // either. Defensive against a proxy/middleware chain that swallows
+    // the JSON body (#1985 initial bug report: "path required" on a
+    // request whose body should have carried the path).
+    const url = `${API_ROUTES.files.open}?path=${encodeURIComponent(props.selectedPath)}`;
+    const result = await apiPost<{ ok: boolean }>(url, { path: props.selectedPath });
     if (!result.ok) openInOsError.value = result.error || t("fileContentRenderer.openInOsFailed");
   } finally {
     openInOsBusy.value = false;

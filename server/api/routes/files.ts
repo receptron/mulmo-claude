@@ -1216,18 +1216,27 @@ router.get(API_ROUTES.files.previewRaw, async (req: Request<object, unknown, unk
 // validation mirrors every other files route. Fire-and-forget: we
 // return once the subprocess has been spawned; anything the OS does
 // afterwards is out of our hands (and the user's problem).
+//
+// Accepts `path` in EITHER the JSON body or the query string so the
+// route stays working when a request lands without a parsed body
+// (proxy edge case, empty POST from a script). `resolveAndStatFile`
+// reads path from the query, so we canonicalise onto that.
 interface OpenFileRequest {
   path?: unknown;
 }
-router.post(API_ROUTES.files.open, async (req: Request<object, unknown, OpenFileRequest>, res: Response<{ ok: boolean } | ErrorResponse>) => {
-  const requestedPath = typeof req.body?.path === "string" ? req.body.path : "";
+router.post(API_ROUTES.files.open, async (req: Request<object, unknown, OpenFileRequest, PathQuery>, res: Response<{ ok: boolean } | ErrorResponse>) => {
+  const bodyPath = typeof req.body?.path === "string" ? req.body.path : "";
+  const queryPath = getOptionalStringQuery(req, "path") ?? "";
+  const requestedPath = bodyPath || queryPath;
   if (!requestedPath) {
+    log.warn("files", "POST open: no path", {
+      hasBody: req.body !== undefined && req.body !== null,
+      bodyPathType: typeof req.body?.path,
+      queryPath: previewSnippet(queryPath),
+    });
     badRequest(res, "path required");
     return;
   }
-  // Reuse the same resolve+stat gate as /content. Set the path onto
-  // the query object so `resolveAndStatFile` (which reads from the
-  // query) accepts the POST body's path.
   (req.query as PathQuery).path = requestedPath;
   const ctx = resolveAndStatFile(req, res);
   if (!ctx) return;
