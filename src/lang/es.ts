@@ -448,6 +448,11 @@ const esMessages = {
     redo: "Rehacer",
     editMarp: "Editar fuente de la diapositiva",
     marpEditorLabel: "Fuente de diapositivas Marp",
+    xlsxSheet: "Hoja",
+    pptxPreview: "Vista previa de PowerPoint (convertido a PDF)",
+    openInOs: "Abrir en el SO",
+    openingInOs: "Abriendo…",
+    openInOsFailed: "No se pudo abrir en el SO",
   },
   filesView: {
     chatPlaceholder: "Pregunta sobre este archivo…",

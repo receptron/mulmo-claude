@@ -435,6 +435,11 @@ const zhMessages = {
     redo: "重做",
     editMarp: "编辑幻灯片源代码",
     marpEditorLabel: "Marp 幻灯片源代码",
+    xlsxSheet: "工作表",
+    pptxPreview: "PowerPoint 预览（转换为 PDF）",
+    openInOs: "在系统中打开",
+    openingInOs: "正在打开…",
+    openInOsFailed: "无法在系统中打开",
   },
   filesView: {
     chatPlaceholder: "询问关于此文件的问题…",

@@ -440,6 +440,11 @@ const ptBRMessages = {
     redo: "Refazer",
     editMarp: "Editar código do slide",
     marpEditorLabel: "Código do slide Marp",
+    xlsxSheet: "Planilha",
+    pptxPreview: "Prévia do PowerPoint (convertido para PDF)",
+    openInOs: "Abrir no SO",
+    openingInOs: "Abrindo…",
+    openInOsFailed: "Falha ao abrir no SO",
   },
   filesView: {
     chatPlaceholder: "Pergunte sobre este arquivo…",

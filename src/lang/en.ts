@@ -460,6 +460,11 @@ const enMessages = {
     redo: "Redo",
     editMarp: "Edit slide source",
     marpEditorLabel: "Marp slide source",
+    xlsxSheet: "Sheet",
+    pptxPreview: "PowerPoint preview (converted to PDF)",
+    openInOs: "Open in OS",
+    openingInOs: "Opening…",
+    openInOsFailed: "Failed to open in OS",
   },
   filesView: {
     chatPlaceholder: "Ask about this file…",

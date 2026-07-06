@@ -115,6 +115,15 @@ const HOST_API_ROUTES = {
     create: "/api/files/create",
     raw: "/api/files/raw",
     refRoots: "/api/files/ref-roots",
+    /** GET the server-converted PDF preview of a `.pptx` file. Backed
+     *  by `previewPptxAsPdf` (LibreOffice), cached on disk. Returns
+     *  404 when the file isn't a pptx or when LibreOffice is
+     *  unavailable — the client falls back to the "Open in OS" UI. */
+    previewRaw: "/api/files/preview-raw",
+    /** POST { path } — ask the server to open the file in the host
+     *  OS's file manager (`open` / `xdg-open` / `start`). Workspace-
+     *  scoped path validation same as every other files route. */
+    open: "/api/files/open",
   },
 
   // `html` group migrated to META — see `src/plugins/presentHtml/meta.ts`.

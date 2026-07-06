@@ -237,9 +237,51 @@
       <div v-else-if="content.kind === 'video' && selectedPath" class="h-full flex items-center justify-center p-4 bg-black">
         <video :key="selectedPath" :src="rawUrl(selectedPath)" controls preload="metadata" class="max-w-full max-h-full" />
       </div>
+      <!-- XLSX (server-converted to CSV per sheet, rendered as a table) -->
+      <div v-else-if="content.kind === 'office-xlsx' && selectedPath" class="h-full flex flex-col overflow-hidden">
+        <div v-if="content.sheets.length > 1" class="flex-shrink-0 px-3 pt-2 flex items-center gap-2 border-b border-gray-200 text-xs">
+          <span class="text-gray-500">{{ t("fileContentRenderer.xlsxSheet") }}:</span>
+          <select v-model="activeXlsxSheet" class="px-2 py-1 border border-gray-300 rounded">
+            <option v-for="s in content.sheets" :key="s.name" :value="s.name">{{ s.name }}</option>
+          </select>
+        </div>
+        <div class="flex-1 overflow-auto p-3">
+          <table class="text-xs border-collapse">
+            <tbody>
+              <tr v-for="(row, ri) in currentXlsxRows" :key="ri">
+                <td v-for="(cell, ci) in row" :key="ci" class="border border-gray-200 px-2 py-1 whitespace-pre align-top">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- DOCX (server-extracted plain text) -->
+      <pre v-else-if="content.kind === 'office-docx' && selectedPath" class="p-4 text-sm whitespace-pre-wrap font-sans text-gray-800 overflow-auto h-full">{{
+        content.content
+      }}</pre>
+      <!-- PPTX (server-converted to PDF via LibreOffice) -->
+      <iframe
+        v-else-if="content.kind === 'office-pptx' && selectedPath"
+        :src="content.previewUrl"
+        class="w-full h-full border-0"
+        :title="t('fileContentRenderer.pptxPreview')"
+      />
       <!-- Binary or too-large -->
-      <div v-else class="p-4 text-sm text-gray-500">
+      <div v-else class="p-4 text-sm text-gray-500 flex flex-col gap-3">
         <template v-if="'message' in content">{{ content.message }}</template>
+        <div v-if="selectedPath">
+          <button
+            type="button"
+            class="h-8 px-3 flex items-center gap-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium disabled:opacity-50"
+            :disabled="openInOsBusy"
+            data-testid="file-open-in-os"
+            @click="openInOs"
+          >
+            <span class="material-icons text-sm">open_in_new</span>
+            {{ openInOsBusy ? t("fileContentRenderer.openingInOs") : t("fileContentRenderer.openInOs") }}
+          </button>
+          <p v-if="openInOsError" class="mt-2 text-xs text-red-600">{{ openInOsError }}</p>
+        </div>
       </div>
     </template>
   </div>
@@ -258,6 +300,7 @@ import type { JsonToken, JsonlLine } from "../utils/format/jsonSyntax";
 import { formatScalarField, type MarkdownDocView } from "../composables/useMarkdownDoc";
 import { rewriteMarkdownImageRefs } from "../utils/image/rewriteMarkdownImageRefs";
 import { API_ROUTES } from "../config/apiRoutes";
+import { apiPost } from "../utils/api";
 import { useSharePack } from "../composables/useSharePack";
 import { descriptorForPath, jsonEditableByPolicy } from "../config/systemFileDescriptors";
 import { isMarpDocument } from "../utils/markdown/marpDetect";
@@ -334,6 +377,82 @@ const marpPdfFilename = computed(() => {
   const stem = dot > 0 ? base.slice(0, dot) : base;
   return buildPdfFilename({ name: stem, fallback: "slides" });
 });
+
+// ── Office preview (#1985) ───────────────────────────────────────
+
+// Which xlsx sheet the user picked from the selector. Auto-resets to
+// the first sheet whenever a new xlsx file loads so the tabs don't
+// stick on a sheet name that doesn't exist in the new workbook.
+const activeXlsxSheet = ref<string>("");
+watch(
+  () => props.content,
+  (loaded) => {
+    if (loaded && loaded.kind === "office-xlsx") activeXlsxSheet.value = loaded.sheets[0]?.name ?? "";
+  },
+  { immediate: true },
+);
+// Parse the selected sheet's CSV into rows of cell strings. CSV comes
+// from SheetJS (`sheet_to_csv`) which uses `,` separators and quotes
+// only when needed — a minimal RFC 4180 tokeniser covers it.
+const currentXlsxRows = computed<string[][]>(() => {
+  if (props.content?.kind !== "office-xlsx") return [];
+  const sheet = props.content.sheets.find((entry) => entry.name === activeXlsxSheet.value) ?? props.content.sheets[0];
+  return sheet ? parseCsv(sheet.csv) : [];
+});
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuote = false;
+  for (let idx = 0; idx < text.length; idx++) {
+    const char = text[idx];
+    if (inQuote) {
+      if (char === '"' && text[idx + 1] === '"') {
+        cell += '"';
+        idx++;
+      } else if (char === '"') {
+        inQuote = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"') {
+      inQuote = true;
+    } else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") {
+      // \r on its own is dropped; the paired \n commits the row.
+      cell += char;
+    }
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+// "Open in OS" button on the binary/unsupported fallback (and any
+// preview surface where the user wants the native app). Fire-and-
+// forget — success just means the server spawned the OS handler.
+const openInOsBusy = ref(false);
+const openInOsError = ref<string | null>(null);
+async function openInOs(): Promise<void> {
+  if (!props.selectedPath) return;
+  openInOsBusy.value = true;
+  openInOsError.value = null;
+  try {
+    const result = await apiPost<{ ok: boolean }>(API_ROUTES.files.open, { path: props.selectedPath });
+    if (!result.ok) openInOsError.value = result.error || t("fileContentRenderer.openInOsFailed");
+  } finally {
+    openInOsBusy.value = false;
+  }
+}
 
 // Inline JSON editor (#833 Phase 1). Available only for policy-editable
 // JSON config files; the read-only pretty-print stays the default.

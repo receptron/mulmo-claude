@@ -23,7 +23,34 @@ interface MetaContent {
   message?: string;
 }
 
-export type FileContent = TextContent | MetaContent;
+// Office document previews (#1985). Server converts on the fly via
+// mammoth / SheetJS / LibreOffice and returns a shape the client can
+// render inline — table for xlsx, plain text for docx, PDF (already
+// wired for `kind: "pdf"`) for pptx.
+interface XlsxContent {
+  kind: "office-xlsx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  sheets: { name: string; csv: string }[];
+}
+interface DocxContent {
+  kind: "office-docx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  content: string;
+}
+interface PptxContent {
+  kind: "office-pptx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  /** URL the client uses to fetch the server-converted PDF. */
+  previewUrl: string;
+}
+
+export type FileContent = TextContent | MetaContent | XlsxContent | DocxContent | PptxContent;
 
 /** Segment-wise traversal check: rejects `../` path components
  *  but allows legitimate filenames like `my..notes.txt`. */

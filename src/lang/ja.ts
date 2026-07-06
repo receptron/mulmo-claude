@@ -444,6 +444,11 @@ const jaMessages = {
     redo: "やり直し",
     editMarp: "スライドソースを編集",
     marpEditorLabel: "Marp スライドソース",
+    xlsxSheet: "シート",
+    pptxPreview: "PowerPoint プレビュー (PDF に変換)",
+    openInOs: "OS で開く",
+    openingInOs: "開いています…",
+    openInOsFailed: "OS で開けませんでした",
   },
   filesView: {
     chatPlaceholder: "このファイルについて質問…",

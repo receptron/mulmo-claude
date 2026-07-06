@@ -13,7 +13,13 @@ import { getCachedReferenceDirs } from "../../workspace/reference-dirs.js";
 import { classifyAsWikiPage, writeWikiPage } from "../../workspace/wiki-pages/io.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
+import { officeKind, previewXlsx, previewDocx, previewPptxAsPdf } from "../../utils/officePreview.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { SUBPROCESS_PROBE_TIMEOUT_MS } from "../../utils/time.js";
 import { publishFileChange } from "../../events/file-change.js";
+
+const execFileAsync = promisify(execFile);
 
 const router = Router();
 
@@ -177,7 +183,36 @@ interface FileContentMeta {
   message?: string;
 }
 
-type FileContentResponse = FileContentText | FileContentMeta;
+// Office document previews (#1985). All server-converted server-side
+// so the client renders a table / text / PDF without shipping mammoth /
+// SheetJS / LibreOffice to the browser.
+interface FileContentOfficeXlsx {
+  kind: "office-xlsx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  /** One entry per worksheet; `csv` is SheetJS `sheet_to_csv` output. */
+  sheets: { name: string; csv: string }[];
+}
+interface FileContentOfficeDocx {
+  kind: "office-docx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  /** Plain text extracted via mammoth. */
+  content: string;
+}
+interface FileContentOfficePptx {
+  kind: "office-pptx";
+  path: string;
+  size: number;
+  modifiedMs: number;
+  /** Client fetches the converted PDF from this URL. Present only when
+   *  LibreOffice was available and conversion succeeded. */
+  previewUrl: string;
+}
+
+type FileContentResponse = FileContentText | FileContentMeta | FileContentOfficeXlsx | FileContentOfficeDocx | FileContentOfficePptx;
 
 export type ContentKind = "text" | "image" | "pdf" | "audio" | "video" | "binary";
 
@@ -686,7 +721,38 @@ function resolveAndStatFile<T>(
   return { relPath, absPath, stat };
 }
 
-router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, PathQuery>, res: Response<FileContentResponse | ErrorResponse>) => {
+interface FileMeta {
+  path: string;
+  size: number;
+  modifiedMs: number;
+}
+
+/** Server-side conversion of Office Open XML formats for the Files view
+ *  (#1985). Returns the specific `office-*` response shape on success,
+ *  or `null` when the file isn't office or every converter failed —
+ *  callers fall through to the generic "binary" response. Split out of
+ *  the content route to keep that handler under the cognitive-complexity
+ *  ceiling. */
+async function tryOfficePreview(absPath: string, relPath: string, meta: FileMeta): Promise<FileContentResponse | null> {
+  const office = officeKind(absPath);
+  if (office === "office-xlsx") {
+    const sheets = await previewXlsx(absPath);
+    return sheets === null ? null : { kind: "office-xlsx", ...meta, sheets };
+  }
+  if (office === "office-docx") {
+    const content = await previewDocx(absPath);
+    return content === null ? null : { kind: "office-docx", ...meta, content };
+  }
+  if (office === "office-pptx") {
+    const pdfPath = await previewPptxAsPdf(absPath);
+    if (pdfPath === null) return null;
+    const previewUrl = `${API_ROUTES.files.previewRaw}?path=${encodeURIComponent(relPath)}`;
+    return { kind: "office-pptx", ...meta, previewUrl };
+  }
+  return null;
+}
+
+router.get(API_ROUTES.files.content, async (req: Request<object, unknown, unknown, PathQuery>, res: Response<FileContentResponse | ErrorResponse>) => {
   const requestedPath = getOptionalStringQuery(req, "path") ?? "";
   log.info("files", "GET content: start", { pathPreview: previewSnippet(requestedPath) });
   const ctx = resolveAndStatFile(req, res);
@@ -725,6 +791,16 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
     return;
   }
   if (kind === "binary") {
+    // Office Open XML formats (.xlsx / .docx / .pptx) get server-side
+    // conversion so the Files view can render them inline (#1985). All
+    // three converters return null on failure — we then fall through to
+    // the generic "binary" response and the client shows the "Open in
+    // OS" fallback UI.
+    const officePreview = await tryOfficePreview(absPath, relPath, meta);
+    if (officePreview !== null) {
+      res.json(officePreview);
+      return;
+    }
     res.json({
       kind: "binary",
       ...meta,
@@ -1110,6 +1186,70 @@ router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQue
 // Returns configured reference directories as top-level TreeNode[]
 // for the file explorer. Each node's path uses the @ref/<label>
 // prefix so subsequent /dir and /content requests route correctly.
+
+// GET /api/files/preview-raw?path=<rel> — stream the server-converted
+// PDF preview of a .pptx file (#1985). Path validation mirrors every
+// other files route; refuses when the target isn't a pptx or when
+// LibreOffice isn't available for conversion. Cached on disk under
+// `os.tmpdir()/mulmoclaude-office-preview/` so re-opens don't re-run
+// LibreOffice.
+router.get(API_ROUTES.files.previewRaw, async (req: Request<object, unknown, unknown, PathQuery>, res: Response<ErrorResponse>) => {
+  const ctx = resolveAndStatFile(req, res);
+  if (!ctx) return;
+  const { absPath } = ctx;
+  if (officeKind(absPath) !== "office-pptx") {
+    notFound(res, "preview-raw is only available for .pptx files");
+    return;
+  }
+  const pdfPath = await previewPptxAsPdf(absPath);
+  if (!pdfPath) {
+    notFound(res, "pptx preview not available (LibreOffice missing or conversion failed)");
+    return;
+  }
+  res.setHeader("Content-Type", "application/pdf");
+  createReadStream(pdfPath).pipe(res);
+});
+
+// POST /api/files/open — ask the host OS to open the file in its
+// default application / file manager (#1985). Cross-platform: macOS
+// `open`, Linux `xdg-open`, Windows `start`. Workspace-scoped path
+// validation mirrors every other files route. Fire-and-forget: we
+// return once the subprocess has been spawned; anything the OS does
+// afterwards is out of our hands (and the user's problem).
+interface OpenFileRequest {
+  path?: unknown;
+}
+router.post(API_ROUTES.files.open, async (req: Request<object, unknown, OpenFileRequest>, res: Response<{ ok: boolean } | ErrorResponse>) => {
+  const requestedPath = typeof req.body?.path === "string" ? req.body.path : "";
+  if (!requestedPath) {
+    badRequest(res, "path required");
+    return;
+  }
+  // Reuse the same resolve+stat gate as /content. Set the path onto
+  // the query object so `resolveAndStatFile` (which reads from the
+  // query) accepts the POST body's path.
+  (req.query as PathQuery).path = requestedPath;
+  const ctx = resolveAndStatFile(req, res);
+  if (!ctx) return;
+  const { absPath } = ctx;
+  const { platform } = process;
+  try {
+    if (platform === "darwin") {
+      await execFileAsync("open", [absPath], { timeout: SUBPROCESS_PROBE_TIMEOUT_MS });
+    } else if (platform === "win32") {
+      // `start` is a cmd built-in; the empty "" is a title placeholder
+      // required when the target path is quoted (else cmd interprets
+      // the first quoted arg as the window title, not the file).
+      await execFileAsync("cmd", ["/c", "start", "", absPath], { timeout: SUBPROCESS_PROBE_TIMEOUT_MS });
+    } else {
+      await execFileAsync("xdg-open", [absPath], { timeout: SUBPROCESS_PROBE_TIMEOUT_MS });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    log.warn("files", "POST open: spawn failed", { platform, error: errorMessage(err) });
+    serverError(res, `Failed to open file in OS: ${errorMessage(err)}`);
+  }
+});
 
 router.get(API_ROUTES.files.refRoots, async (_req: Request, res: Response<TreeNode[]>) => {
   log.info("files", "GET ref-roots: start");

@@ -443,6 +443,11 @@ const koMessages = {
     redo: "다시 실행",
     editMarp: "슬라이드 소스 편집",
     marpEditorLabel: "Marp 슬라이드 소스",
+    xlsxSheet: "시트",
+    pptxPreview: "PowerPoint 미리보기 (PDF로 변환)",
+    openInOs: "OS에서 열기",
+    openingInOs: "여는 중…",
+    openInOsFailed: "OS에서 열 수 없습니다",
   },
   filesView: {
     chatPlaceholder: "이 파일에 대해 질문하세요…",
