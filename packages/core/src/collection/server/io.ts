@@ -363,8 +363,12 @@ export async function readSkillTemplate(skillDir: string, templateRelPath: strin
 
 /** Neutralize prompt-injection vectors in a string bound for the data
  *  block: strip HTML/XML tags (iteratively, so `<<x>>` can't
- *  reconstitute) and defang backticks / `${` template escapes. */
-function sanitizeForPrompt(value: string): string {
+ *  reconstitute) and defang backticks / `${` template escapes.
+ *  Exported for ingest borders (feeds `projectRecord`): external feed
+ *  content is cleansed once at entry, because the agent also Reads the
+ *  stored record files directly — a bind-time-only sanitizer can't
+ *  cover that path. */
+export function sanitizeForPrompt(value: string): string {
   let current = value;
   let prev: string;
   do {
@@ -387,7 +391,7 @@ function sanitizeForPrompt(value: string): string {
  *  file edit / import), so a crafted key like
  *  `"</record_data_json>…"` would otherwise be emitted verbatim and
  *  break the data-boundary framing (Codex P1 on #1511). */
-function sanitizeDeep(value: unknown): unknown {
+export function sanitizeDeep(value: unknown): unknown {
   if (typeof value === "string") return sanitizeForPrompt(value);
   if (Array.isArray(value)) return value.map(sanitizeDeep);
   if (value && typeof value === "object") {

@@ -11,6 +11,7 @@
 
 import { createHash } from "node:crypto";
 import { getByPath } from "./pathResolver.js";
+import { sanitizeDeep } from "../../collection/server/index.js";
 import type { CollectionItem, CollectionSchema } from "../../collection/index.js";
 import type { DeclarativeIngestSpec } from "../ingestTypes.js";
 
@@ -85,7 +86,13 @@ export function projectRecord(rawItem: unknown, ingest: DeclarativeIngestSpec, s
   const record: CollectionItem = {};
   for (const [targetField, sourcePath] of Object.entries(ingest.map)) {
     const value = normalizeValue(getByPath(rawItem, sourcePath), schema.fields?.[targetField]?.type);
-    if (value !== undefined) record[targetField] = value;
+    // Ingest border: feed content is external, attacker-influenceable
+    // text, and the stored record is later read by the agent (directly
+    // via Read, or bound into prompts). Cleanse once at entry with the
+    // same sanitizer the collection layer uses at bind time — a stored
+    // `</record_data_json>` or backtick fence in an RSS title must
+    // never survive to the agent's context.
+    if (value !== undefined) record[targetField] = sanitizeDeep(value);
   }
   record[schema.primaryKey] = toSafeId(naturalKey(record, rawItem, ingest, schema));
   return record;
