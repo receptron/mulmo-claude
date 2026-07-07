@@ -32,6 +32,7 @@ import {
   toDetail,
   toSummary,
   validateCollectionRecords,
+  validateRecordObject,
   writeItem,
 } from "../../workspace/collections/index.js";
 import type {
@@ -208,6 +209,15 @@ router.post(API_ROUTES.collections.items, async (req: Request<{ slug: string }>,
   // generated id (Codex P1 on #1510).
   const itemId = resolveCreateItemId(collection.schema, record) ?? generateItemId();
   const recordWithId: CollectionItem = { ...record, [collection.schema.primaryKey]: itemId };
+  // Same write-time gate as the agent path (manageCollection putItems)
+  // — REST and MCP must enforce identical rules or "neither path is
+  // privileged" silently breaks (agent writes were validated, direct
+  // API/custom-view writes were not).
+  const invalid = validateRecordObject(recordWithId, itemId, collection.schema);
+  if (invalid) {
+    badRequest(res, `record rejected: ${invalid}`);
+    return;
+  }
   try {
     const result = await writeItem(collection.dataDir, itemId, recordWithId, { refuseOverwrite: true, slug: collection.slug });
     if (result.kind === "invalid-id") {
@@ -252,6 +262,14 @@ router.put(API_ROUTES.collections.item, async (req: Request<{ slug: string; item
   // mismatched primary-key value in the body so the file's id and its
   // record id never drift.
   const recordWithId: CollectionItem = { ...record, [primaryKey]: req.params.itemId };
+  // Mirror of the create-path gate above (and of manageCollection's
+  // putItems) — updates must not be able to strip required fields or
+  // set out-of-enum values that a create would have rejected.
+  const invalidUpdate = validateRecordObject(recordWithId, req.params.itemId, collection.schema);
+  if (invalidUpdate) {
+    badRequest(res, `record rejected: ${invalidUpdate}`);
+    return;
+  }
   try {
     const result = await writeItem(collection.dataDir, req.params.itemId, recordWithId, { slug: collection.slug });
     if (result.kind === "invalid-id") {
