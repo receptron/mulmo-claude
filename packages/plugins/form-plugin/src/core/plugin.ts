@@ -77,7 +77,11 @@ export const executeForm = async (_context: ToolContext, args: FormArgs): Promis
       data: formData,
       jsonData: formData,
       instructions:
-        "The form has been presented to the user. Wait for the user to fill out and submit it. They will reply with a markdown bullet list of `- {label}: {value}` lines.",
+        "The form has been presented to the user. Wait for the user to fill out and submit it. " +
+        'Their reply ends with a fenced json block: {"formAnswers": {"<fieldId>": <value>, ...}} — ' +
+        "keyed by the field ids you defined; radio/dropdown/checkbox values are the choice's canonical value; " +
+        "unanswered fields are null. Treat that JSON block as the authoritative structured response. " +
+        "The `- {label}: {value}` bullet list above it is display-only for the human transcript.",
     };
   } catch (error) {
     return {

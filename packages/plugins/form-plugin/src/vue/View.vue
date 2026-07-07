@@ -611,8 +611,56 @@ function handleSubmit(): void {
     lines.push(`- ${singleLine(field.label)}: ${renderValue(field, formValues.value[field.id])}`);
   });
 
+  // Machine-readable channel: answers keyed by stable field id, typed
+  // values, choices resolved to their canonical `value`. The bullet list
+  // above stays for the human transcript; the JSON block is what the
+  // agent parses — no free-text re-extraction (see plugin.ts
+  // instructions, which point the LLM at this block).
+  const answers: Record<string, StructuredAnswer> = {};
+  formData.value?.fields.forEach((field) => {
+    answers[field.id] = structuredAnswer(field, formValues.value[field.id]);
+  });
+  lines.push("", safeJsonFence(JSON.stringify({ formAnswers: answers }, null, 2)));
+
   submitted.value = true;
   props.sendTextMessage(lines.join("\n"));
+}
+
+type StructuredAnswer = string | number | string[] | null;
+
+// Typed answer for the JSON channel. Radio/dropdown/checkbox resolve to
+// the choice's canonical `value` (falling back to its label for plain
+// string choices) so the agent can match answers against the choices it
+// authored without positional index bookkeeping. Unanswered = null.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function structuredAnswer(field: FormField, value: any): StructuredAnswer {
+  if (field.type === "radio" || field.type === "dropdown") {
+    return typeof value === "number" && field.choices[value] !== undefined ? getChoiceValue(field.choices[value]) : null;
+  }
+  if (field.type === "checkbox") {
+    const indices: number[] = Array.isArray(value) ? value : [];
+    return indices.filter((idx) => field.choices[idx] !== undefined).map((idx) => getChoiceValue(field.choices[idx]));
+  }
+  if (field.type === "number") {
+    if (value === null || value === undefined || value === "") return null;
+    const num = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(num) ? num : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  if (value === null || value === undefined) return null;
+  return String(value);
+}
+
+// Fence the JSON with one more backtick than the longest run inside the
+// payload, so free-text answers containing ``` can't break out of the
+// code block and smuggle markdown (or instructions) into the message.
+function safeJsonFence(json: string): string {
+  const longestRun = json.match(/`+/g)?.reduce((max, run) => Math.max(max, run.length), 0) ?? 0;
+  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  return `${fence}json\n${json}\n${fence}`;
 }
 
 // Indent so multi-line text/textarea values stay attached to their bullet
