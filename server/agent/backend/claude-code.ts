@@ -11,7 +11,8 @@
 
 import { spawn, type ChildProcessByStdio } from "child_process";
 import type { Readable, Writable } from "stream";
-import { buildCliArgs, buildDockerSpawnArgs, buildUserMessageLine, type CliArgsParams } from "../config.js";
+import { buildCliArgs, buildDockerSpawnArgs, buildUserMessageLine, resolveSystemPromptPaths, type CliArgsParams } from "../config.js";
+import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { resolveSandboxAuth } from "../sandboxMounts.js";
 import { getCachedReferenceDirs, referenceDirMountArgs } from "../../workspace/reference-dirs.js";
 import { createStreamParser, type AgentEvent, type RawStreamEvent } from "../stream.js";
@@ -190,11 +191,13 @@ async function* readAgentEvents(proc: ClaudeProc, abortSignal?: AbortSignal): As
   if (errorEvent) yield errorEvent;
 }
 
-// The one non-pass-through mapping is `sessionToken` -> `claudeSessionId`
-// (the CLI's `--resume` id); the rest forward verbatim.
-export function cliArgsForInput(input: AgentInput): CliArgsParams {
+// The non-pass-through mappings are `sessionToken` -> `claudeSessionId`
+// (the CLI's `--resume` id) and the system prompt, which travels as a
+// file path (`systemPromptPath`) rather than inline text — see the
+// CliArgsParams field comment for the Windows ENAMETOOLONG rationale.
+export function cliArgsForInput(input: AgentInput, systemPromptPath: string): CliArgsParams {
   return {
-    systemPrompt: input.systemPrompt,
+    systemPromptPath,
     activePlugins: input.activePlugins,
     claudeSessionId: input.sessionToken,
     mcpConfigPath: input.mcpConfigPath,
@@ -203,8 +206,23 @@ export function cliArgsForInput(input: AgentInput): CliArgsParams {
   };
 }
 
+// Write the per-session system-prompt file the CLI reads via
+// `--system-prompt-file`. Returns the path to pass on the command line
+// (container path under Docker). Atomic write so a concurrent spawn on
+// the same session never sees a half-written prompt.
+async function writeSystemPromptFile(input: AgentInput): Promise<string> {
+  const paths = resolveSystemPromptPaths({
+    workspacePath: input.workspacePath,
+    sessionId: input.sessionId,
+    useDocker: input.useDocker,
+  });
+  await writeFileAtomic(paths.hostPath, input.systemPrompt);
+  return paths.argPath;
+}
+
 async function* runClaudeAgent(input: AgentInput): AsyncGenerator<AgentEvent> {
-  const cliArgs = buildCliArgs(cliArgsForInput(input));
+  const systemPromptPath = await writeSystemPromptFile(input);
+  const cliArgs = buildCliArgs(cliArgsForInput(input, systemPromptPath));
 
   // spawnClaude can throw synchronously when `claudeBinPath()` fails
   // to locate `claude.exe` on Windows — surface that through the same

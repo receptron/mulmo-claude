@@ -26,23 +26,32 @@ function makeInput(overrides: Partial<AgentInput> = {}): AgentInput {
   };
 }
 
+const PROMPT_PATH = "/tmp/system-prompt.md";
+
 describe("cliArgsForInput", () => {
   it("maps sessionToken onto claudeSessionId (the --resume id)", () => {
-    const params = cliArgsForInput(makeInput({ sessionToken: "resume-123" }));
+    const params = cliArgsForInput(makeInput({ sessionToken: "resume-123" }), PROMPT_PATH);
     assert.equal(params.claudeSessionId, "resume-123");
+  });
+
+  it("carries the system-prompt file path, not the prompt text", () => {
+    // The prompt itself travels via --system-prompt-file (Windows
+    // command lines cap at ~32k chars — inline text ENAMETOOLONGs).
+    const params = cliArgsForInput(makeInput({ systemPrompt: "SP" }), PROMPT_PATH);
+    assert.equal(params.systemPromptPath, PROMPT_PATH);
+    assert.ok(!("systemPrompt" in params));
   });
 
   it("forwards the pass-through fields verbatim", () => {
     const params = cliArgsForInput(
       makeInput({
-        systemPrompt: "SP",
         activePlugins: ["a", "b"],
         mcpConfigPath: "/cfg.json",
         extraAllowedTools: ["Bash"],
         effortLevel: "high",
       }),
+      PROMPT_PATH,
     );
-    assert.equal(params.systemPrompt, "SP");
     assert.deepEqual(params.activePlugins, ["a", "b"]);
     assert.equal(params.mcpConfigPath, "/cfg.json");
     assert.deepEqual(params.extraAllowedTools, ["Bash"]);
@@ -50,14 +59,14 @@ describe("cliArgsForInput", () => {
   });
 
   it("leaves optional fields undefined when the input omits them", () => {
-    const params = cliArgsForInput(makeInput());
+    const params = cliArgsForInput(makeInput(), PROMPT_PATH);
     assert.equal(params.claudeSessionId, undefined);
     assert.equal(params.mcpConfigPath, undefined);
     assert.equal(params.effortLevel, undefined);
   });
 
   it("does not carry over non-CLI fields (message, workspacePath, port)", () => {
-    const params = cliArgsForInput(makeInput({ message: "secret", port: 9999 }));
+    const params = cliArgsForInput(makeInput({ message: "secret", port: 9999 }), PROMPT_PATH);
     assert.ok(!("message" in params));
     assert.ok(!("workspacePath" in params));
     assert.ok(!("port" in params));

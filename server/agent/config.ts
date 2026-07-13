@@ -394,7 +394,14 @@ export function userServerAllowedToolNames(userServers: Record<string, McpServer
 }
 
 export interface CliArgsParams {
-  systemPrompt: string;
+  /** Path handed to `--system-prompt-file` (container path under
+   *  Docker — see `resolveSystemPromptPaths`). The prompt travels as
+   *  a file, never as an inline `--system-prompt` argument: on
+   *  Windows the argv becomes a single CreateProcess command line
+   *  capped at ~32k chars, and a workspace with a rich role + plugins
+   *  + memory pushes the prompt past the cap — the spawn then fails
+   *  with ENAMETOOLONG before the CLI even starts. */
+  systemPromptPath: string;
   activePlugins: string[];
   claudeSessionId?: string;
   mcpConfigPath?: string;
@@ -407,7 +414,7 @@ export interface CliArgsParams {
 }
 
 export function buildCliArgs(params: CliArgsParams): string[] {
-  const { systemPrompt, activePlugins, claudeSessionId, mcpConfigPath, extraAllowedTools = [], effortLevel } = params;
+  const { systemPromptPath, activePlugins, claudeSessionId, mcpConfigPath, extraAllowedTools = [], effortLevel } = params;
 
   const mcpToolNames = activePlugins.map((pluginName) => `mcp__mulmoclaude__${pluginName}`);
   // DEBUG: also pass the wildcard form `mcp__mulmoclaude` so Claude
@@ -432,8 +439,8 @@ export function buildCliArgs(params: CliArgsParams): string[] {
     "stream-json",
     "--include-partial-messages",
     "--verbose",
-    "--system-prompt",
-    systemPrompt,
+    "--system-prompt-file",
+    systemPromptPath,
     "--allowedTools",
     allowedTools.join(","),
     "-p",
@@ -578,6 +585,22 @@ export function resolveMcpConfigPaths(opts: { workspacePath: string; sessionId: 
     return { hostPath, argPath };
   }
   const hostPath = join(tmpdir(), `mulmoclaude-mcp-${sid}.json`);
+  return { hostPath, argPath: hostPath };
+}
+
+// Where the per-session system-prompt file lives. Same host/container
+// split as the MCP config above: under Docker the file must sit inside
+// the workspace bind mount so the container-side CLI can read it; in
+// native mode the OS tmpdir is fine. One file per chat session —
+// successive turns overwrite it, mirroring the MCP config lifecycle.
+export function resolveSystemPromptPaths(opts: { workspacePath: string; sessionId: string; useDocker: boolean }): McpConfigPaths {
+  const sid = safeSessionSegment(opts.sessionId);
+  if (opts.useDocker) {
+    const hostPath = join(opts.workspacePath, ".mulmoclaude", `system-prompt-${sid}.md`);
+    const argPath = `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/system-prompt-${sid}.md`;
+    return { hostPath, argPath };
+  }
+  const hostPath = join(tmpdir(), `mulmoclaude-system-prompt-${sid}.md`);
   return { hostPath, argPath: hostPath };
 }
 

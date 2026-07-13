@@ -16,6 +16,7 @@ import {
   type Platform,
   prepareUserServers,
   resolveMcpConfigPaths,
+  resolveSystemPromptPaths,
   rewriteLocalhostForDocker,
   userServerAllowedToolNames,
   workspaceModuleMounts,
@@ -100,7 +101,7 @@ describe("buildMcpConfig", () => {
 describe("buildCliArgs", () => {
   it("includes required flags", async () => {
     const args = buildCliArgs({
-      systemPrompt: "You are helpful",
+      systemPromptPath: "/tmp/system-prompt.md",
       activePlugins: [],
     });
 
@@ -109,10 +110,26 @@ describe("buildCliArgs", () => {
     // stream-json is used for both input and output formats.
     assert.equal(args.filter((arg) => arg === "stream-json").length, 2, "stream-json should appear twice (input + output format)");
     assert.ok(args.includes("--verbose"));
-    assert.ok(args.includes("--system-prompt"));
-    assert.ok(args.includes("You are helpful"));
+    assert.ok(args.includes("--system-prompt-file"));
+    assert.ok(args.includes("/tmp/system-prompt.md"));
     assert.ok(args.includes("-p"));
     assert.ok(args.includes("--allowedTools"));
+  });
+
+  it("passes the system prompt as a file path, never inline", async () => {
+    // Regression: an inline `--system-prompt <text>` puts the whole
+    // prompt on the command line. On Windows CreateProcess caps the
+    // command line at ~32k chars, so a workspace with a rich role +
+    // plugins + memory pushed the prompt past the cap and the spawn
+    // failed with ENAMETOOLONG before the CLI even started.
+    const args = buildCliArgs({
+      systemPromptPath: "/tmp/system-prompt.md",
+      activePlugins: [],
+    });
+    const fileIdx = args.indexOf("--system-prompt-file");
+    assert.ok(fileIdx >= 0, "must pass --system-prompt-file");
+    assert.equal(args[fileIdx + 1], "/tmp/system-prompt.md");
+    assert.ok(!args.includes("--system-prompt"), "inline --system-prompt must not be used (Windows ENAMETOOLONG)");
   });
 
   it("does NOT pass the user message as a CLI argument", async () => {
@@ -120,7 +137,7 @@ describe("buildCliArgs", () => {
     // input mode. Passing it as `-p <text>` (the old mode) bypasses
     // slash-command resolution for Claude Code skills.
     const args = buildCliArgs({
-      systemPrompt: "You are helpful",
+      systemPromptPath: "/tmp/system-prompt.md",
       activePlugins: [],
     });
     const pIdx = args.indexOf("-p");
@@ -132,7 +149,7 @@ describe("buildCliArgs", () => {
 
   it("includes MCP tool names in allowedTools", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: ["manageBookmarks"],
     });
 
@@ -148,7 +165,7 @@ describe("buildCliArgs", () => {
     // Regression guard: a strict --allowedTools that omits `Skill`
     // permission-denies every Skill({skill:"…"}) call (Execute skill
     // error + Glob fallback). See plans/done/fix-skill-tool-allowlist.md.
-    const args = buildCliArgs({ systemPrompt: "test", activePlugins: [] });
+    const args = buildCliArgs({ systemPromptPath: "/tmp/sp.md", activePlugins: [] });
     const allowedStr = args[args.indexOf("--allowedTools") + 1];
     const tools = allowedStr.split(",");
     assert.ok(tools.includes("Skill"), `--allowedTools must list "Skill" (got: ${allowedStr})`);
@@ -156,7 +173,7 @@ describe("buildCliArgs", () => {
 
   it("includes --resume when claudeSessionId provided", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
       claudeSessionId: "sess_123",
     });
@@ -168,7 +185,7 @@ describe("buildCliArgs", () => {
 
   it("omits --resume when no claudeSessionId", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
     });
 
@@ -177,7 +194,7 @@ describe("buildCliArgs", () => {
 
   it("includes --mcp-config when path provided", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: ["foo"],
       mcpConfigPath: "/tmp/mcp.json",
     });
@@ -189,7 +206,7 @@ describe("buildCliArgs", () => {
 
   it("omits --mcp-config when no path", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
     });
 
@@ -200,18 +217,18 @@ describe("buildCliArgs", () => {
     // The handler tool lives inside our MCP server. With no
     // --mcp-config the CLI can't resolve it and refuses to start;
     // gate the flag together with --mcp-config.
-    const withMcp = buildCliArgs({ systemPrompt: "x", activePlugins: ["foo"], mcpConfigPath: "/tmp/mcp.json" });
+    const withMcp = buildCliArgs({ systemPromptPath: "/tmp/sp.md", activePlugins: ["foo"], mcpConfigPath: "/tmp/mcp.json" });
     const withMcpIdx = withMcp.indexOf("--permission-prompt-tool");
     assert.ok(withMcpIdx >= 0, "must pass --permission-prompt-tool when MCP is configured");
     assert.equal(withMcp[withMcpIdx + 1], "mcp__mulmoclaude__handlePermission");
 
-    const withoutMcp = buildCliArgs({ systemPrompt: "x", activePlugins: [] });
+    const withoutMcp = buildCliArgs({ systemPromptPath: "/tmp/sp.md", activePlugins: [] });
     assert.ok(!withoutMcp.includes("--permission-prompt-tool"), "must NOT pass --permission-prompt-tool in no-MCP sessions");
   });
 
   it("includes --effort when effortLevel is set", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
       effortLevel: "high",
     });
@@ -223,7 +240,7 @@ describe("buildCliArgs", () => {
 
   it("omits --effort when effortLevel is unset", async () => {
     const args = buildCliArgs({
-      systemPrompt: "test",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
     });
 
@@ -271,6 +288,40 @@ describe("resolveMcpConfigPaths", () => {
         assert.ok(!derivedPath.includes(".."), `traversal leaked into ${derivedPath}`);
         assert.ok(!derivedPath.includes("etc"), `path component leaked into ${derivedPath}`);
         assert.ok(derivedPath.includes("mcp-pwn.json"), `expected sanitized segment, got ${derivedPath}`);
+      }
+    }
+  });
+});
+
+describe("resolveSystemPromptPaths", () => {
+  it("uses tmpdir for native runs (no docker)", async () => {
+    const paths = resolveSystemPromptPaths({
+      workspacePath: "/ws",
+      sessionId: "abc",
+      useDocker: false,
+    });
+    assert.equal(paths.hostPath, join(tmpdir(), "mulmoclaude-system-prompt-abc.md"));
+    assert.equal(paths.argPath, paths.hostPath);
+  });
+
+  it("uses workspace .mulmoclaude dir for docker runs so the container can read it", async () => {
+    const paths = resolveSystemPromptPaths({
+      workspacePath: "/ws",
+      sessionId: "abc",
+      useDocker: true,
+    });
+    assert.equal(paths.hostPath, join("/ws", ".mulmoclaude", "system-prompt-abc.md"));
+    assert.equal(paths.argPath, `${CONTAINER_WORKSPACE_PATH}/.mulmoclaude/system-prompt-abc.md`);
+  });
+
+  it("sanitizes path-injecting sessionId (CodeQL js/path-injection)", async () => {
+    const evil = "../../etc/pwn";
+    for (const useDocker of [true, false]) {
+      const paths = resolveSystemPromptPaths({ workspacePath: "/ws", sessionId: evil, useDocker });
+      for (const derivedPath of [paths.hostPath, paths.argPath]) {
+        assert.ok(!derivedPath.includes(".."), `traversal leaked into ${derivedPath}`);
+        assert.ok(!derivedPath.includes("etc"), `path component leaked into ${derivedPath}`);
+        assert.ok(derivedPath.includes("system-prompt-pwn.md"), `expected sanitized segment, got ${derivedPath}`);
       }
     }
   });
@@ -914,7 +965,7 @@ describe("buildUserMessageLine", () => {
 describe("buildCliArgs — extraAllowedTools", () => {
   it("merges extraAllowedTools into --allowedTools", async () => {
     const args = buildCliArgs({
-      systemPrompt: "s",
+      systemPromptPath: "/tmp/sp.md",
       activePlugins: [],
       extraAllowedTools: ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar"],
     });
