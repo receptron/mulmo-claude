@@ -78,6 +78,28 @@ export function parseSessionEntries(entries: readonly SessionEntry[], sessionOri
   return out;
 }
 
+// Decide whether the server's freshly-fetched transcript is strictly
+// "ahead of" the client's live copy, so a catch-up can adopt it without
+// downgrading richer in-flight state. Two cases upgrade:
+//   1. more cards than the client has — the client missed a whole event
+//      (the original #350 guard).
+//   2. the SAME cards but a longer final card — the live stream stalled
+//      mid-text, leaving the client's last card truncated (#1915). Only
+//      the trailing card can lag this way: earlier cards freeze once a
+//      newer card opens.
+// Comparing only the final card's length is what keeps this from ever
+// replacing a richer in-flight state with a stale snapshot: during
+// normal streaming the client's last card is equal-or-ahead of the
+// server's on-disk copy, so it returns false and nothing is touched.
+export function serverTranscriptAheadOfClient(serverResults: readonly ToolResultComplete[], clientResults: readonly ToolResultComplete[]): boolean {
+  if (serverResults.length !== clientResults.length) {
+    return serverResults.length > clientResults.length;
+  }
+  const lastIndex = serverResults.length - 1;
+  if (lastIndex < 0) return false;
+  return (serverResults[lastIndex].message ?? "").length > (clientResults[lastIndex].message ?? "").length;
+}
+
 // Pick the `selectedResultUuid` the session should restore to on
 // fresh load: the most recent result in the conversation, whether
 // it's a tool result or a text result. Returns null only when the

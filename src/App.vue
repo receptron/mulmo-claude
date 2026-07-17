@@ -369,7 +369,7 @@ import { pushErrorMessage, beginUserTurn, updateResult, applyToolResultToSession
 import { parseCollectionSlashSeed, makeSyntheticCollectionResult, hasRealCollectionResult } from "./utils/collections/presentSeed";
 import { roleName, roleIcon } from "./utils/role/icon";
 import { createEmptySession } from "./utils/session/sessionFactory";
-import { buildLoadedSession, parseSessionEntries } from "./utils/session/sessionEntries";
+import { buildLoadedSession, parseSessionEntries, serverTranscriptAheadOfClient } from "./utils/session/sessionEntries";
 import { usePendingCalls } from "./composables/usePendingCalls";
 import { loadCspExtra } from "./composables/useCspExtra";
 import { cspViolations, dismissCspViolations, installCspViolationListener } from "./composables/useCspViolations";
@@ -976,10 +976,11 @@ async function refreshSessionTranscript(sessionId: string): Promise<void> {
   if (!response.ok) return;
   const summary = sessions.value.find((entry) => entry.id === sessionId);
   const serverResults = parseSessionEntries(response.data, summary?.origin);
-  // Only patch if the server knows more than we do — avoids
-  // replacing a richer in-flight state with a stale snapshot when
-  // session_finished races with the last few events.
-  if (serverResults.length > session.toolResults.length) {
+  // Only patch if the server is strictly ahead — more cards, or the same
+  // cards with a longer final one (a mid-stream stall left the client's
+  // last text truncated, #1915). Never downgrades a richer in-flight
+  // state when session_finished races with the last few events.
+  if (serverTranscriptAheadOfClient(serverResults, session.toolResults)) {
     session.toolResults = serverResults;
   }
 }
@@ -1038,8 +1039,8 @@ function handleSessionFinished(sessionId: string): void {
 // refreshSessionStates() carries its own sequence guard inside
 // useSessionSync so concurrent catch-ups can't overwrite newer live state
 // with an older-but-slower response. refreshSessionTranscript() only
-// upgrades toolResults when the server view is strictly larger, so it's
-// already idempotent against interleaving.
+// upgrades toolResults when the server view is strictly ahead (more cards,
+// or a longer final card), so it's already idempotent against interleaving.
 function catchUpMissedEvents(reason: "reconnect" | "visibility"): void {
   console.info(`[chat-ui] catching up after ${reason}`);
   refreshSessionStates().catch((err) => {

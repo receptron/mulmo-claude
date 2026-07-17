@@ -3,7 +3,12 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseSessionEntries, resolveSelectedUuid, resolveSessionTimestamps } from "../../../src/utils/session/sessionEntries.js";
+import {
+  parseSessionEntries,
+  resolveSelectedUuid,
+  resolveSessionTimestamps,
+  serverTranscriptAheadOfClient,
+} from "../../../src/utils/session/sessionEntries.js";
 import type { SessionEntry, SessionSummary } from "../../../src/types/session.js";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 
@@ -192,6 +197,54 @@ describe("parseSessionEntries", () => {
 function makeResult(uuid: string, toolName: string): ToolResultComplete {
   return { uuid, toolName } as unknown as ToolResultComplete;
 }
+
+// --- serverTranscriptAheadOfClient (#1915) ------------------------
+
+function textCard(message: string): ToolResultComplete {
+  return { uuid: message, toolName: "text-response", message } as unknown as ToolResultComplete;
+}
+
+describe("serverTranscriptAheadOfClient (#1915)", () => {
+  it("upgrades when the server has more cards (original #350 guard)", () => {
+    const server = [textCard("a"), textCard("b"), textCard("c")];
+    const client = [textCard("a"), textCard("b")];
+    assert.equal(serverTranscriptAheadOfClient(server, client), true);
+  });
+
+  it("does NOT upgrade when the server has fewer cards", () => {
+    const server = [textCard("a")];
+    const client = [textCard("a"), textCard("b")];
+    assert.equal(serverTranscriptAheadOfClient(server, client), false);
+  });
+
+  it("upgrades when card counts match but the final card is longer server-side (the reopened bug)", () => {
+    const server = [textCard("intro"), textCard("理由によって打ち手が全然違う。次の一手として…")];
+    const client = [textCard("intro"), textCard("理由によ")];
+    assert.equal(serverTranscriptAheadOfClient(server, client), true);
+  });
+
+  it("does NOT upgrade when counts match and the final card is identical (common no-loss case)", () => {
+    const server = [textCard("intro"), textCard("full answer")];
+    const client = [textCard("intro"), textCard("full answer")];
+    assert.equal(serverTranscriptAheadOfClient(server, client), false);
+  });
+
+  it("does NOT downgrade when the client's final card is AHEAD (session_finished races the last deltas)", () => {
+    const server = [textCard("intro"), textCard("partial")];
+    const client = [textCard("intro"), textCard("partial + a couple more live deltas")];
+    assert.equal(serverTranscriptAheadOfClient(server, client), false);
+  });
+
+  it("returns false for two empty transcripts", () => {
+    assert.equal(serverTranscriptAheadOfClient([], []), false);
+  });
+
+  it("tolerates a final card with no message field", () => {
+    const server = [{ uuid: "x", toolName: "generateImage" } as unknown as ToolResultComplete];
+    const client = [{ uuid: "x", toolName: "generateImage" } as unknown as ToolResultComplete];
+    assert.equal(serverTranscriptAheadOfClient(server, client), false);
+  });
+});
 
 describe("resolveSelectedUuid", () => {
   it("returns null for empty list", () => {
