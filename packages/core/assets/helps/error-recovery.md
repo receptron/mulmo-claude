@@ -243,6 +243,43 @@ Repair pass reports schema violations by record id, but has no
 "malformed file" classification), and the completion/spawn watcher
 reconciles the WHOLE collection per db change (no per-record events).
 
+## storage (firestore) collection fails — "connect remote-host first"
+
+A collection whose schema declares `storage: { type: "firestore" }` keeps its
+records as Firestore documents in the USER'S OWN account, under
+`users/<uid>/collections/<slug>/items`. The authenticated handle belongs to
+the remote-host session, so while that session is closed every operation on
+that collection fails with `firestore collection unavailable: connect
+remote-host first`.
+
+This is a connection state, NOT data loss and NOT corruption. Only
+firestore-backed collections are affected; file, dataSource, and sqlite
+collections keep working.
+
+Diagnosis + fixes, in order:
+
+1. **Tell the user to connect remote-host** (the app's Remote Host control →
+   Connect, which signs in with Google). That is the entire fix in the normal
+   case — the records are intact in Firestore the whole time.
+2. **Do not report the collection as empty.** The failure is deliberately an
+   error rather than an empty list precisely so "not connected" can't be
+   mistaken for "no records". Never tell the user their records are gone, and
+   never "repair" by writing fresh records — that would duplicate everything
+   once the session reopens.
+3. **Do not convert the collection to `dataPath` / `sqlite`** to work around
+   it unless the user asks. The records live in Firestore, not on disk; a
+   schema flip alone makes the collection look empty rather than migrating
+   it (same trap as the sqlite case above).
+4. **If connecting fails**, that is a remote-host problem, not a collection
+   problem — see `docs/remote-host.md` (the Firestore database must be in
+   **Native mode**; Datastore mode silently no-ops the web SDK).
+
+Known limits (by design): deleting a firestore-backed COLLECTION is refused —
+the host can neither archive nor remove the documents, so removing the skill
+would orphan them; delete the records first (`manageCollection` `deleteItems`),
+then the collection. Reads are network round trips, so unselective reads are
+slower and costlier than on the local backends.
+
 ## Fallback
 
 If none of the above matches the failing tool output:

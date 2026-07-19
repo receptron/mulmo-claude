@@ -36,16 +36,25 @@ Records live at `schema.dataPath` (e.g. `data/todos/items/`, or
 `data/collections/<slug>/items` for registry imports). The canonical skill source is
 `data/skills/<slug>/`, mirrored into `.claude/skills/<slug>/` by a hook.
 
-### There is already a second backend
+### Backends
 
-`schema.dataSource` points at an external CSV, queried through DuckDB, **read-only**
-(`server/store.ts:56-71`, `csvStore.ts`). The schema enforces exactly one of
-`dataPath` | `dataSource` (`core/schemaZ.ts:839-841`), and a `dataSource` collection is
-additionally barred from `singleton` / `ingest` / `spawn` / `mutate` actions
-(`schemaZ.ts:847-857`) because those all write.
+Per-collection backend selection is an established pattern — a schema declares exactly one
+of `dataPath` / `dataSource` / `storage`, and `storeFor` resolves the implementation from a
+factory registry keyed by `storageKindFor(schema)`.
 
-So per-collection backend selection is **an established pattern**, not a new idea — but only
-on the read side.
+| kind | declared by | records live in | writable |
+| --- | --- | --- | --- |
+| `file` | `dataPath` (the default) | `<dataDir>/<id>.json`, one per record | yes |
+| `csv` | `dataSource` | an external CSV, queried through DuckDB | **no** |
+| `sqlite` | `storage: { type: "sqlite", path }` | one SQLite db file in the workspace | yes |
+| `firestore` | `storage: { type: "firestore" }` | the user's Firestore, `users/{uid}/collections/{slug}/items` | yes |
+
+A `dataSource` collection is additionally barred from `singleton` / `ingest` / `spawn` /
+`mutate` actions because those all write. The `firestore` variant takes no path — its
+location is derived from the session's uid, so a schema can't point records outside the
+subtree the deployed security rules cover — and it is readable/writable only while a
+remote-host session is open (every operation fails loudly otherwise, never returning an
+empty result).
 
 ## The read seam: `storeFor()`
 

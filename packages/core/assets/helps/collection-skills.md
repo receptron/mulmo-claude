@@ -128,7 +128,7 @@ skipped, never crashes the host):
 | `icon`                 | A **Material Symbols** name (`receipt_long`, `people`, `schedule`, `menu_book`). Required.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `dataPath`             | Workspace-relative records folder, e.g. `data/recipes/items`. Must stay under the workspace. Required — unless `dataSource` is set (declare exactly ONE of the two).                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `dataSource`           | Optional. `{ "type": "csv", "path": "data/students.csv" }` — the records ARE the rows of an external data file (workspace-relative, containment-checked like `dataPath`). Makes the collection **read-only** in every UI/tool write path; see "External data (CSV) collections" below. Mutually exclusive with `dataPath`, `singleton`, `ingest`, `spawn`, and `mutate` actions.                                                                                                                                                                                                     |
-| `storage`              | Optional. `{ "type": "sqlite", "path": "data/<name>.db" }` — records live in a single SQLite database file instead of per-record JSON files; the collection stays **writable** and behaves identically everywhere else. Declare exactly ONE of `dataPath` / `dataSource` / `storage`. Cannot combine with `spawn`, `completionField`, or `triggerField` (v1). See "Alternative storage (sqlite)" below.                                                                                                                                                            |
+| `storage`              | Optional. An alternative WRITABLE backend: `{ "type": "sqlite", "path": "data/<name>.db" }` (records in one SQLite file) or `{ "type": "firestore" }` (records in the user's Firestore, live across devices, no path — and needs a connected remote-host session). The collection stays **writable** and behaves identically everywhere else. Declare exactly ONE of `dataPath` / `dataSource` / `storage`. Record I/O goes through `manageCollection`, not raw file edits. See "Alternative storage" below.                                                                                                                                                            |
 | `primaryKey`           | The field name whose value is the filename. That field MUST set `primary: true`. The value must be a valid record id (see the **Records** section's id-charset rule). Required.                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `singleton`            | Optional. When set, at most one record exists, pinned to this exact id (e.g. `me`). Host pre-fills + locks the create form and hides Add once it exists.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `fields`               | Ordered map of field-name → field spec. **Insertion order = column order** in the table. Required.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -1044,14 +1044,31 @@ Minimal example (Japanese roster, Shift_JIS file dropped at
 }
 ```
 
-## Alternative storage (sqlite) — `storage`
+## Alternative storage — `storage`
 
-A collection can keep its records in a single SQLite database file instead of
-per-record JSON files: declare `storage` instead of `dataPath`. Unlike
-`dataSource` (read-only, user-owned file), a `storage` collection is a normal
-WRITABLE collection — every UI, tool, custom view (desktop and remote), and
-API surface works identically; only where the rows live changes. The db file
-is collection-owned and managed by the host (`records` table, one JSON record
+A collection can keep its records somewhere other than per-record JSON files:
+declare `storage` instead of `dataPath`. Unlike `dataSource` (read-only,
+user-owned file), a `storage` collection is a normal WRITABLE collection —
+every UI, tool, custom view (desktop and remote), and API surface works
+identically; only where the rows live changes.
+
+Two backends:
+
+| `type` | Records live in | Reach for it when |
+|---|---|---|
+| `sqlite` | one SQLite db file in the workspace | a collection will grow past what a folder of JSON files handles (thousands of records) |
+| `firestore` | the user's own Firestore account | the same records must be live across devices (phone + desktop) |
+
+**Record I/O on a `storage` collection goes through `manageCollection`**
+(`getItems` / `putItems` / `deleteItems`), never raw Read/Write/Edit. There is
+no per-record file to edit — sqlite keeps one db file, firestore keeps no
+local file at all. (Raw file I/O stays the escape hatch for `dataPath`
+collections only.)
+
+### `sqlite`
+
+`{ "type": "sqlite", "path": "data/<name>.db" }`. The db file is
+collection-owned and managed by the host (`records` table, one JSON record
 per row keyed by `primaryKey`).
 
 When to use: only when the user explicitly asks for it, or a collection is
@@ -1087,6 +1104,51 @@ Minimal example:
     "id": { "type": "string", "label": "ID", "primary": true },
     "item": { "type": "string", "label": "Item" },
     "total": { "type": "number", "label": "Total" }
+  }
+}
+```
+
+### `firestore`
+
+`{ "type": "firestore" }` — **no path**. The records are Firestore documents
+under the signed-in user's own subtree, at a location the host derives
+(`users/<uid>/collections/<slug>/items`). A path is deliberately not
+accepted: the uid comes from the live session, and a schema-supplied path
+could point outside the subtree the security rules cover. Declaring `path`
+here is a validation error, not a silently ignored key.
+
+**Requires a connected remote-host session.** The authenticated Firestore
+handle belongs to that session, so while it is closed the collection can be
+neither read nor written — every operation fails with "connect remote-host
+first" rather than reporting zero records. Tell the user to connect; do not
+present an unavailable collection as empty.
+
+When to use: only when the user explicitly asks for records that follow them
+across devices. For a single-machine collection prefer `dataPath` (or
+`sqlite` at scale) — those need no session, no network, and no account.
+
+Notes:
+
+- Record ids follow the SAME charset rule as every other backend, so a
+  record stays portable if the collection is later moved to files.
+- Reads are network round trips, unlike the local backends — a summary
+  screen that counts records pays for it. Prefer `getItems` with `ids` /
+  `fields` over unselective reads.
+- Deleting the COLLECTION is refused: the host can neither archive nor
+  remove Firestore documents, so removing the skill would orphan them.
+  Delete the records first (`deleteItems`), then delete the collection.
+- One document caps at ~1 MiB.
+
+```json
+{
+  "title": "Shopping List",
+  "icon": "shopping_cart",
+  "storage": { "type": "firestore" },
+  "primaryKey": "id",
+  "fields": {
+    "id": { "type": "string", "label": "ID", "primary": true },
+    "item": { "type": "string", "label": "Item" },
+    "done": { "type": "boolean", "label": "Done" }
   }
 }
 ```
