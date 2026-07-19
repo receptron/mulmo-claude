@@ -20,8 +20,11 @@ import {
   discoverCollections,
   pageFromFullRead,
   projectItemFields,
+  setFirestoreAccessor,
   storeFor,
   type CollectionStore,
+  type FirestoreDoc,
+  type FirestoreDocs,
 } from "@mulmoclaude/core/collection/server";
 
 let workdir: string;
@@ -33,6 +36,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Module-level state — leaving a fixture's fake wired would let a
+  // firestore collection resolve in a later test that never set one up.
+  setFirestoreAccessor(null);
   rmSync(workdir, { recursive: true, force: true });
   rmSync(emptyUserDir, { recursive: true, force: true });
 });
@@ -126,10 +132,82 @@ async function sqliteStoreFixture(): Promise<CollectionStore> {
   return store;
 }
 
+const FIRESTORE_SCHEMA = {
+  title: "Notes Cloud",
+  icon: "cloud",
+  storage: { type: "firestore" },
+  primaryKey: "id",
+  fields: {
+    id: { type: "string", label: "ID", primary: true },
+    title: { type: "string", label: "Title" },
+    score: { type: "number", label: "Score" },
+  },
+};
+
+const FAKE_UID = "test-uid";
+
+/** In-memory stand-in for the Firestore SDK, satisfying the same
+ *  `FirestoreDocs` seam the real implementation does. Insertion order is
+ *  deliberately NOT the read order — `list` sorts by document id, so the
+ *  fixture seeding shuffled proves the store's documented stable order the
+ *  same way the sqlite fixture does.
+ *
+ *  Fidelity limits (why this can't fully replace a live check): it models
+ *  document storage and create-atomicity, not Firestore's consistency
+ *  model, security rules, or listener semantics. */
+function makeFakeFirestoreDocs(): FirestoreDocs {
+  const collections = new Map<string, Map<string, unknown>>();
+  const bucket = (collectionPath: string): Map<string, unknown> => {
+    const existing = collections.get(collectionPath);
+    if (existing) return existing;
+    const created = new Map<string, unknown>();
+    collections.set(collectionPath, created);
+    return created;
+  };
+  return {
+    list: (collectionPath) => {
+      const entries: FirestoreDoc[] = [...bucket(collectionPath).entries()].map(([docId, data]) => ({ id: docId, data }));
+      entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+      return Promise.resolve(entries);
+    },
+    get: (collectionPath, docId) => Promise.resolve(bucket(collectionPath).has(docId) ? (bucket(collectionPath).get(docId) as unknown) : null),
+    set: (collectionPath, docId, data) => {
+      bucket(collectionPath).set(docId, data);
+      return Promise.resolve();
+    },
+    create: (collectionPath, docId, data) => {
+      if (bucket(collectionPath).has(docId)) return Promise.resolve(false);
+      bucket(collectionPath).set(docId, data);
+      return Promise.resolve(true);
+    },
+    delete: (collectionPath, docId) => Promise.resolve(bucket(collectionPath).delete(docId)),
+  };
+}
+
+async function firestoreStoreFixture(): Promise<CollectionStore> {
+  writeSkill("notescloud", FIRESTORE_SCHEMA);
+  // One fake per fixture — the accessor is called per operation, so
+  // building it inside the closure would hand out a fresh empty store
+  // every time and silently lose every write.
+  const docs = makeFakeFirestoreDocs();
+  setFirestoreAccessor(() => ({ docs, uid: FAKE_UID }));
+  const [collection] = await discoverCollections(discoveryOpts());
+  assert.ok(collection);
+  const store = storeFor(collection, { workspaceRoot: workdir });
+  assert.ok(store.write, "firestore store must be writable");
+  // Seed through the store's own write path, shuffled to prove id ordering.
+  for (const recordId of ["n3", "n1", "n4", "n2"]) {
+    const written = await store.write(recordId, { id: recordId, title: `T-${recordId}`, score: Number(recordId.slice(1)) });
+    assert.equal(written.kind, "ok");
+  }
+  return store;
+}
+
 const FIXTURES: { name: string; make: () => Promise<CollectionStore>; writable: boolean; nativeQuery: boolean }[] = [
   { name: "file store", make: fileStoreFixture, writable: true, nativeQuery: false },
   { name: "csv store", make: csvStoreFixture, writable: false, nativeQuery: true },
   { name: "sqlite store", make: sqliteStoreFixture, writable: true, nativeQuery: false },
+  { name: "firestore store", make: firestoreStoreFixture, writable: true, nativeQuery: false },
 ];
 
 for (const fixture of FIXTURES) {
@@ -248,6 +326,48 @@ describe("storage schema gates (sqlite)", () => {
   it("rejects a storage.path escaping the workspace", async () => {
     writeSkill("escape", { ...SQLITE_SCHEMA, storage: { type: "sqlite", path: "../outside.db" } });
     assert.equal((await discoverCollections(discoveryOpts())).length, 0);
+  });
+});
+
+describe("storage schema gates (firestore)", () => {
+  it("accepts a firestore schema and resolves NO storageFile — records aren't on disk", async () => {
+    writeSkill("notescloud", FIRESTORE_SCHEMA);
+    const [collection] = await discoverCollections(discoveryOpts());
+    assert.ok(collection);
+    assert.equal(collection.storageFile, undefined);
+    assert.equal(collection.dataDir, path.resolve(workdir, "data/collections/notescloud/items"));
+    assert.equal(storeFor(collection, { workspaceRoot: workdir }).capabilities.writable, true);
+  });
+
+  it("rejects a firestore schema carrying a path — the location is host-derived, not schema-supplied", () => {
+    const parsed = CollectionSchemaZ.safeParse({ ...FIRESTORE_SCHEMA, storage: { type: "firestore", path: "data/x.db" } });
+    assert.equal(parsed.success, false);
+  });
+
+  it("keeps the sqlite variant parsing unchanged (discriminated-union regression)", () => {
+    assert.equal(CollectionSchemaZ.safeParse(SQLITE_SCHEMA).success, true);
+    assert.equal(CollectionSchemaZ.safeParse({ ...SQLITE_SCHEMA, storage: { type: "sqlite" } }).success, false, "sqlite still requires its path");
+    assert.equal(CollectionSchemaZ.safeParse({ ...SQLITE_SCHEMA, storage: { type: "mongo", path: "x" } }).success, false, "unknown backend refused");
+  });
+
+  it("fails loudly when there is no session — never an empty result", async () => {
+    writeSkill("notescloud", FIRESTORE_SCHEMA);
+    setFirestoreAccessor(null); // no remote-host session
+    const [collection] = await discoverCollections(discoveryOpts());
+    assert.ok(collection);
+    const store = storeFor(collection, { workspaceRoot: workdir });
+    // The FACTORY must not throw: storeFor runs on screens that merely list
+    // collections, and one disconnected backend can't break them.
+    const { write, delete: removeItem } = store;
+    assert.ok(write);
+    assert.ok(removeItem);
+    // Every operation must reject with something the user can act on. An
+    // empty list here would read as "this collection has no records".
+    await assert.rejects(() => store.list(), /connect remote-host/i);
+    await assert.rejects(() => store.page(), /connect remote-host/i);
+    await assert.rejects(() => store.read("n1"), /connect remote-host/i);
+    await assert.rejects(() => write("n1", { id: "n1" }), /connect remote-host/i);
+    await assert.rejects(() => removeItem("n1"), /connect remote-host/i);
   });
 });
 

@@ -778,15 +778,39 @@ export const DataSourceZ = z.object({
 /** Alternative WRITABLE storage backend for a collection's records —
  *  unlike `dataSource` (external read-only file), a `storage` collection
  *  behaves like a normal writable collection; only where the rows live
- *  changes. v1: `sqlite` — records in a single SQLite database file
- *  (`node:sqlite`, one JSON record per row keyed by the primaryKey).
- *  `path` is workspace-relative and containment-checked exactly like
- *  `dataPath`. The store factory registry (`server/store.ts`) picks the
- *  implementation by `type` (plans/refactor-storage-virtualization.md). */
-export const StorageZ = z.object({
-  type: z.literal("sqlite"),
-  path: z.string().min(1),
-});
+ *  changes. The store factory registry (`server/store.ts`) picks the
+ *  implementation by `type` (plans/refactor-storage-virtualization.md).
+ *
+ *  A discriminated union rather than one shape with optional keys: only
+ *  the sqlite variant is a workspace FILE (`path` is workspace-relative
+ *  and containment-checked exactly like `dataPath`). The firestore
+ *  variant has no path at all — its documents live at a host-derived
+ *  location under `users/{uid}/`, deliberately NOT user-specified so a
+ *  schema can't point records outside the subtree the deployed security
+ *  rules cover (plans/feat-2196-firestore-collection-backend.md). */
+export const StorageZ = z.discriminatedUnion("type", [
+  /** Records in a single SQLite database file (`node:sqlite`, one JSON
+   *  record per row keyed by the primaryKey). */
+  z.object({
+    type: z.literal("sqlite"),
+    path: z.string().min(1),
+  }),
+  /** Records as Firestore documents, live-synced with `onSnapshot`.
+   *  Readable/writable only while remote-host is connected — the
+   *  authenticated handle belongs to that session.
+   *
+   *  `.strict()` (the same reason the `spawn` arms use it): this variant
+   *  takes NO path, and stripping one silently would confirm a wrong
+   *  mental model — an author who writes `path` believes their records
+   *  land there, when the location is derived from the session's uid.
+   *  Only this new arm is strict; the sqlite arm stays permissive so an
+   *  existing schema carrying a stray key doesn't start failing. */
+  z
+    .object({
+      type: z.literal("firestore"),
+    })
+    .strict(),
+]);
 
 // ---------------------------------------------------------------------------
 // The whole schema

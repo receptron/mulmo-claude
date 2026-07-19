@@ -48,6 +48,7 @@ import type { LoadedCollection } from "./discoveredCollection";
 import { deleteItem, listItems, readItem, writeItem, type DeleteItemResult, type IoOptions, type WriteItemResult } from "./io";
 import { csvList, csvRead, csvRunQuery } from "./csvStore";
 import { sqliteStoreFor } from "./sqliteStore";
+import { firestoreStoreFor } from "./firestoreStore";
 import { pageFromFullRead, type ListOptions, type ListPage, type WriteOptions } from "./storePage";
 
 // The pure paging/projection primitives live in storePage.ts (so backend
@@ -171,6 +172,7 @@ const storeFactories = new Map<CollectionStorageKind, CollectionStoreFactory>([
   ["file", fileStoreFor],
   ["csv", csvStoreFor],
   ["sqlite", sqliteStoreFor],
+  ["firestore", firestoreStoreFor],
 ]);
 
 /** Pick the store implementation for a discovered collection via the

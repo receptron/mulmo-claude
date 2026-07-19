@@ -259,7 +259,19 @@ function storagePathChanged(previousJson: string, next: LoadedCollection["schema
   } catch {
     return true; // unreadable cache — remount to be safe
   }
-  return previous.dataSource?.path !== next.dataSource?.path || previous.dataPath !== next.dataPath || previous.storage?.path !== next.storage?.path;
+  return (
+    previous.dataSource?.path !== next.dataSource?.path ||
+    previous.dataPath !== next.dataPath ||
+    previous.storage?.type !== next.storage?.type ||
+    storageFilePath(previous.storage) !== storageFilePath(next.storage)
+  );
+}
+
+/** The on-disk path of a storage backend, or undefined when it has none
+ *  (firestore keeps records off the filesystem, so there is no mount to
+ *  move — only a `type` change matters for it). */
+function storageFilePath(storage: LoadedCollection["schema"]["storage"]): string | undefined {
+  return storage?.type === "sqlite" ? storage.path : undefined;
 }
 
 /** Re-reconcile already-watched collections whose schema changed since

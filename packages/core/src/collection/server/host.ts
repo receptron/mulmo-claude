@@ -8,6 +8,10 @@
 // workspace root) unchanged while removing the package's dependency on
 // host-only modules (`server/workspace/workspace.ts`, the host logger).
 
+// Type-only: this module must not pull the firebase SDK in at runtime
+// (it is an OPTIONAL peer of this package).
+import type { FirestoreDocs } from "./firestoreDocs";
+
 /** Logger shape the engine logs through — matches the host `Logger`
  *  (prefix, message, optional structured data). */
 export interface CollectionLogger {
@@ -47,6 +51,20 @@ export interface CollectionHost {
   isPresetSlug: (slug: string) => boolean;
 }
 
+/** The authenticated Firestore access plus the uid it is scoped to.
+ *
+ *  `uid` is what places documents under `users/{uid}/…`, the subtree the
+ *  deployed security rules cover — so it must come from the live session,
+ *  never from a schema.
+ *
+ *  `docs` is the narrow document interface rather than a raw `Firestore`
+ *  so the backend stays testable: core ships `createFirestoreDocs` over the
+ *  real SDK (`firestoreDocs.ts`) and tests inject an in-memory fake. */
+export interface FirestoreHandle {
+  docs: FirestoreDocs;
+  uid: string;
+}
+
 /** A collection's records changed on disk. Carries the `slug` so the host can
  *  publish on a per-collection channel; `ids` lists the affected record ids
  *  when known (a consumer may ignore them and refetch the whole collection),
@@ -63,6 +81,7 @@ type CollectionChangePublisher = (payload: CollectionChangePayload) => void;
 
 let current: CollectionHost | null = null;
 let changePublisher: CollectionChangePublisher | null = null;
+let firestoreAccessor: (() => FirestoreHandle | null) | null = null;
 
 /** Wire the engine to a host. Call once at server startup, before any
  *  collection storage operation. Re-binding to a *different* host throws —
@@ -130,6 +149,27 @@ export function collectionsRegistriesConfigPath(): string {
 }
 export function isPresetSlug(slug: string): boolean {
   return requireHost().isPresetSlug(slug);
+}
+
+/** Wire the accessor for the host's authenticated Firestore session.
+ *
+ *  Separate from `configureCollectionHost` for the same reason
+ *  `setCollectionChangePublisher` is: the host binding is set at the top of
+ *  server startup, but this session doesn't exist until the user connects
+ *  remote-host (and closes again on disconnect), so it cannot be part of a
+ *  one-shot binding. Optional — left unwired, only `firestore` collections
+ *  are affected, and they report "not connected". Pass `null` to detach. */
+export function setFirestoreAccessor(accessor: (() => FirestoreHandle | null) | null): void {
+  firestoreAccessor = accessor;
+}
+
+/** The host's live Firestore access, or null when there is no session (or
+ *  the host never wired one — every non-firestore backend leaves it unset).
+ *  Callers MUST surface null as an actionable "connect remote-host first",
+ *  never as an empty result: silence would be indistinguishable from a
+ *  collection that genuinely has no records. */
+export function firestoreHandle(): FirestoreHandle | null {
+  return firestoreAccessor?.() ?? null;
 }
 
 /** Logger proxy so engine modules can `import { log }` and use it exactly like

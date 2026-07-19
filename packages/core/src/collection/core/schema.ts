@@ -219,7 +219,7 @@ export type CollectionStorage = z.infer<typeof StorageZ>;
  *  default (`dataPath`); `csv` is implied by `dataSource`; other kinds are
  *  named explicitly via `storage.type`. The server's store factory registry
  *  (`server/store.ts`) is keyed by this. */
-export type CollectionStorageKind = "file" | "csv" | "sqlite";
+export type CollectionStorageKind = "file" | "csv" | "sqlite" | "firestore";
 
 /** Which storage backend serves this schema's records. Derived, not stored:
  *  existing schemas carry no `storage` key and must keep resolving exactly

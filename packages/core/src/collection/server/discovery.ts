@@ -81,18 +81,24 @@ export function acceptParsedSchema(schema: CollectionSchema, opts: { source: Col
     if (dataDir === null) return { ok: false, reason: `slug '${opts.slug}' yields no workspace-contained data dir` };
     return { ok: true, dataDir, dataSourceFile };
   }
-  if (schema.storage !== undefined) {
-    // An alternative-backend data file (e.g. the SQLite db): same
-    // containment as dataSource, same conventional phantom dataDir.
-    const storageFile = resolveDataDir(schema.storage.path, opts.workspaceRoot);
-    if (storageFile === null) return { ok: false, reason: `storage.path '${schema.storage.path}' escapes the workspace` };
-    const dataDir = resolveDataDir(conventionalDataPath(opts.slug), opts.workspaceRoot);
-    if (dataDir === null) return { ok: false, reason: `slug '${opts.slug}' yields no workspace-contained data dir` };
-    return { ok: true, dataDir, storageFile };
-  }
+  if (schema.storage !== undefined) return acceptStorageSchema(schema.storage, opts);
   const dataDir = resolveDataDir(schema.dataPath ?? "", opts.workspaceRoot);
   if (dataDir === null) return { ok: false, reason: `dataPath '${schema.dataPath}' escapes the workspace` };
   return { ok: true, dataDir };
+}
+
+/** The `storage` arm of the acceptance gate. Every storage backend gets the
+ *  conventional phantom dataDir; only a FILE-backed one also resolves (and
+ *  containment-checks) a `storageFile`. Firestore records aren't on disk at
+ *  all — its documents live under a host-derived `users/{uid}/` location, so
+ *  there is no path here to check. */
+function acceptStorageSchema(storage: NonNullable<CollectionSchema["storage"]>, opts: { workspaceRoot: string; slug: string }): SchemaAcceptance {
+  const dataDir = resolveDataDir(conventionalDataPath(opts.slug), opts.workspaceRoot);
+  if (dataDir === null) return { ok: false, reason: `slug '${opts.slug}' yields no workspace-contained data dir` };
+  if (storage.type !== "sqlite") return { ok: true, dataDir };
+  const storageFile = resolveDataDir(storage.path, opts.workspaceRoot);
+  if (storageFile === null) return { ok: false, reason: `storage.path '${storage.path}' escapes the workspace` };
+  return { ok: true, dataDir, storageFile };
 }
 
 async function loadOneCollection(skillsRoot: string, slug: string, source: CollectionSource, workspaceRoot: string): Promise<LoadedCollection | null> {

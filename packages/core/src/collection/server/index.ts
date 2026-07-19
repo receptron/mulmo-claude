@@ -15,7 +15,12 @@ export {
   type CollectionHost,
   type CollectionLogger,
   type CollectionChangePayload,
+  firestoreHandle,
+  setFirestoreAccessor,
+  type FirestoreHandle,
 } from "./host";
+export { createFirestoreDocs, type FirestoreDoc, type FirestoreDocs } from "./firestoreDocs";
+export { firestoreItemsPath } from "./firestoreStore";
 export type { LoadedCollection } from "./discoveredCollection";
 export * from "./paths";
 export * from "./templatePath";
