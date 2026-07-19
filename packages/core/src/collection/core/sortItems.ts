@@ -15,6 +15,7 @@
 //   false<true · ref → display label · derived → its display type.
 // markdown/table/image/file/embed get no sort button.
 
+import { fieldTextOrNull } from "./fieldText";
 import type { CollectionItem, CollectionFieldSpec, CollectionFieldType } from "./schema";
 
 export type SortDirection = "asc" | "desc";
@@ -58,14 +59,17 @@ export function numericSortValue(raw: unknown): SortValue {
 }
 
 export function stringSortValue(raw: unknown): SortValue {
-  if (raw == null) return EMPTY;
-  const str = String(raw);
+  // An array/object has no sort key — treat it as empty (sorts last) instead of
+  // grouping every such record together under "[object Object]".
+  const str = fieldTextOrNull(raw);
+  if (str === null) return EMPTY;
   return str.trim() === "" ? EMPTY : { empty: false, str };
 }
 
 export function dateSortValue(raw: unknown): SortValue {
-  if (raw == null || raw === "") return EMPTY;
-  const epoch = Date.parse(String(raw));
+  const text = fieldTextOrNull(raw);
+  if (text === null || text === "") return EMPTY;
+  const epoch = Date.parse(text);
   // Unparseable dates fall back to a lexical compare rather than vanishing.
   return Number.isNaN(epoch) ? stringSortValue(raw) : { empty: false, num: epoch };
 }
@@ -73,8 +77,9 @@ export function dateSortValue(raw: unknown): SortValue {
 /** Enum sorts by the value's index in the declared `values` list. A value
  *  outside the list (or unset) is treated as empty → last. */
 export function enumSortValue(values: readonly string[] | undefined, raw: unknown): SortValue {
-  if (raw == null || raw === "") return EMPTY;
-  const idx = values ? values.indexOf(String(raw)) : -1;
+  const text = fieldTextOrNull(raw);
+  if (text === null || text === "") return EMPTY;
+  const idx = values ? values.indexOf(text) : -1;
   return idx < 0 ? EMPTY : { empty: false, num: idx };
 }
 

@@ -7,6 +7,7 @@
 // no I/O; safe for the browser barrel.
 
 import { whenMatches } from "./actionVisible";
+import { fieldTextOrNull } from "./fieldText";
 import type { CollectionFieldSpec, CollectionItem } from "./schema";
 
 /** The `backlinks` member of the field-spec union. */
@@ -23,7 +24,9 @@ export type BacklinksFieldSpec = Extract<CollectionFieldSpec, { type: "backlinks
  *  against-itself rule ref targets follow. */
 export function backlinkRows(spec: Pick<BacklinksFieldSpec, "via" | "filter">, recordId: string, sourceItems: CollectionItem[]): CollectionItem[] {
   if (!recordId) return [];
-  return sourceItems.filter((item) => String(item[spec.via] ?? "") === recordId && whenMatches(spec.filter, item));
+  // A `via` field holding an array/object has no id to compare — skip it
+  // rather than testing "[object Object]" against the record id.
+  return sourceItems.filter((item) => fieldTextOrNull(item[spec.via]) === recordId && whenMatches(spec.filter, item));
 }
 
 /** Project one backlink row to the keys consumers surface: the source

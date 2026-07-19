@@ -17,6 +17,7 @@
 //    schema-level refine rejects a completion flag whose `where`
 //    references computed fields, so every condition reads stored data.
 
+import { fieldTextOrNull } from "./fieldText";
 import { matchesWhere, type Where } from "./where";
 
 /** The slice of a parsed schema the done predicate reads — minimal
@@ -39,7 +40,9 @@ export function itemIsDone(schema: CompletionSchemaView, item: Record<string, un
   const spec = schema.fields?.[completionField];
   if (spec?.type === "flag" && spec.where) return matchesWhere(spec.where, item);
   if (!completionDoneValues) return false;
-  const raw = item[completionField];
-  if (raw === undefined || raw === null) return false;
-  return completionDoneValues.includes(String(raw));
+  // An array/object field has no text form; treat it as "not done" rather than
+  // letting "[object Object]" match a configured done-value.
+  const text = fieldTextOrNull(item[completionField]);
+  if (text === null) return false;
+  return completionDoneValues.includes(text);
 }

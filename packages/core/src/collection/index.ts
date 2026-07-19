@@ -11,6 +11,7 @@ export * from "./core/schema";
 // `collection/server`; browser code needs only the derived types.
 export type { CollectionQuery, CollectionQueryAggregate, CollectionQueryOrder, CollectionQueryWhere } from "./core/queryZ";
 export * from "./core/ids";
+export * from "./core/fieldText";
 export * from "./core/project";
 export * from "./core/uiTypes";
 export * from "./core/presentCollection";

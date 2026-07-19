@@ -22,7 +22,7 @@
 // without a side state file.
 
 import { clear as notifierClear, listAll, publish as notifierPublish, updateForPlugin as notifierUpdate, type NotifierEntry } from "../notifier";
-import { itemIsDone, whenMatches, type CollectionItem, type CollectionSchema } from "../collection";
+import { fieldText, itemIsDone, whenMatches, type CollectionItem, type CollectionSchema } from "../collection";
 import {
   type DiscoveryOptions,
   type IoOptions,
@@ -64,9 +64,9 @@ function parseCompletionLegacyId(legacyId: string): { slug: string; itemId: stri
 export function resolveDisplayLabel(schema: CollectionSchema, item: CollectionItem, itemId: string): string {
   const { displayField } = schema;
   if (!displayField) return itemId;
-  const raw = item[displayField];
-  if (raw === undefined || raw === null) return itemId;
-  const label = String(raw).trim();
+  // Same rule as `itemLabelOf`: an array/object display field falls back to
+  // the id rather than labelling the record "[object Object]".
+  const label = fieldText(item[displayField]).trim();
   return label.length > 0 ? label : itemId;
 }
 

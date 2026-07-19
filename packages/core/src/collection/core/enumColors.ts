@@ -15,6 +15,7 @@
 // (red = urgent, amber = nudge) rather than the rotating palette.
 // `resolveEnumColor` encapsulates that rule.
 
+import { fieldTextOrNull } from "./fieldText";
 import type { CollectionSchema } from "./schema";
 
 export interface EnumColorClasses {
@@ -102,8 +103,11 @@ export function enumColorClasses(index: number): EnumColorClasses {
 /** Index of `value` within an enum field's declared `values`, or -1 when the
  *  value is empty / unknown (→ neutral). */
 export function enumValueIndex(values: readonly string[] | undefined, value: unknown): number {
-  if (value === undefined || value === null || value === "") return -1;
-  return values?.indexOf(String(value)) ?? -1;
+  // No text form (array/object) means no enum member — "[object Object]" must
+  // not index into the palette.
+  const text = fieldTextOrNull(value);
+  if (text === null || text === "") return -1;
+  return values?.indexOf(text) ?? -1;
 }
 
 /** The flagged values when `fieldKey` is the schema's `notifyWhen` target (the

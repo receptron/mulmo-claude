@@ -5,6 +5,8 @@
 // Domain-free: the host compares the stringified record value against
 // the allowed set with no knowledge of what the field means.
 
+import { fieldTextOrNull } from "./fieldText";
+
 /** A `when` predicate: render only when the open record's `field`
  *  (stringified) is one of `in`. Shared shape for action buttons and
  *  conditionally visible fields. */
@@ -22,9 +24,12 @@ export interface WhenPredicate {
  *  lacks the status. */
 export function whenMatches(when: WhenPredicate | undefined, record: Record<string, unknown>): boolean {
   if (!when) return true;
-  const value = record[when.field];
-  if (value === undefined || value === null) return false;
-  return when.in.includes(String(value));
+  // `fieldTextOrNull` rather than `String(...)`: an array/object field would
+  // stringify to "[object Object]" and could match a `when.in` entry by
+  // accident. No text ⇒ no match, same as an absent field.
+  const text = fieldTextOrNull(record[when.field]);
+  if (text === null) return false;
+  return when.in.includes(text);
 }
 
 /** Minimal shape this helper needs from an action — the optional state
