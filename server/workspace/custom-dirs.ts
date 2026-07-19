@@ -9,7 +9,7 @@ import path from "path";
 import { workspacePath, WORKSPACE_DIRS } from "./paths.js";
 import { log } from "../system/logger/index.js";
 import { writeJsonAtomicSync } from "../utils/files/json.js";
-import { isRecord } from "../utils/types.js";
+import { hasStringProp, isRecord } from "../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -82,16 +82,23 @@ function sanitizeDescription(raw: string): string {
 
 function validateEntry(raw: unknown): CustomDirEntry | null {
   if (!isRecord(raw)) return null;
-  const obj = raw as Record<string, unknown>;
 
-  const validPath = validatePath(String(obj.path ?? ""));
+  // Type-check the field rather than `String(...)`-ing it. This file is fed by a
+  // hand-edited config, so `path` can be an array or object; stringifying one
+  // handed `validatePath` the literal "[object Object]" to evaluate as a path.
+  // (`validatePath`'s own `typeof !== "string"` check could never fire behind a
+  // `String()` call.)
+  if (!hasStringProp(raw, "path")) return null;
+  const validPath = validatePath(raw.path);
   if (!validPath) return null;
 
-  const structure = isValidStructure(obj.structure) ? obj.structure : DIR_STRUCTURES.flat;
+  const structure = isValidStructure(raw.structure) ? raw.structure : DIR_STRUCTURES.flat;
 
   return {
     path: validPath,
-    description: sanitizeDescription(String(obj.description ?? "")),
+    // A non-string description is dropped rather than described as
+    // "[object Object]" — it is optional, so absent is the honest reading.
+    description: sanitizeDescription(hasStringProp(raw, "description") ? raw.description : ""),
     structure,
   };
 }
@@ -153,7 +160,10 @@ export function validateCustomDirs(raw: unknown): { entries: CustomDirEntry[] } 
     if (entry) {
       entries.push(entry);
     } else {
-      const itemPath = isRecord(item) ? String((item as Record<string, unknown>).path ?? "") : "";
+      // Only echo a genuine string back in the error; a non-string `path` is
+      // exactly the case where "[object Object]" would mislead the reader about
+      // what their config actually says.
+      const itemPath = hasStringProp(item, "path") ? item.path : "";
       errors.push(`entry ${i}: invalid path "${itemPath}"`);
     }
   });

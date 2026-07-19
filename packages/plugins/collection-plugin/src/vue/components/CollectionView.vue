@@ -1301,8 +1301,19 @@ const activeFlagFilterCount = computed<number>(() => flagChips.value.filter((chi
 const filterMenuOpen = ref<boolean>(false);
 const filterMenuRef = ref<HTMLElement | null>(null);
 
+/** Shadow-DOM-safe "did this event land inside the element?". A document-level
+ *  listener sees `event.target` retargeted to the shadow HOST when the
+ *  component is mounted in a shadow root (MulmoTerminal's PluginFrame), so
+ *  `element.contains()` is always false there and the menu closes on the
+ *  mousedown before the inner button's click can fire. `composedPath()` still
+ *  lists the element for open shadow trees — and in the light DOM too, so both
+ *  hosts share this one test. */
+function eventInsideElement(event: Event, element: HTMLElement | null): boolean {
+  return element !== null && event.composedPath().includes(element);
+}
+
 function closeFilterMenuOnOutsideClick(event: MouseEvent): void {
-  if (!filterMenuRef.value?.contains(event.target as Node)) filterMenuOpen.value = false;
+  if (!eventInsideElement(event, filterMenuRef.value)) filterMenuOpen.value = false;
 }
 
 watch(filterMenuOpen, (open) => {
@@ -2052,7 +2063,7 @@ function onAddViewClick(): void {
 }
 
 function closeAddMenuOnOutsideClick(event: MouseEvent): void {
-  if (!addMenuRef.value?.contains(event.target as Node)) addMenuOpen.value = false;
+  if (!eventInsideElement(event, addMenuRef.value)) addMenuOpen.value = false;
 }
 
 watch(addMenuOpen, (open) => {

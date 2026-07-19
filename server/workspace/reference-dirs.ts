@@ -11,7 +11,7 @@ import path from "path";
 import { homedir } from "os";
 import { log } from "../system/logger/index.js";
 import { readReferenceDirsJson, writeReferenceDirsJson, isExistingDirectory } from "../utils/files/reference-dirs-io.js";
-import { isRecord } from "../utils/types.js";
+import { hasStringProp, isRecord } from "../utils/types.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -104,7 +104,10 @@ function validateEntry(raw: unknown): ReferenceDirEntry | null {
     return null;
   }
 
-  const label = sanitizeLabel(String(obj.label ?? path.basename(absPath)));
+  // Type-check like `hostPath` above rather than `String(...)`-ing: a
+  // non-string `label` in the hand-edited config falls back to the basename
+  // instead of labelling the directory "[object Object]".
+  const label = sanitizeLabel(hasStringProp(raw, "label") ? raw.label : path.basename(absPath));
 
   return { hostPath: absPath, label };
 }
@@ -155,7 +158,9 @@ export function validateReferenceDirs(raw: unknown): { entries: ReferenceDirEntr
     if (entry) {
       entries.push(entry);
     } else {
-      const hostPath = isRecord(item) ? String((item as Record<string, unknown>).hostPath ?? "") : "";
+      // Echo the path back only when it really is one — a non-string entry is
+      // precisely where "[object Object]" would misreport the user's config.
+      const hostPath = hasStringProp(item, "hostPath") ? item.hostPath : "";
       errors.push(`entry ${i}: invalid or blocked path "${hostPath}"`);
     }
   });
