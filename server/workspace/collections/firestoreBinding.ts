@@ -5,7 +5,11 @@
 // user connects, and closes on disconnect. The accessor is therefore consulted
 // per operation and answers null while there is no session — the store turns
 // that into "connect remote-host first" rather than an empty result.
-import { createFirestoreDocs, setFirestoreAccessor, type FirestoreDocs } from "@mulmoclaude/core/collection/server";
+import { setFirestoreAccessor, type FirestoreDocs } from "@mulmoclaude/core/collection/server";
+// The adapter ships from its own subpath — it is the one collection module that
+// pulls the firebase SDK in at runtime, kept off the main entry so the optional
+// peer stays optional for hosts without Firestore.
+import { createFirestoreDocs } from "@mulmoclaude/core/collection/firestore";
 import type { Firestore } from "firebase/firestore";
 import { currentFirestoreSession } from "../../remoteHost/session.js";
 

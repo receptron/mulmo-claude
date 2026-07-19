@@ -14,7 +14,6 @@
 
 import {
   collection as firestoreCollection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -75,15 +74,18 @@ export function createFirestoreDocs(database: Firestore): FirestoreDocs {
         transaction.set(ref, { data });
         return true;
       }),
-    delete: async (collectionPath, docId) => {
-      const ref = doc(database, collectionPath, docId);
-      // Firestore's deleteDoc succeeds on a missing document, so the
-      // existence check is what makes "deleted" distinguishable from
-      // "there was nothing" for the caller.
-      const existing = await getDoc(ref);
-      if (!existing.exists()) return false;
-      await deleteDoc(ref);
-      return true;
-    },
+    // Firestore's deleteDoc succeeds on a missing document, so an existence
+    // check is what makes "deleted" distinguishable from "there was nothing".
+    // It runs INSIDE the transaction (like `create`): a plain get-then-delete
+    // would report `true` for a document a concurrent client had already
+    // removed, i.e. claim a delete this call never performed.
+    delete: (collectionPath, docId) =>
+      runTransaction(database, async (transaction) => {
+        const ref = doc(database, collectionPath, docId);
+        const existing = await transaction.get(ref);
+        if (!existing.exists()) return false;
+        transaction.delete(ref);
+        return true;
+      }),
   };
 }

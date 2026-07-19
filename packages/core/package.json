@@ -28,6 +28,12 @@
       "require": "./dist/collection/paths.cjs",
       "default": "./dist/collection/paths.js"
     },
+    "./collection/firestore": {
+      "types": "./dist/collection/firestore.d.ts",
+      "import": "./dist/collection/firestore.js",
+      "require": "./dist/collection/firestore.cjs",
+      "default": "./dist/collection/firestore.js"
+    },
     "./collection/registry": {
       "types": "./dist/collection/registry/index.d.ts",
       "import": "./dist/collection/registry/index.js",

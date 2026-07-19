@@ -21,6 +21,10 @@ export default defineConfig({
         "collection/index": "src/collection/index.ts",
         "collection/server/index": "src/collection/server/index.ts",
         "collection/paths": "src/collection/server/templatePath.ts",
+        // The only collection entry that runtime-imports the firebase SDK.
+        // Separate so the OPTIONAL `firebase` peer stays optional for every
+        // consumer of `collection/server` (see that file's export note).
+        "collection/firestore": "src/collection/firestore.ts",
         "collection/registry/index": "src/collection/registry/index.ts",
         "collection/registry/server/index": "src/collection/registry/server/index.ts",
         "wiki/index": "src/wiki/index.ts",

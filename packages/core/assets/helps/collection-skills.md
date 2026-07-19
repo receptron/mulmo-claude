@@ -1057,7 +1057,7 @@ Two backends:
 | `type` | Records live in | Reach for it when |
 |---|---|---|
 | `sqlite` | one SQLite db file in the workspace | a collection will grow past what a folder of JSON files handles (thousands of records) |
-| `firestore` | the user's own Firestore account | the same records must be live across devices (phone + desktop) |
+| `firestore` | the user's own Firestore account | the same records must be reachable from more than one machine |
 
 **Record I/O on a `storage` collection goes through `manageCollection`**
 (`getItems` / `putItems` / `deleteItems`), never raw Read/Write/Edit. There is
@@ -1130,11 +1130,16 @@ of the box — without that rule every operation is rejected with
 `mulmoserver` project, so it is a deploy the user makes there, not something
 this app can do. See `config/helps/error-recovery.md` if you hit it.
 
-When to use: only when the user explicitly asks for records that follow them
-across devices. For a single-machine collection prefer `dataPath` (or
+When to use: only when the user explicitly asks for records reachable from
+more than one machine. For a single-machine collection prefer `dataPath` (or
 `sqlite` at scale) — those need no session, no network, and no account.
 
 Notes:
+
+- **Changes made elsewhere do not appear until the view is reloaded.** Writes
+  from THIS host refresh the open view; a record added from another device (or
+  from the Firebase console) does not yet push an update here. Live sync is
+  not implemented for this backend.
 
 - Record ids follow the SAME charset rule as every other backend, so a
   record stays portable if the collection is later moved to files.

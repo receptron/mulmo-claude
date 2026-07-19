@@ -9,7 +9,7 @@ collection を **collection 単位で排他的に**選べるようにする。�
 双方向同期・二重書き込みはしない。狙いは `onSnapshot` によるライブ同期で、
 複数デバイスから同じ collection を触っても即座に反映される状態。
 
-```
+```text
 collection A (既存) ──> local JSON     変更なし
 collection B (既存) ──> sqlite         変更なし
 collection C (新規) ──> Firestore      onSnapshot でライブ同期
@@ -113,7 +113,7 @@ export const StorageZ = z.discriminatedUnion("type", [
 > していたが、**誤り**。`docs/remote-host.md` の記載を根拠にしたが、実物
 > (`../mulmoserver/firestore.rules`) は違う:
 >
-> ```
+> ```text
 > match /users/{uid}/hosts/{document=**}      { allow read, write: if 自分; }
 > match /users/{uid}/pushRegistrations/{fid}  { allow read: if 自分; }
 > match /{document=**}                        { allow read, write: if false; }
@@ -125,7 +125,7 @@ export const StorageZ = z.discriminatedUnion("type", [
 >
 > したがって本機能は `../mulmoserver` 側のルール追加とデプロイが**必須**:
 >
-> ```
+> ```text
 > match /users/{uid}/collections/{document=**} {
 >   allow read, write: if request.auth != null && request.auth.uid == uid;
 > }
@@ -144,7 +144,7 @@ export const StorageZ = z.discriminatedUnion("type", [
 (`src/` は `firebase/app` と `firebase/auth` のみ)、Firestore は全てサーバ経由。
 したがって**ブラウザから直接 onSnapshot はしない**:
 
-```
+```text
 Firestore → (サーバ側 onSnapshot) → publishCollectionChange({slug, ids, op})
           → 既存 WebSocket collection:${slug} → UI は今まで通り再取得
 ```
@@ -196,7 +196,11 @@ Stage 2 まで `StorageZ` の firestore バリアントは**スキーマ検証�
    - `read(id)` / `write(id, item, opts)` / `delete(id)`
    - `write` の `refuseOverwrite` は Firestore トランザクションで
      存在チェック＋作成（`hostRunner.ts:64-72` の CAS が参考）
-   - `capabilities`: `{ writable: true, nativeQuery: false, nativePaging: true }`
+   - `capabilities`: `{ writable: true, nativeQuery: false, nativePaging: false }`
+     — paging is emulated over a full ordered read. Firestore has no
+     server-side `offset` (its cursor API needs the preceding document), and
+     `total` needs the full count anyway, so claiming native paging would be
+     dishonest about the cost
    - `query` は**実装しない**。DuckDB の集約に相当するものが無く、
      呼び出し側は `query` の不在を既に処理できる（`store.ts:33-36`）ので
      エンジン側フォールバック (`runCollectionQuery`) が働く
