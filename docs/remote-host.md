@@ -66,13 +66,29 @@ The server authenticates to Firestore **as the user**, using the Firebase JS SDK
    → gets `auth.currentUser.uid`, then starts the host runner. The JS SDK holds
    its own refresh token for the process lifetime; the ID token is used once.
 
-Security rules keep the server scoped to the user's own subtree:
+Security rules keep the server scoped to the user's own subtree — and, within
+it, to the specific paths this feature uses. They are **allow-lists, not a
+blanket grant on `users/{uid}/`**; anything not matched falls through to a
+final deny-all rule:
 
 ```
-match /users/{uid}/{document=**} {
+match /users/{uid}/hosts/{document=**} {          // presence + command queues
   allow read, write: if request.auth != null && request.auth.uid == uid;
 }
+match /users/{uid}/pushRegistrations/{fid} {      // written by the Admin SDK only
+  allow read: if request.auth != null && request.auth.uid == uid;
+}
+match /{document=**} {
+  allow read, write: if false;                    // everything else
+}
 ```
+
+> **A new feature storing data in Firestore needs its own rule.** Writing to a
+> fresh path under `users/{uid}/` is NOT automatically permitted — it hits the
+> deny-all and fails with `PERMISSION_DENIED`. The rules live in the sibling
+> `../mulmoserver` repo (`firestore.rules`, deployed via its `firebase.json`),
+> so such a change is a **cross-repo deploy**, not something this repo can ship
+> on its own.
 
 The server holds **no project-wide privilege** — blast radius is the user's own
 `users/{uid}/…` Firestore subtree. The ID token is treated as a secret: POSTed

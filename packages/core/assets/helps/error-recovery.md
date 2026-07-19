@@ -280,6 +280,31 @@ would orphan them; delete the records first (`manageCollection` `deleteItems`),
 then the collection. Reads are network round trips, so unselective reads are
 slower and costlier than on the local backends.
 
+### Same collection, but the error is `PERMISSION_DENIED` / "Missing or insufficient permissions"
+
+The session IS connected, yet every read/write on the firestore collection is
+rejected by Firestore itself. That is the **security rules**, not the session.
+
+The rules are an allow-list per path, not a blanket grant on `users/{uid}/`:
+records at `users/{uid}/collections/…` are permitted only if a rule for that
+path has been deployed. Without it they fall through to the project's final
+`allow read, write: if false`.
+
+The rules live in the SIBLING repo `../mulmoserver` (`firestore.rules`, shipped
+by its own `firebase.json`) — **not** in this repo, so this is a cross-repo
+deploy the user has to make:
+
+```
+match /users/{uid}/collections/{document=**} {
+  allow read, write: if request.auth != null && request.auth.uid == uid;
+}
+```
+
+Do NOT try to work around it by writing to a different Firestore path (any
+other path is equally denied), and do NOT convert the collection to `dataPath`
+to escape the error unless the user asks — that silently changes where their
+records live.
+
 ## Fallback
 
 If none of the above matches the failing tool output:

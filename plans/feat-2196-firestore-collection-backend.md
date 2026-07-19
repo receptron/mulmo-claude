@@ -105,13 +105,34 @@ export const StorageZ = z.discriminatedUnion("type", [
 ```
 
 **Firestore 側にユーザー指定のパスを持たせない**のが要点。ドキュメント位置は
-`users/{uid}/collections/{slug}/items/{id}` と host が決める。理由は2つ:
+`users/{uid}/collections/{slug}/items/{id}` と host が決める。理由は、任意パスを
+許すとルールの効かない場所を指せてしまうため。
 
-- **セキュリティルールを変えずに済む** — デプロイ済みルールが
-  `users/{uid}/{document=**}` の再帰ワイルドカード。この配下にいる限りルール変更も
-  デプロイも不要。ルール本体は別リポジトリ (`../mulmoserver`) にあり、ここからは
-  変更できない
-- 任意パスを許すと、ルールの効かない場所を指せてしまう
+> **訂正 (2026-07-20)**: 当初この計画は「デプロイ済みルールが
+> `users/{uid}/{document=**}` の再帰ワイルドカードなので**ルール変更不要**」と
+> していたが、**誤り**。`docs/remote-host.md` の記載を根拠にしたが、実物
+> (`../mulmoserver/firestore.rules`) は違う:
+>
+> ```
+> match /users/{uid}/hosts/{document=**}      { allow read, write: if 自分; }
+> match /users/{uid}/pushRegistrations/{fid}  { allow read: if 自分; }
+> match /{document=**}                        { allow read, write: if false; }
+> ```
+>
+> 許可は**パスごとの allow-list** であって `users/{uid}/` 一括ではない。
+> `users/{uid}/collections/...` は最後の deny-all にしかマッチせず、
+> **現状のルールでは全操作が PERMISSION_DENIED になる**。
+>
+> したがって本機能は `../mulmoserver` 側のルール追加とデプロイが**必須**:
+>
+> ```
+> match /users/{uid}/collections/{document=**} {
+>   allow read, write: if request.auth != null && request.auth.uid == uid;
+> }
+> ```
+>
+> これは**別リポジトリへのクロスリポジトリ変更**なので、このリポジトリだけでは
+> 機能を出荷できない。`docs/remote-host.md` の記載も実物に合わせて訂正済み。
 
 `discovery.ts` は `schema.storage.type === "sqlite"` のときだけ `storageFile` を
 解決するよう分岐する（Firestore は解決すべきファイルが無い）。
@@ -231,7 +252,8 @@ Stage 2 まで `StorageZ` の firestore バリアントは**スキーマ検証�
 | `orderBy` がフィールド欠落ドキュメントを黙って除外 | ドキュメント ID 昇順のみ使う。フィールドで並べない |
 | 1ドキュメント約 1MiB 上限 | 超過時は明確なエラー。前例: 添付は Storage に逃がす (`onExpire.ts:45`) |
 | `ontology` の件数取得が毎回ネットワーク往復 | `page({limit:0}).total` が Firestore では count クエリになる。`ontology.ts` は既に fail-soft だが、**コスト特性が local backend と違う**ことを docs に明記 |
-| データが共有プロジェクト `mulmoserver` に載る | `users/{uid}/` 配下限定で他ユーザーから不可視。ルール変更不要 |
+| **セキュリティルールの追加が必須** — `users/{uid}/collections/**` は現状 deny-all にしかマッチしない | `../mulmoserver/firestore.rules` にルールを足してデプロイする。**別リポジトリなので、この repo のマージだけでは機能しない**。デプロイ前は全操作が PERMISSION_DENIED |
+| データが共有プロジェクト `mulmoserver` に載る | `users/{uid}/` 配下限定で他ユーザーから不可視 |
 | 未接続時に無関係な画面が壊れる | ストア構築では throw せず、メソッドが失敗する形にする（設計判断 2） |
 
 ## やらないこと（スコープ外）

@@ -1123,6 +1123,13 @@ neither read nor written — every operation fails with "connect remote-host
 first" rather than reporting zero records. Tell the user to connect; do not
 present an unavailable collection as empty.
 
+**Requires a deployed security rule for `users/<uid>/collections/**`.** The
+project's rules are an allow-list per path, so this backend does not work out
+of the box — without that rule every operation is rejected with
+`PERMISSION_DENIED` even while connected. The rules live in the separate
+`mulmoserver` project, so it is a deploy the user makes there, not something
+this app can do. See `config/helps/error-recovery.md` if you hit it.
+
 When to use: only when the user explicitly asks for records that follow them
 across devices. For a single-machine collection prefer `dataPath` (or
 `sqlite` at scale) — those need no session, no network, and no account.
