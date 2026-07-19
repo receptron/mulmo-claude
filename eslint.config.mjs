@@ -593,6 +593,19 @@ export default [
       // the same function just built (`picked`, `removed`, `missing`) or a fresh
       // `readdir` result — nothing is shared, so there is no one to surprise.
       "sonarjs/no-misleading-array-reverse": "off",
+      // `different-types-comparison` calls a comparison redundant when the types
+      // say it cannot vary. All 17 of its findings here guard a value that IS
+      // `undefined`/`null` at runtime and only looks impossible to the checker:
+      //   - `record[key] !== undefined` — `noUncheckedIndexedAccess` is off (it
+      //     is not part of `strict`), so an index read is typed as the value
+      //     type while returning undefined for a missing key.
+      //   - `JSON.stringify(v) === undefined` — the lib types say `string`, but
+      //     it does return undefined for undefined/function/symbol input.
+      //   - `headers.get(name) !== SECRET` — `get()` returns null when absent.
+      // Deleting these would strip real guards; the Telegram one is a webhook
+      // secret check, and the JSON one is followed by `.length`. The rule's
+      // premise only holds once `noUncheckedIndexedAccess` is on — revisit then.
+      "sonarjs/different-types-comparison": "off",
     },
   },
   eslintConfigPrettier,
