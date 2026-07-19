@@ -79,6 +79,15 @@ export const currentUid = (): string | null => handles?.auth.currentUser?.uid ??
 export const currentFirestore = (): Firestore => requireHandles().firestore;
 export const currentStorage = (): FirebaseStorage => requireHandles().storage;
 
+// Non-throwing twin of `currentFirestore` + `currentUid`, for consumers that
+// must treat "no session" as an ordinary state rather than an exception —
+// firestore-backed collections ask on every operation, including from screens
+// that merely list collections, so a throw would break unrelated UI.
+export const currentFirestoreSession = (): { firestore: Firestore; uid: string } | null => {
+  const uid = handles?.auth.currentUser?.uid;
+  return handles && uid ? { firestore: handles.firestore, uid } : null;
+};
+
 // The signed-in user's Firebase ID token, or null when the RemoteHost session
 // isn't open / not authenticated. web-push uses this to authenticate `sendPush`;
 // a null result (RemoteHost disconnected) makes the push a silent no-op. The
