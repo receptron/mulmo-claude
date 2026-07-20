@@ -28,7 +28,15 @@
 import { watch, type FSWatcher } from "node:fs";
 import { access, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { discoverCollections, itemFilePath, loadCollection, publishCollectionChange, type DiscoveryOptions, type LoadedCollection } from "../collection/server";
+import {
+  discoverCollections,
+  firestoreHandle,
+  itemFilePath,
+  loadCollection,
+  publishCollectionChange,
+  type DiscoveryOptions,
+  type LoadedCollection,
+} from "../collection/server";
 import type { CollectionSchema } from "../collection";
 import { errMsg, log } from "./config.js";
 import { evalNow } from "./clock.js";
@@ -68,6 +76,12 @@ const watchers = new Map<string, CollectionWatcher>();
 let rediscoveryTimer: ReturnType<typeof setInterval> | null = null;
 let triggerTimer: ReturnType<typeof setInterval> | null = null;
 let started = false;
+/** Guards the clock tick against overlapping itself (see the interval).
+ *  Paired with `watcherEpoch`: a teardown while a pass is in flight bumps the
+ *  epoch, so that pass's `finally` knows it belongs to a dead generation and
+ *  must not clear the guard a restarted watcher set now owns. */
+let triggerTickRunning = false;
+let watcherEpoch = 0;
 /** Discovery options threaded into every `discoverCollections` /
  *  `loadCollection` / `sweepStaleActiveEntries` call. Production: empty
  *  (live workspace). Tests: `{ workspaceRoot, userSkillsDir }` pointing
@@ -88,22 +102,10 @@ const itemSlots = new Map<string, ReconcileSlot>();
  *  trailing re-run, mirroring the per-item slots of the file watcher. */
 const storageSlots = new Map<string, ReconcileSlot>();
 
-/** Last reconcile failure per slug, so a persistent one is logged once
- *  instead of once per tick. A closed remote-host session is the common
- *  case and would otherwise emit a line every minute, forever — but going
- *  fully silent would hide a real fault (a denied rule, say) completely. */
-const lastReconcileFailure = new Map<string, string>();
-
 /** Slugs that were reconcile-eligible on the previous unwatched tick, so the
  *  next one can notice a collection dropping out (schema edited to remove its
  *  bells, or the collection deleted) and clear what it left behind. */
 let lastEligibleSlugs = new Set<string>();
-
-function noteReconcileFailure(slug: string, reason: string): void {
-  if (lastReconcileFailure.get(slug) === reason) return;
-  lastReconcileFailure.set(slug, reason);
-  log().warn("collection reconcile pass failed", { slug, reason });
-}
 
 /** Trailing debounce per dataSource collection: an atomic file replace
  *  (Excel save, editor rename) surfaces as 2-3 fs events — collapse them
@@ -150,9 +152,24 @@ export async function startCollectionWatchers(opts: CollectionWatcherOptions = {
     const triggerMs = opts.triggerTickIntervalMs === undefined ? TRIGGER_TICK_INTERVAL_MS : opts.triggerTickIntervalMs;
     if (triggerMs !== null) {
       triggerTimer = setInterval(() => {
-        tickTimeTriggers().catch((err: unknown) => {
-          log().warn("watcher trigger tick failed", { error: errMsg(err) });
-        });
+        // Skip rather than overlap: this tick now does NETWORK work for
+        // unwatched (firestore) collections, so a slow or hung pass could
+        // otherwise let interval firings pile up on each other. Dropping a
+        // tick is harmless — the pass is idempotent and the next one is a
+        // minute away.
+        if (triggerTickRunning) return;
+        triggerTickRunning = true;
+        const epoch = watcherEpoch;
+        tickTimeTriggers()
+          .catch((err: unknown) => {
+            log().warn("watcher trigger tick failed", { error: errMsg(err) });
+          })
+          .finally(() => {
+            // Only the generation that set the guard may clear it — a pass
+            // still running across a stop/start would otherwise unlock the
+            // restarted set and let two passes overlap.
+            if (epoch === watcherEpoch) triggerTickRunning = false;
+          });
       }, triggerMs);
       triggerTimer.unref();
     }
@@ -185,8 +202,11 @@ export async function stopCollectionWatchers(): Promise<void> {
   watchers.clear();
   itemSlots.clear();
   storageSlots.clear();
-  lastReconcileFailure.clear();
   lastEligibleSlugs = new Set();
+  // Bump first: any in-flight pass is now a dead generation and its `finally`
+  // becomes a no-op, so this reset can't be undone by it later.
+  watcherEpoch += 1;
+  triggerTickRunning = false;
   for (const timer of dataSourceTimers.values()) clearTimeout(timer);
   dataSourceTimers.clear();
   discoveryOpts = {};
@@ -230,12 +250,17 @@ async function tickTimeTriggers(now: Date = evalNow()): Promise<void> {
 }
 
 /** One unwatched collection's reconcile pass. Extracted from the loop so the
- *  single-flight callback doesn't close over loop state. */
+ *  single-flight callback doesn't close over loop state.
+ *
+ *  `reconcileAllItems` already swallows a failing store read (it logs and
+ *  returns), so a closed session or a denied rule surfaces there, not as a
+ *  rejection here. This catch is only for the unexpected — it must not let
+ *  one collection's fault abort the rest of the tick. */
 async function reconcileUnwatched(collection: LoadedCollection, now: Date): Promise<void> {
   try {
     await runSingleFlight(storageSlots, collection.slug, () => reconcileAllItems(collection, discoveryOpts, now));
   } catch (err) {
-    noteReconcileFailure(collection.slug, errMsg(err));
+    log().warn("unwatched collection reconcile failed", { slug: collection.slug, error: errMsg(err) });
   }
 }
 
@@ -266,7 +291,13 @@ async function tickUnwatchedCollections(now: Date): Promise<void> {
     log().warn("trigger tick: discover failed", { error: errMsg(err) });
     return;
   }
-  const pending = collections.filter((collection) => collection.schema.storage?.type === "firestore" && needsReconcilePass(collection.schema));
+  // No session, nothing to reconcile: skip the whole pass rather than let
+  // each collection attempt a read and log its own failure. A closed session
+  // is an ordinary state that can last hours, and `reconcileAllItems` warns
+  // on every failed read — attempting anyway would emit a line per collection
+  // per minute, forever, for a condition the user already sees in the UI.
+  const connected = firestoreHandle() !== null;
+  const pending = connected ? collections.filter((collection) => collection.schema.storage?.type === "firestore" && needsReconcilePass(collection.schema)) : [];
   for (const collection of pending) await reconcileUnwatched(collection, now);
   // A record deleted remotely leaves a stale bell that `reconcileAllItems`
   // (which only walks records that still exist) can't clear — same pairing

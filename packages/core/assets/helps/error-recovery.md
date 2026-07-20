@@ -276,9 +276,10 @@ Diagnosis + fixes, in order:
 
 Known limits (by design): deleting a firestore-backed COLLECTION is refused —
 the host can neither archive nor remove the documents, so removing the skill
-would orphan them; delete the records first (`manageCollection` `deleteItems`),
-then the collection. Reads are network round trips, so unselective reads are
-slower and costlier than on the local backends.
+would orphan them. The refusal is unconditional: emptying the collection first
+does NOT unlock it, so don't send the user down that path. Individual RECORDS
+delete normally (`manageCollection` `deleteItems`). Reads are network round
+trips, so unselective reads are slower and costlier than on the local backends.
 
 ### Same collection, but the error is `PERMISSION_DENIED` / "Missing or insufficient permissions"
 

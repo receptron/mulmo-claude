@@ -51,7 +51,7 @@ export function deleteCollectionRefusalMessage(result: DeleteRefusal): string {
     preset: `collection '${slug}' is a preset (mc-*) and re-seeds on restart; unstar it from the catalog instead`,
     "unsafe-data-path": `collection '${slug}' declares a dataPath outside its own data/${slug}/ subtree; refusing to delete`,
     "path-escape": `a directory for collection '${slug}' escapes the workspace`,
-    "unsupported-backend": `collection '${slug}' keeps its records in Firestore, which this delete can neither archive nor remove — deleting the skill would orphan them. Remove the records first (via the collection view or manageCollection deleteItems), then delete the collection.`,
+    "unsupported-backend": `collection '${slug}' keeps its records in Firestore, which this delete can neither archive nor remove — deleting the skill would orphan them. Deleting a Firestore-backed collection is not supported yet, regardless of how many records it holds; removing its records first does NOT unlock it.`,
   };
   return messages[result.kind];
 }

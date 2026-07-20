@@ -1146,9 +1146,11 @@ Notes:
 - Reads are network round trips, unlike the local backends — a summary
   screen that counts records pays for it. Prefer `getItems` with `ids` /
   `fields` over unselective reads.
-- Deleting the COLLECTION is refused: the host can neither archive nor
-  remove Firestore documents, so removing the skill would orphan them.
-  Delete the records first (`deleteItems`), then delete the collection.
+- Deleting the COLLECTION is refused, always: the host can neither archive
+  nor remove Firestore documents, so removing the skill would orphan them.
+  Emptying it first does NOT unlock the delete — don't tell the user it
+  will. Individual RECORDS delete normally (`deleteItems`); it is only the
+  collection itself that can't be removed yet.
 - One document caps at ~1 MiB.
 
 ```json

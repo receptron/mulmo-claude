@@ -8,18 +8,26 @@
 // burst into one publish.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   configureCollectionHost,
   setCollectionChangePublisher,
+  setFirestoreAccessor,
   type CollectionChangePayload,
   type LoadedCollection,
 } from "../../src/collection/server/index.ts";
 import { configureNotifier, setNotifierFilePaths } from "../../src/notifier/index.ts";
-import { configureCollectionWatchers, _scheduleItemReconcileForTesting, type CollectionNotificationAdapter } from "../../src/collection-watchers/index.ts";
+import {
+  configureCollectionWatchers,
+  _scheduleItemReconcileForTesting,
+  _tickTimeTriggersForTesting,
+  startCollectionWatchers,
+  stopCollectionWatchers,
+  type CollectionNotificationAdapter,
+} from "../../src/collection-watchers/index.ts";
 
 const root = mkdtempSync(path.join(tmpdir(), "cw-pub-"));
 test.after(() => rmSync(root, { recursive: true, force: true }));
@@ -54,7 +62,11 @@ const adapter: CollectionNotificationAdapter = {
   buildPluginData: ({ legacyId }) => ({ kind: "cw", legacyId }),
   readEntry: () => null,
 };
-configureCollectionWatchers({ adapter });
+const warnings: { message: string; data?: Record<string, unknown> }[] = [];
+configureCollectionWatchers({
+  adapter,
+  log: { info: () => {}, warn: (message, data) => warnings.push({ message, data }) },
+});
 
 const SCHEMA = { primaryKey: "id", title: "Tasks", displayField: "name", completionField: "done", completionDoneValues: ["true"] } as never;
 
@@ -157,5 +169,47 @@ test("a throwing publisher neither fails the reconcile nor wedges the slot", asy
   } finally {
     setCollectionChangePublisher((payload) => published.push(payload));
     rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+// A closed remote-host session is an ordinary state that can last hours.
+// `reconcileAllItems` warns on every failed store read, so attempting the
+// pass anyway would emit a line per firestore collection per minute forever.
+// The tick must skip the whole pass instead — asserted on the LOG, because
+// that (not the bell state) is what the skip protects.
+test("a disconnected session produces no per-tick reconcile warnings", async () => {
+  const dir = mkdtempSync(path.join(root, "fs-quiet-"));
+  const skillDir = path.join(dir, ".claude", "skills", "cloud-quiet");
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: cloud-quiet\ndescription: t\n---\nbody\n");
+  writeFileSync(
+    path.join(skillDir, "schema.json"),
+    JSON.stringify({
+      title: "Quiet",
+      icon: "cloud",
+      storage: { type: "firestore" },
+      primaryKey: "id",
+      fields: { id: { type: "string", label: "ID", primary: true, required: true }, read: { type: "boolean", label: "R", required: true } },
+      completionField: "read",
+      completionDoneValues: ["true"],
+    }),
+  );
+
+  setFirestoreAccessor(null); // no session
+  await startCollectionWatchers({
+    discoveryOpts: { workspaceRoot: dir, userSkillsDir: path.join(dir, ".user") },
+    rediscoveryIntervalMs: null,
+    triggerTickIntervalMs: null,
+  });
+  try {
+    warnings.length = 0;
+    await _tickTimeTriggersForTesting();
+    await _tickTimeTriggersForTesting();
+    const readFailures = warnings.filter((entry) => entry.message.includes("reconcile list failed"));
+    assert.deepEqual(readFailures, [], "a closed session must not warn once per tick");
+  } finally {
+    await stopCollectionWatchers();
+    setFirestoreAccessor(null);
+    rmSync(dir, { recursive: true, force: true });
   }
 });

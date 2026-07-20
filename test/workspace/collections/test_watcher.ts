@@ -528,3 +528,76 @@ describe("storage (firestore) collection — bells don't outlive their schema", 
     };
   }
 });
+
+describe("unwatched tick — failure logging hygiene", () => {
+  const FSL_SLUG = "test-watcher-fs-log";
+
+  function writeBellSchema(): void {
+    const skillDir = path.join(workdir, ".claude/skills", FSL_SLUG);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(path.join(skillDir, "SKILL.md"), `---\nname: ${FSL_SLUG}\ndescription: test\n---\nbody\n`);
+    writeFileSync(
+      path.join(skillDir, "schema.json"),
+      JSON.stringify({
+        title: "Cloud Log",
+        icon: "cloud",
+        storage: { type: "firestore" },
+        primaryKey: "id",
+        fields: {
+          id: { type: "string", label: "ID", primary: true, required: true },
+          read: { type: "boolean", label: "Read", required: true },
+        },
+        completionField: "read",
+        completionDoneValues: ["true"],
+      }),
+    );
+  }
+
+  // Codex (local review) finding: the per-slug dedupe that stops a closed
+  // session logging once a minute must not also silence a LATER failure with
+  // the same reason. Fail → recover → fail again has to reach the log twice.
+  it("re-reports a repeat failure after a successful pass in between", async () => {
+    writeBellSchema();
+    setFirestoreAccessor(null); // closed session -> reconcile fails
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+    await _tickTimeTriggersForTesting();
+    assert.equal((await activeCompletionEntries()).length, 0, "nothing reconciles while disconnected");
+
+    // Recover: the pass succeeds and the bell appears.
+    const rows = new Map<string, unknown>([["a", { id: "a", read: false }]]);
+    const docs: FirestoreDocs = {
+      list: () => Promise.resolve([...rows.entries()].map(([docId, data]) => ({ id: docId, data }) as FirestoreDoc)),
+      get: (_path, docId) => Promise.resolve(rows.get(docId) ?? null),
+      set: (_path, docId, data) => {
+        rows.set(docId, data);
+        return Promise.resolve();
+      },
+      create: () => Promise.resolve(true),
+      delete: (_path, docId) => Promise.resolve(rows.delete(docId)),
+    };
+    assert.equal((await activeCompletionEntries()).length, 0, "a closed session reconciles nothing");
+
+    // Recover: the pass succeeds, the bell appears, and — the actual fix —
+    // the remembered failure is FORGOTTEN. Without that, the next identical
+    // failure would be deduped against a stale entry and never logged.
+    setFirestoreAccessor(() => ({ docs, uid: "test-uid" }));
+    await _tickTimeTriggersForTesting();
+    assert.ok(
+      (await activeCompletionEntries()).map((entry) => entry.legacyId).includes(`collection-completion:${FSL_SLUG}:a`),
+      "recovered pass must reconcile",
+    );
+
+    // Fail the same way again: it must be remembered afresh (i.e. it was
+    // logged again), and the failed pass must not wipe existing bells.
+    setFirestoreAccessor(null);
+    await assert.doesNotReject(() => _tickTimeTriggersForTesting());
+    assert.ok(
+      (await activeCompletionEntries()).map((entry) => entry.legacyId).includes(`collection-completion:${FSL_SLUG}:a`),
+      "a failed pass must not wipe previously-derived bells",
+    );
+  });
+});
