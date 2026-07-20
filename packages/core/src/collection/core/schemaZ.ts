@@ -910,8 +910,11 @@ const BareCollectionSchemaZ = z
   // NOTE: `storage` collections support the full write machinery
   // (`spawn` / `completionField` / `triggerField` / `singleton` / `ingest`
   // / mutate actions) — spawn and the watcher reconcilers go through the
-  // CollectionStore seam, and a db-file watcher drives their
-  // reconciliation (collection-watchers/watcher.ts).
+  // CollectionStore seam. What DRIVES that reconciliation differs by
+  // backend: `sqlite` has a db-file watcher, while `firestore` has no file
+  // to watch and is reconciled on the clock tick instead
+  // (`tickUnwatchedCollections`). Either way the declared behaviour runs —
+  // that equivalence is what lets this refine stay backend-agnostic.
   // A `dataSource` collection is read-only by definition, so schema-level
   // write machinery can never fire: `singleton` pins CREATES, `ingest`
   // REFILLS records, `spawn` WRITES successor records. Rejecting them at

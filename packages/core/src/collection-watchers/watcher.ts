@@ -88,6 +88,18 @@ const itemSlots = new Map<string, ReconcileSlot>();
  *  trailing re-run, mirroring the per-item slots of the file watcher. */
 const storageSlots = new Map<string, ReconcileSlot>();
 
+/** Last reconcile failure per slug, so a persistent one is logged once
+ *  instead of once per tick. A closed remote-host session is the common
+ *  case and would otherwise emit a line every minute, forever — but going
+ *  fully silent would hide a real fault (a denied rule, say) completely. */
+const lastReconcileFailure = new Map<string, string>();
+
+function noteReconcileFailure(slug: string, reason: string): void {
+  if (lastReconcileFailure.get(slug) === reason) return;
+  lastReconcileFailure.set(slug, reason);
+  log().warn("collection reconcile pass failed", { slug, reason });
+}
+
 /** Trailing debounce per dataSource collection: an atomic file replace
  *  (Excel save, editor rename) surfaces as 2-3 fs events — collapse them
  *  into one change publish so live views refetch once. */
@@ -168,6 +180,7 @@ export async function stopCollectionWatchers(): Promise<void> {
   watchers.clear();
   itemSlots.clear();
   storageSlots.clear();
+  lastReconcileFailure.clear();
   for (const timer of dataSourceTimers.values()) clearTimeout(timer);
   dataSourceTimers.clear();
   discoveryOpts = {};
@@ -207,6 +220,52 @@ async function tickTimeTriggers(now: Date = evalNow()): Promise<void> {
     if (!schema.triggerField && !schema.spawn) continue;
     await reconcileAllItems(entry.collection, discoveryOpts, now);
   }
+  await tickUnwatchedCollections(now);
+}
+
+/** One unwatched collection's reconcile pass. Extracted from the loop so the
+ *  single-flight callback doesn't close over loop state. */
+async function reconcileUnwatched(collection: LoadedCollection, now: Date): Promise<void> {
+  try {
+    await runSingleFlight(storageSlots, collection.slug, () => reconcileAllItems(collection, discoveryOpts, now));
+  } catch (err) {
+    noteReconcileFailure(collection.slug, errMsg(err));
+  }
+}
+
+/** True when a schema declares behaviour that only a reconcile pass can
+ *  produce: bells (`completionField`), date-triggered bells
+ *  (`triggerField`), or recurrence successors (`spawn`). */
+function needsReconcilePass(schema: CollectionSchema): boolean {
+  return Boolean(schema.completionField ?? schema.triggerField ?? schema.spawn);
+}
+
+/** Reconcile collections that mount no file watcher at all.
+ *
+ *  A `firestore` collection keeps its records off the filesystem, so it
+ *  never enters `watchers` — nothing else would ever re-derive its bells or
+ *  spawn its successors, and the schema would validate while its declared
+ *  behaviour silently never ran (Codex review, PR #2209). The clock tick is
+ *  its only reconciliation point.
+ *
+ *  Gated on `needsReconcilePass` so a collection declaring none of those
+ *  costs no network at all: unlike the local backends, every pass here is a
+ *  round trip. A closed session is an ordinary state, not an error — the
+ *  store throws, and the next tick simply tries again. */
+async function tickUnwatchedCollections(now: Date): Promise<void> {
+  let collections: readonly LoadedCollection[];
+  try {
+    collections = await discoverCollections(discoveryOpts);
+  } catch (err) {
+    log().warn("trigger tick: discover failed", { error: errMsg(err) });
+    return;
+  }
+  const pending = collections.filter((collection) => collection.schema.storage?.type === "firestore" && needsReconcilePass(collection.schema));
+  for (const collection of pending) await reconcileUnwatched(collection, now);
+  // A record deleted remotely leaves a stale bell that `reconcileAllItems`
+  // (which only walks records that still exist) can't clear — same pairing
+  // the storage/unknown-filename paths use.
+  if (pending.length > 0) await sweepStaleActiveEntries(discoveryOpts);
 }
 
 /** Reconcile the watcher set against the currently-discovered

@@ -31,12 +31,19 @@ import {
   _scheduleItemReconcileForTesting,
   _scheduleStorageReconcileForTesting,
   _syncWatchersForTesting,
+  _tickTimeTriggersForTesting,
   startCollectionWatchers,
   stopCollectionWatchers,
 } from "../../../server/workspace/collections/watcher.js";
-import { loadCollection, storeFor } from "@mulmoclaude/core/collection/server";
+import {
+  loadCollection,
+  setFirestoreAccessor,
+  storeFor,
+  type FirestoreDoc,
+  type FirestoreDocs,
+  type LoadedCollection,
+} from "@mulmoclaude/core/collection/server";
 import type { CollectionSchema } from "../../../server/workspace/collections/types.js";
-import type { LoadedCollection } from "@mulmoclaude/core/collection/server";
 
 let workdir: string;
 let userDir: string;
@@ -105,6 +112,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await stopCollectionWatchers();
+  // Module-level state: a fixture's fake left wired would let a firestore
+  // collection resolve in a later test that never set one up.
+  setFirestoreAccessor(null);
   rmSync(workdir, { recursive: true, force: true });
   rmSync(userDir, { recursive: true, force: true });
   rmSync(notifierDir, { recursive: true, force: true });
@@ -359,5 +369,96 @@ describe("storage (firestore) collection — watcher set stays quiet", () => {
     // fix must not suppress that signal.
     writeSchema(buildSchema());
     assert.equal(await _syncWatchersForTesting(), true, "a newly mounted watcher must still sweep");
+  });
+});
+
+describe("storage (firestore) collection — declared bells actually run", () => {
+  const FSB_SLUG = "test-watcher-fs-bell";
+
+  function makeFakeDocs(seed: Record<string, unknown>[]): FirestoreDocs {
+    const rows = new Map<string, unknown>(seed.map((record) => [record.id as string, record]));
+    return {
+      list: () => {
+        const entries: FirestoreDoc[] = [...rows.entries()].map(([docId, data]) => ({ id: docId, data }));
+        entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+        return Promise.resolve(entries);
+      },
+      get: (_path, docId) => Promise.resolve(rows.get(docId) ?? null),
+      set: (_path, docId, data) => {
+        rows.set(docId, data);
+        return Promise.resolve();
+      },
+      create: (_path, docId, data) => {
+        if (rows.has(docId)) return Promise.resolve(false);
+        rows.set(docId, data);
+        return Promise.resolve(true);
+      },
+      delete: (_path, docId) => Promise.resolve(rows.delete(docId)),
+    };
+  }
+
+  function writeBellSchema(): void {
+    const skillDir = path.join(workdir, ".claude/skills", FSB_SLUG);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(path.join(skillDir, "SKILL.md"), `---\nname: ${FSB_SLUG}\ndescription: test\n---\nbody\n`);
+    writeFileSync(
+      path.join(skillDir, "schema.json"),
+      JSON.stringify({
+        title: "Cloud Bells",
+        icon: "cloud",
+        storage: { type: "firestore" },
+        primaryKey: "id",
+        fields: {
+          id: { type: "string", label: "ID", primary: true, required: true },
+          read: { type: "boolean", label: "Read", required: true },
+        },
+        completionField: "read",
+        completionDoneValues: ["true"],
+      }),
+    );
+  }
+
+  // Regression for the second Codex finding on PR #2209: a firestore
+  // collection mounts no file watcher, so nothing re-derived its bells and a
+  // schema declaring `completionField` validated while silently doing
+  // nothing. The clock tick is its reconciliation point.
+  it("bells a pending record via the clock tick, and clears it when done", async () => {
+    writeBellSchema();
+    const docs = makeFakeDocs([{ id: "a", read: false }]);
+    setFirestoreAccessor(() => ({ docs, uid: "test-uid" }));
+
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+    // Nothing yet — the collection never mounts a watcher, so only the tick
+    // can produce the bell.
+    await _tickTimeTriggersForTesting();
+    let legacyIds = (await activeCompletionEntries()).map((entry) => entry.legacyId);
+    assert.ok(legacyIds.includes(`collection-completion:${FSB_SLUG}:a`), "pending record must bell");
+
+    await docs.set(`users/test-uid/collections/${FSB_SLUG}/items`, "a", { id: "a", read: true });
+    await _tickTimeTriggersForTesting();
+    legacyIds = (await activeCompletionEntries()).map((entry) => entry.legacyId);
+    assert.ok(!legacyIds.includes(`collection-completion:${FSB_SLUG}:a`), "bell must clear once done");
+  });
+
+  it("survives a closed session — no throw, and it recovers once connected", async () => {
+    writeBellSchema();
+    setFirestoreAccessor(null); // no remote-host session
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+    // A disconnected session is an ordinary state: the tick must not reject.
+    await assert.doesNotReject(() => _tickTimeTriggersForTesting());
+    assert.equal((await activeCompletionEntries()).length, 0);
+
+    setFirestoreAccessor(() => ({ docs: makeFakeDocs([{ id: "a", read: false }]), uid: "test-uid" }));
+    await _tickTimeTriggersForTesting();
+    const legacyIds = (await activeCompletionEntries()).map((entry) => entry.legacyId);
+    assert.ok(legacyIds.includes(`collection-completion:${FSB_SLUG}:a`), "must recover after reconnect");
   });
 });
