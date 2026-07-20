@@ -304,3 +304,60 @@ describe("storage (sqlite) collection reconciliation", () => {
     assert.ok(!legacyIds.includes(`collection-completion:${DB_SLUG}:b`), "bell must clear when the record is deleted");
   });
 });
+
+describe("storage (firestore) collection — watcher set stays quiet", () => {
+  const FS_SLUG = "test-watcher-firestore";
+
+  function writeFirestoreSchema(): void {
+    const skillDir = path.join(workdir, ".claude/skills", FS_SLUG);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(path.join(skillDir, "SKILL.md"), `---\nname: ${FS_SLUG}\ndescription: test\n---\nbody\n`);
+    writeFileSync(
+      path.join(skillDir, "schema.json"),
+      JSON.stringify({
+        title: "Cloud Watcher",
+        icon: "cloud",
+        storage: { type: "firestore" },
+        primaryKey: "id",
+        fields: {
+          id: { type: "string", label: "ID", primary: true, required: true },
+          item: { type: "string", label: "Item" },
+        },
+      }),
+    );
+  }
+
+  // Regression for the Codex finding on PR #2209: a firestore collection has
+  // no file to watch, so it never enters `watchers` and `startNewWatchers`
+  // retries it on every tick. Reporting that attempt as a mutation made
+  // `syncWatchers` sweep every 30s forever, for as long as one such
+  // collection existed. A quiet tick must report no mutation.
+  it("does not report a mutation on repeat ticks (no permanent sweep loop)", async () => {
+    writeFirestoreSchema();
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+
+    // Nothing changed between these — both must be quiet. Before the fix the
+    // firestore collection made every one of them report a mutation.
+    assert.equal(await _syncWatchersForTesting(), false, "first quiet tick must not sweep");
+    assert.equal(await _syncWatchersForTesting(), false, "second quiet tick must not sweep");
+  });
+
+  it("still reports a mutation when a watchable collection really appears", async () => {
+    writeFirestoreSchema();
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+    assert.equal(await _syncWatchersForTesting(), false);
+
+    // A file-backed collection appearing IS a real mutation — the quiet-tick
+    // fix must not suppress that signal.
+    writeSchema(buildSchema());
+    assert.equal(await _syncWatchersForTesting(), true, "a newly mounted watcher must still sweep");
+  });
+});

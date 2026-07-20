@@ -174,9 +174,11 @@ export async function stopCollectionWatchers(): Promise<void> {
   started = false;
 }
 
-/** Test-only: manually trigger one rediscovery + reconcile pass. */
-export async function _syncWatchersForTesting(): Promise<void> {
-  await syncWatchers();
+/** Test-only: manually trigger one rediscovery + reconcile pass. Returns
+ *  whether the pass considered the watcher set changed (and therefore
+ *  swept) — lets a test assert that a quiet tick stays quiet. */
+export async function _syncWatchersForTesting(): Promise<boolean> {
+  return syncWatchers();
 }
 
 /** Test-only: drive one wall-clock tick synchronously, with an optional
@@ -211,22 +213,26 @@ async function tickTimeTriggers(now: Date = evalNow()): Promise<void> {
  *  collections. Adds watchers for new slugs (with a boot reconcile of
  *  their items), drops watchers for vanished slugs, and re-reconciles
  *  items for collections whose schema changed. Runs a final sweep when
- *  this tick changed the watcher set or any schema. */
-async function syncWatchers(): Promise<void> {
+ *  this tick changed the watcher set or any schema.
+ *
+ *  Returns whether that sweep ran — a quiet tick must return false. The
+ *  rediscovery poll fires every 30 s forever, so anything that reports a
+ *  mutation without one becomes a permanent background sweep loop. */
+async function syncWatchers(): Promise<boolean> {
   let collections;
   try {
     collections = await discoverCollections(discoveryOpts);
   } catch (err) {
     log().warn("watcher discover failed", { error: errMsg(err) });
-    return;
+    return false;
   }
   const liveSlugs = new Set(collections.map((collection) => collection.slug));
   const vanishedMutated = stopVanishedWatchers(liveSlugs);
   const schemaMutated = await reconcileChangedSchemas(collections);
   const addedMutated = await startNewWatchers(collections);
-  if (vanishedMutated || schemaMutated || addedMutated) {
-    await sweepStaleActiveEntries(discoveryOpts);
-  }
+  if (!vanishedMutated && !schemaMutated && !addedMutated) return false;
+  await sweepStaleActiveEntries(discoveryOpts);
+  return true;
 }
 
 function stopVanishedWatchers(liveSlugs: Set<string>): boolean {
@@ -316,14 +322,23 @@ async function reconcileChangedSchemas(collections: readonly LoadedCollection[])
   return mutated;
 }
 
+/** Mount a watcher for every collection that doesn't have one yet. Returns
+ *  whether the watcher SET actually changed — the starters report whether
+ *  they mounted, because attempting is not mounting: a backend with no file
+ *  to watch (firestore) and a failed mount both leave `watchers` untouched,
+ *  so the collection is retried on the next tick. Reporting those as
+ *  mutations would make `syncWatchers` sweep on every tick forever. */
 async function startNewWatchers(collections: readonly LoadedCollection[]): Promise<boolean> {
   let mutated = false;
   for (const collection of collections) {
     if (watchers.has(collection.slug)) continue;
-    if (collection.schema.dataSource !== undefined) await startDataSourceWatcher(collection);
-    else if (collection.schema.storage !== undefined) await startStorageWatcher(collection);
-    else await startWatcherFor(collection);
-    mutated = true;
+    const mounted =
+      collection.schema.dataSource !== undefined
+        ? await startDataSourceWatcher(collection)
+        : collection.schema.storage !== undefined
+          ? await startStorageWatcher(collection)
+          : await startWatcherFor(collection);
+    if (mounted) mutated = true;
   }
   return mutated;
 }
@@ -346,9 +361,9 @@ function scheduleDataSourcePublish(slug: string): void {
  *  atomic replace — the inode changes) and filters events to the file's
  *  basename; a null filename (platform quirk) is treated as a hit. No
  *  reconciler involvement — replacing the CSV just refreshes the views. */
-async function startDataSourceWatcher(collection: LoadedCollection): Promise<void> {
+async function startDataSourceWatcher(collection: LoadedCollection): Promise<boolean> {
   const file = collection.dataSourceFile;
-  if (file === undefined) return;
+  if (file === undefined) return false;
   const dir = path.dirname(file);
   const base = path.basename(file);
   try {
@@ -362,8 +377,10 @@ async function startDataSourceWatcher(collection: LoadedCollection): Promise<voi
     });
     watchers.set(collection.slug, { slug: collection.slug, dataDir: dir, watcher, schemaJson: JSON.stringify(collection.schema), collection });
     log().info("dataSource watcher started", { slug: collection.slug, file });
+    return true;
   } catch (err) {
     log().warn("dataSource watcher start failed", { slug: collection.slug, error: errMsg(err) });
+    return false;
   }
 }
 
@@ -374,9 +391,14 @@ async function startDataSourceWatcher(collection: LoadedCollection): Promise<voi
  *  already publish their own change events; the extra ping is debounced
  *  and idempotent). Mounts on the parent dir, same as the dataSource
  *  watcher, so an atomic replace can't strand the watch. */
-async function startStorageWatcher(collection: LoadedCollection): Promise<void> {
+async function startStorageWatcher(collection: LoadedCollection): Promise<boolean> {
   const file = collection.storageFile;
-  if (file === undefined) return;
+  // No db file to watch — a `firestore` storage collection keeps its records
+  // off the filesystem entirely. Reporting "not mounted" matters: the caller
+  // uses it to decide whether the watcher set actually changed, and claiming
+  // a mount here would make every rediscovery tick look like a mutation
+  // forever (this collection can never appear in `watchers`).
+  if (file === undefined) return false;
   const dir = path.dirname(file);
   const base = path.basename(file);
   try {
@@ -399,8 +421,10 @@ async function startStorageWatcher(collection: LoadedCollection): Promise<void> 
     });
     watchers.set(collection.slug, { slug: collection.slug, dataDir: dir, watcher, schemaJson: JSON.stringify(collection.schema), collection });
     log().info("storage watcher started", { slug: collection.slug, file });
+    return true;
   } catch (err) {
     log().warn("storage watcher start failed", { slug: collection.slug, error: errMsg(err) });
+    return false;
   }
 }
 
@@ -422,7 +446,7 @@ export function _scheduleStorageReconcileForTesting(slug: string): Promise<void>
   return scheduleStorageReconcile(slug);
 }
 
-async function startWatcherFor(collection: LoadedCollection): Promise<void> {
+async function startWatcherFor(collection: LoadedCollection): Promise<boolean> {
   const { slug, schema, dataDir } = collection;
   try {
     // `fs.watch` throws on a missing dir, so ensure it exists. New
@@ -445,8 +469,10 @@ async function startWatcherFor(collection: LoadedCollection): Promise<void> {
     });
     watchers.set(slug, { slug, dataDir, watcher, schemaJson: JSON.stringify(schema), collection });
     log().info("watcher started", { slug, dataDir });
+    return true;
   } catch (err) {
     log().warn("watcher start failed", { slug, error: errMsg(err) });
+    return false;
   }
 }
 
