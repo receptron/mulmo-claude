@@ -15,6 +15,7 @@ import path from "node:path";
 
 import { makeManageCollectionTool, MAX_UNSELECTIVE_ITEMS, MAX_SCHEMA_ISSUES } from "../../server/agent/mcp-tools/manageCollection.js";
 import { mcpTools } from "../../server/agent/mcp-tools/index.js";
+import { setFirestoreAccessor } from "@mulmoclaude/core/collection/server";
 
 let workdir: string;
 let emptyUserDir: string;
@@ -608,5 +609,46 @@ describe("manageCollection — deleteItems", () => {
     mkdirSync(path.join(workdir, "data"), { recursive: true });
     writeFileSync(path.join(workdir, "data/students.csv"), "student_id,name\ns1,Ada\n");
     assert.match(await run({ action: "deleteItems", slug: "students", ids: ["s1"] }), /read-only/);
+  });
+});
+
+describe("manageCollection — a disconnected backend never looks like missing data", () => {
+  const CLOUD = "cloud-notes";
+
+  beforeEach(() => {
+    writeSkill(CLOUD, {
+      title: "Cloud Notes",
+      icon: "cloud",
+      storage: { type: "firestore" },
+      primaryKey: "id",
+      fields: { id: { type: "string", label: "ID", primary: true, required: true }, note: { type: "string", label: "Note" } },
+    });
+    setFirestoreAccessor(null); // no remote-host session
+  });
+
+  afterEach(() => setFirestoreAccessor(null));
+
+  // Codex (local review): the store throws a distinguishable error, but the
+  // layers above catch broadly. Flattening that into "missing" / "malformed
+  // file" / "0 records" sends the agent after a data problem that does not
+  // exist, and could have it offer to recreate records that are intact.
+  it("reports getItems by id as unavailable, not as missing records", async () => {
+    const result = await run({ action: "getItems", slug: CLOUD, ids: ["a"] });
+    assert.match(result, /connect remote-host/i);
+    assert.doesNotMatch(result, /"missing"/, "must not report the record as absent");
+  });
+
+  it("reports a merge against an unreachable backend as unavailable, not a malformed file", async () => {
+    const result = await run({ action: "putItems", slug: CLOUD, items: [{ id: "a", note: "x" }], mode: "merge" });
+    assert.match(result, /connect remote-host/i);
+    assert.doesNotMatch(result, /malformed stored file/, "must not blame a file that doesn't exist");
+  });
+
+  it("reports the ontology count as unknown rather than zero", async () => {
+    const result = await runJson({ action: "getOntology" });
+    const collections = result.collections as { slug: string; recordCount: number | null }[];
+    const entry = collections.find((candidate) => candidate.slug === CLOUD);
+    assert.ok(entry, "the collection is still listed");
+    assert.equal(entry.recordCount, null, "unreachable must be null, never 0");
   });
 });

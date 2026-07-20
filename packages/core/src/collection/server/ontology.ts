@@ -11,6 +11,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { discoverCollections, type DiscoveryOptions } from "./discovery";
 import { storeFor } from "./store";
+import { isBackendUnavailable } from "./firestoreStore";
 import { storageKindFor } from "../core/schema";
 import { isRegularFile } from "./io";
 import { isContainedInRoot } from "./paths";
@@ -40,7 +41,11 @@ export interface CollectionOntologyEntry {
   /** The effective display field: the schema's `displayField`, falling
    *  back to the primaryKey exactly as render-time labelling does. */
   displayField: string;
-  recordCount: number;
+  /** Records in the collection, or `null` when the backend couldn't be
+   *  reached to count them (a disconnected firestore session). `null` is
+   *  deliberately NOT 0: an unreachable collection reported as empty invites
+   *  the agent to "restore" data that is intact but out of reach. */
+  recordCount: number | null;
   relations: OntologyRelation[];
 }
 
@@ -87,11 +92,16 @@ async function countRecordFiles(dataDir: string, workspaceRoot: string): Promise
  *  the readdir count would always misreport 0. Fail-soft to 0 like
  *  `countRecordFiles` (an unreadable file / missing engine must not
  *  break the whole ontology). */
-async function countRecords(collection: LoadedCollection, workspaceRoot: string): Promise<number> {
+async function countRecords(collection: LoadedCollection, workspaceRoot: string): Promise<number | null> {
   if (storageKindFor(collection.schema) !== "file") {
     try {
       return (await storeFor(collection, { workspaceRoot }).page({ limit: 0 })).total;
-    } catch {
+    } catch (err) {
+      // `null` = "couldn't count", which is NOT the same as zero. A
+      // disconnected firestore collection reported as 0 records reads as
+      // "this collection is empty" and would have the agent offer to
+      // repopulate data that is sitting safely in the user's account.
+      if (isBackendUnavailable(err)) return null;
       return 0;
     }
   }

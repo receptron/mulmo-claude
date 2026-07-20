@@ -27,7 +27,7 @@ export {
 // subpath instead (same isolation `./remote-host/server` uses). The TYPES are
 // safe here: they erase at build time.
 export type { FirestoreDoc, FirestoreDocs } from "./firestoreDocs";
-export { firestoreItemsPath } from "./firestoreStore";
+export { firestoreItemsPath, BackendUnavailableError, isBackendUnavailable } from "./firestoreStore";
 export type { LoadedCollection } from "./discoveredCollection";
 export * from "./paths";
 export * from "./templatePath";
