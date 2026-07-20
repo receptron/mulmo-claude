@@ -158,6 +158,23 @@ Without a Gemini API key, roles that use image generation will be disabled in th
 
 The Gemini API has a free tier that is sufficient for personal use.
 
+### Using OpenAI for image generation instead
+
+`generateImage` can run on OpenAI instead of Gemini. Set these in your
+`.env` (Gemini stays the default when they're unset):
+
+- `MULMOCLAUDE_IMAGE_PROVIDER=openai` — select the OpenAI provider.
+- `OPENAI_API_KEY=...` — required by the OpenAI provider.
+- `MULMOCLAUDE_OPENAI_IMAGE_MODEL=gpt-image-1` — optional model override
+  (defaults to `gpt-image-1`).
+
+When `MULMOCLAUDE_IMAGE_PROVIDER` is unset, the first provider with a
+configured key wins (Gemini first). An explicit provider is honoured even
+if its key is missing — the call then fails with a clear
+`…_API_KEY is not set` error. Audio / video generation and the
+`editImage` tool stay Gemini-only, so `GEMINI_API_KEY` is still needed
+for those.
+
 ## Security
 
 MulmoClaude uses Claude Code as its AI backend, which has access to tools including Bash — meaning it can read and write files on your machine.

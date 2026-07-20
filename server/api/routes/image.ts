@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
-import { generateGeminiImageContent, generateGeminiImageFromPrompt } from "../../utils/gemini.js";
+import { generateGeminiImageContent, generateImageFromPrompt, resolveImageProvider } from "@mulmoclaude/core/image-generation";
+import { imageGenConfig, isGeminiAvailable, isOpenAIImageAvailable } from "../../system/env.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
 import { saveImage, overwriteImage, loadImageBase64, stripDataUri, isImagePath } from "../../utils/files/image-store.js";
@@ -34,8 +35,9 @@ type ImageResponse = ImageSuccessResponse | ImageErrorResponse;
 
 // Shared save-and-respond for /generate-image and /edit-image. The
 // only difference between the two routes is how they obtain the raw
-// imageData from Gemini — once that's done, the "save to disk and
-// build the JSON response" step is identical.
+// imageData from the provider (/generate-image dispatches to the
+// resolved provider; /edit-image stays Gemini) — once that's done, the
+// "save to disk and build the JSON response" step is identical.
 async function respondWithImage(
   res: Response<ImageResponse>,
   imageData: string | undefined,
@@ -109,21 +111,25 @@ router.post(API_ROUTES.image.generate, async (req: Request<object, unknown, Gene
     res.status(400).json({ success: false, message: "prompt is required" });
     return;
   }
-  log.info("image", "generate: start", { prompt: promptMeta(prompt), model: model ?? "(default)" });
+  const config = imageGenConfig();
+  const provider = resolveImageProvider(config, isGeminiAvailable(), isOpenAIImageAvailable());
+  log.info("image", "generate: start", { prompt: promptMeta(prompt), model: model ?? "(default)", provider });
   try {
-    const { imageData, message } = await generateGeminiImageFromPrompt(prompt, model);
+    const { imageData, message } = await generateImageFromPrompt(config, prompt, model);
     if (!imageData) {
-      log.warn("image", "generate: gemini returned no image data", {
+      log.warn("image", "generate: provider returned no image data", {
         prompt: promptMeta(prompt),
+        provider,
         fallbackMessage: message,
       });
     } else {
-      log.info("image", "generate: ok", { prompt: promptMeta(prompt), bytes: imageData.length });
+      log.info("image", "generate: ok", { prompt: promptMeta(prompt), provider, bytes: imageData.length });
     }
     await respondWithImage(res, imageData, message, prompt, "generation");
   } catch (err) {
-    log.error("image", "generate: gemini call threw", {
+    log.error("image", "generate: provider call threw", {
       prompt: promptMeta(prompt),
+      provider,
       error: errorMessage(err),
     });
     res.status(500).json({ success: false, message: errorMessage(err) });
@@ -207,7 +213,9 @@ router.post(API_ROUTES.image.edit, async (req: Request<object, unknown, EditImag
     // inlineData parts before the text instruct Gemini to combine
     // / edit the inputs as a single composition.
     const parts = [...sources.map((src) => ({ inlineData: { mimeType: src.mimeType, data: src.data } })), { text: prompt }];
-    const { imageData, message } = await generateGeminiImageContent([{ parts }]);
+    // /edit-image stays Gemini-only (OpenAI images/edits parity is
+    // separate work) but now goes through the core module.
+    const { imageData, message } = await generateGeminiImageContent(imageGenConfig(), [{ parts }]);
     if (!imageData) {
       log.warn("image", "edit: gemini returned no image data", {
         prompt: promptMeta(prompt),

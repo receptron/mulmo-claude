@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/core",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "description": "Shared server-side core for MulmoClaude and MulmoTerminal — the always-shipped-together subsystems consolidated behind subpath exports so the two hosts can't drift. Server-only except the browser-safe ./whisper/client, ./workspace-setup/slug, ./translation/client, ./remote-view and ./remote-host entries. All host specifics are injected.",
   "type": "module",
   "exports": {
@@ -15,6 +15,12 @@
       "import": "./dist/collection/index.js",
       "require": "./dist/collection/index.cjs",
       "default": "./dist/collection/index.js"
+    },
+    "./image-generation": {
+      "types": "./dist/image-generation/index.d.ts",
+      "import": "./dist/image-generation/index.js",
+      "require": "./dist/image-generation/index.cjs",
+      "default": "./dist/image-generation/index.js"
     },
     "./google": {
       "types": "./dist/google/index.d.ts",
@@ -173,6 +179,7 @@
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.4-r.1",
+    "@google/genai": "^2.12.0",
     "fast-xml-parser": "^5.10.1",
     "google-auth-library": "^10.9.0",
     "iconv-lite": "^0.7.3",

@@ -1,4 +1,5 @@
-// Unit tests for the pure helpers in `server/utils/gemini.ts`.
+// Unit tests for the pure helpers in the core Gemini image client
+// (moved from the host `test/utils/test_gemini.ts`).
 //
 // `generateGeminiImageContent` itself is a thin wrapper over the
 // `@google/genai` SDK and isn't unit-tested here — exercising it
@@ -12,7 +13,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { GenerateContentResponse, Part } from "@google/genai";
-import { extractImageResult, firstCandidateParts, firstFinishReason } from "../../server/utils/gemini.js";
+import { extractImageResult, firstCandidateParts, firstFinishReason } from "../../src/image-generation/gemini.ts";
 
 // Construct a minimal GenerateContentResponse-shaped object for the
 // helpers to read. Only the fields the helpers touch are populated;

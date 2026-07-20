@@ -147,6 +147,39 @@ missing key to `.env` (restart the server) or rewrite the script's
 keys configured. Don't retry the render unchanged — the same provider
 will fail the same way.
 
+## generateImage / editImages tool — "…_API_KEY is not set" or a provider error
+
+### Symptoms
+
+- The `generateImage` tool returns `GEMINI_API_KEY is not set` or
+  `OPENAI_API_KEY is not set`, or an image-provider error surfaces to
+  the agent (e.g. `401 Incorrect API key`, a moderation rejection).
+- The canvas shows a "missing image" with a `generate:` warn/error in
+  the server log under the `image` prefix.
+
+### Cause
+
+Standalone image generation (`generateImage`) picks its provider at the
+**deployment** level, not per call. `MULMOCLAUDE_IMAGE_PROVIDER` selects
+it: `gemini` (default) needs `GEMINI_API_KEY`; `openai` needs
+`OPENAI_API_KEY` (model overridable via `MULMOCLAUDE_OPENAI_IMAGE_MODEL`,
+default `gpt-image-1`). When `MULMOCLAUDE_IMAGE_PROVIDER` is unset the
+first provider with a configured key wins (Gemini first). An **explicit**
+provider is honoured even when its key is missing — the call then fails
+per-request with the `…_API_KEY is not set` message above, on purpose, so
+the misconfiguration is unambiguous. `editImages` is always Gemini and
+always needs `GEMINI_API_KEY`.
+
+### Fix
+
+Read the resolved provider in the `image` `generate: start` log line,
+then add that provider's key to the `.env` in your launch dir (restart
+the server), or set `MULMOCLAUDE_IMAGE_PROVIDER` to a provider whose key
+is configured. Don't retry unchanged — the same provider fails the same
+way. The `generate` route appends the provider's own error text to the
+message; read it before assuming it's a key problem (it may be quota /
+moderation).
+
 ## Build / yarn workspace ordering
 
 ### Symptoms

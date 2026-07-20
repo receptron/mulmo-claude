@@ -22,6 +22,9 @@ export default defineConfig({
         // Host re-exports these instead of keeping its own copy (#2217).
         "utils/index": "src/utils/index.ts",
         "collection/index": "src/collection/index.ts",
+        // Server-only provider-neutral image-generation engine (Gemini +
+        // OpenAI) — moved out of the host so MulmoTerminal can adopt it.
+        "image-generation/index": "src/image-generation/index.ts",
         "collection/server/index": "src/collection/server/index.ts",
         "collection/paths": "src/collection/server/templatePath.ts",
         "collection/registry/index": "src/collection/registry/index.ts",
@@ -66,6 +69,7 @@ export default defineConfig({
         /^@receptron\//,
         /^firebase/,
         /^@duckdb\//,
+        /^@google\//,
         "iconv-lite",
         "zod",
         "gui-chat-protocol",

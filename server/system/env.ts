@@ -15,7 +15,9 @@
 // `docs/developer.md` lists every env var and what it does; this
 // module is the runtime side of that table.
 
+import type { ImageGenConfig } from "@mulmoclaude/core/image-generation";
 import { CLI_FLAGS } from "../utils/cli-flags.mjs";
+import { log } from "./logger/index.js";
 
 // ── Type coercion helpers ───────────────────────────────────────────
 
@@ -93,7 +95,16 @@ export const env = Object.freeze({
 
   // API credentials (undefined when not configured)
   geminiApiKey: process.env.GEMINI_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY,
   xBearerToken: process.env.X_BEARER_TOKEN,
+
+  // Image-generation provider selection (feat-image-provider-openai).
+  // `imageProvider` is the raw env value ("gemini" | "openai"); the
+  // core resolver validates it and falls back to availability when it
+  // is unset / unrecognised. `openaiImageModel` overrides the OpenAI
+  // client's "gpt-image-1" default. Gemini stays the default provider.
+  imageProvider: process.env.MULMOCLAUDE_IMAGE_PROVIDER,
+  openaiImageModel: process.env.MULMOCLAUDE_OPENAI_IMAGE_MODEL,
 
   // Bearer auth token (#272, #316): if set, the server uses this
   // verbatim instead of generating a fresh random token at startup.
@@ -167,9 +178,30 @@ export const env = Object.freeze({
 // ── Derived helpers ─────────────────────────────────────────────────
 
 /** True iff a Gemini API key is configured. Drives the "image
- *  generation available" hint in the UI. */
+ *  generation available" hint in the UI (Gemini absence still governs
+ *  audio / video, which stay Gemini-only). */
 export function isGeminiAvailable(): boolean {
   return env.geminiApiKey !== undefined && env.geminiApiKey !== "";
+}
+
+/** True iff an OpenAI API key is configured (the OpenAI image
+ *  provider needs it). */
+export function isOpenAIImageAvailable(): boolean {
+  return env.openaiApiKey !== undefined && env.openaiApiKey !== "";
+}
+
+/** Assemble the core `ImageGenConfig` from this host's env + logger.
+ *  Values come from the frozen snapshot above (read once at module
+ *  load); the host builds the config here so the core engine stays
+ *  env-free and portable. */
+export function imageGenConfig(): ImageGenConfig {
+  return {
+    geminiApiKey: env.geminiApiKey,
+    openaiApiKey: env.openaiApiKey,
+    provider: env.imageProvider,
+    openaiImageModel: env.openaiImageModel,
+    log,
+  };
 }
 
 /** The components MULMOCLAUDE_ABLATION may disable (evaluation-only —

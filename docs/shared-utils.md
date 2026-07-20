@@ -41,6 +41,12 @@ This catalog only covers **cross-cutting** helpers — formatters, error helpers
 | `server/utils/files/naming.ts` | `yearMonthUtc(now?)`, `buildArtifactPath(...)`, `buildArtifactPathRandom(...)` | `YYYY/MM` artifact partitioning (#764) and the artifact path builders. UTC so a workspace synced across timezones groups into the same bucket.            |
 | `server/utils/request.ts` | request-side helpers                                                             | Express request parsing / typed body extraction.                                                                                                            |
 
+## Media (image generation)
+
+| Path | Helper | When to use |
+| ---- | ------ | ----------- |
+| `@mulmoclaude/core/image-generation` | `generateImageFromPrompt(config, prompt, model?)` / `resolveImageProvider(config, geminiOk, openaiOk)` / `generateGeminiImageContent(config, contents, genConfig?, model?)` / `extractImageResult` / `extractOpenAIImageResult` | Server-only, provider-neutral image generation (Gemini + OpenAI). The ONE engine both hosts share — build an `ImageGenConfig` from your env + logger once (host side: `imageGenConfig()` in `server/system/env.ts`) and pass it in; the module reads no `process.env`. Use the dispatcher for text→image; `generateGeminiImageContent` for the Gemini-only edit path; the `extract*` helpers are the pure response narrowers. Never re-add a host-local Gemini/OpenAI image client — that's the drift this move removed (`plans/feat-image-provider-openai.md`). |
+
 ## Files / Paths
 
 | Path                                     | Helper                                                                                                              | When to use                                                                                                                                                                                                                                                           |

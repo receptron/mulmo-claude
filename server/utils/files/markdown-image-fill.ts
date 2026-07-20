@@ -6,7 +6,8 @@
 // observability. Image generation/storage is injected as `resolveImage`.
 import path from "node:path";
 import { fillImagePlaceholders, IMAGE_PLACEHOLDER, type ImagePlaceholderResult } from "@mulmoclaude/markdown-plugin";
-import { generateGeminiImageFromPrompt, isGeminiAvailable } from "../gemini.js";
+import { generateGeminiImageFromPrompt } from "@mulmoclaude/core/image-generation";
+import { imageGenConfig, isGeminiAvailable } from "../../system/env.js";
 import { errorMessage } from "../errors.js";
 import { promptMeta } from "../promptMeta.js";
 import { log } from "../../system/logger/index.js";
@@ -23,7 +24,7 @@ async function generateImageFile(prompt: string, index: number, total: number): 
   const meta = promptMeta(prompt);
   log.info(LOG_PREFIX, "image gen start", { index, total, prompt: meta });
   try {
-    const { imageData } = await generateGeminiImageFromPrompt(prompt);
+    const { imageData } = await generateGeminiImageFromPrompt(imageGenConfig(), prompt);
     const elapsedMs = Date.now() - startedAt;
     if (imageData) {
       const url = await saveImage(imageData);

@@ -1,12 +1,14 @@
+// Gemini image-generation client. Moved verbatim from the host
+// `server/utils/gemini.ts` minus its env/log coupling: the API key and
+// logger now arrive on an `ImageGenConfig` param so the module carries
+// no dependency on host-only modules and MulmoTerminal can adopt it
+// with a dep bump. The pure extractors are unchanged.
+
 import { GoogleGenAI, type GenerateContentParameters, type GenerateContentResponse, type Part } from "@google/genai";
-import { env } from "../system/env.js";
-import { log } from "../system/logger/index.js";
-import { errorMessage } from "./errors.js";
+import { errorMessage } from "../utils/errors.js";
+import { type ImageGenConfig, type ImageGenResult, loggerFor } from "./types.js";
 
-export { isGeminiAvailable } from "../system/env.js";
-
-export function getGeminiClient(): GoogleGenAI {
-  const apiKey = env.geminiApiKey;
+export function getGeminiClient(apiKey: string | undefined): GoogleGenAI {
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
   return new GoogleGenAI({ apiKey });
 }
@@ -19,15 +21,6 @@ const DEFAULT_IMAGE_CONFIG: GenerateContentParameters["config"] = {
   responseModalities: ["TEXT", "IMAGE"],
   imageConfig: { aspectRatio: "16:9" },
 };
-
-export interface GeminiImageResult {
-  // Raw base64 payload (no `data:` prefix). Undefined if Gemini
-  // declined to return an image, e.g. because the prompt was filtered.
-  imageData?: string;
-  // Optional text part returned alongside the image (or in lieu of
-  // it). Used as a fallback message when imageData is empty.
-  message?: string;
-}
 
 // Pull the first candidate's `content.parts` array out of a Gemini
 // response, defaulting to `[]` when any layer of the optional chain is
@@ -46,8 +39,8 @@ export function firstFinishReason(response: GenerateContentResponse): string | u
 // message} pair the rest of the app cares about. Last text wins; last
 // inline-image wins. Parts without text or `inlineData.data` are
 // skipped. Pure — exported for unit tests.
-export function extractImageResult(parts: readonly Part[]): GeminiImageResult {
-  const result: GeminiImageResult = {};
+export function extractImageResult(parts: readonly Part[]): ImageGenResult {
+  const result: ImageGenResult = {};
   for (const part of parts) {
     if (part.text) result.message = part.text;
     if (part.inlineData?.data) result.imageData = part.inlineData.data;
@@ -58,7 +51,7 @@ export function extractImageResult(parts: readonly Part[]): GeminiImageResult {
 // Low-level wrapper around `ai.models.generateContent` that pulls
 // the first inline image and text part out of the response. Use this
 // when you need to pass custom `contents` (e.g. text + reference
-// image for /edit-image). Pass `undefined` for `config` to omit it
+// image for /edit-image). Pass `undefined` for `genConfig` to omit it
 // entirely from the request.
 //
 // Per-call logging is deliberately at debug level so the route /
@@ -67,22 +60,24 @@ export function extractImageResult(parts: readonly Part[]): GeminiImageResult {
 // debug line, then re-thrown — callers are still responsible for the
 // HTTP / canvas response.
 export async function generateGeminiImageContent(
+  config: ImageGenConfig,
   contents: GenerateContentParameters["contents"],
-  config?: GenerateContentParameters["config"],
+  genConfig?: GenerateContentParameters["config"],
   model: string = DEFAULT_IMAGE_MODEL,
-): Promise<GeminiImageResult> {
-  const client = getGeminiClient();
+): Promise<ImageGenResult> {
+  const log = loggerFor(config);
+  const client = getGeminiClient(config.geminiApiKey);
   log.debug("gemini", "generateContent: request", {
     model,
-    hasConfig: Boolean(config),
-    aspectRatio: config?.imageConfig?.aspectRatio,
+    hasConfig: Boolean(genConfig),
+    aspectRatio: genConfig?.imageConfig?.aspectRatio,
   });
   let response;
   try {
     response = await client.models.generateContent({
       model,
       contents,
-      ...(config && { config }),
+      ...(genConfig && { config: genConfig }),
     });
   } catch (err) {
     log.debug("gemini", "generateContent: SDK threw", { model, error: errorMessage(err) });
@@ -102,6 +97,6 @@ export async function generateGeminiImageContent(
 
 // Convenience wrapper for the common "text prompt → image" path.
 // Uses the standard 16:9 image config.
-export async function generateGeminiImageFromPrompt(prompt: string, model?: string): Promise<GeminiImageResult> {
-  return generateGeminiImageContent([{ text: prompt }], DEFAULT_IMAGE_CONFIG, model);
+export async function generateGeminiImageFromPrompt(config: ImageGenConfig, prompt: string, model?: string): Promise<ImageGenResult> {
+  return generateGeminiImageContent(config, [{ text: prompt }], DEFAULT_IMAGE_CONFIG, model);
 }

@@ -21,7 +21,7 @@
     "test": "tsx --test test/test_*.ts"
   },
   "dependencies": {
-    "@mulmoclaude/core": "^0.29.0"
+    "@mulmoclaude/core": "^0.30.0"
   },
   "peerDependencies": {
     "gui-chat-protocol": "^0.4.0",
