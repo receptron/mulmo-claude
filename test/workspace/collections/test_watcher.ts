@@ -462,3 +462,69 @@ describe("storage (firestore) collection — declared bells actually run", () =>
     assert.ok(legacyIds.includes(`collection-completion:${FSB_SLUG}:a`), "must recover after reconnect");
   });
 });
+
+describe("storage (firestore) collection — bells don't outlive their schema", () => {
+  const FSD_SLUG = "test-watcher-fs-drop";
+
+  function writeSchemaFor(withBells: boolean): void {
+    const skillDir = path.join(workdir, ".claude/skills", FSD_SLUG);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(path.join(skillDir, "SKILL.md"), `---\nname: ${FSD_SLUG}\ndescription: test\n---\nbody\n`);
+    writeFileSync(
+      path.join(skillDir, "schema.json"),
+      JSON.stringify({
+        title: "Cloud Drop",
+        icon: "cloud",
+        storage: { type: "firestore" },
+        primaryKey: "id",
+        fields: {
+          id: { type: "string", label: "ID", primary: true, required: true },
+          read: { type: "boolean", label: "Read", required: true },
+        },
+        ...(withBells ? { completionField: "read", completionDoneValues: ["true"] } : {}),
+      }),
+    );
+  }
+
+  // Regression for the third Codex finding on PR #2209: removing
+  // `completionField` drops the collection out of the reconcile set at once,
+  // so neither reconcile nor sweep would run and its bells would persist
+  // forever. Watched backends get this cleanup from `reconcileChangedSchemas`,
+  // which only sees collections in `watchers` — firestore never is.
+  it("clears bells when completionField is removed from the schema", async () => {
+    writeSchemaFor(true);
+    setFirestoreAccessor(() => ({ docs: makeDropFakeDocs(), uid: "test-uid" }));
+    await startCollectionWatchers({
+      discoveryOpts: { workspaceRoot: workdir, userSkillsDir: userDir },
+      rediscoveryIntervalMs: null,
+      triggerTickIntervalMs: null,
+    });
+
+    await _tickTimeTriggersForTesting();
+    let legacyIds = (await activeCompletionEntries()).map((entry) => entry.legacyId);
+    assert.ok(legacyIds.includes(`collection-completion:${FSD_SLUG}:a`), "precondition: the bell exists");
+
+    writeSchemaFor(false); // schema edited — no more completion tracking
+    await _tickTimeTriggersForTesting();
+    legacyIds = (await activeCompletionEntries()).map((entry) => entry.legacyId);
+    assert.ok(!legacyIds.includes(`collection-completion:${FSD_SLUG}:a`), "bell must not outlive the field that declared it");
+  });
+
+  function makeDropFakeDocs(): FirestoreDocs {
+    const rows = new Map<string, unknown>([["a", { id: "a", read: false }]]);
+    return {
+      list: () => Promise.resolve([...rows.entries()].map(([docId, data]) => ({ id: docId, data }) as FirestoreDoc)),
+      get: (_path, docId) => Promise.resolve(rows.get(docId) ?? null),
+      set: (_path, docId, data) => {
+        rows.set(docId, data);
+        return Promise.resolve();
+      },
+      create: (_path, docId, data) => {
+        if (rows.has(docId)) return Promise.resolve(false);
+        rows.set(docId, data);
+        return Promise.resolve(true);
+      },
+      delete: (_path, docId) => Promise.resolve(rows.delete(docId)),
+    };
+  }
+});

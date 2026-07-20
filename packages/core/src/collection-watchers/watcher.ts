@@ -94,6 +94,11 @@ const storageSlots = new Map<string, ReconcileSlot>();
  *  fully silent would hide a real fault (a denied rule, say) completely. */
 const lastReconcileFailure = new Map<string, string>();
 
+/** Slugs that were reconcile-eligible on the previous unwatched tick, so the
+ *  next one can notice a collection dropping out (schema edited to remove its
+ *  bells, or the collection deleted) and clear what it left behind. */
+let lastEligibleSlugs = new Set<string>();
+
 function noteReconcileFailure(slug: string, reason: string): void {
   if (lastReconcileFailure.get(slug) === reason) return;
   lastReconcileFailure.set(slug, reason);
@@ -181,6 +186,7 @@ export async function stopCollectionWatchers(): Promise<void> {
   itemSlots.clear();
   storageSlots.clear();
   lastReconcileFailure.clear();
+  lastEligibleSlugs = new Set();
   for (const timer of dataSourceTimers.values()) clearTimeout(timer);
   dataSourceTimers.clear();
   discoveryOpts = {};
@@ -265,7 +271,19 @@ async function tickUnwatchedCollections(now: Date): Promise<void> {
   // A record deleted remotely leaves a stale bell that `reconcileAllItems`
   // (which only walks records that still exist) can't clear — same pairing
   // the storage/unknown-filename paths use.
-  if (pending.length > 0) await sweepStaleActiveEntries(discoveryOpts);
+  //
+  // The drop-out case needs it too, and is easy to miss: a collection whose
+  // `completionField` was just removed (or that was deleted outright) leaves
+  // `pending` immediately, so without this it would neither reconcile nor
+  // sweep and its bells would outlive the schema that declared them. Watched
+  // backends get this from `reconcileChangedSchemas`, which only looks at
+  // collections in `watchers` — firestore is never there. Sweeping only on
+  // the TRANSITION keeps a steady state quiet (a sweep every tick while any
+  // firestore collection exists is the permanent-loop bug fixed earlier).
+  const eligible = new Set(pending.map((collection) => collection.slug));
+  const droppedOut = [...lastEligibleSlugs].some((slug) => !eligible.has(slug));
+  lastEligibleSlugs = eligible;
+  if (pending.length > 0 || droppedOut) await sweepStaleActiveEntries(discoveryOpts);
 }
 
 /** Reconcile the watcher set against the currently-discovered
