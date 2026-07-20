@@ -29,6 +29,8 @@ interface JsonRpcResponse {
     capabilities?: { tools?: { listChanged?: boolean } };
     serverInfo?: { name: string };
     tools?: { name: string; description: string }[];
+    content?: { type: string; text?: string }[];
+    isError?: boolean;
   };
   error?: { code: number; message: string };
 }
@@ -156,5 +158,50 @@ describe("MCP server subprocess smoke test", () => {
     // tools/list, so an ask-mode permission check at session start never
     // hits "MCP tool mcp__mulmoclaude__handlePermission ... not found" (#1698).
     assert.ok(toolNames.includes("handlePermission"), `handlePermission not in tools: ${toolNames.join(", ")}`);
+  });
+
+  // `name` comes from the model, so it can be any JSON type. It used to be read
+  // as `String(args.name ?? "")`, which turns an object into the literal
+  // "[object Object]" — POSTed to /api/skills as a skill name and read back to
+  // the user as one. The guard must reject it before any of that.
+  //
+  // Driven through the subprocess because mcp-server.ts is an stdio entry point
+  // with no exports; there is no unit-level seam to reach the guard.
+  it("rejects a non-string skill name instead of acting on [object Object]", async () => {
+    const env: Record<string, string> = {
+      SESSION_ID: "test-smoke-bad-name",
+      PORT: "0",
+      PLUGIN_NAMES: TOOL_NAMES.manageSkills,
+    };
+
+    const responses = await sendAndReceive(
+      [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "0.0.0" } },
+        }),
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: {
+            name: TOOL_NAMES.manageSkills,
+            arguments: { action: "save", name: { nested: "oops" }, description: "d", body: "b" },
+          },
+        }),
+      ],
+      env,
+    );
+
+    const call = responses.find((response) => response.id === 2);
+    assert.ok(call, `no response for tools/call: ${JSON.stringify(responses)}`);
+
+    const text = JSON.stringify(call);
+    // The guard's message, not an HTTP failure from the unreachable PORT=0 —
+    // proving it fired before the request was attempted.
+    assert.match(text, /name.{0,40}must be a non-empty string/i, `expected the name guard to fire, got: ${text.slice(0, 400)}`);
+    assert.doesNotMatch(text, /\[object Object\]/, `the object name reached the API path: ${text.slice(0, 400)}`);
   });
 });

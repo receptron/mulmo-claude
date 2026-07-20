@@ -399,10 +399,21 @@ async function handleManageSkillsList(): Promise<string> {
   return `Listed ${skills.length} skill${suffix}`;
 }
 
+// `args` is whatever the model emitted, so `name` can be any JSON type. These
+// three used `String(args.name ?? "")` with the stated intent of never
+// interpolating an accidental object into `/${name}` — but `String({})` is
+// exactly the "[object Object]" that would then be POSTed to the API and read
+// back to the user as a skill name. Rejecting a non-string outright is what the
+// comment always meant, and matches how `action` is read in the dispatcher.
+function skillNameArg(args: Record<string, unknown>): string {
+  if (!isNonEmptyString(args.name)) {
+    throw new Error("manageSkills: `name` must be a non-empty string");
+  }
+  return args.name;
+}
+
 async function handleManageSkillsSave(args: Record<string, unknown>): Promise<string> {
-  // Normalize name once up front so log / result messages below never
-  // interpolate an accidental object / number into `/${name}`.
-  const name = String(args.name ?? "");
+  const name = skillNameArg(args);
   const res = await postJson(
     API_ROUTES.skills.create.url,
     {
@@ -420,7 +431,7 @@ async function handleManageSkillsSave(args: Record<string, unknown>): Promise<st
 }
 
 async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<string> {
-  const name = String(args.name ?? "");
+  const name = skillNameArg(args);
   const url = `${BASE_URL}/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
@@ -443,7 +454,7 @@ async function handleManageSkillsUpdate(args: Record<string, unknown>): Promise<
 }
 
 async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<string> {
-  const name = String(args.name ?? "");
+  const name = skillNameArg(args);
   const url = `/api/skills/${encodeURIComponent(name)}?session=${encodeURIComponent(SESSION_ID)}`;
   let res: Response;
   try {
