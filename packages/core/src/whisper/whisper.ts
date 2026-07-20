@@ -43,9 +43,72 @@ export interface Whisper {
 // empty so the UI shows "didn't catch that" rather than a literal marker.
 const BLANK_MARKERS = new Set(["[blank_audio]", "[silence]", "(silence)", "[ inaudible ]"]);
 
-function normalizeTranscript(raw: string): string {
+// Whisper was trained on YouTube-style captions, so on near-silent / non-speech
+// segments it hallucinates the boilerplate that ends such videos ("thanks for
+// watching", "please subscribe", …). These arrive as real-looking text, so the
+// BLANK_MARKERS set alone won't catch them. We drop a segment only when its
+// ENTIRE content (after stripping punctuation and de-duplicating repeats) is one
+// of these phrases — genuine speech that merely contains the phrase survives.
+const HALLUCINATION_PHRASES = new Set([
+  // Japanese (the ones the user actually hit come first)
+  "ご視聴ありがとうございました",
+  "ご視聴ありがとうございます",
+  "ご視聴いただきありがとうございました",
+  "ご視聴いただきありがとうございます",
+  "最後までご視聴いただきありがとうございました",
+  "最後までご視聴いただきありがとうございます",
+  "ありがとうございました",
+  "ありがとうございます",
+  "またお会いしましょう",
+  "また次回お会いしましょう",
+  "次回もお楽しみに",
+  "チャンネル登録をお願いします",
+  "チャンネル登録よろしくお願いします",
+  "おやすみなさい",
+  // English equivalents whisper emits in the same situation
+  "thank you",
+  "thank you for watching",
+  "thanks for watching",
+  "please subscribe",
+  "thank you very much",
+  "you",
+]);
+
+// Punctuation + whitespace whisper may add around a hallucinated phrase. We
+// strip ALL of it (including internal spaces) before matching so multi-word
+// English phrases like "thank you for watching" compare cleanly against a
+// space-free canonical form; Japanese phrases have no spaces so are unaffected.
+const NOISE_CHARS = /[。、．，！？.!?…\s]+/g;
+
+function canonical(s: string): string {
+  return s.replace(NOISE_CHARS, "").toLowerCase();
+}
+
+/** Collapse the transcript to its "meaningful" core so a segment that is nothing
+ *  but hallucinated boilerplate (possibly repeated, possibly punctuated) reduces
+ *  to the empty string and gets dropped. */
+function isPureHallucination(trimmed: string): boolean {
+  let remaining = canonical(trimmed);
+  if (remaining.length === 0) return false;
+  const phrases = [...HALLUCINATION_PHRASES].map(canonical).sort((a, b) => b.length - a.length);
+  let changed = true;
+  while (changed && remaining.length > 0) {
+    changed = false;
+    for (const phrase of phrases) {
+      while (remaining.startsWith(phrase)) {
+        remaining = remaining.slice(phrase.length);
+        changed = true;
+      }
+    }
+  }
+  return remaining.length === 0;
+}
+
+export function normalizeTranscript(raw: string): string {
   const trimmed = raw.trim().replace(/\s+/g, " ");
-  return BLANK_MARKERS.has(trimmed.toLowerCase()) ? "" : trimmed;
+  if (BLANK_MARKERS.has(trimmed.toLowerCase())) return "";
+  if (isPureHallucination(trimmed)) return "";
+  return trimmed;
 }
 
 export function createWhisper(opts: WhisperOptions): Whisper {
