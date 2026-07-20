@@ -61,6 +61,35 @@ describe("createBook id validation", () => {
   });
 });
 
+// The service rejects a non-string name — but only if it still looks non-string
+// by the time it gets here. The router used to read `String(rest.name ?? "")`,
+// which turns `{}` into "[object Object]": a perfectly non-empty string that
+// sails past this guard and names the book that. These pin the guard so it
+// stays the thing a caller must not defeat.
+describe("createBook name validation", () => {
+  it("rejects a missing or blank name", async () => {
+    const root = makeTmp();
+    await assert.rejects(() => createBook({ name: "" }, root), AccountingError);
+    await assert.rejects(() => createBook({ name: "   " }, root), AccountingError);
+  });
+
+  it("rejects a non-string name rather than stringifying it", async () => {
+    const root = makeTmp();
+    for (const notAName of [{ nested: true }, ["a"], 42, null]) {
+      await assert.rejects(() => createBook({ name: notAName as unknown as string }, root), AccountingError, `should reject ${JSON.stringify(notAName)}`);
+    }
+  });
+
+  it("would have accepted the stringified form — which is why the router must not stringify", async () => {
+    const root = makeTmp();
+    // Documents the hole rather than asserting a wrong behaviour: this string
+    // IS valid as far as the service is concerned, so the only defence is the
+    // caller passing the value through untouched.
+    const result = await createBook({ name: String({ nested: true }) }, root);
+    assert.equal(result.book.name, "[object Object]");
+  });
+});
+
 describe("upsertAccount synthetic-code guard", () => {
   it("rejects account codes starting with _ (reserved for synthetic rows)", async () => {
     const root = makeTmp();

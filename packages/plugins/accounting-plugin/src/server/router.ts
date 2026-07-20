@@ -86,7 +86,7 @@ async function handleOpenBook(rest: ActionRest): Promise<OpenBookToolResult> {
 }
 
 async function handleGetReport(rest: ActionRest): Promise<unknown> {
-  const kind = String(rest.kind ?? "");
+  const kind = typeof rest.kind === "string" ? rest.kind : "";
   const periodInput = rest.period as { kind: "month"; period: string } | { kind: "range"; from: string; to: string } | undefined;
   const bookId = rest.bookId as string | undefined;
   if (kind === "balance") {
@@ -118,7 +118,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // `data` carries it like every other write action — the View
     // uses it to preselect the new book on mount.
     const result = await createBook({
-      name: String(rest.name ?? ""),
+      name: typeof rest.name === "string" ? rest.name : "",
       currency: typeof rest.currency === "string" ? rest.currency : undefined,
       country: typeof rest.country === "string" ? rest.country : undefined,
       // Passed through raw — the service coerces + validates it (number,
@@ -129,7 +129,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
   [ACCOUNTING_ACTIONS.updateBook]: async (rest) => {
     const result = await updateBook({
-      bookId: String(rest.bookId ?? ""),
+      bookId: typeof rest.bookId === "string" ? rest.bookId : "",
       name: typeof rest.name === "string" ? rest.name : undefined,
       country: typeof rest.country === "string" ? rest.country : undefined,
       // Passed through raw — the service coerces + validates it.
@@ -137,7 +137,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     });
     return { bookId: result.book.id, ...result };
   },
-  [ACCOUNTING_ACTIONS.deleteBook]: (rest) => deleteBook({ bookId: String(rest.bookId ?? ""), confirm: rest.confirm === true }),
+  [ACCOUNTING_ACTIONS.deleteBook]: (rest) => deleteBook({ bookId: typeof rest.bookId === "string" ? rest.bookId : "", confirm: rest.confirm === true }),
   [ACCOUNTING_ACTIONS.getAccounts]: (rest) => listAccounts({ bookId: rest.bookId as string | undefined }),
   [ACCOUNTING_ACTIONS.upsertAccount]: (rest) =>
     upsertAccount({
@@ -154,7 +154,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   [ACCOUNTING_ACTIONS.voidEntry]: (rest) =>
     voidEntry({
       bookId: rest.bookId as string | undefined,
-      entryId: String(rest.entryId ?? ""),
+      entryId: typeof rest.entryId === "string" ? rest.entryId : "",
       reason: rest.reason as string | undefined,
       voidDate: rest.voidDate as string | undefined,
     }),
@@ -169,7 +169,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   [ACCOUNTING_ACTIONS.setOpeningBalances]: (rest) =>
     setOpeningBalances({
       bookId: rest.bookId as string | undefined,
-      asOfDate: String(rest.asOfDate ?? ""),
+      asOfDate: typeof rest.asOfDate === "string" ? rest.asOfDate : "",
       lines: (rest.lines ?? []) as never,
       memo: rest.memo as string | undefined,
     }),
