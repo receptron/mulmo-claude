@@ -82,6 +82,11 @@ let started = false;
  *  must not clear the guard a restarted watcher set now owns. */
 let triggerTickRunning = false;
 let watcherEpoch = 0;
+/** The in-flight clock pass, so teardown can WAIT for it. Clearing the guard
+ *  alone would let a restart arm a second pass while the old one still runs —
+ *  the epoch stops a stale `finally` corrupting the new guard, but it cannot
+ *  serialize the two passes. */
+let triggerTickInFlight: Promise<void> | null = null;
 /** Discovery options threaded into every `discoverCollections` /
  *  `loadCollection` / `sweepStaleActiveEntries` call. Production: empty
  *  (live workspace). Tests: `{ workspaceRoot, userSkillsDir }` pointing
@@ -160,7 +165,7 @@ export async function startCollectionWatchers(opts: CollectionWatcherOptions = {
         if (triggerTickRunning) return;
         triggerTickRunning = true;
         const epoch = watcherEpoch;
-        tickTimeTriggers()
+        triggerTickInFlight = tickTimeTriggers()
           .catch((err: unknown) => {
             log().warn("watcher trigger tick failed", { error: errMsg(err) });
           })
@@ -168,7 +173,9 @@ export async function startCollectionWatchers(opts: CollectionWatcherOptions = {
             // Only the generation that set the guard may clear it — a pass
             // still running across a stop/start would otherwise unlock the
             // restarted set and let two passes overlap.
-            if (epoch === watcherEpoch) triggerTickRunning = false;
+            if (epoch !== watcherEpoch) return;
+            triggerTickRunning = false;
+            triggerTickInFlight = null;
           });
       }, triggerMs);
       triggerTimer.unref();
@@ -192,6 +199,13 @@ export async function stopCollectionWatchers(): Promise<void> {
     clearInterval(triggerTimer);
     triggerTimer = null;
   }
+  // Wait for a clock pass that is still running: the interval is disarmed
+  // above, but a pass already in flight keeps touching the notifier and the
+  // slot maps. Tearing down under it would let a restart run a second pass
+  // concurrently with the first (the epoch only protects the guard flag, it
+  // does not serialize the work).
+  await triggerTickInFlight;
+  triggerTickInFlight = null;
   for (const watcher of watchers.values()) {
     try {
       watcher.watcher.close();
@@ -291,13 +305,15 @@ async function tickUnwatchedCollections(now: Date): Promise<void> {
     log().warn("trigger tick: discover failed", { error: errMsg(err) });
     return;
   }
-  // No session, nothing to reconcile: skip the whole pass rather than let
-  // each collection attempt a read and log its own failure. A closed session
-  // is an ordinary state that can last hours, and `reconcileAllItems` warns
-  // on every failed read — attempting anyway would emit a line per collection
-  // per minute, forever, for a condition the user already sees in the UI.
-  const connected = firestoreHandle() !== null;
-  const pending = connected ? collections.filter((collection) => collection.schema.storage?.type === "firestore" && needsReconcilePass(collection.schema)) : [];
+  // No session: this tick learns NOTHING, so it must change nothing. Skipping
+  // the reads avoids a warning per collection per minute for a state that can
+  // last hours (`reconcileAllItems` logs every failed read), and returning
+  // BEFORE the eligibility bookkeeping is what keeps drop-out detection
+  // correct — overwriting `lastEligibleSlugs` with an empty set here would
+  // make a collection that loses its bells WHILE disconnected look like it
+  // was never eligible, so the reconnect would never sweep what it left.
+  if (firestoreHandle() === null) return;
+  const pending = collections.filter((collection) => collection.schema.storage?.type === "firestore" && needsReconcilePass(collection.schema));
   for (const collection of pending) await reconcileUnwatched(collection, now);
   // A record deleted remotely leaves a stale bell that `reconcileAllItems`
   // (which only walks records that still exist) can't clear — same pairing

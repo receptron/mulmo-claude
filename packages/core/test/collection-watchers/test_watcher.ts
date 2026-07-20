@@ -19,7 +19,7 @@ import {
   type CollectionChangePayload,
   type LoadedCollection,
 } from "../../src/collection/server/index.ts";
-import { configureNotifier, setNotifierFilePaths } from "../../src/notifier/index.ts";
+import { configureNotifier, setNotifierFilePaths, listAll } from "../../src/notifier/index.ts";
 import {
   configureCollectionWatchers,
   _scheduleItemReconcileForTesting,
@@ -60,7 +60,14 @@ const adapter: CollectionNotificationAdapter = {
   priorityToSeverity: () => "nudge",
   buildNavigateTarget: (slug, itemId) => `/x/${slug}/${itemId}`,
   buildPluginData: ({ legacyId }) => ({ kind: "cw", legacyId }),
-  readEntry: () => null,
+  // Must round-trip `buildPluginData`: the stale sweep skips any entry whose
+  // `readEntry` returns null, so a stub that always returns null would make
+  // every sweep a silent no-op and hide the behaviour under test.
+  readEntry: (pluginData) => {
+    if (typeof pluginData !== "object" || pluginData === null) return null;
+    const record = pluginData as Record<string, unknown>;
+    return record.kind === "cw" && typeof record.legacyId === "string" ? { legacyId: record.legacyId, priority: "normal" } : null;
+  },
 };
 const warnings: { message: string; data?: Record<string, unknown> }[] = [];
 configureCollectionWatchers({
@@ -207,6 +214,73 @@ test("a disconnected session produces no per-tick reconcile warnings", async () 
     await _tickTimeTriggersForTesting();
     const readFailures = warnings.filter((entry) => entry.message.includes("reconcile list failed"));
     assert.deepEqual(readFailures, [], "a closed session must not warn once per tick");
+  } finally {
+    await stopCollectionWatchers();
+    setFirestoreAccessor(null);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A drop-out that happens WHILE disconnected must still be cleaned up on
+// reconnect. The disconnected tick has no information, so it must not
+// overwrite the remembered eligibility — otherwise the collection looks like
+// it was never eligible and its bells outlive the schema forever.
+test("disconnecting does not masquerade as a drop-out; the real one is swept on reconnect", async () => {
+  const dir = mkdtempSync(path.join(root, "fs-drop-"));
+  const skillDir = path.join(dir, ".claude", "skills", "cloud-drop");
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: cloud-drop\ndescription: t\n---\nbody\n");
+  const schema = (withBells: boolean) =>
+    JSON.stringify({
+      title: "Drop",
+      icon: "cloud",
+      storage: { type: "firestore" },
+      primaryKey: "id",
+      fields: { id: { type: "string", label: "ID", primary: true, required: true }, read: { type: "boolean", label: "R", required: true } },
+      ...(withBells ? { completionField: "read", completionDoneValues: ["true"] } : {}),
+    });
+  writeFileSync(path.join(skillDir, "schema.json"), schema(true));
+
+  const rows = new Map<string, unknown>([["a", { id: "a", read: false }]]);
+  const docs = {
+    list: () => Promise.resolve([...rows.entries()].map(([docId, data]) => ({ id: docId, data }))),
+    get: (_path: string, docId: string) => Promise.resolve(rows.get(docId) ?? null),
+    set: () => Promise.resolve(),
+    create: () => Promise.resolve(true),
+    delete: () => Promise.resolve(true),
+  };
+  setFirestoreAccessor(() => ({ docs, uid: "u" }));
+  const notifDir = mkdtempSync(path.join(root, "notif-drop-"));
+  setNotifierFilePaths({ active: path.join(notifDir, "active.json"), history: path.join(notifDir, "history.json") });
+  await startCollectionWatchers({
+    discoveryOpts: { workspaceRoot: dir, userSkillsDir: path.join(dir, ".user") },
+    rediscoveryIntervalMs: null,
+    triggerTickIntervalMs: null,
+  });
+  try {
+    await _tickTimeTriggersForTesting();
+    assert.equal((await listAll()).length, 1, "precondition: the bell exists");
+
+    // Disconnecting must not, by itself, look like a drop-out. Before this
+    // fix the tick forced `pending = []`, which made every previously-eligible
+    // slug appear to have vanished and triggered a full sweep — one that can
+    // only fail per entry (its reads need the session that is gone).
+    setFirestoreAccessor(null);
+    warnings.length = 0;
+    await _tickTimeTriggersForTesting();
+    await _tickTimeTriggersForTesting();
+    assert.deepEqual(
+      warnings.filter((entry) => entry.message.includes("sweep entry failed")),
+      [],
+      "disconnecting must not trigger a sweep whose every read then fails",
+    );
+    assert.equal((await listAll()).length, 1, "a disconnect changes nothing — the bell is still valid");
+
+    // The real drop-out is observed once reconnected, and swept then.
+    writeFileSync(path.join(skillDir, "schema.json"), schema(false));
+    setFirestoreAccessor(() => ({ docs, uid: "u" }));
+    await _tickTimeTriggersForTesting();
+    assert.equal((await listAll()).length, 0, "the bell must not outlive the field that declared it");
   } finally {
     await stopCollectionWatchers();
     setFirestoreAccessor(null);
