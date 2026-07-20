@@ -6,7 +6,7 @@ agent loses **every** `mcp__mulmoclaude__*` tool at once, so the CLI reports the
 missing `--permission-prompt-tool mcp__mulmoclaude__handlePermission` rather than
 the real cause. One symptom, many causes — this table keeps them straight.
 
-Two layers:
+Three layers:
 
 - **Layer 1 — broker dies at LOAD** (permanent `MODULE_NOT_FOUND`; fails on every
   manual retry). A dependency the broker imports is unreachable inside the mount
@@ -14,6 +14,9 @@ Two layers:
 - **Layer 2 — broker loses the STARTUP RACE** (transient; succeeds on a manual
   retry). The broker boots too slowly to connect before the CLI's first tool call.
   Timing → mitigated, not eliminated.
+- **Layer 3 — the CLI in the image is STALE** (permanent until the user clears the
+  Docker build cache). Our side is healthy; the consumer of the broker is an old
+  binary that predates the upstream fix. Environmental → documented, not fixed.
 
 ## Layer 1 — mount / resolution (permanent). Status: FIXED + TESTED
 
@@ -78,6 +81,26 @@ dispatch failure is still recorded immediately, but a successful dispatch record
 (and real duration) from the turn's completion hook. `finalizeRun` fires the one-shot completion
 hook for visible origins too (it was hidden-worker-only), a no-op when none is registered.
 
+## Layer 3 — stale CLI in the sandbox image (permanent). Status: DOCUMENTED, NOT FIXED
+
+| #   | Trigger                                                                                                                        | Platform | Fix                                                                       | Test                              | Status                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------- | --------------------------------- | -------------------------- |
+| M   | `Dockerfile.sandbox` installs `@anthropic-ai/claude-code` unpinned; the image freezes it and no upstream release retriggers a rebuild (`ensureSandboxImage()` keys on the Dockerfile SHA). CLI < 2.1.206 crashes on `--permission-prompt-tool` before the broker connects (#2202, surfaced by #2201) | any      | none in-repo — user runs `yarn sandbox:remove && docker builder prune -a -f` | none (environmental, not in CI)   | **DOCUMENTED (no code fix)** |
+
+### M — why deleting the image isn't enough
+
+`docker rmi` drops the image but not the **build cache**, so the rebuild reuses the cached
+`npm install -g` layer (`CACHED`, 0.0s) and reinstalls nothing. Only `docker builder prune -a -f`
+invalidates it. Diagnose with `docker run --rm --entrypoint claude mulmoclaude-sandbox --version`
+— the host's `claude --version` says nothing about what's in the image.
+
+Pinning the CLI was proposed (#2202 remedy 1) and **deliberately declined**: it trades a silently
+stale CLI for a silently outdated pin, and makes every upstream fix wait on a repo edit. The
+consequence is accepted — this case stays live and is handled by documentation
+(`packages/core/assets/helps/error-recovery.md`, `docs/developer.md`). If it keeps costing users
+time, the better follow-up is a staleness *check* (warn when the in-image version is behind npm's
+latest), not a pin.
+
 ## Verdict
 
 - **Layer 1 is done and regression-locked** across every platform × layout × mode combination
@@ -85,6 +108,9 @@ hook for visible origins too (it was hidden-worker-only), a no-op when none is r
 - **Layer 2 is done and tested:** J (stagger) cuts multi-task contention, K (retry) self-recovers
   the single-task race that stagger can't touch, L (honest logging) makes any residual failure
   visible instead of a false success. All three ship with regression tests.
+- **Layer 3 (M) is open by choice** — no code fix, documented recovery only. The family is
+  therefore *not* fully closed; a `handlePermission not found` report that survives a manual
+  retry and shows no `Cannot find module` should be checked against M before reopening A–L.
 
 ## Residual note
 

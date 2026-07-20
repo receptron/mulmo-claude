@@ -340,6 +340,8 @@ stay in sync.
   listing `/app/server/agent/mcp-server.ts`.
 - Sandbox (Docker) mode only. The broker dies **permanently** — it fails on every manual retry
   too (contrast the transient scheduler race below, which succeeds on a manual re-run).
+- Three causes share this message. Only this one names a missing module in the log; if the log
+  has no `Cannot find module`, check the scheduler race and the frozen-CLI section below.
 
 ### Cause
 
@@ -412,12 +414,65 @@ so it should be rare. It is NOT a module-resolution problem — the mounts / `di
 Just re-run the task. If it recurs often on a busy schedule, spread the tasks across different
 minutes rather than stacking them on the same one.
 
+If a manual re-run fails too, it isn't this race — check the frozen-CLI section below.
+
 ### Regression coverage
 
 `.github/workflows/docker_sandbox_windows.yaml` boots the real `mcp-server.ts` inside a Linux
 container from a Windows host (WSL2 + native `dockerd`), with the same mounts / env / argv the
 shipped builders produce, and asserts `handlePermission` comes back over the MCP handshake. See
 `docs/windows-docker-ci.md`.
+
+## Sandbox CLI frozen at an old version — `handlePermission not found` that `docker rmi` won't fix
+
+### Symptoms
+
+- The SAME `MCP tool mcp__mulmoclaude__handlePermission ... not found` message as the two
+  sections above. Sandbox (Docker) mode only.
+- Fails on cold start and the automatic replay fails with it, so it looks like the permanent
+  load failure — but the mounts and `dist` are fine.
+- The tell: the CLI **inside the image** is older than the host's. Anything before 2.1.206
+  crashes when `--permission-prompt-tool` is referenced before the broker connects, instead
+  of waiting for it.
+- Deleting the image (`yarn sandbox:remove`) and letting it rebuild leaves the version
+  unchanged.
+
+### Cause
+
+`Dockerfile.sandbox` installs the CLI unpinned (`RUN npm install -g @anthropic-ai/claude-code
+tsx`), so the image freezes whatever was latest when it was built. Two mechanisms then keep it
+frozen:
+
+1. `ensureSandboxImage()` (`server/system/docker.ts`) rebuilds only when the **Dockerfile's
+   SHA** changes. A new CLI release upstream doesn't change that SHA, so nothing retriggers.
+2. Deleting the image does not delete the **build cache**. The rebuild reuses the cached
+   `npm install -g` layer (it reports `CACHED` in 0.0s) and reinstalls nothing.
+
+So the usual "remove it and let it rebuild" reflex genuinely does nothing here, which is why
+this one burns time.
+
+### Fix
+
+Check the version inside the image — the host's `claude --version` says nothing about it, and
+the entrypoint override is required because the image's ENTRYPOINT is the sandbox script:
+
+```bash
+docker run --rm --entrypoint claude mulmoclaude-sandbox --version
+```
+
+If it's behind, drop the image AND the build cache, then let the next run rebuild:
+
+```bash
+yarn sandbox:remove          # docker rmi mulmoclaude-sandbox
+docker builder prune -a -f   # the step that actually invalidates the npm layer
+```
+
+`docker builder prune -a -f` clears the builder cache for the whole daemon, not just this
+image, so unrelated builds are slower once afterwards. That is the cost of the fix, not a
+sign something went wrong.
+
+The CLI is deliberately left unpinned (#2202), so this can recur whenever an upstream fix
+matters to you — the check above is the way to rule it in or out.
 
 ---
 

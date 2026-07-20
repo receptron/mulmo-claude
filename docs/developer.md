@@ -183,7 +183,7 @@ You never set these by hand; the server constructs them when spawning Claude ins
 
 | Script                | Notes                                                                                                                     |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `yarn sandbox:remove` | `docker rmi mulmoclaude-sandbox` — force a rebuild on next run.                                                           |
+| `yarn sandbox:remove` | `docker rmi mulmoclaude-sandbox` — rebuild on next run. Reuses the cached layers, so it does NOT refresh the bundled Claude CLI; add `docker builder prune -a -f` for that (#2202). |
 | `yarn sandbox:login`  | macOS only. Exports the Claude CLI keychain entry to `~/.claude/.credentials.json` so the sandbox container can reuse it. |
 | `yarn sandbox:logout` | Removes that file.                                                                                                        |
 
@@ -464,6 +464,15 @@ Set `VITE_LOCALE` in `.env` and restart `yarn dev`. Supported values: `en`, `ja`
 ## Docker sandbox (`Dockerfile.sandbox`)
 
 Minimal image: `node:22-slim` + `@anthropic-ai/claude-code` + `tsx`. Built lazily on first Docker-mode run; rebuilt when `Dockerfile.sandbox` changes (image SHA pinned in code). `yarn sandbox:remove` forces a rebuild.
+
+The CLI is installed unpinned, so the image freezes whatever was latest at build time, and no upstream CLI release retriggers a rebuild (the Dockerfile SHA is unchanged). `yarn sandbox:remove` alone does not refresh it either — the rebuild reuses the cached `npm install -g` layer. To move the CLI, check what the image actually has and clear the build cache too:
+
+```bash
+docker run --rm --entrypoint claude mulmoclaude-sandbox --version
+yarn sandbox:remove && docker builder prune -a -f
+```
+
+A stale CLI here surfaces as `handlePermission not found` (versions before 2.1.206 crash on `--permission-prompt-tool` before the broker connects) — see #2202 and `packages/core/assets/helps/error-recovery.md`.
 
 **Bind mounts** (constructed by `buildDockerSpawnArgs` in `server/agent/config.ts`):
 
