@@ -29,6 +29,7 @@ import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
 import { validateTokenClaims, validateJwkEndorsement, isAllowedSender, type AppType } from "./teams-verify.js";
+import { envSecret, requireEnvSecret } from "../utils/envSecret.js";
 import { makeUuid } from "../utils/id.js";
 
 const MULTITENANT_ISSUER = "https://api.botframework.com";
@@ -170,7 +171,7 @@ async function verifyTeamsJwt(authHeader: string | undefined, env: Env, activity
   const { header, payload } = jwt;
   const claimsOk = validateTokenClaims({
     payload,
-    appId: String(env.MICROSOFT_APP_ID),
+    appId: envSecret(env, "MICROSOFT_APP_ID") ?? "",
     expectedIssuer: getExpectedIssuer(env),
     nowSeconds: Math.floor(Date.now() / 1000),
     activity: { serviceUrl: activity.serviceUrl, channelId: activity.channelId },
@@ -256,8 +257,8 @@ async function getAccessToken(env: Env): Promise<string> {
 
   const body = new URLSearchParams({
     grant_type: "client_credentials",
-    client_id: String(env.MICROSOFT_APP_ID),
-    client_secret: String(env.MICROSOFT_APP_PASSWORD),
+    client_id: requireEnvSecret(env, "MICROSOFT_APP_ID"),
+    client_secret: requireEnvSecret(env, "MICROSOFT_APP_PASSWORD"),
     scope: TOKEN_SCOPE,
   });
 

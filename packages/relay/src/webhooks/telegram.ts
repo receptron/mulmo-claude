@@ -1,6 +1,7 @@
 // Telegram platform plugin.
 
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
+import { requireEnvSecret } from "../utils/envSecret.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { makeUuid } from "../utils/id.js";
 
@@ -52,10 +53,7 @@ const telegramPlugin: PlatformPlugin = {
   },
 
   async sendResponse(chatId: string, text: string, env: Env): Promise<void> {
-    const botToken = env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      throw new Error("TELEGRAM_BOT_TOKEN not configured");
-    }
+    const botToken = requireEnvSecret(env, "TELEGRAM_BOT_TOKEN");
 
     const chunks: string[] = [];
     for (let i = 0; i < text.length; i += MAX_TG_TEXT) {
@@ -65,7 +63,7 @@ const telegramPlugin: PlatformPlugin = {
     for (const chunk of chunks) {
       let response: Response;
       try {
-        response = await fetch(`https://api.telegram.org/bot${String(botToken)}/sendMessage`, {
+        response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text: chunk }),

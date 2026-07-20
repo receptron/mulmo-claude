@@ -2,6 +2,7 @@
 
 import { chunkText } from "@mulmobridge/client/text";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
+import { requireEnvSecret } from "../utils/envSecret.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { makeUuid } from "../utils/id.js";
 
@@ -70,7 +71,7 @@ const linePlugin: PlatformPlugin = {
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
     const signature = request.headers.get("x-line-signature") ?? "";
-    const isValid = await verifyLineSignature(String(env.LINE_CHANNEL_SECRET), body, signature);
+    const isValid = await verifyLineSignature(requireEnvSecret(env, "LINE_CHANNEL_SECRET"), body, signature);
     if (!isValid) {
       throw new Error("LINE signature verification failed");
     }
@@ -96,10 +97,7 @@ const linePlugin: PlatformPlugin = {
   },
 
   async sendResponse(chatId: string, text: string, env: Env, replyToken?: string): Promise<void> {
-    const accessToken = env.LINE_CHANNEL_ACCESS_TOKEN;
-    if (!accessToken) {
-      throw new Error("LINE_CHANNEL_ACCESS_TOKEN not configured");
-    }
+    const accessToken = requireEnvSecret(env, "LINE_CHANNEL_ACCESS_TOKEN");
 
     const messages = chunkText(text, MAX_LINE_TEXT)
       .slice(0, MAX_LINE_MESSAGES_PER_REQUEST)
@@ -113,7 +111,7 @@ const linePlugin: PlatformPlugin = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${String(accessToken)}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(body),
       });

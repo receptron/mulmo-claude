@@ -8,6 +8,7 @@
 
 import { chunkText } from "@mulmobridge/client/text";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
+import { envSecret, requireEnvSecret } from "../utils/envSecret.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { verifyMetaSignature, handleMetaVerification } from "./meta.js";
 import { FIFTEEN_SECONDS_MS } from "../time.js";
@@ -54,12 +55,12 @@ const whatsappPlugin: PlatformPlugin = {
   },
 
   handleVerification(request: Request, env: Env): Response {
-    return handleMetaVerification(request, String(env.WHATSAPP_VERIFY_TOKEN ?? ""));
+    return handleMetaVerification(request, envSecret(env, "WHATSAPP_VERIFY_TOKEN") ?? "");
   },
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
     const signature = request.headers.get("x-hub-signature-256") ?? "";
-    const valid = await verifyMetaSignature(String(env.WHATSAPP_APP_SECRET), body, signature);
+    const valid = await verifyMetaSignature(requireEnvSecret(env, "WHATSAPP_APP_SECRET"), body, signature);
     if (!valid) throw new Error("WhatsApp signature verification failed");
 
     return extractWaMessages(JSON.parse(body)).map((msg) => ({
@@ -73,9 +74,8 @@ const whatsappPlugin: PlatformPlugin = {
   },
 
   async sendResponse(chatId: string, text: string, env: Env): Promise<void> {
-    const accessToken = String(env.WHATSAPP_ACCESS_TOKEN ?? "");
-    const phoneNumberId = String(env.WHATSAPP_PHONE_NUMBER_ID ?? "");
-    if (!accessToken || !phoneNumberId) throw new Error("WhatsApp access token / phone number ID not configured");
+    const accessToken = requireEnvSecret(env, "WHATSAPP_ACCESS_TOKEN");
+    const phoneNumberId = requireEnvSecret(env, "WHATSAPP_PHONE_NUMBER_ID");
 
     const chunks = chunkText(text, MAX_WA_TEXT);
     for (const chunk of chunks) {
