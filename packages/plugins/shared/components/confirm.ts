@@ -1,6 +1,8 @@
-// Promise-based confirm dialog state, plugin-side mirror of
-// `src/composables/useConfirm.ts` — see the header note there for
-// why the two files stay separate (useRuntime vs vue-i18n locale).
+// Promise-based confirm dialog state, plugin-side mirror of `src/composables/useConfirm.ts`.
+// Mirrored on purpose: recipe-book (the consumer) is a deliberately gui-chat-protocol-only
+// sample, so sharing via @mulmoclaude/core would force a core dep onto the sample + scaffold —
+// unify only if that dependency-minimalism policy changes. (The ConfirmModal.vue components'
+// useRuntime-vs-vue-i18n locale split is a separate constraint on the components, not on this file.)
 
 import { ref } from "vue";
 

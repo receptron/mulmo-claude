@@ -2,8 +2,22 @@
 // share these. Persisted shapes go through Zod parsers; in-memory
 // transient shapes (pending OAuth state) are plain interfaces.
 
+import type { PluginRuntime } from "gui-chat-protocol";
 import type { z } from "zod";
 import type { TokensSchema, ClientConfigSchema, PendingAuthSchema } from "./schemas";
+
+/** Dependencies the dispatcher (`index.ts`) hands every handler
+ *  module (listening / search / playback). */
+export interface SpotifyDeps {
+  runtime: PluginRuntime;
+  clientId: string;
+  tokens: SpotifyTokens;
+  /** Injectable clock — primarily for tests, where the default
+   *  `() => new Date()` would race the proactive-refresh window
+   *  whenever the fixture's `expiresAt` is close to wall-clock time.
+   *  Production callers omit it. */
+  now?: () => Date;
+}
 
 /** Persisted OAuth tokens (`tokens.json`). Refresh-token rotation
  *  policy: when Spotify omits `refreshToken` on a refresh response,

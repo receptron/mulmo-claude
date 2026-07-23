@@ -14,10 +14,11 @@ export function fileWatchChannel(filePath: string): string {
 // Next monotonic version given the current one and an incoming payload. Bumps to
 // `mtimeMs` only when it is a number strictly greater than `current`, which drops
 // out-of-order events and collapses same-ms writes to the later mtime. Returns
-// `current` unchanged otherwise.
-export function nextFileVersion(current: number, payload: FileChangePayload | undefined): number {
-  if (typeof payload?.mtimeMs === "number" && payload.mtimeMs > current) {
-    return payload.mtimeMs;
-  }
-  return current;
+// `current` unchanged otherwise. Accepts `unknown` because pubsub payloads arrive
+// untyped — the runtime check here is the single validation point, so subscribers
+// don't need their own guard (or a cast) before calling.
+export function nextFileVersion(current: number, payload: unknown): number {
+  if (typeof payload !== "object" || payload === null || !("mtimeMs" in payload)) return current;
+  const { mtimeMs } = payload;
+  return typeof mtimeMs === "number" && mtimeMs > current ? mtimeMs : current;
 }

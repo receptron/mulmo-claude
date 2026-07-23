@@ -57,6 +57,7 @@ import {
 // import { publishNotification } from "../../events/notifications.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
+import type { StartChatParams as ChatServiceStartChatParams } from "@mulmobridge/chat-service";
 import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
 import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension, saveAttachment } from "../../utils/files/attachment-store.js";
 
@@ -110,38 +111,11 @@ router.post(API_ROUTES.agent.cancel, (req: Request<object, unknown, CancelBody>,
 // Shared entry point for starting an agent chat. Called by both the
 // POST /api/agent route and server-side callers (e.g. debug tasks).
 
-export interface StartChatParams {
-  message: string;
-  roleId: string;
-  chatSessionId: string;
-  /** Bridge-only legacy carrier for "the user picked this image".
-   *  No in-tree bridge sets it today; it remains on the type so
-   *  external bridge clients that populate it from older protocol
-   *  versions continue to work. Only workspace paths
-   *  (`data/attachments/...` or `artifacts/images/...`) are accepted
-   *  — `data:` URLs are no longer supported and are dropped with a
-   *  warn. Bridges that need to ship raw bytes should use the
-   *  modern `attachments[]` field with `{ mimeType, data }` entries;
-   *  those get persisted to `data/attachments/YYYY/MM/` server-side
-   *  and rewritten as path-bearing attachments. The Vue UI never
-   *  sets this — paste/drop and sidebar picks ride on
-   *  `attachments[]` as path-only entries directly. */
-  selectedImageData?: string;
-  attachments?: Attachment[];
-  /** Where this session originates (#486). Accepts string for
-   *  cross-package compatibility (chat-service passes string). */
-  origin?: string;
+export interface StartChatParams extends ChatServiceStartChatParams {
   /** IANA timezone the user's browser resolved (e.g. "Asia/Tokyo").
    *  Validated server-side before it reaches the system prompt — an
    *  invalid or missing value falls back to server-local time. */
   userTimezone?: string;
-  /** Flat primitive bag forwarded from the bridge handshake, string
-   *  / number / boolean values only (see plans/feat-bridge-options-
-   *  passthrough.md). The session-level `defaultRole` override is
-   *  already applied upstream in chat-service; MulmoClaude doesn't
-   *  read any other keys today. Accepted here so the typing matches
-   *  `StartChatFn` exported by chat-service. */
-  bridgeOptions?: Readonly<Record<string, string | number | boolean>>;
 }
 
 export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };

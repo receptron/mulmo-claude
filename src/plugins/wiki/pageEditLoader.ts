@@ -17,13 +17,18 @@ export type PageEditLoadResult =
 // from without a manual reload.
 export const isTransientStatus = (status: number): boolean => status === 0 || status >= 500;
 
+const NOT_FOUND_STATUS = 404;
+
 // When neither the snapshot nor the live page yielded content, decide whether
-// that's a transient outage (report "error", recoverable) or a genuine
-// deletion (404 / exists:false). `current` is the failed live-page fetch.
+// that's a fetch problem (report "error", recoverable) or a genuine deletion.
+// Only NOT-FOUND semantics prove a deletion: an explicit 404, or a live fetch
+// that succeeded and reported no page. Every other failure — 401, 403, 429, a
+// 5xx, a dropped connection — says nothing about whether the page still
+// exists, and calling it "deleted" is a lie the user cannot recover from.
 export const classifyLoadFailure = (snapStatus: number, current: { ok: boolean; status: number }): "error" | "deleted" => {
   if (isTransientStatus(snapStatus)) return "error";
-  if (!current.ok && isTransientStatus(current.status)) return "error";
-  return "deleted";
+  if (current.ok || current.status === NOT_FOUND_STATUS) return "deleted";
+  return "error";
 };
 
 interface SnapshotResponse {

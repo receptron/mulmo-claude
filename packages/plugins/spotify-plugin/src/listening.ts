@@ -8,27 +8,12 @@
 // each handler is independently testable. Pure delegation — the
 // runtime + clientId + tokens are passed in by the dispatcher.
 
-import type { PluginRuntime } from "gui-chat-protocol";
-
 import { spotifyApi } from "./client";
-import type { SpotifyClientError } from "./client";
+import type { SpotifyClientResult } from "./client";
 import { normalisePlaylist, normalisePlaylistList, normaliseRecentlyPlayed, normaliseTrack, normaliseTrackList } from "./normalize";
-import type { NormalisedPlaylist, NormalisedTrack, RecentlyPlayedItem, SpotifyTokens } from "./types";
+import type { NormalisedPlaylist, NormalisedTrack, RecentlyPlayedItem, SpotifyDeps } from "./types";
 
-export interface ListeningDeps {
-  runtime: PluginRuntime;
-  clientId: string;
-  tokens: SpotifyTokens;
-  /** Injectable clock — primarily for tests, where the default
-   *  `() => new Date()` would race the proactive-refresh window
-   *  whenever the fixture's `expiresAt` is close to wall-clock time.
-   *  Production callers omit it. */
-  now?: () => Date;
-}
-
-type Result<T> = { ok: true; data: T } | { ok: false; error: SpotifyClientError };
-
-export async function fetchLiked(deps: ListeningDeps, limit: number): Promise<Result<NormalisedTrack[]>> {
+export async function fetchLiked(deps: SpotifyDeps, limit: number): Promise<SpotifyClientResult<NormalisedTrack[]>> {
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "GET", `/v1/me/tracks?limit=${limit}`, {}, deps.now);
   if (!result.ok) return result;
   return { ok: true, data: normaliseTrackList(result.data, "track") };
@@ -43,7 +28,7 @@ export async function fetchLiked(deps: ListeningDeps, limit: number): Promise<Re
 const PLAYLISTS_PAGE_SIZE = 50;
 const PLAYLISTS_HARD_CAP = 500;
 
-export async function fetchPlaylists(deps: ListeningDeps): Promise<Result<NormalisedPlaylist[]>> {
+export async function fetchPlaylists(deps: SpotifyDeps): Promise<SpotifyClientResult<NormalisedPlaylist[]>> {
   const collected: NormalisedPlaylist[] = [];
   let offset = 0;
   while (collected.length < PLAYLISTS_HARD_CAP) {
@@ -69,7 +54,7 @@ function hasNextPage(raw: unknown): boolean {
   return typeof raw === "object" && raw !== null && typeof (raw as { next?: unknown }).next === "string";
 }
 
-function logPlaylistsPageDebug(deps: ListeningDeps, raw: unknown, offset: number): void {
+function logPlaylistsPageDebug(deps: SpotifyDeps, raw: unknown, offset: number): void {
   // Dump first item's `tracks` shape on debug log so "all playlists
   // show 0 tracks" reports can be triaged from the server log
   // without re-running curl.
@@ -81,14 +66,14 @@ function logPlaylistsPageDebug(deps: ListeningDeps, raw: unknown, offset: number
   deps.runtime.log.debug("playlists page", { offset, count: items.length, sample: { id: sample.id, name: sample.name, tracks: sample.tracks } });
 }
 
-export async function fetchPlaylistTracks(deps: ListeningDeps, playlistId: string, limit: number): Promise<Result<NormalisedTrack[]>> {
+export async function fetchPlaylistTracks(deps: SpotifyDeps, playlistId: string, limit: number): Promise<SpotifyClientResult<NormalisedTrack[]>> {
   const path = `/v1/playlists/${encodeURIComponent(playlistId)}/tracks?limit=${limit}`;
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "GET", path, {}, deps.now);
   if (!result.ok) return result;
   return { ok: true, data: normaliseTrackList(result.data, "track") };
 }
 
-export async function fetchRecent(deps: ListeningDeps, limit: number): Promise<Result<RecentlyPlayedItem[]>> {
+export async function fetchRecent(deps: SpotifyDeps, limit: number): Promise<SpotifyClientResult<RecentlyPlayedItem[]>> {
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "GET", `/v1/me/player/recently-played?limit=${limit}`, {}, deps.now);
   if (!result.ok) return result;
   return { ok: true, data: normaliseRecentlyPlayed(result.data) };
@@ -96,7 +81,7 @@ export async function fetchRecent(deps: ListeningDeps, limit: number): Promise<R
 
 /** `nowPlaying` returns null when nothing is currently playing
  *  (Spotify returns 204). The View shows an empty state. */
-export async function fetchNowPlaying(deps: ListeningDeps): Promise<Result<NormalisedTrack | null>> {
+export async function fetchNowPlaying(deps: SpotifyDeps): Promise<SpotifyClientResult<NormalisedTrack | null>> {
   const result = await spotifyApi<unknown>(deps.runtime, deps.clientId, deps.tokens, "GET", "/v1/me/player/currently-playing", {}, deps.now);
   if (!result.ok) return result;
   if (result.data === null) return { ok: true, data: null };

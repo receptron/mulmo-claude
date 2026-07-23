@@ -27,6 +27,13 @@ test("nextFileVersion ignores missing / non-number / undefined payloads", () => 
   assert.equal(nextFileVersion(5, { mtimeMs: Number.NaN }), 5);
 });
 
+test("nextFileVersion ignores non-object payloads (untyped pubsub data)", () => {
+  assert.equal(nextFileVersion(5, null), 5);
+  assert.equal(nextFileVersion(5, "junk"), 5);
+  assert.equal(nextFileVersion(5, 9000), 5);
+  assert.equal(nextFileVersion(5, [9000]), 5);
+});
+
 test("nextFileVersion treats a negative-but-greater mtime as a bump (monotonic only)", () => {
   assert.equal(nextFileVersion(-10, { mtimeMs: -5 }), -5);
 });

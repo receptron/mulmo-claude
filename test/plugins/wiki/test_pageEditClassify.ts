@@ -37,4 +37,13 @@ describe("classifyLoadFailure", () => {
     assert.equal(classifyLoadFailure(404, { ok: true, status: 200 }), "deleted");
     assert.equal(classifyLoadFailure(404, { ok: false, status: 404 }), "deleted");
   });
+
+  // Auth / rate-limit / bad-request failures say nothing about whether the page
+  // exists; only NOT-FOUND semantics do. Reporting them as "deleted" showed a
+  // false "page deleted" state the user could not recover from (Codex review).
+  it("reports error for a live fetch that failed for a non-not-found reason", () => {
+    for (const status of [400, 401, 403, 429]) {
+      assert.equal(classifyLoadFailure(404, { ok: false, status }), "error", `status ${status} is not a deletion`);
+    }
+  });
 });
