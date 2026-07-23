@@ -14,6 +14,7 @@ import { apiGet, apiPost } from "../../utils/api";
 import { pluginEndpoints } from "../api";
 import type { SkillsEndpoints } from "./definition";
 import { entryKey, catalogActionParams, type CatalogSource } from "./categories";
+import { acquireActionKey, releaseActionKey } from "./actionLock";
 
 type TranslateFn = ReturnType<typeof useI18n>["t"];
 
@@ -112,18 +113,29 @@ function reconcileSelectionAfterStar(state: CatalogState, entry: CatalogEntry): 
 
 async function starCatalogEntry(state: CatalogState, entry: CatalogEntry): Promise<void> {
   if (entry.alreadyActive) return;
-  state.catalogActioningKey.value = entryKey(entry);
-  const response = await apiPost<{ starred: true; slug: string }>(state.endpoints.catalogStar.url, catalogActionParams(entry));
-  state.catalogActioningKey.value = null;
-  if (!response.ok) {
-    state.catalogError.value = state.t("pluginManageSkills.errCatalogStarFailed", { error: response.error });
-    return;
+  const key = entryKey(entry);
+  // Acquire only when idle: selecting another entry mid-flight and clicking
+  // its Star would otherwise fire a second request whose completion clears
+  // the lock while the first is still running.
+  const { acquired, key: heldKey } = acquireActionKey(state.catalogActioningKey.value, key);
+  if (!acquired) return;
+  state.catalogActioningKey.value = heldKey;
+  try {
+    const response = await apiPost<{ starred: true; slug: string }>(state.endpoints.catalogStar.url, catalogActionParams(entry));
+    if (!response.ok) {
+      state.catalogError.value = state.t("pluginManageSkills.errCatalogStarFailed", { error: response.error });
+      return;
+    }
+    state.catalogError.value = null;
+    // Hold the lock through the refresh so the button can't be re-clicked
+    // before `alreadyActive` flips.
+    await Promise.all([loadCatalog(state), state.deps.refreshActiveList()]);
+    reconcileSelectionAfterStar(state, entry);
+  } finally {
+    // Release only if we still own it (defensive; the idle-guard already
+    // prevents a takeover).
+    state.catalogActioningKey.value = releaseActionKey(state.catalogActioningKey.value, key);
   }
-  state.catalogError.value = null;
-  // Refresh both lists so the row flips to "Starred" and the new active
-  // entry shows up in the left column.
-  await Promise.all([loadCatalog(state), state.deps.refreshActiveList()]);
-  reconcileSelectionAfterStar(state, entry);
 }
 
 async function selectCatalogEntry(state: CatalogState, entry: CatalogEntry): Promise<void> {

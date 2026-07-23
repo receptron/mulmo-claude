@@ -16,27 +16,27 @@ re-verified against the actual code before any change.
 
 ## Shipped in this PR — verified fixes + extractions (all with node:test)
 
-| Area | Fix | Extracted pure module + test |
-|---|---|---|
-| shared `meta-types.ts` | `buildRouteUrl` `:id`-inside-`:idx` prefix collision → single-pass regex, own-prop guard | `test/plugins/test_buildRouteUrl.ts` |
-| shared `metas.ts` | proto-key hardening missed `__proto__` (silent drop / prototype pollution) → `Object.create(null)` targets, spread back | extended `test_meta_aggregation.ts` |
-| shared `api.ts` | `pluginEndpoints`/`pluginPageRoute` proto-key lookups → own-prop guard | (covered by hardening) |
-| scheduler | `formatInterval(90m)` → "Every 2h" (remainder dropped); `20s` → "Every 0m" → `1h 30m` / `<1m` | extended `test_formatSchedule.ts` |
-| scheduler | display + tri-state toggle logic | `taskDisplay.ts` (`nextEnabledState`: `undefined`≠`!current`) + test |
-| manageRoles **(security)** | server `role.id` unvalidated on tool path → `path.join` traversal (write/delete outside `roles/`) | `server/utils/files/roleId.ts` + `test/server/test_roleId.ts` |
-| manageRoles | edit path persisted `icon: ""` (create fell back to `person`); duplicated form logic | `roleForm.ts` (`formToRole`/`roleToForm`/`validateRoleForm`/`parseQueriesText`) + test |
-| manageSkills | local `skills` ref aliased + mutated the shared tool-result array (rewrote history/export); `saveEdit` had no stale-selection guard (could graft skill A onto skill B) | `skillListEdits.ts` (immutable update/remove) + test |
-| manageSkills | catalog detail pane missing `@click="handleExternalLinkClick"` (external links navigated SPA away) | — |
-| wiki | embedded log/lint result clobbered to Index on mount (Preview had the guard, View didn't) → mirrored guard | — |
-| wiki | task-checkbox toggle scroll-jumped to top (watch keyed on `content`) → keyed on page identity | — |
-| wiki | restore-toast timer leaked past unmount → `onBeforeUnmount` cleanup | — |
-| wiki | raw `[[link]]` text used as slug (2 copies) | `currentSlug.ts` (`resolveWikiSlug`) + test |
-| textResponse | unsanitised `marked` via `v-html` (`<img onerror>`/`javascript:` executed) → route through `renderMarkdownToSafeHtml` (DOMPurify) | — |
-| textResponse | `<think>` regex mangled fenced examples; JSON-fence wrap inline | `renderPipeline.ts` (fence-aware `transformThinkBlocks`, `wrapJsonAsCodeFence`) + test |
-| textResponse | `truncateForRender` split surrogate pairs; `extractTextResponseTitle` took `# comment` inside a fence as title | extended `test_utils.ts` |
-| photoLocations | `fmtDate` rendered "Invalid Date"; `hasFiniteCoords` missing lat/lng range + 0,0 rejection | `format.ts` + test |
-| canvas | width 33px → 1×0 canvas accepted (height floors to 0) | `canvasSize.ts` (`computeCanvasSize`) + test |
-| presentSVG | empty-string "unloaded" sentinel clobbered a deliberately-cleared editor; stale-fetch could overwrite cache; PDF failed silently; PNG squashed viewBox-only SVGs; proto-key cache reads; duplicated `saveBlob` | `exportName.ts`, `editorRefresh.ts`, `pngExport.ts`, `printableHtml.ts` + tests |
+| Area                       | Fix                                                                                                                                                                                                            | Extracted pure module + test                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| shared `meta-types.ts`     | `buildRouteUrl` `:id`-inside-`:idx` prefix collision → single-pass regex, own-prop guard                                                                                                                       | `test/plugins/test_buildRouteUrl.ts`                                                   |
+| shared `metas.ts`          | proto-key hardening missed `__proto__` (silent drop / prototype pollution) → `Object.create(null)` targets, spread back                                                                                        | extended `test_meta_aggregation.ts`                                                    |
+| shared `api.ts`            | `pluginEndpoints`/`pluginPageRoute` proto-key lookups → own-prop guard                                                                                                                                         | (covered by hardening)                                                                 |
+| scheduler                  | `formatInterval(90m)` → "Every 2h" (remainder dropped); `20s` → "Every 0m" → `1h 30m` / `<1m`                                                                                                                  | extended `test_formatSchedule.ts`                                                      |
+| scheduler                  | display + tri-state toggle logic                                                                                                                                                                               | `taskDisplay.ts` (`nextEnabledState`: `undefined`≠`!current`) + test                   |
+| manageRoles **(security)** | server `role.id` unvalidated on tool path → `path.join` traversal (write/delete outside `roles/`)                                                                                                              | `server/utils/files/roleId.ts` + `test/server/test_roleId.ts`                          |
+| manageRoles                | edit path persisted `icon: ""` (create fell back to `person`); duplicated form logic                                                                                                                           | `roleForm.ts` (`formToRole`/`roleToForm`/`validateRoleForm`/`parseQueriesText`) + test |
+| manageSkills               | local `skills` ref aliased + mutated the shared tool-result array (rewrote history/export); `saveEdit` had no stale-selection guard (could graft skill A onto skill B)                                         | `skillListEdits.ts` (immutable update/remove) + test                                   |
+| manageSkills               | catalog detail pane missing `@click="handleExternalLinkClick"` (external links navigated SPA away)                                                                                                             | —                                                                                      |
+| wiki                       | embedded log/lint result clobbered to Index on mount (Preview had the guard, View didn't) → mirrored guard                                                                                                     | —                                                                                      |
+| wiki                       | task-checkbox toggle scroll-jumped to top (watch keyed on `content`) → keyed on page identity                                                                                                                  | —                                                                                      |
+| wiki                       | restore-toast timer leaked past unmount → `onBeforeUnmount` cleanup                                                                                                                                            | —                                                                                      |
+| wiki                       | raw `[[link]]` text used as slug (2 copies)                                                                                                                                                                    | `currentSlug.ts` (`resolveWikiSlug`) + test                                            |
+| textResponse               | unsanitised `marked` via `v-html` (`<img onerror>`/`javascript:` executed) → route through `renderMarkdownToSafeHtml` (DOMPurify)                                                                              | —                                                                                      |
+| textResponse               | `<think>` regex mangled fenced examples; JSON-fence wrap inline                                                                                                                                                | `renderPipeline.ts` (fence-aware `transformThinkBlocks`, `wrapJsonAsCodeFence`) + test |
+| textResponse               | `truncateForRender` split surrogate pairs; `extractTextResponseTitle` took `# comment` inside a fence as title                                                                                                 | extended `test_utils.ts`                                                               |
+| photoLocations             | `fmtDate` rendered "Invalid Date"; `hasFiniteCoords` missing lat/lng range + 0,0 rejection                                                                                                                     | `format.ts` + test                                                                     |
+| canvas                     | width 33px → 1×0 canvas accepted (height floors to 0)                                                                                                                                                          | `canvasSize.ts` (`computeCanvasSize`) + test                                           |
+| presentSVG                 | empty-string "unloaded" sentinel clobbered a deliberately-cleared editor; stale-fetch could overwrite cache; PDF failed silently; PNG squashed viewBox-only SVGs; proto-key cache reads; duplicated `saveBlob` | `exportName.ts`, `editorRefresh.ts`, `pngExport.ts`, `printableHtml.ts` + tests        |
 
 Every regression test was mutation-checked (reverting the fix turns it red).
 
@@ -55,9 +55,10 @@ These are verified or plausible but out of scope for a mechanical fix-plus-test 
 - ~~**scheduler TasksTab**: unsequenced refetch races; full-list remount on every
   mutation (scroll/expand reset); unconfirmed one-click delete; hardcoded English
   frequency-hint labels (8-locale change).~~ **Shipped (fix/scheduler-tasks-robustness).**
-- **manageSkills**: same-repo update/uninstall overlap; four loaders sharing one
-  `catalogError` channel; post-delete selection clobber; `actionLock` extraction
-  (release-if-owner).
+- **manageSkills**: ~~same-repo update/uninstall overlap~~ **(shipped)**;
+  four loaders sharing one `catalogError` channel (still open — needs a UX call
+  on where the repo-list error surfaces); post-delete selection clobber;
+  ~~`actionLock` extraction (release-if-owner)~~ **(shipped, fix/manageskills-loader-races)**.
 - **manageRoles**: IME-Enter commits half-typed names (use `useImeAwareEnter`);
   no re-entrancy guard on Enter; unconfirmed delete (needs new i18n key ×8);
   `alwaysActive` MCP tools shown as toggleable; refresh-failure swallowed;

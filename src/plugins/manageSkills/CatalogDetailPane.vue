@@ -17,7 +17,7 @@
         <button
           v-if="!entry.alreadyActive"
           class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-yellow-400 text-yellow-600 hover:bg-yellow-50 disabled:opacity-40"
-          :disabled="actioningKey === selectedKey"
+          :disabled="actioningKey !== null"
           :title="t('pluginManageSkills.catalogStar')"
           data-testid="skill-catalog-detail-star-btn"
           @click="emit('star', entry)"
@@ -58,7 +58,6 @@ const props = defineProps<{
   entry: CatalogEntry;
   sourceMeta: SourceMeta;
   actioningKey: string | null;
-  selectedKey: string | null;
   loading: boolean;
   error: string | null;
   detail: CatalogDetail | null;
