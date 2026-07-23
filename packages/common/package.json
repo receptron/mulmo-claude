@@ -12,6 +12,12 @@
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./env-options": {
+      "types": "./dist/env-options.d.ts",
+      "import": "./dist/env-options.js",
+      "require": "./dist/env-options.js",
+      "default": "./dist/env-options.js"
+    },
     "./meta-webhook": {
       "types": "./dist/meta-webhook.d.ts",
       "import": "./dist/meta-webhook.js",
