@@ -548,7 +548,6 @@ import {
 import { collectionUi } from "../uiContext";
 import { useClickOutside } from "../composables/useClickOutside";
 import { useTableSort } from "../composables/useTableSort";
-import { activatePathLink } from "../refLink";
 import {
   dateOf,
   itemMatchesQuery,
