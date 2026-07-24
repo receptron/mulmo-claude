@@ -1,21 +1,11 @@
 // Self-contained ports of the few host utilities the X tools relied on,
 // inlined so the package carries no dependency on MulmoClaude's server tree
-// (server/utils/{errors,fetch,http,date,time}). Kept faithful to the
-// originals; see the matching files in the host repo for rationale.
+// (server/utils/{fetch,http,time}). Kept faithful to the originals; see
+// the matching files in the host repo for rationale. `errorMessage` (#2461)
+// and `toUtcIsoDate` (#2480) are the exceptions: they come from the shared
+// leaf `@mulmoclaude/common`.
 
 export const ONE_SECOND_MS = 1_000;
-
-/** Human-readable message from an unknown thrown value.
- *  Mirrors server/utils/errors.ts `errorMessage`. */
-export function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (err !== null && typeof err === "object") {
-    const obj = err as { details?: unknown; message?: unknown };
-    if (typeof obj.details === "string" && obj.details) return obj.details;
-    if (typeof obj.message === "string" && obj.message) return obj.message;
-  }
-  return String(err);
-}
 
 /** Best-effort response body text, capped, never throwing.
  *  Mirrors server/utils/http.ts `safeResponseText`. */
@@ -28,15 +18,13 @@ export async function safeResponseText(res: Response, maxLength = 200): Promise<
   }
 }
 
-/** `Date` → `YYYY-MM-DD` in UTC. Mirrors server/utils/date.ts `toUtcIsoDate`. */
-export function toUtcIsoDate(timestamp: Date): string {
-  const year = timestamp.getUTCFullYear();
-  const month = String(timestamp.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(timestamp.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-export type FetchWithTimeoutInit = Parameters<typeof fetch>[1] & { timeoutMs?: number };
+/** `signal` is deliberately excluded. This compact port owns the signal it
+ *  passes to `fetch`, so a caller-supplied one would be silently overwritten
+ *  and dropped — no type error, no runtime error, just an abort that never
+ *  arrives (#2221). Omitting it from the type turns that misuse into a compile
+ *  error instead. If external cancellation is ever needed here, port the
+ *  bridging from `server/utils/fetch.ts` rather than re-widening this type. */
+export type FetchWithTimeoutInit = Omit<NonNullable<Parameters<typeof fetch>[1]>, "signal"> & { timeoutMs?: number };
 
 /** `fetch` with a finite timeout that aborts the request once `timeoutMs`
  *  elapses. Compact port of server/utils/fetch.ts `fetchWithTimeout` — the X

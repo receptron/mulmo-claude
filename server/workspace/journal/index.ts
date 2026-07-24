@@ -16,7 +16,7 @@ import { runDailyPass } from "./dailyPass.js";
 import { runOptimizationPass } from "./optimizationPass.js";
 import { buildIndexMarkdown, type IndexTopicEntry, type IndexDailyEntry } from "./indexFile.js";
 import { runClaudeCli, ClaudeCliNotFoundError, type Summarize, type JournalSummaryModel } from "./archivist-cli.js";
-import { extractFirstH1 } from "../../../src/utils/markdown/extractFirstH1.js";
+import { extractFirstH1 } from "@mulmoclaude/markdown-utils/markdown/extractFirstH1";
 import { log } from "../../system/logger/index.js";
 import { journalMode as resolveJournalMode, loadSettings, type JournalMode } from "../../system/config.js";
 

@@ -2,14 +2,16 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   beatMayHaveMovie,
+  clearReactiveRecords,
   getMissingCharacterKeys,
   isAllSlideDeck,
   isSameScript,
+  resolveSilentAdvanceSeconds,
   shouldAutoRenderBeat,
   validateBeatJSON,
   type SafeParseSchema,
 } from "../src/vue/helpers";
-import { errorMessage } from "../src/vue/support";
+import { errorMessage } from "@mulmoclaude/common";
 
 // Ported from the host's test/plugins/presentMulmoScript/test_helpers.ts
 // when the View moved into this package (phase 2). The SSE-stream helper
@@ -230,5 +232,61 @@ describe("beatMayHaveMovie", () => {
     assert.equal(beatMayHaveMovie({ image: { type: "textSlide" } }), false);
     assert.equal(beatMayHaveMovie({ moviePrompt: "" }), false);
     assert.equal(beatMayHaveMovie({}), false);
+  });
+});
+
+describe("resolveSilentAdvanceSeconds", () => {
+  const DEFAULT_SEC = 3;
+
+  it("returns a valid positive number unchanged", () => {
+    assert.equal(resolveSilentAdvanceSeconds(5, DEFAULT_SEC), 5);
+    assert.equal(resolveSilentAdvanceSeconds(0.5, DEFAULT_SEC), 0.5);
+  });
+
+  it("falls back to the default for zero and negatives — they would fire the timer immediately and race the Play loop", () => {
+    assert.equal(resolveSilentAdvanceSeconds(0, DEFAULT_SEC), DEFAULT_SEC);
+    assert.equal(resolveSilentAdvanceSeconds(-1, DEFAULT_SEC), DEFAULT_SEC);
+  });
+
+  it("falls back to the default for NaN and Infinity", () => {
+    assert.equal(resolveSilentAdvanceSeconds(NaN, DEFAULT_SEC), DEFAULT_SEC);
+    assert.equal(resolveSilentAdvanceSeconds(Infinity, DEFAULT_SEC), DEFAULT_SEC);
+  });
+
+  it("falls back to the default for non-number and missing durations", () => {
+    assert.equal(resolveSilentAdvanceSeconds("3", DEFAULT_SEC), DEFAULT_SEC);
+    assert.equal(resolveSilentAdvanceSeconds(undefined, DEFAULT_SEC), DEFAULT_SEC);
+    assert.equal(resolveSilentAdvanceSeconds(null, DEFAULT_SEC), DEFAULT_SEC);
+  });
+});
+
+describe("clearReactiveRecords", () => {
+  it("deletes every own key of a single record in place", () => {
+    const record: Record<string, number> = { a: 1, b: 2, c: 3 };
+    clearReactiveRecords(record);
+    assert.deepEqual(record, {});
+  });
+
+  it("clears every record passed", () => {
+    const first: Record<string, number> = { a: 1 };
+    const second: Record<number, string> = { 0: "x", 1: "y" };
+    clearReactiveRecords(first, second);
+    assert.deepEqual(first, {});
+    assert.deepEqual(second, {});
+  });
+
+  it("mutates in place — same object reference, now empty", () => {
+    const record: Record<string, boolean> = { on: true };
+    const before = record;
+    clearReactiveRecords(record);
+    assert.equal(record, before);
+    assert.deepEqual(Object.keys(record), []);
+  });
+
+  it("is a no-op on an already-empty record and on zero arguments", () => {
+    const record: Record<string, number> = {};
+    clearReactiveRecords(record);
+    assert.deepEqual(record, {});
+    assert.doesNotThrow(() => clearReactiveRecords());
   });
 });

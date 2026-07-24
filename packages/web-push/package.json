@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/web-push",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Auth-agnostic sender for the mulmoserver Web Push (sendPush) Cloud Function",
   "type": "module",
   "main": "./dist/index.js",

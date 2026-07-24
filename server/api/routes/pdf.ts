@@ -10,10 +10,10 @@ import { badRequest, serverError } from "../../utils/httpError.js";
 import { WORKSPACE_DIRS } from "../../workspace/paths.js";
 import { resolveWithinRoot, readBinarySafeSync } from "../../utils/files/safe.js";
 import { resolveWorkspacePath } from "../../utils/files/workspace-io.js";
-import { parseFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { log } from "../../system/logger/index.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
-import { transformResolvableUrlsInHtml } from "../../../src/utils/image/htmlSrcAttrs.js";
+import { transformResolvableUrlsInHtml } from "@mulmoclaude/markdown-utils/image/htmlSrcAttrs";
 
 const router = Router();
 

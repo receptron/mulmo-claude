@@ -12,6 +12,7 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, Partials, type Message } from "discord.js";
 import { createBridgeClient } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "discord";
 const MAX_DISCORD_LENGTH = 2000;
@@ -22,12 +23,7 @@ if (!token) {
   process.exit(1);
 }
 
-const allowedChannels = new Set(
-  (process.env.DISCORD_ALLOWED_CHANNELS ?? "")
-    .split(",")
-    .map((channelId) => channelId.trim())
-    .filter(Boolean),
-);
+const allowedChannels = parseCsvSet(process.env.DISCORD_ALLOWED_CHANNELS);
 const allowAll = allowedChannels.size === 0;
 
 const discord = new Client({

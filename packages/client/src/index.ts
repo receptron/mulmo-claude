@@ -8,6 +8,10 @@ export { readBridgeEnvOptions } from "./options.js";
 
 export { chunkText } from "./text.js";
 
+export { frameText } from "./frame.js";
+
+export { asJsonRecord, fetchJsonRecord, type JsonRecord } from "./http.js";
+
 export { formatAckReply } from "./reply.js";
 
 export {

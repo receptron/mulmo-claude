@@ -11,20 +11,9 @@
 // `{ ok, message }` so the LLM can confirm the action. `getDevices`
 // is the only one with an interesting payload.
 
-import type { PluginRuntime } from "gui-chat-protocol";
-
 import { spotifyApi } from "./client";
-import type { SpotifyClientError } from "./client";
-import type { NormalisedDevice, SpotifyTokens } from "./types";
-
-export interface PlaybackDeps {
-  runtime: PluginRuntime;
-  clientId: string;
-  tokens: SpotifyTokens;
-  now?: () => Date;
-}
-
-type Result<T> = { ok: true; data: T } | { ok: false; error: SpotifyClientError };
+import type { SpotifyClientResult } from "./client";
+import type { NormalisedDevice, SpotifyDeps } from "./types";
 
 interface PlayArgs {
   deviceId?: string;
@@ -32,7 +21,7 @@ interface PlayArgs {
   trackUris?: string[];
 }
 
-export async function playerPlay(deps: PlaybackDeps, args: PlayArgs): Promise<Result<null>> {
+export async function playerPlay(deps: SpotifyDeps, args: PlayArgs): Promise<SpotifyClientResult<null>> {
   const body: Record<string, unknown> = {};
   if (args.contextUri) body.context_uri = args.contextUri;
   if (args.trackUris) body.uris = args.trackUris;
@@ -45,46 +34,49 @@ export async function playerPlay(deps: PlaybackDeps, args: PlayArgs): Promise<Re
   return mapVoidResult(result);
 }
 
-export async function playerPause(deps: PlaybackDeps, deviceId?: string): Promise<Result<null>> {
+export async function playerPause(deps: SpotifyDeps, deviceId?: string): Promise<SpotifyClientResult<null>> {
   const path = withDeviceId("/v1/me/player/pause", deviceId);
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "PUT", path, {}, deps.now);
   return mapVoidResult(result);
 }
 
-export async function playerNext(deps: PlaybackDeps, deviceId?: string): Promise<Result<null>> {
+export async function playerNext(deps: SpotifyDeps, deviceId?: string): Promise<SpotifyClientResult<null>> {
   const path = withDeviceId("/v1/me/player/next", deviceId);
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "POST", path, {}, deps.now);
   return mapVoidResult(result);
 }
 
-export async function playerPrevious(deps: PlaybackDeps, deviceId?: string): Promise<Result<null>> {
+export async function playerPrevious(deps: SpotifyDeps, deviceId?: string): Promise<SpotifyClientResult<null>> {
   const path = withDeviceId("/v1/me/player/previous", deviceId);
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "POST", path, {}, deps.now);
   return mapVoidResult(result);
 }
 
-export async function playerSeek(deps: PlaybackDeps, positionMs: number, deviceId?: string): Promise<Result<null>> {
-  const params = new URLSearchParams({ position_ms: String(positionMs) });
-  const path = appendQueryParam(`/v1/me/player/seek?${params.toString()}`, "device_id", deviceId);
+/** PUT a Player endpoint whose only query is one required param plus an
+ *  optional `device_id` (seek, volume). */
+async function playerPutWithParam(deps: SpotifyDeps, basePath: string, param: Record<string, string>, deviceId?: string): Promise<SpotifyClientResult<null>> {
+  const params = new URLSearchParams(param);
+  const path = appendQueryParam(`${basePath}?${params.toString()}`, "device_id", deviceId);
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "PUT", path, {}, deps.now);
   return mapVoidResult(result);
 }
 
-export async function playerSetVolume(deps: PlaybackDeps, volumePercent: number, deviceId?: string): Promise<Result<null>> {
-  const params = new URLSearchParams({ volume_percent: String(volumePercent) });
-  const path = appendQueryParam(`/v1/me/player/volume?${params.toString()}`, "device_id", deviceId);
-  const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "PUT", path, {}, deps.now);
-  return mapVoidResult(result);
+export async function playerSeek(deps: SpotifyDeps, positionMs: number, deviceId?: string): Promise<SpotifyClientResult<null>> {
+  return playerPutWithParam(deps, "/v1/me/player/seek", { position_ms: String(positionMs) }, deviceId);
 }
 
-export async function playerTransfer(deps: PlaybackDeps, deviceId: string, play: boolean | undefined): Promise<Result<null>> {
+export async function playerSetVolume(deps: SpotifyDeps, volumePercent: number, deviceId?: string): Promise<SpotifyClientResult<null>> {
+  return playerPutWithParam(deps, "/v1/me/player/volume", { volume_percent: String(volumePercent) }, deviceId);
+}
+
+export async function playerTransfer(deps: SpotifyDeps, deviceId: string, play: boolean | undefined): Promise<SpotifyClientResult<null>> {
   const body: Record<string, unknown> = { device_ids: [deviceId] };
   if (play !== undefined) body.play = play;
   const result = await spotifyApi(deps.runtime, deps.clientId, deps.tokens, "PUT", "/v1/me/player", { body }, deps.now);
   return mapVoidResult(result);
 }
 
-export async function playerGetDevices(deps: PlaybackDeps): Promise<Result<NormalisedDevice[]>> {
+export async function playerGetDevices(deps: SpotifyDeps): Promise<SpotifyClientResult<NormalisedDevice[]>> {
   const result = await spotifyApi<unknown>(deps.runtime, deps.clientId, deps.tokens, "GET", "/v1/me/player/devices", {}, deps.now);
   if (!result.ok) return result;
   return { ok: true, data: normaliseDevices(result.data) };
@@ -103,7 +95,7 @@ function appendQueryParam(path: string, key: string, value: string | undefined):
 /** Player API success responses are 204 No Content; `data` is null
  *  in our client wrapper. Normalise so the dispatcher can use a
  *  uniform `{ ok, message }` shape. */
-function mapVoidResult(result: Result<unknown>): Result<null> {
+function mapVoidResult(result: SpotifyClientResult<unknown>): SpotifyClientResult<null> {
   if (!result.ok) return result;
   return { ok: true, data: null };
 }

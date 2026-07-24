@@ -37,6 +37,14 @@ interface Logger {
   error: (prefix: string, msg: string, data?: Record<string, unknown>) => void;
 }
 
+// `ws` hands the listener `Buffer | ArrayBuffer | Buffer[]`. The default
+// binaryType is nodebuffer so a Buffer is what actually arrives, but the type
+// admits ArrayBuffer — whose `toString()` is the literal "[object ArrayBuffer]",
+// i.e. a frame silently parsed as garbage. Normalise instead of trusting the
+// runtime default to hold.
+const frameText = (data: Buffer | ArrayBuffer | Buffer[]): string =>
+  Buffer.isBuffer(data) ? data.toString("utf8") : Array.isArray(data) ? Buffer.concat(data).toString("utf8") : Buffer.from(data).toString("utf8");
+
 export interface RelayClientDeps {
   relayUrl: string;
   relayToken: string;
@@ -280,7 +288,7 @@ function attachSocketHandlers(socket: WebSocket, deps: AttachSocketHandlersDeps)
     // One bad message must not take the socket down: `handleRelayMessage`
     // already logs the failures it anticipates, so anything reaching here is
     // unexpected and only needs to be recorded, not propagated.
-    void handleRelayMessage(String(data), { relay, logger, sendResponse: queue.send }).catch((err: unknown) => {
+    void handleRelayMessage(frameText(data), { relay, logger, sendResponse: queue.send }).catch((err: unknown) => {
       logger.error(LOG_PREFIX, "relay message handler threw", { error: String(err) });
     });
   });

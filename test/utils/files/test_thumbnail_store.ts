@@ -1,5 +1,5 @@
 // Unit tests for the remote-view thumbnail resolver (phase 5 —
-// plans/feat-remote-view-images.md). The resize step is injected so no native
+// plans/done/feat-remote-view-images.md). The resize step is injected so no native
 // `sharp` binary is needed; the test exercises workspace containment, the
 // mtime-keyed cache, and the graceful-null failure paths against real temp files
 // under the workspace root.

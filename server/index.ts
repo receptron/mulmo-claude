@@ -77,7 +77,7 @@ import { onSessionEvent, initSessionStore } from "./events/session-store/index.j
 import { initFileChangePublisher } from "./events/file-change.js";
 // Importing also binds the shared mulmoScript server ops to this host's
 // backend and registers the built-in "mulmoScript" dispatch handler (side
-// effect at module load — plans/feat-mulmoscript-plugin.md phase 3).
+// effect at module load — plans/done/feat-mulmoscript-plugin.md phase 3).
 import { initMulmoScriptGenerationPublisher } from "./plugins/mulmoscript-server.js";
 import { initCollectionChangePublisher } from "./events/collection-change.js";
 import { initFirestoreCollectionBinding } from "./workspace/collections/firestoreBinding.js";
@@ -86,6 +86,7 @@ import { discoverSkills } from "./workspace/skills/index.js";
 import { WORKSPACE_PATHS } from "./workspace/paths.js";
 import { resolveClientDir } from "./utils/clientDir.js";
 import { serverError } from "./utils/httpError.js";
+import { browserVisibleOrigin } from "./utils/forwardedOrigin.js";
 import { makeUuid } from "./utils/id.js";
 import { mcpToolsRouter, mcpTools, isMcpToolEnabled } from "./agent/mcp-tools/index.js";
 import { preflightUserServers, logPreflightResult } from "./agent/mcpPreflight.js";
@@ -121,6 +122,8 @@ import { isViewDataPath } from "./api/auth/viewToken.js";
 import { deleteTokenFile, generateAndWriteToken, getCurrentToken } from "./api/auth/token.js";
 import { log } from "./system/logger/index.js";
 import { logBackgroundError } from "./utils/logBackgroundError.js";
+import { isNonEmptyString } from "./utils/types.js";
+import { collectSessionEntriesNewestFirst } from "./utils/sessionJsonl.js";
 import { errorMessage } from "./utils/errors.js";
 import { registerScheduledSkills } from "./workspace/skills/scheduler.js";
 import { registerUserTasks } from "./workspace/skills/user-tasks.js";
@@ -429,31 +432,6 @@ const HTML_PREVIEW_EXT_RE = /\.(html?|png|jpe?g|webp|gif|svg|ico|mp4|webm|mov|m4
 const HTML_DOCUMENT_EXT_RE = /\.html?$/i;
 const getHtmlsDirReal = makeCachedRealpath(WORKSPACE_PATHS.htmls);
 
-// Honour `X-Forwarded-*` so dev (Vite proxies `/artifacts/html` →
-// `localhost:3001` with `changeOrigin: true`) emits the browser-
-// visible origin (`localhost:5173`) rather than the upstream socket.
-// In prod (no proxy) the headers are absent and we fall back to the
-// raw `Host` / `req.protocol`.
-//
-// `X-Forwarded-*` values can be a comma-separated proxy chain (each
-// hop appends its own value). The CSP origin only needs the
-// outermost hop — the value the browser actually sees — so we take
-// the first entry and trim. Without this, a multi-hop deployment
-// would emit `https://a.example.com, b.example.com://x` and break
-// preview resource loading at the browser (#1056 review).
-function browserVisibleOrigin(req: Request): string {
-  const fwdHost = firstForwardedValue(req.get("x-forwarded-host"));
-  const fwdProto = firstForwardedValue(req.get("x-forwarded-proto"));
-  const host = fwdHost ?? req.get("host");
-  const proto = fwdProto ?? req.protocol;
-  return `${proto}://${host}`;
-}
-
-function firstForwardedValue(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  const first = raw.split(",")[0]?.trim();
-  return first && first.length > 0 ? first : undefined;
-}
 app.use(
   "/artifacts/html",
   async (req, res, next) => {
@@ -667,22 +645,11 @@ async function getSessionRoleForBridge(sessionId: string): Promise<string | null
 async function getSessionHistoryForBridge(sessionId: string, opts: { limit: number; offset: number }) {
   const content = await readSessionJsonl(sessionId);
   if (!content) return { messages: [], total: 0 };
-  const allMessages: { source: string; text: string }[] = [];
-  const lines = content.split("\n").filter(Boolean);
-  // Collect all text events newest-first
-  for (let i = lines.length - 1; i >= 0; i--) {
-    try {
-      const entry = JSON.parse(lines[i]);
-      if (entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
-        allMessages.push({
-          source: entry.source ?? "unknown",
-          text: entry.message,
-        });
-      }
-    } catch {
-      // skip malformed lines
-    }
-  }
+  const allMessages = collectSessionEntriesNewestFirst(content, (entry) =>
+    entry.type === EVENT_TYPES.text && typeof entry.message === "string"
+      ? { source: isNonEmptyString(entry.source) ? entry.source : "unknown", text: entry.message }
+      : undefined,
+  );
   const total = allMessages.length;
   const messages = allMessages.slice(opts.offset, opts.offset + opts.limit);
   return { messages, total };

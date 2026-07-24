@@ -9,7 +9,7 @@
 // composable can be unit-tested outside a Vue setup context.
 
 import { computed, watchEffect, type ComputedRef, type Ref, ref } from "vue";
-import { createTranslationCache, type TranslateRequest, type TranslateResponse } from "@mulmoclaude/core/translation/client";
+import { createTranslationCache, loadTranslated, type TranslateResponse } from "@mulmoclaude/core/translation/client";
 import { apiPost } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
 
@@ -22,25 +22,6 @@ export function pickTranslated(translated: readonly string[] | null, sources: re
   return [...(translated ?? sources)];
 }
 
-/** Resolve a request through the cache (peek-then-fetch) and hand the result to
- *  `apply`, but only while `isCurrent()` still holds — so a slow response can't
- *  overwrite a newer locale/input's translation. */
-function loadInto(req: TranslateRequest, isCurrent: () => boolean, apply: (value: readonly string[]) => void): void {
-  const hit = cache.peek(req);
-  if (hit !== null) {
-    apply(hit);
-    return;
-  }
-  cache
-    .fetch(req)
-    .then((result) => {
-      if (result !== null && isCurrent()) apply(result);
-    })
-    .catch(() => {
-      /* transport rejected — keep the English fallback */
-    });
-}
-
 /** Translated strings when available, falling back to the English source while
  *  the request is in flight or on failure. `en` and empty inputs never fetch. */
 export function useTranslatedStrings(namespace: string, sentences: Ref<readonly string[]>, locale: Ref<string>): ComputedRef<string[]> {
@@ -51,7 +32,8 @@ export function useTranslatedStrings(namespace: string, sentences: Ref<readonly 
     translated.value = null; // reset on any input change → source shows meanwhile
     if (lang === "en" || sources.length === 0) return;
     const req = { namespace, targetLanguage: lang, sentences: sources };
-    loadInto(
+    loadTranslated(
+      cache,
       req,
       () => locale.value === lang && sentences.value === sources,
       (value) => (translated.value = value),

@@ -15,119 +15,21 @@
           <span v-if="filePath" class="truncate">{{ filePath }}</span>
         </div>
       </div>
-      <div class="ml-4 shrink-0 flex items-center gap-2">
-        <!-- Play presentation: opens the lightbox at beat 0 and starts
-             audio. Same gating as Download Movie — only when a movie has
-             been generated, which is our proxy for "every beat has both
-             an image and audio on disk". Green outline + green icon
-             share the visual idiom with the (filled) Download button so
-             both completed-artifact actions read as the same family.
-             `isPlayReady` ensures we don't open the lightbox before the
-             first beat's image (and audio, if it has text) finish their
-             async load — moviePath can be set while loadExistingBeatImage
-             is still in flight. -->
-        <button
-          v-if="moviePath && !movieGenerating"
-          class="h-8 w-8 flex items-center justify-center rounded border border-green-600 text-green-600 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          :disabled="!isPlayReady"
-          :title="m.playPresentation"
-          :aria-label="m.playPresentation"
-          @click="playPresentation"
-        >
-          <span class="material-icons text-base">play_arrow</span>
-        </button>
-        <!-- Download Movie: authenticated blob fetch through the host
-             adapter, then a synthetic <a download> click. A plain
-             <a href download> can't attach the host's auth headers, which
-             would have forced an auth exemption on the media route — the
-             host-injected `fetchMediaBlob` keeps the auth boundary intact
-             (and hosts that don't provide it simply don't show this
-             button). -->
-        <button
-          v-if="moviePath && !movieGenerating && canFetchMedia"
-          class="h-8 px-2.5 flex items-center gap-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          :disabled="movieDownloading"
-          data-testid="mulmo-script-download-movie-button"
-          @click="downloadMovie"
-        >
-          <span class="material-icons text-base">download</span>
-          <span>{{ m.movie }}</span>
-        </button>
-        <!-- Regenerate Movie (icon-only): collapses to a square once a
-             movie exists — the adjacent Download / Play already make
-             the subject clear, so the "Movie" label only adds noise. -->
-        <button
-          v-if="moviePath && !movieGenerating"
-          class="h-8 w-8 flex items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-          :title="m.regenerateMovie"
-          :aria-label="m.regenerateMovie"
-          data-testid="mulmo-script-regenerate-movie-button"
-          @click="generateMovie"
-        >
-          <span class="material-icons text-base">refresh</span>
-        </button>
-        <!-- Generate Movie (pill): no movie yet, or one is currently
-             generating. Keeps the label so first-time users know what
-             they're triggering. -->
-        <button
-          v-else
-          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          :disabled="movieGenerating"
-          data-testid="mulmo-script-generate-movie-button"
-          @click="generateMovie"
-        >
-          <svg v-if="movieGenerating" class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span v-if="movieGenerating">{{ m.generating }}</span>
-          <template v-else>
-            <span class="material-icons text-sm">refresh</span>
-            <span>{{ m.movie }}</span>
-          </template>
-        </button>
-        <!-- PDF (#1614): same Generate / Download / Regenerate pattern
-             as the Movie cluster above, kept structurally separate so
-             the two outputs can be requested independently and report
-             status independently. -->
-        <button
-          v-if="pdfPath && !pdfGenerating && canFetchMedia"
-          class="h-8 px-2.5 flex items-center gap-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          :disabled="pdfDownloading"
-          data-testid="mulmo-script-download-pdf-button"
-          @click="downloadPdf"
-        >
-          <span class="material-icons text-base">download</span>
-          <span>{{ m.pdf }}</span>
-        </button>
-        <button
-          v-if="pdfPath && !pdfGenerating"
-          class="h-8 w-8 flex items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-          :title="m.regeneratePdf"
-          :aria-label="m.regeneratePdf"
-          data-testid="mulmo-script-regenerate-pdf-button"
-          @click="generatePdf"
-        >
-          <span class="material-icons text-base">refresh</span>
-        </button>
-        <button
-          v-else
-          class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          :disabled="pdfGenerating"
-          data-testid="mulmo-script-generate-pdf-button"
-          @click="generatePdf"
-        >
-          <svg v-if="pdfGenerating" class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span v-if="pdfGenerating">{{ m.generatingPdf }}</span>
-          <template v-else>
-            <span class="material-icons text-sm">picture_as_pdf</span>
-            <span>{{ m.pdf }}</span>
-          </template>
-        </button>
-      </div>
+      <MulmoScriptToolbar
+        :movie-path="moviePath"
+        :movie-generating="movieGenerating"
+        :movie-downloading="movieDownloading"
+        :is-play-ready="isPlayReady"
+        :can-fetch-media="canFetchMedia"
+        :pdf-path="pdfPath"
+        :pdf-generating="pdfGenerating"
+        :pdf-downloading="pdfDownloading"
+        @play="playPresentation"
+        @generate-movie="generateMovie"
+        @download-movie="downloadMovie"
+        @generate-pdf="generatePdf"
+        @download-pdf="downloadPdf"
+      />
     </div>
 
     <!--
@@ -158,88 +60,23 @@
     </div>
 
     <!-- Characters section -->
-    <div v-if="characterKeys.length > 0" class="border-b border-gray-100 shrink-0 px-4 py-3">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ m.characters }}</span>
-        <button
-          class="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-          :disabled="movieGenerating || anyBeatRendering || characterKeys.every((key) => charRenderState[key] === 'rendering')"
-          @click="generateAllCharacters"
-        >
-          {{ m.generateAll }}
-        </button>
-      </div>
-      <div class="flex gap-3 flex-wrap">
-        <div v-for="key in characterKeys" :key="key" class="flex flex-col items-center gap-1 w-36">
-          <!-- Character thumbnail -->
-          <div
-            class="relative w-36 h-36 rounded-lg border overflow-hidden bg-gray-50 flex items-center justify-center transition-colors"
-            :class="charDragOver[key] ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
-            @dragover="onCharDragOver($event, key)"
-            @dragleave="onCharDragLeave(key)"
-            @drop="onCharDrop($event, key)"
-          >
-            <img
-              v-if="charImages[key]"
-              :src="charImages[key]"
-              class="w-full h-full object-cover cursor-zoom-in"
-              :alt="key"
-              @click="openCharacterLightbox(key)"
-            />
-            <template v-else-if="charRenderState[key] === 'rendering'">
-              <svg class="animate-spin w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            </template>
-            <template v-else-if="charRenderState[key] === 'error'">
-              <span class="text-xs text-red-400 text-center px-1">{{ charErrors[key] }}</span>
-            </template>
-            <template v-else>
-              <span class="text-xs text-gray-300 text-center px-1 leading-tight">{{ characterPrompt(key) }}</span>
-            </template>
-            <!-- Permanent drop hint -->
-            <div v-if="!charDragOver[key]" class="absolute bottom-0 inset-x-0 text-center text-xs text-gray-400 bg-white/70 py-0.5 pointer-events-none">
-              {{ m.orDropImage }}
-            </div>
-            <!-- Drop overlay -->
-            <div v-if="charDragOver[key]" class="absolute inset-0 flex items-center justify-center bg-blue-50/80 pointer-events-none">
-              <span class="text-xs text-blue-500 font-medium">{{ m.drop }}</span>
-            </div>
-            <!-- Regenerate button -->
-            <button
-              v-if="charImages[key] && charRenderState[key] !== 'rendering'"
-              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
-              :class="
-                movieGenerating || anyBeatRendering ? 'border-yellow-400 text-yellow-500 cursor-not-allowed' : 'border-gray-400 text-gray-600 hover:bg-gray-50'
-              "
-              :disabled="movieGenerating || anyBeatRendering"
-              @click.stop="renderCharacter(key, true)"
-            >
-              <span v-if="movieGenerating || anyBeatRendering" class="inline-block animate-spin">↺</span>
-              <span v-else>↺</span>
-            </button>
-            <!-- Generate button -->
-            <button
-              v-else-if="!charImages[key] && charRenderState[key] !== 'rendering'"
-              class="absolute top-0.5 right-0.5 px-1 py-0.5 text-xs rounded border bg-white"
-              :class="
-                movieGenerating || anyBeatRendering ? 'border-yellow-400 text-yellow-500 cursor-not-allowed' : 'border-blue-400 text-blue-600 hover:bg-blue-50'
-              "
-              :disabled="movieGenerating || anyBeatRendering"
-              @click.stop="renderCharacter(key, false)"
-            >
-              <svg v-if="movieGenerating || anyBeatRendering" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-              <span v-else>{{ m.gen }}</span>
-            </button>
-          </div>
-          <span class="text-xs text-gray-600 text-center truncate w-full">{{ key }}</span>
-        </div>
-      </div>
-    </div>
+    <CharacterStrip
+      v-if="characterKeys.length > 0"
+      :character-keys="characterKeys"
+      :images="script.imageParams?.images"
+      :thumbnails="charImages"
+      :render-state="charRenderState"
+      :errors="charErrors"
+      :drag-over="charDragOver"
+      :movie-generating="movieGenerating"
+      :any-beat-rendering="anyBeatRendering"
+      @generate-all="generateAllCharacters"
+      @char-drag-over="onCharDragOver"
+      @char-drag-leave="onCharDragLeave"
+      @char-drop="onCharDrop"
+      @open-lightbox="openCharacterLightbox"
+      @render-character="renderCharacter"
+    />
 
     <!-- Deck editor (#1575): every beat is a slide → mount the
          interactive deck editor from @mulmocast/deck-web. The Vue
@@ -476,74 +313,21 @@
     </div>
 
     <!-- Lightbox -->
-    <div v-if="lightbox" class="fixed inset-0 z-50 bg-black/80 overflow-y-auto" @click="closeLightbox">
-      <button class="fixed top-2 right-4 z-10 text-white/60 hover:text-white text-3xl leading-none" :title="m.close" @click.stop="closeLightbox">✕</button>
-      <div class="flex flex-col items-center gap-4 pt-4 pb-8" @click.stop>
-        <div class="flex items-center gap-4">
-          <button
-            v-if="!lightbox.isCharacter"
-            class="text-white/60 hover:text-white disabled:opacity-20 text-5xl leading-none"
-            :disabled="!hasPrev"
-            @click="lightboxMove(-1)"
-          >
-            ‹
-          </button>
-          <div class="flex flex-col items-center">
-            <img :src="lightbox.src" class="max-w-[80vw] max-h-[85vh] object-contain rounded shadow-2xl" />
-            <div v-if="!lightbox.isCharacter && beats.length > 1" class="relative w-full h-1">
-              <div class="flex gap-1 h-full">
-                <div
-                  v-for="i in beats.length"
-                  :key="i - 1"
-                  class="group flex-1 cursor-pointer relative transition-colors"
-                  :class="
-                    i - 1 === lightbox.index
-                      ? 'bg-white/80 hover:bg-white'
-                      : i - 1 < lightbox.index
-                        ? 'bg-white/40 hover:bg-white/60'
-                        : 'bg-white/20 hover:bg-white/40'
-                  "
-                  @click="jumpToBeat(i - 1)"
-                >
-                  <span class="absolute -inset-y-3 inset-x-0" />
-                  <div
-                    v-if="beatTooltip(i - 1)"
-                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 px-2 py-1 rounded bg-black/90 text-white text-xs leading-tight w-48 max-h-[53px] overflow-hidden opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
-                  >
-                    {{ beatTooltip(i - 1) }}
-                  </div>
-                </div>
-              </div>
-              <div
-                v-if="playingAudio && playingAudio.index === lightbox.index"
-                class="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-white shadow ring-2 ring-black/30 -translate-y-1/2 -translate-x-1/2 pointer-events-none"
-                :style="{ left: `${((lightbox.index + audioProgress) / beats.length) * 100}%` }"
-              />
-            </div>
-          </div>
-          <button
-            v-if="!lightbox.isCharacter"
-            class="text-white/60 hover:text-white disabled:opacity-20 text-5xl leading-none"
-            :disabled="!hasNext"
-            @click="lightboxMove(1)"
-          >
-            ›
-          </button>
-        </div>
-        <div v-if="lightbox.text || beatAudios[lightbox.index]" class="relative w-screen flex justify-center px-16">
-          <p v-if="lightbox.text" class="max-w-[80vw] text-center text-white leading-relaxed text-[clamp(0.8rem,1.76vw,1.6rem)]">
-            {{ lightbox.text }}
-          </p>
-          <button
-            v-if="beatAudios[lightbox.index]"
-            class="absolute top-0 right-4 text-sm px-3 py-1 rounded border border-white/60 text-white/60 hover:bg-white/20"
-            @click="playAudio(lightbox.index)"
-          >
-            {{ playingAudio?.index === lightbox.index ? m.stop : m.play }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <BeatLightbox
+      v-if="lightbox"
+      :lightbox="lightbox"
+      :beat-count="beats.length"
+      :beat-texts="beatTexts"
+      :has-prev="hasPrev"
+      :has-next="hasNext"
+      :playing-audio-index="playingAudio?.index ?? null"
+      :audio-progress="audioProgress"
+      :has-current-audio="Boolean(beatAudios[lightbox.index])"
+      @close="closeLightbox"
+      @move="lightboxMove"
+      @jump="jumpToBeat"
+      @play-audio="playAudio"
+    />
   </div>
 </template>
 
@@ -551,13 +335,32 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { mulmoBeatSchema, mulmoScriptSchema } from "@mulmocast/types";
-import type { SlideLayout, SlideTheme } from "@mulmocast/deck-web";
 import type { MulmoScriptData } from "../core/types";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
-import { getMissingCharacterKeys, isAllSlideDeck, isSameScript, beatMayHaveMovie, shouldAutoRenderBeat, validateBeatJSON } from "./helpers";
-import { errorMessage, useClipboardCopy } from "./support";
+import {
+  isSameScript,
+  beatMayHaveMovie,
+  shouldAutoRenderBeat,
+  effectiveBeat as effectiveBeatOf,
+  isValidBeat as isValidBeatOf,
+  staleSince as staleSinceOf,
+  scriptSourceText as toScriptSourceText,
+  resolveSilentAdvanceSeconds,
+  clearReactiveRecords,
+  type Beat,
+} from "./helpers";
+import { errorMessage } from "@mulmoclaude/common";
+import { readFileAsDataUrl, useClipboardCopy } from "./support";
 import { useMulmoScriptTransport } from "./transport";
 import { useHostAdapter } from "./hostAdapter";
+import { useMediaExport } from "./composables/useMediaExport";
+import { useBeatMovie } from "./composables/useBeatMovie";
+import { useCharacterImages } from "./composables/useCharacterImages";
+import { useDeckEditor } from "./composables/useDeckEditor";
+import type { LightboxState, MulmoScript } from "./viewTypes";
+import BeatLightbox from "./components/BeatLightbox.vue";
+import CharacterStrip from "./components/CharacterStrip.vue";
+import MulmoScriptToolbar from "./components/MulmoScriptToolbar.vue";
 import { useT } from "../lang/index";
 
 // Lazy-loaded so the deck editor's Vue / tailwind / SlidePreview chunk
@@ -575,38 +378,6 @@ const adapter = useHostAdapter();
 const canFetchMedia = computed(() => Boolean(adapter.fetchMediaBlob));
 
 const m = useT();
-
-interface Beat {
-  speaker?: string;
-  text?: string;
-  id?: string;
-  imagePrompt?: string;
-  moviePrompt?: string;
-  image?: { type: string; [key: string]: unknown };
-  /** Beat duration in seconds. The mulmocast schema notes this is
-   *  "Used only when the text is empty" — when there's no TTS audio
-   *  to drive playback, the Play loop uses this as the auto-advance
-   *  timer (#1073). */
-  duration?: number;
-}
-
-interface ImageEntry {
-  type: string;
-  prompt?: string;
-  [key: string]: unknown;
-}
-
-interface MulmoScript {
-  title?: string;
-  description?: string;
-  lang?: string;
-  beats?: Beat[];
-  imageParams?: {
-    images?: Record<string, ImageEntry>;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
 
 const props = defineProps<{
   selectedResult: ToolResultComplete<MulmoScriptData>;
@@ -636,31 +407,9 @@ interface BeatSaveError {
 const beatSaveErrors = reactive<Record<number, BeatSaveError>>({});
 const beatSaving = reactive<Record<number, boolean>>({});
 const localOverrides = reactive<Record<number, Beat>>({});
-const movieGenerating = ref(false);
-const movieDownloading = ref(false);
-const moviePath = ref<string | null>(null);
-// Persists the most-recent movie-generation failure so the spinner
-// area can surface it inline with a retry button (#1197). Cleared
-// at the start of every generate / regenerate attempt.
-const movieError = ref<string | null>(null);
-// PDF generation (#1614). Mirrors the movie triple — path / spinner /
-// downloading flag — kept independent so a PDF and a movie can be
-// generated for the same script without state collision.
-const pdfGenerating = ref(false);
-const pdfDownloading = ref(false);
-const pdfPath = ref<string | null>(null);
 const beatAudios = reactive<Record<number, string>>({});
 const audioState = reactive<Record<number, "generating" | "done" | "error">>({});
 const audioErrors = reactive<Record<number, string>>({});
-// Per-beat generated video clip (moviePrompt / animated beats).
-// `beatMovies` holds the "stories/…" wire path from the beat-movie
-// probe; the blob object URL is fetched lazily on first play through
-// the host adapter's authenticated `fetchMediaBlob` — a plain
-// <video src> can't attach the host's auth headers.
-const beatMovies = reactive<Record<number, string>>({});
-const beatMovieUrls = reactive<Record<number, string>>({});
-const beatMovieOpen = reactive<Record<number, boolean>>({});
-const beatMovieLoading = reactive<Record<number, boolean>>({});
 const playingAudio = ref<{ index: number; audio: HTMLAudioElement } | null>(null);
 // Tracks the auto-advance timer running on a silent beat
 // (`beat.text === ""`). Beats without text generate no audio, so the
@@ -676,26 +425,10 @@ const audioProgress = ref(0);
 const SILENT_BEAT_DEFAULT_SEC = 3;
 const MS_PER_SECOND = 1000;
 const beatListEl = ref<HTMLElement | null>(null);
-const lightbox = ref<{
-  src: string;
-  text?: string;
-  index: number;
-  isCharacter?: boolean;
-} | null>(null);
-// Character (imageParams.images) state
-type CharRenderState = "idle" | "rendering" | "done" | "error";
-const charRenderState = reactive<Record<string, CharRenderState>>({});
-const charImages = reactive<Record<string, string>>({});
-const charErrors = reactive<Record<string, string>>({});
-const charDragOver = reactive<Record<string, boolean>>({});
+const lightbox = ref<LightboxState | null>(null);
 const beatDragOver = reactive<Record<number, boolean>>({});
 
 const anyBeatRendering = computed(() => Object.values(renderState).some((state) => state === "rendering"));
-
-const characterKeys = computed(() => {
-  const imgs = script.value.imageParams?.images ?? {};
-  return Object.keys(imgs).filter((key) => imgs[key]?.type === "imagePrompt");
-});
 
 // Session tagging is host transport: MulmoClaude injects the active chat
 // session id so generations light its per-session sidebar indicator;
@@ -703,9 +436,50 @@ const characterKeys = computed(() => {
 // omitted from generation dispatches.
 const chatSessionId = computed(() => adapter.chatSessionId?.value);
 
-function characterPrompt(key: string): string {
-  return (script.value.imageParams?.images?.[key]?.prompt as string) ?? "";
-}
+const {
+  moviePath,
+  movieGenerating,
+  movieDownloading,
+  movieError,
+  pdfPath,
+  pdfGenerating,
+  pdfDownloading,
+  generateMovie,
+  downloadMovie,
+  refreshMoviePath,
+  generatePdf,
+  downloadPdf,
+  refreshPdfPath,
+  resetMedia,
+} = useMediaExport({ api, adapter, filePath, chatSessionId });
+
+const {
+  beatMovies,
+  beatMovieUrls,
+  beatMovieOpen,
+  beatMovieLoading,
+  loadExistingBeatMovie,
+  playBeatMovie,
+  closeBeatMovie,
+  invalidateBeatMovie,
+  resetBeatMovies,
+} = useBeatMovie({ api, adapter, filePath });
+
+const {
+  charRenderState,
+  charImages,
+  charErrors,
+  charDragOver,
+  characterKeys,
+  onCharDragOver,
+  onCharDragLeave,
+  onCharDrop,
+  loadExistingCharacterImage,
+  refreshMissingCharacterImages,
+  renderCharacter,
+  generateAllCharacters,
+  resetCharacters,
+} = useCharacterImages({ api, filePath, chatSessionId, getImages: () => script.value.imageParams?.images });
 
 function stopPlayingAudio() {
   // Single helper that clears both the audio path and the silent
@@ -809,13 +583,11 @@ function playBeat(index: number): void {
 }
 
 function scheduleSilentAdvance(index: number): void {
-  // Defensively narrow the script-supplied duration. A bad value
-  // (zero, negative, NaN, non-number) would otherwise collapse to
-  // an immediate timeout and the Play loop would race through every
-  // silent beat in a single tick (Codex review iter-5 on #1365).
-  // Falling back to the default keeps the presentation watchable.
-  const raw = effectiveBeat(index).duration;
-  const seconds = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : SILENT_BEAT_DEFAULT_SEC;
+  // Defensively narrow the script-supplied duration (zero / negative / NaN /
+  // non-number → default) — a bad value would otherwise collapse to an
+  // immediate timeout and the Play loop would race through every silent beat
+  // in a single tick (Codex review iter-5 on #1365).
+  const seconds = resolveSilentAdvanceSeconds(effectiveBeat(index).duration, SILENT_BEAT_DEFAULT_SEC);
   const timer = setTimeout(() => {
     if (silentPlaybackTimer.value?.index !== index) return;
     silentPlaybackTimer.value = null;
@@ -847,6 +619,10 @@ const hasNext = computed(() => {
   return false;
 });
 
+// Narration text per beat, for the lightbox beat-strip hover tooltips. Reads
+// through `effectiveBeat` so an unsaved in-place edit shows its new text.
+const beatTexts = computed(() => beats.value.map((_, index) => effectiveBeat(index).text));
+
 function jumpToBeat(index: number) {
   if (!lightbox.value) return;
   if (index === lightbox.value.index) return;
@@ -857,11 +633,6 @@ function jumpToBeat(index: number) {
   const wasPlaying = playingAudio.value !== null || silentPlaybackTimer.value !== null;
   openLightbox(index);
   if (wasPlaying) playBeat(index);
-}
-
-function beatTooltip(index: number): string {
-  const text = effectiveBeat(index).text ?? "";
-  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
 function lightboxMove(delta: number) {
@@ -898,92 +669,27 @@ const effectiveScript = computed<MulmoScript>(() => ({
   ...script.value,
   beats: beats.value.map((beat, i) => localOverrides[i] ?? beat),
 }));
-const scriptSourceText = computed(() => JSON.stringify(effectiveScript.value, null, 2));
+const scriptSourceText = computed(() => toScriptSourceText(effectiveScript.value));
 
-// #1575 — when every beat is a `slide`, swap the per-beat list UI for
-// the interactive deck editor (@mulmocast/deck-web). Mixed scripts
-// (any non-slide beat) fall back to the existing list so the user can
-// keep editing movie / textSlide / html_tailwind beats as before.
-const isDeck = computed(() => isAllSlideDeck(effectiveScript.value));
-
-// `@mulmocast/deck-web` types its `script` prop as a *structural*
-// superset of MulmoScript (every key optional + index signature) using
-// `SlideLayout` / `SlideTheme` from `@mulmocast/deck`. Our strict
-// `MulmoScript` from `@mulmocast/types` doesn't unify with that shape
-// by name, so we re-type at the boundary. The cast is safe — any real
-// MulmoScript instance fits the structural shape. Mirrored on the way
-// out (`onDeckUpdate`).
-interface DeckBeatShape {
-  image?: {
-    type?: string;
-    slide?: SlideLayout;
-    theme?: SlideTheme;
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-interface DeckScriptShape {
-  beats?: DeckBeatShape[];
-  presentationStyle?: { slideParams?: { theme?: SlideTheme } };
-  slideParams?: { theme?: SlideTheme };
-  [k: string]: unknown;
-}
-const deckScriptInput = computed<DeckScriptShape>(() => effectiveScript.value as unknown as DeckScriptShape);
-
-// Debounce window for deck-editor → update-script. Drag a slide,
-// reorder, edit a field — each emit fires `update:script`, and we
-// only want one network round-trip per quiet stretch. 300ms is short
-// enough to feel live, long enough that typing in the Inspector
-// doesn't carpet-bomb the server.
-const DECK_SAVE_DEBOUNCE_MS = 300;
-let deckSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingDeckScript: MulmoScript | null = null;
-
-function scheduleDeckSave(next: MulmoScript): void {
-  pendingDeckScript = next;
-  if (deckSaveTimer) clearTimeout(deckSaveTimer);
-  deckSaveTimer = setTimeout(() => {
-    void flushDeckSave();
-  }, DECK_SAVE_DEBOUNCE_MS);
-}
-
-async function flushDeckSave(): Promise<void> {
-  deckSaveTimer = null;
-  const next = pendingDeckScript;
-  pendingDeckScript = null;
-  if (!next || !filePath.value) return;
-  const response = await api.call("updateScript", {
-    filePath: filePath.value,
-    script: next,
-  });
-  if (!response.ok) {
-    // Surface via console so the user can see what failed; a full
-    // toast UI is P2. The deck editor still holds the latest edit
-    // in its props until the next prop refresh, so the visible state
-    // doesn't snap back on a transient failure.
-    console.error("[presentMulmoScript] deck save failed:", response.error);
-    return;
-  }
-  // Mirror the JSON-source `applySource` flow so the parent's in-memory
-  // script and our reactive beats[] stay in sync without a remount.
+// Persist a saved script back into the parent's toolResult so the in-memory
+// script and reactive beats[] stay in sync without a remount. The parent's
+// handleUpdateResult uses Object.assign (in-place), so the prop watcher won't
+// fire — callers that need a re-read drive initializeScript themselves.
+function commitScript(next: MulmoScript): void {
   emit("updateResult", {
     ...props.selectedResult,
     data: { ...props.selectedResult.data, script: next },
   });
 }
 
-function onDeckUpdate(next: DeckScriptShape): void {
-  scheduleDeckSave(next as unknown as MulmoScript);
-}
+// #1575 — when every beat is a `slide`, swap the per-beat list UI for the
+// interactive deck editor (@mulmocast/deck-web). Mixed scripts (any non-slide
+// beat) fall back to the existing list. The debounce + flush-on-unmount live
+// in the composable.
+const { isDeck, deckScriptInput, onDeckUpdate, flushPendingDeckSave } = useDeckEditor({ api, filePath, effectiveScript, commitScript });
 
 onBeforeUnmount(() => {
-  if (deckSaveTimer) {
-    clearTimeout(deckSaveTimer);
-    // Flush synchronously-scheduled work on unmount so a quick switch
-    // away doesn't lose the last keystroke. Fire-and-forget — the
-    // component is gone, we just want the bytes to land.
-    void flushDeckSave();
-  }
+  flushPendingDeckSave();
   // Release beat-clip blob object URLs — they outlive the component
   // otherwise (document-scoped, not GC'd with it).
   resetBeatMovies();
@@ -1013,7 +719,7 @@ async function onSourceToggle(open: boolean) {
     if (filePath.value) {
       const response = await api.call("save", { filePath: filePath.value });
       const diskScript = response.ok ? (response.data.script as MulmoScript | undefined) : undefined;
-      if (diskScript) text = JSON.stringify(diskScript, null, 2);
+      if (diskScript) text = toScriptSourceText(diskScript);
       // fall through to in-memory script on failure
     }
     editableSource.value = text;
@@ -1042,15 +748,10 @@ async function applySource() {
     return;
   }
 
-  // Update the UI with the new script.
-  // Note: the parent's handleUpdateResult uses Object.assign (in-place
-  // mutation), so the watcher on props.selectedResult won't fire.
-  // We emit first so the parent data is updated, then manually
-  // re-initialize the view.
-  emit("updateResult", {
-    ...props.selectedResult,
-    data: { ...props.selectedResult.data, script: parsed },
-  });
+  // Update the UI with the new script. commitScript emits first so the parent
+  // data is updated (its handleUpdateResult uses in-place Object.assign, so
+  // the prop watcher won't fire), then we manually re-initialize the view.
+  commitScript(parsed);
 
   if (sourceDetails.value) sourceDetails.value.open = false;
   await initializeScript();
@@ -1061,19 +762,19 @@ async function copyText() {
 }
 
 function effectiveBeat(index: number): Beat {
-  return localOverrides[index] ?? beats.value[index] ?? {};
+  return effectiveBeatOf(localOverrides, beats.value, index);
 }
 
 function toggleSource(index: number) {
   if (!sourceOpen[index]) {
-    sourceText[index] = JSON.stringify(effectiveBeat(index), null, 2);
+    sourceText[index] = toScriptSourceText(effectiveBeat(index));
     Reflect.deleteProperty(beatSaveErrors, index);
   }
   sourceOpen[index] = !sourceOpen[index];
 }
 
 function isValidBeat(index: number): boolean {
-  return validateBeatJSON(sourceText[index] ?? "", mulmoBeatSchema);
+  return isValidBeatOf(sourceText[index], mulmoBeatSchema);
 }
 
 async function updateBeat(index: number) {
@@ -1177,7 +878,7 @@ async function regenerateBeat(index: number) {
 // otherwise late responses from script A's bulk mount-time probes would
 // write into the per-beat maps that now belong to script B.
 function staleSince(requestedFilePath: string): boolean {
-  return filePath.value !== requestedFilePath;
+  return staleSinceOf(filePath.value, requestedFilePath);
 }
 
 async function loadExistingBeatImage(index: number) {
@@ -1200,55 +901,6 @@ async function loadExistingBeatAudio(index: number) {
     beatAudios[index] = response.data.audio;
     audioState[index] = "done";
   }
-}
-
-async function loadExistingBeatMovie(index: number) {
-  const requestedFilePath = filePath.value;
-  const response = await api.call("beatMovie", { filePath: requestedFilePath, beatIndex: index });
-  if (staleSince(requestedFilePath)) return;
-  // silently ignore errors — the clip simply hasn't been generated yet
-  if (response.ok && response.data.moviePath) {
-    beatMovies[index] = response.data.moviePath;
-  }
-}
-
-async function playBeatMovie(index: number) {
-  const fetchMediaBlob = adapter.fetchMediaBlob;
-  if (!fetchMediaBlob || !beatMovies[index] || beatMovieLoading[index]) return;
-  if (beatMovieUrls[index]) {
-    beatMovieOpen[index] = true;
-    return;
-  }
-  beatMovieLoading[index] = true;
-  try {
-    // Re-type the .mov blob as video/mp4 — same ISO-BMFF family, and
-    // <video> support for "video/mp4" is broader than "video/quicktime".
-    const blob = new Blob([await fetchMediaBlob({ moviePath: beatMovies[index] })], { type: "video/mp4" });
-    beatMovieUrls[index] = URL.createObjectURL(blob);
-    beatMovieOpen[index] = true;
-  } catch (err) {
-    alert(errorMessage(err));
-  } finally {
-    Reflect.deleteProperty(beatMovieLoading, index);
-  }
-}
-
-function closeBeatMovie(index: number) {
-  Reflect.deleteProperty(beatMovieOpen, index);
-}
-
-// Drop one beat's cached clip (regenerate is about to replace it on
-// disk). Revoking the object URL frees the blob immediately.
-function invalidateBeatMovie(index: number): void {
-  if (beatMovieUrls[index]) URL.revokeObjectURL(beatMovieUrls[index]);
-  [beatMovies, beatMovieUrls, beatMovieOpen].forEach((map) => Reflect.deleteProperty(map, index));
-}
-
-function resetBeatMovies(): void {
-  Object.values(beatMovieUrls).forEach((url) => URL.revokeObjectURL(url));
-  [beatMovies, beatMovieUrls, beatMovieOpen, beatMovieLoading].forEach((map) => {
-    Object.keys(map).forEach((key) => Reflect.deleteProperty(map, key));
-  });
 }
 
 async function generateAudio(index: number) {
@@ -1315,12 +967,7 @@ async function onBeatDrop(event: DragEvent, index: number) {
   Reflect.deleteProperty(renderErrors, index);
   let imageData: string;
   try {
-    imageData = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    imageData = await readFileAsDataUrl(file);
   } catch (err) {
     renderErrors[index] = errorMessage(err);
     renderState[index] = "error";
@@ -1342,49 +989,6 @@ async function onBeatDrop(event: DragEvent, index: number) {
   renderState[index] = "done";
 }
 
-function onCharDragOver(event: DragEvent, key: string) {
-  if (!event.dataTransfer?.types.includes("Files")) return;
-  event.preventDefault();
-  charDragOver[key] = true;
-}
-
-function onCharDragLeave(key: string) {
-  charDragOver[key] = false;
-}
-
-async function onCharDrop(event: DragEvent, key: string) {
-  event.preventDefault();
-  charDragOver[key] = false;
-  const file = event.dataTransfer?.files[0];
-  if (!file || !file.type.startsWith("image/")) return;
-
-  charRenderState[key] = "rendering";
-  Reflect.deleteProperty(charErrors, key);
-  let imageData: string;
-  try {
-    imageData = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  } catch (err) {
-    charErrors[key] = errorMessage(err);
-    charRenderState[key] = "error";
-    return;
-  }
-  const requestedFilePath = filePath.value;
-  const response = await api.call("uploadCharacterImage", { filePath: requestedFilePath, key, imageData });
-  if (staleSince(requestedFilePath)) return;
-  if (!response.ok) {
-    charErrors[key] = response.error || "Upload failed";
-    charRenderState[key] = "error";
-    return;
-  }
-  charImages[key] = response.data.image ?? "";
-  charRenderState[key] = "done";
-}
-
 function openCharacterLightbox(key: string) {
   // Stop both audio and silent timer — character lightbox is
   // outside the play loop (#1073).
@@ -1395,45 +999,6 @@ function openCharacterLightbox(key: string) {
     index: -1,
     isCharacter: true,
   };
-}
-
-async function loadExistingCharacterImage(key: string) {
-  const requestedFilePath = filePath.value;
-  const response = await api.call("characterImage", { filePath: requestedFilePath, key });
-  if (staleSince(requestedFilePath)) return;
-  // silently ignore errors
-  if (response.ok && response.data.image) {
-    charImages[key] = response.data.image;
-    charRenderState[key] = "done";
-  }
-}
-
-function refreshMissingCharacterImages() {
-  getMissingCharacterKeys(characterKeys.value, charImages, charRenderState).forEach((key) => loadExistingCharacterImage(key));
-}
-
-async function renderCharacter(key: string, force: boolean) {
-  const requestedFilePath = filePath.value;
-  charRenderState[key] = "rendering";
-  Reflect.deleteProperty(charErrors, key);
-  const response = await api.call("renderCharacter", {
-    filePath: requestedFilePath,
-    key,
-    force,
-    chatSessionId: chatSessionId.value,
-  });
-  if (staleSince(requestedFilePath)) return;
-  if (!response.ok) {
-    charErrors[key] = response.error || "Render failed";
-    charRenderState[key] = "error";
-    return;
-  }
-  charImages[key] = response.data.image ?? "";
-  charRenderState[key] = "done";
-}
-
-async function generateAllCharacters() {
-  await Promise.all(characterKeys.value.filter((key) => charRenderState[key] !== "rendering").map((key) => renderCharacter(key, false)));
 }
 
 // Probe the server for an existing beat PNG before triggering any
@@ -1488,10 +1053,7 @@ async function refreshScriptFromDisk(): Promise<void> {
   // we only need a presence check.
   if (!diskScript) return;
   if (isSameScript(diskScript, script.value)) return;
-  emit("updateResult", {
-    ...props.selectedResult,
-    data: { ...props.selectedResult.data, script: diskScript },
-  });
+  commitScript(diskScript);
 }
 
 async function initializeScript() {
@@ -1506,32 +1068,27 @@ async function initializeScript() {
   lightbox.value = null;
   // Reset scroll position so new results start at the top
   if (beatListEl.value) beatListEl.value.scrollTop = 0;
-  // Reset per-script state
-  Object.keys(renderState).forEach((key) => Reflect.deleteProperty(renderState, key));
-  Object.keys(renderedImages).forEach((key) => Reflect.deleteProperty(renderedImages, key));
-  Object.keys(renderErrors).forEach((key) => Reflect.deleteProperty(renderErrors, key));
-  Object.keys(sourceOpen).forEach((key) => Reflect.deleteProperty(sourceOpen, key));
-  Object.keys(sourceText).forEach((key) => Reflect.deleteProperty(sourceText, key));
-  Object.keys(beatSaveErrors).forEach((key) => Reflect.deleteProperty(beatSaveErrors, key));
-  Object.keys(beatSaving).forEach((key) => Reflect.deleteProperty(beatSaving, key));
-  Object.keys(localOverrides).forEach((key) => Reflect.deleteProperty(localOverrides, key));
-  Object.keys(beatAudios).forEach((key) => Reflect.deleteProperty(beatAudios, key));
-  Object.keys(audioState).forEach((key) => Reflect.deleteProperty(audioState, key));
-  Object.keys(audioErrors).forEach((key) => Reflect.deleteProperty(audioErrors, key));
-  Object.keys(charRenderState).forEach((key) => Reflect.deleteProperty(charRenderState, key));
-  Object.keys(charImages).forEach((key) => Reflect.deleteProperty(charImages, key));
-  Object.keys(charErrors).forEach((key) => Reflect.deleteProperty(charErrors, key));
-  Object.keys(beatDragOver).forEach((key) => Reflect.deleteProperty(beatDragOver, key));
+  // Reset per-script state. resetMedia clears the movie/PDF spinners too —
+  // per-script, so switching away from a generating script doesn't leave the
+  // new script's toolbar spinning; the pendingGenerations snapshot below
+  // re-lights them when the NEW script really does have work in flight.
+  clearReactiveRecords(
+    renderState,
+    renderedImages,
+    renderErrors,
+    sourceOpen,
+    sourceText,
+    beatSaveErrors,
+    beatSaving,
+    localOverrides,
+    beatAudios,
+    audioState,
+    audioErrors,
+    beatDragOver,
+  );
+  resetCharacters();
   resetBeatMovies();
-  moviePath.value = null;
-  pdfPath.value = null;
-  // Movie/PDF spinners are per-script: without this reset, switching
-  // away from a generating script would leave the new script's toolbar
-  // spinning. The pendingGenerations snapshot below re-lights them when
-  // the NEW script really does have work in flight.
-  movieGenerating.value = false;
-  pdfGenerating.value = false;
-  movieError.value = null;
+  resetMedia();
   if (sourceDetails.value) sourceDetails.value.open = false;
 
   // #1074 — re-read the script file from disk before per-beat
@@ -1664,129 +1221,6 @@ async function reflectGenerationFinish(entry: MulmoScriptGenerationEvent): Promi
   } else if (entry.kind === "pdf") {
     pdfGenerating.value = false;
     await refreshPdfPath();
-  }
-}
-
-async function refreshMoviePath(): Promise<void> {
-  const requestedFilePath = filePath.value;
-  if (!requestedFilePath) return;
-  const response = await api.call("movieStatus", { filePath: requestedFilePath });
-  if (filePath.value !== requestedFilePath) return;
-  if (response.ok && response.data.moviePath) {
-    moviePath.value = response.data.moviePath;
-  }
-}
-
-// Long-held dispatch: resolves when the whole images → audio → movie
-// pipeline finishes (or fails). Per-beat progress arrives on the
-// pubsub `generation` channel and is applied by
-// `reflectGenerationFinish`, which reloads each asset off disk —
-// replacing the pre-extraction SSE stream.
-async function generateMovie() {
-  // This dispatch is held open for the whole pipeline (minutes). If the
-  // user navigates to a different result meanwhile, the resolution
-  // describes the OLD script — drop it; the new script's own
-  // initializeScript / pubsub subscription owns the visible state.
-  const requestedFilePath = filePath.value;
-  movieGenerating.value = true;
-  movieError.value = null;
-  const response = await api.call("generateMovie", {
-    filePath: requestedFilePath,
-    chatSessionId: chatSessionId.value,
-  });
-  if (filePath.value !== requestedFilePath) return;
-  movieGenerating.value = false;
-  if (!response.ok) {
-    // Surface inline (instead of `alert()` which blocks + has no
-    // retry affordance). The error chip with a retry button lives
-    // next to the generate button in the template (#1197).
-    movieError.value = response.error;
-    return;
-  }
-  moviePath.value = response.data.moviePath;
-}
-
-// Authenticated movie download through the host adapter (which attaches
-// whatever auth its media route needs — a plain `<a href download>`
-// cannot). The blob is hooked to a synthetic anchor whose `download`
-// attribute carries the filename — the browser still surfaces a native
-// save dialog.
-async function downloadMovie() {
-  const fetchMediaBlob = adapter.fetchMediaBlob;
-  if (!fetchMediaBlob || !moviePath.value || movieDownloading.value) return;
-  movieDownloading.value = true;
-  let objectUrl: string | null = null;
-  try {
-    const blob = await fetchMediaBlob({ moviePath: moviePath.value });
-    objectUrl = URL.createObjectURL(blob);
-    const filename = moviePath.value.split("/").pop() ?? "movie.mp4";
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  } catch (err) {
-    alert(errorMessage(err));
-  } finally {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    movieDownloading.value = false;
-  }
-}
-
-// --- PDF (#1614) ---------------------------------------------------
-//
-// Same triple as movie: status poll → long-held generate dispatch →
-// authenticated download. Per-beat image progress arrives on the same
-// pubsub `generation` channel.
-
-async function refreshPdfPath(): Promise<void> {
-  const requestedFilePath = filePath.value;
-  if (!requestedFilePath) return;
-  const response = await api.call("pdfStatus", { filePath: requestedFilePath });
-  if (filePath.value !== requestedFilePath) return;
-  if (response.ok && response.data.pdfPath) {
-    pdfPath.value = response.data.pdfPath;
-  }
-}
-
-async function generatePdf() {
-  // Long-held dispatch — same stale-navigation guard as generateMovie.
-  const requestedFilePath = filePath.value;
-  pdfGenerating.value = true;
-  const response = await api.call("generatePdf", {
-    filePath: requestedFilePath,
-    chatSessionId: chatSessionId.value,
-  });
-  if (filePath.value !== requestedFilePath) return;
-  pdfGenerating.value = false;
-  if (!response.ok) {
-    alert(response.error);
-    return;
-  }
-  pdfPath.value = response.data.pdfPath;
-}
-
-async function downloadPdf() {
-  const fetchMediaBlob = adapter.fetchMediaBlob;
-  if (!fetchMediaBlob || !pdfPath.value || pdfDownloading.value) return;
-  pdfDownloading.value = true;
-  let objectUrl: string | null = null;
-  try {
-    const blob = await fetchMediaBlob({ pdfPath: pdfPath.value });
-    objectUrl = URL.createObjectURL(blob);
-    const filename = pdfPath.value.split("/").pop() ?? "deck.pdf";
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  } catch (err) {
-    alert(errorMessage(err));
-  } finally {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    pdfDownloading.value = false;
   }
 }
 </script>

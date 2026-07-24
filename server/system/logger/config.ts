@@ -52,10 +52,16 @@ export const DEFAULT_CONFIG: LoggerConfig = {
   },
 };
 
+// `in` walks the prototype chain, so `LOG_LEVEL=constructor` used to pass as a
+// level. `LEVEL_PRIORITY["constructor"]` is then a FUNCTION, and every
+// `priority <= function` comparison is false — the process ran with every log
+// record silently discarded and nothing said so.
+const isLogLevel = (value: string): value is LogLevel => Object.prototype.hasOwnProperty.call(LEVEL_PRIORITY, value);
+
 function parseLevel(raw: string | undefined): LogLevel | undefined {
   if (!raw) return undefined;
   const normalized = raw.toLowerCase();
-  return normalized in LEVEL_PRIORITY ? (normalized as LogLevel) : undefined;
+  return isLogLevel(normalized) ? normalized : undefined;
 }
 
 function parseFormat(raw: string | undefined): LogFormat | undefined {

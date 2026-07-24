@@ -415,8 +415,8 @@ describe("manageCollection — getOntology", () => {
     });
     const invoice = entryFor(await getOntology(), "invoice");
     assert.deepEqual(invoice.relations, [
-      { field: "payments", kind: "backlinks", to: "portfolio" },
-      { field: "paidTotal", kind: "rollup", to: "portfolio" },
+      { field: "payments", kind: "backlinks", to: "portfolio", via: "invoiceId" },
+      { field: "paidTotal", kind: "rollup", to: "portfolio", via: "invoiceId" },
       { field: "lines.clientId", kind: "ref", to: "portfolio" },
     ]);
   });
@@ -439,6 +439,57 @@ describe("manageCollection — schemaDocs", () => {
     const docs = await run({ action: "schemaDocs" });
     assert.doesNotMatch(docs, /could not read/);
     assert.match(docs, /Collection skills/); // heading from the bundled collection-skills.md
+  });
+
+  // The full doc outgrew the agent's per-tool-result limit, so the default
+  // reply is the core authoring guide + a table of contents (see
+  // @mulmoclaude/core collection/server/schemaDocs.ts for the unit-level
+  // rules; these pin the wiring against the real bundled doc).
+  it("defaults to the core guide + table of contents, not the full doc", async () => {
+    const docs = await run({ action: "schemaDocs" });
+    assert.match(docs, /### Field types/, "field DSL served by default");
+    assert.match(docs, /Sections \(call schemaDocs/, "table of contents present");
+    assert.match(docs, /- Kanban view/, "advanced sections listed in the TOC");
+    assert.doesNotMatch(docs, /gains a \*\*Kanban board\*\* toggle/, "advanced section BODIES stay topic-only");
+    assert.ok(docs.length < 40_000, `default reply must stay well under the full doc (${docs.length} chars)`);
+  });
+
+  // #2312: the agent authored Google Calendar collections with an MCP
+  // connector + an `ingest: { kind: "agent" }` worker because the DEFAULT
+  // reply — the only part it reads before writing a schema — never named the
+  // LLM-free `googleCalendar` block. A mention in a `###` subsection would
+  // not fix that: renderDefault serves only the core sections' own prose, so
+  // the pointer has to live in the top-level shape table.
+  it("names the googleCalendar block in the default reply and routes to its help file", async () => {
+    const docs = await run({ action: "schemaDocs" });
+    assert.match(docs, /`googleCalendar`/, "the sync block is discoverable without a topic");
+    assert.match(docs, /config\/helps\/google-calendar-collection\.md/, "the default reply routes to the full contract");
+    assert.match(docs, /- Google Calendar sync \(`googleCalendar`\)/, "the section is listed in the TOC");
+  });
+
+  it("serves a single section by topic", async () => {
+    const docs = await run({ action: "schemaDocs", topic: "kanban" });
+    assert.match(docs, /gains a \*\*Kanban board\*\* toggle/);
+    assert.doesNotMatch(docs, /### Field types/);
+  });
+
+  it('serves the Google Calendar sync section for topic "google calendar"', async () => {
+    const docs = await run({ action: "schemaDocs", topic: "google calendar" });
+    assert.match(docs, /### Google Calendar sync \(`googleCalendar`\)/);
+    assert.match(docs, /"map": \{ "title": "summary"/, "the block example is included");
+    assert.doesNotMatch(docs, /### Field types/, "one section, not the whole doc");
+  });
+
+  it('serves the full doc for topic "all"', async () => {
+    const docs = await run({ action: "schemaDocs", topic: "all" });
+    assert.match(docs, /billing suite/i, "tail of the full doc present");
+    assert.ok(docs.length > 60_000, "the whole reference");
+  });
+
+  it("reports an unmatched topic and repeats the table of contents", async () => {
+    const docs = await run({ action: "schemaDocs", topic: "zebra crossings" });
+    assert.match(docs, /no schemaDocs section matches 'zebra crossings'/);
+    assert.match(docs, /Sections \(call schemaDocs/);
   });
 
   it("prefers the workspace copy over the bundled asset", async () => {

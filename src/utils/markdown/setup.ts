@@ -19,7 +19,7 @@ import { wikiEmbedExtension } from "./wikiEmbeds";
 import { registerBuiltInWikiEmbeds, setEmbedLocaleProvider } from "./wikiEmbedHandlers";
 import { workspaceLinkifyExtension } from "./workspaceLinkify";
 import { markedHighlightExtension } from "./highlight";
-import { mermaidExtension } from "./mermaidExtension";
+import { mermaidExtension } from "@mulmoclaude/markdown-utils/markdown/mermaidExtension";
 
 let installed = false;
 

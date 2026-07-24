@@ -234,20 +234,20 @@ bindRoute(
 // createMindMap — uses package execute for node layout computation
 router.post(
   API_ROUTES.plugins.mindmap,
-  wrapPluginExecute((req) => executeMindMap(null as never, req.body)),
+  wrapPluginExecute<Parameters<typeof executeMindMap>[1]>((req) => executeMindMap(null as never, req.body)),
 );
 
 // putQuestions — quiz
 router.post(
   API_ROUTES.plugins.quiz,
-  wrapPluginExecute((req) => executeQuiz(null as never, req.body)),
+  wrapPluginExecute<Parameters<typeof executeQuiz>[1]>((req) => executeQuiz(null as never, req.body)),
 );
 
 // presentForm — form
 bindRoute(
   router,
   API_ROUTES.form.dispatch,
-  wrapPluginExecute((req) => executeForm(null as never, req.body)),
+  wrapPluginExecute<Parameters<typeof executeForm>[1]>((req) => executeForm(null as never, req.body)),
 );
 
 // presentCollection — render a collection (or one item) as an inline,
@@ -308,7 +308,7 @@ bindRoute(
 // present3d — 3D visualization
 router.post(
   API_ROUTES.plugins.present3d,
-  wrapPluginExecute((req) => executePresent3D(null as never, req.body)),
+  wrapPluginExecute<Parameters<typeof executePresent3D>[1]>((req) => executePresent3D(null as never, req.body)),
 );
 
 // mapControl — Google Map (showLocation / Places / Directions etc.)
@@ -318,7 +318,7 @@ router.post(
 // receives the API key as a prop sourced from `AppSettings`.
 router.post(
   API_ROUTES.plugins.googleMap,
-  wrapPluginExecute((req) => executeMapControl(null as never, req.body)),
+  wrapPluginExecute<Parameters<typeof executeMapControl>[1]>((req) => executeMapControl(null as never, req.body)),
 );
 
 // META aggregator diagnostics — boot-time host/plugin or plugin/plugin

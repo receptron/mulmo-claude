@@ -31,8 +31,6 @@ import {
   sortedRefOptions,
   stepForFieldType,
   tableRows,
-  uniqueEmbedTargets,
-  uniqueRefTargets,
 } from "../../../packages/plugins/collection-plugin/src/vue/useCollectionRendering.helpers";
 
 // Fixture builder: assembles a spec dynamically (often deliberately partial),
@@ -208,35 +206,10 @@ describe("displayFieldFor", () => {
   });
 });
 
-describe("uniqueRefTargets", () => {
-  it("collects top-level and one-level table ref targets, de-duplicated", () => {
-    const schema = makeSchema({
-      author: field("ref", { to: "people" }),
-      editor: field("ref", { to: "people" }),
-      lines: field("table", { of: { who: field("ref", { to: "vendors" }), qty: field("number") } }),
-      note: field("text"),
-    });
-    assert.deepEqual(uniqueRefTargets(schema).sort(), ["people", "vendors"]);
-  });
-  it("ignores refs with an empty target and tables without an of-schema", () => {
-    const schema = makeSchema({ a: field("ref", { to: "" }), b: field("table"), c: field("text") });
-    assert.deepEqual(uniqueRefTargets(schema), []);
-  });
-});
-
-describe("uniqueEmbedTargets", () => {
-  it("collects top-level embed targets only, de-duplicated", () => {
-    const schema = makeSchema({
-      billFrom: field("embed", { to: "profiles", id: "me" }),
-      billTo: field("embed", { to: "profiles", idField: "customerId" }),
-      author: field("ref", { to: "people" }),
-    });
-    assert.deepEqual(uniqueEmbedTargets(schema), ["profiles"]);
-  });
-  it("ignores embeds with an empty target", () => {
-    assert.deepEqual(uniqueEmbedTargets(makeSchema({ a: field("embed", { to: "" }) })), []);
-  });
-});
+// uniqueRefTargets / uniqueEmbedTargets / uniqueBacklinkSources moved to
+// @mulmoclaude/core (`collection/core/linkTargets.ts`) — the single
+// implementation shared with server enrichment. Their tests live in
+// packages/core/test/collection/test_linkTargets.ts.
 
 describe("buildRefDisplayMap", () => {
   it("maps primary-key slug to the name field, falling back to slug", () => {

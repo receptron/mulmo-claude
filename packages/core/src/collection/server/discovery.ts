@@ -51,6 +51,16 @@ function conventionalDataPath(slug: string): string {
   return `data/collections/${slug}/items`;
 }
 
+/** The declared field named by `primaryKey`, or `undefined` when the schema
+ *  declares no such field. Own-property guarded: a `primaryKey` of `toString`
+ *  / `constructor` / `__proto__` must miss here, not read an Object.prototype
+ *  member and slip past the "is it a declared field?" gate into the wrong
+ *  "add `primary: true`" advice. Shared with manageCollection's putSchema
+ *  gate so both report the SAME reason. */
+export function resolvePrimaryField(fields: CollectionSchema["fields"], primaryKey: string): CollectionSchema["fields"][string] | undefined {
+  return Object.hasOwn(fields, primaryKey) ? fields[primaryKey] : undefined;
+}
+
 /** The acceptance gates discovery applies AFTER `CollectionSchemaZ` parses,
  *  before a schema becomes a live collection:
  *
@@ -68,7 +78,7 @@ function conventionalDataPath(slug: string): string {
  *  of these would otherwise write cleanly yet be skipped on the next discovery,
  *  hiding the collection (the exact failure that tool exists to prevent). */
 export function acceptParsedSchema(schema: CollectionSchema, opts: { source: CollectionSource; workspaceRoot: string; slug: string }): SchemaAcceptance {
-  const primaryField = schema.fields[schema.primaryKey];
+  const primaryField = resolvePrimaryField(schema.fields, schema.primaryKey);
   if (!primaryField) return { ok: false, reason: `primaryKey '${schema.primaryKey}' is not one of the declared fields` };
   if (primaryField.primary !== true) return { ok: false, reason: `the primaryKey field '${schema.primaryKey}' must be flagged \`primary: true\`` };
   if (opts.source === "feed" && !schema.ingest) return { ok: false, reason: "a feed schema must declare an `ingest` block" };

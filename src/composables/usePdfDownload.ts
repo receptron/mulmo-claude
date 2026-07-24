@@ -10,50 +10,25 @@
 
 import { ref, type Ref } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
-import { apiFetchRaw } from "../utils/api";
+import { postMarkdownForBlob, type MarkdownRenderOptions } from "../utils/markdownBlobRequest";
 import { errorMessage } from "../utils/errors";
-
-export interface DownloadPdfOptions {
-  /** Workspace-relative source directory of the markdown (e.g.
-   *  `"data/wiki/pages"` for Wiki pages). The server uses it to
-   *  resolve relative `<img>` references to the right base path
-   *  before inlining. Omit for the legacy `markdowns/` default. */
-  baseDir?: string;
-  /** When true, the server strips a leading YAML frontmatter envelope
-   *  (`---\n…\n---\n`) before rendering, so the YAML header doesn't
-   *  appear as plain text on page 1 of the PDF. Wiki pages set this.
-   *  Other callers leave it false so a chat-generated document that
-   *  literally starts with `---` is preserved. */
-  stripFrontmatter?: boolean;
-  /** When true, the server renders the markdown via Marp (slide deck,
-   *  one slide per page, 16:9) instead of the default paged markdown
-   *  layout. Caller sets this when the source has `marp: true` in its
-   *  frontmatter. */
-  marp?: boolean;
-}
 
 export interface UsePdfDownloadHandle {
   pdfDownloading: Ref<boolean>;
   pdfError: Ref<string | null>;
-  downloadPdf: (markdown: string, filename: string, options?: DownloadPdfOptions) => Promise<void>;
+  downloadPdf: (markdown: string, filename: string, options?: MarkdownRenderOptions) => Promise<void>;
 }
 
 export function usePdfDownload(): UsePdfDownloadHandle {
   const pdfDownloading = ref(false);
   const pdfError = ref<string | null>(null);
 
-  async function downloadPdf(markdown: string, filename: string, options: DownloadPdfOptions = {}): Promise<void> {
+  async function downloadPdf(markdown: string, filename: string, options: MarkdownRenderOptions = {}): Promise<void> {
     pdfError.value = null;
     pdfDownloading.value = true;
     let url: string | null = null;
     try {
-      // PDF endpoint returns a binary blob, not JSON — use the raw
-      // Response escape hatch so we can call `.blob()` ourselves.
-      const response = await apiFetchRaw(API_ROUTES.pdf.markdown, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown, filename, baseDir: options.baseDir, stripFrontmatter: options.stripFrontmatter, marp: options.marp }),
-      });
+      const response = await postMarkdownForBlob(API_ROUTES.pdf.markdown, markdown, filename, options);
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         pdfError.value = `PDF error ${response.status}: ${errText}`;

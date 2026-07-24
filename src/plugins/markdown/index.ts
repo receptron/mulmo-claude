@@ -7,17 +7,14 @@
 // package's context.app create, so the legacy create route is untouched.
 import type { Component } from "vue";
 import type { PluginRegistration, ToolPlugin } from "../../tools/types";
-import type { ToolResult } from "gui-chat-protocol";
 import { View, Preview, TOOL_DEFINITION, TOOL_NAME, type MarkdownToolData } from "@mulmoclaude/markdown-plugin/vue";
 // The package's component scoped styles (incl. the flex/overflow layout
 // that makes the document scrollable) are compiled into a standalone
 // stylesheet; Vite lib mode does NOT auto-inject it, so the consumer
 // must import it — same as @mulmoclaude/form-plugin (task #6).
 import "@mulmoclaude/markdown-plugin/style.css";
-import { pluginEndpoints } from "../api";
+import { makeRouteExecute } from "../execute";
 import { wrapWithScope } from "../scope";
-import { apiCall } from "../../utils/api";
-import { makeUuid } from "../../utils/id";
 import { META } from "./meta";
 import type { ResolvedRoute } from "../meta-types";
 
@@ -29,23 +26,7 @@ const markdownPlugin: ToolPlugin<MarkdownToolData> = {
   // make the package's nominal types distinct; coerce once here.
   toolDefinition: TOOL_DEFINITION as ToolPlugin<MarkdownToolData>["toolDefinition"],
 
-  async execute(_context, args) {
-    const endpoints = pluginEndpoints<DocumentEndpoints>("markdown");
-    const { method, url } = endpoints.create;
-    const result = await apiCall<ToolResult<MarkdownToolData>>(url, { method, body: args });
-    if (!result.ok) {
-      return {
-        toolName: TOOL_NAME,
-        uuid: makeUuid(),
-        message: result.error,
-      };
-    }
-    return {
-      ...result.data,
-      toolName: TOOL_NAME,
-      uuid: makeUuid(),
-    };
-  },
+  execute: makeRouteExecute<DocumentEndpoints, MarkdownToolData>("markdown", "create", TOOL_NAME),
 
   isEnabled: () => true,
   generatingMessage: "Creating document...",

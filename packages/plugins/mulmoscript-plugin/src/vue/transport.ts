@@ -12,7 +12,8 @@
 import { useRuntime } from "gui-chat-protocol/vue";
 import type { MulmoScriptDispatchArgs, MulmoScriptDispatchResult, MulmoScriptGenerationEvent } from "../core/contract";
 import { GENERATION_EVENT } from "../core/contract";
-import { errorMessage, isRecord } from "./support";
+import { errorMessage } from "@mulmoclaude/common";
+import { isRecord } from "./support";
 
 export type TransportResult<T> = { ok: true; data: T } | { ok: false; error: string };
 

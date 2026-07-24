@@ -31,7 +31,7 @@ import {
   upsertAccount,
   voidEntry,
 } from "./service.js";
-import type { BookSummary } from "./types.js";
+import type { BookSummary } from "../shared/types.js";
 import { ACCOUNTING_ACTIONS, ACCOUNTING_API } from "../shared";
 import { log } from "./context.js";
 import { asyncHandler } from "./http.js";

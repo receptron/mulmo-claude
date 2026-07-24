@@ -139,6 +139,35 @@ describe("CSV pure helpers", () => {
     assert.equal(normalizeCsvValue("x"), "x");
   });
 
+  // A STRUCT / LIST / MAP cell used to render "[object Object]" — the column's
+  // content simply gone. It is serialised now, but `JSON.stringify` is not total
+  // on what DuckDB hands back: a BIGINT nested in a struct throws, and so does a
+  // circular ref. Losing one cell is bad; aborting the whole CSV read is worse,
+  // so serialisation failures fall back rather than propagate.
+  it("normalizeCsvValue serialises object cells instead of rendering [object Object]", () => {
+    assert.equal(normalizeCsvValue({ a: 1, b: "x" }), '{"a":1,"b":"x"}');
+    assert.equal(normalizeCsvValue([1, 2, 3]), "[1,2,3]");
+    assert.equal(String({ a: 1 }), "[object Object]"); // what it used to produce
+  });
+
+  it("normalizeCsvValue survives values JSON.stringify cannot handle", () => {
+    // The branch above only unwraps a TOP-LEVEL bigint, so a nested one reaches
+    // the serialiser — where plain JSON.stringify throws.
+    assert.throws(() => JSON.stringify({ big: 1n }), TypeError);
+    assert.doesNotThrow(() => normalizeCsvValue({ big: 1n }));
+    assert.equal(normalizeCsvValue({ big: 1n }), '{"big":"1"}');
+
+    const circular: Record<string, unknown> = { name: "loop" };
+    circular.self = circular;
+    assert.throws(() => JSON.stringify(circular), TypeError);
+    assert.doesNotThrow(() => normalizeCsvValue(circular));
+    assert.equal(normalizeCsvValue(circular), "[object Object]"); // falls back, does not abort
+
+    // `toJSON` returning undefined makes JSON.stringify yield undefined, which
+    // must not become the cell's value.
+    assert.equal(normalizeCsvValue({ toJSON: () => undefined }), "[object Object]");
+  });
+
   it("csvRowToItem overwrites the key field with the record id and skips empty keys", () => {
     const item = csvRowToItem({ student_id: "山田001", name: "山田" }, "student_id");
     assert.ok(item);

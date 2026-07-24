@@ -3,9 +3,19 @@
 // already loaded. Snapshot-aware aggregation is layered on top in
 // `snapshotCache.ts`, which calls into here.
 
-import type { Account, AccountBalance, AccountType, JournalEntry } from "./types.js";
+import type { Account, AccountBalance, AccountType, BalanceSheet, BalanceSheetSection, JournalEntry, Ledger, LedgerRow, ProfitLoss } from "../shared/types.js";
 
 const ZERO_TOLERANCE = 0.0049; // hide rows that round to 0 at 2dp
+
+/** Collapse an accountCode → netDebit map into the sorted
+ *  `AccountBalance[]` wire shape. Shared by `aggregateBalances` and
+ *  the snapshot cache's `mergeBalances` so the two produce identical,
+ *  deterministically ordered output. */
+export function sortedBalancesFromMap(balanceByCode: ReadonlyMap<string, number>): AccountBalance[] {
+  return Array.from(balanceByCode.entries())
+    .map(([accountCode, netDebit]) => ({ accountCode, netDebit }))
+    .sort((lhs, rhs) => lhs.accountCode.localeCompare(rhs.accountCode));
+}
 
 /** Returns net (debit − credit) per account across the supplied
  *  entries. Voids work by having an original + reverse pair that
@@ -28,24 +38,7 @@ export function aggregateBalances(entries: readonly JournalEntry[]): AccountBala
       map.set(line.accountCode, cur + debit - credit);
     }
   }
-  return Array.from(map.entries())
-    .map(([accountCode, netDebit]) => ({ accountCode, netDebit }))
-    .sort((lhs, rhs) => lhs.accountCode.localeCompare(rhs.accountCode));
-}
-
-export interface BalanceSheetSection {
-  type: AccountType;
-  rows: { accountCode: string; accountName: string; balance: number }[];
-  total: number;
-}
-
-export interface BalanceSheet {
-  asOf: string; // ISO date; period end
-  sections: BalanceSheetSection[];
-  /** Σ assets − Σ (liabilities + equity). Should be 0 (the
-   *  accounting equation); a non-zero here indicates either a
-   *  rounding artefact or a data problem. */
-  imbalance: number;
+  return sortedBalancesFromMap(map);
 }
 
 function naturalSign(type: AccountType, netDebit: number): number {
@@ -106,14 +99,6 @@ export function buildBalanceSheet(input: { accounts: readonly Account[]; balance
   };
 }
 
-export interface ProfitLoss {
-  from: string; // inclusive ISO date
-  to: string; // inclusive ISO date
-  income: { rows: { accountCode: string; accountName: string; amount: number }[]; total: number };
-  expense: { rows: { accountCode: string; accountName: string; amount: number }[]; total: number };
-  netIncome: number; // income − expense
-}
-
 export function buildProfitLoss(input: { accounts: readonly Account[]; entries: readonly JournalEntry[]; from: string; to: string }): ProfitLoss {
   const inRange = input.entries.filter((entry) => entry.date >= input.from && entry.date <= input.to);
   const balances = aggregateBalances(inRange);
@@ -141,33 +126,6 @@ export function buildProfitLoss(input: { accounts: readonly Account[]; entries: 
     expense: { rows: expenseRows, total: expenseTotal },
     netIncome: incomeTotal - expenseTotal,
   };
-}
-
-export interface LedgerRow {
-  entryId: string;
-  date: string;
-  kind: JournalEntry["kind"];
-  memo?: string;
-  debit: number;
-  credit: number;
-  /** Running netDebit balance for this account, in entry order. */
-  runningBalance: number;
-  /** Counterparty tax-registration ID copied from the source
-   *  journal line (T-number / VAT ID / GSTIN / ABN). Surfaced as a
-   *  Ledger column when the active account is in the input-tax
-   *  band (14xx — see `isTaxAccountCode` in
-   *  src/plugins/accounting/components/accountNumbering.ts).
-   *  Carried per row even on non-tax accounts so a future view
-   *  that wants to show it elsewhere doesn't need a server change. */
-  taxRegistrationId?: string;
-}
-
-export interface Ledger {
-  accountCode: string;
-  accountName: string;
-  rows: LedgerRow[];
-  /** Closing netDebit balance — the sum at the bottom of `rows`. */
-  closingBalance: number;
 }
 
 interface LedgerLineAccumulator {

@@ -494,7 +494,7 @@ export default [
       ],
     },
   },
-  // Storage-virtualization seam (plans/refactor-storage-virtualization.md):
+  // Storage-virtualization seam (plans/done/refactor-storage-virtualization.md):
   // host + plugin code must read collection records through `storeFor(...)`
   // (the CollectionStore seam), never through the raw io readers — a direct
   // `listItems` / `readItem` import silently bypasses whatever storage
@@ -515,7 +515,7 @@ export default [
               name: "@mulmoclaude/core/collection/server",
               importNames: ["listItems", "readItem", "writeItem", "deleteItem"],
               message:
-                "Access records through `storeFor(collection)` — `.list()`/`.page()`/`.read()`, and `.write()`/`.delete()` (present only on writable stores). The raw io functions bypass the storage seam (plans/refactor-storage-virtualization.md).",
+                "Access records through `storeFor(collection)` — `.list()`/`.page()`/`.read()`, and `.write()`/`.delete()` (present only on writable stores). The raw io functions bypass the storage seam (plans/done/refactor-storage-virtualization.md).",
             },
           ],
         },
@@ -557,7 +557,12 @@ export default [
       "@typescript-eslint/no-unsafe-enum-comparison": "warn",
       "@typescript-eslint/no-unsafe-declaration-merging": "warn",
       // (2) Bugs only the type checker can see.
-      "@typescript-eslint/no-base-to-string": "warn",
+      // Drained to zero and ratcheted, same as the promise rules above. Every
+      // remaining `String(x)` on a possibly-object value is either a real read
+      // (now going through a typed helper) or a last-resort fallback carrying an
+      // audited eslint-disable with its reason. A new one is a regression, not a
+      // warning to file behind 168 others.
+      "@typescript-eslint/no-base-to-string": "error",
       // Drained to zero and ratcheted to `error` per docs/lint-policy.md — a
       // dropped `await` or an async callback handed to a sync-only API is a
       // real bug, and the backlog for these three is empty, so there is nothing

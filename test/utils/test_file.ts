@@ -82,8 +82,11 @@ describe("writeFileAtomic", () => {
   it("leaves the existing target untouched if the tmp write fails", async () => {
     const filePath = path.join(tmpDir, "out.txt");
     writeFileSync(filePath, "ORIGINAL");
+    // Occupy the staging path with a directory so the write fails. This needs
+    // the PREDICTABLE staging name, hence the explicit `uniqueTmp: false` —
+    // with the default (unique) name there is nothing to collide with (#2222).
     mkdirSync(`${filePath}.tmp`);
-    await assert.rejects(writeFileAtomic(filePath, "NEW"));
+    await assert.rejects(writeFileAtomic(filePath, "NEW", { uniqueTmp: false }));
     assert.equal(readFileSync(filePath, "utf-8"), "ORIGINAL");
   });
 

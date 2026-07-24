@@ -73,6 +73,18 @@ export function findHostPluginCollisions(hostRecord: Readonly<Record<string, unk
   return Object.keys(pluginRecord).filter((key) => hostKeys.has(key));
 }
 
+// `Object.hasOwn` needs the es2022 lib, which this project's frontend config
+// does not enable; `hasOwnProperty.call` is the same check and is what the
+// collection schema rules already use.
+const hasOwnKey = (record: Readonly<Record<string, unknown>>, key: string): boolean => Object.prototype.hasOwnProperty.call(record, key);
+
+/** The plugin that claimed `key`, or "" when none did. Own-property only: a
+ *  key named after an `Object.prototype` member would otherwise attribute the
+ *  collision to a function. */
+function ownAttribution(pluginByKey: Readonly<Record<string, string>>, key: string): string {
+  return hasOwnKey(pluginByKey, key) ? (pluginByKey[key] ?? "") : "";
+}
+
 /** Build an attributed collision list — one entry per (key, plugin)
  *  pair, where `pluginAttribution[key]` names the plugin claiming
  *  that key. Used by aggregators that aggregate ACROSS plugins
@@ -84,7 +96,7 @@ export function attributeHostPluginCollisions(
   pluginRecord: Readonly<Record<string, unknown>>,
   pluginByKey: Readonly<Record<string, string>>,
 ): HostPluginCollision[] {
-  return findHostPluginCollisions(hostRecord, pluginRecord).map((key) => ({ label, key, plugin: pluginByKey[key] ?? "" }));
+  return findHostPluginCollisions(hostRecord, pluginRecord).map((key) => ({ label, key, plugin: ownAttribution(pluginByKey, key) }));
 }
 
 /** Build a first-write-wins aggregate of a per-plugin record across
@@ -105,15 +117,22 @@ export function buildPluginAggregate<V>(
   extract: (meta: PluginMeta) => Readonly<Record<string, V>> | undefined,
   dimension: IntraPluginCollision["dimension"],
 ): { aggregate: Record<string, V>; owner: Record<string, string>; collisions: IntraPluginCollision[] } {
-  const aggregate: Record<string, V> = {};
-  const owner: Record<string, string> = {};
+  // Null-prototype targets: with a plain `{}`, `aggregate["__proto__"] = v`
+  // hits the inherited setter — the entry is silently dropped (no collision
+  // ever reported) and an object value would replace the prototype.
+  const aggregate: Record<string, V> = Object.create(null);
+  const owner: Record<string, string> = Object.create(null);
   const collisions: IntraPluginCollision[] = [];
   for (const meta of metas) {
     const record = extract(meta);
     if (!record) continue;
     for (const [key, value] of Object.entries(record)) {
-      const priorPlugin = owner[key];
-      if (priorPlugin !== undefined) {
+      // Own-property check, not a bare index: a key named `constructor` or
+      // `toString` reads an `Object.prototype` member here, so the very first
+      // plugin to claim it is reported as colliding with a plugin that does
+      // not exist, and its entry is dropped.
+      if (hasOwnKey(owner, key)) {
+        const priorPlugin = owner[key];
         // Two distinct plugins claim the same key. Keep the first
         // entry; report the offender so diagnostics can warn.
         collisions.push({ dimension, key, plugins: [priorPlugin, meta.toolName] });
@@ -123,7 +142,10 @@ export function buildPluginAggregate<V>(
       owner[key] = meta.toolName;
     }
   }
-  return { aggregate, owner, collisions };
+  // Spread back to plain objects: spread DEFINES own properties (no setter),
+  // so a `__proto__` entry survives as a normal own key, while callers get
+  // ordinary objects (deep-equal-friendly, normal prototype).
+  return { aggregate: { ...aggregate }, owner: { ...owner }, collisions };
 }
 
 /** Filter a plugin record so only the keys that survive the merge
@@ -140,16 +162,17 @@ export function filterPluginKeys<V>(
   pluginRecord: Readonly<Record<string, V>>,
   pluginByKey: Readonly<Record<string, string>>,
 ): { cleaned: Record<string, V>; dropped: HostPluginCollision[] } {
-  const cleaned: Record<string, V> = {};
+  // Null-prototype for the same `__proto__` reason as `buildPluginAggregate`.
+  const cleaned: Record<string, V> = Object.create(null);
   const dropped: HostPluginCollision[] = [];
   for (const [key, value] of Object.entries(pluginRecord)) {
     if (hostKeys.has(key)) {
-      dropped.push({ label, key, plugin: pluginByKey[key] ?? "" });
+      dropped.push({ label, key, plugin: ownAttribution(pluginByKey, key) });
       continue;
     }
     cleaned[key] = value;
   }
-  return { cleaned, dropped };
+  return { cleaned: { ...cleaned }, dropped };
 }
 
 // ────────────────────────────────────────────────────────────────

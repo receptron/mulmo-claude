@@ -50,7 +50,10 @@ function step(current: unknown, token: PathToken): unknown {
   if (current === null || current === undefined) return undefined;
   if (token.kind === "key") {
     if (typeof current !== "object" || Array.isArray(current)) return undefined;
-    return (current as Record<string, unknown>)[token.key];
+    const record = current as Record<string, unknown>;
+    // A `__proto__` / `constructor` / `toString` key must miss (→ undefined),
+    // not read an inherited Object.prototype member into a `naturalKey`.
+    return Object.hasOwn(record, token.key) ? record[token.key] : undefined;
   }
   return Array.isArray(current) ? current[token.index] : undefined;
 }

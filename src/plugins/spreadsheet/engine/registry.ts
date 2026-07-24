@@ -6,6 +6,7 @@
  */
 
 import type { CellValue } from "./types";
+import { parseNumericString } from "./numericCoercion";
 export type { CellValue };
 export type CellGetter = (ref: string) => CellValue;
 export type RangeGetter = (range: string) => CellValue[];
@@ -67,35 +68,13 @@ class FunctionRegistry {
 export const functionRegistry = new FunctionRegistry();
 
 /**
- * Helper function to convert a value to a number
+ * Lenient numeric coercion for range aggregation: anything unreadable is 0.
+ * PINNED behaviour (booleans are 0, not Excel's 1/0) — the string parsing lives
+ * in numericCoercion.parseNumericString, shared with the strict scalar read.
  */
 export function toNumber(value: CellValue): number {
   if (typeof value === "number") return value;
-
-  // Handle percentage strings like "5%" or "0.4167%"
-  if (typeof value === "string" && value.includes("%")) {
-    const numericPart = value.replace("%", "").trim();
-    const num = parseFloat(numericPart);
-    return isNaN(num) ? 0 : num / 100;
-  }
-
-  // Handle currency strings like "$1,000" or "$1,000.00"
-  if (typeof value === "string" && value.includes("$")) {
-    const numericPart = value.replace(/[$,]/g, "").trim();
-    const num = parseFloat(numericPart);
-    return isNaN(num) ? 0 : num;
-  }
-
-  // Handle comma-separated numbers like "1,000"
-  if (typeof value === "string" && value.includes(",")) {
-    const numericPart = value.replace(/,/g, "").trim();
-    const num = parseFloat(numericPart);
-    return isNaN(num) ? 0 : num;
-  }
-
-  // Handle regular numeric strings
-  const num = parseFloat(String(value));
-  return isNaN(num) ? 0 : num;
+  return parseNumericString(String(value)) ?? 0;
 }
 
 /**
@@ -103,6 +82,35 @@ export function toNumber(value: CellValue): number {
  */
 export function toString(value: CellValue): string {
   return String(value);
+}
+
+const REGEXP_METACHARACTERS = /[.*+?^${}()|[\]\\]/;
+
+const escapeRegExpChar = (char: string): string => (REGEXP_METACHARACTERS.test(char) ? `\\${char}` : char);
+
+/**
+ * Match text the way a spreadsheet criteria does: case-insensitively, with `*`
+ * standing for any run of characters, `?` for exactly one, and `~` escaping the
+ * next character. A plain `String(v) === criteria` missed both — `COUNTIF(range,
+ * "yes")` skipped a cell holding `Yes`, and `"A*"` was compared literally.
+ */
+function textMatcher(pattern: string): (text: string) => boolean {
+  const source: string[] = [];
+  for (let index = 0; index < pattern.length; index++) {
+    const char = pattern[index];
+    if (char === "~" && index + 1 < pattern.length) {
+      source.push(escapeRegExpChar(pattern[index + 1]));
+      index++;
+    } else if (char === "*") {
+      source.push(".*");
+    } else if (char === "?") {
+      source.push(".");
+    } else {
+      source.push(escapeRegExpChar(char));
+    }
+  }
+  const regex = new RegExp(`^${source.join("")}$`, "iu");
+  return (text) => regex.test(text);
 }
 
 /**
@@ -120,6 +128,9 @@ export function parseCriteria(criteria: string): (value: CellValue) => boolean {
     const [, op, value] = opMatch;
     const numValue = parseFloat(value);
 
+    // `=` / `<>` compare like the bare criteria does — case-insensitive text
+    // with wildcards, or the number. `<>` is exactly its negation.
+    const equals = matchesTextOrNumber(value);
     switch (op) {
       case ">":
         return (v) => toNumber(v) > numValue;
@@ -131,20 +142,23 @@ export function parseCriteria(criteria: string): (value: CellValue) => boolean {
         return (v) => toNumber(v) <= numValue;
       case "=":
       case "==":
-        return (v) => String(v) === value || toNumber(v) === numValue;
+        return equals;
       case "!=":
       case "<>":
-        return (v) => String(v) !== value && toNumber(v) !== numValue;
+        return (v) => !equals(v);
       default:
         return () => false;
     }
   }
 
-  // Exact match (string or number)
-  return (v) => {
-    const strMatch = String(v) === trimmedCriteria;
-    const numCriteria = parseFloat(trimmedCriteria);
-    const numMatch = !isNaN(numCriteria) && toNumber(v) === numCriteria;
-    return strMatch || numMatch;
-  };
+  return matchesTextOrNumber(trimmedCriteria);
+}
+
+/** A value matches when its text matches the criteria (case-insensitively, with
+ *  wildcards) or, for a numeric criteria, when its number is equal. */
+function matchesTextOrNumber(criteria: string): (value: CellValue) => boolean {
+  const matchesText = textMatcher(criteria);
+  const numCriteria = parseFloat(criteria);
+  const hasNumber = !isNaN(numCriteria);
+  return (value) => matchesText(String(value)) || (hasNumber && toNumber(value) === numCriteria);
 }

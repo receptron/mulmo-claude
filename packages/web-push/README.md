@@ -27,7 +27,8 @@ const result = await sendWebPush("✅ my-project", "Task finished", {
 - `sendWebPush(title, body, options)` — POST to `sendPush`. No-ops (returns `null`,
   never fetches) when `getIdToken()` yields `null` or rejects. `AbortController`
   timeout (default 8000 ms). Never throws.
-- `buildSendPushBody(title, body)` — the onCall `{ data: { title, body } }` envelope.
+- `buildSendPushBody(title, body, data?)` — the onCall `{ data: { title, body } }`
+  envelope, with the routing map nested as `data.data` when non-empty.
 - `parseSendPushResult(json)` — read `{ sent, failed, targets }` from the onCall
   `{ result }` envelope, or `null` when the shape doesn't match.
 - `DEFAULT_SEND_PUSH_URL` — the mulmoserver production endpoint.
@@ -40,6 +41,27 @@ const result = await sendWebPush("✅ my-project", "Task finished", {
 | `url` | `DEFAULT_SEND_PUSH_URL` | sendPush endpoint |
 | `timeoutMs` | `8000` | request timeout |
 | `fetchImpl` | `globalThis.fetch` | test seam |
+| `data` | — | `Record<string, string>` forwarded to FCM's `data` block, for routing the tap |
+
+### Routing the tap (`data`)
+
+A push with only a title and body lands the user on the home screen. Attach `data`
+so the receiver knows what to open:
+
+```ts
+await sendWebPush("✅ my-project", "Task finished", {
+  getIdToken,
+  data: { sessionId },   // → the receiver can open /terminals/{sessionId}
+});
+```
+
+FCM requires **string** values. The map is deliberately untyped beyond that — each
+host picks its own routing keys.
+
+`data` is added *alongside* `notification`, never instead of it: both mulmoserver
+receivers return early when `payload.notification` is missing, so a data-only
+message is silently discarded. Omitting `data` (or passing `{}`) sends exactly the
+envelope this package sent before the option existed.
 
 ## License
 

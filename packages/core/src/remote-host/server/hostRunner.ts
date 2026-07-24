@@ -71,6 +71,12 @@ const claimCommand = (firestore: Firestore, ref: DocumentReference): Promise<Cla
     return { method: data.method, params: data.params ?? {} };
   });
 
+// Own-property lookup: a bare `handlers[method]` with a method name written by a
+// remote terminal resolves `constructor` / `toString` to an Object.prototype
+// function, which is truthy and slips past the unknown-method check (#2319).
+export const resolveCommandHandler = (handlers: CommandHandlers, method: string): CommandHandler | undefined =>
+  Object.hasOwn(handlers, method) ? handlers[method] : undefined;
+
 const runHandler = async (ref: DocumentReference, claim: Claim, handler: CommandHandler): Promise<HostEvent> => {
   try {
     const result = await handler(claim.params);
@@ -125,7 +131,7 @@ const processCommand = async (ctx: RunnerContext, ref: DocumentReference, comman
     return;
   }
   options.onEvent?.({ phase: "received", method: claim.method });
-  const handler: CommandHandler | undefined = handlers[claim.method];
+  const handler = resolveCommandHandler(handlers, claim.method);
   if (!handler) {
     await writeError(ref, "unknown_method", `No handler for method: ${claim.method}`);
     options.onEvent?.({ phase: "error", method: claim.method, message: "unknown method" });

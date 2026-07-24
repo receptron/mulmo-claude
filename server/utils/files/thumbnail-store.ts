@@ -1,5 +1,5 @@
 // Downscaled `data:` URL thumbnails for remote (mobile) custom views
-// (plans/feat-remote-view-images.md). A phone can't reach the host's localhost,
+// (plans/done/feat-remote-view-images.md). A phone can't reach the host's localhost,
 // so an `image`-type field's workspace path is unrenderable there; a view that
 // lists the field in `imageFields` gets it inlined as a small JPEG data URL the
 // host produces here. Kept a leaf util (no collection/remote-view imports) so

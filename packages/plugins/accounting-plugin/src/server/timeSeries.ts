@@ -12,7 +12,7 @@
 // Pure module: no I/O, no service-layer awareness. Caller hands in
 // the entries / accounts already loaded; we return the points.
 
-import type { Account, AccountType, JournalEntry } from "./types.js";
+import type { Account, AccountType, JournalEntry } from "../shared/types.js";
 import { aggregateBalances } from "./report.js";
 import {
   fiscalYearEndMonth,

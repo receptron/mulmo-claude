@@ -16,6 +16,7 @@
 // `field.type === "enum"` (etc.) before reading a variant key like `values`,
 // `to`, `formula`, or `of`.
 
+import { fieldText } from "./fieldText";
 import type { z } from "zod";
 import type {
   ActionSpecZ,
@@ -272,6 +273,6 @@ export type CollectionItem = Record<string, unknown>;
 export function embedTargetId(field: CollectionFieldSpec, record: CollectionItem | null): string {
   if (field.type !== "embed") return "";
   if (field.id) return field.id;
-  if (field.idField && record) return String(record[field.idField] ?? "");
+  if (field.idField && record) return fieldText(record[field.idField]);
   return "";
 }

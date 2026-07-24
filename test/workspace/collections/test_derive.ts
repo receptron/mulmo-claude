@@ -173,6 +173,46 @@ describe("enrichItems — derived across refs", () => {
     assert.equal(enriched[2]?.owner, null);
   });
 
+  it("a per-record embed pointing at a prototype-key id fails soft to null (#2322)", async () => {
+    // `ownerId` is a ref value from the record (LLM/user/feed input). A
+    // dangling id that happens to be `"constructor"` / `"__proto__"` must
+    // resolve to null (em-dash), NOT the inherited Object.prototype member
+    // a bare `byId[id]` would return — otherwise a function lands in the
+    // record and JSON.stringify drops the whole `owner` key.
+    writeSkill("profile", { ...profileSchema, singleton: undefined });
+    writeSkill("portfolio", {
+      ...portfolioSchema,
+      fields: {
+        ...portfolioSchema.fields,
+        ownerId: { type: "ref", label: "Owner", to: "profile" },
+        owner: { type: "embed", label: "Owner", to: "profile", idField: "ownerId" },
+      },
+    });
+    const enriched = await enrichPortfolio([
+      { id: "h1", ownerId: "constructor" },
+      { id: "h2", ownerId: "__proto__" },
+      { id: "h3", ownerId: "toString" },
+    ]);
+    assert.equal(enriched[0]?.owner, null);
+    assert.equal(enriched[1]?.owner, null);
+    assert.equal(enriched[2]?.owner, null);
+  });
+
+  it("a profile whose id is literally a prototype key still embeds (own key, boundary)", async () => {
+    writeSkill("profile", { ...profileSchema, singleton: undefined });
+    writeSkill("portfolio", {
+      ...portfolioSchema,
+      fields: {
+        ...portfolioSchema.fields,
+        ownerId: { type: "ref", label: "Owner", to: "profile" },
+        owner: { type: "embed", label: "Owner", to: "profile", idField: "ownerId" },
+      },
+    });
+    writeRecord("data/profile/items", "constructor", { id: "constructor", name: "Edge Case Inc" });
+    const [enriched] = await enrichPortfolio([{ id: "h1", ownerId: "constructor" }]);
+    assert.deepEqual(enriched?.owner, { id: "constructor", name: "Edge Case Inc" });
+  });
+
   it("does not mutate the input records", async () => {
     const input = { id: "h1", ticker: "aapl", shares: 10 };
     await enrichPortfolio([input]);

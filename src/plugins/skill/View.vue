@@ -44,7 +44,7 @@ import { useI18n } from "vue-i18n";
 import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { SkillData } from "./types";
-import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { sanitizeMarkdownHtml } from "../../utils/markdown/sanitize";
 import { useMermaidRenderer } from "../../utils/markdown/useMermaid";
 

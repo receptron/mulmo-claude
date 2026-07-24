@@ -10,10 +10,17 @@
 //     host app uses. They look like the real `Role` / `Logger` /
 //     `StartChatParams` types so the same functions plug in, but
 //     they are defined here so the package has no compile-time
-//     link back to the host.
+//     link back to the host. Importing from a declared package
+//     dependency is fine — `Attachment` comes from
+//     `@mulmobridge/protocol` (already a runtime dep) rather than
+//     being redeclared here (#2488).
 //  3. When you add a new dependency, extend `ChatServiceDeps` and
 //     thread it through the factory functions — do NOT reach out
 //     to a module import. See #269 / #305 for the rationale.
+
+import type { Attachment } from "@mulmobridge/protocol";
+
+export type { Attachment };
 
 export interface Role {
   id: string;
@@ -25,29 +32,6 @@ export interface Logger {
   warn(prefix: string, message: string, data?: Record<string, unknown>): void;
   info(prefix: string, message: string, data?: Record<string, unknown>): void;
   debug(prefix: string, message: string, data?: Record<string, unknown>): void;
-}
-
-/** A file attached to a bridge or UI message. Generic enough for
- *  images, PDFs, documents, videos, etc. The server decides what to
- *  do with each based on mimeType — images become vision content
- *  blocks, unsupported types are ignored with a log.
- *
- *  Either `data` (inline base64 bytes) or `path` (workspace-relative
- *  path the server can read) MUST be set:
- *
- *    - Bridges over the socket transport ship raw bytes, so they
- *      populate `data` (and usually `mimeType`).
- *    - The Vue UI uploads paste/drop and sidebar-pick files to disk
- *      before sending and populates `path`; the server reads bytes
- *      from disk and infers `mimeType` from the extension.
- *
- *  Mirrors `@mulmobridge/protocol`'s `Attachment` (kept structurally
- *  duplicated here per the package-contract rules in this file). */
-export interface Attachment {
-  mimeType?: string;
-  data?: string; // base64-encoded
-  path?: string;
-  filename?: string;
 }
 
 export interface StartChatParams {
@@ -94,6 +78,15 @@ export interface SessionSummary {
   updatedAt: string;
 }
 
+/** List recent sessions (paged). Backs the `/sessions` bridge command. */
+export type ListSessionsFn = (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+
+/** Recent messages in a session (paged, newest-first). Backs `/history`. */
+export type GetSessionHistoryFn = (
+  sessionId: string,
+  opts: { limit: number; offset: number },
+) => Promise<{ messages: Array<{ source: string; text: string }>; total: number }>;
+
 export interface ChatServiceDeps {
   /** Relay a user turn into the agent loop. */
   startChat: StartChatFn;
@@ -120,18 +113,12 @@ export interface ChatServiceDeps {
    * Omit if session listing is not available (command will reply
    * "not available").
    */
-  listSessions?: (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
+  listSessions?: ListSessionsFn;
   /**
    * Get recent messages from a session. Used by /history command.
    * Returns newest-first array of {source, text} pairs.
    */
-  getSessionHistory?: (
-    sessionId: string,
-    opts: { limit: number; offset: number },
-  ) => Promise<{
-    messages: Array<{ source: string; text: string }>;
-    total: number;
-  }>;
+  getSessionHistory?: GetSessionHistoryFn;
   /**
    * Resolve the roleId a given session was started with. Used by the HTTP
    * `/connect` route so the persisted bridge state's role tracks the target

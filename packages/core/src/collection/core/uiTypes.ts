@@ -4,6 +4,7 @@
 // them. The host's src/components/collectionTypes.ts re-exports these.
 
 import type { CollectionDetail, CollectionItem, CollectionSchema, CollectionSummary } from "./schema";
+import type { CollectionOntologyEntry } from "./ontologyGraph";
 
 /** A record file the server couldn't load or that violates the schema —
  *  silently skipped at read time (mirror of the server `RecordIssue`). */
@@ -137,6 +138,13 @@ export type CollectionNotifySeverity = "info" | "nudge" | "urgent";
 /** Response of the collections list endpoint (`API_ROUTES.collections.list`). */
 export interface CollectionsListResponse {
   collections: CollectionSummary[];
+}
+
+/** Response of the workspace-ontology endpoint
+ *  (`API_ROUTES.collections.ontology`) — the raw entries the Map tab
+ *  feeds to `buildOntologyGraph` client-side. */
+export interface CollectionOntologyResponse {
+  entries: CollectionOntologyEntry[];
 }
 
 /** A row in the feeds index — a data-source collection from the workspace's

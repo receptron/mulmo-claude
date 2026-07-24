@@ -33,6 +33,7 @@ import {
   type LogDeps,
 } from "@receptron/task-scheduler";
 import type { ITaskManager, TaskDefinition, SchedulerLogger } from "./task-manager.js";
+import { errorMessage } from "../utils/errors.js";
 
 const ONE_SECOND_MS = 1000;
 const SCHEDULER_CONFIG_DIR = "config/scheduler";
@@ -65,10 +66,6 @@ function requireConfig(): SchedulerConfig {
 
 function logger(): SchedulerLogger {
   return config?.log ?? NOOP_LOG;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 // ── Paths ─────────────────────────────────────────────────────────

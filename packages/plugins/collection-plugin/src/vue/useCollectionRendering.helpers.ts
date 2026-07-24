@@ -4,7 +4,7 @@
 // function of its arguments. The composable imports these and calls them
 // from inside its computed/watch closures; behaviour is identical.
 
-import { deriveAll } from "@mulmoclaude/core/collection";
+import { deriveAll, fieldText } from "@mulmoclaude/core/collection";
 import type {
   CollectionDetailResponse,
   CollectionItem,
@@ -45,8 +45,8 @@ export function isExternalUrl(value: unknown): boolean {
 }
 
 export function detailText(value: unknown): string {
-  if (value === undefined || value === null || value === "") return EM_DASH;
-  return String(value);
+  const text = fieldText(value, EM_DASH);
+  return text === "" ? EM_DASH : text;
 }
 
 export function formatCell(value: unknown, type: FieldType): string {
@@ -75,7 +75,7 @@ export function resolveCurrency(field: FieldSpec, record: CollectionItem | null 
 export function formatMoney(value: unknown, currency: string | undefined, displayLocale: string): string {
   if (value === undefined || value === "") return EM_DASH;
   const amount = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(amount)) return String(value);
+  if (!Number.isFinite(amount)) return fieldText(value, EM_DASH);
   const currencyCode = currency && currency.length > 0 ? currency : DEFAULT_CURRENCY;
   try {
     return new Intl.NumberFormat(displayLocale, { style: "currency", currency: currencyCode }).format(amount);
@@ -109,42 +109,6 @@ export function displayFieldFor(fields: Record<string, FieldSpec>, primaryKey: s
   if ("name" in fields) return "name";
   if ("title" in fields) return "title";
   return primaryKey;
-}
-
-export function uniqueRefTargets(schema: CollectionSchema): string[] {
-  const targets = new Set<string>();
-  const walk = (fields: Record<string, FieldSpec>): void => {
-    for (const field of Object.values(fields)) {
-      if (field.type === "ref" && typeof field.to === "string" && field.to.length > 0) targets.add(field.to);
-      // Sub-fields of a table can also be refs; walk one level deep
-      // (nested tables are schema-rejected, so one recursion suffices).
-      if (field.type === "table" && field.of) walk(field.of);
-    }
-  };
-  walk(schema.fields);
-  return [...targets];
-}
-
-export function uniqueEmbedTargets(schema: CollectionSchema): string[] {
-  const targets = new Set<string>();
-  // Embeds are top-level only (the schema rejects `embed` inside a
-  // table's `of`), so no recursion.
-  for (const field of Object.values(schema.fields)) {
-    if (field.type === "embed" && typeof field.to === "string" && field.to.length > 0) targets.add(field.to);
-  }
-  return [...targets];
-}
-
-/** Slugs of every SOURCE collection a `backlinks` or `rollup` field
- *  reverses over (the two share one load). Top-level only, like `embed`
- *  (the schema rejects both inside a table's `of`). Mirrors the server's
- *  `uniqueBacklinkSources`. */
-export function uniqueBacklinkSources(schema: CollectionSchema): string[] {
-  const sources = new Set<string>();
-  for (const field of Object.values(schema.fields)) {
-    if ((field.type === "backlinks" || field.type === "rollup") && field.from.length > 0) sources.add(field.from);
-  }
-  return [...sources];
 }
 
 export function buildRefDisplayMap(detail: CollectionDetailResponse): RefDisplayMap {
@@ -193,7 +157,7 @@ export function buildEmbedOptions(schema: CollectionSchema, items: CollectionIte
   const displayField = displayFieldFor(fields, primaryKey);
   return items
     .map((item) => {
-      const slug = String(item[primaryKey] ?? "");
+      const slug = fieldText(item[primaryKey]);
       const labelRaw = item[displayField];
       const display = typeof labelRaw === "string" && labelRaw.length > 0 ? labelRaw : slug;
       return { slug, display };

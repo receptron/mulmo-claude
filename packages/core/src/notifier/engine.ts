@@ -316,28 +316,27 @@ export async function publish<TPluginData = unknown>(input: PublishInput<TPlugin
   return { id: entryId };
 }
 
-export async function clear(entryId: string): Promise<void> {
+/** Remove an active entry and record its terminal history. `clear`
+ *  (user dismissed) and `cancel` (producer withdrew) differ only in the
+ *  emitted event / history reason. No-op when the id is unknown. */
+async function terminateEntry(entryId: string, reason: "cleared" | "cancelled"): Promise<void> {
   await enqueue((state) => {
     const entry = state.entries[entryId];
     if (!entry) return null;
     state.entries = removeEntry(state, entryId);
     return {
-      event: { type: "cleared", id: entryId },
-      historyEntry: buildHistoryEntry(entry, "cleared"),
+      event: reason === "cleared" ? { type: "cleared", id: entryId } : { type: "cancelled", id: entryId },
+      historyEntry: buildHistoryEntry(entry, reason),
     };
   });
 }
 
+export async function clear(entryId: string): Promise<void> {
+  await terminateEntry(entryId, "cleared");
+}
+
 export async function cancel(entryId: string): Promise<void> {
-  await enqueue((state) => {
-    const entry = state.entries[entryId];
-    if (!entry) return null;
-    state.entries = removeEntry(state, entryId);
-    return {
-      event: { type: "cancelled", id: entryId },
-      historyEntry: buildHistoryEntry(entry, "cancelled"),
-    };
-  });
+  await terminateEntry(entryId, "cancelled");
 }
 
 /** In-place update for an active entry. Only the fields present on

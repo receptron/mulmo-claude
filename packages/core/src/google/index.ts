@@ -49,6 +49,7 @@ export {
   type SyncEventsInput,
 } from "./calendar.js";
 export { calendarSyncStatePath, clearCalendarSyncToken, loadCalendarSyncToken, saveCalendarSyncToken } from "./calendarSyncStore.js";
+export { toCollectionDateTime } from "./collectionDateTime.js";
 export {
   googleCalendarSyncTaskDef,
   classifyDelete,

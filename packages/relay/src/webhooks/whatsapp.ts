@@ -6,44 +6,16 @@
 //   WHATSAPP_PHONE_NUMBER_ID   — Phone number ID from Meta dashboard
 //   WHATSAPP_VERIFY_TOKEN      — Arbitrary string for webhook verification
 
-import { chunkText } from "@mulmobridge/client/text";
+import { extractWhatsAppMessages } from "@mulmoclaude/common/meta-webhook";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { envSecret, requireEnvSecret } from "../utils/envSecret.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
-import { verifyMetaSignature, handleMetaVerification } from "./meta.js";
-import { FIFTEEN_SECONDS_MS } from "../time.js";
-import { makeUuid } from "../utils/id.js";
+import { handleMetaVerification, verifyMetaWebhookSignature } from "./meta.js";
+import { postJsonChunks } from "./respond.js";
+import { makeRelayMessage } from "./relay-message.js";
 
 const WHATSAPP_API_VERSION = "v21.0";
 const MAX_WA_TEXT = 4096;
-
-interface WaTextMessage {
-  from: string;
-  text: { body: string };
-}
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function parseOneWaMessage(msg: unknown): WaTextMessage | null {
-  if (!isObj(msg) || msg.type !== "text" || typeof msg.from !== "string") return null;
-  if (!isObj(msg.text) || typeof msg.text.body !== "string" || !msg.text.body.trim()) return null;
-  return { from: msg.from, text: { body: msg.text.body } };
-}
-
-function extractWaMessages(body: unknown): WaTextMessage[] {
-  if (!isObj(body) || !Array.isArray(body.entry)) return [];
-  const raw: unknown[] = [];
-  for (const entry of body.entry) {
-    if (!isObj(entry) || !Array.isArray(entry.changes)) continue;
-    for (const change of entry.changes) {
-      if (!isObj(change) || !isObj(change.value) || !Array.isArray(change.value.messages)) continue;
-      raw.push(...change.value.messages);
-    }
-  }
-  return raw.map(parseOneWaMessage).filter((msg): msg is WaTextMessage => msg !== null);
-}
 
 const whatsappPlugin: PlatformPlugin = {
   name: PLATFORMS.whatsapp,
@@ -59,42 +31,23 @@ const whatsappPlugin: PlatformPlugin = {
   },
 
   async handleWebhook(request: Request, body: string, env: Env): Promise<RelayMessage[]> {
-    const signature = request.headers.get("x-hub-signature-256") ?? "";
-    const valid = await verifyMetaSignature(requireEnvSecret(env, "WHATSAPP_APP_SECRET"), body, signature);
-    if (!valid) throw new Error("WhatsApp signature verification failed");
+    await verifyMetaWebhookSignature(request, body, requireEnvSecret(env, "WHATSAPP_APP_SECRET"), "WhatsApp");
 
-    return extractWaMessages(JSON.parse(body)).map((msg) => ({
-      id: makeUuid(),
-      platform: PLATFORMS.whatsapp,
-      senderId: msg.from,
-      chatId: msg.from,
-      text: msg.text.body,
-      receivedAt: new Date().toISOString(),
-    }));
+    return extractWhatsAppMessages(JSON.parse(body)).map((msg) =>
+      makeRelayMessage({ platform: PLATFORMS.whatsapp, senderId: msg.from, chatId: msg.from, text: msg.text.body }),
+    );
   },
 
   async sendResponse(chatId: string, text: string, env: Env): Promise<void> {
-    const accessToken = requireEnvSecret(env, "WHATSAPP_ACCESS_TOKEN");
     const phoneNumberId = requireEnvSecret(env, "WHATSAPP_PHONE_NUMBER_ID");
-
-    const chunks = chunkText(text, MAX_WA_TEXT);
-    for (const chunk of chunks) {
-      let res: Response;
-      try {
-        res = await fetch(`https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({ messaging_product: "whatsapp", to: chatId, type: "text", text: { body: chunk } }),
-          signal: AbortSignal.timeout(FIFTEEN_SECONDS_MS),
-        });
-      } catch (err) {
-        throw new Error(`WhatsApp API network error: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new Error(`WhatsApp API failed: ${res.status} ${detail.slice(0, 200)}`);
-      }
-    }
+    await postJsonChunks({
+      text,
+      maxTextLength: MAX_WA_TEXT,
+      label: "WhatsApp",
+      endpoint: `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
+      accessToken: requireEnvSecret(env, "WHATSAPP_ACCESS_TOKEN"),
+      buildBody: (chunk) => ({ messaging_product: "whatsapp", to: chatId, type: "text", text: { body: chunk } }),
+    });
   },
 };
 

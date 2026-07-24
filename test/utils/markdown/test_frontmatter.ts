@@ -4,7 +4,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "../../../src/utils/markdown/frontmatter.js";
+import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 
 describe("parseFrontmatter — happy path", () => {
   it("splits a well-formed envelope into meta + body", () => {

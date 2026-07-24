@@ -8,7 +8,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { withAttachedFileMarker } from "../../../server/api/routes/agent.ts";
+import { withAttachedFileMarker } from "../../../server/agent/messageDecorate.ts";
 
 describe("withAttachedFileMarker", () => {
   it("returns the original message when no paths are attached", () => {

@@ -19,6 +19,15 @@ export async function verifyMetaSignature(secret: string, body: string, signatur
   return diff === 0;
 }
 
+// Shared inbound-webhook signature gate for the Meta platforms (Messenger,
+// WhatsApp): read the x-hub-signature-256 header, HMAC-check it against the app
+// secret, and throw a labelled error on mismatch (fail closed).
+export async function verifyMetaWebhookSignature(request: Request, body: string, appSecret: string, label: string): Promise<void> {
+  const signature = request.headers.get("x-hub-signature-256") ?? "";
+  const valid = await verifyMetaSignature(appSecret, body, signature);
+  if (!valid) throw new Error(`${label} signature verification failed`);
+}
+
 export function handleMetaVerification(request: Request, verifyToken: string): Response {
   // Reject unconfigured deployments — an empty verify token would otherwise
   // match an empty `hub.verify_token` query param and leak the challenge echo.

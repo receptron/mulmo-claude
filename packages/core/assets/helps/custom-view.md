@@ -131,6 +131,11 @@ const { rows } = await res.json(); // [{ Category, total, n }, ...] — chart th
   ops: `eq/ne/in/gt/gte/lt/lte/contains`; at least one of
   `groupBy`/`aggregates`; `orderBy` sorts by a groupBy column or an
   aggregate alias; result rows clamp at 1,000 by default.
+- Aggregate aliases (the keys of `aggregates`) must be simple ASCII
+  identifiers (`/^[A-Za-z_]\w{0,63}$/`) — non-ASCII keys (e.g. Japanese)
+  are rejected by validation. This applies **only to aliases**: column
+  references (`column`, `groupBy`, `where.field`) accept the source's
+  headers as-is, including non-ASCII CSV headers like `価格`.
 - Structured JSON only — there is **no SQL surface**, by design.
 - Combine with `onChange` (below) to stay live: in the callback, re-run
   **this POST query** (wrap it in your own `refresh()` and register that)
@@ -208,11 +213,42 @@ if (res.ok) {
 } // non-ok: leave the placeholder — 404 = not an image-field value / unresolvable
 ```
 
+**Never fire one fetch per image in parallel** (`Promise.all` over every
+record) — the host caps in-flight `/image` + `/query` requests at **4 per
+collection** and answers the rest **429**, so a first paint of a dozen
+images half-fails. Resolve through a small worker pool instead:
+
+```js
+// Throttled resolver: N paths, at most 3 in flight, one retry on 429.
+async function resolveImages(paths, onResolved, workers = 3) {
+  const queue = [...paths];
+  const work = async () => {
+    for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
+      let res = await fetch(dataUrl + "/image?path=" + encodeURIComponent(path) + "&maxEdge=256", {
+        headers: { Authorization: "Bearer " + token },
+      });
+      if (res.status === 429) {
+        await new Promise((r) => setTimeout(r, 500));
+        res = await fetch(dataUrl + "/image?path=" + encodeURIComponent(path) + "&maxEdge=256", {
+          headers: { Authorization: "Bearer " + token },
+        });
+      }
+      if (res.ok) onResolved(path, (await res.json()).dataUrl);
+    }
+  };
+  await Promise.all(Array.from({ length: workers }, work));
+}
+```
+
 - **Only current image-field values resolve.** The host checks `path`
   against the collection's records: it must be the CURRENT value of a
   schema `image`-type field — the token cannot read arbitrary workspace
   files. A stale or hand-built path answers 404.
 - `maxEdge` clamps to 64–1024 (default 512) — request the size you render.
+- **429 = concurrency/rate limit, not a bad path.** Both a shared in-flight
+  cap (4 per collection, shared with `/query`) and a per-minute budget guard
+  this endpoint; a 429'd path resolves fine on retry — never mark it failed
+  without one.
 - Cache the resolved `data:` URLs per path in your view (a simple `Map`)
   and re-resolve inside your `onChange` callback only for paths you haven't
   seen — each request re-scans the records server-side.

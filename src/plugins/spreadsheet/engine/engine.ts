@@ -45,6 +45,7 @@ export class SpreadsheetEngine {
       maxIterations: options.maxIterations ?? 100,
       enableCrossSheetRefs: options.enableCrossSheetRefs ?? true,
       strictMode: options.strictMode ?? false,
+      preferDDMMYYYY: options.preferDDMMYYYY ?? false,
     };
   }
 
@@ -73,7 +74,7 @@ export class SpreadsheetEngine {
    * ```
    */
   calculate(sheet: SheetData, allSheets?: SheetData[]): CalculatedSheet {
-    return calculateSheet(sheet, allSheets);
+    return calculateSheet(sheet, allSheets, { preferDDMMYYYY: this.options.preferDDMMYYYY });
   }
 
   /**
@@ -95,7 +96,7 @@ export class SpreadsheetEngine {
    * ```
    */
   calculateWorkbook(sheets: SheetData[]): CalculatedSheet[] {
-    return calculateWorkbook(sheets);
+    return calculateWorkbook(sheets, { preferDDMMYYYY: this.options.preferDDMMYYYY });
   }
 
   /**

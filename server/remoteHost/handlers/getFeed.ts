@@ -10,7 +10,7 @@ import { listFeeds as listFeedsRegistry } from "@mulmoclaude/core/feeds/server";
 import { storeFor, toDetail, type LoadedCollection, type CollectionItem } from "../../workspace/collections/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import type { CommandHandler, JsonObject } from "../commandChannel.js";
-import { clampLimit, clampOffset, deriveItems, pageResult } from "./collectionPage.js";
+import { clampLimit, clampOffset, deriveItems, pageResult, readIdParam } from "./collectionPage.js";
 
 export interface GetFeedDeps {
   listFeeds: typeof listFeedsRegistry;
@@ -22,7 +22,7 @@ export interface GetFeedDeps {
 export const createGetFeed =
   (deps: GetFeedDeps): CommandHandler =>
   async (params: JsonObject) => {
-    const slug = String(params.slug ?? "");
+    const slug = readIdParam(params.slug);
     const offset = clampOffset(params.offset);
     const limit = clampLimit(params.limit);
     const feeds = await deps.listFeeds(deps.workspaceRoot);

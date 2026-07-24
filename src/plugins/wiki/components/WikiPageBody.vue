@@ -6,7 +6,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { renderWikiPageHtml } from "../helpers";
-import { handleExternalLinkClick } from "../../../utils/dom/externalLink";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { classifyWorkspacePath, resolveWikiHref } from "../../../utils/path/workspaceLinkRouter";
 import { useMermaidRenderer } from "../../../utils/markdown/useMermaid";
 

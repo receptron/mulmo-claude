@@ -10,7 +10,8 @@
 // Future prefixes (youtube / x / map / github / …) plug into the
 // same registry — see plans/done/feat-rich-embed-syntax-1221.md PR-C+.
 
-import { escapeHtml, registerWikiEmbed } from "./wikiEmbeds";
+import { escapeHtml } from "@mulmoclaude/core/wiki";
+import { registerWikiEmbed } from "./wikiEmbeds";
 
 // Map app locale → Amazon storefront TLD. Each TLD must be a real
 // Amazon storefront; locales without a corresponding storefront
@@ -47,14 +48,26 @@ export function setEmbedLocaleProvider(provider: () => string): void {
   localeProvider = provider;
 }
 
-function amazonTldForCurrentLocale(): string {
-  const raw = localeProvider().toLowerCase();
-  // Try the full tag first (`pt-br`), then fall back to the
-  // language-only segment (`pt`).
-  const fullMatch = AMAZON_TLDS[raw];
+// `Object.hasOwn` needs the es2022 lib, which this project's frontend config
+// does not enable; `hasOwnProperty.call` is the same own-property check the
+// rest of the frontend uses (see src/plugins/metas.ts).
+const tldFor = (key: string): string | undefined => (Object.prototype.hasOwnProperty.call(AMAZON_TLDS, key) ? AMAZON_TLDS[key] : undefined);
+
+/** Amazon storefront TLD for an app locale. A locale of `constructor` /
+ *  `toString` (or any unmapped tag) falls back to `.com` rather than reading
+ *  an inherited Object.prototype member as the TLD and breaking the URL host.
+ *  Pure + exported so the fallback is unit-testable. */
+export function amazonTldForLocale(locale: string): string {
+  const raw = locale.toLowerCase();
+  // Try the full tag first (`pt-br`), then the language-only segment (`pt`).
+  const fullMatch = tldFor(raw);
   if (fullMatch) return fullMatch;
   const [lang] = raw.split("-");
-  return AMAZON_TLDS[lang] ?? "com";
+  return tldFor(lang) ?? "com";
+}
+
+function amazonTldForCurrentLocale(): string {
+  return amazonTldForLocale(localeProvider());
 }
 
 /** Amazon ASIN format — letters + digits, 10 chars. The pattern

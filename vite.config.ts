@@ -169,17 +169,8 @@ export default defineConfig({
       //    component statically (App.vue / SettingsModal.vue /
       //    plugins/scope.ts), so the dynamic import legitimately
       //    doesn't chunk-split — that's the intended outcome.
-      // 2. EVAL — `spreadsheet/engine/functions/logical.ts` IFS handler
-      //    uses direct `eval()` so the spreadsheet condition string
-      //    runs in strict-mode caller scope. Indirect eval
-      //    (`globalThis.eval`) would widen semantics to sloppy global
-      //    script context (Codex review on PR #1855), so the call
-      //    stays direct and the warning is suppressed instead.
       onwarn(warning, defaultHandler) {
         if (warning.code === 'INEFFECTIVE_DYNAMIC_IMPORT' && warning.message.includes('PluginScopedRoot.vue')) {
-          return
-        }
-        if (warning.code === 'EVAL' && warning.message.includes('spreadsheet/engine/functions/logical.ts')) {
           return
         }
         defaultHandler(warning)

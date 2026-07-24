@@ -126,6 +126,28 @@ describe("deriveAll + resolveRowRefs — cross-collection deref", () => {
     assert.deepEqual(refs, { ticker: { symbol: "aapl", price: 200 } });
     assert.deepEqual(resolveRowRefs(schema, { ticker: 42 }, refRecords), { ticker: null });
   });
+
+  // #2322: a dangling ref slug that is a prototype key must fall back to
+  // null, not resolve to an inherited Object.prototype member (a bare
+  // `byId["constructor"]` returns the Object function).
+  for (const protoKey of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+    it(`dangling proto-key slug "${protoKey}" resolves to null (not a prototype value)`, () => {
+      assert.deepEqual(resolveRowRefs(schema, { ticker: protoKey }, refRecords), { ticker: null });
+      assert.equal(deriveAll(schema, { ticker: protoKey, shares: 10 }, refRecords).value, undefined);
+    });
+  }
+
+  it("a proto-key target COLLECTION is treated as unloaded (null), not the Object function", () => {
+    const schemaToProto: DerivableSchema = { fields: { ticker: field("ref", { to: "constructor" }) } };
+    assert.deepEqual(resolveRowRefs(schemaToProto, { ticker: "aapl" }, refRecords), { ticker: null });
+  });
+
+  it("a record whose id is literally a prototype key still resolves (own key, boundary)", () => {
+    const realProtoRecords = { "stock-quotes": { constructor: { symbol: "constructor", price: 5 } } };
+    assert.deepEqual(resolveRowRefs(schema, { ticker: "constructor" }, realProtoRecords), {
+      ticker: { symbol: "constructor", price: 5 },
+    });
+  });
 });
 
 describe("deriveAll — flag fields", () => {

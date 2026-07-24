@@ -280,7 +280,7 @@ full-resolution bytes, images go through **Firebase Storage** as a staging area:
 Storage is staging only. Two orphan safeguards (for uploads whose host never
 ran): **remote-side rollback** — the remote best-effort deletes its own staged
 objects if `startChat` never gets a host ack — and a **Storage lifecycle TTL**
-backstop (follow-up, not v1). See `plans/feat-remote-chat-image-attachments.md`.
+backstop (follow-up, not v1). See `plans/done/feat-remote-chat-image-attachments.md`.
 
 ---
 
@@ -292,7 +292,7 @@ while the host is offline; the host **drains everything on reconnect** because t
 runner's `onSnapshot` reports every pre-existing `queued` doc as an `added` change
 the instant it re-attaches. No flush call, no separate channel — the same
 `commands` subcollection, treated slightly differently on both ends. See
-`plans/feat-remote-offline-queue.md`.
+`plans/done/feat-remote-offline-queue.md`.
 
 Three optional, backward-compatible fields on the command doc drive it (absent ⇒
 today's exact behaviour):
@@ -405,15 +405,15 @@ Design rationale lives in the plan files:
 
 | Plan | Phase / feature |
 |---|---|
-| `plans/feat-remote-host-firestore-list-collections.md` | Phase 1 — channel + auth + hostRunner + `listCollections` |
+| `plans/done/feat-remote-host-firestore-list-collections.md` | Phase 1 — channel + auth + hostRunner + `listCollections` |
 | `plans/feat-remote-collection-view.md` | Phase 2 — `getCollection` / paged records |
-| `plans/feat-remote-custom-view.md` | Phase 3 — `getRemoteView` sandboxed srcdoc + postMessage bridge |
-| `plans/feat-remote-writable-view.md` | Phase 4 — `mutateRemoteViewItem` (host-enforced policy) |
-| `plans/feat-remote-view-images.md` | Phase 5 — `getRemoteViewItems` image thumbnails |
-| `plans/feat-remote-chat-image-attachments.md` | `startChat` attachments + `ingestAttachments` |
-| `plans/feat-1955-remote-host-help.md` | Popover help text + mobile URL link |
-| `plans/feat-remote-host-capabilities.md` | Capability advertisement in the presence doc (`HostPresence`, `protocolVersion`) |
-| `plans/feat-remote-offline-queue.md` | _(planned)_ Queue `startChat` while the host is offline — drain on reconnect, `expiresAt` + host-side expiry delete (doc + attachments), user-managed pending list |
+| `plans/done/feat-remote-custom-view.md` | Phase 3 — `getRemoteView` sandboxed srcdoc + postMessage bridge |
+| `plans/done/feat-remote-writable-view.md` | Phase 4 — `mutateRemoteViewItem` (host-enforced policy) |
+| `plans/done/feat-remote-view-images.md` | Phase 5 — `getRemoteViewItems` image thumbnails |
+| `plans/done/feat-remote-chat-image-attachments.md` | `startChat` attachments + `ingestAttachments` |
+| `plans/done/feat-1955-remote-host-help.md` | Popover help text + mobile URL link |
+| `plans/done/feat-remote-host-capabilities.md` | Capability advertisement in the presence doc (`HostPresence`, `protocolVersion`) |
+| `plans/done/feat-remote-offline-queue.md` | _(planned)_ Queue `startChat` while the host is offline — drain on reconnect, `expiresAt` + host-side expiry delete (doc + attachments), user-managed pending list |
 
 > **Not to be confused with** MulmoBridge's "relay" (a Cloudflare Workers message
 > relay — see `docs/message_apps/relay/`). That is a separate messaging feature;

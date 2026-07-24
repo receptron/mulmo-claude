@@ -23,6 +23,7 @@ import "dotenv/config";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { createBridgeClient, formatAckReply } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 import { buildExternalChatId, effectiveThreadTs, parseExternalChatId, parseGranularity } from "./sessionId.js";
 import { parseAckReaction } from "./ackReaction.js";
 import { redactUser } from "./redactUser.js";
@@ -36,12 +37,7 @@ if (!botToken || !appToken) {
   process.exit(1);
 }
 
-const allowedChannels = new Set(
-  (process.env.SLACK_ALLOWED_CHANNELS ?? "")
-    .split(",")
-    .map((channelId) => channelId.trim())
-    .filter(Boolean),
-);
+const allowedChannels = parseCsvSet(process.env.SLACK_ALLOWED_CHANNELS);
 const allowAll = allowedChannels.size === 0;
 
 const granularity = (() => {

@@ -6,7 +6,7 @@
 // upstreams. On a transient upstream failure we serve that registry's last good
 // index rather than failing the whole Discover view.
 
-import { fetchWithTimeout } from "./fetch.js";
+import { fetchWithTimeout } from "../../../utils/fetch.js";
 import { errorMessage, ONE_SECOND_MS } from "../../server/util.js";
 import { log } from "../../server/host.js";
 import { parseRegistryIndex, type RegistryEntry, type RegistryIndex } from "../registryIndex.js";

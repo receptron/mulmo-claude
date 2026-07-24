@@ -258,3 +258,108 @@ describe("useChatScroll — sticky bottom (#2179)", () => {
     assert.ok(writes.length > writesAfterSend, "following should be re-armed after a send");
   });
 });
+
+// The "new messages" affordance (#2181). The badge claims new output arrived,
+// so it must not appear merely because the reader scrolled up — someone
+// re-reading an old card has no new messages, and saying otherwise is a lie
+// the UI can't take back. These pin the distinction.
+describe("useChatScroll — new-messages affordance", () => {
+  function mountScroll(sessionId: string, scrollEl: HTMLDivElement) {
+    const session = reactive(createEmptySession(sessionId, "general"));
+    const sessionSidebarRef = ref<{ root: HTMLDivElement | null } | null>({ root: scrollEl });
+    const toolResults = computed<ToolResultComplete[]>(() => session.toolResults);
+    const isRunning = computed(() => false);
+    const chatInputRef = ref<{ focus: () => void } | null>(null);
+    const handle = useChatScroll({ sessionSidebarRef, toolResults, isRunning, chatInputRef });
+    return { session, handle };
+  }
+
+  it("stays false while the reader sits at the bottom", async () => {
+    const { el } = makeFakeScrollEl();
+    const { session, handle } = mountScroll("n1", el);
+
+    pushResult(session, makeTextResult("Hello", "assistant"));
+    await nextTick();
+    await nextTick();
+
+    assert.equal(handle.hasNewWhileDetached.value, false, "following the stream is not 'new messages'");
+  });
+
+  it("stays false when the reader scrolls up and nothing new arrives", async () => {
+    // The condition the issue proposed (`!stuck`) would flip to true here.
+    const { el, userScrollTo } = makeFakeScrollEl({ scrollHeight: 5000, clientHeight: 1000 });
+    const { handle } = mountScroll("n2", el);
+
+    userScrollTo(0);
+    await nextTick();
+
+    assert.equal(handle.stuckToBottom.value, false, "scrolling up detaches");
+    assert.equal(handle.hasNewWhileDetached.value, false, "detached alone must not claim new messages");
+  });
+
+  it("turns true when output arrives while detached", async () => {
+    const { el, userScrollTo } = makeFakeScrollEl({ scrollHeight: 5000, clientHeight: 1000 });
+    const { session, handle } = mountScroll("n3", el);
+
+    userScrollTo(0);
+    await nextTick();
+    pushResult(session, makeTextResult("While you were away", "assistant"));
+    await nextTick();
+    await nextTick();
+
+    assert.equal(handle.hasNewWhileDetached.value, true);
+  });
+
+  it("does not fire when switching sessions while detached", async () => {
+    // Regression (Codex review on #2291): the watched key is derived from the
+    // last result, so swapping the whole list on a session switch changes it
+    // too. Treating that as "output arrived" is the exact false positive this
+    // affordance exists to avoid — the other session's backlog is not news.
+    const { el, userScrollTo } = makeFakeScrollEl({ scrollHeight: 5000, clientHeight: 1000 });
+    const sessionA = reactive(createEmptySession("swap-a", "general"));
+    const sessionB = reactive(createEmptySession("swap-b", "general"));
+    pushResult(sessionA, makeTextResult("from A", "assistant"));
+    pushResult(sessionB, makeTextResult("from B", "assistant"));
+
+    const active = ref<typeof sessionA>(sessionA);
+    const handle = useChatScroll({
+      sessionSidebarRef: ref<{ root: HTMLDivElement | null } | null>({ root: el }),
+      toolResults: computed<ToolResultComplete[]>(() => active.value.toolResults),
+      isRunning: computed(() => false),
+      chatInputRef: ref<{ focus: () => void } | null>(null),
+      sessionId: computed(() => active.value.id),
+    });
+
+    userScrollTo(0);
+    await nextTick();
+    assert.equal(handle.stuckToBottom.value, false, "reader is detached");
+
+    active.value = sessionB;
+    await nextTick();
+    await nextTick();
+
+    assert.equal(handle.hasNewWhileDetached.value, false, "a session switch is not new output");
+  });
+
+  it("clears once following is re-armed by jumpToLatest", async () => {
+    const { el, userScrollTo, writes } = makeFakeScrollEl({ scrollHeight: 5000, clientHeight: 1000 });
+    const { session, handle } = mountScroll("n4", el);
+
+    userScrollTo(0);
+    await nextTick();
+    pushResult(session, makeTextResult("While you were away", "assistant"));
+    await nextTick();
+    await nextTick();
+    assert.equal(handle.hasNewWhileDetached.value, true);
+
+    handle.jumpToLatest();
+    await nextTick();
+    await nextTick();
+
+    assert.equal(handle.stuckToBottom.value, true, "jumpToLatest re-arms following");
+    assert.equal(handle.hasNewWhileDetached.value, false, "and retires the badge");
+    // Re-arming is only half of it — the user pressed a button that says
+    // "jump", so the list must actually be at the bottom (CodeRabbit on #2291).
+    assert.equal(writes[writes.length - 1], 5000, "jumpToLatest scrolls to the bottom");
+  });
+});

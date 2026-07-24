@@ -3,9 +3,7 @@
 export const ONE_SECOND_MS = 1_000;
 export const ONE_MINUTE_MS = 60_000;
 
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+export { errorMessage } from "../utils/errors.js";
 
 /** Minimal logger the host can inject; defaults to no-op so the package
  *  is silent unless wired up. */

@@ -2,29 +2,21 @@
  * Logical Functions
  */
 
+import { evaluateConditionValues, readOperand, renderConditionOperand } from "../condition";
+import { findCellRefs } from "../evaluator";
 import { functionRegistry, type FunctionHandler } from "../registry";
+import { isErrorResult, isSpreadsheetErrorValue, NA_ERROR } from "../spreadsheet-errors";
+import { coerceToBoolean } from "../coerce-boolean";
+import type { CellValue } from "../types";
 
 const ifHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 3) throw new Error("IF requires 3 arguments");
-
   const condition = args[0];
   const trueValue = args[1];
   const falseValue = args[2];
 
   // Evaluate condition - use evaluateFormula to handle nested functions like MONTH()
   const conditionValue = context.evaluateFormula(condition);
-
-  // Convert to boolean
-  let conditionResult = false;
-  if (typeof conditionValue === "boolean") {
-    conditionResult = conditionValue;
-  } else if (typeof conditionValue === "number") {
-    conditionResult = conditionValue !== 0;
-  } else if (typeof conditionValue === "string") {
-    conditionResult = conditionValue.toLowerCase() === "true" || conditionValue !== "";
-  } else {
-    conditionResult = !!conditionValue;
-  }
+  const conditionResult = coerceToBoolean(conditionValue);
 
   // Return the appropriate value based on condition
   const resultValue = conditionResult ? trueValue : falseValue;
@@ -34,35 +26,17 @@ const ifHandler: FunctionHandler = (args, context) => {
     return resultValue.slice(1, -1);
   }
 
-  // If result is a nested formula, evaluate it recursively
-  if (/^(SUM|AVERAGE|MAX|MIN|COUNT|IF|AND|OR|NOT)\(/i.test(resultValue)) {
-    return context.evaluateFormula(resultValue);
-  }
-
-  // Otherwise evaluate as expression
-  let expr = resultValue;
-
-  const refs = resultValue.match(/(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g);
-  if (refs) {
-    for (const ref of refs) {
-      const value = context.getCellValue(ref);
-      const escapedRef = ref.replace(/\$/g, "\\$").replace(/'/g, "\\'");
-      expr = expr.replace(new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), String(value));
-    }
-  }
-
-  const numResult = parseFloat(expr);
-  return isNaN(numResult) ? expr : numResult;
+  // Everything else — a nested call, an arithmetic expression, a reference — is
+  // evaluated by the engine. Hand-rolling it here silently returned a plausible
+  // wrong value twice over: a hard-coded list of nine function names sent
+  // `ROUND(A1,1)` back as its own text, and the fallback read `A1+1` through
+  // `parseFloat("3+1")`, yielding 3.
+  return context.evaluateFormula(resultValue);
 };
 
 const andHandler: FunctionHandler = (args, context) => {
-  if (args.length === 0) throw new Error("AND requires at least 1 argument");
-
   for (const arg of args) {
-    const value = context.evaluateFormula(arg.trim());
-    // Check if value is falsy (0, false, empty string, etc.)
-    // Note: !value already covers false, so we check for 0 and "0" explicitly
-    if (!value || value === 0 || value === "0") {
+    if (!coerceToBoolean(context.evaluateFormula(arg.trim()))) {
       return false;
     }
   }
@@ -70,12 +44,8 @@ const andHandler: FunctionHandler = (args, context) => {
 };
 
 const orHandler: FunctionHandler = (args, context) => {
-  if (args.length === 0) throw new Error("OR requires at least 1 argument");
-
   for (const arg of args) {
-    const value = context.evaluateFormula(arg.trim());
-    // Check if value is truthy (non-zero, non-empty)
-    if (value && value !== 0 && value !== "0") {
+    if (coerceToBoolean(context.evaluateFormula(arg.trim()))) {
       return true;
     }
   }
@@ -83,20 +53,19 @@ const orHandler: FunctionHandler = (args, context) => {
 };
 
 const notHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("NOT requires 1 argument");
-
-  const value = context.evaluateFormula(args[0]);
-  // Note: !value already covers false
-  return !value || value === 0 || value === "0";
+  return !coerceToBoolean(context.evaluateFormula(args[0]));
 };
 
 const iferrorHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 2) throw new Error("IFERROR requires 2 arguments");
-
   try {
     const result = context.evaluateFormula(args[0]);
-    // Check if result is an error (NaN, Infinity, etc.)
-    if (result === null || result === undefined || (typeof result === "number" && (isNaN(result) || !isFinite(result)))) {
+    // Catches NaN/∞ and the formula error VALUES functions return (a math domain
+    // miss like SQRT(-1) → #NUM!), so IFERROR(SQRT(-1), 0) is 0. Text that
+    // merely spells an error is not an error value, so it passes through
+    // whether it was written as a literal (IFERROR("#NUM!", 42)) or computed
+    // (IFERROR(CONCAT("#N","UM!"), 42)) — the computed case is why errors carry
+    // provenance at all (#2451).
+    if (isErrorResult(result)) {
       return context.evaluateFormula(args[1]);
     }
     return result;
@@ -107,11 +76,9 @@ const iferrorHandler: FunctionHandler = (args, context) => {
 };
 
 const ifnaHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 2) throw new Error("IFNA requires 2 arguments");
-
   const result = context.evaluateFormula(args[0]);
-  // Check if result is N/A (could be represented as specific error value)
-  if (result === null || result === undefined || result === "#N/A") {
+  const isNotAvailable = isSpreadsheetErrorValue(result) && result.code === NA_ERROR.code;
+  if (result === null || result === undefined || isNotAvailable) {
     return context.evaluateFormula(args[1]);
   }
   return result;
@@ -127,35 +94,32 @@ const ifsHandler: FunctionHandler = (args, context) => {
     const condition = args[i];
     const value = args[i + 1];
 
-    // Evaluate condition
+    // Substitute references by POSITION (back to front), skipping any that sit
+    // inside a quoted string literal: `IFS(A1="B2", …)` must compare A1 to the
+    // TEXT "B2", not to cell B2's value (Codex review). findCellRefs already
+    // skips literals and matches absolute / sheet-qualified refs, so this also
+    // avoids the earlier regex double-escaping. renderConditionOperand quotes a
+    // text cell so its own operators are not re-parsed as comparisons.
     let condExpr = condition;
-
-    const cellRefs = condition.match(/(?:'[^']+'|[^'!\s]+)![A-Z]+\d+|\$?[A-Z]+\$?\d+/g);
-    if (cellRefs) {
-      for (const ref of cellRefs) {
-        const cellValue = context.getCellValue(ref);
-        const escapedRef = ref.replace(/\$/g, "\\$").replace(/'/g, "\\'");
-        condExpr = condExpr.replace(new RegExp(escapedRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), String(cellValue));
-      }
+    const cellRefs = findCellRefs(condition);
+    for (let index = cellRefs.length - 1; index >= 0; index--) {
+      const { ref, start } = cellRefs[index];
+      const rendered = renderConditionOperand(context.getCellValue(ref));
+      condExpr = condExpr.slice(0, start) + rendered + condExpr.slice(start + ref.length);
     }
 
-    // Evaluate the condition. Direct `eval()` is required here so the
-    // expression runs in strict-mode caller scope — switching to
-    // indirect eval (`globalThis.eval`) widens semantics to sloppy
-    // global script context (an expression like `x=1` would silently
-    // create a global, `this` flips from `undefined` to `globalThis`).
-    // The rolldown `[EVAL]` build warning is suppressed via the
-    // `onwarn` filter in `vite.config.ts` rather than by changing call
-    // semantics. (Codex review on PR #1855.)
-    let conditionResult = false;
-
-    if (/>=|<=|>|<|==|!=/.test(condExpr)) {
-      conditionResult = eval(condExpr);
-    } else {
-      conditionResult = !!eval(condExpr);
-    }
-
-    if (conditionResult) {
+    // Parsed, not executed. This used to call `eval` on `condExpr`, which is
+    // the substituted text — so a cell containing `globalThis.x = 1` ran as
+    // code whenever an IFS referenced it, and so did anything written into the
+    // formula itself. `readOperand` resolves the simple operands (TRUE/FALSE ->
+    // boolean, quoted text, numbers); an arithmetic expression it leaves as raw
+    // text is handed to the engine's safe evaluator so `A1+1>10` is computed.
+    // Only the top-level comparison is applied — the condition is never run.
+    const evaluateOperand = (operand: string): CellValue => {
+      const parsed = readOperand(operand);
+      return typeof parsed === "string" && parsed === operand.trim() ? context.evaluateFormula(operand) : parsed;
+    };
+    if (evaluateConditionValues(condExpr, evaluateOperand)) {
       // If result is a quoted string, return without quotes
 
       if (/^["'](.*)["']$/.test(value)) {
@@ -167,18 +131,12 @@ const ifsHandler: FunctionHandler = (args, context) => {
   }
 
   // If no conditions match, return error
-  return "#N/A";
+  return NA_ERROR;
 };
 
-const trueHandler: FunctionHandler = (args) => {
-  if (args.length !== 0) throw new Error("TRUE requires 0 arguments");
-  return true;
-};
+const trueHandler: FunctionHandler = () => true;
 
-const falseHandler: FunctionHandler = (args) => {
-  if (args.length !== 0) throw new Error("FALSE requires 0 arguments");
-  return false;
-};
+const falseHandler: FunctionHandler = () => false;
 
 // Register all logical functions
 functionRegistry.register({

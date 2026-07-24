@@ -12,7 +12,6 @@
 //   IRC_PASSWORD   — NickServ or server password
 
 import "dotenv/config";
-// @ts-expect-error — irc-framework has no type declarations
 import { Client as IrcClient } from "irc-framework";
 import { createBridgeClient } from "@mulmobridge/client";
 
@@ -60,7 +59,24 @@ irc.on("registered", () => {
   }
 });
 
-irc.on("message", async (event: { target: string; nick: string; message: string }) => {
+interface IrcMessageEvent {
+  target: string;
+  nick: string;
+  message: string;
+}
+
+// `.on` takes a void-returning listener, so an async one hands EventEmitter a
+// floating promise: a `mulmo.send` rejection (the server being down is enough)
+// becomes an unhandled rejection, which Node turns into process exit — the
+// bridge dies on a transient error instead of logging and staying up. Keep the
+// async work in a named function and settle it here.
+irc.on("message", (event: IrcMessageEvent) => {
+  void handleMessage(event).catch((err: unknown) => {
+    console.error("[irc] message handling failed:", err);
+  });
+});
+
+async function handleMessage(event: IrcMessageEvent): Promise<void> {
   // Ignore our own messages
   if (event.nick === nick) return;
 
@@ -91,7 +107,7 @@ irc.on("message", async (event: { target: string; nick: string; message: string 
   console.log(`[irc] pm from=${event.nick} len=${text.length}`);
   const ack = await mulmo.send(chatId, text);
   sendReply(chatId, ack);
-});
+}
 
 function sendReply(target: string, ack: { ok: boolean; reply?: string; error?: string; status?: number }): void {
   if (ack.ok) {

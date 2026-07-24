@@ -6,13 +6,14 @@
 // (`packages/core/src/collection/server/dynamicIcon.ts`) loads the source
 // collection's records and calls these.
 
+import { fieldText } from "./fieldText";
 import { matchesWhere } from "./where";
 import type { CollectionFieldSpec, CollectionItem, CollectionSchema, DynamicIconSource, DynamicIconSpec } from "./schema";
 
 /** The record with the greatest `String(record[field])` (localeCompare) —
  *  ties keep the first-seen record (stable left-to-right `reduce`). */
 function latestByField(pool: CollectionItem[], field: string): CollectionItem {
-  return pool.reduce((latest, candidate) => (String(candidate[field] ?? "").localeCompare(String(latest[field] ?? "")) > 0 ? candidate : latest));
+  return pool.reduce((latest, candidate) => (fieldText(candidate[field]).localeCompare(fieldText(latest[field])) > 0 ? candidate : latest));
 }
 
 /** Reduce `records` to the one record that decides the effective icon, per

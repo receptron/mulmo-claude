@@ -315,6 +315,21 @@ describe("resolveEvery", () => {
     assert.equal(resolveEvery(FREQ_EVERY, { frequency: "" }), null); // empty
     assert.equal(resolveEvery(FREQ_EVERY, {}), null); // missing
   });
+
+  // A bare `map[key]` resolves these to `Object.prototype` members, and the
+  // `?? null` fallback cannot catch it — a function is not undefined. The
+  // interval then reaches `advanceTriggerDate` and yields a NaN date, so the
+  // successor lands on disk as `<stem>-0NaNNaNNaN` with nothing thrown (#2314).
+  it("returns null for a driver value that names an Object.prototype member", () => {
+    for (const frequency of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      assert.equal(resolveEvery(FREQ_EVERY, { frequency }), null, `expected ${frequency} to resolve to null`);
+    }
+  });
+
+  it("does not build a successor for a driver value naming a prototype member", () => {
+    const result = computeSuccessor(freqSchema(), { id: "rent", dueOn: "2026-06-10", frequency: "constructor", status: "paid" }, "rent");
+    assert.equal(result, null);
+  });
 });
 
 describe("computeSuccessor — field-driven every", () => {

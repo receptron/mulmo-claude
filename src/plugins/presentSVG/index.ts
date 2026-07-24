@@ -1,12 +1,9 @@
 import type { PluginRegistration, ToolPlugin } from "../../tools/types";
-import type { ToolResult } from "gui-chat-protocol";
 import toolDefinition, { TOOL_NAME, type SvgEndpoints } from "./definition";
-import { pluginEndpoints } from "../api";
+import { makeRouteExecute } from "../execute";
 import { wrapWithScope } from "../scope";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
-import { apiCall } from "../../utils/api";
-import { makeUuid } from "../../utils/id";
 
 export interface PresentSvgData {
   title?: string;
@@ -16,23 +13,7 @@ export interface PresentSvgData {
 const presentSvgPlugin: ToolPlugin<PresentSvgData> = {
   toolDefinition,
 
-  async execute(_context, args) {
-    const endpoints = pluginEndpoints<SvgEndpoints>("svg");
-    const { method, url } = endpoints.create;
-    const result = await apiCall<ToolResult<PresentSvgData>>(url, { method, body: args });
-    if (!result.ok) {
-      return {
-        toolName: TOOL_NAME,
-        uuid: makeUuid(),
-        message: result.error,
-      };
-    }
-    return {
-      ...result.data,
-      toolName: TOOL_NAME,
-      uuid: makeUuid(),
-    };
-  },
+  execute: makeRouteExecute<SvgEndpoints, PresentSvgData>("svg", "create", TOOL_NAME),
 
   isEnabled: () => true,
   generatingMessage: "Presenting SVG…",

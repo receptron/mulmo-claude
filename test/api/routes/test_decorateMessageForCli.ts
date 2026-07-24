@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
-import { decorateMessageForCli } from "../../../server/api/routes/agent.ts";
+import { decorateMessageForCli } from "../../../server/agent/messageDecorate.ts";
 import { WORKSPACE_FILES } from "../../../server/workspace/paths.js";
 
 let workspace: string;

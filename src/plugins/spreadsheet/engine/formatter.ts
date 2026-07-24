@@ -31,6 +31,12 @@ function isDateFormat(format: string): boolean {
  * @param format - Date format code
  * @returns Formatted date string
  */
+// Every token, longest-first within each family so `MMMM` wins over `MMM` and
+// `MM`. Matched in ONE pass: a sequence of `replace` calls re-scans its own
+// output, so an inserted "March" had its `M` rewritten by the later month-number
+// step and "AM/PM" was destroyed before the meridiem branch could see it.
+const DATE_TOKEN_RE = /YYYY|YY|MMMM|MMM|MM|M|dddd|ddd|DD|D|AM\/PM|am\/pm|HH|H|hh|h|mm|ss/g;
+
 function formatDate(serial: number, format: string): string {
   const date = serialToDate(serial);
 
@@ -42,47 +48,48 @@ function formatDate(serial: number, format: string): string {
   const seconds = date.getUTCSeconds();
   const dayOfWeek = date.getUTCDay(); // 0-6
 
-  let result = format;
+  // `h` means the 12-hour clock only when the format also asks for a meridiem;
+  // decided from the ORIGINAL format, before any substitution.
+  const uses12Hour = /AM\/PM|am\/pm/.test(format);
+  const hours12 = hours % 12 || 12; // 0 becomes 12
+  const isPM = hours >= 12;
 
-  // Replace year tokens
-  result = result.replace(/YYYY/g, year.toString());
-  result = result.replace(/YY/g, (year % 100).toString().padStart(2, "0"));
+  const replacements: Record<string, string> = {
+    YYYY: year.toString(),
+    YY: (year % 100).toString().padStart(2, "0"),
+    MMMM: MONTH_NAMES_FULL[month] ?? MONTH_NAMES_FULL[0],
+    MMM: MONTH_NAMES_SHORT[month] ?? MONTH_NAMES_SHORT[0],
+    MM: (month + 1).toString().padStart(2, "0"),
+    M: (month + 1).toString(),
+    dddd: DAY_NAMES_FULL[dayOfWeek] ?? DAY_NAMES_FULL[0],
+    ddd: DAY_NAMES_SHORT[dayOfWeek] ?? DAY_NAMES_SHORT[0],
+    DD: day.toString().padStart(2, "0"),
+    D: day.toString(),
+    "AM/PM": isPM ? "PM" : "AM",
+    "am/pm": isPM ? "pm" : "am",
+    HH: hours.toString().padStart(2, "0"),
+    H: hours.toString(),
+    hh: (uses12Hour ? hours12 : hours).toString().padStart(2, "0"),
+    h: (uses12Hour ? hours12 : hours).toString(),
+    mm: minutes.toString().padStart(2, "0"),
+    ss: seconds.toString().padStart(2, "0"),
+  };
 
-  // Replace month tokens (order matters - do longer patterns first)
-  result = result.replace(/MMMM/g, MONTH_NAMES_FULL[month] || MONTH_NAMES_FULL[0]);
-  result = result.replace(/MMM/g, MONTH_NAMES_SHORT[month] || MONTH_NAMES_SHORT[0]);
-  result = result.replace(/MM/g, (month + 1).toString().padStart(2, "0"));
-  result = result.replace(/M/g, (month + 1).toString());
-
-  // Replace day tokens
-  result = result.replace(/DD/g, day.toString().padStart(2, "0"));
-  result = result.replace(/D/g, day.toString());
-
-  // Replace day of week tokens
-  result = result.replace(/dddd/g, DAY_NAMES_FULL[dayOfWeek] || DAY_NAMES_FULL[0]);
-  result = result.replace(/ddd/g, DAY_NAMES_SHORT[dayOfWeek] || DAY_NAMES_SHORT[0]);
-
-  // Replace time tokens
-  // Handle 12-hour format with AM/PM
-  if (result.includes("AM/PM") || result.includes("am/pm")) {
-    const isPM = hours >= 12;
-    const hours12 = hours % 12 || 12; // 0 becomes 12
-
-    result = result.replace(/h/g, hours12.toString());
-    result = result.replace(/AM\/PM/g, isPM ? "PM" : "AM");
-    result = result.replace(/am\/pm/g, isPM ? "pm" : "am");
-  } else {
-    // 24-hour format
-    result = result.replace(/HH/g, hours.toString().padStart(2, "0"));
-    result = result.replace(/H/g, hours.toString());
-    result = result.replace(/h/g, hours.toString());
-  }
-
-  result = result.replace(/mm/g, minutes.toString().padStart(2, "0"));
-  result = result.replace(/ss/g, seconds.toString().padStart(2, "0"));
-
-  return result;
+  return format.replace(DATE_TOKEN_RE, (token) => replacements[token] ?? token);
 }
+
+const THOUSANDS_GROUP_SIZE = 3;
+
+/**
+ * Insert thousands separators into a run of digits ("1234567" → "1,234,567").
+ * Regex free on purpose: the classic `\B(?=(\d{3})+(?!\d))` lookahead
+ * backtracks badly on a long run of digits.
+ */
+export const groupThousands = (digits: string): string =>
+  Array.from(digits).reduce((grouped, digit, index) => {
+    const needsSeparator = index > 0 && (digits.length - index) % THOUSANDS_GROUP_SIZE === 0;
+    return needsSeparator ? `${grouped},${digit}` : `${grouped}${digit}`;
+  }, "");
 
 /**
  * Format a number according to Excel format code
@@ -114,17 +121,8 @@ export function formatNumber(value: number, format: string): string {
 
       let formatted = Math.abs(value).toFixed(decimals >= 0 ? decimals : 0);
       if (hasComma) {
-        // Add thousand separators without regex to avoid performance issues
         const parts = formatted.split(".");
-        const integerPart = parts[0];
-        let result = "";
-        for (let i = integerPart.length - 1, count = 0; i >= 0; i--, count++) {
-          if (count > 0 && count % 3 === 0) {
-            result = "," + result;
-          }
-          result = integerPart[i] + result;
-        }
-        parts[0] = result;
+        parts[0] = groupThousands(parts[0]);
         formatted = parts.join(".");
       }
       formatted = "$" + formatted;
@@ -142,17 +140,8 @@ export function formatNumber(value: number, format: string): string {
     if (format.includes(",")) {
       const decimals = (format.match(/\.0+/) || [""])[0].length - 1;
       let formatted = Math.abs(value).toFixed(decimals >= 0 ? decimals : 0);
-      // Add thousand separators without regex to avoid performance issues
       const parts = formatted.split(".");
-      const integerPart = parts[0];
-      let result = "";
-      for (let i = integerPart.length - 1, count = 0; i >= 0; i--, count++) {
-        if (count > 0 && count % 3 === 0) {
-          result = "," + result;
-        }
-        result = integerPart[i] + result;
-      }
-      parts[0] = result;
+      parts[0] = groupThousands(parts[0]);
       formatted = parts.join(".");
       if (value < 0) formatted = "-" + formatted;
       return formatted;

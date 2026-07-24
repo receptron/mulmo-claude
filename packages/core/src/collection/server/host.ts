@@ -8,6 +8,8 @@
 // workspace root) unchanged while removing the package's dependency on
 // host-only modules (`server/workspace/workspace.ts`, the host logger).
 
+import { createForwardingLogger, createHostSlot } from "../../host/hostSlot.js";
+
 // Type-only: this module must not pull the firebase SDK in at runtime
 // (it is an OPTIONAL peer of this package).
 import type { FirestoreDocs } from "./firestoreDocs";
@@ -79,7 +81,7 @@ export interface CollectionChangePayload {
 
 type CollectionChangePublisher = (payload: CollectionChangePayload) => void;
 
-let current: CollectionHost | null = null;
+const hostSlot = createHostSlot<CollectionHost>("@mulmoclaude/core/collection/server: configureCollectionHost()");
 let changePublisher: CollectionChangePublisher | null = null;
 let firestoreAccessor: (() => FirestoreHandle | null) | null = null;
 
@@ -88,10 +90,7 @@ let firestoreAccessor: (() => FirestoreHandle | null) | null = null;
  *  silently redirecting later filesystem operations to another workspace
  *  would be a bug, not a feature. Re-calling with the same host is a no-op. */
 export function configureCollectionHost(host: CollectionHost): void {
-  if (current !== null && current !== host) {
-    throw new Error("@mulmoclaude/core/collection/server: configureCollectionHost() was already called with a different host");
-  }
-  current = host;
+  hostSlot.set(host);
 }
 
 /** Wire a publisher that broadcasts record-change events; the host bridges it
@@ -113,10 +112,7 @@ export function publishCollectionChange(payload: CollectionChangePayload): void 
 }
 
 function requireHost(): CollectionHost {
-  if (current === null) {
-    throw new Error("@mulmoclaude/core/collection/server: configureCollectionHost() was not called by the host");
-  }
-  return current;
+  return hostSlot.get();
 }
 
 /** The configured workspace root. Throws if the host never configured one. */
@@ -178,9 +174,4 @@ export function firestoreHandle(): FirestoreHandle | null {
  *  that exercise pure logic) are dropped rather than throwing — unlike
  *  `getWorkspaceRoot()`, which fails loudly because the engine cannot operate
  *  without a workspace root. */
-export const log: CollectionLogger = {
-  error: (prefix, message, data) => current?.log.error(prefix, message, data),
-  warn: (prefix, message, data) => current?.log.warn(prefix, message, data),
-  info: (prefix, message, data) => current?.log.info(prefix, message, data),
-  debug: (prefix, message, data) => current?.log.debug(prefix, message, data),
-};
+export const log: CollectionLogger = createForwardingLogger(() => hostSlot.peek()?.log ?? null);

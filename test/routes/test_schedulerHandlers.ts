@@ -450,4 +450,18 @@ describe("dispatchScheduler", () => {
     });
     assert.equal(result.kind, "success");
   });
+
+  // Proto-key regression (#2319): `action` is untrusted (LLM tool arg / HTTP
+  // body). A bare `HANDLERS[action]` resolves `constructor`/`toString` to an
+  // Object.prototype function that is truthy and callable, so it slips past the
+  // unknown-action guard and RUNS instead of being rejected.
+  for (const proto of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+    it(`rejects the prototype key "${proto}" as an unknown action`, () => {
+      const result = dispatchScheduler(proto, [makeItem({ id: "a" })], {});
+      assert.equal(result.kind, "error");
+      if (result.kind !== "error") return;
+      assert.equal(result.status, 400);
+      assert.equal(result.error, `Unknown action: ${proto}`);
+    });
+  }
 });

@@ -6,11 +6,11 @@
 // that budget. The clamps live in @mulmoclaude/core/remote-view (params arrive
 // as untyped JSON there too) so the record handlers and the remote-view bridge
 // serve identical page semantics — re-exported here for the handlers.
-import { clampLimit, clampOffset } from "@mulmoclaude/core/remote-view";
+import { clampLimit, clampOffset, readIdParam } from "@mulmoclaude/core/remote-view";
 import { deriveAll, type DerivableFieldSpec, type DerivableRecord } from "@mulmoclaude/core/collection";
 import type { JsonObject } from "../commandChannel.js";
 
-export { clampLimit, clampOffset };
+export { clampLimit, clampOffset, readIdParam };
 
 /** Resolve record-local computed fields (derived formulas) before paging, so
  *  channel consumers — the phase-2 card list and a remote view's `getItems` —

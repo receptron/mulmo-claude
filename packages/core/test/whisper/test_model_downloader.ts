@@ -35,7 +35,10 @@ function streamFromController(): { body: ReadableStream<Uint8Array>; push: (byte
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  tempDirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+  // maxRetries: the stall-abort test's async partial-file cleanup can still
+  // be mid-flight here; a file reappearing while rm walks the dir throws a
+  // transient ENOTEMPTY (seen on CI). rmSync retries exactly that class.
+  tempDirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 });
 
 describe("createModelDownloader.ensure — download orchestration", () => {

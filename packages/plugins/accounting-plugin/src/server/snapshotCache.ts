@@ -33,11 +33,12 @@ import {
   readSnapshot,
   writeSnapshot,
 } from "./io.js";
-import { aggregateBalances } from "./report.js";
+import { aggregateBalances, sortedBalancesFromMap } from "./report.js";
 import { publishBookChange } from "./eventPublisher.js";
 import { log } from "./context.js";
 import { errorMessage, BOOK_EVENT_KINDS as ACCOUNTING_BOOK_EVENT_KINDS } from "../shared";
-import type { AccountBalance, JournalEntry, MonthSnapshot } from "./types.js";
+import type { MonthSnapshot } from "./types.js";
+import type { AccountBalance, JournalEntry } from "../shared/types.js";
 
 function previousPeriod(period: string): string {
   // YYYY-MM → previous YYYY-MM. December rolls back to the previous
@@ -53,9 +54,7 @@ function mergeBalances(base: readonly AccountBalance[], delta: readonly AccountB
   for (const row of delta) {
     map.set(row.accountCode, (map.get(row.accountCode) ?? 0) + row.netDebit);
   }
-  return Array.from(map.entries())
-    .map(([accountCode, netDebit]) => ({ accountCode, netDebit }))
-    .sort((lhs, rhs) => lhs.accountCode.localeCompare(rhs.accountCode));
+  return sortedBalancesFromMap(map);
 }
 
 async function buildEmptySnapshot(bookId: string, period: string, workspaceRoot?: string): Promise<MonthSnapshot> {

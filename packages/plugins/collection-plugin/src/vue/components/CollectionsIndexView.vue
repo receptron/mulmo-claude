@@ -25,6 +25,16 @@
             >
               {{ t("collectionsView.discover.tab") }}
             </button>
+            <button
+              v-if="hasOntology"
+              type="button"
+              class="px-3 h-7 rounded-md text-xs font-semibold transition-colors"
+              :class="tab === 'map' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              data-testid="collections-tab-map"
+              @click="tab = 'map'"
+            >
+              {{ t("collectionsView.mapTab") }}
+            </button>
           </div>
         </div>
         <button
@@ -42,6 +52,7 @@
       <NewCollectionModal v-if="showNewCollectionModal" @close="showNewCollectionModal = false" />
 
       <DiscoverPanel v-if="tab === 'discover'" @imported="loadCollections" />
+      <CollectionOntologyGraphView v-else-if="tab === 'map'" @open="openCollection" />
       <template v-else>
         <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-sm text-slate-500 gap-3">
           <div class="h-8 w-8 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -164,6 +175,7 @@ import { computed, onMounted, ref } from "vue";
 import { useCollectionI18n } from "../lang";
 import { collectionUi } from "../uiContext";
 import DiscoverPanel from "./DiscoverPanel.vue";
+import CollectionOntologyGraphView from "./CollectionOntologyGraphView.vue";
 import NewCollectionModal from "./NewCollectionModal.vue";
 import type { CollectionSummary } from "@mulmoclaude/core/collection";
 
@@ -172,7 +184,10 @@ const { t } = useCollectionI18n();
 const cui = collectionUi();
 const { pinToggle, reconcileShortcuts } = cui;
 
-const tab = ref<"installed" | "discover">("installed");
+const tab = ref<"installed" | "discover" | "map">("installed");
+// The Map tab needs the host's ontology route; a host without the
+// binding (older MulmoTerminal) simply doesn't show the tab.
+const hasOntology = cui.fetchOntology !== undefined;
 const showNewCollectionModal = ref(false);
 const collections = ref<CollectionSummary[]>([]);
 const loading = ref(true);

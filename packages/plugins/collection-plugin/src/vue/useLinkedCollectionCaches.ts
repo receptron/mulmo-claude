@@ -7,7 +7,8 @@
 
 import { ref, type Ref } from "vue";
 import { collectionUi, type CollectionApiResult } from "./uiContext";
-import { buildRefDisplayMap, buildRefRecordMap, uniqueBacklinkSources, uniqueEmbedTargets, uniqueRefTargets } from "./useCollectionRendering.helpers";
+import { buildRefDisplayMap, buildRefRecordMap } from "./useCollectionRendering.helpers";
+import { uniqueBacklinkSources, uniqueEmbedTargets, uniqueRefTargets } from "@mulmoclaude/core/collection";
 import type { CollectionDetail, CollectionDetailResponse, CollectionSchema, EmbedCache, RefCache, RefRecordCache } from "@mulmoclaude/core/collection";
 
 export interface LinkedCollectionCaches {

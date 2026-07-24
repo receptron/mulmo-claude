@@ -6,6 +6,7 @@
 
 import type { ToolDefinition } from "gui-chat-protocol";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
+import { resolveActiveTools } from "./resolveActiveTools.js";
 import { TOOL_ENDPOINTS, PLUGIN_DEFS, MCP_PLUGIN_NAMES } from "./plugin-names.js";
 import { loadRuntimePlugins } from "../plugins/runtime-loader.js";
 import { loadDevPlugins, parseDevPluginsEnv } from "../plugins/dev-loader.js";
@@ -137,7 +138,7 @@ function expandActiveNames(base: readonly string[]): string[] {
 }
 
 let activeNames: string[] = expandActiveNames(PLUGIN_NAMES);
-let tools: ToolDef[] = activeNames.map((name) => ALL_TOOLS[name]).filter(Boolean);
+let tools: ToolDef[] = resolveActiveTools(activeNames, ALL_TOOLS);
 
 // Comma-joined tool names, used to detect whether runtime-plugin load
 // actually changed the advertised surface (so we only nudge the client
@@ -219,7 +220,7 @@ const runtimeReady: Promise<void> = (async () => {
     // entries, but only the names PLUGIN_NAMES authorises become live
     // tools.
     activeNames = expandActiveNames(PLUGIN_NAMES);
-    tools = activeNames.map((name) => ALL_TOOLS[name]).filter(Boolean);
+    tools = resolveActiveTools(activeNames, ALL_TOOLS);
   } catch (err) {
     process.stderr.write(`[mcp-server] runtime plugin load failed; static tools only: ${String(err)}\n`);
   }
@@ -371,8 +372,11 @@ async function fetchSkillsList(): Promise<{ name: string }[]> {
     const body = await safeResponseText(res);
     throw new Error(`HTTP ${res.status} calling /api/skills: ${body}`);
   }
-  const body: { skills: { name: string }[] } = await res.json();
-  return body.skills;
+  const body: unknown = await res.json();
+  if (!isRecord(body) || !Array.isArray(body.skills)) {
+    throw new Error(`Unexpected /api/skills response: expected { skills: [...] }`);
+  }
+  return body.skills.filter((skill): skill is { name: string } => isRecord(skill) && typeof skill.name === "string");
 }
 
 async function pushSkillsListResult(message: string): Promise<void> {
@@ -472,6 +476,22 @@ async function handleManageSkillsDelete(args: Record<string, unknown>): Promise<
   return `Deleted skill ${name}.`;
 }
 
+// Render a pure-MCP-tool response body to the string the CLI returns. The
+// body is untyped JSON, so `error`/`result` are read through guards: a
+// non-string `error` falls back to the status code (avoids stringifying an
+// object), and a non-string `result` is JSON-encoded — with a "null" fallback
+// because `JSON.stringify(undefined)` is itself `undefined`, which the return
+// type forbids.
+async function formatMcpToolResponse(res: Response): Promise<string> {
+  const json: unknown = await res.json();
+  if (!res.ok) {
+    const errValue = isRecord(json) && typeof json.error === "string" ? json.error : undefined;
+    return `Error: ${errValue ?? res.status}`;
+  }
+  const resultValue = isRecord(json) ? json.result : undefined;
+  return typeof resultValue === "string" ? resultValue : (JSON.stringify(resultValue) ?? "null");
+}
+
 async function handleToolCall(name: string, args: Record<string, unknown>): Promise<string> {
   if (name === "manageSkills") return handleManageSkills(args);
 
@@ -487,9 +507,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       allowHttpError: true,
       timeoutMs: MCP_TOOL_BRIDGE_TIMEOUT_MS,
     });
-    const json = await res.json();
-    if (!res.ok) return `Error: ${json.error ?? res.status}`;
-    return typeof json.result === "string" ? json.result : JSON.stringify(json.result);
+    return formatMcpToolResponse(res);
   }
 
   const tool = tools.find((toolDef) => toolDef.name === name);
@@ -501,7 +519,8 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   // for the slowest realistic completion — see PLUGIN_BRIDGE_TIMEOUT_MS
   // and the timeout-policy comment on `postJson`.
   const res = await postJson(tool.endpoint, args, { timeoutMs: PLUGIN_BRIDGE_TIMEOUT_MS });
-  const result = ((await res.json()) ?? {}) as PluginResultEnvelope;
+  const rawResult: unknown = (await res.json()) ?? {};
+  const result: PluginResultEnvelope = isRecord(rawResult) ? rawResult : {};
 
   // Push visual ToolResult to the frontend via the session — but
   // only when the handler set `data`, which is the protocol's

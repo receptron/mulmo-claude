@@ -12,6 +12,7 @@ import { homedir } from "os";
 import { log } from "../system/logger/index.js";
 import { readReferenceDirsJson, writeReferenceDirsJson, isExistingDirectory } from "../utils/files/reference-dirs-io.js";
 import { hasStringProp, isRecord } from "../utils/types.js";
+import { validateEntryList, type EntryListResult } from "../utils/validateEntryList.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -31,8 +32,31 @@ const CONTAINER_MOUNT_ROOT = "/mnt/readonly";
 /** Home-relative directories that must never be mounted. */
 const HOME_RELATIVE_BLOCKED = [".ssh", ".aws", ".gnupg", ".config/gh", ".kube", ".docker"];
 
-/** Absolute system paths that must never be mounted. */
-const SYSTEM_BLOCKED_PREFIXES = ["/etc", "/root", "/var", "/proc", "/sys", "/boot", "/private/etc", "/private/var", "/System", "/Library"];
+const IS_WINDOWS = process.platform === "win32";
+
+/** Absolute system paths that must never be mounted, POSIX spelling. */
+const POSIX_SYSTEM_BLOCKED = ["/etc", "/root", "/var", "/proc", "/sys", "/boot", "/private/etc", "/private/var", "/System", "/Library"];
+
+/** The Windows equivalents, read from the environment rather than hardcoded:
+ *  the system drive is not always `C:`, and a hardcoded letter would silently
+ *  block nothing on a machine that boots from another one. Entries the OS
+ *  doesn't set are simply absent. */
+function windowsSystemBlocked(): string[] {
+  const candidates = [process.env.SystemRoot, process.env.windir, process.env.ProgramFiles, process.env["ProgramFiles(x86)"], process.env.ProgramData];
+  return candidates.filter((value): value is string => typeof value === "string" && value.length > 0).map((value) => path.resolve(value));
+}
+
+// The POSIX list is dead weight on Windows — `path.resolve("/etc")` yields
+// `<drive>:\etc`, which matches no entry — so each platform carries only its
+// own vocabulary.
+const SYSTEM_BLOCKED_PREFIXES = IS_WINDOWS ? windowsSystemBlocked() : POSIX_SYSTEM_BLOCKED;
+
+/** Comparison key for a path. Windows filesystems are case-insensitive, so
+ *  `c:\windows` and `C:\Windows` name the same directory — comparing them
+ *  verbatim would let the lowercase spelling walk straight past the blocklist. */
+function pathKey(absPath: string): string {
+  return IS_WINDOWS ? absPath.toLowerCase() : absPath;
+}
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHAR_RE_G = /[\x00-\x1f]/g;
@@ -48,6 +72,7 @@ function expandHome(inputPath: string): string {
 
 function isSensitivePath(absPath: string): boolean {
   const normalized = path.resolve(absPath);
+  const key = pathKey(normalized);
 
   // Reject filesystem root
   if (normalized === path.parse(normalized).root) return true;
@@ -55,20 +80,23 @@ function isSensitivePath(absPath: string): boolean {
   const home = homedir();
 
   // Block $HOME itself (transitively exposes .ssh etc.)
-  if (normalized === home) return true;
+  if (key === pathKey(home)) return true;
 
   // Block home-relative sensitive dirs
-  if (
-    HOME_RELATIVE_BLOCKED.some((blockedPath) => {
-      const full = path.join(home, blockedPath);
-      return normalized === full || normalized.startsWith(full + path.sep);
-    })
-  ) {
+  if (HOME_RELATIVE_BLOCKED.some((blockedPath) => isAtOrUnder(key, path.join(home, blockedPath)))) {
     return true;
   }
 
   // Block system directories
-  return SYSTEM_BLOCKED_PREFIXES.some((blockedPrefix) => normalized === blockedPrefix || normalized.startsWith(blockedPrefix + path.sep));
+  return SYSTEM_BLOCKED_PREFIXES.some((blockedPrefix) => isAtOrUnder(key, blockedPrefix));
+}
+
+/** True when `key` (already a `pathKey`) is the blocked dir itself or sits
+ *  underneath it. The `+ path.sep` guard is what keeps `/etc-backup` out of
+ *  `/etc`'s subtree. */
+function isAtOrUnder(key: string, blockedDir: string): boolean {
+  const blocked = pathKey(blockedDir);
+  return key === blocked || key.startsWith(blocked + path.sep);
 }
 
 function sanitizeLabel(raw: string): string {
@@ -144,39 +172,24 @@ export function saveReferenceDirs(entries: readonly ReferenceDirEntry[], root?: 
 
 // ── Validate input array (for API) ─────────────────────────────
 
-export function validateReferenceDirs(raw: unknown): { entries: ReferenceDirEntry[] } | { error: string } {
-  if (!Array.isArray(raw)) {
-    return { error: "expected an array" };
-  }
-  if (raw.length > MAX_ENTRIES) {
-    return { error: `too many entries (max ${MAX_ENTRIES})` };
-  }
-  const entries: ReferenceDirEntry[] = [];
-  const errors: string[] = [];
-  raw.forEach((item, i) => {
-    const entry = validateEntry(item);
-    if (entry) {
-      entries.push(entry);
-    } else {
-      // Echo the path back only when it really is one — a non-string entry is
-      // precisely where "[object Object]" would misreport the user's config.
-      const hostPath = hasStringProp(item, "hostPath") ? item.hostPath : "";
-      errors.push(`entry ${i}: invalid or blocked path "${hostPath}"`);
-    }
+export function validateReferenceDirs(raw: unknown): EntryListResult<ReferenceDirEntry> {
+  const result = validateEntryList(raw, {
+    maxEntries: MAX_ENTRIES,
+    validateEntry,
+    echoProp: "hostPath",
+    describeInvalid: (hostPath) => `invalid or blocked path "${hostPath}"`,
   });
-  if (errors.length > 0) {
-    return { error: errors.join("; ") };
-  }
+  if ("error" in result) return result;
 
   // Reject duplicate labels — @ref/<label> routing requires uniqueness
   const seenLabels = new Set<string>();
-  for (const entry of entries) {
+  for (const entry of result.entries) {
     if (seenLabels.has(entry.label)) {
       return { error: `duplicate label "${entry.label}"` };
     }
     seenLabels.add(entry.label);
   }
-  return { entries };
+  return result;
 }
 
 // ── Cached loader (for system prompt + Docker mounts) ───────────

@@ -45,6 +45,41 @@ function isFileDrag(event: DragEvent): boolean {
   return event.dataTransfer?.types.includes("Files") ?? false;
 }
 
+/** Install the window-level `preventDefault` guard on its own, for callers that
+ *  roll their own per-element handlers (the File Explorer attaches a drop zone
+ *  to every folder row, so one `useFileDropZone` per row would mean one window
+ *  listener per row). Idempotent — the module-scope handle makes it install-once. */
+export function installFileDropWindowGuard(): void {
+  installWindowDefaultGuard();
+}
+
+// Bumped whenever a drag terminates anywhere on the window. Hand-rolled drop
+// zones watch it so a drag that ends WITHOUT a matching `dragleave` — released
+// outside any row, or cancelled with Escape — still clears their highlight.
+// `useFileDropZone` gets this from its own per-instance listeners; per-row
+// callers can't afford one listener each, so they share this pulse instead.
+const dragSessionEnded = ref(0);
+let windowResetHandler: (() => void) | null = null;
+
+function installWindowResetPulse(): void {
+  if (windowResetHandler !== null) return;
+  if (typeof window === "undefined") return;
+  const handler = (): void => {
+    dragSessionEnded.value += 1;
+  };
+  window.addEventListener("drop", handler);
+  window.addEventListener("dragend", handler);
+  windowResetHandler = handler;
+}
+
+/** Shared "a drag just ended" counter for callers with hand-rolled handlers.
+ *  Watch it and reset local drag state. Installs the window guard + pulse once. */
+export function useDragSessionEnd(): Readonly<Ref<number>> {
+  installWindowDefaultGuard();
+  installWindowResetPulse();
+  return dragSessionEnded;
+}
+
 function installWindowDefaultGuard(): void {
   if (windowGuardHandler !== null) return;
   if (typeof window === "undefined") return;

@@ -34,7 +34,7 @@ const respond = (res: Response<StatusResponse>, hostStatus: RemoteHostStatus): v
   res.json({ status: hostStatus, session: exportSession() });
 };
 
-router.post(API_ROUTES.remoteHost.connect, async (req: Request, res: Response<StatusResponse>) => {
+router.post(API_ROUTES.remoteHost.connect, async (req: Request<object, unknown, { idToken?: string }>, res: Response<StatusResponse>) => {
   const idToken = typeof req.body?.idToken === "string" ? req.body.idToken.trim() : "";
   if (!idToken) {
     badRequest(res, "Request body must be { idToken: string }");
@@ -49,7 +49,7 @@ router.post(API_ROUTES.remoteHost.connect, async (req: Request, res: Response<St
   }
 });
 
-router.post(API_ROUTES.remoteHost.reconnect, async (req: Request, res: Response<StatusResponse>) => {
+router.post(API_ROUTES.remoteHost.reconnect, async (req: Request<object, unknown, { session?: string }>, res: Response<StatusResponse>) => {
   const session = typeof req.body?.session === "string" ? req.body.session : "";
   if (!session) {
     badRequest(res, "Request body must be { session: string }");

@@ -16,7 +16,6 @@ import { Router, Request, Response } from "express";
 import { deleteProjectSkill, discoverSkills, saveProjectSkill, updateProjectSkill } from "../../workspace/skills/index.js";
 import type { Skill, SkillSummary } from "../../workspace/skills/index.js";
 import {
-  isCatalogSource,
   listCatalogEntries,
   readCatalogEntryDetail,
   readExternalDetailAsCatalog,
@@ -27,6 +26,7 @@ import {
   type CatalogDetailResult,
   type StarResult,
 } from "../../workspace/skills/catalog.js";
+import { resolveCatalogTarget } from "./skillCatalogTarget.js";
 import { installExternalRepo, listInstalledRepos, uninstallExternalRepo, type InstalledRepo } from "../../workspace/skills/external/install.js";
 import { EXTERNAL_PRESETS, type ExternalPresetSuggestion } from "../../workspace/skills/external/presets.js";
 import { workspacePath } from "../../workspace/workspace.js";
@@ -140,26 +140,15 @@ bindRoute(
   router,
   API_ROUTES.skills.catalogPreview,
   async (req: Request<object, unknown, unknown, CatalogPreviewQuery>, res: Response<CatalogPreviewResponse | ErrorResponse>) => {
-    const { source, slug, repoId, skillFolder } = req.query;
-    if (!isCatalogSource(source)) {
-      badRequest(res, "source must be a known catalog source");
+    const target = resolveCatalogTarget(req.query, "preview", res);
+    if (!target) return;
+    if (target.kind === "external") {
+      const result = await readExternalDetailAsCatalog(target.repoId, target.skillFolder);
+      previewResponse(result, target.source, `${target.repoId}/${target.skillFolder}`, res);
       return;
     }
-    if (source === "external") {
-      if (typeof repoId !== "string" || repoId.length === 0 || typeof skillFolder !== "string" || skillFolder.length === 0) {
-        badRequest(res, "repoId and skillFolder are required for external preview");
-        return;
-      }
-      const result = await readExternalDetailAsCatalog(repoId, skillFolder);
-      previewResponse(result, source, `${repoId}/${skillFolder}`, res);
-      return;
-    }
-    if (typeof slug !== "string" || slug.length === 0) {
-      badRequest(res, "slug is required");
-      return;
-    }
-    const result = await readCatalogEntryDetail(source, slug);
-    previewResponse(result, source, slug, res);
+    const result = await readCatalogEntryDetail(target.source, target.slug);
+    previewResponse(result, target.source, target.slug, res);
   },
 );
 
@@ -191,26 +180,15 @@ interface ExternalStarBody {
 }
 
 bindRoute(router, API_ROUTES.skills.catalogStar, async (req: Request<object, unknown, ExternalStarBody>, res: Response<StarResponse | ErrorResponse>) => {
-  const { source, slug, repoId, skillFolder } = req.body;
-  if (!isCatalogSource(source)) {
-    badRequest(res, "source must be a known catalog source");
+  const target = resolveCatalogTarget(req.body, "star", res);
+  if (!target) return;
+  if (target.kind === "external") {
+    const result = await starExternalAsCatalog(target.repoId, target.skillFolder);
+    starResponse(result, target.source, `${target.repoId}/${target.skillFolder}`, res);
     return;
   }
-  if (source === "external") {
-    if (typeof repoId !== "string" || repoId.length === 0 || typeof skillFolder !== "string" || skillFolder.length === 0) {
-      badRequest(res, "repoId and skillFolder are required for external star");
-      return;
-    }
-    const result = await starExternalAsCatalog(repoId, skillFolder);
-    starResponse(result, source, `${repoId}/${skillFolder}`, res);
-    return;
-  }
-  if (typeof slug !== "string" || slug.length === 0) {
-    badRequest(res, "slug is required");
-    return;
-  }
-  const result = await starCatalogEntry(source, slug);
-  starResponse(result, source, slug, res);
+  const result = await starCatalogEntry(target.source, target.slug);
+  starResponse(result, target.source, target.slug, res);
 });
 
 // External-repo lifecycle endpoints (#1383 / #1335 PR-C). They live

@@ -25,11 +25,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSy
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { PRESET_SLUG_PREFIX, isPresetSlug } from "./slug.js";
-
-// Inlined (was the host's ../utils/errors.js) so the package has no host coupling.
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+import { errorMessage } from "../utils/errors.js";
 
 // Recursively mirror `srcDir` into `destDir`. Used by the preset
 // sync so a preset skill that ships sibling assets (e.g.

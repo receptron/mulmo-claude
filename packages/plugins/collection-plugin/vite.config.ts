@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
+import { createVuePluginConfig } from "../../../scripts/lib/pluginViteConfig";
 
 // `./vue` = browser UI layer (composition API + SFCs), imported only by the host
 // frontend. The isomorphic engine + node storage engine moved to
@@ -13,28 +13,16 @@ import tailwindcss from "@tailwindcss/vite";
 // content scan, so the package must ship its own classes. `.d.ts` is emitted by
 // vue-tsc (see the build script), not vite-plugin-dts, because the latter can't
 // type SFCs.
-export default defineConfig({
+export default createVuePluginConfig({
   plugins: [vue(), tailwindcss()],
-  build: {
-    lib: {
-      entry: { vue: "src/vue/index.ts" },
-      formats: ["es", "cjs"],
-      fileName: (format, entryName) => `${entryName}.${format === "es" ? "js" : "cjs"}`,
-    },
-    rollupOptions: {
-      // node built-ins + the @mulmoclaude/core engine + zod + gui-chat-protocol(/vue)
-      // + vue + vue-i18n stay external (resolved from node_modules at runtime); only
-      // the package's own Vue modules are bundled. `gui-chat-protocol/vue` is
-      // externalized so plugin and host share ONE injected PLUGIN_RUNTIME_KEY Symbol.
-      external: [/^node:/, /^@mulmoclaude\/core/, "zod", "gui-chat-protocol", "gui-chat-protocol/vue", "vue", "vue-i18n", "vuedraggable"],
-      output: {
-        exports: "named",
-        globals: { vue: "Vue" },
-        assetFileNames: "style.[ext]",
-      },
-    },
-    cssCodeSplit: false,
-    minify: false,
-    sourcemap: true,
-  },
+  entry: { vue: "src/vue/index.ts" },
+  // node built-ins + the @mulmoclaude/core engine + zod + gui-chat-protocol(/vue)
+  // + vue + vue-i18n stay external (resolved from node_modules at runtime); only
+  // the package's own Vue modules are bundled. `gui-chat-protocol/vue` is
+  // externalized so plugin and host share ONE injected PLUGIN_RUNTIME_KEY Symbol.
+  // `echarts` is external too (peer dep) so the Map tab reuses the host's
+  // single charting engine, same as chart-plugin.
+  external: [/^node:/, /^@mulmoclaude\/core/, "zod", "gui-chat-protocol", "gui-chat-protocol/vue", "vue", "vue-i18n", "vuedraggable", "echarts"],
+  minify: false,
+  sourcemap: true,
 });

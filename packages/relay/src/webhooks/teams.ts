@@ -24,13 +24,15 @@
 // — the serviceUrl varies per region and we carry it through via the
 // existing RelayMessage.replyToken channel (opaque to the relay core).
 
-import { chunkText } from "@mulmobridge/client/text";
+import { isRecord } from "@mulmoclaude/common";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
-import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
+import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS } from "../time.js";
 import { validateTokenClaims, validateJwkEndorsement, isAllowedSender, type AppType } from "./teams-verify.js";
+import { parseJwt, jwtKid, verifyJwtSignature } from "./jwt.js";
+import { postJsonChunks } from "./respond.js";
+import { makeRelayMessage } from "./relay-message.js";
 import { envSecret, requireEnvSecret } from "../utils/envSecret.js";
-import { makeUuid } from "../utils/id.js";
 
 const MULTITENANT_ISSUER = "https://api.botframework.com";
 const MULTITENANT_JWKS_URL = "https://login.botframework.com/v1/.well-known/keys";
@@ -41,10 +43,6 @@ const JWKS_CACHE_TTL_MS = ONE_HOUR_MS;
 const TOKEN_REFRESH_SKEW_SEC = 300; // refresh 5 min before expiry
 
 // ── Type guards ─────────────────────────────────────────────────
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 // ── Config helpers ──────────────────────────────────────────────
 
@@ -113,7 +111,7 @@ async function fetchJwks(url: string): Promise<JwkKey[]> {
   const data: { keys?: unknown[] } = await res.json();
   if (!Array.isArray(data.keys)) return cached?.keys ?? [];
   const keys = data.keys
-    .filter((key): key is Record<string, unknown> => isObj(key) && typeof key.kid === "string" && typeof key.n === "string")
+    .filter((key): key is Record<string, unknown> => isRecord(key) && typeof key.kid === "string" && typeof key.n === "string")
     .map((key): JwkKey => {
       const endorsements = Array.isArray(key.endorsements) ? key.endorsements.filter((entry): entry is string => typeof entry === "string") : undefined;
       return {
@@ -129,34 +127,7 @@ async function fetchJwks(url: string): Promise<JwkKey[]> {
   return keys;
 }
 
-// ── JWT parsing + verification ──────────────────────────────────
-
-function b64UrlDecode(str: string): Uint8Array {
-  const padded = str
-    .replace(/-/g, "+")
-    .replace(/_/g, "/")
-    .padEnd(str.length + ((4 - (str.length % 4)) % 4), "=");
-  return Uint8Array.from(atob(padded), (chr) => chr.charCodeAt(0));
-}
-
-interface ParsedJwt {
-  header: Record<string, unknown>;
-  payload: Record<string, unknown>;
-  signInput: string;
-  sig: Uint8Array;
-}
-
-function parseJwt(token: string): ParsedJwt | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const header = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[0]))) as Record<string, unknown>;
-    const payload = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[1]))) as Record<string, unknown>;
-    return { header, payload, signInput: `${parts[0]}.${parts[1]}`, sig: b64UrlDecode(parts[2]) };
-  } catch {
-    return null;
-  }
-}
+// ── JWT verification ────────────────────────────────────────────
 
 // Verifies the JWT against all of: expected issuer/audience/exp, the
 // activity body (serviceUrl + channelId cross-checks), the JWKS key's
@@ -168,9 +139,8 @@ async function verifyTeamsJwt(authHeader: string | undefined, env: Env, activity
   const jwt = parseJwt(token);
   if (!jwt) return false;
 
-  const { header, payload } = jwt;
   const claimsOk = validateTokenClaims({
-    payload,
+    payload: jwt.payload,
     appId: envSecret(env, "MICROSOFT_APP_ID") ?? "",
     expectedIssuer: getExpectedIssuer(env),
     nowSeconds: Math.floor(Date.now() / 1000),
@@ -178,16 +148,12 @@ async function verifyTeamsJwt(authHeader: string | undefined, env: Env, activity
   });
   if (!claimsOk) return false;
 
-  const keyId = typeof header.kid === "string" ? header.kid : "";
-  const alg = typeof header.alg === "string" ? header.alg : "RS256";
-  const hashAlg = alg === "RS256" ? "SHA-256" : alg === "RS384" ? "SHA-384" : "SHA-512";
   const keys = await fetchJwks(getJwksUrl(env));
-  const jwk = keys.find((key) => key.kid === keyId);
+  const jwk = keys.find((key) => key.kid === jwtKid(jwt));
   if (!jwk) return false;
   if (!validateJwkEndorsement(jwk, getAppType(env))) return false;
 
-  const pubKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: hashAlg }, false, ["verify"]);
-  return crypto.subtle.verify("RSASSA-PKCS1-v1_5", pubKey, jwt.sig, new TextEncoder().encode(jwt.signInput));
+  return verifyJwtSignature(jwt, jwk);
 }
 
 // ── Activity parsing ────────────────────────────────────────────
@@ -217,7 +183,7 @@ export function parseWebhookBody(body: string): TeamsMessage | null {
 }
 
 function parseActivity(body: unknown): TeamsMessage | null {
-  if (!isObj(body)) return null;
+  if (!isRecord(body)) return null;
   // Non-message activities (conversationUpdate, invoke, typing, …) are
   // legit but we don't forward them to MulmoClaude.
   if (body.type !== "message") return null;
@@ -227,8 +193,8 @@ function parseActivity(body: unknown): TeamsMessage | null {
   const { from } = body;
   const serviceUrl = typeof body.serviceUrl === "string" ? body.serviceUrl.trim() : "";
   const channelId = typeof body.channelId === "string" ? body.channelId.trim() : "";
-  if (!isObj(conversation) || typeof conversation.id !== "string") return null;
-  if (!isObj(from) || typeof from.id !== "string") return null;
+  if (!isRecord(conversation) || typeof conversation.id !== "string") return null;
+  if (!isRecord(from) || typeof from.id !== "string") return null;
   if (!serviceUrl) return null;
   return {
     conversationId: conversation.id,
@@ -314,17 +280,15 @@ const teamsPlugin: PlatformPlugin = {
     }
 
     return [
-      {
-        id: makeUuid(),
+      makeRelayMessage({
         platform: PLATFORMS.teams,
         senderId: activity.senderAadObjectId || activity.senderId,
         chatId: activity.conversationId,
         text: activity.text,
-        receivedAt: new Date().toISOString(),
         // Carry the activity's serviceUrl through the outbound path —
         // the relay's response routing treats replyToken as opaque.
         replyToken: activity.serviceUrl,
-      },
+      }),
     ];
   },
 
@@ -333,30 +297,17 @@ const teamsPlugin: PlatformPlugin = {
     if (!serviceUrl) {
       throw new Error("Teams sendResponse missing serviceUrl (no prior inbound message to reply to)");
     }
-    const accessToken = await getAccessToken(env);
     const base = serviceUrl.replace(/\/$/, "");
     const endpoint = `${base}/v3/conversations/${encodeURIComponent(chatId)}/activities`;
 
-    for (const chunk of chunkText(text, MAX_TEAMS_TEXT)) {
-      let res: Response;
-      try {
-        res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ type: "message", text: chunk }),
-          signal: AbortSignal.timeout(FIFTEEN_SECONDS_MS),
-        });
-      } catch (err) {
-        throw new Error(`Teams API network error: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new Error(`Teams API failed: ${res.status} ${detail.slice(0, 200)}`);
-      }
-    }
+    await postJsonChunks({
+      text,
+      maxTextLength: MAX_TEAMS_TEXT,
+      label: "Teams",
+      endpoint,
+      accessToken: await getAccessToken(env),
+      buildBody: (chunk) => ({ type: "message", text: chunk }),
+    });
   },
 };
 

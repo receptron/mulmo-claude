@@ -20,7 +20,7 @@
 import path from "node:path";
 import { promises as fsp, constants as fsConstants, type Dirent } from "node:fs";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
-import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { shortId } from "../../utils/id.js";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
 import { WORKSPACE_DIRS } from "../paths.js";

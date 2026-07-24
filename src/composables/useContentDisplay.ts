@@ -6,7 +6,7 @@ import type { FileContent } from "./useFileContentLoader";
 import { wrapHtmlWithPreviewCsp } from "../utils/html/previewCsp";
 import { cspExtra, loadCspExtra } from "./useCspExtra";
 import { tokenizeJson, tokenizeJsonl, prettyJson } from "../utils/format/jsonSyntax";
-import { parseFrontmatter } from "../utils/markdown/frontmatter";
+import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 
 function hasExt(filePath: string | null, exts: string[]): boolean {
   if (!filePath) return false;

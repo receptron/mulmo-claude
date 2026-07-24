@@ -27,6 +27,7 @@ import "dotenv/config";
 import crypto from "crypto";
 import express, { type Request, type Response } from "express";
 import { createBridgeClient } from "@mulmobridge/client";
+import { isRecord } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "webhook";
 const PORT = Number(process.env.WEBHOOK_PORT) || 3009;
@@ -73,19 +74,13 @@ function secretOk(provided: string | undefined): boolean {
 
 // ── Payload extraction ─────────────────────────────────────────
 
-type JsonRecord = Record<string, unknown>;
-
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
 interface Extracted {
   chatId: string;
   text: string;
 }
 
 function extractPayload(body: unknown): Extracted | null {
-  if (!isObj(body)) return null;
+  if (!isRecord(body)) return null;
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const chatId = typeof body.chatId === "string" && body.chatId.length > 0 ? body.chatId : "default";
   if (!text) return null;

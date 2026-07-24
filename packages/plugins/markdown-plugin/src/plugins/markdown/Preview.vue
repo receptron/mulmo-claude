@@ -17,9 +17,9 @@
 import { computed, ref, watch } from "vue";
 import type { ToolResult } from "gui-chat-protocol";
 import { isFilePath, type MarkdownToolData } from "./definition";
-import { extractFirstH1 } from "../../utils/markdown/extractFirstH1";
-import { parseFrontmatter } from "../../utils/markdown/frontmatter";
-import { isMarpDocument } from "../../utils/markdown/marpDetect";
+import { extractFirstH1 } from "@mulmoclaude/markdown-utils/markdown/extractFirstH1";
+import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
+import { isMarpDocument } from "@mulmoclaude/markdown-utils/markdown/marpDetect";
 import { useRuntime } from "gui-chat-protocol/vue";
 import { useT } from "../../lang";
 

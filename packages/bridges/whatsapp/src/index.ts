@@ -16,8 +16,9 @@
 import "dotenv/config";
 import type { Request, Response } from "express";
 import { createBridgeClient } from "@mulmobridge/client";
-import { createWebhookApp, createWebhookRateLimit, verifyHmacSignature } from "@mulmobridge/webhook-runtime";
-import { narrowChallenge } from "./verify.js";
+import { createWebhookApp, createWebhookRateLimit, registerMetaWebhookVerification, verifyMetaHmacSignature } from "@mulmobridge/webhook-runtime";
+import { parseCsvSet } from "@mulmoclaude/common";
+import { extractWhatsAppMessages } from "@mulmoclaude/common/meta-webhook";
 
 const TRANSPORT_ID = "whatsapp";
 const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT) || 3003;
@@ -38,12 +39,7 @@ function readRequiredEnv(): { accessToken: string; phoneNumberId: string; verify
 }
 const { accessToken, phoneNumberId, verifyToken, appSecret } = readRequiredEnv();
 
-const allowedNumbers = new Set(
-  (process.env.WHATSAPP_ALLOWED_NUMBERS ?? "")
-    .split(",")
-    .map((phoneNumber) => phoneNumber.trim())
-    .filter(Boolean),
-);
+const allowedNumbers = parseCsvSet(process.env.WHATSAPP_ALLOWED_NUMBERS);
 const allowAll = allowedNumbers.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -89,53 +85,6 @@ async function sendWhatsAppMessage(recipientId: string, text: string): Promise<v
   }
 }
 
-// ── Signature verification (x-hub-signature-256) ────────────────
-
-function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  // Meta prefixes the hex digest with `sha256=`; strip it before comparing.
-  return verifyHmacSignature(rawBody, signature.replace("sha256=", ""), appSecret, "sha256", "hex");
-}
-
-// ── Payload extraction ──────────────────────────────────────────
-
-interface WhatsAppTextMessage {
-  from: string;
-  text: { body: string };
-}
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function parseOneMessage(msg: unknown): WhatsAppTextMessage | null {
-  if (!isObj(msg)) return null;
-  if (msg.type !== "text" || typeof msg.from !== "string") return null;
-  if (!isObj(msg.text)) return null;
-  const { body } = msg.text;
-  if (typeof body !== "string" || !body.trim()) return null;
-  return { from: msg.from, text: { body } };
-}
-
-function collectRawMessages(body: unknown): unknown[] {
-  if (!isObj(body) || !Array.isArray(body.entry)) return [];
-  const raw: unknown[] = [];
-  for (const entry of body.entry) {
-    if (!isObj(entry) || !Array.isArray(entry.changes)) continue;
-    for (const change of entry.changes) {
-      if (!isObj(change) || !isObj(change.value)) continue;
-      const { messages } = change.value;
-      if (Array.isArray(messages)) raw.push(...messages);
-    }
-  }
-  return raw;
-}
-
-function extractTextMessages(body: unknown): WhatsAppTextMessage[] {
-  return collectRawMessages(body)
-    .map(parseOneMessage)
-    .filter((message): message is WhatsAppTextMessage => message !== null);
-}
-
 // ── Webhook server ──────────────────────────────────────────────
 
 const app = createWebhookApp();
@@ -143,41 +92,17 @@ const app = createWebhookApp();
 // `hub.challenge` probes would otherwise hammer us just as effectively.
 const webhookRateLimit = createWebhookRateLimit();
 
-// Webhook verification (GET).
-//
-// Meta sends `hub.mode=subscribe` + the shared `hub.verify_token`
-// + a one-time `hub.challenge` ASCII nonce that we must echo back.
-// Three layered defences against `js/reflected-xss` — full
-// rationale + compatibility notes live in `./verify.ts` next to
-// the unit-tested `narrowChallenge` helper.
-//
-//   1. **Shape whitelist** on `hub.challenge` (`narrowChallenge`)
-//      — required to clear CodeQL's data-flow analyser (we tried
-//      `text/plain` alone and the alert stayed open).
-//   2. **`text/plain` content-type** — neutralises browser HTML
-//      execution even if a future regression widened the whitelist.
-//   3. **String-narrowing** — `narrowChallenge` rejects non-string
-//      query values so `?hub.challenge[]=…` array forms can't
-//      bypass the regex via toString().
-app.get("/webhook", webhookRateLimit, (req: Request, res: Response) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = narrowChallenge(req.query["hub.challenge"]);
-
-  if (mode === "subscribe" && token === verifyToken && challenge !== null) {
-    console.log("[whatsapp] webhook verified");
-    res.type("text/plain").status(200).send(challenge);
-  } else {
-    res.status(403).type("text/plain").send("Forbidden");
-  }
-});
+// Webhook verification (GET). The shared handler echoes Meta's one-time
+// `hub.challenge` only after `hub.verify_token` matches, behind the
+// `narrowChallenge` `js/reflected-xss` whitelist + a `text/plain` response.
+registerMetaWebhookVerification(app, { rateLimit: webhookRateLimit, verifyToken, label: "whatsapp" });
 
 // Webhook events (POST) — signature-verified + rate-limited
 app.post("/webhook", webhookRateLimit, async (req: Request, res: Response) => {
   const signature = req.headers["x-hub-signature-256"] as string;
   const rawBody = req.body as string;
 
-  if (!signature || !verifyWebhookSignature(rawBody, signature)) {
+  if (!signature || !verifyMetaHmacSignature(rawBody, signature, appSecret)) {
     console.warn("[whatsapp] webhook signature verification failed");
     res.status(401).send("Invalid signature");
     return;
@@ -193,7 +118,7 @@ app.post("/webhook", webhookRateLimit, async (req: Request, res: Response) => {
     return;
   }
 
-  for (const msg of extractTextMessages(parsed)) {
+  for (const msg of extractWhatsAppMessages(parsed)) {
     if (!allowAll && !allowedNumbers.has(msg.from)) {
       console.log(`[whatsapp] denied from=${msg.from}`);
       continue;

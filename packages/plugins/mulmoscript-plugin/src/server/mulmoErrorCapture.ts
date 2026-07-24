@@ -14,7 +14,8 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { GraphAILogger } from "graphai";
-import { errorText, isRecord } from "./support";
+import { errorMessage } from "@mulmoclaude/common";
+import { isRecord } from "./support";
 import type { MulmoScriptServerLog } from "./types";
 
 const capturedErrors = new AsyncLocalStorage<string[]>();
@@ -79,7 +80,7 @@ export function describeMulmoCause(err: unknown): string | null {
  * log the same error more than once.
  */
 export function composeMulmoErrorMessage(err: unknown, captured: readonly string[]): string {
-  const base = errorText(err);
+  const base = errorMessage(err);
   const details = [...new Set(captured)].filter((message) => message !== "" && message !== base);
   return [base, describeMulmoCause(err), ...details].filter(Boolean).join(" — ");
 }

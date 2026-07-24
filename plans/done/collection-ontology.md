@@ -144,7 +144,7 @@ The reserved kind from `schema.ts:174-178`, exactly Foundry's Action shape minus
 
 ```text
 ⓪ zod single-source refactor  — Phase A blocks everything; Phase B blocks ④ (mutate params)
-① getOntology (LLM summary)   — ✅ DONE 2026-07-15 (graph panel still pending as its phase 2)
+① getOntology (LLM summary)   — ✅ DONE 2026-07-15 (phase-2 graph panel shipped 2026-07-19, plans/done/feat-collection-ontology-graph.md)
 ② backlinks                   — ✅ DONE 2026-07-15 (from/via vocabulary + reverse loading established)
 ③ kind:"agent" actions        — ✅ DONE 2026-07-15 (completes the 2×2)
 ④ kind:"mutate"               — ✅ DONE 2026-07-15 (fills the reserved slot)
@@ -154,7 +154,7 @@ The reserved kind from `schema.ts:174-178`, exactly Foundry's Action shape minus
 
 Each step is independently shippable and backward compatible (all new schema surface is opt-in).
 
-**PLAN COMPLETE 2026-07-16.** ⓪ #2097/#2098 · ① #2099 · ② #2103 · ③ #2104 · ④ #2105 · ⑤ #2116 · ⑥ (this PR). Field-proven along the way: stock-quotes holders (backlinks), W杯2026 standings fully computed (rollups + derived-over-rollup, with the groupResult-enum pattern standing in for comparative row predicates). Still open if demand appears: the `/collections` ontology graph panel (①'s phase 2), `transitions` (deferred, pull-based), promoting strict record checks to enforced once the lint runs clean.
+**PLAN COMPLETE 2026-07-16.** ⓪ #2097/#2098 · ① #2099 · ② #2103 · ③ #2104 · ④ #2105 · ⑤ #2116 · ⑥ (this PR). Field-proven along the way: stock-quotes holders (backlinks), W杯2026 standings fully computed (rollups + derived-over-rollup, with the groupResult-enum pattern standing in for comparative row predicates). ①'s phase-2 `/collections` ontology graph panel shipped 2026-07-19 (plans/done/feat-collection-ontology-graph.md). Still open if demand appears: `transitions` (deferred, pull-based), promoting strict record checks to enforced once the lint runs clean.
 
 ## One-line summary
 

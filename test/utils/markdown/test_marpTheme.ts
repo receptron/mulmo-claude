@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ensureThemeDirective, MARP_HTML_ALLOWLIST, marpThemeNameFromFilename, sanitizeMarpThemeCss } from "../../../src/utils/markdown/marpTheme.ts";
+import { ensureThemeDirective, MARP_HTML_ALLOWLIST, marpThemeNameFromFilename, sanitizeMarpThemeCss } from "@mulmoclaude/markdown-utils/markdown/marpTheme";
 
 describe("marpThemeNameFromFilename", () => {
   it("strips the .css extension", () => {

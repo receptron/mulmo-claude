@@ -26,6 +26,7 @@ import type { PluginRuntime, ToolDefinition } from "gui-chat-protocol";
 import { isPluginFactory } from "gui-chat-protocol";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
 import { readLedger, type LedgerEntry } from "../utils/files/plugins-io.js";
+import { isRecord } from "../utils/types.js";
 import { log } from "../system/logger/index.js";
 
 const LOG_PREFIX = "plugins/runtime";
@@ -72,8 +73,6 @@ interface PackageJson {
   main?: string;
   module?: string;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
 const isToolDefinition = (value: unknown): value is ToolDefinition => {
   if (!isRecord(value)) return false;
@@ -292,12 +291,15 @@ function resolveCarrier(name: string, mod: Record<string, unknown>, deps: Loader
  *  handlers keep the `(context, args)` signature unchanged. Returns
  *  null when no function is exported under `definition.name` — the
  *  plugin still appears in `tools/list` but dispatch logs + 500s. */
-function resolveExecute(
+export function resolveExecute(
   carrier: Record<string, unknown>,
   definitionName: string,
   usingFactory: boolean,
 ): ((context: unknown, args: unknown) => unknown) | null {
-  const handler = carrier[definitionName];
+  // Own-property guard: a bare `carrier[definitionName]` for a plugin naming its
+  // tool `constructor` / `toString` resolves to an Object.prototype function,
+  // defeating the `typeof … !== "function"` gate below (#2319).
+  const handler = Object.hasOwn(carrier, definitionName) ? carrier[definitionName] : undefined;
   if (typeof handler !== "function") return null;
   if (usingFactory) {
     const factoryHandler = handler as (args: unknown) => unknown;
@@ -316,6 +318,7 @@ function resolveOauthCallbackAlias(name: string, mod: Record<string, unknown>): 
   const raw = mod.OAUTH_CALLBACK_ALIAS;
   if (raw === undefined) return null;
   if (typeof raw !== "string" || !OAUTH_CALLBACK_ALIAS_RE.test(raw)) {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- this branch exists BECAUSE `raw` is the wrong shape; echoing whatever it stringifies to is the diagnostic.
     log.warn(LOG_PREFIX, "OAUTH_CALLBACK_ALIAS export is not a valid alias — ignoring", { name, raw: String(raw) });
     return null;
   }

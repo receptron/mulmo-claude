@@ -208,6 +208,6 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
   };
 }
 
-export type { ChatServiceDeps, StartChatFn, OnSessionEventFn } from "./types.js";
+export type { Attachment, ChatServiceDeps, StartChatFn, StartChatParams, OnSessionEventFn } from "./types.js";
 
 export { writeFileAtomic } from "./atomic-write.js";

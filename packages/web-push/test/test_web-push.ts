@@ -101,3 +101,49 @@ test("sendWebPush returns null when the response body isn't valid JSON", async (
   }));
   assert.equal(await sendWebPush("t", "b", okOpts({ fetchImpl })), null);
 });
+
+// --- FCM data payload (#2230) ---------------------------------------
+// The routing map must reach FCM's `data` block so a receiver can act on the
+// tap (e.g. open the session that just finished) instead of landing on the
+// home screen.
+
+test("buildSendPushBody nests the routing map under the onCall envelope", () => {
+  assert.deepEqual(JSON.parse(buildSendPushBody("done", "ok", { sessionId: "abc123" })), {
+    data: { title: "done", body: "ok", data: { sessionId: "abc123" } },
+  });
+});
+
+test("buildSendPushBody omits data entirely when absent or empty", () => {
+  // The envelope of an ordinary push must be unchanged by this feature —
+  // sending `data: {}` would be noise the server has to reason about.
+  assert.deepEqual(JSON.parse(buildSendPushBody("t", "b")), { data: { title: "t", body: "b" } });
+  assert.deepEqual(JSON.parse(buildSendPushBody("t", "b", {})), { data: { title: "t", body: "b" } });
+});
+
+test("buildSendPushBody keeps title/body alongside data, never replacing them", () => {
+  // Both mulmoserver receivers bail out when `notification` is missing, so a
+  // data-only message is silently dropped — title/body must survive.
+  const parsed = JSON.parse(buildSendPushBody("T", "B", { k: "v" })) as { data: Record<string, unknown> };
+  assert.equal(parsed.data.title, "T");
+  assert.equal(parsed.data.body, "B");
+});
+
+test("buildSendPushBody carries multiple routing keys verbatim", () => {
+  const parsed = JSON.parse(buildSendPushBody("t", "b", { sessionId: "s1", kind: "stop" })) as { data: { data: unknown } };
+  assert.deepEqual(parsed.data.data, { sessionId: "s1", kind: "stop" });
+});
+
+test("sendWebPush forwards options.data to the request body", async () => {
+  const { fetchImpl, calls } = makeFetch(() => ({ ok: true, json: async () => ({ result: { sent: 1, failed: 0, targets: 1 } }) }));
+  await sendWebPush("done", "ok", okOpts({ fetchImpl, data: { sessionId: "xyz" } }));
+  assert.equal(calls.length, 1);
+  const sent = JSON.parse(String(calls[0].init.body)) as { data: { data?: unknown } };
+  assert.deepEqual(sent.data.data, { sessionId: "xyz" });
+});
+
+test("sendWebPush omits data when the caller passes none (back-compat)", async () => {
+  const { fetchImpl, calls } = makeFetch(() => ({ ok: true, json: async () => ({ result: { sent: 1, failed: 0, targets: 1 } }) }));
+  await sendWebPush("done", "ok", okOpts({ fetchImpl }));
+  const sent = JSON.parse(String(calls[0].init.body)) as { data: Record<string, unknown> };
+  assert.ok(!("data" in sent.data), `no routing block expected, got: ${JSON.stringify(sent)}`);
+});

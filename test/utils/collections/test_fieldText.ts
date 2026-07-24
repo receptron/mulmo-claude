@@ -9,7 +9,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { fieldText, fieldTextOrNull } from "@mulmoclaude/core/collection";
+import { embedTargetId, fieldText, fieldTextOrNull } from "@mulmoclaude/core/collection";
+import type { CollectionFieldSpec } from "@mulmoclaude/core/collection";
 
 describe("fieldTextOrNull", () => {
   it("returns the text of a primitive", () => {
@@ -75,5 +76,38 @@ describe("fieldText", () => {
     assert.equal(fieldText("value", "—"), "value");
     assert.equal(fieldText(0, "—"), "0");
     assert.equal(fieldText(false, "—"), "false");
+  });
+});
+
+// Identity comparisons only hold if BOTH sides derive the id the same way.
+// `embedTargetId` produces the lookup key and the renderers produce the
+// candidate key; while one used `String(...)` and the other `fieldText(...)`,
+// a non-scalar id could match on one path and not the other. These pin the two
+// together — a future edit that reintroduces `String()` on either side breaks
+// here rather than in a silently-unresolved embed.
+describe("embedTargetId agrees with fieldText on both sides of the lookup", () => {
+  const idField = (name: string): CollectionFieldSpec => ({ type: "embed", to: "other", idField: name }) as CollectionFieldSpec;
+
+  it("produces the same key as fieldText for scalars", () => {
+    for (const value of ["abc", 42, 0, true, false]) {
+      const record = { ref: value };
+      assert.equal(embedTargetId(idField("ref"), record), fieldText(value), `mismatch for ${JSON.stringify(value)}`);
+    }
+  });
+
+  it("yields no key for a value that has no text form", () => {
+    for (const value of [{ nested: true }, ["a"], null, undefined]) {
+      const record = { ref: value };
+      assert.equal(embedTargetId(idField("ref"), record), "", `expected no key for ${JSON.stringify(value)}`);
+    }
+  });
+
+  // The bug this closes: two unrelated records both stringified to
+  // "[object Object]", so an embed resolved to whichever happened to be first.
+  it("cannot make two different objects produce the same lookup key", () => {
+    assert.equal(String({ a: 1 }), String({ b: 2 })); // the trap
+    assert.equal(embedTargetId(idField("ref"), { ref: { a: 1 } }), "");
+    assert.equal(embedTargetId(idField("ref"), { ref: { b: 2 } }), "");
+    // "" is falsy, and every caller guards on it — so neither resolves at all.
   });
 });

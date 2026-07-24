@@ -66,7 +66,10 @@ function trimTrailingSeparators(text: string): string {
   return text.slice(0, end);
 }
 
-function compactAlnum(text: string): string {
+// Exported because every memory slug flavour must share ONE
+// character rule: it decides a user-visible filename, so a second
+// copy silently renames existing files the next time one is tweaked.
+export function compactAlnum(text: string): string {
   const out: string[] = [];
   let lastWasSep = true;
   for (const char of text) {

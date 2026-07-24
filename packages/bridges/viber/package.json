@@ -21,9 +21,10 @@
   "license": "MIT",
   "author": "Receptron Team",
   "dependencies": {
-    "@mulmobridge/client": "^0.1.4",
+    "@mulmobridge/client": "^0.2.0",
     "@mulmobridge/protocol": "^0.1.4",
-    "@mulmobridge/webhook-runtime": "^0.1.0",
+    "@mulmobridge/webhook-runtime": "^1.0.0",
+    "@mulmoclaude/common": "^1.1.0",
     "dotenv": "^17.0.0",
     "express": "^5.0.0",
     "express-rate-limit": "^8.6.0"

@@ -13,7 +13,7 @@
 // with `gui-chat-protocol` is configured to make those imports a hard
 // error, keeping the surface small for plugin reviewers.
 
-import { definePlugin } from "gui-chat-protocol";
+import { createSerialLock, definePlugin } from "gui-chat-protocol";
 import { z } from "zod";
 import { TOOL_DEFINITION } from "./definition";
 
@@ -46,19 +46,8 @@ export default definePlugin(({ pubsub, files, log }) => {
   // Two `add` calls (or `add` + `remove`) hitting in parallel both
   // read the same `bookmarks.json` snapshot and the later writer wins
   // — silently dropping the earlier change. Serialise read-modify-
-  // write through a per-plugin promise chain so the file mutations
-  // happen one at a time. Plain `Promise.resolve()` chain — no need
-  // for a real mutex library since this runs in a single Node
-  // process. CodeRabbit review on PR #1124.
-  let writeLock: Promise<unknown> = Promise.resolve();
-  function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
-    const next = writeLock.catch(() => undefined).then(fn);
-    // Swallow rejection on the chain head so a thrown handler doesn't
-    // poison the next caller; each caller still sees its own error
-    // because we return `next` (not the swallowed copy).
-    writeLock = next.catch(() => undefined);
-    return next;
-  }
+  // write so the file mutations happen one at a time.
+  const withWriteLock = createSerialLock();
 
   async function readAll(): Promise<Bookmark[]> {
     if (!(await files.data.exists("bookmarks.json"))) return [];

@@ -10,6 +10,7 @@ import type { EffortLevel, McpServerSpec } from "../system/config.js";
 import { startStdioHttpShim, type ShimHandle } from "./stdioHttpShim.js";
 import { claudeConfigDir, claudeConfigJson } from "../utils/claudeConfigPath.js";
 import { getCurrentToken } from "../api/auth/token.js";
+import { ONE_MINUTE_MS } from "../utils/time.js";
 import type { Attachment } from "@mulmobridge/protocol";
 import { isImageMime, isNativeAttachmentMime } from "@mulmobridge/client";
 import { convertAttachment } from "./attachmentConverter.js";
@@ -297,11 +298,32 @@ const LOCAL_MCP_SERVER_PATH = join(dirname(fileURLToPath(import.meta.url)), "mcp
  *  with the SHIPPED command/args/env instead of a hand-copied duplicate —
  *  the drift that let #1974 and #1995 ship without the smoke test ever
  *  seeing them (#2052). */
+/** Connect-wait ceiling handed to the CLI inside the sandbox container.
+ *
+ *  This is a CEILING, not a delay: a fast environment still proceeds the moment
+ *  the broker answers, so raising it costs nothing there. It exists for the slow
+ *  bind-mount case (Windows / macOS Docker Desktop), where tsx transcodes the
+ *  broker's import graph over a 9p-class mount and cold boot overruns the CLI's
+ *  ~5s default, surfacing as an intermittent
+ *  `MCP tool mcp__mulmoclaude__handlePermission not found` (#2201, #2234).
+ *
+ *  Deliberately generous rather than tuned: the only cost of overshooting is a
+ *  slower report when the broker is genuinely dead, while undershooting brings
+ *  the flake back. #2233 will measure real cold-boot time and this can tighten
+ *  to that figure plus margin. */
+const MCP_CONNECT_TIMEOUT_MS = ONE_MINUTE_MS;
+
 export interface McpStdioServerSpec {
   type: "stdio";
   command: string;
   args: string[];
   env: Record<string, string>;
+  /** Connect to this server at session start rather than lazily, so a resumed
+   *  turn doesn't race the broker's cold boot (#2234). Requires CLI ≥ 2.1.121;
+   *  older versions ignore the field. Inert on its own — the CLI still gives up
+   *  after its default connect wait, so this only helps together with the
+   *  raised `MCP_CONNECT_TIMEOUT_MS` in `buildDockerSpawnArgs`. */
+  alwaysLoad: boolean;
 }
 
 export function buildMulmoclaudeServer(params: { chatSessionId: string; port: number; activePlugins: string[]; useDocker: boolean }): McpStdioServerSpec {
@@ -333,6 +355,7 @@ export function buildMulmoclaudeServer(params: { chatSessionId: string; port: nu
     // when absent, which is why this worked through Apr 2026 and
     // started silently failing some time after the CLI update.
     type: "stdio",
+    alwaysLoad: true,
     command,
     // Docker path: register the ESM resolver hook that plugs the
     // Windows-junction gap in the ESM loader (#1946/#1982). Passed
@@ -847,6 +870,12 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     // toolResult into its timeline.
     "-e",
     `MULMOCLAUDE_CHAT_SESSION_ID=${params.chatSessionId}`,
+    // How long the CLI *inside the container* waits for the MCP broker to
+    // connect. Set here because only the vars listed in this argv reach the
+    // container — a host-side `MCP_CONNECT_TIMEOUT_MS` never arrived, so the
+    // knob was unreachable in the one environment that needs it (#2234).
+    "-e",
+    `MCP_CONNECT_TIMEOUT_MS=${MCP_CONNECT_TIMEOUT_MS}`,
     ...dockerBindMountArgs({ projectRoot, packageRoot, workspacePath, homeDir, packagesMount, platform }),
     ...sandboxAuthArgs,
     ...extraHosts,

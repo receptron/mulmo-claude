@@ -7,6 +7,7 @@
 
 import { PAGE_ROUTES } from "../../router/pageRoutes";
 import { isExternalHref, extractSessionIdFromPath } from "./relativeLink";
+import { stripFragmentAndQuery, normalizeWorkspacePath } from "./posixPath";
 
 export type WorkspaceLinkTarget =
   | { kind: "wiki"; slug: string }
@@ -79,7 +80,7 @@ export function classifyWorkspacePath(href: string): WorkspaceLinkTarget | null 
   const decoded = safeDecode(cleaned);
 
   // Normalize path (collapse ./ and ../, reject root-escape)
-  const normalized = normalizePath(decoded);
+  const normalized = normalizeWorkspacePath(decoded);
   if (!normalized) return null;
 
   // Wiki page: data/wiki/pages/<slug>.md
@@ -160,7 +161,7 @@ export function resolveWikiHref(href: string, baseDir: string): string {
 // Everything else round-trips via `decodeURIComponent`: multibyte
 // (UTF-8) sequences emitted by marked.parse, transport-encoded spaces
 // (`%20`), and encoded `..` (`%2E%2E`) — the last one decodes to the
-// literal `..` token that `normalizePath` then catches as a
+// literal `..` token that `normalizeWorkspacePath` then catches as a
 // workspace-root escape. Malformed sequences (truncated UTF-8, lone
 // `%`) fall back to the raw bytes so a bad link still routes — Files
 // view surfaces its own 404 if the path is unreachable.
@@ -197,6 +198,12 @@ function looksLikeFileSegment(segment: string): boolean {
 // counts as a query delimiter — a "?" sitting inside the fragment
 // is part of the fragment, not a query. Sliced from the raw href so
 // percent-encoding is preserved for vue-router to decode.
+//
+// Deliberately NOT folded into `stripFragmentAndQuery` (posixPath.ts)
+// despite the near-identical index arithmetic: that helper only needs
+// where the PATH ends, so once a "#" ends it a later "?" is irrelevant;
+// here a later "?" must stay inside the fragment rather than become a
+// router query. `/x#frag?a=1` → path `/x`, query `""`.
 function extractQuery(href: string): string {
   const queryIdx = href.indexOf("?");
   if (queryIdx === -1) return "";
@@ -204,29 +211,4 @@ function extractQuery(href: string): string {
   if (hashIdx !== -1 && hashIdx < queryIdx) return "";
   const end = hashIdx !== -1 ? hashIdx : href.length;
   return href.slice(queryIdx, end);
-}
-
-function stripFragmentAndQuery(str: string): string {
-  const hashIdx = str.indexOf("#");
-  const queryIdx = str.indexOf("?");
-  let end = str.length;
-  if (hashIdx !== -1 && hashIdx < end) end = hashIdx;
-  if (queryIdx !== -1 && queryIdx < end) end = queryIdx;
-  return str.slice(0, end);
-}
-
-function normalizePath(raw: string): string | null {
-  if (raw.length === 0) return null;
-  const parts = raw.split("/");
-  const stack: string[] = [];
-  for (const part of parts) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") {
-      if (stack.length === 0) return null;
-      stack.pop();
-      continue;
-    }
-    stack.push(part);
-  }
-  return stack.length === 0 ? null : stack.join("/");
 }

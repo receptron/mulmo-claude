@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/recipe-book-plugin",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Personal recipe book runtime plugin for MulmoClaude — saves recipes as markdown-per-file with frontmatter, multi-tab live sync. PR-A of #1169 Cooking Coach.",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
     "test": "echo 'no in-package tests; covered by host integration test test/plugins/test_recipe_book_integration.ts'"
   },
   "peerDependencies": {
-    "gui-chat-protocol": "^0.4.0",
+    "gui-chat-protocol": "^1.2.0",
     "vue": "^3.5.0",
     "zod": "^4.3.6"
   },

@@ -95,3 +95,98 @@ export function isAllSlideDeck(script: unknown): boolean {
     return isRecord(image) && image.type === "slide";
   });
 }
+
+/** A single MulmoScript beat as the View consumes it — every field
+ *  optional so the empty-beat fallback (`effectiveBeat` on an
+ *  out-of-range index) is a valid instance without a cast. */
+export interface Beat {
+  speaker?: string;
+  text?: string;
+  id?: string;
+  imagePrompt?: string;
+  moviePrompt?: string;
+  image?: { type: string; [key: string]: unknown };
+  /** Beat duration in seconds. The mulmocast schema notes this is
+   *  "Used only when the text is empty" — the silent-beat Play loop
+   *  uses it as the auto-advance timer (#1073). */
+  duration?: number;
+}
+
+/** Resolve the beat the View should render at `index`: the user's
+ *  in-place edit (`overrides`) wins over the on-disk beat, and an
+ *  out-of-range index yields an empty beat so callers can read
+ *  `.text` / `.image` without a guard. */
+export function effectiveBeat(overrides: Record<number, Beat>, beats: readonly Beat[], index: number): Beat {
+  return overrides[index] ?? beats[index] ?? {};
+}
+
+const BEAT_TOOLTIP_MAX_CHARS = 80;
+
+/** Beat-strip hover tooltip: the beat text, truncated with an ellipsis
+ *  past the cap. Missing text yields an empty string. Text of exactly
+ *  the cap length is returned whole (only a longer string is cut). */
+export function beatTooltip(text: string | undefined): string {
+  const value = text ?? "";
+  return value.length > BEAT_TOOLTIP_MAX_CHARS ? `${value.slice(0, BEAT_TOOLTIP_MAX_CHARS)}…` : value;
+}
+
+/** The prompt for a character image, or "" when the key or its prompt
+ *  is absent — the character strip renders the empty string as no
+ *  caption rather than `undefined`. */
+export function characterPrompt(images: Record<string, { prompt?: string }> | undefined, key: string): string {
+  return images?.[key]?.prompt ?? "";
+}
+
+/** Is the in-editor JSON for a beat currently valid? A missing entry
+ *  (source editor never opened) validates the empty string, which is
+ *  not parseable JSON, so it reports invalid rather than throwing. */
+export function isValidBeat(source: string | undefined, schema: SafeParseSchema): boolean {
+  return validateBeatJSON(source ?? "", schema);
+}
+
+/** Stale-response guard: a per-beat / per-character response is stale
+ *  once the View has navigated to a different result, i.e. the current
+ *  file path no longer matches the one captured when the call was made.
+ *  Keeping the direction pinned matters — an inverted check would let
+ *  script A's late responses write into script B's state. */
+export function staleSince(currentFilePath: string, requestedFilePath: string): boolean {
+  return currentFilePath !== requestedFilePath;
+}
+
+const JSON_INDENT = 2;
+
+/** Pretty-print a script (or any value) as the source-editor / clipboard
+ *  text — two-space indent, matching what the beat and disk views emit. */
+export function scriptSourceText(value: unknown): string {
+  return JSON.stringify(value, null, JSON_INDENT);
+}
+
+/** Basename for a download `<a download>` attribute, falling back when
+ *  the path has no basename. Mirrors the exact existing behaviour, and
+ *  it has a sharp edge: `.pop()` returns "" (not undefined) for a
+ *  trailing slash or empty path, and `??` does NOT replace "", so those
+ *  yield an empty filename rather than the fallback. Server paths always
+ *  carry a basename, so this never bites in practice — pinned so a later
+ *  reader doesn't "simplify" `??` to `||` and change behaviour. */
+export function downloadFilename(path: string, fallback: string): string {
+  return path.split("/").pop() ?? fallback;
+}
+
+/** Narrow a script-supplied silent-beat duration to a safe positive number.
+ *  Zero / negative / NaN / Infinity / non-number collapse the auto-advance
+ *  timer to an immediate fire, which races the Play loop through every silent
+ *  beat in a single tick (#1365) — fall back to the default so a run of silent
+ *  beats stays watchable. The script's own valid `duration` always wins. */
+export function resolveSilentAdvanceSeconds(raw: unknown, defaultSec: number): number {
+  return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : defaultSec;
+}
+
+/** Delete every own enumerable key of each record, in place. Used to reset the
+ *  View's per-beat / per-character reactive maps between scripts — passing the
+ *  reactive proxies mutates them so the template re-renders empty. Replaces a
+ *  wall of hand-rolled `Object.keys(map).forEach(delete)` loops. */
+export function clearReactiveRecords(...records: object[]): void {
+  records.forEach((record) => {
+    Object.keys(record).forEach((key) => Reflect.deleteProperty(record, key));
+  });
+}

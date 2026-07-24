@@ -36,6 +36,17 @@ function isMissing(raw: unknown): boolean {
   return raw === undefined || raw === null;
 }
 
+/** Own-property read for a user/LLM-controlled key (`cond.field`,
+ *  `valueFrom.record`, `valueFrom.field`). A bare `obj[key]` reaches inherited
+ *  Object.prototype members, so `field: "toString"` would read a function
+ *  instead of an absent value (spurious match), and `record: "constructor"`
+ *  would read the `Object` function whose `.name`/`.length` are plausible
+ *  bogus comparands — breaking the "unresolved ⇒ never matches" contract
+ *  (#2323). A prototype key resolves to `undefined` (absent). */
+function ownProp<T>(obj: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(obj, key) ? obj[key] : undefined;
+}
+
 /** The effective comparison value for `cond`: its literal `value`, or — for
  *  a `valueFrom` reference — the target field read out of `recordsById`.
  *  `undefined` means UNRESOLVED (no such record, or the field on it is
@@ -44,8 +55,8 @@ function isMissing(raw: unknown): boolean {
 function resolveValue(cond: WhereCond, record: Record<string, unknown>, recordsById: Record<string, Record<string, unknown>>): string | string[] | undefined {
   if (!cond.valueFrom) return cond.value;
   const { record: refRecord, field } = cond.valueFrom;
-  const target = refRecord === undefined ? record : recordsById[refRecord];
-  const raw = target?.[field];
+  const target = refRecord === undefined ? record : ownProp(recordsById, refRecord);
+  const raw = target === undefined ? undefined : ownProp(target, field);
   return isMissing(raw) ? undefined : String(raw);
 }
 
@@ -106,7 +117,7 @@ function matchesPresent(operator: WhereOp, raw: string, value: string | string[]
  *    target record/field doesn't exist) → false for EVERY op, including
  *    `ne` — a broken reference must never spuriously match. */
 function matchesCond(cond: WhereCond, record: Record<string, unknown>, recordsById: Record<string, Record<string, unknown>>): boolean {
-  const raw = record[cond.field];
+  const raw = ownProp(record, cond.field);
   if (isMissing(raw)) return cond.op === "ne";
   const value = resolveValue(cond, record, recordsById);
   if (value === undefined) return false;

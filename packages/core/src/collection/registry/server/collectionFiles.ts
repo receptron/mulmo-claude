@@ -8,7 +8,7 @@
 // rawBase is no longer a single module-level value — it comes from the entry's
 // source registry descriptor, so user-added registries can live anywhere.
 
-import { fetchWithTimeout } from "./fetch.js";
+import { fetchWithTimeout } from "../../../utils/fetch.js";
 import { errorMessage, ONE_SECOND_MS } from "../../server/util.js";
 import { isRecord } from "../guards.js";
 import { fetchAllRegistries, findRegistry } from "./client.js";

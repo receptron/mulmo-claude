@@ -8,6 +8,8 @@
 //   - resolveWorkspaceLink(currentFile, href): resolve a markdown
 //     href to a workspace-relative path the file viewer can open.
 
+import { stripFragmentAndQuery, normalizeWorkspacePath } from "./posixPath";
+
 // --- External URL detection ---------------------------------------
 
 // Return true when `href` points at something that isn't inside the
@@ -71,17 +73,6 @@ export function resolveWorkspaceLink(currentFilePath: string, href: string): str
   return normalizeWorkspacePath(joined);
 }
 
-// Drop any trailing #fragment or ?query from a path-like string.
-// Whichever marker comes first wins.
-function stripFragmentAndQuery(str: string): string {
-  const hashIdx = str.indexOf("#");
-  const queryIdx = str.indexOf("?");
-  let end = str.length;
-  if (hashIdx !== -1 && hashIdx < end) end = hashIdx;
-  if (queryIdx !== -1 && queryIdx < end) end = queryIdx;
-  return str.slice(0, end);
-}
-
 // If `resolvedPath` points at a chat session log (e.g.
 // `chat/abc-123.jsonl`), return the session id. Used by the file
 // viewer to recognise when a clicked markdown link should switch
@@ -106,25 +97,4 @@ export function extractSessionIdFromPath(resolvedPath: string): string | null {
 function posixDirname(path: string): string {
   const i = path.lastIndexOf("/");
   return i === -1 ? "" : path.slice(0, i);
-}
-
-// Collapse "./" and "../" in a workspace path. Rejects paths that
-// escape above the workspace root. Returns null for the empty-path
-// case so the caller can bail out. Callers are expected to strip
-// #fragment / ?query before invoking this function.
-function normalizeWorkspacePath(path: string): string | null {
-  if (path.length === 0) return null;
-  const parts = path.split("/");
-  const stack: string[] = [];
-  for (const part of parts) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") {
-      if (stack.length === 0) return null; // escape attempt
-      stack.pop();
-      continue;
-    }
-    stack.push(part);
-  }
-  if (stack.length === 0) return null;
-  return stack.join("/");
 }

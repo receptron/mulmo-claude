@@ -12,7 +12,7 @@
 // exception — they ship active by default since almost every
 // jurisdiction levies a consumption / sales / VAT tax.
 
-import type { Account } from "./types.js";
+import type { Account } from "../shared/types.js";
 
 export const DEFAULT_ACCOUNTS: readonly Account[] = [
   // Assets

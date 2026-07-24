@@ -60,7 +60,7 @@ import type { HtmlDispatchResult, PackHtmlResult } from "../core/contract";
 import { htmlArtifactPreviewUrl } from "../core/paths";
 import { useT } from "../lang";
 import { buildPrintCspContent } from "./previewCsp";
-import { useFileWatch } from "./useFileWatch";
+import { useFileWatch } from "@mulmoclaude/core/plugin-vue";
 
 const runtime = useRuntime();
 const t = useT();

@@ -8,7 +8,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { itemIsDone, type CompletionSchemaView } from "@mulmoclaude/core/collection";
+import { itemIsDone, completionCoveredByFieldChip, type CompletionSchemaView, type CompletionChipSchemaView } from "@mulmoclaude/core/collection";
 
 describe("itemIsDone — legacy completion pair", () => {
   const schema: CompletionSchemaView = {
@@ -70,5 +70,56 @@ describe("itemIsDone — flag-form completion", () => {
     };
     assert.equal(itemIsDone(passed, { score: 80 }), true);
     assert.equal(itemIsDone(passed, { score: 59 }), false);
+  });
+});
+
+describe("completionCoveredByFieldChip", () => {
+  it("false when there is not exactly one done value (a superset still synthesizes its own chip)", () => {
+    const two: CompletionChipSchemaView = { fields: { done: { type: "boolean" } }, completionField: "done", completionDoneValues: ["true", "yes"] };
+    assert.equal(completionCoveredByFieldChip(two), false);
+    const none: CompletionChipSchemaView = { fields: { done: { type: "boolean" } }, completionField: "done" };
+    assert.equal(completionCoveredByFieldChip(none), false);
+  });
+
+  it('true for a boolean completion field whose single done value is "true" (its own chip covers it)', () => {
+    const schema: CompletionChipSchemaView = { fields: { done: { type: "boolean" } }, completionField: "done", completionDoneValues: ["true"] };
+    assert.equal(completionCoveredByFieldChip(schema), true);
+  });
+
+  it('false for a boolean completion field whose single done value is not "true"', () => {
+    const schema: CompletionChipSchemaView = { fields: { done: { type: "boolean" } }, completionField: "done", completionDoneValues: ["yes"] };
+    assert.equal(completionCoveredByFieldChip(schema), false);
+  });
+
+  it("true when a toggle projects the completion field with a matching onValue (the todos shape)", () => {
+    const schema: CompletionChipSchemaView = {
+      fields: {
+        status: { type: "enum" },
+        doneToggle: { type: "toggle", field: "status", onValue: "done" },
+      },
+      completionField: "status",
+      completionDoneValues: ["done"],
+    };
+    assert.equal(completionCoveredByFieldChip(schema), true);
+  });
+
+  it("false when a toggle projects a different field or a different onValue", () => {
+    const wrongField: CompletionChipSchemaView = {
+      fields: { doneToggle: { type: "toggle", field: "other", onValue: "done" } },
+      completionField: "status",
+      completionDoneValues: ["done"],
+    };
+    assert.equal(completionCoveredByFieldChip(wrongField), false);
+    const wrongValue: CompletionChipSchemaView = {
+      fields: { doneToggle: { type: "toggle", field: "status", onValue: "closed" } },
+      completionField: "status",
+      completionDoneValues: ["done"],
+    };
+    assert.equal(completionCoveredByFieldChip(wrongValue), false);
+  });
+
+  it("false when no boolean/toggle field expresses the completion predicate", () => {
+    const schema: CompletionChipSchemaView = { fields: { status: { type: "enum" } }, completionField: "status", completionDoneValues: ["done"] };
+    assert.equal(completionCoveredByFieldChip(schema), false);
   });
 });

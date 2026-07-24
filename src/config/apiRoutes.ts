@@ -113,6 +113,11 @@ const HOST_API_ROUTES = {
      *  client doesn't have to gate creation through PUT, which is
      *  update-only and 404s on non-existent paths (#1598). */
     create: "/api/files/create",
+    /** POST { dir, filename, dataUrl } — save dropped OS files into a
+     *  workspace folder. Unlike `create` this takes binary (a `data:`
+     *  URI) and never overwrites: a name collision is resolved by
+     *  auto-renaming to `name (n).ext` (#2270). */
+    upload: "/api/files/upload",
     raw: "/api/files/raw",
     refRoots: "/api/files/ref-roots",
     /** POST { path } — spawn the host OS's default handler for the
@@ -165,7 +170,7 @@ const HOST_API_ROUTES = {
   // Remote host over Firestore (phase 1). The server signs in to Firebase as
   // the user (connect, body carries a browser-minted Google idToken), runs the
   // command-loop + presence heartbeat, and exposes its running state. See
-  // plans/feat-remote-host-firestore-list-collections.md.
+  // plans/done/feat-remote-host-firestore-list-collections.md.
   remoteHost: {
     connect: "/api/remote-host/connect",
     reconnect: "/api/remote-host/reconnect",
@@ -300,6 +305,12 @@ const HOST_API_ROUTES = {
   // host renders its records via `<CollectionView>`.
   collections: {
     list: "/api/collections",
+    /** GET → { entries: CollectionOntologyEntry[] } — the raw workspace
+     *  ontology; the /collections Map tab builds its graph client-side
+     *  from these via the shared `buildOntologyGraph` (server/client
+     *  parity). Must be registered BEFORE `detail` so "ontology" is
+     *  never matched as a `:slug`. */
+    ontology: "/api/collections/ontology",
     /** GET → { collection, items } */
     detail: "/api/collections/:slug",
     /** POST → create one record (auto-id when primaryKey value omitted) */
@@ -321,21 +332,21 @@ const HOST_API_ROUTES = {
      *  view wrapped into its sandboxed srcdoc (global-bearer auth) →
      *  { view, srcdoc, bytes }. Same builder as the command channel's
      *  `getRemoteView`, so the desktop phone-frame preview renders the exact
-     *  artifact the phone receives (plans/feat-remote-custom-view.md). */
+     *  artifact the phone receives (plans/done/feat-remote-custom-view.md). */
     remoteView: "/api/collections/:slug/remote-view",
     /** POST { op: "update"|"delete", id, patch? } → apply one mutate on behalf
      *  of a `target: "mobile"` view, authorized by that view's declared
      *  editableFields / allowDelete and enforced host-side (global-bearer auth).
      *  The desktop phone-frame preview's write channel — same builder the
      *  command channel's `mutateRemoteViewItem` uses, so preview === phone
-     *  (plans/feat-remote-writable-view.md). */
+     *  (plans/done/feat-remote-writable-view.md). */
     remoteViewMutate: "/api/collections/:slug/remote-view/:viewId/mutate",
     /** GET ?offset&limit&fields=<csv> → one page of a `target: "mobile"` view's
      *  records with its declared `imageFields` inlined as `data:` URL thumbnails
      *  (global-bearer auth) → { page, inlined, omitted }. Same builder as the
      *  command channel's `getRemoteViewItems`, so the desktop phone-frame preview
      *  pages the exact data (incl. real thumbnails) the phone will
-     *  (plans/feat-remote-view-images.md). */
+     *  (plans/done/feat-remote-view-images.md). */
     remoteViewItems: "/api/collections/:slug/remote-view/:viewId/items",
     /** GET ?id=<viewId>&locale=<tag> → translation dict for one custom view
      *  (global-bearer auth) → { locale, dict }. `dict` is the host-picked

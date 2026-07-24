@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/discord",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Discord bridge for MulmoBridge — connect a Discord bot to MulmoClaude",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,8 +21,9 @@
   "license": "MIT",
   "author": "Receptron Team",
   "dependencies": {
-    "@mulmobridge/client": "^0.1.4",
+    "@mulmobridge/client": "^0.2.0",
     "@mulmobridge/protocol": "^0.1.4",
+    "@mulmoclaude/common": "^1.1.0",
     "discord.js": "^14.27.0",
     "dotenv": "^17.0.0"
   },

@@ -126,7 +126,7 @@ import { getPlugin } from "../tools";
 import { TOOL_NAMES, type ToolName } from "../config/toolNames";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { View as TextResponseOriginalView } from "../plugins/textResponse/index";
-import { handleExternalLinkClick } from "../utils/dom/externalLink";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { clampIframeHeight } from "../utils/dom/iframeHeightClamp";
 import { isNearBottom } from "../utils/dom/scrollable";
 import type { TextResponseData } from "../plugins/textResponse/types";

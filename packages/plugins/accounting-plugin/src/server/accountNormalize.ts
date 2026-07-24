@@ -21,7 +21,7 @@
 //                          mentioning the active flag — the bug
 //                          coverage that prompted this helper)
 
-import type { Account } from "./types.js";
+import type { Account } from "../shared/types.js";
 
 export function normalizeStoredAccount(input: Account, existing?: Account): Account {
   const stored: Account = { code: input.code, name: input.name, type: input.type };

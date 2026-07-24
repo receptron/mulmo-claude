@@ -89,7 +89,10 @@ export function resolveMountNames(names: readonly string[], allowed: Record<stri
   for (const raw of names) {
     const name = raw.trim();
     if (!name) continue;
-    const spec = allowed[name];
+    // Own-property only: a user-supplied name like `constructor` / `toString`
+    // must land in `unknown` (a config error to fix), not read an inherited
+    // Object.prototype member and later fail as a phantom "path missing".
+    const spec = Object.hasOwn(allowed, name) ? allowed[name] : undefined;
     if (!spec) {
       unknown.push(name);
       continue;

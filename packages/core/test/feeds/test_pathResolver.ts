@@ -34,6 +34,15 @@ describe("getByPath", () => {
     assert.equal(getByPath(root, "results[9].id"), undefined);
     assert.equal(getByPath(null, "anything"), undefined);
   });
+
+  it("misses on a prototype-chain key instead of returning an inherited function", () => {
+    // Without the own-property guard, `{}["toString"]` returns the
+    // Object.prototype function, which would flow into a `naturalKey`.
+    assert.equal(getByPath(root, "toString"), undefined);
+    assert.equal(getByPath(root, "constructor"), undefined);
+    assert.equal(getByPath(root, "data.__proto__"), undefined);
+    assert.equal(getByPath(root, "data.hasOwnProperty"), undefined);
+  });
 });
 
 describe("getItemsArray", () => {

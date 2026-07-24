@@ -139,3 +139,20 @@ Rationale: the launcher-sync gate enforces `launcherRange.lowerBound == workspac
 When to bump `packages/mulmoclaude/package.json`'s `version`:
 - Inside the `/publish-mulmoclaude` flow, right before the actual `npm publish`. That commit becomes the identity of the release.
 - Never as part of a `chore(release)` that publishes only shared packages.
+
+### Internal dep ranges — always track the latest published version
+
+Every declared range on a workspace-internal package (`@mulmoclaude/*`, `@mulmobridge/*`, `mulmoclaude`) MUST equal `^<latest version published to npm>`, in **every** `package.json` that declares it — `dependencies`, `devDependencies` and `peerDependencies` alike, in bridges and plugins, not just the launcher.
+
+Whenever you publish a workspace package, sweep every consumer's range to the new version in the same PR.
+
+Rationale: a caret range on a `0.x` package does **not** float across minor versions — `^0.23.0` resolves to `>=0.23.0 <0.24.0`. So a stale range doesn't merely look untidy, it *pins consumers to an old line* and silently withholds everything published since. This is not hypothetical: `mulmoclaude@1.3.0` shipped `@mulmoclaude/core: ^0.23.0` while npm had already served 0.24 through 0.28, so npm-installed users could not receive any of it. The `launcherSync.mjs` gate only checks the launcher, so nothing catches the same drift in the other ~50 workspaces.
+
+To audit before a release:
+
+```bash
+# for each internal dep name, compare every declared range against npm's latest
+npm view <pkg> version --registry https://registry.npmjs.org/
+```
+
+A range update reaches users only through that consumer's own next release, so it does not force an immediate republish of all 50 packages — but it MUST be in the tree before the consumer is published next.

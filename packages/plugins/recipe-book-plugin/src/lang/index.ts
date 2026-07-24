@@ -3,22 +3,13 @@
 // the host's locale via `useRuntime()` and looks up its own table
 // reactively.
 
-import { computed } from "vue";
-import { useRuntime } from "gui-chat-protocol/vue";
+import { createUseT } from "gui-chat-protocol/vue";
 import en from "./en";
 import ja from "./ja";
 
 const MESSAGES = { en, ja } as const;
-type LocaleKey = keyof typeof MESSAGES;
 
-function isSupportedLocale(value: string): value is LocaleKey {
-  return value in MESSAGES;
-}
-
-export function useT() {
-  const { locale } = useRuntime();
-  return computed(() => (isSupportedLocale(locale.value) ? MESSAGES[locale.value] : MESSAGES.en));
-}
+export const useT = createUseT(MESSAGES);
 
 /** Substitute `{key}` placeholders in a translated string with caller
  *  values. Lightweight stand-in for vue-i18n's interpolation since the

@@ -18,7 +18,7 @@ import { TOOL_NAMES } from "../../../../src/config/toolNames.js";
 import { hasMeaningfulChange, writeWikiPage } from "../../../workspace/wiki-pages/io.js";
 import { WORKSPACE_DIRS } from "../../../workspace/paths.js";
 import { isSafeStamp, listSnapshots, readSnapshot, stripSnapshotMeta, type SnapshotContent } from "../../../workspace/wiki-pages/snapshot.js";
-import { mergeFrontmatter, serializeWithFrontmatter } from "../../../utils/markdown/frontmatter.js";
+import { mergeFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { badRequest, notFound } from "../../../utils/httpError.js";
 import { readTextOrNull } from "../../../utils/files/safe.js";
 import { workspacePath } from "../../../workspace/workspace.js";

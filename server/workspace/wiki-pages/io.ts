@@ -22,7 +22,7 @@ import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readTextSafe } from "../../utils/files/safe.js";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
-import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { isSafeSlug } from "@mulmoclaude/core/wiki";
 import { wikiSlugFromAbsPath } from "@mulmoclaude/core/wiki/paths";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";

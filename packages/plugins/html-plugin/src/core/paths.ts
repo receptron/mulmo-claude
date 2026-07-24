@@ -1,34 +1,19 @@
-// Pure path helpers for presentHtml artifacts. No Node built-ins so the
-// package stays bundler-agnostic; all filesystem access happens through the
-// host's generic `files.artifacts` FileOps (rooted at `<workspace>/artifacts`).
+// Path helpers for presentHtml artifacts. The generic build primitives (slug,
+// YYYY/MM partition, the `""`/`.`/`..` traversal guard) live in the shared,
+// browser-safe `@mulmoclaude/core/artifacts` (#2405); only the html-specific
+// rules (`.html` extension, `artifacts/html/` prefix, preview URL) stay here.
+// All filesystem access happens through the host's generic `files.artifacts`
+// FileOps (rooted at `<workspace>/artifacts`).
+
+import { ARTIFACTS_ROOT, buildArtifactRelPath, hasUnsafePathSegment, slugifyArtifact, toWorkspaceArtifactPath } from "@mulmoclaude/core/artifacts";
 
 const HTML_DIR = "html";
-const ARTIFACTS_ROOT = "artifacts";
-const MAX_SLUG_LEN = 120;
+const HTML_FALLBACK_SLUG = "page";
 
-/** Lowercase-hyphen slug, capped at MAX_SLUG_LEN, with leading/trailing
- *  hyphens stripped. Falls back to `fallback` for empty/undefined input.
- *  Mirrors chart-plugin's in-package slugify (deliberately simpler than the
- *  host's hash-fallback variant — these are throwaway artifact filenames). */
-export function slugify(title: string | undefined, fallback = "page"): string {
-  if (!title) return fallback;
-  const collapsed = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .slice(0, MAX_SLUG_LEN);
-  let start = 0;
-  let end = collapsed.length;
-  while (start < end && collapsed[start] === "-") start += 1;
-  while (end > start && collapsed[end - 1] === "-") end -= 1;
-  return collapsed.slice(start, end) || fallback;
-}
-
-// #764 partitioning. UTC (not local) so a workspace synced across timezones
-// still groups into the same YYYY/MM bucket.
-function yearMonthUtc(now: Date): string {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}/${month}`;
+/** Lowercase-hyphen slug, capped, leading/trailing hyphens stripped; falls back
+ *  to `fallback` for empty/undefined/non-ASCII input. */
+export function slugify(title: string | undefined, fallback = HTML_FALLBACK_SLUG): string {
+  return slugifyArtifact(title, fallback);
 }
 
 export interface HtmlPath {
@@ -42,9 +27,8 @@ export interface HtmlPath {
 
 /** Build a fresh, collision-safe artifact path for a new HTML page. */
 export function htmlArtifactPath(title: string | undefined, now: Date = new Date()): HtmlPath {
-  const fname = `${slugify(title)}-${now.getTime()}.html`;
-  const relPath = `${HTML_DIR}/${yearMonthUtc(now)}/${fname}`;
-  return { relPath, filePath: `${ARTIFACTS_ROOT}/${relPath}` };
+  const relPath = buildArtifactRelPath({ dir: HTML_DIR, title, ext: ".html", fallback: HTML_FALLBACK_SLUG, now });
+  return { relPath, filePath: toWorkspaceArtifactPath(relPath) };
 }
 
 /**
@@ -56,10 +40,7 @@ export function htmlArtifactPath(title: string | undefined, now: Date = new Date
 export function isHtmlArtifactPath(value: string): boolean {
   if (!value.startsWith(`${ARTIFACTS_ROOT}/${HTML_DIR}/`)) return false;
   if (!value.endsWith(".html")) return false;
-  // Reject empty segments (`//`, leading/trailing slash) and `.` / `..` —
-  // equivalent to the host's `path.posix.normalize(v) === v && !v.includes("..")`.
-  const segments = value.split("/");
-  return !segments.some((seg) => seg === "" || seg === "." || seg === "..");
+  return !hasUnsafePathSegment(value);
 }
 
 /** Convert a workspace-relative artifacts path (`artifacts/html/…`) to the
@@ -87,7 +68,7 @@ export function htmlArtifactPreviewUrl(filePath: string | null): string | null {
   // Reject traversal / non-canonical segments so the derived URL can never point
   // the iframe outside artifacts/html/ — defence-in-depth even though `filePath`
   // is normally produced by `htmlArtifactPath` / validated by `presentExisting`.
-  if (filePath.split("/").some((seg) => seg === "" || seg === "." || seg === "..")) return null;
+  if (hasUnsafePathSegment(filePath)) return null;
   const rest = filePath.slice(prefix.length);
   if (rest.length === 0) return null;
   return `/${ARTIFACTS_ROOT}/${HTML_DIR}/${rest.split("/").map(encodeURIComponent).join("/")}`;

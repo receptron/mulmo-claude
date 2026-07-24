@@ -11,7 +11,7 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { adoptSvg } from "../../../src/utils/markdown/mermaidRender";
+import { adoptSvg } from "@mulmoclaude/markdown-utils/markdown/mermaidRender";
 
 let dom: JSDOM;
 

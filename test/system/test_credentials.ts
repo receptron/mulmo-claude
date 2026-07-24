@@ -1,12 +1,13 @@
-// Tests for the pure response-detection predicate of
-// `server/system/credentials.ts`. `looksLikeClaudeResponse` decides
-// whether PTY output looks like a real Claude reply (conversational
-// opener AND >= 20 chars) versus an error chunk that should time out.
+// Tests for the pure helpers of `server/system/credentials.ts`.
+// `looksLikeClaudeResponse` decides whether PTY output looks like a real Claude
+// reply (conversational opener AND >= 20 chars) versus an error chunk that
+// should time out. `readExpiresAt` narrows the Keychain blob to the token's
+// expiry in epoch ms.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { looksLikeClaudeResponse } from "../../server/system/credentials.js";
+import { looksLikeClaudeResponse, readExpiresAt } from "../../server/system/credentials.js";
 
 describe("looksLikeClaudeResponse", () => {
   it("returns true for a conversational opener with enough text", () => {
@@ -51,5 +52,45 @@ describe("looksLikeClaudeResponse", () => {
 
   it("returns false for an empty string", () => {
     assert.equal(looksLikeClaudeResponse(""), false);
+  });
+});
+
+describe("readExpiresAt", () => {
+  const wrap = (expiresAt: unknown) => JSON.stringify({ claudeAiOauth: { expiresAt } });
+
+  it("returns the epoch-ms number when expiresAt is a number (the Keychain's real shape)", () => {
+    // Regression: a `typeof === "string"` guard used to reject this, so a valid
+    // token read as "no expiry → expired" and forced a renew on every run.
+    assert.equal(readExpiresAt(wrap(1784602611420)), 1784602611420);
+  });
+
+  it("parses an ISO-8601 string expiresAt to epoch ms (legacy CLI shape)", () => {
+    const iso = "2026-07-21T03:00:00.000Z";
+    assert.equal(readExpiresAt(wrap(iso)), Date.parse(iso));
+  });
+
+  it("returns null when claudeAiOauth is absent", () => {
+    assert.equal(readExpiresAt(JSON.stringify({ other: 1 })), null);
+  });
+
+  it("returns null when expiresAt is absent", () => {
+    assert.equal(readExpiresAt(JSON.stringify({ claudeAiOauth: {} })), null);
+  });
+
+  it("returns null for a non-numeric, non-date string expiresAt", () => {
+    assert.equal(readExpiresAt(wrap("not-a-date")), null);
+  });
+
+  it("returns null for a boolean expiresAt", () => {
+    assert.equal(readExpiresAt(wrap(true)), null);
+  });
+
+  it("returns null for invalid JSON", () => {
+    assert.equal(readExpiresAt("{not json"), null);
+  });
+
+  it("returns null for a non-object top-level value", () => {
+    assert.equal(readExpiresAt("42"), null);
+    assert.equal(readExpiresAt("null"), null);
   });
 });

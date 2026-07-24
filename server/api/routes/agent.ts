@@ -18,16 +18,17 @@ import {
 } from "../../utils/files/session-io.js";
 import { getRole } from "../../workspace/roles.js";
 import { runAgent } from "../../agent/index.js";
-import { prependJournalPointer } from "../../agent/prompt.js";
 import { notifyTaskFinished } from "../../agent/webPush.js";
-import { buildTranscriptPreamble, isStaleSessionError } from "../../agent/resumeFailover.js";
-import { isMcpBrokerNotReadyError } from "../../agent/mcpBrokerFailover.js";
-import { ONE_SECOND_MS } from "../../utils/time.js";
+import { buildTranscriptPreamble } from "../../agent/resumeFailover.js";
+import { abortableSleep, BROKER_RECONNECT_WAIT_MS, detectRecovery, type RecoveryKind, type RetryBudgets } from "../../agent/retryPolicy.js";
+import { splitSkillAndReply, updatePendingSkillOnToolCall, updatePendingSkillOnToolCallResult, type PendingSkill } from "../../agent/skillEvents.js";
+import { decorateMessageForCli } from "../../agent/messageDecorate.js";
 import { getOrCreateSession, beginRun, endRun, cancelRun, pushSessionEvent, pushToolResult, getActiveSessionIds } from "../../events/session-store/index.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { discoverSkills } from "../../workspace/skills/discovery.js";
 import type { Skill } from "../../workspace/skills/types.js";
-import { isRecord } from "../../utils/types.js";
+import { isNonEmptyString } from "../../utils/types.js";
+import { findLastSessionEntry } from "../../utils/sessionJsonl.js";
 import { maybeRunJournal } from "../../workspace/journal/index.js";
 import { maybeIndexSession } from "../../workspace/chat-index/index.js";
 import { maybeAppendWikiBacklinks } from "../../workspace/wiki-backlinks/index.js";
@@ -56,6 +57,7 @@ import {
 // import { publishNotification } from "../../events/notifications.js";
 import { env } from "../../system/env.js";
 import type { Attachment } from "@mulmobridge/protocol";
+import type { StartChatParams as ChatServiceStartChatParams } from "@mulmobridge/chat-service";
 import { isImagePath, loadImageBase64 } from "../../utils/files/image-store.js";
 import { isAttachmentPath, loadAttachmentBase64, inferMimeFromExtension, saveAttachment } from "../../utils/files/attachment-store.js";
 
@@ -109,38 +111,11 @@ router.post(API_ROUTES.agent.cancel, (req: Request<object, unknown, CancelBody>,
 // Shared entry point for starting an agent chat. Called by both the
 // POST /api/agent route and server-side callers (e.g. debug tasks).
 
-export interface StartChatParams {
-  message: string;
-  roleId: string;
-  chatSessionId: string;
-  /** Bridge-only legacy carrier for "the user picked this image".
-   *  No in-tree bridge sets it today; it remains on the type so
-   *  external bridge clients that populate it from older protocol
-   *  versions continue to work. Only workspace paths
-   *  (`data/attachments/...` or `artifacts/images/...`) are accepted
-   *  — `data:` URLs are no longer supported and are dropped with a
-   *  warn. Bridges that need to ship raw bytes should use the
-   *  modern `attachments[]` field with `{ mimeType, data }` entries;
-   *  those get persisted to `data/attachments/YYYY/MM/` server-side
-   *  and rewritten as path-bearing attachments. The Vue UI never
-   *  sets this — paste/drop and sidebar picks ride on
-   *  `attachments[]` as path-only entries directly. */
-  selectedImageData?: string;
-  attachments?: Attachment[];
-  /** Where this session originates (#486). Accepts string for
-   *  cross-package compatibility (chat-service passes string). */
-  origin?: string;
+export interface StartChatParams extends ChatServiceStartChatParams {
   /** IANA timezone the user's browser resolved (e.g. "Asia/Tokyo").
    *  Validated server-side before it reaches the system prompt — an
    *  invalid or missing value falls back to server-local time. */
   userTimezone?: string;
-  /** Flat primitive bag forwarded from the bridge handshake, string
-   *  / number / boolean values only (see plans/feat-bridge-options-
-   *  passthrough.md). The session-level `defaultRole` override is
-   *  already applied upstream in chat-service; MulmoClaude doesn't
-   *  read any other keys today. Accepted here so the typing matches
-   *  `StartChatFn` exported by chat-service. */
-  bridgeOptions?: Readonly<Record<string, string | number | boolean>>;
 }
 
 export type StartChatResult = { kind: "started"; chatSessionId: string } | { kind: "error"; error: string; status?: number };
@@ -586,51 +561,6 @@ async function loadImageFromPath(value: string, declaredMimeType: string | undef
   }
 }
 
-// Drop any path containing characters that could break the
-// `[Attached file: <path>]` marker line (`\r`, `\n`) or its closing
-// bracket (`]`). Such a path would let request-controlled input
-// inject arbitrary text into the privileged prompt prefix — the
-// path itself reaches the marker straight from the request body.
-// CodeRabbit review on #1045.
-const UNSAFE_MARKER_CHARS_RE = /[\r\n\]]/;
-
-type MarkerPosition = "prepend" | "append";
-
-/** Marker attached to the LLM-bound user message that tells the
- *  model which workspace files are attached / selected for this turn.
- *  One `[Attached file: <path>]` line is emitted per path so multi-
- *  file flows (e.g. paste one image + pick another → "combine these")
- *  surface every path to the model — `editImages` then receives the
- *  full list in `imagePaths`. The user's persisted (jsonl) and
- *  broadcast (UI) message is the raw text — these marker lines are
- *  added strictly on the path to Claude. The system prompt teaches
- *  the model how to interpret them.
- *
- *  `position` defaults to `"prepend"`; a command turn passes `"append"`
- *  so the leading `/` stays at position 0 (see `decorateMessageForCli`). */
-export function withAttachedFileMarker(message: string, attachedFilePaths: string[], position: MarkerPosition = "prepend"): string {
-  const safePaths = attachedFilePaths.filter((relPath) => !UNSAFE_MARKER_CHARS_RE.test(relPath));
-  if (safePaths.length === 0) return message;
-  const markerLines = safePaths.map((relPath) => `[Attached file: ${relPath}]`).join("\n");
-  return position === "append" ? `${message}\n\n${markerLines}` : `${markerLines}\n\n${message}`;
-}
-
-/** Build the CLI-bound message, preserving a leading `/` as the CLI's
- *  deterministic slash-command trigger. The CLI resolves a slash command
- *  only when the message STARTS with `/name`; any decoration pushed in
- *  front of it silently drops skill selection back to the model guessing
- *  from descriptions (#2134). A slash-first message is a command, not an
- *  open question — so skip the journal pointer (prior-session context is
- *  irrelevant to a command) and append the file markers after the body
- *  instead of prepending. Detection is position-0 `startsWith` to match
- *  the CLI; the collection UI and manual entry emit no leading whitespace. */
-export function decorateMessageForCli(args: { message: string; workspaceDir: string; attachedFilePaths: string[]; resumed: boolean }): string {
-  const { message, workspaceDir, attachedFilePaths, resumed } = args;
-  const isCommand = message.startsWith("/");
-  const base = resumed || isCommand ? message : prependJournalPointer(message, workspaceDir);
-  return withAttachedFileMarker(base, attachedFilePaths, isCommand ? "append" : "prepend");
-}
-
 // ── HTTP route ──────────────────────────────────────────────────────
 
 // HTTP route body — used by the Vue UI only. Paste/drop and sidebar
@@ -709,56 +639,10 @@ interface EventContext {
   resultsFilePath: string;
   toolArgsCache: ReturnType<typeof createArgsCache>;
   textAccumulator: string[];
-  pendingSkill: { skillName: string; toolUseId: string } | null;
+  pendingSkill: PendingSkill | null;
 }
 
 const CLAUDE_CLI_SKILL_BODY_PREFIX = "Base directory for this skill: ";
-
-// #1218 — state-machine helpers for `pendingSkill`. Extracted so
-// `handleAgentEvent` stays under the cognitive-complexity cap and so
-// the leak-fix logic (Codex iter-2: clear on mismatched
-// tool_call_result + claudeSessionId, in addition to the iter-1
-// "non-Skill tool_call" clear) lives in one named place.
-//
-// When the model invokes a skill, Claude CLI emits the SKILL.md
-// body as the next assistant text. We track that expectation here:
-// the structural signal is `toolName === "Skill"` + `args.skill`
-// slug, not a body-text prefix, so it survives any rewording Claude
-// CLI might do to the synthesised body.
-
-// Narrow the helpers to only the slot they read/mutate so the
-// state-machine unit test in test/agent/ doesn't have to construct
-// the full `EventContext` (chatSessionId, resultsFilePath, etc).
-type PendingSkillSlot = Pick<EventContext, "pendingSkill">;
-
-function updatePendingSkillOnToolCall(ctx: PendingSkillSlot, event: { toolName: string; toolUseId: string; args: unknown }): void {
-  // Any non-Skill tool_call resets the pending state. Without this,
-  // a Skill call followed by another tool (Bash, etc.) without a
-  // body flush in between would leak `pendingSkill` and miscategorise
-  // a later unrelated assistant text as a skill body.
-  if (event.toolName !== "Skill") {
-    ctx.pendingSkill = null;
-    return;
-  }
-  const skillSlug = isRecord(event.args) && typeof event.args.skill === "string" ? event.args.skill : null;
-  ctx.pendingSkill = skillSlug ? { skillName: skillSlug, toolUseId: event.toolUseId } : null;
-}
-
-// The Skill's own tool_call_result (matching toolUseId) carries
-// "Launching skill: X" content; the body follows in the next text
-// event so we leave `pendingSkill` set. A tool_call_result with any
-// OTHER id means a different tool's result interleaved before the
-// body — sequence broken, clear the flag so a later unrelated
-// assistant text isn't mis-tagged as `type: "skill"`.
-function updatePendingSkillOnToolCallResult(ctx: PendingSkillSlot, toolUseId: string): void {
-  if (ctx.pendingSkill && toolUseId !== ctx.pendingSkill.toolUseId) {
-    ctx.pendingSkill = null;
-  }
-}
-
-// Exported for the unit test in test/agent/test_pendingSkillStateMachine.ts.
-export const _updatePendingSkillOnToolCallForTest = updatePendingSkillOnToolCall;
-export const _updatePendingSkillOnToolCallResultForTest = updatePendingSkillOnToolCallResult;
 
 // Returns true if the event was handled "out of band" (no pub-sub
 // broadcast, no jsonl append). Right now only `claudeSessionId`
@@ -947,40 +831,6 @@ async function resolveSkillMetadata(skillName: string): Promise<SkillMetadata> {
   }
 }
 
-/** Split the consolidated text Claude CLI emits after a `Skill`
- *  tool_call into the SKILL.md body half (synthesised by Claude CLI)
- *  and the LLM's actual reply half. Without this, the entire blob
- *  gets tagged `type: "skill"`, so when the user collapses the
- *  card their actual reply disappears (#1218 reproducer: shiritori
- *  skill, where the body ends with a "respond now" instruction and
- *  the LLM's first move is concatenated to the same text block).
- *
- *  Structural split: the SKILL.md body is on disk, available via
- *  `discoverSkills()`. We find that exact substring inside the
- *  message and slice. Optional `ARGUMENTS: <user_input>` line that
- *  Claude CLI appends when the SKILL.md uses `{{ARGUMENTS}}` is
- *  consumed too. Returns the whole message as `skillPart` with
- *  empty `replyPart` when `skillBody` is empty (discovery missed)
- *  or not found verbatim (Claude CLI changed the inlining format —
- *  the canary log warn fires in that case). */
-function splitSkillAndReply(message: string, skillBody: string | null): { skillPart: string; replyPart: string } {
-  if (!skillBody) return { skillPart: message, replyPart: "" };
-  const trimmedBody = skillBody.trim();
-  if (!trimmedBody) return { skillPart: message, replyPart: "" };
-  const idx = message.indexOf(trimmedBody);
-  if (idx < 0) return { skillPart: message, replyPart: "" };
-  let cursor = idx + trimmedBody.length;
-  // Skip the optional ARGUMENTS line + trailing whitespace.
-  const argMatch = /^\s*ARGUMENTS:[^\n]*\n?/.exec(message.slice(cursor));
-  if (argMatch) cursor += argMatch[0].length;
-  const skillPart = message.slice(0, cursor).trimEnd();
-  const replyPart = message.slice(cursor).replace(/^\s+/, "");
-  return { skillPart, replyPart };
-}
-
-// Exported for the unit test in test/agent/test_skillBodySplit.ts.
-export const _splitSkillAndReplyForTest = splitSkillAndReply;
-
 // Helper kept commented (instead of deleted) alongside the
 // publishNotification call below — see the duplicate-notification
 // comment near `endRun()` in `runAgentInBackground` for context.
@@ -1001,59 +851,6 @@ export const _splitSkillAndReplyForTest = splitSkillAndReply;
 //       return `✅ ${roleName} finished`;
 //   }
 // }
-
-/** A stale `--resume` failure we can recover from by retrying without it: an
- *  error event carrying a stale-session message, while failover budget remains. */
-function isRecoverableStaleSession(event: { type: string; message?: unknown }, attemptsRemaining: number): boolean {
-  return attemptsRemaining > 0 && event.type === EVENT_TYPES.error && typeof event.message === "string" && isStaleSessionError(event.message);
-}
-
-/** The transient MCP-broker startup race (#2057): the CLI couldn't resolve the
- *  permission-prompt tool because the broker's stdio wasn't connected when the
- *  first tool call ran. Recoverable by waiting a moment and replaying the SAME
- *  turn — nothing executed, the first tool call is what failed. Hits fresh
- *  sessions too, so it carries a budget independent of `--resume`. */
-function isRecoverableBrokerNotReady(event: { type: string; message?: unknown }, attemptsRemaining: number): boolean {
-  return attemptsRemaining > 0 && event.type === EVENT_TYPES.error && typeof event.message === "string" && isMcpBrokerNotReadyError(event.message);
-}
-
-// How long to let the broker finish connecting before replaying (#2057). The
-// forensics show it comes up a few seconds after losing the race.
-const BROKER_RECONNECT_WAIT_MS = 3 * ONE_SECOND_MS;
-
-// Abortable wait so a stop during the retry pause ends promptly instead of
-// spawning a doomed replay after the user already cancelled.
-const abortableSleep = (delayMs: number, signal: AbortSignal): Promise<void> =>
-  new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve();
-      return;
-    }
-    const timer = setTimeout(resolve, delayMs);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
-
-type RecoveryKind = "stale" | "broker" | null;
-
-interface RetryBudgets {
-  stale: number;
-  broker: number;
-}
-
-/** Classify an event into the one recovery it warrants, or null. Budgets are
- *  consumed by the caller after a successful classification. */
-function detectRecovery(event: { type: string; message?: unknown }, budgets: RetryBudgets): RecoveryKind {
-  if (isRecoverableStaleSession(event, budgets.stale)) return "stale";
-  if (isRecoverableBrokerNotReady(event, budgets.broker)) return "broker";
-  return null;
-}
 
 // Clear the stale `--resume` id and rebuild the turn from the local jsonl so the
 // replay carries context without the bad session id (#211). Returns the message
@@ -1327,16 +1124,7 @@ async function readClaudeSessionIdFromSession(chatSessionId: string): Promise<st
   // Legacy scan: search jsonl lines backwards for a claudeSessionId event
   const jsonl = await readSessionJsonl(chatSessionId);
   if (!jsonl) return undefined;
-  const lines = jsonl.split("\n").filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    try {
-      const entry = JSON.parse(lines[i]);
-      if (entry.type === EVENT_TYPES.claudeSessionId && entry.id) return entry.id;
-    } catch {
-      // skip malformed lines
-    }
-  }
-  return undefined;
+  return findLastSessionEntry(jsonl, (entry) => (entry.type === EVENT_TYPES.claudeSessionId && isNonEmptyString(entry.id) ? entry.id : undefined));
 }
 
 // Read the session jsonl and render the transcript preamble used on

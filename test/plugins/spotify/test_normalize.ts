@@ -285,3 +285,30 @@ describe("normalisePlaylistList", () => {
     assert.equal(result[0].id, "ok");
   });
 });
+
+// --- array inputs are not records (#2220) ----------------------------
+// The local `isRecord` copy had lost the `!Array.isArray` guard, so an array
+// narrowed to `Record<string, unknown>` and got indexed by string key. No
+// observable misbehaviour resulted — every normaliser's next field check
+// rejected the array anyway — so these assertions pass before the fix too.
+// They pin the entry-point contract so a future path that DOES depend on the
+// distinction can't regress silently.
+
+describe("normalisers reject array input", () => {
+  it("normaliseTrack returns null for an array", () => {
+    assert.equal(normaliseTrack([]), null);
+    assert.equal(normaliseTrack([{ id: "x", name: "y" }]), null);
+  });
+
+  it("normaliseAlbum / normaliseArtist / normalisePlaylist return null for an array", () => {
+    assert.equal(normaliseAlbum([]), null);
+    assert.equal(normaliseArtist([]), null);
+    assert.equal(normalisePlaylist([]), null);
+  });
+
+  it("list normalisers return [] for an array payload (items[] is expected, not a bare array)", () => {
+    assert.deepEqual(normaliseTrackList([], "track"), []);
+    assert.deepEqual(normalisePlaylistList([]), []);
+    assert.deepEqual(normaliseRecentlyPlayed([]), []);
+  });
+});

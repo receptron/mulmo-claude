@@ -1,9 +1,33 @@
 {
   "name": "@mulmoclaude/core",
-  "version": "0.26.0",
-  "description": "Shared server-side core for MulmoClaude and MulmoTerminal — the always-shipped-together subsystems consolidated behind subpath exports so the two hosts can't drift. Server-only except the browser-safe ./whisper/client, ./workspace-setup/slug, ./translation/client, ./remote-view and ./remote-host entries. All host specifics are injected.",
+  "version": "1.2.0",
+  "description": "Shared server-side core for MulmoClaude and MulmoTerminal — the always-shipped-together subsystems consolidated behind subpath exports so the two hosts can't drift. Server-only except the browser-safe ./artifacts, ./whisper/client, ./workspace-setup/slug, ./translation/client, ./remote-view, ./remote-host and ./plugin-vue entries. All host specifics are injected.",
   "type": "module",
   "exports": {
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.cjs",
+      "default": "./dist/utils/index.js"
+    },
+    "./files": {
+      "types": "./dist/files/index.d.ts",
+      "import": "./dist/files/index.js",
+      "require": "./dist/files/index.cjs",
+      "default": "./dist/files/index.js"
+    },
+    "./fetch": {
+      "types": "./dist/utils/fetch.d.ts",
+      "import": "./dist/utils/fetch.js",
+      "require": "./dist/utils/fetch.cjs",
+      "default": "./dist/utils/fetch.js"
+    },
+    "./artifacts": {
+      "types": "./dist/artifacts/paths.d.ts",
+      "import": "./dist/artifacts/paths.js",
+      "require": "./dist/artifacts/paths.cjs",
+      "default": "./dist/artifacts/paths.js"
+    },
     "./collection": {
       "types": "./dist/collection/index.d.ts",
       "import": "./dist/collection/index.js",
@@ -148,6 +172,18 @@
       "require": "./dist/translation/client.cjs",
       "default": "./dist/translation/client.js"
     },
+    "./plugin-vue": {
+      "types": "./dist/plugin-vue/index.d.ts",
+      "import": "./dist/plugin-vue/index.js",
+      "require": "./dist/plugin-vue/index.cjs",
+      "default": "./dist/plugin-vue/index.js"
+    },
+    "./plugin-vue/i18n": {
+      "types": "./dist/plugin-vue/pluginI18n.d.ts",
+      "import": "./dist/plugin-vue/i18n.js",
+      "require": "./dist/plugin-vue/i18n.cjs",
+      "default": "./dist/plugin-vue/i18n.js"
+    },
     "./workspace-setup": {
       "types": "./dist/workspace-setup/index.d.ts",
       "import": "./dist/workspace-setup/index.js",
@@ -172,31 +208,43 @@
     "test": "tsx --test test/**/test_*.ts"
   },
   "dependencies": {
-    "@duckdb/node-api": "^1.5.4-r.1",
+    "@duckdb/node-api": "^1.5.5-r.1",
+    "@mulmoclaude/common": "^1.1.0",
+    "@mulmoclaude/markdown-utils": "^1.3.0",
     "fast-xml-parser": "^5.10.1",
-    "google-auth-library": "^10.9.0",
+    "google-auth-library": "^10.9.1",
     "iconv-lite": "^0.7.3",
-    "js-yaml": "^5.2.1",
+    "js-yaml": "^5.2.2",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@receptron/task-scheduler": "*",
     "firebase": "^12.0.0",
-    "gui-chat-protocol": "^0.4.0"
+    "gui-chat-protocol": "^1.2.0",
+    "vue": "^3.5.0",
+    "vue-i18n": "^11.4.4"
   },
   "peerDependenciesMeta": {
     "firebase": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "vue-i18n": {
       "optional": true
     }
   },
   "devDependencies": {
     "@receptron/task-scheduler": "*",
     "@types/node": "^26.1.1",
-    "gui-chat-protocol": "^0.4.0",
+    "gui-chat-protocol": "^1.2.0",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
-    "vite-plugin-dts": "^5.0.3"
+    "vite-plugin-dts": "^5.0.3",
+    "vue": "^3.5.40",
+    "vue-i18n": "^11.4.7"
   },
   "license": "MIT"
 }

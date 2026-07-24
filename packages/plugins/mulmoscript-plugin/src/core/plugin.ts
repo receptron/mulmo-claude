@@ -1,5 +1,6 @@
 import type { ToolPluginCore, ToolResult } from "gui-chat-protocol";
 import { mulmoScriptSchema } from "@mulmocast/types";
+import { errorMessage } from "@mulmoclaude/common";
 import { TOOL_DEFINITION } from "./definition";
 import { normalizeStoryPath, storyFilePath } from "./paths";
 import { validateUpdateBeatBody, validateUpdateScriptBody } from "./validate";
@@ -24,10 +25,6 @@ function badRequest(error: string): MulmoScriptFailure {
 
 function notFound(error: string): MulmoScriptFailure {
   return { ok: false, code: "not_found", error };
-}
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function stringifyScript(script: unknown): string {
@@ -71,7 +68,7 @@ async function loadExistingScript(context: MulmoScriptExecuteContext, filePath: 
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    return badRequest(`Invalid JSON: ${errorText(err)}`);
+    return badRequest(`Invalid JSON: ${errorMessage(err)}`);
   }
   const validation = mulmoScriptSchema.safeParse(parsed);
   if (!validation.success) {
@@ -131,7 +128,7 @@ export async function executeUpdateBeat(context: MulmoScriptExecuteContext, body
   try {
     script = JSON.parse(await context.files.artifacts.read(resolved.storyPath));
   } catch (err) {
-    return badRequest(`Invalid JSON: ${errorText(err)}`);
+    return badRequest(`Invalid JSON: ${errorMessage(err)}`);
   }
   if (!Array.isArray(script.beats) || beatIndex >= script.beats.length) {
     return badRequest("Invalid beatIndex");

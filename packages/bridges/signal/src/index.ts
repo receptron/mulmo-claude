@@ -17,7 +17,8 @@
 
 import "dotenv/config";
 import WebSocket from "ws";
-import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { createBridgeClient, chunkText, frameText } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "signal";
 const MAX_SIGNAL_TEXT = 4_000;
@@ -32,12 +33,7 @@ if (!apiUrl || !botNumber) {
   process.exit(1);
 }
 
-const allowedNumbers = new Set(
-  (process.env.SIGNAL_ALLOWED_NUMBERS ?? "")
-    .split(",")
-    .map((num) => num.trim())
-    .filter(Boolean),
-);
+const allowedNumbers = parseCsvSet(process.env.SIGNAL_ALLOWED_NUMBERS);
 const allowAll = allowedNumbers.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -84,10 +80,6 @@ async function sendSignal(chatId: string, text: string): Promise<void> {
 
 type JsonRecord = Record<string, unknown>;
 
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
 interface IncomingSignal {
   sourceNumber: string;
   /** Stable conversation id. For DMs = sourceNumber; for groups =
@@ -106,9 +98,9 @@ function extractGroupId(dataMessage: JsonRecord): string {
   //   - v2: dataMessage.groupInfo.groupId (base64)
   //   - new: dataMessage.groupV2.id (also base64)
   // Either form is accepted as a recipient prefix.
-  const groupV2 = isObj(dataMessage.groupV2) ? dataMessage.groupV2 : null;
+  const groupV2 = isRecord(dataMessage.groupV2) ? dataMessage.groupV2 : null;
   if (groupV2 && typeof groupV2.id === "string" && groupV2.id.length > 0) return groupV2.id;
-  const info = isObj(dataMessage.groupInfo) ? dataMessage.groupInfo : null;
+  const info = isRecord(dataMessage.groupInfo) ? dataMessage.groupInfo : null;
   if (info && typeof info.groupId === "string" && info.groupId.length > 0) return info.groupId;
   return "";
 }
@@ -125,8 +117,8 @@ function parseEnvelope(raw: string): IncomingSignal | null {
   } catch {
     return null;
   }
-  if (!isObj(parsed)) return null;
-  const envelope = isObj(parsed.envelope) ? parsed.envelope : null;
+  if (!isRecord(parsed)) return null;
+  const envelope = isRecord(parsed.envelope) ? parsed.envelope : null;
   if (!envelope) return null;
 
   // Signal envelopes carry both `source` (may be phone or UUID) and
@@ -136,7 +128,7 @@ function parseEnvelope(raw: string): IncomingSignal | null {
   // null — we can't reply to them at all, so drop the message rather
   // than attempt a failing send. See CodeRabbit review on #611.
   const sourceNumber = typeof envelope.sourceNumber === "string" && E164_PHONE.test(envelope.sourceNumber) ? envelope.sourceNumber : "";
-  const dataMessage = isObj(envelope.dataMessage) ? envelope.dataMessage : null;
+  const dataMessage = isRecord(envelope.dataMessage) ? envelope.dataMessage : null;
   const text = dataMessage && typeof dataMessage.message === "string" ? dataMessage.message.trim() : "";
   if (!sourceNumber || !text || !dataMessage) return null;
 
@@ -193,7 +185,7 @@ function connect(): void {
   });
 
   socket.on("message", (buffer) => {
-    handleEnvelope(buffer.toString()).catch((err) => console.error(`[signal] envelope handler error: ${err}`));
+    handleEnvelope(frameText(buffer)).catch((err) => console.error(`[signal] envelope handler error: ${err}`));
   });
 
   socket.on("error", (err) => {

@@ -53,14 +53,29 @@ describe("formatDailyLocal", () => {
 });
 
 describe("formatInterval", () => {
-  it("rounds to hours once the interval crosses 60 minutes", () => {
+  it("formats whole hours without a minute part", () => {
     assert.equal(formatInterval(60 * 60 * 1000), "Every 1h");
     assert.equal(formatInterval(4 * 60 * 60 * 1000), "Every 4h");
+  });
+
+  // Regression: 90 minutes used to display as "Every 2h" (remainder discarded)
+  // even though the engine fires on the exact intervalMs.
+  it("keeps the minute remainder for non-whole hours", () => {
+    assert.equal(formatInterval(90 * 60 * 1000), "Every 1h 30m");
+    assert.equal(formatInterval(89 * 60 * 1000), "Every 1h 29m");
+    assert.equal(formatInterval(61 * 60 * 1000), "Every 1h 1m");
   });
 
   it("keeps sub-hour intervals in minutes", () => {
     assert.equal(formatInterval(5 * 60 * 1000), "Every 5m");
     assert.equal(formatInterval(30 * 60 * 1000), "Every 30m");
+    assert.equal(formatInterval(59 * 60 * 1000), "Every 59m");
+  });
+
+  it("clamps sub-minute intervals instead of showing 0m", () => {
+    assert.equal(formatInterval(20_000), "Every <1m");
+    assert.equal(formatInterval(29_999), "Every <1m");
+    assert.equal(formatInterval(30_000), "Every 1m");
   });
 
   it("handles invalid input gracefully", () => {

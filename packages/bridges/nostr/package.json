@@ -1,6 +1,6 @@
 {
   "name": "@mulmobridge/nostr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Nostr bridge for MulmoBridge — encrypted DMs over any Nostr relay",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,10 +21,11 @@
   "license": "MIT",
   "author": "Receptron Team",
   "dependencies": {
-    "@mulmobridge/client": "^0.1.4",
+    "@mulmobridge/client": "^0.2.0",
     "@mulmobridge/protocol": "^0.1.4",
+    "@mulmoclaude/common": "^1.1.0",
     "dotenv": "^17.0.0",
-    "nostr-tools": "^2.23.12"
+    "nostr-tools": "^2.24.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

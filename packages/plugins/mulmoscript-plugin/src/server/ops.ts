@@ -43,7 +43,9 @@ import {
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
 import { normalizeStoryPath } from "../core/paths";
-import { errorText, fileToDataUri, resolveWithinRoot, stripDataUri } from "./support";
+import { errorMessage } from "@mulmoclaude/common";
+import { resolveWithinRoot } from "@mulmoclaude/core/files";
+import { fileToDataUri, stripDataUri } from "./support";
 import { enableGraphAIErrorCapture, setMulmoErrorCaptureLogger, withMulmoErrorCapture } from "./mulmoErrorCapture";
 import type {
   GenerateOpArgs,
@@ -133,6 +135,36 @@ export function buildBeatIdIndex(beats: MulmoBeat[]): Map<string, number> {
     idToIndex.set(key, index);
   });
   return idToIndex;
+}
+
+// Run `body` with a mulmocast per-beat progress callback registered.
+// `onBeat` receives each beat event's sessionType + resolved index; the
+// caller decides which sessionTypes to forward. The callback is always
+// unregistered, even when `body` throws.
+//
+// Known limitation: addSessionProgressCallback is global, so when two
+// generations for *different* scripts run concurrently, both closures
+// are invoked for every beat event and rely on idToIndex to filter out
+// the other run's events. That filter is reliable only when each beat
+// carries an explicit `id`. Beats without one fall back to
+// "__index__${index}", and identical fallback ids across scripts collide
+// → progress meant for script A surfaces on script B. Fixing this
+// properly needs mulmocast to attach a per-run identifier to its
+// progress events (or a global serialization gate); tracked separately.
+async function withBeatProgress<T>(beats: MulmoBeat[], onBeat: (sessionType: string, beatIndex: number) => void, body: () => Promise<T>): Promise<T> {
+  const idToIndex = buildBeatIdIndex(beats);
+  const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
+    if (event.kind !== "beat" || event.inSession || event.id === undefined) return;
+    const beatIndex = idToIndex.get(event.id);
+    if (beatIndex === undefined) return;
+    onBeat(event.sessionType, beatIndex);
+  };
+  addSessionProgressCallback(onProgress);
+  try {
+    return await body();
+  } finally {
+    removeSessionProgressCallback(onProgress);
+  }
 }
 
 /** Map identity for the in-flight tracker. JSON array keeps the three
@@ -359,9 +391,9 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       log.warn("op failed", {
         ...(options.operation ? { operation: options.operation } : {}),
         filePath,
-        error: errorText(err),
+        error: errorMessage(err),
       });
-      return opServerError(errorText(err));
+      return opServerError(errorMessage(err));
     }
   }
 
@@ -593,44 +625,28 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     const context = await buildContext(absoluteFilePath);
     if (!context) return { ok: false, error: "Failed to initialize mulmo context" };
 
-    const idToIndex = buildBeatIdIndex(context.studio.script.beats as MulmoBeat[]);
+    return withBeatProgress(
+      context.studio.script.beats as MulmoBeat[],
+      (sessionType, beatIndex) => {
+        if (sessionType !== "image" && sessionType !== "audio") return;
+        onProgressEvent({ kind: sessionType, beatIndex });
+      },
+      async () => {
+        // Order matters: audio() must run before images(). For html_tailwind
+        // beats with `animation: true`, mulmocast only emits the per-beat
+        // `_animated.mp4` when the beat's duration is already known (see
+        // processHtmlTailwindAnimated in mulmocast). Durations are populated
+        // by audio(), so running images() first leaves the .mp4 files
+        // missing and movie() then fails in validateBeatSource.
+        const audioContext = await audio(context);
+        const imagesContext = await images(audioContext);
+        await movie(imagesContext);
 
-    // Known limitation: addSessionProgressCallback is global, so when two
-    // movie generations for *different* scripts run concurrently, both
-    // closures are invoked for every beat event and rely on idToIndex to
-    // filter out the other run's events. That filter is reliable only
-    // when each beat carries an explicit `id`. Beats without one fall
-    // back to "__index__${index}", and identical fallback ids across
-    // scripts collide → progress meant for script A surfaces on script B.
-    // Fixing this properly needs mulmocast to attach a per-run identifier
-    // to its progress events (or a global serialization gate); tracked
-    // separately.
-    const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
-      if (event.kind !== "beat" || event.inSession || event.id === undefined) return;
-      const beatIndex = idToIndex.get(event.id);
-      if (beatIndex === undefined) return;
-      if (event.sessionType !== "image" && event.sessionType !== "audio") return;
-      onProgressEvent({ kind: event.sessionType, beatIndex });
-    };
-
-    addSessionProgressCallback(onProgress);
-    try {
-      // Order matters: audio() must run before images(). For html_tailwind
-      // beats with `animation: true`, mulmocast only emits the per-beat
-      // `_animated.mp4` when the beat's duration is already known (see
-      // processHtmlTailwindAnimated in mulmocast). Durations are populated
-      // by audio(), so running images() first leaves the .mp4 files
-      // missing and movie() then fails in validateBeatSource.
-      const audioContext = await audio(context);
-      const imagesContext = await images(audioContext);
-      await movie(imagesContext);
-
-      const outputPath = movieFilePath(imagesContext);
-      if (!existsSync(outputPath)) return { ok: false, error: "Movie was not generated" };
-      return { ok: true, outputPath };
-    } finally {
-      removeSessionProgressCallback(onProgress);
-    }
+        const outputPath = movieFilePath(imagesContext);
+        if (!existsSync(outputPath)) return { ok: false, error: "Movie was not generated" };
+        return { ok: true, outputPath };
+      },
+    );
   }
 
   /**
@@ -665,7 +681,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       }
       return { ok: true, moviePath: toStoryRef(result.outputPath) };
     } catch (err) {
-      genError = errorText(err);
+      genError = errorMessage(err);
       return opServerError(genError);
     } finally {
       inFlightMovies.delete(absoluteFilePath);
@@ -726,7 +742,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         outputPath: result.outputPath,
       });
     } catch (err) {
-      genError = errorText(err);
+      genError = errorMessage(err);
       await writeErrorSidecar(errorSidecarPath, genError);
       log.error("background movie generation crashed", { filePath: wireFilePath, error: genError });
     } finally {
@@ -742,7 +758,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     } catch (writeErr) {
       log.error("failed to write error sidecar", {
         errorSidecarPath,
-        error: errorText(writeErr),
+        error: errorMessage(writeErr),
       });
     }
   }
@@ -760,24 +776,20 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   async function runPdfPipeline(context: StoryContext, onImageBeatDone: (beatIndex: number) => void): Promise<PdfGenerationResult> {
-    const idToIndex = buildBeatIdIndex(context.studio.script.beats as MulmoBeat[]);
-    const onProgress = (event: { kind: string; sessionType: string; id?: string; inSession: boolean }) => {
-      if (event.kind !== "beat" || event.inSession || event.id === undefined) return;
-      const beatIndex = idToIndex.get(event.id);
-      if (beatIndex === undefined) return;
-      if (event.sessionType !== "image") return;
-      onImageBeatDone(beatIndex);
-    };
-    addSessionProgressCallback(onProgress);
-    try {
-      const imagesContext = await images(context);
-      await pdf(imagesContext, PDF_MODE, PDF_SIZE);
-      const outputPath = pdfFilePath(imagesContext, PDF_MODE);
-      if (!existsSync(outputPath)) return { ok: false, error: "PDF was not generated" };
-      return { ok: true, outputPath };
-    } finally {
-      removeSessionProgressCallback(onProgress);
-    }
+    return withBeatProgress(
+      context.studio.script.beats as MulmoBeat[],
+      (sessionType, beatIndex) => {
+        if (sessionType !== "image") return;
+        onImageBeatDone(beatIndex);
+      },
+      async () => {
+        const imagesContext = await images(context);
+        await pdf(imagesContext, PDF_MODE, PDF_SIZE);
+        const outputPath = pdfFilePath(imagesContext, PDF_MODE);
+        if (!existsSync(outputPath)) return { ok: false, error: "PDF was not generated" };
+        return { ok: true, outputPath };
+      },
+    );
   }
 
   /** Long-held foreground PDF generation (the package View's `generatePdf`
@@ -811,7 +823,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       }
       return { ok: true, pdfPath: toStoryRef(result.outputPath) };
     } catch (err) {
-      genError = errorText(err);
+      genError = errorMessage(err);
       return opServerError(genError);
     } finally {
       inFlightPdfs.delete(absoluteFilePath);

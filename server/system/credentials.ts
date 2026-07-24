@@ -1,11 +1,17 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { chmodSync, existsSync, readdirSync, statSync } from "fs";
+import { createRequire } from "module";
+import { dirname, join } from "path";
 import { log } from "./logger/index.js";
+import { isRecord } from "../utils/types.js";
 import { ONE_SECOND_MS, ONE_MINUTE_MS } from "../utils/time.js";
 import { writeFileAtomic } from "../utils/files/atomic.js";
 import { claudeCredentialsPath } from "../utils/claudeConfigPath.js";
 
 const execFileAsync = promisify(execFile);
+
+const SPAWN_HELPER_EXEC_BITS = 0o111;
 
 const CREDENTIALS_PATH = claudeCredentialsPath();
 const KEYCHAIN_SERVICE = "Claude Code-credentials";
@@ -32,14 +38,6 @@ export function looksLikeClaudeResponse(text: string): boolean {
   return RESPONSE_PATTERN_RE.test(text) && text.length >= MIN_RESPONSE_CHARS;
 }
 
-interface CredentialsJson {
-  claudeAiOauth?: {
-    accessToken?: string;
-    refreshToken?: string;
-    expiresAt?: string;
-  };
-}
-
 /**
  * Read the raw credentials string from macOS Keychain.
  */
@@ -53,23 +51,36 @@ async function readFromKeychain(): Promise<string | null> {
   }
 }
 
-/**
- * Check whether the access token in the credentials JSON is expired.
- */
-function isTokenExpired(raw: string): boolean {
+/** The token's expiry as epoch milliseconds, or null when the JSON is
+ *  unparseable or carries no usable expiry.
+ *
+ *  Claude's Keychain blob stores `expiresAt` as a number (epoch ms); older CLI
+ *  builds wrote an ISO string. Accept both. A prior `typeof === "string"` guard
+ *  silently rejected the numeric form, so every token read as "no expiry →
+ *  expired" and forced a PTY renew of the CLI on every Docker run. */
+export function readExpiresAt(raw: string): number | null {
+  let parsed: unknown;
   try {
-    const creds: CredentialsJson = JSON.parse(raw);
-    const expiresAt = creds.claudeAiOauth?.expiresAt;
-    if (!expiresAt) return true; // no expiry info — treat as expired
-
-    const expiresMs = new Date(expiresAt).getTime();
-    if (isNaN(expiresMs)) return true;
-
-    return Date.now() >= expiresMs - EXPIRY_MARGIN_MS;
+    parsed = JSON.parse(raw);
   } catch {
-    log.error("credentials", "Failed to parse credentials JSON from Keychain");
-    return true;
+    return null;
   }
+  if (!isRecord(parsed)) return null;
+  const oauth = parsed.claudeAiOauth;
+  if (!isRecord(oauth)) return null;
+  const { expiresAt } = oauth;
+  if (typeof expiresAt === "number") return Number.isFinite(expiresAt) ? expiresAt : null;
+  if (typeof expiresAt === "string") {
+    const parsedMs = Date.parse(expiresAt);
+    return Number.isNaN(parsedMs) ? null : parsedMs;
+  }
+  return null;
+}
+
+function isTokenExpired(raw: string): boolean {
+  const expiresMs = readExpiresAt(raw);
+  if (expiresMs === null) return true; // no usable expiry — treat as expired
+  return Date.now() >= expiresMs - EXPIRY_MARGIN_MS;
 }
 
 /**
@@ -151,6 +162,55 @@ function awaitTokenRenewal(pty: typeof import("node-pty")): Promise<boolean> {
   });
 }
 
+/** node-pty's prebuilds directory, resolved from wherever it's installed
+ *  (hoisted or nested), or null when node-pty can't be found. */
+export function nodePtyPrebuildsDir(): string | null {
+  try {
+    const require = createRequire(import.meta.url);
+    let dir = dirname(require.resolve("node-pty"));
+    while (dir !== dirname(dir)) {
+      if (existsSync(join(dir, "prebuilds"))) return join(dir, "prebuilds");
+      dir = dirname(dir);
+    }
+  } catch {
+    // node-pty not resolvable — nothing to fix
+  }
+  return null;
+}
+
+/** Restore +x on one prebuild's `spawn-helper`, if it's a regular file that
+ *  lacks it. Errors are per-entry so one bad platform bundle can't abort the
+ *  repair of the others. */
+function restoreSpawnHelperExec(helper: string): void {
+  try {
+    if (!existsSync(helper)) return;
+    const info = statSync(helper);
+    if (!info.isFile()) return;
+    if ((info.mode | SPAWN_HELPER_EXEC_BITS) !== info.mode) chmodSync(helper, info.mode | SPAWN_HELPER_EXEC_BITS);
+  } catch {
+    // best-effort — skip this entry, keep repairing the rest
+  }
+}
+
+/** Runtime backstop for `posix_spawnp failed`. node-pty execs its prebuilt
+ *  `spawn-helper` before the target command, but ships it mode 644 in the npm
+ *  tarball; an install that skipped lifecycle scripts (`--ignore-scripts`,
+ *  some `npm ci` setups) leaves it non-executable and every spawn throws. The
+ *  postinstall normally restores +x — this covers installs that never ran it,
+ *  so it also protects end users who never run the test suite. Best-effort:
+ *  any failure is swallowed and we still attempt the spawn. */
+export function ensureSpawnHelperExecutable(): void {
+  const prebuilds = nodePtyPrebuildsDir();
+  if (prebuilds === null) return;
+  let platforms: string[];
+  try {
+    platforms = readdirSync(prebuilds);
+  } catch {
+    return;
+  }
+  for (const platform of platforms) restoreSpawnHelperExec(join(prebuilds, platform, "spawn-helper"));
+}
+
 async function renewTokenViaPty(): Promise<boolean> {
   // Dynamic import — node-pty is a native module that may not be present
   // on all platforms. Guard with try/catch.
@@ -162,6 +222,7 @@ async function renewTokenViaPty(): Promise<boolean> {
     return false;
   }
 
+  ensureSpawnHelperExecutable();
   return awaitTokenRenewal(pty);
 }
 
@@ -186,14 +247,13 @@ export async function refreshCredentials(): Promise<boolean> {
     }
 
     if (isTokenExpired(credentials)) {
-      // Extract expiry for logging
-      try {
-        const creds: CredentialsJson = JSON.parse(credentials);
-        const expiresAt = creds.claudeAiOauth?.expiresAt ?? "unknown";
-        log.warn("credentials", `Access token expired at ${expiresAt}, launching claude CLI to renew...`);
-      } catch {
-        log.warn("credentials", "Access token expired (could not parse expiry), launching claude CLI to renew...");
-      }
+      const expiresMs = readExpiresAt(credentials);
+      log.warn(
+        "credentials",
+        expiresMs !== null
+          ? `Access token expired at ${new Date(expiresMs).toISOString()}, launching claude CLI to renew...`
+          : "Access token expired (could not parse expiry), launching claude CLI to renew...",
+      );
 
       const renewed = await renewTokenViaPty();
       if (!renewed) {
@@ -217,13 +277,8 @@ export async function refreshCredentials(): Promise<boolean> {
         return false;
       }
     } else {
-      try {
-        const creds: CredentialsJson = JSON.parse(credentials);
-        const expiresAt = creds.claudeAiOauth?.expiresAt ?? "unknown";
-        log.info("credentials", `Access token is valid, expires at ${expiresAt}`);
-      } catch {
-        log.info("credentials", "Access token appears valid");
-      }
+      const expiresMs = readExpiresAt(credentials);
+      log.info("credentials", expiresMs !== null ? `Access token is valid, expires at ${new Date(expiresMs).toISOString()}` : "Access token appears valid");
     }
 
     // Atomic so a readers mid-refresh can't see a truncated creds

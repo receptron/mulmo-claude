@@ -4,7 +4,7 @@
 // bullets). Coexists with #1029's atomic files during the
 // transition — PR-B retires the atomic format.
 
-import type { MemoryType } from "./types.js";
+import { compactAlnum, type MemoryType } from "./types.js";
 
 export interface TopicMemoryFile {
   type: MemoryType;
@@ -92,20 +92,7 @@ const WINDOWS_RESERVED_BASENAMES = new Set([
 // the result is empty (caller decides whether to fall back to a
 // hash).
 export function slugifyTopicName(name: string): string | null {
-  const lower = name.toLowerCase();
-  const out: string[] = [];
-  let lastWasSep = true;
-  for (const char of lower) {
-    if ((char >= "a" && char <= "z") || (char >= "0" && char <= "9")) {
-      out.push(char);
-      lastWasSep = false;
-    } else if (!lastWasSep) {
-      out.push("-");
-      lastWasSep = true;
-    }
-  }
-  while (out.length > 0 && out[out.length - 1] === "-") out.pop();
-  const compact = out.slice(0, MAX_TOPIC_SLUG_LENGTH).join("");
+  const compact = compactAlnum(name.toLowerCase()).slice(0, MAX_TOPIC_SLUG_LENGTH);
   if (compact.length === 0) return null;
   const trimmed = trimTrailing(compact, "-");
   if (WINDOWS_RESERVED_BASENAMES.has(trimmed)) return null;

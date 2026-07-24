@@ -1,3 +1,4 @@
+/* eslint-disable no-undef -- Cloudflare Workers ambient types (DurableObjectNamespace) live in @cloudflare/workers-types, which tsc sees via tsconfig `types` but eslint's globals list does not. Same reason durable-object.ts disables it. */
 // Relay message format — normalized from platform-specific webhooks.
 
 export const PLATFORMS = {
@@ -45,8 +46,7 @@ export interface RelayResponse {
 // can access their own secrets without extending this interface.
 // Each plugin checks for its own keys via `env.KEY_NAME`.
 export interface Env {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RELAY: any;
+  RELAY: DurableObjectNamespace;
   RELAY_TOKEN: string;
   // Platform-specific secrets are accessed dynamically.
   // Known keys for reference (not exhaustive):

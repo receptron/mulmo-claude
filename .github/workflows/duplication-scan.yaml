@@ -94,6 +94,10 @@ jobs:
       # duplicate by nature, and the 528 extra findings they bring would
       # drown the ~186 that are actually worth reading.
       #
+      # `**/_generated/**` is excluded: codegen output (the plugin barrels
+      # from scripts/codegen-plugin-barrels.ts) duplicates by nature and
+      # is regenerated, never hand-refactored.
+      #
       # The test globs are written `**/test/**` rather than `test/**` to
       # say "any test dir, at any depth" out loud — packages/*/test/ has
       # to be excluded too. jscpd's --ignore globs are unanchored, so the
@@ -104,7 +108,7 @@ jobs:
           set -euo pipefail
           jscpd . \
             --format typescript \
-            --ignore "**/node_modules/**,**/dist/**,**/*.d.ts,**/test/**,**/e2e/**,**/e2e-live/**" \
+            --ignore "**/node_modules/**,**/dist/**,**/*.d.ts,**/test/**,**/e2e/**,**/e2e-live/**,**/spreadsheet/engine/**,**/_generated/**" \
             --reporters console,sarif \
             --output report
 

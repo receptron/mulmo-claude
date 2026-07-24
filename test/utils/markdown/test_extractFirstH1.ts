@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractFirstH1 } from "../../../src/utils/markdown/extractFirstH1.js";
+import { extractFirstH1 } from "@mulmoclaude/markdown-utils/markdown/extractFirstH1";
 
 describe("extractFirstH1", () => {
   it("returns the text of the first H1", () => {

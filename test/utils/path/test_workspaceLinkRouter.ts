@@ -453,6 +453,22 @@ describe("classifyWorkspacePath", () => {
       const result = classifyWorkspacePath("/collections/mc-invoice#frag?notquery");
       assert.deepEqual(result, { kind: "spa-route", path: "/collections/mc-invoice" });
     });
+
+    // `extractQuery` is deliberately NOT the mirror of the shared
+    // `stripFragmentAndQuery` (src/utils/path/posixPath.ts), and these two
+    // cases pin the asymmetry so it isn't "unified" away: both helpers end
+    // the PATH at whichever marker comes first, but only a "?" that
+    // precedes any "#" is a router query — a "?" after a "#" is fragment
+    // text and must be dropped, not pushed into `route.query`.
+    it("keeps a '?' before a '#' as the query", () => {
+      const result = classifyWorkspacePath("/collections/mc-invoice?a=1#frag");
+      assert.deepEqual(result, { kind: "spa-route", path: "/collections/mc-invoice?a=1" });
+    });
+
+    it("drops a '?' after a '#' instead of promoting it to a query", () => {
+      const result = classifyWorkspacePath("/collections/mc-invoice#frag?a=1");
+      assert.deepEqual(result, { kind: "spa-route", path: "/collections/mc-invoice" });
+    });
   });
 });
 

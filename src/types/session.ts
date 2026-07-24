@@ -47,37 +47,45 @@ export function isSessionOrigin(value: unknown): value is SessionOrigin {
   return pluginPkgFromOrigin(value) !== null;
 }
 
-// Server `/api/sessions` summary. Optional `summary` and `keywords`
-// are populated by the chat indexer (#123) when present.
-//
-// `updatedAt` is the most recent activity timestamp — taken from the
-// jsonl file's mtime on the server side and bumped whenever the
-// client appends a message in-memory. Used for the "most recently
-// touched" sort order in the session history sidebar (users expect
-// active sessions to float to the top, not to stay pinned in
-// creation order).
+// Response shape of `GET /api/sessions`. Single source of truth for both
+// sides of that boundary — `server/api/routes/sessions.ts` imports this type
+// rather than restating it, so a field added on one side can't silently be
+// missing on the other.
 export interface SessionSummary {
   id: string;
   roleId: string;
   startedAt: string;
+  /** Most recent activity: the jsonl file's mtime server-side, bumped
+   *  in-memory whenever the client appends a message. The history sidebar
+   *  sorts on it, so active sessions float to the top instead of staying
+   *  pinned in creation order. */
   updatedAt: string;
   preview: string;
+  /** Produced by the chat indexer (#123); rendered as a smaller second line
+   *  under `preview` in the history popup. */
   summary?: string;
   keywords?: string[];
-  /** Where this session originated. Missing = "human" (backward compat). */
+  /** Where this session originated (#486). Missing = "human" (backward
+   *  compat). */
   origin?: SessionOrigin;
-  /** User-set bookmark flag. Persisted in the meta sidecar. */
+  /** User-set bookmark flag, persisted in the meta sidecar. Surfaced as a
+   *  dedicated history filter chip and a green role-icon tint. */
   isBookmarked?: boolean;
-  /** Number of user turns sent to this session (server-derived from the
-   *  meta sidecar). One-shot sessions have 1; long conversations more. */
+  /** Number of user turns, server-derived from the meta sidecar. Lets the
+   *  history panel tell a one-shot (1) apart from a long conversation. */
   userQueryCount?: number;
-  // Live state from the server session store (present when the
-  // session has an active in-memory entry on the server).
+  // Live state from the server's in-memory session store. Absent when the
+  // session has no active entry there (i.e. idle / historical).
   //
-  // `isRunning` — broad: agent turn live OR background generation
-  // pending. Drives the sidebar busy indicator.
-  // `liveIsRunning` — narrow: mirrors the DELETE 409 gate exactly
-  // (#1195). `false` ⇒ a DELETE on this session will be accepted.
+  // `isRunning` is the BROAD predicate: agent turn live OR any background
+  // generation (image/audio/movie) still pending. Drives the sidebar busy
+  // indicator, which has to stay lit across navigation.
+  //
+  // `liveIsRunning` is the NARROW predicate: byte-identical to the
+  // `DELETE /api/sessions/:id` 409 gate (`getSession()?.isRunning`), so
+  // `false` ⇒ a DELETE will be accepted. Exposed for cleanup-style callers
+  // (e2e-live `waitForSessionIdle`) that must not over-wait on lingering
+  // pendingGenerations (#1195).
   isRunning?: boolean;
   liveIsRunning?: boolean;
   hasUnread?: boolean;

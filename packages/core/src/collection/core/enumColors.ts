@@ -15,7 +15,7 @@
 // (red = urgent, amber = nudge) rather than the rotating palette.
 // `resolveEnumColor` encapsulates that rule.
 
-import { fieldTextOrNull } from "./fieldText";
+import { fieldText, fieldTextOrNull } from "./fieldText";
 import type { CollectionSchema } from "./schema";
 
 export interface EnumColorClasses {
@@ -125,7 +125,7 @@ function notifyValuesFor(schema: CollectionSchema, fieldKey: string): readonly s
 export function resolveEnumColor(schema: CollectionSchema, fieldKey: string, value: unknown): EnumColorClasses {
   const notifyValues = notifyValuesFor(schema, fieldKey);
   if (notifyValues) {
-    const str = value === undefined || value === null ? "" : String(value);
+    const str = fieldText(value);
     const rank = notifyValues.indexOf(str);
     if (rank < 0) return ENUM_NEUTRAL;
     return rank === 0 ? ENUM_ALERT : ENUM_NUDGE;

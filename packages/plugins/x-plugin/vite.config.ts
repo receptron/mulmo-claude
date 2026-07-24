@@ -5,7 +5,8 @@ import dts from "vite-plugin-dts";
 // Unlike sandboxed runtime plugins, this package is imported directly by
 // the host server build (like @mulmoclaude/{form,markdown}-plugin), so it
 // may use global `fetch` and `process.env` freely. Node built-ins are
-// externalized; there are no other runtime deps to bundle.
+// externalized; `@mulmoclaude/common` (the only runtime dep, a tiny pure
+// leaf) is inlined — the same convention as markdown/accounting-plugin.
 export default defineConfig({
   plugins: [
     dts({

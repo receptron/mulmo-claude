@@ -36,79 +36,23 @@ describe("extractFetchError", () => {
   });
 });
 
-describe("fetchWithTimeout", () => {
+// The behaviour of `fetchWithTimeout` is pinned canonically against the source
+// in `packages/core/test/utils/test_fetch.ts` (#2398). Here we only smoke-test
+// that the host re-export from `@mulmoclaude/core/fetch` resolves and still
+// exposes the same surface — so the wiring can't silently break.
+describe("fetchWithTimeout (host re-export smoke)", () => {
   const realFetch = globalThis.fetch;
-
   afterEach(() => {
     globalThis.fetch = realFetch;
   });
 
-  it("exposes a sensible default timeout", () => {
+  it("re-exports the 10 s default timeout constant", () => {
     assert.equal(DEFAULT_FETCH_TIMEOUT_MS, 10_000);
   });
 
-  it("returns the response on happy path", async () => {
+  it("re-exports a working fetchWithTimeout", async () => {
     const expected = new Response("ok", { status: 200 });
     globalThis.fetch = async () => expected;
-    const res = await fetchWithTimeout("http://example.test/");
-    assert.equal(res, expected);
-  });
-
-  it("rejects with a TimeoutError when the peer stalls past timeoutMs", async () => {
-    // fetch never resolves — the timer must win.
-    globalThis.fetch = (_url, init) =>
-      new Promise<Response>((_, reject) => {
-        init?.signal?.addEventListener("abort", () => {
-          reject((init.signal as AbortSignal & { reason?: unknown }).reason ?? new Error("aborted"));
-        });
-      });
-    await assert.rejects(
-      () => fetchWithTimeout("http://example.test/", { timeoutMs: 25 }),
-      (err: unknown) => err instanceof DOMException && err.name === "TimeoutError" && /25ms/.test(err.message),
-    );
-  });
-
-  it("aborts in-flight when the caller's signal fires", async () => {
-    const caller = new AbortController();
-    globalThis.fetch = (_url, init) =>
-      new Promise<Response>((_, reject) => {
-        init?.signal?.addEventListener("abort", () => {
-          reject((init.signal as AbortSignal & { reason?: unknown }).reason ?? new Error("aborted"));
-        });
-      });
-    const pending = fetchWithTimeout("http://example.test/", { signal: caller.signal, timeoutMs: 5_000 });
-    const customReason = new Error("caller cancelled");
-    setTimeout(() => caller.abort(customReason), 10);
-    await assert.rejects(pending, (err: unknown) => err === customReason);
-  });
-
-  it("rejects immediately when the caller's signal is already aborted", async () => {
-    const caller = new AbortController();
-    const reason = new Error("already cancelled");
-    caller.abort(reason);
-    let fetchCalled = false;
-    globalThis.fetch = async () => {
-      fetchCalled = true;
-      return new Response("should not reach here");
-    };
-    // fetch() itself is what rejects here because we pass the
-    // already-aborted controller.signal. The helper's job is just to
-    // make sure that propagation happens (and doesn't deadlock).
-    await assert.rejects(
-      () => fetchWithTimeout("http://example.test/", { signal: caller.signal }),
-      (err: unknown) => err === reason,
-    );
-    assert.equal(fetchCalled, false, "fetch should not run when signal is pre-aborted");
-  });
-
-  it("does not leave the timer pending after a successful response", async () => {
-    // If the finally clause didn't clearTimeout, subsequent tests
-    // would see the handle keep the event loop alive. We can't
-    // observe that directly, but running 50 quick calls exercises
-    // the cleanup path and would surface a leak under --detectOpenHandles.
-    globalThis.fetch = async () => new Response("ok");
-    for (let i = 0; i < 50; i++) {
-      await assert.doesNotReject(fetchWithTimeout("http://example.test/", { timeoutMs: 5_000 }));
-    }
+    assert.equal(await fetchWithTimeout("http://example.test/"), expected);
   });
 });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { loadPluginFromCacheDir, isCacheValid, EXTRACT_MARKER, ensureInsideBase } from "../../server/plugins/runtime-loader.js";
+import { loadPluginFromCacheDir, isCacheValid, EXTRACT_MARKER, ensureInsideBase, resolveExecute } from "../../server/plugins/runtime-loader.js";
 
 interface FixtureOpts {
   exportsImport?: string;
@@ -177,6 +177,35 @@ describe("loadPluginFromCacheDir", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "mulmo-runtime-cache-complete-"));
     writeFileSync(path.join(dir, EXTRACT_MARKER), "");
     assert.equal(isCacheValid(dir), true);
+  });
+
+  // Proto-key regression (#2319): `definitionName` is a plugin-controlled
+  // `TOOL_DEFINITION.name`. A bare `carrier[definitionName]` for a proto name
+  // resolves to an Object.prototype function, DEFEATING the `typeof !==
+  // "function"` gate — a plugin exporting no matching handler gets `Object` /
+  // `Object.prototype.toString` registered and dispatched instead of null.
+  describe("resolveExecute — prototype-key guard", () => {
+    // `__proto__` resolves to Object.prototype (an object), already caught by the
+    // typeof gate; the callable Object.prototype functions are the real hazard.
+    for (const proto of ["constructor", "toString", "valueOf", "hasOwnProperty"]) {
+      it(`returns null for the prototype key "${proto}" on a carrier that does not own it`, () => {
+        assert.equal(resolveExecute({}, proto, false), null);
+      });
+    }
+
+    it("returns null for a normal unexported name", () => {
+      assert.equal(resolveExecute({}, "myTool", false), null);
+    });
+
+    it("returns the legacy handler a carrier actually exports", () => {
+      const handler = () => undefined;
+      assert.equal(resolveExecute({ myTool: handler }, "myTool", false), handler);
+    });
+
+    it("returns a handler legitimately exported under a proto-collision name (boundary)", () => {
+      const handler = () => "real";
+      assert.equal(resolveExecute({ toString: handler }, "toString", false), handler);
+    });
   });
 
   it("returns null when entry file is missing on disk", async () => {

@@ -13,8 +13,9 @@
 //   MATRIX_ALLOWED_ROOMS   — CSV of room IDs (empty = all joined rooms)
 
 import "dotenv/config";
-import { createClient, type MatrixClient, type MatrixEvent, type Room } from "matrix-js-sdk";
+import { createClient, RoomEvent, type MatrixClient, type MatrixEvent, type Room } from "matrix-js-sdk";
 import { createBridgeClient } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "matrix";
 
@@ -26,12 +27,7 @@ if (!homeserverUrl || !accessToken || !userId) {
   process.exit(1);
 }
 
-const allowedRooms = new Set(
-  (process.env.MATRIX_ALLOWED_ROOMS ?? "")
-    .split(",")
-    .map((roomId) => roomId.trim())
-    .filter(Boolean),
-);
+const allowedRooms = parseCsvSet(process.env.MATRIX_ALLOWED_ROOMS);
 const allowAll = allowedRooms.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -46,10 +42,20 @@ mulmo.onPush((pushEvent) => {
   matrixClient.sendTextMessage(pushEvent.chatId, pushEvent.message).catch((err: unknown) => console.error(`[matrix] push send failed: ${err}`));
 });
 
-// The matrix-js-sdk event emitter types are narrowly typed; the
-// Room.timeline event name requires a cast.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(matrixClient as any).on("Room.timeline", async (event: MatrixEvent, room: Room | null) => {
+// `.on` takes a void-returning listener, so an async one hands the emitter a
+// floating promise: a throw in the synchronous prelude (getType/getContent,
+// which run before mulmo.send's own error handling) would become an unhandled
+// rejection that crashes the process. Keep the listener sync and settle the
+// async work with `.catch()`. `RoomEvent.Timeline` is the typed event key —
+// the old `"Room.timeline"` string + `as any` cast only masked the emitter's
+// precise typing.
+matrixClient.on(RoomEvent.Timeline, (event: MatrixEvent, room: Room | undefined) => {
+  void handleTimelineEvent(event, room).catch((err: unknown) => {
+    console.error(`[matrix] message handling failed: ${err}`);
+  });
+});
+
+async function handleTimelineEvent(event: MatrixEvent, room: Room | undefined): Promise<void> {
   if (!room) return;
   if (event.getType() !== "m.room.message") return;
   if (event.getSender() === userId) return;
@@ -66,18 +72,14 @@ mulmo.onPush((pushEvent) => {
 
   console.log(`[matrix] message room=${roomId} sender=${event.getSender()} len=${text.length}`);
 
-  try {
-    const ack = await mulmo.send(roomId, text);
-    if (ack.ok) {
-      await sendChunked(roomId, ack.reply ?? "");
-    } else {
-      const status = ack.status ? ` (${ack.status})` : "";
-      await matrixClient.sendTextMessage(roomId, `Error${status}: ${ack.error ?? "unknown"}`);
-    }
-  } catch (err) {
-    console.error(`[matrix] message handling failed: ${err}`);
+  const ack = await mulmo.send(roomId, text);
+  if (ack.ok) {
+    await sendChunked(roomId, ack.reply ?? "");
+  } else {
+    const status = ack.status ? ` (${ack.status})` : "";
+    await matrixClient.sendTextMessage(roomId, `Error${status}: ${ack.error ?? "unknown"}`);
   }
-});
+}
 
 async function sendChunked(roomId: string, text: string): Promise<void> {
   // Matrix has no strict char limit but we chunk at 4000 for readability

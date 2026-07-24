@@ -1,5 +1,5 @@
 import "../../../server/workspace/collections/configure.js"; // configure @mulmoclaude/core/collection host binding for tests
-// Shared storage-contract suite (plans/refactor-storage-virtualization.md).
+// Shared storage-contract suite (plans/done/refactor-storage-virtualization.md).
 // ONE set of assertions run against EVERY CollectionStore implementation —
 // the per-record JSON file store, the DuckDB-backed CSV `dataSource` store,
 // and the node:sqlite `storage` store — pinning the contract documented on

@@ -2,6 +2,7 @@
 // grid + day view), so both label a record identically. Pure, type-only
 // dependency on the schema shape.
 
+import { fieldText } from "./fieldText";
 import type { CollectionItem, CollectionSchema } from "./schema";
 
 // Text-like field types that make a sensible human-readable label.
@@ -21,7 +22,7 @@ export function labelFieldFor(schema: CollectionSchema): string | null {
 
 /** A record's primary-key value as a string. */
 export function itemIdOf(item: CollectionItem, schema: CollectionSchema): string {
-  return String(item[schema.primaryKey] ?? "");
+  return fieldText(item[schema.primaryKey]);
 }
 
 /** A record's display label: the resolved `labelField` value, else the

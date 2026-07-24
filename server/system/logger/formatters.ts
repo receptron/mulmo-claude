@@ -19,6 +19,7 @@ function stringifyScalar(value: unknown): string {
   try {
     return JSON.stringify(value);
   } catch {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- JSON.stringify threw on this log value. A log line reading "[object Object]" is poor; a log line reading "" hides that anything was logged at all.
     return String(value);
   }
 }

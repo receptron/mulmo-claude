@@ -3,10 +3,63 @@
  */
 
 import { functionRegistry, toString, type FunctionHandler } from "../registry";
+import { VALUE_ERROR, isSpreadsheetErrorValue, type SpreadsheetError } from "../spreadsheet-errors";
+import { formatWithPattern } from "../textFormat";
+
+// A letter or a combining mark. A decomposed accented letter (e + U+0301) is two
+// code points; counting the mark as part of the word stops PROPER from treating
+// the base letter that follows it as a new word (éclair → Éclair, not ÉClair).
+const isWordCharacter = (char: string): boolean => /[\p{L}\p{M}]/u.test(char);
+
+// Excel PROPER capitalises a letter at the start of the text or after any
+// non-letter (space, punctuation, digit) and lowercases the rest — so word
+// boundaries include "'" and "-", which a space-only split misses.
+export const toProperCase = (text: string): string => {
+  const chars = Array.from(text);
+  const cased = chars.map((char, index) => (index === 0 || !isWordCharacter(chars[index - 1]) ? char.toUpperCase() : char.toLowerCase()));
+  return cased.join("");
+};
+
+// Excel LEFT/RIGHT reject a negative count with #VALUE!; 0 and over-length
+// counts keep substring's clamping.
+// Excel truncates a fractional count toward zero and rejects a non-finite or
+// negative one with #VALUE! (LEFT/RIGHT with "x" or -1). Normalising once keeps
+// LEFT and RIGHT consistent instead of each feeding a raw Number() to substring.
+const normalizeCharCount = (count: number): number | SpreadsheetError => {
+  // Test the sign before truncating: Math.trunc(-0.5) is -0, which is not < 0.
+  if (!Number.isFinite(count) || count < 0) return VALUE_ERROR;
+  return Math.trunc(count);
+};
+
+export const takeLeft = (text: string, count: number): string | SpreadsheetError => {
+  const chars = normalizeCharCount(count);
+  return isSpreadsheetErrorValue(chars) ? chars : text.substring(0, chars);
+};
+
+export const takeRight = (text: string, count: number): string | SpreadsheetError => {
+  const chars = normalizeCharCount(count);
+  return isSpreadsheetErrorValue(chars) ? chars : text.substring(text.length - chars);
+};
+
+// Replace the nth (1-based) occurrence; split/join keeps matches non-overlapping,
+// matching the replace-all path.
+const replaceNthOccurrence = (text: string, oldText: string, newText: string, nth: number): string => {
+  const parts = text.split(oldText);
+  if (nth > parts.length - 1) return text;
+  return parts.slice(0, nth).join(oldText) + newText + parts.slice(nth).join(oldText);
+};
+
+// Excel SUBSTITUTE: empty old_text returns the text unchanged (never inserts
+// between characters); a supplied instance ≤ 0 or non-finite is a #VALUE! error.
+export const substituteText = (text: string, oldText: string, newText: string, instance?: number): string | SpreadsheetError => {
+  if (oldText === "") return text;
+  if (instance === undefined) return text.split(oldText).join(newText);
+  const nth = Math.trunc(instance);
+  if (!Number.isFinite(nth) || nth <= 0) return VALUE_ERROR;
+  return replaceNthOccurrence(text, oldText, newText, nth);
+};
 
 const concatenateHandler: FunctionHandler = (args, context) => {
-  if (args.length === 0) throw new Error("CONCATENATE requires at least 1 argument");
-
   return args
     .map((arg) => {
       const value = context.evaluateFormula(arg.trim());
@@ -18,30 +71,20 @@ const concatenateHandler: FunctionHandler = (args, context) => {
 const concatHandler: FunctionHandler = concatenateHandler; // Alias
 
 const leftHandler: FunctionHandler = (args, context) => {
-  if (args.length < 1 || args.length > 2) {
-    throw new Error("LEFT requires 1 or 2 arguments");
-  }
-
   const text = toString(context.evaluateFormula(args[0]));
   const numChars = args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
 
-  return text.substring(0, numChars);
+  return takeLeft(text, numChars);
 };
 
 const rightHandler: FunctionHandler = (args, context) => {
-  if (args.length < 1 || args.length > 2) {
-    throw new Error("RIGHT requires 1 or 2 arguments");
-  }
-
   const text = toString(context.evaluateFormula(args[0]));
   const numChars = args.length === 2 ? Number(context.evaluateFormula(args[1])) : 1;
 
-  return text.substring(text.length - numChars);
+  return takeRight(text, numChars);
 };
 
 const midHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 3) throw new Error("MID requires 3 arguments");
-
   const text = toString(context.evaluateFormula(args[0]));
   const start = Number(context.evaluateFormula(args[1])) - 1; // 1-indexed to 0-indexed
   const numChars = Number(context.evaluateFormula(args[2]));
@@ -50,80 +93,41 @@ const midHandler: FunctionHandler = (args, context) => {
 };
 
 const lenHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("LEN requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
   return text.length;
 };
 
 const upperHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("UPPER requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
   return text.toUpperCase();
 };
 
 const lowerHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("LOWER requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
   return text.toLowerCase();
 };
 
 const properHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("PROPER requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
-  return text
-    .toLowerCase()
-    .split(" ")
-    .map((word) => (word.length > 0 ? word[0].toUpperCase() + word.slice(1) : ""))
-    .join(" ");
+  return toProperCase(text);
 };
 
 const trimHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("TRIM requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
   // Trim leading/trailing spaces and replace multiple spaces with single space
   return text.trim().replace(/\s+/g, " ");
 };
 
 const substituteHandler: FunctionHandler = (args, context) => {
-  if (args.length < 3 || args.length > 4) {
-    throw new Error("SUBSTITUTE requires 3 or 4 arguments");
-  }
-
   const text = toString(context.evaluateFormula(args[0]));
   const oldText = toString(context.evaluateFormula(args[1]));
   const newText = toString(context.evaluateFormula(args[2]));
+  const instance = args.length === 4 ? Number(context.evaluateFormula(args[3])) : undefined;
 
-  if (args.length === 4) {
-    // Replace specific instance
-    const instance = Number(context.evaluateFormula(args[3]));
-    let count = 0;
-    let index = 0;
-
-    while (index < text.length) {
-      const pos = text.indexOf(oldText, index);
-      if (pos === -1) break;
-
-      count++;
-      if (count === instance) {
-        return text.substring(0, pos) + newText + text.substring(pos + oldText.length);
-      }
-      index = pos + 1;
-    }
-    return text; // Instance not found
-  } else {
-    // Replace all instances
-    return text.split(oldText).join(newText);
-  }
+  return substituteText(text, oldText, newText, instance);
 };
 
 const replaceHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 4) throw new Error("REPLACE requires 4 arguments");
-
   const oldText = toString(context.evaluateFormula(args[0]));
   const startPos = Number(context.evaluateFormula(args[1])) - 1; // 1-indexed to 0-indexed
   const numChars = Number(context.evaluateFormula(args[2]));
@@ -133,23 +137,15 @@ const replaceHandler: FunctionHandler = (args, context) => {
 };
 
 const findHandler: FunctionHandler = (args, context) => {
-  if (args.length < 2 || args.length > 3) {
-    throw new Error("FIND requires 2 or 3 arguments");
-  }
-
   const findText = toString(context.evaluateFormula(args[0]));
   const withinText = toString(context.evaluateFormula(args[1]));
   const startPos = args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
 
   const index = withinText.indexOf(findText, startPos);
-  return index === -1 ? "#VALUE!" : index + 1; // Return 1-indexed position
+  return index === -1 ? VALUE_ERROR : index + 1; // Return 1-indexed position
 };
 
 const searchHandler: FunctionHandler = (args, context) => {
-  if (args.length < 2 || args.length > 3) {
-    throw new Error("SEARCH requires 2 or 3 arguments");
-  }
-
   const findText = toString(context.evaluateFormula(args[0]));
   const withinText = toString(context.evaluateFormula(args[1]));
   const startPos = args.length === 3 ? Number(context.evaluateFormula(args[2])) - 1 : 0;
@@ -159,42 +155,21 @@ const searchHandler: FunctionHandler = (args, context) => {
   const lowerWithin = withinText.toLowerCase();
 
   const index = lowerWithin.indexOf(lowerFind, startPos);
-  return index === -1 ? "#VALUE!" : index + 1; // Return 1-indexed position
+  return index === -1 ? VALUE_ERROR : index + 1; // Return 1-indexed position
 };
 
+// A format code written as a literal still carries its quotes when it reaches
+// the handler.
+const stripSurroundingQuotes = (text: string): string => text.replace(/^["']/, "").replace(/["']$/, "");
+
 const textHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 2) throw new Error("TEXT requires 2 arguments");
-
   const value = context.evaluateFormula(args[0]);
-  const format = toString(context.evaluateFormula(args[1])).replace(
-    // eslint-disable -- sonarjs/anchor-precedence
-    /^["']|["']$/g,
-    "",
-  );
-
-  // Simple format code handling
-  if (typeof value === "number") {
-    // Handle common format codes
-    if (format.includes("$")) {
-      const decimals = (format.match(/\.0+/) || [""])[0].length - 1;
-      return "$" + value.toFixed(decimals >= 0 ? decimals : 2);
-    }
-    if (format.includes("%")) {
-      const decimals = (format.match(/\.0+/) || [""])[0].length - 1;
-      return (value * 100).toFixed(decimals >= 0 ? decimals : 2) + "%";
-    }
-    if (format.includes("0")) {
-      const decimals = (format.match(/\.0+/) || [""])[0].length - 1;
-      return value.toFixed(decimals >= 0 ? decimals : 0);
-    }
-  }
-
-  return toString(value);
+  const format = stripSurroundingQuotes(toString(context.evaluateFormula(args[1])));
+  if (typeof value !== "number") return toString(value);
+  return formatWithPattern(value, format) ?? toString(value);
 };
 
 const valueHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 1) throw new Error("VALUE requires 1 argument");
-
   const text = toString(context.evaluateFormula(args[0]));
 
   // Remove currency symbols and commas
@@ -203,16 +178,14 @@ const valueHandler: FunctionHandler = (args, context) => {
   // Handle percentages
   if (cleaned.includes("%")) {
     const num = parseFloat(cleaned.replace("%", ""));
-    return isNaN(num) ? "#VALUE!" : num / 100;
+    return isNaN(num) ? VALUE_ERROR : num / 100;
   }
 
   const num = parseFloat(cleaned);
-  return isNaN(num) ? "#VALUE!" : num;
+  return isNaN(num) ? VALUE_ERROR : num;
 };
 
 const exactHandler: FunctionHandler = (args, context) => {
-  if (args.length !== 2) throw new Error("EXACT requires 2 arguments");
-
   const text1 = toString(context.evaluateFormula(args[0]));
   const text2 = toString(context.evaluateFormula(args[1]));
 

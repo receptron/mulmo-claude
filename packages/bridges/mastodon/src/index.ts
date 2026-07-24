@@ -22,12 +22,17 @@
 
 import "dotenv/config";
 import WebSocket from "ws";
-import { createBridgeClient, chunkText, formatAckReply } from "@mulmobridge/client";
-import { isObj, parseNotificationRaw, parseFrame, type JsonRecord, type ParsedStatus } from "./parse.js";
+import { createBridgeClient, chunkText, formatAckReply, frameText } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
+import { parseNotificationRaw, parseFrame, type JsonRecord, type ParsedStatus } from "./parse.js";
+import { resolvePublicUrl } from "./urlGuard.js";
 
 const TRANSPORT_ID = "mastodon";
 const MAX_STATUS_LEN = 500; // Mastodon's default soft limit; many instances raise to 1000+
 const FETCH_TIMEOUT_MS = 15_000;
+/** Cap on one fetched attachment. Without it a remote sender could point the
+ *  bridge at an arbitrarily large file and have it buffered, then base64'd. */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 60_000;
 
@@ -38,12 +43,7 @@ if (!instanceUrl || !accessToken) {
   process.exit(1);
 }
 
-const allowedAccts = new Set(
-  (process.env.MASTODON_ALLOWED_ACCTS ?? "")
-    .split(",")
-    .map((acct) => acct.trim())
-    .filter(Boolean),
-);
+const allowedAccts = parseCsvSet(process.env.MASTODON_ALLOWED_ACCTS);
 const allowAll = allowedAccts.size === 0;
 const dmOnly = (process.env.MASTODON_DM_ONLY ?? "true").toLowerCase() !== "false";
 
@@ -90,7 +90,7 @@ async function postOneStatus(chunk: string, opts: PostStatusOptions): Promise<st
   const payload: unknown = await res.json().catch((err) => {
     throw new Error(`Mastodon status POST returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
   });
-  if (!isObj(payload) || typeof payload.id !== "string") {
+  if (!isRecord(payload) || typeof payload.id !== "string") {
     throw new Error("Mastodon status POST response is missing id");
   }
   return payload.id;
@@ -123,12 +123,46 @@ interface MulmoAttachment {
   filename?: string;
 }
 
-async function fetchImageAttachment(url: string): Promise<MulmoAttachment | null> {
+/** Read at most `MAX_IMAGE_BYTES`, aborting mid-stream rather than after the
+ *  fact — `arrayBuffer()` would have already materialised the whole body. */
+async function readCappedBody(res: Response): Promise<Buffer | null> {
+  const declared = Number(res.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
+  const { body } = res;
+  if (!body) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_IMAGE_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function fetchImageAttachment(rawUrl: string): Promise<MulmoAttachment | null> {
+  // The URL comes from a remote sender, so it has to clear the SSRF guard
+  // before it can become an outbound request.
+  const url = await resolvePublicUrl(rawUrl);
+  if (url === null) {
+    console.warn("[mastodon] image fetch refused: url failed the safety check");
+    return null;
+  }
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), redirect: "error" });
     if (!res.ok) return null;
     const mimeType = res.headers.get("content-type") ?? "image/jpeg";
-    const buf = Buffer.from(await res.arrayBuffer());
+    const buf = await readCappedBody(res);
+    if (buf === null) {
+      console.warn("[mastodon] image fetch refused: body over the size cap");
+      return null;
+    }
     return { mimeType, data: buf.toString("base64") };
   } catch (err) {
     console.warn(`[mastodon] image fetch failed: ${err}`);
@@ -140,7 +174,7 @@ async function collectImageAttachments(media: unknown): Promise<MulmoAttachment[
   if (!Array.isArray(media)) return [];
   const out: MulmoAttachment[] = [];
   for (const item of media) {
-    if (!isObj(item) || item.type !== "image" || typeof item.url !== "string") continue;
+    if (!isRecord(item) || item.type !== "image" || typeof item.url !== "string") continue;
     const att = await fetchImageAttachment(item.url);
     if (att) out.push(att);
   }
@@ -194,7 +228,7 @@ function connect(): void {
   });
 
   socket.on("message", (buffer) => {
-    const frame = parseFrame(buffer.toString());
+    const frame = parseFrame(frameText(buffer));
     if (!frame || frame.event !== "notification") return;
     handleNotification(frame.payload).catch((err) => console.error(`[mastodon] notification handler error: ${err}`));
   });

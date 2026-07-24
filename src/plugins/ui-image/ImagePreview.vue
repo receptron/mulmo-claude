@@ -10,7 +10,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData } from "./types";
-import { resolveImageSrcFresh } from "../../utils/image/resolve";
+import { resolveImageSrcFresh } from "@mulmoclaude/markdown-utils/image/resolve";
 
 const { t } = useI18n();
 

@@ -114,6 +114,7 @@ import type { ToolResult } from "gui-chat-protocol";
 import type { SpreadsheetToolData, SpreadsheetSheet, SpreadsheetEndpoints } from "./definition";
 import {
   SpreadsheetEngine,
+  prefersDayFirst,
   indexToColumn,
   extractCellReferences,
   buildCellFromInput,
@@ -124,9 +125,9 @@ import {
 } from "./engine";
 import { applyCellHighlights, clearCellHighlights } from "./cellHighlights";
 import { getArrowKeyOffset, isWithinSheetBounds } from "./keyboardNav";
-import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { errorMessage as formatErrorMessage } from "../../utils/errors";
-import { escapeHtml } from "../../utils/markdown/wikiEmbeds";
+import { escapeHtml } from "@mulmoclaude/core/wiki";
 
 // Import all spreadsheet functions to populate the function registry
 import "./engine/functions";
@@ -138,7 +139,7 @@ import { isObj, isRecord } from "../../utils/types";
 const endpoints = pluginEndpoints<SpreadsheetEndpoints>("spreadsheet");
 const filesEndpoints = pluginEndpoints<{ content: string }>("files");
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 /**
  * Normalize malformed data structures
@@ -328,7 +329,9 @@ const calculateFormulas = (data: SpreadsheetCell[][], sheetName?: string): CellV
     data,
   };
 
-  // Calculate using the engine
+  // Read the date order from the current locale on every calculation, so a
+  // locale switch takes effect without rebuilding the engine.
+  engine.setOptions({ preferDDMMYYYY: prefersDayFirst(locale.value) });
   const result = engine.calculate(sheet, allSheets);
 
   // Return the calculated data

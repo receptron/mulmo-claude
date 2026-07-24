@@ -171,7 +171,7 @@
                   type="button"
                   class="h-8 w-8 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 disabled:opacity-40"
                   :data-testid="`skill-catalog-repo-update-${group.repo.repoId}`"
-                  :disabled="updatingRepoId === group.repo.repoId"
+                  :disabled="updatingRepoId === group.repo.repoId || uninstallingRepoId === group.repo.repoId"
                   :title="t('pluginManageSkills.catalogUpdateRepo')"
                   :aria-label="t('pluginManageSkills.catalogUpdateRepo')"
                   :aria-busy="updatingRepoId === group.repo.repoId"
@@ -183,7 +183,7 @@
                   type="button"
                   class="h-8 w-8 flex items-center justify-center rounded text-gray-400 hover:text-red-600 disabled:opacity-40"
                   :data-testid="`skill-catalog-repo-uninstall-${group.repo.repoId}`"
-                  :disabled="uninstallingRepoId === group.repo.repoId"
+                  :disabled="uninstallingRepoId === group.repo.repoId || updatingRepoId === group.repo.repoId"
                   :title="t('pluginManageSkills.catalogUninstallRepo')"
                   :aria-label="t('pluginManageSkills.catalogUninstallRepo')"
                   :aria-busy="uninstallingRepoId === group.repo.repoId"
@@ -245,53 +245,16 @@
 
       <!-- Right: detail pane -->
       <div class="flex-1 min-w-0 overflow-y-auto">
-        <!-- Catalog (preset) detail. Selecting a row from the
-             "Preset catalog" section in the left column routes
-             here. Shows description + body + Star / Run once
-             actions. (#1335 PR-B2 follow-up — replaces the inline
-             buttons and the Preview modal with a single right-pane
-             that mirrors the active-skill view.) -->
-        <div v-if="selectedCatalog" class="p-6" data-testid="skill-catalog-detail-pane">
-          <div class="flex items-start justify-between gap-4 mb-4">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="material-icons text-sm" :class="presetSourceMeta.colour" :title="presetSourceMeta.title" aria-hidden="true">{{
-                  presetSourceMeta.icon
-                }}</span>
-                <h3 class="text-xl font-semibold text-gray-800 truncate">{{ selectedCatalog.name }}</h3>
-              </div>
-              <p class="text-sm text-gray-600 mt-1">{{ selectedCatalog.description }}</p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                v-if="!selectedCatalog.alreadyActive"
-                class="h-8 px-2.5 flex items-center gap-1 text-sm rounded border border-yellow-400 text-yellow-600 hover:bg-yellow-50 disabled:opacity-40"
-                :disabled="catalogActioningKey === selectedCatalogKey"
-                :title="t('pluginManageSkills.catalogStar')"
-                data-testid="skill-catalog-detail-star-btn"
-                @click="starCatalogEntry(selectedCatalog)"
-              >
-                <span class="material-icons text-sm" aria-hidden="true">star_border</span>
-                {{ t("pluginManageSkills.catalogStar") }}
-              </button>
-              <button
-                v-else
-                class="h-8 px-2.5 flex items-center gap-1 text-sm rounded text-yellow-500 cursor-not-allowed"
-                :title="t('pluginManageSkills.catalogStarred')"
-                data-testid="skill-catalog-detail-starred"
-                disabled
-              >
-                <span class="material-icons text-sm" aria-hidden="true">star</span>
-                {{ t("pluginManageSkills.catalogStarred") }}
-              </button>
-            </div>
-          </div>
-          <div v-if="catalogDetailLoading" class="text-sm text-gray-400 italic">{{ t("pluginManageSkills.loading") }}</div>
-          <div v-else-if="catalogError" class="text-sm text-red-600">{{ catalogError }}</div>
-          <!-- eslint-disable vue/no-v-html -- markdown sanitized via sanitizeMarkdownHtml; same trust chain as the active-skill body below -->
-          <div v-else-if="catalogDetail" ref="catalogMarkdownRef" class="markdown-content text-gray-700" v-html="catalogRenderedBody"></div>
-          <!-- eslint-enable vue/no-v-html -->
-        </div>
+        <CatalogDetailPane
+          v-if="selectedCatalog"
+          :entry="selectedCatalog"
+          :source-meta="presetSourceMeta"
+          :actioning-key="catalogActioningKey"
+          :loading="catalogDetailLoading"
+          :error="catalogError"
+          :detail="catalogDetail"
+          @star="starCatalogEntry"
+        />
 
         <div v-else-if="!selected" class="p-6 text-sm text-gray-400 italic">{{ t("pluginManageSkills.selectHint") }}</div>
         <div v-else class="p-6">
@@ -390,119 +353,50 @@
       </div>
     </div>
 
-    <!-- Add-repo modal (#1383 PR-C2). URL (+ optional subpath) or a
-         one-click seed suggestion. Backend error kinds (invalid-url /
-         invalid-subpath / id-collision / no-skills / 502) surface
-         inline. -->
-    <div
+    <AddRepoModal
       v-if="addRepoOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      data-testid="skill-add-repo-modal"
-      @click.self="addRepoOpen = false"
-    >
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-5">
-        <h3 class="text-base font-semibold text-gray-800 mb-3">{{ t("pluginManageSkills.catalogAddRepoTitle") }}</h3>
-        <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageSkills.catalogRepoUrlLabel") }}</label>
-        <input
-          v-model="addRepoUrl"
-          type="text"
-          data-testid="skill-add-repo-url"
-          class="w-full h-8 px-2 mb-3 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          :placeholder="t('pluginManageSkills.catalogRepoUrlPlaceholder')"
-          @keydown.enter="installRepo(addRepoUrl, addRepoSubpath)"
-        />
-        <label class="block text-xs font-medium text-gray-600 mb-1">{{ t("pluginManageSkills.catalogRepoSubpathLabel") }}</label>
-        <input
-          v-model="addRepoSubpath"
-          type="text"
-          data-testid="skill-add-repo-subpath"
-          class="w-full h-8 px-2 mb-3 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-          :placeholder="t('pluginManageSkills.catalogRepoSubpathPlaceholder')"
-          @keydown.enter="installRepo(addRepoUrl, addRepoSubpath)"
-        />
-        <p v-if="addRepoError" class="text-xs text-red-600 mb-3" data-testid="skill-add-repo-error">{{ addRepoError }}</p>
-        <div class="flex items-center justify-end gap-2 mb-4">
-          <button
-            type="button"
-            class="h-8 px-2.5 flex items-center text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-            @click="addRepoOpen = false"
-          >
-            {{ t("common.cancel") }}
-          </button>
-          <button
-            type="button"
-            data-testid="skill-add-repo-submit"
-            class="h-8 px-2.5 flex items-center gap-1 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40"
-            :disabled="addRepoBusy"
-            @click="installRepo(addRepoUrl, addRepoSubpath)"
-          >
-            {{ addRepoBusy ? t("pluginManageSkills.catalogRepoInstalling") : t("pluginManageSkills.catalogAddRepoSubmit") }}
-          </button>
-        </div>
-        <div v-if="suggestions.length > 0">
-          <p class="text-xs font-medium text-gray-600 mb-2">{{ t("pluginManageSkills.catalogAddRepoSuggestions") }}</p>
-          <div
-            v-for="suggestion in suggestions"
-            :key="suggestion.url"
-            class="mb-1 rounded border"
-            :class="selectedSuggestionUrl === suggestion.url ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
-          >
-            <div class="flex items-start">
-              <button
-                type="button"
-                :data-testid="`skill-add-repo-suggestion-${suggestion.url}`"
-                class="flex-1 min-w-0 text-left px-3 py-2 text-sm"
-                :aria-pressed="selectedSuggestionUrl === suggestion.url"
-                @click="selectSuggestion(suggestion)"
-              >
-                <div class="font-medium text-gray-700">{{ suggestion.displayName }}</div>
-                <div class="text-xs text-gray-500" :class="selectedSuggestionUrl === suggestion.url ? 'whitespace-normal break-words' : 'truncate'">
-                  {{ suggestion.description }}
-                </div>
-              </button>
-              <a
-                :href="suggestion.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                :data-testid="`skill-add-repo-suggestion-link-${suggestion.url}`"
-                class="h-8 w-8 shrink-0 flex items-center justify-center rounded text-gray-400 hover:text-blue-600"
-                :title="t('pluginManageSkills.catalogRepoOpenLink')"
-                :aria-label="t('pluginManageSkills.catalogRepoOpenLink')"
-                @click.stop
-              >
-                <span class="material-icons text-sm" aria-hidden="true">open_in_new</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      v-model:url="addRepoUrl"
+      v-model:subpath="addRepoSubpath"
+      :error="addRepoError"
+      :busy="addRepoBusy"
+      :suggestions="suggestions"
+      :selected-suggestion-url="selectedSuggestionUrl"
+      @close="addRepoOpen = false"
+      @install="installRepo(addRepoUrl, addRepoSubpath)"
+      @select-suggestion="selectSuggestion"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { marked } from "marked";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import type { ManageSkillsData, SkillSummary } from "./index";
-import { apiGet, apiPost, apiPut, apiDelete } from "../../utils/api";
-import { handleExternalLinkClick } from "../../utils/dom/externalLink";
-import { sanitizeMarkdownHtml } from "../../utils/markdown/sanitize";
-import { useMermaidRenderer } from "../../utils/markdown/useMermaid";
+import { apiGet, apiPut, apiDelete } from "../../utils/api";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { pluginEndpoints } from "../api";
 import { buildRouteUrl } from "../meta-types";
 import type { SkillsEndpoints } from "./definition";
 import {
-  categorizeSkill,
   loadCollapsedSections,
   persistCollapsedSections,
-  loadRepoCollapsed,
-  persistRepoCollapsed,
   pickInitialSelection,
+  entryKey,
+  repoLabel,
+  toggleInSet,
+  skillBadgeMeta,
+  PRESET_SOURCE_META,
   type SkillSectionKey,
+  type SourceMeta,
 } from "./categories";
 import { isPresetActivation } from "./presetDetection";
+import { updateSkillDescription, removeSkillByName } from "./skillListEdits";
+import { useSkillMarkdown } from "./useSkillMarkdown";
+import { useSkillCatalog } from "./useSkillCatalog";
+import { useExternalRepos } from "./useExternalRepos";
+import AddRepoModal from "./AddRepoModal.vue";
+import CatalogDetailPane from "./CatalogDetailPane.vue";
 
 const { t } = useI18n();
 
@@ -518,10 +412,12 @@ const props = defineProps<{
   selectedResult?: ToolResultComplete<ManageSkillsData>;
 }>();
 
-// Local mutable copy of the skill list so the Delete button can
-// remove rows without waiting for a fresh tool_result push.
-// Re-seeded whenever the underlying tool result changes.
-const skills = ref<SkillSummary[]>(props.selectedResult?.data?.skills ?? []);
+// Local copy of the skill list so the Delete button can remove rows
+// without waiting for a fresh tool_result push. Shallow-copied (not the
+// prop array by reference) so local edits never rewrite the shared
+// tool result the Preview / chat export also read. Re-seeded whenever
+// the underlying tool result changes.
+const skills = ref<SkillSummary[]>([...(props.selectedResult?.data?.skills ?? [])]);
 
 // Collapsed-section state for the sidebar (active / catalog). Persisted
 // to localStorage so each user's preference survives reloads.
@@ -539,12 +435,7 @@ function isSectionOpen(key: SkillSectionKey): boolean {
 }
 
 function toggleSection(key: SkillSectionKey): void {
-  const next = new Set(collapsedSections.value);
-  if (next.has(key)) {
-    next.delete(key);
-  } else {
-    next.add(key);
-  }
+  const next = toggleInSet(collapsedSections.value, key);
   collapsedSections.value = next;
   persistCollapsedSections(next);
 }
@@ -561,14 +452,7 @@ const editBody = ref("");
 
 const selected = computed(() => skills.value.find((skill) => skill.name === selectedName.value) ?? null);
 
-const renderedBody = computed(() => {
-  const body = detail.value?.body;
-  if (!body) return "";
-  return sanitizeMarkdownHtml(marked(body) as string);
-});
-
-const skillMarkdownRef = ref<HTMLElement | null>(null);
-useMermaidRenderer(skillMarkdownRef, renderedBody);
+const { markdownRef: skillMarkdownRef, renderedBody } = useSkillMarkdown(() => detail.value?.body);
 
 // Edit/Delete follows the backend writer contract (writer.ts rejects
 // only source === "user"), NOT the mc- name heuristic. Under #1335
@@ -583,157 +467,76 @@ const listError = ref<string | null>(null);
 
 const endpoints = pluginEndpoints<SkillsEndpoints>("skills");
 
-// Catalog state (#1335 PR-B). Loaded on mount + after a successful
-// star so the row updates from "★ Star" → "★ Starred".
-// `catalogActioningKey` (declared below) disables the button
-// mid-request to prevent double-clicks across Star / Run once.
-type CatalogSource = "preset" | "external";
-interface CatalogEntry {
-  slug: string;
-  name: string;
-  description: string;
-  source: CatalogSource;
-  alreadyActive: boolean;
-  // External entries only — identify the source repo + skill folder
-  // so star / preview / run-once can address them (slug alone is the
-  // derived activeId, not enough to locate the catalog copy).
-  repoId?: string;
-  skillFolder?: string;
-  repoUrl?: string;
+async function refreshActiveList(): Promise<void> {
+  // Mirrors the onMounted fetch so the left-column list reflects a
+  // newly-starred skill without waiting for the next manageSkills tool
+  // result. Errors here are non-fatal — the catalog state is the source
+  // of truth for the "Starred" badge.
+  const response = await apiGet<{ skills: SkillSummary[] }>(endpoints.list.url);
+  if (response.ok && Array.isArray(response.data.skills)) {
+    skills.value = response.data.skills;
+  }
 }
-interface CatalogDetail {
-  slug: string;
-  source: CatalogSource;
-  description: string;
-  body: string;
-}
-interface ExternalRepo {
-  repoId: string;
-  url: string;
-  subpath?: string;
-  sha: string;
-  installedAt: string;
-}
-interface ExternalSuggestion {
-  url: string;
-  subpath?: string;
-  displayName: string;
-  description: string;
-  license?: string;
-}
-const catalogPresets = ref<CatalogEntry[]>([]);
-const catalogExternal = ref<CatalogEntry[]>([]);
-const catalogRepos = ref<ExternalRepo[]>([]);
-const catalogError = ref<string | null>(null);
 
-// True when the selected active skill has a matching entry in the
-// preset catalog — meaning a "delete" from `.claude/skills/<slug>/`
-// is recoverable, because the launcher re-syncs the catalog copy
-// under `data/skills/catalog/preset/<slug>/` on every boot
-// (see server/workspace/skills-preset.ts). We expose this case as
-// "Unstar" with a non-destructive confirm message; the underlying
-// DELETE endpoint is identical.
-//
-// Catalog membership (not the `mc-` slug prefix) is the
-// authoritative signal: the writer pipeline does not reserve the
-// `mc-` namespace, so a hand-rolled project skill named `mc-foo`
-// without a catalog entry must still surface the destructive Delete
-// copy. See isPresetActivation tests in test/plugins/manageSkills/.
+// Active and catalog selections are mutually exclusive — selecting a
+// catalog row clears the active selection (and vice versa) so the right
+// pane has a single source of truth.
+function clearActiveSelection(): void {
+  selectedName.value = null;
+}
+
+// Preset-catalog cluster (#1335 PR-B): browse / select / ★ Star / preview.
+const catalog = useSkillCatalog({ refreshActiveList, clearActiveSelection });
+const {
+  catalogPresets,
+  catalogExternal,
+  catalogError,
+  selectedCatalog,
+  catalogDetail,
+  catalogDetailLoading,
+  catalogActioningKey,
+  selectedCatalogKey,
+  loadCatalog,
+  selectCatalogEntry,
+  starCatalogEntry,
+} = catalog;
+
+// True when the selected active skill has a matching entry in the preset
+// catalog — meaning a "delete" from `.claude/skills/<slug>/` is
+// recoverable (the launcher re-syncs the catalog copy on every boot). We
+// expose this case as "Unstar" with a non-destructive confirm; the DELETE
+// endpoint is identical. Catalog membership (not the `mc-` slug prefix) is
+// the authoritative signal — see isPresetActivation tests.
 const isSelectedPreset = computed(() => isPresetActivation(detail.value?.name, catalogPresets.value));
-// Per-repo collapse set (repoId ∈ set ⇒ collapsed). shallowRef: the
-// Set is replaced wholesale on toggle.
-const repoCollapsed = shallowRef<Set<string>>(loadRepoCollapsed());
-// Add-repo modal state.
-const addRepoOpen = ref(false);
-const addRepoUrl = ref("");
-const addRepoSubpath = ref("");
-const addRepoError = ref<string | null>(null);
-const addRepoBusy = ref(false);
-const suggestions = ref<ExternalSuggestion[]>([]);
-// Which suggestion the user picked: drives the form prefill + the
-// "expanded description" / highlight. Selecting never installs —
-// install stays explicit (Install button / Enter in the URL field).
-const selectedSuggestionUrl = ref<string | null>(null);
-const uninstallingRepoId = ref<string | null>(null);
-const updatingRepoId = ref<string | null>(null);
-// Single in-flight gate covers Star / Run once on the selected
-// entry so a slow request doesn't let the user fire a second
-// action mid-flight.
-const catalogActioningKey = ref<string | null>(null);
-// Right-pane selection for a catalog entry (mutually exclusive
-// with `selectedName` — picking one clears the other).
-const selectedCatalog = ref<CatalogEntry | null>(null);
-const catalogDetail = ref<CatalogDetail | null>(null);
-const catalogDetailLoading = ref(false);
 
-const catalogRenderedBody = computed(() => {
-  const body = catalogDetail.value?.body;
-  if (!body) return "";
-  return sanitizeMarkdownHtml(marked(body) as string);
+// External-repo cluster (#1383 PR-C2): installed repos + add-repo modal.
+const repos = useExternalRepos({
+  catalogExternal,
+  catalogError,
+  reloadCatalog: loadCatalog,
+  refreshActiveList,
+  clearCatalogSelectionForRepo: catalog.clearSelectionIfRepo,
 });
-
-const catalogMarkdownRef = ref<HTMLElement | null>(null);
-useMermaidRenderer(catalogMarkdownRef, catalogRenderedBody);
-
-// External catalog entries grouped under their repo, in the repo
-// order returned by `/external/repos`. Repos with zero discoverable
-// entries still render (header + empty state) so an install that
-// found nothing is visible rather than silently absent.
-const externalGroups = computed<{ repo: ExternalRepo; entries: CatalogEntry[] }[]>(() =>
-  catalogRepos.value.map((repo) => ({
-    repo,
-    entries: catalogExternal.value
-      .filter((entry) => entry.repoId === repo.repoId)
-      .sort((leftEntry, rightEntry) => leftEntry.slug.localeCompare(rightEntry.slug)),
-  })),
-);
-
-function repoLabel(repo: ExternalRepo): string {
-  // `https://github.com/owner/repo` → `owner/repo`; fall back to the
-  // repoId if the URL is somehow unparseable.
-  const match = /github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(repo.url);
-  return match ? match[1] : repo.repoId;
-}
-
-function isRepoOpen(repoId: string): boolean {
-  return !repoCollapsed.value.has(repoId);
-}
-
-function toggleRepo(repoId: string): void {
-  const next = new Set(repoCollapsed.value);
-  if (next.has(repoId)) {
-    next.delete(repoId);
-  } else {
-    next.add(repoId);
-  }
-  repoCollapsed.value = next;
-  persistRepoCollapsed(next);
-}
-
-// Body/query shape for star + preview: external entries are keyed by
-// (repoId, skillFolder); presets by slug. Centralised so the two call
-// sites can't drift.
-function catalogActionParams(entry: CatalogEntry): Record<string, string> {
-  if (entry.source === "external" && entry.repoId && entry.skillFolder) {
-    return { source: "external", repoId: entry.repoId, skillFolder: entry.skillFolder };
-  }
-  return { source: entry.source, slug: entry.slug };
-}
-
-// Stable UI identity. External `slug` is the backend-derived
-// `<owner>-<skillFolder>` activeId — lossy + owner-prefixed, so two
-// external entries can collide (dup Vue keys / testids, wrong row
-// highlighted, shared in-flight lock, stale preview guard passing for
-// the wrong item). `(repoId, skillFolder)` is the unique stable key;
-// presets keep their already-unique slug.
-function entryKey(entry: CatalogEntry): string {
-  if (entry.source === "external" && entry.repoId && entry.skillFolder) {
-    return `${entry.repoId}/${entry.skillFolder}`;
-  }
-  return entry.slug;
-}
-
-const selectedCatalogKey = computed(() => (selectedCatalog.value ? entryKey(selectedCatalog.value) : null));
+const {
+  externalGroups,
+  isRepoOpen,
+  toggleRepo,
+  addRepoOpen,
+  addRepoUrl,
+  addRepoSubpath,
+  addRepoError,
+  addRepoBusy,
+  suggestions,
+  selectedSuggestionUrl,
+  uninstallingRepoId,
+  updatingRepoId,
+  loadExternalRepos,
+  openAddRepo,
+  selectSuggestion,
+  installRepo,
+  uninstallRepo,
+  updateRepo,
+} = repos;
 
 // Visual key for the provenance badge on every active row + the
 // preset rows. Provenance is derived via categorizeSkill (NOT the raw
@@ -747,239 +550,37 @@ const selectedCatalogKey = computed(() => (selectedCatalog.value ? entryKey(sele
 // preset case where we hint "library / shelf" with the inventory
 // glyph. The yellow ★ for "starred" is rendered separately so the
 // scope badge stays semantically about provenance, not state.
-interface SourceMeta {
-  icon: string;
-  title: string;
-  colour: string;
-}
-
+//
+// Thin view wrapper: the pure skillBadgeMeta returns an i18n title KEY;
+// resolve it here through the live t() so the template keeps its
+// { icon, title, colour } contract.
 function skillBadge(skill: SkillSummary): SourceMeta {
-  const provenance = categorizeSkill(skill);
-  if (provenance === "system") {
-    return { icon: "lock", title: t("pluginManageSkills.sourceSystemTitle"), colour: "text-gray-500" };
-  }
-  if (provenance === "user") {
-    return { icon: "home", title: t("pluginManageSkills.sourceUserTitle"), colour: "text-blue-500" };
-  }
-  return { icon: "folder", title: t("pluginManageSkills.sourceProjectTitle"), colour: "text-green-600" };
+  const meta = skillBadgeMeta(skill);
+  return { icon: meta.icon, colour: meta.colour, title: t(meta.titleKey) };
 }
 
 const presetSourceMeta = computed<SourceMeta>(() => ({
-  icon: "inventory_2",
-  title: t("pluginManageSkills.sourcePresetTitle"),
-  colour: "text-gray-400",
+  icon: PRESET_SOURCE_META.icon,
+  colour: PRESET_SOURCE_META.colour,
+  title: t(PRESET_SOURCE_META.titleKey),
 }));
 
-// Reset the selection when the tool result is replaced (e.g. the
-// user opens a newer `manageSkills` invocation from the sidebar).
-// Lives after the catalog refs so source-order use-before-define
-// is satisfied — the closure runs at watch-fire time, not at
-// module-eval time, but the lint rule is structural.
-watch(
-  () => props.selectedResult?.uuid,
-  () => {
-    skills.value = props.selectedResult?.data?.skills ?? [];
-    selectedName.value = pickInitialSelection(activeSkills.value, collapsedSections.value);
-    selectedCatalog.value = null;
-    catalogDetail.value = null;
-    catalogDetailLoading.value = false;
-    catalogActioningKey.value = null;
-    catalogError.value = null;
-    addRepoOpen.value = false;
-    addRepoError.value = null;
-    selectedSuggestionUrl.value = null;
-    uninstallingRepoId.value = null;
-    updatingRepoId.value = null;
-  },
-);
-
-async function loadCatalog(): Promise<void> {
-  const response = await apiGet<{ entries: CatalogEntry[] }>(endpoints.catalogList.url);
-  if (!response.ok) {
-    catalogError.value = t("pluginManageSkills.errCatalogListFailed", { error: response.error });
-    return;
-  }
-  catalogError.value = null;
-  if (Array.isArray(response.data.entries)) {
-    catalogPresets.value = response.data.entries.filter((entry) => entry.source === "preset");
-    catalogExternal.value = response.data.entries.filter((entry) => entry.source === "external");
-  }
-}
-
-async function loadExternalRepos(): Promise<void> {
-  const response = await apiGet<{ repos: ExternalRepo[] }>(endpoints.externalReposList.url);
-  if (!response.ok) {
-    catalogError.value = t("pluginManageSkills.errCatalogRepoListFailed", { error: response.error });
-    return;
-  }
-  if (Array.isArray(response.data.repos)) catalogRepos.value = response.data.repos;
-}
-
-async function loadSuggestions(): Promise<void> {
-  const response = await apiGet<{ suggestions: ExternalSuggestion[] }>(endpoints.externalSuggestions.url);
-  if (response.ok && Array.isArray(response.data.suggestions)) suggestions.value = response.data.suggestions;
-}
-
-function openAddRepo(): void {
-  addRepoUrl.value = "";
-  addRepoSubpath.value = "";
-  addRepoError.value = null;
-  selectedSuggestionUrl.value = null;
-  addRepoOpen.value = true;
-  if (suggestions.value.length === 0) void loadSuggestions();
-}
-
-// Pick a suggestion → prefill the form so the user can review and
-// then press Install. Deliberately does NOT install (avoids the
-// accidental one-click install footgun).
-function selectSuggestion(suggestion: ExternalSuggestion): void {
-  addRepoUrl.value = suggestion.url;
-  addRepoSubpath.value = suggestion.subpath ?? "";
-  addRepoError.value = null;
-  selectedSuggestionUrl.value = suggestion.url;
-}
-
-async function installRepo(url: string, subpath?: string): Promise<void> {
-  if (addRepoBusy.value) return;
-  const trimmedUrl = url.trim();
-  if (trimmedUrl.length === 0) {
-    addRepoError.value = t("pluginManageSkills.errCatalogRepoInvalidUrl");
-    return;
-  }
-  addRepoBusy.value = true;
-  addRepoError.value = null;
-  try {
-    const trimmedSubpath = subpath?.trim();
-    const body: Record<string, string> = { url: trimmedUrl };
-    if (trimmedSubpath) body.subpath = trimmedSubpath;
-    const response = await apiPost<{ installed: true; repoId: string }>(endpoints.externalReposInstall.url, body);
-    if (!response.ok) {
-      addRepoError.value = t("pluginManageSkills.errCatalogRepoInstallFailed", { error: response.error });
-      return;
-    }
-    addRepoOpen.value = false;
-    await Promise.all([loadExternalRepos(), loadCatalog()]);
-  } finally {
-    addRepoBusy.value = false;
-  }
-}
-
-async function uninstallRepo(repoId: string): Promise<void> {
-  if (uninstallingRepoId.value !== null) return;
-  if (typeof window !== "undefined" && !window.confirm(t("pluginManageSkills.catalogUninstallConfirm"))) return;
-  uninstallingRepoId.value = repoId;
-  try {
-    const response = await apiDelete<{ uninstalled: true }>(buildRouteUrl(endpoints.externalReposRemove, { repoId }));
-    if (!response.ok) {
-      catalogError.value = t("pluginManageSkills.errCatalogRepoUninstallFailed", { error: response.error });
-      return;
-    }
-    catalogError.value = null;
-    if (selectedCatalog.value?.repoId === repoId) {
-      selectedCatalog.value = null;
-      catalogDetail.value = null;
-    }
-    // Starred copies survive uninstall (backend-guaranteed, C1) — pull
-    // the active list so any starred-from-this-repo rows stay visible.
-    await Promise.all([loadExternalRepos(), loadCatalog(), refreshActiveList()]);
-  } finally {
-    uninstallingRepoId.value = null;
-  }
-}
-
-// "Update" == re-install with the repo's recorded url/subpath. C1's
-// install path re-fetches upstream HEAD, wipes + re-copies the
-// catalog dir, and rewrites `.source.json` with the new SHA. Starred
-// copies under `.claude/skills/` are untouched (catalog-layer only).
-async function updateRepo(repo: ExternalRepo): Promise<void> {
-  if (updatingRepoId.value !== null) return;
-  updatingRepoId.value = repo.repoId;
-  // try/finally so the in-flight gate always clears even if the
-  // request throws — otherwise the button stays disabled forever
-  // (same hardening as the star handler, Codex review #1374).
-  try {
-    const body: Record<string, string> = { url: repo.url };
-    if (repo.subpath) body.subpath = repo.subpath;
-    const response = await apiPost<{ installed: true; repoId: string }>(endpoints.externalReposInstall.url, body);
-    if (!response.ok) {
-      catalogError.value = t("pluginManageSkills.errCatalogRepoInstallFailed", { error: response.error });
-      return;
-    }
-    catalogError.value = null;
-    await Promise.all([loadExternalRepos(), loadCatalog()]);
-  } finally {
-    updatingRepoId.value = null;
-  }
-}
-
-async function refreshActiveList(): Promise<void> {
-  // Mirrors the onMounted fetch so the left-column list reflects the
-  // newly-starred skill without waiting for the next manageSkills
-  // tool result. Errors here are non-fatal — the catalog state is
-  // the source of truth for the "Starred" badge.
-  const response = await apiGet<{ skills: SkillSummary[] }>(endpoints.list.url);
-  if (response.ok && Array.isArray(response.data.skills)) {
-    skills.value = response.data.skills;
-  }
-}
-
-async function starCatalogEntry(entry: CatalogEntry): Promise<void> {
-  if (entry.alreadyActive) return;
-  catalogActioningKey.value = entryKey(entry);
-  const response = await apiPost<{ starred: true; slug: string }>(endpoints.catalogStar.url, catalogActionParams(entry));
-  catalogActioningKey.value = null;
-  if (!response.ok) {
-    catalogError.value = t("pluginManageSkills.errCatalogStarFailed", { error: response.error });
-    return;
-  }
-  catalogError.value = null;
-  // Refresh both lists so the row flips to "Starred" and the new
-  // active entry shows up in the left column.
-  await Promise.all([loadCatalog(), refreshActiveList()]);
-  // Reconcile the right-pane selection with the refreshed list so
-  // its `alreadyActive` flag reflects reality without forcing the
-  // user to re-click.
-  if (selectedCatalog.value && entryKey(selectedCatalog.value) === entryKey(entry)) {
-    const pool = entry.source === "external" ? catalogExternal.value : catalogPresets.value;
-    const updated = pool.find((candidate) => entryKey(candidate) === entryKey(entry));
-    if (updated) selectedCatalog.value = updated;
-  }
-}
-
-async function fetchCatalogDetail(entry: CatalogEntry): Promise<CatalogDetail | null> {
-  const response = await apiGet<{ detail: CatalogDetail }>(endpoints.catalogPreview.url, catalogActionParams(entry));
-  if (!response.ok) {
-    catalogError.value = t("pluginManageSkills.errCatalogPreviewFailed", { error: response.error });
-    return null;
-  }
-  catalogError.value = null;
-  return response.data.detail;
-}
-
 function selectActiveSkill(name: string): void {
-  // Active and catalog selections are mutually exclusive — picking
-  // one clears the other so the right pane has a single source of
-  // truth.
-  selectedCatalog.value = null;
-  catalogDetail.value = null;
+  catalog.clearSelection();
   selectedName.value = name;
 }
 
-async function selectCatalogEntry(entry: CatalogEntry): Promise<void> {
-  selectedName.value = null;
-  selectedCatalog.value = entry;
-  catalogDetail.value = null;
-  catalogDetailLoading.value = true;
-  const keyAtRequest = entryKey(entry);
-  const fetched = await fetchCatalogDetail(entry);
-  // Selection may have changed while the request was in flight —
-  // drop the response if so (same race-condition guard the active-
-  // skill detail watcher uses). Identity is the (repoId, skillFolder)
-  // composite for external entries, not the lossy slug.
-  if (!selectedCatalog.value || entryKey(selectedCatalog.value) !== keyAtRequest) return;
-  catalogDetailLoading.value = false;
-  if (fetched !== null) catalogDetail.value = fetched;
-}
+// Reset the selection when the tool result is replaced (e.g. the user
+// opens a newer `manageSkills` invocation from the sidebar).
+watch(
+  () => props.selectedResult?.uuid,
+  () => {
+    skills.value = [...(props.selectedResult?.data?.skills ?? [])];
+    selectedName.value = pickInitialSelection(activeSkills.value, collapsedSections.value);
+    catalog.reset();
+    repos.resetModalState();
+  },
+);
 
 // Standalone mode: if no selectedResult was passed, fetch the skill
 // list from the API on mount so the view is populated.
@@ -1059,20 +660,20 @@ async function saveEdit(): Promise<void> {
     detailError.value = t("pluginManageSkills.errSaveFailed", { error: result.error });
     return;
   }
-  detail.value = {
-    ...detail.value,
-    description: editDescription.value,
-    body: editBody.value,
-  };
-  // Update the sidebar summary too.
-  const idx = skills.value.findIndex((skill) => skill.name === name);
-  if (idx >= 0) {
-    skills.value[idx] = {
-      ...skills.value[idx],
+  // The sidebar summary keys off the captured `name`, so it stays correct
+  // even if the selection changed mid-save.
+  skills.value = updateSkillDescription(skills.value, name, editDescription.value);
+  // But `detail.value` may now describe a different skill (the user clicked
+  // away while the PUT was in flight) — only patch it when it is still ours,
+  // or we would graft skill A's edits onto skill B's pane.
+  if (detail.value?.name === name) {
+    detail.value = {
+      ...detail.value,
       description: editDescription.value,
+      body: editBody.value,
     };
+    editing.value = false;
   }
-  editing.value = false;
 }
 
 // Delete is project-scope only — see saveProjectSkill / deleteProjectSkill
@@ -1097,10 +698,7 @@ async function deleteSkill(): Promise<void> {
     return;
   }
   // Remove from the local list, advance selection, clear detail.
-  const idx = skills.value.findIndex((skill) => skill.name === name);
-  if (idx >= 0) {
-    skills.value.splice(idx, 1);
-  }
+  skills.value = removeSkillByName(skills.value, name);
   selectedName.value = pickInitialSelection(activeSkills.value, collapsedSections.value);
   detail.value = null;
   // Refresh the catalog so a deleted star reverts to ☆ Star.
@@ -1108,9 +706,6 @@ async function deleteSkill(): Promise<void> {
   // this call the badge + right-pane state would lag until the
   // next mount. (#1335 PR-B2 follow-up.)
   await loadCatalog();
-  if (selectedCatalog.value?.slug === name) {
-    const refreshed = catalogPresets.value.find((candidate) => candidate.slug === name);
-    if (refreshed) selectedCatalog.value = refreshed;
-  }
+  catalog.reconcileAfterDelete(name);
 }
 </script>

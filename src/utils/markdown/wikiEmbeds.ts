@@ -21,12 +21,13 @@
 // inherits the substitution automatically.
 
 import type { MarkedExtension, Tokens } from "marked";
+import { escapeHtml } from "@mulmoclaude/core/wiki";
 
 /** A handler renders one prefix's substitution HTML. Pure: no I/O,
  *  no fetches. The result is dropped straight into the rendered
  *  document, so it MUST be HTML-safe (escape user-controlled
- *  segments). Helpers like `escapeHtml` below cover the common
- *  case. */
+ *  segments). The shared `escapeHtml` from `@mulmoclaude/core/wiki`
+ *  covers the common case. */
 export interface WikiEmbedHandler {
   /** Lower-case prefix without the trailing colon (`"amazon"`,
    *  `"isbn"`, …). The tokenizer matches case-insensitively but
@@ -57,27 +58,6 @@ export function _resetWikiEmbeds(): void {
  *  doesn't need to enumerate handlers. */
 export function listWikiEmbedPrefixes(): string[] {
   return [...handlers.keys()].sort();
-}
-
-/** HTML-escape attribute / text content. Don't reach for
- *  DOMPurify here — the handlers run inside `marked.parse`'s tree
- *  at render time, before any sanitisation step the consumer
- *  applies; a single-purpose escaper keeps the bundle small. */
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
 }
 
 /** Pattern that matches one wiki-embed token. The id portion is

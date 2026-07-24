@@ -1,5 +1,5 @@
 // MulmoClaude's binding of the shared mulmoScript server ops (phase 3 of
-// plans/feat-mulmoscript-plugin.md). The mulmocast orchestration, realpath
+// plans/done/feat-mulmoscript-plugin.md). The mulmocast orchestration, realpath
 // containment, dispatch routing, and generation tracking all live in
 // @mulmoclaude/mulmoscript-plugin/server; this module supplies the
 // host-specific backend — stories location, artifacts FileOps, hardened

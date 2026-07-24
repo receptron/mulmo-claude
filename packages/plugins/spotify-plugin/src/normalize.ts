@@ -48,7 +48,11 @@ interface SpotifyPlaylist {
   images?: unknown;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+// Kept local: this plugin has no `@mulmoclaude/core` dependency. Must stay
+// identical to the canonical guard in `server/utils/types.ts` — `!Array.isArray`
+// is what stops an array narrowing to `Record` and being indexed by string key
+// (#2220).
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 function smallestImageUrl(images: unknown): string | undefined {
   if (!Array.isArray(images) || images.length === 0) return undefined;

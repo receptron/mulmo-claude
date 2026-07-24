@@ -7,7 +7,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { transformResolvableUrlsInHtml, rewriteSrcset, RESOLVABLE_TAG_ATTRS, SRCSET_TAG_ATTRS } from "../../../src/utils/image/htmlSrcAttrs";
+import { transformResolvableUrlsInHtml, rewriteSrcset, RESOLVABLE_TAG_ATTRS, SRCSET_TAG_ATTRS } from "@mulmoclaude/markdown-utils/image/htmlSrcAttrs";
 
 // `transform` that wraps every value with `R(...)` so substitutions
 // are visible at a glance and unchanged input is obvious.

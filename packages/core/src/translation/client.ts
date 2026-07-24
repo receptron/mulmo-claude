@@ -56,6 +56,27 @@ function cacheKey(req: TranslateRequest): string {
   return [req.namespace, req.targetLanguage, ...req.sentences].join("\u0000");
 }
 
+/** Resolve `req` through `cache` (peek-then-fetch) and hand the result to
+ *  `apply`, but only while `isCurrent()` still holds — so a slow response can't
+ *  overwrite a newer locale/input's translation. A synchronous peek hit skips
+ *  the guard (the caller just built `req`, so it is current by construction).
+ *  A rejected fetch is swallowed: the caller keeps its English fallback. */
+export function loadTranslated(cache: TranslationCache, req: TranslateRequest, isCurrent: () => boolean, apply: (value: readonly string[]) => void): void {
+  const hit = cache.peek(req);
+  if (hit !== null) {
+    apply(hit);
+    return;
+  }
+  cache
+    .fetch(req)
+    .then((result) => {
+      if (result !== null && isCurrent()) apply(result);
+    })
+    .catch(() => {
+      /* transport rejected — keep the English fallback */
+    });
+}
+
 export function createTranslationCache(transport: TranslateTransport): TranslationCache {
   const memo = new Map<string, readonly string[]>();
   const inflight = new Map<string, Promise<readonly string[] | null>>();

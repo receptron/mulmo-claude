@@ -3,7 +3,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { isMemoryType, slugifyMemoryName } from "../../../server/workspace/memory/types.js";
+import { compactAlnum, isMemoryType, slugifyMemoryName } from "../../../server/workspace/memory/types.js";
 import { isSafeMemorySlug } from "../../../server/workspace/memory/io.js";
 
 describe("memory/types — isMemoryType", () => {
@@ -19,6 +19,30 @@ describe("memory/types — isMemoryType", () => {
     assert.equal(isMemoryType(""), false);
     assert.equal(isMemoryType(undefined), false);
     assert.equal(isMemoryType(42), false);
+  });
+});
+
+// The single source of "which chars survive into a memory
+// filename" — both slug flavours build on it, so its edges are
+// pinned directly and not only through the slugifiers.
+describe("memory/types — compactAlnum", () => {
+  it("keeps ASCII alnum runs and joins them with a single separator", () => {
+    assert.equal(compactAlnum("egypt trip 2026"), "egypt-trip-2026");
+    assert.equal(compactAlnum("a!!!b"), "a-b");
+  });
+
+  it("does not lowercase — the caller does", () => {
+    assert.equal(compactAlnum("Egypt Trip"), "gypt-rip");
+  });
+
+  it("drops leading and trailing separator runs", () => {
+    assert.equal(compactAlnum("  ...music!!!  "), "music");
+  });
+
+  it("returns an empty string when no ASCII alnum char survives", () => {
+    assert.equal(compactAlnum(""), "");
+    assert.equal(compactAlnum("   "), "");
+    assert.equal(compactAlnum("印象派"), "");
   });
 });
 

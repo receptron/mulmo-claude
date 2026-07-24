@@ -7,7 +7,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { _splitSkillAndReplyForTest as splitSkillAndReply } from "../../server/api/routes/agent.js";
+import { splitSkillAndReply } from "../../server/agent/skillEvents.js";
 
 const SKILL_BODY =
   "# Shiritori (しりとり)\n\nPlay a round of しりとり with the user.\n\nStart the game now — output just your opening word + the prompt line, nothing else first.";

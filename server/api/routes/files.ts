@@ -4,8 +4,13 @@ import { mkdir, realpath, writeFile } from "fs/promises";
 import path from "path";
 import { workspacePath } from "../../workspace/workspace.js";
 import { statSafe, statSafeAsync, readDirSafeAsync, resolveWithinRoot, writeFileAtomic } from "../../utils/files/index.js";
+import { stripDataUri } from "../../utils/files/attachment-store.js";
+import { writeNewFileExclusive } from "../../utils/files/upload-io.js";
+import { MAX_RENAME_ATTEMPTS, renamedCandidate, sanitizeUploadFilename } from "../../utils/files/upload-name.js";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, notFound, sendError, serverError } from "../../utils/httpError.js";
+import { jsonSyntaxError, MAX_PREVIEW_BYTES } from "../../utils/files/content-write-validate.js";
+import { respondWithWrittenFile, validateWriteRequestOr400, type WriteContentResponse } from "./filesWriteResponse.js";
 import { getOptionalStringQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { GitignoreFilter } from "../../utils/gitignore.js";
@@ -31,9 +36,34 @@ import { spawn } from "node:child_process";
 // but we CAN distinguish "spawn succeeded" from "command not found /
 // permission denied" (e.g. `xdg-open` missing on a headless Linux
 // host). Client-side error handling depends on this signal.
-function spawnDetachedOsCommand(command: string, args: readonly string[], label: string): Promise<boolean> {
+/** The argv for opening a path in the host file manager, per platform. Pure,
+ *  so the per-OS choice can be tested without spawning anything — running the
+ *  real command in a test opens Finder on macOS and Explorer on Windows. */
+export function openArgv(absPath: string, platform: typeof process.platform): { command: string; args: string[] } {
+  if (platform === "darwin") return { command: "open", args: [absPath] };
+  if (platform === "win32") return { command: "explorer.exe", args: [absPath] };
+  return { command: "xdg-open", args: [absPath] };
+}
+
+/** The argv for revealing a path (folder opened, file selected). macOS `open -R`
+ *  and Windows `explorer /select,` select the file; Linux `xdg-open <dir>` only
+ *  opens the folder — there is no portable "select this item" across Linux file
+ *  managers, and landing next to the file is enough for drag-and-drop (#1985).
+ *  Same argv-array (no shell) discipline as `openArgv`, so a filename with shell
+ *  metacharacters can never be reinterpreted as command syntax. */
+export function revealArgv(absPath: string, platform: typeof process.platform): { command: string; args: string[] } {
+  if (platform === "darwin") return { command: "open", args: ["-R", absPath] };
+  if (platform === "win32") return { command: "explorer.exe", args: [`/select,${absPath}`] };
+  return { command: "xdg-open", args: [path.dirname(absPath)] };
+}
+
+/** Injectable so a test can assert the argv without launching the real file
+ *  manager. Defaults to Node's `spawn`. */
+export type Spawner = typeof spawn;
+
+function spawnDetachedOsCommand(command: string, args: readonly string[], label: string, spawner: Spawner): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    const child = spawner(command, args as string[], { detached: true, stdio: "ignore" });
     let settled = false;
     child.once("error", (err) => {
       if (settled) return;
@@ -50,35 +80,18 @@ function spawnDetachedOsCommand(command: string, args: readonly string[], label:
   });
 }
 
-export function openInHostOs(absPath: string): Promise<boolean> {
-  const { platform } = process;
-  const [command, args] =
-    platform === "darwin" ? (["open", [absPath]] as const) : platform === "win32" ? (["explorer.exe", [absPath]] as const) : (["xdg-open", [absPath]] as const);
-  return spawnDetachedOsCommand(command, args, "open");
+export function openInHostOs(absPath: string, spawner: Spawner = spawn): Promise<boolean> {
+  const { command, args } = openArgv(absPath, process.platform);
+  return spawnDetachedOsCommand(command, args, "open", spawner);
 }
 
-// Reveal the file in the host file manager. macOS `open -R` and
-// Windows `explorer /select,` open the containing folder with the
-// file selected; Linux `xdg-open <dir>` opens the folder only —
-// there's no portable "select this item" across the many Linux file
-// managers, and landing next to the file is enough for drag-and-drop
-// (#1985 follow-up). Same argv-array (no shell) discipline as
-// `openInHostOs` so a filename with shell metacharacters can never be
-// reinterpreted as command syntax.
-export function revealInHostOs(absPath: string): Promise<boolean> {
-  const { platform } = process;
-  const [command, args] =
-    platform === "darwin"
-      ? (["open", ["-R", absPath]] as const)
-      : platform === "win32"
-        ? (["explorer.exe", [`/select,${absPath}`]] as const)
-        : (["xdg-open", [path.dirname(absPath)]] as const);
-  return spawnDetachedOsCommand(command, args, "reveal");
+export function revealInHostOs(absPath: string, spawner: Spawner = spawn): Promise<boolean> {
+  const { command, args } = revealArgv(absPath, process.platform);
+  return spawnDetachedOsCommand(command, args, "reveal", spawner);
 }
 
 const router = Router();
 
-const MAX_PREVIEW_BYTES = 1024 * 1024; // 1 MB — text content embedded in JSON
 const MAX_RAW_BYTES = 50 * 1024 * 1024; // 50 MB — cap for non-media streaming (images/pdf/binary load whole into the browser)
 // Audio/video are streamed via HTTP Range requests (see GET /raw),
 // so the browser never buffers the whole file. Podcasts commonly
@@ -224,12 +237,6 @@ interface WriteContentRequest {
   content?: unknown;
 }
 
-interface WriteContentResponse {
-  path: string;
-  size: number;
-  modifiedMs: number;
-}
-
 interface FileContentMeta {
   kind: "image" | "pdf" | "audio" | "video" | "binary" | "too-large";
   path: string;
@@ -306,6 +313,9 @@ function resolveSafe(relPath: string): string | null {
 // ── Reference directory path resolution ──────────────────────────
 
 const REF_PREFIX = "@ref/";
+/** The prefix without its separator — a directory named exactly this is still
+ *  reference territory even though it fails the `@ref/` prefix test. */
+const REF_ROOT_SEGMENT = REF_PREFIX.slice(0, -1);
 
 function isRefPath(relPath: string): boolean {
   return relPath.startsWith(REF_PREFIX);
@@ -840,44 +850,6 @@ router.get(API_ROUTES.files.content, (req: Request<object, unknown, unknown, Pat
   res.json({ kind: "text", ...meta, content });
 });
 
-type PutContentValidation =
-  { ok: true; relPath: string; content: string; bytes: number } | { ok: false; logMsg: string; logExtra?: Record<string, unknown>; message: string };
-
-// Runtime-shape gate for PUT /api/files/content's body. Returns either
-// the narrowed inputs + their byte length (computed once and reused
-// downstream), or a structured rejection carrying the log message,
-// log extras, and the response message — so the caller can fan them
-// out into log.warn + badRequest without rebuilding context. `logExtra`
-// is optional so the missing-path branch can omit it: passing `{}` to
-// `log.warn` would emit `data: {}` (an observable change vs the
-// pre-refactor no-third-arg call); passing `undefined` skips the
-// `data` field entirely.
-function validatePutContentRequest(body: unknown): PutContentValidation {
-  const obj = (body ?? {}) as { path?: unknown; content?: unknown };
-  const { path: relPathRaw, content: contentRaw } = obj;
-  if (typeof relPathRaw !== "string" || relPathRaw.length === 0) {
-    return { ok: false, logMsg: "PUT content: missing path", message: "path required" };
-  }
-  if (typeof contentRaw !== "string") {
-    return {
-      ok: false,
-      logMsg: "PUT content: missing content",
-      logExtra: { pathPreview: previewSnippet(relPathRaw) },
-      message: "content required",
-    };
-  }
-  const bytes = Buffer.byteLength(contentRaw, "utf-8");
-  if (bytes > MAX_PREVIEW_BYTES) {
-    return {
-      ok: false,
-      logMsg: "PUT content: too large",
-      logExtra: { pathPreview: previewSnippet(relPathRaw), bytes },
-      message: `content exceeds ${MAX_PREVIEW_BYTES} byte limit`,
-    };
-  }
-  return { ok: true, relPath: relPathRaw, content: contentRaw, bytes };
-}
-
 type ResolvedTextFile = { ok: true; absPath: string } | { ok: false; status: 400 | 404; message: string };
 
 // Two-step path resolution + text-only gate for PUT /api/files/content.
@@ -932,16 +904,6 @@ async function writeFileContent(absPath: string, content: string): Promise<void>
 // hits disk so the editor can surface the parser error inline. `.jsonl`
 // is intentionally excluded — each line is its own document, not one
 // JSON value, so `JSON.parse` of the whole file would always fail.
-function jsonSyntaxError(relPath: string, content: string): string | null {
-  if (!relPath.toLowerCase().endsWith(".json")) return null;
-  try {
-    JSON.parse(content);
-    return null;
-  } catch (err) {
-    return `Invalid JSON: ${errorMessage(err)}`;
-  }
-}
-
 // Write the body of an existing text file. Only text-classified files
 // (per `classify`) are editable — binary, image, audio, etc. are
 // refused so the endpoint can't be used to ship arbitrary uploads.
@@ -977,7 +939,6 @@ async function resolveNewFilePath(
     if (HIDDEN_DIRS.has(seg)) return { ok: false, status: 400, message: "Path not allowed" };
   }
   if (isSensitivePath(relativeFromWorkspace)) return { ok: false, status: 400, message: "Path not allowed" };
-  if (classify(candidate) !== "text") return { ok: false, status: 400, message: "File type not editable" };
   // Walk up the candidate's ancestors until we find one that exists.
   // Realpath THAT ancestor — a symlinked in-workspace folder pointing
   // outside `workspaceReal` would otherwise let the create land outside.
@@ -1069,18 +1030,19 @@ async function performCreateWrite(
 // passes a slug for a file it believes doesn't exist; we re-check
 // here to close the TOCTOU window between two tabs.
 router.post(API_ROUTES.files.create, async (req: Request<object, unknown, WriteContentRequest>, res: Response<WriteContentResponse | ErrorResponse>) => {
-  const validation = validatePutContentRequest(req.body);
-  if (!validation.ok) {
-    log.warn("files", validation.logMsg, validation.logExtra);
-    badRequest(res, validation.message);
-    return;
-  }
-  const { relPath, content, bytes: contentBytes } = validation;
-  log.info("files", "POST create: start", { pathPreview: previewSnippet(relPath), bytes: contentBytes });
+  const inputs = validateWriteRequestOr400(req.body, res, "POST create");
+  if (!inputs) return;
+  const { relPath, content, bytes: contentBytes } = inputs;
 
   const resolved = await resolveNewFilePath(relPath);
   if (!resolved.ok) {
     badRequest(res, resolved.message);
+    return;
+  }
+  // Type policy lives with the caller: create/edit only accept editable text,
+  // while `files.upload` deliberately writes arbitrary bytes.
+  if (classify(resolved.absPath) !== "text") {
+    badRequest(res, "File type not editable");
     return;
   }
   const jsonError = jsonSyntaxError(relPath, content);
@@ -1091,28 +1053,125 @@ router.post(API_ROUTES.files.create, async (req: Request<object, unknown, WriteC
   }
   const created = await performCreateWrite(resolved, content, relPath, res);
   if (!created) return;
-  const fresh = await statSafeAsync(resolved.absPath);
-  log.info("files", "POST create: ok", {
-    pathPreview: previewSnippet(relPath),
-    bytes: fresh?.size ?? contentBytes,
-  });
-  void publishFileChange(relPath);
-  res.json({
-    path: relPath,
-    size: fresh?.size ?? contentBytes,
-    modifiedMs: fresh?.mtimeMs ?? Date.now(),
-  });
+  await respondWithWrittenFile(res, { absPath: resolved.absPath, relPath, fallbackBytes: contentBytes, logLabel: "POST create" });
 });
 
-router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteContentRequest>, res: Response<WriteContentResponse | ErrorResponse>) => {
-  const validation = validatePutContentRequest(req.body);
+/** Cap on one dropped file, in decoded bytes.
+ *
+ *  Deliberately well under the 50 MB `express.json` body cap (server/index.ts):
+ *  the file travels as a base64 `data:` URI inside JSON, which inflates it by
+ *  4/3 before the envelope is even counted. Advertising 50 MB would be a limit
+ *  this handler never gets to enforce — express would reject a 40 MB file with
+ *  a generic 413 first. 32 MB decoded is ~43 MB encoded, comfortably inside. */
+const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
+
+/** Refused on upload: things a later double-click would execute. A drop into
+ *  the workspace is for data, not for programs. */
+const BLOCKED_UPLOAD_EXTENSIONS = new Set([".exe", ".dll", ".so", ".dylib", ".bat", ".cmd", ".com", ".scr", ".msi", ".app", ".sh", ".ps1"]);
+
+interface UploadFileBody {
+  dir?: unknown;
+  filename?: unknown;
+  dataUrl?: unknown;
+}
+
+/** Seams for `writeUploadWithRename`, so its collision / containment behaviour
+ *  can be exercised without touching the real workspace. */
+export interface UploadWriteDeps {
+  resolve: (relPath: string) => Promise<{ ok: true; absPath: string; workspaceRoot: string } | { ok: false; status: 400; message: string }>;
+  write: (absPath: string, bytes: Buffer) => Promise<void>;
+}
+
+const defaultUploadWriteDeps: UploadWriteDeps = {
+  resolve: resolveNewFilePath,
+  // Exclusive create lives in its own I/O module; EEXIST drives the rename retry.
+  write: writeNewFileExclusive,
+};
+
+// Write the bytes under `dirRel`, never clobbering: on EEXIST the name gets a
+// ` (n)` suffix and we retry. Each candidate re-runs the containment check, so
+// a rename can't walk the write out of the workspace either.
+export async function writeUploadWithRename(
+  dirRel: string,
+  safeName: string,
+  bytes: Buffer,
+  deps: UploadWriteDeps = defaultUploadWriteDeps,
+): Promise<{ ok: true; relPath: string; absPath: string } | { ok: false; status: number; message: string }> {
+  for (let attempt = 0; attempt <= MAX_RENAME_ATTEMPTS; attempt += 1) {
+    const relPath = path.join(dirRel, attempt === 0 ? safeName : renamedCandidate(safeName, attempt));
+    const resolved = await deps.resolve(relPath);
+    if (!resolved.ok) return { ok: false, status: resolved.status, message: resolved.message };
+    try {
+      await deps.write(resolved.absPath, bytes);
+      // Hand back the resolver's realpath'd target: rebuilding it from
+      // `workspaceReal + relPath` would skip symlink resolution and could stat
+      // the wrong file (or nothing).
+      return { ok: true, relPath, absPath: resolved.absPath };
+    } catch (err) {
+      const { code } = err as { code?: string };
+      if (code !== "EEXIST") return { ok: false, status: 500, message: errorMessage(err) };
+    }
+  }
+  return { ok: false, status: 409, message: "Could not find an unused filename" };
+}
+
+export function validateUploadBody(body: UploadFileBody): { ok: true; dir: string; safeName: string; bytes: Buffer } | { ok: false; message: string } {
+  const { dir, filename, dataUrl } = body;
+  if (typeof dir !== "string" || typeof filename !== "string" || typeof dataUrl !== "string") {
+    return { ok: false, message: "dir, filename and dataUrl are required" };
+  }
+  // Reference roots are read-only mounts. The tree hides the drop affordance
+  // for them, but that's UI, not enforcement — a direct POST must be refused
+  // too, or `@ref/<label>/…` would resolve like any other folder. The bare
+  // `@ref` segment has to go as well: it isn't a ref path by the prefix test,
+  // yet writing into it produces `@ref/<file>`, which every other file API
+  // then reads back as a reference path.
+  // Compare on a POSIX-shaped path. `path.normalize` is host-dependent: on
+  // Windows it rewrites "@ref/docs" to "@ref\docs", and the prefix test looks
+  // for the literal "@ref/" — so normalising the host way would let a ref-root
+  // upload through on Windows while blocking it on POSIX.
+  const normalisedDir = path.posix.normalize(dir.replace(/\\/g, "/"));
+  if (isRefPath(normalisedDir) || normalisedDir === REF_ROOT_SEGMENT) {
+    return { ok: false, message: "Reference roots are read-only" };
+  }
+  const safeName = sanitizeUploadFilename(filename);
+  if (safeName === null) return { ok: false, message: "Invalid filename" };
+  if (BLOCKED_UPLOAD_EXTENSIONS.has(path.extname(safeName).toLowerCase())) return { ok: false, message: "File type not allowed" };
+  const parsed = stripDataUri(dataUrl);
+  if (!parsed) return { ok: false, message: "dataUrl must be a data: URI" };
+  const bytes = Buffer.from(parsed.base64, "base64");
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) return { ok: false, message: `File exceeds the ${MAX_UPLOAD_BYTES} byte upload limit` };
+  return { ok: true, dir, safeName, bytes };
+}
+
+router.post(API_ROUTES.files.upload, async (req: Request<object, unknown, UploadFileBody>, res: Response<WriteContentResponse | ErrorResponse>) => {
+  const validation = validateUploadBody(req.body);
   if (!validation.ok) {
-    log.warn("files", validation.logMsg, validation.logExtra);
+    log.warn("files", "POST upload: rejected", { reason: validation.message });
     badRequest(res, validation.message);
     return;
   }
-  const { relPath, content, bytes: contentBytes } = validation;
-  log.info("files", "PUT content: start", { pathPreview: previewSnippet(relPath), bytes: contentBytes });
+  const { dir, safeName, bytes } = validation;
+  log.info("files", "POST upload: start", { pathPreview: previewSnippet(path.join(dir, safeName)), bytes: bytes.byteLength });
+
+  const written = await writeUploadWithRename(dir, safeName, bytes);
+  if (!written.ok) {
+    sendError(res, written.status, written.message);
+    return;
+  }
+  // Kept off `respondWithWrittenFile`: the success line reports the
+  // decoded payload size the client sent, not the post-write stat that
+  // the create / overwrite routes log.
+  const fresh = await statSafeAsync(written.absPath);
+  log.info("files", "POST upload: ok", { pathPreview: previewSnippet(written.relPath), bytes: bytes.byteLength });
+  void publishFileChange(written.relPath);
+  res.json({ path: written.relPath, size: fresh?.size ?? bytes.byteLength, modifiedMs: fresh?.mtimeMs ?? Date.now() });
+});
+
+router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteContentRequest>, res: Response<WriteContentResponse | ErrorResponse>) => {
+  const inputs = validateWriteRequestOr400(req.body, res, "PUT content");
+  if (!inputs) return;
+  const { relPath, content, bytes: contentBytes } = inputs;
 
   const resolved = await resolveExistingTextFile(relPath);
   if (!resolved.ok) {
@@ -1133,21 +1192,7 @@ router.put(API_ROUTES.files.content, async (req: Request<object, unknown, WriteC
     serverError(res, "Failed to write file");
     return;
   }
-  const fresh = await statSafeAsync(resolved.absPath);
-  log.info("files", "PUT content: ok", {
-    pathPreview: previewSnippet(relPath),
-    bytes: fresh?.size ?? contentBytes,
-  });
-  // Notify subscribers + run side-effect hooks (e.g. memory topic
-  // index regeneration in #1032). Fire-and-forget; the publisher
-  // logs failures internally and the user-facing write already
-  // succeeded.
-  void publishFileChange(relPath);
-  res.json({
-    path: relPath,
-    size: fresh?.size ?? contentBytes,
-    modifiedMs: fresh?.mtimeMs ?? Date.now(),
-  });
+  await respondWithWrittenFile(res, { absPath: resolved.absPath, relPath, fallbackBytes: contentBytes, logLabel: "PUT content" });
 });
 
 router.get(API_ROUTES.files.raw, (req: Request<object, unknown, unknown, PathQuery>, res: Response<ErrorResponse>) => {

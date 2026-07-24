@@ -25,6 +25,14 @@ export interface TruncationResult {
   omittedChars: number;
 }
 
+// A code-unit slice can end on the high half of a surrogate pair — the
+// tail then renders as U+FFFD and a lone surrogate leaks into marked /
+// clipboard paths. Drop the dangling half instead.
+function sliceWithoutDanglingSurrogate(text: string, length: number): string {
+  const sliced = text.slice(0, length);
+  return /[\uD800-\uDBFF]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
+}
+
 // Truncate an assistant message so pathological model output can't
 // freeze the render path. Pure so it can be unit-tested from
 // node:test without a Vue runtime.
@@ -33,11 +41,12 @@ export function truncateForRender(text: string): TruncationResult {
   if (originalChars <= RENDER_TRUNCATE_CHARS) {
     return { displayText: text, wasTruncated: false, originalChars, omittedChars: 0 };
   }
+  const displayText = sliceWithoutDanglingSurrogate(text, RENDER_TRUNCATE_PREVIEW_CHARS);
   return {
-    displayText: text.slice(0, RENDER_TRUNCATE_PREVIEW_CHARS),
+    displayText,
     wasTruncated: true,
     originalChars,
-    omittedChars: originalChars - RENDER_TRUNCATE_PREVIEW_CHARS,
+    omittedChars: originalChars - displayText.length,
   };
 }
 
@@ -50,10 +59,18 @@ export function truncateForRender(text: string): TruncationResult {
 //      fallback (the PDF filename builder uses "chat").
 export function extractTextResponseTitle(text: string): string {
   let firstNonEmpty: string | null = null;
+  let insideFence = false;
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    if (trimmed.startsWith("# ")) {
+    // A "# ..." line inside a fenced block is a shell/Python comment, not a
+    // heading — "```bash\n# install deps\n```" must not name the download.
+    if (/^(```|~~~)/.test(trimmed)) {
+      insideFence = !insideFence;
+      if (firstNonEmpty === null) firstNonEmpty = trimmed;
+      continue;
+    }
+    if (!insideFence && trimmed.startsWith("# ")) {
       return trimmed.slice(2).trim().slice(0, MAX_TITLE_CHARS);
     }
     if (firstNonEmpty === null) firstNonEmpty = trimmed;

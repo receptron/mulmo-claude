@@ -10,6 +10,7 @@
 import { computed, ref, type ComputedRef } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
 import { apiGet, apiPut } from "../utils/api";
+import { createMutationQueue } from "../utils/mutationQueue";
 import { sameShortcut, type Shortcut, type ShortcutKind } from "../types/shortcuts";
 
 const shortcuts = ref<Shortcut[]>([]);
@@ -46,24 +47,10 @@ async function load(force = false): Promise<void> {
   return loadPromise;
 }
 
-// Every mutation runs through this chain so the replace-all PUTs never
-// overlap. `PUT /api/shortcuts` rewrites the whole array, so two in-flight
-// saves could land out of order and resurrect a removed pin or drop a new
-// one — both in the UI and on disk. Serializing also fixes the cold-load
-// race: each task awaits `load()` first, so the initial server list is in
-// the ref before any task reads `previous` (otherwise a click during the
-// boot GET would persist `[]` + the new pin, wiping existing pins).
-let mutationChain: Promise<unknown> = Promise.resolve();
-
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
-  const run = mutationChain.then(task, task);
-  // Keep the chain alive regardless of any single task's outcome.
-  mutationChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
+// `PUT /api/shortcuts` rewrites the whole array, so every mutation runs
+// through this queue and the replace-all PUTs never overlap. See
+// `createMutationQueue` for the races that prevents.
+const { enqueue } = createMutationQueue();
 
 /** Persist the given list, rolling the local ref back to `previous` on
  *  failure. Returns true on success. Call only from inside `enqueue`. */

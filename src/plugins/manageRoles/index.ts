@@ -1,12 +1,9 @@
 import type { ToolPlugin } from "../../tools/types";
-import type { ToolResult } from "gui-chat-protocol";
 import toolDefinition, { TOOL_NAME, type RolesEndpoints } from "./definition";
-import { pluginEndpoints } from "../api";
+import { makePostExecute } from "../execute";
 import { wrapWithScope } from "../scope";
 import View from "./View.vue";
 import Preview from "./Preview.vue";
-import { apiPost } from "../../utils/api";
-import { makeUuid } from "../../utils/id";
 
 export interface CustomRole {
   id: string;
@@ -23,22 +20,7 @@ export interface ManageRolesData {
 
 const manageRolesPlugin: ToolPlugin = {
   toolDefinition,
-  async execute(_context, args) {
-    const endpoints = pluginEndpoints<RolesEndpoints>("roles");
-    const result = await apiPost<ToolResult<ManageRolesData>>(endpoints.manage, args);
-    if (!result.ok) {
-      return {
-        toolName: TOOL_NAME,
-        uuid: makeUuid(),
-        message: result.error,
-      };
-    }
-    return {
-      ...result.data,
-      toolName: TOOL_NAME,
-      uuid: makeUuid(),
-    };
-  },
+  execute: makePostExecute<RolesEndpoints, ManageRolesData>("roles", "manage", TOOL_NAME),
   isEnabled: () => true,
   generatingMessage: "Managing roles…",
   viewComponent: wrapWithScope("roles", View),

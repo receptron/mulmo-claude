@@ -20,6 +20,7 @@ import crypto from "crypto";
 import express, { type Request, type Response } from "express";
 import { configureTrustProxy, createWebhookRateLimit } from "@mulmobridge/webhook-runtime";
 import { createBridgeClient } from "@mulmobridge/client";
+import { isRecord } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "google-chat";
 const PORT = Number(process.env.GOOGLE_CHAT_BRIDGE_PORT) || 3005;
@@ -37,10 +38,6 @@ mulmo.onPush((pushEvent) => {
   // available in synchronous webhook mode. Log for now.
   console.log(`[google-chat] push (not delivered): ${pushEvent.chatId} ${pushEvent.message}`);
 });
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 // ── JWT verification (Google Chat OIDC) ────────────────────────
 //
@@ -75,11 +72,11 @@ async function fetchJwks(): Promise<JwkKey[]> {
     if (!res.ok) {
       throw new Error(`JWKS fetch failed: ${res.status}`);
     }
-    const data: { keys?: unknown[] } = await res.json();
-    if (!Array.isArray(data.keys)) throw new Error("Invalid JWKS response");
+    const data: unknown = await res.json();
+    if (!isRecord(data) || !Array.isArray(data.keys)) throw new Error("Invalid JWKS response");
     cachedKeys = data.keys.filter(
       (keyCandidate): keyCandidate is JwkKey =>
-        isObj(keyCandidate) && typeof keyCandidate.kid === "string" && typeof keyCandidate.n === "string" && typeof keyCandidate.e === "string",
+        isRecord(keyCandidate) && typeof keyCandidate.kid === "string" && typeof keyCandidate.n === "string" && typeof keyCandidate.e === "string",
     );
     cacheExpiresAt = Date.now() + JWKS_CACHE_TTL_MS;
     return cachedKeys;
@@ -107,7 +104,7 @@ function parseJwtParts(token: string): JwtParts | null {
   try {
     const header: unknown = JSON.parse(base64UrlDecode(parts[0]).toString());
     const payload: unknown = JSON.parse(base64UrlDecode(parts[1]).toString());
-    if (!isObj(header) || !isObj(payload)) return null;
+    if (!isRecord(header) || !isRecord(payload)) return null;
     return {
       header,
       payload,
@@ -198,7 +195,7 @@ configureTrustProxy(app);
 app.use(express.json({ limit: BODY_LIMIT }));
 
 function extractEventType(body: unknown): string {
-  if (!isObj(body) || typeof body.type !== "string") return "";
+  if (!isRecord(body) || typeof body.type !== "string") return "";
   return body.type;
 }
 
@@ -209,14 +206,14 @@ interface ParsedMessage {
 }
 
 function extractMessage(body: unknown): ParsedMessage | null {
-  if (!isObj(body)) return null;
+  if (!isRecord(body)) return null;
   const msg = body.message;
-  if (!isObj(msg)) return null;
+  if (!isRecord(msg)) return null;
   if (typeof msg.text !== "string") return null;
   const { space } = msg;
-  if (!isObj(space) || typeof space.name !== "string") return null;
+  if (!isRecord(space) || typeof space.name !== "string") return null;
   const { sender } = msg;
-  const senderName = isObj(sender) && typeof sender.displayName === "string" ? sender.displayName : "unknown";
+  const senderName = isRecord(sender) && typeof sender.displayName === "string" ? sender.displayName : "unknown";
   return { spaceName: space.name, senderName, text: msg.text };
 }
 

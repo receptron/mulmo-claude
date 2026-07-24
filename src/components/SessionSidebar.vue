@@ -19,31 +19,45 @@
         <CanvasViewToggle :model-value="layoutMode" @update:model-value="(mode) => emit('update:layoutMode', mode)" />
       </div>
     </div>
-    <div
-      ref="root"
-      class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 outline-none"
-      tabindex="0"
-      data-testid="tool-results-scroll"
-      @mousedown="emit('activate')"
-    >
-      <div
-        v-for="result in results"
-        :key="result.uuid"
-        class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
-        :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
-        @click="emit('select', result.uuid)"
+    <!-- `relative` so the "new messages" affordance can sit over the scroll
+         area without joining its scrolling content. -->
+    <div class="relative flex-1 min-h-0 flex flex-col">
+      <button
+        v-if="hasNewMessages"
+        type="button"
+        class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-blue-700 transition-colors"
+        data-testid="chat-new-messages"
+        @click="emit('jump-to-latest')"
       >
-        <span class="absolute top-0 left-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none">
-          {{ sourceLabel(result) }}
-        </span>
-        <span
-          v-if="resultTimestamps.get(result.uuid)"
-          class="absolute top-0 right-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none"
+        {{ t("sidebarHeader.newMessages") }}
+        <span class="material-icons text-sm leading-none" aria-hidden="true">arrow_downward</span>
+      </button>
+      <div
+        ref="root"
+        class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 outline-none"
+        tabindex="0"
+        data-testid="tool-results-scroll"
+        @mousedown="emit('activate')"
+      >
+        <div
+          v-for="result in results"
+          :key="result.uuid"
+          class="relative cursor-pointer rounded border border-gray-300 text-sm text-gray-900 hover:opacity-75 transition-opacity"
+          :class="result.uuid === selectedUuid ? 'ring-2 ring-blue-500' : ''"
+          @click="emit('select', result.uuid)"
         >
-          {{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}
-        </span>
-        <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
-        <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
+          <span class="absolute top-0 left-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none">
+            {{ sourceLabel(result) }}
+          </span>
+          <span
+            v-if="resultTimestamps.get(result.uuid)"
+            class="absolute top-0 right-2 -translate-y-1/2 bg-gray-100 px-1 text-[10px] text-gray-400 leading-none pointer-events-none"
+          >
+            {{ formatSmartTime(resultTimestamps.get(result.uuid)!) }}
+          </span>
+          <component :is="getPlugin(result.toolName)?.previewComponent" v-if="getPlugin(result.toolName)?.previewComponent" :result="result" />
+          <span v-else class="block truncate p-2">{{ result.title || result.toolName }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -74,6 +88,10 @@ defineProps<{
   sessionRoleIcon?: string;
   layoutMode: LayoutMode;
   showRightSidebar: boolean;
+  /** Output arrived while the reader was scrolled away from the bottom.
+   *  Drives the "new messages" affordance — deliberately NOT just "scrolled
+   *  up", which would claim new output when the reader is only re-reading. */
+  hasNewMessages?: boolean;
 }>();
 
 function sourceLabel(result: ToolResultComplete): string {
@@ -93,6 +111,7 @@ const emit = defineEmits<{
   activate: [];
   "update:layoutMode": [mode: LayoutMode];
   "toggle-right-sidebar": [];
+  "jump-to-latest": [];
 }>();
 
 const root = ref<HTMLDivElement | null>(null);

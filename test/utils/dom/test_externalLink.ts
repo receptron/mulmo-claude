@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isCrossOriginHttpUrl } from "../../../src/utils/dom/externalLink.js";
+import { isCrossOriginHttpUrl } from "@mulmoclaude/markdown-utils/dom/externalLink";
 
 const ORIGIN = "http://localhost:3001";
 

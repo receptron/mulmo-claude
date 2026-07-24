@@ -145,7 +145,7 @@ describe("validateRecordObject — the write-gate variant", () => {
   });
 });
 
-// Phase B (plans/collection-ontology.md step ⓪): the file scan lints
+// Phase B (plans/done/collection-ontology.md step ⓪): the file scan lints
 // per-type rules ("strict" tier) that the write gate deliberately does NOT
 // enforce yet — legacy records get reported, never rejected on write.
 describe("strict tier — typed checks reported by the scan, not enforced on write", () => {

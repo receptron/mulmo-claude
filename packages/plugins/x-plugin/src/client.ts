@@ -1,4 +1,5 @@
-import { errorMessage, fetchWithTimeout, ONE_SECOND_MS, safeResponseText, toUtcIsoDate } from "./internal";
+import { errorMessage, toUtcIsoDate } from "@mulmoclaude/common";
+import { fetchWithTimeout, ONE_SECOND_MS, safeResponseText } from "./internal";
 
 const X_API_BASE = "https://api.twitter.com/2";
 

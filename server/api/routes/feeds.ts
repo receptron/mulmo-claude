@@ -10,41 +10,18 @@ import { Router, Request, Response } from "express";
 import { workspacePath } from "../../workspace/workspace.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { listFeeds, readFeedState, removeFeed } from "@mulmoclaude/core/feeds/server";
+import type { FeedsListResponse } from "@mulmoclaude/core/collection";
+import { buildFeedSummaries } from "../../workspace/feeds/summaries.js";
 import { errorMessage } from "../../utils/errors.js";
 import { serverError } from "../../utils/httpError.js";
 import { log } from "../../system/logger/index.js";
 
 const router = Router();
 
-interface FeedSummary {
-  slug: string;
-  title: string;
-  icon: string;
-  kind: string;
-  schedule: string;
-  lastFetchedAt: string | null;
-}
-interface FeedsListResponse {
-  feeds: FeedSummary[];
-}
-
 router.get(API_ROUTES.feeds.list, async (_req: Request, res: Response<FeedsListResponse>) => {
   try {
     const feeds = await listFeeds(workspacePath);
-    const summaries: FeedSummary[] = [];
-    for (const feed of feeds) {
-      const state = await readFeedState(workspacePath, feed);
-      const { ingest } = feed.schema;
-      summaries.push({
-        slug: feed.slug,
-        title: feed.schema.title,
-        icon: feed.schema.icon,
-        kind: ingest?.kind ?? "rss",
-        schedule: ingest?.schedule ?? "on-demand",
-        lastFetchedAt: state.lastFetchedAt,
-      });
-    }
-    res.json({ feeds: summaries });
+    res.json({ feeds: await buildFeedSummaries(feeds, readFeedState, workspacePath) });
   } catch (err) {
     log.warn("feeds", "list failed", { error: errorMessage(err) });
     serverError(res, errorMessage(err));

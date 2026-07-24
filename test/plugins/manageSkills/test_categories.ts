@@ -20,6 +20,15 @@ import {
   REPO_COLLAPSED_STORAGE_KEY,
   loadRepoCollapsed,
   persistRepoCollapsed,
+  entryKey,
+  catalogActionParams,
+  buildRepoInstallBody,
+  groupEntriesByRepo,
+  repoLabel,
+  skillBadgeMeta,
+  PRESET_SOURCE_META,
+  toggleInSet,
+  type CatalogEntryIdentity,
 } from "../../../src/plugins/manageSkills/categories.js";
 
 // Minimal localStorage shim. Mirrors only the methods the helpers call,
@@ -298,5 +307,237 @@ describe("manageSkills section constants", () => {
 
   it("opens both sections by default (nothing collapsed)", () => {
     assert.deepEqual([...DEFAULT_CLOSED_SECTIONS], []);
+  });
+});
+
+// entryKey is load-bearing: its return value flows into the Vue `:key`,
+// the `skill-catalog-item-<key>` testid, the row-highlight comparison,
+// and the in-flight action lock. The external `slug` is the
+// backend-derived `<owner>-<skillFolder>` activeId, which is lossy and
+// can collide across repos of the same owner — the exact regression the
+// (repoId, skillFolder) composite key guards against.
+describe("manageSkills entryKey", () => {
+  it("keys an external entry by repoId/skillFolder, not its lossy slug", () => {
+    const entry: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-tools", skillFolder: "deploy" };
+    assert.equal(entryKey(entry), "acme-tools/deploy");
+  });
+
+  it("keys a preset entry by its already-unique slug", () => {
+    const entry: CatalogEntryIdentity = { slug: "mc-library", source: "preset" };
+    assert.equal(entryKey(entry), "mc-library");
+  });
+
+  it("distinguishes two external entries that collide on slug but differ on repoId", () => {
+    // Same owner (`acme`) publishes a `deploy` skill in two repos. The
+    // backend derives the same `<owner>-<skillFolder>` slug for both, so
+    // slug alone would produce duplicate Vue keys / testids and a shared
+    // in-flight lock. The composite key keeps them distinct.
+    const fromTools: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-tools", skillFolder: "deploy" };
+    const fromInfra: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-infra", skillFolder: "deploy" };
+    assert.equal(fromTools.slug, fromInfra.slug, "premise: the lossy slug collides");
+    assert.notEqual(entryKey(fromTools), entryKey(fromInfra), "entryKey must NOT collide");
+    assert.equal(entryKey(fromTools), "acme-tools/deploy");
+    assert.equal(entryKey(fromInfra), "acme-infra/deploy");
+  });
+
+  it("falls back to slug when an external entry is missing repoId", () => {
+    const entry: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", skillFolder: "deploy" };
+    assert.equal(entryKey(entry), "acme-deploy");
+  });
+
+  it("falls back to slug when an external entry is missing skillFolder", () => {
+    const entry: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-tools" };
+    assert.equal(entryKey(entry), "acme-deploy");
+  });
+
+  it("uses slug for a preset even if repoId/skillFolder happen to be present", () => {
+    const entry: CatalogEntryIdentity = { slug: "mc-library", source: "preset", repoId: "x", skillFolder: "y" };
+    assert.equal(entryKey(entry), "mc-library");
+  });
+});
+
+describe("manageSkills catalogActionParams", () => {
+  it("addresses an external entry by (repoId, skillFolder)", () => {
+    const entry: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-tools", skillFolder: "deploy" };
+    assert.deepEqual(catalogActionParams(entry), { source: "external", repoId: "acme-tools", skillFolder: "deploy" });
+  });
+
+  it("addresses a preset entry by slug", () => {
+    const entry: CatalogEntryIdentity = { slug: "mc-library", source: "preset" };
+    assert.deepEqual(catalogActionParams(entry), { source: "preset", slug: "mc-library" });
+  });
+
+  it("falls back to slug for an external entry missing its locator fields", () => {
+    const entry: CatalogEntryIdentity = { slug: "acme-deploy", source: "external", repoId: "acme-tools" };
+    assert.deepEqual(catalogActionParams(entry), { source: "external", slug: "acme-deploy" });
+  });
+});
+
+// buildRepoInstallBody feeds both the fresh-install and the "update"
+// (re-install) call sites; they must send an identical shape.
+describe("manageSkills buildRepoInstallBody", () => {
+  it("carries url + trimmed subpath when a subpath is given", () => {
+    assert.deepEqual(buildRepoInstallBody("https://github.com/acme/a", "  skills  "), {
+      url: "https://github.com/acme/a",
+      subpath: "skills",
+    });
+  });
+
+  it("omits subpath when undefined", () => {
+    assert.deepEqual(buildRepoInstallBody("https://github.com/acme/a"), { url: "https://github.com/acme/a" });
+  });
+
+  it("omits subpath when it is empty or whitespace-only", () => {
+    assert.deepEqual(buildRepoInstallBody("https://github.com/acme/a", "   "), { url: "https://github.com/acme/a" });
+    assert.deepEqual(buildRepoInstallBody("https://github.com/acme/a", ""), { url: "https://github.com/acme/a" });
+  });
+});
+
+describe("manageSkills groupEntriesByRepo", () => {
+  const repoA = { repoId: "repo-a", url: "https://github.com/acme/a" };
+  const repoB = { repoId: "repo-b", url: "https://github.com/acme/b" };
+  const entries = [
+    { slug: "b-two", repoId: "repo-a" },
+    { slug: "a-one", repoId: "repo-a" },
+    { slug: "b-only", repoId: "repo-b" },
+  ];
+
+  it("preserves the given repo order", () => {
+    const groups = groupEntriesByRepo(entries, [repoB, repoA]);
+    assert.deepEqual(
+      groups.map((group) => group.repo.repoId),
+      ["repo-b", "repo-a"],
+    );
+  });
+
+  it("sorts entries within a repo by slug", () => {
+    const groups = groupEntriesByRepo(entries, [repoA]);
+    assert.deepEqual(
+      groups[0].entries.map((entry) => entry.slug),
+      ["a-one", "b-two"],
+    );
+  });
+
+  it("still yields a group (with empty entries) for a repo that discovered nothing", () => {
+    const emptyRepo = { repoId: "repo-empty", url: "https://github.com/acme/empty" };
+    const groups = groupEntriesByRepo(entries, [emptyRepo]);
+    assert.equal(groups.length, 1);
+    assert.deepEqual(groups[0].entries, []);
+  });
+
+  it("drops entries whose repoId matches no repo", () => {
+    const orphan = [{ slug: "orphan", repoId: "gone" }];
+    const groups = groupEntriesByRepo(orphan, [repoA]);
+    assert.deepEqual(groups[0].entries, []);
+  });
+
+  it("returns no groups for an empty repo list", () => {
+    assert.deepEqual(groupEntriesByRepo(entries, []), []);
+  });
+
+  it("does not mutate the input entries array order", () => {
+    const input = [
+      { slug: "z", repoId: "repo-a" },
+      { slug: "a", repoId: "repo-a" },
+    ];
+    groupEntriesByRepo(input, [repoA]);
+    assert.deepEqual(
+      input.map((entry) => entry.slug),
+      ["z", "a"],
+    );
+  });
+});
+
+describe("manageSkills repoLabel", () => {
+  it("reduces a canonical github URL to owner/repo", () => {
+    assert.equal(repoLabel({ url: "https://github.com/anthropics/skills", repoId: "anthropics-skills" }), "anthropics/skills");
+  });
+
+  it("strips a trailing .git suffix", () => {
+    assert.equal(repoLabel({ url: "https://github.com/owner/repo.git", repoId: "owner-repo" }), "owner/repo");
+  });
+
+  it("strips a trailing slash", () => {
+    assert.equal(repoLabel({ url: "https://github.com/owner/repo/", repoId: "owner-repo" }), "owner/repo");
+  });
+
+  it("falls back to the repoId when the URL is not a github URL", () => {
+    assert.equal(repoLabel({ url: "https://example.com/not/github", repoId: "custom-id" }), "custom-id");
+  });
+
+  it("falls back to the repoId on an empty URL", () => {
+    assert.equal(repoLabel({ url: "", repoId: "custom-id" }), "custom-id");
+  });
+});
+
+describe("manageSkills skillBadgeMeta", () => {
+  it("maps a mc- project skill to the read-only system badge", () => {
+    assert.deepEqual(skillBadgeMeta({ name: "mc-foo", source: "project" }), {
+      icon: "lock",
+      colour: "text-gray-500",
+      titleKey: "pluginManageSkills.sourceSystemTitle",
+    });
+  });
+
+  it("maps a user skill to the home badge regardless of name", () => {
+    assert.deepEqual(skillBadgeMeta({ name: "mc-foo", source: "user" }), {
+      icon: "home",
+      colour: "text-blue-500",
+      titleKey: "pluginManageSkills.sourceUserTitle",
+    });
+  });
+
+  it("maps a plain project skill to the folder badge", () => {
+    assert.deepEqual(skillBadgeMeta({ name: "my-skill", source: "project" }), {
+      icon: "folder",
+      colour: "text-green-600",
+      titleKey: "pluginManageSkills.sourceProjectTitle",
+    });
+  });
+
+  it("returns an i18n key (not a resolved string) so the helper stays pure", () => {
+    assert.match(skillBadgeMeta({ name: "x", source: "project" }).titleKey, /^pluginManageSkills\./);
+  });
+});
+
+describe("manageSkills PRESET_SOURCE_META", () => {
+  it("is the launcher-managed library badge with an i18n title key", () => {
+    assert.deepEqual(PRESET_SOURCE_META, {
+      icon: "inventory_2",
+      colour: "text-gray-400",
+      titleKey: "pluginManageSkills.sourcePresetTitle",
+    });
+  });
+});
+
+// toggleInSet backs both sidebar collapse handlers (section-level and
+// per-repo). It must add-or-remove the key AND leave the input set
+// untouched — the callers replace the ref wholesale so Vue re-renders,
+// so an accidental in-place mutation would corrupt the previous value.
+describe("manageSkills toggleInSet", () => {
+  it("removes a key that is present", () => {
+    assert.deepEqual([...toggleInSet(new Set(["a", "b"]), "a")], ["b"]);
+  });
+
+  it("adds a key that is absent", () => {
+    assert.deepEqual([...toggleInSet(new Set(["a"]), "b")], ["a", "b"]);
+  });
+
+  it("toggles from empty to a single-member set and back", () => {
+    const added = toggleInSet(new Set<string>(), "x");
+    assert.deepEqual([...added], ["x"]);
+    assert.deepEqual([...toggleInSet(added, "x")], []);
+  });
+
+  it("never mutates the input set", () => {
+    const input = new Set(["a"]);
+    toggleInSet(input, "a");
+    toggleInSet(input, "b");
+    assert.deepEqual([...input], ["a"], "input must stay unchanged");
+  });
+
+  it("returns a new set instance (reference changes for reactivity)", () => {
+    const input = new Set(["a"]);
+    assert.notEqual(toggleInSet(input, "a"), input);
   });
 });

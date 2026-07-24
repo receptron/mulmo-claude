@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { aggregateBalances, buildBalanceSheet, buildLedger, buildProfitLoss } from "../../src/server/report.js";
+import { aggregateBalances, buildBalanceSheet, buildLedger, buildProfitLoss, sortedBalancesFromMap } from "../../src/server/report.js";
 import { makeEntry, makeVoidEntries } from "../../src/server/journal.js";
-import type { Account } from "../../src/server/types.js";
+import type { Account } from "../../src/shared/types.js";
 
 const ACCOUNTS: Account[] = [
   { code: "1000", name: "Cash", type: "asset" },
@@ -19,6 +19,24 @@ function findAccount(code: string): Account {
   if (!acct) throw new Error(`fixture missing account ${code}`);
   return acct;
 }
+
+describe("sortedBalancesFromMap", () => {
+  it("emits AccountBalance rows sorted by accountCode", () => {
+    const map = new Map<string, number>([
+      ["2000", -50],
+      ["1000", 100],
+      ["1100", 0],
+    ]);
+    assert.deepEqual(sortedBalancesFromMap(map), [
+      { accountCode: "1000", netDebit: 100 },
+      { accountCode: "1100", netDebit: 0 },
+      { accountCode: "2000", netDebit: -50 },
+    ]);
+  });
+  it("returns an empty array for an empty map", () => {
+    assert.deepEqual(sortedBalancesFromMap(new Map()), []);
+  });
+});
 
 describe("aggregateBalances", () => {
   it("nets debit minus credit per account, sorted by code", () => {

@@ -83,6 +83,17 @@ interface JsonlEntry {
   message?: string;
 }
 
+/** A jsonl line we can read. Only the fields the caller touches are required to
+ *  be the right type; anything else on the line is ignored. */
+function isJsonlEntry(value: unknown): value is JsonlEntry {
+  if (!isRecord(value)) return false;
+  return (
+    (value.source === undefined || typeof value.source === "string") &&
+    (value.type === undefined || typeof value.type === "string") &&
+    (value.message === undefined || typeof value.message === "string")
+  );
+}
+
 function trimMessage(text: string): string {
   if (text.length <= PER_MESSAGE_MAX) return text;
   return `${text.slice(0, PER_MESSAGE_MAX)}…`;
@@ -96,12 +107,16 @@ export function extractText(jsonlContent: string): string {
   const lines = jsonlContent.split("\n").filter(Boolean);
   const parts: string[] = [];
   for (const line of lines) {
-    let entry: JsonlEntry;
+    let entry: unknown;
     try {
       entry = JSON.parse(line);
     } catch {
       continue;
     }
+    // The `JsonlEntry` annotation used to sit on the parse result, which is
+    // `any` — it described the line without verifying it. The guard does the
+    // describing now.
+    if (!isJsonlEntry(entry)) continue;
     const { source } = entry;
     if ((source === "user" || source === "assistant") && entry.type === EVENT_TYPES.text && typeof entry.message === "string") {
       parts.push(`[${source}] ${trimMessage(entry.message)}`);

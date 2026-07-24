@@ -172,7 +172,10 @@
                   v-model="editForm.name"
                   type="text"
                   class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-                  @keydown.enter="saveEdit(role.id)"
+                  @keydown="editNameEnter.onKeydown"
+                  @compositionstart="editNameEnter.onCompositionStart"
+                  @compositionend="editNameEnter.onCompositionEnd"
+                  @blur="editNameEnter.onBlur"
                 />
               </div>
               <div class="w-32">
@@ -285,6 +288,8 @@ import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getAllPluginNames } from "../tools/index";
 import { apiGet, apiPost } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { useImeAwareEnter } from "../composables/useImeAwareEnter";
+import { confirmItemDelete } from "../utils/confirmDelete";
 
 // Inlined from the former `src/plugins/manageRoles/index.ts`
 // (deleted alongside the manageRoles MCP tool — #949). RolesView
@@ -460,19 +465,25 @@ async function callManage(body: Record<string, unknown>): Promise<ManageResult> 
 
 async function refreshList() {
   const result = await callManage({ action: "list" });
-  if (result.success) {
-    const data = result as { data?: { customRoles?: CustomRole[] } };
-    customRoles.value = data.data?.customRoles ?? [];
-    if (props.selectedResult) {
-      emit("updateResult", {
-        ...props.selectedResult,
-        ...result,
-        uuid: props.selectedResult.uuid,
-      });
-    }
-    // Let App.vue know the dropdown needs to refresh.
-    await Promise.resolve(appApi.refreshRoles());
+  if (!result.success) {
+    // Mutation succeeded but the follow-up list reload failed — surface it
+    // and self-heal via the abort-coordinated GET rather than leaving the
+    // list silently stale.
+    saveError.value = result.error ?? t("pluginManageRoles.errRefreshFailed");
+    void refreshCustomRoles();
+    return;
   }
+  const data = result as { data?: { customRoles?: CustomRole[] } };
+  customRoles.value = data.data?.customRoles ?? [];
+  if (props.selectedResult) {
+    emit("updateResult", {
+      ...props.selectedResult,
+      ...result,
+      uuid: props.selectedResult.uuid,
+    });
+  }
+  // Let App.vue know the dropdown needs to refresh.
+  await Promise.resolve(appApi.refreshRoles());
 }
 
 function validateRoleForm(form: EditForm, excludeId: string | null): string | null {
@@ -508,6 +519,7 @@ function buildNewRole(): CustomRole {
 }
 
 async function saveNew() {
+  if (saving.value) return;
   if (newFormError.value) {
     createError.value = newFormError.value;
     return;
@@ -525,6 +537,9 @@ async function saveNew() {
 }
 
 async function saveEdit(originalId: string) {
+  // Re-entrancy guard: the Update button is disabled while saving, but the
+  // name field's Enter handler (and key auto-repeat) bypasses the button.
+  if (saving.value) return;
   if (editFormError.value) {
     saveError.value = editFormError.value;
     return;
@@ -534,7 +549,9 @@ async function saveEdit(originalId: string) {
   const role: CustomRole = {
     id: editForm.value.id.trim(),
     name: editForm.value.name.trim(),
-    icon: editForm.value.icon.trim(),
+    // Fall back to the default icon so an edit that clears the field can't
+    // persist an empty icon (create already falls back — keep them in sync).
+    icon: editForm.value.icon.trim() || "person",
     prompt: editForm.value.prompt,
     availablePlugins: editForm.value.selectedPlugins,
     queries: editForm.value.queriesText
@@ -557,6 +574,9 @@ async function saveEdit(originalId: string) {
 }
 
 async function deleteRole(roleId: string) {
+  if (saving.value) return;
+  const role = customRoles.value.find((candidate) => candidate.id === roleId);
+  if (!confirmItemDelete(t("pluginManageRoles.confirmDelete", { name: role?.name ?? roleId }))) return;
   saving.value = true;
   saveError.value = "";
   const result = await callManage({ action: "delete", roleId });
@@ -568,4 +588,11 @@ async function deleteRole(roleId: string) {
   }
   saving.value = false;
 }
+
+// IME-aware Enter for the edit-name field (see plugin manageRoles/View.vue):
+// without it, confirming a kana/hanzi conversion with Enter submits a
+// half-typed name.
+const editNameEnter = useImeAwareEnter(() => {
+  if (selectedId.value) void saveEdit(selectedId.value);
+});
 </script>

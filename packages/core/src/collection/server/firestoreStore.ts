@@ -24,31 +24,13 @@
 // fallback (`runCollectionQuery`) answers aggregations instead.
 
 import type { CollectionItem } from "../core/schema";
+import { BackendUnavailableError } from "./backendAvailability";
 import type { LoadedCollection } from "./discoveredCollection";
 import { firestoreHandle, publishCollectionChange, type FirestoreHandle } from "./host";
 import type { DeleteItemResult, IoOptions, WriteItemResult } from "./io";
 import { safeRecordId } from "./paths";
 import { projectItemFields, type ListOptions, type ListPage, type WriteOptions } from "./storePage";
 import type { CollectionStore } from "./store";
-
-/** Thrown when a backend cannot serve a request because its session/engine
- *  is unavailable — as opposed to the record being absent or malformed.
- *
- *  A distinct type matters because the layers above catch broadly: without
- *  it, `store.read(...).catch(() => null)` reports "record missing" and a
- *  merge reports "malformed stored file", both of which send the agent
- *  chasing a data problem that doesn't exist. Callers that summarise or
- *  swallow errors MUST re-check with `isBackendUnavailable`. */
-export class BackendUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BackendUnavailableError";
-  }
-}
-
-export function isBackendUnavailable(err: unknown): err is BackendUnavailableError {
-  return err instanceof BackendUnavailableError;
-}
 
 /** What every operation throws when there is no live session. Worded as an
  *  instruction because it surfaces straight to the user and the agent. */

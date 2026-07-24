@@ -1,7 +1,7 @@
 // Contracts for the server-side ops entry (`./server`). Everything the ops
 // need from a host that ISN'T generic mulmocast work is declared here as an
 // injected backend — MulmoClaude and MulmoTerminal each supply their own
-// implementation (phase 3 of plans/feat-mulmoscript-plugin.md).
+// implementation (phase 3 of plans/done/feat-mulmoscript-plugin.md).
 
 import type { FileOps } from "gui-chat-protocol";
 import type { MulmoScriptGenerationEvent } from "../core/contract";

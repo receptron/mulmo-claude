@@ -86,7 +86,7 @@
                     })
                   }}
                 </div>
-                <!-- eslint-disable vue/no-v-html -- marked.parse output of app-owned assistant response text; trusted in-process render. Multi-line element so disable/enable pair (CLAUDE.md UI rule) instead of -next-line. -->
+                <!-- eslint-disable vue/no-v-html -- DOMPurify-sanitised marked output (renderMarkdownToSafeHtml). Multi-line element so disable/enable pair (CLAUDE.md UI rule) instead of -next-line. -->
                 <div
                   ref="markdownContainerRef"
                   class="markdown-content prose prose-slate max-w-none leading-relaxed text-gray-900"
@@ -126,15 +126,17 @@ import { marked } from "marked";
 import type { ToolResult, ToolResultComplete } from "gui-chat-protocol/vue";
 import type { TextResponseData } from "./types";
 import SentAttachmentChip from "../../components/SentAttachmentChip.vue";
-import { handleExternalLinkClick } from "../../utils/dom/externalLink";
+import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { classifyWorkspacePath } from "../../utils/path/workspaceLinkRouter";
 import { useMermaidRenderer } from "../../utils/markdown/useMermaid";
 import { useAppApi } from "../../composables/useAppApi";
 import { usePdfDownload } from "../../composables/usePdfDownload";
 import { useMarkdownZip } from "../../composables/useMarkdownZip";
-import { useClipboardCopy } from "../../composables/useClipboardCopy";
-import { buildPdfFilename } from "../../utils/files/filename";
+import { useClipboardCopy } from "@mulmoclaude/core/plugin-vue";
+import { buildPdfFilename } from "@mulmoclaude/markdown-utils/files/filename";
 import { extractTextResponseTitle, truncateForRender } from "./utils";
+import { renderMarkdownToSafeHtml } from "../../utils/markdown/renderMarkdown";
+import { transformThinkBlocks, wrapJsonAsCodeFence } from "./renderPipeline";
 
 const { t, locale } = useI18n();
 const appApi = useAppApi();
@@ -192,34 +194,24 @@ const isSeededUserTurn = computed(() => Boolean(seededByPlugin.value) && message
 // input this defends against (Opus 4.8 degenerate repetition freezing Safari).
 const truncationInfo = computed(() => truncateForRender(messageText.value ?? ""));
 
+const MARKED_OPTIONS = { breaks: true, gfm: true } as const;
+
+const renderInnerMarkdown = (markdown: string): string => {
+  const html = marked(markdown, MARKED_OPTIONS);
+  return typeof html === "string" ? html : "";
+};
+
 const renderedHtml = computed(() => {
-  const { displayText } = truncationInfo.value;
+  const { displayText, wasTruncated } = truncationInfo.value;
   if (!displayText) return "";
-
-  let processedText = displayText;
-
-  // Detect and wrap JSON content in code fences (skip for truncated views —
-  // JSON.parse of a truncated tail would throw anyway, and a partial JSON
-  // dump is more informative rendered as markdown).
-  if (!truncationInfo.value.wasTruncated) {
-    const trimmedText = processedText.trim();
-    if ((trimmedText.startsWith("{") && trimmedText.endsWith("}")) || (trimmedText.startsWith("[") && trimmedText.endsWith("]"))) {
-      try {
-        JSON.parse(trimmedText);
-        processedText = `\`\`\`json\n${trimmedText}\n\`\`\``;
-      } catch {
-        // Not valid JSON, continue with original text
-      }
-    }
-  }
-
-  // Process <think> blocks to make them grey
-  processedText = processedText.replace(/<think>([\s\S]*?)<\/think>/g, (_, content) => {
-    const thinkContent = marked(content.trim());
-    return `<div class="think-block">${thinkContent}</div>`;
-  });
-
-  return marked(processedText, { breaks: true, gfm: true });
+  // A truncated tail can't be valid JSON, so skip the wrap; a partial dump
+  // is more informative rendered as markdown.
+  const withJson = wasTruncated ? displayText : wrapJsonAsCodeFence(displayText);
+  const processedText = transformThinkBlocks(withJson, renderInnerMarkdown);
+  // Assistant text is the least-trusted markdown surface in the app —
+  // route it through the shared DOMPurify path so an echoed
+  // `<img onerror=…>` / `javascript:` link can't execute.
+  return renderMarkdownToSafeHtml(processedText, MARKED_OPTIONS);
 });
 
 const speakerLabel = computed(() => {

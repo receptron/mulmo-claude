@@ -191,7 +191,10 @@ const HANDLERS: Record<string, (items: ScheduledItem[], input: SchedulerActionIn
 };
 
 export function dispatchScheduler(action: string, items: ScheduledItem[], input: SchedulerActionInput): SchedulerActionResult {
-  const handler = HANDLERS[action];
+  // Own-property guard: a bare `HANDLERS[action]` with an untrusted action name
+  // resolves `constructor` / `toString` to an Object.prototype function, which
+  // is truthy and slips past the unknown-action check (#2319).
+  const handler = Object.hasOwn(HANDLERS, action) ? HANDLERS[action] : undefined;
   if (!handler) {
     return { kind: "error", status: 400, error: `Unknown action: ${action}` };
   }

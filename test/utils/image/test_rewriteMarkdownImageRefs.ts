@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { rewriteMarkdownImageRefs, rewriteImgSrcAttrsInHtml } from "../../../src/utils/image/rewriteMarkdownImageRefs";
+import { rewriteMarkdownImageRefs, rewriteImgSrcAttrsInHtml } from "@mulmoclaude/markdown-utils/image/rewriteMarkdownImageRefs";
 
 describe("rewriteMarkdownImageRefs — no basePath", () => {
   it("rewrites a simple relative image ref to an /api/files/raw URL", () => {

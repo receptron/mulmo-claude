@@ -102,9 +102,23 @@ describe("loadPageEdit — snapshot gc'd", () => {
 });
 
 describe("loadPageEdit — transient failure", () => {
-  it("treats snapshot 5xx as deleted (no flicker, no exception)", async () => {
+  // A 5xx on both the snapshot and the live-page fallback is a transient
+  // outage, not a deletion — reporting "deleted" for a page that exists is a
+  // factual lie the user can't recover from. Now surfaced as "error".
+  it("treats a transient snapshot + live-page failure as error, not deleted", async () => {
     stubFetch(async () => jsonResponse(500, { error: "server exploded" }));
     const result = await loadPageEdit("topic", "stamp");
-    assert.equal(result.kind, "deleted");
+    assert.equal(result.kind, "error");
+  });
+
+  it("still recovers via the live page when only the snapshot 5xx's", async () => {
+    stubFetch(async (url) => {
+      if (typeof url === "string" && url.includes("/history/")) {
+        return jsonResponse(503, { error: "snapshot store down" });
+      }
+      return jsonResponse(200, { data: { action: "page", title: "T", content: "# live", pageExists: true } });
+    });
+    const result = await loadPageEdit("topic", "stamp");
+    assert.equal(result.kind, "current");
   });
 });

@@ -27,6 +27,7 @@ export {
   _syncWatchersForTesting,
   _tickTimeTriggersForTesting,
   _scheduleItemReconcileForTesting,
-  _scheduleStorageReconcileForTesting,
+  _scheduleCollectionReconcileForTesting,
+  _handleStoreChangeForTesting,
   type CollectionWatcherOptions,
 } from "./watcher.js";

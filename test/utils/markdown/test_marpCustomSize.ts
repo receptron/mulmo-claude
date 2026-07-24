@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { applyCustomMarpSize } from "../../../src/utils/markdown/marpCustomSize.js";
+import { applyCustomMarpSize } from "@mulmoclaude/markdown-utils/markdown/marpCustomSize";
 
 interface FakeThemeSet {
   add: (css: string) => void;

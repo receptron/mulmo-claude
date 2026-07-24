@@ -5,7 +5,7 @@
 // can wire them with thin closures while they stay unit-testable in isolation.
 // NO vue / DOM / I/O / reactive state here — every function is pure.
 
-import { backlinkRows, deriveAll, embedTargetId, rollupValue } from "@mulmoclaude/core/collection";
+import { backlinkRows, deriveAll, embedTargetId, fieldText, rollupValue } from "@mulmoclaude/core/collection";
 import type {
   BacklinksView,
   CollectionItem,
@@ -56,7 +56,7 @@ export function resolveEmbed(
   const targetId = embedTargetId(field, record);
   const data = targetId ? embedCache[field.to] : undefined;
   if (!data) return { schema: null, item: null };
-  const item = data.items.find((entry) => String(entry[data.schema.primaryKey] ?? "") === targetId) ?? null;
+  const item = data.items.find((entry) => fieldText(entry[data.schema.primaryKey]) === targetId) ?? null;
   return { schema: data.schema, item };
 }
 
@@ -131,7 +131,7 @@ export function buildBacklinksViews(
       continue;
     }
     for (const column of columns) column.label = data.schema.fields[column.key]?.label ?? column.key;
-    const selfId = String(record?.[schema.primaryKey] ?? "");
+    const selfId = fieldText(record?.[schema.primaryKey]);
     // Index the derived source records EXACTLY like the server's
     // `loadTarget` (shared memo over `derivedRecordsById`): non-empty
     // string ids, one record per id — so the client can never surface a
@@ -139,7 +139,7 @@ export function buildBacklinksViews(
     // every rendered row is navigable with a unique Vue key.
     const sourceItems = derivedSourceItems(embedCache, field.from) ?? [];
     const rows = backlinkRows(field, selfId, sourceItems).map((row) => ({
-      id: String(row[data.schema.primaryKey] ?? ""),
+      id: fieldText(row[data.schema.primaryKey]),
       cells: columns.map((column) => formatBacklinkCell(data.schema.fields[column.key], row[column.key], row, locale)),
     }));
     out[key] = { found: true, columns, rows, fromSlug: field.from };
@@ -183,7 +183,7 @@ export function rollupValueFor(field: FieldSpec, record: CollectionItem | null, 
   // No empty-id guard here: an empty primaryKey matches nothing inside
   // `backlinkRows` and yields a real 0 — exactly what the server's
   // `projectRollups` returns for the same record (Codex on PR #2116).
-  return rollupValue(field, String(record[schema.primaryKey] ?? ""), items);
+  return rollupValue(field, fieldText(record[schema.primaryKey]), items);
 }
 
 /** Display string for a rollup cell: the aggregate as a plain number,

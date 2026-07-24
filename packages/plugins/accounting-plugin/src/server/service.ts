@@ -61,7 +61,8 @@ import {
   resolveFiscalYearEnd,
   type FiscalYearEnd,
 } from "../shared";
-import type { Account, AccountingConfig, BookSummary, JournalEntry, JournalLine, ReportPeriod } from "./types.js";
+import type { AccountingConfig } from "./types.js";
+import type { Account, BookSummary, JournalEntry, JournalLine, ReportPeriod } from "../shared/types.js";
 
 export class AccountingError extends Error {
   constructor(

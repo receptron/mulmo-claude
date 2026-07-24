@@ -1,4 +1,4 @@
-// The remote custom-view contract (phase 3 — plans/feat-remote-custom-view.md).
+// The remote custom-view contract (phase 3 — plans/done/feat-remote-custom-view.md).
 //
 // Browser-safe single source of truth shared by the host server (which wraps
 // the view HTML into a sandboxed srcdoc), the desktop phone-frame preview, and
@@ -54,7 +54,7 @@ export const MAX_PAGE_LIMIT = 200;
  *  command document (1 MiB total), so leave envelope headroom. */
 export const REMOTE_VIEW_MAX_BYTES = 900_000;
 
-/** Hard cap on ONE `getItems` page (phase 5 — plans/feat-remote-view-images.md).
+/** Hard cap on ONE `getItems` page (phase 5 — plans/done/feat-remote-view-images.md).
  *  Same 1 MiB command-document envelope as the srcdoc: when a view inlines image
  *  fields as `data:` URLs, the host stops inlining once the serialized page would
  *  exceed this, leaving the remaining image fields as their original path (which
@@ -92,6 +92,14 @@ const toInt = (value: unknown): number | null => {
 
 /** Coerce a channel/postMessage offset (arrives as untyped JSON) to a non-negative int. */
 export const clampOffset = (value: unknown): number => Math.max(0, toInt(value) ?? 0);
+
+/** Read a channel/postMessage identifier (a slug, a view id) as a string.
+ *  Params arrive as untyped JSON, so a caller can send anything; `String(...)`
+ *  turned an object into the literal "[object Object]", which then travelled on
+ *  as if the caller had asked for a collection by that name — surfacing as
+ *  `collection '[object Object]' not found` rather than a bad-request. A value
+ *  with no string form is simply absent. */
+export const readIdParam = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /** Coerce a channel/postMessage limit to [1, MAX_PAGE_LIMIT] (default 50). */
 export const clampLimit = (value: unknown): number => {

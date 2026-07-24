@@ -9,39 +9,16 @@
 //
 // Both forms strip the prefix and convert the `UPPER_SNAKE` tail to
 // `lowerCamel`. Empty string values are dropped so a stray
-// `FOO=""` doesn't shadow `BAR`'s match.
+// `FOO=""` doesn't shadow `BAR`'s match. The scan itself is the
+// shared `scanEnvOptions` (#2487) — the host's relay path resolves
+// its `RELAY_*` scheme through the same algorithm.
 //
 // The `_BRIDGE_` segment is deliberate: it lets the bridge keep its
 // own secrets (`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, …) naturally
 // outside the scrape — they have no `_BRIDGE_` segment so they're
 // never picked up, no reserved-list needed.
 
-// Convert UPPER_SNAKE_CASE → lowerCamelCase. Leading digits and
-// adjacent underscores degrade gracefully (adjacent underscores
-// collapse to a single word break; leading digits are allowed but
-// kept as-is after the first segment is lowercased).
-function snakeToLowerCamel(snake: string): string {
-  const parts = snake
-    .toLowerCase()
-    .split("_")
-    .filter((segment) => segment.length > 0);
-  if (parts.length === 0) return "";
-  const [head, ...rest] = parts;
-  return head + rest.map((part) => (part ? part[0].toUpperCase() + part.slice(1) : "")).join("");
-}
-
-// Strip the prefix, return null if the name doesn't match.
-function matchBridgePrefix(name: string, transportPrefix: string): string | null {
-  if (name.startsWith(transportPrefix)) {
-    const tail = name.slice(transportPrefix.length);
-    return tail.length > 0 ? tail : null;
-  }
-  if (name.startsWith("BRIDGE_")) {
-    const tail = name.slice("BRIDGE_".length);
-    return tail.length > 0 ? tail : null;
-  }
-  return null;
-}
+import { scanEnvOptions } from "@mulmoclaude/common";
 
 /**
  * Read `<TRANSPORT>_BRIDGE_*` and `BRIDGE_*` env vars into a
@@ -66,23 +43,5 @@ function matchBridgePrefix(name: string, transportPrefix: string): string | null
  */
 export function readBridgeEnvOptions(transportId: string, env: Readonly<Record<string, string | undefined>>): Record<string, string> {
   const transportPrefix = `${transportId.toUpperCase().replace(/-/g, "_")}_BRIDGE_`;
-  const shared: Record<string, string> = {};
-  const specific: Record<string, string> = {};
-
-  for (const [name, value] of Object.entries(env)) {
-    if (typeof value !== "string" || value.length === 0) continue;
-    const tail = matchBridgePrefix(name, transportPrefix);
-    if (tail === null) continue;
-    const key = snakeToLowerCamel(tail);
-    if (!key) continue;
-    if (name.startsWith(transportPrefix)) {
-      specific[key] = value;
-    } else {
-      shared[key] = value;
-    }
-  }
-
-  // Transport-specific overrides shared on conflict — spread order
-  // (shared first, then specific) gives exactly that behaviour.
-  return { ...shared, ...specific };
+  return scanEnvOptions(env, { prefixes: ["BRIDGE_", transportPrefix] });
 }

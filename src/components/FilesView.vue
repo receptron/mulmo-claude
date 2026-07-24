@@ -15,7 +15,21 @@
       @update:sort-mode="setSortMode"
       @update:show-hidden-system="setShowHiddenSystem"
       @create-file="handleCreateFile"
+      @upload-files="handleUploadFiles"
     />
+    <!-- Drop-upload progress / failure banner (#2270). Fixed so it
+         stays visible while the tree scrolls under it. -->
+    <div
+      v-if="uploadStatus"
+      class="fixed bottom-4 left-4 z-50 px-3 py-2 rounded shadow-md text-sm"
+      :class="uploadStatus.failed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'"
+      data-testid="file-upload-status"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {{ uploadStatus.message }}
+    </div>
     <!-- Content pane -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <FileContentHeader
@@ -191,6 +205,84 @@ async function handleCreateFile(args: { folder: string; filename: string; resolv
   // can start editing immediately. selectFile() also drives the URL
   // bar + ancestor expansion via the existing watcher.
   selectFile(result.data.path);
+}
+
+// --- Drop-to-upload (#2270) ---------------------------------------------
+
+/** How long the "done"/"failed" banner lingers before clearing itself. */
+const UPLOAD_STATUS_CLEAR_MS = 4000;
+
+interface UploadState {
+  done: number;
+  total: number;
+  failed: number;
+}
+
+const uploadState = ref<UploadState | null>(null);
+let uploadClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+const uploadStatus = computed<{ failed: boolean; message: string } | null>(() => {
+  const state = uploadState.value;
+  if (state === null) return null;
+  if (state.done < state.total) return { failed: false, message: t("fileTree.upload.progress", { done: state.done, total: state.total }) };
+  if (state.failed > 0) return { failed: true, message: t("fileTree.upload.failed", { count: state.failed }) };
+  return { failed: false, message: t("fileTree.upload.done", { count: state.total }) };
+});
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("file read failed"));
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadOne(folder: string, file: File): Promise<boolean> {
+  try {
+    const dataUrl = await readAsDataUrl(file);
+    if (dataUrl === "") return false;
+    const result = await apiPost<{ path: string }>(API_ROUTES.files.upload, { dir: folder, filename: file.name, dataUrl });
+    return result.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Sequential on purpose: the banner reports "n of m", and a folder full of
+// large drops shouldn't open one request per file at once.
+async function handleUploadFiles(args: { folder: string; files: File[] }): Promise<void> {
+  const { folder, files } = args;
+  if (uploadClearTimer !== null) {
+    clearTimeout(uploadClearTimer);
+    uploadClearTimer = null;
+  }
+  // Fold this batch into any still-running one. Overwriting instead would let
+  // a second drop reset the counters, and the first batch's clear-timer could
+  // then null the state mid-flight — making the second batch abandon its
+  // remaining files silently.
+  const started: UploadState | null = uploadState.value;
+  uploadState.value =
+    started === null ? { done: 0, total: files.length, failed: 0 } : { done: started.done, total: started.total + files.length, failed: started.failed };
+
+  for (const file of files) {
+    const ok = await uploadOne(folder, file);
+    const current: UploadState | null = uploadState.value;
+    // Re-seed rather than bail if something cleared the banner underneath us.
+    uploadState.value =
+      current === null
+        ? { done: 1, total: files.length, failed: ok ? 0 : 1 }
+        : { done: current.done + 1, total: current.total, failed: current.failed + (ok ? 0 : 1) };
+  }
+  await reloadDirChildren(folder);
+
+  // Only retire the banner once every in-flight batch has landed.
+  const settled: UploadState | null = uploadState.value;
+  if (settled !== null && settled.done >= settled.total) {
+    uploadClearTimer = setTimeout(() => {
+      uploadState.value = null;
+    }, UPLOAD_STATUS_CLEAR_MS);
+  }
 }
 
 const recentPaths = computed(() => {

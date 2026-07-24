@@ -9,7 +9,7 @@
 // stubbed; the default export wires the real engine functions.
 import { loadCollection, storeFor, toDetail, type CollectionItem, type LoadedCollection } from "../../workspace/collections/index.js";
 import type { CommandHandler, JsonObject } from "../commandChannel.js";
-import { clampLimit, clampOffset, deriveItems, pageResult } from "./collectionPage.js";
+import { clampLimit, clampOffset, deriveItems, pageResult, readIdParam } from "./collectionPage.js";
 
 export interface GetCollectionDeps {
   loadCollection: typeof loadCollection;
@@ -21,7 +21,7 @@ export interface GetCollectionDeps {
 export const createGetCollection =
   (deps: GetCollectionDeps): CommandHandler =>
   async (params: JsonObject) => {
-    const slug = String(params.slug ?? "");
+    const slug = readIdParam(params.slug);
     const offset = clampOffset(params.offset);
     const limit = clampLimit(params.limit);
     const collection = await deps.loadCollection(slug);

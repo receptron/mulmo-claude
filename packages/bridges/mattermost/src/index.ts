@@ -13,6 +13,7 @@
 import "dotenv/config";
 import WebSocket from "ws";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "mattermost";
 
@@ -27,12 +28,7 @@ function readRequiredEnv(): { mmUrl: string; botToken: string } {
 }
 const { mmUrl, botToken } = readRequiredEnv();
 
-const allowedChannels = new Set(
-  (process.env.MATTERMOST_ALLOWED_CHANNELS ?? "")
-    .split(",")
-    .map((channelId) => channelId.trim())
-    .filter(Boolean),
-);
+const allowedChannels = parseCsvSet(process.env.MATTERMOST_ALLOWED_CHANNELS);
 const allowAll = allowedChannels.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -115,33 +111,46 @@ function connectWebSocket(): void {
   });
 }
 
+interface PostedMessage {
+  userId: string;
+  channelId: string;
+  message: string;
+}
+
+// Parse a Mattermost `posted` WebSocket frame into the fields we act on. The
+// frame is untyped JSON with a stringified `post` payload nested inside;
+// returns null for anything that isn't a usable posted message.
+function parsePostedMessage(raw: string): PostedMessage | null {
+  const event: unknown = JSON.parse(raw);
+  if (!isRecord(event) || event.event !== "posted" || !isRecord(event.data) || typeof event.data.post !== "string" || !event.data.post) return null;
+  const post: unknown = JSON.parse(event.data.post);
+  if (!isRecord(post)) return null;
+  return {
+    userId: typeof post.user_id === "string" ? post.user_id : "",
+    channelId: typeof post.channel_id === "string" ? post.channel_id : "",
+    message: typeof post.message === "string" ? post.message : "",
+  };
+}
+
 async function onWebSocketMessage(data: { toString: () => string }): Promise<void> {
   try {
-    const event: {
-      event?: string;
-      data?: { post?: string };
-    } = JSON.parse(data.toString());
-    if (event.event !== "posted" || !event.data?.post) return;
-
-    const post: {
-      user_id: string;
-      channel_id: string;
-      message: string;
-    } = JSON.parse(event.data.post);
+    const posted = parsePostedMessage(data.toString());
+    if (!posted) return;
+    const { userId, channelId, message } = posted;
 
     // Ignore own messages
-    if (post.user_id === botUserId) return;
-    if (!post.message.trim()) return;
-    if (!allowAll && !allowedChannels.has(post.channel_id)) return;
+    if (userId === botUserId) return;
+    if (!message.trim()) return;
+    if (!allowAll && !allowedChannels.has(channelId)) return;
 
-    console.log(`[mattermost] message channel=${post.channel_id} user=${post.user_id} len=${post.message.length}`);
+    console.log(`[mattermost] message channel=${channelId} user=${userId} len=${message.length}`);
 
-    const ack = await mulmo.send(post.channel_id, post.message);
+    const ack = await mulmo.send(channelId, message);
     if (ack.ok) {
-      await postMessage(post.channel_id, ack.reply ?? "");
+      await postMessage(channelId, ack.reply ?? "");
     } else {
       const status = ack.status ? ` (${ack.status})` : "";
-      await postMessage(post.channel_id, `Error${status}: ${ack.error ?? "unknown"}`);
+      await postMessage(channelId, `Error${status}: ${ack.error ?? "unknown"}`);
     }
   } catch (err) {
     console.error(`[mattermost] message handling failed: ${err}`);

@@ -2,7 +2,7 @@
 
 import { getCurrentScope, onScopeDispose, ref, type Ref } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
-import { PUBSUB_CHANNELS, type SessionsChannelPayload } from "../config/pubsubChannels";
+import { PUBSUB_CHANNELS, readSessionDeletedIds } from "../config/pubsubChannels";
 import type { SessionSummary } from "../types/session";
 import { apiDelete, apiGet, apiPost } from "../utils/api";
 import { applySessionDiff } from "../utils/session/mergeSessions";
@@ -13,12 +13,6 @@ interface SessionsResponse {
   sessions: SessionSummary[];
   cursor: string;
   deletedIds: string[];
-}
-
-function readDeletedIds(payload: unknown): string[] {
-  if (!payload || typeof payload !== "object") return [];
-  const ids = (payload as SessionsChannelPayload).deletedIds;
-  return Array.isArray(ids) ? ids.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
 // Cross-tab cache pruning: cursor diffs don't carry deletions
@@ -33,7 +27,7 @@ function subscribeToSessionDeletions(sessions: Ref<SessionSummary[]>): void {
   if (!getCurrentScope()) return;
   const { subscribe } = usePubSub();
   const unsubscribe = subscribe(PUBSUB_CHANNELS.sessions, (data) => {
-    const ids = readDeletedIds(data);
+    const ids = readSessionDeletedIds(data);
     if (ids.length === 0) return;
     const drop = new Set(ids);
     sessions.value = sessions.value.filter((session) => !drop.has(session.id));

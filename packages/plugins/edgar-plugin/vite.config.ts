@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+import { createServerPluginConfig, SERVER_DTS_OPTIONS } from "../../../scripts/lib/pluginViteConfig";
 
 // Server-only plugin: one entry, no Vue. Mirrors the externals
 // strategy from packages/plugins/bookmarks-plugin/vite.config.ts —
@@ -7,24 +7,7 @@ import dts from "vite-plugin-dts";
 // `zod` are inlined so the bundled `dist/index.js` resolves
 // cleanly when the runtime loader extracts the tarball into a
 // cache dir without node_modules.
-export default defineConfig({
-  plugins: [
-    dts({
-      include: ["src/**/*.ts"],
-      outDir: "dist",
-      compilerOptions: { rootDir: "src" },
-    }),
-  ],
-  build: {
-    lib: {
-      entry: { index: "src/index.ts" },
-      formats: ["es"],
-      fileName: (_format, entryName) => `${entryName}.js`,
-    },
-    rollupOptions: {
-      external: ["node:os", "node:url"],
-    },
-    minify: false,
-    sourcemap: true,
-  },
+export default createServerPluginConfig({
+  plugins: [dts(SERVER_DTS_OPTIONS)],
+  external: ["node:os", "node:url"],
 });

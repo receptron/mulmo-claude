@@ -1,6 +1,6 @@
 // Unit tests for the phase-3 remote custom-view surface: the shared
 // buildRemoteView assembly (engine stubbed) and the getRemoteView command
-// handler over it. See plans/feat-remote-custom-view.md.
+// handler over it. See plans/done/feat-remote-custom-view.md.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 

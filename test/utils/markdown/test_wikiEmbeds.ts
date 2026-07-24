@@ -9,8 +9,15 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { marked } from "marked";
 
-import { _resetWikiEmbeds, escapeHtml, listWikiEmbedPrefixes, registerWikiEmbed, wikiEmbedExtension } from "../../../src/utils/markdown/wikiEmbeds";
-import { registerAmazonEmbed, registerIsbnEmbed, registerYoutubeEmbed, registerBuiltInWikiEmbeds } from "../../../src/utils/markdown/wikiEmbedHandlers";
+import { escapeHtml } from "@mulmoclaude/core/wiki";
+import { _resetWikiEmbeds, listWikiEmbedPrefixes, registerWikiEmbed, wikiEmbedExtension } from "../../../src/utils/markdown/wikiEmbeds";
+import {
+  amazonTldForLocale,
+  registerAmazonEmbed,
+  registerIsbnEmbed,
+  registerYoutubeEmbed,
+  registerBuiltInWikiEmbeds,
+} from "../../../src/utils/markdown/wikiEmbedHandlers";
 
 // `marked.use()` mutates the global instance — install once per
 // suite. Tests that need a fresh handler set call
@@ -141,6 +148,28 @@ describe("Amazon embed handler", () => {
     // fail the pattern, not get URL-injected.
     const html = (marked.parse("[[amazon:<script>x]]") as string).trim();
     assert.doesNotMatch(html, /<script/);
+  });
+});
+
+describe("amazonTldForLocale", () => {
+  it("maps a full tag, then a language-only fallback", () => {
+    assert.equal(amazonTldForLocale("ja"), "co.jp");
+    assert.equal(amazonTldForLocale("pt-BR"), "com.br");
+    assert.equal(amazonTldForLocale("de-AT"), "de");
+  });
+
+  it("unmapped locales fall back to .com", () => {
+    assert.equal(amazonTldForLocale("nl"), "com");
+    assert.equal(amazonTldForLocale(""), "com");
+  });
+
+  it("a prototype-chain locale falls back to .com, not an inherited function", () => {
+    // A bare `AMAZON_TLDS["constructor"]` returns the Object.prototype
+    // function, which would become the URL host and break the storefront link.
+    assert.equal(amazonTldForLocale("constructor"), "com");
+    assert.equal(amazonTldForLocale("toString"), "com");
+    assert.equal(amazonTldForLocale("__proto__"), "com");
+    assert.equal(amazonTldForLocale("hasOwnProperty"), "com");
   });
 });
 

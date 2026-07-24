@@ -28,6 +28,8 @@
 //     delivered as a method, so the agent never needs to know the help
 //     file's path or that it exists — the gap that made schema EDITS fail
 //     (create-time prompts point at the doc; edit-time had no pointer).
+//     Sectioned via `topic` (see schemaDocs.ts): the full doc outgrew the
+//     agent's per-tool-result limit.
 //   - getSchema / putSchema: read the raw schema.json, and validate it
 //     against `CollectionSchemaZ` BEFORE writing the canonical staging
 //     copy + mirroring it active (an internal write skips the skill-bridge
@@ -48,19 +50,20 @@ import type { CollectionItem, CollectionSchema } from "../core/schema";
 import { CollectionSchemaZ } from "../core/schemaZ";
 import { CollectionQueryZ } from "../core/queryZ";
 import { defangForPrompt } from "../core/promptSafety";
-import { loadCollection, type DiscoveryOptions } from "./discovery";
+import { loadCollection, resolvePrimaryField, type DiscoveryOptions } from "./discovery";
 import type { LoadedCollection } from "./discoveredCollection";
 import { resolveCreateItemId } from "./io";
 import { readOnlyRefusal, storeFor, type CollectionStore } from "./store";
-import { isBackendUnavailable } from "./firestoreStore";
+import { isBackendUnavailable } from "./backendAvailability";
 import { runCollectionQuery } from "./queryRunner";
 import { enrichItems } from "./derive";
 import { validateCollectionRecords, validateRecordObject } from "./validate";
 import { buildWorkspaceOntology } from "./ontology";
 import { resolveDataDir } from "./paths";
 import { getWorkspaceRoot } from "./host";
-import { writeFileAtomic } from "./atomic";
+import { writeFileAtomic } from "../../files/atomic.js";
 import { dataSkillDir, mirrorSkillWrite } from "../../skill-bridge/index.js";
+import { renderSchemaDocs } from "./schemaDocs";
 // NOTE: only the browser-safe `slug` module — workspace-setup's assets.ts uses
 // `import.meta.url` and is ESM-only (build pass 2), while this entry builds
 // dual ESM+CJS. The bundled-docs dir is injected instead (`bundledHelpsDir`).
@@ -142,7 +145,10 @@ function optionalStringArray(value: unknown, name: string): { ok: true; value?: 
  *  follow-up getItems/putItems. */
 function projectFields(record: CollectionItem, fields: string[], primaryKey: string): CollectionItem {
   const keys = fields.includes(primaryKey) ? fields : [primaryKey, ...fields];
-  return Object.fromEntries(keys.filter((key) => key in record).map((key) => [key, record[key]]));
+  // Own-property only: a requested field named `toString` / `constructor`
+  // must project as absent, not pull an inherited prototype function that
+  // `JSON.stringify` then drops — leaving the LLM to read the field as empty.
+  return Object.fromEntries(keys.filter((key) => Object.hasOwn(record, key)).map((key) => [key, record[key]]));
 }
 
 /** The validation warning appended to a getItems result when stored
@@ -172,11 +178,11 @@ async function loadRequestedItems(
     // The file store's read THROWS on a malformed record file (only ENOENT
     // is null) — for the tool that's a `missing` entry, not a failed call:
     // the warning scan that runs whenever something is missing then names
-    // the broken file and how to fix it. An UNAVAILABLE backend is different
-    // and must not be flattened into "missing": reporting a disconnected
-    // Firestore collection as absent records would send the agent hunting a
-    // data problem that doesn't exist.
+    // the broken file and how to fix it.
     const item = await store.read(recordId).catch((err: unknown) => {
+      // An UNAVAILABLE backend is not an absent record. Flattening it into
+      // `missing` would have the agent hunt a data problem that doesn't
+      // exist — and the repair scan then blames files that are fine.
       if (isBackendUnavailable(err)) throw err;
       return null;
     });
@@ -253,8 +259,9 @@ async function mergeWithExisting(
   try {
     existing = await store.read(itemId);
   } catch (err) {
-    // An unavailable backend is not a broken record — telling the agent to
-    // "fix the file" would send it after a file that doesn't exist.
+    // Same distinction as loadRequestedItems: an unreachable backend is not a
+    // broken record, and telling the agent to "fix the file" points it at a
+    // file that may not even exist for this backend.
     if (isBackendUnavailable(err)) throw err;
     return `'${itemId}' has a malformed stored file — mode "merge" needs to read it; fix the file (Read → correct → Write) or replace it whole with "upsert"`;
   }
@@ -396,18 +403,21 @@ async function handleGetOntology(deps: ManageCollectionDeps): Promise<string> {
   return JSON.stringify({ count: collections.length, collections });
 }
 
-/** Return the collection-authoring reference (`collection-skills.md`).
- *  Workspace copy first (reflects user edits), bundled asset as the
- *  always-present fallback. Both reads guarded; if neither resolves the
- *  agent still gets an actionable message instead of a thrown call. */
-async function handleSchemaDocs(deps: ManageCollectionDeps): Promise<string> {
+/** Return the collection-authoring reference (`collection-skills.md`),
+ *  rendered by `renderSchemaDocs` — the full doc overflows the agent's
+ *  per-result limit, so the default reply is the core guide + a table of
+ *  contents, and `topic` fetches individual sections. Workspace copy
+ *  first (reflects user edits), bundled asset as the always-present
+ *  fallback. Both reads guarded; if neither resolves the agent still
+ *  gets an actionable message instead of a thrown call. */
+async function handleSchemaDocs(deps: ManageCollectionDeps, topic?: string): Promise<string> {
   const candidates = [
     path.join(resolveBase(deps), HELPS_DIR, SCHEMA_DOCS_FILE),
     ...(deps.bundledHelpsDir ? [path.join(deps.bundledHelpsDir(), SCHEMA_DOCS_FILE)] : []),
   ];
   for (const candidate of candidates) {
     try {
-      return await readFile(candidate, "utf-8");
+      return renderSchemaDocs(await readFile(candidate, "utf-8"), topic);
     } catch {
       // try the next source
     }
@@ -477,7 +487,7 @@ async function writeAndMirrorSchema(slug: string, schema: unknown, deps: ManageC
  *  gate doesn't apply. Returns a one-line reason, or null when the schema
  *  would be accepted. */
 function schemaDiscoveryGate(schema: CollectionSchema, base: string): string | null {
-  const primaryField = schema.fields[schema.primaryKey];
+  const primaryField = resolvePrimaryField(schema.fields, schema.primaryKey);
   if (!primaryField) return `primaryKey '${schema.primaryKey}' is not one of the declared fields`;
   if (primaryField.primary !== true) return `the primaryKey field '${schema.primaryKey}' must be flagged \`primary: true\``;
   if (schema.dataPath !== undefined && resolveDataDir(schema.dataPath, base) === null) return `dataPath '${schema.dataPath}' escapes the workspace`;
@@ -515,7 +525,7 @@ async function handlePutSchema(slug: string, schemaArg: unknown, deps: ManageCol
 
 const MANAGE_COLLECTION_PROMPT =
   "Use `manageCollection` instead of raw Read/Write/Edit when working with a collection's records OR its schema (raw file I/O stays available as the escape hatch). " +
-  "Before authoring or changing a collection's `schema.json`, call `schemaDocs` to load the field/DSL reference, then read with `getSchema` and write with `putSchema` — `putSchema` validates the whole schema before writing and returns actionable errors instead of silently failing discovery's validation. " +
+  "Before authoring or changing a collection's `schema.json`, call `schemaDocs` to load the field/DSL reference — the default reply is the core authoring guide plus a table of contents; fetch advanced sections (actions, bells, calendar/kanban views, dataSource, storage) by passing their heading as `topic` rather than dumping `topic: \"all\"`. Then read with `getSchema` and write with `putSchema` — `putSchema` validates the whole schema before writing and returns actionable errors instead of silently failing discovery's validation. " +
   "`getItems` is the only way to see computed values — `derived` fields (e.g. a portfolio's value), `toggle` projections, and `embed` records are host-computed and never present in the stored JSON files. On large collections pass `ids` and/or `fields` to keep the result small. " +
   'For a question that spans collections ("which clients have unpaid invoices?"), start with `getOntology`: it lists every collection with its primaryKey, record count, and outbound `ref`/`embed` relations, so you know which collections to join before reading any records. ' +
   "`putItems` validates every row against the schema before writing (required fields, enum values, primaryKey = record id) and returns `{ written, rejected }`; fix each rejected row using its `problem` text and retry just those rows. Never include computed fields in a row you write. " +
@@ -556,9 +566,9 @@ async function manageCollectionHandler(deps: ManageCollectionDeps, args: Record<
   try {
     return await dispatchManageCollection(deps, args);
   } catch (err) {
-    // An unreachable backend is an ANSWER, not a crash: the tool's contract
-    // is actionable text, and the message already says what to do. Letting it
-    // throw would surface as a tool failure with no guidance.
+    // An unreachable backend is an ANSWER, not a crash: the tool's contract is
+    // actionable text, and the message already says what to do about it.
+    // Letting it throw would surface as a tool failure with no guidance.
     if (isBackendUnavailable(err)) return `manageCollection: ${err.message}`;
     throw err;
   }
@@ -566,7 +576,7 @@ async function manageCollectionHandler(deps: ManageCollectionDeps, args: Record<
 
 async function dispatchManageCollection(deps: ManageCollectionDeps, args: Record<string, unknown>): Promise<string> {
   const action = typeof args.action === "string" ? args.action : "";
-  if (action === "schemaDocs") return handleSchemaDocs(deps);
+  if (action === "schemaDocs") return handleSchemaDocs(deps, typeof args.topic === "string" ? args.topic : undefined);
   if (action === "getOntology") return handleGetOntology(deps);
   const slug = typeof args.slug === "string" ? args.slug.trim() : "";
   if (!slug) return "manageCollection: `slug` is required (the collection's slug).";
@@ -585,7 +595,7 @@ async function dispatchManageCollection(deps: ManageCollectionDeps, args: Record
 const MANAGE_COLLECTION_DEFINITION = {
   name: "manageCollection",
   description:
-    "Read and write a schema-driven collection through the host — both its records and its structure. getItems returns records WITH computed values (derived formulas, toggles, embeds) the stored JSON files don't contain; putItems validates each row against the schema before writing; deleteItems removes records by id. getOntology maps the whole workspace: every collection with its record count and outbound ref/embed relations — call it first for cross-collection questions. schemaDocs returns the collection-authoring reference; getSchema/putSchema read and validate-then-write the collection's schema.json. Prefer it over raw file I/O on collections.",
+    "Read and write a schema-driven collection through the host — both its records and its structure. getItems returns records WITH computed values (derived formulas, toggles, embeds) the stored JSON files don't contain; putItems validates each row against the schema before writing; deleteItems removes records by id. getOntology maps the whole workspace: every collection with its record count and outbound ref/embed relations — call it first for cross-collection questions. schemaDocs returns the collection-authoring reference — the core guide plus a table of contents by default; pass `topic` for a specific section. getSchema/putSchema read and validate-then-write the collection's schema.json. Prefer it over raw file I/O on collections.",
   inputSchema: {
     type: "object",
     properties: {
@@ -624,6 +634,11 @@ const MANAGE_COLLECTION_DEFINITION = {
         type: "object",
         description:
           "putSchema: the full collection schema object (same shape as schema.json — title, icon, dataPath, primaryKey, fields, …). Call getSchema first for the current one, and schemaDocs for the field DSL.",
+      },
+      topic: {
+        type: "string",
+        description:
+          'schemaDocs: fetch one section of the reference by heading (case-insensitive substring — e.g. "field types", "kanban", "calendar", "dataSource"). Omit for the core authoring guide plus a table of contents of every section; "all" returns the full document (large — it can exceed your tool-result limit).',
       },
       query: {
         type: "object",

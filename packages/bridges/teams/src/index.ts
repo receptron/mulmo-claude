@@ -21,6 +21,7 @@ import "dotenv/config";
 import express, { type Request, type Response } from "express";
 import { CloudAdapter, ConfigurationBotFrameworkAuthentication, TurnContext, type Activity } from "botbuilder";
 import { createBridgeClient, chunkText, formatAckReply } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 import { extractIncomingMessage } from "./parse.js";
 
 const TRANSPORT_ID = "teams";
@@ -38,12 +39,7 @@ function readRequiredEnv(): { appId: string; appPassword: string } {
 }
 const { appId, appPassword } = readRequiredEnv();
 
-const allowedUsers = new Set(
-  (process.env.TEAMS_ALLOWED_USERS ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean),
-);
+const allowedUsers = parseCsvSet(process.env.TEAMS_ALLOWED_USERS);
 const allowAll = allowedUsers.size === 0;
 
 // The ConfigurationBotFrameworkAuthentication reads from a config object

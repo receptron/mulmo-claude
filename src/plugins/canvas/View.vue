@@ -105,8 +105,9 @@ import type { ToolResult } from "gui-chat-protocol/vue";
 import type { ImageToolData } from "./definition";
 import { apiPut } from "../../utils/api";
 import { pluginEndpoints } from "../api";
-import { resolveImageSrc } from "../../utils/image/resolve";
-import { bumpImage } from "../../utils/image/cacheBust";
+import { resolveImageSrc } from "@mulmoclaude/markdown-utils/image/resolve";
+import { bumpImage } from "@mulmoclaude/markdown-utils/image/cacheBust";
+import { computeCanvasSize } from "./canvasSize";
 
 const imageStoreEndpoints = pluginEndpoints<{ update: string }>("imageStore");
 
@@ -234,19 +235,17 @@ const clear = () => {
 const updateCanvasSize = () => {
   const container = containerRef.value;
   if (!container) return;
-  const containerRect = container.getBoundingClientRect();
-  const padding = 32;
-  const newWidth = Math.floor(containerRect.width - padding);
-  const newHeight = Math.floor((newWidth * 9) / 16);
-  if (newWidth <= 0) return;
-  if (newWidth === canvasWidth.value && newHeight === canvasHeight.value) return;
-  const firstPaint = canvasWidth.value === 0;
-  canvasWidth.value = newWidth;
-  canvasHeight.value = newHeight;
+  const { size, changed, isFirstPaint } = computeCanvasSize(container.getBoundingClientRect().width, {
+    width: canvasWidth.value,
+    height: canvasHeight.value,
+  });
+  if (!size || !changed) return;
+  canvasWidth.value = size.width;
+  canvasHeight.value = size.height;
   // Remount the child on every size change *after* the first paint so
   // it re-reads the background image at the new dimensions. The first
   // paint doesn't need this — v-if gates the mount on `canvasWidth > 0`.
-  if (!firstPaint) canvasRenderKey.value++;
+  if (!isFirstPaint) canvasRenderKey.value++;
 };
 
 onMounted(async () => {

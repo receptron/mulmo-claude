@@ -50,7 +50,7 @@ export interface Command {
   // NUMBERS set by the remote at enqueue time — deliberately plain numbers, not
   // Firestore Timestamps, so `isExpired` / `byCreatedAt` stay pure + browser-safe
   // and unit-testable without a Firestore fake. Clock skew over a multi-day expiry
-  // window is immaterial. See plans/feat-remote-offline-queue.md.
+  // window is immaterial. See plans/done/feat-remote-offline-queue.md.
   createdAt?: number; // enqueue time — age/display + best-effort dispatch bias (NOT a strict order guarantee; chat is async)
   expiresAt?: number; // deadline; past it the host deletes the command + its staged attachments
   queuedOffline?: boolean; // emitted while the host was offline (gates the remote's attachment rollback)

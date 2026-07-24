@@ -9,7 +9,14 @@ export * from "./types";
 
 // Export utilities
 export * from "./parser";
+export * from "./condition";
+export * from "./date-locale";
+export * from "./cellEmpty";
+export * from "./datedif";
 export * from "./formatter";
+export * from "./translateFormula";
+export * from "./formulaError";
+export * from "./spreadsheet-errors";
 export * from "./evaluator";
 export * from "./calculator";
 export * from "./formulaRefs";

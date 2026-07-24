@@ -18,6 +18,7 @@
 import { computed, ref, type ComputedRef } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
 import { apiGet, apiPut } from "../utils/api";
+import { createMutationQueue } from "../utils/mutationQueue";
 import type { DashboardTile } from "../types/dashboard";
 
 const tiles = ref<DashboardTile[]>([]);
@@ -67,18 +68,10 @@ async function load(force = false): Promise<void> {
   return loadPromise;
 }
 
-// Every mutation runs through this chain so the replace-all PUTs never
-// overlap (the same race `useShortcuts` guards against).
-let mutationChain: Promise<unknown> = Promise.resolve();
-
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
-  const run = mutationChain.then(task, task);
-  mutationChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
+// `PUT /api/dashboard` rewrites the whole layout, so every mutation runs
+// through this queue and the replace-all PUTs never overlap. See
+// `createMutationQueue` for the races that prevents.
+const { enqueue } = createMutationQueue();
 
 /** Persist the given layout, rolling back to `previous` on failure.
  *  Returns true on success. Call only from inside `enqueue`. */

@@ -21,10 +21,11 @@
   "license": "MIT",
   "author": "Receptron Team",
   "dependencies": {
-    "@mulmobridge/client": "^0.1.4",
+    "@mulmobridge/client": "^0.2.0",
     "@mulmobridge/protocol": "^0.1.4",
+    "@mulmoclaude/common": "^1.1.0",
     "dotenv": "^17.0.0",
-    "imapflow": "^1.4.7",
+    "imapflow": "^1.5.0",
     "mailparser": "^3.9.14",
     "nodemailer": "^9.0.3"
   },

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isMarpDocument } from "../../../src/utils/markdown/marpDetect.js";
+import { isMarpDocument } from "@mulmoclaude/markdown-utils/markdown/marpDetect";
 
 describe("isMarpDocument", () => {
   it("returns true for boolean true", () => {

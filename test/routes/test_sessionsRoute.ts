@@ -339,3 +339,42 @@ describe("POST /api/sessions/:id/mark-read", () => {
     assert.equal(meta.hasUnread, false);
   });
 });
+
+// `readSessionMeta` used to gate on `meta?.roleId && meta?.startedAt` — a truthy
+// test, so a corrupt row with empty strings was skipped. Replacing that with a
+// type guard is only equivalent if the guard keeps the non-empty invariant;
+// `typeof x === "string"` alone would start letting those rows into the list.
+// Both read paths are covered because they narrow independently.
+describe("GET /api/sessions — corrupt meta rows are skipped", () => {
+  it("skips a .json meta whose roleId/startedAt are empty strings", async () => {
+    await writeFile(path.join(chatDir, "empty-meta.json"), JSON.stringify({ roleId: "", startedAt: "" }));
+    await writeFile(path.join(chatDir, "empty-meta.jsonl"), "");
+
+    const { state, res } = mockRes();
+    await getHandler({ query: {} } as unknown as Request, res);
+
+    const ids = (state.body?.sessions ?? []).map((session) => session.id);
+    assert.ok(!ids.includes("empty-meta"), `corrupt session leaked into the list: ${ids.join(", ")}`);
+  });
+
+  it("skips a legacy .jsonl first line whose roleId/startedAt are empty strings", async () => {
+    // No .json meta at all, so the handler falls through to the legacy path.
+    await writeFile(path.join(chatDir, "legacy-empty.jsonl"), `${JSON.stringify({ roleId: "", startedAt: "" })}\n`);
+
+    const { state, res } = mockRes();
+    await getHandler({ query: {} } as unknown as Request, res);
+
+    const ids = (state.body?.sessions ?? []).map((session) => session.id);
+    assert.ok(!ids.includes("legacy-empty"), `corrupt legacy session leaked into the list: ${ids.join(", ")}`);
+  });
+
+  it("still lists a session whose meta is well-formed", async () => {
+    await writeSession("good-meta", { mtimeMs: BASE_MS });
+
+    const { state, res } = mockRes();
+    await getHandler({ query: {} } as unknown as Request, res);
+
+    const ids = (state.body?.sessions ?? []).map((session) => session.id);
+    assert.ok(ids.includes("good-meta"), `well-formed session missing: ${ids.join(", ")}`);
+  });
+});

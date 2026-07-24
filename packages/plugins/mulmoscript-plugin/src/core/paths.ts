@@ -1,40 +1,30 @@
-// Pure path helpers for MulmoScript story artifacts. No Node built-ins so the
-// package stays bundler-agnostic (chart/html precedent); all filesystem access
-// happens through the host's generic `files.artifacts` FileOps.
+// Path helpers for MulmoScript story artifacts. The generic build primitives
+// (slug + the `""`/`.`/`..` traversal guard) live in the shared, browser-safe
+// `@mulmoclaude/core/artifacts` (#2405); only the story-specific wire-path
+// rules stay here.
 //
 // Path model: the stories directory lives at `<workspace>/artifacts/stories`
 // and the FileOps scope root is `<workspace>/artifacts`, so the
 // FileOps-relative path and the historical `stories/<name>.json` wire form
-// (which every mulmoScript endpoint keys on) are the SAME string. Helpers
-// below therefore return one path used for both purposes.
+// (which every mulmoScript endpoint keys on) are the SAME string. Stories are
+// NOT `YYYY/MM`-partitioned, so `storyFilePath` opts out of partitioning.
+
+import { ARTIFACTS_ROOT, buildArtifactRelPath, hasUnsafePathSegment, slugifyArtifact } from "@mulmoclaude/core/artifacts";
 
 const STORIES_DIR = "stories";
-const ARTIFACTS_DIR = "artifacts";
-const MAX_SLUG_LEN = 120;
+const STORY_FALLBACK_SLUG = "story";
 
-/** Lowercase-hyphen slug, capped at MAX_SLUG_LEN, with leading/trailing
- *  hyphens stripped. Falls back to `fallback` for empty/undefined/non-ASCII
- *  input. Mirrors html-plugin's in-package slugify — deliberately simpler
- *  than the host's hash-fallback variant; the timestamp suffix appended by
- *  `storyFilePath` keeps these throwaway filenames collision-free. */
-export function slugify(title: string | undefined, fallback = "story"): string {
-  if (!title) return fallback;
-  const collapsed = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .slice(0, MAX_SLUG_LEN);
-  let start = 0;
-  let end = collapsed.length;
-  while (start < end && collapsed[start] === "-") start += 1;
-  while (end > start && collapsed[end - 1] === "-") end -= 1;
-  return collapsed.slice(start, end) || fallback;
+/** Lowercase-hyphen slug, capped, leading/trailing hyphens stripped; falls back
+ *  to `fallback` for empty/undefined/non-ASCII input. */
+export function slugify(title: string | undefined, fallback = STORY_FALLBACK_SLUG): string {
+  return slugifyArtifact(title, fallback);
 }
 
 /** Build a fresh, collision-safe story path for a new script —
  *  `stories/<slug>-<epoch-ms>.json`, valid as both the FileOps-relative
  *  write path and the wire `filePath`. */
 export function storyFilePath(slugSource: string, now: Date = new Date()): string {
-  return `${STORIES_DIR}/${slugify(slugSource)}-${now.getTime()}.json`;
+  return buildArtifactRelPath({ dir: STORIES_DIR, title: slugSource, ext: ".json", fallback: STORY_FALLBACK_SLUG, now, partitioned: false });
 }
 
 /**
@@ -55,9 +45,9 @@ export function normalizeStoryPath(filePath: string): string | null {
   if (filePath.length === 0 || filePath.includes("\\")) return null;
   // Absolute POSIX path or Windows drive prefix.
   if (filePath.startsWith("/") || /^[A-Za-z]:/.test(filePath)) return null;
+  if (hasUnsafePathSegment(filePath)) return null;
   const segments = filePath.split("/");
-  if (segments.some((seg) => seg === "" || seg === "." || seg === "..")) return null;
-  const trimmed = segments[0] === ARTIFACTS_DIR && segments[1] === STORIES_DIR ? segments.slice(1) : segments;
+  const trimmed = segments[0] === ARTIFACTS_ROOT && segments[1] === STORIES_DIR ? segments.slice(1) : segments;
   const rest = trimmed[0] === STORIES_DIR ? trimmed.slice(1) : trimmed;
   if (rest.length === 0) return null;
   return [STORIES_DIR, ...rest].join("/");

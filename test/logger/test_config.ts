@@ -28,6 +28,25 @@ describe("resolveConfig", () => {
     assert.equal(config.sinks.console.level, DEFAULT_CONFIG.sinks.console.level);
   });
 
+  // A membership test written with `in` walks the prototype chain, so these
+  // used to pass as levels. `LEVEL_PRIORITY["constructor"]` is then a function,
+  // every `priority <= function` comparison is false, and the process runs with
+  // every log record discarded — with no error and no way to notice (#2321).
+  it("rejects a level named after an Object.prototype member", () => {
+    for (const level of ["constructor", "tostring", "valueof", "hasownproperty"]) {
+      const config = resolveConfig({ LOG_LEVEL: level });
+      assert.equal(config.sinks.console.level, DEFAULT_CONFIG.sinks.console.level, `${level} must not be accepted`);
+      assert.equal(config.sinks.file.level, DEFAULT_CONFIG.sinks.file.level, `${level} must not be accepted`);
+    }
+  });
+
+  it("rejects a prototype-named level on the per-sink overrides too", () => {
+    const config = resolveConfig({ LOG_CONSOLE_LEVEL: "constructor", LOG_FILE_LEVEL: "constructor", LOG_TELEMETRY_LEVEL: "constructor" });
+    assert.equal(config.sinks.console.level, DEFAULT_CONFIG.sinks.console.level);
+    assert.equal(config.sinks.file.level, DEFAULT_CONFIG.sinks.file.level);
+    assert.equal(config.sinks.telemetry.level, DEFAULT_CONFIG.sinks.telemetry.level);
+  });
+
   it("accepts format overrides per sink", () => {
     const config = resolveConfig({
       LOG_CONSOLE_FORMAT: "json",

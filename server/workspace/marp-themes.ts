@@ -9,7 +9,7 @@
 import path from "node:path";
 import { WORKSPACE_DIRS, workspacePath } from "./paths.js";
 import { readdirUnderSync, readTextUnderSync } from "../utils/files/workspace-io.js";
-import { ensureThemeDirective, marpThemeNameFromFilename, sanitizeMarpThemeCss } from "../../src/utils/markdown/marpTheme.js";
+import { ensureThemeDirective, marpThemeNameFromFilename, sanitizeMarpThemeCss } from "@mulmoclaude/markdown-utils/markdown/marpTheme";
 import { log } from "../system/logger/index.js";
 
 export interface MarpTheme {

@@ -2,7 +2,7 @@
 // orchestration, realpath containment, generation tracking) plus the
 // dispatch router. Server-only: imports mulmocast/graphai and Node
 // built-ins; never bundle into a browser build. Phase 3 of
-// plans/feat-mulmoscript-plugin.md.
+// plans/done/feat-mulmoscript-plugin.md.
 
 export type {
   GenerateOpArgs,

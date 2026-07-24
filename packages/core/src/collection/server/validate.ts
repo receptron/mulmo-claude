@@ -6,6 +6,7 @@
 // closing the loop so the model fixes the file instead of a human noticing
 // missing rows much later.
 
+import { fieldText } from "../core/fieldText";
 import { readdir, readFile, lstat } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceRoot, log } from "./host";
@@ -89,7 +90,7 @@ async function validateStoreRecords(collection: LoadedCollection, opts: { worksp
   const issues: RecordIssue[] = [];
   for (const item of items) {
     if (issues.length >= MAX_ISSUES) break;
-    const itemId = String(item[collection.schema.primaryKey] ?? "");
+    const itemId = fieldText(item[collection.schema.primaryKey]);
     const problem = validateRecordObject(item, itemId, collection.schema, "strict");
     if (problem) issues.push({ file: itemId, problem });
   }
@@ -134,6 +135,16 @@ async function inspectRecord(fullPath: string, name: string, schema: CollectionS
   return problem ? { file: name, problem } : null;
 }
 
+/** What a non-string primary key actually is, for the error message. Names the
+ *  shape rather than stringifying the value — "[object Object]" tells the reader
+ *  nothing about what is wrong. */
+function describeIdType(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "missing";
+  if (Array.isArray(value)) return "an array";
+  return `a ${typeof value}`;
+}
+
 /** First schema problem on an in-memory record (primaryKey↔id mismatch,
  *  then the compiled per-field checks — see `../core/recordZ` for the two
  *  tiers), or null when it's fine. One issue per record keeps the report
@@ -145,8 +156,16 @@ async function inspectRecord(fullPath: string, name: string, schema: CollectionS
  *  report-only surfaces. */
 export function validateRecordObject(record: CollectionItem, itemId: string, schema: CollectionSchema, tier: RecordCheckTier = "enforced"): string | null {
   const idValue = record[schema.primaryKey];
-  if (typeof idValue !== "string" || idValue !== itemId) {
-    return `'${schema.primaryKey}' is '${String(idValue ?? "")}' but must equal the filename ('${itemId}'), or the record can't be opened`;
+  // Two distinct failures, reported distinctly. A non-string id used to be
+  // rendered with `String(...)`, so an object arrived in the message as
+  // "[object Object]" — which reads like a value the user typed rather than a
+  // type error, and no longer matched the (now text-derived) `itemId` it was
+  // being compared against.
+  if (typeof idValue !== "string") {
+    return `'${schema.primaryKey}' must be a string, but is ${describeIdType(idValue)} — must equal the filename ('${itemId}'), or the record can't be opened`;
+  }
+  if (idValue !== itemId) {
+    return `'${schema.primaryKey}' is '${idValue}' but must equal the filename ('${itemId}'), or the record can't be opened`;
   }
   return firstRecordProblem(record, schema, tier);
 }

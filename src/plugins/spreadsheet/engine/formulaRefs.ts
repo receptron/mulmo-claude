@@ -57,6 +57,22 @@ export function expandRange(rangeStr: string): CellCoord[] {
   return cells;
 }
 
+// Expand a range OR a single cell into coordinates, upcasing first so
+// lowercase references (`a1:b2`, which spreadsheets accept) are not dropped,
+// and falling back to a single cell when there is no colon. `collectRangeValues`
+// in the calculator used a range-only, case-sensitive regex, so `A1`,
+// `$A$1:$A$10` and `a1:a10` all silently produced no values (#2356). Ordering
+// matches `expandRange`: top-to-bottom, left-to-right.
+export function expandRangeOrCell(ref: string): CellCoord[] | null {
+  const upper = ref.trim().toUpperCase();
+  if (upper.includes(":")) {
+    const cells = expandRange(upper);
+    return cells.length > 0 ? cells : null;
+  }
+  const single = parseSingleCellRef(upper);
+  return single ? [single] : null;
+}
+
 // Parse a single cell ref (`A1`, `$A$1`, `AA100`) into a coord.
 // Returns null for malformed input rather than throwing — keeps the
 // caller's loop flat (the engine-layer `parseCellRef` throws, which
@@ -69,6 +85,69 @@ export function parseSingleCellRef(refStr: string): CellCoord | null {
     col: columnToIndex(match[1]),
     row: parseInt(match[2], 10) - 1,
   };
+}
+
+// Numeric bounds of a `A2:C10` range, with any `Sheet1!` / `'My Sheet'!`
+// prefix kept verbatim so callers can rebuild sheet-qualified refs. Columns
+// are 0-based (via `columnToIndex`); rows stay 1-based, matching A1 notation.
+export interface RangeBounds {
+  sheetPrefix: string;
+  startCol: number;
+  startRow: number;
+  endCol: number;
+  endRow: number;
+}
+
+// Split an optional sheet prefix from a range, then parse the `A2:C10` body.
+// The prefix is everything up to and including the last `!`, so a quoted sheet
+// name that itself contains no `!` (the common case) is preserved intact. The
+// lookup functions each carried their own copy of this parse; one copy ran a
+// sheet-unaware regex against the whole string and threw on `Sheet1!A2:C10`
+// before the sheet-aware copy could run (#2390). Returns null for anything that
+// is not a two-endpoint range so callers surface one "Invalid range" message.
+export function parseRangeBounds(range: string): RangeBounds | null {
+  const bang = range.lastIndexOf("!");
+  const sheetPrefix = bang >= 0 ? range.slice(0, bang + 1) : "";
+  const body = bang >= 0 ? range.slice(bang + 1) : range;
+  const match = body.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!match) return null;
+  return {
+    sheetPrefix,
+    startCol: columnToIndex(match[1]),
+    startRow: parseInt(match[2], 10),
+    endCol: columnToIndex(match[3]),
+    endRow: parseInt(match[4], 10),
+  };
+}
+
+// Excel's `0` row/column index selects the entire row/column. This scalar engine
+// returns a single cell, so `0` is representable only when that dimension is one
+// line long; otherwise it is out of range.
+const WHOLE_LINE_INDEX = 0;
+const FIRST_INDEX = 1;
+
+// Map a 1-based INDEX position onto a 0-based offset within a `size`-long line,
+// truncating toward zero as Excel does. Returns null when the position falls
+// outside the line — including a `0` (whole-line) request the scalar engine
+// cannot collapse to one cell. Callers turn null into #REF!.
+function lineOffset(position: number, size: number): number | null {
+  const index = Math.trunc(position);
+  if (!Number.isFinite(index)) return null;
+  if (index === WHOLE_LINE_INDEX) return size === 1 ? 0 : null;
+  if (index < FIRST_INDEX || index > size) return null;
+  return index - FIRST_INDEX;
+}
+
+// Resolve INDEX(range, rowNum, colNum)'s 1-based position to an absolute cell
+// within the range, or null (→ #REF!) when it falls outside. The former handler
+// computed the target with no bounds check, so an out-of-range index silently
+// read a cell outside the range (#2390: `INDEX(A1:A3,5)` read A5, `INDEX(A2:B5,
+// 0,1)` read A1). Returned column is 0-based; row is 1-based (A1 notation).
+export function resolveIndexTarget(bounds: RangeBounds, rowNum: number, colNum: number): { colIndex: number; row: number } | null {
+  const rowOffset = lineOffset(rowNum, bounds.endRow - bounds.startRow + 1);
+  const colOffset = lineOffset(colNum, bounds.endCol - bounds.startCol + 1);
+  if (rowOffset === null || colOffset === null) return null;
+  return { colIndex: bounds.startCol + colOffset, row: bounds.startRow + rowOffset };
 }
 
 // Top-level: scan the formula, expand any ranges, then pick up

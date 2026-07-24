@@ -46,3 +46,28 @@ export function itemIsDone(schema: CompletionSchemaView, item: Record<string, un
   if (text === null) return false;
   return completionDoneValues.includes(text);
 }
+
+/** The schema slice `completionCoveredByFieldChip` reads: field kinds (it
+ *  inspects `boolean` / `toggle` variants' `field` / `onValue`) plus the
+ *  completion pair. Minimal structural shape so both the client and server
+ *  `CollectionSchema` types satisfy it as-is. */
+export interface CompletionChipSchemaView {
+  fields: Record<string, { type: string; field?: string; onValue?: string }>;
+  completionField?: string;
+  completionDoneValues?: readonly string[];
+}
+
+/** True when an existing FIELD chip already expresses the legacy completion
+ *  predicate exactly, so a synthesized "done" chip would be a duplicate: a
+ *  boolean `completionField` (done ⇔ `"true"` ⇔ the boolean's own chip), or a
+ *  `toggle` projecting the `completionField` whose `onValue` is the single
+ *  done value (the todos-schema shape: toggle "Done" on `status` +
+ *  `completionDoneValues: ["done"]`). A superset pair (extra done values)
+ *  still synthesizes — no field chip covers it. */
+export function completionCoveredByFieldChip(schema: CompletionChipSchemaView): boolean {
+  const { completionField, completionDoneValues } = schema;
+  if (completionDoneValues?.length !== 1) return false;
+  const [doneValue] = completionDoneValues;
+  if (schema.fields[completionField ?? ""]?.type === "boolean") return doneValue === "true";
+  return Object.values(schema.fields).some((field) => field.type === "toggle" && field.field === completionField && field.onValue === doneValue);
+}

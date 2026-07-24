@@ -29,11 +29,26 @@ export interface SendWebPushOptions {
   timeoutMs?: number;
   // fetch implementation (test seam). Defaults to globalThis.fetch.
   fetchImpl?: typeof fetch;
+  // Arbitrary key/value pairs forwarded to the FCM `data` block, so a receiver
+  // can route the tap (e.g. `{ sessionId }` to open that session instead of the
+  // home screen). FCM requires string values. Deliberately untyped beyond that:
+  // each host decides its own routing keys.
+  //
+  // This is ADDED alongside `notification`, never instead of it — both
+  // mulmoserver receivers bail out when `payload.notification` is missing, so a
+  // data-only message is silently dropped.
+  data?: Record<string, string>;
 }
 
-// The onCall wire shape wraps the payload in `data`.
-export function buildSendPushBody(title: string, body: string): string {
-  return JSON.stringify({ data: { title, body } });
+// The onCall wire shape wraps the call's arguments in `data` — that outer key
+// is the Cloud Functions envelope, NOT the FCM data block. The caller's routing
+// payload rides inside it as `data.data`, which the server forwards to FCM.
+//
+// Omitted entirely when empty, so the envelope of an ordinary push is byte-for-
+// byte what it was before this option existed.
+export function buildSendPushBody(title: string, body: string, data?: Record<string, string>): string {
+  const routing = data && Object.keys(data).length > 0 ? { data } : {};
+  return JSON.stringify({ data: { title, body, ...routing } });
 }
 
 // The onCall response wraps the payload in `result`. Missing / non-number counts read as 0.
@@ -55,9 +70,10 @@ async function resolveIdToken(getIdToken: () => Promise<string | null>): Promise
   }
 }
 
-// POST { title, body } to sendPush as the signed-in user. Returns the delivery
-// result, or null when nothing was sent (not signed in / network / timeout /
-// non-2xx / bad JSON). Never throws — a failed push must not disturb its trigger.
+// POST { title, body, data? } to sendPush as the signed-in user. Returns the
+// delivery result, or null when nothing was sent (not signed in / network /
+// timeout / non-2xx / bad JSON). Never throws — a failed push must not disturb
+// its trigger.
 export async function sendWebPush(title: string, body: string, options: SendWebPushOptions): Promise<SendPushResult | null> {
   const idToken = await resolveIdToken(options.getIdToken);
   if (!idToken) return null; // not signed in → nothing to send with
@@ -70,7 +86,7 @@ export async function sendWebPush(title: string, body: string, options: SendWebP
     const res = await doFetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
-      body: buildSendPushBody(title, body),
+      body: buildSendPushBody(title, body, options.data),
       signal: controller.signal,
     });
     if (!res.ok) return null;

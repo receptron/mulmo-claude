@@ -108,7 +108,7 @@ function defaultSleep(delayMs) {
 // filesystem. `overrides` (npm `overrides`) redirects the launcher's
 // first-party workspace deps to local `file:` tarballs so the install
 // resolves them from the just-built workspace instead of the public
-// registry — see packWorkspaceOverrides / plans/feat-smoke-local-registry.md.
+// registry — see packWorkspaceOverrides / plans/done/feat-smoke-local-registry.md.
 export function buildInstallerPackageJson({ tarballName, overrides } = {}) {
   const pkg = {
     name: "mulmoclaude-smoke-installer",
@@ -218,7 +218,7 @@ export function toFileSpecifier(tarballPath, sep = path.sep) {
 // return an npm `overrides` map { name: "file:<abs tarball>" }. This is what lets
 // the smoke install a launcher pinned to a bumped-but-unpublished shared package
 // (e.g. @mulmoclaude/core@0.12.0) without that version existing on public npm —
-// see plans/feat-smoke-local-registry.md.
+// see plans/done/feat-smoke-local-registry.md.
 export async function packWorkspaceOverrides({ root, packDir, runCommandImpl = runCommand, enumerateImpl = enumerateWorkspacePackages, packTimeoutMs } = {}) {
   const packages = await enumerateImpl(root);
   const closure = computeFirstPartyClosure(packages, LAUNCHER_NAME);
@@ -482,7 +482,7 @@ export async function verifySandboxFiles({ workDir, files = REQUIRED_SANDBOX_FIL
 // workspace deps are packed to local tarballs and pinned via `overrides` so the
 // install resolves them from the just-built workspace, not the public registry —
 // otherwise a launcher pinned to a bumped-but-unpublished shared package would
-// fail with ETARGET (plans/feat-smoke-local-registry.md).
+// fail with ETARGET (plans/done/feat-smoke-local-registry.md).
 async function installTarball({ workDir, tarballAbsolutePath, installTimeoutMs, root, packTimeoutMs }) {
   const packDir = path.join(workDir, "local-deps");
   await mkdir(packDir, { recursive: true });

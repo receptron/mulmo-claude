@@ -8,47 +8,14 @@
 
 import { backlinkRows, projectBacklinkRow, rollupValue } from "../core/backlinks";
 import { deriveAll, type DeriveRefRecords } from "../core/deriveAll";
+import { ownProp } from "../core/ownProp";
+import { uniqueBacklinkSources, uniqueEmbedTargets, uniqueRefTargets } from "../core/linkTargets";
 import { loadCollection, type DiscoveryOptions } from "./discovery";
 import type { LoadedCollection } from "./discoveredCollection";
 import { storeFor } from "./store";
+import { fieldText } from "../core/fieldText";
 import { embedTargetId } from "../core/schema";
 import type { CollectionFieldSpec, CollectionItem, CollectionSchema } from "../core/schema";
-
-/** Slugs of every collection referenced by a `ref` field — top-level
- *  and one level into `table` sub-fields (nested tables are
- *  schema-rejected). Mirrors the client's `uniqueRefTargets`. */
-function uniqueRefTargets(schema: CollectionSchema): string[] {
-  const targets = new Set<string>();
-  const walk = (fields: Record<string, CollectionFieldSpec>): void => {
-    for (const field of Object.values(fields)) {
-      if (field.type === "ref" && typeof field.to === "string" && field.to.length > 0) targets.add(field.to);
-      if (field.type === "table" && field.of) walk(field.of);
-    }
-  };
-  walk(schema.fields);
-  return [...targets];
-}
-
-/** Slugs of every collection referenced by an `embed` field (top-level
- *  only, like the client). */
-function uniqueEmbedTargets(schema: CollectionSchema): string[] {
-  const targets = new Set<string>();
-  for (const field of Object.values(schema.fields)) {
-    if (field.type === "embed" && typeof field.to === "string" && field.to.length > 0) targets.add(field.to);
-  }
-  return [...targets];
-}
-
-/** Slugs of every SOURCE collection a `backlinks` or `rollup` field
- *  reverses over — loaded exactly like ref/embed targets (whole
- *  collection, once; the two field kinds share one load). */
-function uniqueBacklinkSources(schema: CollectionSchema): string[] {
-  const sources = new Set<string>();
-  for (const field of Object.values(schema.fields)) {
-    if ((field.type === "backlinks" || field.type === "rollup") && field.from.length > 0) sources.add(field.from);
-  }
-  return [...sources];
-}
 
 interface LinkedTarget {
   schema: CollectionSchema;
@@ -102,7 +69,7 @@ function projectBacklinks(
 ): CollectionItem[] {
   const source = linked[field.from];
   if (!source) return [];
-  const selfId = String(enriched[schema.primaryKey] ?? "");
+  const selfId = fieldText(enriched[schema.primaryKey]);
   return backlinkRows(field, selfId, Object.values(source.byId)).map((row) => projectBacklinkRow(row, field.display, source.schema.primaryKey));
 }
 
@@ -113,11 +80,12 @@ function projectBacklinks(
 function projectComputed(schema: CollectionSchema, enriched: CollectionItem, linked: Record<string, LinkedTarget>): CollectionItem {
   for (const [key, field] of Object.entries(schema.fields)) {
     if (field.type === "toggle" && field.field) {
-      enriched[key] = String(enriched[field.field] ?? "") === field.onValue;
+      enriched[key] = fieldText(enriched[field.field]) === field.onValue;
     }
     if (field.type === "embed" && field.to) {
       const targetId = embedTargetId(field, enriched);
-      enriched[key] = (targetId && linked[field.to]?.byId[targetId]) || null;
+      const target = ownProp(linked, field.to);
+      enriched[key] = (targetId && target && ownProp(target.byId, targetId)) || null;
     }
     if (field.type === "backlinks") {
       enriched[key] = projectBacklinks(field, schema, enriched, linked);
@@ -139,7 +107,7 @@ function projectRollups(schema: CollectionSchema, record: CollectionItem, linked
     if (field.type !== "rollup") continue;
     if (out === record) out = { ...record };
     const source = linked[field.from];
-    const selfId = String(record[schema.primaryKey] ?? "");
+    const selfId = fieldText(record[schema.primaryKey]);
     out[key] = source ? rollupValue(field, selfId, Object.values(source.byId)) : null;
   }
   return out;

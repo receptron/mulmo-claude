@@ -1,6 +1,12 @@
 // Shared date-formatting and date-validation helpers. Previously
 // scattered across workspace/journal/paths.ts, journal/indexFile.ts,
 // and workspace/tool-trace/writeSearch.ts.
+// `toUtcIsoDate` lives in `@mulmoclaude/common` (#2480) and is re-exported
+// here so the host import sites keep their surface, mirroring files/safe.ts.
+
+import { toUtcIsoDate } from "@mulmoclaude/common";
+
+export { toUtcIsoDate };
 
 /**
  * YYYY-MM-DD in the LOCAL timezone. Used for journal daily paths
@@ -12,18 +18,6 @@ export function toLocalIsoDate(input: Date | number): string {
   const year = dateValue.getFullYear();
   const month = String(dateValue.getMonth() + 1).padStart(2, "0");
   const day = String(dateValue.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * YYYY-MM-DD in UTC. Used for tool-trace search directories and
- * any context where the date must not shift with the server's
- * local timezone.
- */
-export function toUtcIsoDate(timestamp: Date): string {
-  const year = timestamp.getUTCFullYear();
-  const month = String(timestamp.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(timestamp.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 

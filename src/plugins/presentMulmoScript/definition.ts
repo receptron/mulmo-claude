@@ -4,7 +4,7 @@ import { TOOL_DEFINITION } from "@mulmoclaude/mulmoscript-plugin";
 
 // presentMulmoScript's tool schema and save/reopen/update logic now live in
 // the shared @mulmoclaude/mulmoscript-plugin package (single source of truth,
-// also consumable by MulmoTerminal — plans/feat-mulmoscript-plugin.md). This
+// also consumable by MulmoTerminal — plans/done/feat-mulmoscript-plugin.md). This
 // built-in is a thin host adapter: it keeps MulmoClaude's host-specific
 // routing META and View while sourcing the schema from the package.
 export const TOOL_NAME = META.toolName;

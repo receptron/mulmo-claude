@@ -11,43 +11,19 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { discoverCollections, type DiscoveryOptions } from "./discovery";
 import { storeFor } from "./store";
-import { isBackendUnavailable } from "./firestoreStore";
+import { isBackendUnavailable } from "./backendAvailability";
 import { storageKindFor } from "../core/schema";
 import { isRegularFile } from "./io";
 import { isContainedInRoot } from "./paths";
 import { getWorkspaceRoot } from "./host";
 import type { LoadedCollection } from "./discoveredCollection";
 import type { CollectionSchema } from "../core/schema";
+import type { CollectionOntologyEntry, OntologyRelation } from "../core/ontologyGraph";
 
-/** One relationship a schema declares: a `ref` (the record stores the
- *  target's primaryKey slug) or `embed` (display-only pull) pointing at
- *  collection `to`, or `backlinks` (display-only REVERSE refs — `to` is
- *  the backlink's source collection, i.e. its `from`). A `ref` column
- *  inside a `table` field is reported with a dotted path
- *  (`lines.clientId`). Whether `to` exists is NOT checked — resolution
- *  is fail-soft at render, and the caller holds the full slug list to
- *  compare against anyway. */
-export interface OntologyRelation {
-  field: string;
-  kind: "ref" | "embed" | "backlinks" | "rollup";
-  to: string;
-}
-
-export interface CollectionOntologyEntry {
-  slug: string;
-  title: string;
-  icon: string;
-  primaryKey: string;
-  /** The effective display field: the schema's `displayField`, falling
-   *  back to the primaryKey exactly as render-time labelling does. */
-  displayField: string;
-  /** Records in the collection, or `null` when the backend couldn't be
-   *  reached to count them (a disconnected firestore session). `null` is
-   *  deliberately NOT 0: an unreachable collection reported as empty invites
-   *  the agent to "restore" data that is intact but out of reach. */
-  recordCount: number | null;
-  relations: OntologyRelation[];
-}
+// The entry/relation types live browser-safe in core/ontologyGraph.ts
+// (the Map panel builds the graph client-side from the raw entries);
+// re-exported here so the server subpath's surface is unchanged.
+export type { CollectionOntologyEntry, OntologyRelation } from "../core/ontologyGraph";
 
 /** Extract the relations a schema declares, in field declaration order:
  *  top-level `ref` / `embed` / `backlinks` fields plus `ref` sub-fields
@@ -57,7 +33,7 @@ export function schemaRelations(schema: CollectionSchema): OntologyRelation[] {
   const relations: OntologyRelation[] = [];
   for (const [key, spec] of Object.entries(schema.fields)) {
     if (spec.type === "ref" || spec.type === "embed") relations.push({ field: key, kind: spec.type, to: spec.to });
-    if (spec.type === "backlinks" || spec.type === "rollup") relations.push({ field: key, kind: spec.type, to: spec.from });
+    if (spec.type === "backlinks" || spec.type === "rollup") relations.push({ field: key, kind: spec.type, to: spec.from, via: spec.via });
     if (spec.type !== "table") continue;
     for (const [subKey, subSpec] of Object.entries(spec.of)) {
       if (subSpec.type === "ref") relations.push({ field: `${key}.${subKey}`, kind: "ref", to: subSpec.to });
@@ -97,10 +73,9 @@ async function countRecords(collection: LoadedCollection, workspaceRoot: string)
     try {
       return (await storeFor(collection, { workspaceRoot }).page({ limit: 0 })).total;
     } catch (err) {
-      // `null` = "couldn't count", which is NOT the same as zero. A
-      // disconnected firestore collection reported as 0 records reads as
-      // "this collection is empty" and would have the agent offer to
-      // repopulate data that is sitting safely in the user's account.
+      // `null` = "couldn't count", which is NOT zero. Reporting an
+      // unreachable backend as 0 reads as "this collection is empty" and
+      // invites the agent to repopulate records that are perfectly intact.
       if (isBackendUnavailable(err)) return null;
       return 0;
     }

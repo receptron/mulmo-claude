@@ -27,6 +27,7 @@
 import "dotenv/config";
 import xmppPkg, { type XmlElement } from "@xmpp/client";
 import { createBridgeClient, chunkText, formatAckReply } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 import { splitJid, parseStanzaFields } from "./parse.js";
 
 const { client, xml } = xmppPkg;
@@ -49,12 +50,7 @@ if (replyMode !== "bare" && replyMode !== "full") {
   process.exit(1);
 }
 const replyWithFullJid = replyMode === "full";
-const allowedJids = new Set(
-  (process.env.XMPP_ALLOWED_JIDS ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean),
-);
+const allowedJids = parseCsvSet(process.env.XMPP_ALLOWED_JIDS, { lowercase: true });
 const allowAll = allowedJids.size === 0;
 
 const { username, domain } = splitJid(jid);

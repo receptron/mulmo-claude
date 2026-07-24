@@ -12,7 +12,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { WORKSPACE_DIRS, WORKSPACE_FILES } from "../paths.js";
 import { readDirSafeAsync, readTextSafe, statSafeAsync } from "../../utils/files/safe.js";

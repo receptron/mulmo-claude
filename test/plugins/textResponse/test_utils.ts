@@ -50,6 +50,28 @@ describe("extractTextResponseTitle", () => {
     const text = "## Subhead\nFirst real line";
     assert.equal(extractTextResponseTitle(text), "## Subhead");
   });
+
+  // Regression: "# install deps" inside a ```bash fence is a shell comment,
+  // not a heading — it used to become the download filename.
+  it("does not treat a '# ' line inside a code fence as the title", () => {
+    const text = "```bash\n# install deps\nnpm i\n```\nHere is how to set up.";
+    assert.equal(extractTextResponseTitle(text), "```bash");
+  });
+
+  it("still finds an H1 after a closed fence", () => {
+    const text = "```\n# not a title\n```\n# Real title\nbody";
+    assert.equal(extractTextResponseTitle(text), "Real title");
+  });
+
+  it("treats ~~~ fences like ``` fences", () => {
+    const text = "~~~\n# not a title\n~~~\nplain lead";
+    assert.equal(extractTextResponseTitle(text), "~~~");
+  });
+
+  it("ignores every '# ' line inside an unclosed fence (streaming partial)", () => {
+    const text = "```python\n# comment one\n# comment two";
+    assert.equal(extractTextResponseTitle(text), "```python");
+  });
 });
 
 describe("truncateForRender", () => {
@@ -94,5 +116,28 @@ describe("truncateForRender", () => {
     assert.equal(result.displayText, "");
     assert.equal(result.originalChars, 0);
     assert.equal(result.omittedChars, 0);
+  });
+
+  // Regression: the code-unit slice used to cut an astral character in half,
+  // leaving a lone high surrogate (renders as U+FFFD) at the preview tail.
+  it("never ends the preview on a lone high surrogate", () => {
+    // RENDER_TRUNCATE_PREVIEW_CHARS is even, so a pure surrogate-pair payload
+    // slices cleanly — prefix one code unit to force the cut mid-pair.
+    const emoji = "\u{1F600}";
+    const misaligned = `x${emoji.repeat(RENDER_TRUNCATE_CHARS)}`;
+    const result = truncateForRender(misaligned);
+    assert.equal(result.wasTruncated, true);
+    assert.ok(!/[\uD800-\uDBFF]$/.test(result.displayText), "preview must not end on a high surrogate");
+    assert.equal(result.displayText.length, RENDER_TRUNCATE_PREVIEW_CHARS - 1);
+    assert.equal(result.omittedChars, misaligned.length - result.displayText.length);
+  });
+
+  it("keeps a clean surrogate-pair boundary intact", () => {
+    const emoji = "\u{1F600}";
+    const aligned = emoji.repeat(RENDER_TRUNCATE_CHARS);
+    const result = truncateForRender(aligned);
+    assert.equal(result.wasTruncated, true);
+    assert.equal(result.displayText.length, RENDER_TRUNCATE_PREVIEW_CHARS);
+    assert.ok(!/[\uD800-\uDBFF]$/.test(result.displayText));
   });
 });

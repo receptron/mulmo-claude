@@ -41,6 +41,7 @@
 // params or message types, never change existing response shapes, never
 // let a new backend alter what an existing view observes.
 
+import { fieldText } from "../core/fieldText";
 import type { CollectionItem, CollectionStorageKind } from "../core/schema";
 import type { CollectionQuery } from "../core/queryZ";
 import { isReadOnlySchema, storageKindFor } from "../core/schema";
@@ -50,6 +51,7 @@ import { csvList, csvRead, csvRunQuery } from "./csvStore";
 import { sqliteStoreFor } from "./sqliteStore";
 import { firestoreStoreFor } from "./firestoreStore";
 import { pageFromFullRead, type ListOptions, type ListPage, type WriteOptions } from "./storePage";
+import { closerFor, watchDirectory, watchSingleFile } from "./watchFs";
 
 // The pure paging/projection primitives live in storePage.ts (so backend
 // modules can share them without an import cycle); re-exported here to
@@ -83,6 +85,20 @@ export interface CollectionStoreCapabilities {
  *     (io.ts is the reference).
  *  4. HONEST AGGREGATION — `query`, when present, is computed over the
  *     WHOLE data set, never from a capped read. */
+/** What a store reports when its records changed underneath it.
+ *
+ *  Two granularities, because backends genuinely differ: a per-record file
+ *  store knows WHICH record changed, while a single-artifact backend (one
+ *  CSV, one db file, one remote snapshot) only knows THAT something did.
+ *  Naming the difference here is what lets the watcher react uniformly
+ *  instead of branching on the backend. */
+export type StoreChange = { readonly kind: "item"; readonly itemId: string } | { readonly kind: "collection" };
+
+export type StoreChangeListener = (change: StoreChange) => void;
+
+/** Detaches a `watch` subscription. */
+export type StoreUnsubscribe = () => void;
+
 export interface CollectionStore {
   readonly capabilities: CollectionStoreCapabilities;
   /** Every record, in the store's stable order. CSV store: capped at
@@ -103,6 +119,27 @@ export interface CollectionStore {
    *  collection's slug into the publish hook, so no writer can forget it. */
   write?: (itemId: string, item: CollectionItem, opts?: WriteOptions) => Promise<WriteItemResult>;
   delete?: (itemId: string) => Promise<DeleteItemResult>;
+  /** Subscribe to changes made OUTSIDE this process — a file edited by the
+   *  agent, a CSV replaced by the user, a db written by another tool.
+   *
+   *  Resolves to an unsubscribe function, or to `null` when the backend
+   *  could not arm the watch (no inotify watches left, an unreadable
+   *  directory). `null` is NOT the same as absent `watch`: absent means the
+   *  backend never reports changes and the caller should settle for its
+   *  periodic pass, while `null` means this attempt failed and mounting
+   *  should be retried. Swallowing the difference strands a collection on
+   *  stale data until the process restarts.
+   *
+   *  This is the store's job because only it knows where its bytes live and
+   *  what its own change events look like (which paths to watch, which
+   *  filenames are noise, whether an atomic replace surfaces as two events).
+   *  Absorbing that noise — debouncing a replace into one report — belongs
+   *  here too. What to DO about a change (reconcile bells, sweep, publish)
+   *  is the watcher's policy and is deliberately NOT expressed here.
+   *
+   *  Absent ⇒ the backend cannot report external changes; the caller falls
+   *  back to its periodic pass. */
+  watch?: (onChange: StoreChangeListener) => Promise<StoreUnsubscribe | null>;
 }
 
 /** The file store's stable order: lexicographic by record id (codepoint
@@ -110,8 +147,8 @@ export interface CollectionStore {
  *  is filesystem-dependent; paging needs determinism. */
 function sortByRecordId(items: CollectionItem[], primaryKey: string): CollectionItem[] {
   return [...items].sort((left, right) => {
-    const leftId = String(left[primaryKey] ?? "");
-    const rightId = String(right[primaryKey] ?? "");
+    const leftId = fieldText(left[primaryKey]);
+    const rightId = fieldText(right[primaryKey]);
     if (leftId < rightId) return -1;
     return leftId > rightId ? 1 : 0; // 0 on equality — a comparator that never ties breaks sort's contract
   });
@@ -144,6 +181,21 @@ function csvStoreFor(collection: LoadedCollection, opts: IoOptions): CollectionS
     page: (pageOpts = {}) => listAll().then((result) => pageFromFullRead(result.items, pageOpts, key, result.truncated)),
     read: (itemId: string) => (file === undefined ? Promise.resolve(null) : csvRead(file, key, itemId, opts.workspaceRoot)),
     query: (query: CollectionQuery) => (file === undefined ? Promise.resolve([]) : csvRunQuery(file, key, query, opts.workspaceRoot)),
+    // One file holds every row, so an event can't name a record — only that
+    // the set changed. `watchSingleFile` watches the parent dir (an atomic
+    // replace swaps the inode) and debounces the 2-3 events a replace emits.
+    ...(file === undefined
+      ? {}
+      : {
+          watch: async (onChange) =>
+            closerFor(
+              await watchSingleFile(
+                file,
+                () => false,
+                () => onChange({ kind: "collection" }),
+              ),
+            ),
+        }),
   };
 }
 
@@ -159,12 +211,25 @@ function fileStoreFor(collection: LoadedCollection, opts: IoOptions): Collection
     write: (itemId: string, item: CollectionItem, writeOpts: WriteOptions = {}) =>
       writeItem(collection.dataDir, itemId, item, { ...ioOpts, refuseOverwrite: writeOpts.refuseOverwrite }),
     delete: (itemId: string) => deleteItem(collection.dataDir, itemId, ioOpts),
+    // One file per record, so an event names the record that changed —
+    // reported at `item` granularity, which is what lets the watcher
+    // reconcile just that record instead of the whole collection. Dot-
+    // prefixed names are skipped: atomic writes, OS metadata and editor swap
+    // files are not records.
+    watch: async (onChange) =>
+      closerFor(
+        await watchDirectory(
+          collection.dataDir,
+          (name) => name.endsWith(".json") && !name.startsWith("."),
+          (filename) => onChange(filename === null ? { kind: "collection" } : { kind: "item", itemId: filename.slice(0, -".json".length) }),
+        ),
+      ),
   };
 }
 
 export type CollectionStoreFactory = (collection: LoadedCollection, opts: IoOptions) => CollectionStore;
 
-// The store factory registry (plans/refactor-storage-virtualization.md,
+// The store factory registry (plans/done/refactor-storage-virtualization.md,
 // Stage 3): schema storage kind → implementation. Factories live in CORE
 // (dependency-direction rule — never plugin-registered); a new backend is
 // one factory + a `StorageZ` variant + a pass of the contract test suite.

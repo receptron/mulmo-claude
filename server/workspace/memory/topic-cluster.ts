@@ -9,10 +9,12 @@
 // chain goes.
 
 import { errorMessage } from "../../utils/errors.js";
+import { isRecord } from "../../utils/types.js";
 import { log } from "../../system/logger/index.js";
 import type { Summarize } from "../journal/archivist-cli.js";
 import type { MemoryEntry, MemoryType } from "./types.js";
 import { isMemoryType } from "./types.js";
+import { extractFirstObject, stripFenceAndWhitespace } from "./llm-json.js";
 import { isSafeTopicSlug, slugifyTopicName } from "./topic-types.js";
 
 export interface ClusterTopic {
@@ -103,7 +105,7 @@ export function parseClusterMap(raw: string): ClusterMap | null {
   } catch {
     return null;
   }
-  if (!isPlainObject(parsed)) return null;
+  if (!isRecord(parsed)) return null;
   const out: ClusterMap = { preference: [], interest: [], fact: [], reference: [] };
   for (const type of ["preference", "interest", "fact", "reference"] as const) {
     const list = (parsed as Record<string, unknown>)[type];
@@ -117,7 +119,7 @@ export function parseClusterMap(raw: string): ClusterMap | null {
 }
 
 function normaliseTopic(value: unknown): ClusterTopic | null {
-  if (!isPlainObject(value)) return null;
+  if (!isRecord(value)) return null;
   const obj = value as Record<string, unknown>;
   const slug = resolveTopicSlug(obj.topic);
   if (!slug) return null;
@@ -154,7 +156,7 @@ function normaliseBulletList(value: unknown): string[] {
 }
 
 function normaliseSection(value: unknown): ClusterSection | null {
-  if (!isPlainObject(value)) return null;
+  if (!isRecord(value)) return null;
   const obj = value as Record<string, unknown>;
   const heading = typeof obj.heading === "string" ? obj.heading.trim() : "";
   if (heading.length === 0) return null;
@@ -162,55 +164,6 @@ function normaliseSection(value: unknown): ClusterSection | null {
   const bullets = obj.bullets.filter((bullet): bullet is string => typeof bullet === "string" && bullet.trim().length > 0);
   if (bullets.length === 0) return null;
   return { heading, bullets };
-}
-
-function stripFenceAndWhitespace(raw: string): string {
-  let text = raw.trim();
-  if (text.startsWith("```")) {
-    const firstNl = text.indexOf("\n");
-    if (firstNl >= 0) text = text.slice(firstNl + 1);
-    if (text.endsWith("```")) text = text.slice(0, -3);
-  }
-  return text.trim();
-}
-
-function extractFirstObject(text: string): string | null {
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let index = start;
-  while (index < text.length) {
-    const char = text[index];
-    if (char === '"') {
-      index = skipStringBody(text, index + 1);
-      continue;
-    }
-    if (char === "{") depth += 1;
-    else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return text.slice(start, index + 1);
-    }
-    index += 1;
-  }
-  return null;
-}
-
-function skipStringBody(text: string, fromIndex: number): number {
-  let index = fromIndex;
-  while (index < text.length) {
-    const char = text[index];
-    if (char === "\\") {
-      index += 2;
-      continue;
-    }
-    if (char === '"') return index + 1;
-    index += 1;
-  }
-  return text.length;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // Re-exported so migrate.ts can validate the clusterer's output

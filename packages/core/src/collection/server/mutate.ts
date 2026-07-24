@@ -45,7 +45,10 @@ export type MutateActionOutcome =
 export function firstMutateParamProblem(action: CollectionMutateAction, params: Record<string, unknown>): string | null {
   const declared = action.params ?? {};
   for (const key of Object.keys(params)) {
-    if (declared[key] === undefined) return `unknown param '${key}' — not declared by action '${action.id}'`;
+    // Own-property check, not a bare index: `params` keys come from the request
+    // body, so `constructor` / `toString` would resolve to an `Object.prototype`
+    // member and slip past the rejection this loop exists to make.
+    if (!Object.hasOwn(declared, key)) return `unknown param '${key}' — not declared by action '${action.id}'`;
   }
   for (const [key, spec] of Object.entries(declared)) {
     const problem = recordFieldProblem(key, spec, params[key], "strict");

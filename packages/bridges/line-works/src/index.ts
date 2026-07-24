@@ -28,6 +28,7 @@ import { readFileSync } from "fs";
 import type { Request, Response as ExpressResponse } from "express";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
 import { createWebhookApp, createWebhookRateLimit, verifyHmacSignature } from "@mulmobridge/webhook-runtime";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "line-works";
 const MAX_TEXT = 1_000;
@@ -69,12 +70,7 @@ function resolvePrivateKey(): string | null {
   return null;
 }
 
-const allowedUsers = new Set(
-  (process.env.LINEWORKS_ALLOWED_USERS ?? "")
-    .split(",")
-    .map((user) => user.trim())
-    .filter(Boolean),
-);
+const allowedUsers = parseCsvSet(process.env.LINEWORKS_ALLOWED_USERS);
 const allowAll = allowedUsers.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -179,22 +175,16 @@ async function sendLineWorks(userId: string, text: string): Promise<void> {
 
 // ── Payload parsing ────────────────────────────────────────────
 
-type JsonRecord = Record<string, unknown>;
-
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
 interface IncomingLineWorks {
   userId: string;
   text: string;
 }
 
 function parseEvent(body: unknown): IncomingLineWorks | null {
-  if (!isObj(body)) return null;
+  if (!isRecord(body)) return null;
   if (body.type !== "message") return null;
-  const source = isObj(body.source) ? body.source : null;
-  const content = isObj(body.content) ? body.content : null;
+  const source = isRecord(body.source) ? body.source : null;
+  const content = isRecord(body.content) ? body.content : null;
   if (!source || !content) return null;
   const userId = typeof source.userId === "string" ? source.userId : "";
   const text = content.type === "text" && typeof content.text === "string" ? String(content.text).trim() : "";

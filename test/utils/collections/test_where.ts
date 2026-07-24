@@ -147,3 +147,45 @@ describe("matchesWhere with valueFrom", () => {
     assert.equal(matchesWhere(over, { spent: "120" }), false);
   });
 });
+
+// Regression for #2323: `cond.field` / `valueFrom.record` / `valueFrom.field`
+// are LLM-authored keys. A bare index read reaches Object.prototype members —
+// `record["toString"]` is a function (`isMissing` false → spurious match),
+// `recordsById["constructor"]` is the `Object` function whose `["name"]` is the
+// plausible bogus value `"Object"`. Every such key must resolve as absent /
+// unresolved, never matching.
+describe("matchesWhere — prototype keys resolve as absent (#2323)", () => {
+  it("cond.field is a prototype key → treated as missing, not a matched value", () => {
+    // `record["toString"]` would be a function; `contains` would spuriously match.
+    assert.equal(matchesWhere([{ field: "toString", op: "contains", value: "function" }], {}), false);
+    assert.equal(matchesWhere([{ field: "constructor", op: "contains", value: "Object" }], {}), false);
+    assert.equal(matchesWhere([{ field: "hasOwnProperty", op: "contains", value: "native" }], {}), false);
+  });
+
+  it("valueFrom.record is a prototype key → unresolved, never matches (eq and ne)", () => {
+    // recordsById["constructor"] → Object fn; Object["name"] === "Object".
+    const eqWhere: Where = [{ field: "office", op: "eq", valueFrom: { record: "constructor", field: "name" } }];
+    const neWhere: Where = [{ field: "office", op: "ne", valueFrom: { record: "constructor", field: "name" } }];
+    assert.equal(matchesWhere(eqWhere, { office: "Object" }, {}), false);
+    assert.equal(matchesWhere(neWhere, { office: "tokyo" }, {}), false);
+  });
+
+  it("valueFrom.field (same record) is a prototype key → unresolved, never matches", () => {
+    // record["constructor"] would be a function; a broken ref must not match.
+    assert.equal(matchesWhere([{ field: "office", op: "ne", valueFrom: { field: "constructor" } }], { office: "tokyo" }), false);
+    assert.equal(matchesWhere([{ field: "office", op: "ne", valueFrom: { field: "toString" } }], { office: "tokyo" }), false);
+  });
+
+  it("valueFrom.field (cross record) is a prototype key → unresolved, never matches", () => {
+    const neWhere: Where = [{ field: "office", op: "ne", valueFrom: { record: "_config", field: "toString" } }];
+    assert.equal(matchesWhere(neWhere, { office: "tokyo" }, { _config: { defaultCity: "x" } }), false);
+  });
+
+  it("BOUNDARY: an OWN field literally named `toString` still resolves normally", () => {
+    assert.equal(matchesWhere([{ field: "toString", op: "eq", value: "hello" }], { toString: "hello" }), true);
+    assert.equal(matchesWhere([{ field: "toString", op: "eq", value: "hello" }], { toString: "world" }), false);
+    // …and as a valueFrom target the own value resolves too.
+    const where: Where = [{ field: "office", op: "eq", valueFrom: { record: "_config", field: "toString" } }];
+    assert.equal(matchesWhere(where, { office: "hi" }, { _config: { toString: "hi" } }), true);
+  });
+});

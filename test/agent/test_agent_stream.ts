@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { blockToEvent, parseStreamEvent, type ClaudeContentBlock, type RawStreamEvent } from "../../server/agent/stream.js";
+import { blockToEvent, createStreamParser, parseStreamEvent, type ClaudeContentBlock, type RawStreamEvent } from "../../server/agent/stream.js";
+import { EVENT_TYPES } from "../../src/types/events.js";
+
+// `content` is declared as an array, so a payload that reaches the
+// `Array.isArray` guard's false branch — the CLI is a separate process
+// and can send anything — has to be built from JSON.
+const rawEventFromJson = (json: string): RawStreamEvent => JSON.parse(json);
 
 describe("blockToEvent", () => {
   it("converts tool_use block to tool_call event", () => {
@@ -219,5 +225,139 @@ describe("parseStreamEvent", () => {
     const event: RawStreamEvent = { type: "system" };
     const result = parseStreamEvent(event);
     assert.equal(result.length, 0);
+  });
+
+  it("keeps recognised blocks and drops the rest for an assistant event mixing block types", () => {
+    const event: RawStreamEvent = {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "checking" },
+          { type: "tool_use", id: "tu_mix", name: "Bash", input: { command: "ls" } },
+          { type: "tool_result", tool_use_id: "tu_mix", content: "ok", is_error: true },
+          { type: "thinking" },
+        ],
+      },
+    };
+    assert.deepEqual(parseStreamEvent(event), [
+      { type: EVENT_TYPES.status, message: "Thinking..." },
+      { type: EVENT_TYPES.text, message: "checking" },
+      { type: EVENT_TYPES.toolCall, toolUseId: "tu_mix", toolName: "Bash", args: { command: "ls" } },
+      { type: EVENT_TYPES.toolCallResult, toolUseId: "tu_mix", content: "ok", isError: true },
+    ]);
+  });
+
+  it("returns only the status for an assistant event whose content is not an array", () => {
+    assert.deepEqual(parseStreamEvent(rawEventFromJson('{"type":"assistant","message":{"content":"not-an-array"}}')), [
+      { type: EVENT_TYPES.status, message: "Thinking..." },
+    ]);
+  });
+
+  it("returns empty for a user event whose content is not an array", () => {
+    assert.deepEqual(parseStreamEvent(rawEventFromJson('{"type":"user","message":{"content":"not-an-array"}}')), []);
+  });
+
+  it("returns empty for a user event with no message at all", () => {
+    assert.deepEqual(parseStreamEvent({ type: "user" }), []);
+  });
+
+  // A result event can arrive with empty text (the reply already
+  // streamed). The session id rides on that same event, so it must not
+  // be gated on the text being present.
+  it("returns the session id for a result event carrying no text", () => {
+    assert.deepEqual(parseStreamEvent({ type: "result", result: "", session_id: "sess_empty" }), [{ type: EVENT_TYPES.claudeSessionId, id: "sess_empty" }]);
+  });
+
+  // stream_event is neither "assistant" nor "user", so a parser that
+  // reaches its type guard before extracting the delta swallows the
+  // partial-message text entirely.
+  it("emits the text of a stream_event delta", () => {
+    const event: RawStreamEvent = {
+      type: "stream_event",
+      event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "chunk" } },
+    };
+    assert.deepEqual(parseStreamEvent(event), [{ type: EVENT_TYPES.text, message: "chunk" }]);
+  });
+
+  it("returns empty for a stream_event that carries no text delta", () => {
+    assert.deepEqual(parseStreamEvent({ type: "stream_event", event: { type: "message_start" } }), []);
+  });
+});
+
+const equivalenceCases: { name: string; event: RawStreamEvent }[] = [
+  { name: "a result event with a session id", event: { type: "result", result: "answer", session_id: "sess_eq" } },
+  { name: "a result event without a session id", event: { type: "result", result: "answer" } },
+  { name: "a result event with no text but a session id", event: { type: "result", result: "", session_id: "sess_eq" } },
+  { name: "an unrecognised event type", event: { type: "system" } },
+  {
+    name: "an assistant event mixing block types",
+    event: {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "checking" },
+          { type: "tool_use", id: "tu_eq", name: "Bash", input: { command: "ls" } },
+          { type: "tool_result", tool_use_id: "tu_eq", content: "ok" },
+          { type: "thinking" },
+        ],
+      },
+    },
+  },
+  { name: "an assistant event with an empty content array", event: { type: "assistant", message: { content: [] } } },
+  { name: "a user event", event: { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "tu_eq", content: "ok" }] } } },
+  { name: "a user event with content absent", event: { type: "user", message: {} } },
+  { name: "a user event with content that is not an array", event: rawEventFromJson('{"type":"user","message":{"content":"not-an-array"}}') },
+  {
+    name: "a stream_event text delta",
+    event: { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "chunk" } } },
+  },
+];
+
+// Tautological while parseStreamEvent delegates — which is the point:
+// it turns red the moment someone re-forks the body into a second
+// implementation that these tests would vouch for instead of the
+// parser the agent loop actually runs.
+describe("parseStreamEvent matches a fresh createStreamParser().parse", () => {
+  equivalenceCases.forEach(({ name, event }) => {
+    it(`agrees on ${name}`, () => {
+      assert.deepEqual(parseStreamEvent(event), createStreamParser().parse(event));
+    });
+  });
+});
+
+// filterAssistantBlocks(blocks, false) is the identity, which is the
+// only reason a per-event parser may stand in for the stateful one.
+// Both sides are pinned here: dropping the deltaStreamed guard, or
+// making the filter depend on the blocks themselves, breaks a case
+// below instead of silently changing what reaches the client.
+describe("filterAssistantBlocks divergence between the stateless and stateful paths", () => {
+  const assistantWithText: RawStreamEvent = {
+    type: "assistant",
+    message: { content: [{ type: "text", text: "streamed" }] },
+  };
+  const textDelta: RawStreamEvent = {
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "streamed" } },
+  };
+
+  it("keeps the assistant text block when no delta preceded it", () => {
+    assert.deepEqual(parseStreamEvent(assistantWithText), [
+      { type: EVENT_TYPES.status, message: "Thinking..." },
+      { type: EVENT_TYPES.text, message: "streamed" },
+    ]);
+  });
+
+  it("drops the assistant text block once the same parser streamed a delta", () => {
+    const parser = createStreamParser();
+    parser.parse(textDelta);
+    assert.deepEqual(parser.parse(assistantWithText), [{ type: EVENT_TYPES.status, message: "Thinking..." }]);
+  });
+
+  it("never filters via parseStreamEvent, because each call gets an unstreamed parser", () => {
+    parseStreamEvent(textDelta);
+    assert.deepEqual(parseStreamEvent(assistantWithText), [
+      { type: EVENT_TYPES.status, message: "Thinking..." },
+      { type: EVENT_TYPES.text, message: "streamed" },
+    ]);
   });
 });

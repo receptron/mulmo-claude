@@ -69,6 +69,11 @@ import { pluginEndpoints } from "../api";
 import type { SvgEndpoints } from "./definition";
 import { errorMessage } from "../../utils/errors";
 import { useFileChange } from "../../composables/useFileChange";
+import { saveBlob } from "../../utils/blobDownload";
+import { svgExportBaseName } from "./exportName";
+import { resolveEditorTextAfterReload } from "./editorRefresh";
+import { parseViewBoxAspect, pngCanvasSize } from "./pngExport";
+import { buildPrintableHtml } from "./printableHtml";
 
 const endpoints = pluginEndpoints<SvgEndpoints>("svg");
 const filesEndpoints = pluginEndpoints<{ raw: string }>("files");
@@ -102,34 +107,43 @@ const saveError = ref<string | null>(null);
 // when the edit-source pane is closed.
 const exportError = ref<string | null>(null);
 
-const cachedSource = computed(() => (filePath.value ? (sourceCache.value[filePath.value] ?? null) : null));
+// Own-property reads so a filePath named after an `Object.prototype`
+// member can never resolve to an inherited function. (`Object.hasOwn`
+// needs es2022 lib — not enabled for the frontend config.)
+const hasCached = (path: string): boolean => Object.prototype.hasOwnProperty.call(sourceCache.value, path);
+
+const cachedSource = computed(() => {
+  const path = filePath.value;
+  if (!path || !hasCached(path)) return null;
+  return sourceCache.value[path];
+});
 const hasChanges = computed(() => cachedSource.value !== null && editableSvg.value !== cachedSource.value);
+
+// Monotonic id so a stale in-flight GET can never overwrite the cache
+// entry written by a newer one (the file may change between the two).
+let fetchSeq = 0;
 
 async function fetchSource(): Promise<string | null> {
   const path = filePath.value;
   if (!path) return null;
-  const hit = sourceCache.value[path];
-  if (hit !== undefined) return hit;
+  if (hasCached(path)) return sourceCache.value[path];
+  const seq = ++fetchSeq;
   sourceLoading.value = true;
   sourceError.value = null;
   try {
     const resp = await apiFetchRaw(filesEndpoints.raw, { query: { path } });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
-    if (filePath.value === path) {
-      sourceCache.value = { ...sourceCache.value, [path]: text };
-      if (editableSvg.value === "") {
-        editableSvg.value = text;
-      }
-    }
+    if (seq !== fetchSeq || filePath.value !== path) return null;
+    sourceCache.value = { ...sourceCache.value, [path]: text };
     return text;
   } catch (err) {
-    if (filePath.value === path) {
+    if (seq === fetchSeq && filePath.value === path) {
       sourceError.value = errorMessage(err);
     }
     return null;
   } finally {
-    if (filePath.value === path) {
+    if (seq === fetchSeq && filePath.value === path) {
       sourceLoading.value = false;
     }
   }
@@ -137,15 +151,16 @@ async function fetchSource(): Promise<string | null> {
 
 function onDetailsToggle(event: Event) {
   const { open } = event.target as HTMLDetailsElement;
-  if (open) {
-    saveError.value = null;
-    editableSvg.value = cachedSource.value ?? "";
-    if (cachedSource.value === null) {
-      void fetchSource();
-    }
-  } else {
-    editableSvg.value = cachedSource.value ?? "";
-    saveError.value = null;
+  saveError.value = null;
+  editableSvg.value = cachedSource.value ?? "";
+  if (open && cachedSource.value === null) {
+    void fetchSource().then((text) => {
+      // The textarea is disabled while loading, so "" here can only mean
+      // "not yet populated" — safe to fill without clobbering an edit.
+      if (text !== null && sourceDetails.value?.open === true && editableSvg.value === "") {
+        editableSvg.value = text;
+      }
+    });
   }
 }
 
@@ -156,19 +171,20 @@ function cancelEdit() {
 async function applySvg() {
   const path = filePath.value;
   if (!path) return;
+  const svg = editableSvg.value;
   saveError.value = null;
   saving.value = true;
   const result = await apiPut<{ path: string }>(endpoints.update.url, {
     relativePath: path,
-    svg: editableSvg.value,
+    svg,
   });
   saving.value = false;
   if (!result.ok) {
-    saveError.value = result.error;
+    if (filePath.value === path) saveError.value = result.error;
     return;
   }
-  sourceCache.value = { ...sourceCache.value, [path]: editableSvg.value };
-  if (sourceDetails.value) sourceDetails.value.open = false;
+  sourceCache.value = { ...sourceCache.value, [path]: svg };
+  if (filePath.value === path && sourceDetails.value) sourceDetails.value.open = false;
 }
 
 watch(filePath, () => {
@@ -176,6 +192,7 @@ watch(filePath, () => {
   editableSvg.value = "";
   saveError.value = null;
   sourceError.value = null;
+  sourceLoading.value = false;
 });
 
 watch(previewVersion, async (current, previous) => {
@@ -188,49 +205,26 @@ watch(previewVersion, async (current, previous) => {
   sourceCache.value = next;
   if (sourceDetails.value?.open === true) {
     const fresh = await fetchSource();
-    if (fresh !== null && !wasDirty) {
-      editableSvg.value = fresh;
-    }
+    editableSvg.value = resolveEditorTextAfterReload({ current: editableSvg.value, fresh, wasDirty });
   }
 });
 
-function deriveBaseName(): string {
-  const path = filePath.value;
-  if (!path) return "drawing";
-  const last = path.split("/").pop() ?? "drawing.svg";
-  return last.replace(/\.svg$/i, "") || "drawing";
-}
-
-// Reference the saved SVG via `<img src=ABS_URL>` inside the printable
-// wrapper rather than inlining its source. Browsers refuse to execute
-// `<script>` inside an SVG loaded via `<img>`, so even an LLM that
-// emits scripted SVG can't run code through this path. The wrapping
-// HTML is fully under our control — its only script is the auto-print
-// trigger below, not anything from the SVG.
-function buildPrintableHtml(absoluteImgUrl: string): string {
-  const styleBlock = `<style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    body { display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
-    img { max-width: 100%; max-height: 100%; height: auto; width: auto; display: block; }
-    @media print {
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      @page { margin: 10mm; }
-    }
-  </style>`;
-  // Use `onload` on the `<img>` so the print dialog fires only after
-  // the SVG has rendered — beats a fixed timeout that could race a
-  // slow paint on cold cache.
-  const escapedUrl = absoluteImgUrl.replace(/"/g, "&quot;");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${styleBlock}</head><body><img src="${escapedUrl}" alt="" onload="window.print()"></body></html>`;
-}
-
-function printToPdf() {
+async function printToPdf() {
   const relative = previewUrl.value;
   if (!relative) return;
+  exportError.value = null;
+  // Pre-flight the URL: a missing file would otherwise fail silently
+  // inside the sandboxed iframe (no onerror path back to this component).
+  try {
+    const resp = await apiFetchRaw(relative);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  } catch (err) {
+    exportError.value = errorMessage(err);
+    return;
+  }
   // Iframe srcdoc has an opaque origin, so the `<img>` needs an
   // absolute URL — relative paths would not resolve.
-  const absoluteImgUrl = `${window.location.origin}${relative}`;
-  const printable = buildPrintableHtml(absoluteImgUrl);
+  const printable = buildPrintableHtml(`${window.location.origin}${relative}`);
   const printFrame = document.createElement("iframe");
   printFrame.style.cssText = "position:fixed;left:-10000px;top:0;width:0;height:0;border:0";
   // `allow-scripts` is still needed for the wrapper's inline `onload`
@@ -247,59 +241,49 @@ function printToPdf() {
 // the intrinsic dimensions for crispness, export via toBlob, trigger
 // download. The Image is loaded from the same-origin /artifacts/svg/...
 // URL, so the canvas is not tainted and toBlob is allowed.
-const PNG_SCALE = 2;
-const PNG_FALLBACK_DIM = 1024;
-
 async function exportPng() {
   const url = previewUrl.value;
   if (!url) return;
   exportError.value = null;
   try {
     const blob = await rasterizeToPng(url);
-    triggerDownload(blob, `${deriveBaseName()}.png`);
+    saveBlob(blob, `${svgExportBaseName(filePath.value)}.png`);
   } catch (err) {
     exportError.value = errorMessage(err);
   }
 }
 
-function rasterizeToPng(url: string): Promise<Blob> {
+function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const intrinsicW = img.naturalWidth || PNG_FALLBACK_DIM;
-      const intrinsicH = img.naturalHeight || PNG_FALLBACK_DIM;
-      const canvas = document.createElement("canvas");
-      canvas.width = intrinsicW * PNG_SCALE;
-      canvas.height = intrinsicH * PNG_SCALE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("canvas 2D context unavailable"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error("canvas.toBlob returned null"));
-          return;
-        }
-        resolve(blob);
-      }, "image/png");
-    };
+    img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("failed to load SVG into Image"));
     img.src = url;
   });
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+async function rasterizeToPng(url: string): Promise<Blob> {
+  const img = await loadImage(url);
+  const needsAspect = img.naturalWidth === 0 || img.naturalHeight === 0;
+  const source = needsAspect ? await fetchSource() : null;
+  const size = pngCanvasSize(img.naturalWidth, img.naturalHeight, parseViewBoxAspect(source ?? ""));
+  return drawToPngBlob(img, size);
+}
+
+function drawToPngBlob(img: HTMLImageElement, size: { width: number; height: number }): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      reject(new Error("canvas 2D context unavailable"));
+      return;
+    }
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
+  });
 }
 </script>
 

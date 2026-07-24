@@ -141,5 +141,6 @@ function formatYamlValue(value: unknown): string {
     if (/^[A-Za-z0-9_\-./]+$/.test(value)) return value;
     return JSON.stringify(value);
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- reached only for values JSON.stringify cannot represent; a diff line showing "[object Object]" is more informative than an empty one.
   return String(value);
 }

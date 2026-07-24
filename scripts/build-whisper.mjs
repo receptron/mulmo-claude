@@ -5,7 +5,7 @@
 // source rather than `brew install whisper-cpp` because the Homebrew
 // formula ships with `-DWHISPER_BUILD_SERVER=OFF` — it provides only
 // `whisper-cli`, not the warm-model HTTP server the app spawns. See
-// plans/feat-voice-input.md.
+// plans/done/feat-voice-input.md.
 //
 // macOS / Apple Silicon only (Metal acceleration). The build links the
 // dylibs with an absolute rpath into `.whisper/dist/lib`, so the

@@ -16,66 +16,40 @@ import {
   type FiscalYearEnd,
   type TimeSeriesGranularity,
   type TimeSeriesMetric,
+  type Account,
+  type AccountBalance,
+  type AccountType,
+  type BalanceSheet,
+  type BalanceSheetSection,
+  type BookSummary,
+  type JournalEntry,
+  type JournalEntryKind,
+  type JournalLine,
+  type Ledger,
+  type LedgerRow,
+  type ProfitLoss,
+  type ReportPeriod,
 } from "../shared";
 
-export type AccountType = "asset" | "liability" | "equity" | "income" | "expense";
-export type JournalEntryKind = "normal" | "opening" | "void" | "void-marker";
-
-export interface Account {
-  code: string;
-  name: string;
-  type: AccountType;
-  note?: string;
-  /** Soft-delete flag. When `false`, the account is hidden from
-   *  entry/ledger dropdowns but stays visible in Manage Accounts
-   *  and historical entries. */
-  active?: boolean;
-}
-
-export interface JournalLine {
-  accountCode: string;
-  debit?: number;
-  credit?: number;
-  memo?: string;
-  /** Counterparty's tax-authority-issued registration ID — JP
-   *  T-number, EU VAT ID, UK VAT registration number, GSTIN, ABN,
-   *  etc. See server/accounting/types.ts for the full doc. */
-  taxRegistrationId?: string;
-}
-
-export interface JournalEntry {
-  id: string;
-  date: string;
-  kind: JournalEntryKind;
-  lines: JournalLine[];
-  memo?: string;
-  voidedEntryId?: string;
-  voidReason?: string;
-  /** Set on the new entry posted via the "edit" flow — id of the
-   *  original entry that was voided in the same operation. The
-   *  void + new-entry pair is two sequential calls on the client,
-   *  not an atomic transaction. */
-  replacesEntryId?: string;
-  createdAt: string;
-}
-
-export interface BookSummary {
-  id: string;
-  name: string;
-  currency: string;
-  /** ISO 3166-1 alpha-2 country code identifying the tax jurisdiction
-   *  the book is kept under. Constrained to `SupportedCountryCode` —
-   *  see `countries.ts`. Optional for backward compatibility with
-   *  books created before the field was introduced. */
-  country?: SupportedCountryCode;
-  /** Calendar month (1-12) on whose last day the book's fiscal year
-   *  closes — e.g. 8 = August 31, 12 = December 31. Optional in the
-   *  persisted shape for backward compatibility — read-side code
-   *  normalises absence (and the legacy "Q1".."Q4" tokens) to a
-   *  closing month via `resolveFiscalYearEnd`. See `fiscalYear.ts`. */
-  fiscalYearEnd?: FiscalYearEnd;
-  createdAt: string;
-}
+// The domain + report shapes are single-sourced in ../shared/types.ts so
+// the server and this client can't drift (see #2411). Re-exported here so
+// the View / sub-components keep importing both the API function and its
+// result type from this one module (`../api`).
+export type {
+  Account,
+  AccountBalance,
+  AccountType,
+  BalanceSheet,
+  BalanceSheetSection,
+  BookSummary,
+  JournalEntry,
+  JournalEntryKind,
+  JournalLine,
+  Ledger,
+  LedgerRow,
+  ProfitLoss,
+  ReportPeriod,
+};
 
 export interface OpenAppPayload {
   kind: "accounting-app";
@@ -84,54 +58,6 @@ export interface OpenAppPayload {
   bookId: string | null;
   initialTab?: string;
 }
-
-export interface AccountBalance {
-  accountCode: string;
-  netDebit: number;
-}
-
-export interface BalanceSheetSection {
-  type: AccountType;
-  rows: { accountCode: string; accountName: string; balance: number }[];
-  total: number;
-}
-
-export interface BalanceSheet {
-  asOf: string;
-  sections: BalanceSheetSection[];
-  imbalance: number;
-}
-
-export interface ProfitLoss {
-  from: string;
-  to: string;
-  income: { rows: { accountCode: string; accountName: string; amount: number }[]; total: number };
-  expense: { rows: { accountCode: string; accountName: string; amount: number }[]; total: number };
-  netIncome: number;
-}
-
-export interface LedgerRow {
-  entryId: string;
-  date: string;
-  kind: JournalEntryKind;
-  memo?: string;
-  debit: number;
-  credit: number;
-  runningBalance: number;
-  /** Counterparty tax-registration ID per source line. The Ledger
-   *  view shows it as its own column when the selected account is
-   *  in the input-tax band (14xx — see `isTaxAccountCode`). */
-  taxRegistrationId?: string;
-}
-
-export interface Ledger {
-  accountCode: string;
-  accountName: string;
-  rows: LedgerRow[];
-  closingBalance: number;
-}
-
-export type ReportPeriod = { kind: "month"; period: string } | { kind: "range"; from: string; to: string };
 
 // The single dispatch route this plugin owns — shared with the server
 // router via `ACCOUNTING_API` so the two can't drift.

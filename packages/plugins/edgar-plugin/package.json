@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/edgar-plugin",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "SEC EDGAR runtime plugin for MulmoClaude — wraps the public EDGAR API as one tool with kind-discriminated dispatch. Server-only; no Vue View.",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,7 +21,7 @@
     "test": "tsx --test test/test_*.ts"
   },
   "peerDependencies": {
-    "gui-chat-protocol": "^0.4.0",
+    "gui-chat-protocol": "^1.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

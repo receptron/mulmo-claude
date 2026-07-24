@@ -3,7 +3,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { extractH2Sections, isSafeTopicSlug, slugifyTopicName } from "../../../server/workspace/memory/topic-types.js";
+import { MAX_TOPIC_SLUG_LENGTH, extractH2Sections, isSafeTopicSlug, slugifyTopicName } from "../../../server/workspace/memory/topic-types.js";
 
 describe("memory/topic-types — extractH2Sections", () => {
   it("returns headings in source order", () => {
@@ -51,6 +51,55 @@ describe("memory/topic-types — slugifyTopicName", () => {
     const result = slugifyTopicName(long);
     assert.ok(result !== null);
     assert.ok(result.length <= 60, `result is bounded; got ${result.length}`);
+  });
+
+  // The slug becomes a filename, so the exact character rule is
+  // pinned rather than sampled: a change to how separators collapse
+  // renames every topic file the index already links to.
+  it("collapses every run of non-alnum chars into a single separator", () => {
+    assert.equal(slugifyTopicName("a!!!b"), "a-b");
+    assert.equal(slugifyTopicName("a   b\t\tc"), "a-b-c");
+    assert.equal(slugifyTopicName("Rock / Metal"), "rock-metal");
+  });
+
+  it("drops leading and trailing symbols entirely", () => {
+    assert.equal(slugifyTopicName("---music---"), "music");
+    assert.equal(slugifyTopicName("  ...hello world!  "), "hello-world");
+  });
+
+  it("lowercases mixed-case names", () => {
+    assert.equal(slugifyTopicName("MiXeD CaSe"), "mixed-case");
+  });
+
+  it("keeps only the ASCII alnum runs of a mixed Japanese / ASCII name", () => {
+    assert.equal(slugifyTopicName("AI 印象派 Research"), "ai-research");
+    assert.equal(slugifyTopicName("印象派 Art"), "art");
+  });
+
+  it("returns null when nothing survives the compaction", () => {
+    assert.equal(slugifyTopicName(""), null);
+    assert.equal(slugifyTopicName("   "), null);
+    assert.equal(slugifyTopicName("!!!"), null);
+    assert.equal(slugifyTopicName("---"), null);
+    assert.equal(slugifyTopicName("！？　…"), null);
+  });
+
+  it("keeps a name that is exactly MAX_TOPIC_SLUG_LENGTH chars intact", () => {
+    const exact = "y".repeat(MAX_TOPIC_SLUG_LENGTH);
+    assert.equal(slugifyTopicName(exact), exact);
+  });
+
+  it("trims the separator when the length cap lands on one", () => {
+    // The cap slices at 60; here char 60 is the separator between
+    // the two words, so the second trim is what keeps the slug from
+    // ending in a dangling `-`.
+    const name = `${"x".repeat(MAX_TOPIC_SLUG_LENGTH - 1)} tail`;
+    assert.equal(slugifyTopicName(name), "x".repeat(MAX_TOPIC_SLUG_LENGTH - 1));
+  });
+
+  it("cuts mid-word when the length cap lands inside one", () => {
+    const name = `${"x".repeat(MAX_TOPIC_SLUG_LENGTH - 2)} tail`;
+    assert.equal(slugifyTopicName(name), `${"x".repeat(MAX_TOPIC_SLUG_LENGTH - 2)}-t`);
   });
 });
 

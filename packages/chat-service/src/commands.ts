@@ -5,7 +5,7 @@
 // reset arrive via the factory so this file has zero imports from
 // the host app — only sibling module types.
 
-import type { BridgeSkillSummary, Role, SessionSummary } from "./types.js";
+import type { BridgeSkillSummary, GetSessionHistoryFn, ListSessionsFn, Role, SessionSummary } from "./types.js";
 import type { ChatStateStore, TransportChatState } from "./chat-state.js";
 
 // ── Types ────────────────────────────────────────────────────
@@ -80,14 +80,8 @@ export function createCommandHandler(opts: {
   getRole: (roleId: string) => Role;
   resetChatState: ChatStateStore["resetChatState"];
   connectSession: ChatStateStore["connectSession"];
-  listSessions?: (opts: { limit: number; offset: number }) => Promise<{ sessions: SessionSummary[]; total: number }>;
-  getSessionHistory?: (
-    sessionId: string,
-    opts: { limit: number; offset: number },
-  ) => Promise<{
-    messages: Array<{ source: string; text: string }>;
-    total: number;
-  }>;
+  listSessions?: ListSessionsFn;
+  getSessionHistory?: GetSessionHistoryFn;
   /** Lists the skills the bridge command handler should expose.
    *  Drives both the slash-command allowlist (only matching names
    *  are forwarded to the agent) and the "Skills:" section in the

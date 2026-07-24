@@ -19,6 +19,7 @@
 
 import "dotenv/config";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "bluesky";
 const MAX_DM_LEN = 10_000;
@@ -34,12 +35,7 @@ if (!handle || !appPassword) {
   process.exit(1);
 }
 
-const allowedDids = new Set(
-  (process.env.BLUESKY_ALLOWED_DIDS ?? "")
-    .split(",")
-    .map((did) => did.trim())
-    .filter(Boolean),
-);
+const allowedDids = parseCsvSet(process.env.BLUESKY_ALLOWED_DIDS);
 const allowAll = allowedDids.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -60,10 +56,6 @@ let session: Session | null = null;
 
 type JsonRecord = Record<string, unknown>;
 
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -80,7 +72,7 @@ async function createSession(): Promise<Session> {
     throw new Error(`createSession failed: ${res.status} ${text.slice(0, 200)}`);
   }
   const body: unknown = await res.json();
-  if (!isObj(body)) throw new Error("createSession: non-object response");
+  if (!isRecord(body)) throw new Error("createSession: non-object response");
   const did = asString(body.did);
   const accessJwt = asString(body.accessJwt);
   const refreshJwt = asString(body.refreshJwt);
@@ -96,7 +88,7 @@ async function refreshSession(current: Session): Promise<Session> {
   });
   if (!res.ok) throw new Error(`refreshSession failed: ${res.status}`);
   const body: unknown = await res.json();
-  if (!isObj(body)) throw new Error("refreshSession: non-object response");
+  if (!isRecord(body)) throw new Error("refreshSession: non-object response");
   return {
     did: asString(body.did) || current.did,
     accessJwt: asString(body.accessJwt),
@@ -143,7 +135,7 @@ async function parseChatResponse(res: Response, method: string, path: string): P
     throw new Error(`${method} ${path}: ${res.status} ${text.slice(0, 200)}`);
   }
   const json: unknown = await res.json();
-  return isObj(json) ? json : {};
+  return isRecord(json) ? json : {};
 }
 
 async function chatRequest(method: "GET" | "POST", path: string, body?: JsonRecord, query?: Record<string, string>): Promise<JsonRecord> {
@@ -180,10 +172,10 @@ function parseMessageLog(log: JsonRecord, selfDid: string): IncomingMessage | nu
   if (log.$type !== "chat.bsky.convo.defs#logCreateMessage") return null;
   const convoId = asString(log.convoId);
   const { message } = log;
-  if (!isObj(message)) return null;
+  if (!isRecord(message)) return null;
   const text = asString(message.text);
   if (!text) return null;
-  const sender = isObj(message.sender) ? message.sender : null;
+  const sender = isRecord(message.sender) ? message.sender : null;
   const senderDid = sender ? asString(sender.did) : "";
   if (!convoId || !senderDid) return null;
   if (senderDid === selfDid) return null; // ignore our own
@@ -213,7 +205,7 @@ async function handleMessage(msg: IncomingMessage): Promise<void> {
 
 async function processLogEntries(logs: unknown[], selfDid: string): Promise<void> {
   for (const entry of logs) {
-    if (!isObj(entry)) continue;
+    if (!isRecord(entry)) continue;
     const parsed = parseMessageLog(entry, selfDid);
     if (parsed) await handleMessage(parsed);
   }

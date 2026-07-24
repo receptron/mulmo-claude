@@ -12,8 +12,8 @@
 // marp-core is dynamically imported so it stays out of the eager browser
 // bundle (it's only needed once a Marp deck is actually rendered).
 
-import { MARP_HTML_ALLOWLIST } from "../utils/markdown/marpTheme";
-import { applyCustomMarpSize } from "../utils/markdown/marpCustomSize";
+import { MARP_HTML_ALLOWLIST } from "@mulmoclaude/markdown-utils/markdown/marpTheme";
+import { applyCustomMarpSize } from "@mulmoclaude/markdown-utils/markdown/marpCustomSize";
 import type { MarpThemeEntry } from "../plugins/markdown/contract";
 
 export const DEFAULT_SLIDE_WIDTH = 1280;

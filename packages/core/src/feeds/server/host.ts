@@ -6,6 +6,8 @@
 // subpath, imported directly. Both MulmoClaude and MulmoTerminal supply their
 // own host shim.
 
+import { createForwardingLogger, createHostSlot } from "../../host/hostSlot.js";
+
 /** Outcome of launching one hidden/visible agent-ingest worker. `chatId` lets
  *  the caller register a completion hook so a failed refresh doesn't die
  *  silently. */
@@ -44,32 +46,24 @@ export interface FeedsHost {
   spawnWorker: AgentWorkerRunner;
 }
 
-let current: FeedsHost | null = null;
+const hostSlot = createHostSlot<FeedsHost>("@mulmoclaude/core/feeds: configureFeedsHost()");
 
 /** Wire the feeds engine to a host. Call once at startup, before any refresh. */
 export function configureFeedsHost(host: FeedsHost): void {
-  if (current && current !== host) {
-    throw new Error("@mulmoclaude/core/feeds: configureFeedsHost() was already called with a different host");
-  }
-  current = host;
+  hostSlot.set(host);
 }
 
 /** The configured host, or throw if `configureFeedsHost` was never called. */
 export function requireFeedsHost(): FeedsHost {
-  if (!current) throw new Error("@mulmoclaude/core/feeds: configureFeedsHost() was not called by the host");
-  return current;
+  return hostSlot.get();
 }
 
 /** Test-only: clear the configured host. */
 export function resetFeedsHostForTesting(): void {
-  current = null;
+  hostSlot.reset();
 }
 
 /** Forwarding logger so engine modules can `import { log }` without each
- *  reaching for `requireFeedsHost().log`. */
-export const log: FeedsLogger = {
-  error: (prefix, msg, data) => requireFeedsHost().log.error(prefix, msg, data),
-  warn: (prefix, msg, data) => requireFeedsHost().log.warn(prefix, msg, data),
-  info: (prefix, msg, data) => requireFeedsHost().log.info(prefix, msg, data),
-  debug: (prefix, msg, data) => requireFeedsHost().log.debug(prefix, msg, data),
-};
+ *  reaching for `requireFeedsHost().log`. Non-critical: calls before the host
+ *  is wired are dropped (not thrown), matching the collection/google seams. */
+export const log: FeedsLogger = createForwardingLogger(() => hostSlot.peek()?.log ?? null);

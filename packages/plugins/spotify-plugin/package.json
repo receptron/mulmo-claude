@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/spotify-plugin",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Read-only Spotify integration for MulmoClaude — Liked Songs / playlists / recently played, OAuth via PKCE. Built as a runtime plugin (issue #1162).",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
     "test": "echo 'no in-package tests; covered by host tests under test/plugins/spotify/'"
   },
   "peerDependencies": {
-    "gui-chat-protocol": "^0.4.0",
+    "gui-chat-protocol": "^1.2.0",
     "vue": "^3.5.0",
     "zod": "^4.3.6"
   },

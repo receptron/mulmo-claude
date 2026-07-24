@@ -55,6 +55,16 @@ describe("resolveMountNames", () => {
     assert.equal(out.resolved.length, 0);
   });
 
+  it("treats a prototype-chain name as unknown, not a phantom missing path", () => {
+    // A bare `allowed["constructor"]` reads the Object.prototype function
+    // (truthy), so the name skips `unknown` and later fails as "path missing"
+    // — a misleading diagnosis for a Docker mount permission boundary.
+    const out = resolveMountNames(["constructor", "toString", "__proto__"], buildAllowedConfigMounts("/fake/home"));
+    assert.deepEqual(out.unknown, ["constructor", "toString", "__proto__"]);
+    assert.equal(out.resolved.length, 0);
+    assert.equal(out.missing.length, 0);
+  });
+
   it("reports missing host paths separately from unknown", () => {
     const home = makeFixtureHome({}); // nothing on disk
     const out = resolveMountNames(["gh"], buildAllowedConfigMounts(home));

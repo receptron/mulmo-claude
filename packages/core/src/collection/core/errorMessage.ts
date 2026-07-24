@@ -1,6 +1,4 @@
-/** Normalise an unknown thrown value to a display string. The view layer's host
- *  capabilities already return normalised `{ ok: false, error }` results, so this
- *  only backs the defensive `catch` around an unexpected throw. */
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+// Re-exported from the canonical helper so the collection engine and the host
+// agree on gRPC-shaped errors (#2217). Kept as a module rather than rewriting
+// its importers, which reach for this path by name.
+export { errorMessage } from "../../utils/errors.js";

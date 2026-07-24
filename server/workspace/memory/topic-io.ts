@@ -17,7 +17,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { parseFrontmatter, serializeWithFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
 import { readDirSafeAsync, readTextSafe } from "../../utils/files/safe.js";
 import { log } from "../../system/logger/index.js";

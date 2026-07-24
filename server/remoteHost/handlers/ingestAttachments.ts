@@ -1,4 +1,4 @@
-// Attachment ingest for remote chat (plans/feat-remote-chat-image-attachments.md).
+// Attachment ingest for remote chat (plans/done/feat-remote-chat-image-attachments.md).
 //
 // The phone can't carry full-res attachment bytes over the Firestore command
 // channel (a command doc caps at ~1 MiB), so it uploads each file — photo,

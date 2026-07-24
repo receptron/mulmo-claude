@@ -92,11 +92,12 @@ export interface PluginMeta {
  *  `?injection=1` survive intact. */
 export function buildRouteUrl(route: ResolvedRoute, params?: Readonly<Record<string, string | number>>): string {
   if (!params) return route.url;
-  let { url } = route;
-  for (const [key, value] of Object.entries(params)) {
-    const placeholder = `:${key}`;
-    if (!url.includes(placeholder)) continue;
-    url = url.split(placeholder).join(encodeURIComponent(String(value)));
-  }
-  return url;
+  // Single-pass token replacement: substituting param-by-param would let
+  // one value rewrite a longer placeholder it prefixes (`:id` vs `:idx`).
+  // Own-property check so a `:constructor` placeholder never reads
+  // `Object.prototype`. (`Object.hasOwn` needs es2022 lib — not enabled.)
+  return route.url.replace(/:([A-Za-z0-9_]+)/g, (placeholder, name: string) => {
+    if (!Object.prototype.hasOwnProperty.call(params, name)) return placeholder;
+    return encodeURIComponent(String(params[name]));
+  });
 }

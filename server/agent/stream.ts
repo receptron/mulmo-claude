@@ -174,29 +174,11 @@ export function createStreamParser(): {
   return { parse };
 }
 
-// Stateless convenience — used by tests and one-off parsing.
-// For the agent loop, use createStreamParser() to get dedup.
+// Stateless convenience: one throwaway parser per event, so no dedup
+// state survives the call. The agent loop must keep a single
+// createStreamParser() across the whole turn instead — dedup works by
+// remembering what earlier events in that turn already emitted, which
+// a per-event parser can never observe.
 export function parseStreamEvent(event: RawStreamEvent): AgentEvent[] {
-  if (event.type === "result" && event.result) {
-    const events: AgentEvent[] = [{ type: EVENT_TYPES.text, message: event.result }];
-    if (event.session_id) {
-      events.push({
-        type: EVENT_TYPES.claudeSessionId,
-        id: event.session_id,
-      });
-    }
-    return events;
-  }
-
-  if (event.type !== "assistant" && event.type !== "user") {
-    return [];
-  }
-
-  const content = event.message?.content;
-  const blockEvents = Array.isArray(content) ? content.map(blockToEvent).filter((agentEvent): agentEvent is AgentEvent => agentEvent !== null) : [];
-
-  if (event.type === "assistant") {
-    return [{ type: EVENT_TYPES.status, message: "Thinking..." }, ...blockEvents];
-  }
-  return blockEvents;
+  return createStreamParser().parse(event);
 }

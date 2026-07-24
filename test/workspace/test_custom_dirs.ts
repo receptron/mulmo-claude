@@ -229,10 +229,33 @@ describe("loadCustomDirs — non-string fields", () => {
   });
 });
 
+// The wording below is the HTTP response body, so it is pinned verbatim: the
+// generic `validateEntryList` behind this wrapper must not reword it.
 describe("validateCustomDirs — error text", () => {
   it("does not echo [object Object] back as the offending path", () => {
     const result = validateCustomDirs([{ path: { nested: true } }]);
     assert.ok("error" in result);
     assert.doesNotMatch(result.error, /\[object Object\]/);
+  });
+
+  it("reports a non-array input", () => {
+    assert.deepEqual(validateCustomDirs("data/notes"), { error: "expected an array" });
+  });
+
+  it("names the offending entry by index", () => {
+    const result = validateCustomDirs([{ path: "data/notes" }, { path: "config/evil" }]);
+    assert.deepEqual(result, { error: 'entry 1: invalid path "config/evil"' });
+  });
+
+  it("accepts exactly 100 entries", () => {
+    const entries = Array.from({ length: 100 }, (_unused, i) => ({ path: `data/dir-${i}` }));
+    const result = validateCustomDirs(entries);
+    assert.ok(!("error" in result), `expected 100 entries to pass, got: ${JSON.stringify(result)}`);
+    assert.equal(result.entries.length, 100);
+  });
+
+  it("rejects 101 entries with the cap in the message", () => {
+    const entries = Array.from({ length: 101 }, (_unused, i) => ({ path: `data/dir-${i}` }));
+    assert.deepEqual(validateCustomDirs(entries), { error: "too many entries (max 100)" });
   });
 });

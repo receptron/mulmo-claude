@@ -19,7 +19,7 @@ export type { MarkdownHostApp, MarkdownDispatchArgs, MarkdownDispatchResult, Exp
 
 export { TOOL_DEFINITION, executeDocument, pluginCore } from "../core/plugin";
 export { isFilePath, TOOL_NAME } from "../plugins/markdown/definition";
-export { setFilesRawUrl } from "../utils/image/resolve";
+export { setFilesRawUrl } from "@mulmoclaude/markdown-utils/image/resolve";
 
 // MarpView / MarpSplitEditor are also consumed standalone by hosts that
 // render Marp outside the plugin canvas (e.g. MulmoClaude's File

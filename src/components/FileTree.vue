@@ -2,10 +2,17 @@
   <div>
     <button
       v-if="node.type === 'dir'"
-      class="w-full flex items-center gap-1 px-2 py-1 text-left text-sm hover:bg-gray-100 rounded"
+      class="w-full flex items-center gap-1 px-2 py-1 text-left text-sm rounded transition-colors"
+      :class="isDropTarget ? 'bg-blue-100 ring-1 ring-blue-400' : 'hover:bg-gray-100'"
       :data-testid="`file-tree-dir-${node.name || 'root'}`"
+      :data-drop-target="isDropTarget ? 'true' : undefined"
+      :title="allowUpload ? t('fileTree.dropHint') : undefined"
       @click="onToggle"
       @contextmenu="onFolderContextMenu"
+      @dragenter="onDropEnter"
+      @dragover="onDropOver"
+      @dragleave="onDropLeave"
+      @drop="onDropFiles"
     >
       <span class="material-icons text-sm text-gray-400 shrink-0">{{ expanded ? "folder_open" : "folder" }}</span>
       <span class="text-gray-700 truncate">{{ node.name || t("fileTree.workspace") }}</span>
@@ -59,9 +66,11 @@
         :children-by-path="childrenByPath"
         :sort-mode="sortMode"
         :show-hidden-system="showHiddenSystem"
+        :allow-upload="allowUpload"
         @select="(p) => emit('select', p)"
         @load-children="(p) => emit('loadChildren', p)"
         @create-file="(args) => emit('createFile', args)"
+        @upload-files="(args) => emit('uploadFiles', args)"
       />
     </div>
     <!-- Floating context menu (#1598). Position-fixed near the
@@ -94,6 +103,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useExpandedDirs } from "../composables/useExpandedDirs";
+import { useDragSessionEnd } from "../composables/useFileDropZone";
 import { sortChildren } from "../utils/files/sortChildren";
 import { descriptorForPath, EDIT_POLICY_ICON_COLOR } from "../config/systemFileDescriptors";
 import { isVisibleTopLevel } from "../config/visibleWorkspaceDirs";
@@ -128,11 +138,19 @@ const props = defineProps<{
   // still receive the prop so the recursion carries it, but they
   // don't apply the filter themselves.
   showHiddenSystem: boolean;
+  // Reference roots are read-only mounts, so they opt out of the
+  // drop affordance entirely rather than offering a target that the
+  // server would refuse (#2270).
+  allowUpload: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [path: string];
   loadChildren: [path: string];
+  // Files dropped onto this folder row. Bubbled up to FilesView, which
+  // performs the uploads and refreshes the folder — same shape of
+  // hand-off as `createFile` below.
+  uploadFiles: [args: { folder: string; files: File[] }];
   // Bubbled up to FilesView, which performs the PUT and refreshes
   // the tree. Per-instance FileTree state is reset by the parent
   // setting `childrenByPath` for this folder; the inline input here
@@ -190,6 +208,64 @@ function onToggle(): void {
   if (cached.value !== undefined) return;
   emit("loadChildren", props.node.path);
 }
+
+// --- Drop target (#2270) -------------------------------------------------
+// Deliberately hand-rolled instead of `useFileDropZone`: that composable
+// installs window listeners in `onMounted`, and this component is recursive
+// (one instance per node), so a tree of 300 nodes would install 300 of them.
+// The pane installs the shared window guard once instead.
+const isDropTarget = ref(false);
+// Browsers fire dragenter/dragleave for every child element the pointer
+// crosses (the icon and label spans here), so a plain boolean flickers.
+// Count depth and only release at zero.
+let dragDepth = 0;
+
+function isFileDrag(event: DragEvent): boolean {
+  return event.dataTransfer?.types.includes("Files") ?? false;
+}
+
+function canAcceptDrop(event: DragEvent): boolean {
+  return props.allowUpload && props.node.type === "dir" && isFileDrag(event);
+}
+
+function onDropEnter(event: DragEvent): void {
+  if (!canAcceptDrop(event)) return;
+  event.preventDefault();
+  dragDepth += 1;
+  isDropTarget.value = true;
+}
+
+function onDropOver(event: DragEvent): void {
+  // WebKit suppresses `drop` unless `dragover` also preventDefaults.
+  if (canAcceptDrop(event)) event.preventDefault();
+}
+
+function onDropLeave(): void {
+  if (dragDepth === 0) return;
+  dragDepth -= 1;
+  if (dragDepth <= 0) resetDropState();
+}
+
+function onDropFiles(event: DragEvent): void {
+  if (!canAcceptDrop(event)) return;
+  event.preventDefault();
+  // The row under the pointer owns the drop; don't let an ancestor
+  // container claim it too.
+  event.stopPropagation();
+  resetDropState();
+  const dropped = event.dataTransfer?.files;
+  if (dropped && dropped.length > 0) emit("uploadFiles", { folder: props.node.path, files: Array.from(dropped) });
+}
+
+function resetDropState(): void {
+  dragDepth = 0;
+  isDropTarget.value = false;
+}
+
+// Safety net for drags that end without a matching `dragleave` on this row —
+// released outside the tree, or cancelled with Escape. One shared window
+// listener drives every row, so the highlight can't get stuck on.
+watch(useDragSessionEnd(), resetDropState);
 
 // Mirrors the server's AUDIO_EXTENSIONS in server/api/routes/files.ts
 // so the tree icon agrees with how /api/files/content classifies the

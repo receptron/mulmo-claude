@@ -1,13 +1,7 @@
 import path from "node:path";
+import { yearMonthUtc } from "@mulmoclaude/core/artifacts";
 import { shortId } from "../id.js";
 import { slugify } from "../slug.js";
-
-// #764 partitioning. UTC (not local) so a workspace synced across timezones still groups into the same bucket.
-export function yearMonthUtc(now: Date = new Date()): string {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}/${month}`;
-}
 
 export function buildArtifactPath(dir: string, title: string | undefined, ext: string, fallbackSlug = "file"): string {
   const slug = title ? slugify(title) || fallbackSlug : fallbackSlug;

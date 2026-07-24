@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/mulmoscript-plugin",
-  "version": "0.2.2",
+  "version": "1.0.0",
   "description": "presentMulmoScript — MulmoScript storyboard tool for MulmoClaude and MulmoTerminal. Browser-safe core (tool definition + save/reopen/update logic against the generic gui-chat-protocol files.artifacts capability) on `.`, Vue View/Preview on `./vue`, and the Node-only ops layer (mulmocast render/movie/PDF orchestration + dispatch router, host backends injected) on `./server`.",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,30 +40,34 @@
     "lint": "eslint .",
     "test": "tsx --test test/test_*.ts"
   },
+  "dependencies": {
+    "@mulmoclaude/common": "^1.1.0",
+    "@mulmoclaude/core": "^1.2.0"
+  },
   "peerDependencies": {
     "@mulmocast/deck-web": "^1.1.1",
-    "@mulmocast/types": "^2.8.1",
+    "@mulmocast/types": "^2.9.0",
     "graphai": "^2.0.18",
-    "gui-chat-protocol": "^0.4.0",
-    "mulmocast": "^2.8.1",
+    "gui-chat-protocol": "^1.2.0",
+    "mulmocast": "^2.9.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^26.1.1",
-    "@typescript-eslint/eslint-plugin": "^8.64.0",
-    "@typescript-eslint/parser": "^8.64.0",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "eslint": "^10.7.0",
-    "eslint-plugin-vue": "^10.8.0",
+    "eslint-plugin-vue": "^10.10.0",
     "globals": "^17.7.0",
     "tailwindcss": "^4.3.2",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vite": "^8.1.4",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.8"
   },
   "license": "MIT"
 }

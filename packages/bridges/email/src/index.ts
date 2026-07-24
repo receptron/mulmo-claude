@@ -22,6 +22,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
 import nodemailer from "nodemailer";
 import { createBridgeClient } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "email";
 const MAX_BODY_LEN = 100_000; // truncate inbound email text before forwarding to MulmoClaude
@@ -62,12 +63,7 @@ const imapTls = (process.env.EMAIL_IMAP_TLS ?? "true").toLowerCase() !== "false"
 const smtpPort = Number(process.env.EMAIL_SMTP_PORT) || 587;
 const smtpSecure = process.env.EMAIL_SMTP_TLS ? process.env.EMAIL_SMTP_TLS.toLowerCase() === "true" : smtpPort === 465;
 const pollIntervalSec = Math.max(10, Number(process.env.EMAIL_POLL_INTERVAL_SEC) || DEFAULT_POLL_SEC);
-const allowedSenders = new Set(
-  (process.env.EMAIL_ALLOWED_SENDERS ?? "")
-    .split(",")
-    .map((addr) => addr.trim().toLowerCase())
-    .filter(Boolean),
-);
+const allowedSenders = parseCsvSet(process.env.EMAIL_ALLOWED_SENDERS, { lowercase: true });
 const allowAll = allowedSenders.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });

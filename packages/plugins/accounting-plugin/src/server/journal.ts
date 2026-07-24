@@ -12,7 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import type { Account, JournalEntry, JournalLine } from "./types.js";
+import type { Account, JournalEntry, JournalLine } from "../shared/types.js";
 
 /** Floating-point tolerance for the debit = credit check. Currency
  *  amounts arrive as JavaScript numbers (the on-wire format is JSON,

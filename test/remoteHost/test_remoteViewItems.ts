@@ -1,6 +1,6 @@
 // Unit tests for the phase-5 remote view item pages: the shared
 // createRemoteViewItems builder (engine + thumbnail resolver stubbed) and the
-// getRemoteViewItems command handler over it. See plans/feat-remote-view-images.md.
+// getRemoteViewItems command handler over it. See plans/done/feat-remote-view-images.md.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 

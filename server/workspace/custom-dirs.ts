@@ -10,6 +10,7 @@ import { workspacePath, WORKSPACE_DIRS } from "./paths.js";
 import { log } from "../system/logger/index.js";
 import { writeJsonAtomicSync } from "../utils/files/json.js";
 import { hasStringProp, isRecord } from "../utils/types.js";
+import { validateEntryList, type EntryListResult } from "../utils/validateEntryList.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -146,31 +147,13 @@ export function saveCustomDirs(entries: readonly CustomDirEntry[], root?: string
 
 // ── Validate input array (for API) ─────────────────────────────
 
-export function validateCustomDirs(raw: unknown): { entries: CustomDirEntry[] } | { error: string } {
-  if (!Array.isArray(raw)) {
-    return { error: "expected an array" };
-  }
-  if (raw.length > MAX_ENTRIES) {
-    return { error: `too many entries (max ${MAX_ENTRIES})` };
-  }
-  const entries: CustomDirEntry[] = [];
-  const errors: string[] = [];
-  raw.forEach((item, i) => {
-    const entry = validateEntry(item);
-    if (entry) {
-      entries.push(entry);
-    } else {
-      // Only echo a genuine string back in the error; a non-string `path` is
-      // exactly the case where "[object Object]" would mislead the reader about
-      // what their config actually says.
-      const itemPath = hasStringProp(item, "path") ? item.path : "";
-      errors.push(`entry ${i}: invalid path "${itemPath}"`);
-    }
+export function validateCustomDirs(raw: unknown): EntryListResult<CustomDirEntry> {
+  return validateEntryList(raw, {
+    maxEntries: MAX_ENTRIES,
+    validateEntry,
+    echoProp: "path",
+    describeInvalid: (itemPath) => `invalid path "${itemPath}"`,
   });
-  if (errors.length > 0) {
-    return { error: errors.join("; ") };
-  }
-  return { entries };
 }
 
 // ── Cached loader (for system prompt) ───────────────────────────

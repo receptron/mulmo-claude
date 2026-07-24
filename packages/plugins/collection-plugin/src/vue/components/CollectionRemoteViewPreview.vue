@@ -117,13 +117,13 @@ watch([() => props.slug, () => props.view.id, () => collectionUi().localeTag()],
 // ── The parent side of the remote-view bridge ──
 // Answers ONLY what the phone parent answers — `getItems` pages and `startChat`
 // relays. No `onChange`, no `openItem`: preview capability must equal phone
-// capability exactly (plans/feat-remote-custom-view.md, decision 5).
+// capability exactly (plans/done/feat-remote-custom-view.md, decision 5).
 //
 // Paging goes through the HOST (not client-side over the records) because the
 // page's declared `imageFields` are inlined as `data:` URL thumbnails the
 // browser can neither read from the workspace nor resize — the preview fetches
 // the same host page (real thumbnails, byte budget) the phone will, over the
-// identical `createRemoteViewItems` builder (plans/feat-remote-view-images.md).
+// identical `createRemoteViewItems` builder (plans/done/feat-remote-view-images.md).
 async function getPage(request: RemoteViewPageRequest): Promise<RemoteViewPage> {
   const binding = collectionUi();
   if (!binding.fetchRemoteViewItems) throw new Error("fetchRemoteViewItems is not wired on this host");
@@ -134,7 +134,7 @@ async function getPage(request: RemoteViewPageRequest): Promise<RemoteViewPage> 
 }
 
 // A preview mutation is a REAL host write, through the same builder + policy the
-// phone will run (plans/feat-remote-writable-view.md, decision 4). The write
+// phone will run (plans/done/feat-remote-writable-view.md, decision 4). The write
 // publishes a collection-change event, so the parent's live subscription
 // refetches `props.items` and the view's next `getItems` reflects it. A refused
 // mutate (read-only / non-editable field / …) throws the host's message, which

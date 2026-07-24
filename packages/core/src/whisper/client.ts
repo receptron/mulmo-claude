@@ -42,6 +42,7 @@ function pickRecorderMime(): string | undefined {
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- FileReader.result is `string | ArrayBuffer | null`; readAsDataURL always yields the string branch, and the rule cannot narrow it.
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
     reader.readAsDataURL(blob);

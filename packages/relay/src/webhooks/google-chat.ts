@@ -12,10 +12,12 @@
 // the message but cannot send replies back.
 
 import { chunkText } from "@mulmobridge/client/text";
+import { isRecord } from "@mulmoclaude/common";
 import { PLATFORMS, type RelayMessage, type Env } from "../types.js";
 import { registerPlatform, CONNECTION_MODES, type PlatformPlugin } from "../platform.js";
 import { ONE_HOUR_MS, ONE_HOUR_S, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS } from "../time.js";
-import { makeUuid } from "../utils/id.js";
+import { parseJwt, jwtKid, verifyJwtSignature } from "./jwt.js";
+import { makeRelayMessage } from "./relay-message.js";
 
 const GOOGLE_CHAT_ISSUER = "chat@system.gserviceaccount.com";
 const JWKS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com";
@@ -52,26 +54,6 @@ async function getJwks(): Promise<JwkKey[]> {
 
 // ── JWT verification ────────────────────────────────────────────
 
-function b64UrlDecode(str: string): Uint8Array {
-  const padded = str
-    .replace(/-/g, "+")
-    .replace(/_/g, "/")
-    .padEnd(str.length + ((4 - (str.length % 4)) % 4), "=");
-  return Uint8Array.from(atob(padded), (chr) => chr.charCodeAt(0));
-}
-
-function parseJwt(token: string): { header: Record<string, unknown>; payload: Record<string, unknown>; signInput: string; sig: Uint8Array } | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const header = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[0]))) as Record<string, unknown>;
-    const payload = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[1]))) as Record<string, unknown>;
-    return { header, payload, signInput: `${parts[0]}.${parts[1]}`, sig: b64UrlDecode(parts[2]) };
-  } catch {
-    return null;
-  }
-}
-
 // Pure claim-check — no network, safe to unit-test. Verifies the
 // iss / aud / exp claims before any JWKS lookup or signature work.
 // Callers that want signature verification run verifyGoogleJwt below,
@@ -90,23 +72,14 @@ async function verifyGoogleJwt(authHeader: string | undefined, projectNumber: st
   const token = authHeader.slice(7).trim();
   const jwt = parseJwt(token);
   if (!jwt) return false;
-  const { payload, header } = jwt;
-  if (!validateGoogleChatClaims(payload, projectNumber, Date.now() / 1000)) return false;
-  const keyId = typeof header.kid === "string" ? header.kid : "";
-  const alg = typeof header.alg === "string" ? header.alg : "RS256";
-  const hashAlg = alg === "RS256" ? "SHA-256" : alg === "RS384" ? "SHA-384" : "SHA-512";
+  if (!validateGoogleChatClaims(jwt.payload, projectNumber, Date.now() / 1000)) return false;
   const keys = await getJwks();
-  const jwk = keys.find((key) => key.kid === keyId);
+  const jwk = keys.find((key) => key.kid === jwtKid(jwt));
   if (!jwk) return false;
-  const pubKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: hashAlg }, false, ["verify"]);
-  return crypto.subtle.verify("RSASSA-PKCS1-v1_5", pubKey, jwt.sig, new TextEncoder().encode(jwt.signInput));
+  return verifyJwtSignature(jwt, jwk);
 }
 
 // ── Payload parsing ─────────────────────────────────────────────
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 interface ChatMessage {
   spaceName: string;
@@ -114,11 +87,11 @@ interface ChatMessage {
 }
 
 function parseMessage(body: unknown): ChatMessage | null {
-  if (!isObj(body) || body.type !== "MESSAGE") return null;
+  if (!isRecord(body) || body.type !== "MESSAGE") return null;
   const msg = body.message;
-  if (!isObj(msg) || typeof msg.text !== "string") return null;
+  if (!isRecord(msg) || typeof msg.text !== "string") return null;
   const { space } = msg;
-  if (!isObj(space) || typeof space.name !== "string") return null;
+  if (!isRecord(space) || typeof space.name !== "string") return null;
   return { spaceName: space.name, text: msg.text.trim() };
 }
 
@@ -132,7 +105,7 @@ interface ServiceAccount {
 function parseServiceAccount(raw: string): ServiceAccount | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isObj(parsed) || typeof parsed.client_email !== "string" || typeof parsed.private_key !== "string") return null;
+    if (!isRecord(parsed) || typeof parsed.client_email !== "string" || typeof parsed.private_key !== "string") return null;
     return { client_email: parsed.client_email, private_key: parsed.private_key };
   } catch {
     return null;
@@ -191,16 +164,7 @@ const googleChatPlugin: PlatformPlugin = {
     const parsed = parseMessage(JSON.parse(body));
     if (!parsed || !parsed.text) return [];
 
-    return [
-      {
-        id: makeUuid(),
-        platform: PLATFORMS.googleChat,
-        senderId: parsed.spaceName,
-        chatId: parsed.spaceName,
-        text: parsed.text,
-        receivedAt: new Date().toISOString(),
-      },
-    ];
+    return [makeRelayMessage({ platform: PLATFORMS.googleChat, senderId: parsed.spaceName, chatId: parsed.spaceName, text: parsed.text })];
   },
 
   async sendResponse(chatId: string, text: string, env: Env): Promise<void> {

@@ -31,6 +31,19 @@ function formatZodIssues(
   return issues.length > 3 ? `${head} (+${issues.length - 3} more)` : head;
 }
 
+/** Shared prelude: require an object body carrying a non-empty
+ *  `filePath`. On success returns the narrowed record + filePath so the
+ *  caller reads the remaining fields without re-narrowing. */
+function validateFilePathBody(body: unknown): ValidationResult<{ record: Record<string, unknown>; filePath: string }> {
+  if (!isRecord(body)) {
+    return { ok: false, error: "body must be an object" };
+  }
+  if (typeof body.filePath !== "string" || body.filePath === "") {
+    return { ok: false, error: "filePath must be a non-empty string" };
+  }
+  return { ok: true, value: { record: body, filePath: body.filePath } };
+}
+
 /**
  * Validate the `update-script` request body. Returns the parsed,
  * schema-conformant script on success, or a human-readable error
@@ -40,16 +53,13 @@ export function validateUpdateScriptBody(body: unknown): ValidationResult<{
   filePath: string;
   script: unknown;
 }> {
-  if (!isRecord(body)) {
-    return { ok: false, error: "body must be an object" };
-  }
-  if (typeof body.filePath !== "string" || body.filePath === "") {
-    return { ok: false, error: "filePath must be a non-empty string" };
-  }
-  if (body.script === undefined) {
+  const base = validateFilePathBody(body);
+  if (!base.ok) return base;
+  const { record, filePath } = base.value;
+  if (record.script === undefined) {
     return { ok: false, error: "script is required" };
   }
-  const parsed = mulmoScriptSchema.safeParse(body.script);
+  const parsed = mulmoScriptSchema.safeParse(record.script);
   if (!parsed.success) {
     return {
       ok: false,
@@ -58,7 +68,7 @@ export function validateUpdateScriptBody(body: unknown): ValidationResult<{
   }
   return {
     ok: true,
-    value: { filePath: body.filePath as string, script: parsed.data },
+    value: { filePath, script: parsed.data },
   };
 }
 
@@ -72,19 +82,17 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   beatIndex: number;
   beat: unknown;
 }> {
-  if (!isRecord(body)) {
-    return { ok: false, error: "body must be an object" };
-  }
-  if (typeof body.filePath !== "string" || body.filePath === "") {
-    return { ok: false, error: "filePath must be a non-empty string" };
-  }
-  if (typeof body.beatIndex !== "number" || !Number.isInteger(body.beatIndex) || body.beatIndex < 0) {
+  const base = validateFilePathBody(body);
+  if (!base.ok) return base;
+  const { record, filePath } = base.value;
+  const beatIndex = record.beatIndex;
+  if (typeof beatIndex !== "number" || !Number.isInteger(beatIndex) || beatIndex < 0) {
     return { ok: false, error: "beatIndex must be a non-negative integer" };
   }
-  if (body.beat === undefined) {
+  if (record.beat === undefined) {
     return { ok: false, error: "beat is required" };
   }
-  const parsed = mulmoBeatSchema.safeParse(body.beat);
+  const parsed = mulmoBeatSchema.safeParse(record.beat);
   if (!parsed.success) {
     return {
       ok: false,
@@ -94,8 +102,8 @@ export function validateUpdateBeatBody(body: unknown): ValidationResult<{
   return {
     ok: true,
     value: {
-      filePath: body.filePath as string,
-      beatIndex: body.beatIndex as number,
+      filePath,
+      beatIndex,
       beat: parsed.data,
     },
   };

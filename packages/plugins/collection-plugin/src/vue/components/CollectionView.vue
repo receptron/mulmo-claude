@@ -77,6 +77,60 @@
         <span>{{ t("collectionsView.chat") }}</span>
       </button>
 
+      <!-- Related-collections pulldown: one click to hop to a collection this
+           one links to (its refs) or that links back (their refs/backlinks).
+           Standalone only, and only when the host exposes `fetchOntology` — a
+           host without that capability (MulmoTerminal) simply omits the
+           control, the same additive pattern as the index Map tab. Neighbors
+           are derived lazily on first open (the ontology scan is expensive and
+           most view opens never touch this menu). -->
+      <div v-if="showRelatedMenu" ref="relatedMenuRef" class="relative">
+        <button
+          type="button"
+          class="h-8 px-2.5 flex items-center gap-1 rounded border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-600 font-bold text-xs transition-colors"
+          :aria-expanded="relatedMenuOpen"
+          data-testid="collections-related-menu"
+          @click="toggleRelatedMenu"
+        >
+          <span class="material-icons text-sm">hub</span>
+          <span>{{ t("collectionsView.related") }}</span>
+        </button>
+        <div
+          v-if="relatedMenuOpen"
+          class="absolute right-0 top-full mt-1 z-20 min-w-max rounded border border-slate-200 bg-white shadow-lg py-1"
+          data-testid="collections-related-menu-panel"
+        >
+          <!-- In-flight: the ontology fetch backing this open. -->
+          <div v-if="relatedLoading" class="w-full h-8 px-3 flex items-center gap-2 text-xs text-slate-400" data-testid="collections-related-loading">
+            <span class="material-icons text-sm animate-spin">hourglass_empty</span>
+            <span>{{ t("common.loading") }}</span>
+          </div>
+          <!-- Fail-soft: a failed fetch or a collection with no relations both
+               land on the same disabled empty-state row (no error toast). -->
+          <div v-else-if="relatedItems.length === 0" class="w-full h-8 px-3 flex items-center text-xs text-slate-400" data-testid="collections-related-empty">
+            {{ t("collectionsView.relatedEmpty") }}
+          </div>
+          <button
+            v-for="related in relatedItems"
+            :key="related.slug"
+            type="button"
+            class="w-full h-8 px-3 flex items-center gap-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+            :data-testid="`collections-related-item-${related.slug}`"
+            @click="gotoRelated(related.slug)"
+          >
+            <span class="material-symbols-outlined text-base">{{ related.icon }}</span>
+            <span class="flex-1 text-left">{{ related.title }}</span>
+            <span
+              class="material-icons text-sm text-slate-400"
+              :title="relatedDirectionLabel(related.direction)"
+              :aria-label="relatedDirectionLabel(related.direction)"
+              role="img"
+              >{{ relatedDirectionIcon(related.direction) }}</span
+            >
+          </button>
+        </div>
+      </div>
+
       <!-- Collection-level actions (schema `collectionActions`). No record
            context: each seeds a chat with a progress summary of all items. -->
       <button
@@ -369,27 +423,7 @@
       </div>
     </div>
 
-    <!-- Repair banner: the server flagged record files that won't load /
-         violate the schema and are silently skipped. The button reports
-         them back to the LLM (same path presentCollection uses) so it
-         fixes the files. View-independent, so it sits above the body. -->
-    <div
-      v-if="collection && dataIssues.length > 0"
-      class="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900 shadow-sm flex items-center gap-3"
-      data-testid="collections-data-issues"
-    >
-      <span class="material-icons text-amber-600">warning</span>
-      <span class="flex-1">{{ t("collectionsView.dataIssuesDetected", { count: dataIssues.length }) }}</span>
-      <button
-        type="button"
-        class="h-8 px-2.5 flex items-center gap-1 rounded border border-amber-300 bg-white hover:bg-amber-100 text-amber-700 font-bold text-xs transition-colors"
-        data-testid="collections-repair"
-        @click="repairCollection"
-      >
-        <span class="material-icons text-sm">build</span>
-        <span>{{ t("collectionsView.repair") }}</span>
-      </button>
-    </div>
+    <CollectionRepairBanner v-if="collection && dataIssues.length > 0" :count="dataIssues.length" @repair="repairCollection" />
 
     <div class="flex-1 overflow-auto">
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-sm text-slate-500 gap-3">
@@ -817,80 +851,17 @@
       @close="configOpen = false"
     />
 
-    <!-- Chat modal — collect a message and start a new general-role chat
-         seeded with the collection's skill command (`/<slug> <message>`). -->
-    <div
-      v-if="chatOpen && collection"
-      class="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all duration-300"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="collections-chat-title"
-      data-testid="collections-chat-modal"
-      @click.self="closeChat"
-      @keydown.esc="closeChat"
-    >
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col border border-slate-200 overflow-hidden">
-        <header class="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-          <div class="h-9 w-9 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/50">
-            <span class="material-icons text-lg">forum</span>
-          </div>
-          <div class="flex-1">
-            <h2 id="collections-chat-title" class="text-sm font-bold text-slate-800 uppercase tracking-wide">{{ t("collectionsView.chatTitle") }}</h2>
-            <span class="text-xs text-slate-400 font-semibold">{{ collection.title }}</span>
-          </div>
-          <button
-            type="button"
-            class="h-8 w-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 transition-colors"
-            :aria-label="t('common.close')"
-            data-testid="collections-chat-close"
-            @click="closeChat"
-          >
-            <span class="material-icons text-lg">close</span>
-          </button>
-        </header>
-
-        <div class="px-6 py-5">
-          <textarea
-            ref="chatInputEl"
-            v-model="chatMessage"
-            rows="4"
-            :placeholder="t('collectionsView.chatPlaceholder')"
-            class="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all resize-none"
-            data-testid="collections-chat-input"
-            @keydown.meta.enter="submitChat"
-            @keydown.ctrl.enter="submitChat"
-          ></textarea>
-        </div>
-
-        <footer class="px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
-          <button
-            type="button"
-            class="h-8 px-2.5 rounded text-xs font-bold text-slate-500 hover:bg-slate-200/50 transition-colors"
-            data-testid="collections-chat-cancel"
-            @click="closeChat"
-          >
-            {{ t("common.cancel") }}
-          </button>
-          <button
-            type="button"
-            class="h-8 px-2.5 rounded bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/10"
-            :disabled="!chatMessage.trim()"
-            data-testid="collections-chat-send"
-            @click="submitChat"
-          >
-            {{ t("collectionsView.chatStart") }}
-          </button>
-        </footer>
-      </div>
-    </div>
+    <CollectionChatModal v-if="chatOpen && collection" :collection-title="collection.title" @close="closeChat" @submit="submitChat" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useCollectionI18n } from "../lang";
 import CollectionMutateParamsModal from "./CollectionMutateParamsModal.vue";
 import CollectionRecordModal from "./CollectionRecordModal.vue";
+import CollectionChatModal from "./CollectionChatModal.vue";
+import CollectionRepairBanner from "./CollectionRepairBanner.vue";
 import CollectionCalendarView from "./CollectionCalendarView.vue";
 import CollectionDayView from "./CollectionDayView.vue";
 import CollectionKanbanView from "./CollectionKanbanView.vue";
@@ -902,7 +873,6 @@ import { useCollectionRendering } from "../useCollectionRendering";
 import {
   readCollectionViewMode,
   writeCollectionViewMode,
-  readCollectionSort,
   writeCollectionSort,
   readCollectionFlagFilters,
   writeCollectionFlagFilters,
@@ -913,17 +883,18 @@ import {
   type FlagFilterState,
 } from "../collectionViewMode";
 import { collectionUi } from "../uiContext";
+import { useClickOutside } from "../composables/useClickOutside";
+import { useRelatedMenu } from "../composables/useRelatedMenu";
+import { useTableSort } from "../composables/useTableSort";
 import { activateRefLink, activatePathLink } from "../refLink";
 import {
   dateOf,
   isSortableField,
-  nextSortDirection,
-  sortItems,
-  numericSortValue,
-  stringSortValue,
-  dateSortValue,
-  enumSortValue,
-  boolSortValue,
+  itemMatchesQuery,
+  completionCoveredByFieldChip,
+  snapshotEmptyEnums,
+  cellKey,
+  generateUniqueId,
   shortHexId,
   defangForPrompt,
   actionVisible,
@@ -938,8 +909,7 @@ import {
   firstMissingRequiredField,
   rowFromItem,
   type Ymd,
-  type SortState,
-  type SortValue,
+  type SortValueDeps,
   type CollectionAction,
   type CollectionMutateAction,
   type CollectionCustomView as CustomViewSpec,
@@ -1114,8 +1084,6 @@ function applyServerRunningActions(keys: string[] | undefined, genAtFetch: numbe
   runningActions.value = new Set(keys ?? []);
 }
 const chatOpen = ref(false);
-const chatMessage = ref("");
-const chatInputEl = ref<HTMLTextAreaElement | null>(null);
 
 // Shared rendering + linked-data layer: owns the ref/embed caches and
 // every value-formatting helper, reused by the extracted record panel
@@ -1126,16 +1094,6 @@ const render = useCollectionRendering(collection, locale);
 const { refDisplay, formatMoney, resolveCurrency, derivedDisplay, evaluateDerivedAgainstItem, formatCell, isExternalUrl, artifactUrl, fileRoutePath } = render;
 
 const searchQuery = ref("");
-
-/** Case-insensitive substring match across an item's scalar fields.
- *  Object-valued fields (table rows, nested records) are skipped —
- *  they don't render as searchable text in the list table. */
-function itemMatchesQuery(item: CollectionItem, query: string): boolean {
-  return Object.values(item).some((val) => {
-    if (val === undefined || val === null || typeof val === "object") return false;
-    return String(val).toLowerCase().includes(query);
-  });
-}
 
 const filteredItems = computed<CollectionItem[]>(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -1149,7 +1107,7 @@ const filteredItems = computed<CollectionItem[]>(() => {
 // a synthesized "done" chip driven by the shared `itemIsDone`, so #2174's
 // hide-completed works without a schema edit. Calendar / kanban / custom
 // views deliberately see the UNfiltered list (plan scope —
-// plans/feat-collection-flag-fields.md). Chip state is a SHARED
+// plans/done/feat-collection-flag-fields.md). Chip state is a SHARED
 // per-collection localStorage preference, exactly like the table sort.
 
 /** Chip key (state/testid/localStorage) for the synthesized
@@ -1177,26 +1135,6 @@ interface FlagChip {
  *  `boolean` and a `toggle`'s projected on/off state. Enums stay out:
  *  they need a value picker, and kanban already slices by enum. */
 const CHIP_FIELD_TYPES = new Set(["flag", "boolean", "toggle"]);
-
-/** True when an existing FIELD chip already expresses the legacy
- *  completion predicate exactly, so a synthesized "done" chip would be a
- *  duplicate: a boolean `completionField` (done ⇔ `"true"` ⇔ the
- *  boolean's own chip), or a `toggle` projecting the `completionField`
- *  whose `onValue` is the single done value (the todos-schema shape:
- *  toggle "Done" on `status` + `completionDoneValues: ["done"]`). A
- *  superset pair (extra done values) still synthesizes — no field chip
- *  covers it. */
-function completionCoveredByFieldChip(schema: {
-  fields: Record<string, FieldSpec>;
-  completionField?: string;
-  completionDoneValues?: readonly string[];
-}): boolean {
-  const { completionField, completionDoneValues } = schema;
-  if (completionDoneValues?.length !== 1) return false;
-  const [doneValue] = completionDoneValues;
-  if (schema.fields[completionField ?? ""]?.type === "boolean") return doneValue === "true";
-  return Object.values(schema.fields).some((field) => field.type === "toggle" && field.field === completionField && field.onValue === doneValue);
-}
 
 const flagChips = computed<FlagChip[]>(() => {
   const schema = collection.value?.schema;
@@ -1298,28 +1236,7 @@ function flagChipClass(key: string): string {
 const activeFlagFilterCount = computed<number>(() => flagChips.value.filter((chip) => flagFilterMode(chip.key) !== undefined).length);
 
 // ── Filter dropdown open/close (same pattern as the "+" add-view menu) ──
-const filterMenuOpen = ref<boolean>(false);
-const filterMenuRef = ref<HTMLElement | null>(null);
-
-/** Shadow-DOM-safe "did this event land inside the element?". A document-level
- *  listener sees `event.target` retargeted to the shadow HOST when the
- *  component is mounted in a shadow root (MulmoTerminal's PluginFrame), so
- *  `element.contains()` is always false there and the menu closes on the
- *  mousedown before the inner button's click can fire. `composedPath()` still
- *  lists the element for open shadow trees — and in the light DOM too, so both
- *  hosts share this one test. */
-function eventInsideElement(event: Event, element: HTMLElement | null): boolean {
-  return element !== null && event.composedPath().includes(element);
-}
-
-function closeFilterMenuOnOutsideClick(event: MouseEvent): void {
-  if (!eventInsideElement(event, filterMenuRef.value)) filterMenuOpen.value = false;
-}
-
-watch(filterMenuOpen, (open) => {
-  if (open) document.addEventListener("mousedown", closeFilterMenuOnOutsideClick);
-  else document.removeEventListener("mousedown", closeFilterMenuOnOutsideClick);
-});
+const { open: filterMenuOpen, menuRef: filterMenuRef } = useClickOutside();
 
 function flagChipTitle(chip: FlagChip): string {
   const mode = flagFilterMode(chip.key);
@@ -1329,100 +1246,36 @@ function flagChipTitle(chip: FlagChip): string {
 }
 
 // ── List-table sort (single active column, header toggle) ─────────
-// Calendar / kanban keep their own ordering; only the table consumes
-// `sortedItems`. The active sort is a single SHARED per-collection
-// preference in localStorage — both the standalone page and embedded chat
-// cards read AND write it, so a sort set anywhere is consistent the next
-// time the collection is viewed. Resets only when a DIFFERENT collection
-// loads (the slug watch), so the sort survives a refresh / edit / remount.
-function storedSortFor(slug: string | undefined): SortState | null {
-  return (slug && readCollectionSort(slug)) || null;
-}
-const sortState = ref<SortState | null>(storedSortFor(activeSlug.value));
-// The column whose sort button is currently hovered (at most one). Hover
-// previews the NEXT click's state, so descending visibly fades back to the
-// light-grey "off" look — signalling the next click clears the sort.
-const hoveredSortKey = ref<string | null>(null);
+// Row readers the pure `sortValueOf` can't get from the raw cell: toggle /
+// flag projections, the derived-formula evaluator, the derived-record
+// enrichment, and ref display resolution — all backed by the rendering
+// composable. Stable function refs, so one object serves every row.
+const sortValueDeps: SortValueDeps = {
+  toggleChecked,
+  flagValueOf,
+  evaluateDerived: evaluateDerivedAgainstItem,
+  deriveRecord: render.deriveRecord,
+  resolveRefDisplay: refDisplay,
+};
 
-function sortDirectionFor(key: string): "asc" | "desc" | null {
-  return sortState.value?.field === key ? sortState.value.direction : null;
-}
-
-/** The direction whose visuals to render: on hover, preview the next
- *  click's state; otherwise show the column's actual state. */
-function effectiveSortDir(key: string): "asc" | "desc" | null {
-  const current = sortDirectionFor(key);
-  return hoveredSortKey.value === key ? nextSortDirection(current) : current;
-}
-
-/** Cycle a column none → asc → desc → none; activating one clears the rest. */
-function cycleSort(key: string): void {
-  const next = nextSortDirection(sortDirectionFor(key));
-  sortState.value = next ? { field: key, direction: next } : null;
-}
-
-function sortIconName(key: string): string {
-  return effectiveSortDir(key) === "desc" ? "arrow_downward" : "arrow_upward";
-}
-
-// Dark grey while a direction is active; light grey for the "off" state —
-// so hovering a descending column previews the cleared look.
-function sortButtonClass(key: string): string {
-  return effectiveSortDir(key) ? "text-slate-600" : "text-slate-300";
-}
-
-/** ARIA `aria-sort` token for a column's header cell. */
-function sortAriaValue(key: string): "ascending" | "descending" | "none" {
-  const dir = sortDirectionFor(key);
-  return dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none";
-}
-
-/** Comparable value for scalar fields that key off the raw cell value. */
-function scalarSortValue(field: FieldSpec, raw: unknown): SortValue {
-  switch (field.type) {
-    case "number":
-    case "money":
-      return numericSortValue(raw);
-    case "date":
-    case "datetime":
-      return dateSortValue(raw);
-    case "enum":
-      return enumSortValue(field.values, raw);
-    case "boolean":
-      return boolSortValue(raw === true);
-    case "ref":
-      return field.to && typeof raw === "string" && raw ? stringSortValue(refDisplay(field.to, raw)) : stringSortValue(raw);
-    default:
-      return stringSortValue(raw);
-  }
-}
-
-/** Comparable value for one row under the active field. Toggle, flag, and
- *  derived need the whole record; every other type keys off the raw cell. */
-function sortValueOf(field: FieldSpec, key: string, item: CollectionItem): SortValue {
-  if (field.type === "toggle") return boolSortValue(toggleChecked(item, field));
-  if (field.type === "flag") return boolSortValue(flagValueOf(key, item));
-  if (field.type === "derived") return derivedSortValue(field, key, item);
-  return scalarSortValue(field, item[key]);
-}
-
-/** Derived rows sort by their display type: money/number → numeric,
- *  date → epoch, anything else → the enriched value as a string. */
-function derivedSortValue(field: FieldSpec, key: string, item: CollectionItem): SortValue {
-  const display = field.type === "derived" ? field.display : undefined;
-  if (display === undefined || display === "number" || display === "money") {
-    return numericSortValue(evaluateDerivedAgainstItem(field, key, item));
-  }
-  const enriched = render.deriveRecord(item);
-  if (display === "date") return dateSortValue(enriched[key]);
-  return stringSortValue(enriched[key]);
-}
-
-const sortedItems = computed<CollectionItem[]>(() => {
-  const state = sortState.value;
-  const field = state ? collection.value?.schema.fields[state.field] : undefined;
-  if (!state || !field) return tableFilteredItems.value;
-  return sortItems(tableFilteredItems.value, state.direction, (item) => sortValueOf(field, state.field, item));
+// Sort state + header display, extracted to a composable. Calendar / kanban keep
+// their own ordering; only the table consumes `sortedItems`. The shared
+// per-collection localStorage sort is read here and reset on collection switch
+// (below); the write lives in the persist watch.
+const {
+  sortState,
+  hoveredSortKey,
+  sortedItems,
+  cycleSort,
+  sortIconName,
+  sortButtonClass,
+  sortAriaValue,
+  resetForSlug: resetSortForSlug,
+} = useTableSort({
+  collection,
+  tableFilteredItems,
+  activeSlug,
+  sortValueDeps,
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -1437,28 +1290,6 @@ const sortedItems = computed<CollectionItem[]>(() => {
 function rowId(item: CollectionItem): string {
   const primaryKey = collection.value?.schema.primaryKey;
   return primaryKey ? String(item[primaryKey] ?? "") : "";
-}
-
-/** Stable key for one cell in the `enumOriginallyEmpty` snapshot. */
-function cellKey(rowIdValue: string, fieldKey: string): string {
-  return `${rowIdValue}:${fieldKey}`;
-}
-
-/** Build the set of enum cells that were empty in the freshly-fetched
- *  records — the only cells whose inline dropdown offers an empty option. */
-function snapshotEmptyEnums(schema: CollectionDetail["schema"], records: CollectionItem[]): Set<string> {
-  const empty = new Set<string>();
-  const enumKeys = Object.entries(schema.fields)
-    .filter(([, field]) => field.type === "enum")
-    .map(([fieldKey]) => fieldKey);
-  if (enumKeys.length === 0) return empty;
-  for (const record of records) {
-    const recordId = String(record[schema.primaryKey] ?? "");
-    for (const fieldKey of enumKeys) {
-      if (record[fieldKey] == null || record[fieldKey] === "") empty.add(cellKey(recordId, fieldKey));
-    }
-  }
-  return empty;
 }
 
 /** Whether an inline enum dropdown should render its empty placeholder
@@ -1701,16 +1532,37 @@ const viewingRunningActionIds = computed<string[]>(() => {
   return (current.schema.actions ?? []).filter((action) => isActionRunning(action.id, itemId)).map((action) => action.id);
 });
 
-/** Open the chat modal, blanking any prior draft and focusing the input. */
+/** Open the chat modal. The modal owns its draft + focus: it remounts on
+ *  every open (parent `v-if`), so it starts blank and self-focuses. */
 function openChat(): void {
-  chatMessage.value = "";
   chatOpen.value = true;
-  void nextTick(() => chatInputEl.value?.focus());
 }
 
 function closeChat(): void {
   chatOpen.value = false;
 }
+
+// ── Related-collections pulldown (same menu pattern as the filter / "+"
+// menus) ─────────────────────────────────────────────────────────────
+// Offered on the standalone page when the host can fetch the workspace
+// ontology; the derived neighbor list is cached per slug for the
+// component's lifetime and (re)built lazily on the menu's first open, so a
+// view open that never touches the pulldown never pays for the ontology
+// scan.
+// Reactive shell in the composable (open state, lazy per-slug ontology fetch,
+// direction glyph/label); the reset on collection switch is wired below.
+const {
+  relatedMenuOpen,
+  relatedMenuRef,
+  relatedLoading,
+  showRelatedMenu,
+  relatedItems,
+  toggleRelatedMenu,
+  gotoRelated,
+  relatedDirectionIcon,
+  relatedDirectionLabel,
+  resetForSlugChange: resetRelatedMenu,
+} = useRelatedMenu({ collection, embedded, cui, t });
 
 /** Build the chat seed text for the current view.
  *
@@ -1737,10 +1589,11 @@ function buildChatSeed(slug: string, message: string, itemId?: string): string {
   return t("collectionsView.feedChatSeed", { slug, dataPath, message: scoped });
 }
 
-/** Start a new general-role chat seeded from the current view. */
-function submitChat(): void {
+/** Start a new general-role chat seeded from the current view. `raw` is
+ *  the modal's untrimmed textarea text. */
+function submitChat(raw: string): void {
   if (!collection.value) return;
-  const message = chatMessage.value.trim();
+  const message = raw.trim();
   if (!message) return;
   closeChat();
   const text = buildChatSeed(collection.value.slug, message);
@@ -2044,8 +1897,7 @@ function builtInViewOrTable(mode: CollectionViewMode): BuiltInViewMode {
 const canAddCustomView = computed<boolean>(() => Boolean(collection.value) && !embedded.value);
 
 // ── "+" add-view chooser (desktop vs phone target) ───────────────────
-const addMenuOpen = ref<boolean>(false);
-const addMenuRef = ref<HTMLElement | null>(null);
+const { open: addMenuOpen, menuRef: addMenuRef } = useClickOutside();
 
 /** Whether authoring a phone (remote app) view is worth offering — mirrors
  *  the selector filter above: without the host's `fetchRemoteView` binding a
@@ -2061,15 +1913,6 @@ function onAddViewClick(): void {
   }
   addMenuOpen.value = !addMenuOpen.value;
 }
-
-function closeAddMenuOnOutsideClick(event: MouseEvent): void {
-  if (!eventInsideElement(event, addMenuRef.value)) addMenuOpen.value = false;
-}
-
-watch(addMenuOpen, (open) => {
-  if (open) document.addEventListener("mousedown", closeAddMenuOnOutsideClick);
-  else document.removeEventListener("mousedown", closeAddMenuOnOutsideClick);
-});
 
 /** Seed a chat asking Claude to author a new custom view for this collection.
  *  Reuses the same chat-seed path as collection actions — the host injects a
@@ -2166,11 +2009,7 @@ function setCustomView(viewId: string): void {
  *  candidate (the server's overwrite guard is the final backstop). */
 function generateUniqueItemId(primaryKey: string): string {
   const existing = new Set(items.value.map((item) => String(item[primaryKey] ?? "")));
-  let candidate = shortHexId();
-  for (let attempt = 0; attempt < 8 && existing.has(candidate); attempt++) {
-    candidate = shortHexId();
-  }
-  return candidate;
+  return generateUniqueId(existing, shortHexId);
 }
 
 function openCreate(): void {
@@ -2672,10 +2511,13 @@ watch(
       kanbanOverride.value = null;
       addMenuOpen.value = false;
       filterMenuOpen.value = false;
+      // Drop the previous collection's cached neighbors so the next open
+      // re-derives them for the new slug (also clears any in-flight spinner).
+      resetRelatedMenu();
       // A sort belongs to a collection's own schema, so don't carry it across —
       // restore the new collection's stored (shared) sort instead. Same for
       // the flag filter chips.
-      sortState.value = storedSortFor(slug);
+      resetSortForSlug(slug);
       flagFilters.value = storedFlagFiltersFor(slug);
     }
     if (slug) {
@@ -2756,8 +2598,6 @@ onUnmounted(() => {
   changeUnsub = null;
   clearLiveRefreshTimer();
   if (refreshNoteTimer !== undefined) clearTimeout(refreshNoteTimer);
-  document.removeEventListener("mousedown", closeAddMenuOnOutsideClick);
-  document.removeEventListener("mousedown", closeFilterMenuOnOutsideClick);
 });
 
 // Embedded mode: report view/anchor changes so the chat card persists them

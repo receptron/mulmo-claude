@@ -1,22 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isObj, htmlToText, stripLeadingMentions, parseMentionStatus, parseNotificationRaw, parseFrame } from "../src/parse.js";
-
-describe("isObj", () => {
-  it("returns true for plain objects and arrays", () => {
-    assert.equal(isObj({}), true);
-    assert.equal(isObj({ a: 1 }), true);
-    assert.equal(isObj([]), true);
-  });
-
-  it("returns false for null / primitives", () => {
-    assert.equal(isObj(null), false);
-    assert.equal(isObj(undefined), false);
-    assert.equal(isObj("str"), false);
-    assert.equal(isObj(42), false);
-    assert.equal(isObj(true), false);
-  });
-});
+import { htmlToText, stripLeadingMentions, parseMentionStatus, parseNotificationRaw, parseFrame } from "../src/parse.js";
 
 describe("htmlToText", () => {
   it("strips paragraph tags and converts to plain text", () => {

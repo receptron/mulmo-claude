@@ -27,12 +27,14 @@ export {
 // subpath instead (same isolation `./remote-host/server` uses). The TYPES are
 // safe here: they erase at build time.
 export type { FirestoreDoc, FirestoreDocs } from "./firestoreDocs";
-export { firestoreItemsPath, BackendUnavailableError, isBackendUnavailable } from "./firestoreStore";
+export { firestoreItemsPath } from "./firestoreStore";
 export type { LoadedCollection } from "./discoveredCollection";
 export * from "./paths";
 export * from "./templatePath";
 export * from "./io";
+export * from "./skillAssets";
 export * from "./store";
+export { BackendUnavailableError, isBackendUnavailable } from "./backendAvailability";
 export { MAX_CSV_ROWS, encodeCsvRecordId, decodeCsvRecordId, normalizeCsvValue, csvRowToItem, dedupeByRecordId } from "./csvStore";
 export { compileCsvQuery, compileJsonlQuery } from "./csvQuery";
 export { runQueryOverRows } from "./jsonlQuery";

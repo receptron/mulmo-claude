@@ -7,7 +7,7 @@
 
 import { onMounted, watch, nextTick, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { renderMermaidNodes, type MermaidRenderLabels } from "./mermaidRender";
+import { renderMermaidNodes, type MermaidRenderLabels } from "@mulmoclaude/markdown-utils/markdown/mermaidRender";
 
 export function useMermaidRenderer(containerRef: Ref<HTMLElement | null | undefined>, sourceRef: Ref<unknown>): void {
   const { t } = useI18n();

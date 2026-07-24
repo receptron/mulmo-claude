@@ -11,10 +11,16 @@
 // new one. `version` resets to 0 whenever the path changes so callers
 // can cheaply detect "this file has been modified since I started
 // watching it" via `version.value > 0`.
+//
+// The rebind / version-bump scaffold is `useFileVersion` from core —
+// only the pubsub substrate differs (host-local `usePubSub` +
+// `fileChannel` here, the `gui-chat-protocol/vue` runtime in plugins),
+// so that seam is what this composable injects.
 
-import { ref, watch, onUnmounted, type Ref } from "vue";
+import type { Ref } from "vue";
+import { useFileVersion } from "@mulmoclaude/core/plugin-vue";
 import { usePubSub } from "./usePubSub";
-import { fileChannel, type FileChannelPayload } from "../config/pubsubChannels";
+import { fileChannel } from "../config/pubsubChannels";
 
 export interface UseFileChangeReturn {
   /** Latest known `mtimeMs` from the server, or `0` while we have not
@@ -23,31 +29,6 @@ export interface UseFileChangeReturn {
 }
 
 export function useFileChange(filePath: Ref<string | null>): UseFileChangeReturn {
-  const version = ref(0);
   const { subscribe } = usePubSub();
-  let unsubscribe: (() => void) | null = null;
-
-  function bind(nextPath: string | null): void {
-    unsubscribe?.();
-    unsubscribe = null;
-    version.value = 0;
-    if (!nextPath) return;
-    unsubscribe = subscribe(fileChannel(nextPath), (data) => {
-      const event = data as FileChannelPayload;
-      // Drop out-of-order events. Two writers landing within the same
-      // millisecond would also collapse to the later mtime, but that's
-      // fine — we'd refetch once and observe the merged state.
-      if (typeof event?.mtimeMs === "number" && event.mtimeMs > version.value) {
-        version.value = event.mtimeMs;
-      }
-    });
-  }
-
-  watch(filePath, bind, { immediate: true });
-  onUnmounted(() => {
-    unsubscribe?.();
-    unsubscribe = null;
-  });
-
-  return { version };
+  return useFileVersion(filePath, (path, onData) => subscribe(fileChannel(path), onData));
 }

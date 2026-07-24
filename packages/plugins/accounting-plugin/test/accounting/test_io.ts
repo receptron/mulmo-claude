@@ -21,7 +21,7 @@ import {
   writeConfig,
   writeSnapshot,
 } from "../../src/server/io.js";
-import type { JournalEntry } from "../../src/server/types.js";
+import type { JournalEntry } from "../../src/shared/types.js";
 
 const created: string[] = [];
 function makeTmp(): string {

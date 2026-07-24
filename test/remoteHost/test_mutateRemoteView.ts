@@ -1,6 +1,6 @@
 // Unit tests for the phase-4 writable remote-view surface: the shared
 // createMutateRemoteView builder (io stubbed) and the mutateRemoteViewItem
-// command handler over it. See plans/feat-remote-writable-view.md.
+// command handler over it. See plans/done/feat-remote-writable-view.md.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 

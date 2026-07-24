@@ -8,6 +8,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { classifyDelete, classifyWrite, groupByCalendar, toCollectionRecord } from "@mulmoclaude/core/google";
 import type { CalendarEventSummary } from "@mulmoclaude/core/google";
+import { parseIsoDateTime } from "@mulmoclaude/core/collection";
+import type { CollectionFieldSpec } from "@mulmoclaude/core/collection";
 import type { LoadedCollection } from "@mulmoclaude/core/collection/server";
 
 const event = (overrides: Partial<CalendarEventSummary> = {}): CalendarEventSummary => ({
@@ -21,38 +23,41 @@ const event = (overrides: Partial<CalendarEventSummary> = {}): CalendarEventSumm
   ...overrides,
 });
 
+// The recipe shape from `assets/helps/google-calendar-collection.md`: the
+// start/end columns are `datetime`, everything else is text.
+const recipeFields: Record<string, CollectionFieldSpec> = {
+  gid: { type: "string", label: "ID", primary: true },
+  title: { type: "string", label: "Event" },
+  on: { type: "datetime", label: "Start" },
+  until: { type: "datetime", label: "End" },
+  colour: { type: "string", label: "Colour" },
+};
+
 describe("toCollectionRecord (#2095)", () => {
   it("projects mapped event fields onto the collection's own field names", () => {
-    const record = toCollectionRecord(event(), { title: "summary", on: "start", until: "end" }, "gid");
+    const record = toCollectionRecord(event(), { title: "summary", on: "start", until: "end" }, "gid", recipeFields);
     assert.equal(record.title, "Standup");
-    assert.equal(record.on, "2026-07-19T09:00:00+09:00");
-    assert.equal(record.until, "2026-07-19T09:15:00+09:00");
+    assert.equal(record.on, "2026-07-19T09:00:00");
+    assert.equal(record.until, "2026-07-19T09:15:00");
   });
 
   it("always writes the Google event id into the primary field", () => {
-    const record = toCollectionRecord(event({ id: "abc123" }), { title: "summary" }, "gid");
+    const record = toCollectionRecord(event({ id: "abc123" }), { title: "summary" }, "gid", recipeFields);
     assert.equal(record.gid, "abc123");
   });
 
   it("writes ONLY the mapped fields plus the primary — no stray event fields leak in", () => {
-    const record = toCollectionRecord(event(), { title: "summary" }, "gid");
+    const record = toCollectionRecord(event(), { title: "summary" }, "gid", recipeFields);
     assert.deepEqual(Object.keys(record).sort(), ["gid", "title"]);
   });
 
   it("supports an empty map (records then carry just the id)", () => {
-    const record = toCollectionRecord(event(), {}, "gid");
+    const record = toCollectionRecord(event(), {}, "gid", recipeFields);
     assert.deepEqual(record, { gid: "ev-1" });
   });
 
-  it("carries an all-day event's date values through unchanged", () => {
-    const allDay = event({ start: "2026-07-19", end: "2026-07-20" });
-    const record = toCollectionRecord(allDay, { on: "start", until: "end" }, "gid");
-    assert.equal(record.on, "2026-07-19");
-    assert.equal(record.until, "2026-07-20");
-  });
-
   it("keeps an empty optional value as an empty string rather than dropping the key", () => {
-    const record = toCollectionRecord(event({ colorId: "" }), { colour: "colorId" }, "gid");
+    const record = toCollectionRecord(event({ colorId: "" }), { colour: "colorId" }, "gid", recipeFields);
     assert.equal(record.colour, "");
     assert.ok("colour" in record);
   });
@@ -60,8 +65,53 @@ describe("toCollectionRecord (#2095)", () => {
   it("lets the primary field win even if the map tries to target it", () => {
     // Schema validation rejects this, but the projection must not corrupt the
     // id if a hand-edited schema slips through.
-    const record = toCollectionRecord(event({ id: "real-id" }), { gid: "summary" }, "gid");
+    const record = toCollectionRecord(event({ id: "real-id" }), { gid: "summary" }, "gid", recipeFields);
     assert.equal(record.gid, "real-id");
+  });
+});
+
+// Google's own shapes are rejected by the `datetime` record lint, so every
+// synced record was reported as a data problem until the projection normalised
+// them (#2310). Normalisation keys off the TARGET field's declared type, never
+// the source field name.
+describe("toCollectionRecord datetime normalisation (#2310)", () => {
+  it("stores a timed event in the shape the collection parses", () => {
+    const record = toCollectionRecord(event(), { on: "start", until: "end" }, "gid", recipeFields);
+    assert.notEqual(parseIsoDateTime(record.on), null, "a synced start must satisfy the datetime lint");
+    assert.notEqual(parseIsoDateTime(record.until), null, "a synced end must satisfy the datetime lint");
+  });
+
+  it("anchors an all-day event at midnight so it parses as a datetime", () => {
+    const allDay = event({ start: "2026-07-19", end: "2026-07-20" });
+    const record = toCollectionRecord(allDay, { on: "start", until: "end" }, "gid", recipeFields);
+    assert.equal(record.on, "2026-07-19T00:00");
+    assert.equal(record.until, "2026-07-20T00:00");
+    assert.notEqual(parseIsoDateTime(record.on), null);
+  });
+
+  it("leaves a `string` target byte-for-byte alone — the user asked for Google's raw value", () => {
+    const stringFields: Record<string, CollectionFieldSpec> = { on: { type: "string", label: "Start" } };
+    const record = toCollectionRecord(event(), { on: "start" }, "gid", stringFields);
+    assert.equal(record.on, "2026-07-19T09:00:00+09:00");
+  });
+
+  it("leaves a field the schema does not declare alone", () => {
+    const record = toCollectionRecord(event(), { stray: "start" }, "gid", recipeFields);
+    assert.equal(record.stray, "2026-07-19T09:00:00+09:00");
+  });
+
+  it("ignores a spec reachable only through the prototype chain", () => {
+    // The declared shape is what the record lint reads, and it reads own
+    // properties. Typing a field off an inherited spec would normalise a value
+    // the collection never declared as a datetime.
+    const inheritedFields: Record<string, CollectionFieldSpec> = Object.create({ on: { type: "datetime", label: "Start" } });
+    const record = toCollectionRecord(event(), { on: "start" }, "gid", inheritedFields);
+    assert.equal(record.on, "2026-07-19T09:00:00+09:00");
+  });
+
+  it("keeps an empty datetime value empty instead of inventing a time", () => {
+    const record = toCollectionRecord(event({ start: "" }), { on: "start" }, "gid", recipeFields);
+    assert.equal(record.on, "");
   });
 });
 

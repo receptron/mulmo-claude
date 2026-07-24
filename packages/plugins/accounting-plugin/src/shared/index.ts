@@ -5,6 +5,7 @@
 
 export * from "./actions";
 export * from "./api";
+export * from "./types";
 export * from "./channels";
 export * from "./errors";
 export * from "./paths";

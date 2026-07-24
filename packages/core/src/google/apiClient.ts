@@ -3,7 +3,7 @@
 // endpoints don't justify the dependency (see
 // plans/done/feat-google-oauth-calendar.md).
 import { errorMessage, isRecord, ONE_SECOND_MS, truncate } from "./util.js";
-import { fetchWithTimeout } from "./fetch.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
 
 export const GOOGLE_API_TIMEOUT_MS = 30 * ONE_SECOND_MS;
 const ERROR_BODY_MAX_CHARS = 300;

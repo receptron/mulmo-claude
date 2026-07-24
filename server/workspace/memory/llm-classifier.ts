@@ -16,9 +16,11 @@
 
 import type { MemoryClassification, MemoryCandidate, MemoryClassifier } from "./migrate.js";
 import { isMemoryType, type MemoryType } from "./types.js";
+import { extractFirstObject, stripFenceAndWhitespace } from "./llm-json.js";
 
 import { ClaudeCliNotFoundError, type Summarize } from "../journal/archivist-cli.js";
 import { errorMessage } from "../../utils/errors.js";
+import { isRecord } from "../../utils/types.js";
 import { log } from "../../system/logger/index.js";
 
 const SYSTEM_PROMPT = `You are classifying a single bullet from a personal-memory file into one of four types.
@@ -88,7 +90,7 @@ export function parseClassifierVerdict(raw: string): MemoryClassification | null
   } catch {
     return null;
   }
-  if (!isPlainObject(parsed)) return null;
+  if (!isRecord(parsed)) return null;
   const { type, description } = parsed as { type?: unknown; description?: unknown };
   if (!isMemoryType(type)) return null;
   const desc = typeof description === "string" ? description.trim() : "";
@@ -99,58 +101,6 @@ export function parseClassifierVerdict(raw: string): MemoryClassification | null
   // entries never exceed the schema the classifier was told to follow
   // (#1061 review).
   return desc.length > 0 ? { type: type as MemoryType, description: oneLine(desc).slice(0, 100) } : { type: type as MemoryType };
-}
-
-function stripFenceAndWhitespace(raw: string): string {
-  let text = raw.trim();
-  if (text.startsWith("```")) {
-    const firstNl = text.indexOf("\n");
-    if (firstNl >= 0) text = text.slice(firstNl + 1);
-    if (text.endsWith("```")) text = text.slice(0, -3);
-  }
-  return text.trim();
-}
-
-function extractFirstObject(text: string): string | null {
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let index = start;
-  while (index < text.length) {
-    const char = text[index];
-    if (char === '"') {
-      index = skipStringBody(text, index + 1);
-      continue;
-    }
-    if (char === "{") depth += 1;
-    else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return text.slice(start, index + 1);
-    }
-    index += 1;
-  }
-  return null;
-}
-
-// Returns the index immediately after the closing `"`, or `text.length`
-// if the string is unterminated. Backslash escapes the next char so
-// `\"` does not close the string.
-function skipStringBody(text: string, fromIndex: number): number {
-  let index = fromIndex;
-  while (index < text.length) {
-    const char = text[index];
-    if (char === "\\") {
-      index += 2;
-      continue;
-    }
-    if (char === '"') return index + 1;
-    index += 1;
-  }
-  return text.length;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function oneLine(text: string): string {

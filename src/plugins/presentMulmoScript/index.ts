@@ -1,5 +1,5 @@
 // MulmoClaude's thin built-in adapter for the shared mulmoscript plugin
-// (plans/feat-mulmoscript-plugin.md phase 2). View / Preview /
+// (plans/done/feat-mulmoscript-plugin.md phase 2). View / Preview /
 // TOOL_DEFINITION come from @mulmoclaude/mulmoscript-plugin; the View
 // reaches host backends via useRuntime().dispatch → the built-in
 // "mulmoScript" dispatch handler (server/plugins/mulmoscript-server.ts)
@@ -10,16 +10,15 @@
 // generation indicator) and the bearer-authenticated media download.
 import { computed, defineComponent, h, markRaw, provide, type Component } from "vue";
 import type { PluginRegistration, ToolPlugin } from "../../tools/types";
-import type { ToolResult } from "gui-chat-protocol";
 import { View, Preview, MULMOSCRIPT_HOST_ADAPTER_KEY, type MulmoScriptData, type MulmoScriptHostAdapter } from "@mulmoclaude/mulmoscript-plugin/vue";
 // Lib mode doesn't auto-inject the package's compiled styles; the consumer
 // must import them — same as @mulmoclaude/{markdown,form,chart,html}-plugin.
 import "@mulmoclaude/mulmoscript-plugin/style.css";
 import toolDefinition, { TOOL_NAME, type MulmoScriptEndpoints } from "./definition";
 import { pluginEndpoints } from "../api";
+import { makeRouteExecute } from "../execute";
 import { wrapWithScope } from "../scope";
-import { apiCall, apiFetchRaw } from "../../utils/api";
-import { makeUuid } from "../../utils/id";
+import { apiFetchRaw } from "../../utils/api";
 import { useActiveSession } from "../../composables/useActiveSession";
 
 // Re-exported from the shared package so anything importing the result-data
@@ -74,23 +73,7 @@ const presentMulmoScriptPlugin: ToolPlugin<MulmoScriptData> = {
   // and reopen-existing (`filePath`) modes and handles the optional
   // `autoGenerateMovie` background trigger server-side. Keeping this
   // function trivial means the two callers can never drift apart.
-  async execute(_context, args) {
-    const endpoints = pluginEndpoints<MulmoScriptEndpoints>("mulmoScript");
-    const { method, url } = endpoints.save;
-    const result = await apiCall<ToolResult<MulmoScriptData>>(url, { method, body: args });
-    if (!result.ok) {
-      return {
-        toolName: TOOL_NAME,
-        uuid: makeUuid(),
-        message: result.error,
-      };
-    }
-    return {
-      ...result.data,
-      toolName: TOOL_NAME,
-      uuid: makeUuid(),
-    };
-  },
+  execute: makeRouteExecute<MulmoScriptEndpoints, MulmoScriptData>("mulmoScript", "save", TOOL_NAME),
 
   isEnabled: () => true,
   generatingMessage: "Generating MulmoScript storyboard…",

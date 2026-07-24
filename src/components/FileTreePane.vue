@@ -51,9 +51,11 @@
       :children-by-path="childrenByPath"
       :sort-mode="sortMode"
       :show-hidden-system="showHiddenSystem"
+      allow-upload
       @select="emit('select', $event)"
       @load-children="emit('loadChildren', $event)"
       @create-file="emit('createFile', $event)"
+      @upload-files="emit('uploadFiles', $event)"
     />
     <template v-if="refRoots.length > 0">
       <div class="mt-2 pt-2 border-t border-gray-200 px-1 mb-1 flex items-center gap-1">
@@ -69,6 +71,7 @@
         :children-by-path="childrenByPath"
         :sort-mode="sortMode"
         show-hidden-system
+        :allow-upload="false"
         @select="emit('select', $event)"
         @load-children="emit('loadChildren', $event)"
       />
@@ -79,6 +82,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import FileTree from "./FileTree.vue";
+import { installFileDropWindowGuard } from "../composables/useFileDropZone";
 import type { TreeNode } from "../types/fileTree";
 import type { FileSortMode } from "../composables/useFileSortMode";
 
@@ -101,7 +105,13 @@ const emit = defineEmits<{
   "update:sortMode": [mode: FileSortMode];
   "update:showHiddenSystem": [next: boolean];
   createFile: [args: { folder: string; filename: string; resolve: (ok: boolean, error?: string) => void }];
+  uploadFiles: [args: { folder: string; files: File[] }];
 }>();
+
+// Installed once for the whole tree: without it, a file released just
+// outside a folder row makes the browser navigate away from the app.
+// The rows themselves use hand-rolled handlers (see FileTree.vue).
+installFileDropWindowGuard();
 
 // Shared empty set for reference roots (they don't highlight recents).
 const emptySet = new Set<string>();

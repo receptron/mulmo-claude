@@ -3,7 +3,7 @@ import path from "path";
 import { WORKSPACE_DIRS, WORKSPACE_PATHS } from "../../workspace/paths.js";
 import { shortId } from "../id.js";
 import { writeFileAtomic } from "./atomic.js";
-import { yearMonthUtc } from "./naming.js";
+import { yearMonthUtc } from "@mulmoclaude/core/artifacts";
 import { makePathValidator } from "./path-validator.js";
 import { makeStoreResolvers } from "./store-resolvers.js";
 

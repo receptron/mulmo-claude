@@ -1,5 +1,4 @@
-import { computed, inject, ref, type ComputedRef, type Ref } from "vue";
-import { PLUGIN_RUNTIME_KEY } from "gui-chat-protocol/vue";
+import { createUseT } from "gui-chat-protocol/vue";
 import type { Messages } from "./messages";
 import de from "./de";
 import en from "./en";
@@ -12,22 +11,10 @@ import zh from "./zh";
 
 const MESSAGES = { de, en, es, fr, ja, ko, "pt-BR": ptBR, zh } as const;
 
-type SupportedLocale = keyof typeof MESSAGES;
-
-function isSupportedLocale(value: string): value is SupportedLocale {
-  // Object.hasOwn (not `in`) so inherited names like "toString" can never
-  // masquerade as a locale.
-  return Object.hasOwn(MESSAGES, value);
-}
-
 /** Reactive message bundle for the active host locale. The plugin carries its
  *  own translations (no host i18n dependency); it reads the locale off the
  *  injected `BrowserPluginRuntime.locale` ref and falls back to English.
  *  Same pattern as @mulmoclaude/html-plugin. */
-export function useT(): ComputedRef<Messages> {
-  const runtime = inject(PLUGIN_RUNTIME_KEY, undefined);
-  const locale: Ref<string> = runtime?.locale ?? ref("en");
-  return computed(() => (isSupportedLocale(locale.value) ? MESSAGES[locale.value] : MESSAGES.en));
-}
+export const useT = createUseT(MESSAGES);
 
 export type { Messages };

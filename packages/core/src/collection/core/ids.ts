@@ -39,3 +39,17 @@ export function isSafeRecordId(value: string): boolean {
   if (typeof value !== "string" || !SAFE_RECORD_ID_PATTERN.test(value)) return false;
   return !value.includes("..");
 }
+
+const DEFAULT_UNIQUE_ID_ATTEMPTS = 8;
+
+/** Pick an id not already in `existing`, re-rolling `generate()` up to
+ *  `maxAttempts` times before giving up and returning the last candidate.
+ *  Collisions on a wide id space are astronomically unlikely, so a caller's
+ *  own overwrite guard is the final backstop rather than an unbounded loop. */
+export function generateUniqueId(existing: ReadonlySet<string>, generate: () => string, maxAttempts: number = DEFAULT_UNIQUE_ID_ATTEMPTS): string {
+  let candidate = generate();
+  for (let attempt = 0; attempt < maxAttempts && existing.has(candidate); attempt++) {
+    candidate = generate();
+  }
+  return candidate;
+}

@@ -1,5 +1,5 @@
 // E2E: the standalone /collections/:slug table's filter menu
-// (plans/feat-collection-flag-fields.md, reframing #2174). Predicate-shaped
+// (plans/done/feat-collection-flag-fields.md, reframing #2174). Predicate-shaped
 // fields — `flag`, `boolean`, `toggle` — each get a tri-state entry
 // (all → hide → only) in a dropdown behind a single "Filters" trigger; the
 // entries narrow the table rows and persist per-collection in localStorage.

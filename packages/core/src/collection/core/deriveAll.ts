@@ -12,6 +12,7 @@
 // (server/workspace/collections/types.ts) satisfy them as-is.
 
 import { evaluateDerived, type FormulaContext } from "./derivedFormula";
+import { ownProp } from "./ownProp";
 import { matchesWhere, type Where } from "./where";
 
 /** Minimal field shape the derive loop needs — accepts both the client
@@ -46,7 +47,8 @@ export function resolveRowRefs(schema: DerivableSchema, record: DerivableRecord,
   for (const [key, field] of Object.entries(schema.fields)) {
     if (field.type !== "ref" || !field.to) continue;
     const slug = record[key];
-    refs[key] = typeof slug === "string" ? (refRecords[field.to]?.[slug] ?? null) : null;
+    const targets = ownProp(refRecords, field.to);
+    refs[key] = typeof slug === "string" && targets ? (ownProp(targets, slug) ?? null) : null;
   }
   return refs;
 }

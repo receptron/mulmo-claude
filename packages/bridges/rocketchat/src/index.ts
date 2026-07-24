@@ -17,7 +17,8 @@
 //   ROCKETCHAT_POLL_INTERVAL_SEC  — poll interval seconds (default 5)
 
 import "dotenv/config";
-import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { createBridgeClient, chunkText, fetchJsonRecord, type JsonRecord } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "rocketchat";
 const MAX_MSG_LEN = 4_000;
@@ -35,12 +36,7 @@ function readRequiredEnv(): { baseUrl: string; userId: string; authToken: string
 }
 const { baseUrl, userId, authToken } = readRequiredEnv();
 
-const allowedUsers = new Set(
-  (process.env.ROCKETCHAT_ALLOWED_USERS ?? "")
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean),
-);
+const allowedUsers = parseCsvSet(process.env.ROCKETCHAT_ALLOWED_USERS);
 const allowAll = allowedUsers.size === 0;
 const pollIntervalSec = Math.max(2, Number(process.env.ROCKETCHAT_POLL_INTERVAL_SEC) || 5);
 
@@ -53,10 +49,10 @@ mulmo.onPush((pushEvent) => {
 
 // ── REST helpers ────────────────────────────────────────────────
 
-type JsonRecord = Record<string, unknown>;
-
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
+// `Array.isArray(x: unknown)` narrows to `any[]`, which reintroduces `any`;
+// this preserves the element type as `unknown` so downstream stays checked.
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
 }
 
 function authHeaders(): Record<string, string> {
@@ -68,31 +64,20 @@ function authHeaders(): Record<string, string> {
 
 async function rcGet(path: string, query?: Record<string, string>): Promise<JsonRecord> {
   const queryString = query && Object.keys(query).length > 0 ? `?${new URLSearchParams(query).toString()}` : "";
-  const res = await fetch(`${apiBase}${path}${queryString}`, {
-    headers: authHeaders(),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`GET ${path}: ${res.status} ${text.slice(0, 200)}`);
-  }
-  const json: unknown = await res.json();
-  return isObj(json) ? json : {};
+  return fetchJsonRecord(`${apiBase}${path}${queryString}`, { headers: authHeaders(), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }, `GET ${path}`);
 }
 
 async function rcPost(path: string, body: JsonRecord): Promise<JsonRecord> {
-  const res = await fetch(`${apiBase}${path}`, {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`POST ${path}: ${res.status} ${text.slice(0, 200)}`);
-  }
-  const json: unknown = await res.json();
-  return isObj(json) ? json : {};
+  return fetchJsonRecord(
+    `${apiBase}${path}`,
+    {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    },
+    `POST ${path}`,
+  );
 }
 
 // ── Send / receive ──────────────────────────────────────────────
@@ -118,10 +103,10 @@ interface IncomingMessage {
 }
 
 function parseMessage(raw: unknown, roomId: string): IncomingMessage | null {
-  if (!isObj(raw)) return null;
+  if (!isRecord(raw)) return null;
   const msgId = typeof raw._id === "string" ? raw._id : "";
   const text = typeof raw.msg === "string" ? raw.msg : "";
-  const user = isObj(raw.u) ? raw.u : null;
+  const user = isRecord(raw.u) ? raw.u : null;
   const senderUsername = user && typeof user.username === "string" ? user.username : "";
   const senderId = user && typeof user._id === "string" ? user._id : "";
   const tsIso = typeof raw.ts === "string" ? raw.ts : new Date().toISOString();
@@ -181,7 +166,7 @@ async function listDmRoomIds(): Promise<string[]> {
     });
     const rooms = Array.isArray(result.ims) ? result.ims : [];
     for (const room of rooms) {
-      if (isObj(room) && typeof room._id === "string") ids.push(room._id);
+      if (isRecord(room) && typeof room._id === "string") ids.push(room._id);
     }
     offset += rooms.length;
     const total = typeof result.total === "number" ? result.total : null;
@@ -207,7 +192,7 @@ async function pollRoom(roomId: string, oldestIso: string): Promise<string> {
       inclusive: "false",
       count: String(HISTORY_PAGE_SIZE),
     });
-    const messages = Array.isArray(result.messages) ? result.messages : [];
+    const messages: unknown[] = isUnknownArray(result.messages) ? result.messages : [];
     if (messages.length === 0) break;
 
     const sorted = [...messages].reverse(); // API returns newest-first

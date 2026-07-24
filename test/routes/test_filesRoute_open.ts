@@ -7,8 +7,10 @@
 // `process.platform` and `process.env.PATH` — Codex correctly
 // flagged that as unreliable under `tsx --test` parallelism, since
 // a concurrent test file could observe the mutated globals mid-run.
-// This version routes entirely through HTTP; the platform branch
-// is exercised implicitly by whichever host CI runs on.
+// This file covers only the path-validation contract over real HTTP.
+// The platform branch is NOT exercised here — running the real command
+// opens Finder on the macOS CI runner. The argv per platform and the
+// spawn handling are tested directly in test/routes/test_osOpen.ts.
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -27,7 +29,6 @@ const REL_TEST_DIR = "mc-test-open-in-os";
 
 describe("POST /api/files/open (#1985)", () => {
   let fixture: AppFixture;
-  let relPath: string;
   let apiOpenRoute: string;
 
   before(async () => {
@@ -41,7 +42,6 @@ describe("POST /api/files/open (#1985)", () => {
     mkdirSync(absDir, { recursive: true });
     const absFile = join(absDir, "sample.bin");
     writeFileSync(absFile, "not a real binary but has a body");
-    relPath = `${REL_TEST_DIR}/sample.bin`;
 
     const filesRoutesModule = await import("../../server/api/routes/files.js");
     const apiRoutesModule = await import("../../src/config/apiRoutes.js");
@@ -83,35 +83,5 @@ describe("POST /api/files/open (#1985)", () => {
       body: JSON.stringify({ path: "../../../etc/passwd" }),
     });
     assert.equal(res.status, 400);
-  });
-
-  it(
-    "accepts a valid workspace path (200 on darwin, 200/500 on linux depending on xdg-open)",
-    { skip: process.platform !== "darwin" && process.platform !== "linux" },
-    async () => {
-      // macOS `open <existing-file>` succeeds even for a binary payload.
-      // Linux `xdg-open` may or may not be installed on the runner —
-      // if missing, spawn fires an `error` event → route returns 500,
-      // which is a legitimate outcome for that env.
-      const res = await fetch(`${fixture.baseUrl}${apiOpenRoute}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ path: relPath }),
-      });
-      const body = (await res.json()) as { ok?: boolean; error?: string };
-      assert.ok(res.status === 200 || res.status === 500, `expected 200 or 500, got ${res.status}: ${JSON.stringify(body)}`);
-      if (res.status === 200) assert.equal(body.ok, true);
-      else assert.ok(typeof body.error === "string");
-    },
-  );
-
-  it("accepts a valid path via the query string as well as the body (belt+suspenders)", { skip: process.platform !== "darwin" }, async () => {
-    const url = `${fixture.baseUrl}${apiOpenRoute}?path=${encodeURIComponent(relPath)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}), // deliberately empty; server should use the query
-    });
-    assert.equal(res.status, 200);
   });
 });

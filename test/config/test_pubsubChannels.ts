@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { PUBSUB_CHANNELS, fileChannel, sessionChannel } from "../../src/config/pubsubChannels.js";
+import { PUBSUB_CHANNELS, fileChannel, readSessionDeletedIds, sessionChannel } from "../../src/config/pubsubChannels.js";
 
 describe("sessionChannel", () => {
   it("prefixes the session id with `session.`", () => {
@@ -35,6 +35,63 @@ describe("fileChannel", () => {
     // factory, so a literal "//" in either side would still match —
     // but the audit trail in logs is cleaner without doubles.
     assert.equal(fileChannel("artifacts//html///foo.html"), "file:artifacts/html/foo.html");
+  });
+});
+
+describe("readSessionDeletedIds", () => {
+  it("returns the ids a well-formed payload carries", () => {
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: ["a", "b"] }), ["a", "b"]);
+  });
+
+  it("returns an empty list for an empty deletedIds array", () => {
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: [] }), []);
+  });
+
+  it("returns an empty list for the ordinary `{}` refetch hint", () => {
+    // Run/finish, mark-read and bookmark toggles all publish `{}` —
+    // by far the most common payload on this channel.
+    assert.deepEqual(readSessionDeletedIds({}), []);
+  });
+
+  it("returns an empty list for null and undefined", () => {
+    assert.deepEqual(readSessionDeletedIds(null), []);
+    assert.deepEqual(readSessionDeletedIds(undefined), []);
+  });
+
+  it("returns an empty list for a primitive payload", () => {
+    assert.deepEqual(readSessionDeletedIds("sessions"), []);
+    assert.deepEqual(readSessionDeletedIds(0), []);
+    assert.deepEqual(readSessionDeletedIds(42), []);
+    assert.deepEqual(readSessionDeletedIds(true), []);
+  });
+
+  it("returns an empty list for an array payload", () => {
+    // typeof [] === "object", so the guard has to reject arrays
+    // explicitly rather than lean on the typeof check alone.
+    assert.deepEqual(readSessionDeletedIds([]), []);
+    assert.deepEqual(readSessionDeletedIds(["a", "b"]), []);
+  });
+
+  it("returns an empty list when deletedIds is present but not an array", () => {
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: "a" }), []);
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: 1 }), []);
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: null }), []);
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: { 0: "a" } }), []);
+  });
+
+  it("keeps the string ids and drops the rest from a mixed array", () => {
+    // Deliberately lenient: dropping the whole batch on one bad entry
+    // would leave the other deleted sessions on screen in every tab,
+    // and this payload is the only signal that they are gone.
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: ["a", 1, "b", null, undefined, {}, ["c"], "d"] }), ["a", "b", "d"]);
+  });
+
+  it("drops every entry when none of them are strings", () => {
+    assert.deepEqual(readSessionDeletedIds({ deletedIds: [1, null, {}] }), []);
+  });
+
+  it("ignores unrelated keys", () => {
+    assert.deepEqual(readSessionDeletedIds({ foo: "bar", sessions: ["a"] }), []);
   });
 });
 

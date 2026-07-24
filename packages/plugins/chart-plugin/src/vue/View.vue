@@ -54,7 +54,10 @@ const title = computed(() => data.value?.title ?? data.value?.document?.title);
 const containers = ref<(HTMLDivElement | null)[]>([]);
 // Kept as a plain array (not `ref`): ECharts instances are managed
 // imperatively and should not trigger Vue re-renders on mutation.
-const instances: echarts.ECharts[] = [];
+// Index-aligned with `charts`; a skipped chart (missing container /
+// malformed option) holds `undefined` so the array stays DENSE — a sparse
+// array would make `for...of` yield `undefined` and crash resize/dispose.
+const instances: (echarts.ECharts | undefined)[] = [];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -66,7 +69,7 @@ function setChartRef(idx: number, element: HTMLDivElement | null): void {
 
 function disposeAll(): void {
   for (const instance of instances) {
-    instance.dispose();
+    instance?.dispose();
   }
   instances.length = 0;
 }
@@ -96,7 +99,12 @@ function renderAll(): void {
   for (let i = 0; i < charts.value.length; i += 1) {
     const element = containers.value[i];
     const chart = charts.value[i];
-    if (!element || !chart) continue;
+    if (!element || !chart) {
+      // Keep the array dense: record the skipped slot so a later
+      // container ref resolving doesn't leave a hole behind it.
+      instances[i] = undefined;
+      continue;
+    }
     const instance = echarts.init(element);
     try {
       instance.setOption(disableWheelZoom(chart.option));
@@ -109,7 +117,7 @@ function renderAll(): void {
 }
 
 function handleResize(): void {
-  for (const instance of instances) instance.resize();
+  for (const instance of instances) instance?.resize();
 }
 
 onMounted(() => {

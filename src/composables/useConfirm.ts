@@ -1,10 +1,9 @@
 // Promise-based confirm dialog state, host-side mirror of
-// `packages/plugins/shared/components/confirm.ts`. The two have
-// identical interfaces but separate module-scoped state — they
-// can't be merged into one file today because the plugin-side
-// ConfirmModal pulls locale from `useRuntime` (only valid inside
-// PluginScopedRoot) while the host-side one uses vue-i18n. Unify
-// when the host/plugin runtime split is reconciled.
+// `packages/plugins/shared/components/confirm.ts`. Mirrored on purpose: recipe-book (that
+// copy's consumer) is a deliberately gui-chat-protocol-only sample, so sharing via
+// @mulmoclaude/core would force a core dep onto the sample + scaffold — unify only if that
+// dependency-minimalism policy changes. (The ConfirmModal.vue components' vue-i18n-vs-useRuntime
+// locale split is a separate constraint on the components, not on this file.)
 
 import { ref } from "vue";
 

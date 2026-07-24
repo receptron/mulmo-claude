@@ -6,35 +6,24 @@
 
 import { ref, type Ref } from "vue";
 import { API_ROUTES } from "../config/apiRoutes";
-import { apiFetchRaw } from "../utils/api";
+import { postMarkdownForBlob, type MarkdownRenderOptions } from "../utils/markdownBlobRequest";
 import { saveBlob, filenameFromDisposition } from "../utils/blobDownload";
-
-export interface DownloadMarkdownZipOptions {
-  /** Workspace-relative source dir for resolving relative `<img>` refs. */
-  baseDir?: string;
-  stripFrontmatter?: boolean;
-  marp?: boolean;
-}
 
 export interface UseMarkdownZipHandle {
   zipDownloading: Ref<boolean>;
   zipFailed: Ref<boolean>;
-  downloadZip: (markdown: string, filename: string, options?: DownloadMarkdownZipOptions) => Promise<void>;
+  downloadZip: (markdown: string, filename: string, options?: MarkdownRenderOptions) => Promise<void>;
 }
 
 export function useMarkdownZip(): UseMarkdownZipHandle {
   const zipDownloading = ref(false);
   const zipFailed = ref(false);
 
-  async function downloadZip(markdown: string, filename: string, options: DownloadMarkdownZipOptions = {}): Promise<void> {
+  async function downloadZip(markdown: string, filename: string, options: MarkdownRenderOptions = {}): Promise<void> {
     zipFailed.value = false;
     zipDownloading.value = true;
     try {
-      const response = await apiFetchRaw(API_ROUTES.share.packMarkdown, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown, filename, baseDir: options.baseDir, stripFrontmatter: options.stripFrontmatter, marp: options.marp }),
-      });
+      const response = await postMarkdownForBlob(API_ROUTES.share.packMarkdown, markdown, filename, options);
       if (!response.ok) {
         zipFailed.value = true;
         return;

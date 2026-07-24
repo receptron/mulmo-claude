@@ -18,7 +18,7 @@ export { initAccountingEventPublisher } from "./eventPublisher.js";
 // that need to enumerate books outside the HTTP dispatch route — e.g. the
 // remote-host command channel surfacing a book picker to the mobile client.
 export { listBooks } from "./service.js";
-export type { BookSummary } from "./types.js";
+export type { BookSummary } from "../shared/types.js";
 
 // Pure date-validation helper reused by host e2e mock fixtures so the
 // mock dispatcher rejects the same malformed dates the real service does.

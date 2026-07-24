@@ -99,4 +99,14 @@ describe("template — server / browser entry shape", () => {
     assert.match(view.content, /useRuntime/);
     assert.match(view.content, /pubsub\.subscribe/);
   });
+
+  it("i18n locale guard is own-property, not a prototype-chain `in` lookup", () => {
+    // The seed is copied into every scaffolded plugin. A `value in MESSAGES`
+    // check treats a host locale of `constructor` / `toString` as supported,
+    // then indexes MESSAGES to an inherited function and blanks every label.
+    const lang = TEMPLATE_FILES.find((entry) => entry.path === "src/lang/index.ts");
+    assert.ok(lang);
+    assert.match(lang.content, /Object\.hasOwn\(MESSAGES, value\)/);
+    assert.doesNotMatch(lang.content, /return value in MESSAGES/);
+  });
 });

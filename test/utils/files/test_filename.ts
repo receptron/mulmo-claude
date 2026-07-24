@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { toSafeFilename, formatLocalDate, buildPdfFilename } from "../../../src/utils/files/filename.js";
+import { toSafeFilename, formatLocalDate, buildPdfFilename } from "@mulmoclaude/markdown-utils/files/filename";
 
 describe("toSafeFilename", () => {
   it("leaves a clean filename untouched", () => {

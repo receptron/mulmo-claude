@@ -21,7 +21,7 @@
 
 import { readFile, stat, unlink } from "node:fs/promises";
 import path from "node:path";
-import { writeFileAtomic } from "./atomic";
+import { writeFileAtomic } from "../../files/atomic.js";
 import { getWorkspaceRoot, isPresetSlug, skillsStagingDir } from "./host";
 import { resolveTemplatePath, safeSlugName, SCHEMA_FILE } from "./paths";
 import type { IoOptions } from "./io";

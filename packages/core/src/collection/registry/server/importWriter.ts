@@ -29,7 +29,7 @@ import { claudeSkillDir, dataSkillDir, mirrorSkillWrite } from "../../../skill-b
 
 import { log } from "../../server/host.js";
 import { errorMessage } from "../../server/util.js";
-import { writeFileAtomic } from "../../server/atomic.js";
+import { writeFileAtomic } from "../../../files/atomic.js";
 import { isRecord } from "../guards.js";
 import { fetchAllRegistries } from "./client.js";
 import { fetchBundle, fetchManifest, normalizedDataPath } from "./importCollection.js";

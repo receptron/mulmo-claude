@@ -12,8 +12,8 @@
 // route handler is responsible for ordering this with snapshot
 // invalidation so the "before" snapshots get dropped.
 
-import type { Account, JournalEntry, JournalLine } from "./types.js";
-import { BALANCE_SHEET_ACCOUNT_TYPES } from "./types.js";
+import type { Account, JournalEntry, JournalLine } from "../shared/types.js";
+import { BALANCE_SHEET_ACCOUNT_TYPES } from "../shared/types.js";
 import { isValidCalendarDate, netBalance, voidedIdSet } from "./journal.js";
 
 const EQUALITY_TOLERANCE = 0.005;

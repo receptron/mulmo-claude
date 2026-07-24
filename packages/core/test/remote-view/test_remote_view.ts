@@ -13,6 +13,7 @@ import {
   clampImageMaxEdge,
   clampLimit,
   clampOffset,
+  readIdParam,
   handleRemoteViewMessage,
   normalizeFields,
   normalizeMutate,
@@ -87,6 +88,23 @@ describe("clamps + projection", () => {
     assert.equal(clampLimit(100000), 200);
     assert.equal(clampLimit(0), 50);
     assert.equal(clampLimit("7"), 7);
+  });
+
+  // Params arrive as untyped JSON over the command channel, so a caller can send
+  // anything. `String(...)` turned an object into "[object Object]", which then
+  // travelled on as if it were the requested slug — surfacing as
+  // `collection '[object Object]' not found` instead of a bad request.
+  it("readIdParam takes only real strings", () => {
+    assert.equal(readIdParam("notes"), "notes");
+    assert.equal(readIdParam(""), "");
+    assert.equal(readIdParam(undefined), "");
+    assert.equal(readIdParam(null), "");
+    assert.equal(readIdParam({ slug: "notes" }), "");
+    assert.equal(readIdParam(["notes"]), "");
+    // Unlike clampOffset("3") === 3, an id is NOT coerced from a number — a
+    // numeric slug would address a different collection than the caller meant.
+    assert.equal(readIdParam(42), "");
+    assert.equal(String({ slug: "notes" }), "[object Object]"); // what it replaced
   });
 
   it("normalizeFields keeps only non-empty strings", () => {

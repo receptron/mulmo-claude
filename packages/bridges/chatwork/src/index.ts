@@ -25,6 +25,7 @@
 
 import "dotenv/config";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "chatwork";
 const API_BASE = "https://api.chatwork.com/v2";
@@ -41,12 +42,7 @@ function readRequiredEnv(): { apiToken: string } {
 }
 const { apiToken } = readRequiredEnv();
 
-const allowedRooms = new Set(
-  (process.env.CHATWORK_ALLOWED_ROOMS ?? "")
-    .split(",")
-    .map((roomId) => roomId.trim())
-    .filter(Boolean),
-);
+const allowedRooms = parseCsvSet(process.env.CHATWORK_ALLOWED_ROOMS);
 const allowAll = allowedRooms.size === 0;
 const pollIntervalSec = Math.max(2, Number(process.env.CHATWORK_POLL_INTERVAL_SEC) || 5);
 const roomsTtlMs = Math.max(30, Number(process.env.CHATWORK_ROOMS_TTL_SEC) || 180) * 1000;
@@ -60,10 +56,6 @@ mulmo.onPush((pushEvent) => {
 // ── Chatwork REST helpers ───────────────────────────────────────
 
 type JsonRecord = Record<string, unknown>;
-
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
 
 // Shared 429 backoff — any 429 response pauses all subsequent
 // requests until `retryAfter`. Keeps multiple concurrent callers
@@ -129,7 +121,7 @@ async function cwFetch(method: "GET" | "POST" | "PUT", path: string, form?: Reco
 
 async function getBotAccountId(): Promise<number> {
   const profile = await cwFetch("GET", "/me");
-  if (!isObj(profile) || typeof profile.account_id !== "number") {
+  if (!isRecord(profile) || typeof profile.account_id !== "number") {
     throw new Error("/me returned unexpected shape");
   }
   return profile.account_id;
@@ -155,7 +147,7 @@ async function getRoomIds(): Promise<string[]> {
   if (!Array.isArray(rooms)) {
     return roomsCache?.ids ?? [];
   }
-  const ids = rooms.filter((room): room is JsonRecord => isObj(room) && typeof room.room_id === "number").map((room) => String(room.room_id));
+  const ids = rooms.filter((room): room is JsonRecord => isRecord(room) && typeof room.room_id === "number").map((room) => String(room.room_id));
   roomsCache = { ids, fetchedAt: now };
   return ids;
 }
@@ -181,10 +173,10 @@ interface ParsedMessage {
 }
 
 function parseMessage(raw: unknown): ParsedMessage | null {
-  if (!isObj(raw)) return null;
+  if (!isRecord(raw)) return null;
   const messageId = typeof raw.message_id === "string" ? raw.message_id : "";
   const body = typeof raw.body === "string" ? raw.body : "";
-  const account = isObj(raw.account) ? raw.account : null;
+  const account = isRecord(raw.account) ? raw.account : null;
   if (!messageId || !body || !account) return null;
   const accountId = typeof account.account_id === "number" ? account.account_id : -1;
   const accountName = typeof account.name === "string" ? account.name : "unknown";

@@ -7,14 +7,15 @@ import {
   type SaveMulmoScriptArgs,
 } from "@mulmoclaude/mulmoscript-plugin";
 import { makeArtifactsFileOps } from "../../plugins/runtime.js";
-import { buildContext, type OpFailure } from "@mulmoclaude/mulmoscript-plugin/server";
+import { buildContext } from "@mulmoclaude/mulmoscript-plugin/server";
 import { mulmoScriptOps } from "../../plugins/mulmoscript-server.js";
 import { errorMessage } from "../../utils/errors.js";
-import { badRequest, notFound, sendError } from "../../utils/httpError.js";
+import { badRequest, notFound } from "../../utils/httpError.js";
 import { getOptionalStringQuery, getSessionQuery } from "../../utils/request.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { bindRoute } from "../../utils/router.js";
 import { GENERATION_KINDS } from "../../../src/types/events.js";
+import { makeBeatOpHandler, sendOpFailure, validBeatIndex, type ErrorResponse } from "./mulmoScriptBeatOp.js";
 
 // Express adapters over the shared ops instance from
 // `server/plugins/mulmoscript-server.ts`. Every op body lives in
@@ -27,17 +28,6 @@ import { GENERATION_KINDS } from "../../../src/types/events.js";
 
 const router = Router();
 
-const OP_FAILURE_STATUS: Record<OpFailure["code"], number> = {
-  bad_request: 400,
-  not_found: 404,
-  unavailable: 503,
-  server_error: 500,
-};
-
-function sendOpFailure(res: Response, failure: OpFailure): void {
-  sendError(res, OP_FAILURE_STATUS[failure.code], failure.error);
-}
-
 // Shared SSE preamble for the two streaming routes; returns the
 // line-writer bound to this response.
 function beginSse(res: Response): (data: unknown) => void {
@@ -47,21 +37,10 @@ function beginSse(res: Response): (data: unknown) => void {
   return (data: unknown) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-interface RenderBeatBody {
-  filePath: string;
-  beatIndex: number;
-  force?: boolean;
-  chatSessionId?: string;
-}
-
 interface UploadBeatImageBody {
   filePath: string;
   beatIndex: number;
   imageData: string; // base64 data URI
-}
-
-interface ErrorResponse {
-  error: string;
 }
 
 type BeatImageResponse = { image: string | null } | ErrorResponse;
@@ -69,7 +48,6 @@ type BeatAudioResponse = { audio: string | null } | ErrorResponse;
 type BeatMovieResponse = { moviePath: string | null } | ErrorResponse;
 type MovieStatusResponse = { moviePath: string | null } | ErrorResponse;
 type PdfStatusResponse = { pdfPath: string | null } | ErrorResponse;
-type GenerateBeatAudioResponse = { audio: string } | ErrorResponse;
 
 interface BeatQuery {
   filePath?: string;
@@ -85,14 +63,10 @@ interface FilePathQuery {
 // guards below reject non-string / non-index values before they can reach
 // any path or beat-indexed logic (CodeQL
 // js/type-confusion-through-parameter-tampering + Codex review on #2133).
+// `validBeatIndex` is shared with the beat POST handlers — see
+// `./mulmoScriptBeatOp.ts`.
 function stringQuery(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
-}
-
-// Beat indexes must be non-negative integers — `-1` / `1.5` must fail as a
-// deterministic 400 instead of indexing undefined beats downstream.
-function validBeatIndex(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function parseBeatQuery<TRes>(req: Request<object, TRes, object, BeatQuery>, res: Response): { filePath: string; beatIndex: number } | null {
@@ -110,7 +84,7 @@ function parseBeatQuery<TRes>(req: Request<object, TRes, object, BeatQuery>, res
 
 // The save / reopen / update slice lives in the shared
 // @mulmoclaude/mulmoscript-plugin package (single source of truth, also
-// consumable by MulmoTerminal — plans/feat-mulmoscript-plugin.md). These
+// consumable by MulmoTerminal — plans/done/feat-mulmoscript-plugin.md). These
 // routes are THIN host adapters: they inject the GENERIC `files.artifacts`
 // runtime capability, map the package's discriminated failures back onto
 // the pre-extraction 400/404 wire contract, and keep the host-only
@@ -238,44 +212,19 @@ bindRoute(router, API_ROUTES.mulmoScript.beatMovie, async (req: Request<object, 
   res.json({ moviePath: result.moviePath });
 });
 
-interface GenerateBeatAudioBody {
-  filePath: string;
-  beatIndex: number;
-  force?: boolean;
-  chatSessionId?: string;
-}
-
+// Beat generation endpoints: same validation, same failure mapping — only
+// the op and the success key differ, so they declare just those two.
 bindRoute(
   router,
   API_ROUTES.mulmoScript.generateBeatAudio,
-  async (req: Request<object, object, GenerateBeatAudioBody>, res: Response<GenerateBeatAudioResponse>) => {
-    const { filePath, beatIndex, force, chatSessionId } = req.body;
-    if (typeof filePath !== "string" || !filePath || !validBeatIndex(beatIndex)) {
-      badRequest(res, "filePath and beatIndex are required");
-      return;
-    }
-    const result = await mulmoScriptOps.generateBeatAudioOp({ filePath, beatIndex, force, chatSessionId });
-    if (!result.ok) {
-      sendOpFailure(res, result);
-      return;
-    }
-    res.json({ audio: result.audio });
-  },
+  makeBeatOpHandler(mulmoScriptOps.generateBeatAudioOp, (result) => ({ audio: result.audio })),
 );
 
-bindRoute(router, API_ROUTES.mulmoScript.renderBeat, async (req: Request<object, object, RenderBeatBody>, res: Response) => {
-  const { filePath, beatIndex, force, chatSessionId } = req.body;
-  if (typeof filePath !== "string" || !filePath || !validBeatIndex(beatIndex)) {
-    badRequest(res, "filePath and beatIndex are required");
-    return;
-  }
-  const result = await mulmoScriptOps.renderBeatOp({ filePath, beatIndex, force, chatSessionId });
-  if (!result.ok) {
-    sendOpFailure(res, result);
-    return;
-  }
-  res.json({ image: result.image });
-});
+bindRoute(
+  router,
+  API_ROUTES.mulmoScript.renderBeat,
+  makeBeatOpHandler(mulmoScriptOps.renderBeatOp, (result) => ({ image: result.image })),
+);
 
 interface GenerationRequestBody {
   filePath: string;

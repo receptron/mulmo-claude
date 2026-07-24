@@ -91,7 +91,10 @@ function requireContext(): HostContext {
  *  satisfy it — `pluginEndpoints` is the indirection that lets a
  *  caller assert the contract it expects. */
 export function pluginEndpoints<E extends object = EndpointGroup>(scope: string): E {
-  const group = requireContext().endpoints[scope];
+  const { endpoints } = requireContext();
+  // Own-property check: a scope like "constructor" would otherwise return
+  // an inherited `Object.prototype` member instead of throwing.
+  const group = Object.prototype.hasOwnProperty.call(endpoints, scope) ? endpoints[scope] : undefined;
   if (!group) {
     throw new Error(`Unknown plugin endpoint scope: "${scope}"`);
   }
@@ -106,7 +109,8 @@ export function pluginBuiltinRoleIds(): Readonly<Record<string, string>> {
 /** A specific Vue-router page-name constant
  *  (`pluginPageRoute("wiki")`). Throws on unknown name. */
 export function pluginPageRoute(name: string): string {
-  const route = requireContext().pageRoutes[name];
+  const { pageRoutes } = requireContext();
+  const route = Object.prototype.hasOwnProperty.call(pageRoutes, name) ? pageRoutes[name] : undefined;
   if (!route) {
     throw new Error(`Unknown page route: "${name}"`);
   }

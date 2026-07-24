@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { findActiveOpening, validateOpening } from "../../src/server/openingBalances.js";
 import { makeEntry, makeVoidEntries } from "../../src/server/journal.js";
-import type { Account, JournalEntry, JournalLine } from "../../src/server/types.js";
+import type { Account, JournalEntry, JournalLine } from "../../src/shared/types.js";
 
 const ACCOUNTS: Account[] = [
   { code: "1000", name: "Cash", type: "asset" },

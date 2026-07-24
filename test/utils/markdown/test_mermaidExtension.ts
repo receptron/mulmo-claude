@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Marked } from "marked";
-import { mermaidExtension } from "../../../src/utils/markdown/mermaidExtension";
+import { mermaidExtension } from "@mulmoclaude/markdown-utils/markdown/mermaidExtension";
 import { markedHighlightExtension } from "../../../src/utils/markdown/highlight";
 
 function markedWithMermaid(): Marked {

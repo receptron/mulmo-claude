@@ -130,7 +130,7 @@ import { useI18n } from "vue-i18n";
 import type { ToolCallHistoryItem } from "../types/toolCallHistory";
 import { formatTime } from "../utils/format/date";
 import { buildMessagePermalink } from "../utils/chat/permalink";
-import { useClipboardCopy } from "../composables/useClipboardCopy";
+import { useClipboardCopy } from "@mulmoclaude/core/plugin-vue";
 
 const { t } = useI18n();
 

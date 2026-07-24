@@ -28,6 +28,7 @@ import "dotenv/config";
 import crypto from "crypto";
 import express, { type Request, type Response as ExpressResponse } from "express";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
+import { parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "twilio-sms";
 const MAX_SMS_LEN = 1_600; // Twilio concatenates segments up to 1600 chars
@@ -59,12 +60,7 @@ if (!publicUrl && !allowUnverified) {
 if (!publicUrl && allowUnverified) {
   console.warn("[twilio-sms] ⚠ TWILIO_ALLOW_UNVERIFIED=1 — signature verification DISABLED. Use only in local testing.");
 }
-const allowedNumbers = new Set(
-  (process.env.TWILIO_ALLOWED_NUMBERS ?? "")
-    .split(",")
-    .map((num) => num.trim())
-    .filter(Boolean),
-);
+const allowedNumbers = parseCsvSet(process.env.TWILIO_ALLOWED_NUMBERS);
 const allowAll = allowedNumbers.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });

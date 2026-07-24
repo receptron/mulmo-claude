@@ -60,8 +60,13 @@ export function formatDailyLocal(utcHHMM: string, now: Date = new Date()): strin
 export function formatInterval(intervalMs: number): string {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) return "Every ?";
   const mins = Math.round(intervalMs / 60_000);
-  if (mins >= 60) return `Every ${Math.round(mins / 60)}h`;
-  return `Every ${mins}m`;
+  if (mins < 1) return "Every <1m";
+  const hours = Math.floor(mins / 60);
+  const restMins = mins % 60;
+  if (hours === 0) return `Every ${mins}m`;
+  // The engine fires on the exact intervalMs, so "Every 2h" for a 90-minute
+  // task would misrepresent real behavior — keep the minute remainder.
+  return restMins === 0 ? `Every ${hours}h` : `Every ${hours}h ${restMins}m`;
 }
 
 export function formatSchedule(schedule: TaskSchedule, now: Date = new Date()): string {

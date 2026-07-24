@@ -14,7 +14,7 @@ import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } f
 import { tmpdir } from "os";
 import path from "path";
 import { classifyAsWikiPage, readWikiPage, wikiPagePath, writeWikiPage } from "../../../server/workspace/wiki-pages/io.js";
-import { parseFrontmatter } from "../../../server/utils/markdown/frontmatter.js";
+import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { WORKSPACE_DIRS } from "../../../server/workspace/paths.js";
 
 /** Helper: a fixed `now` injector so frontmatter timestamps are

@@ -137,8 +137,8 @@ function isSafeActionTemplatePath(value) {
 }
 
 // packages/core/dist/skill-bridge/index.js
-import path3 from "node:path";
 import { mkdirSync, readFileSync as readFileSync2, renameSync, rmSync, writeFileSync } from "node:fs";
+import path3 from "node:path";
 var DATA_SKILLS_DIR = path3.join("data", "skills");
 var CLAUDE_SKILLS_DIR = path3.join(".claude", "skills");
 var SKILL_FILENAME = "SKILL.md";
@@ -201,14 +201,17 @@ function mirrorSkillDelete(workspaceRoot2, slug) {
   return { dest };
 }
 
-// server/utils/errors.ts
+// packages/core/dist/dist-ChwiBd99.js
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function hasStringProp(value, key) {
+  return isRecord(value) && typeof value[key] === "string";
+}
 function errorMessage(err, fallback) {
   if (err instanceof Error) return err.message;
-  if (err !== null && typeof err === "object") {
-    const obj = err;
-    if (typeof obj.details === "string" && obj.details) return obj.details;
-    if (typeof obj.message === "string" && obj.message) return obj.message;
-  }
+  if (hasStringProp(err, "details") && err.details) return err.details;
+  if (hasStringProp(err, "message") && err.message) return err.message;
   if (fallback !== void 0) return fallback;
   return String(err);
 }

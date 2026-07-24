@@ -154,3 +154,34 @@ describe("writeFileAtomic — binary content (#881 v1)", () => {
     assert.equal(siblings.filter((file) => file.endsWith(".tmp")).length, 0);
   });
 });
+
+// The staging name used to be the shared `${filePath}.tmp`, so two writers of
+// one destination raced: one rename/unlink pulled the staging file out from
+// under the other. It fired in production on session meta — ten callers all
+// write the same `<sessionId>.json` — as
+// `ENOENT … rename '<file>.json.tmp' -> '<file>.json'` (#2222).
+describe("writeFileAtomic — concurrent writers to one destination (#2222)", () => {
+  it("does not lose a write when several writers target the same file", async () => {
+    const file = path.join(tmpDir, "contended.json");
+    const writers = Array.from({ length: 12 }, (_, index) => writeFileAtomic(file, `payload-${index}`));
+    // Every write must resolve: none may fail because a sibling removed its
+    // staging file mid-flight.
+    await Promise.all(writers);
+    // Last writer wins, but the file must be one intact payload — never a
+    // half-written or missing file.
+    assert.match(readFileSync(file, "utf-8"), /^payload-\d+$/);
+  });
+
+  it("leaves no staging files behind after a contended burst", async () => {
+    const file = path.join(tmpDir, "contended-cleanup.json");
+    await Promise.all(Array.from({ length: 8 }, (_, index) => writeFileAtomic(file, `v${index}`)));
+    const strays = readdirSync(tmpDir).filter((name) => name.startsWith("contended-cleanup.json.") && name.endsWith(".tmp"));
+    assert.deepEqual(strays, [], `staging files leaked: ${strays.join(", ")}`);
+  });
+
+  it("still honours an explicit uniqueTmp: false for callers that need a predictable staging path", async () => {
+    const file = path.join(tmpDir, "predictable.txt");
+    await writeFileAtomic(file, "ok", { uniqueTmp: false });
+    assert.equal(readFileSync(file, "utf-8"), "ok");
+  });
+});

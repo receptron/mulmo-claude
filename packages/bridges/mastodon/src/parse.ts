@@ -1,11 +1,9 @@
 // Pure parsing helpers for the Mastodon bridge — HTML→text,
 // leading-mention strip, mention-status extraction.
 
-export type JsonRecord = Record<string, unknown>;
+import { isRecord } from "@mulmoclaude/common";
 
-export function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
+export type JsonRecord = Record<string, unknown>;
 
 export interface ParsedStatus {
   statusId: string;
@@ -87,10 +85,10 @@ export function stripLeadingMentions(text: string): string {
 export function parseMentionStatus(notification: JsonRecord): ParsedStatus | null {
   if (notification.type !== "mention") return null;
   const { status } = notification;
-  if (!isObj(status)) return null;
+  if (!isRecord(status)) return null;
   const statusId = typeof status.id === "string" ? status.id : "";
   const visibility = typeof status.visibility === "string" ? status.visibility : "public";
-  const account = isObj(status.account) ? status.account : null;
+  const account = isRecord(status.account) ? status.account : null;
   const senderAcct = account && typeof account.acct === "string" ? account.acct : "";
   const content = typeof status.content === "string" ? status.content : "";
   const text = stripLeadingMentions(htmlToText(content));
@@ -109,7 +107,7 @@ export function parseNotificationRaw(raw: string): ParsedStatus | null {
   } catch {
     return null;
   }
-  if (!isObj(notif)) return null;
+  if (!isRecord(notif)) return null;
   return parseMentionStatus(notif);
 }
 
@@ -122,7 +120,7 @@ export function parseFrame(raw: unknown): StreamFrame | null {
   if (typeof raw !== "string") return null;
   try {
     const msg: unknown = JSON.parse(raw);
-    if (!isObj(msg)) return null;
+    if (!isRecord(msg)) return null;
     const event = typeof msg.event === "string" ? msg.event : "";
     const payload = typeof msg.payload === "string" ? msg.payload : "";
     if (!event || !payload) return null;

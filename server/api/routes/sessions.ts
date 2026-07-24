@@ -1,3 +1,4 @@
+import { isNonEmptyString, isRecord } from "../../utils/types.js";
 import { Router, Request, Response } from "express";
 import { realpathSync } from "fs";
 import { readdir, stat } from "fs/promises";
@@ -19,7 +20,7 @@ import { markRead, getSession, evictSession, publishSessionsChanged } from "../.
 import { notFound } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { EVENT_TYPES } from "../../../src/types/events.js";
-import { SESSION_ORIGINS, type SessionOrigin } from "../../../src/types/session.js";
+import { SESSION_ORIGINS, type SessionOrigin, type SessionSummary } from "../../../src/types/session.js";
 import { env } from "../../system/env.js";
 import { ONE_DAY_MS } from "../../utils/time.js";
 import { encodeCursor, parseCursor, sessionChangeMs } from "./sessionsCursor.js";
@@ -37,66 +38,35 @@ interface SessionMeta {
   userQueryCount?: number;
 }
 
+/** The two fields every caller relies on. Both paths below already tested for
+ *  them — one behind an `as` cast, one on a `JSON.parse` result typed `any`, so
+ *  neither test actually narrowed anything. Same check, now load-bearing.
+ *
+ *  `isNonEmptyString`, not `typeof === "string"`: the checks this replaced were
+ *  truthy tests, so a corrupt row like `{ roleId: "", startedAt: "" }` was
+ *  skipped. A plain type check would start letting those through. */
+function isSessionMeta(value: unknown): value is SessionMeta {
+  return isRecord(value) && isNonEmptyString(value.roleId) && isNonEmptyString(value.startedAt);
+}
+
 async function readSessionMeta(__chatDir: string, sessionId: string): Promise<SessionMeta | null> {
   // Try new-style .json meta first
   const meta = await readSessionMetaIO(sessionId);
-  if (meta?.roleId && meta?.startedAt) {
-    return meta as SessionMeta;
-  }
+  if (isSessionMeta(meta)) return meta;
   // Legacy: read first line of .jsonl
   const jsonl = await readSessionJsonl(sessionId);
   if (jsonl) {
     const first = jsonl.split("\n").find(Boolean);
     if (first) {
       try {
-        const parsed = JSON.parse(first);
-        if (parsed.roleId && parsed.startedAt) return parsed;
+        const parsed: unknown = JSON.parse(first);
+        if (isSessionMeta(parsed)) return parsed;
       } catch {
         // ignore
       }
     }
   }
   return null;
-}
-
-export interface SessionSummary {
-  id: string;
-  roleId: string;
-  startedAt: string;
-  // ISO timestamp of the jsonl file's most recent mtime — i.e. the
-  // last time the session had an event appended. Clients sort the
-  // sidebar history list by this so active sessions float to the top.
-  updatedAt: string;
-  preview: string;
-  // Populated when the chat indexer has produced a summary for this
-  // session. The frontend renders `summary` as a smaller second line
-  // under the preview in the history popup. See #123.
-  summary?: string;
-  keywords?: string[];
-  // Where this session originated (#486). Missing = "human".
-  origin?: SessionOrigin;
-  // User-toggled bookmark — surfaced in the history panel as a
-  // dedicated filter chip and a green role-icon tint.
-  isBookmarked?: boolean;
-  // Number of user turns sent to this session. Lets the history panel
-  // tell a one-shot (1) apart from a long-running conversation.
-  userQueryCount?: number;
-  // Live state from the in-memory session store. Absent when the
-  // session has no active entry in the store (i.e. idle / historical).
-  //
-  // `isRunning` is the BROAD predicate: agent turn live OR any
-  // background generation (image/audio/movie) still pending. Drives
-  // the sidebar "busy" indicator that must stay lit across nav.
-  //
-  // `liveIsRunning` is the NARROW predicate: exactly the
-  // `DELETE /api/sessions/:id` 409 gate (`getSession()?.isRunning`).
-  // Exposed for cleanup-style callers (e2e-live `waitForSessionIdle`)
-  // that need to poll "is DELETE accepted yet" without over-waiting
-  // on lingering pendingGenerations. See issue #1195.
-  isRunning?: boolean;
-  liveIsRunning?: boolean;
-  hasUnread?: boolean;
-  statusMessage?: string;
 }
 
 // Public response envelope for GET /api/sessions (issue #205).
@@ -280,18 +250,18 @@ interface SessionErrorResponse {
 // Narrow type predicate for the presentMulmoScript tool-result shape
 // the enrichment helper inspects. Returning `entry is …` lets the
 // caller drop the redundant nested checks once the predicate passes.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function isPresentMulmoScriptToolResult(entry: any): entry is {
+type PresentMulmoScriptToolResult = {
   source: "tool";
   type: string;
-  result: { toolName: "presentMulmoScript"; data: { filePath: string } & Record<string, unknown> };
-} & Record<string, unknown> {
-  return (
-    entry?.source === "tool" &&
-    entry?.type === EVENT_TYPES.toolResult &&
-    entry?.result?.toolName === "presentMulmoScript" &&
-    typeof entry?.result?.data?.filePath === "string"
-  );
+  result: { toolName: "presentMulmoScript"; data: { filePath: string } & Record<string, unknown> } & Record<string, unknown>;
+} & Record<string, unknown>;
+
+function isPresentMulmoScriptToolResult(entry: unknown): entry is PresentMulmoScriptToolResult {
+  if (!isRecord(entry) || entry.source !== "tool" || entry.type !== EVENT_TYPES.toolResult) return false;
+  const { result } = entry;
+  if (!isRecord(result) || result.toolName !== "presentMulmoScript") return false;
+  const { data } = result;
+  return isRecord(data) && typeof data.filePath === "string";
 }
 
 // Re-read the MulmoScript JSON pointed at by `entry.result.data.filePath`
@@ -300,8 +270,7 @@ function isPresentMulmoScriptToolResult(entry: any): entry is {
 // path) so the detail route never breaks because of a single rotted
 // link. Path-traversal guard is realpath-based — see
 // resolveWithinRoot for why.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function enrichWithMulmoScript(entry: any): Promise<any> {
+async function enrichWithMulmoScript(entry: PresentMulmoScriptToolResult): Promise<unknown> {
   try {
     const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
     let storiesReal: string;
@@ -316,13 +285,14 @@ async function enrichWithMulmoScript(entry: any): Promise<any> {
     const scriptPath = resolveWithinRoot(storiesReal, relFromStories);
     if (!scriptPath) return entry;
     const scriptJson = (await readTextSafe(scriptPath)) ?? "";
+    const script: unknown = JSON.parse(scriptJson);
     return {
       ...entry,
       result: {
         ...entry.result,
         data: {
           ...entry.result.data,
-          script: JSON.parse(scriptJson),
+          script,
         },
       },
     };
@@ -342,12 +312,12 @@ async function parseSessionEntry(line: string): Promise<unknown> {
   } catch {
     return null;
   }
-  // Skip legacy metadata entries now stored in .json
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const typed = entry as any;
-  if (typed?.type === EVENT_TYPES.sessionMeta || typed?.type === EVENT_TYPES.claudeSessionId) return null;
-  if (isPresentMulmoScriptToolResult(typed)) return enrichWithMulmoScript(typed);
-  return typed;
+  // Skip legacy metadata entries now stored in .json. A non-object line
+  // (JSON.parse can return a bare number/string) has no type field, so it
+  // falls through unchanged — same as the previous optional-chaining path.
+  if (isRecord(entry) && (entry.type === EVENT_TYPES.sessionMeta || entry.type === EVENT_TYPES.claudeSessionId)) return null;
+  if (isPresentMulmoScriptToolResult(entry)) return enrichWithMulmoScript(entry);
+  return entry;
 }
 
 router.get(API_ROUTES.sessions.detail, async (req: Request<SessionIdParams>, res: Response<unknown[] | SessionErrorResponse>) => {

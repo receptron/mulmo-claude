@@ -1,9 +1,14 @@
 // Wrappers that swallow ENOENT/EACCES so callers branch on `result === null` instead of try/catch.
-// resolveWithinRoot is the realpath-based traversal check used by every endpoint serving workspace files.
+// resolveWithinRoot — the realpath-based traversal check used by every endpoint serving workspace
+// files — lives in `@mulmoclaude/core/files` (#2461) and is re-exported here so the ~15 host
+// import sites keep their surface, mirroring atomic.ts.
 
-import { Dirent, Stats, promises, readFileSync, readdirSync, realpathSync, statSync } from "fs";
+import { Dirent, Stats, promises, readFileSync, readdirSync, statSync } from "fs";
 import path from "path";
+import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { isErrorWithCode } from "../types.js";
+
+export { resolveWithinRoot };
 
 export function isEnoent(err: unknown): boolean {
   return isErrorWithCode(err) && err.code === "ENOENT";
@@ -136,22 +141,6 @@ export function resolveArtifactRequestPath(rootReal: string, reqPath: string, de
   if (!resolveWithinRoot(rootReal, relPath)) return null;
   if (denyDotfiles && containsDotfileSegment(relPath)) return null;
   return relPath;
-}
-
-// `rootReal` MUST already be a realpath. Returns null on traversal or if either path doesn't exist on disk.
-export function resolveWithinRoot(rootReal: string, relPath: string): string | null {
-  const normalized = path.normalize(relPath || "");
-  const resolved = path.resolve(rootReal, normalized);
-  let resolvedReal: string;
-  try {
-    resolvedReal = realpathSync(resolved);
-  } catch {
-    return null;
-  }
-  if (resolvedReal !== rootReal && !resolvedReal.startsWith(rootReal + path.sep)) {
-    return null;
-  }
-  return resolvedReal;
 }
 
 // `C:foo`, `c:relative\path` — Windows drive-qualified RELATIVE paths.

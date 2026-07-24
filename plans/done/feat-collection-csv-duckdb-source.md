@@ -10,7 +10,7 @@
 > - **当初から別フェーズ**（未着手のままスコープ外として維持）: 一覧ページング、
 >   リモート（phone）ビューへのクエリ露出、v3（xlsx 等フォーマット追加・ネイティブ昇格・
 >   メトリクス定義）。
-> - **後続プラン**: [plans/feat-collection-bi-extensions.md](../feat-collection-bi-extensions.md)
+> - **後続プラン**: [plans/done/feat-collection-bi-extensions.md](../feat-collection-bi-extensions.md)
 >   （時系列 bucketing / count distinct / xlsx / install 検証の引き継ぎ）。
 
 Date: 2026-07-17

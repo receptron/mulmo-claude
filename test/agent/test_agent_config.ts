@@ -45,6 +45,19 @@ describe("buildMcpConfig", () => {
     assert.equal(env.PLUGIN_NAMES, "manageBookmarks,presentDocument");
   });
 
+  // Connect at session start instead of lazily, so a resumed turn doesn't race
+  // the broker's cold boot. Inert without the raised connect ceiling — the two
+  // only work as a pair (#2234).
+  it("marks the mulmoclaude server alwaysLoad so a resumed turn doesn't race cold boot", async () => {
+    const config = buildMcpConfig({ chatSessionId: "s1", port: 3001, activePlugins: [] }) as Record<string, unknown>;
+    const servers = config.mcpServers as Record<string, unknown>;
+    const server = servers.mulmoclaude as Record<string, unknown>;
+    assert.equal(server.alwaysLoad, true);
+    // Still a stdio spawn — alwaysLoad must not have displaced the type field,
+    // whose absence makes the CLI skip the entry silently.
+    assert.equal(server.type, "stdio");
+  });
+
   it("handles empty plugins", async () => {
     const config = buildMcpConfig({
       chatSessionId: "s2",
@@ -397,6 +410,20 @@ describe("buildDockerSpawnArgs", () => {
     assert.ok(args.includes("HOST_GID=20"));
     assert.ok(args.includes("CHOWN"));
     assert.ok(args.includes("SETUID"));
+  });
+
+  // The CLI runs INSIDE the container, so only vars listed in this argv reach
+  // it — a host-side MCP_CONNECT_TIMEOUT_MS never arrived, leaving the knob
+  // unreachable in the one environment that needs it (#2234).
+  it("passes the MCP connect-wait ceiling into the container", async () => {
+    const args = buildDockerSpawnArgs(baseParams());
+    const value = args.find((arg) => arg.startsWith("MCP_CONNECT_TIMEOUT_MS="));
+    assert.ok(value, `expected an MCP_CONNECT_TIMEOUT_MS -e arg, got: ${args.join(" ")}`);
+    const timeoutMs = Number(value.split("=")[1]);
+    assert.ok(Number.isFinite(timeoutMs) && timeoutMs > 0, `expected a positive ms value, got: ${value}`);
+    // Must clear the CLI's ~5s default, which is the whole point.
+    assert.ok(timeoutMs >= 30_000, `ceiling must comfortably exceed the CLI default, got ${timeoutMs}ms`);
+    assert.equal(args[args.indexOf(value) - 1], "-e", "value must be preceded by its -e flag");
   });
 
   it("mounts the workspace at the container path", async () => {

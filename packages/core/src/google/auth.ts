@@ -17,7 +17,7 @@ import { CodeChallengeMethod, OAuth2Client, type Credentials } from "google-auth
 import { brokerExchange, brokerRefresh, brokerStart } from "./broker.js";
 import { log } from "./host.js";
 import { errorMessage, ONE_MINUTE_MS, ONE_SECOND_MS } from "./util.js";
-import { fetchWithTimeout } from "./fetch.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
 import { clientSecretPresence, loadClientSecret, type InstalledClientSecret } from "./clientSecret.js";
 import { deleteGoogleTokens, loadGoogleTokens, saveGoogleTokens, type IssuedVia } from "./tokenStore.js";
 

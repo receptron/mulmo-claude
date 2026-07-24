@@ -9,7 +9,7 @@
 // mint a `state` at /googleOAuthStart, so the verifier — not the state — is the
 // authorization. See the broker's pkce.ts for the same reasoning server-side.
 import type { Credentials } from "google-auth-library";
-import { fetchWithTimeout } from "./fetch.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
 import { errorMessage, isRecord, ONE_SECOND_MS } from "./util.js";
 
 const DEFAULT_BROKER_BASE_URL = "https://asia-northeast1-mulmoserver.cloudfunctions.net";

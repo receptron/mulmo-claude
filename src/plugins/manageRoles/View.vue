@@ -172,7 +172,10 @@
                   v-model="editForm.name"
                   type="text"
                   class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400"
-                  @keydown.enter="saveEdit(role.id)"
+                  @keydown="editNameEnter.onKeydown"
+                  @compositionstart="editNameEnter.onCompositionStart"
+                  @compositionend="editNameEnter.onCompositionEnd"
+                  @blur="editNameEnter.onBlur"
                 />
               </div>
               <div class="w-32">
@@ -286,6 +289,9 @@ import type { CustomRole, ManageRolesData } from "./index";
 import { apiGet, apiPost } from "../../utils/api";
 import { pluginEndpoints, pluginAllPluginNames } from "../api";
 import type { RolesEndpoints } from "./definition";
+import { formToRole, roleToForm, validateRoleForm, type RoleForm, type RoleFormError } from "./roleForm";
+import { useImeAwareEnter } from "../../composables/useImeAwareEnter";
+import { confirmItemDelete } from "../../utils/confirmDelete";
 
 const { t } = useI18n();
 
@@ -358,16 +364,7 @@ const selectedId = ref<string | null>(null);
 const saving = ref(false);
 const saveError = ref("");
 
-interface EditForm {
-  id: string;
-  name: string;
-  icon: string;
-  prompt: string;
-  selectedPlugins: string[];
-  queriesText: string;
-}
-
-const editForm = ref<EditForm>({
+const editForm = ref<RoleForm>({
   id: "",
   name: "",
   icon: "",
@@ -378,7 +375,7 @@ const editForm = ref<EditForm>({
 
 const creating = ref(false);
 const createError = ref("");
-const newForm = ref<EditForm>({
+const newForm = ref<RoleForm>({
   id: "",
   name: "",
   icon: "person",
@@ -413,14 +410,7 @@ function selectRole(role: CustomRole) {
   }
   selectedId.value = role.id;
   saveError.value = "";
-  editForm.value = {
-    id: role.id,
-    name: role.name,
-    icon: role.icon,
-    prompt: role.prompt,
-    selectedPlugins: [...role.availablePlugins],
-    queriesText: (role.queries ?? []).join("\n"),
-  };
+  editForm.value = roleToForm(role);
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -450,61 +440,54 @@ async function callManage(body: Record<string, unknown>): Promise<ManageResult> 
 
 async function refreshList() {
   const result = await callManage({ action: "list" });
-  if (result.success) {
-    const data = result as { data?: { customRoles?: CustomRole[] } };
-    customRoles.value = data.data?.customRoles ?? [];
-    if (props.selectedResult) {
-      emit("updateResult", {
-        ...props.selectedResult,
-        ...result,
-        uuid: props.selectedResult.uuid,
-      });
-    }
-    // Let App.vue know the dropdown needs to refresh.
-    await Promise.resolve(appApi.refreshRoles());
+  if (!result.success) {
+    // A mutation succeeded but the follow-up list reload failed — surface it
+    // (and self-heal via the abort-coordinated GET) instead of silently
+    // leaving the list stale, which reads as "the create/edit didn't work".
+    saveError.value = result.error ?? t("pluginManageRoles.errRefreshFailed");
+    void refreshCustomRoles();
+    return;
   }
+  const data = result as { data?: { customRoles?: CustomRole[] } };
+  customRoles.value = data.data?.customRoles ?? [];
+  if (props.selectedResult) {
+    emit("updateResult", {
+      ...props.selectedResult,
+      ...result,
+      uuid: props.selectedResult.uuid,
+    });
+  }
+  // Let App.vue know the dropdown needs to refresh.
+  await Promise.resolve(appApi.refreshRoles());
 }
 
-function validateRoleForm(form: EditForm, excludeId: string | null): string | null {
-  const trimmedId = form.id.trim();
-  const trimmedName = form.name.trim();
-  if (!trimmedId) return t("pluginManageRoles.errIdRequired");
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedId)) {
-    return t("pluginManageRoles.errIdInvalid");
-  }
-  if (!trimmedName) return t("pluginManageRoles.errNameRequired");
-  if (customRoles.value.some((existing) => existing.id === trimmedId && existing.id !== excludeId)) {
-    return t("pluginManageRoles.errIdDuplicate", { id: trimmedId });
-  }
-  return null;
+const ROLE_FORM_ERROR_KEY: Record<RoleFormError["code"], string> = {
+  idRequired: "pluginManageRoles.errIdRequired",
+  idInvalid: "pluginManageRoles.errIdInvalid",
+  nameRequired: "pluginManageRoles.errNameRequired",
+  idDuplicate: "pluginManageRoles.errIdDuplicate",
+};
+
+function formErrorMessage(error: RoleFormError | null): string | null {
+  if (!error) return null;
+  return t(ROLE_FORM_ERROR_KEY[error.code], { id: error.id });
 }
 
-const newFormError = computed<string | null>(() => validateRoleForm(newForm.value, null));
+const existingRoleIds = computed(() => customRoles.value.map((role) => role.id));
 
-const editFormError = computed<string | null>(() => validateRoleForm(editForm.value, selectedId.value));
+const newFormError = computed<string | null>(() => formErrorMessage(validateRoleForm(newForm.value, null, existingRoleIds.value)));
 
-function buildNewRole(): CustomRole {
-  return {
-    id: newForm.value.id.trim(),
-    name: newForm.value.name.trim(),
-    icon: newForm.value.icon.trim() || "person",
-    prompt: newForm.value.prompt,
-    availablePlugins: newForm.value.selectedPlugins,
-    queries: newForm.value.queriesText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean),
-  };
-}
+const editFormError = computed<string | null>(() => formErrorMessage(validateRoleForm(editForm.value, selectedId.value, existingRoleIds.value)));
 
 async function saveNew() {
+  if (saving.value) return;
   if (newFormError.value) {
     createError.value = newFormError.value;
     return;
   }
   saving.value = true;
   createError.value = "";
-  const result = await callManage({ action: "create", role: buildNewRole() });
+  const result = await callManage({ action: "create", role: formToRole(newForm.value) });
   if (result.success) {
     creating.value = false;
     await refreshList();
@@ -515,26 +498,18 @@ async function saveNew() {
 }
 
 async function saveEdit(originalId: string) {
+  // Re-entrancy guard: the Update button is disabled while saving, but the
+  // name field's Enter handler (and key auto-repeat) bypasses the button.
+  if (saving.value) return;
   if (editFormError.value) {
     saveError.value = editFormError.value;
     return;
   }
   saving.value = true;
   saveError.value = "";
-  const role: CustomRole = {
-    id: editForm.value.id.trim(),
-    name: editForm.value.name.trim(),
-    icon: editForm.value.icon.trim(),
-    prompt: editForm.value.prompt,
-    availablePlugins: editForm.value.selectedPlugins,
-    queries: editForm.value.queriesText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean),
-  };
   const result = await callManage({
     action: "update",
-    role,
+    role: formToRole(editForm.value),
     oldRoleId: originalId,
   });
   if (result.success) {
@@ -547,6 +522,9 @@ async function saveEdit(originalId: string) {
 }
 
 async function deleteRole(roleId: string) {
+  if (saving.value) return;
+  const role = customRoles.value.find((candidate) => candidate.id === roleId);
+  if (!confirmItemDelete(t("pluginManageRoles.confirmDelete", { name: role?.name ?? roleId }))) return;
   saving.value = true;
   saveError.value = "";
   const result = await callManage({ action: "delete", roleId });
@@ -558,4 +536,13 @@ async function deleteRole(roleId: string) {
   }
   saving.value = false;
 }
+
+// IME-aware Enter for the edit-name field: on Chrome/Firefox `isComposing`
+// stays true through the confirming Enter; on Safari `compositionend` fires
+// first, so the composable's post-composition race window suppresses it too.
+// Without this, confirming a kana/hanzi conversion with Enter submits a
+// half-typed name.
+const editNameEnter = useImeAwareEnter(() => {
+  if (selectedId.value) void saveEdit(selectedId.value);
+});
 </script>

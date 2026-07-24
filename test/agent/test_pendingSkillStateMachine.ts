@@ -6,13 +6,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  _updatePendingSkillOnToolCallForTest as onToolCall,
-  _updatePendingSkillOnToolCallResultForTest as onToolCallResult,
-} from "../../server/api/routes/agent.js";
-
-interface MinimalCtx {
-  pendingSkill: { skillName: string; toolUseId: string } | null;
-}
+  updatePendingSkillOnToolCall as onToolCall,
+  updatePendingSkillOnToolCallResult as onToolCallResult,
+  type PendingSkillSlot as MinimalCtx,
+} from "../../server/agent/skillEvents.js";
 
 describe("pendingSkill state machine (#1218)", () => {
   it("Skill tool_call sets pendingSkill with skillName + toolUseId", () => {

@@ -61,8 +61,9 @@ const adapter: CollectionNotificationAdapter = {
   buildNavigateTarget: (slug, itemId) => `/x/${slug}/${itemId}`,
   buildPluginData: ({ legacyId }) => ({ kind: "cw", legacyId }),
   // Must round-trip `buildPluginData`: the stale sweep skips any entry whose
-  // `readEntry` returns null, so a stub that always returns null would make
-  // every sweep a silent no-op and hide the behaviour under test.
+  // `readEntry` returns null, so a stub returning null unconditionally makes
+  // every sweep a silent no-op — a test asserting sweep behaviour would pass
+  // no matter what the sweep did.
   readEntry: (pluginData) => {
     if (typeof pluginData !== "object" || pluginData === null) return null;
     const record = pluginData as Record<string, unknown>;

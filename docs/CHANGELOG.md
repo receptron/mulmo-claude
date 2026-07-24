@@ -8,6 +8,63 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Packages
+
+- **`@mulmoclaude/common`, `@mulmobridge/webhook-runtime`, `@mulmobridge/client`** (#2403) — Phase-3 dedup of the bridge↔bridge and bridge↔relay clones (code only; version bumps + consumer-range sweeps are deferred to the next publish, per the bump-once-at-publish policy). **`@mulmoclaude/common/meta-webhook`** (new subpath) holds `extractMessengerMessages` / `extractWhatsAppMessages` — the pure Meta payload parsers that were byte-identical between the Messenger/WhatsApp bridges and the relay's `webhooks/{messenger,whatsapp}.ts`; common is the only tier both the Node bridges and the Cloudflare Worker relay can import (signature verification stays per-runtime: bridge = node:crypto, relay = Web Crypto). **`@mulmobridge/webhook-runtime`** adds `registerMetaWebhookVerification` / `metaVerificationResult` (pure) / `verifyMetaHmacSignature`, collapsing the identical Meta GET `hub.challenge` handler + `sha256=` HMAC strip shared by the two Meta bridges. **`@mulmobridge/client`** adds `frameText` (ws-frame→utf8, Mastodon/Signal), `fetchJsonRecord` + pure `asJsonRecord` (REST GET/POST skeleton, Rocket.Chat/Zulip), and gains a `@mulmoclaude/common` dep for `isRecord`. New unit tests for every extracted pure function.
+- **`@mulmoclaude/markdown-utils@1.3.0`** (PR #2382, #2300) — adds `splitFrontmatter(raw)`, returning the frontmatter `prefix` + the `body` that follows so callers rewriting the body can re-attach the original header verbatim. Built on `parseFrontmatter` (`body` is always a suffix of `raw`, so `prefix + body` reproduces the input exactly). Replaces the hand-rolled splitter in the wiki `View.vue` task-checkbox path — the safe-layer part of the View.vue split (#2300; template split deferred for the xpath-dependent e2e). Minor bump; launcher + markdown-plugin ranges swept to `^1.3.0`. npm publish is a follow-up (`/publish`).
+- **`@mulmoclaude/markdown-utils@1.2.0`** (PR #2280) — released 2026-07-21. Moves the **mermaid renderer** (`renderMermaidNodes`, `mermaidExtension`, `adoptSvg`) into the shared package — the last markdown/image host↔plugin duplication. The per-diagram DOM id prefix is now a parameter (`renderMermaidNodes(root, labels?, idPrefix = "mulmo-mermaid")`) so host and plugin keep distinct prefixes (host default, plugin passes `"mulmo-mermaid-plugin"`) without duplicating the renderer; `useMermaid` stays per-side (its `vue-i18n` vs plugin-`useT` wiring is environment-specific). Behavior unchanged — the prefix only feeds mermaid's invisible SVG root id (verified rendering a live wiki page). jscpd (spreadsheet excluded): 2163 → 2036 duplicated lines (1.80% → 1.69%); the markdown-utils dedup took the repo from 2.74% → 1.69% overall. New peer dep `mermaid`; minor bump (no consumer sweep). Completes the markdown-utils dedup (`errors` deliberately left — a `@mulmoclaude/core` concern).
+- **`@mulmoclaude/markdown-utils@1.1.0`** (PR #2278) — released 2026-07-21. Adds the image-resolution chain (`resolveImageSrc` + `setFilesRawUrl`, `rewriteMarkdownImageRefs`/`rewriteImgSrcAttrsInHtml` — the 237-line rewriter) that #2277 deferred. Removes the last big markdown/image host↔plugin clone (jscpd, spreadsheet excluded: 2419 → 2163 duplicated lines, 2.01% → 1.80%). The host wires `setFilesRawUrl(API_ROUTES.files.raw)` in `uiHost.ts` so `API_ROUTES` stays the single source of truth (default already matched, behavior unchanged). **Minor bump** — `^1.0.0` consumers pick it up with no range change (the 1.0.0-graduation payoff); only launcher + markdown-plugin ranges bumped `^1.1.0` for hygiene. New dep `marked`. Still deferred: the mermaid trio (`idPrefix` param) and `errors` (a `@mulmoclaude/core/utils` concern).
+- **`@mulmoclaude/markdown-utils@1.0.0`** (PR #2277) — released 2026-07-21. New **browser-safe leaf** holding the markdown / image rendering utilities (`parseFrontmatter`/`mergeFrontmatter`, `extractFirstH1`, marp helpers, `renderTaskListItems`, `cacheBustUrl`, `transformResolvableUrlsInHtml`, `externalLinkAttrs`, filename helpers). Eliminates the near-complete COPY of `src/utils/{markdown,image,dom,files}` that `markdown-plugin` was carrying: 10 files moved (canonical = host version), 41 import sites + tests repointed, 21 duplicate copies deleted (net −931 lines). **jscpd: 3456 → 2591 duplicated lines (2.74% → 2.07%, −865 lines)** — the first change to meaningfully move the metric (the earlier bridge consolidations were sub-threshold). Deps `js-yaml`; peer `vue`. Also excludes `src/plugins/spreadsheet/engine/**` from the jscpd scan. Deferred to a follow-up (intentional drift): `image/resolve` (host `API_ROUTES` vs plugin settable URL), `rewriteMarkdownImageRefs`, the mermaid trio (plugin-specific DOM id prefix), `errors`.
+- **`@mulmobridge/webhook-runtime@1.0.0`** (PR #2274) — released 2026-07-21. **Graduates to 1.0.0.** Adds Meta (Messenger / WhatsApp) webhook verification — `narrowChallenge(raw)` + `SAFE_CHALLENGE_RE`, the CodeQL `js/reflected-xss` sanitiser that narrows Meta's `hub.challenge` to a known base64url-nonce shape before it is echoed back — consolidated from two byte-identical bridge `verify.ts` copies (messenger, whatsapp). Both bridge copies + the two near-duplicate root regression tests were deleted; the comprehensive suite now lives in webhook-runtime. 6 consumer ranges swept `^0.1.0 → ^1.0.0`. Applies the "packages updated going forward start at 1.0.0+" policy to `@mulmobridge/*` too (leaves `client` 0.1.5 / `protocol` 0.1.4 on 0.x for now).
+- **`@mulmoclaude/common@1.1.0`** (#2400) — adds `errorMessage(err, fallback?)`, the isomorphic "unknown caught value → human-readable string" helper (Error → `.message`; non-Error object → non-empty string `details` (gRPC) or `message`, `details` wins; else `fallback`; else `String(err)`). #2217 could only consolidate this for server code because `@mulmoclaude/core/utils` is server-only, so it lived as 4 byte-identical copies (core + accounting / markdown / mulmoscript plugins). All four now source the one implementation here — `@mulmoclaude/core/utils` re-exports it (host + collection/scheduler/Google engines unchanged), the markdown & mulmoscript plugin copies are deleted, and accounting's `./shared` entry re-exports it. `@mulmoclaude/common` added to the 3 plugins' + core's deps; all 27 declared consumer ranges swept `^1.0.0 → ^1.1.0` (bundled by the plugins' vite lib build, so no runtime install cost). npm publish is a follow-up (`/publish`).
+- **`@mulmoclaude/common@1.0.0`** (PR #2272) — released 2026-07-21. **Graduates to 1.0.0** to escape the 0.x caret cascade (`^1.0.0` floats across minors). Adds `parseCsvList(raw, { lowercase? })` and `parseCsvSet(raw, { lowercase? })` — the canonical CSV/env allowlist helpers (empty set = "allow all" sentinel), consolidating ~17 hand-written `new Set(...split...map(trim)...filter)` builders across the bridges (~85 lines removed; telegram excluded for its opposite deny-all semantics). All 15 existing consumer ranges swept `^0.1.0 → ^1.0.0` (mandatory — a `^0.1.0` range rejects 1.0.0, so the workspace would fall back to the stale npm copy).
+- **`@mulmoclaude/common@0.1.0`** (PR #2267, #2269) — released 2026-07-21. Initial release of the leaf, dependency-free package holding the general-purpose runtime type guards shared across the MulmoClaude host, bridges, and plugins. Promotes the guards that originated as `server/utils/types.ts` (#504) into their own package so they stop being re-hand-written in every bridge and plugin. Exports `isRecord`, `isObj`, `isNonEmptyString`, `isStringRecord`, `isStringArray`, `isUnknownArray`, `isErrorWithCode`, `hasStringProp`, `hasNumberProp`. Consumed by the host (`server/utils/types.ts`, `src/utils/types.ts`) from #2267; the 12 bridges + relay adopt it in #2269 (local `isObj` → `isRecord` consolidation). Publishing was required before any consumer's next npm publish because bridges build with `tsc` (no bundling) and ship raw runtime deps, so the package had to reach npm first.
+- **`@mulmobridge/web-push@0.2.0`** (#2230, PR #2232) — released 2026-07-20. `SendWebPushOptions` gains `data?: Record<string, string>`, forwarded to FCM's `data` block so a receiver can route the tap. A push carrying only a title and body gives the receiver nothing to act on, so tapping the notification lands on the home screen; with `data` a host can open what the push is about — MulmoTerminal's case is `/terminals/{sessionId}` for the session that just finished. `buildSendPushBody(title, body, data?)` nests the map as `data.data` (the outer key is the Cloud Functions onCall envelope, the inner one is the FCM block). Omitted entirely when absent or empty, so an ordinary push serialises to exactly the 0.1.0 envelope — fully backward compatible. `data` is added **alongside** `notification`, never instead of it: both mulmoserver receivers return early when `payload.notification` is missing, so a data-only message would be silently discarded. The map is deliberately untyped beyond FCM's string-value requirement, since each host picks its own routing keys. Unblocks receptron/mulmoserver#75 and receptron/mulmoterminal#440, which were both waiting on this release.
+
+---
+
+## [1.4.0] - 2026-07-20
+
+**Collections grow a map, and the npm launcher finally ships what it promises.** The `/collections` page gains an ontology graph, calendar events sync into collections, and — importantly for anyone installing from npm — this launcher is the first to carry the current `@mulmoclaude/*` line.
+
+### Highlights
+
+#### Collections — ontology graph panel (#2218)
+
+The `/collections` page gains a **Map** tab that draws the ontology across your collections: each schema is a node, each `ref` field an edge, so you can see how records point at each other instead of inferring it from schema files. Reverse edges collapse by their declared `via`.
+
+#### Collections — calendar sync, file query, flag fields, delete (#2095, #2182, #2184, #2200, #2204)
+
+Google Calendar events now sync into a collection, incrementally after the first pass (#2182, #2184). `manageCollection` can delete items (#2200). New `flag` field type with its own chip styling (#2211, #2101). File-backed queries (`dataSource`) landed alongside storage virtualization for view images (#2204).
+
+#### The `String()`-coercion family (#2208, #2210, #2211, #2213, #2215, #2223, #2225)
+
+A `@typescript-eslint/no-base-to-string` sweep found seven places where a non-string value was being stringified into `"[object Object]"` on its way to a user, a filename, or a webhook signature check — collection scalar values, workspace dir names, MCP skill args, relay webhook secrets, the accounting router's action args, and two collection paths. Each was fixed at the source rather than papered over at the render site.
+
+#### Relay — fail closed on a misconfigured signing secret (#2213)
+
+A malformed or absent webhook signing secret now rejects the request instead of falling through to the handler. Credentials are read as strings-or-absent via `envSecret`, so a missing platform binding can no longer arrive as the literal `"undefined"` and be treated as configured.
+
+#### Shared helpers consolidated into core (#2217, #2219)
+
+`errorMessage` existed 14 times across 4 behaviours — gRPC-shaped errors surfaced as `"quota exceeded"` through the host copy and `"[object Object]"` through the core ones. `truncate`'s core copy had dropped the guard that keeps output inside `max`. Both now live once in the new browser-safe `@mulmoclaude/core/utils`, with the host re-exporting. `docs/shared-utils.md` gained a "Known duplicates" table, since the catalog's failure mode was naming one member of a family and hiding the rest.
+
+#### Sandbox — the frozen-CLI failure mode is now self-diagnosable (#2202, #2214)
+
+The sandbox image installs the Claude CLI unpinned, and neither an upstream release nor `docker rmi` refreshes it (the rebuild reuses the cached `npm install -g` layer). `error-recovery.md` now carries the symptom, the in-image version check, and the `docker builder prune -a -f` recovery; `docs/developer.md` no longer claims `yarn sandbox:remove` forces a rebuild.
+
+#### Google sign-in — retry after abandoning browser consent (#2171)
+
+Abandoning the browser consent screen previously left the link unretryable.
+
+### Fixes
+
+Chat sticky-bottom scroll (#2205), shadow-DOM-safe dropdown dismiss on `/collections` (#2212), collection live-refresh on direct writes (#2199), wiki summary schema left unwritten (#2226), Windows sandbox preset mount drift, floating promises across host and packages (#2191), unreachable type comparisons (#2207).
+
+Ships `@mulmoclaude/core@0.28.0`, `@mulmoclaude/collection-plugin@0.14.0`, `@mulmoclaude/google-plugin@0.3.2`, `@mulmoclaude/accounting-plugin@0.3.3`.
+
+> **Note for npm users:** `mulmoclaude@1.3.0` shipped dep ranges pinned to `@mulmoclaude/core@^0.23.0` and `@mulmoclaude/collection-plugin@^0.12.0`. A caret range on a `0.x` package does not float across minors, so installs of 1.3.0 could not receive anything published since — including most of the above. 1.4.0 is the first launcher that actually delivers it.
+
 ---
 
 ## [1.3.0] - 2026-07-18
@@ -30,6 +87,24 @@ Ships `@mulmoclaude/core@0.23.0`, `@mulmoclaude/collection-plugin@0.12.0`, `@mul
 
 ---
 
+## npm packages — 2026-07-20 (10)
+
+`@mulmoclaude/core@0.28.0` — a wiki fix: two files the host reads on its own had no writer.
+
+- **`@mulmoclaude/core@0.28.0`** (#2226) — `server/agent/prompt.ts` loads `data/wiki/summary.md` into the system prompt of **every session**, and points every role at `data/wiki/SCHEMA.md` when it exists. Both are declared `editPolicy: "agent-managed"`, but nothing ever instructed the agent to create or update them — they appeared only in a folder-layout diagram in the help, never in the Ingest or Lint operations. A wiki in real use for two months (202 pages) had neither file, and the failure is silent: with no `summary.md` the host falls back to a generic hint, so accumulated knowledge stops reaching ordinary conversations and nothing reports it. `assets/helps/wiki.md` now instructs Ingest to refresh `summary.md` (about a screenful — it costs context every session; topic areas and anchor pages, not a page list), makes Lint flag both files as missing or stale, marks both as agent-maintained in the layout, and adds a section on what belongs in each. That section also records why `summary.md` must never be phrased as instructions: the host wraps it in a `<reference>` block telling the model to ignore instructions inside it, because the summary derives from user-supplied sources and is therefore a prompt-injection surface. Help-only; no code changed.
+
+---
+
+## npm packages — 2026-07-20 (9)
+
+Two behaviour fixes, one hardening fix, and a floating-promise sweep across the chat bridges. Shipped alongside `@mulmoclaude/core@0.27.0`, `@mulmoclaude/collection-plugin@0.14.0`, and `@mulmoclaude/google-plugin@0.3.2`.
+
+- **`@mulmobridge/relay@0.2.1`** — the webhook signature check now **fails closed** when the signing secret is misconfigured, instead of falling through to the handler. Credentials for LINE, Messenger, Teams, Telegram and WhatsApp are read through `envSecret` (strings-or-absent) rather than `String()`-ing the platform binding, so a missing binding can no longer arrive as the literal string `"undefined"` and be treated as a configured secret.
+- **`@mulmoclaude/accounting-plugin@0.3.3`** — the router no longer stringifies action arguments once they pass the service guard, so typed arguments reach the accounting service with their original types.
+- **`@mulmobridge/slack@0.4.2`**, **`@mulmobridge/discord@0.1.2`**, **`@mulmobridge/mattermost@0.1.2`**, **`@mulmobridge/nostr@0.1.2`**, **`@mulmobridge/xmpp@0.1.2`** — unawaited promises in each bridge entry point are now handled explicitly, so a rejection surfaces rather than becoming an unhandled rejection. The lint rules covering this were ratcheted from warning to error across `packages/`.
+
+---
+
 ## npm packages — 2026-07-17 (8)
 
 - **`@mulmoclaude/mulmoscript-plugin@0.2.2`** — presentMulmoScript: updating a beat's `text` via the per-beat JSON source editor now drops that beat's cached narration audio, so the "Generate Audio" button reappears for the new text (previously only Play showed, with no way to re-generate). Audio files are content-addressed by text hash, so the view re-probes disk after the edit — reverting the text restores the existing audio without a paid TTS call.
@@ -47,7 +122,7 @@ presentMulmoScript `filePath` base clarified (the wire form `stories/<name>.json
 
 ## npm packages — 2026-07-17 (6)
 
-Package release riding PR #2137 (presentMulmoScript extraction, phase 3a of `plans/feat-mulmoscript-plugin.md`):
+Package release riding PR #2137 (presentMulmoScript extraction, phase 3a of `plans/done/feat-mulmoscript-plugin.md`):
 
 - **`@mulmoclaude/mulmoscript-plugin@0.2.0`** — the entire server ops layer moves into a new Node-only **`./server`** entry so any host runs the SAME mulmocast orchestration: all op cores (probes, beat/character rendering, audio, uploads, movie/PDF pipelines, background `autoGenerateMovie`), the edge-triggered generation tracker + `pendingGenerations` snapshot, the dispatch kind router (`createMulmoScriptDispatchHandler`, carrying the realpath symlink-containment guard), and the GraphAI provider-error capture. Host transport is injected via `MulmoScriptServerBackend`; `mulmocast` + `graphai` become peers (must resolve to the host's single hoisted copies). Review hardening: `toStoryRef` relativizes against the realpath stories root; `fileToDataUri` reads asynchronously. MulmoClaude's four host-side files (`mulmo-script-ops.ts`, `mulmoscript-builtin.ts`, `events/mulmoscript-generation.ts`, `utils/mulmoErrorCapture.ts`) collapsed into one ~60-line binding (`server/plugins/mulmoscript-server.ts`). MulmoTerminal wiring is phase 3b.
 
@@ -55,7 +130,7 @@ Package release riding PR #2137 (presentMulmoScript extraction, phase 3a of `pla
 
 ## npm packages — 2026-07-17 (5)
 
-Package release riding PR #2133 (presentMulmoScript extraction, phases 1+2 of `plans/feat-mulmoscript-plugin.md`):
+Package release riding PR #2133 (presentMulmoScript extraction, phases 1+2 of `plans/done/feat-mulmoscript-plugin.md`):
 
 - **`@mulmoclaude/mulmoscript-plugin@0.1.0`** — NEW shared package for the `presentMulmoScript` tool, extracted so MulmoTerminal can import it like `@mulmoclaude/{markdown,form,chart,html}-plugin` (phase 3 does that wiring). **Server core (`.`)**: tool definition, body validators (former `mulmoScriptValidate.ts`), and save / reopen / update-beat / update-script logic against the generic `files.artifacts` capability. **`./vue` + `./style.css`**: the 1,950-line storyboard View + Preview with their own 8-locale i18n; the View reaches every backend through kind-discriminated `useRuntime().dispatch` envelopes, hears generation progress on the plugin pubsub `generation` channel (SSE streams and the `useActiveSession()` watcher both retired; a `pendingGenerations` snapshot dispatch covers views mounted mid-generation), and takes host transport (`chatSessionId`, authenticated `fetchMediaBlob`) via the optional host-adapter injection. MulmoClaude's route bodies moved to shared ops (`mulmo-script-ops.ts`) backing both the legacy REST routes and the new dispatch handler. Review hardening on the way in: non-negative-integer `beatIndex` validation on both surfaces, string-typed query guards, realpath symlink containment restored host-side (`guardStoryWirePath`), edge-triggered (refcounted) generation events, and stale-response guards on every View probe/mutator.
 
@@ -404,7 +479,7 @@ Two threads dominate this release: **writable remote custom views for the mobile
 
 - **Root ↔ launcher ↔ plugin peer dep sync gate** ([#1923](https://github.com/receptron/mulmoclaude/pull/1923)) — new `scripts/mulmoclaude/launcherSync.mjs` audits every PR for three invariants (root ↔ launcher common dep range identical, workspace source satisfies launcher range, plugin `peerDependencies` satisfied by launcher pins). Catches the [#1920](https://github.com/receptron/mulmoclaude/issues/1920) class of bug at PR time.
 - **CHANGELOG.md for 0.9.2 with PR / issue links** ([#1926](https://github.com/receptron/mulmoclaude/pull/1926)) — retroactive entry documenting the 30 PRs shipped in 0.9.2.
-- **Fix plan archived** ([#1935](https://github.com/receptron/mulmoclaude/pull/1935)) — `plans/fix-1915-chat-ui-stuck-mid-turn.md` → `plans/done/` after merge.
+- **Fix plan archived** ([#1935](https://github.com/receptron/mulmoclaude/pull/1935)) — `plans/done/fix-1915-chat-ui-stuck-mid-turn.md` → `plans/done/` after merge.
 
 ### Cascade publishes
 

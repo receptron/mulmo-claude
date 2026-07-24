@@ -19,6 +19,7 @@ import "dotenv/config";
 import type { Request, Response as ExpressResponse } from "express";
 import { createBridgeClient, chunkText } from "@mulmobridge/client";
 import { createWebhookApp, createWebhookRateLimit, verifyHmacSignature } from "@mulmobridge/webhook-runtime";
+import { isRecord, parseCsvSet } from "@mulmoclaude/common";
 
 const TRANSPORT_ID = "viber";
 const MAX_VIBER_TEXT = 7_000;
@@ -37,12 +38,7 @@ function readRequiredEnv(): { authToken: string } {
 const { authToken } = readRequiredEnv();
 
 const senderName = process.env.VIBER_SENDER_NAME ?? "MulmoClaude";
-const allowedUsers = new Set(
-  (process.env.VIBER_ALLOWED_USERS ?? "")
-    .split(",")
-    .map((user) => user.trim())
-    .filter(Boolean),
-);
+const allowedUsers = parseCsvSet(process.env.VIBER_ALLOWED_USERS);
 const allowAll = allowedUsers.size === 0;
 
 const mulmo = createBridgeClient({ transportId: TRANSPORT_ID });
@@ -102,12 +98,6 @@ async function sendViber(receiverId: string, text: string): Promise<void> {
 
 // ── Webhook handler ────────────────────────────────────────────
 
-type JsonRecord = Record<string, unknown>;
-
-function isObj(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
 interface IncomingViber {
   // Raw Viber user id, e.g. "01234567890A=". Kept so allowlist /
   // log lookups compare against what the operator actually sees in
@@ -117,10 +107,10 @@ interface IncomingViber {
 }
 
 function parseMessageEvent(body: unknown): IncomingViber | null {
-  if (!isObj(body)) return null;
+  if (!isRecord(body)) return null;
   if (body.event !== "message") return null;
-  const sender = isObj(body.sender) ? body.sender : null;
-  const message = isObj(body.message) ? body.message : null;
+  const sender = isRecord(body.sender) ? body.sender : null;
+  const message = isRecord(body.message) ? body.message : null;
   if (!sender || !message) return null;
   const rawSenderId = typeof sender.id === "string" ? sender.id : "";
   const textFieldOk = message.type === "text" && typeof message.text === "string";

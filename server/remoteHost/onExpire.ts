@@ -1,4 +1,4 @@
-// onExpire cleanup for the remote-host runner (plans/feat-remote-offline-queue.md).
+// onExpire cleanup for the remote-host runner (plans/done/feat-remote-offline-queue.md).
 //
 // When the shared runner drops a command for being past its `expiresAt`, it calls
 // this BEFORE deleting the command doc so an expired `startChat` leaves nothing

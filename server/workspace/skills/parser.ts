@@ -7,7 +7,7 @@
 
 import { TIME_UNIT_MS, ONE_SECOND_MS } from "../../utils/time.js";
 import { LEADING_BLANK_LINES_PATTERN } from "../../utils/regex.js";
-import { parseFrontmatter } from "../../utils/markdown/frontmatter.js";
+import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
 
 export interface SkillSchedule {

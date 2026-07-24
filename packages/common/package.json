@@ -1,0 +1,44 @@
+{
+  "name": "@mulmoclaude/common",
+  "version": "1.1.0",
+  "description": "General-purpose pure utilities (type guards, etc.) shared across the MulmoClaude host, bridges, and plugins",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./meta-webhook": {
+      "types": "./dist/meta-webhook.d.ts",
+      "import": "./dist/meta-webhook.js",
+      "require": "./dist/meta-webhook.js",
+      "default": "./dist/meta-webhook.js"
+    },
+    "./ssrf": {
+      "types": "./dist/ssrf.d.ts",
+      "import": "./dist/ssrf.js",
+      "require": "./dist/ssrf.js",
+      "default": "./dist/ssrf.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "yarn build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/test_*.ts",
+    "lint": "eslint src test"
+  },
+  "license": "MIT",
+  "author": "Receptron Team",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

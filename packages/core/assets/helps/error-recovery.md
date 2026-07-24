@@ -526,3 +526,30 @@ Two ways the link can be minted, and the tool picks automatically:
 - **Drive shows nothing / "I can't find the user's file"** — not an error. The app holds the
   `drive.file` scope, so it can only ever see files IT created; the user's wider Drive is
   invisible by design. Say so plainly instead of implying an empty Drive.
+
+## Custom view — some images 429 / only a few thumbnails render
+
+### Symptoms
+
+- A collection's custom view renders records fine, but only a handful of its
+  `image`-type field thumbnails appear; the rest stay placeholders.
+- The view's error UI (or console) shows **HTTP 429** from
+  `<dataUrl>/image` with **"too many concurrent queries for this collection —
+  retry shortly"**.
+
+### Cause
+
+The view resolves every image at once — typically a `Promise.all` over all
+records firing one `GET <dataUrl>/image` each. The host caps in-flight
+`/image` + `/query` requests at **4 per collection** (each request re-scans
+the records for authorization), and answers the overflow 429. The paths are
+valid; only the burst is.
+
+### Fix
+
+Edit the view's image-resolution code (`views/*.html` under the collection's
+skill directory) to throttle: a small worker pool (≤ 3 concurrent) draining a
+queue of paths, with one short-delay retry on 429. See the throttled-resolver
+example in `custom-view.md` ("Displaying images"). Do NOT widen the server
+cap, switch to base64-embedding images in the HTML, or treat the 429'd paths
+as bad values.

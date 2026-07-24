@@ -19,6 +19,7 @@
 // First slice of issue #289 (item 6: pub-sub channels).
 
 import { BUILT_IN_PLUGIN_METAS, defineHostAggregate, type BuiltInPluginMetas, type HostPluginCollision, type IntraPluginCollision } from "../plugins/metas";
+import { isRecord, isUnknownArray } from "../utils/types";
 
 /**
  * Channel for the per-session event stream. One per chat session.
@@ -101,6 +102,18 @@ export interface FileChannelPayload {
  *    full refetch (cursor diffs don't carry deletions). */
 export interface SessionsChannelPayload {
   deletedIds?: string[];
+}
+
+/** Read `deletedIds` out of a `PUBSUB_CHANNELS.sessions` payload that arrives
+ *  as `unknown`. Malformed entries are dropped, never the whole batch — this is
+ *  the only cross-tab signal that a session is gone, so one bad id must not
+ *  leave every other deleted session on screen. Shared so the sidebar list and
+ *  the live session map can't prune on different rules (#2365). */
+export function readSessionDeletedIds(payload: unknown): string[] {
+  if (!isRecord(payload)) return [];
+  const { deletedIds } = payload;
+  if (!isUnknownArray(deletedIds)) return [];
+  return deletedIds.filter((entry): entry is string => typeof entry === "string");
 }
 
 /**
