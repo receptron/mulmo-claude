@@ -4,8 +4,8 @@
 // diagram render itself is deferred to `mermaidRender.ts`, which
 // scans the placeholders in the DOM after Vue's v-html injects the
 // html. Two-step split keeps this file pure (no runtime deps beyond
-// `marked`) so tests can assert the html shape without booting a
-// browser.
+// `marked` and the zero-dep `@mulmoclaude/common` leaf) so tests can
+// assert the html shape without booting a browser.
 //
 // Why a renderer override and not a block tokenizer:
 //   - marked already handles every fence variation CommonMark / GFM
@@ -24,10 +24,7 @@
 // short-circuits into the placeholder and never reaches highlight.
 
 import type { MarkedExtension, Tokens } from "marked";
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
+import { escapeHtml } from "@mulmoclaude/common";
 
 export const mermaidExtension: MarkedExtension = {
   renderer: {

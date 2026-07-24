@@ -6,8 +6,8 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseNumericString, toScalarNumber } from "../../../../src/plugins/spreadsheet/engine/numericCoercion.ts";
-import { VALUE_ERROR } from "../../../../src/plugins/spreadsheet/engine/spreadsheet-errors.ts";
+import { holdsNumber, parseNumericString, toScalarNumber } from "../../../../src/plugins/spreadsheet/engine/numericCoercion.ts";
+import { DIV_ZERO_ERROR, VALUE_ERROR } from "../../../../src/plugins/spreadsheet/engine/spreadsheet-errors.ts";
 import { toNumber } from "../../../../src/plugins/spreadsheet/engine/registry.ts";
 
 describe("parseNumericString — reads the formats the engine has always read", () => {
@@ -102,5 +102,51 @@ describe("toScalarNumber — strict scalar read for ABS / SIGN (#2391)", () => {
   // (matching the rest of the engine) rather than erroring as strict Excel would.
   it("still takes the leading number from partly-numeric text", () => {
     assert.equal(toScalarNumber("12abc"), 12);
+  });
+});
+
+// The question `toNumber` cannot answer: it maps text, booleans and a genuine 0
+// to the same 0, so COUNT could not tell "no number here" from "the number zero"
+// and counted COUNT("text") as a value (Codex review on #2360).
+describe("holdsNumber — is there a number in this value at all", () => {
+  it("is true for numbers, including zero and negatives", () => {
+    assert.equal(holdsNumber(42), true);
+    assert.equal(holdsNumber(0), true);
+    assert.equal(holdsNumber(-7.5), true);
+  });
+
+  it("is true for text the engine reads as a number", () => {
+    assert.equal(holdsNumber("1"), true);
+    assert.equal(holdsNumber("  42  "), true);
+    assert.equal(holdsNumber("5%"), true);
+    assert.equal(holdsNumber("$1,000"), true);
+  });
+
+  it("is false for text holding no number", () => {
+    assert.equal(holdsNumber("text"), false);
+    assert.equal(holdsNumber(""), false);
+    assert.equal(holdsNumber("   "), false);
+    assert.equal(holdsNumber("N/A"), false);
+    assert.equal(holdsNumber("abc12"), false);
+  });
+
+  // Same PINNED stance as toNumber: a boolean is not a number in this engine.
+  it("is false for booleans", () => {
+    assert.equal(holdsNumber(true), false);
+    assert.equal(holdsNumber(false), false);
+  });
+
+  it("is false for a formula error value", () => {
+    assert.equal(holdsNumber(DIV_ZERO_ERROR), false);
+  });
+
+  it("is false for NaN, which is a number that is no number", () => {
+    assert.equal(holdsNumber(NaN), false);
+  });
+
+  // Inherited from parseNumericString, pinned deliberately: the engine reads the
+  // leading number everywhere, so SUM and COUNT agree that "12abc" has one.
+  it("is true for a leading-number string, unlike Excel", () => {
+    assert.equal(holdsNumber("12abc"), true);
   });
 });

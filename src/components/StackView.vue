@@ -69,13 +69,14 @@
            rounded/border/shadow box, role header) so only the stack
            card's own border shows.
 
-           We render the upstream OriginalView directly rather than our
-           local TextResponseView wrapper, so we lose the wrapper's
-           "open external links in a new tab" click handler. Attach
-           the same handler here via @click.capture so cross-origin
-           links in assistant Markdown don't navigate the SPA away. -->
-        <div v-if="isTextResponse(item.head)" class="stack-text-response" @click.capture="handleExternalLinkClick">
-          <TextResponseOriginalView :selected-result="item.head" />
+           The upstream OriginalView already owns the external-link +
+           workspace-path click handling (its own @click.capture), so we must
+           NOT add another here — a second capture-phase handler on this
+           wrapper fired first and opened every external link in TWO tabs.
+           `@update-result` is wired so edits made in the card's editor
+           actually persist instead of vanishing. -->
+        <div v-if="isTextResponse(item.head)" class="stack-text-response">
+          <TextResponseOriginalView :selected-result="item.head" @update-result="forwardResultUpdate" />
         </div>
         <!-- Document-like plugins: let the content flow at its natural
            height by overriding the plugin's internal h-full / overflow
@@ -94,7 +95,7 @@
             :selected-result="item.head"
             :send-text-message="sendTextMessage"
             :google-map-key="googleMapKeyFor(item.head.toolName)"
-            @update-result="(r: ToolResultComplete) => emit('updateResult', r)"
+            @update-result="forwardResultUpdate"
           />
         </div>
         <!-- Other plugins: fixed height wrapper so plugins that rely on
@@ -110,7 +111,7 @@
             :results="item.isGroup ? item.members : undefined"
             :send-text-message="sendTextMessage"
             :google-map-key="googleMapKeyFor(item.head.toolName)"
-            @update-result="(r: ToolResultComplete) => emit('updateResult', r)"
+            @update-result="forwardResultUpdate"
           />
           <pre v-else class="h-full overflow-auto p-4 text-xs text-gray-500 whitespace-pre-wrap">{{ JSON.stringify(item.head, null, 2) }}</pre>
         </div>
@@ -124,9 +125,8 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { getPlugin } from "../tools";
 import { TOOL_NAMES, type ToolName } from "../config/toolNames";
-import type { ToolResultComplete } from "gui-chat-protocol/vue";
+import type { ToolResult, ToolResultComplete } from "gui-chat-protocol/vue";
 import { View as TextResponseOriginalView } from "../plugins/textResponse/index";
-import { handleExternalLinkClick } from "@mulmoclaude/markdown-utils/dom/externalLink";
 import { clampIframeHeight } from "../utils/dom/iframeHeightClamp";
 import { isNearBottom } from "../utils/dom/scrollable";
 import type { TextResponseData } from "../plugins/textResponse/types";
@@ -237,6 +237,16 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const stickToBottom = ref(true);
 const itemRefs = new Map<string, HTMLElement>();
 const naturalWrapperRefs = new Map<string, HTMLElement>();
+
+// A plugin view emits `ToolResult`, whose `toolName` is optional; the parent
+// only accepts a complete result. Check at runtime instead of asserting the
+// narrower type in the template — an edit from a result that somehow lost its
+// toolName has nothing to update and is dropped rather than forwarded.
+function forwardResultUpdate(result: ToolResult): void {
+  const { toolName, uuid } = result;
+  if (typeof toolName !== "string" || typeof uuid !== "string") return;
+  emit("updateResult", { ...result, toolName, uuid });
+}
 
 function setItemRef(uuid: string, element: HTMLElement | null): void {
   if (element) itemRefs.set(uuid, element);

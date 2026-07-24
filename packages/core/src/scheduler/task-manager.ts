@@ -4,6 +4,7 @@
 // edge so an ordering like "news fetch → journal → memory extraction"
 // runs in sequence within one tick.
 
+import type { MinimalLogger } from "@mulmoclaude/common";
 import { SCHEDULE_TYPES } from "@receptron/task-scheduler";
 
 const ONE_SECOND_MS = 1000;
@@ -38,11 +39,7 @@ function staggerStepMs(staggerMs: number, tickMs: number, count: number): number
 }
 
 /** Minimal logger the engine logs through. Absent one, runs silent. */
-export interface SchedulerLogger {
-  info: (message: string, data?: Record<string, unknown>) => void;
-  warn: (message: string, data?: Record<string, unknown>) => void;
-  error: (message: string, data?: Record<string, unknown>) => void;
-}
+export type SchedulerLogger = MinimalLogger;
 
 const NOOP_LOG: SchedulerLogger = { info: () => {}, warn: () => {}, error: () => {} };
 

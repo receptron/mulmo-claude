@@ -20,6 +20,7 @@
 import path from "node:path";
 import { promises as fsp, constants as fsConstants, type Dirent } from "node:fs";
 import { writeFileAtomic } from "../../utils/files/atomic.js";
+import { ONE_DAY_MS } from "../../utils/time.js";
 import { mergeFrontmatter, parseFrontmatter, serializeWithFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { shortId } from "../../utils/id.js";
 import { workspacePath as defaultWorkspacePath } from "../workspace.js";
@@ -28,7 +29,6 @@ import type { WikiPageEditor, WikiWriteMeta } from "./io.js";
 
 export const SNAPSHOT_RETAIN_COUNT = 100;
 export const SNAPSHOT_RETAIN_DAYS = 180;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface SnapshotPathOptions {
   workspaceRoot?: string;

@@ -19,6 +19,7 @@
 // still wins and the failure is logged. Active is the source of
 // truth; history is an audit aid.
 
+import type { MinimalLogger } from "@mulmoclaude/common";
 import { randomUUID } from "node:crypto";
 import { loadActive, loadHistory, saveActive, saveHistory, type WriteJson } from "./store.js";
 import { validatePublishInput } from "./validate.js";
@@ -39,10 +40,7 @@ export { NOTIFIER_LIMITS, validatePublishInput } from "./validate.js";
 /** Minimal logger the engine needs. The host passes its structured
  *  logger; absent one, failures are swallowed (the engine never throws
  *  on a fan-out/persist-best-effort path). */
-export interface NotifierLogger {
-  warn: (message: string, data?: Record<string, unknown>) => void;
-  error: (message: string, data?: Record<string, unknown>) => void;
-}
+export type NotifierLogger = Pick<MinimalLogger, "warn" | "error">;
 
 export interface NotifierConfig {
   /** Atomic JSON writer (the host's `writeJsonAtomic`). */

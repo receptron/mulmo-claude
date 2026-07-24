@@ -13,6 +13,7 @@
 // user isn't told to reconnect during a Spotify outage.
 
 import type { PluginRuntime } from "gui-chat-protocol";
+import { errorMessage } from "@mulmoclaude/common";
 
 import { mergeRefreshResponse, writeTokens } from "./tokens";
 import { ONE_SECOND_MS } from "./time";
@@ -224,8 +225,4 @@ export function parseRetryAfterSec(headerValue: string | null): number {
     if (deltaSec > 0) return deltaSec;
   }
   return RETRY_AFTER_FALLBACK_SEC;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

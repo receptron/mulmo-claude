@@ -6,27 +6,15 @@
 // String-only, no `marked` / DOM / Node deps — the host pipeline
 // (image-ref rewrite, marked.parse, task-interactive) wraps this.
 
+import { escapeHtml } from "@mulmoclaude/common";
 import { parseWikiLink } from "./link.js";
 
-/** HTML-escape attribute / text content. Self-contained on purpose:
- *  this package can't reach the host's escaper, and the rule is a
- *  fixed five-char map. */
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
-}
+// `escapeHtml` moved down to the zero-dep leaf `@mulmoclaude/common` (#2483) so
+// `@mulmoclaude/markdown-utils` — a leaf THIS package depends on, hence unable
+// to import back up — can share it. Re-exported here because the wiki
+// consumers (collection-plugin's graph view, the host's wiki embeds and
+// spreadsheet view) already import it from `@mulmoclaude/core/wiki`.
+export { escapeHtml };
 
 /**
  * Replace every `[[page name]]` occurrence in `content` with a

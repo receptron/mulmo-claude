@@ -46,3 +46,21 @@ This is the single home the #2217 consolidation could not reach, because
 
 `isRecord` vs `isObj`: use `isRecord` whenever you go on to index string keys —
 `isObj` lets arrays through, which is rarely what you want for a JSON payload.
+
+## Shared types
+
+`src/logger.ts` (re-exported from the root entry) holds the canonical logger
+interface family:
+
+| Type | Shape | Notes |
+|---|---|---|
+| `StructuredLogger` | `error`/`warn`/`info`/`debug` `(prefix, message, data?)` | The host logger, and every engine/plugin logger injected from it |
+| `MinimalLogger` | `info`/`warn`/`error` `(message, data?)` | For a package that already namespaces its own entries |
+
+They live here because the shape spans all three tiers — host `server/`, the
+plugins, and `@mulmoclaude/core` — so no tier above the leaf can own the
+declaration without becoming an uphill import for the others (#2486). Domains
+keep their own exported name by **aliasing** rather than re-declaring
+(`export type FeedsLogger = StructuredLogger`, or a
+`Pick<MinimalLogger, "warn" | "error">` subset): TypeScript is structurally
+typed, so the alias preserves the public name and the emitted `.d.ts` exactly.

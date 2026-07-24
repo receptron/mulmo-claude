@@ -8,20 +8,14 @@
 // workspace root) unchanged while removing the package's dependency on
 // host-only modules (`server/workspace/workspace.ts`, the host logger).
 
-import { createForwardingLogger, createHostSlot } from "../../host/hostSlot.js";
+import { createForwardingLogger, createHostSlot, type StructuredLogger } from "../../host/hostSlot.js";
 
 // Type-only: this module must not pull the firebase SDK in at runtime
 // (it is an OPTIONAL peer of this package).
 import type { FirestoreDocs } from "./firestoreDocs";
 
-/** Logger shape the engine logs through — matches the host `Logger`
- *  (prefix, message, optional structured data). */
-export interface CollectionLogger {
-  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-}
+/** Public alias of the shared `StructuredLogger` — keeps the domain surface name-stable. */
+export type CollectionLogger = StructuredLogger;
 
 export interface CollectionHost {
   /** Absolute path to the host workspace root (e.g. `~/mulmoclaude`). The

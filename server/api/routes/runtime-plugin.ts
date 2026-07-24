@@ -37,6 +37,7 @@ import { getRuntimePluginByOauthAlias, getRuntimePlugins } from "../../plugins/r
 import { getBuiltinDispatch } from "../../plugins/builtin-dispatch.js";
 import { notFound, serverError } from "../../utils/httpError.js";
 import { errorMessage } from "../../utils/errors.js";
+import { escapeHtml } from "@mulmoclaude/core/wiki";
 import { isRecord } from "../../utils/types.js";
 import { resolveWithinRoot } from "../../utils/files/safe.js";
 import { readPluginAsset } from "../../utils/files/plugins-io.js";
@@ -167,12 +168,10 @@ function renderFallbackCallbackHtml(title: string, body: string): string {
   // Minimal fallback when the plugin doesn't return its own HTML.
   // Plugins are encouraged to return a richer page; this is just a
   // safety net so the browser always gets something readable.
-  const escape = (value: string) =>
-    value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escape(title)}</title>
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;color:#111}h1{margin-bottom:1rem}pre{white-space:pre-wrap;background:#f5f5f5;padding:1rem;border-radius:.5rem}</style>
-<h1>${escape(title)}</h1>
-<pre>${escape(body)}</pre>
+<h1>${escapeHtml(title)}</h1>
+<pre>${escapeHtml(body)}</pre>
 </html>`;
 }
 

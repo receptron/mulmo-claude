@@ -71,10 +71,10 @@ These are verified or plausible but out of scope for a mechanical fix-plus-test 
   snapshot failure rendered as "page deleted"~~ **(shipped, fix/wiki-stale-response)**;
   renderer vs `WIKI_LINK_PATTERN` divergence (core); save-queue extraction
   (`taskSaveQueue`).
-- **textResponse / StackView**: speaker labels hardcoded English (×8);
+- ~~**textResponse / StackView**: speaker labels hardcoded English (×8);
   StackView duplicate capture-phase link handler (opens 2 tabs); StackView
   edit panel emits to nothing (silent edit loss); copy button copies rewritten
-  display text in Files-Explorer mode.
+  display text in Files-Explorer mode.~~ **Shipped (fix/textresponse-stackview).**
 - ~~**generateImage**: stale-image cache watch; chart-plugin sparse
   `instances[]`.~~ **(shipped, fix/chart-generateimage-cleanup — chart crash +
   generateImage deep-watch)** — generateImage's caching-ref/StackView-key

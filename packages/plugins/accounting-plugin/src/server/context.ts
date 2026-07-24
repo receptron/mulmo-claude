@@ -12,6 +12,8 @@
 // the service with an explicit workspace root) it falls back to a
 // console logger so nothing throws.
 
+import type { StructuredLogger } from "@mulmoclaude/common";
+
 /** Minimal pub/sub shape — structurally compatible with the host's
  *  `IPubSub`. The eventPublisher holds its own instance (set via
  *  `initAccountingEventPublisher`); this type is the contract. */
@@ -19,16 +21,8 @@ export interface IPubSub {
   publish: (channel: string, payload: unknown) => void;
 }
 
-/** Logger shape — mirrors the host server logger
- *  `log.{level}(namespace, message, data?)`. `data` uses
- *  `Record<string, unknown>` (not `object`) so the host's `Logger`
- *  is structurally assignable when injected. */
-export interface AccountingLogger {
-  error: (namespace: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (namespace: string, message: string, data?: Record<string, unknown>) => void;
-  info: (namespace: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (namespace: string, message: string, data?: Record<string, unknown>) => void;
-}
+/** Alias of the shared `StructuredLogger` — the host `Logger` stays directly assignable when injected. */
+export type AccountingLogger = StructuredLogger;
 
 export interface AccountingServerDeps {
   /** Absolute path to the workspace root (where `data/` lives). Used as

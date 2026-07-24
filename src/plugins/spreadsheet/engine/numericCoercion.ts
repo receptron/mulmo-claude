@@ -6,6 +6,9 @@
  *    anything unreadable becomes 0. PINNED (booleans are 0, not Excel's 1/0).
  *  - `toScalarNumber` — strict, for single-value math functions (ABS / SIGN):
  *    booleans are 1/0 and non-numeric text is `#VALUE!`, matching Excel.
+ *
+ * `holdsNumber` asks the question neither read can answer once it has coerced:
+ * was there a number here at all, or is this 0 the reading of something else.
  */
 
 import type { CellValue } from "./types";
@@ -29,6 +32,19 @@ export function parseNumericString(value: string): number | null {
   if (value.includes("$")) return numberOrNull(parseFloat(value.replace(/[$,]/g, "").trim()));
   if (value.includes(",")) return numberOrNull(parseFloat(value.replace(/,/g, "").trim()));
   return numberOrNull(parseFloat(value));
+}
+
+/**
+ * Whether a value holds a number at all, under the same reading `toNumber` uses.
+ *
+ * `toNumber` answers 0 for text, for a boolean and for a genuine 0 alike, so a
+ * caller that must tell "no number here" from "the number zero" — COUNT — cannot
+ * ask it. Booleans are not numbers here, matching `toNumber`'s PINNED behaviour.
+ */
+export function holdsNumber(value: CellValue): boolean {
+  if (typeof value === "number") return !isNaN(value);
+  if (typeof value !== "string") return false;
+  return parseNumericString(value) !== null;
 }
 
 /**

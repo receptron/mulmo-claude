@@ -45,18 +45,12 @@ describe("#2359 typed error reporting", () => {
     assert.equal(errorType, "syntax");
   });
 
-  it("unknown: a handler that throws (SUM over two ranges) is #ERROR!, not the formula text", () => {
-    const sheet: SheetData = {
-      name: "S",
-      data: [
-        [{ v: 1 }, { v: 10 }, { v: "=SUM(A1:A5,B1:B5)" }],
-        [{ v: 2 }, { v: 20 }],
-        [{ v: 3 }, { v: 30 }],
-        [{ v: 4 }, { v: 40 }],
-        [{ v: 5 }, { v: 50 }],
-      ],
-    };
-    const { value, errorType } = cellAndError(sheet, 0, 2);
+  // IFS needs condition/value PAIRS — a count the registry's min/max cannot
+  // express, so the handler itself throws. (This used to use SUM over two
+  // ranges, which now legitimately sums them.)
+  it("unknown: a handler that throws (IFS with an odd argument count) is #ERROR!, not the formula text", () => {
+    const sheet: SheetData = { name: "S", data: [[{ v: 1 }, { v: '=IFS(A1>0, "yes", "orphan")' }]] };
+    const { value, errorType } = cellAndError(sheet, 0, 1);
     assert.equal(value, "#ERROR!");
     assert.equal(errorType, "unknown");
   });
@@ -69,7 +63,7 @@ describe("#2359 typed error reporting", () => {
   });
 
   it("a failed formula never lands in the cell as a bare string", () => {
-    const formulas = ["=1/0", "=UNKNOWNFN(A1)", "=SUM(A1:A5,B1:B5)"];
+    const formulas = ["=1/0", "=UNKNOWNFN(A1)", '=IFS(A1>0, "yes", "orphan")'];
     for (const formula of formulas) {
       const [[value]] = calc({ name: "S", data: [[{ v: formula }]] }).data;
       assert.equal(typeof value === "string" && value.startsWith("#"), true, `${formula} → ${JSON.stringify(value)} should be an # error value`);

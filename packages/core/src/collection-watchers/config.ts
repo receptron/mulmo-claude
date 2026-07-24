@@ -6,6 +6,7 @@
 // adapter. MulmoClaude wires its legacy notification machinery; a future
 // MulmoTerminal wires its own routes + pluginData shape.
 
+import type { MinimalLogger } from "@mulmoclaude/common";
 import type { NotifierSeverity } from "../notifier";
 
 /** Two-level urgency a pending record can carry, derived from the
@@ -13,10 +14,7 @@ import type { NotifierSeverity } from "../notifier";
  *  scale via `priorityToSeverity`. */
 export type CompletionPriority = "normal" | "high";
 
-export interface CollectionWatcherLogger {
-  info: (message: string, data?: Record<string, unknown>) => void;
-  warn: (message: string, data?: Record<string, unknown>) => void;
-}
+export type CollectionWatcherLogger = Pick<MinimalLogger, "info" | "warn">;
 
 /** The host-specific notification surface the reconciler binds to. The
  *  reconciler owns the internal `legacyId` key (it encodes slug+itemId

@@ -103,4 +103,29 @@ export function toUtcIsoDate(timestamp: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// A Map, not an object literal: `{}[char]` reads through the prototype chain,
+// so a future caller widening the regex would silently get `[object Object]`
+// for keys like `constructor`.
+const HTML_ESCAPES = new Map<string, string>([
+  ["&", "&amp;"],
+  ["<", "&lt;"],
+  [">", "&gt;"],
+  ['"', "&quot;"],
+  ["'", "&#39;"],
+]);
+
+/** HTML-escape text destined for markup or an attribute value — the fixed
+ *  five-character map, nothing more. Lives here rather than in
+ *  `@mulmoclaude/core/wiki` (#2483) because `@mulmoclaude/markdown-utils` is a
+ *  leaf that core depends on and so cannot import back up; core/wiki
+ *  re-exports this, keeping its consumers' import path unchanged.
+ *
+ *  Escaping `&` first is what makes a single pass safe — the entities this
+ *  introduces contain none of the other four characters, so nothing is
+ *  double-escaped. Not a sanitiser: it neither strips tags nor validates URLs. */
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES.get(char) ?? char);
+}
+
 export { scanEnvOptions, snakeToLowerCamel, type ScanEnvOptionsConfig } from "./envScan.js";
+export type { MinimalLogger, StructuredLogger } from "./logger.js";

@@ -215,14 +215,9 @@ const renderedHtml = computed(() => {
 });
 
 const speakerLabel = computed(() => {
-  switch (messageRole.value) {
-    case "system":
-      return "System";
-    case "user":
-      return "You";
-    default:
-      return "Assistant";
-  }
+  if (messageRole.value === "system") return t("pluginTextResponse.speakerSystem");
+  if (messageRole.value === "user") return t("pluginTextResponse.speakerUser");
+  return t("pluginTextResponse.speakerAssistant");
 });
 
 const roleTheme = computed(() => {
@@ -320,7 +315,12 @@ function cancelEdit() {
 const { copied, copy } = useClipboardCopy();
 
 async function copyText() {
-  await copy(props.selectedResult.data?.text ?? "");
+  // In Files-Explorer mode `data.text` is the DISPLAY text with image refs
+  // rewritten to `/api/files/raw?...` — copying that yields broken URLs
+  // outside the app. Prefer the raw editable source, then the export source,
+  // falling back to display text for the chat path (where it's the full raw
+  // text the truncation banner promises).
+  await copy(props.editableSource ?? props.selectedResult.data?.pdfSourceText ?? props.selectedResult.data?.text ?? "");
 }
 
 // PDF and zip share the same source: display text and export source can

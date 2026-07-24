@@ -27,6 +27,11 @@ export interface Role {
   name: string;
 }
 
+/** Structurally identical to `StructuredLogger` in `@mulmoclaude/common`, where
+ *  the rest of that family was folded (#2486). This one stays local: rule 2 only
+ *  exempts a DECLARED package dependency, and this package's sole dependency is
+ *  `@mulmobridge/protocol` — adding common would give a published
+ *  `@mulmobridge/*` package its first `@mulmoclaude/*` edge, for a type. */
 export interface Logger {
   error(prefix: string, message: string, data?: Record<string, unknown>): void;
   warn(prefix: string, message: string, data?: Record<string, unknown>): void;

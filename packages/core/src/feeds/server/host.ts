@@ -6,7 +6,7 @@
 // subpath, imported directly. Both MulmoClaude and MulmoTerminal supply their
 // own host shim.
 
-import { createForwardingLogger, createHostSlot } from "../../host/hostSlot.js";
+import { createForwardingLogger, createHostSlot, type StructuredLogger } from "../../host/hostSlot.js";
 
 /** Outcome of launching one hidden/visible agent-ingest worker. `chatId` lets
  *  the caller register a completion hook so a failed refresh doesn't die
@@ -27,13 +27,8 @@ export type AgentWorkerRunner = (args: {
   onComplete?: (outcome: { didError: boolean }) => void | Promise<void>;
 }) => Promise<AgentWorkerResult>;
 
-/** Structured logger, `(prefix, msg, data?)` — same shape as `CollectionLogger`. */
-export interface FeedsLogger {
-  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-}
+/** Public alias of the shared `StructuredLogger` — same shape as `CollectionLogger`. */
+export type FeedsLogger = StructuredLogger;
 
 export interface FeedsHost {
   /** Absolute workspace root — the default for `refreshDue()` and state paths. */

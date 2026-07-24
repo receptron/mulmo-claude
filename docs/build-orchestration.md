@@ -2,14 +2,17 @@
 
 Read this when adding a new workspace package, debugging a "Cannot find module" cold-install error, or touching `scripts/build-workspaces.mjs`. The dependency-direction rule that the tier order enforces is in [`CLAUDE.md`](../CLAUDE.md#package-dependency-direction-always-apply).
 
-The script runs **four tiers in order**:
+The script runs **five tiers in order**:
 
-1. `@mulmobridge/protocol` + `@mulmobridge/web-push` + `@mulmobridge/webhook-runtime` + `@receptron/task-scheduler` — no internal deps, run in parallel
-2. `@mulmobridge/{client, chat-service, mock-server}` — depend on tier 1
+0. `@mulmoclaude/common` — alone, and first. The zero-dep leaf every other tier may import; `@mulmoclaude/markdown-utils` takes a real dependency on it (`escapeHtml`, #2483), so it cannot share tier 1's parallel group without racing that package's `tsc`.
+1. `@mulmobridge/protocol` + `@mulmobridge/web-push` + `@mulmobridge/webhook-runtime` + `@receptron/task-scheduler` + `@mulmoclaude/markdown-utils` — no deps beyond tier 0, run in parallel
+2. `@mulmobridge/{client, chat-service, mock-server}` + `@mulmoclaude/core` — depend on tiers 0-1
 3. **All bridges** under `packages/bridges/*` whose name starts with `@mulmobridge/` and has a `build` script
 4. **All runtime plugins** under `packages/plugins/*` whose name starts with `@mulmoclaude/` AND ends with `-plugin` and has a `build` script
 
-Tiers 3 and 4 are auto-discovered by `scripts/build-workspaces.mjs`. Tiers 1 and 2 stay explicit in `package.json` because their dep-graph order can't be globbed.
+Tiers 3 and 4 are auto-discovered by `scripts/build-workspaces.mjs`. Tiers 0-2 stay explicit in `package.json` because their dep-graph order can't be globbed.
+
+**Before adding a workspace-internal dep to a tier-0/1/2 package**, check that the target builds in an EARLIER tier. Two packages in the same `concurrently` group are genuinely parallel — a `tsc` consumer starting before its producer emits `dist/*.d.ts` fails cold, and passes on a warm tree, so the breakage only ever shows up in CI.
 
 ## Adding a new workspace
 

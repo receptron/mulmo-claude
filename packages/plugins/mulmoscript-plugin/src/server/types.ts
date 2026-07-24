@@ -3,6 +3,7 @@
 // injected backend — MulmoClaude and MulmoTerminal each supply their own
 // implementation (phase 3 of plans/done/feat-mulmoscript-plugin.md).
 
+import type { MinimalLogger } from "@mulmoclaude/common";
 import type { FileOps } from "gui-chat-protocol";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
 
@@ -32,13 +33,8 @@ export interface MovieProgressEvent {
   beatIndex: number;
 }
 
-/** Host logger; every entry is already namespaced to mulmoScript by the
- *  package, so hosts just bind their own prefix/transport. */
-export interface MulmoScriptServerLog {
-  info: (message: string, data?: Record<string, unknown>) => void;
-  warn: (message: string, data?: Record<string, unknown>) => void;
-  error: (message: string, data?: Record<string, unknown>) => void;
-}
+/** Host logger; every entry is already namespaced to mulmoScript by the package, so hosts just bind their own prefix/transport. */
+export type MulmoScriptServerLog = MinimalLogger;
 
 /**
  * Host capabilities the server ops run against. Only genuinely

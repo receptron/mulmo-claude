@@ -6,15 +6,13 @@
 // bindings (collection, feeds, google) can't drift into subtly different
 // behaviour.
 
+import type { StructuredLogger } from "@mulmoclaude/common";
+
 /** Structured logger shape the engines log through — `(prefix, message,
- *  data?)`, matching the host `Logger`. The domains re-declare their own
- *  identically-shaped alias so their public surface is unchanged. */
-export interface StructuredLogger {
-  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-}
+ *  data?)`, matching the host `Logger`. The canonical declaration lives in
+ *  `@mulmoclaude/common`; the domains alias it under their public names
+ *  (`CollectionLogger` / `FeedsLogger` / `GoogleLogger`). */
+export type { StructuredLogger };
 
 /** A single host-injected dependency, wired once at boot and read back by the
  *  engine. `get()` fails loudly when the host never configured (the engine

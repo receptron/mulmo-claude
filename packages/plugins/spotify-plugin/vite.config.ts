@@ -8,7 +8,8 @@ import dts from "vite-plugin-dts";
 //   the tarball into `~/mulmoclaude/plugins/.cache/<pkg>/<ver>/` with
 //   no node_modules underneath, so any bare import left as `external`
 //   breaks at load time. Inline `gui-chat-protocol` (just the identity
-//   `definePlugin` helper) and `zod`.
+//   `definePlugin` helper), `zod`, and `@mulmoclaude/common` (the tiny
+//   zero-dep leaf holding `errorMessage` / `escapeHtml`).
 //
 // - `dist/vue.js` (browser) — `vue` and `gui-chat-protocol/vue` stay
 //   external; the host provides Vue via the importmap and

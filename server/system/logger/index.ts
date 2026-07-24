@@ -1,3 +1,4 @@
+import type { StructuredLogger } from "@mulmoclaude/common";
 import type { LoggerConfig } from "./config.js";
 import { resolveConfig } from "./config.js";
 import { createConsoleSink, createFileSink, createTelemetrySink } from "./sinks.js";
@@ -8,12 +9,8 @@ export type { LogLevel, LogRecord } from "./types.js";
 export type { LoggerConfig } from "./config.js";
 export { resolveConfig, DEFAULT_CONFIG } from "./config.js";
 
-export interface Logger {
-  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-}
+/** The canonical `StructuredLogger` under the host's historical name. */
+export type Logger = StructuredLogger;
 
 export function createLogger(config: LoggerConfig): Logger {
   const sinks: Sink[] = [];

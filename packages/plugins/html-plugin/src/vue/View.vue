@@ -61,6 +61,7 @@ import { htmlArtifactPreviewUrl } from "../core/paths";
 import { useT } from "../lang";
 import { buildPrintCspContent } from "./previewCsp";
 import { useFileWatch } from "@mulmoclaude/core/plugin-vue";
+import { errorMessage } from "@mulmoclaude/common";
 
 const runtime = useRuntime();
 const t = useT();
@@ -68,10 +69,6 @@ const t = useT();
 const props = defineProps<{
   selectedResult: ToolResultComplete<PresentHtmlData>;
 }>();
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 const PRINT_STYLE_CSS = `@media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }

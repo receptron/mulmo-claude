@@ -4,14 +4,10 @@
 // `collection/server/host.ts`). The default is silent so the engine works
 // unconfigured in unit tests.
 
-import { createForwardingLogger, createHostSlot } from "../host/hostSlot.js";
+import { createForwardingLogger, createHostSlot, type StructuredLogger } from "../host/hostSlot.js";
 
-export interface GoogleLogger {
-  error: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  warn: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  info: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-  debug: (prefix: string, message: string, data?: Record<string, unknown>) => void;
-}
+/** Public alias of the shared `StructuredLogger` — keeps the domain surface name-stable. */
+export type GoogleLogger = StructuredLogger;
 
 const hostSlot = createHostSlot<GoogleLogger>("@mulmoclaude/core/google: configureGoogleHost()");
 

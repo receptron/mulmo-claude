@@ -20,6 +20,7 @@
 // surface at lint time.
 
 import { definePlugin, type PluginRuntime } from "gui-chat-protocol";
+import { escapeHtml } from "@mulmoclaude/common";
 
 import { TOOL_DEFINITION } from "./definition";
 import { DispatchArgsSchema, type DispatchArgs } from "./schemas";
@@ -615,8 +616,4 @@ function renderCallbackHtml(params: { title: string; body: string }): string {
 <h1>${escapeHtml(params.title)}</h1>
 <pre>${escapeHtml(params.body)}</pre>
 </html>`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }

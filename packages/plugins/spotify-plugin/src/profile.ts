@@ -89,7 +89,7 @@ export async function getProfile(deps: ProfileDeps): Promise<{ ok: true; profile
     return { ok: true, profile: fresh.profile };
   }
   if (cached) {
-    deps.runtime.log.warn("profile fetch failed; serving stale cache", { detail: errorMessage(fresh.error) });
+    deps.runtime.log.warn("profile fetch failed; serving stale cache", { detail: formatClientError(fresh.error) });
     return { ok: true, profile: cached };
   }
   return fresh;
@@ -110,7 +110,10 @@ export function isPremium(profile: SpotifyProfile): boolean {
   return profile.product === PREMIUM_PRODUCT;
 }
 
-function errorMessage(error: SpotifyClientError): string {
+// Not the shared `errorMessage(err: unknown)` from `@mulmoclaude/common` — this
+// renders an already-typed `SpotifyClientError` union. Named apart (#2483) so a
+// grep for the shared helper's copies doesn't keep rediscovering it.
+function formatClientError(error: SpotifyClientError): string {
   switch (error.kind) {
     case "auth_expired":
       return error.detail;
