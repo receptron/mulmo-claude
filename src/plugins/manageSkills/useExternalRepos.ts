@@ -15,6 +15,7 @@ import { pluginEndpoints } from "../api";
 import { buildRouteUrl } from "../meta-types";
 import type { SkillsEndpoints } from "./definition";
 import { loadRepoCollapsed, persistRepoCollapsed, groupEntriesByRepo, toggleInSet, buildRepoInstallBody } from "./categories";
+import { repoActionBlocked } from "./actionLock";
 import type { CatalogEntry } from "./useSkillCatalog";
 
 type TranslateFn = ReturnType<typeof useI18n>["t"];
@@ -163,7 +164,7 @@ async function uninstallRepo(state: ReposState, repoId: string): Promise<void> {
   // Bail if this repo is mid-update: uninstall + re-install interleave with
   // no server-side lock, so a delete during a slow update can be undone by
   // the update's re-copy (repo reappears), or leave a half-copied dir.
-  if (state.uninstallingRepoId.value !== null || state.updatingRepoId.value === repoId) return;
+  if (repoActionBlocked(state.uninstallingRepoId.value, state.updatingRepoId.value, repoId)) return;
   if (typeof window !== "undefined" && !window.confirm(state.t("pluginManageSkills.catalogUninstallConfirm"))) return;
   state.uninstallingRepoId.value = repoId;
   try {
@@ -189,7 +190,7 @@ async function uninstallRepo(state: ReposState, repoId: string): Promise<void> {
 // clears even if the request throws.
 async function updateRepo(state: ReposState, repo: ExternalRepo): Promise<void> {
   // Bail if this repo is mid-uninstall (see uninstallRepo — same interleave).
-  if (state.updatingRepoId.value !== null || state.uninstallingRepoId.value === repo.repoId) return;
+  if (repoActionBlocked(state.updatingRepoId.value, state.uninstallingRepoId.value, repo.repoId)) return;
   state.updatingRepoId.value = repo.repoId;
   try {
     const response = await apiPost<{ installed: true; repoId: string }>(state.endpoints.externalReposInstall.url, buildRepoInstallBody(repo.url, repo.subpath));

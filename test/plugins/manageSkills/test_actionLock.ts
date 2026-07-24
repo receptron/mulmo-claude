@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { acquireActionKey, releaseActionKey } from "../../../src/plugins/manageSkills/actionLock.js";
+import { acquireActionKey, releaseActionKey, repoActionBlocked } from "../../../src/plugins/manageSkills/actionLock.js";
 
 describe("acquireActionKey", () => {
   it("acquires when idle", () => {
@@ -45,5 +45,31 @@ describe("acquire/release round-trip", () => {
     assert.equal(acquired, false);
     // The intruder never owned it, so its release must be a no-op.
     assert.equal(releaseActionKey(held, "intruder"), held);
+  });
+});
+
+describe("repoActionBlocked", () => {
+  it("allows an action when nothing is in flight", () => {
+    assert.equal(repoActionBlocked(null, null, "repo-a"), false);
+  });
+
+  it("blocks when the same class of action is already running", () => {
+    // e.g. an uninstall while another uninstall is in flight.
+    assert.equal(repoActionBlocked("repo-a", null, "repo-b"), true);
+  });
+
+  // Regression: uninstall must bail while THIS repo is mid-update (and vice
+  // versa) — the server has no lock, so the overlap can resurrect a deleted
+  // repo or leave a half-copied dir.
+  it("blocks when the opposite action is running against the same repo", () => {
+    assert.equal(repoActionBlocked(null, "repo-a", "repo-a"), true);
+  });
+
+  it("allows when the opposite action runs against a DIFFERENT repo", () => {
+    assert.equal(repoActionBlocked(null, "repo-a", "repo-b"), false);
+  });
+
+  it("blocks self-in-flight even against a different repo", () => {
+    assert.equal(repoActionBlocked("repo-a", null, "repo-a"), true);
   });
 });
