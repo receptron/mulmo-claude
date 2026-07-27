@@ -42,6 +42,8 @@ This writes `MulmoClaude.app` to `/Applications` (or `~/Applications` if that is
 
 When something is missing — Node.js, npm, or Claude Code — it says which one and what to run, in your system language. Its log is at `~/Library/Logs/MulmoClaude/launcher.log`.
 
+> **Where `.env` goes**: a terminal launch reads `.env` from the directory you launched in. An icon has no such directory (macOS starts apps in `/`), so the icon launch reads `~/.env` — your home directory.
+
 Re-run the command after upgrading: the bundle carries its own copy of the launcher.
 
 ### Prerequisites

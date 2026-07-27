@@ -67,6 +67,8 @@ Creates a real app bundle (no Electron — an `Info.plist` and a shell stub) in 
 
 A GUI launch gets none of your shell's `PATH`, so the bundle asks your login shell for it before looking for anything — this is why a version manager (nodebrew / nvm / asdf / Volta) still works from the icon.
 
+It also starts the server from your home directory rather than the `/` macOS hands a GUI app, so the `.env` it loads is `~/.env`.
+
 The launcher writes `~/Library/Logs/MulmoClaude/launcher.log`. The bundle carries its own copy of the launcher code, so re-run the command after upgrading. Windows is not supported yet.
 
 ## How it works
