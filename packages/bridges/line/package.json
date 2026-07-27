@@ -27,7 +27,7 @@
     "@mulmobridge/webhook-runtime": "^1.0.2",
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
-    "express-rate-limit": "^8.6.0"
+    "express-rate-limit": "^8.6.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

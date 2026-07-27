@@ -28,7 +28,7 @@
   "author": "Receptron Team",
   "dependencies": {
     "express": "^5.1.0",
-    "express-rate-limit": "^8.6.0"
+    "express-rate-limit": "^8.6.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

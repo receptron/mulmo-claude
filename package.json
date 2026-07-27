@@ -1,7 +1,7 @@
 {
   "name": "mulmoclaude-monorepo",
   "private": true,
-  "version": "1.7.1",
+  "version": "1.7.2",
   "type": "module",
   "author": "snakajima",
   "license": "MIT",
@@ -168,7 +168,7 @@
     "eslint-plugin-security": "^4.0.1",
     "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-vue": "^10.10.0",
-    "globals": "^17.7.0",
+    "globals": "^17.8.0",
     "jsdom": "^29.1.1",
     "jsonc-eslint-parser": "^3.1.0",
     "knip": "^6.29.0",

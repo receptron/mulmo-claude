@@ -20,15 +20,37 @@ npx mulmoclaude@latest create-shortcut
 
 It writes `MulmoClaude.app` to `/Applications` — or `~/Applications` when that is not writable, which is what a non-admin account gets. `--dir <path>` chooses somewhere else, `--yes` skips the confirmation. macOS only for now; the command refuses to run elsewhere.
 
-Double-clicking it opens the browser straight to an **already-running** MulmoClaude rather than starting a second one, checks Node.js, npm and Claude Code before anything else, and shows a progress page while the server boots — `npx …@latest` looks at the network on every launch, so a silent thirty-second wait was not an option. When a prerequisite is missing, the page names it and gives the commands to run, in whichever of the 8 UI languages the system is set to. The launcher's log is at `~/Library/Logs/MulmoClaude/launcher.log`.
+Double-clicking it opens the browser straight to an **already-running** MulmoClaude rather than starting a second one, checks Node.js, `npx` and Claude Code before anything else, and shows a progress page while the server boots — `npx …@latest` looks at the network on every launch, so a silent thirty-second wait was not an option. When a prerequisite is missing, the page names it and gives the commands to run, in whichever of the 8 UI languages the system is set to. The launcher's log is at `~/Library/Logs/MulmoClaude/launcher.log`.
 
-No Electron. A macOS app bundle is a directory with an `Info.plist` and an executable, so this is one of each — no native module rebuilds, no signing, no notarisation, and no Gatekeeper prompt, since a bundle written locally never carries the quarantine attribute.
+No Electron. A macOS app bundle is a directory with an `Info.plist` and an executable, so this is one of each — no native module rebuilds, no signing, no notarisation, and no Gatekeeper prompt, since a bundle written locally never carries the quarantine attribute that triggers one. A Mac under managed policy can still be told to refuse unsigned apps outright.
 
 **The part that decides whether any of it works is `PATH`.** A GUI launch inherits `/usr/bin:/bin:/usr/sbin:/sbin` and nothing else — `launchctl getenv PATH` is empty — so nodebrew, nvm, fnm, asdf, Volta and even Apple-Silicon Homebrew are all absent. The stub therefore asks the login shell for its `PATH` before looking for anything, and it has to be an **interactive** login shell: version managers and `~/.local/bin` are set up in `.zshrc`, which `-l` alone never reads. Measured on a nodebrew machine, `-l` resolved a different Node than the user's own and could not find `claude` at all — it would have told someone who has Claude Code installed to go install it.
 
 Re-run `create-shortcut` after upgrading: the bundle carries its own copy of the launcher.
 
 Two known gaps, both tracked: the server keeps running with no way to stop it from the icon (#2616), and `--disable-macos-reminders` is a CLI flag an icon cannot pass (#2617).
+
+---
+
+## [1.7.2] - 2026-07-27
+
+**A `.env` you edit that has no effect, and no way to tell why.**
+
+### Highlights
+
+#### The app says when your shell is overriding `.env` (#2604, PR #2612 — and #2610, PR #2614)
+
+`.env` loses to an exported shell variable. That is dotenv's documented rule and it was working correctly — the problem was that losing was invisible. With a stale `export GEMINI_API_KEY=…` left in `~/.zshrc`, you can correct `.env` as many times as you like, restart every time, and nothing changes, with nothing anywhere pointing at the shell. The report that started this came out of exactly that loop.
+
+A single definition is unambiguous and fine. The failure needs two definitions and no visible precedence.
+
+The launcher already knew which keys had lost — `mergeLaunchEnv` returns them — and turned the fact into one terminal log line that is easy to scroll past. It now hands the key **names** (never values) to the server, which raises a notification in the bell naming them and saying which side won. The entry is de-duplicated by a stable id, so restarting with the conflict unfixed does not stack a second one; fixing one of two keys **replaces** the entry rather than leaving one that still names the key you just fixed; and a boot with nothing shadowed **retracts** the warning entirely.
+
+`yarn dev` reached a `.env` by a second route that got none of this (#2610): the server's own `import "dotenv/config"` read `<cwd>/.env` with the same shell-wins rule and discarded what it skipped — the same dead end with even less to go on, since the launcher's log line is not there either. That import is now a reporting loader, and both routes feed one notification.
+
+Along the way, `error-recovery.md` — the file the agent reads before asking you a clarifying question about a tool failure — gained a section for this state. It needed one: the section already there told the agent to *"add the missing key to `.env` (restart the server)"*, which is precisely the advice that fails silently here. It also corrects two things the obvious guidance gets wrong: an **empty** export (`export GEMINI_API_KEY=`) shadows just as hard, and `echo "$VAR"` cannot detect that case because unset and set-but-empty both print blank.
+
+Ships the same scoped package versions as 1.7.1, except `@mulmoclaude/core@1.7.1` (the `error-recovery.md` addition).
 
 ---
 

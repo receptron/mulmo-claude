@@ -143,7 +143,7 @@ Recommended: ≥ 32 characters of random data (shorter values trigger a startup 
 
 ## Optional features
 
-- **Gemini API key** (`GEMINI_API_KEY` in environment or `.env`) — enables AI image generation (`generateImage`), audio / video. Free tier suffices for everyday use; get one from [Google AI Studio](https://aistudio.google.com/).
+- **Gemini API key** (`GEMINI_API_KEY` in environment or `.env`) — enables AI image generation (`generateImage`), audio / video. Free tier suffices for everyday use; get one from [Google AI Studio](https://aistudio.google.com/). Set it in both places and the exported shell value wins, `.env` is ignored — the app now says so in the notification bell instead of leaving you editing a file that has no effect.
 - **Local voice input** (macOS only, opt-in) — `whisper.cpp` for dictating chat messages without sending audio to a cloud API.
 - **Marp slides** — `marp: true` frontmatter on any markdown file renders a slide deck in the canvas with PDF export. Custom themes via `config/marp-themes/<name>.css`.
 - **Auto memory** — the agent maintains a typed memory layout (`conversations/memory/<type>/<topic>.md`) and reads it ambient-style.

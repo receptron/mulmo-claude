@@ -16,6 +16,8 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { ONE_SECOND_MS } from "../../../server/utils/time.ts";
+
 const SCRIPT = join(process.cwd(), "server", "utils", "launcher", "macos", "resolve-path.sh");
 const GUI_PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
 const darwinOnly = { skip: process.platform !== "darwin" };
@@ -28,7 +30,7 @@ const darwinOnly = { skip: process.platform !== "darwin" };
 // Without a hard ceiling here, a regression in that watchdog would hang
 // CI instead of failing it, so the subprocess is bounded well above the
 // longest legitimate run.
-const SHELL_TIMEOUT_MS = 30_000;
+const SHELL_TIMEOUT_MS = 30 * ONE_SECOND_MS;
 
 const runShell = (script: string, home: string, extraEnv: Record<string, string> = {}): { stdout: string; ms: number } => {
   const startedAt = Date.now();

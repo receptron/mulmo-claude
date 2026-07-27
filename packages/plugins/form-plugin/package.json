@@ -47,7 +47,7 @@
     "@vitejs/plugin-vue": "^6.0.8",
     "eslint": "^10.8.0",
     "eslint-plugin-vue": "^10.10.0",
-    "globals": "^17.7.0",
+    "globals": "^17.8.0",
     "gui-chat-protocol": "^1.2.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
