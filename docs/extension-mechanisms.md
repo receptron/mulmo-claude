@@ -317,7 +317,7 @@ const skills = await discoverSkills({ workspaceRoot: workspacePath });
 
 **例 (built-in)**: `general`, `office`, `guide`, `artist`, `tutor`, `storyteller`, `settings`, `accounting`, `cookingCoach`, `debug`
 
-**追加 (user-defined)**: MulmoClaude の Settings → Roles から `manageRoles` 経由、または `<workspace>/config/roles/<id>.md` を直接置く
+**追加 (user-defined)**: MulmoClaude の Settings → Roles から `manageRoles` 経由、または `<workspace>/config/roles/<id>.json` を直接置く (ローダは `.json` のみ読む — `server/workspace/roles.ts`)
 
 **ソース実装**:
 

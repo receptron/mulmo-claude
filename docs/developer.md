@@ -71,6 +71,8 @@ All env vars are **optional unless flagged "required"**. The server reads them a
 | Variable                               | Default                        | Effect                                                                                                                                                                                                                                                                                            |
 | -------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`                                 | `3001`                         | Express listen port (`server/index.ts:47`).                                                                                                                                                                                                                                                       |
+| `MULMOCLAUDE_WORKSPACE_PATH`           | `<homedir>/mulmoclaude`        | Absolute path to the workspace (`server/workspace/paths.ts`). **Evaluated once at module load**, so it is a start-time choice — there is no API, UI, or CLI flag to switch workspaces on a running server. A path that does not exist yet is created on boot (`server/workspace/workspace.ts`), including `git init`. Under `node:test` with an un-overridden `HOME` the default becomes `<tmpdir>/mulmoclaude-test` instead. Point it somewhere else to run a second, fully isolated instance — see [Running two instances](#running-two-instances). |
+| `MULMOCLAUDE_CLIENT_DIR`               | `<serverDir>/../client`        | Absolute path to the built client Express serves when `NODE_ENV=production` (`server/index.ts`). Set it when the client bundle lives outside the standard dist layout — e.g. running a second instance straight from a source clone (`e2e-live/fixtures/isolated-dev-server.ts` does exactly this). |
 | `NODE_ENV`                             | unset / `production`           | When `production`, Express serves the built client from `dist/client` and falls back to `index.html` for SPA history-mode routing. Auto-set by tooling — you rarely set this manually.                                                                                                            |
 | `DISABLE_SANDBOX`                      | unset                          | Set to `1` to bypass the Docker sandbox even when Docker is available. The agent runs `claude` directly on the host. Useful for debugging without container rebuild overhead (`server/system/docker.ts:49`, `server/index.ts:147`).                                                               |
 | `SANDBOX_SSH_AGENT_FORWARD`            | unset                          | Set to `1` to forward the host's `$SSH_AUTH_SOCK` into the sandbox. Private keys stay on the host; the agent signs on the container's behalf. Full contract: [docs/sandbox-credentials.md](sandbox-credentials.md).                                                                               |
@@ -147,7 +149,7 @@ You never set these by hand; the server constructs them when spawning Claude ins
 | `HOME`                           | container only | `/home/node` so Claude CLI finds its credentials at `~/.claude`.                                                                                                                                                                                                              |
 | Sentinel `X_BEARER_TOKEN=1` etc. | container only | `isMcpToolEnabled()` re-evaluates inside the container; the actual API call still happens on the host, so we only signal "enabled" with `1`.                                                                                                                                  |
 
-> **There is no `WORKSPACE_PATH` env var.** The workspace path is hard-coded to `~/mulmoclaude` in `server/workspace/workspace.ts:11`. To experiment with multiple workspaces you currently need a code change or a symlink swap.
+> **Paths inside the sandbox are not host paths.** The container sees the workspace at `/home/node/mulmoclaude` and each configured reference directory at `/mnt/readonly/<basename>-<hash8>` (`server/workspace/reference-dirs.ts`) — never at its host location. Anything that hands the agent a **literal host path** (a custom role's `prompt`, a collection action template, a skill) silently fails in Docker mode, because that path does not exist in the container. Refer to a reference directory by its **label**: the host already injects a label→mount-path table into the system prompt, and the built-in roles keep every path workspace-relative for the same reason.
 
 ---
 
@@ -207,11 +209,28 @@ Three independent Node processes cooperate at runtime:
 2. **Vite dev client** — listens on `localhost:5173`, proxies `/api/*` to `:3001`. Production builds skip Vite and let Express serve the static `dist/client`.
 3. **MCP stdio bridge** (`server/agent/mcp-server.ts`) — spawned by the Claude CLI subprocess via `--mcp-config`. No HTTP listener: speaks JSON-RPC over stdin/stdout, forwards Claude's tool calls back to the Express server (`MCP_HOST:PORT/api/*`).
 
+### Running two instances
+
+`yarn dev` twice does **not** give you two independent stacks. The server half honours `PORT`, but Vite's proxy targets are literal `localhost:3001` / `ws://localhost:3001` in `vite.config.ts`, with no env override — so the second dev client talks to the *first* server no matter what you set.
+
+To run a genuinely isolated second instance, bypass Vite and let Express serve a prebuilt client:
+
+```bash
+yarn build   # once, produces dist/client
+MULMOCLAUDE_WORKSPACE_PATH=~/mulmoclaude-scratch \
+PORT=3100 \
+NODE_ENV=production \
+MULMOCLAUDE_CLIENT_DIR="$PWD/dist/client" \
+  yarn server
+```
+
+The workspace, port, and served client are then all independent. `e2e-live/fixtures/isolated-dev-server.ts` uses this exact combination (plus `HOME`) to give each live test its own stack.
+
 ---
 
 ## Workspace layout (`~/mulmoclaude/`)
 
-`initWorkspace()` creates / refreshes this on every server start (`server/workspace/workspace.ts`). Everything is plain files tracked in a private git repo, grouped into four top-level buckets by purpose (issue #284):
+`initWorkspace()` creates / refreshes this on every server start (`server/workspace/workspace.ts`). The location defaults to `~/mulmoclaude` and is overridden with [`MULMOCLAUDE_WORKSPACE_PATH`](#runtime), read once at module load. Everything is plain files tracked in a private git repo, grouped into four top-level buckets by purpose (issue #284):
 
 ```text
 ~/mulmoclaude/

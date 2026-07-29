@@ -187,7 +187,7 @@ mulmoclaude は **ネイティブ実行**(developer machine)と **Docker サン�
 |---|---|
 | URL 形式 | `@ref/<label>/<remainder>` |
 | 配信ルート | `/api/files/raw?path=@ref/<label>/<remainder>`(static mount は使わない) |
-| Docker での扱い | ホストの絶対パスを read-only で bind mount(コンテナ内 `/workspace/refs/<label>` 等)。書き込みは弾かれる |
+| Docker での扱い | ホストの絶対パスを read-only で bind mount(コンテナ内 `/mnt/readonly/<basename>-<hash8>`。`server/workspace/reference-dirs.ts`)。書き込みは弾かれる |
 | センシティブ・パス遮断 | `.git` / `.ssh` / `.env` / `.aws` などサーバー側で `isSensitivePath` 検査 |
 | 画像表示 | `/api/files/raw?path=@ref/...` 経由で `<img>` が表示可。**`/artifacts/images/` mount からは届かない**(別ファイルシステム・別 prefix) |
 
