@@ -637,6 +637,15 @@ describe("buildDockerSpawnArgs", () => {
     assert.ok(!args.includes("--add-host"));
   });
 
+  it("does not pass Docker-only --add-host to Apple container", async () => {
+    const args = buildDockerSpawnArgs({
+      ...baseParams(),
+      platform: "linux" as Platform,
+      sandboxRuntime: "apple-container",
+    });
+    assert.ok(!args.includes("--add-host"));
+  });
+
   it("normalizes Windows backslash paths to forward slashes", async () => {
     const args = buildDockerSpawnArgs({
       ...baseParams(),

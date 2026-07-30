@@ -12,6 +12,7 @@ interface EnvSnapshot {
     nodeEnv: string;
     isProduction: boolean;
     disableSandbox: boolean;
+    sandboxRuntime: "auto" | "docker" | "apple-container";
     geminiApiKey: string | undefined;
     xBearerToken: string | undefined;
     authTokenOverride: string | undefined;
@@ -38,6 +39,7 @@ const ENV_KEYS = [
   "PORT",
   "NODE_ENV",
   "DISABLE_SANDBOX",
+  "SANDBOX_RUNTIME",
   "GEMINI_API_KEY",
   "X_BEARER_TOKEN",
   "MULMOCLAUDE_AUTH_TOKEN",
@@ -74,6 +76,7 @@ describe("env defaults", () => {
     assert.equal(env.nodeEnv, "development");
     assert.equal(env.isProduction, false);
     assert.equal(env.disableSandbox, false);
+    assert.equal(env.sandboxRuntime, "auto");
     assert.equal(env.geminiApiKey, undefined);
     assert.equal(env.xBearerToken, undefined);
     assert.equal(env.authTokenOverride, undefined);
@@ -117,6 +120,17 @@ describe("env coercion", () => {
     process.env.DISABLE_SANDBOX = "0";
     const envC = await loadEnvFresh();
     assert.equal(envC.env.disableSandbox, false);
+  });
+
+  it("accepts supported SANDBOX_RUNTIME values and falls back to auto", async () => {
+    process.env.SANDBOX_RUNTIME = "apple-container";
+    assert.equal((await loadEnvFresh()).env.sandboxRuntime, "apple-container");
+
+    process.env.SANDBOX_RUNTIME = "docker";
+    assert.equal((await loadEnvFresh()).env.sandboxRuntime, "docker");
+
+    process.env.SANDBOX_RUNTIME = "unknown";
+    assert.equal((await loadEnvFresh()).env.sandboxRuntime, "auto");
   });
 
   it("isProduction reflects NODE_ENV=production", async () => {

@@ -1,6 +1,6 @@
-// Docker smoke test for the MCP server subprocess.
+// Container-runtime smoke test for the MCP server subprocess.
 //
-// Verifies that the MCP server can start inside the Docker sandbox
+// Verifies that the MCP server can start inside the sandbox
 // container and respond to initialize + tools/list. This catches:
 //   - Missing Docker volume mounts (e.g. packages/ not mounted)
 //   - package.json exports issues (e.g. missing "require" condition)
@@ -25,30 +25,22 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import path from "node:path";
 
 import { buildMulmoclaudeServer, workspaceModuleMounts, type Platform } from "../../server/agent/config.ts";
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
+import { detectLiveSandboxRuntime, sandboxRuntimeCommand, type SandboxRuntime } from "../../server/system/docker.ts";
 
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 
-function isDockerAvailable(): boolean {
+function isSandboxImageAvailable(runtime: SandboxRuntime): boolean {
   try {
-    execSync("docker info", { stdio: "ignore", timeout: 5 * ONE_SECOND_MS });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isSandboxImageAvailable(): boolean {
-  try {
-    const out = execSync("docker images -q mulmoclaude-sandbox", {
-      encoding: "utf-8",
+    execFileSync(sandboxRuntimeCommand(runtime), ["image", "inspect", "mulmoclaude-sandbox"], {
+      stdio: "ignore",
       timeout: 5 * ONE_SECOND_MS,
     });
-    return out.trim().length > 0;
+    return true;
   } catch {
     return false;
   }
@@ -74,10 +66,12 @@ function hostPlatform(): Platform {
   return found;
 }
 
-const canRunDocker = isDockerAvailable() && isSandboxImageAvailable();
+const sandboxRuntime = await detectLiveSandboxRuntime();
+const canRunContainer = sandboxRuntime !== null && isSandboxImageAvailable(sandboxRuntime);
 
-describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
-  it("responds to initialize + tools/list inside Docker container", async () => {
+describe("MCP server container smoke test", { skip: !canRunContainer }, () => {
+  it("responds to initialize + tools/list inside the sandbox container", async () => {
+    assert.ok(sandboxRuntime);
     const toDockerPath = (filePath: string): string => filePath.replace(/\\/g, "/");
 
     // The exact spec Claude Code would spawn: `tsx --import <bootstrap>
@@ -111,7 +105,7 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
     ];
 
     const responses = await new Promise<JsonRpcResponse[]>((resolve, reject) => {
-      const child = spawn("docker", dockerArgs, {
+      const child = spawn(sandboxRuntimeCommand(sandboxRuntime), dockerArgs, {
         cwd: PROJECT_ROOT,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -152,7 +146,7 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
 
       const timer = setTimeout(() => {
         child.kill("SIGTERM");
-        reject(new Error(`Docker MCP server timed out. stderr: ${stderr}`));
+        reject(new Error(`${sandboxRuntime} MCP server timed out. stderr: ${stderr}`));
       }, 30 * ONE_SECOND_MS);
 
       child.on("close", (code) => {
@@ -170,7 +164,7 @@ describe("MCP server Docker smoke test", { skip: !canRunDocker }, () => {
           .filter((resp): resp is JsonRpcResponse => resp !== null);
 
         if (parsed.length === 0 && code !== 0) {
-          reject(new Error(`Docker MCP server exited ${code}. stderr:\n${stderr.slice(0, 1000)}`));
+          reject(new Error(`${sandboxRuntime} MCP server exited ${code}. stderr:\n${stderr.slice(0, 1000)}`));
           return;
         }
         resolve(parsed);

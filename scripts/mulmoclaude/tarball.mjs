@@ -19,8 +19,8 @@ import os from "node:os";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
 
-// Sandbox build context: `server/system/docker.ts` runs `docker build
-// -f Dockerfile.sandbox .` from the launcher's package dir, so both
+// Sandbox build context: `server/system/docker.ts` runs Apple container
+// or Docker from the launcher's package dir, so both
 // the Dockerfile and the entrypoint script it COPYs must be inside
 // the published tarball. 0.5.2 silently shipped without them and
 // sandbox mode fell back to unrestricted execution at runtime — this

@@ -56,7 +56,7 @@ Re-run the command after upgrading: the shortcut carries its own copy of the lau
   - macOS: `brew install ffmpeg`
   - Linux: `apt install ffmpeg`
   - Windows: `winget install Gyan.FFmpeg`
-- **Docker Desktop** (optional but recommended) — enables sandbox mode. See [Installing Docker Desktop](#installing-docker-desktop) below
+- **Apple container or Docker Desktop** (optional but recommended) — enables sandbox mode. Use [Apple container](https://github.com/apple/container) on macOS 26+, or Docker Desktop on other supported systems
 - **whisper.cpp** (optional, macOS only) — enables local voice input (dictate chat messages). See [Optional: Local Voice Input](#optional-local-voice-input-macos) below
 
 > **UI language**: 8 locales are supported (English, Japanese, Simplified Chinese, Korean, Spanish, Brazilian Portuguese, French, German). The default is auto-detected from the browser / OS language. To set it explicitly, put `VITE_LOCALE=ja` (or `zh` / `ko` / `es` / `pt-BR` / `fr` / `de`) in `.env`. Locale is picked at build/dev time; restart `yarn dev` after changing it. See [`docs/developer.md`](docs/developer.md#i18n-vue-i18n) for how to add strings.
@@ -182,9 +182,9 @@ The Gemini API has a free tier that is sufficient for personal use.
 
 MulmoClaude uses Claude Code as its AI backend, which has access to tools including Bash — meaning it can read and write files on your machine.
 
-**Without Docker**, Claude can access any file your user account can reach, including SSH keys and credentials stored outside your workspace. This is acceptable for personal local use, but worth understanding.
+**Without a container runtime**, Claude can access any file your user account can reach, including SSH keys and credentials stored outside your workspace. This is acceptable for personal local use, but worth understanding.
 
-**With Docker Desktop installed**, MulmoClaude automatically runs Claude inside a sandboxed container. Only your workspace and Claude's own config (`~/.claude`) are mounted — the rest of your filesystem is invisible to Claude. No configuration is required: the app detects Docker on startup and enables the sandbox automatically.
+**With Apple container or Docker Desktop available**, MulmoClaude automatically runs Claude inside a sandboxed container. Only your workspace and Claude's own config (`~/.claude`) are mounted — the rest of your filesystem is invisible to Claude. Auto-selection prefers Apple container on macOS and falls back to Docker.
 
 **Bearer token auth**: every `/api/*` endpoint requires an `Authorization: Bearer <token>` header. The token is auto-generated on server startup and injected into the browser via a `<meta>` tag — no manual setup. The only exception is `/api/files/*` (exempt because `<img>` tags in rendered documents can't attach headers). See [`docs/developer.md`](docs/developer.md#auth-bearer-token-on-api) for details.
 
@@ -195,7 +195,16 @@ MulmoClaude uses Claude Code as its AI backend, which has access to tools includ
 
 Full contract and security notes: [`docs/sandbox-credentials.md`](docs/sandbox-credentials.md).
 
-### Installing Docker Desktop
+### Installing a container runtime
+
+On macOS 26 or later, install Apple container:
+
+1. Download the signed installer from [apple/container Releases](https://github.com/apple/container/releases)
+2. Run `container system start`
+3. Confirm that `container system status` reports `running`
+4. Restart MulmoClaude
+
+To use Docker Desktop:
 
 1. Download Docker Desktop from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
 2. **macOS**: open the `.dmg` and drag Docker to Applications, then launch it from Applications
@@ -204,11 +213,13 @@ Full contract and security notes: [`docs/sandbox-credentials.md`](docs/sandbox-c
 5. Wait for Docker Desktop to finish starting — the whale icon in the menu bar / system tray should turn steady (not animated)
 6. Restart MulmoClaude — it will detect Docker and build the sandbox image on first run (one-time, takes about a minute)
 
-When the Docker sandbox is active on macOS, credentials are managed automatically — the app extracts OAuth tokens from the system Keychain at startup and refreshes them on 401 errors, so no manual steps are needed.
+If both runtimes are installed, or you want an explicit choice, set `SANDBOX_RUNTIME=apple-container` or `SANDBOX_RUNTIME=docker` in `.env`.
 
-If Docker is not installed, the app shows a warning banner and continues to work without sandboxing.
+When the container sandbox is active on macOS, credentials are managed automatically — the app extracts OAuth tokens from the system Keychain at startup and refreshes them on 401 errors, so no manual steps are needed.
 
-> **Debug mode**: To run without the sandbox even when Docker is installed, set `DISABLE_SANDBOX=1` before starting the server, or pass the `--disable-sandbox` CLI flag (`yarn dev --disable-sandbox` / `npx mulmoclaude --disable-sandbox`) — handy on Windows PowerShell where `VAR=value cmd` doesn't work inline.
+If no supported container runtime is available, the app shows a warning banner and continues to work without sandboxing.
+
+> **Debug mode**: To run without the sandbox even when a container runtime is installed, set `DISABLE_SANDBOX=1` before starting the server, or pass the `--disable-sandbox` CLI flag (`yarn dev --disable-sandbox` / `npx mulmoclaude --disable-sandbox`) — handy on Windows PowerShell where `VAR=value cmd` doesn't work inline.
 >
 > **Tool-call history**: Set `PERSIST_TOOL_CALLS=1` to also record `tool_call` events (with their `args`) in the per-session jsonl alongside `tool_result`. Off by default because `args` can be large and may carry payload bytes you didn't expect to land on disk; useful for debugging after a page refresh or server restart. See [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096).
 
@@ -260,16 +271,16 @@ No extra typing, no copy-pasting SKILL.md bodies — the Run button is a one-cli
 
 Both scopes are read-only in phase 0 — edits happen on the file system. A future release will let MulmoClaude itself create / edit project-scope skills.
 
-### Docker sandbox vs non-Docker
+### Container sandbox vs no sandbox
 
-MulmoClaude's default **Docker sandbox mode** isolates Claude Code in a container for safety (see [Security](#security)). Skill behaviour differs between the two modes:
+MulmoClaude's default **container sandbox mode** (Apple container or Docker) isolates Claude Code for safety (see [Security](#security)). Skill behaviour differs between the two modes:
 
-| Mode                                 | User skills (`~/.claude/skills/`) | Project skills (`~/mulmoclaude/.claude/skills/`) | Built-in CLI skills (`/simplify`, `/update-config`, …) |
-| ------------------------------------ | --------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
-| **Non-Docker** (`DISABLE_SANDBOX=1`) | ✅ All work                       | ✅                                               | ✅                                                     |
-| **Docker sandbox** (default)         | ⚠️ See caveats below              | ✅ Mounted via workspace volume                  | ✅                                                     |
+| Mode                                     | User skills (`~/.claude/skills/`) | Project skills (`~/mulmoclaude/.claude/skills/`) | Built-in CLI skills (`/simplify`, `/update-config`, …) |
+| ---------------------------------------- | --------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| **No sandbox** (`DISABLE_SANDBOX=1`)     | ✅ All work                       | ✅                                               | ✅                                                     |
+| **Container sandbox** (default when available) | ⚠️ See caveats below       | ✅ Mounted via workspace volume                  | ✅                                                     |
 
-**Docker caveats — why user skills sometimes don't work in the sandbox:**
+**Container caveats — why user skills sometimes don't work in the sandbox:**
 
 - **Symlinked `~/.claude/skills/`** — if your `~/.claude/skills` (or any sub-entry) is a symlink pointing outside `~/.claude/` (for example `~/.claude/skills → ~/ss/dotfiles/claude/skills`), the symlink's target is not present inside the container. The link appears as **dangling**, and Claude Code falls back to only the built-in skills.
 - **Older Claude CLI inside the sandbox image** — `Dockerfile.sandbox` pins the CLI version at image build time. If that version is behind your host CLI (e.g. 2.1.96 in the image vs 2.1.105 on the host), user-skill discovery may behave differently.
@@ -499,8 +510,8 @@ First, run `claude mcp` once in a terminal and complete the OAuth flow for each 
 
 Add external MCP servers without hand-editing JSON. Two types are supported:
 
-- **HTTP** — remote servers (e.g. `https://example.com/mcp`). Works in every mode; in Docker, `localhost` / `127.0.0.1` URLs are rewritten to `host.docker.internal` automatically.
-- **Stdio** — local subprocess (e.g. an `npx` MCP), restricted to `npx` / `node` / `tsx` for safety. Runs on the host when the Docker sandbox is **off**. When the sandbox is **on**, stdio entries are **dropped by default** (the minimal sandbox image can't host arbitrary runtimes) — set `"hostExecInDocker": true` to run one on the host behind a `stdio ↔ HTTP` gateway instead. See [docs/mcp-sandbox.md](docs/mcp-sandbox.md).
+- **HTTP** — remote servers (e.g. `https://example.com/mcp`). Works in every mode; in a container sandbox, `localhost` / `127.0.0.1` URLs are rewritten to `host.docker.internal` automatically.
+- **Stdio** — local subprocess (e.g. an `npx` MCP), restricted to `npx` / `node` / `tsx` for safety. Runs on the host when the container sandbox is **off**. When the sandbox is **on**, stdio entries are **dropped by default** (the minimal sandbox image can't host arbitrary runtimes) — set the legacy-named `"hostExecInDocker": true` option to run one on the host behind a `stdio ↔ HTTP` gateway instead. See [docs/mcp-sandbox.md](docs/mcp-sandbox.md).
 
 Pass credentials to a stdio server with an **`env`** map (`"env": { "IMAP_PASS": "…" }`). Values are literal and stored in `mcp.json` (mode `0600`, but **plaintext** — file-permission protection, not a vault). Full details, including the `hostExecInDocker` opt-in and how `env` reaches the process, are in [docs/mcp-sandbox.md](docs/mcp-sandbox.md).
 
@@ -555,7 +566,7 @@ Constraints the server enforces when loading the file:
 - Stdio `command` is restricted to `npx`, `node`, or `tsx`.
 - Entries that fail validation are silently dropped on load (a warning is logged); the rest of the file still applies.
 
-**Example** — a credentialed stdio server that also runs under the Docker sandbox (e.g. an IMAP MCP):
+**Example** — a credentialed stdio server that also runs under the container sandbox (e.g. an IMAP MCP):
 
 ```json
 {
@@ -595,9 +606,9 @@ Paste (Ctrl+V / Cmd+V) or drag-and-drop files into the chat input to send them t
 | Text (.txt, .csv, .json, .md, .xml, .html, .yaml) | Decoded UTF-8 text              | None                         |
 | DOCX                                              | Extracted plain text            | `mammoth` (npm)              |
 | XLSX                                              | CSV per sheet                   | `xlsx` (npm)                 |
-| PPTX                                              | Converted to PDF                | LibreOffice (Docker sandbox) |
+| PPTX                                              | Converted to PDF                | LibreOffice (container sandbox) |
 
-PPTX conversion runs inside the Docker sandbox image (`libreoffice --headless`). Without Docker, a message suggests exporting to PDF or images instead. Maximum attachment size is 30 MB.
+PPTX conversion runs inside the selected container sandbox image (`libreoffice --headless`). Without a supported runtime or native LibreOffice, a message suggests exporting to PDF or images instead. Maximum attachment size is 30 MB.
 
 ## Canvas view modes
 
@@ -753,7 +764,7 @@ Full documentation lives in [`docs/`](docs/README.md). Here are the key entry po
 | [Built-in Plugin Development](docs/developer.md#plugin-development)                  | Author a plugin co-located in `src/plugins/<name>/` — META shape, `useRuntime<E>()` API, mounting paths, sync invariants                             |
 | [Runtime-Loaded Plugins](docs/plugin-runtime.md)                                     | Author a plugin distributed as an npm package and installed into a workspace at runtime                                                              |
 | [Bridge Protocol](docs/bridge-protocol.md)                                           | Wire-level spec for writing new messaging bridges                                                                                                    |
-| [Sandbox Credentials](docs/sandbox-credentials.md)                                   | Docker sandbox credential forwarding (SSH, GitHub CLI)                                                                                               |
+| [Sandbox Credentials](docs/sandbox-credentials.md)                                   | Container sandbox credential forwarding (SSH, GitHub CLI)                                                                                            |
 | [Logging](docs/logging.md)                                                           | Log levels, formats, file rotation                                                                                                                   |
 | [Troubleshooting](docs/troubleshooting.md)                                           | Setup problems — broken-looking UI, `dist/*` 404s, Windows/OneDrive, `401` after restart, boot warnings                                               |
 | [CHANGELOG](docs/CHANGELOG.md)                                                       | Release history                                                                                                                                      |

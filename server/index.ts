@@ -109,7 +109,7 @@ import { buildDiagnosticsMarkdown } from "./utils/diagnostics/collect.js";
 import { existsSync, readFileSync } from "fs";
 import { makeCachedRealpath, resolveArtifactRequestPath } from "./utils/files/safe.js";
 import { cpus, loadavg } from "os";
-import { isDockerAvailable, ensureSandboxImage } from "./system/docker.js";
+import { resolveSandboxRuntime, ensureSandboxImage } from "./system/docker.js";
 import { maybeRunJournal } from "./workspace/journal/index.js";
 import { backfillAllSessions } from "./workspace/chat-index/index.js";
 import { feedRefreshTaskDef } from "@mulmoclaude/core/feeds/server";
@@ -828,15 +828,15 @@ async function setupSandbox(): Promise<boolean> {
     return false;
   }
   try {
-    const dockerAvailable = await isDockerAvailable();
-    if (!dockerAvailable) {
-      log.info("sandbox", "Docker not found — claude will run unrestricted");
+    const runtime = await resolveSandboxRuntime();
+    if (!runtime) {
+      log.info("sandbox", "No supported container runtime found — claude will run unrestricted");
       return false;
     }
     await ensureCredentialsAvailable();
-    log.info("sandbox", "Docker available — building sandbox image if needed");
-    await ensureSandboxImage();
-    log.info("sandbox", "Sandbox ready");
+    log.info("sandbox", "Container runtime available — building sandbox image if needed", { runtime });
+    await ensureSandboxImage(runtime);
+    log.info("sandbox", "Sandbox ready", { runtime });
     return true;
   } catch (err) {
     log.error("sandbox", "Failed to set up sandbox, running unrestricted", {

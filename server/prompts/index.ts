@@ -3,11 +3,10 @@
 // never user-visible, never edited at runtime), so a synchronous read
 // at import time is correct — no async plumbing, no per-request I/O.
 //
-// Content is returned verbatim (NO trimEnd): the source `.md` files
-// are byte-identical to the template literals these replaced, including
-// whether or not they end in a trailing newline. `buildSystemPrompt`
-// must produce a byte-identical system prompt before/after this
-// refactor — see plans/done/refactor-prompts-to-files.md.
+// Most content is returned verbatim. The sandbox block is the one
+// historical inline fragment without a trailing newline; normalize
+// exactly one editor-added LF for that file so buildSystemPrompt keeps
+// its load-bearing separator shape.
 //
 // Path is resolved relative to this module (import.meta.url), NOT
 // process.cwd(), so it resolves under both the dev server and the
@@ -29,7 +28,7 @@ export const ATOMIC_MEMORY_MANAGEMENT = load("memory-management-atomic.md");
 // sandbox-tools.md mirrors the tool set installed by
 // Dockerfile.sandbox — if you add/remove a tool there, update the
 // .md so the prompt-level mention stays in sync with the image.
-export const SANDBOX_TOOLS_HINT = load("sandbox-tools.md");
+export const SANDBOX_TOOLS_HINT = load("sandbox-tools.md").replace(/\n$/, "");
 
 // Static blocks emitted behind a runtime guard (the guard / message
 // wrapping stays in prompt.ts; only the prose lives here). No trailing

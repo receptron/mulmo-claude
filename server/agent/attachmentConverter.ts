@@ -21,6 +21,7 @@ import { tmpdir } from "os";
 import { promisify } from "util";
 import type { Attachment } from "@mulmobridge/protocol";
 import { SUBPROCESS_PROBE_TIMEOUT_MS, SUBPROCESS_WORK_TIMEOUT_MS } from "../utils/time.js";
+import { detectLiveSandboxRuntime, sandboxRuntimeCommand, type SandboxRuntime } from "../system/docker.js";
 import { errorMessage } from "../utils/errors.js";
 
 const execFileAsync = promisify(execFile);
@@ -106,14 +107,16 @@ async function tryNativeLibreOffice(): Promise<boolean> {
   }
 }
 
-async function tryDockerLibreOffice(): Promise<boolean> {
+async function tryContainerLibreOffice(): Promise<SandboxRuntime | null> {
+  const runtime = await detectLiveSandboxRuntime();
+  if (!runtime) return null;
   try {
-    await execFileAsync("docker", ["image", "inspect", "mulmoclaude-sandbox"], {
+    await execFileAsync(sandboxRuntimeCommand(runtime), ["image", "inspect", "mulmoclaude-sandbox"], {
       timeout: SUBPROCESS_PROBE_TIMEOUT_MS,
     });
-    return true;
+    return runtime;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -128,10 +131,12 @@ export async function convertPptxToPdf(data: string): Promise<Buffer | null> {
     if (await tryNativeLibreOffice()) {
       // Host has libreoffice installed natively
       await execFileAsync("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", tmpDir, inputPath], { timeout: SUBPROCESS_WORK_TIMEOUT_MS });
-    } else if (await tryDockerLibreOffice()) {
-      // Use the sandbox Docker image for conversion
+    } else {
+      const runtime = await tryContainerLibreOffice();
+      if (!runtime) return null;
+      // Use the sandbox container image for conversion
       await execFileAsync(
-        "docker",
+        sandboxRuntimeCommand(runtime),
         [
           "run",
           "--rm",
@@ -148,8 +153,6 @@ export async function convertPptxToPdf(data: string): Promise<Buffer | null> {
         ],
         { timeout: SUBPROCESS_WORK_TIMEOUT_MS },
       );
-    } else {
-      return null;
     }
 
     return await readFile(outputPath);

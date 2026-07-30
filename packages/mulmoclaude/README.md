@@ -79,7 +79,7 @@ Your data lives in `~/mulmoclaude/` (created on first run): conversations, memor
 
 ## Sandbox (recommended)
 
-When Docker is available, the Claude Code agent runs inside a credential-free Docker sandbox so it can't see anything outside the workspace. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and the launcher detects it automatically.
+When Apple container (macOS 26+) or Docker is available, the Claude Code agent runs inside a credential-free container sandbox so it can't see anything outside the workspace. Auto mode prefers Apple container on macOS and falls back to Docker.
 
 The sandbox is off by default for credentials (`gh auth`, SSH keys). Opt into the host's credential flow for the agent's `git` / `gh` commands:
 

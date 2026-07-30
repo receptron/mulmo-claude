@@ -95,8 +95,8 @@ cpSync(join(rootDir, "src"), join(pkgDir, "src"), {
 console.log("✓ shared src/");
 
 // ── Sandbox build context ───────────────────────────────────
-// `server/system/docker.ts` builds the sandbox image via `docker build
-// -f Dockerfile.sandbox .` with cwd = pkgDir. The Dockerfile in turn
+// `server/system/docker.ts` builds the sandbox image through Apple
+// container or Docker with cwd = pkgDir. The Dockerfile in turn
 // `COPY`s `sandbox-entrypoint.sh`, so both files must sit at pkgDir
 // or sandbox mode silently falls back to unrestricted execution.
 

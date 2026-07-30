@@ -1,11 +1,11 @@
 // Claude Code backend: spawns the `claude` CLI as a subprocess (or
-// inside the mulmoclaude-sandbox Docker image) and translates its
+// inside the mulmoclaude-sandbox container image) and translates its
 // stream-json output into portable AgentEvents.
 //
 // This file is the single seam between the orchestrator in
 // server/agent/index.ts (which is backend-agnostic) and the Claude
 // CLI specifics. Pure helpers it depends on (CLI arg construction,
-// Docker arg construction, stream parsing) stay in their existing
+// container arg construction, stream parsing) stay in their existing
 // home so the existing test suite under test/agent/ keeps working
 // unchanged.
 
@@ -24,10 +24,17 @@ import { EVENT_TYPES } from "../../../src/types/events.js";
 import { env } from "../../system/env.js";
 import { claudeBinPath } from "../../utils/claudeBin.js";
 import type { AgentInput, LLMBackend } from "./types.js";
+import { sandboxRuntimeCommand, type SandboxRuntime } from "../../system/docker.js";
 
 type ClaudeProc = ChildProcessByStdio<Writable, Readable, Readable>;
 
-function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[], chatSessionId: string): ClaudeProc {
+function spawnClaude(
+  useDocker: boolean,
+  workspacePath: string,
+  cliArgs: string[],
+  chatSessionId: string,
+  sandboxRuntime: SandboxRuntime = "docker",
+): ClaudeProc {
   if (!useDocker) {
     // MULMOCLAUDE_CHAT_SESSION_ID is the chat-session id our wiki-history
     // PostToolUse hook needs to publish a `page-edit` toolResult back to
@@ -44,6 +51,7 @@ function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[
     sshAllowedHosts: env.sandboxSshAllowedHosts,
     configMountNames: env.sandboxMountConfigs,
     sshAuthSock: process.env.SSH_AUTH_SOCK,
+    sandboxRuntime,
   });
   const refDirArgs = referenceDirMountArgs(getCachedReferenceDirs());
   const dockerArgs = buildDockerSpawnArgs({
@@ -54,9 +62,10 @@ function spawnClaude(useDocker: boolean, workspacePath: string, cliArgs: string[
     gid: process.getgid?.() ?? 1000,
     platform: process.platform,
     sandboxAuthArgs: [...sandboxAuth.args, ...refDirArgs],
-    sshAgentForward: env.sandboxSshAgentForward,
+    sshAgentForward: sandboxAuth.sshAgentForwarded,
+    sandboxRuntime,
   });
-  return spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
+  return spawn(sandboxRuntimeCommand(sandboxRuntime), dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
 }
 
 // Track MCP tool usage to detect silent MCP server failures.
@@ -253,9 +262,9 @@ async function* runClaudeAgent(input: AgentInput): AsyncGenerator<AgentEvent> {
   // "install with npm install -g …" hint.
   let proc: ReturnType<typeof spawnClaude>;
   try {
-    proc = spawnClaude(input.useDocker, input.workspacePath, cliArgs, input.sessionId);
+    proc = spawnClaude(input.useDocker, input.workspacePath, cliArgs, input.sessionId, input.sandboxRuntime);
   } catch (err) {
-    const target = input.useDocker ? "docker" : "claude";
+    const target = input.useDocker ? sandboxRuntimeCommand(input.sandboxRuntime ?? "docker") : "claude";
     const message = err instanceof Error ? err.message : String(err);
     log.error("agent", `failed to resolve ${target} binary`, { error: message });
     yield {
@@ -277,7 +286,7 @@ async function* runClaudeAgent(input: AgentInput): AsyncGenerator<AgentEvent> {
       proc.once("error", (err) => reject(err));
     });
   } catch (err) {
-    const target = input.useDocker ? "docker" : "claude";
+    const target = input.useDocker ? sandboxRuntimeCommand(input.sandboxRuntime ?? "docker") : "claude";
     const message = errorMessage(err);
     log.error("agent", `failed to spawn ${target}`, { error: message });
     yield {

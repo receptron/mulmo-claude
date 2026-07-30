@@ -143,6 +143,26 @@ describe("sshAgentForwardArgs", () => {
     assert.equal(result.args.length, 4);
   });
 
+  it("uses Apple container native SSH forwarding", () => {
+    const fake = path.join(mkdtempSync(path.join(tmpdir(), "apple-sock-")), "agent.sock");
+    writeFileSync(fake, "");
+    const result = sshAgentForwardArgs(true, fake, "darwin", "apple-container");
+    assert.deepEqual(result.args, ["--ssh"]);
+    assert.equal(result.skippedReason, null);
+  });
+
+  it("skips Apple container SSH forwarding when the host has no agent", () => {
+    const result = sshAgentForwardArgs(true, undefined, "darwin", "apple-container");
+    assert.deepEqual(result.args, []);
+    assert.match(result.skippedReason ?? "", /not set/);
+  });
+
+  it("rejects Apple container forwarding off macOS", () => {
+    const result = sshAgentForwardArgs(true, "/tmp/agent.sock", "linux", "apple-container");
+    assert.deepEqual(result.args, []);
+    assert.match(result.skippedReason ?? "", /only available on macOS/);
+  });
+
   it("reports SSH_AUTH_SOCK missing on Linux", () => {
     const result = sshAgentForwardArgs(true, undefined, "linux");
     assert.deepEqual(result.args, []);

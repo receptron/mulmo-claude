@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { log } from "../system/logger/index.js";
 import { SUBPROCESS_PROBE_TIMEOUT_MS } from "../utils/time.js";
+import type { SandboxRuntime } from "../system/docker.js";
 
 // ── Config-mount allowlist ──────────────────────────────────────────
 
@@ -166,8 +167,24 @@ export function sshAgentForwardArgs(
   enabled: boolean,
   sshAuthSock: string | undefined,
   platform: typeof process.platform = process.platform,
+  runtime: SandboxRuntime = "docker",
 ): SshAgentForwardResult {
   if (!enabled) return { args: [], skippedReason: null };
+
+  // Apple container has native SSH-agent forwarding. It tracks the
+  // host socket across login sessions and injects SSH_AUTH_SOCK itself.
+  if (runtime === "apple-container") {
+    if (platform !== "darwin") {
+      return { args: [], skippedReason: "Apple container is only available on macOS" };
+    }
+    if (!sshAuthSock || sshAuthSock.length === 0) {
+      return { args: [], skippedReason: "SSH_AUTH_SOCK not set on host" };
+    }
+    if (!existsSync(sshAuthSock)) {
+      return { args: [], skippedReason: `SSH_AUTH_SOCK=${sshAuthSock} not found on host` };
+    }
+    return { args: ["--ssh"], skippedReason: null };
+  }
 
   // macOS + Docker Desktop: use the magic VM-internal socket.
   if (platform === "darwin") {
@@ -203,6 +220,8 @@ export interface ResolvedSandboxAuth {
   args: string[];
   /** Descriptions the caller can log once to show what got mounted. */
   appliedDescriptions: string[];
+  /** True only when the runtime will actually receive an agent socket. */
+  sshAgentForwarded: boolean;
 }
 
 export interface ResolveSandboxAuthParams {
@@ -215,6 +234,7 @@ export interface ResolveSandboxAuthParams {
   configMountNames: readonly string[];
   sshAuthSock?: string;
   home?: string;
+  sandboxRuntime?: SandboxRuntime;
 }
 
 /**
@@ -242,7 +262,7 @@ export function resolveSandboxAuth(params: ResolveSandboxAuthParams): ResolvedSa
     });
   }
 
-  const sshResult = sshAgentForwardArgs(params.sshAgentForward, params.sshAuthSock);
+  const sshResult = sshAgentForwardArgs(params.sshAgentForward, params.sshAuthSock, process.platform, params.sandboxRuntime);
   if (sshResult.skippedReason !== null) {
     log.warn("sandbox", "SSH agent forward requested but skipped", {
       reason: sshResult.skippedReason,
@@ -275,7 +295,7 @@ export function resolveSandboxAuth(params: ResolveSandboxAuthParams): ResolvedSa
     });
   }
 
-  return { args, appliedDescriptions };
+  return { args, appliedDescriptions, sshAgentForwarded: sshResult.args.length > 0 };
 }
 
 // ── GitHub CLI token fallback ──────────────────────────────────────

@@ -55,6 +55,13 @@ function asCsv(value: string | undefined): readonly string[] {
   );
 }
 
+export type SandboxRuntimePreference = "auto" | "docker" | "apple-container";
+
+function asSandboxRuntime(value: string | undefined): SandboxRuntimePreference {
+  if (value === "docker" || value === "apple-container") return value;
+  return "auto";
+}
+
 // ── Snapshot ────────────────────────────────────────────────────────
 
 /**
@@ -77,8 +84,11 @@ export const env = Object.freeze({
   claudeConfigDir: process.env.CLAUDE_CONFIG_DIR,
   claudeConfigJson: process.env.CLAUDE_CONFIG_JSON,
 
-  // Sandbox / Docker
+  // Container sandbox
   disableSandbox: flagOf("DISABLE_SANDBOX"),
+  // auto: prefer Apple's native container runtime on macOS, then fall
+  // back to Docker. Explicit values are useful when both are installed.
+  sandboxRuntime: asSandboxRuntime(process.env.SANDBOX_RUNTIME),
   // Debug aid: also persist `tool_call` events to the session
   // jsonl (the `tool_result` side already lands on disk). Off by
   // default because args can be large and may carry payload bytes

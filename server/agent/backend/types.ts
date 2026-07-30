@@ -9,6 +9,7 @@
 
 import type { Attachment } from "@mulmobridge/protocol";
 import type { Role } from "../../../src/config/roles.js";
+import type { SandboxRuntime } from "../../system/docker.js";
 import type { EffortLevel } from "../../system/config.js";
 import type { AgentEvent } from "../stream.js";
 
@@ -47,6 +48,9 @@ export interface AgentInput {
   /** Whether the orchestrator detected a usable Docker sandbox.
    *  Backends that don't sandbox can ignore. */
   useDocker: boolean;
+  /** Concrete runtime when useDocker is true. Older tests/callers may
+   *  omit it and the Claude backend defaults to Docker. */
+  sandboxRuntime?: SandboxRuntime;
 }
 
 export interface BackendCapabilities {

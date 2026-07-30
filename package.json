@@ -71,7 +71,7 @@
     "test:e2e:live:plugin-dispatch": "yarn ensure:playwright-browsers && cross-env E2E_LIVE_REPORT_SUBDIR=plugin-dispatch playwright test --config e2e-live/playwright.config.ts plugin-dispatch.spec.ts",
     "test:e2e:live:journey-llm": "yarn ensure:playwright-browsers && cross-env E2E_LIVE_REPORT_SUBDIR=journey-llm playwright test --config e2e-live/playwright.config.ts journey-llm.spec.ts",
     "test:coverage": "tsx --test --experimental-test-coverage ./test/*/test_*.ts ./test/*/*/test_*.ts && yarn workspaces run test",
-    "sandbox:remove": "docker rmi mulmoclaude-sandbox",
+    "sandbox:remove": "node scripts/remove-sandbox-image.mjs",
     "sandbox:login": "security find-generic-password -s 'Claude Code-credentials' -w > ~/.claude/.credentials.json && echo 'Credentials exported to ~/.claude/.credentials.json'",
     "sandbox:logout": "rm -f ~/.claude/.credentials.json && echo 'Credentials file removed'",
     "package": "node scripts/package.mjs"

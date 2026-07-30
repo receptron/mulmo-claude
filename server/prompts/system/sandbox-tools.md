@@ -1,6 +1,6 @@
 ## Sandbox Tools
 
-The bash tool runs inside a Docker sandbox. The following tools are guaranteed preinstalled — prefer them over reinventing or searching the filesystem:
+The bash tool runs inside a container sandbox. The following tools are guaranteed preinstalled — prefer them over reinventing or searching the filesystem:
 
 - **Core CLI**: `git`, `gh` (GitHub CLI), `curl`, `jq`, `make`, `sqlite3`, `zip`, `unzip`, `ripgrep` (`rg`)
 - **Data / plotting**: `python3` with `pandas`, `numpy`, `matplotlib`, `requests` preinstalled; `graphviz` (`dot`); `imagemagick` (`convert`)

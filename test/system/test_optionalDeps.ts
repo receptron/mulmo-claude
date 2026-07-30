@@ -38,6 +38,22 @@ describe("probeOne — reason mapping + override precedence", () => {
     assert.deepEqual(await probeOne(dep, present), { id: "ffmpeg", available: true, reason: "ok" });
   });
 
+  it("accepts any executable that provides the same capability", async () => {
+    const checked: string[] = [];
+    const dep: OptionalDep = {
+      id: "sandbox",
+      command: "container / docker",
+      commands: ["container", "docker"],
+      enables: "sandbox",
+    };
+    const status = await probeOne(dep, async (command) => {
+      checked.push(command);
+      return command === "docker";
+    });
+    assert.deepEqual(status, { id: "sandbox", available: true, reason: "ok" });
+    assert.deepEqual(checked, ["container", "docker"]);
+  });
+
   it("never throws when the PATH check itself throws (degrades, not crashes)", async () => {
     const dep: OptionalDep = { id: "x", command: "x", enables: "x" };
     const throwing = async () => {
@@ -62,10 +78,12 @@ describe("probeOne — reason mapping + override precedence", () => {
 });
 
 describe("registry", () => {
-  it("declares docker (with liveness override) and ffmpeg (plain PATH)", () => {
+  it("declares the container sandbox (with liveness override) and ffmpeg (plain PATH)", () => {
     const byId = Object.fromEntries(optionalDeps().map((dep) => [dep.id, dep]));
     assert.ok(byId.docker, "docker entry present");
     assert.equal(typeof byId.docker?.probe, "function", "docker has a liveness override");
+    assert.ok(byId.docker?.commands?.includes("docker"));
+    if (process.platform === "darwin") assert.ok(byId.docker?.commands?.includes("container"));
     assert.ok(byId.ffmpeg, "ffmpeg entry present");
     assert.equal(byId.ffmpeg?.probe, undefined, "ffmpeg uses the default PATH check");
   });

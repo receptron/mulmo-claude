@@ -72,7 +72,8 @@ All env vars are **optional unless flagged "required"**. The server reads them a
 | -------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`                                 | `3001`                         | Express listen port (`server/index.ts:47`).                                                                                                                                                                                                                                                       |
 | `NODE_ENV`                             | unset / `production`           | When `production`, Express serves the built client from `dist/client` and falls back to `index.html` for SPA history-mode routing. Auto-set by tooling — you rarely set this manually.                                                                                                            |
-| `DISABLE_SANDBOX`                      | unset                          | Set to `1` to bypass the Docker sandbox even when Docker is available. The agent runs `claude` directly on the host. Useful for debugging without container rebuild overhead (`server/system/docker.ts:49`, `server/index.ts:147`).                                                               |
+| `DISABLE_SANDBOX`                      | unset                          | Set to `1` to bypass the container sandbox even when a runtime is available. The agent runs `claude` directly on the host. |
+| `SANDBOX_RUNTIME`                      | `auto`                         | `auto`, `apple-container`, or `docker`. Auto mode prefers Apple container on macOS and falls back to Docker; other platforms use Docker. |
 | `SANDBOX_SSH_AGENT_FORWARD`            | unset                          | Set to `1` to forward the host's `$SSH_AUTH_SOCK` into the sandbox. Private keys stay on the host; the agent signs on the container's behalf. Full contract: [docs/sandbox-credentials.md](sandbox-credentials.md).                                                                               |
 | `SANDBOX_MOUNT_CONFIGS`                | unset                          | CSV of allowlisted config mounts (currently `gh`, `gitconfig`). Each entry resolves to a fixed host→container path pair defined in `server/agent/sandboxMounts.ts`; unknown names are logged and ignored.                                                                                         |
 | `SESSIONS_LIST_WINDOW_DAYS`            | `90`                           | Caps how far back the sidebar looks when listing chat sessions (`server/api/routes/sessions.ts`). Set to `0` to disable the cutoff entirely. Introduced in PR #203 to keep `GET /api/sessions` cheap on long-lived workspaces; anything older is still on disk, just hidden from the list.        |
@@ -132,7 +133,7 @@ Set by `npx mulmoclaude` on the server it spawns. Auto-computed like the contain
 
 ### Container-only env (auto-set)
 
-You never set these by hand; the server constructs them when spawning Claude inside the Docker sandbox (`server/agent/config.ts` and `server/agent/mcp-server.ts`). They're listed here so log lines / failures involving them are decodable.
+You never set these by hand; the server constructs them when spawning Claude inside the container sandbox (`server/agent/config.ts` and `server/agent/mcp-server.ts`). They're listed here so log lines / failures involving them are decodable.
 
 | Variable                         | Set by         | Purpose                                                                                                                                                                                                                                                                       |
 | -------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,11 +191,11 @@ You never set these by hand; the server constructs them when spawning Claude ins
 | `npx tsx --test test/agent/test_mcp_smoke.ts`        | MCP server subprocess smoke test (CI).                                                                                                |
 | `npx tsx --test test/agent/test_mcp_docker_smoke.ts` | MCP server Docker smoke test (local only, requires `mulmoclaude-sandbox` image). Run after changing package exports or Docker mounts. |
 
-### Docker sandbox
+### Container sandbox
 
 | Script                | Notes                                                                                                                     |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `yarn sandbox:remove` | `docker rmi mulmoclaude-sandbox` — rebuild on next run. Reuses the cached layers, so it does NOT refresh the bundled Claude CLI; add `docker builder prune -a -f` for that (#2202). |
+| `yarn sandbox:remove` | Removes `mulmoclaude-sandbox` from the selected Apple container or Docker runtime; it is rebuilt on next run. |
 | `yarn sandbox:login`  | macOS only. Exports the Claude CLI keychain entry to `~/.claude/.credentials.json` so the sandbox container can reuse it. |
 | `yarn sandbox:logout` | Removes that file.                                                                                                        |
 
@@ -472,13 +473,18 @@ Set `VITE_LOCALE` in `.env` and restart `yarn dev`. Supported values: `en`, `ja`
 
 ---
 
-## Docker sandbox (`Dockerfile.sandbox`)
+## Container sandbox (`Dockerfile.sandbox`)
 
-Minimal image: `node:22-slim` + `@anthropic-ai/claude-code` + `tsx`. Built lazily on first Docker-mode run; rebuilt when `Dockerfile.sandbox` changes (image SHA pinned in code). `yarn sandbox:remove` forces a rebuild.
+Minimal image: `node:22-slim` + `@anthropic-ai/claude-code` + `tsx`. Built lazily by Apple container or Docker on the first sandboxed run; rebuilt when `Dockerfile.sandbox` changes (image SHA pinned in code). `yarn sandbox:remove` forces a rebuild.
 
 The CLI is installed unpinned, so the image freezes whatever was latest at build time, and no upstream CLI release retriggers a rebuild (the Dockerfile SHA is unchanged). `yarn sandbox:remove` alone does not refresh it either — the rebuild reuses the cached `npm install -g` layer. To move the CLI, check what the image actually has and clear the build cache too:
 
 ```bash
+# Apple container
+container run --rm --entrypoint claude mulmoclaude-sandbox --version
+SANDBOX_RUNTIME=apple-container yarn sandbox:remove
+
+# Docker
 docker run --rm --entrypoint claude mulmoclaude-sandbox --version
 yarn sandbox:remove && docker builder prune -a -f
 ```
@@ -514,9 +520,9 @@ Users can paste or drop files into the chat input. The server converts non-nativ
 | text/\* (.txt, .csv, .json, .md, .xml, .html, .yaml) | base64 → UTF-8       | `type: "text"`     | —               | All                              |
 | DOCX                                                 | mammoth → plain text | `type: "text"`     | `mammoth` (npm) | All                              |
 | XLSX                                                 | xlsx → CSV per sheet | `type: "text"`     | `xlsx` (npm)    | All                              |
-| PPTX                                                 | libreoffice → PDF    | `type: "document"` | LibreOffice     | Docker sandbox or native install |
+| PPTX                                                 | libreoffice → PDF    | `type: "document"` | LibreOffice     | Container sandbox or native install |
 
-**PPTX conversion path**: the server process runs on the host (macOS/Linux), but LibreOffice lives inside the Docker sandbox image. `convertPptxToPdf()` in `server/agent/attachmentConverter.ts` tries native `libreoffice` first; if not found, falls back to `docker run --rm -v tmpdir:/data mulmoclaude-sandbox libreoffice --headless --convert-to pdf`. Without either, the user sees a text hint suggesting PDF or image export.
+**PPTX conversion path**: the server process runs on the host (macOS/Linux), but LibreOffice also lives inside the sandbox image. `convertPptxToPdf()` in `server/agent/attachmentConverter.ts` tries native `libreoffice` first; if not found, falls back to the selected Apple container or Docker runtime. Without either, the user sees a text hint suggesting PDF or image export.
 
 **Adding a new type**: add MIME handling in `server/agent/attachmentConverter.ts` (conversion logic), update `isConvertibleMime()` + `CONVERTIBLE_MIME_TYPES`, and add the MIME to `ACCEPTED_MIME_EXACT` in `src/App.vue`.
 

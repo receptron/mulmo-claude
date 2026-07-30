@@ -8,7 +8,7 @@
 // before this).
 
 import which from "which";
-import { isDockerLive } from "./docker.js";
+import { detectLiveSandboxRuntime } from "./docker.js";
 
 /** A single optional host dependency the app can run without. */
 export interface OptionalDep {
@@ -18,6 +18,10 @@ export interface OptionalDep {
   readonly id: string;
   /** Binary name passed to `which` for the default presence probe. */
   readonly command: string;
+  /** Alternative executable names that can satisfy one capability.
+   *  The sandbox uses this on macOS, where Apple container or Docker
+   *  are both valid providers. */
+  readonly commands?: readonly string[];
   /** i18n key fragment naming what stops working when absent. */
   readonly enables: string;
   /** Override when "on PATH" is insufficient (e.g. docker client
@@ -35,7 +39,15 @@ export interface DepStatus {
 }
 
 const REGISTRY: readonly OptionalDep[] = [
-  { id: "docker", command: "docker", enables: "dockerSandbox", probe: isDockerLive },
+  {
+    // Keep the stable id because plugin metadata and persisted
+    // notification ids already use it; the capability is now generic.
+    id: "docker",
+    command: process.platform === "darwin" ? "container / docker" : "docker",
+    commands: process.platform === "darwin" ? ["container", "docker"] : ["docker"],
+    enables: "dockerSandbox",
+    probe: async () => (await detectLiveSandboxRuntime()) !== null,
+  },
   { id: "ffmpeg", command: "ffmpeg", enables: "mulmocast" },
   // Local voice input (whisper.cpp server binary). Spawned as a warm
   // sidecar, not loaded in-process — see server/system/whisper/. The
@@ -62,7 +74,15 @@ async function onPath(command: string): Promise<boolean> {
 // real PATH.
 export async function probeOne(dep: OptionalDep, pathCheck: (command: string) => Promise<boolean> = onPath): Promise<DepStatus> {
   try {
-    if (!(await pathCheck(dep.command))) {
+    const commands = dep.commands ?? [dep.command];
+    let found = false;
+    for (const command of commands) {
+      if (await pathCheck(command)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
       return { id: dep.id, available: false, reason: "not-on-path" };
     }
     if (dep.probe && !(await dep.probe())) {

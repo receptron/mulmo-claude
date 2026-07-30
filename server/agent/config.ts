@@ -9,6 +9,7 @@ import { getActiveToolDescriptors } from "./activeTools.js";
 import type { EffortLevel, McpServerSpec } from "../system/config.js";
 import { startStdioHttpShim, type ShimHandle } from "./stdioHttpShim.js";
 import { claudeConfigDir, claudeConfigJson } from "../utils/claudeConfigPath.js";
+import type { SandboxRuntime } from "../system/docker.js";
 import { getCurrentToken } from "../api/auth/token.js";
 import { ONE_MINUTE_MS } from "../utils/time.js";
 import type { Attachment } from "@mulmobridge/protocol";
@@ -663,6 +664,9 @@ export interface DockerSpawnArgsParams {
    *  When false (default), `--user uid:gid --cap-drop ALL` with zero
    *  capabilities — identical to the pre-#259 security posture. */
   sshAgentForward?: boolean;
+  /** Runtime executing this Dockerfile-compatible image. Defaults to
+   *  Docker for backward-compatible tests and callers. */
+  sandboxRuntime?: SandboxRuntime;
 }
 
 // Every workspace-package dir under `packages/`, matching the root manifest's
@@ -832,8 +836,9 @@ export function buildDockerSpawnArgs(params: DockerSpawnArgsParams): string[] {
     homeDir = homedir(),
     sandboxAuthArgs = [],
     sshAgentForward = false,
+    sandboxRuntime = "docker",
   } = params;
-  const extraHosts: string[] = platform === "linux" ? ["--add-host", "host.docker.internal:host-gateway"] : [];
+  const extraHosts: string[] = sandboxRuntime === "docker" && platform === "linux" ? ["--add-host", "host.docker.internal:host-gateway"] : [];
   // `packages/` ships in the dev monorepo but NOT in the published
   // mulmoclaude package (the `files` whitelist in
   // `packages/mulmoclaude/package.json` excludes it — internal

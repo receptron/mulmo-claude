@@ -1,7 +1,7 @@
 import { mkdir, unlink } from "fs/promises";
 import { writeJsonAtomic } from "../utils/files/json.js";
 import { dirname } from "path";
-import { isDockerAvailable } from "../system/docker.js";
+import { resolveSandboxRuntime, type SandboxRuntime } from "../system/docker.js";
 import { refreshCredentials } from "../system/credentials.js";
 import { loadMcpConfig, loadSettings } from "../system/config.js";
 import type { Role } from "../../src/config/roles.js";
@@ -41,7 +41,8 @@ export interface RunAgentInput {
 export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentEvent> {
   const { role, workspacePath } = input;
   const activePlugins = getActivePlugins(role);
-  const useDocker = await isDockerAvailable();
+  const sandboxRuntime = await resolveSandboxRuntime();
+  const useDocker = sandboxRuntime !== null;
 
   // Per-invocation read so Settings UI changes apply without a server restart.
   const userMcpRaw = loadMcpConfig().mcpServers;
@@ -56,7 +57,7 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentEvent
   // tears them down — otherwise host processes / ports leak for the
   // rest of the session.
   try {
-    const prepared = await prepareAgentRun(input, { activePlugins, useDocker, userServers });
+    const prepared = await prepareAgentRun(input, { activePlugins, useDocker, sandboxRuntime, userServers });
     try {
       yield* prepared.backend.runAgent(prepared.agentInput);
     } finally {
@@ -81,6 +82,7 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentEvent
 interface AgentRunDeps {
   activePlugins: string[];
   useDocker: boolean;
+  sandboxRuntime: SandboxRuntime | null;
   userServers: Awaited<ReturnType<typeof prepareUserServers>>["servers"];
 }
 
@@ -185,7 +187,7 @@ function buildAgentInput(
   args: { systemPrompt: string; hasMcp: boolean; mcpPaths: McpPaths; mcpServerNames: string[] },
 ): { backend: LLMBackend; agentInput: AgentInput } {
   const { message, role, workspacePath, sessionId, port, claudeSessionId, abortSignal, attachments, userTimezone } = input;
-  const { activePlugins, useDocker, userServers } = deps;
+  const { activePlugins, useDocker, sandboxRuntime, userServers } = deps;
   const { systemPrompt, hasMcp, mcpPaths, mcpServerNames } = args;
 
   // Per-invocation read so allowedTools / MCP-server changes apply without a server restart.
@@ -224,6 +226,7 @@ function buildAgentInput(
     abortSignal,
     userTimezone,
     useDocker,
+    sandboxRuntime: sandboxRuntime ?? undefined,
   };
   return { backend, agentInput };
 }

@@ -38,7 +38,7 @@ npx mulmoclaude@latest
   - macOS: `brew install ffmpeg`
   - Linux: `apt install ffmpeg`
   - Windows: `winget install Gyan.FFmpeg`
-- **Docker Desktop** (任意・推奨) — サンドボックスモードを有効化します。下記 [Docker Desktop のインストール](#docker-desktop-のインストール) を参照してください
+- **Apple container または Docker Desktop** (任意・推奨) — サンドボックスモードを有効化します。macOS 26 以降では [Apple container](https://github.com/apple/container)、その他の環境では Docker Desktop を利用できます
 
 > **UI 言語**: 英語、日本語、中国語、韓国語、スペイン語、ポルトガル語 (ブラジル)、フランス語、ドイツ語の 8 言語に対応しています。デフォルトではブラウザ / OS の言語設定から自動判定されます。明示的に指定する場合は `.env` に `VITE_LOCALE=ja` を設定してください (日本語辞書 `src/lang/ja.ts` が使用されます)。ロケールはビルド / 開発時に決定されるため、変更後は `yarn dev` を再起動してください。文字列の追加方法は [`docs/developer.md`](docs/developer.md#i18n-vue-i18n) を参照してください。
 
@@ -165,9 +165,9 @@ Gemini API には個人利用に十分な無料枠があります。
 
 MulmoClaude は AI バックエンドとして Claude Code を使用しており、Bash を含むツールにアクセスできます — つまりマシン上のファイルを読み書きできます。
 
-**Docker を使わない場合**、Claude はあなたのユーザーアカウントが到達できるすべてのファイル (ワークスペースの外に保存されている SSH キーや資格情報を含む) にアクセスできます。個人のローカル利用では許容できますが、理解しておく価値があります。
+**コンテナランタイムを使わない場合**、Claude はあなたのユーザーアカウントが到達できるすべてのファイル (ワークスペースの外に保存されている SSH キーや資格情報を含む) にアクセスできます。個人のローカル利用では許容できますが、理解しておく価値があります。
 
-**Docker Desktop がインストールされている場合**、MulmoClaude は自動的に Claude をサンドボックス化されたコンテナ内で実行します。マウントされるのはワークスペースと Claude 自身の設定 (`~/.claude`) のみ — 残りのファイルシステムは Claude からは見えません。設定は不要です: アプリは起動時に Docker を検出し、自動的にサンドボックスを有効化します。
+**Apple container または Docker Desktop が利用できる場合**、MulmoClaude は自動的に Claude をサンドボックス化されたコンテナ内で実行します。マウントされるのはワークスペースと Claude 自身の設定 (`~/.claude`) のみ — 残りのファイルシステムは Claude からは見えません。macOS の自動選択では Apple container を優先し、Docker にフォールバックします。
 
 **Bearer トークン認証**: すべての `/api/*` エンドポイントは `Authorization: Bearer <token>` ヘッダーを要求します。トークンはサーバー起動時に自動生成され、`<meta>` タグ経由でブラウザに注入されます — 手動設定は不要です。唯一の例外は `/api/files/*` です (レンダリングされたドキュメント内の `<img>` タグはヘッダーを付与できないため免除)。詳細は [`docs/developer.md`](docs/developer.md#auth-bearer-token-on-api) を参照してください。
 
@@ -178,7 +178,16 @@ MulmoClaude は AI バックエンドとして Claude Code を使用しており
 
 完全な仕様とセキュリティ上の注意: [`docs/sandbox-credentials.md`](docs/sandbox-credentials.md)。
 
-### Docker Desktop のインストール
+### コンテナランタイムのインストール
+
+macOS 26 以降では Apple container を利用できます:
+
+1. [apple/container の Releases](https://github.com/apple/container/releases) から署名済みインストーラーを入手してインストール
+2. `container system start` を実行
+3. `container system status` が `running` を返すことを確認
+4. MulmoClaude を再起動
+
+Docker Desktop を使う場合:
 
 1. [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) から Docker Desktop をダウンロード
 2. **macOS**: `.dmg` を開いて Docker を Applications にドラッグし、Applications から起動
@@ -187,11 +196,11 @@ MulmoClaude は AI バックエンドとして Claude Code を使用しており
 5. Docker Desktop の起動が完了するのを待つ — メニューバー / システムトレイのクジラアイコンが (アニメーションではなく) 安定した状態になるはず
 6. MulmoClaude を再起動 — Docker を検出し、初回起動時にサンドボックスイメージをビルドします (一度だけ、約 1 分かかります)
 
-macOS で Docker サンドボックスがアクティブなとき、資格情報は自動的に管理されます — アプリは起動時にシステム Keychain から OAuth トークンを抽出し、401 エラー時には更新します。手動操作は不要です。
+macOS でコンテナサンドボックスがアクティブなとき、資格情報は自動的に管理されます — アプリは起動時にシステム Keychain から OAuth トークンを抽出し、401 エラー時には更新します。手動操作は不要です。
 
-Docker がインストールされていない場合、アプリは警告バナーを表示しますが、サンドボックスなしで引き続き動作します。
+どちらのランタイムも利用できない場合、アプリは警告バナーを表示しますが、サンドボックスなしで引き続き動作します。両方がインストールされている場合や明示的に選びたい場合は、`.env` に `SANDBOX_RUNTIME=apple-container` または `SANDBOX_RUNTIME=docker` を設定します。
 
-> **デバッグモード**: Docker がインストールされている場合でもサンドボックスなしで実行するには、サーバー起動前に `DISABLE_SANDBOX=1` を設定するか、CLI フラグ `--disable-sandbox`（`yarn dev --disable-sandbox` / `npx mulmoclaude --disable-sandbox`、Windows PowerShell でも可）を渡してください。
+> **デバッグモード**: コンテナランタイムが利用できる場合でもサンドボックスなしで実行するには、サーバー起動前に `DISABLE_SANDBOX=1` を設定するか、CLI フラグ `--disable-sandbox`（`yarn dev --disable-sandbox` / `npx mulmoclaude --disable-sandbox`、Windows PowerShell でも可）を渡してください。
 >
 > **ツール呼び出し履歴**: `PERSIST_TOOL_CALLS=1` を設定すると、`tool_result` と並んで `tool_call` イベント(`args` 含む)もセッション jsonl に記録されます。`args` は大きくなりがちで、ディスクに残したくないペイロード(画像 base64、MulmoScript JSON など)を含む可能性があるためデフォルトでは off。ページ更新やサーバー再起動後のデバッグに有用です。詳細は [issue #1096](https://github.com/receptron/mulmoclaude/issues/1096) を参照。
 
@@ -240,16 +249,16 @@ MulmoClaude はすでにお持ちの **Claude Code skills** を一覧表示し�
 
 フェーズ 0 では両スコープとも読み取り専用です — 編集はファイルシステム上で行います。将来のリリースで MulmoClaude 自身が project スコープの skill を作成 / 編集できるようになります。
 
-### Docker サンドボックス vs 非 Docker
+### コンテナサンドボックス vs サンドボックスなし
 
-MulmoClaude のデフォルトの **Docker サンドボックスモード** は安全性のため Claude Code をコンテナ内に隔離します ([セキュリティ](#security) を参照)。skill の動作は 2 つのモード間で異なります:
+MulmoClaude のデフォルトの **コンテナサンドボックスモード**（Apple container または Docker）は、安全性のため Claude Code を隔離します ([セキュリティ](#security) を参照)。skill の動作は 2 つのモード間で異なります:
 
-| モード                               | User skills (`~/.claude/skills/`) | Project skills (`~/mulmoclaude/.claude/skills/`) | 組み込み CLI skills (`/simplify`, `/update-config`, …) |
-| ------------------------------------ | --------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
-| **Non-Docker** (`DISABLE_SANDBOX=1`) | ✅ すべて動作                     | ✅                                               | ✅                                                     |
-| **Docker sandbox** (デフォルト)      | ⚠️ 下記の注意事項を参照           | ✅ ワークスペースボリューム経由でマウント        | ✅                                                     |
+| モード                                          | User skills (`~/.claude/skills/`) | Project skills (`~/mulmoclaude/.claude/skills/`) | 組み込み CLI skills (`/simplify`, `/update-config`, …) |
+| ----------------------------------------------- | --------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| **サンドボックスなし** (`DISABLE_SANDBOX=1`)   | ✅ すべて動作                     | ✅                                               | ✅                                                     |
+| **コンテナサンドボックス**（利用可能時の既定） | ⚠️ 下記の注意事項を参照           | ✅ ワークスペースボリューム経由でマウント        | ✅                                                     |
 
-**Docker 上の注意事項 — サンドボックス内でユーザー skill が機能しないことがある理由:**
+**コンテナ上の注意事項 — サンドボックス内でユーザー skill が機能しないことがある理由:**
 
 - **シンボリックリンクされた `~/.claude/skills/`** — `~/.claude/skills` (またはサブエントリ) が `~/.claude/` の外を指すシンボリックリンクの場合 (例: `~/.claude/skills → ~/ss/dotfiles/claude/skills`)、そのリンクのターゲットはコンテナ内に存在しません。リンクは **デッドリンク** として現れ、Claude Code は組み込み skill のみにフォールバックします。
 - **サンドボックスイメージ内の古い Claude CLI** — `Dockerfile.sandbox` はイメージビルド時に CLI バージョンを固定します。そのバージョンがホスト CLI より古い場合 (例: イメージ内 2.1.96 vs ホスト上 2.1.105)、ユーザー skill の発見動作が異なることがあります。
@@ -447,7 +456,7 @@ mcp__claude_ai_Google_Calendar
 JSON を手で編集することなく外部 MCP サーバーを追加できます。2 つのタイプをサポートしています:
 
 - **HTTP** — リモートサーバー (例: `https://example.com/mcp`)。どのモードでも動作します。Docker では `localhost` / `127.0.0.1` URL は自動的に `host.docker.internal` に書き換えられます。
-- **Stdio** — ローカルサブプロセス (例: `npx` の MCP)。安全のため `npx` / `node` / `tsx` に制限されます。Docker サンドボックスが **オフ** のときはホスト上で動きます。**オン** のときは stdio エントリは **既定で破棄されます** (最小構成のサンドボックスイメージでは任意のランタイムを動かせないため) — 代わりに `"hostExecInDocker": true` を設定すると、そのサーバーをホスト上で `stdio ↔ HTTP` ゲートウェイ越しに動かせます。[docs/mcp-sandbox.ja.md](docs/mcp-sandbox.ja.md) を参照。
+- **Stdio** — ローカルサブプロセス (例: `npx` の MCP)。安全のため `npx` / `node` / `tsx` に制限されます。コンテナサンドボックスが **オフ** のときはホスト上で動きます。**オン** のときは stdio エントリは **既定で破棄されます** (最小構成のサンドボックスイメージでは任意のランタイムを動かせないため) — 代わりに、従来名の設定 `"hostExecInDocker": true` を使うと、そのサーバーをホスト上で `stdio ↔ HTTP` ゲートウェイ越しに動かせます。[docs/mcp-sandbox.ja.md](docs/mcp-sandbox.ja.md) を参照。
 
 stdio サーバーへの認証情報は **`env`** マップで渡します (`"env": { "IMAP_PASS": "…" }`)。値はリテラルで `mcp.json` に保存されます (mode `0600` ですが **平文** — vault ではなくファイル権限による保護)。`hostExecInDocker` の opt-in や `env` がプロセスに届く仕組みなど詳細は [docs/mcp-sandbox.ja.md](docs/mcp-sandbox.ja.md) にあります。
 
@@ -502,7 +511,7 @@ MCP ファイルは Claude CLI の標準フォーマットを使用するため�
 - Stdio `command` は `npx`、`node`、`tsx` に制限されます。
 - 検証に失敗したエントリは読み込み時に暗黙的に破棄されます (警告がログに記録されます)。残りのファイルは引き続き適用されます。
 
-**例** — 認証情報を持ち、Docker サンドボックス下でも動く stdio サーバー (例: IMAP MCP):
+**例** — 認証情報を持ち、コンテナサンドボックス下でも動く stdio サーバー (例: IMAP MCP):
 
 ```json
 {
@@ -542,9 +551,9 @@ MCP ファイルは Claude CLI の標準フォーマットを使用するため�
 | テキスト (.txt, .csv, .json, .md, .xml, .html, .yaml) | デコードされた UTF-8 テキスト               | なし                                |
 | DOCX                                                  | 抽出されたプレーンテキスト                  | `mammoth` (npm)                     |
 | XLSX                                                  | シートごとの CSV                            | `xlsx` (npm)                        |
-| PPTX                                                  | PDF に変換                                  | LibreOffice (Docker サンドボックス) |
+| PPTX                                                  | PDF に変換                                  | LibreOffice (コンテナサンドボックス) |
 
-PPTX 変換は Docker サンドボックスイメージ内 (`libreoffice --headless`) で実行されます。Docker がない場合、代わりに PDF または画像へのエクスポートを提案するメッセージが表示されます。添付ファイルの最大サイズは 30 MB です。
+PPTX 変換は選択されたコンテナサンドボックスイメージ内 (`libreoffice --headless`) で実行されます。対応ランタイムもネイティブ LibreOffice もない場合、代わりに PDF または画像へのエクスポートを提案するメッセージが表示されます。添付ファイルの最大サイズは 30 MB です。
 
 ## キャンバスのビューモード
 
@@ -681,7 +690,7 @@ Claude はチャット会話からユーザーの永続的な事実を自動的�
 | -------------------------------------------------- | ----------------------------------------------------------------- |
 | [Developer Guide](docs/developer.md)               | 環境変数、スクリプト、ワークスペース構造、CI                      |
 | [Bridge Protocol](docs/bridge-protocol.md)         | 新しいメッセージングブリッジを書くためのワイヤーレベル仕様        |
-| [Sandbox Credentials](docs/sandbox-credentials.md) | Docker サンドボックスの資格情報フォワーディング (SSH、GitHub CLI) |
+| [Sandbox Credentials](docs/sandbox-credentials.md) | コンテナサンドボックスの資格情報フォワーディング (SSH、GitHub CLI) |
 | [Logging](docs/logging.md)                         | ログレベル、フォーマット、ファイルローテーション                  |
 | [Troubleshooting](docs/troubleshooting.md)         | セットアップの問題 — UI が崩れる、`dist/*` の 404、Windows/OneDrive、再起動後の `401`、起動時の警告 |
 | [CHANGELOG](docs/CHANGELOG.md)                     | リリース履歴                                                      |
