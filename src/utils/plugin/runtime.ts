@@ -20,18 +20,52 @@ export function pluginChannelName(pkgName: string, eventName: string): string {
   return `plugin:${pkgName}:${eventName}`;
 }
 
+/** The `subscribe` options bag, written out rather than imported from the
+ *  protocol: this repo runs ESLint without `projectService` (lint speed), so a
+ *  type followed across a package boundary resolves to `any` and every use of
+ *  `parse` reads as an unsafe call. Structurally identical to the compiler. */
+interface ParseOptions<T> {
+  parse: (raw: unknown) => T | null;
+}
+
+/** Wrap a plugin's `parse` + handler into the raw-frame callback the host
+ *  pubsub takes.
+ *
+ *  Two rules the protocol puts on the HOST, both of which are drops rather
+ *  than failures — extracted so they can be exercised without a socket:
+ *
+ *  - A `parse` that THROWS drops the frame. The documented idiom is
+ *    `parse: (raw) => Schema.parse(raw)` and zod's `parse` throws, so a
+ *    rethrow here would take down a channel shared with every other
+ *    subscriber over one malformed frame.
+ *  - A `parse` returning `null` drops it too; that is the cheap path the
+ *    protocol prefers (`safeParse(raw).data ?? null`). */
+export function parsedFrameDelivery<T>(parse: (raw: unknown) => T | null, handler: ((payload: T) => void) | undefined): (raw: unknown) => void {
+  return (raw: unknown) => {
+    let parsed: T | null;
+    try {
+      parsed = parse(raw);
+    } catch {
+      return;
+    }
+    if (parsed !== null && handler) handler(parsed);
+  };
+}
+
 function makeScopedPubSub(pkgName: string): BrowserPluginRuntime["pubsub"] {
   const { subscribe } = usePubSub();
-  return {
-    subscribe(eventName, handler) {
-      // The host pubsub fans payloads as `unknown`; the plugin
-      // declares the expected shape via the generic at the call
-      // site. Validation is the plugin's responsibility (Zod or
-      // hand-written guard).
-      // Kept (#2692): `T` is the plugin's, so the host cannot check the payload.
-      return subscribe(pluginChannelName(pkgName, eventName), handler as (data: unknown) => void);
-    },
-  };
+  // Two arities (protocol 2.0.0): `(name, handler)` delivers raw frames as
+  // `unknown`; `(name, { parse }, handler)` delivers `parse`'s return type.
+  // The plugin used to name that type with a generic, which checked nothing —
+  // the host fans out untyped frames.
+  function scoped(eventName: string, handler: (payload: unknown) => void): () => void;
+  function scoped<T>(eventName: string, opts: ParseOptions<T>, handler: (payload: T) => void): () => void;
+  function scoped<T>(eventName: string, optsOrHandler: ParseOptions<T> | ((payload: unknown) => void), maybeHandler?: (payload: T) => void): () => void {
+    const channel = pluginChannelName(pkgName, eventName);
+    if (typeof optsOrHandler === "function") return subscribe(channel, optsOrHandler);
+    return subscribe(channel, parsedFrameDelivery(optsOrHandler.parse, maybeHandler));
+  }
+  return { subscribe: scoped };
 }
 
 function makeScopedLogger(pkgName: string): BrowserPluginRuntime["log"] {
@@ -81,18 +115,30 @@ function makeOpenUrl(pkgName: string): BrowserPluginRuntime["openUrl"] {
   };
 }
 
-function makeDispatch(pkgName: string): BrowserPluginRuntime["dispatch"] {
+export function makeDispatch(pkgName: string): BrowserPluginRuntime["dispatch"] {
   // Substitute `:pkg` in the contracted dispatch route. encodeURIComponent
   // collapses scoped names (`@org/pkg`) into one URL path segment;
   // the parameter pattern `:pkg` matches any segment.
   const url = API_ROUTES.plugins.runtimeDispatch.replace(":pkg", encodeURIComponent(pkgName));
-  return async <T = unknown>(args: object): Promise<T> => {
-    const result = await apiPost<T>(url, args);
+  // Both arities (protocol 2.0.0). The reader is the ONLY thing that checks a
+  // response: the old single generic let a caller name the type of bytes
+  // nobody had looked at. Accepting `parse` in the signature but ignoring it
+  // here would be worse than not migrating — every call site would read as
+  // validated while nothing ran (Codex review on #2783).
+  //
+  // A throwing `parse` propagates, unlike `subscribe`'s: the protocol
+  // documents that idiom for `dispatch`, and the caller's own try/catch is
+  // where a bad response belongs.
+  function dispatch(args: object): Promise<unknown>;
+  function dispatch<T>(args: object, parse: (raw: unknown) => T): Promise<T>;
+  async function dispatch<T>(args: object, parse?: (raw: unknown) => T): Promise<T | unknown> {
+    const result = await apiPost<unknown>(url, args);
     if (!result.ok) {
       throw new Error(`plugin/${pkgName} dispatch failed (${result.status}): ${result.error}`);
     }
-    return result.data;
-  };
+    return parse ? parse(result.data) : result.data;
+  }
+  return dispatch;
 }
 
 export interface MakeBrowserPluginRuntimeDeps {

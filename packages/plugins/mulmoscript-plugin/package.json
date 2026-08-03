@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/mulmoscript-plugin",
-  "version": "1.1.4",
+  "version": "2.0.0",
   "description": "presentMulmoScript — MulmoScript storyboard tool for MulmoClaude and MulmoTerminal. Browser-safe core (tool definition + save/reopen/update logic against the generic gui-chat-protocol files.artifacts capability) on `.`, Vue View/Preview on `./vue`, and the Node-only ops layer (mulmocast render/movie/PDF orchestration + dispatch router, host backends injected) on `./server`.",
   "type": "module",
   "main": "./dist/index.js",
@@ -42,13 +42,13 @@
   },
   "dependencies": {
     "@mulmoclaude/common": "^1.1.1",
-    "@mulmoclaude/core": "^1.14.1"
+    "@mulmoclaude/core": "^2.0.0"
   },
   "peerDependencies": {
     "@mulmocast/deck-web": "^1.1.1",
     "@mulmocast/types": "^2.9.0",
     "graphai": "^2.0.18",
-    "gui-chat-protocol": "^1.2.0",
+    "gui-chat-protocol": "^2.0.0",
     "mulmocast": "^2.9.0",
     "vue": "^3.5.0"
   },

@@ -143,3 +143,35 @@ export function isMarkdownDispatchArgs(value: unknown): value is MarkdownDispatc
   const check = DISPATCH_SHAPE_CHECKS.get(value.kind);
   return check !== undefined && check(value);
 }
+
+// ── Dispatch result readers ─────────────────────────────────────────
+//
+// Protocol 2.0.0 makes `dispatch` return `unknown` unless it is handed a
+// reader: naming the result type at the call site never checked anything,
+// since the caller had not seen the response. These sit beside the shapes
+// they read, like the argument guards above.
+//
+// They throw, which is the documented idiom for `dispatch` — every caller
+// here is already inside a try/catch that reports the failure.
+
+const notReturned = (what: string, value: unknown): never => {
+  throw new Error(`markdown plugin: dispatch returned no ${what} (got ${typeof value})`);
+};
+
+export function readDocContent(value: unknown): { content: string } {
+  if (isRecord(value) && typeof value.content === "string") return { content: value.content };
+  return notReturned("document content", value);
+}
+
+export function readMarpThemes(value: unknown): { themes: MarpThemeEntry[] } {
+  if (!isRecord(value) || !Array.isArray(value.themes)) return notReturned("marp themes", value);
+  const themes = value.themes.filter((entry): entry is MarpThemeEntry => isRecord(entry) && typeof entry.name === "string" && typeof entry.css === "string");
+  // A malformed entry is dropped rather than failing the whole list: one
+  // bad theme file should not leave the deck with no themes at all.
+  return { themes };
+}
+
+export function readExportedPdf(value: unknown): { pdfBase64: string } {
+  if (isRecord(value) && typeof value.pdfBase64 === "string") return { pdfBase64: value.pdfBase64 };
+  return notReturned("exported PDF", value);
+}

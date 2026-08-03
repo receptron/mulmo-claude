@@ -44,8 +44,9 @@ export interface PackHtmlResult {
   zipBase64: string;
 }
 
-/** Maps a dispatch `kind` to its result shape so the View can call
- *  `dispatch<HtmlDispatchResult["loadHtml"]>(…)` without a cast. */
+/** Maps a dispatch `kind` to its result shape. Read back with the readers
+ *  below — protocol 2.0.0 makes `dispatch` return `unknown` without one,
+ *  because naming the type at the call site never checked anything. */
 export interface HtmlDispatchResult {
   loadHtml: { html: string };
   saveHtml: { path: string };
@@ -76,4 +77,33 @@ export function isHtmlDispatchArgs(value: unknown): value is HtmlDispatchArgs {
   if (!isRecord(value) || typeof value.path !== "string") return false;
   if (value.kind === "loadHtml") return true;
   return value.kind === "saveHtml" && typeof value.html === "string";
+}
+
+// ── Result readers ──────────────────────────────────────────────────
+//
+// The mirror of the argument guards above: a dispatch RESPONSE is untyped
+// data too. `dispatch(args, parse)` resolves to `parse`'s return type, so
+// these are what turn the shapes above from a claim into a check. They
+// throw, which is the documented idiom for `dispatch` — the View's own
+// try/catch reports it.
+
+const expected = (what: string, value: unknown): never => {
+  throw new Error(`html plugin: dispatch returned no ${what} (got ${typeof value})`);
+};
+
+export function readPackHtmlResult(value: unknown): PackHtmlResult {
+  if (isRecord(value) && typeof value.filename === "string" && typeof value.zipBase64 === "string") {
+    return { filename: value.filename, zipBase64: value.zipBase64 };
+  }
+  return expected("packHtml result", value);
+}
+
+export function readLoadHtmlResult(value: unknown): HtmlDispatchResult["loadHtml"] {
+  if (isRecord(value) && typeof value.html === "string") return { html: value.html };
+  return expected("loadHtml result", value);
+}
+
+export function readSaveHtmlResult(value: unknown): HtmlDispatchResult["saveHtml"] {
+  if (isRecord(value) && typeof value.path === "string") return { path: value.path };
+  return expected("saveHtml result", value);
 }

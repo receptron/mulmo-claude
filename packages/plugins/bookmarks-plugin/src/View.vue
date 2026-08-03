@@ -9,14 +9,22 @@
 
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
+import { z } from "zod";
 import { useT } from "./lang";
 
-interface Bookmark {
-  id: string;
-  url: string;
-  title: string;
-  addedAt: string;
-}
+const Bookmark = z.object({
+  id: z.string(),
+  url: z.string(),
+  title: z.string(),
+  addedAt: z.string(),
+});
+type Bookmark = z.infer<typeof Bookmark>;
+
+// `dispatch` hands back `unknown` unless it is given a reader (protocol
+// 2.0.0): naming the type at the call site was an assertion in disguise,
+// since nothing on this side had seen the response. Parsing here is what
+// makes `json.bookmarks` a `Bookmark[]` rather than a claim.
+const ListResult = z.object({ ok: z.boolean(), bookmarks: z.array(Bookmark).optional() });
 
 // gui-chat-protocol's ViewComponentProps: the host passes
 // `selectedResult` as the latest tool-call result. For our handler
@@ -57,7 +65,7 @@ watch(
 
 async function refetch(): Promise<void> {
   try {
-    const json = await dispatch<{ ok: boolean; bookmarks?: Bookmark[] }>({ kind: "list" });
+    const json = await dispatch({ kind: "list" }, (raw) => ListResult.parse(raw));
     if (json.ok && json.bookmarks) bookmarks.value = json.bookmarks;
   } catch (err) {
     // CLAUDE.md mandate: every fetch must handle errors. Log + leave

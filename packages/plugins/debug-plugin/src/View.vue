@@ -23,6 +23,16 @@
 
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
+import { z } from "zod";
+
+// `dispatch` hands back `unknown` unless given a reader (protocol 2.0.0):
+// naming the result type at the call site never checked anything. These
+// readers throw, which is the documented idiom — each caller already
+// reports through its own try/catch.
+const PublishResult = z.object({ ok: z.boolean(), id: z.string().optional() });
+const ChatResult = z.object({ ok: z.boolean(), chatId: z.string() });
+const ChatAndStoreResult = z.object({ ok: z.boolean(), chatId: z.string(), pendingId: z.string() });
+const TickToggleResult = z.object({ ok: z.boolean(), on: z.boolean() });
 
 // Contract pinned to the host's `HOST_EVENTS.routeChange` in
 // `src/config/hostEvents.ts`. Runtime plugins can't import host
@@ -123,7 +133,7 @@ const view = computed<"default" | "auto-clear" | "manual-clear" | "ask-user" | "
 async function publish(args: Omit<PublishArgs, "kind">): Promise<void> {
   status.value = `firing ${args.lifecycle}/${args.severity}…`;
   try {
-    const result = await runtime.dispatch<{ ok: boolean; id?: string }>({ kind: "publish", ...args } satisfies PublishArgs);
+    const result = await runtime.dispatch({ kind: "publish", ...args } satisfies PublishArgs, (raw) => PublishResult.parse(raw));
     status.value = result.id ? `published ${result.id.slice(0, 8)}` : `published`;
   } catch (err) {
     status.value = `publish failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -167,10 +177,13 @@ async function maybeStartAskUserChat(): Promise<void> {
   if (view.value !== "ask-user" || askUserStartedAt.value) return;
   status.value = "creating Claude question chat…";
   try {
-    const result = await runtime.dispatch<{ ok: boolean; chatId: string }>({
-      kind: "chat-start",
-      initialMessage: ASK_USER_INITIAL_MESSAGE,
-    } satisfies ChatStartArgs);
+    const result = await runtime.dispatch(
+      {
+        kind: "chat-start",
+        initialMessage: ASK_USER_INITIAL_MESSAGE,
+      } satisfies ChatStartArgs,
+      (raw) => ChatResult.parse(raw),
+    );
     askUserChatId.value = result.chatId;
     askUserStartedAt.value = new Date().toISOString();
     if (notificationId.value) {
@@ -200,10 +213,13 @@ async function maybeStartAskUserStoreChat(): Promise<void> {
   if (view.value !== "ask-user-store" || askUserStoreStartedAt.value || !notificationId.value) return;
   status.value = "creating Claude question chat (LLM-cleared)…";
   try {
-    const result = await runtime.dispatch<{ ok: boolean; chatId: string; pendingId: string }>({
-      kind: "chat-start-and-store",
-      notificationId: notificationId.value,
-    } satisfies ChatStartAndStoreArgs);
+    const result = await runtime.dispatch(
+      {
+        kind: "chat-start-and-store",
+        notificationId: notificationId.value,
+      } satisfies ChatStartAndStoreArgs,
+      (raw) => ChatAndStoreResult.parse(raw),
+    );
     askUserStoreChatId.value = result.chatId;
     askUserStorePendingId.value = result.pendingId;
     askUserStoreStartedAt.value = new Date().toISOString();
@@ -339,7 +355,7 @@ const tickStatus = ref<string>("");
 async function setTick(on: boolean): Promise<void> {
   tickStatus.value = on ? "enabling…" : "disabling…";
   try {
-    const result = await runtime.dispatch<{ ok: boolean; on: boolean }>({ kind: "tick-toggle", on } satisfies TickToggleArgs);
+    const result = await runtime.dispatch({ kind: "tick-toggle", on } satisfies TickToggleArgs, (raw) => TickToggleResult.parse(raw));
     tickOn.value = result.on;
     tickStatus.value = result.on ? "ON — fyi notification every minute (watch the bell)" : "OFF";
   } catch (err) {
@@ -365,7 +381,7 @@ async function startSeededChat(): Promise<void> {
       initialMessage: chatInitialMessage.value,
       ...(chatRole.value.trim() ? { role: chatRole.value.trim() } : {}),
     };
-    const result = await runtime.dispatch<{ ok: boolean; chatId: string }>(args);
+    const result = await runtime.dispatch(args, (raw) => ChatResult.parse(raw));
     chatStartedId.value = result.chatId;
     chatStatus.value = `chat started — open the chat to see the seeded turn marked "from @mulmoclaude/debug-plugin"`;
   } catch (err) {

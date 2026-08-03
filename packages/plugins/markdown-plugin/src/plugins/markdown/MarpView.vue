@@ -43,6 +43,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
 import { usePdfExport } from "./usePdfExport";
 import type { MarpThemeEntry } from "./contract";
+import { readMarpThemes } from "./contract";
 import { errorMessage } from "@mulmoclaude/common";
 import { rewriteMarkdownImageRefs } from "@mulmoclaude/markdown-utils/image/rewriteMarkdownImageRefs";
 import { renderMarpDeck, type RenderMarpResult } from "../../render/marp";
@@ -159,7 +160,7 @@ let cachedThemes: readonly MarpThemeEntry[] | null = null;
 async function loadMarpThemes(): Promise<readonly MarpThemeEntry[]> {
   if (cachedThemes !== null) return cachedThemes;
   try {
-    const { themes } = await dispatch<{ themes: MarpThemeEntry[] }>({ kind: "marpThemes" });
+    const { themes } = await dispatch({ kind: "marpThemes" }, readMarpThemes);
     if (!Array.isArray(themes)) return [];
     cachedThemes = themes;
     return cachedThemes;

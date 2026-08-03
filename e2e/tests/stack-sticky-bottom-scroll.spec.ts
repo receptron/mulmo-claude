@@ -18,7 +18,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { mockAllApis } from "../fixtures/api";
-import { mockAgentWithPubSub, waitForScrollHeightStable, scrollMetrics } from "../fixtures/pubsub";
+import { mockAgentWithPubSub, releaseStream, waitForScrollHeightStable, scrollMetrics } from "../fixtures/pubsub";
 import { SESSION_A } from "../fixtures/sessions";
 
 import { ONE_SECOND_MS } from "../../server/utils/time.ts";
@@ -77,10 +77,14 @@ test.describe("StackView — sticky-bottom auto-follow (#2179)", () => {
   });
 
   test("a streamed result does not move the viewport while the reader is scrolled up", async ({ page }) => {
-    // Delayed so the scroll happens first; the assertions below are about
-    // what the arriving result does to an already-scrolled canvas.
+    // Held until this test releases it, so the scroll provably happens first;
+    // the assertions below are about what the arriving result does to an
+    // ALREADY-scrolled canvas. A fixed delay used to order these, and it was a
+    // race against this test's own setup — under load the setup lost, the
+    // result landed before `before` was recorded, and the growth asserted at
+    // the end had already been counted (#2766).
     await serveTranscript(page, tallTranscript());
-    await mockAgentWithPubSub(page, [streamedEntry], { startDelayMs: 2500 });
+    await mockAgentWithPubSub(page, [streamedEntry], { startOnRelease: true });
     await openStackSession(page);
 
     // Let the load's own auto-scroll and its suppression window clear, so
@@ -94,12 +98,33 @@ test.describe("StackView — sticky-bottom auto-follow (#2179)", () => {
     expect(before.scrollHeight).toBeGreaterThan(before.clientHeight); // canvas really overflows
     expect(before.scrollHeight - before.scrollTop - before.clientHeight).toBeGreaterThan(BOTTOM_TOLERANCE_PX);
 
+    await releaseStream(page);
     await awaitStreamedResult(page);
 
     const after = await scrollMetrics(page, "stack-scroll");
     // The result landed (content grew) but the viewport stayed put.
     expect(after.scrollHeight).toBeGreaterThan(before.scrollHeight);
     expect(after.scrollTop).toBe(before.scrollTop);
+  });
+
+  // Guards the gate the test above depends on. Without this, `startOnRelease`
+  // could stop holding anything — the flag left set by a previous release, a
+  // polling bug — and that test would go back to racing its own setup while
+  // still passing, which is exactly how it broke the first time (#2766).
+  test("startOnRelease holds the stream until releaseStream is called", async ({ page }) => {
+    await serveTranscript(page, tallTranscript());
+    await mockAgentWithPubSub(page, [streamedEntry], { startOnRelease: true });
+    await openStackSession(page);
+
+    const marker = page.getByText(STREAM_MARKER).first();
+    // Long enough that a gate which is not holding would have delivered: the
+    // events send `RENDER_GAP_MS` (20ms) apart once released.
+    // eslint-disable-next-line sonarjs/no-fixed-wait-in-tests -- proving an ABSENCE over a window; there is no DOM signal for "still not sent".
+    await page.waitForTimeout(2000);
+    await expect(marker).toHaveCount(0);
+
+    await releaseStream(page);
+    await expect(marker).toBeVisible({ timeout: 10 * ONE_SECOND_MS });
   });
 
   test("following resumes once the reader scrolls back to the bottom", async ({ page }) => {

@@ -56,7 +56,7 @@
 import { computed, ref, watch } from "vue";
 import { useRuntime, type ToolResultComplete } from "gui-chat-protocol/vue";
 import type { PresentHtmlData } from "../core/types";
-import type { HtmlDispatchResult, PackHtmlResult } from "../core/contract";
+import { readLoadHtmlResult, readPackHtmlResult, readSaveHtmlResult } from "../core/contract";
 import { htmlArtifactPreviewUrl } from "../core/paths";
 import { useT } from "../lang";
 import { buildPrintCspContent } from "./previewCsp";
@@ -137,7 +137,7 @@ async function downloadZip() {
   downloading.value = true;
   downloadError.value = null;
   try {
-    const { zipBase64, filename } = await runtime.dispatch<PackHtmlResult>({ kind: "packHtml", path });
+    const { zipBase64, filename } = await runtime.dispatch({ kind: "packHtml", path }, readPackHtmlResult);
     triggerBlobDownload(zipBase64, filename);
   } catch (err) {
     downloadError.value = errorMessage(err);
@@ -157,7 +157,7 @@ async function fetchSource(): Promise<string | null> {
   sourceLoading.value = true;
   sourceError.value = null;
   try {
-    const { html } = await runtime.dispatch<HtmlDispatchResult["loadHtml"]>({ kind: "loadHtml", path });
+    const { html } = await runtime.dispatch({ kind: "loadHtml", path }, readLoadHtmlResult);
     // Stale-response guard: only commit if the user hasn't navigated away.
     if (filePath.value === path) {
       sourceCache.value = { ...sourceCache.value, [path]: html };
@@ -204,7 +204,7 @@ async function applyHtml() {
   saveError.value = null;
   saving.value = true;
   try {
-    await runtime.dispatch<HtmlDispatchResult["saveHtml"]>({ kind: "saveHtml", path, html: editableHtml.value });
+    await runtime.dispatch({ kind: "saveHtml", path, html: editableHtml.value }, readSaveHtmlResult);
     // Commit the just-saved text as canonical so the editor doesn't refetch
     // over its own write when the file-change event arrives. Iframe cache-bust
     // happens via `previewVersion` when the event lands.

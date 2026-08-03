@@ -10,6 +10,7 @@
 import { ref } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
 import type { ExportPdfOptions } from "./contract";
+import { readExportedPdf } from "./contract";
 
 function base64ToBlob(base64: string, type: string): Blob {
   const binary = atob(base64);
@@ -45,7 +46,7 @@ export function usePdfExport() {
     pdfDownloading.value = true;
     pdfError.value = null;
     try {
-      const { pdfBase64 } = await dispatch<{ pdfBase64: string }>({ kind: "exportPdf", ...options });
+      const { pdfBase64 } = await dispatch({ kind: "exportPdf", ...options }, readExportedPdf);
       triggerDownload(base64ToBlob(pdfBase64, "application/pdf"), options.filename);
     } catch (err) {
       pdfError.value = err instanceof Error ? err.message : String(err);

@@ -171,6 +171,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
+import { readDocContent } from "./contract";
 import { marked } from "marked";
 import { formatScalarField, sanitizeMarkdownHtml, useMarkdownDoc, useClipboardCopy, useFileWatch } from "@mulmoclaude/core/plugin-vue";
 import type { ToolResult } from "gui-chat-protocol";
@@ -232,7 +233,7 @@ async function fetchMarkdownContent(): Promise<void> {
   if (filePath) {
     loading.value = true;
     try {
-      const { content } = await dispatch<{ content: string }>({ kind: "loadDoc", path: filePath });
+      const { content } = await dispatch({ kind: "loadDoc", path: filePath }, readDocContent);
       markdownContent.value = content ?? "";
     } catch (err) {
       // Preserve any previously-loaded content instead of wiping it —

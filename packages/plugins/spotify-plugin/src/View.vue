@@ -16,20 +16,23 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRuntime } from "gui-chat-protocol/vue";
 import { useT } from "./lang";
 import type { NormalisedDevice, NormalisedPlaylist, NormalisedTrack, RecentlyPlayedItem, SearchResult } from "./types";
-
-interface StatusData {
-  clientIdConfigured: boolean;
-  connected: boolean;
-  expiresAt: string | null;
-  scopes: string[];
-  isPremium?: boolean | null;
-  displayName?: string;
-}
-
-interface StatusResponse {
-  ok: true;
-  data: StatusData;
-}
+import {
+  AckResponseSchema,
+  ConnectResponseSchema,
+  DevicesResponseSchema,
+  LikedResponseSchema,
+  NowPlayingResponseSchema,
+  PlaylistsResponseSchema,
+  RecentResponseSchema,
+  SearchResponseSchema,
+  StatusResponseSchema,
+  type StatusData,
+  type WireDevice,
+  type WirePlaylist,
+  type WireRecentItem,
+  type WireSearchResult,
+  type WireTrack,
+} from "./schemas";
 
 type Tab = "liked" | "playlists" | "recent" | "nowPlaying" | "search";
 
@@ -38,12 +41,12 @@ const t = useT();
 
 const status = ref<StatusData | null>(null);
 const activeTab = ref<Tab>("liked");
-const liked = ref<NormalisedTrack[] | null>(null);
-const playlists = ref<NormalisedPlaylist[] | null>(null);
-const recent = ref<RecentlyPlayedItem[] | null>(null);
-const nowPlaying = ref<NormalisedTrack | null | undefined>(undefined);
+const liked = ref<WireTrack[] | null>(null);
+const playlists = ref<WirePlaylist[] | null>(null);
+const recent = ref<WireRecentItem[] | null>(null);
+const nowPlaying = ref<WireTrack | null | undefined>(undefined);
 const searchQuery = ref("");
-const searchResult = ref<SearchResult | null>(null);
+const searchResult = ref<WireSearchResult | null>(null);
 const isSearching = ref(false);
 const tabError = ref<string | null>(null);
 const isLoadingTab = ref(false);
@@ -55,14 +58,14 @@ const saveError = ref<string | null>(null);
 const isConnecting = ref(false);
 
 // Player Controls (PR 3)
-const devices = ref<NormalisedDevice[]>([]);
+const devices = ref<WireDevice[]>([]);
 const playerError = ref<string | null>(null);
 const isPlayerBusy = ref(false);
 const volumeInput = ref(50);
 
 async function refreshStatus(): Promise<void> {
   try {
-    const response = await dispatch<StatusResponse>({ kind: "status" });
+    const response = await dispatch({ kind: "status" }, (raw) => StatusResponseSchema.parse(raw));
     if (response.ok) status.value = response.data;
   } catch (err) {
     log.warn("status fetch failed", { error: err instanceof Error ? err.message : String(err) });
@@ -106,10 +109,7 @@ function computeRedirectUri(): string {
 async function startConnect(): Promise<void> {
   isConnecting.value = true;
   try {
-    const response = await dispatch<{ ok: boolean; data?: { authorizeUrl?: string }; message?: string }>({
-      kind: "connect",
-      redirectUri: computeRedirectUri(),
-    });
+    const response = await dispatch({ kind: "connect", redirectUri: computeRedirectUri() }, (raw) => ConnectResponseSchema.parse(raw));
     if (response.ok && response.data?.authorizeUrl) {
       // Open the consent screen in a new tab. The original tab
       // keeps the View; the server's `connected` pubsub event
@@ -130,25 +130,25 @@ async function startConnect(): Promise<void> {
 }
 
 async function loadLiked(): Promise<void> {
-  const response = await dispatch<{ ok: boolean; data?: NormalisedTrack[]; message?: string }>({ kind: "liked" });
+  const response = await dispatch({ kind: "liked" }, (raw) => LikedResponseSchema.parse(raw));
   if (response.ok && response.data) liked.value = response.data;
   else tabError.value = response.message ?? t.value.loadFailed;
 }
 
 async function loadPlaylists(): Promise<void> {
-  const response = await dispatch<{ ok: boolean; data?: NormalisedPlaylist[]; message?: string }>({ kind: "playlists" });
+  const response = await dispatch({ kind: "playlists" }, (raw) => PlaylistsResponseSchema.parse(raw));
   if (response.ok && response.data) playlists.value = response.data;
   else tabError.value = response.message ?? t.value.loadFailed;
 }
 
 async function loadRecent(): Promise<void> {
-  const response = await dispatch<{ ok: boolean; data?: RecentlyPlayedItem[]; message?: string }>({ kind: "recent" });
+  const response = await dispatch({ kind: "recent" }, (raw) => RecentResponseSchema.parse(raw));
   if (response.ok && response.data) recent.value = response.data;
   else tabError.value = response.message ?? t.value.loadFailed;
 }
 
 async function loadNowPlaying(): Promise<void> {
-  const response = await dispatch<{ ok: boolean; data?: NormalisedTrack | null; message?: string }>({ kind: "nowPlaying" });
+  const response = await dispatch({ kind: "nowPlaying" }, (raw) => NowPlayingResponseSchema.parse(raw));
   if (response.ok) nowPlaying.value = response.data ?? null;
   else tabError.value = response.message ?? t.value.loadFailed;
   // Always also (re)load devices so the dropdown stays current —
@@ -175,7 +175,7 @@ async function runSearch(): Promise<void> {
   isSearching.value = true;
   tabError.value = null;
   try {
-    const response = await dispatch<{ ok: boolean; data?: SearchResult; message?: string }>({ kind: "search", query });
+    const response = await dispatch({ kind: "search", query }, (raw) => SearchResponseSchema.parse(raw));
     if (response.ok && response.data) searchResult.value = response.data;
     else tabError.value = response.message ?? t.value.loadFailed;
   } catch (err) {
@@ -239,7 +239,7 @@ function refreshActiveTab(): void {
 // users too so the dropdown loads regardless of plan.
 async function loadDevices(): Promise<void> {
   try {
-    const response = await dispatch<{ ok: boolean; data?: NormalisedDevice[]; message?: string }>({ kind: "getDevices" });
+    const response = await dispatch({ kind: "getDevices" }, (raw) => DevicesResponseSchema.parse(raw));
     if (response.ok && response.data) devices.value = response.data;
   } catch (err) {
     log.warn("getDevices failed", { error: err instanceof Error ? err.message : String(err) });
@@ -250,7 +250,7 @@ async function dispatchPlayer(args: object, busyMessage: string): Promise<void> 
   isPlayerBusy.value = true;
   playerError.value = null;
   try {
-    const response = await dispatch<{ ok: boolean; message?: string }>(args);
+    const response = await dispatch(args, (raw) => AckResponseSchema.parse(raw));
     if (!response.ok) {
       playerError.value = response.message ?? busyMessage;
     } else {

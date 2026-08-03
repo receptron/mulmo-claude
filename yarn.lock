@@ -1339,36 +1339,33 @@
     protobufjs "^7.5.3"
     yargs "^17.7.2"
 
-"@gui-chat-plugin/browse@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/browse/-/browse-1.1.1.tgz#29ef08c6ce880a5134dd710e87af17ffcad1dbd5"
-  integrity sha512-+1J8Bw6Q4JZ7MtKaN/RjK8GFkoQjPNaIoP9d3efFOqir5pmrN0DqezWMzbNSAIf9CLX4RmoAQ6hxMyi8mMZrkw==
+"@gui-chat-plugin/browse@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/browse/-/browse-2.0.0.tgz#30ad7c7fddc15498ec8d2f82b379b44b32df0437"
+  integrity sha512-sy35G8Trv1naUIFRPJ4iQgUuoV3FoAkZV6WFP2ebpxlXlrrhsf6g9E78IdF0aKx9u06q+0qh4Pke3hzwliOIHw==
 
-"@gui-chat-plugin/camera@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/camera/-/camera-1.1.0.tgz#8a1d48e123a80152a1734c59bc9aa64e68a9756f"
-  integrity sha512-YflpZFS7r1y+5xo046n/bSGAosSr3QbgMpdmTJ06OLUEdNkPdpZblKecEzwC+wHx9AHwyxuDEIY4o2r8JK+DQg==
+"@gui-chat-plugin/camera@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/camera/-/camera-2.0.0.tgz#4bf523a3f7f4916646512a88b3f36acda150959a"
+  integrity sha512-ZuGjKRRj56B5PCxYec68pb3PdFVJc0aWTjQvFCG2aE+E6+7GGskpb5x6ywrqEe+CiHByhVeIdllL087khOGGcw==
 
-"@gui-chat-plugin/google-map@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/google-map/-/google-map-1.1.0.tgz#0202de10c4ed868f054e756696713068e4d7f4fd"
-  integrity sha512-A/TcYT/VH25p6wXB93UGvCS/7dBPLOVzoRhW4VKg7fnudX8XEkj1k3ixLKs+VrY08IQ+yEwLH/V/fosNiHPlPA==
-  dependencies:
-    gui-chat-protocol "^1.2.0"
+"@gui-chat-plugin/google-map@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/google-map/-/google-map-2.0.0.tgz#9609f994ec686cd6f10f442877d771cc72b97bb3"
+  integrity sha512-YSM8PrD73xedl6h6XqvlKHSNHvUU9v/IxcCnlIVJ4GrIbyOkDposQXhA+KcOg7+RT6QBVJrT52W9pNSnC4ze8w==
 
-"@gui-chat-plugin/mindmap@^1.2.1":
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/mindmap/-/mindmap-1.2.1.tgz#b714c26c29a0dc616df65f53954b1f648d18a497"
-  integrity sha512-Mkfk54cguaxJRirYcApQfW9zpI2sSi8wpf+XkDcmaAo0f/26NtpTBnU1HPZvgd+NAghVzLecgQHvxH8rx1C4ww==
+"@gui-chat-plugin/mindmap@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/mindmap/-/mindmap-2.0.0.tgz#a10be45cd7c5a51e341e9454e189f88084bd4acf"
+  integrity sha512-mAWCu2LBi3BibvOPRIgpERRd8qzmKNgu0mwlcSOCDgTCw/k7422H2rUnseBD3SVyeoSeebvOn500H+bFHnCrCg==
   dependencies:
     jspdf "^4.0.0"
 
-"@gui-chat-plugin/present3d@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/present3d/-/present3d-1.1.0.tgz#25f4ed0cdbde94bee56b7ca56cc3425d2bafed63"
-  integrity sha512-XyMPiijGLzZVEWo2gRbsfqPM4sxS9tODJnnoy/IypH+UrEVBEqBKz8eAbQQWK2I/WDxf+H0USYkidsUq1/5HoA==
+"@gui-chat-plugin/present3d@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@gui-chat-plugin/present3d/-/present3d-2.0.0.tgz#58fb534fd4ddcffadb4297421c1f7e50076b95ae"
+  integrity sha512-BZme2Tkg4iwAe+OzM9Cgl3MA/LuF61XuvNCYt5HlfZqNuG72VdvnJFczP94Q2VC7wRB2G+Ccy8Fc9HASFa8sYQ==
   dependencies:
-    gui-chat-protocol "^1.2.0"
     three "^0.185.1"
     three-bvh-csg "^0.0.18"
     three-mesh-bvh "0.9.13"
@@ -2079,12 +2076,10 @@
     "@mulmocast/deck" "^0.7.0"
     zod "^4.4.3"
 
-"@mulmochat-plugin/quiz@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@mulmochat-plugin/quiz/-/quiz-1.1.0.tgz#a09d4a992eec860a3691e79e6140532435aaa673"
-  integrity sha512-iKL5rtbAD1YuU3Oxex3iL3KK6V5Dt3OacEo+06M1asWEuo2o/9fCoRZfgOYWbZxTTW3HwfTCl/4wP2rzV1ftow==
-  dependencies:
-    gui-chat-protocol "^1.2.0"
+"@mulmochat-plugin/quiz@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@mulmochat-plugin/quiz/-/quiz-2.0.0.tgz#1e30ab83fa04cbab7e81ec96c9eca402fec13915"
+  integrity sha512-7EQVzHUCfuo6JGisb3Dnf/7Dv3W16dxYhOIn9bZJYBOiNTSx0NHquRlJMn0UGyAdD7Sj+D6rKA/vK8oYPsLYPw==
 
 "@mulmochat-plugin/ui-image@^0.4.1":
   version "0.4.1"
@@ -6428,10 +6423,10 @@ groq-sdk@^0.30.0:
     formdata-node "^4.3.2"
     node-fetch "^2.6.7"
 
-gui-chat-protocol@^1.2.0:
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-1.2.0.tgz#8bc7f8d4e31a625aff94fa2c79951b5b80c30145"
-  integrity sha512-5qKQCpXOrH5+QlOWujhYpsG469IB6nsSZ9TOoodsBQ+U5aAPGEEUbvmacyOmPsimHvsDLCxP0S/ZNycWEFHOww==
+gui-chat-protocol@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/gui-chat-protocol/-/gui-chat-protocol-2.0.0.tgz#96f0f0a115c92f8567b68b9c74a53514e1f3253f"
+  integrity sha512-E02kPSXKH2bX4WAp6TuMjSx4Ftzr2n8XEQtPhZxRCKCBO9ss3Qkx4G5xWeZ6bVUCZtyhB+N8V8Jlv+YRPQJQ9w==
 
 hachure-fill@^0.5.2:
   version "0.5.2"

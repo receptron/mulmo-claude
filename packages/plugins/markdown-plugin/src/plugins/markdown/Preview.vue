@@ -21,6 +21,7 @@ import { extractFirstH1 } from "@mulmoclaude/markdown-utils/markdown/extractFirs
 import { parseFrontmatter } from "@mulmoclaude/markdown-utils/markdown/frontmatter";
 import { isMarpDocument } from "@mulmoclaude/markdown-utils/markdown/marpDetect";
 import { useRuntime } from "gui-chat-protocol/vue";
+import { readDocContent } from "./contract";
 import { useT } from "../../lang";
 
 const t = useT();
@@ -39,7 +40,7 @@ async function fetchContent(): Promise<void> {
     return;
   }
   try {
-    const { content } = await dispatch<{ content: string }>({ kind: "loadDoc", path: filePath });
+    const { content } = await dispatch({ kind: "loadDoc", path: filePath }, readDocContent);
     fetchedContent.value = content ?? "";
   } catch {
     fetchedContent.value = "";

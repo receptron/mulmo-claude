@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/html-plugin",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "presentHtml — self-contained HTML page tool for MulmoClaude and MulmoTerminal. Server core (validation + artifacts persistence via the generic gui-chat-protocol files.artifacts capability) on `.`, Vue View/Preview on `./vue`.",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,17 +36,17 @@
   },
   "dependencies": {
     "@mulmoclaude/common": "^1.1.1",
-    "@mulmoclaude/core": "^1.14.1"
+    "@mulmoclaude/core": "^2.0.0"
   },
   "peerDependencies": {
-    "@mulmoclaude/core": "^1.14.1",
-    "gui-chat-protocol": "^1.2.0",
+    "@mulmoclaude/core": "^2.0.0",
+    "gui-chat-protocol": "^2.0.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@mulmoclaude/common": "^1.1.1",
-    "@mulmoclaude/core": "^1.14.1",
+    "@mulmoclaude/core": "^2.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.1.2",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
@@ -55,7 +55,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-vue": "^10.10.0",
     "globals": "^17.9.0",
-    "gui-chat-protocol": "^1.2.0",
+    "gui-chat-protocol": "^2.0.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.4",
     "typescript": "~6.0.2",

@@ -221,3 +221,102 @@ export const DispatchArgsSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type DispatchArgs = z.infer<typeof DispatchArgsSchema>;
+
+// ── Dispatch response schemas ───────────────────────────────────────
+//
+// The mirror of `DispatchArgsSchema`. Protocol 2.0.0 makes `dispatch`
+// return `unknown` unless it is handed a reader, because naming the
+// result type at the call site never checked anything — the View had not
+// seen the response, the server had. These are what make the View's
+// `NormalisedTrack[]` a fact rather than a claim.
+//
+// Kept beside the arg schemas so the two halves of one contract cannot
+// drift apart, which is the reason this file exists.
+
+const TrackSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  artists: z.array(z.string()),
+  album: z.string(),
+  durationMs: z.number(),
+  url: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+
+const PlaylistSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  trackCount: z.number(),
+  url: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+
+const ArtistSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  genres: z.array(z.string()),
+  popularity: z.number().optional(),
+  url: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+
+const AlbumSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  artists: z.array(z.string()),
+  releaseDate: z.string(),
+  totalTracks: z.number(),
+  url: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+
+const SearchResultSchema = z.object({
+  tracks: z.array(TrackSchema).optional(),
+  artists: z.array(ArtistSchema).optional(),
+  albums: z.array(AlbumSchema).optional(),
+  playlists: z.array(PlaylistSchema).optional(),
+});
+
+/** `id` is nullable on purpose: Spotify lists restricted devices without
+ *  one, and dropping them would underreport the user's setup. */
+const DeviceSchema = z.object({
+  id: z.string().nullable(),
+  name: z.string(),
+  type: z.string(),
+  isActive: z.boolean(),
+  volumePercent: z.number().optional(),
+});
+
+/** Every dispatch answers in this envelope; only `data` varies. */
+const envelope = <T extends z.ZodTypeAny>(data: T) => z.object({ ok: z.boolean(), data: data.optional(), message: z.string().optional() });
+
+const StatusDataSchema = z.object({
+  clientIdConfigured: z.boolean(),
+  connected: z.boolean(),
+  expiresAt: z.string().nullable(),
+  scopes: z.array(z.string()),
+  isPremium: z.boolean().nullable().optional(),
+  displayName: z.string().optional(),
+});
+export const StatusResponseSchema = z.object({ ok: z.boolean(), data: StatusDataSchema });
+export type StatusData = z.infer<typeof StatusDataSchema>;
+export const ConnectResponseSchema = envelope(z.object({ authorizeUrl: z.string().optional() }));
+export const LikedResponseSchema = envelope(z.array(TrackSchema));
+export const PlaylistsResponseSchema = envelope(z.array(PlaylistSchema));
+const RecentItemSchema = z.object({ track: TrackSchema, playedAt: z.string() });
+export const RecentResponseSchema = envelope(z.array(RecentItemSchema));
+export const NowPlayingResponseSchema = envelope(TrackSchema.nullable());
+export const SearchResponseSchema = envelope(SearchResultSchema);
+export const DevicesResponseSchema = envelope(z.array(DeviceSchema));
+export const AckResponseSchema = z.object({ ok: z.boolean(), message: z.string().optional() });
+
+// Inferred from the wire schemas above, not from `types.ts`. The two differ
+// under `exactOptionalPropertyTypes`: an absent optional survives JSON as
+// absent, and zod models that as `| undefined`. The View holds parsed values,
+// so it holds THESE — `types.ts` stays the server's shape.
+export type WireTrack = z.infer<typeof TrackSchema>;
+export type WirePlaylist = z.infer<typeof PlaylistSchema>;
+export type WireRecentItem = z.infer<typeof RecentItemSchema>;
+export type WireSearchResult = z.infer<typeof SearchResultSchema>;
+export type WireDevice = z.infer<typeof DeviceSchema>;
