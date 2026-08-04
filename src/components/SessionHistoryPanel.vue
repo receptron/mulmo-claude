@@ -35,7 +35,7 @@
         :key="session.id"
         tabindex="0"
         role="button"
-        :aria-label="t('sessionHistoryPanel.openRowAria', { preview: primaryText(session) })"
+        :aria-label="rowAriaLabel(session)"
         :title="primaryText(session)"
         class="relative cursor-pointer rounded p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         :class="rowClasses(session)"
@@ -53,7 +53,7 @@
              previewClasses (bold text); bookmark state is signalled
              via the green role icon. -->
         <div class="absolute top-0 right-6 -translate-y-1/2 flex items-center gap-1 bg-white px-1 leading-none">
-          <span class="text-[10px] text-gray-400 pointer-events-none">{{ formatDate(session.updatedAt) }}</span>
+          <span class="text-[10px] text-gray-400 pointer-events-none">{{ rowTimestamp(session) }}</span>
           <button
             type="button"
             class="flex items-center justify-center px-0.5 border border-gray-300 rounded-md text-gray-400 hover:text-gray-700 hover:border-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400"
@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary, SessionOrigin } from "../types/session";
@@ -125,8 +125,32 @@ import { resolveSessionPrimaryText, sessionHasVisibleSummary } from "../utils/se
 import { formatDate } from "../utils/format/date";
 import SessionRoleIcon from "./SessionRoleIcon.vue";
 import FilterChip from "./FilterChip.vue";
+import { createPerfAccumulator, perfLogUntilPaint } from "../utils/devPerf";
 
 const { t } = useI18n();
+
+// ── Investigation instrumentation (see src/utils/devPerf.ts) ────────
+// Off unless `localStorage["mulmoclaude:perf"] === "1"`. Splits the
+// panel's render cost into the three per-row calls the template makes,
+// so "the list is slow" resolves into which of them dominates.
+const setupStartedAt = performance.now();
+const timestampCost = createPerfAccumulator();
+const ariaCost = createPerfAccumulator();
+const primaryTextCost = createPerfAccumulator();
+
+function flushRowCosts(pass: string, rows: number): void {
+  timestampCost.flush(`${pass}: formatDate()`, { rows });
+  ariaCost.flush(`${pass}: t(openRowAria)`, { rows });
+  primaryTextCost.flush(`${pass}: primaryText()`, { rows });
+}
+
+function rowTimestamp(session: SessionSummary): string {
+  return timestampCost.add(() => formatDate(session.updatedAt));
+}
+
+function rowAriaLabel(session: SessionSummary): string {
+  return ariaCost.add(() => t("sessionHistoryPanel.openRowAria", { preview: primaryText(session) }));
+}
 
 // `unread` and `bookmarked` are mutually exclusive with origin pills —
 // selecting either shows every matching session regardless of origin,
@@ -209,7 +233,7 @@ function previewClasses(session: SessionSummary): string {
 // visible text, aria-label, and the hover title so all three stay in
 // lockstep.
 function primaryText(session: SessionSummary): string {
-  return resolveSessionPrimaryText(session) ?? t("sessionHistoryPanel.noMessages");
+  return primaryTextCost.add(() => resolveSessionPrimaryText(session) ?? t("sessionHistoryPanel.noMessages"));
 }
 
 // ── Row action menu ─────────────────────────────────────────
@@ -243,6 +267,17 @@ function onDelete(session: SessionSummary): void {
 
 onMounted(() => {
   document.addEventListener("click", closeMenu);
+  perfLogUntilPaint("history-panel setup→paint", setupStartedAt, {
+    rows: filteredSessions.value.length,
+    totalSessions: props.sessions.length,
+  });
+  flushRowCosts("mount", filteredSessions.value.length);
+});
+
+// Every re-render of the list (filter change, selection change, or a
+// sessions-channel refetch replacing the array) lands here.
+onUpdated(() => {
+  flushRowCosts("update", filteredSessions.value.length);
 });
 
 onBeforeUnmount(() => {

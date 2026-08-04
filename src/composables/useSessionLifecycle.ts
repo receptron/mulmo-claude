@@ -15,6 +15,7 @@ import type { Role } from "../config/roles";
 import { PAGE_ROUTES } from "../router";
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { perfLogUntilPaint, perfTime, perfTimeAsync } from "../utils/devPerf";
 import { createEmptySession } from "../utils/session/sessionFactory";
 import { buildLoadedSession, parseSessionEntries, shouldAdoptServerTranscript } from "../utils/session/sessionEntries";
 import {
@@ -108,23 +109,36 @@ function activateSession(ctx: LifecycleCtx, sessionId: string, replace: boolean)
 }
 
 async function loadSession(ctx: LifecycleCtx, sessionId: string): Promise<void> {
+  // Investigation instrumentation (src/utils/devPerf.ts): the click has
+  // no visible effect until this whole function completes, so each phase
+  // is timed separately and the paint is timed from the very start.
+  const clickedAt = performance.now();
   if (isSessionAlreadyDisplayed(sessionId, ctx.currentSessionId.value, ctx.sessionMap.has(sessionId))) return;
   const replaced = shouldReplaceHistory(removeCurrentIfEmpty(ctx), ctx.isChatPage.value);
   if (ctx.sessionMap.has(sessionId)) {
     activateSession(ctx, sessionId, replaced);
+    perfLogUntilPaint("loadSession cached→paint", clickedAt, { sessionId });
     return;
   }
-  const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
+  const response = await perfTimeAsync("loadSession: GET /sessions/:id", () =>
+    apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId))),
+  );
   if (!response.ok) return;
-  const newSession = buildLoadedSession({
-    id: sessionId,
-    entries: response.data,
-    defaultRoleId: ctx.roles.value[0]?.id ?? "",
-    serverSummary: ctx.sessions.value.find((summary) => summary.id === sessionId),
-    nowIso: new Date().toISOString(),
-  });
+  const newSession = perfTime(
+    "loadSession: buildLoadedSession()",
+    () =>
+      buildLoadedSession({
+        id: sessionId,
+        entries: response.data,
+        defaultRoleId: ctx.roles.value[0]?.id ?? "",
+        serverSummary: ctx.sessions.value.find((summary) => summary.id === sessionId),
+        nowIso: new Date().toISOString(),
+      }),
+    { entries: response.data.length },
+  );
   ctx.sessionMap.set(sessionId, newSession);
   activateSession(ctx, sessionId, replaced);
+  perfLogUntilPaint("loadSession click→paint", clickedAt, { sessionId, entries: response.data.length });
 }
 
 // Re-fetch the transcript and patch entries missed via a dropped socket

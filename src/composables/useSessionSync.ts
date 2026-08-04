@@ -10,6 +10,22 @@ import { usePubSub } from "./usePubSub";
 import { PUBSUB_CHANNELS, readSessionDeletedIds } from "../config/pubsubChannels";
 import { apiPost } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { createPerfCounter, perfTimeAsync } from "../utils/devPerf";
+
+// Investigation instrumentation (src/utils/devPerf.ts). Every hit here
+// is a server-side session state change (beginRun / endRun / markRead)
+// that makes THIS tab refetch the whole list and re-render it — the
+// re-renders that happen without the user touching anything.
+const sessionsChannelHits = createPerfCounter("sessions-channel broadcast");
+
+// Clicking an UNREAD row lands here, and the server answers this POST
+// with a sessions-channel broadcast — so it is what turns one click
+// into a second full-list refetch + re-render.
+function postMarkRead(sessionId: string) {
+  return perfTimeAsync("markSessionRead: POST mark-read", () =>
+    apiPost<{ ok: boolean }>(API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(sessionId))),
+  );
+}
 
 export function useSessionSync(opts: {
   sessionMap: Map<string, ActiveSession>;
@@ -56,7 +72,7 @@ export function useSessionSync(opts: {
   }
 
   async function markSessionRead(sessionId: string): Promise<void> {
-    const result = await apiPost<{ ok: boolean }>(API_ROUTES.sessions.markRead.replace(":id", encodeURIComponent(sessionId)));
+    const result = await postMarkRead(sessionId);
     if (!result.ok || result.data.ok === false) {
       await refreshSessionStates();
     }
@@ -74,6 +90,7 @@ export function useSessionSync(opts: {
       if (deletedId === currentSessionId.value) currentWasDeleted = true;
     }
     if (currentWasDeleted) onCurrentSessionDeleted?.();
+    sessionsChannelHits.hit({ deleted: deletedIds.length });
     void refreshSessionStates();
   });
   if (typeof unsub === "function") onScopeDispose(unsub);
