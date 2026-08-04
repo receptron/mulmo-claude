@@ -40,7 +40,7 @@
         class="relative cursor-pointer rounded p-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         :class="rowClasses(session)"
         :data-testid="`session-item-${session.id}`"
-        @click="emit('loadSession', session.id)"
+        @click="onRowClick(session.id)"
         @keydown.enter.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
         @keydown.space.prevent.self="(e) => !e.repeat && emit('loadSession', session.id)"
       >
@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUpdated } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, onUpdated, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary, SessionOrigin } from "../types/session";
@@ -125,7 +125,7 @@ import { resolveSessionPrimaryText, sessionHasVisibleSummary } from "../utils/se
 import { formatDate } from "../utils/format/date";
 import SessionRoleIcon from "./SessionRoleIcon.vue";
 import FilterChip from "./FilterChip.vue";
-import { createPerfAccumulator, perfLogUntilPaint } from "../utils/devPerf";
+import { createPerfAccumulator, perfLogSinceClick, perfLogUntilPaint, perfMarkClick } from "../utils/devPerf";
 
 const { t } = useI18n();
 
@@ -174,6 +174,19 @@ const emit = defineEmits<{
 
 const root = ref<HTMLDivElement | null>(null);
 defineExpose({ root });
+
+// The row's selected border is the first feedback the click produces.
+// It cannot appear until loadSession has finished, so this measures the
+// "I clicked but nothing happened yet" window directly.
+function onRowClick(sessionId: string): void {
+  perfMarkClick();
+  emit("loadSession", sessionId);
+}
+
+watch(
+  () => props.currentSessionId,
+  () => perfLogSinceClick("click→row selected"),
+);
 
 // ── Filter ──────────────────────────────────────────────────
 

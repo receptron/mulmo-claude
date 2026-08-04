@@ -69,6 +69,27 @@ export function perfLogUntilPaint(label: string, startedAt: number, extra?: Reco
   });
 }
 
+// ── Click clock ─────────────────────────────────────────────────────
+// One click updates three things the reader notices at different
+// moments: the row's own selected border, the middle pane's transcript,
+// and the canvas. They live in different components, so the click time
+// is parked here and each of them reports its own distance from it.
+
+let lastClickAt = 0;
+
+/** Stamp the moment the user pressed a session row. */
+export function perfMarkClick(): void {
+  if (!perfEnabled) return;
+  lastClickAt = performance.now();
+}
+
+/** Report when this part of the UI actually finished painting, measured
+ *  from the click that caused it. No-op before the first click. */
+export function perfLogSinceClick(label: string, extra?: Record<string, unknown>): void {
+  if (!perfEnabled || lastClickAt === 0) return;
+  perfLogUntilPaint(label, lastClickAt, extra);
+}
+
 /** Sums many small calls (per-row work) across one render pass, so the
  *  cost of 800 individual `formatDate` / `t()` calls shows up as one
  *  line instead of 800. Call `add` around each unit, `flush` once the
