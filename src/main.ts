@@ -10,6 +10,7 @@ import router from "./router/index";
 import { installGuards } from "./router/guards";
 import i18n from "./lib/vue-i18n";
 import { setAuthToken } from "./utils/api";
+import { perfEnabled } from "./utils/devPerf";
 import { readAuthTokenFromMeta } from "./utils/dom/authTokenMeta";
 import { loadRuntimePlugins } from "./tools/runtimeLoader";
 import { startDevPluginReloadListener } from "./composables/useDevPluginReload";
@@ -120,6 +121,11 @@ setupMarked();
 installGuards(router);
 
 const app = createApp(App);
+// Investigation instrumentation (src/utils/devPerf.ts): makes Vue emit a
+// `performance.measure` per component init / render / patch, which
+// devPerf's observer aggregates into a per-click breakdown. Only on
+// when `localStorage["mulmoclaude:perf"] === "1"`.
+app.config.performance = perfEnabled;
 app.use(router);
 app.use(i18n);
 app.mount("#app");

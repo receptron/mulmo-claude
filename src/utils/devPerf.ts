@@ -79,6 +79,58 @@ export function perfLogUntilPaint(label: string, startedAt: number, extra?: Reco
   });
 }
 
+// ── Component breakdown ─────────────────────────────────────────────
+// `app.config.performance = true` (src/main.ts) makes Vue emit a
+// `performance.measure` per component init / render / patch. Collecting
+// them per click answers "which component owns the frame the click waits
+// for" without hand-instrumenting each pane. Vue's measures NEST (a
+// parent's patch contains its children's), so the durations overlap —
+// read the ranking, not the sum.
+
+interface MeasureRecord {
+  name: string;
+  startTime: number;
+  duration: number;
+}
+
+const MEASURE_MIN_MS = 1;
+const MEASURE_TOP_N = 12;
+const MEASURE_BUFFER_MAX = 4000;
+const NAME_WIDTH = 40;
+
+const measures: MeasureRecord[] = [];
+
+if (perfEnabled && typeof PerformanceObserver !== "undefined") {
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      measures.push({ name: entry.name, startTime: entry.startTime, duration: entry.duration });
+    }
+    if (measures.length > MEASURE_BUFFER_MAX) measures.splice(0, measures.length - MEASURE_BUFFER_MAX);
+  });
+  observer.observe({ entryTypes: ["measure"] });
+}
+
+let dumpedClickAt = 0;
+
+function dumpMeasuresSinceClick(clickAt: number): void {
+  if (dumpedClickAt === clickAt) return;
+  dumpedClickAt = clickAt;
+  const totals = new Map<string, { ms: number; calls: number }>();
+  for (const record of measures.filter((entry) => entry.startTime >= clickAt)) {
+    const acc = totals.get(record.name) ?? { ms: 0, calls: 0 };
+    totals.set(record.name, { ms: acc.ms + record.duration, calls: acc.calls + 1 });
+  }
+  const ranked = [...totals.entries()]
+    .map(([name, acc]) => ({ name, ...acc }))
+    .filter((row) => row.ms >= MEASURE_MIN_MS)
+    .sort((left, right) => right.ms - left.ms)
+    .slice(0, MEASURE_TOP_N);
+  console.log(`${LOG_PREFIX} ── component breakdown for this click (${totals.size} distinct, nested: durations overlap)`);
+  for (const row of ranked) {
+    console.log(`${LOG_PREFIX}   ${row.name.padEnd(NAME_WIDTH)} ${row.ms.toFixed(MS_DECIMALS).padStart(VALUE_WIDTH)} ms  x${row.calls}`);
+  }
+}
+
 // ── Click clock ─────────────────────────────────────────────────────
 // One click updates three things the reader notices at different
 // moments: the row's own selected border, the middle pane's transcript,
@@ -91,6 +143,7 @@ let lastClickAt = 0;
 export function perfMarkClick(): void {
   if (!perfEnabled) return;
   lastClickAt = performance.now();
+  measures.length = 0;
 }
 
 /** The click currently being measured, for callers that need to time a
@@ -103,7 +156,15 @@ export function perfClickAt(): number {
  *  from the click that caused it. No-op before the first click. */
 export function perfLogSinceClick(label: string, extra?: Record<string, unknown>): void {
   if (!perfEnabled || lastClickAt === 0) return;
-  perfLogUntilPaint(label, lastClickAt, extra);
+  const clickAt = lastClickAt;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      perfLog(label, performance.now() - clickAt, extra);
+      // Several call sites report the same click; only the first one to
+      // paint prints the breakdown.
+      dumpMeasuresSinceClick(clickAt);
+    });
+  });
 }
 
 /** Sums many small calls (per-row work) across one render pass, so the
