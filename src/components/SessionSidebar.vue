@@ -64,11 +64,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ToolResultComplete } from "gui-chat-protocol/vue";
 import { getPlugin } from "../tools";
 import { formatSmartTime } from "../utils/format/date";
+import { perfLogSinceClick } from "../utils/devPerf";
 import { isRecord } from "../utils/types";
 import CanvasViewToggle from "./CanvasViewToggle.vue";
 import CopyChatButton from "./CopyChatButton.vue";
@@ -76,7 +77,7 @@ import type { LayoutMode } from "../utils/canvas/layoutMode";
 
 const { t } = useI18n();
 
-defineProps<{
+const props = defineProps<{
   // Already filtered to "what the user should see" by the parent's
   // `sidebarResults` computed (see useSessionDerived.ts) — keyboard
   // navigation, selection, and this render all consume the same
@@ -115,6 +116,15 @@ const emit = defineEmits<{
 
 const root = ref<HTMLDivElement | null>(null);
 defineExpose({ root });
+
+// Investigation instrumentation (src/utils/devPerf.ts). This pane is the
+// one that visibly swaps content on a session click, and each card can
+// mount a plugin preview component, so its cost scales with the result
+// count rather than with the session list.
+watch(
+  () => props.results,
+  (results) => perfLogSinceClick("click→middle pane painted", { results: results.length }),
+);
 </script>
 
 <style scoped>

@@ -15,6 +15,7 @@ import type { Role } from "../config/roles";
 import { PAGE_ROUTES } from "../router";
 import { apiGet } from "../utils/api";
 import { API_ROUTES } from "../config/apiRoutes";
+import { perfLogSinceClick, perfTime, perfTimeAsync } from "../utils/devPerf";
 import { createEmptySession } from "../utils/session/sessionFactory";
 import { buildLoadedSession, parseSessionEntries, shouldAdoptServerTranscript } from "../utils/session/sessionEntries";
 import {
@@ -120,16 +121,27 @@ function activateSession(ctx: LifecycleCtx, sessionId: string, replace: boolean)
   ctx.currentSessionId.value = sessionId;
 }
 
+// Investigation instrumentation (src/utils/devPerf.ts): the two phases
+// the click used to wait on before anything moved on screen. Since
+// #2813 the row highlights before this runs, so these numbers now say
+// how long the CONTENT lags the highlight rather than the whole click.
 async function fetchLoadedSession(ctx: LifecycleCtx, sessionId: string): Promise<ActiveSession | null> {
-  const response = await apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId)));
+  const response = await perfTimeAsync("loadSession: GET /sessions/:id", () =>
+    apiGet<SessionEntry[]>(API_ROUTES.sessions.detail.replace(":id", encodeURIComponent(sessionId))),
+  );
   if (!response.ok) return null;
-  return buildLoadedSession({
-    id: sessionId,
-    entries: response.data,
-    defaultRoleId: ctx.roles.value[0]?.id ?? "",
-    serverSummary: ctx.sessions.value.find((summary) => summary.id === sessionId),
-    nowIso: new Date().toISOString(),
-  });
+  return perfTime(
+    "loadSession: buildLoadedSession()",
+    () =>
+      buildLoadedSession({
+        id: sessionId,
+        entries: response.data,
+        defaultRoleId: ctx.roles.value[0]?.id ?? "",
+        serverSummary: ctx.sessions.value.find((summary) => summary.id === sessionId),
+        nowIso: new Date().toISOString(),
+      }),
+    { entries: response.data.length },
+  );
 }
 
 async function loadSession(ctx: LifecycleCtx, sessionId: string): Promise<void> {
@@ -138,6 +150,7 @@ async function loadSession(ctx: LifecycleCtx, sessionId: string): Promise<void> 
   const replaced = shouldReplaceHistory(removeCurrentIfEmpty(ctx), ctx.isChatPage.value);
   if (ctx.sessionMap.has(sessionId)) {
     activateSession(ctx, sessionId, replaced);
+    perfLogSinceClick("loadSession cached→paint", { sessionId });
     return;
   }
   // Highlight the row on the click instead of a round trip later (#2809).
@@ -155,6 +168,7 @@ async function loadSession(ctx: LifecycleCtx, sessionId: string): Promise<void> 
   // and their next click on this session then costs no round trip.
   ctx.sessionMap.set(sessionId, newSession);
   if (stillAwaited) activateSession(ctx, sessionId, replaced);
+  perfLogSinceClick("loadSession fetched→paint", { sessionId, stillAwaited });
 }
 
 // Re-fetch the transcript and patch entries missed via a dropped socket

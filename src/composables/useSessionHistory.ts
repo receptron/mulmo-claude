@@ -6,6 +6,7 @@ import { PUBSUB_CHANNELS, readSessionDeletedIds } from "../config/pubsubChannels
 import type { SessionSummary } from "../types/session";
 import { apiDelete, apiGet, apiPost } from "../utils/api";
 import { applySessionDiff } from "../utils/session/mergeSessions";
+import { perfNote, perfTime, perfTimeAsync } from "../utils/devPerf";
 import { applyBookmarkFlag } from "./useSessionHistory.helpers";
 import { usePubSub } from "./usePubSub";
 
@@ -85,7 +86,12 @@ export function useSessionHistory(): UseSessionHistory {
   async function fetchSessions(): Promise<SessionSummary[]> {
     const query: Record<string, string> = {};
     if (cursor !== null) query.since = cursor;
-    const result = await apiGet<SessionsResponse>(API_ROUTES.sessions.list, query);
+    // Investigation instrumentation (src/utils/devPerf.ts): this call is
+    // the one every sessions-channel broadcast triggers, and its result
+    // replaces the array the 800-row list renders from.
+    const result = await perfTimeAsync(cursor === null ? "fetchSessions: GET /sessions (full)" : "fetchSessions: GET /sessions (diff)", () =>
+      apiGet<SessionsResponse>(API_ROUTES.sessions.list, query),
+    );
     if (!result.ok) {
       historyError.value = result.error;
       // Preserve sessions.value so callers keep showing the last-known-good list.
@@ -93,11 +99,18 @@ export function useSessionHistory(): UseSessionHistory {
     }
     historyError.value = null;
     const body = result.data;
-    if (cursor === null) {
-      sessions.value = body.sessions;
-    } else {
-      sessions.value = applySessionDiff(sessions.value, body.sessions, body.deletedIds);
-    }
+    perfTime(
+      "fetchSessions: merge into list",
+      () => {
+        if (cursor === null) {
+          sessions.value = body.sessions;
+        } else {
+          sessions.value = applySessionDiff(sessions.value, body.sessions, body.deletedIds);
+        }
+      },
+      { received: body.sessions.length },
+    );
+    perfNote("fetchSessions: list size after merge", { rows: sessions.value.length });
     ({ cursor } = body);
     return sessions.value;
   }

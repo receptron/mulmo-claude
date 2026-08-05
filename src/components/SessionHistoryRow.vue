@@ -91,15 +91,23 @@
 //     makes the props compare fail, so every row re-renders again)
 //   - every derived string is a `computed`, so date formatting and
 //     i18n interpolation survive a re-render instead of re-running
-import { computed } from "vue";
+import { computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary } from "../types/session";
 import { resolveSessionPrimaryText, sessionHasVisibleSummary } from "../utils/session/sessionPreview";
 import { formatDate } from "../utils/format/date";
+import { rowPerf } from "../utils/devPerf";
 import SessionRoleIcon from "./SessionRoleIcon.vue";
 
 const { t } = useI18n();
+
+// ── Investigation instrumentation (see src/utils/devPerf.ts) ────────
+// Off unless `localStorage["mulmoclaude:perf"] === "1"`. Counts this
+// instance into the pass the panel flushes, so a click reports how many
+// of the N rows Vue actually re-rendered and how much of the per-row
+// string work re-ran inside them.
+onUpdated(() => rowPerf.renders.bump());
 
 const props = defineProps<{
   session: SessionSummary;
@@ -119,11 +127,11 @@ const emit = defineEmits<{
 // title so all three stay in lockstep. `null` from the resolver means
 // "nothing to show" — the localised placeholder is applied here rather
 // than in the pure helper.
-const primaryText = computed(() => resolveSessionPrimaryText(props.session) ?? t("sessionHistoryPanel.noMessages"));
+const primaryText = computed(() => rowPerf.primaryText.add(() => resolveSessionPrimaryText(props.session) ?? t("sessionHistoryPanel.noMessages")));
 
-const rowAria = computed(() => t("sessionHistoryPanel.openRowAria", { preview: primaryText.value }));
+const rowAria = computed(() => rowPerf.aria.add(() => t("sessionHistoryPanel.openRowAria", { preview: primaryText.value })));
 
-const formattedDate = computed(() => formatDate(props.session.updatedAt));
+const formattedDate = computed(() => rowPerf.timestamp.add(() => formatDate(props.session.updatedAt)));
 
 const hasVisibleSummary = computed(() => sessionHasVisibleSummary(props.session));
 

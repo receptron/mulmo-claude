@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Role } from "../config/roles";
 import type { SessionSummary, SessionOrigin } from "../types/session";
@@ -63,8 +63,18 @@ import { HISTORY_FILTERS, HISTORY_FILTER_ORDER, type HistoryFilter } from "../co
 import { isLongRunningConversation } from "../utils/session/longRunning";
 import SessionHistoryRow from "./SessionHistoryRow.vue";
 import FilterChip from "./FilterChip.vue";
+import { flushRowPerf, perfLog, perfLogSinceClick, perfLogUntilPaint, perfMarkClick } from "../utils/devPerf";
 
 const { t } = useI18n();
+
+// ── Investigation instrumentation (see src/utils/devPerf.ts) ────────
+// Off unless `localStorage["mulmoclaude:perf"] === "1"`. #2810's version
+// of this measured the panel before the row split; the call sites here
+// measure the same click on the fixed code — how long until the row's
+// border appears, how long Vue spends patching the list, and how much
+// of the per-row work still runs.
+const setupStartedAt = performance.now();
+let updatePassStartedAt = 0;
 
 // `unread` and `bookmarked` are mutually exclusive with origin pills —
 // selecting either shows every matching session regardless of origin,
@@ -123,9 +133,17 @@ function countByOrigin(filterKey: HistoryFilter): number {
   return props.sessions.filter((session) => matchesFilter(session, filterKey)).length;
 }
 
+// The row's selected border is the first feedback the click produces,
+// so this pair brackets the "I clicked but nothing happened yet" window.
 function onSelect(sessionId: string): void {
+  perfMarkClick();
   emit("loadSession", sessionId);
 }
+
+watch(
+  () => props.currentSessionId,
+  () => perfLogSinceClick("click→row selected"),
+);
 
 // ── Row action menu ─────────────────────────────────────────
 //
@@ -158,6 +176,24 @@ function onDelete(session: SessionSummary): void {
 
 onMounted(() => {
   document.addEventListener("click", closeMenu);
+  perfLogUntilPaint("history-panel setup→paint", setupStartedAt, {
+    rows: filteredSessions.value.length,
+    totalSessions: props.sessions.length,
+  });
+  flushRowPerf("mount", filteredSessions.value.length);
+});
+
+// Every re-render of the list (filter change, selection change, or a
+// sessions-channel refetch replacing the array) lands here. The span
+// between the two hooks is the vnode diff + child patch of the whole
+// list — the ~110 ms line in #2809's Safari table.
+onBeforeUpdate(() => {
+  updatePassStartedAt = performance.now();
+});
+
+onUpdated(() => {
+  perfLog("list patch (vnode diff)", performance.now() - updatePassStartedAt, { rows: filteredSessions.value.length });
+  flushRowPerf("update", filteredSessions.value.length);
 });
 
 onBeforeUnmount(() => {
