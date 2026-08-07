@@ -1,7 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { reconnectStateUpdate, shouldAutoReconnect, shouldShowRemoteHostBanner, type RemoteHostSignals } from "../../src/composables/remoteHostDecisions";
+import {
+  reconnectStateUpdate,
+  shouldAutoReconnect,
+  shouldShowRemoteHostBanner,
+  signInErrorKey,
+  type RemoteHostSignals,
+} from "../../src/composables/remoteHostDecisions";
 
 const base: RemoteHostSignals = { intended: false, connected: false, reconnectInFlight: false, reconnectFailed: false };
 
@@ -57,5 +63,33 @@ describe("reconnectStateUpdate", () => {
   it("keeps the blob on a transient failure so the next poll can retry", () => {
     assert.deepEqual(reconnectStateUpdate(false, 503, UNAUTHORIZED), { dropBlob: false, failed: true });
     assert.deepEqual(reconnectStateUpdate(false, 0, UNAUTHORIZED), { dropBlob: false, failed: true });
+  });
+});
+
+describe("signInErrorKey", () => {
+  const firebaseError = (code: string): Error => Object.assign(new Error(`Firebase: (${code}).`), { code });
+
+  it("maps the popup failures a user can actually act on", () => {
+    assert.equal(signInErrorKey(firebaseError("auth/popup-blocked")), "remoteHost.signInPopupBlocked");
+    assert.equal(signInErrorKey(firebaseError("auth/unauthorized-domain")), "remoteHost.signInUnauthorizedDomain");
+    assert.equal(signInErrorKey(firebaseError("auth/network-request-failed")), "remoteHost.signInNetworkFailed");
+  });
+
+  it("treats both popup-dismissal codes as a plain cancellation", () => {
+    assert.equal(signInErrorKey(firebaseError("auth/popup-closed-by-user")), "remoteHost.signInCancelled");
+    assert.equal(signInErrorKey(firebaseError("auth/cancelled-popup-request")), "remoteHost.signInCancelled");
+  });
+
+  // IndexedDBLocalPersistence throws a bare Error with no `code`, so this one
+  // has to be matched on message text.
+  it("recognises the stuck-IndexedDB error by message", () => {
+    assert.equal(signInErrorKey(new Error("Database is closing/hidden")), "remoteHost.signInStorageBlocked");
+  });
+
+  it("returns null for anything unrecognised so the caller keeps the raw text", () => {
+    assert.equal(signInErrorKey(new Error("boom")), null);
+    assert.equal(signInErrorKey(firebaseError("auth/some-future-code")), null);
+    assert.equal(signInErrorKey("not an error"), null);
+    assert.equal(signInErrorKey(null), null);
   });
 });

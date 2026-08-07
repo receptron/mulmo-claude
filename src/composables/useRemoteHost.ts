@@ -14,7 +14,7 @@ import { API_ROUTES } from "../config/apiRoutes";
 import { apiGet, apiPost } from "../utils/api";
 import { errorMessage } from "../utils/errors";
 import i18n from "../lib/vue-i18n";
-import { reconnectStateUpdate, shouldAutoReconnect, shouldShowRemoteHostBanner, type RemoteHostSignals } from "./remoteHostDecisions";
+import { reconnectStateUpdate, shouldAutoReconnect, shouldShowRemoteHostBanner, signInErrorKey, type RemoteHostSignals } from "./remoteHostDecisions";
 
 const translate = (key: string): string => i18n.global.t(key);
 
@@ -164,7 +164,10 @@ const connect = async (): Promise<void> => {
     hasIntent.value = true;
     reconnectFailed.value = false;
   } catch (err) {
-    error.value = errorMessage(err, translate("remoteHost.signInFailed"));
+    // Recognised Firebase failures get an actionable message; anything else
+    // falls back to the raw text, which is still better than a generic string.
+    const key = signInErrorKey(err);
+    error.value = key ? translate(key) : errorMessage(err, translate("remoteHost.signInFailed"));
   } finally {
     busy.value = false;
   }
