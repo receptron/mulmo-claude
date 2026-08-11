@@ -50,3 +50,8 @@ test-results-live/
 # build, so unlike server/build/dispatcher.mjs it is not committed; the spawn
 # path falls back to tsx when it is absent.
 /server/build/mcp-server.mjs
+
+# MulmoTerminal のプロジェクト配色。開発者ごとの見た目の設定で、リポジトリの
+# 成果物ではない。追跡していると `git add -A` が拾い、無関係なコミットに
+# 紛れ込む（実際に一度 main に入った）。
+.mulmoterminal.json
