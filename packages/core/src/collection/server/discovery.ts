@@ -18,6 +18,7 @@ import { log, getWorkspaceRoot, userSkillsDir, projectSkillsDir, feedsRoot } fro
 import { CollectionSchemaZ } from "../core/schemaZ";
 import { SCHEMA_FILE, resolveDataDir, safeSlugName } from "./paths";
 import { appManifestReason, loadAppManifest } from "./appManifest";
+import { subscribedCollections } from "./subscribedCollections";
 import type { LoadedCollection } from "./discoveredCollection";
 import type { CollectionDetail, CollectionSchema, CollectionSource, CollectionSummary } from "../core/schema";
 import { isErrorWithCode, isRecord } from "@mulmoclaude/common";
@@ -58,7 +59,7 @@ export type SchemaAcceptance = { ok: true; dataDir: string; dataSourceFile?: str
  *  `dataSource` / `storage`; a schema with none of the three is REJECTED, not
  *  quietly pointed here. Handing a per-file collection this path would silently
  *  relocate its records away from the folder the user (and its SKILL.md) sees. */
-function conventionalDataPath(slug: string): string {
+export function conventionalDataPath(slug: string): string {
   return `data/collections/${slug}/items`;
 }
 
@@ -269,11 +270,17 @@ export async function discoverCollections(opts: DiscoveryOptions = {}): Promise<
   // project) always overrides a feed on slug collision — a feed must
   // never shadow a genuine skill-backed collection.
   const feedCollections = await collectFromDir(feedsRoot(workspaceRoot), "feed", workspaceRoot);
+  // The second source: apps whose roster carries this address. Merged FIRST,
+  // so anything on this disk wins a slug collision — a repository's own copy
+  // of a collection is the one its author is editing, and silently serving the
+  // published projection instead would make local edits look ineffective.
+  const subscribed = await subscribedCollections(workspaceRoot);
   // A root with no user scope skips the pass entirely (not an empty dir scan)
   // — see the `userSkillsDir` contract in `host.ts`.
   const userCollections = userDir === null ? [] : await collectFromDir(userDir, "user", workspaceRoot);
   const projectCollections = await collectFromDir(projectDir, "project", workspaceRoot);
   const merged = new Map<string, LoadedCollection>();
+  for (const entry of subscribed) merged.set(entry.slug, entry);
   for (const entry of feedCollections) merged.set(entry.slug, entry);
   for (const entry of userCollections) merged.set(entry.slug, entry);
   for (const entry of projectCollections) merged.set(entry.slug, entry);
@@ -297,7 +304,13 @@ export async function loadCollection(slug: string, opts: DiscoveryOptions = {}):
   // ONLY in user scope is a MISS rather than a quiet hop into another world.
   const userCollection = userDir === null ? null : await loadOneCollection(userDir, safeName, "user", workspaceRoot);
   if (userCollection) return userCollection;
-  return loadOneCollection(feedsRoot(workspaceRoot), safeName, "feed", workspaceRoot);
+  const feedCollection = await loadOneCollection(feedsRoot(workspaceRoot), safeName, "feed", workspaceRoot);
+  if (feedCollection) return feedCollection;
+  // Last, and only by slug: a subscribed collection is not on this disk, so a
+  // name that resolves nowhere locally may still be an app you belong to.
+  // Same precedence as the union above — disk first, always.
+  const subscribed = await subscribedCollections(workspaceRoot);
+  return subscribed.find((entry: LoadedCollection) => entry.slug === safeName) ?? null;
 }
 
 export function toSummary(collection: LoadedCollection): CollectionSummary {

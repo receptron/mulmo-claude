@@ -592,6 +592,9 @@ const sharedLegacyIdFor = (slug: string, itemId: string): string => `collection-
 function makeFakeDocs(seed: Record<string, unknown>[]): FirestoreDocs {
   const rows = new Map<string, unknown>(seed.map((record) => [record.id as string, record]));
   return {
+    // Not exercised here (the watcher watches one collection), but the seam
+    // has to be satisfied whole or the fake stops standing in for the backend.
+    listWhereArrayContains: () => Promise.resolve([]),
     list: () => {
       const entries: FirestoreDoc[] = [...rows.entries()].map(([docId, data]) => ({ id: docId, data }));
       entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));

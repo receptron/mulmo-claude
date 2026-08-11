@@ -91,6 +91,7 @@ export {
 } from "./publishProject";
 export { publishProblems, bindsSubmitterIdentity, type PublishableCollection } from "./publishChecks";
 export { publishApp, type PublishOptions, type PublishResult } from "./publish";
+export { subscribedCollections, forgetSubscribedCollections } from "./subscribedCollections";
 export type { LoadedCollection } from "./discoveredCollection";
 export * from "./paths";
 export * from "./templatePath";

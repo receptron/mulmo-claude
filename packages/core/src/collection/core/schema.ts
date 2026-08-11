@@ -88,7 +88,13 @@ export type FeedSchedule = (typeof FEED_SCHEDULES)[number];
 // "feed" collections live in the non-skill `<workspace>/feeds/` registry
 // and carry an `ingest` block; they reuse the same storage + rendering
 // as skill-backed collections but are never loaded into the agent prompt.
-export type CollectionSource = "user" | "project" | "feed";
+/** Where a collection came from.
+ *
+ *  The first three are DIRECTORIES this machine can scan. `subscribed` is not:
+ *  it is an app whose roster carries your address, discovered from Firestore,
+ *  and it is the one source whose `appId` does NOT come from the workspace's
+ *  `app.json` (see `server/subscribedCollections.ts`). */
+export type CollectionSource = "user" | "project" | "feed" | "subscribed";
 
 /** One field of a record — a discriminated union on `type`; see the variant
  *  docs in `./schemaZ` (`FieldSpecZ`). */

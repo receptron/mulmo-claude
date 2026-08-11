@@ -180,6 +180,19 @@ function makeFakeFirestoreDocs(): FirestoreDocs & { paths: () => string[] } {
   };
   return {
     paths: () => [...collections.keys()],
+    // The subscription query. This fixture never exercises it — a store test
+    // is about one known collection path, not about finding apps — but the
+    // seam is what a fake has to satisfy WHOLE, or it stops standing in for
+    // the real backend.
+    listWhereArrayContains: (collectionPath, field, value) =>
+      Promise.resolve(
+        [...bucket(collectionPath).entries()]
+          .filter(([, data]) => {
+            const held = (data as Record<string, unknown>)[field];
+            return Array.isArray(held) && held.includes(value);
+          })
+          .map(([docId, data]) => ({ id: docId, data })),
+      ),
     list: (collectionPath) => {
       const entries: FirestoreDoc[] = [...bucket(collectionPath).entries()].map(([docId, data]) => ({ id: docId, data }));
       entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));

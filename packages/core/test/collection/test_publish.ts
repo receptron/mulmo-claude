@@ -61,6 +61,14 @@ function makeFakeFirestoreDocs(): FirestoreDocs {
     return created;
   };
   return {
+    listWhereArrayContains: (collectionPath, field, value) =>
+      Promise.resolve(
+        [...bucket(collectionPath).entries()]
+          .filter(
+            ([, data]) => Array.isArray((data as Record<string, unknown>)[field]) && ((data as Record<string, unknown>)[field] as unknown[]).includes(value),
+          )
+          .map(([docId, data]) => ({ id: docId, data })),
+      ),
     list: (collectionPath) => {
       const entries: FirestoreDoc[] = [...bucket(collectionPath).entries()].map(([docId, data]) => ({ id: docId, data }));
       entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));

@@ -25,6 +25,7 @@ import {
   query as firestoreQuery,
   runTransaction,
   setDoc,
+  where,
   type Firestore,
 } from "firebase/firestore";
 
@@ -40,6 +41,20 @@ export interface FirestoreDoc {
 export interface FirestoreDocs {
   /** Every document under `collectionPath`, ordered by document id. */
   list: (collectionPath: string) => Promise<FirestoreDoc[]>;
+  /** The documents whose ARRAY field `field` contains `value`, ordered by
+   *  document id.
+   *
+   *  One query shape, not a query builder — the seam stays a list of the
+   *  operations the engine actually performs, so a fake can satisfy it
+   *  honestly. This one exists for exactly one question, and it is the
+   *  question the whole sharing model turns on: "which apps am I a member
+   *  of?", asked as `apps` where `memberEmails` contains my address.
+   *
+   *  It is answerable at all because publish DERIVES `memberEmails` from the
+   *  roster — Firestore cannot index the keys of a map, which is why the
+   *  denormalised array exists and why the rules refuse a write where the two
+   *  disagree. */
+  listWhereArrayContains: (collectionPath: string, field: string, value: string) => Promise<FirestoreDoc[]>;
   /** One document's fields, or null when it doesn't exist. */
   get: (collectionPath: string, docId: string) => Promise<unknown | null>;
   /** Create or replace. */
@@ -71,6 +86,10 @@ export function createFirestoreDocs(database: Firestore): FirestoreDocs {
   return {
     list: async (collectionPath) => {
       const snapshot = await getDocs(firestoreQuery(firestoreCollection(database, collectionPath), orderBy("__name__")));
+      return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
+    },
+    listWhereArrayContains: async (collectionPath, field, value) => {
+      const snapshot = await getDocs(firestoreQuery(firestoreCollection(database, collectionPath), where(field, "array-contains", value), orderBy("__name__")));
       return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
     },
     get: async (collectionPath, docId) => {

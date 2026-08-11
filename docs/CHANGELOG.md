@@ -10,6 +10,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Added
 
+#### Collections you were invited to now show up (implementation order 4, first half)
+
+Discovery has always answered one question — "what is on this disk?" — and for a
+shared app that is the wrong question. A member of an app has never cloned its
+repository and may never: the invitation is an entry in `apps/{aid}.members`,
+and the schema is a document `publish` wrote. Discovery now unions a second
+source, the apps whose roster carries your address, asked as `apps` where
+`memberEmails` contains it.
+
+- **Firestore is the source of truth for a subscribed collection, and the disk
+  is at most a display copy.** Not a preference: `acceptParsedSchema` resolves a
+  firestore schema's `aid` from the WORKSPACE's `app.json`, so a subscribed
+  schema written into a skills directory would be re-discovered as belonging to
+  whichever repository the server happens to be serving — somebody else's
+  records, read and written under your app id. A subscribed collection's `aid`
+  comes from the subscription and from nowhere else.
+- **Anything on this disk wins a slug collision.** A repository's own copy is
+  the one its author is editing; serving the published projection instead would
+  make local edits look ineffective.
+- **A host with no session, or a query that fails, is left with its local
+  collections** rather than an empty screen. This is deliberately a different
+  judgement from the store's, which refuses loudly — there someone is reading
+  data, and "no records" must stay distinguishable from "not connected".
+- The subscription list is memoised for 30s: discovery runs several times per
+  interaction, and a membership list changes when somebody edits a roster.
+
+`FirestoreDocs` gains one query, `listWhereArrayContains` — one shape, not a
+query builder, so a fake can satisfy the seam honestly. It exists for the single
+question the sharing model turns on, and it is answerable only because publish
+derives `memberEmails` (Firestore cannot index the keys of a map).
+
+Materialising a subscribed skill to disk, so Claude Code can read it, is the
+second half and lands separately.
+
 #### Publishing a shared app: `manageCollection` action `publishApp`
 
 A repository that declares a shared app (`app.json` + collections with
@@ -63,7 +97,7 @@ is people.
 
 ### Package releases
 
-Ships `@mulmoclaude/core@3.7.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/accounting-plugin@2.2.0`, `@mulmoclaude/chart-plugin@2.1.0`, `@mulmoclaude/collection-plugin@3.1.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@2.2.0`, `@mulmoclaude/html-plugin@3.0.0`, `@mulmoclaude/markdown-plugin@3.0.0`, `@mulmoclaude/mulmoscript-plugin@2.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/core@3.8.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/accounting-plugin@2.2.0`, `@mulmoclaude/chart-plugin@2.1.0`, `@mulmoclaude/collection-plugin@3.1.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@2.2.0`, `@mulmoclaude/html-plugin@3.0.0`, `@mulmoclaude/markdown-plugin@3.0.0`, `@mulmoclaude/mulmoscript-plugin@2.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ## [1.13.1] - 2026-08-10
 
