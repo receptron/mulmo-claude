@@ -35,6 +35,12 @@ export async function performExport(
   if (collection.schema.dataSource !== undefined) {
     return { ok: false, status: STATUS_UNPROCESSABLE, error: `collection '${slug}' is backed by an external dataSource and cannot be exported to a registry` };
   }
+  // A subscribed collection has no directory of ours to export: its schema is
+  // a document in another app, and its records are that app's. Refused for the
+  // same reason a `dataSource` collection is — a bundle cannot carry it.
+  if (collection.skillDir === null) {
+    return { ok: false, status: STATUS_UNPROCESSABLE, error: `collection '${slug}' is subscribed from another app and cannot be exported to a registry` };
+  }
   const skillMd = await readFile(path.join(collection.skillDir, "SKILL.md"), "utf-8").catch(() => "");
   const existingMeta = await readJsonObject(path.join(collection.skillDir, "meta.json"));
   const meta: ExportMeta = {

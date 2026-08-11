@@ -58,7 +58,10 @@ async function readSourceAwareFile(collection: SourceAwareReadTarget, relPath: s
   // followed the staged authoring instructions would SHADOW the committed
   // `.claude/skills/<slug>/views/x.html` on every read.
   const staging = collection.source === "project" ? stagingSkillDir(workspaceRoot, safeSlug) : null;
-  const bases = staging === null ? [collection.skillDir] : [staging, collection.skillDir];
+  // A subscribed collection contributes no base: it has no directory here, and
+  // an absent base must read NOTHING rather than fall through to a relative
+  // path resolved against the process's working directory.
+  const bases = [staging, collection.skillDir].filter((base): base is string => base !== null);
   for (const base of bases) {
     const resolved = resolveTemplatePath(base, relPath);
     if (resolved === null) continue;
@@ -139,7 +142,12 @@ export async function readCustomViewI18n(
 /** Read an action's template file from `skillDir`, path-safely. Returns
  *  the file contents, or null when the path escapes the skill dir, the
  *  resolved target isn't a regular file, or the read fails. */
-export async function readSkillTemplate(skillDir: string, templateRelPath: string): Promise<string | null> {
+export async function readSkillTemplate(skillDir: string | null, templateRelPath: string): Promise<string | null> {
+  // No directory (a subscribed collection) reads NOTHING. Taking `null` here
+  // rather than at every call site is what keeps an absent base from becoming
+  // a relative path resolved against the server's working directory — the
+  // shape `""` would have had.
+  if (skillDir === null) return null;
   const resolved = resolveTemplatePath(skillDir, templateRelPath);
   if (resolved === null) return null;
   if (!(await isRegularFile(resolved))) return null;
@@ -200,7 +208,10 @@ function sanitizeDeep(value: unknown): unknown {
 export interface CollectionPromptPaths {
   slug: string;
   dataPath: string;
-  skillDir: string;
+  /** null for a subscribed collection: there is no directory on this machine,
+   *  and a prompt that named one would send the agent to a path that does not
+   *  exist — or, worse, to a relative one resolved against the process's cwd. */
+  skillDir: string | null;
 }
 
 /** Build the paths block from a discovered collection. `skillDir` is
@@ -210,9 +221,19 @@ export interface CollectionPromptPaths {
  *  absolute path is emitted so the agent can still address it. `dataPath` is
  *  read straight from the schema — post-R3-normalization for imported
  *  collections, so it reflects what the host actually reads/writes. */
+/** The skill dir as the agent should see it: workspace-relative when it is
+ *  inside the workspace, absolute when it is not (a user-scope skill), and
+ *  null when there is no directory at all. */
+function relativeSkillDir(skillDir: string | null, workspaceRoot: string): string | null {
+  if (skillDir === null) return null;
+  const rel = path.relative(workspaceRoot, skillDir);
+  return rel === "" || rel.startsWith("..") ? skillDir : rel;
+}
+
 export function promptPathsFor(collection: Pick<LoadedCollection, "slug" | "schema" | "skillDir">, workspaceRoot: string): CollectionPromptPaths {
-  const rel = path.relative(workspaceRoot, collection.skillDir);
-  const raw = rel === "" || rel.startsWith("..") ? collection.skillDir : rel;
+  // Absent for a subscribed collection: nothing of it is on this machine, and a
+  // prompt naming a directory that does not exist is worse than naming none.
+  const raw = relativeSkillDir(collection.skillDir, workspaceRoot);
   // POSIX separators unconditionally — the value goes into `<collection_paths>`
   // and the prompt tells the agent to substitute it verbatim into shell / script
   // invocations (`python3 {{skillDir}}/fetch.py ...`). On Windows `path.relative`
@@ -220,7 +241,7 @@ export function promptPathsFor(collection: Pick<LoadedCollection, "slug" | "sche
   // escape sequences and break the invocation. Every legitimate consumer (bash
   // inside the sandbox, cross-platform CLIs) accepts forward slashes on both
   // platforms, so the normalization is one-way safe. Codex review on #1897.
-  const skillDir = toPosixRelPath(raw);
+  const skillDir = raw === null ? null : toPosixRelPath(raw);
   // A `dataSource` collection has no record dir — its data location IS the
   // external file, so that path is the honest value for scripts/templates.
   return { slug: collection.slug, dataPath: collection.schema.dataPath ?? collection.schema.dataSource?.path ?? "", skillDir };

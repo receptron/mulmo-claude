@@ -374,7 +374,14 @@ describe("shared (firestore) collections", () => {
     const store = storeFor(collection, { workspaceRoot: workdir });
     assert.ok(store.write);
     await store.write("n1", { id: "n1", title: "T" });
-    assert.deepEqual(docs.paths(), [`apps/${APP_ID}/collections/notescloud/items`]);
+    // `apps` is touched too, by discovery's subscribed pass ("which apps is
+    // this address on?"). What this case pins is where RECORDS land, so it
+    // asserts on the item paths alone — a second one here would mean the store
+    // wrote somebody else's collection.
+    assert.deepEqual(
+      docs.paths().filter((touched) => touched.includes("/items")),
+      [`apps/${APP_ID}/collections/notescloud/items`],
+    );
   });
 
   it("builds that path only through the key, which refuses a name no encoding survives", () => {

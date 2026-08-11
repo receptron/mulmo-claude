@@ -89,7 +89,9 @@ function deleteTargets(collection: LoadedCollection, workspaceRoot: string): str
   const staging = stagingSkillDir(workspaceRoot, collection.slug);
   return [
     ...(staging === null ? [] : [staging]),
-    collection.skillDir,
+    // Absent for a subscribed collection: there is no directory of ours to
+    // remove, and the records belong to another app.
+    ...(collection.skillDir === null ? [] : [collection.skillDir]),
     collection.dataDir,
     ingestStatePath(collection.slug, workspaceRoot),
     ...(collection.storageFile !== undefined ? [collection.storageFile] : []),
@@ -218,7 +220,9 @@ async function writeArchive(collection: LoadedCollection, archiveDir: string, wo
   // for a project collection that was created without the bridge.
   const staging = stagingSkillDir(workspaceRoot, collection.slug);
   const skillSrc = staging !== null && (await pathExists(staging)) ? staging : collection.skillDir;
-  await cp(skillSrc, path.join(archiveDir, "skill"), { recursive: true });
+  // Nothing to archive for a subscribed collection: the schema is a document
+  // in another app and no skill of ours was ever written here.
+  if (skillSrc !== null) await cp(skillSrc, path.join(archiveDir, "skill"), { recursive: true });
   if (await pathExists(collection.dataDir)) {
     await cp(collection.dataDir, path.join(archiveDir, "records"), { recursive: true });
   }
@@ -252,7 +256,7 @@ async function removeLocations(collection: LoadedCollection, workspaceRoot: stri
   // under the name "staging" — see the `skillsStagingDir` contract.
   const staging = stagingSkillDir(workspaceRoot, collection.slug);
   if (staging !== null) await rm(staging, { recursive: true, force: true });
-  await rm(collection.skillDir, { recursive: true, force: true });
+  if (collection.skillDir !== null) await rm(collection.skillDir, { recursive: true, force: true });
   await rm(collection.dataDir, { recursive: true, force: true });
   await rmdir(path.dirname(collection.dataDir)).catch(() => undefined);
   // The retrieval cursor lives in a SHARED dir (`data/ingest-state/<slug>.json`),

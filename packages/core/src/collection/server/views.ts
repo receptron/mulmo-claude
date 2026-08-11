@@ -52,7 +52,7 @@ async function fileExists(target: string): Promise<boolean> {
  *  (imported layout — staging never materialised). For feed / user, it's
  *  always the discovered skillDir. Matches `readCustomViewHtml` so reads and
  *  deletes agree on both layouts. */
-async function canonicalBase(collection: Pick<LoadedCollection, "source" | "skillDir">, workspaceRoot: string, safeSlug: string): Promise<string> {
+async function canonicalBase(collection: Pick<LoadedCollection, "source" | "skillDir">, workspaceRoot: string, safeSlug: string): Promise<string | null> {
   if (collection.source !== "project") return collection.skillDir;
   const staging = stagingSkillDir(workspaceRoot, safeSlug);
   if (staging !== null && (await fileExists(path.join(staging, SCHEMA_FILE)))) return staging;
@@ -65,6 +65,10 @@ async function canonicalBase(collection: Pick<LoadedCollection, "source" | "skil
  *  project collection (no staging mirror) doesn't have an empty staging tree
  *  materialised by a side effect of the delete. */
 async function schemaWriteTargets(collection: Pick<LoadedCollection, "source" | "skillDir">, workspaceRoot: string, safeSlug: string): Promise<string[]> {
+  // A subscribed collection has no schema.json on this machine — its schema is
+  // a document in another app. Nothing to rewrite, and nothing to refuse
+  // loudly about: the caller's own gate decides whether the operation applies.
+  if (collection.skillDir === null) return [];
   const active = path.join(collection.skillDir, SCHEMA_FILE);
   if (collection.source !== "project") return [active];
   const staging = stagingSkillDir(workspaceRoot, safeSlug);
@@ -90,6 +94,10 @@ async function unlinkIfPresent(target: string): Promise<void> {
  *  preserved verbatim. */
 async function removeViewFromSchemas(collection: LoadedCollection, viewId: string, workspaceRoot: string, safeSlug: string): Promise<void> {
   const base = await canonicalBase(collection, workspaceRoot, safeSlug);
+  // A subscribed collection has no schema file here — `deleteCustomView`
+  // refuses before reaching this, so an absent base is a no-op rather than a
+  // second refusal in a function whose job is the rewrite.
+  if (base === null) return;
   const canonical = path.join(base, SCHEMA_FILE);
   const parsed: unknown = JSON.parse(await readFile(canonical, "utf-8"));
   // Anything that isn't an object with a `views` array is written back
@@ -115,7 +123,11 @@ export async function deleteCustomView(collection: LoadedCollection, viewId: str
   const view = views.find((entry) => entry.id === viewId);
   if (!view) return { kind: "not-found", viewId };
   const workspaceRoot = opts.workspaceRoot ?? getWorkspaceRoot();
-  const htmlPath = resolveTemplatePath(await canonicalBase(collection, workspaceRoot, safeSlug), view.file);
+  // Nothing of this collection is on this machine: its views live in another
+  // app's repository and its schema is changed by that app's publish.
+  const base = await canonicalBase(collection, workspaceRoot, safeSlug);
+  if (base === null) return { kind: "not-found", viewId };
+  const htmlPath = resolveTemplatePath(base, view.file);
   if (htmlPath === null) return { kind: "unsafe-path", viewId };
   // Rewrite the schema BEFORE unlinking: if the write fails the request errors
   // out, but the HTML stays put and the still-registered view keeps working —

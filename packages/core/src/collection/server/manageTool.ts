@@ -528,7 +528,11 @@ async function handleGetSchema(slug: string, deps: ManageCollectionDeps): Promis
   if (!collection) return unknownCollection(slug);
   // Path from the discovered (sanitized) slug, never the raw arg.
   const { stagingDir } = authoringTarget(deps, collection.slug);
-  const candidates = [...(stagingDir === null ? [] : [path.join(stagingDir, SCHEMA_FILE)]), path.join(collection.skillDir, SCHEMA_FILE)];
+  // A subscribed collection contributes no candidate: its schema is a document
+  // in ANOTHER app, published from a repository this machine may not even have
+  // a clone of. Reading it out of `publishedSchema` and handing it back would
+  // invite an edit that `putSchema` then has nowhere to write.
+  const candidates = [stagingDir, collection.skillDir].filter((base): base is string => base !== null).map((base) => path.join(base, SCHEMA_FILE));
   for (const candidate of candidates) {
     try {
       return await readFile(candidate, "utf-8");
@@ -631,6 +635,13 @@ async function handlePutSchema(slug: string, schemaArg: unknown, deps: ManageCol
   const gate = schemaDiscoveryGate(parsed.data, resolveBase(deps));
   if (gate) {
     return `manageCollection: schema rejected — ${gate} (call schemaDocs for the field reference). It passes basic validation but discovery would skip it, hiding the collection.`;
+  }
+  // A subscribed collection has nowhere here to write: its schema belongs to
+  // another app's repository, and publish is what changes it. Refusing by name
+  // beats writing a file discovery would then ignore — the author would edit,
+  // see "written: true", and watch nothing change.
+  if (collection.skillDir === null) {
+    return `manageCollection: '${defangForPrompt(slug)}' is subscribed from another app — its schema is published by that app's repository and cannot be edited here.`;
   }
   // Path from the discovered (sanitized) slug, never the raw arg.
   await writeAndMirrorSchema(collection.slug, collection.skillDir, parsed.data, deps);

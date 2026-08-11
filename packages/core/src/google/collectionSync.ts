@@ -694,7 +694,9 @@ export async function anySyncedCollectionSurvives(
   collections: readonly Pick<LoadedCollection, "skillDir">[],
   exists: (absPath: string) => Promise<boolean> = pathExists,
 ): Promise<boolean> {
-  const alive = await Promise.all(collections.map((collection) => exists(collection.skillDir)));
+  // A subscribed collection has no directory on this machine, so it can never
+  // be the thing keeping a sync alive — it is not a skill this host installed.
+  const alive = await Promise.all(collections.map((collection) => (collection.skillDir === null ? Promise.resolve(false) : exists(collection.skillDir))));
   return alive.some(Boolean);
 }
 

@@ -36,6 +36,16 @@ export interface LoadedCollection {
    *  REFUSED at discovery, so this is present whenever the backend needs it. */
   appId?: string;
   /** Absolute path to the skill directory this collection was loaded from
-   *  (`<skillsRoot>/<slug>/`). Action templates are read from here, path-safely. */
-  skillDir: string;
+   *  (`<skillsRoot>/<slug>/`). Action templates are read from here, path-safely.
+   *
+   *  **null for a SUBSCRIBED collection**: nothing was cloned, so there is no
+   *  directory. It is null rather than `""` because an empty string does not
+   *  fail closed — `path.join("", "views/x.html")` is a RELATIVE path, which
+   *  resolves against the server's working directory, so a template or a
+   *  custom view would be read from wherever the process happens to be
+   *  running. Making it null moves that from an accident to a decision each
+   *  consumer states: a subscribed collection's schema cannot be edited here
+   *  (it belongs to another app's repository), and it has no view files until
+   *  it is materialised. */
+  skillDir: string | null;
 }

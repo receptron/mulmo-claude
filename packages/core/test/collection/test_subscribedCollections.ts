@@ -239,6 +239,36 @@ test("a published schema that is not firestore-backed is skipped", async () => {
   );
 });
 
+test("a subscribed collection has NO skill directory — null, not an empty string", async () => {
+  // `""` does not fail closed. `path.join("", "views/x.html")` is a RELATIVE
+  // path, so a custom view or an action template would be read from wherever
+  // the server process happens to be running. null makes every consumer state
+  // what it does instead — refuse, or contribute no base at all.
+  connect(rosteredApp([MY_EMAIL]));
+  const [answers] = await discoverCollections(opts());
+  assert.ok(answers);
+  assert.equal(answers.skillDir, null);
+  assert.notEqual(answers.skillDir, "");
+});
+
+test("the memo is keyed by WORKSPACE ROOT as well as address", async () => {
+  // A cached LoadedCollection carries a dataDir built from the root that
+  // produced it, and MulmoTerminal serves N roots from ONE process. Keyed by
+  // address alone, the second root would be handed the first root's paths —
+  // green types, green tests, wrong workspace.
+  connect(rosteredApp([MY_EMAIL]));
+  const otherRoot = mkdtempSync(path.join(tmpdir(), "subscribed-other-"));
+  try {
+    const [here] = await discoverCollections(opts());
+    const [there] = await discoverCollections({ workspaceRoot: otherRoot, userSkillsDir: emptyUserDir });
+    assert.ok(here && there);
+    assert.ok(here.dataDir.startsWith(workdir), "the first root's dataDir belongs to the first root");
+    assert.ok(there.dataDir.startsWith(otherRoot), "and the second root's to the second — not a memoised copy of the first");
+  } finally {
+    rmSync(otherRoot, { recursive: true, force: true });
+  }
+});
+
 test("the subscription list is memoised, and forgotten on demand", async () => {
   // Discovery runs several times per interaction; a round trip on each would
   // make every screen pay for a membership list that changes when somebody

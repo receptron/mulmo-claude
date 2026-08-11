@@ -464,6 +464,10 @@ describe("prompt paths block — #1891 ingest-dataPath gap", () => {
       skillDir: path.join("/w", ".claude", "skills", "jma-weather"),
     };
     const built = promptPathsFor(collection, "/w");
+    // Non-null here by construction: this collection HAS a skill dir. (A
+    // subscribed collection has none, and `promptPathsFor` answers null rather
+    // than a relative path the agent would resolve against its own cwd.)
+    assert.ok(built.skillDir);
     assert.equal(built.skillDir.includes("\\"), false, "no backslash may reach the prompt output");
     assert.equal(built.skillDir.includes("//"), false, "no double-slash from a botched normalize");
     assert.equal(built.skillDir, ".claude/skills/jma-weather", "canonical POSIX form regardless of host");

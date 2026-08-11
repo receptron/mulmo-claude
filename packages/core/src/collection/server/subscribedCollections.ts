@@ -50,6 +50,16 @@ const CACHE_TTL_MS = 30_000;
 
 interface CacheEntry {
   email: string;
+  /** The root the cached collections were RESOLVED AGAINST.
+   *
+   *  Part of the key, not decoration. A cached `LoadedCollection` carries a
+   *  `dataDir` built from the workspace root that produced it, and
+   *  MulmoTerminal serves N project roots from ONE process — so a cache keyed
+   *  by address alone would hand the second root the first root's paths, with
+   *  types and tests green and nothing to see. This is the same multi-root
+   *  contract the engine's entry points are held to; a memo is just another
+   *  place to break it. */
+  workspaceRoot: string;
   at: number;
   collections: LoadedCollection[];
 }
@@ -100,11 +110,11 @@ function toSubscribedCollection(aid: string, cid: string, data: unknown, workspa
     dataDir,
     appId: aid,
     // No skill directory: nothing was cloned. Action templates and custom-view
-    // files are read from a skill dir, and a subscribed collection has none
-    // until it is materialised (implementation order 4, second half) — the
-    // empty string keeps the field's shape while making any path built from it
-    // fail closed rather than resolve to the workspace root.
-    skillDir: "",
+    // files are read from one, and a subscribed collection has none until it is
+    // materialised (implementation order 4, second half). NULL, not "" — an
+    // empty base does not fail closed, it makes every path RELATIVE and so
+    // reads from the server's working directory.
+    skillDir: null,
   };
 }
 
@@ -140,10 +150,10 @@ export async function subscribedCollections(workspaceRoot: string): Promise<Load
   const handle = firestoreHandle();
   if (!handle) return [];
   const now = Date.now();
-  if (cache && cache.email === handle.email && now - cache.at < CACHE_TTL_MS) return cache.collections;
+  if (cache && cache.email === handle.email && cache.workspaceRoot === workspaceRoot && now - cache.at < CACHE_TTL_MS) return cache.collections;
   try {
     const collections = await loadFor(handle, workspaceRoot);
-    cache = { email: handle.email, at: now, collections };
+    cache = { email: handle.email, workspaceRoot, at: now, collections };
     return collections;
   } catch (err) {
     log.warn("collections", "could not list subscribed apps, falling back to local collections only", { error: String(err) });
