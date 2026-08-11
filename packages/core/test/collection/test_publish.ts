@@ -417,6 +417,30 @@ test("a first-step failure says nothing was written, because nothing was", async
   assert.equal(!result.ok && result.partial, false, "a first-step failure wrote nothing, and must not claim otherwise");
 });
 
+test("a SUBSCRIBED collection is NOT published into this repository's app", async () => {
+  // Discovery's second source hands back the collections of apps this address
+  // was invited to, and those carry an appId too — somebody else's. Filtering
+  // on `appId !== undefined` alone would publish another app's schema into
+  // THIS app, under this repository's aid: the same shape as the user-scope
+  // hole, arriving through a different door.
+  writeSkill("bookings", BOOKINGS_SCHEMA);
+  writeApp();
+  const invitedApp = "app_someone_else";
+  await docs.set("apps", invitedApp, { owner: "uid_them", members: {}, memberEmails: [OWNER_EMAIL] });
+  await docs.set(`apps/${invitedApp}/collections`, "theirnotes", {
+    publishedSchema: { ...BOOKINGS_SCHEMA, title: "Their Notes" },
+    publishedAt: 1,
+    publishedBy: "them@example.com",
+  });
+
+  const result = await publishApp(opts());
+  assert.equal(result.ok, true, result.ok ? "" : result.problems.join("\n"));
+  assert.deepEqual(result.ok && result.cids, ["bookings"], "only this repository's own collections may be published");
+  assert.equal(await docs.get(`apps/${AID}/collections`, "theirnotes"), null);
+  // …and the invited app is untouched: publish writes to its own app alone.
+  assert.notEqual(await docs.get(`apps/${invitedApp}/collections`, "theirnotes"), null);
+});
+
 test("a user-scope skill is NOT published into this repository's app", async () => {
   // `~/.claude/skills` is installed once per machine; a repository is not. And
   // discovery resolves every schema it finds — user scope included — against

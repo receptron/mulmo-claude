@@ -315,6 +315,20 @@ test("a submit path that lets the submitter name its own primaryKey is refused",
   assert.deepEqual(problemsFor({ public: { submit: { bookings: { auth: "verifiedEmail", createFields: ["customerName"] } } } }), []);
 });
 
+test("an identity-only submission is expressible — createFields may be empty", () => {
+  // "I attended", "I voted": a record whose whole content is that it exists at
+  // its id. The rules read `keys().hasOnly([])`, which admits exactly the
+  // empty document. Requiring one field would have made the shape undeclarable
+  // — the only field it wants is the primary key, which publish refuses.
+  assert.deepEqual(
+    problemsFor({
+      collections: { responses: { submitOnly: true } },
+      public: { submit: { responses: { auth: "verifiedEmail", createFields: [], idFrom: "auth.uid" } } },
+    }),
+    [],
+  );
+});
+
 test("the primaryKey check follows the schema, not the name 'id'", () => {
   // A collection keyed by `name` (S1's services) must be held to `name`.
   // Hard-coding "id" would pass this file and fail the first real schema.

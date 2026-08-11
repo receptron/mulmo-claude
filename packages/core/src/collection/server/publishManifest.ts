@@ -121,7 +121,19 @@ const SubmitZ = z
   .object({
     auth: z.enum(["none", "anonymous", "verifiedEmail"]),
     emailField: z.string().trim().min(1).optional(),
-    createFields: z.array(z.string().trim().min(1)).min(1),
+    /** The fields a submission may carry — and it may carry NONE.
+     *
+     *  An empty list is the identity-only submission: a record whose whole
+     *  content is the fact that it exists at its id ("I attended", "I voted",
+     *  a per-uid marker). The rules read it as `keys().hasOnly([])`, which
+     *  admits exactly the empty document.
+     *
+     *  It is expressible only because the primary key is NOT a create field:
+     *  the identity is the document id, which `idFrom` pins and the store
+     *  fills in on read. Requiring at least one field here would have made
+     *  that shape undeclarable — the only field it wants is the one publish
+     *  refuses. */
+    createFields: z.array(z.string().trim().min(1)),
     initialStatus: z.string().trim().min(1).optional(),
     idFrom: z.enum(["auto", "auth.uid", "auth.uid+field"]).optional(),
     idField: z.string().trim().min(1).optional(),

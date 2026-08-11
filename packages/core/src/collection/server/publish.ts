@@ -137,7 +137,15 @@ async function gitStamp(root: string): Promise<{ commit?: string | undefined; di
  *  quietly publishing a schema from outside the repository. */
 async function sharedCollections(opts: DiscoveryOptions, root: string): Promise<LoadedCollection[]> {
   const all = await discoverCollections({ ...opts, workspaceRoot: root, userSkillsDir: null });
-  return all.filter((collection) => collection.appId !== undefined);
+  // `appId !== undefined` is NOT the test. Discovery's second source hands back
+  // the collections of apps this address was INVITED to, and those carry an
+  // appId too — somebody else's. Publishing one would write another app's
+  // schema into THIS repository's app, under this repository's aid: the same
+  // shape as the user-scope hole above, arriving through a different door.
+  //
+  // An app is a repository, and what it publishes is what is committed beside
+  // its own `app.json`. So the test is where the collection CAME FROM.
+  return all.filter((collection) => collection.appId !== undefined && collection.source !== "subscribed");
 }
 
 interface RecordScan {
