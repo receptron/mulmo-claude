@@ -69,6 +69,10 @@ function makeFakeFirestoreDocs(): FirestoreDocs {
           )
           .map(([docId, data]) => ({ id: docId, data })),
       ),
+    // The live-update seam. Publish never listens — it writes three documents
+    // and reports — but a fake has to satisfy the seam whole or it stops
+    // standing in for the backend.
+    watch: () => () => {},
     list: (collectionPath) => {
       const entries: FirestoreDoc[] = [...bucket(collectionPath).entries()].map(([docId, data]) => ({ id: docId, data }));
       entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));

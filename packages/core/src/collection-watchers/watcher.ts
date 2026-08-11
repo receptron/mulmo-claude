@@ -74,6 +74,7 @@ import { access } from "node:fs/promises";
 import {
   canonicalRoot,
   collectionChangePayload,
+  sharedCollectionChangePayload,
   discoverCollections,
   firestoreHandle,
   itemFilePath,
@@ -548,10 +549,23 @@ function stopVanishedWatchers(gen: WatcherGeneration, liveSlugs: Set<string>): b
   return mutated;
 }
 
+/** True when the collection's records moved — a different `dataSource.path`, a
+ *  different `dataPath`, a flip between the two modes, or a different APP. The
+ *  mount (an fs.watch, or a Firestore listener) is bound to the OLD location,
+ *  so it must be remounted, not just re-reconciled.
+ *
+ *  `appId` belongs here even though it is not in the schema: it is resolved
+ *  separately, from the repository's `app.json`. Point that file at another app
+ *  and every read and write follows immediately, while a listener armed on the
+ *  old one keeps running — so the collection would serve the NEW app's records
+ *  and be woken by the OLD app's changes, forever. */
+function backendMoved(previous: LoadedCollection, next: LoadedCollection): boolean {
+  return previous.appId !== next.appId || storagePathChanged(previous.schema, next.schema);
+}
+
 /** True when a schema edit moved the collection's storage — a different
  *  `dataSource.path`, a different `dataPath`, or a flip between the two
- *  modes. The mounted fs.watch is bound to the OLD location, so it must
- *  be remounted, not just re-reconciled. */
+ *  modes. */
 function storagePathChanged(previous: LoadedCollection["schema"], next: LoadedCollection["schema"]): boolean {
   return (
     previous.dataSource?.path !== next.dataSource?.path ||
@@ -570,26 +584,32 @@ function storageFilePath(storage: LoadedCollection["schema"]["storage"]): string
 
 /** Re-reconcile already-watched collections whose schema changed since
  *  the last tick. New collections fall through to `startNewWatchers`. */
+/** Unmount a collection whose records moved. `startNewWatchers` (right after
+ *  this pass in syncWatchers) remounts it on the new location. A dataSource
+ *  collection also gets a change ping so open views refetch immediately. */
+function dropStaleMount(gen: WatcherGeneration, existing: CollectionWatcher, collection: LoadedCollection): void {
+  log().info("watcher backend moved, remounting", { slug: collection.slug });
+  try {
+    existing.unsubscribe();
+  } catch {
+    /* best-effort */
+  }
+  gen.watchers.delete(collection.slug);
+  if (collection.schema.dataSource !== undefined) safePublish(gen, collection, { slug: collection.slug, op: "upsert" });
+}
+
 async function reconcileChangedSchemas(gen: WatcherGeneration, collections: readonly LoadedCollection[]): Promise<boolean> {
   let mutated = false;
   for (const collection of collections) {
     const existing = gen.watchers.get(collection.slug);
     if (!existing) continue;
     const nextJson = JSON.stringify(collection.schema);
-    if (existing.schemaJson === nextJson) continue;
-    if (storagePathChanged(existing.collection.schema, collection.schema)) {
-      // Drop the stale mount; `startNewWatchers` (which runs right after
-      // this pass in syncWatchers) remounts on the new location. A
-      // dataSource collection also gets a change ping so open views
-      // refetch against the new file immediately.
-      log().info("watcher storage path changed, remounting", { slug: collection.slug });
-      try {
-        existing.unsubscribe();
-      } catch {
-        /* best-effort */
-      }
-      gen.watchers.delete(collection.slug);
-      if (collection.schema.dataSource !== undefined) safePublish(gen, { slug: collection.slug, op: "upsert" });
+    // The APP is checked even when the schema is byte-identical: an `app.json`
+    // edit changes where the records live without touching a schema file.
+    const moved = backendMoved(existing.collection, collection);
+    if (existing.schemaJson === nextJson && !moved) continue;
+    if (moved) {
+      dropStaleMount(gen, existing, collection);
       mutated = true;
       continue;
     }
@@ -606,7 +626,7 @@ async function reconcileChangedSchemas(gen: WatcherGeneration, collections: read
     if (collection.schema.dataSource !== undefined) {
       // Read-only rows can't have changed, but a schema edit changes what the
       // views render (fields, displayField, …), so ping them.
-      safePublish(gen, { slug: collection.slug, op: "upsert" });
+      safePublish(gen, collection, { slug: collection.slug, op: "upsert" });
     }
     mutated = true;
   }
@@ -696,12 +716,14 @@ async function handleStoreChange(gen: WatcherGeneration, slug: string, change: S
  *  per slug so a burst of writes collapses into one pass plus one trailing
  *  re-run. */
 function scheduleCollectionReconcile(gen: WatcherGeneration, slug: string): Promise<void> {
+  let target: PublishTarget = gen.watchers.get(slug)?.collection ?? { appId: undefined };
   return runSingleFlight(
     gen.collectionSlots,
     slug,
     async () => {
       const collection = await loadCollection(slug, gen.discoveryOpts);
       if (!collection) return;
+      target = collection;
       await reconcileAllItems(collection, gen.discoveryOpts);
       // A record deleted underneath us leaves a bell that a walk over the
       // SURVIVING records can never clear — the sweep is the other half.
@@ -712,7 +734,10 @@ function scheduleCollectionReconcile(gen: WatcherGeneration, slug: string): Prom
     // it, and a missed event leaves every open view silently stale. The slot
     // is the coalescing unit, so one burst still yields one publish.
     () => {
-      safePublish(gen, { slug, op: "upsert" });
+      // `target` may still be the mount-time entry (the load above can fail),
+      // which is enough: what routes the publish is the APP, and a collection
+      // does not change apps without remounting.
+      safePublish(gen, target, { slug, op: "upsert" });
       return Promise.resolve();
     },
   );
@@ -791,8 +816,28 @@ function runSingleFlight(slots: Map<string, ReconcileSlot>, key: string, pass: (
  *  file-backed collections reach here; a `storage` (db) collection has no
  *  per-record file and publishes wholesale in `scheduleStorageReconcile`. */
 async function publishItemChange(gen: WatcherGeneration, collection: LoadedCollection, itemId: string): Promise<void> {
-  const changeOp = (await itemFileExists(collection.dataDir, itemId)) ? "upsert" : "delete";
-  safePublish(gen, { slug: collection.slug, ids: [itemId], op: changeOp });
+  const changeOp = (await recordStillExists(gen, collection, itemId)) ? "upsert" : "delete";
+  safePublish(gen, collection, { slug: collection.slug, ids: [itemId], op: changeOp });
+}
+
+/** Upsert or delete? Answered by whatever actually holds the record.
+ *
+ *  A shared collection's records are Firestore documents — there is no item
+ *  file, so the file check answers "gone" for every one of them and each live
+ *  change would be published as a DELETE. Asking the store is the question the
+ *  file check was standing in for; the file path keeps it because it is
+ *  cheaper and its semantics (an unreadable dir, an id that is not a safe
+ *  filename) are already settled there. */
+async function recordStillExists(gen: WatcherGeneration, collection: LoadedCollection, itemId: string): Promise<boolean> {
+  if (collection.appId === undefined) return itemFileExists(collection.dataDir, itemId);
+  try {
+    return (await storeFor(collection, gen.discoveryOpts).read(itemId)) !== null;
+  } catch {
+    // A closed session or a denied read tells us nothing about the record.
+    // "Still there" is the safer guess: a spurious delete removes it from
+    // every open view, a spurious upsert only costs a refetch.
+    return true;
+  }
 }
 
 async function itemFileExists(dataDir: string, itemId: string): Promise<boolean> {
@@ -812,11 +857,24 @@ async function itemFileExists(dataDir: string, itemId: string): Promise<boolean>
  *  carries only absolute paths, and a root reconstructed by string surgery
  *  would be a guess. Undefined in a single-workspace host, which is exactly
  *  what the payload contract means by "the host's configured root". */
-function safePublish(gen: WatcherGeneration, payload: Omit<CollectionChangePayload, "root">): void {
-  const enriched = collectionChangePayload(payload, gen.discoveryOpts.workspaceRoot);
+/** Publish a change on the channel the collection actually lives on.
+ *
+ *  A SHARED collection is not keyed by this checkout: its identity is
+ *  `(aid, cid)`, and the same collection is open in every clone. Publishing it
+ *  as `(root, slug)` sends the refresh to a channel no shared subscriber is
+ *  listening on — the live update simply never arrives, and nothing errors.
+ *  That is why this takes the collection rather than a bare slug. */
+function safePublish(gen: WatcherGeneration, collection: PublishTarget, base: { slug: string; ids?: string[]; op?: "upsert" | "delete" }): void {
+  const enriched: CollectionChangePayload =
+    collection.appId === undefined ? collectionChangePayload(base, gen.discoveryOpts.workspaceRoot) : sharedCollectionChangePayload(base, collection.appId);
   try {
     publishCollectionChange(enriched);
   } catch (err) {
     log().warn("collection change publish failed", { slug: enriched.slug, error: errMsg(err) });
   }
+}
+
+/** What `safePublish` needs to know: which app, if any, this belongs to. */
+interface PublishTarget {
+  appId?: string | undefined;
 }

@@ -42,11 +42,12 @@ import { sharedCollectionKey, type SharedCollectionKey } from "../core/collectio
 import type { CollectionItem } from "../core/schema";
 import { BackendUnavailableError } from "./backendAvailability";
 import type { LoadedCollection } from "./discoveredCollection";
-import { firestoreHandle, publishCollectionChange, sharedCollectionChangePayload, type FirestoreHandle } from "./host";
+import { backoffDelayMs, classifyListenerError } from "../../firestore/listen";
+import { firestoreHandle, log, publishCollectionChange, sharedCollectionChangePayload, type FirestoreHandle } from "./host";
 import type { DeleteItemResult, IoOptions, WriteItemResult } from "./io";
 import { safeRecordId } from "./paths";
 import { projectItemFields, type ListOptions, type ListPage, type WriteOptions } from "./storePage";
-import type { CollectionStore } from "./store";
+import type { CollectionStore, StoreChangeListener, StoreUnsubscribe } from "./store";
 
 /** What every operation throws when there is no live session. Worded as an
  *  instruction because it surfaces straight to the user and the agent. */
@@ -211,6 +212,126 @@ async function firestoreDelete(key: SharedCollectionKey, itemId: string, opts: I
   );
 }
 
+// --- live updates -----------------------------------------------------------
+
+/** One live subscription to a shared collection's records. */
+interface SharedWatch {
+  key: SharedCollectionKey;
+  onChange: StoreChangeListener;
+  stopped: boolean;
+  detach: () => void;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  attempt: number;
+}
+
+/** Deliver one snapshot's changes.
+ *
+ *  THE FIRST SNAPSHOT IS ONE COLLECTION-LEVEL REPORT, not N per-record ones.
+ *  `onSnapshot` hands over the collection's current contents immediately, as a
+ *  snapshot in which every existing document reads as `added`.
+ *
+ *  Dropping it is wrong. There is a GAP on either side of a subscription — the
+ *  boot reconcile finishes before the listener arms, and a listener that died
+ *  is re-armed after a backoff — and a record that moved inside one of those
+ *  gaps appears only in that first snapshot. Since this backend now HAS a
+ *  `watch`, the watcher's periodic re-derivation no longer covers it, so a
+ *  dropped first snapshot means stale bells and stale views until that record
+ *  happens to change again. That is exactly the failure this step was supposed
+ *  to remove.
+ *
+ *  Announcing every record individually is also wrong: it is a refresh storm
+ *  to every open view, on every mount and every reconnect. `{ kind: "collection" }`
+ *  says the same thing in one event — the watcher answers it with a full
+ *  re-derivation plus a sweep, which is precisely "work out what changed while
+ *  I was not listening".
+ *
+ *  A change this process made itself also arrives here — the write path has
+ *  already published for it, so the record is reconciled twice. Harmless
+ *  (reconciling is idempotent) and left alone: suppressing it would mean
+ *  tracking our own in-flight writes, and getting that wrong loses a real
+ *  change rather than a duplicate one. */
+function deliverSnapshot(run: SharedWatch, ids: string[], initial: boolean): void {
+  if (run.stopped) return;
+  if (initial) {
+    run.onChange({ kind: "collection" });
+    return;
+  }
+  for (const itemId of ids) run.onChange({ kind: "item", itemId });
+}
+
+/** A listener died. Firestore never revives one on its own, so the choice is
+ *  re-subscribe or go dark.
+ *
+ *  NO OVERALL RETRY WINDOW, unlike `hostRunner`'s listener. There, giving up
+ *  escalates to a lifecycle owner that can re-authenticate; here there is
+ *  nobody above to escalate to — the watcher registers a mounted collection
+ *  once and never re-arms it, so "give up" means this collection serves stale
+ *  data until the server restarts. A capped 30s re-subscribe is cheap and
+ *  makes recovery automatic when the session comes back.
+ *
+ *  A FATAL error still stops: `permission-denied` is what a revoked membership
+ *  looks like, and re-listening cannot restore a grant. It is logged as such
+ *  rather than retried in silence. */
+function handleWatchError(run: SharedWatch, error: unknown): void {
+  if (run.stopped) return;
+  if (classifyListenerError(error) === "fatal") {
+    log.warn("collections", "shared collection listener stopped", {
+      aid: run.key.aid,
+      cid: run.key.cid,
+      error: isRecord(error) && typeof error.message === "string" ? error.message : String(error),
+      detail: "live updates for this collection are off until the server re-syncs; a revoked membership looks exactly like this",
+    });
+    return;
+  }
+  run.retryTimer = setTimeout(() => subscribeShared(run), backoffDelayMs(run.attempt));
+  run.attempt += 1;
+}
+
+/** (Re-)arm the listener. The handle is fetched HERE rather than captured: a
+ *  retry may land after the session was replaced, and listening through a
+ *  closed session's handle would fail forever. */
+function subscribeShared(run: SharedWatch): void {
+  run.retryTimer = null;
+  if (run.stopped) return;
+  const handle = firestoreHandle();
+  if (handle === null) {
+    // Not connected yet. The steady state while remote-host is closed, so it
+    // is a wait rather than an error — no log, capped backoff, and the next
+    // attempt picks up the session the moment it opens.
+    run.retryTimer = setTimeout(() => subscribeShared(run), backoffDelayMs(run.attempt));
+    run.attempt += 1;
+    return;
+  }
+  run.detach = handle.docs.watch(
+    sharedItemsPath(run.key),
+    (ids, meta) => {
+      // A healthy snapshot proves the listener recovered: the ladder starts
+      // fresh for whatever comes next.
+      run.attempt = 0;
+      deliverSnapshot(run, ids, meta.initial);
+    },
+    (error) => handleWatchError(run, error),
+  );
+}
+
+/** Subscribe to a shared collection's records.
+ *
+ *  Returns `null` when there is no session: the watcher reads that as "has a
+ *  watch but could not arm it", leaves the collection unmounted and retries on
+ *  the next sync tick — which is the right channel for a connection that has
+ *  not happened yet. Arming a dead listener instead would mark the slug mounted
+ *  forever. */
+function armSharedWatch(key: SharedCollectionKey, onChange: StoreChangeListener): StoreUnsubscribe | null {
+  if (firestoreHandle() === null) return null;
+  const run: SharedWatch = { key, onChange, stopped: false, detach: () => {}, retryTimer: null, attempt: 0 };
+  subscribeShared(run);
+  return () => {
+    run.stopped = true;
+    if (run.retryTimer !== null) clearTimeout(run.retryTimer);
+    run.detach();
+  };
+}
+
 /** The store factory registered for `storage.type === "firestore"`.
  *  Synchronous and connection-agnostic by contract — see the header. */
 export function firestoreStoreFor(collection: LoadedCollection, opts: IoOptions): CollectionStore {
@@ -228,5 +349,10 @@ export function firestoreStoreFor(collection: LoadedCollection, opts: IoOptions)
     write: async (itemId: string, item: CollectionItem, writeOpts: WriteOptions = {}) =>
       firestoreWrite(keyOf(collection), itemId, item, { ...ioOpts, refuseOverwrite: writeOpts.refuseOverwrite }),
     delete: async (itemId: string) => firestoreDelete(keyOf(collection), itemId, ioOpts),
+    // Having a `watch` at all is what takes this backend out of the watcher's
+    // clock-tick fallback: `cannotReportChanges()` asks the store whether it
+    // can report, never which backend it is, so this one line is the whole
+    // change on that side.
+    watch: async (onChange) => armSharedWatch(keyOf(collection), onChange),
   };
 }

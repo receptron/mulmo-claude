@@ -60,6 +60,10 @@ const SHARED_SCHEMA = {
 function fakeDocs(seed: Record<string, Record<string, unknown>>): FirestoreDocs {
   const listOf = (collectionPath: string): FirestoreDoc[] => Object.entries(seed[collectionPath] ?? {}).map(([docId, data]) => ({ id: docId, data }));
   return {
+    // The live-update seam. Not exercised here — discovery asks who you are a
+    // member of, it does not listen — but a fake satisfies the seam whole or
+    // it stops standing in for the backend.
+    watch: () => () => {},
     list: (collectionPath) => Promise.resolve(listOf(collectionPath)),
     listWhereArrayContains: (collectionPath, field, value) =>
       Promise.resolve(

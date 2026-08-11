@@ -9,7 +9,7 @@ import "../../../server/workspace/collections/configure.js"; // configure @mulmo
 // write/delete present iff writable (with create-conflict semantics).
 // A future backend joins by passing this suite unchanged.
 
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +29,7 @@ import {
   type CollectionChangePayload,
   type CollectionStore,
   type FirestoreDoc,
+  type StoreChange,
   type FirestoreDocs,
 } from "@mulmoclaude/core/collection/server";
 import { sharedCollectionKey } from "@mulmoclaude/core/collection";
@@ -169,8 +170,9 @@ function writeAppManifest(aid: string = APP_ID): void {
  *  Fidelity limits (why this can't fully replace a live check): it models
  *  document storage and create-atomicity, not Firestore's consistency model,
  *  its security rules, or listener semantics. */
-function makeFakeFirestoreDocs(): FirestoreDocs & { paths: () => string[] } {
+function makeFakeFirestoreDocs(): FakeFirestoreDocs {
   const collections = new Map<string, Map<string, unknown>>();
+  const listeners: FakeListener[] = [];
   const bucket = (collectionPath: string): Map<string, unknown> => {
     const existing = collections.get(collectionPath);
     if (existing) return existing;
@@ -193,6 +195,16 @@ function makeFakeFirestoreDocs(): FirestoreDocs & { paths: () => string[] } {
           })
           .map(([docId, data]) => ({ id: docId, data })),
       ),
+    live: () => listeners.filter((listener) => listener.live),
+    emit: (ids, opts = {}) => {
+      for (const listener of listeners.filter((entry) => entry.live)) listener.onChanged(ids, { initial: opts.initial ?? false });
+    },
+    fail: (error) => {
+      for (const listener of listeners.filter((entry) => entry.live)) {
+        listener.live = false; // a Firestore listen error terminates that listener
+        listener.onError(error);
+      }
+    },
     list: (collectionPath) => {
       const entries: FirestoreDoc[] = [...bucket(collectionPath).entries()].map(([docId, data]) => ({ id: docId, data }));
       entries.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
@@ -209,13 +221,37 @@ function makeFakeFirestoreDocs(): FirestoreDocs & { paths: () => string[] } {
       return Promise.resolve(true);
     },
     delete: (collectionPath, docId) => Promise.resolve(bucket(collectionPath).delete(docId)),
+    watch: (collectionPath, onChanged, onError) => {
+      const listener = { collectionPath, onChanged, onError, live: true };
+      listeners.push(listener);
+      return () => {
+        listener.live = false;
+      };
+    },
   };
 }
+
+interface FakeListener {
+  collectionPath: string;
+  onChanged: (ids: string[], meta: { initial: boolean }) => void;
+  onError: (error: unknown) => void;
+  live: boolean;
+}
+
+/** The fake seam plus the controls a listener test needs: how many
+ *  subscriptions are live, and the ability to drive a snapshot or kill one the
+ *  way Firestore does (an error TERMINATES that listener). */
+type FakeFirestoreDocs = FirestoreDocs & {
+  paths: () => string[];
+  live: () => FakeListener[];
+  emit: (ids: string[], opts?: { initial?: boolean }) => void;
+  fail: (error: unknown) => void;
+};
 
 /** Wire a fake session. ONE fake per fixture — the accessor is called per
  *  operation, so building it inside the closure would hand out a fresh empty
  *  store every time and silently lose every write. */
-function connectFakeFirestore(): FirestoreDocs & { paths: () => string[] } {
+function connectFakeFirestore(): FakeFirestoreDocs {
   const docs = makeFakeFirestoreDocs();
   setFirestoreAccessor(() => ({ docs, email: "owner@example.com", uid: "uid_owner" }));
   return docs;
@@ -542,5 +578,137 @@ describe("page emulation helpers (pure)", () => {
     assert.equal(page.total, 2);
     assert.equal(page.truncated, true);
     assert.deepEqual(pageFromFullRead(items, { offset: -5 }, "id", false).items, items);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A shared collection's live updates. `watch` is what takes this backend out of
+// the watcher's clock-tick fallback, so its edges are the difference between
+// "records refresh by themselves" and "records look frozen until a restart".
+// ---------------------------------------------------------------------------
+
+describe("shared collection live updates", () => {
+  /** Arm a listener over the fixture and collect what it reports. */
+  async function armed(): Promise<{ docs: FakeFirestoreDocs; changes: StoreChange[]; stop: () => void }> {
+    writeSkill("notescloud", FIRESTORE_SCHEMA);
+    writeAppManifest();
+    const docs = connectFakeFirestore();
+    const [collection] = await discoverCollections(discoveryOpts());
+    assert.ok(collection);
+    const store = storeFor(collection, { workspaceRoot: workdir });
+    assert.ok(store.watch, "a shared collection must report its own changes");
+    const changes: StoreChange[] = [];
+    const stop = await store.watch((change) => changes.push(change));
+    assert.ok(stop, "arming with a live session must succeed");
+    return { docs, changes, stop };
+  }
+
+  it("turns the first snapshot into ONE collection-level report, then reports per record", async () => {
+    // onSnapshot hands over the collection's CURRENT contents immediately, as
+    // one snapshot in which every document reads as `added`.
+    //
+    // It must not be dropped: a record that moved in the gap on either side of
+    // a subscription (boot reconcile → arm, or listener death → re-arm) appears
+    // ONLY there, and this backend no longer gets the watcher's periodic
+    // re-derivation to catch it later.
+    //
+    // It must not be N per-record reports either — that is a refresh storm to
+    // every open view on every mount. One collection-level report says the same
+    // thing, and the watcher answers it with a full re-derivation plus a sweep.
+    const { docs, changes, stop } = await armed();
+    docs.emit(["n1", "n2"], { initial: true });
+    assert.deepEqual(changes, [{ kind: "collection" }]);
+    docs.emit(["n2"]);
+    docs.emit(["n5"]);
+    assert.deepEqual(changes, [{ kind: "collection" }, { kind: "item", itemId: "n2" }, { kind: "item", itemId: "n5" }]);
+    stop();
+  });
+
+  it("stops reporting once unsubscribed, and detaches the listener", async () => {
+    const { docs, changes, stop } = await armed();
+    docs.emit([], { initial: true });
+    changes.length = 0; // the mount's own report; this test is about what comes after
+    stop();
+    assert.equal(docs.live().length, 0, "unsubscribing must detach, not just ignore");
+    docs.emit(["n1"]);
+    assert.deepEqual(changes, []);
+  });
+
+  it("refuses to arm with no session, so the watcher retries instead of mounting", async () => {
+    // `null` is NOT absent: absent means the backend never reports changes and
+    // the caller settles for its periodic pass. Returning a no-op unsubscribe
+    // here would mark the collection mounted forever and freeze it.
+    writeSkill("notescloud", FIRESTORE_SCHEMA);
+    writeAppManifest();
+    connectFakeFirestore();
+    const [collection] = await discoverCollections(discoveryOpts());
+    assert.ok(collection);
+    const store = storeFor(collection, { workspaceRoot: workdir });
+    assert.ok(store.watch);
+    setFirestoreAccessor(null); // remote-host closed between discovery and mount
+    assert.equal(await store.watch(() => {}), null);
+  });
+
+  it("re-subscribes after a transient error and keeps delivering", async () => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      const { docs, changes, stop } = await armed();
+      docs.emit([], { initial: true });
+      docs.fail({ code: "unavailable", message: "backend blip" });
+      assert.equal(docs.live().length, 0, "a Firestore listen error terminates that listener");
+      mock.timers.tick(1_000);
+      assert.equal(docs.live().length, 1, "a transient error must re-arm");
+      changes.length = 0;
+      // The re-armed listener replays the collection as its own first
+      // snapshot. That is the ONLY place a record that moved during the outage
+      // shows up, so it becomes a collection-level report — one event, not one
+      // per record.
+      docs.emit(["n1", "n2"], { initial: true });
+      docs.emit(["n3"]);
+      assert.deepEqual(changes, [{ kind: "collection" }, { kind: "item", itemId: "n3" }]);
+      stop();
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  it("stops on a fatal error rather than retrying a revoked grant", async () => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      const { docs, stop } = await armed();
+      docs.emit([], { initial: true });
+      // What a membership removed from the roster looks like. Re-listening
+      // cannot restore a grant, and an open-ended retry would spin forever.
+      docs.fail({ code: "permission-denied", message: "Missing or insufficient permissions." });
+      mock.timers.tick(60_000);
+      assert.equal(docs.live().length, 0, "a fatal error must not re-arm");
+      stop();
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  it("waits without erroring when the session is gone, and re-arms when it returns", async () => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      const { docs, changes, stop } = await armed();
+      docs.emit([], { initial: true });
+      setFirestoreAccessor(null); // remote-host closed
+      docs.fail({ code: "unavailable", message: "session closed" });
+      mock.timers.tick(1_000);
+      assert.equal(docs.live().length, 0, "nothing to arm through while disconnected");
+      // The handle is fetched at RETRY time, not captured at arm time: a
+      // reconnect hands out a new session, and a listener holding the old
+      // one would fail forever.
+      setFirestoreAccessor(() => ({ docs, email: "owner@example.com", uid: "uid_owner" }));
+      mock.timers.tick(60_000);
+      assert.equal(docs.live().length, 1, "a returning session must be picked up");
+      changes.length = 0;
+      docs.emit(["n7"]);
+      assert.deepEqual(changes, [{ kind: "item", itemId: "n7" }]);
+      stop();
+    } finally {
+      mock.timers.reset();
+    }
   });
 });

@@ -23,6 +23,7 @@ import {
   getDocs,
   orderBy,
   query as firestoreQuery,
+  onSnapshot,
   runTransaction,
   setDoc,
   where,
@@ -65,6 +66,22 @@ export interface FirestoreDocs {
   /** Delete. Returns false when the id didn't exist, so a caller can tell a
    *  real delete from a typo'd id. */
   delete: (collectionPath: string, docId: string) => Promise<boolean>;
+  /** Listen to `collectionPath`. Every snapshot reports the ids that changed
+   *  in it, and whether it is the FIRST one.
+   *
+   *  `initial` is not a nicety. `onSnapshot` delivers the current contents
+   *  immediately, as one snapshot in which every existing document reads as
+   *  `added` — so a listener that treats snapshots uniformly announces the
+   *  whole collection as changed the moment it arms, on every mount. The flag
+   *  is passed up rather than swallowed here so the decision (and its test)
+   *  lives with the store's policy, next to the rest of it.
+   *
+   *  `onError` fires at most once per subscription: a Firestore listen error
+   *  TERMINATES the listener and never recovers on its own. Re-subscribing is
+   *  the caller's job (`firestore/listen.ts` holds the policy).
+   *
+   *  Returns the detach function synchronously — `onSnapshot` is not async. */
+  watch: (collectionPath: string, onChanged: (ids: string[], meta: { initial: boolean }) => void, onError: (error: unknown) => void) => () => void;
 }
 
 /** The real implementation over the modular SDK.
@@ -120,5 +137,30 @@ export function createFirestoreDocs(database: Firestore): FirestoreDocs {
         transaction.delete(ref);
         return true;
       }),
+    // `docChanges()` rather than the whole snapshot: it names the documents
+    // that moved, which is what lets the store report per-record changes
+    // instead of "something in this collection changed". Added, modified and
+    // removed are all reported the same way — the store's listener takes an
+    // id, and re-reads; what KIND of change it was is not something a
+    // reconcile pass needs to be told.
+    //
+    // `includeMetadataChanges` is deliberately left off: local writes and
+    // has-pending-writes flips would otherwise wake every listener for
+    // changes this process just made.
+    watch: (collectionPath, onChanged, onError) => {
+      let seen = false;
+      return onSnapshot(
+        firestoreCollection(database, collectionPath),
+        (snapshot) => {
+          const initial = !seen;
+          seen = true;
+          onChanged(
+            snapshot.docChanges().map((change) => change.doc.id),
+            { initial },
+          );
+        },
+        onError,
+      );
+    },
   };
 }
