@@ -8,6 +8,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Fixed
+
+#### A shared record's identity is its document id, not a field a submitter can name
+
+The security rules can pin the DOCUMENT ID of a submission — `idFrom` ties it to
+the submitter's uid, or to uid plus a field — and they cannot pin the VALUE of a
+field: `validateOk` checks which keys are present and `keyFieldsOk` checks a
+declared enum, but nothing compares `request.resource.data[primaryKey]` with the
+path being written.
+
+The firestore store returned a document's fields verbatim, so whatever the
+writer put in the primary-key field became the record's identity to every
+reader. A public submitter writing at their one permitted document id could
+therefore claim a duplicate — or another member's record id — and be believed.
+
+`firestoreStore` now takes the identity from the document id and overwrites the
+field on read. For a record written through the store the two already agree
+(`firestoreWrite` writes at the id it was given), so nothing changes for an
+honest write; the spoof simply becomes unreachable.
+
+`publish` refuses the declaration that made it reachable: a `public.submit[cid]`
+whose `createFields` names the schema's `primaryKey`. There is nothing for that
+field to do now — a submitted value is either equal to the id or a lie that is
+discarded — and publishing a form field whose value is thrown away is worse than
+not having it, because the author will believe submitters choose their ids.
+
+This reverses a check added earlier in this release, which required the primary
+key in `createFields` for the opposite reason (a record without one was rejected
+by every reader). That was right about the symptom and wrong about the cure: the
+identity belongs to the id the rules can pin, not to a field they cannot.
+
 ### Added
 
 #### Collections you were invited to now show up (implementation order 4, first half)

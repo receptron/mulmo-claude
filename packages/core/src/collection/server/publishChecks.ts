@@ -360,31 +360,34 @@ export function publishProblems(app: AuthoredApp, collections: readonly Publisha
   ];
 }
 
-/** A public submission must be able to produce a record the HOST can read.
+/** A public submission must NOT be allowed to name its own primary key.
  *
- *  The rules and the engine disagree about what identifies a record, and the
- *  gap is invisible from either side alone. The rules bind the DOCUMENT ID
- *  (`idFrom`) and let a submission carry only `createFields`; the engine
- *  identifies a record by its schema's `primaryKey` FIELD, and the firestore
- *  store hands back the document's fields verbatim — `toItem` does not
- *  synthesize the key from the document id. So a submit path whose
- *  `createFields` omits the primary key writes rows that Firestore accepts and
- *  every reader rejects: `validateRecordObject` fails them, the collection
- *  renders empty-ish, and the next publish's own pre-check reports them as
- *  broken records the publisher never wrote.
+ *  The rules constrain the DOCUMENT ID (`idFrom`) and cannot constrain the
+ *  value of a field — nothing compares `request.resource.data[primaryKey]`
+ *  with the path being written. So a submit path that accepts the primary key
+ *  as a `createField` lets a submitter write at their one permitted document
+ *  id while CLAIMING another record's identity, or a duplicate.
  *
- *  Not checkable by the rules (they have never heard of a schema) and not
- *  catchable at write time (nothing is wrong with the write). Publish is the
- *  only place that holds both halves. */
+ *  It is refused rather than tolerated because there is nothing for the field
+ *  to do: `firestoreStore` takes a shared record's identity from the document
+ *  id and overwrites the field on read, so a submitted value is either equal
+ *  to the id (noise) or a lie (silently discarded). Publishing a form field
+ *  whose value is thrown away is worse than not having it — the author will
+ *  believe submitters choose their ids.
+ *
+ *  This is the second answer to the same question. The first was the reverse —
+ *  REQUIRE the key, because a record without one was rejected by every reader
+ *  — and it was right about the symptom and wrong about the cure: the identity
+ *  belongs to the id the rules can pin, not to a field they cannot. */
 function primaryKeyProblems(app: AuthoredApp, collections: readonly PublishableCollection[]): string[] {
   const primaryKeyOf = new Map(collections.map((collection) => [collection.cid, collection.primaryKey]));
   return Object.entries(app.public?.submit ?? {}).flatMap(([cid, submit]) => {
     const primaryKey = primaryKeyOf.get(cid);
-    if (primaryKey === undefined || submit.createFields.includes(primaryKey)) return [];
+    if (primaryKey === undefined || !submit.createFields.includes(primaryKey)) return [];
     return [
-      `public.submit.${cid}.createFields must include "${primaryKey}", the schema's primaryKey: a submission may carry only the createFields, ` +
-        "and a shared record is stored as exactly the fields it was written with — the document id is not copied into the record. " +
-        "Without it every submission is accepted by the rules and then rejected by every reader.",
+      `public.submit.${cid}.createFields must NOT include "${primaryKey}", the schema's primaryKey: the rules can pin the document id but not the value of a field, ` +
+        "so a submitter could write at their own id while claiming another record's. A shared record's identity is its document id — the store fills the field from it, " +
+        "and a submitted value is either the same thing or a lie that is thrown away.",
     ];
   });
 }

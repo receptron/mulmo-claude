@@ -1,0 +1,24 @@
+{
+  "name": "🩵 mulmoclaude (git)",
+  "badgeColor": "#2dd4bf",
+  "headerColor": "#0b4a47",
+  "headerTextColor": "#ccfbf1",
+  "cellColor": "#07201f",
+  "cellBorderColor": "#14b8a6",
+  "dotColor": "#2dd4bf",
+  "buttonColor": "#99f6e4",
+  "theme": "midnight",
+  "colors": {
+    "background": "#07201f",
+    "foreground": "#dcf5f1",
+    "cursor": "#2dd4bf",
+    "cursorAccent": "#07201f",
+    "selectionBackground": "#125e58",
+    "red": "#f08a9e",
+    "green": "#6fc79a",
+    "yellow": "#e0c274",
+    "blue": "#8fa8f0",
+    "magenta": "#c4a2f5",
+    "cyan": "#5eead4"
+  }
+}

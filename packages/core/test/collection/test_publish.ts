@@ -147,10 +147,11 @@ function writeApp(overrides: Record<string, unknown> = {}): void {
         submit: {
           bookings: {
             auth: "verifiedEmail",
-            // `id` is the schema's primaryKey, and a submission may carry only
-            // the createFields — without it, every submitted row would be
-            // stored with no primary key and rejected by every reader.
-            createFields: ["id", "customerEmail", "status"],
+            // `id` — the schema's primaryKey — is deliberately ABSENT: a
+            // shared record's identity is its document id, which the rules can
+            // pin, and the store fills the field from it. A submitter that
+            // could name its own would be claiming an identity nothing checks.
+            createFields: ["customerEmail", "status"],
             initialStatus: "pending",
             window: { until: "2026-12-31T23:59:59Z" },
           },
@@ -213,7 +214,7 @@ test("a refused declaration writes NOTHING", async () => {
   // rules enforcing one declaration while members read another.
   writeSkill("bookings", BOOKINGS_SCHEMA);
   writeApp({
-    public: { submit: { bookings: { auth: "verifiedEmail", createFields: ["id", "customerEmail"], idFrom: "auth.uid" } } },
+    public: { submit: { bookings: { auth: "verifiedEmail", createFields: ["customerEmail"], idFrom: "auth.uid" } } },
   });
 
   const result = await publishApp(opts());

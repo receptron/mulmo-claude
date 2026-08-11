@@ -126,8 +126,29 @@ async function guarded<T>(key: SharedCollectionKey, email: string, run: () => Pr
  *  older version) can hold anything, so a non-object is dropped rather than
  *  surfaced as a broken record — the same fail-soft the file store applies to
  *  an unparseable `.json`. */
-function toItem(data: unknown): CollectionItem | null {
-  return isRecord(data) ? data : null;
+/** A stored document as a record — with its identity taken from the DOCUMENT
+ *  ID, never from the document's own fields.
+ *
+ *  This is the one place a shared record's identity is decided, and it is
+ *  decided against the field the writer supplied on purpose.
+ *
+ *  The rules can constrain the document id (`idFrom` pins it to the
+ *  submitter's uid, or to uid+field) and they CANNOT constrain the value of a
+ *  field: `validateOk` checks which keys are present, `keyFieldsOk` checks a
+ *  declared enum, and nothing compares `request.resource.data[primaryKey]`
+ *  with the path being written. So a public submitter writing at their one
+ *  permitted document id could put ANY value in the primary-key field —
+ *  another member's record id, or a duplicate — and every reader would take it
+ *  as the record's identity. Overwriting it here makes that unreachable rather
+ *  than merely discouraged, and it costs nothing: for a record written through
+ *  this store the two already agree, because `firestoreWrite` writes at the id
+ *  it was given.
+ *
+ *  It also removes the reason a submit path would have had to accept the
+ *  primary key as a `createField` at all — a submission that cannot name its
+ *  own id is exactly right when the id is the thing being assigned. */
+function toItem(data: unknown, docId: string, primaryKey: string): CollectionItem | null {
+  return isRecord(data) ? { ...data, [primaryKey]: docId } : null;
 }
 
 /** Record ids are validated with the SAME helper every other backend uses.
@@ -140,10 +161,10 @@ function withSafeId<T>(itemId: string, onInvalid: () => T, run: (safeId: string,
   return run(safeId, requireHandle());
 }
 
-async function firestoreList(key: SharedCollectionKey): Promise<CollectionItem[]> {
+async function firestoreList(key: SharedCollectionKey, primaryKey: string): Promise<CollectionItem[]> {
   const { docs, email } = requireHandle();
   const entries = await guarded(key, email, () => docs.list(sharedItemsPath(key)));
-  return entries.map((entry) => toItem(entry.data)).filter((item): item is CollectionItem => item !== null);
+  return entries.map((entry) => toItem(entry.data, entry.id, primaryKey)).filter((item): item is CollectionItem => item !== null);
 }
 
 /** Paging is emulated over a full ordered read rather than pushed into
@@ -152,17 +173,17 @@ async function firestoreList(key: SharedCollectionKey): Promise<CollectionItem[]
  *  `total` needs the full count anyway. Hence `nativePaging: false` — the
  *  capability is honest about the cost. */
 async function firestorePage(key: SharedCollectionKey, primaryKey: string, opts: ListOptions): Promise<ListPage> {
-  const items = await firestoreList(key);
+  const items = await firestoreList(key, primaryKey);
   const offset = Math.max(0, opts.offset ?? 0);
   const sliced = opts.limit === undefined ? items.slice(offset) : items.slice(offset, offset + Math.max(0, opts.limit));
   return { items: projectItemFields(sliced, opts.fields, primaryKey), total: items.length, truncated: false };
 }
 
-async function firestoreRead(key: SharedCollectionKey, itemId: string): Promise<CollectionItem | null> {
+async function firestoreRead(key: SharedCollectionKey, itemId: string, primaryKey: string): Promise<CollectionItem | null> {
   return withSafeId(
     itemId,
     () => Promise.resolve(null),
-    async (safeId, { docs, email }) => toItem(await guarded(key, email, () => docs.get(sharedItemsPath(key), safeId))),
+    async (safeId, { docs, email }) => toItem(await guarded(key, email, () => docs.get(sharedItemsPath(key), safeId)), safeId, primaryKey),
   );
 }
 
@@ -343,9 +364,9 @@ export function firestoreStoreFor(collection: LoadedCollection, opts: IoOptions)
   // collections; one that throws there takes an unrelated screen down with it.
   return {
     capabilities: { writable: true, nativeQuery: false, nativePaging: false },
-    list: async () => firestoreList(keyOf(collection)),
+    list: async () => firestoreList(keyOf(collection), primaryKey),
     page: async (pageOpts = {}) => firestorePage(keyOf(collection), primaryKey, pageOpts),
-    read: async (itemId: string) => firestoreRead(keyOf(collection), itemId),
+    read: async (itemId: string) => firestoreRead(keyOf(collection), itemId, primaryKey),
     write: async (itemId: string, item: CollectionItem, writeOpts: WriteOptions = {}) =>
       firestoreWrite(keyOf(collection), itemId, item, { ...ioOpts, refuseOverwrite: writeOpts.refuseOverwrite }),
     delete: async (itemId: string) => firestoreDelete(keyOf(collection), itemId, ioOpts),

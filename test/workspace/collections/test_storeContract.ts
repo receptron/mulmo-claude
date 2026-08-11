@@ -251,8 +251,13 @@ type FakeFirestoreDocs = FirestoreDocs & {
 /** Wire a fake session. ONE fake per fixture — the accessor is called per
  *  operation, so building it inside the closure would hand out a fresh empty
  *  store every time and silently lose every write. */
+/** The fake most recently wired, so a test can seed a document the store's own
+ *  write path would never produce. */
+let connectedDocs: FirestoreDocs | null = null;
+
 function connectFakeFirestore(): FakeFirestoreDocs {
   const docs = makeFakeFirestoreDocs();
+  connectedDocs = docs;
   setFirestoreAccessor(() => ({ docs, email: "owner@example.com", uid: "uid_owner" }));
   return docs;
 }
@@ -546,6 +551,28 @@ describe("shared (firestore) collections", () => {
       // and without this a denial degrades to "no records" (see the store).
       assert.ok(isBackendUnavailable(error));
     }
+  });
+
+  it("takes a record's identity from the DOCUMENT ID, not from the stored field", async () => {
+    // The rules can pin the document id (`idFrom`) and cannot pin the value of
+    // a field: nothing compares `request.resource.data[primaryKey]` with the
+    // path being written. So a public submitter writing at their one permitted
+    // id could claim another record's identity — unless the store decides it.
+    //
+    // Seeded THROUGH THE FAKE rather than through `store.write`, because the
+    // write path is exactly what an attacker does not use.
+    const store = await firestoreStoreFixture();
+    const docs = connectedDocs;
+    assert.ok(docs);
+    await docs.set(sharedItemsPath(sharedCollectionKey(APP_ID, "notescloud")), "n7", { id: "n1", title: "spoofed" });
+
+    const read = await store.read("n7");
+    assert.equal(read?.id, "n7", "the document id wins");
+    const listed = (await store.list()).filter((item) => item.title === "spoofed");
+    assert.deepEqual(
+      listed.map((item) => item.id),
+      ["n7"],
+    );
   });
 
   it("refuses create over an existing id — the atomicity the store contract requires", async () => {
