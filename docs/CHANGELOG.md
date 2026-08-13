@@ -103,6 +103,12 @@ Firestore rules emulator — the only test in either repository that proves a
 projection and `firestore.rules` agree. Moving those would leave it with nothing
 to check.
 
+The seven bundled plugins move up a major with it. None of them use the removed exports —
+what changes is their `@mulmoclaude/core` peer range, from `^3.6.0` to `^4.0.0`, which
+excludes the version they were published against. Leaving the range alone would let a strict
+peer resolution reject a fresh launcher install, so the range moves and the plugins are
+released with it.
+
 `projectSubmit` is newly EXPORTED for the same reason in reverse: the host needs
 the identical ISO-to-millis window lowering, and two implementations of it is a
 divergence nothing notices until a submit window silently stops closing.
@@ -112,7 +118,7 @@ lands its own copy in the same release; nothing else consumes these.
 
 ### Package releases
 
-Ships `@mulmoclaude/accounting-plugin@2.2.0`, `@mulmoclaude/chart-plugin@2.1.0`, `@mulmoclaude/collection-plugin@3.1.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.0.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@2.2.0`, `@mulmoclaude/html-plugin@3.0.0`, `@mulmoclaude/markdown-plugin@3.0.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/mulmoscript-plugin@2.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.0.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.0.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.0.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/mulmoscript-plugin@3.0.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ### Fixed
 
