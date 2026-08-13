@@ -80,9 +80,39 @@ Design: mulmoterminal `plans/feat-shared-app-member-view.md`. The rules are
 mulmoserver#168 and the runtime mulmoserver#169; both go out before a host
 writes any of this.
 
+### Removed
+
+#### The per-tier projection moves to the host (`@mulmoclaude/core@4.0.0`)
+
+`projectAppViews`, `writeFor` and the shapes they produce (`AppViewTier`,
+`AppViewConfigDoc`, `ProjectedViewWrite`) are gone from
+`@mulmoclaude/core/collection/server`. They now live in MulmoTerminal,
+`server/backends/sharedApp/appViewProjection.ts`.
+
+They had exactly one caller anywhere — MulmoTerminal's deploy — and MulmoClaude
+neither writes nor reads a shared collection: `setSharedCollectionsSupport(true)`
+is called in production only by that host, and `discovery.ts` refuses rather
+than skips without it. So every field added to `{tier}/config` was a release of
+this package followed by a wait, for a document this package has no part in.
+
+What STAYS is what other things here depend on, and it is the cut line rather
+than a convenience: `normalizeViews` and `participantScope` are what the publish
+gate refuses a declaration through, and `projectApp` / `projectDeploy` /
+`projectPublish` are what mulmoserver `test/rules/rules_publish.ts` feeds to the
+Firestore rules emulator — the only test in either repository that proves a
+projection and `firestore.rules` agree. Moving those would leave it with nothing
+to check.
+
+`projectSubmit` is newly EXPORTED for the same reason in reverse: the host needs
+the identical ISO-to-millis window lowering, and two implementations of it is a
+divergence nothing notices until a submit window silently stops closing.
+
+Design: mulmoterminal `plans/refactor-shared-app-wire-contract.md`. MulmoTerminal
+lands its own copy in the same release; nothing else consumes these.
+
 ### Package releases
 
-Ships `@mulmoclaude/accounting-plugin@2.2.0`, `@mulmoclaude/chart-plugin@2.1.0`, `@mulmoclaude/collection-plugin@3.1.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@3.15.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@2.2.0`, `@mulmoclaude/html-plugin@3.0.0`, `@mulmoclaude/markdown-plugin@3.0.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/mulmoscript-plugin@2.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@2.2.0`, `@mulmoclaude/chart-plugin@2.1.0`, `@mulmoclaude/collection-plugin@3.1.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.0.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@2.2.0`, `@mulmoclaude/html-plugin@3.0.0`, `@mulmoclaude/markdown-plugin@3.0.0`, `@mulmoclaude/markdown-utils@1.3.5`, `@mulmoclaude/mulmoscript-plugin@2.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ### Fixed
 

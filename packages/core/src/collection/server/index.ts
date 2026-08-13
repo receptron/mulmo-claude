@@ -82,10 +82,9 @@ export {
 } from "./publishManifest";
 export {
   projectApp,
-  projectAppViews,
+  projectSubmit,
   appViewTierPath,
   viewConfigDocId,
-  type AppViewTier,
   projectDeploy,
   projectPublish,
   stagedRuleConfig,
@@ -114,18 +113,15 @@ export {
   normalizeViews,
   participantScope,
   viewDocId,
-  writeFor,
   PUBLIC_VIEW_ID,
   RESERVED_VIEW_IDS,
   VIEW_AUDIENCES,
   VIEW_CONFIG_ID,
   VIEW_ID_PATTERN,
   VIEW_TIER,
-  type AppViewConfigDoc,
   type NormalizedView,
   type NormalizedViewsResult,
   type ProjectedViewCollection,
-  type ProjectedViewWrite,
   type ViewAudience,
 } from "./appViews";
 export type { LoadedCollection } from "./discoveredCollection";

@@ -28,7 +28,23 @@
 //   shared projection cannot serve both: handed the staff datasets, a
 //   participant's page builds a query the rules refuse — it does not render
 //   less, it fails.
-import type { AuthoredApp, AuthoredMail, AuthoredSubmit } from "./publishManifest";
+
+// WHAT IS *NOT* HERE: the projection itself. Turning a declaration into the
+// `{tier}/config` document — what each audience may read, and what it may
+// CHANGE — belongs to the host (MulmoTerminal
+// `server/backends/sharedApp/appViewProjection.ts`), because that document has
+// exactly one writer and one reader and neither of them is this package. It
+// moved out so that adding a field to it stops being a release of this package
+// followed by a wait; see mulmoterminal
+// `plans/refactor-shared-app-wire-contract.md`.
+//
+// What stays is what OTHER things here depend on: normalization (the publish
+// gate refuses a declaration through it), the participant's read scope (the
+// same gate), and the document ids. Those are guarded by
+// mulmoserver `test/rules/rules_publish.ts`, which is the only test in either
+// repository that proves a projection and `firestore.rules` agree.
+
+import type { AuthoredApp, AuthoredSubmit } from "./publishManifest";
 
 /** The audiences a view may be written for. A CLOSED set: each one names a
  *  tier with a rule behind it, so an unknown value has nowhere to be
@@ -210,166 +226,7 @@ export function participantScope(app: AuthoredApp, cid: string, participantRead:
   return null;
 }
 
-/** The declaration as one non-public audience may see it — the document
- *  published at `apps/{aid}/{tier}/live:config`, and deployed at
- *  `staged:config`.
- *
- *  The roster is NOT here, and neither is anything about another member: this
- *  is read by everyone the tier admits, which for `roster` includes every
- *  participant. */
-export interface AppViewConfigDoc extends Record<string, unknown> {
-  name?: string;
-  views: { id: string; collections: ProjectedViewCollection[] }[];
-  /** The submit declarations for the collections these views draw, so the page
-   *  can show what may be sent rather than discovering it from a denial. */
-  submit: Record<string, Record<string, unknown>>;
-  /** What this audience may CHANGE about those collections — see
-   *  {@link writeFor}. One entry per collection that has anything writable, in
-   *  the order the views declare them; absent entries mean "read only", which
-   *  is what a page with no buttons is drawn from. */
-  write: ProjectedViewWrite[];
-  publishedAt: number;
-}
-
 /** The document ids one tier uses. `live:` and `staged:` are the only two
  *  prefixes, so a single `match` covers the projection and every view. */
 export const viewDocId = (stage: "live" | "staged", viewId: string): string => `${stage}:${viewId}`;
 export const VIEW_CONFIG_ID = "config";
-
-// ---------------------------------------------------------------------------
-// What an audience may CHANGE
-//
-// mulmoterminal plans/feat-shared-app-member-write.md. The rules already allow
-// every write below — `isWriter`, the assignee branch, `ownRow` + `selfWriteOk`
-// — so nothing here grants anything. What it does is tell the page which
-// buttons exist, and let the parent name a refusal the rules would answer with
-// a bare permission error.
-//
-// THE VOCABULARY IS CLOSED: a transition moves one declared status field, an
-// assignment moves one declared assignee field, and there is no third thing.
-// A general patch would be no less safe (the rules bind either way) and two
-// things worse: a bug in the page reaches as far as the member's role does,
-// and nothing above can say what happened.
-//
-// AND IT IS PROJECTED PER TIER, because "which transitions" is a different
-// question for each audience. Staff move `pending → approved`
-// (`collections[cid].transitions`); the person who booked moves
-// `pending → cancelled` (`public.submit[cid].selfTransitions`). Publishing one
-// table to both draws an approve button on a participant's page that the rules
-// refuse when pressed — declaration and enforcement disagreeing, which is the
-// one failure this whole mechanism exists to prevent.
-
-/** What one audience may change about one collection.
- *
- *  An entry exists only where something is actually writable; a collection a
- *  tier may only read is absent rather than present and empty. */
-export interface ProjectedViewWrite {
-  cid: string;
-  /** The field a transition moves. Without it there are no transitions. */
-  statusField?: string;
-  /** `{ <current status>: [<status>...] }`, for THIS audience. */
-  transitions?: Record<string, string[]>;
-  /** The field naming the member a row belongs to. `member` tier only. */
-  assigneeField?: string;
-  /** Who may write EVERY row here — the `owner` / `editor` holders. `member`
-   *  tier only, and it is what makes the tier's one shared document honest:
-   *  see {@link writersOf}. */
-  writers?: string[];
-  /** Who may write only the rows ASSIGNED to them — the `assignee` holders.
-   *  Present with `assigneeField`, since without one the role grants nothing.
-   *
-   *  The assignment CANDIDATES are these two lists together, and are left to
-   *  be derived rather than published a third time: a separate list would be
-   *  one more thing that can disagree with the two the rules actually read. */
-  rowWriters?: string[];
-  /** `member` tier only: the rules let only a writer (or the row's own
-   *  assignee) queue mail, so a participant handed this could only be refused. */
-  mail?: AuthoredMail;
-}
-
-/** The role a member holds on one collection, by the rules' own resolution:
- *  the per-collection entry, else the `*` fallback, else none. */
-function roleOn(app: AuthoredApp, address: string, cid: string): string | undefined {
-  const held = app.members[address];
-  if (held === undefined) return undefined;
-  return held[cid] ?? held["*"];
-}
-
-/** The addresses holding one of `roles` on `cid`.
- *
- *  Sorted, for the same reason `memberEmails` is: a second publish of an
- *  unchanged declaration must produce an unchanged document. */
-function holdersOf(app: AuthoredApp, cid: string, roles: readonly string[]): string[] {
-  return Object.keys(app.members)
-    .filter((address) => roles.includes(roleOn(app, address, cid) ?? ""))
-    .sort();
-}
-
-/** Who may write every row of `cid`, and who may write only their own.
- *
- *  WHY ADDRESSES ARE PUBLISHED AT ALL. One `member/config` document is read by
- *  everyone the tier admits, and the tier only establishes that somebody holds
- *  SOME role SOMEWHERE — so a `viewer`, or a stylist scoped to another
- *  collection, reads the same entry as the front desk. Without these lists the
- *  page would draw approve and reassign for all of them and the rules would
- *  refuse when pressed, which is the declaration/enforcement mismatch this
- *  whole mechanism exists to prevent.
- *
- *  It cannot be answered per principal instead: the document is written once
- *  at publish and read by many, and the reader cannot look their own role up —
- *  `apps/{aid}` is `readerOf(a, '*')`, and a stylist carrying only
- *  `{bookings: "editor"}` holds no `*` role. So the ROSTER'S ANSWER travels
- *  with the declaration and the page compares its own address to it.
- *
- *  The cost is that staff addresses are visible to staff. That is already true
- *  of the approval mail they send each other, and participants read the
- *  `roster` tier, which never carries these.
- *
- *  A SNAPSHOT, like everything else published: a member added since the last
- *  publish is absent until the next one. The rules are the authority either
- *  way — this only decides which buttons are drawn. */
-function writersOf(app: AuthoredApp, cid: string): string[] {
-  return holdersOf(app, cid, ["owner", "editor"]);
-}
-
-/** The transition half: which table applies, and the field it moves.
- *
- *  Both halves or neither. A status field with no table would offer every
- *  value; a table with no field has nothing to write it to. */
-function transitionPart(app: AuthoredApp, audience: Exclude<ViewAudience, "public">, cid: string): Partial<ProjectedViewWrite> {
-  const config = app.collections?.[cid];
-  const transitions = audience === "member" ? config?.transitions : app.public?.submit?.[cid]?.selfTransitions;
-  if (config?.statusField === undefined || transitions === undefined) return {};
-  const part: Partial<ProjectedViewWrite> = { statusField: config.statusField, transitions };
-  // The rules let only a writer (or the row's own assignee) queue mail, so a
-  // participant handed this could only ever be refused.
-  if (audience === "member" && config.mail !== undefined) part.mail = config.mail;
-  return part;
-}
-
-/** The assignment half. `member` only — see {@link writersOf}.
- *
- *  `rowWriters` rides here rather than beside `writers`, because the
- *  `assignee` role grants nothing at all without a field to compare against
- *  (`isAssigned` in the rules requires one, and publish refuses the pair). */
-function assignPart(app: AuthoredApp, audience: Exclude<ViewAudience, "public">, cid: string): Partial<ProjectedViewWrite> {
-  const assigneeField = app.collections?.[cid]?.assigneeField;
-  if (audience !== "member" || assigneeField === undefined) return {};
-  return { assigneeField, rowWriters: holdersOf(app, cid, ["assignee"]) };
-}
-
-/** What `audience` may change about `cid`, or null when the answer is nothing.
- *
- *  The two audiences differ in WHICH transition table applies, in whether
- *  assignment exists at all, and in whether the roster's answer travels with
- *  it; they agree that the status field is the collection's, since the rules
- *  read one field either way. */
-export function writeFor(app: AuthoredApp, audience: Exclude<ViewAudience, "public">, cid: string): ProjectedViewWrite | null {
-  const write: ProjectedViewWrite = { cid, ...transitionPart(app, audience, cid), ...assignPart(app, audience, cid) };
-  if (Object.keys(write).length === 1) return null;
-  // Only the staff tier: a participant writes their own row, which the rules
-  // answer from the record rather than from a role, and publishing the roster's
-  // writers to them would be an address list for nothing.
-  if (audience === "member") write.writers = writersOf(app, cid);
-  return write;
-}

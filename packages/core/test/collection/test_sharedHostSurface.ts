@@ -47,6 +47,16 @@ const HOST_SURFACE = [
   "projectDeploy",
   "projectPublish",
   "promoteSchema",
+  // the declaration the host projects itself: normalization (so "which
+  // spelling was used" is decided once, here, where the publish gate also
+  // decides it), the participant's read scope (the rules' own answer), and the
+  // one submit conversion both projections must agree on
+  "normalizeViews",
+  "participantScope",
+  "projectSubmit",
+  "viewDocId",
+  "viewConfigDocId",
+  "VIEW_TIER",
   // where each document lives, and the shapes the rules read
   "APPS_COLLECTION",
   "PUBLIC_CONFIG_DOC",
@@ -61,6 +71,21 @@ const HOST_SURFACE = [
 test("every symbol a shared-collection host imports is exported", () => {
   const missing = HOST_SURFACE.filter((name) => !(name in server));
   assert.deepEqual(missing, [], `not exported from @mulmoclaude/core/collection/server: ${missing.join(", ")}`);
+});
+
+test("the per-tier projection belongs to the host, not here", () => {
+  // `projectAppViews` and `writeFor` used to live here, and every field added
+  // to `{tier}/config` was therefore a release of this package followed by a
+  // wait — for a document with exactly one writer (MulmoTerminal) and one
+  // reader (mulmoserver), neither of which is this package. They moved to
+  // mulmoterminal `server/backends/sharedApp/appViewProjection.ts`.
+  //
+  // They must not come back. Two projections of one document is the divergence
+  // nothing here would notice: this package's tests would pass on its copy
+  // while the host wrote the other one. See mulmoterminal
+  // `plans/refactor-shared-app-wire-contract.md`.
+  assert.equal("projectAppViews" in server, false);
+  assert.equal("writeFor" in server, false);
 });
 
 test("the engine exposes no whole-app publish operation", () => {
