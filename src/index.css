@@ -1,4 +1,17 @@
-@import "tailwindcss";
+/* Tailwind v4 auto-detects content by scanning the whole Vite root minus
+   `.gitignore`. With the workspace inside the checkout (the default —
+   `MULMOCLAUDE_WORKSPACE_PATH` is `~/mulmoclaude`), that pulls in every
+   tracked non-code file: `plans/`, `docs/`, `outputs/`, `.claude/`, root
+   `*.md`. `@tailwindcss/vite`'s `hotUpdate` has no HMR boundary for those,
+   so it broadcasts a bare `{"type":"full-reload"}` on each write — and the
+   documented workflow writes a plan record plus a CHANGELOG entry per task.
+   One session's agent turn then reloads every open tab, destroying staged
+   attachments in whichever composer the user is typing in (#2919).
+   #1940 / #2632 pruned the workspace RUNTIME dirs from the dev watcher;
+   scoping the scan here closes the class instead of enumerating dirs. */
+@import "tailwindcss" source(none);
+@source "../src";
+@source "../packages/plugins";
 
 @layer base {
   /* Tailwind v4 removed the default `cursor: pointer` on <button>
