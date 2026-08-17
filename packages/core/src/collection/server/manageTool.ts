@@ -89,6 +89,17 @@ export const MAX_SCHEMA_ISSUES = 20;
  *  write that reported success would leave a half-filled collection nobody
  *  knows is half-filled. */
 export const MAX_PUT_ITEMS = 1000;
+/** Cap the strict-tier findings one putItems call reports back. The rows were
+ *  WRITTEN, so this is a report and not a refusal — and a generated batch is
+ *  wrong the same way in every row, which means ten samples plus the total say
+ *  everything a thousand would. */
+export const MAX_PUT_LINT = 10;
+/** What the `lint` block SAYS, once per call. A bare list of findings on rows the
+ *  call also reports as `written` reads as noise; the reason to act is that the
+ *  next reader of these rows is stricter than the write was. */
+const PUT_LINT_NOTE =
+  "These rows WERE written. The write gate refuses only what makes a record unopenable (required fields, enum values, primaryKey = record id) — it does not check the SHAPE of a value, so a wrong-shaped one is reported here rather than rejected. " +
+  "`getItems` surfaces the same finding as a `warning` (on a full listing, or when a requested id is missing), and publishing a shared app REFUSES the row outright. Fix the generator and rewrite them before writing the rest of the set.";
 /** Refuse an `itemsFile` larger than this, from `stat` and before any read.
  *  The row cap alone cannot bound the work: the file has to be read and parsed
  *  WHOLE before there are rows to count, so a huge blob is paid for in full
@@ -307,9 +318,25 @@ function computedKeyProblem(record: CollectionItem, schema: CollectionSchema): s
   return null;
 }
 
-interface RejectedRow {
+/** One row the call did not take, or took and flagged: the id it was about and
+ *  what to fix. Exported alongside `PutItemsLint`, whose `rows` are these. */
+export interface RejectedRow {
   id: string;
   problem: string;
+}
+
+/** The `lint` block of a putItems result — the strict-tier findings on rows the
+ *  call WROTE. Exported because it is part of the tool's answer, not an
+ *  internal: a caller (or a test) that re-declares the shape inline is a copy
+ *  that stops matching the day the block gains a field. */
+export interface PutItemsLint {
+  /** Every flagged row, not just the shown ones — a capped `rows` must never be
+   *  readable as a total. */
+  total: number;
+  /** What the reader has to know to act on findings sitting beside `written`. */
+  note: string;
+  /** The first `MAX_PUT_LINT` findings. */
+  rows: RejectedRow[];
 }
 
 /** `mode: "merge"` resolves the row against the EXISTING record —
@@ -354,6 +381,24 @@ async function mergeWithExisting(
   return { ...Object.fromEntries(stored), ...record };
 }
 
+/** The strict-tier finding on a row the write gate LET THROUGH, or nothing.
+ *
+ *  The gate stays exactly where it was — `lint-not-lock` is why the strict tier
+ *  exists (see `../core/recordZ`), and turning these into rejections would make
+ *  a collection whose legacy rows predate the typed rules unwritable. What was
+ *  missing is that the row's author never HEARD about it: `getItems` reports the
+ *  same finding and publishing a shared app refuses exactly these rows, so the
+ *  one surface that stayed silent was the one that could still fix the generator
+ *  before it wrote the other 719 rows (mulmoterminal#1763).
+ *
+ *  Run against the record as WRITTEN (`toWrite`, post-merge, post-defaults) —
+ *  what a later read will lint is what landed, not what the caller sent. */
+function lintOf(record: CollectionItem, itemId: string, schema: CollectionSchema, deps: ManageCollectionDeps): { lint?: RejectedRow } {
+  if (deps.ablateValidation) return {};
+  const problem = validateRecordObject(record, itemId, schema, "strict");
+  return problem ? { lint: { id: defangForPrompt(itemId), problem: defangForPrompt(problem) } } : {};
+}
+
 async function putOneItem(
   collection: LoadedCollection,
   store: CollectionStore,
@@ -361,7 +406,7 @@ async function putOneItem(
   record: CollectionItem,
   mode: PutMode,
   deps: ManageCollectionDeps,
-): Promise<{ written?: string; rejected?: RejectedRow }> {
+): Promise<{ written?: string; rejected?: RejectedRow; lint?: RejectedRow }> {
   const { schema } = collection;
   // Schema defaults fill only what the row left out, and only on create:
   // "upsert" and "merge" edit a record that already answered this question, so
@@ -389,7 +434,7 @@ async function putOneItem(
     if (invalid) return reject(itemId, invalid);
   }
   const result = await write(itemId, toWrite, { refuseOverwrite: mode === "create" });
-  if (result.kind === "ok") return { written: result.itemId };
+  if (result.kind === "ok") return { written: result.itemId, ...lintOf(toWrite, result.itemId, schema, deps) };
   if (result.kind === "invalid-id")
     return reject(itemId, `'${itemId}' is not a valid record id (letters/digits at the ends; -, _, or . inside; no '..' or path characters)`);
   if (result.kind === "conflict") return reject(itemId, `'${itemId}' already exists — mode "create" refuses overwrite; use "upsert" to update it`);
@@ -587,6 +632,17 @@ async function resolvePutRows(args: PutItemsArgs, deps: ManageCollectionDeps): P
   return rows;
 }
 
+/** The `lint` block of a putItems result, or nothing when every written row is
+ *  clean — absent rather than empty, so a clean call reads exactly as it always
+ *  did and the key's presence is itself the signal.
+ *
+ *  `total` counts every flagged row and `rows` shows the first
+ *  `MAX_PUT_LINT` of them, so a capped report can never be read as a total. */
+function lintReport(lint: RejectedRow[]): { lint?: PutItemsLint } {
+  if (lint.length === 0) return {};
+  return { lint: { total: lint.length, note: PUT_LINT_NOTE, rows: lint.slice(0, MAX_PUT_LINT) } };
+}
+
 async function handlePutItems(collection: LoadedCollection, args: PutItemsArgs, deps: ManageCollectionDeps): Promise<string> {
   // Server-enforced read-only: a `dataSource` collection's rows live in
   // the external data file — point the agent at the real update path
@@ -601,12 +657,14 @@ async function handlePutItems(collection: LoadedCollection, args: PutItemsArgs, 
   if (typeof rows === "string") return rows;
   const written: string[] = [];
   const rejected: RejectedRow[] = [];
+  const lint: RejectedRow[] = [];
   for (const record of rows) {
     const outcome = await putOneItem(collection, store, write, record, args.mode, deps);
     if (outcome.written) written.push(outcome.written);
     if (outcome.rejected) rejected.push(outcome.rejected);
+    if (outcome.lint) lint.push(outcome.lint);
   }
-  return JSON.stringify({ collection: collection.slug, written, rejected });
+  return JSON.stringify({ collection: collection.slug, written, rejected, ...lintReport(lint) });
 }
 
 /** Delete records by id, through the store — so it works on any writable
@@ -870,7 +928,9 @@ const MANAGE_COLLECTION_PROMPT =
   "Before authoring or changing a collection's `schema.json`, call `schemaDocs` to load the field/DSL reference — the default reply is the core authoring guide plus a table of contents; fetch advanced sections (actions, bells, calendar/kanban views, dataSource, storage) by passing their heading as `topic` rather than dumping `topic: \"all\"`. Then read with `getSchema` and write with `putSchema` — `putSchema` validates the whole schema before writing and returns actionable errors instead of silently failing discovery's validation. " +
   "`getItems` is the only way to see computed values — `derived` fields (e.g. a portfolio's value), `toggle` projections, and `embed` records are host-computed and never present in the stored JSON files. On large collections pass `ids` and/or `fields` to keep the result small. " +
   'For a question that spans collections ("which clients have unpaid invoices?"), start with `getOntology`: it lists every collection with its primaryKey, record count, and outbound `ref`/`embed` relations, so you know which collections to join before reading any records. ' +
-  "`putItems` validates every row against the schema before writing (required fields, enum values, primaryKey = record id) and returns `{ written, rejected }`; fix each rejected row using its `problem` text and retry just those rows. Never include computed fields in a row you write. " +
+  "`putItems` GATES every row on what would make the record unopenable — required fields, enum values, primaryKey = record id — and returns `{ written, rejected }`; fix each rejected row using its `problem` text and retry just those rows. Never include computed fields in a row you write. " +
+  "That gate does NOT check the SHAPE of a value: a `datetime` carrying a `Z` suffix, a `number` holding a string, a `date` that is not a real day are all WRITTEN, and come back in a `lint` block beside `written`. Read it — a full `getItems` listing warns about the same rows and publishing a shared app REFUSES them, so a silent `lint` is the only proof the values are right. " +
+  'Before generating a large set, read the exact stored form of each type in the `Field types` section of `schemaDocs` (`topic: "Field types"` fetches just that one), then write ONE batch and check that `lint` is absent. `datetime` in particular is a local wall clock (`YYYY-MM-DDTHH:MM`, no timezone suffix), so `new Date(...).toISOString()` is wrong twice over — the suffix, and the hours the conversion moved. ' +
   "When the rows come from a script rather than from you (a generated schedule, an imported set, anything past a few dozen records), write them to a JSON file UNDER THE WORKSPACE and pass its absolute path as `itemsFile` instead of `items` — the host reads the file, so the rows never pass through your context. Do NOT hand-transcribe a generated file into `items`, and never drive the collection by spawning the MCP bridge yourself. " +
   'To update a few fields of an existing record, use `mode: "merge"` with a partial row ({ id, <changed fields> }) — the default upsert replaces the WHOLE record, so a partial upsert would silently erase every optional field it omits. ' +
   "`deleteItems` removes records by id and returns `{ deleted, rejected }`; an id that doesn't exist comes back rejected rather than counted as deleted, so check `rejected` before reporting a deletion as done. " +
@@ -938,7 +998,7 @@ async function dispatchManageCollection(deps: ManageCollectionDeps, args: Record
 const MANAGE_COLLECTION_DEFINITION = {
   name: "manageCollection",
   description:
-    "Read and write a schema-driven collection through the host — both its records and its structure. getItems returns records WITH computed values (derived formulas, toggles, embeds) the stored JSON files don't contain; putItems validates each row against the schema before writing; deleteItems removes records by id. getOntology maps the whole workspace: every collection with its record count and outbound ref/embed relations — call it first for cross-collection questions. schemaDocs returns the collection-authoring reference — the core guide plus a table of contents by default; pass `topic` for a specific section. getSchema/putSchema read and validate-then-write the collection's schema.json. Prefer it over raw file I/O on collections.",
+    "Read and write a schema-driven collection through the host — both its records and its structure. getItems returns records WITH computed values (derived formulas, toggles, embeds) the stored JSON files don't contain; putItems gates each row on required/enum/primaryKey before writing and lints the value shapes it does not gate; deleteItems removes records by id. getOntology maps the whole workspace: every collection with its record count and outbound ref/embed relations — call it first for cross-collection questions. schemaDocs returns the collection-authoring reference — the core guide plus a table of contents by default; pass `topic` for a specific section. getSchema/putSchema read and validate-then-write the collection's schema.json. Prefer it over raw file I/O on collections.",
   inputSchema: {
     type: "object",
     properties: {

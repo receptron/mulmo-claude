@@ -8,6 +8,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Added
+
+#### `putItems` reports the value shapes it does not refuse (mulmoterminal#1763)
+
+`manageCollection` `putItems` gains a **`lint`** block beside `written` and
+`rejected`: the strict-tier findings on the rows it just wrote.
+
+Record validation has had two tiers since the ontology work. The **enforced**
+tier is the write gate — required fields, enum values, `primaryKey` = record id,
+the things that make a record unopenable. The **strict** tier adds the per-type
+checks (a `number` holds a number, a `date` is a real day, a `datetime` is the
+civil `YYYY-MM-DDTHH:MM` shape the calendar can place) and is deliberately
+report-only, so a collection whose rows predate the typed rules stays writable.
+`getItems` reports it and `presentCollection` reports it. `putItems` did not —
+so the one surface that could still fix the generator was the silent one.
+
+What that costs, from the session that prompted this: an agent building a
+tennis-court booking app generated 720 slots with `new Date(...).toISOString()`,
+and `putItems` answered `{ written: [720 ids], rejected: [] }`. Publishing the
+shared app then refused every record, because publish reads the strict tier. The
+format was only half of it — `toISOString()` also converts, so a Tokyo court's
+`08:00` became `15:00Z` on a US machine; had the shape passed, the app would have
+published with every slot seven hours wrong (eight, the other side of a DST
+change).
+
+The rows are still written — turning these into rejections is the thing the
+strict tier exists NOT to do. What changed is that the call now says so:
+
+- `lint.rows` carries `{ id, problem }` for each flagged row, capped at
+  `MAX_PUT_LINT` (10) — a generated batch is wrong the same way in every row, so
+  ten samples say what a thousand would — with `lint.total` reporting the true
+  count, so a capped list can never be read as a total.
+- `lint.note` says what the reader has to know to act: the rows WERE written,
+  the gate does not check value shapes, a full `getItems` listing warns about
+  the same rows, and a shared app's publish refuses them outright.
+- The key is ABSENT when every written row is clean, so a clean call reads
+  exactly as it always did.
+- Findings are computed on the record as WRITTEN (post-default, post-merge) —
+  what a later read lints is what landed, not what the caller sent — and are
+  skipped under `ablateValidation`, like the rest of the gate.
+
+The tool's own prompt said `putItems` "validates every row against the schema",
+which reads as full validation and is what makes a clean `rejected` look like
+proof. It now names what the gate covers, says the shape of a value is reported
+rather than refused, and tells the model to prove ONE batch before generating
+thousands. The `datetime` entry in the authoring reference (`schemaDocs`,
+`Field types`) now says outright that the type is a local wall clock rather than
+an instant, that a generated value is FORMATTED and never converted, and that
+the one legal `Z`-suffixed datetime is the one a shared app's server stamps.
+
 ### Fixed
 
 #### `@mulmoclaude/core@4.2.0` / `@mulmoclaude/collection-plugin@4.2.0` — a server-stamped datetime reaches a page as a string

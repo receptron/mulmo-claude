@@ -18,7 +18,9 @@ import {
   MAX_UNSELECTIVE_ITEMS,
   MAX_SCHEMA_ISSUES,
   MAX_PUT_ITEMS,
+  MAX_PUT_LINT,
   MAX_ITEMS_FILE_BYTES,
+  type PutItemsLint,
 } from "../../server/agent/mcp-tools/manageCollection.js";
 import { mcpTools } from "../../server/agent/mcp-tools/index.js";
 
@@ -348,6 +350,88 @@ describe("manageCollection — putItems", () => {
     assert.equal(rejectedRow?.id, "bad");
     assert.match(rejectedRow?.problem ?? "", /malformed stored file/);
     assert.equal(stored("h1").status, "closed"); // the healthy row landed
+  });
+});
+
+// The write gate refuses what makes a record unopenable; the SHAPE of a value it
+// only reports (`lint-not-lock`, so a collection whose legacy rows predate the
+// typed rules stays writable). Before mulmoterminal#1763 it did not report it
+// either: 720 slots seeded with `toISOString()` came back as 720 written and
+// nothing else, and the app that published from them refused every one.
+describe("manageCollection — putItems lint", () => {
+  const slot = (itemId: string, startAt: string) => ({ id: itemId, startAt });
+
+  beforeEach(() => {
+    writeSkill("slots", {
+      title: "Slots",
+      icon: "event",
+      dataPath: "data/slots/items",
+      primaryKey: "id",
+      fields: {
+        id: { type: "string", label: "ID", primary: true, required: true },
+        startAt: { type: "datetime", label: "Start" },
+        note: { type: "string", label: "Note" },
+      },
+    });
+  });
+
+  it("writes a Z-suffixed datetime and says so, naming what a later reader will do about it", async () => {
+    const result = await runJson({ action: "putItems", slug: "slots", items: [slot("s1", "2026-08-17T15:00:00.000Z")] });
+    assert.deepEqual(result.written, ["s1"], "the row is written — the strict tier reports, it does not refuse");
+    assert.deepEqual(result.rejected, []);
+    assert.ok(existsSync(path.join(workdir, "data/slots/items/s1.json")));
+    const lint = result.lint as PutItemsLint;
+    assert.equal(lint.total, 1);
+    assert.equal(lint.rows[0]?.id, "s1");
+    assert.match(lint.rows[0]?.problem ?? "", /not a YYYY-MM-DDTHH:MM datetime/);
+    assert.match(lint.note, /WERE written/);
+    assert.match(lint.note, /publishing a shared app REFUSES the row/);
+  });
+
+  it("has no lint key at all when every written row fits its types", async () => {
+    const result = await runJson({ action: "putItems", slug: "slots", items: [slot("s1", "2026-08-17T08:00")] });
+    assert.deepEqual(result.written, ["s1"]);
+    assert.equal("lint" in result, false, "absence is the signal — an empty block would read as noise");
+  });
+
+  it("reports the true total while showing only the first rows", async () => {
+    const rows = Array.from({ length: MAX_PUT_LINT + 2 }, (unused, index) => slot(`s${index}`, "2026-08-17T15:00:00.000Z"));
+    const result = await runJson({ action: "putItems", slug: "slots", items: rows });
+    const lint = result.lint as PutItemsLint;
+    assert.equal((result.written as string[]).length, MAX_PUT_LINT + 2);
+    assert.equal(lint.total, MAX_PUT_LINT + 2, "a capped list must never be readable as a total");
+    assert.equal(lint.rows.length, MAX_PUT_LINT);
+  });
+
+  it("lints only the rows it wrote — a rejected row already has its problem", async () => {
+    const result = await runJson({
+      action: "putItems",
+      slug: "slots",
+      items: [slot("s1", "2026-08-17T15:00:00.000Z"), { startAt: "2026-08-17T15:00:00.000Z" }],
+    });
+    assert.deepEqual(result.written, ["s1"]);
+    assert.equal((result.rejected as unknown[]).length, 1);
+    const lint = result.lint as PutItemsLint;
+    assert.equal(lint.total, 1);
+    assert.equal(lint.rows[0]?.id, "s1");
+  });
+
+  it("lints the record as WRITTEN, so a merge that leaves a bad value in place still reports it", async () => {
+    writeRecord("data/slots/items", "s1", slot("s1", "2026-08-17T15:00:00.000Z"));
+    const result = await runJson({ action: "putItems", slug: "slots", items: [{ id: "s1", note: "held" }], mode: "merge" });
+    assert.deepEqual(result.written, ["s1"]);
+    const lint = result.lint as PutItemsLint;
+    assert.match(lint.rows[0]?.problem ?? "", /not a YYYY-MM-DDTHH:MM datetime/, "the merged result is what a later read will lint");
+  });
+
+  it("stays silent under ablateValidation, like the rest of the gate", async () => {
+    const ablated = makeManageCollectionTool({ workspaceRoot: workdir, userSkillsDir: emptyUserDir, ablateValidation: true });
+    const result = JSON.parse(await ablated.handler({ action: "putItems", slug: "slots", items: [slot("s1", "2026-08-17T15:00:00.000Z")] })) as Record<
+      string,
+      unknown
+    >;
+    assert.deepEqual(result.written, ["s1"]);
+    assert.equal("lint" in result, false);
   });
 });
 

@@ -19,7 +19,16 @@ import { helpsAssetDir } from "@mulmoclaude/core/workspace-setup";
 import { CONTAINER_WORKSPACE_PATH } from "../containerPaths.js";
 import { isAblated } from "../../system/env.js";
 
-export { MAX_UNSELECTIVE_ITEMS, MAX_SCHEMA_ISSUES, MAX_PUT_ITEMS, MAX_ITEMS_FILE_BYTES, type ManageCollectionDeps } from "@mulmoclaude/core/collection/server";
+export {
+  MAX_UNSELECTIVE_ITEMS,
+  MAX_SCHEMA_ISSUES,
+  MAX_PUT_ITEMS,
+  MAX_PUT_LINT,
+  MAX_ITEMS_FILE_BYTES,
+  type ManageCollectionDeps,
+  type PutItemsLint,
+  type RejectedRow,
+} from "@mulmoclaude/core/collection/server";
 
 /** Best-effort post-write refresh. Discovery re-reads schema.json from
  *  disk on every call, so a failed refresh only delays the live UI
