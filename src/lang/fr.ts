@@ -349,6 +349,12 @@ const frMessages = {
     },
     modelTab: {
       description: "Contrôle l'effort de raisonnement utilisé par Claude Code à chaque tour. Laissez vide pour utiliser la valeur par défaut de Claude.",
+      modelLabel: "Modèle",
+      modelUnset: "(non défini — suivre la valeur par défaut de Claude Code)",
+      modelHelperText:
+        "Sans réglage, MulmoClaude suit ~/.claude/settings.json, un fichier que les autres clients Claude Code (VS Code / Cursor) écrivent aussi lorsque vous changez de modèle — leurs changements modifient donc aussi MulmoClaude. Choisissez un modèle ici pour fixer MulmoClaude indépendamment.",
+      modelConfigured: "Modèle : {model}",
+      modelNotConfigured: "Suit la valeur par défaut de Claude Code",
       effortLabel: "Effort de raisonnement",
       effortUnset: "(non défini — utiliser la valeur par défaut de Claude)",
       helperText: "Les niveaux plus élevés autorisent plus de temps de réflexion mais augmentent la latence et la consommation de tokens.",

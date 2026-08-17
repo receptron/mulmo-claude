@@ -267,6 +267,30 @@ describe("buildCliArgs", () => {
 
     assert.ok(!args.includes("--effort"));
   });
+
+  it("includes --model when chatModel is set", async () => {
+    const args = buildCliArgs({
+      systemPromptPath: "/tmp/sp.md",
+      activePlugins: [],
+      chatModel: "opus",
+    });
+
+    const modelIdx = args.indexOf("--model");
+    assert.ok(modelIdx >= 0, "--model flag must exist");
+    assert.equal(args[modelIdx + 1], "opus");
+  });
+
+  // Omission is load-bearing, not cosmetic: without the flag the CLI
+  // resolves the model from the user's own ~/.claude/settings.json, which
+  // is the documented default for an unset setting.
+  it("omits --model when chatModel is unset", async () => {
+    const args = buildCliArgs({
+      systemPromptPath: "/tmp/sp.md",
+      activePlugins: [],
+    });
+
+    assert.ok(!args.includes("--model"));
+  });
 });
 
 describe("resolveMcpConfigPaths", () => {

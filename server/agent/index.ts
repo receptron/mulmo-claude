@@ -255,6 +255,7 @@ function buildAgentInput(
     mcpConfigPath: hasMcp ? mcpPaths.argPath : undefined,
     extraAllowedTools: [...settings.extraAllowedTools, ...userServerAllowedTools],
     effortLevel: settings.effortLevel,
+    chatModel: settings.chatModel,
     abortSignal,
     userTimezone,
     useDocker,

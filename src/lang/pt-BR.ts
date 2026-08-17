@@ -348,6 +348,12 @@ const ptBRMessages = {
     },
     modelTab: {
       description: "Controla o esforço de raciocínio que o Claude Code usa em cada turno. Deixe sem configurar para usar o padrão do Claude.",
+      modelLabel: "Modelo",
+      modelUnset: "(sem configurar — seguir o padrão do Claude Code)",
+      modelHelperText:
+        "Sem configurar, o MulmoClaude segue o ~/.claude/settings.json, arquivo que outros clientes do Claude Code (VS Code / Cursor) também escrevem ao trocar de modelo — então as trocas deles mudam o MulmoClaude junto. Escolha um modelo aqui para fixar o MulmoClaude de forma independente.",
+      modelConfigured: "Modelo: {model}",
+      modelNotConfigured: "Seguindo o padrão do Claude Code",
       effortLabel: "Esforço de raciocínio",
       effortUnset: "(sem configurar — usar padrão do Claude)",
       helperText: "Níveis mais altos permitem mais tempo de pensamento mas aumentam latência e uso de tokens.",

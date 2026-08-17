@@ -352,6 +352,12 @@ const deMessages = {
     },
     modelTab: {
       description: "Steuert den Reasoning-Effort, den Claude Code pro Zug verwendet. Ohne Einstellung wird der Standard von Claude verwendet.",
+      modelLabel: "Modell",
+      modelUnset: "(nicht gesetzt — Standard von Claude Code verwenden)",
+      modelHelperText:
+        "Ohne Einstellung folgt MulmoClaude der Datei ~/.claude/settings.json, die auch andere Claude Code Clients (VS Code / Cursor) beim Modellwechsel schreiben — deren Wechsel ändern also auch MulmoClaude. Wählen Sie hier ein Modell, um MulmoClaude unabhängig festzulegen.",
+      modelConfigured: "Modell: {model}",
+      modelNotConfigured: "Folgt dem Standard von Claude Code",
       effortLabel: "Reasoning-Effort",
       effortUnset: "(nicht gesetzt — Standard von Claude verwenden)",
       helperText: "Höhere Stufen erlauben mehr Denkzeit, erhöhen aber Latenz und Token-Verbrauch.",

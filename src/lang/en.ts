@@ -368,6 +368,12 @@ const enMessages = {
     },
     modelTab: {
       description: "Control the reasoning effort Claude Code uses for each turn. Leave unset to use Claude's default.",
+      modelLabel: "Model",
+      modelUnset: "(unset — follow the Claude Code default)",
+      modelHelperText:
+        "Unset means MulmoClaude follows ~/.claude/settings.json, which other Claude Code clients (VS Code / Cursor) also write to when you switch models — so their switches change MulmoClaude too. Pick a model here to pin MulmoClaude independently.",
+      modelConfigured: "Model: {model}",
+      modelNotConfigured: "Following the Claude Code default",
       effortLabel: "Reasoning effort",
       effortUnset: "(unset — use Claude's default)",
       helperText: "Higher levels allow more thinking time but increase latency and token usage.",

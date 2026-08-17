@@ -76,6 +76,19 @@ and when it is not enabling a run the archivist short-circuits before the interv
 consulted. Neither the turn-end hook nor the hourly scheduled task will have written anything, so
 an empty journal is not evidence of a scheduler fault.
 
+## MulmoClaude is running on a different model than I picked
+
+configKey: chatModel
+source: server/agent/config.ts
+
+Read `chatModel` first. Unset is the shipping default and means the `--model` flag is omitted, so
+the CLI resolves the model from the user's own `~/.claude/settings.json` — the same file other
+Claude Code clients (VS Code / Cursor) WRITE to when the user picks a model from `/model`. So a
+model switch made in another client silently becomes MulmoClaude's model too, which reads as a bug
+but is the documented unset behaviour. Setting `chatModel` pins MulmoClaude independently of that
+file. Note an already-running turn keeps the model it started with; the change lands on the next
+one.
+
 ## Gmail / Google Calendar / Notion tools don't show up for the agent
 
 configKey: extraAllowedTools

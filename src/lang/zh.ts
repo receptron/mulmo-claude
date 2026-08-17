@@ -340,6 +340,12 @@ const zhMessages = {
     },
     modelTab: {
       description: "控制 Claude Code 每个回合使用的推理强度。留空则使用 Claude 的默认值。",
+      modelLabel: "模型",
+      modelUnset: "(未设置 — 遵循 Claude Code 的默认值)",
+      modelHelperText:
+        "未设置时，MulmoClaude 会遵循 ~/.claude/settings.json。其他 Claude Code 客户端（VS Code / Cursor）在切换模型时也会写入该文件，因此在那边切换也会改变 MulmoClaude。在此选择模型即可单独固定 MulmoClaude。",
+      modelConfigured: "模型:{model}",
+      modelNotConfigured: "正在遵循 Claude Code 的默认值",
       effortLabel: "推理强度",
       effortUnset: "(未设置 — 使用 Claude 的默认值)",
       helperText: "更高的等级会带来更多思考时间,但也会增加延迟和 token 消耗。",

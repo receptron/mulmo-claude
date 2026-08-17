@@ -182,6 +182,12 @@ router.put(API_ROUTES.config.settings, (req: Request<unknown, unknown, AppSettin
   if (body.effortLevel === null) {
     delete merged.effortLevel;
   }
+  // Chat-model null-sentinel: unset means "follow ~/.claude/settings.json"
+  // (the `--model` flag is omitted), which is the documented default, so
+  // the tab sends `null` rather than a literal "default" value.
+  if (body.chatModel === null) {
+    delete merged.chatModel;
+  }
   // Chat-index null-sentinel (#1944): "off" is the documented default
   // (chatIndexMode() maps undefined → "off"), so the tab sends `null`
   // to drop the field entirely and keep settings.json free of default

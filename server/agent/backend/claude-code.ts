@@ -269,6 +269,7 @@ export function cliArgsForInput(input: AgentInput, systemPromptPath: string): Cl
     mcpConfigPath: input.mcpConfigPath,
     extraAllowedTools: input.extraAllowedTools,
     effortLevel: input.effortLevel,
+    chatModel: input.chatModel,
   };
 }
 

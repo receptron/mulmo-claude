@@ -120,6 +120,25 @@ describe("isAppSettingsPatch", () => {
     assert.equal(mod.isAppSettingsPatch({ journal: "" }), false);
     assert.equal(mod.isAppSettingsPatch({ journal: 42 }), false);
   });
+
+  // `chatModel` pins the model the main agent spawns with. Unset is the
+  // documented default (follow ~/.claude/settings.json), so it uses the
+  // same null clear-sentinel as effortLevel / chatIndex / journal.
+  it("accepts every known chat model and the null clear-sentinel", () => {
+    for (const model of mod.CHAT_MODELS) {
+      assert.ok(mod.isAppSettingsPatch({ chatModel: model }), `expected ${model} to be accepted`);
+    }
+    assert.ok(mod.isAppSettingsPatch({ chatModel: null }));
+  });
+
+  it("rejects unknown chatModel values on the patch path", () => {
+    // A pinned model id is deliberately rejected: only family aliases are
+    // accepted, so the stored choice keeps tracking the newest model.
+    assert.equal(mod.isAppSettingsPatch({ chatModel: "claude-opus-4-8" }), false);
+    assert.equal(mod.isAppSettingsPatch({ chatModel: "default" }), false);
+    assert.equal(mod.isAppSettingsPatch({ chatModel: "" }), false);
+    assert.equal(mod.isAppSettingsPatch({ chatModel: 42 }), false);
+  });
 });
 
 describe("normaliseAppSettingsPatch", () => {
@@ -152,6 +171,15 @@ describe("normaliseAppSettingsPatch", () => {
   it("preserves a present journal", () => {
     assert.deepEqual(mod.normaliseAppSettingsPatch({ journal: "haiku" }), { journal: "haiku" });
     assert.deepEqual(mod.normaliseAppSettingsPatch({ journal: "sonnet" }), { journal: "sonnet" });
+  });
+
+  it("strips null chatModel", () => {
+    assert.deepEqual(mod.normaliseAppSettingsPatch({ chatModel: null }), {});
+  });
+
+  it("preserves a present chatModel", () => {
+    assert.deepEqual(mod.normaliseAppSettingsPatch({ chatModel: "opus" }), { chatModel: "opus" });
+    assert.deepEqual(mod.normaliseAppSettingsPatch({ chatModel: "haiku" }), { chatModel: "haiku" });
   });
 });
 
@@ -496,6 +524,20 @@ describe("saveSettings", () => {
     const raw = readFileSync(mod.settingsPath(), "utf-8");
     const parsed = JSON.parse(raw);
     assert.equal("chatIndex" in parsed, false);
+  });
+
+  it("persists chatModel and roundtrips it through loadSettings", () => {
+    mod.saveSettings({ extraAllowedTools: [], chatModel: "opus" });
+    assert.deepEqual(mod.loadSettings(), { extraAllowedTools: [], chatModel: "opus" });
+    mod.saveSettings({ extraAllowedTools: [], chatModel: "sonnet" });
+    assert.deepEqual(mod.loadSettings(), { extraAllowedTools: [], chatModel: "sonnet" });
+  });
+
+  it("omits chatModel when unset so settings.json stays default-clean", () => {
+    mod.saveSettings({ extraAllowedTools: [] });
+    const raw = readFileSync(mod.settingsPath(), "utf-8");
+    const parsed = JSON.parse(raw);
+    assert.equal("chatModel" in parsed, false);
   });
 
   it("persists journal and roundtrips it through loadSettings", () => {

@@ -9,7 +9,7 @@
 
 import type { Attachment } from "@mulmobridge/protocol";
 import type { Role } from "../../../src/config/roles.js";
-import type { EffortLevel } from "../../system/config.js";
+import type { ChatModel, EffortLevel } from "../../system/config.js";
 import type { AgentEvent } from "../stream.js";
 
 /** Inputs the orchestrator passes to a backend for one user turn.
@@ -40,6 +40,9 @@ export interface AgentInput {
   extraAllowedTools: string[];
   /** Reasoning effort from settings (#1323). Undefined → flag omitted. */
   effortLevel?: EffortLevel | undefined;
+  /** Model alias from settings. Undefined → flag omitted, so the backend
+   *  falls back to whatever the underlying client resolves by itself. */
+  chatModel?: ChatModel | undefined;
   /** When fired, the backend must terminate any in-flight
    *  subprocess / connection. */
   abortSignal?: AbortSignal | undefined;

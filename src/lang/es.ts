@@ -354,6 +354,12 @@ const esMessages = {
     },
     modelTab: {
       description: "Controla el esfuerzo de razonamiento que Claude Code usa en cada turno. Déjalo sin configurar para usar el valor por defecto de Claude.",
+      modelLabel: "Modelo",
+      modelUnset: "(sin configurar — seguir el valor por defecto de Claude Code)",
+      modelHelperText:
+        "Sin configurar, MulmoClaude sigue ~/.claude/settings.json, un archivo que otros clientes de Claude Code (VS Code / Cursor) también escriben al cambiar de modelo, por lo que sus cambios afectan también a MulmoClaude. Elige aquí un modelo para fijar MulmoClaude de forma independiente.",
+      modelConfigured: "Modelo: {model}",
+      modelNotConfigured: "Siguiendo el valor por defecto de Claude Code",
       effortLabel: "Esfuerzo de razonamiento",
       effortUnset: "(sin configurar — usar valor por defecto de Claude)",
       helperText: "Niveles más altos permiten más tiempo de pensamiento pero aumentan la latencia y el uso de tokens.",

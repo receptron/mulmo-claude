@@ -306,6 +306,35 @@ describe("PUT /config/settings", () => {
     putSettingsHandler({ body: { journal: "opus" } } as Request, res);
     assert.equal(state.status, 400);
   });
+
+  it("sets chatModel from a patch and roundtrips it", () => {
+    configMod.saveSettings({ extraAllowedTools: ["mcp__keep"] });
+    const { state, res } = mockRes();
+    putSettingsHandler({ body: { chatModel: "opus" } } as Request, res);
+    assert.equal(state.status, 200);
+    const persisted = configMod.loadSettings();
+    assert.equal(persisted.chatModel, "opus");
+    assert.deepEqual(persisted.extraAllowedTools, ["mcp__keep"]);
+  });
+
+  // Key-absent, not merely "not the old value": the regression shape is
+  // the previous value leaking through `{...existing, ...patch}` once the
+  // patch is normalised to drop the null.
+  it("clears chatModel when the patch sends null", () => {
+    configMod.saveSettings({ extraAllowedTools: ["mcp__keep"], chatModel: "opus" });
+    const { state, res } = mockRes();
+    putSettingsHandler({ body: { chatModel: null } } as Request, res);
+    assert.equal(state.status, 200);
+    const persisted = configMod.loadSettings();
+    assert.equal(persisted.chatModel, undefined);
+    assert.deepEqual(persisted.extraAllowedTools, ["mcp__keep"]);
+  });
+
+  it("rejects unknown chatModel values with 400", () => {
+    const { state, res } = mockRes();
+    putSettingsHandler({ body: { chatModel: "claude-opus-4-8" } } as Request, res);
+    assert.equal(state.status, 400);
+  });
 });
 
 describe("PUT /config (atomic)", () => {

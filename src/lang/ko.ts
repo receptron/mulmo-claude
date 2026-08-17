@@ -350,6 +350,12 @@ const koMessages = {
     },
     modelTab: {
       description: "Claude Code가 각 턴에 사용하는 추론 effort를 제어합니다. 설정하지 않으면 Claude의 기본값이 사용됩니다.",
+      modelLabel: "모델",
+      modelUnset: "(미설정 — Claude Code 기본값을 따름)",
+      modelHelperText:
+        "미설정이면 MulmoClaude는 ~/.claude/settings.json을 따릅니다. 이 파일은 다른 Claude Code 클라이언트(VS Code / Cursor)도 모델을 전환할 때 기록하므로, 그쪽에서 모델을 바꾸면 MulmoClaude도 함께 바뀝니다. 여기서 모델을 선택하면 MulmoClaude만 독립적으로 고정할 수 있습니다.",
+      modelConfigured: "모델: {model}",
+      modelNotConfigured: "Claude Code 기본값을 따르는 중",
       effortLabel: "추론 effort",
       effortUnset: "(미설정 — Claude 기본값 사용)",
       helperText: "레벨이 높을수록 사고 시간이 늘어나지만 지연 시간과 토큰 사용량도 증가합니다.",

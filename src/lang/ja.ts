@@ -350,6 +350,12 @@ const jaMessages = {
     },
     modelTab: {
       description: "Claude Code が各ターンで使う推論 effort を設定します。未設定の場合は Claude のデフォルトに従います。",
+      modelLabel: "モデル",
+      modelUnset: "(未設定 — Claude Code のデフォルトに従う)",
+      modelHelperText:
+        "未設定のときは ~/.claude/settings.json に従います。このファイルは他の Claude Code クライアント（VS Code / Cursor）がモデル切り替え時に書き換えるため、そちらでモデルを変えると MulmoClaude も一緒に変わります。ここでモデルを選ぶと、MulmoClaude だけを固定できます。",
+      modelConfigured: "モデル: {model}",
+      modelNotConfigured: "Claude Code のデフォルトに従っています",
       effortLabel: "推論 effort",
       effortUnset: "(未設定 — Claude のデフォルトを使用)",
       helperText: "高いレベルほど思考時間が長くなりますが、レイテンシとトークン消費も増えます。",
