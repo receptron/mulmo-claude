@@ -98,7 +98,7 @@ export const MAX_PUT_LINT = 10;
  *  call also reports as `written` reads as noise; the reason to act is that the
  *  next reader of these rows is stricter than the write was. */
 const PUT_LINT_NOTE =
-  "These rows WERE written. The write gate refuses only what makes a record unopenable (required fields, enum values, primaryKey = record id) — it does not check the SHAPE of a value, so a wrong-shaped one is reported here rather than rejected. " +
+  "These rows WERE written. The write gate refuses what would make a record unopenable — a missing required field, a value outside an enum, a mismatched primaryKey, a computed key, a colliding id under `create` — but it does not check the SHAPE of a value, so a wrong-shaped one is reported here rather than rejected. " +
   "`getItems` surfaces the same finding as a `warning` (on a full listing, or when a requested id is missing), and publishing a shared app REFUSES the row outright. Fix the generator and rewrite them before writing the rest of the set.";
 /** Refuse an `itemsFile` larger than this, from `stat` and before any read.
  *  The row cap alone cannot bound the work: the file has to be read and parsed
@@ -643,6 +643,29 @@ function lintReport(lint: RejectedRow[]): { lint?: PutItemsLint } {
   return { lint: { total: lint.length, note: PUT_LINT_NOTE, rows: lint.slice(0, MAX_PUT_LINT) } };
 }
 
+/** Write the batch row by row, sorting each outcome into its own list. One row
+ *  at a time on purpose: a rejection is per row, so a bad row must not take the
+ *  batch with it. */
+async function putEachRow(
+  collection: LoadedCollection,
+  store: CollectionStore,
+  write: NonNullable<CollectionStore["write"]>,
+  rows: CollectionItem[],
+  mode: PutMode,
+  deps: ManageCollectionDeps,
+): Promise<{ written: string[]; rejected: RejectedRow[]; lint: RejectedRow[] }> {
+  const written: string[] = [];
+  const rejected: RejectedRow[] = [];
+  const lint: RejectedRow[] = [];
+  for (const record of rows) {
+    const outcome = await putOneItem(collection, store, write, record, mode, deps);
+    if (outcome.written) written.push(outcome.written);
+    if (outcome.rejected) rejected.push(outcome.rejected);
+    if (outcome.lint) lint.push(outcome.lint);
+  }
+  return { written, rejected, lint };
+}
+
 async function handlePutItems(collection: LoadedCollection, args: PutItemsArgs, deps: ManageCollectionDeps): Promise<string> {
   // Server-enforced read-only: a `dataSource` collection's rows live in
   // the external data file — point the agent at the real update path
@@ -655,15 +678,7 @@ async function handlePutItems(collection: LoadedCollection, args: PutItemsArgs, 
   }
   const rows = await resolvePutRows(args, deps);
   if (typeof rows === "string") return rows;
-  const written: string[] = [];
-  const rejected: RejectedRow[] = [];
-  const lint: RejectedRow[] = [];
-  for (const record of rows) {
-    const outcome = await putOneItem(collection, store, write, record, args.mode, deps);
-    if (outcome.written) written.push(outcome.written);
-    if (outcome.rejected) rejected.push(outcome.rejected);
-    if (outcome.lint) lint.push(outcome.lint);
-  }
+  const { written, rejected, lint } = await putEachRow(collection, store, write, rows, args.mode, deps);
   return JSON.stringify({ collection: collection.slug, written, rejected, ...lintReport(lint) });
 }
 

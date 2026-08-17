@@ -370,6 +370,7 @@ describe("manageCollection — putItems lint", () => {
       fields: {
         id: { type: "string", label: "ID", primary: true, required: true },
         startAt: { type: "datetime", label: "Start" },
+        day: { type: "date", label: "Day" },
         note: { type: "string", label: "Note" },
       },
     });
@@ -386,6 +387,16 @@ describe("manageCollection — putItems lint", () => {
     assert.match(lint.rows[0]?.problem ?? "", /not a YYYY-MM-DDTHH:MM datetime/);
     assert.match(lint.note, /WERE written/);
     assert.match(lint.note, /publishing a shared app REFUSES the row/);
+  });
+
+  // Not a datetime special case: the strict tier is the whole per-type layer, and
+  // a day the calendar cannot place fails it the same way (CodeRabbit on #2925).
+  it("reports an impossible date the same way", async () => {
+    const result = await runJson({ action: "putItems", slug: "slots", items: [{ id: "s1", day: "2026-02-30" }] });
+    assert.deepEqual(result.written, ["s1"]);
+    assert.deepEqual(result.rejected, []);
+    const lint = result.lint as PutItemsLint;
+    assert.match(lint.rows[0]?.problem ?? "", /not a real YYYY-MM-DD date/);
   });
 
   it("has no lint key at all when every written row fits its types", async () => {
