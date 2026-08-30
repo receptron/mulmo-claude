@@ -342,10 +342,27 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * validation (including the script-vs-filePath mode check) belongs to
    * the core.
    */
-  function guardStoryWirePath(filePath: unknown): OpFailure | null {
+  function guardStoryWirePath(filePath: unknown, root?: string): OpFailure | null {
     if (typeof filePath !== "string" || filePath === "") return null;
-    const resolved = resolveStory(filePath);
+    const resolved = resolveStory(filePath, root);
     return resolved.ok ? null : resolved;
+  }
+
+  /**
+   * Whether a WRITE may target this root.
+   *
+   * Reads are root-aware; writes are not. `executeMulmoScriptSave` and the
+   * update executors run against one `FileOps`, bound by the host to the
+   * default root, so a write naming another root would rewrite the DEFAULT
+   * root's identically-named file and then announce the other one as changed
+   * (#3015 review G1). Closing it here is fail-closed: "readable but not yet
+   * writable" beats "wrote somewhere else and said so".
+   *
+   * Step 2 replaces this with a per-root FileOps rather than removing it.
+   */
+  function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
+    if (normalizeRoot(root) === DEFAULT_ROOT) return null;
+    return opBadRequest("writing to a non-default stories root is not supported yet");
   }
 
   // mulmocast shells out to ffmpeg for movie / beat rendering. When the
@@ -777,7 +794,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   async function generateMovieOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ moviePath: string }>> {
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
-    const resolved = resolveStory(filePath);
+    const resolved = resolveStory(filePath, root);
     if (!resolved.ok) return resolved;
     const absoluteFilePath = resolved.absolutePath;
 
@@ -917,7 +934,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   async function generatePdfOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ pdfPath: string }>> {
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
-    const resolved = resolveStory(filePath);
+    const resolved = resolveStory(filePath, root);
     if (!resolved.ok) return resolved;
     const absoluteFilePath = resolved.absolutePath;
 
@@ -958,6 +975,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     toStoryRef,
     resolveStory,
     guardStoryWirePath,
+    guardStoryWriteRoot,
     ffmpegGuard,
     runStoryOp,
     publishGeneration,

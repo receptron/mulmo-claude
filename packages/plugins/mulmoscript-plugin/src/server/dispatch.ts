@@ -92,7 +92,11 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
   const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {
-    const guard = ops.guardStoryWirePath(args.filePath);
+    // Writes stay in the default root until step 2 gives the executors a
+    // per-root FileOps — see `guardStoryWriteRoot` (#3015 review G1).
+    const rootGuard = ops.guardStoryWriteRoot(str(args.root));
+    if (rootGuard) return fromOpFailure(rootGuard);
+    const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
     const outcome = await executeMulmoScriptSave(executeContext, {
       script: args.script,
@@ -104,7 +108,9 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
   }
 
   async function updateKind(kind: "updateBeat" | "updateScript", args: Record<string, unknown>): Promise<unknown> {
-    const guard = ops.guardStoryWirePath(args.filePath);
+    const rootGuard = ops.guardStoryWriteRoot(str(args.root));
+    if (rootGuard) return fromOpFailure(rootGuard);
+    const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
     const outcome = kind === "updateBeat" ? await executeUpdateBeat(executeContext, args) : await executeUpdateScript(executeContext, args);
     if (!outcome.ok) return fromPackageFailure(outcome);

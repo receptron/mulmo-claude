@@ -119,6 +119,49 @@ describe("pendingGenerations is scoped by the pair", () => {
   });
 });
 
+describe("every read resolves in the root it was asked for", () => {
+  // `runStoryOp` forwards the root for the ops that go through it, but the
+  // movie and PDF generators call `resolveStory` DIRECTLY — a call site the
+  // first round's "count the forwards" check missed because it only counted
+  // `runStoryOp` options (CodeRabbit on #3015). An unregistered root must
+  // therefore fail HERE too, not silently resolve in the default root.
+  const unregistered = "nope";
+
+  it("fails generateMovie for an unregistered root instead of using the default", async () => {
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const result = await ops.generateMovieOp("stories/deck.json", undefined, unregistered);
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.code, "bad_request");
+  });
+
+  it("fails generatePdf for an unregistered root instead of using the default", async () => {
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const result = await ops.generatePdfOp("stories/deck.json", undefined, unregistered);
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.code, "bad_request");
+  });
+});
+
+describe("writes stay in the default root until step 2", () => {
+  // Reads became root-aware in this PR; writes did not. `executeMulmoScriptSave`
+  // and the update executors run against one FileOps bound to the default root,
+  // so a write naming another root would rewrite the DEFAULT root's
+  // identically-named file and then announce the other one as changed
+  // (#3015 review G1). Fail closed until step 2 supplies a per-root FileOps.
+  it("refuses a write that names a non-default root", () => {
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const guard = ops.guardStoryWriteRoot("repoA");
+    assert.ok(guard, "a named root must not be writable yet");
+    assert.equal(guard?.code, "bad_request");
+  });
+
+  it("still allows every write that names no root", () => {
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    assert.equal(ops.guardStoryWriteRoot(undefined), null);
+    assert.equal(ops.guardStoryWriteRoot(""), null, "the empty spelling is the default root");
+  });
+});
+
 describe("script-changed events carry their root", () => {
   it("names the root a write happened in", () => {
     const { ops, changes } = makeOps({ repoA: "/tmp/a" });
