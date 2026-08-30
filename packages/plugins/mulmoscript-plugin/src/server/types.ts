@@ -23,6 +23,9 @@ export interface GenerateOpArgs {
   key?: string | undefined;
   force?: boolean | undefined;
   chatSessionId?: string | undefined;
+  /** Which registered stories root `filePath` is relative to (#3014).
+   *  Absent = the host's default root. */
+  root?: string | undefined;
 }
 
 /** `GenerateOpArgs` with `K` promoted to genuinely required. `Required<Pick<…>>`

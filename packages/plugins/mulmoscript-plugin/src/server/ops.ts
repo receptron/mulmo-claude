@@ -193,9 +193,14 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   const DEFAULT_ROOT = "";
   const rootDirs = new Map<string, string>([[DEFAULT_ROOT, path.resolve(backend.storiesDir)]]);
   for (const [id, dir] of Object.entries(backend.extraRoots ?? {})) {
-    // An empty id would shadow the default root and silently re-point every
-    // pre-roots caller at someone else's directory.
-    if (id !== DEFAULT_ROOT) rootDirs.set(id, path.resolve(dir));
+    // An empty id is the default root's own key: accepting it would re-point
+    // every pre-roots caller at someone else's directory. Dropping it quietly
+    // would hide the host's misconfiguration until a read returned the wrong
+    // file, and this runs at boot, where throwing is the cheap failure.
+    if (id === DEFAULT_ROOT) {
+      throw new Error("mulmoScript: extraRoots key must not be empty — the empty id is reserved for the default stories root");
+    }
+    rootDirs.set(id, path.resolve(dir));
   }
 
   /** The registered directory for a wire `root`, or null when the host never
@@ -215,10 +220,23 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // paths under the link's target, and relativizing against the link
   // itself would produce a traversal-like "stories/../../…" ref that
   // resolveStory then rejects (CodeRabbit on #2137).
-  function toStoryRef(absolutePath: string, root?: string): string {
+  function toStoryRef(absolutePath: string, root?: string): string | null {
+    // An unregistered root gets null, not the default root's base. Relativizing
+    // against the default would mint a wire ref that READS BACK as a different
+    // file — the same silent-substitution failure `resolveStory` rejects, and
+    // this function is on the ops object, so a host can reach it directly
+    // without passing through that guard (#3015 review F2).
     const dir = rootDir(root);
-    const base = (dir === null ? null : ensureStoriesReal(root)) ?? dir ?? rootDirs.get(DEFAULT_ROOT)!;
+    if (dir === null) return null;
+    const base = ensureStoriesReal(root) ?? dir;
     const rel = path.relative(base, absolutePath).split(path.sep).join("/");
+    // A path outside the base relativizes to `../…`, which would be handed
+    // out as the traversal-shaped ref `stories/../../…` that `resolveStory`
+    // then rejects — a wire path that cannot be read back. It happens for
+    // real: a root whose directory does not exist yet has no realpath, so the
+    // base falls back to the unresolved directory and every absolute path
+    // looks outside it.
+    if (rel === ".." || rel.startsWith("../")) return null;
     return rel ? `stories/${rel}` : "stories";
   }
 
@@ -234,7 +252,12 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     const dir = rootDir(root);
     if (dir === null) return null;
     try {
-      mkdirSync(dir, { recursive: true });
+      // Only the DEFAULT root is created on demand. An extra root is a
+      // directory the user already owns — often a git worktree — and creating
+      // it here would grow `artifacts/stories/` inside their repository as a
+      // side effect of a status poll. A host that registers a root is
+      // responsible for it existing (#3015 review F3).
+      if (normalizeRoot(root) === DEFAULT_ROOT) mkdirSync(dir, { recursive: true });
       const real = realpathSync(dir);
       storiesRealCache.set(key, real);
       return real;
@@ -350,7 +373,22 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // can't clear subscribers' spinners while a duplicate run is active.
   // A finish with no tracked start (the movie/PDF pipelines' per-beat
   // completion pulses) always publishes.
-  const inFlightGenerations = new Map<string, { kind: GenerationKind; filePath: string; key: string; count: number }>();
+  const inFlightGenerations = new Map<string, { kind: GenerationKind; filePath: string; key: string; root: string; count: number }>();
+
+  /** The default root's two spellings (absent, `""`) collapse to one, so a
+   *  snapshot filter and a tracker entry compare equal whichever the caller
+   *  used. */
+  function normalizeRoot(root: string | undefined): string {
+    return root ?? DEFAULT_ROOT;
+  }
+
+  /** Emit `root` only when it names a non-default one: an event carrying
+   *  `root: ""` and one carrying nothing must stay indistinguishable to every
+   *  pre-#3014 consumer. */
+  function rootField(root: string | undefined): { root?: string } {
+    const normalized = normalizeRoot(root);
+    return normalized === DEFAULT_ROOT ? {} : { root: normalized };
+  }
 
   /** Tracker state and events key on the canonical `stories/<rel>` wire
    *  form: subscribers (the View's pubsub filter, `pendingGenerations`
@@ -385,9 +423,16 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         existing.count += 1;
         return; // already reported as started
       }
-      inFlightGenerations.set(mapKey, { kind, filePath: wirePath, key, count: 1 });
+      inFlightGenerations.set(mapKey, { kind, filePath: wirePath, key, root: normalizeRoot(root), count: 1 });
     }
-    const event: MulmoScriptGenerationEvent = { kind, filePath: wirePath, key, done: finished, ...(error ? { error } : {}) };
+    const event: MulmoScriptGenerationEvent = {
+      kind,
+      filePath: wirePath,
+      key,
+      done: finished,
+      ...(error ? { error } : {}),
+      ...rootField(root),
+    };
     backend.onGenerationEvent?.(chatSessionId, event);
   }
 
@@ -398,17 +443,29 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * save — reloading there would rebuild the element the caret is in, mid-keystroke. A write
    * from the agent carries no origin, so everyone reloads.
    */
-  function publishScriptChanged(filePath: string, origin?: string): void {
-    backend.onScriptChanged?.({ filePath: canonicalWirePath(filePath), ...(origin === undefined ? {} : { origin }) });
+  function publishScriptChanged(filePath: string, origin?: string, root?: string): void {
+    backend.onScriptChanged?.({
+      filePath: canonicalWirePath(filePath),
+      ...(origin === undefined ? {} : { origin }),
+      ...rootField(root),
+    });
   }
 
-  /** Snapshot of generations currently in flight for one script — the
-   *  View's mount-time catch-up, filtered to its wire `filePath`. */
-  function pendingGenerations(filePath: string): MulmoScriptGenerationEvent[] {
+  /**
+   * Snapshot of generations currently in flight for one script — the View's
+   * mount-time catch-up.
+   *
+   * Filtered on the PAIR. Filtering on `filePath` alone hands a View watching
+   * `repoB/stories/deck.json` the run started for `repoA`'s identically-named
+   * deck, and the caller cannot discard it because the returned event would
+   * carry no root either (Codex P1 / CodeRabbit on #3015).
+   */
+  function pendingGenerations(filePath: string, root?: string): MulmoScriptGenerationEvent[] {
     const wirePath = canonicalWirePath(filePath);
+    const wanted = normalizeRoot(root);
     return [...inFlightGenerations.values()]
-      .filter((entry) => entry.filePath === wirePath)
-      .map(({ kind, key }) => ({ kind, filePath: wirePath, key, done: false }));
+      .filter((entry) => entry.filePath === wirePath && entry.root === wanted)
+      .map(({ kind, key }) => ({ kind, filePath: wirePath, key, done: false, ...rootField(root) }));
   }
 
   // ── Op scaffolding ────────────────────────────────────────────
@@ -453,8 +510,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
 
   // ── Probe ops ─────────────────────────────────────────────────
 
-  async function beatImageOp(filePath: string, beatIndex: number): Promise<OpResult<{ image: string | null }>> {
-    return runStoryOp<{ image: string | null }>(filePath, { operation: "beat-image" }, async ({ context }) => {
+  async function beatImageOp(filePath: string, beatIndex: number, root?: string): Promise<OpResult<{ image: string | null }>> {
+    return runStoryOp<{ image: string | null }>(filePath, { operation: "beat-image", root }, async ({ context }) => {
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       if (!existsSync(imagePath)) return { ok: true, image: null };
       return { ok: true, image: await fileToDataUri(imagePath, "image/png") };
@@ -464,10 +521,10 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // beatAudio is a probe — the frontend polls it expecting `{ audio: null }`
   // when nothing has been generated yet. Override the default
   // server_error-on-context-missing so the soft-fail contract is preserved.
-  async function beatAudioOp(filePath: string, beatIndex: number): Promise<OpResult<{ audio: string | null }>> {
+  async function beatAudioOp(filePath: string, beatIndex: number, root?: string): Promise<OpResult<{ audio: string | null }>> {
     return runStoryOp<{ audio: string | null }>(
       filePath,
-      { operation: "beat-audio", onContextMissing: () => ({ ok: true, audio: null }) },
+      { operation: "beat-audio", root, onContextMissing: () => ({ ok: true, audio: null }) },
       async ({ context }) => {
         const beat = context.studio.script.beats[beatIndex];
         // Probe contract: a beat index the script doesn't have soft-fails
@@ -485,17 +542,17 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // sound effect > raw movie clip > animated html_tailwind render. The
   // response is the "stories/…" wire path so the client can stream it
   // through the host's authenticated media download.
-  async function beatMovieOp(filePath: string, beatIndex: number): Promise<OpResult<{ moviePath: string | null }>> {
-    return runStoryOp<{ moviePath: string | null }>(filePath, { operation: "beat-movie" }, async ({ context }) => {
+  async function beatMovieOp(filePath: string, beatIndex: number, root?: string): Promise<OpResult<{ moviePath: string | null }>> {
+    return runStoryOp<{ moviePath: string | null }>(filePath, { operation: "beat-movie", root }, async ({ context }) => {
       const { movieFile, soundEffectFile, lipSyncFile } = getBeatMoviePaths(context, beatIndex);
       const candidates = [lipSyncFile, soundEffectFile, movieFile, getBeatAnimatedVideoPath(context, beatIndex)];
       const existing = candidates.find((candidate) => existsSync(candidate));
-      return { ok: true, moviePath: existing ? toStoryRef(existing) : null };
+      return { ok: true, moviePath: existing ? toStoryRef(existing, root) : null };
     });
   }
 
-  async function characterImageOp(filePath: string, key: string): Promise<OpResult<{ image: string | null }>> {
-    return runStoryOp<{ image: string | null }>(filePath, { operation: "character-image" }, async ({ context }) => {
+  async function characterImageOp(filePath: string, key: string, root?: string): Promise<OpResult<{ image: string | null }>> {
+    return runStoryOp<{ image: string | null }>(filePath, { operation: "character-image", root }, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
       if (!existsSync(imagePath)) return { ok: true, image: null };
       return { ok: true, image: await fileToDataUri(imagePath, "image/png") };
@@ -505,41 +562,41 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   /** Shared "output exists and is newer than the source script" gate for
    *  movie / PDF status. A stale artifact (script edited after it was
    *  generated) reports null so the UI re-offers the Generate button. */
-  function freshOutputRef(outputPath: string, absoluteFilePath: string): string | null {
+  function freshOutputRef(outputPath: string, absoluteFilePath: string, root?: string): string | null {
     if (!existsSync(outputPath)) return null;
     const outputMtime = statSync(outputPath).mtimeMs;
     const sourceMtime = statSync(absoluteFilePath).mtimeMs;
     if (outputMtime < sourceMtime) return null;
-    return toStoryRef(outputPath);
+    return toStoryRef(outputPath, root);
   }
 
-  async function movieStatusOp(filePath: string): Promise<OpResult<{ moviePath: string | null }>> {
+  async function movieStatusOp(filePath: string, root?: string): Promise<OpResult<{ moviePath: string | null }>> {
     return runStoryOp(
       filePath,
-      { operation: "movie-status", onContextMissing: () => ({ ok: true, moviePath: null }) },
-      async ({ absoluteFilePath, context }) => ({ ok: true, moviePath: freshOutputRef(movieFilePath(context), absoluteFilePath) }),
+      { operation: "movie-status", root, onContextMissing: () => ({ ok: true, moviePath: null }) },
+      async ({ absoluteFilePath, context }) => ({ ok: true, moviePath: freshOutputRef(movieFilePath(context), absoluteFilePath, root) }),
     );
   }
 
-  async function pdfStatusOp(filePath: string): Promise<OpResult<{ pdfPath: string | null }>> {
-    return runStoryOp(filePath, { operation: "pdf-status", onContextMissing: () => ({ ok: true, pdfPath: null }) }, async ({ absoluteFilePath, context }) => ({
+  async function pdfStatusOp(filePath: string, root?: string): Promise<OpResult<{ pdfPath: string | null }>> {
+    return runStoryOp(filePath, { operation: "pdf-status", root, onContextMissing: () => ({ ok: true, pdfPath: null }) }, async ({ absoluteFilePath, context }) => ({
       ok: true,
-      pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath),
+      pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath, root),
     }));
   }
 
   // ── Generation ops ────────────────────────────────────────────
 
   async function renderBeatOp(args: GenerateOpArgsWith<"filePath" | "beatIndex">): Promise<OpResult<{ image: string }>> {
-    const { filePath, beatIndex, force, chatSessionId } = args;
+    const { filePath, beatIndex, force, chatSessionId, root } = args;
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
 
     const mapKey = String(beatIndex);
-    publishGeneration(chatSessionId, "beatImage", filePath, mapKey, false);
+    publishGeneration(chatSessionId, "beatImage", filePath, mapKey, false, root);
     let genError: string | undefined;
     try {
-      const result = await runStoryOp<{ image: string }>(filePath, { force, operation: "render-beat" }, async ({ context }) => {
+      const result = await runStoryOp<{ image: string }>(filePath, { force, operation: "render-beat", root }, async ({ context }) => {
         await generateBeatImage({
           index: beatIndex,
           context,
@@ -554,17 +611,17 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       if (!result.ok) genError = result.error;
       return result;
     } finally {
-      publishGeneration(chatSessionId, "beatImage", filePath, mapKey, true, genError);
+      publishGeneration(chatSessionId, "beatImage", filePath, mapKey, true, genError, root);
     }
   }
 
   async function generateBeatAudioOp(args: GenerateOpArgsWith<"filePath" | "beatIndex">): Promise<OpResult<{ audio: string }>> {
-    const { filePath, beatIndex, force, chatSessionId } = args;
+    const { filePath, beatIndex, force, chatSessionId, root } = args;
     const mapKey = String(beatIndex);
-    publishGeneration(chatSessionId, "beatAudio", filePath, mapKey, false);
+    publishGeneration(chatSessionId, "beatAudio", filePath, mapKey, false, root);
     let genError: string | undefined;
     try {
-      const result = await runStoryOp<{ audio: string }>(filePath, { force, operation: "generate-beat-audio" }, async ({ context }) => {
+      const result = await runStoryOp<{ audio: string }>(filePath, { force, operation: "generate-beat-audio", root }, async ({ context }) => {
         await generateBeatAudio(beatIndex, context, {
           settings: process.env as Record<string, string>,
         } as Parameters<typeof generateBeatAudio>[2]);
@@ -595,16 +652,16 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       if (!result.ok) genError = result.error;
       return result;
     } finally {
-      publishGeneration(chatSessionId, "beatAudio", filePath, mapKey, true, genError);
+      publishGeneration(chatSessionId, "beatAudio", filePath, mapKey, true, genError, root);
     }
   }
 
   async function renderCharacterOp(args: GenerateOpArgsWith<"filePath" | "key">): Promise<OpResult<{ image: string }>> {
-    const { filePath, key, force, chatSessionId } = args;
-    publishGeneration(chatSessionId, "characterImage", filePath, key, false);
+    const { filePath, key, force, chatSessionId, root } = args;
+    publishGeneration(chatSessionId, "characterImage", filePath, key, false, root);
     let genError: string | undefined;
     try {
-      const result = await runStoryOp<{ image: string }>(filePath, { force, operation: "render-character" }, async ({ context }) => {
+      const result = await runStoryOp<{ image: string }>(filePath, { force, operation: "render-character", root }, async ({ context }) => {
         // `imageEntries` (not `images`) to avoid shadowing mulmocast's
         // imported `images()` pipeline stage.
         const imageEntries = context.studio.script.imageParams?.images ?? {};
@@ -632,14 +689,14 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       if (!result.ok) genError = result.error;
       return result;
     } finally {
-      publishGeneration(chatSessionId, "characterImage", filePath, key, true, genError);
+      publishGeneration(chatSessionId, "characterImage", filePath, key, true, genError, root);
     }
   }
 
   // ── Upload ops ────────────────────────────────────────────────
 
-  async function uploadBeatImageOp(filePath: string, beatIndex: number, imageData: string): Promise<OpResult<{ image: string }>> {
-    return runStoryOp<{ image: string }>(filePath, { operation: "upload-beat-image" }, async ({ context }) => {
+  async function uploadBeatImageOp(filePath: string, beatIndex: number, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
+    return runStoryOp<{ image: string }>(filePath, { operation: "upload-beat-image", root }, async ({ context }) => {
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       // writeFileAtomic creates parent dirs and prevents a half-
       // written PNG from surviving a crash mid-write (#881 v2).
@@ -649,8 +706,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     });
   }
 
-  async function uploadCharacterImageOp(filePath: string, key: string, imageData: string): Promise<OpResult<{ image: string }>> {
-    return runStoryOp<{ image: string }>(filePath, { operation: "upload-character-image" }, async ({ context }) => {
+  async function uploadCharacterImageOp(filePath: string, key: string, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
+    return runStoryOp<{ image: string }>(filePath, { operation: "upload-character-image", root }, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
       const base64 = stripDataUri(imageData);
       await backend.writeFileAtomic(imagePath, Buffer.from(base64, "base64"));
@@ -717,7 +774,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * initiating View (and any other mounted View) reloads assets off disk
    * as they land — the successor of the SSE per-beat events.
    */
-  async function generateMovieOp(filePath: string, chatSessionId: string | undefined): Promise<OpResult<{ moviePath: string }>> {
+  async function generateMovieOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ moviePath: string }>> {
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
     const resolved = resolveStory(filePath);
@@ -729,31 +786,33 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     }
 
     inFlightMovies.add(absoluteFilePath);
-    publishGeneration(chatSessionId, "movie", filePath, "", false);
+    publishGeneration(chatSessionId, "movie", filePath, "", false, root);
     let genError: string | undefined;
     try {
       const result = await runMovieGeneration(absoluteFilePath, (event) => {
         const eventKind = event.kind === "image" ? "beatImage" : "beatAudio";
-        publishGeneration(chatSessionId, eventKind, filePath, String(event.beatIndex), true);
+        publishGeneration(chatSessionId, eventKind, filePath, String(event.beatIndex), true, root);
       });
       if (!result.ok) {
         genError = result.error;
         return opServerError(result.error);
       }
-      return { ok: true, moviePath: toStoryRef(result.outputPath) };
+      const movieRef = toStoryRef(result.outputPath, root);
+      if (movieRef === null) return opServerError("generated movie is outside the registered stories root");
+      return { ok: true, moviePath: movieRef };
     } catch (err) {
       genError = errorMessage(err);
       return opServerError(genError);
     } finally {
       inFlightMovies.delete(absoluteFilePath);
-      publishGeneration(chatSessionId, "movie", filePath, "", true, genError);
+      publishGeneration(chatSessionId, "movie", filePath, "", true, genError, root);
     }
   }
 
-  function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): void {
+  function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined, root?: string): void {
     if (inFlightMovies.has(absoluteFilePath)) return;
     inFlightMovies.add(absoluteFilePath);
-    void runBackgroundMovieGeneration(absoluteFilePath, wireFilePath, chatSessionId);
+    void runBackgroundMovieGeneration(absoluteFilePath, wireFilePath, chatSessionId, root);
   }
 
   // Detached movie generation. Reports progress through the generation
@@ -765,7 +824,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // stale sidecar from a previous run is cleared on each new attempt.
   // Triggered server-side from the unified save route when the caller
   // passes `autoGenerateMovie: true`.
-  async function runBackgroundMovieGeneration(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined): Promise<void> {
+  async function runBackgroundMovieGeneration(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined, root?: string): Promise<void> {
     const errorSidecarPath = `${absoluteFilePath}.error.txt`;
     // Clear stale error from a previous failed run before starting; if it
     // doesn't exist that's fine. Catch any unexpected fs errors silently —
@@ -776,7 +835,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       // intentional: ENOENT is the common case, others non-fatal
     }
 
-    publishGeneration(chatSessionId, "movie", wireFilePath, "", false);
+    publishGeneration(chatSessionId, "movie", wireFilePath, "", false, root);
     let genError: string | undefined;
     try {
       const result = await runMovieGeneration(absoluteFilePath, (event) => {
@@ -788,8 +847,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         // the reload.
         const eventKind = event.kind === "image" ? "beatImage" : "beatAudio";
         const key = String(event.beatIndex);
-        publishGeneration(chatSessionId, eventKind, wireFilePath, key, false);
-        setImmediate(() => publishGeneration(chatSessionId, eventKind, wireFilePath, key, true));
+        publishGeneration(chatSessionId, eventKind, wireFilePath, key, false, root);
+        setImmediate(() => publishGeneration(chatSessionId, eventKind, wireFilePath, key, true, undefined, root));
       });
 
       if (!result.ok) {
@@ -808,7 +867,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       log.error("background movie generation crashed", { filePath: wireFilePath, error: genError });
     } finally {
       inFlightMovies.delete(absoluteFilePath);
-      publishGeneration(chatSessionId, "movie", wireFilePath, "", true, genError);
+      publishGeneration(chatSessionId, "movie", wireFilePath, "", true, genError, root);
     }
   }
 
@@ -855,7 +914,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
 
   /** Long-held foreground PDF generation (the package View's `generatePdf`
    *  dispatch) — the PDF sibling of `generateMovieOp`. */
-  async function generatePdfOp(filePath: string, chatSessionId: string | undefined): Promise<OpResult<{ pdfPath: string }>> {
+  async function generatePdfOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ pdfPath: string }>> {
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
     const resolved = resolveStory(filePath);
@@ -867,7 +926,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     }
 
     inFlightPdfs.add(absoluteFilePath);
-    publishGeneration(chatSessionId, "pdf", filePath, "", false);
+    publishGeneration(chatSessionId, "pdf", filePath, "", false, root);
     let genError: string | undefined;
     try {
       const context = await buildContext(absoluteFilePath);
@@ -876,19 +935,21 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         return opServerError(genError);
       }
       const result = await runPdfGeneration(context, (beatIndex) => {
-        publishGeneration(chatSessionId, "beatImage", filePath, String(beatIndex), true);
+        publishGeneration(chatSessionId, "beatImage", filePath, String(beatIndex), true, root);
       });
       if (!result.ok) {
         genError = result.error;
         return opServerError(result.error);
       }
-      return { ok: true, pdfPath: toStoryRef(result.outputPath) };
+      const pdfRef = toStoryRef(result.outputPath, root);
+      if (pdfRef === null) return opServerError("generated PDF is outside the registered stories root");
+      return { ok: true, pdfPath: pdfRef };
     } catch (err) {
       genError = errorMessage(err);
       return opServerError(genError);
     } finally {
       inFlightPdfs.delete(absoluteFilePath);
-      publishGeneration(chatSessionId, "pdf", filePath, "", true, genError);
+      publishGeneration(chatSessionId, "pdf", filePath, "", true, genError, root);
     }
   }
 

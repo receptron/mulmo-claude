@@ -110,7 +110,7 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (!outcome.ok) return fromPackageFailure(outcome);
     // After the write landed, never before: a View that reloads on a failed write would
     // discard the user's edit and show the old file back.
-    ops.publishScriptChanged(str(args.filePath) ?? "", str(args.origin));
+    ops.publishScriptChanged(str(args.filePath) ?? "", str(args.origin), str(args.root));
     return { ok: true };
   }
 
@@ -121,34 +121,38 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     const statusOp = STATUS_OPS[kind as keyof typeof STATUS_OPS];
     if (statusOp) {
       const filePath = str(args.filePath);
-      return filePath ? envelope(await statusOp(filePath)) : invalidArgs(kind);
+      return filePath ? envelope(await statusOp(filePath, str(args.root))) : invalidArgs(kind);
     }
     if (kind === "characterImage") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.characterImageOp(parsed.filePath, parsed.key)) : invalidArgs(kind);
+      return parsed ? envelope(await ops.characterImageOp(parsed.filePath, parsed.key, str(args.root))) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
-    return envelope(await BEAT_PROBE_OPS[kind as keyof typeof BEAT_PROBE_OPS](parsed.filePath, parsed.beatIndex));
+    return envelope(await BEAT_PROBE_OPS[kind as keyof typeof BEAT_PROBE_OPS](parsed.filePath, parsed.beatIndex, str(args.root)));
   }
 
   async function generateKind(kind: string, args: Record<string, unknown>): Promise<unknown> {
     const chatSessionId = str(args.chatSessionId);
+    const root = str(args.root);
     const force = args.force === true;
     if (kind === "generateMovie" || kind === "generatePdf") {
       const filePath = str(args.filePath);
       if (!filePath) return invalidArgs(kind);
-      const result = kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId) : await ops.generatePdfOp(filePath, chatSessionId);
+      const result =
+        kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId, root) : await ops.generatePdfOp(filePath, chatSessionId, root);
       return envelope(result);
     }
     if (kind === "renderCharacter") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.renderCharacterOp({ ...parsed, force, chatSessionId })) : invalidArgs(kind);
+      return parsed ? envelope(await ops.renderCharacterOp({ ...parsed, force, chatSessionId, root })) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
     const result =
-      kind === "renderBeat" ? await ops.renderBeatOp({ ...parsed, force, chatSessionId }) : await ops.generateBeatAudioOp({ ...parsed, force, chatSessionId });
+      kind === "renderBeat"
+        ? await ops.renderBeatOp({ ...parsed, force, chatSessionId, root })
+        : await ops.generateBeatAudioOp({ ...parsed, force, chatSessionId, root });
     return envelope(result);
   }
 
@@ -157,11 +161,11 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (!imageData) return invalidArgs(kind);
     if (kind === "uploadCharacterImage") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.uploadCharacterImageOp(parsed.filePath, parsed.key, imageData)) : invalidArgs(kind);
+      return parsed ? envelope(await ops.uploadCharacterImageOp(parsed.filePath, parsed.key, imageData, str(args.root))) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
-    return envelope(await ops.uploadBeatImageOp(parsed.filePath, parsed.beatIndex, imageData));
+    return envelope(await ops.uploadBeatImageOp(parsed.filePath, parsed.beatIndex, imageData, str(args.root)));
   }
 
   return async (args: Record<string, unknown>): Promise<unknown> => {
@@ -175,7 +179,7 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (kind === "pendingGenerations") {
       const filePath = str(args.filePath);
       if (!filePath) return invalidArgs(kind);
-      return { ok: true, pending: ops.pendingGenerations(filePath) };
+      return { ok: true, pending: ops.pendingGenerations(filePath, str(args.root)) };
     }
     return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
   };
