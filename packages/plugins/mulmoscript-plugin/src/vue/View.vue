@@ -1255,13 +1255,13 @@ watch(() => props.selectedResult, initializeScript);
 // plugin pubsub channel (started + finished, per beat and per artifact);
 // on start we mirror the local "rendering" state so spinners show even
 // after a remount, on finish we reload the relevant asset off disk.
-const unsubscribeGenerationEvents = api.onGenerationEvent(
-  () => filePath.value,
+const unsubscribeGenerationEvents = api.onGenerationEvent({
+  filePath: () => filePath.value,
   // The View is opened from the host's default root today; step 2 gives it a
   // root of its own. Written out rather than left to a default so the pair
   // filter is visible at the call site (#3014).
-  () => undefined,
-  (event) => {
+  root: () => undefined,
+  handler: (event) => {
     if (!event.done) {
       reflectGenerationStart(event);
       return;
@@ -1272,7 +1272,7 @@ const unsubscribeGenerationEvents = api.onGenerationEvent(
       console.error("[presentMulmoScript] reload on finish failed:", err);
     });
   },
-);
+});
 
 function reflectGenerationStart(entry: MulmoScriptGenerationEvent): void {
   if (entry.kind === "beatImage") {

@@ -85,16 +85,16 @@ export function useDeckEditor({ api, filePath, effectiveScript, commitScript }: 
    * flushing cannot clobber it out of order.
    */
   function watchForeignWrites(reload: () => void): () => void {
-    return api.onScriptChanged(
-      () => filePath.value,
+    return api.onScriptChanged({
+      filePath: () => filePath.value,
       // Default root until step 2 — see the note in View.vue.
-      () => undefined,
-      EDITOR_ORIGIN,
-      () => {
+      root: () => undefined,
+      ownOrigin: EDITOR_ORIGIN,
+      handler: () => {
         flushPendingDeckSave();
         reload();
       },
-    );
+    });
   }
 
   return { canEditBeats, deckScriptInput, onDeckUpdate, flushPendingDeckSave, watchForeignWrites };

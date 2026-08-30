@@ -12,6 +12,9 @@
 import { useRuntime } from "gui-chat-protocol/vue";
 import type { MulmoScriptChangedEvent, MulmoScriptDispatchArgs, MulmoScriptDispatchResult, MulmoScriptGenerationEvent } from "../core/contract";
 import { GENERATION_EVENT, SCRIPT_CHANGED_EVENT, sameRoot, shouldReloadForScriptChange } from "../core/contract";
+import { normalizeGenerationSubscription, normalizeScriptChangedSubscription } from "./subscription";
+import type { GenerationSubscription, ScriptChangedSubscription } from "./subscription";
+export type { GenerationSubscription, ScriptChangedSubscription } from "./subscription";
 import { errorMessage } from "@mulmoclaude/common";
 import { isRecord } from "./support";
 
@@ -58,11 +61,16 @@ export interface MulmoScriptTransport {
    *  identified by the PAIR `(root, filePath)`, since the same wire path
    *  exists in every registered root (#3014). Returns the unsubscribe
    *  function. */
-  onGenerationEvent(filePath: () => string, root: () => string | undefined, handler: (event: MulmoScriptGenerationEvent) => void): () => void;
+  onGenerationEvent(subscription: GenerationSubscription): () => void;
+  /** The pre-#3014 form: no root named, so the host's default root. Kept
+   *  because this interface is exported from `/vue` on a published package. */
+  onGenerationEvent(filePath: () => string, handler: (event: MulmoScriptGenerationEvent) => void): () => void;
   /** Subscribe to writes of one script, skipping the echo of this View's own
    *  (`ownOrigin`). Same pair identity as above. Returns the unsubscribe
    *  function. */
-  onScriptChanged(filePath: () => string, root: () => string | undefined, ownOrigin: string, handler: () => void): () => void;
+  onScriptChanged(subscription: ScriptChangedSubscription): () => void;
+  /** The pre-#3014 form — see `onGenerationEvent` above. */
+  onScriptChanged(filePath: () => string, ownOrigin: string, handler: () => void): () => void;
 }
 
 export function useMulmoScriptTransport(): MulmoScriptTransport {
@@ -82,16 +90,17 @@ export function useMulmoScriptTransport(): MulmoScriptTransport {
     return { ok: true, data: result as MulmoScriptDispatchResult[K] };
   }
 
-  function onGenerationEvent(filePath: () => string, root: () => string | undefined, handler: (event: MulmoScriptGenerationEvent) => void): () => void {
+  function onGenerationEvent(first: GenerationSubscription | (() => string), legacyHandler?: (event: MulmoScriptGenerationEvent) => void): () => void {
+    const { filePath, root, handler } = normalizeGenerationSubscription(first, legacyHandler);
     return runtime.pubsub.subscribe(GENERATION_EVENT, (payload: unknown) => {
       const event = parseGenerationEvent(payload);
       if (!event) return;
       const current = filePath();
       // The PAIR, not the path: `stories/deck.json` exists in every root, so
       // filtering on the path alone puts another repository's spinners on this
-      // View (Codex P1 on #3015). `root` is a required parameter rather than an
-      // optional one because a forgotten optional is exactly how the server
-      // side of this shipped broken twice.
+      // View (Codex P1 on #3015). `root` is a required FIELD rather than an
+      // optional parameter because a forgotten optional is exactly how the
+      // server side of this shipped broken twice — see `GenerationSubscription`.
       if (!current || event.filePath !== current || !sameRoot(event.root, root())) return;
       handler(event);
     });
@@ -104,7 +113,8 @@ export function useMulmoScriptTransport(): MulmoScriptTransport {
    * on them would rebuild the element the caret is in on every keystroke, so they are dropped
    * here. A write from the agent carries no origin and always reaches the handler.
    */
-  function onScriptChanged(filePath: () => string, root: () => string | undefined, ownOrigin: string, handler: () => void): () => void {
+  function onScriptChanged(first: ScriptChangedSubscription | (() => string), legacyOwnOrigin?: string, legacyHandler?: () => void): () => void {
+    const { filePath, root, ownOrigin, handler } = normalizeScriptChangedSubscription(first, legacyOwnOrigin, legacyHandler);
     return runtime.pubsub.subscribe(SCRIPT_CHANGED_EVENT, (payload: unknown) => {
       const event = parseScriptChangedEvent(payload);
       if (!event) return;

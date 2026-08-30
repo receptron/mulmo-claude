@@ -138,17 +138,22 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     return envelope(await BEAT_PROBE_OPS[kind as keyof typeof BEAT_PROBE_OPS](parsed.filePath, parsed.beatIndex, str(args.root)));
   }
 
+  /** Movie and PDF take the whole script; the other generate kinds take a beat
+   *  or a character within it. */
+  async function wholeScriptGenerationKind(kind: "generateMovie" | "generatePdf", args: Record<string, unknown>): Promise<unknown> {
+    const filePath = str(args.filePath);
+    if (!filePath) return invalidArgs(kind);
+    const chatSessionId = str(args.chatSessionId);
+    const root = str(args.root);
+    const result = kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId, root) : await ops.generatePdfOp(filePath, chatSessionId, root);
+    return envelope(result);
+  }
+
   async function generateKind(kind: string, args: Record<string, unknown>): Promise<unknown> {
+    if (kind === "generateMovie" || kind === "generatePdf") return wholeScriptGenerationKind(kind, args);
     const chatSessionId = str(args.chatSessionId);
     const root = str(args.root);
     const force = args.force === true;
-    if (kind === "generateMovie" || kind === "generatePdf") {
-      const filePath = str(args.filePath);
-      if (!filePath) return invalidArgs(kind);
-      const result =
-        kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId, root) : await ops.generatePdfOp(filePath, chatSessionId, root);
-      return envelope(result);
-    }
     if (kind === "renderCharacter") {
       const parsed = keyArgs(args);
       return parsed ? envelope(await ops.renderCharacterOp({ ...parsed, force, chatSessionId, root })) : invalidArgs(kind);
