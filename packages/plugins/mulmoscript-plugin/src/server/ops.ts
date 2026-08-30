@@ -596,10 +596,14 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   async function pdfStatusOp(filePath: string, root?: string): Promise<OpResult<{ pdfPath: string | null }>> {
-    return runStoryOp(filePath, { operation: "pdf-status", root, onContextMissing: () => ({ ok: true, pdfPath: null }) }, async ({ absoluteFilePath, context }) => ({
-      ok: true,
-      pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath, root),
-    }));
+    return runStoryOp(
+      filePath,
+      { operation: "pdf-status", root, onContextMissing: () => ({ ok: true, pdfPath: null }) },
+      async ({ absoluteFilePath, context }) => ({
+        ok: true,
+        pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath, root),
+      }),
+    );
   }
 
   // ── Generation ops ────────────────────────────────────────────
