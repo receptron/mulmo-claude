@@ -41,6 +41,7 @@ import {
   removeSessionProgressCallback,
 } from "mulmocast";
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
+import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
 import { normalizeStoryPath } from "../core/paths";
 import { errorMessage } from "@mulmoclaude/common";
@@ -190,7 +191,6 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // Root registry: the default (pre-#3014, wire `root` absent) plus whatever
   // the host registered. Resolved once — the host owns the ids, this package
   // only ever looks them up.
-  const DEFAULT_ROOT = "";
   const rootDirs = new Map<string, string>([[DEFAULT_ROOT, path.resolve(backend.storiesDir)]]);
   for (const [id, dir] of Object.entries(backend.extraRoots ?? {})) {
     // An empty id is the default root's own key: accepting it would re-point
@@ -402,6 +402,18 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     return opBadRequest("generating in a non-default stories root is not supported yet");
   }
 
+  /**
+   * The write half of the same fail-closed rule.
+   *
+   * It lives in the ops that write rather than at their dispatch sites,
+   * because a per-site guard is a list someone has to remember to extend:
+   * `save` / `updateBeat` / `updateScript` were guarded and the two upload
+   * kinds were not, so an image could still land in a named root
+   * (CodeRabbit on #3015). `save` / `update* ` cannot follow suit — they run
+   * through the package executors, not through these ops — so
+   * `test_server_roots.ts` walks the whole ops surface and fails on any op
+   * that is neither in the read-only allowlist nor refusing.
+   */
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
     return opBadRequest("writing to a non-default stories root is not supported yet");
@@ -433,19 +445,6 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // A finish with no tracked start (the movie/PDF pipelines' per-beat
   // completion pulses) always publishes.
   const inFlightGenerations = new Map<string, { kind: GenerationKind; filePath: string; key: string; root: string; count: number }>();
-
-  /** The default root's two spellings (absent, `""`) collapse to one, so a
-   *  snapshot filter and a tracker entry compare equal whichever the caller
-   *  used. */
-  function normalizeRoot(root: string | undefined): string {
-    // Trimmed, because the codebase's other opaque "which project root" reader
-    // — `readCommandScope` in `@mulmoclaude/core/remote-host` — trims its value
-    // and shares the "absent = the host's own root" convention. Without this,
-    // `" repoA "` is one root there and a different one here, which is a live
-    // divergence between two parallel scope identifiers rather than a
-    // hypothetical one (#3015 review).
-    return root?.trim() ?? DEFAULT_ROOT;
-  }
 
   /** Emit `root` only when it names a non-default one: an event carrying
    *  `root: ""` and one carrying nothing must stay indistinguishable to every
@@ -788,6 +787,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // ── Upload ops ────────────────────────────────────────────────
 
   async function uploadBeatImageOp(filePath: string, beatIndex: number, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
+    const rootGuard = guardStoryWriteRoot(root);
+    if (rootGuard) return rootGuard;
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-beat-image", root }, async ({ context }) => {
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       // writeFileAtomic creates parent dirs and prevents a half-
@@ -799,6 +800,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   async function uploadCharacterImageOp(filePath: string, key: string, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
+    const rootGuard = guardStoryWriteRoot(root);
+    if (rootGuard) return rootGuard;
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-character-image", root }, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
       const base64 = stripDataUri(imageData);

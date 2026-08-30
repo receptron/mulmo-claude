@@ -11,7 +11,7 @@
 
 import { useRuntime } from "gui-chat-protocol/vue";
 import type { MulmoScriptChangedEvent, MulmoScriptDispatchArgs, MulmoScriptDispatchResult, MulmoScriptGenerationEvent } from "../core/contract";
-import { GENERATION_EVENT, SCRIPT_CHANGED_EVENT, shouldReloadForScriptChange } from "../core/contract";
+import { GENERATION_EVENT, SCRIPT_CHANGED_EVENT, sameRoot, shouldReloadForScriptChange } from "../core/contract";
 import { errorMessage } from "@mulmoclaude/common";
 import { isRecord } from "./support";
 
@@ -92,7 +92,7 @@ export function useMulmoScriptTransport(): MulmoScriptTransport {
       // View (Codex P1 on #3015). `root` is a required parameter rather than an
       // optional one because a forgotten optional is exactly how the server
       // side of this shipped broken twice.
-      if (!current || event.filePath !== current || (event.root ?? "") !== (root() ?? "")) return;
+      if (!current || event.filePath !== current || !sameRoot(event.root, root())) return;
       handler(event);
     });
   }

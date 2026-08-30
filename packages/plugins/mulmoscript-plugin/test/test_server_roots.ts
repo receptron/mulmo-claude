@@ -13,6 +13,7 @@ import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
+import type { OpResult } from "../src/server/types";
 import type { MulmoScriptGenerationEvent, MulmoScriptChangedEvent } from "../src/core/contract";
 
 const stubFileOps: FileOps = {
@@ -220,6 +221,75 @@ describe("every read resolves in the root it was asked for", () => {
     assert.equal(result.ok, false);
     assert.equal(result.ok === false && result.code, "bad_request");
   });
+});
+
+describe("the whole ops surface is classified for named roots", () => {
+  // The per-site guard was a list, and a list is something someone has to
+  // remember to extend: `save` / `updateBeat` / `updateScript` were guarded
+  // while the two upload kinds were not, so an image could still be written
+  // into a named root (CodeRabbit on #3015). That is the fifth finding of the
+  // same shape on this PR — a rule enforced by enumerating its sites.
+  //
+  // So the enumeration moves here, where being incomplete is a RED TEST rather
+  // than a hole: every key the ops object exposes must appear below. A new op
+  // added without classifying it fails `every op is classified`, and one
+  // classified as mutating must actually refuse.
+  const namedRoot = "repoA";
+  const NOT_AN_OP = new Set([
+    "backend",
+    "toStoryRef",
+    "resolveStory",
+    "guardStoryWirePath",
+    "guardStoryWriteRoot",
+    "guardStoryGenerationRoot",
+    "ffmpegGuard",
+    "runStoryOp",
+    "publishGeneration",
+    "publishScriptChanged",
+    "pendingGenerations",
+    "inFlightMovies",
+    "inFlightPdfs",
+    "runMovieGeneration",
+    "runPdfGeneration",
+    "triggerAutoBackgroundMovie",
+  ]);
+  /** Ops that only read. A named root is legal for them — that is the feature. */
+  const READ_ONLY = ["beatImageOp", "beatAudioOp", "beatMovieOp", "characterImageOp", "movieStatusOp", "pdfStatusOp"] as const;
+  /** Ops that write or generate. A named root must be refused, fail-closed. */
+  const REFUSAL = /^(writing to|generating in) a non-default stories root is not supported yet$/;
+  const MUTATING: ReadonlyArray<[string, (ops: ReturnType<typeof makeOps>["ops"]) => Promise<OpResult<unknown>>]> = [
+    ["renderBeatOp", (ops) => ops.renderBeatOp({ filePath: "stories/d.json", beatIndex: 0, root: namedRoot })],
+    ["generateBeatAudioOp", (ops) => ops.generateBeatAudioOp({ filePath: "stories/d.json", beatIndex: 0, root: namedRoot })],
+    ["renderCharacterOp", (ops) => ops.renderCharacterOp({ filePath: "stories/d.json", key: "alice", root: namedRoot })],
+    ["uploadBeatImageOp", (ops) => ops.uploadBeatImageOp("stories/d.json", 0, "data:image/png;base64,AA==", namedRoot)],
+    ["uploadCharacterImageOp", (ops) => ops.uploadCharacterImageOp("stories/d.json", "alice", "data:image/png;base64,AA==", namedRoot)],
+    ["generateMovieOp", (ops) => ops.generateMovieOp("stories/d.json", undefined, namedRoot)],
+    ["generatePdfOp", (ops) => ops.generatePdfOp("stories/d.json", undefined, namedRoot)],
+  ];
+
+  it("every op is classified as read-only or mutating", () => {
+    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const classified = new Set<string>([...READ_ONLY, ...MUTATING.map(([name]) => name)]);
+    const unclassified = Object.keys(ops).filter((key) => !NOT_AN_OP.has(key) && !classified.has(key));
+    assert.deepEqual(unclassified, [], `classify these in test_server_roots.ts: ${unclassified.join(", ")}`);
+  });
+
+  for (const [name, invoke] of MUTATING) {
+    it(`${name} refuses a named root`, async () => {
+      const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+      const result = await invoke(ops);
+      // The REASON, not just `ok === false`. Every one of these also fails for
+      // an unrelated reason in this fixture (no such script on disk), so
+      // asserting failure alone stays green with the guard deleted — which is
+      // exactly what removing it proved before this line was tightened.
+      assert.equal(result.ok, false, `${name} must refuse a named root`);
+      assert.equal(result.ok === false && result.code, "bad_request", `${name} must refuse with bad_request`);
+      assert.match(result.ok === false ? result.error : "", REFUSAL, `${name} must refuse BECAUSE of the root`);
+      // Refused BEFORE any announcement: a start with no matching finish is
+      // the stuck indicator these guards exist to prevent.
+      assert.equal(generations.length, 0, `${name} must not publish anything when refused`);
+    });
+  }
 });
 
 describe("generations stay in the default root until step 2", () => {
