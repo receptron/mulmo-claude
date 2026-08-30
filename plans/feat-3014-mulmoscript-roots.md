@@ -53,6 +53,28 @@ publish した瞬間に MulmoTerminal が壊れ、同一 PR で追随させる�
 後方互換が定義から出る（`root` 無し = 既定の根 = 今の挙動）うえ、
 MulmoTerminal は 1 行も変えずに動き続ける。minor で出せる。
 
+### この段階で決めた 2 つの制限（レビューで確定）
+
+**1. 未登録の `root` は既定の根へ fallback せず `bad_request` で拒否する。**
+fallback は「名前だけ合った別ファイル」を黙って返す。読み違いは書き違いより
+発見が遅いので、落とす方を選ぶ。空文字列・空白のみは既定の根（`root` 無しと
+同じ）— これは既存の呼び出しを無改変で通すために必要。
+
+**2. 名前付きの根は「読み取り専用」。書き込みと生成は拒否する。**
+この段階で最大の機能制限。理由が 2 つあり、どちらもこのパッケージの外にある:
+
+- **書き**: `executeMulmoScriptSave` と update 系の executor は 1 つの `FileOps`
+  で動き、ホストが既定の根に束縛している。別の根を名乗る書きは**既定の根の
+  同名ファイルを書き換えて、別の根が変わったと announce する**。
+- **生成**: ホストのセッションストアは `generationKey`
+  （`@mulmobridge/protocol`）で `(kind, filePath, key)` を鍵にする。1 セッションで
+  2 つの根が同じ生成を始めると 1 エントリに潰れ、どちらかの完了が
+  他方のインジケータを消す。protocol の変更は消費者を持つので順序 1 の範囲外。
+
+どちらも `guardStoryWriteRoot` / `guardStoryGenerationRoot` が `bad_request` で
+閉じ、根を登録したホストには boot で警告する。順序 2 が `generationKey` に
+root を通したら、両方まとめて外れる。
+
 ### `src/core/contract.ts`
 - `MulmoScriptGenerationEvent` / `MulmoScriptChangedEvent` に `root?: string`
 - `shouldReloadForScriptChange` を `(root, filePath)` の対で比較
@@ -77,5 +99,8 @@ CLAUDE.md の規則どおり、旧実装をそのまま別ハーネスに写し�
 ## 検証
 
 - 既存テスト（`test/test_paths.ts`, `test_server_ops.ts`, `test_plugin.ts`）が無改変で緑
+- 新規テスト（`test_roots.ts`, `test_server_roots.ts`, `test_dispatch_roots.ts`,
+  `test_subscription.ts`, `test_transport_parsers.ts`）が緑
 - 上の差分ハーネスで旧＝新
-- ホスト 2 つ（mulmoclaude / MulmoTerminal）が `roots` に追随してビルド緑
+- ホスト 2 つ（mulmoclaude / MulmoTerminal）が**無改変で**ビルド緑
+  — 追加型を選んだので `roots` への追随作業は発生しない（上の「追加型にする」参照）

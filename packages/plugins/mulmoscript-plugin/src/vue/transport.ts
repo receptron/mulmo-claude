@@ -29,14 +29,35 @@ const GENERATION_EVENT_KINDS: ReadonlySet<string> = new Set(["beatImage", "beatA
 // which is how `(root, filePath)` checks were added downstream and compared
 // `undefined` against every named root, filtering out the very events they
 // were written to route (Codex P1 on #3015).
+/**
+ * A field that is absent, or a string.
+ *
+ * `undefined` is a legitimate answer for both `root` and `origin`, so a
+ * present-but-wrong-typed value CANNOT be flattened into it: `root: 42` read
+ * as "no root" makes a named root's event look like a default-root one, and
+ * the subscriber then routes another repository's script to this View
+ * (CodeRabbit on #3015 — the same shape the dispatch boundary was just fixed
+ * for). Malformed means malformed; the caller rejects the payload.
+ */
+function optionalString(value: unknown): { ok: true; value: string | undefined } | { ok: false } {
+  if (value === undefined) return { ok: true, value: undefined };
+  return typeof value === "string" ? { ok: true, value } : { ok: false };
+}
+
 export function parseScriptChangedEvent(payload: unknown): MulmoScriptChangedEvent | null {
   if (!isRecord(payload)) return null;
   const { filePath, origin, root } = payload;
   if (typeof filePath !== "string") return null;
+  // `origin` decides whether this View acts on the echo of its OWN write.
+  // Read as absent, a malformed one makes every keystroke rebuild the element
+  // the caret is in — so it is identity too, and rejected the same way.
+  const parsedOrigin = optionalString(origin);
+  const parsedRoot = optionalString(root);
+  if (!parsedOrigin.ok || !parsedRoot.ok) return null;
   return {
     filePath,
-    ...(typeof origin === "string" ? { origin } : {}),
-    ...(typeof root === "string" ? { root } : {}),
+    ...(parsedOrigin.value !== undefined ? { origin: parsedOrigin.value } : {}),
+    ...(parsedRoot.value !== undefined ? { root: parsedRoot.value } : {}),
   };
 }
 
@@ -45,13 +66,19 @@ export function parseGenerationEvent(payload: unknown): MulmoScriptGenerationEve
   const { kind, filePath, key, done, error, root } = payload;
   if (typeof kind !== "string" || !GENERATION_EVENT_KINDS.has(kind)) return null;
   if (typeof filePath !== "string" || typeof key !== "string" || typeof done !== "boolean") return null;
+  const parsedRoot = optionalString(root);
+  if (!parsedRoot.ok) return null;
   return {
     kind: kind as MulmoScriptGenerationEvent["kind"],
     filePath,
     key,
     done,
+    // `error` is the one field a malformed value may be dropped from rather
+    // than rejected with: it is a message shown beside a finished generation,
+    // and rejecting the whole event would drop the FINISH — leaving the
+    // spinner running forever, which is worse than losing the text.
     ...(typeof error === "string" ? { error } : {}),
-    ...(typeof root === "string" ? { root } : {}),
+    ...(parsedRoot.value !== undefined ? { root: parsedRoot.value } : {}),
   };
 }
 

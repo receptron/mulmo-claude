@@ -35,9 +35,36 @@ describe("the pubsub boundary preserves the root", () => {
     assert.deepEqual(parseScriptChangedEvent(changed), changed);
   });
 
-  it("drops a non-string root rather than passing it through", () => {
-    const parsed = parseGenerationEvent({ kind: "movie", filePath: "stories/deck.json", key: "", done: false, root: 42 });
-    assert.ok(parsed);
-    assert.ok(!("root" in parsed), "a malformed root must not reach the comparison");
+  it("rejects a payload whose root is present but not a string", () => {
+    // This test used to assert the OPPOSITE — that a malformed root was
+    // dropped and the rest of the event kept. That is wrong, and it is wrong
+    // in the direction this whole PR keeps failing in: `undefined` is a
+    // meaningful value here (the default root), so flattening `42` into it
+    // does not discard information, it CHANGES WHICH FILE the event is about.
+    // A default-root View would then act on a named root's event
+    // (CodeRabbit on #3015).
+    for (const root of [42, null, {}, ["repoA"], true]) {
+      assert.equal(parseGenerationEvent({ kind: "movie", filePath: "stories/deck.json", key: "", done: false, root }), null, `root: ${JSON.stringify(root)}`);
+      assert.equal(parseScriptChangedEvent({ filePath: "stories/deck.json", root }), null, `root: ${JSON.stringify(root)}`);
+    }
+  });
+
+  it("rejects a payload whose origin is present but not a string", () => {
+    // `origin` is identity too: read as absent, a View acts on the echo of its
+    // own write and rebuilds the element the caret is in on every keystroke.
+    for (const origin of [42, null, {}, true]) {
+      assert.equal(parseScriptChangedEvent({ filePath: "stories/deck.json", origin }), null, `origin: ${JSON.stringify(origin)}`);
+    }
+  });
+
+  it("keeps a finish event whose error field is malformed", () => {
+    // The one field that is dropped rather than rejected. It is a message
+    // shown beside a finished generation; rejecting the event would drop the
+    // FINISH and leave the spinner running forever, which is worse than
+    // losing the text.
+    const parsed = parseGenerationEvent({ kind: "movie", filePath: "stories/deck.json", key: "", done: true, error: 42 });
+    assert.ok(parsed, "a finish must still arrive");
+    assert.equal(parsed.done, true);
+    assert.ok(!("error" in parsed));
   });
 });

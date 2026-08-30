@@ -388,11 +388,16 @@ describe("generations stay in the default root until step 2", () => {
     }
   });
 
-  it("publishes nothing for a refused generation", () => {
+  it("publishes nothing for a refused generation", async () => {
     // The refusal must come BEFORE the start event: a start with no matching
     // finish is the stuck-spinner this guard exists to prevent.
+    //
+    // Awaited, not fired and forgotten: on the same tick `generations` is
+    // empty whether the guard ran or the op merely had not reached its
+    // publish yet, so the un-awaited version stayed green for the wrong
+    // reason (CodeRabbit on #3015).
     const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
-    void ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
+    await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
     assert.equal(generations.length, 0);
   });
 
