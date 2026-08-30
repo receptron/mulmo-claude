@@ -121,6 +121,17 @@ describe("a start event carries its root and no error", () => {
     assert.ok(!("error" in started), `a start must carry no error, got ${JSON.stringify(started)}`);
   });
 
+  it("matches a start and finish written with different spellings of one root", () => {
+    // The tracker value and the event normalize; the KEY did not, so
+    // `" repoA "` started an entry that `"repoA"` could never delete
+    // (Codex P2 on #3015).
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: " repoA " });
+    assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", true, { root: "repoA" });
+    assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 0, "the finish must delete the entry the untrimmed start created");
+  });
+
   it("clears the tracker when the matching finish arrives", () => {
     // Start and finish must produce the SAME key. When they did not, the
     // snapshot kept reporting a finished run forever.

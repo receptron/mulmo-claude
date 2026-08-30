@@ -87,6 +87,8 @@ export function useDeckEditor({ api, filePath, effectiveScript, commitScript }: 
   function watchForeignWrites(reload: () => void): () => void {
     return api.onScriptChanged(
       () => filePath.value,
+      // Default root until step 2 — see the note in View.vue.
+      () => undefined,
       EDITOR_ORIGIN,
       () => {
         flushPendingDeckSave();

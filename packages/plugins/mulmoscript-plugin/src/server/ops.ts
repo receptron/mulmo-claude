@@ -449,7 +449,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   ): void {
     const { error, root } = opts;
     const wirePath = canonicalWirePath(filePath);
-    const mapKey = generationMapKey(kind, wirePath, key, root);
+    // The NORMALIZED root, not the raw spelling. The tracker value and the
+    // emitted event both normalize, so keying on the raw text made a start
+    // written `" repoA "` and its finish written `"repoA"` two entries: the
+    // finish deleted nothing and the start leaked (Codex P2 on #3015).
+    const mapKey = generationMapKey(kind, wirePath, key, normalizeRoot(root));
     const existing = inFlightGenerations.get(mapKey);
     if (finished) {
       if (existing && existing.count > 1) {

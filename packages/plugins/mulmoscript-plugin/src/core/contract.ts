@@ -92,24 +92,38 @@ interface SessionTag {
   chatSessionId?: string | undefined;
 }
 
-export type MulmoScriptDispatchArgs =
-  | ({ kind: "save" } & { filePath?: string; script?: unknown; filename?: string })
-  | { kind: "updateBeat"; filePath: string; beatIndex: number; beat: unknown; origin?: string }
-  | { kind: "updateScript"; filePath: string; script: unknown; origin?: string }
-  | ({ kind: "beatImage" } & BeatRef)
-  | ({ kind: "beatAudio" } & BeatRef)
-  | ({ kind: "beatMovie" } & BeatRef)
-  | ({ kind: "renderBeat" } & BeatRef & SessionTag & { force?: boolean })
-  | ({ kind: "generateBeatAudio" } & BeatRef & SessionTag & { force?: boolean })
-  | ({ kind: "uploadBeatImage" } & BeatRef & { imageData: string })
-  | ({ kind: "characterImage" } & CharacterRef)
-  | ({ kind: "renderCharacter" } & CharacterRef & SessionTag & { force?: boolean })
-  | ({ kind: "uploadCharacterImage" } & CharacterRef & { imageData: string })
-  | ({ kind: "movieStatus" } & { filePath: string })
-  | ({ kind: "pdfStatus" } & { filePath: string })
-  | ({ kind: "generateMovie" } & { filePath: string } & SessionTag)
-  | ({ kind: "generatePdf" } & { filePath: string } & SessionTag)
-  | { kind: "pendingGenerations"; filePath: string };
+/**
+ * Which registered stories root the named script lives in (#3014).
+ *
+ * Intersected into the whole union below, so every dispatch that names a
+ * `filePath` can name its root — a union member that could not would make
+ * root-aware calls untypeable while the handler happily read `args.root`
+ * off an untyped record (Codex P1 on #3015).
+ */
+interface RootTag {
+  root?: string | undefined;
+}
+
+export type MulmoScriptDispatchArgs = RootTag &
+  (
+    | ({ kind: "save" } & { filePath?: string; script?: unknown; filename?: string })
+    | { kind: "updateBeat"; filePath: string; beatIndex: number; beat: unknown; origin?: string }
+    | { kind: "updateScript"; filePath: string; script: unknown; origin?: string }
+    | ({ kind: "beatImage" } & BeatRef)
+    | ({ kind: "beatAudio" } & BeatRef)
+    | ({ kind: "beatMovie" } & BeatRef)
+    | ({ kind: "renderBeat" } & BeatRef & SessionTag & { force?: boolean })
+    | ({ kind: "generateBeatAudio" } & BeatRef & SessionTag & { force?: boolean })
+    | ({ kind: "uploadBeatImage" } & BeatRef & { imageData: string })
+    | ({ kind: "characterImage" } & CharacterRef)
+    | ({ kind: "renderCharacter" } & CharacterRef & SessionTag & { force?: boolean })
+    | ({ kind: "uploadCharacterImage" } & CharacterRef & { imageData: string })
+    | ({ kind: "movieStatus" } & { filePath: string })
+    | ({ kind: "pdfStatus" } & { filePath: string })
+    | ({ kind: "generateMovie" } & { filePath: string } & SessionTag)
+    | ({ kind: "generatePdf" } & { filePath: string } & SessionTag)
+    | { kind: "pendingGenerations"; filePath: string }
+  );
 
 export type MulmoScriptDispatchKind = MulmoScriptDispatchArgs["kind"];
 

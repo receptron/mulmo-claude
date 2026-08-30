@@ -44,12 +44,15 @@ function parseGenerationEvent(payload: unknown): MulmoScriptGenerationEvent | nu
 
 export interface MulmoScriptTransport {
   call<K extends MulmoScriptDispatchArgs["kind"]>(kind: K, args: ArgsFor<K>): Promise<TransportResult<MulmoScriptDispatchResult[K]>>;
-  /** Subscribe to the host's generation channel, pre-filtered to one
-   *  script's wire path. Returns the unsubscribe function. */
-  onGenerationEvent(filePath: () => string, handler: (event: MulmoScriptGenerationEvent) => void): () => void;
+  /** Subscribe to the host's generation channel, pre-filtered to one script —
+   *  identified by the PAIR `(root, filePath)`, since the same wire path
+   *  exists in every registered root (#3014). Returns the unsubscribe
+   *  function. */
+  onGenerationEvent(filePath: () => string, root: () => string | undefined, handler: (event: MulmoScriptGenerationEvent) => void): () => void;
   /** Subscribe to writes of one script, skipping the echo of this View's own
-   *  (`ownOrigin`). Returns the unsubscribe function. */
-  onScriptChanged(filePath: () => string, ownOrigin: string, handler: () => void): () => void;
+   *  (`ownOrigin`). Same pair identity as above. Returns the unsubscribe
+   *  function. */
+  onScriptChanged(filePath: () => string, root: () => string | undefined, ownOrigin: string, handler: () => void): () => void;
 }
 
 export function useMulmoScriptTransport(): MulmoScriptTransport {
@@ -69,12 +72,17 @@ export function useMulmoScriptTransport(): MulmoScriptTransport {
     return { ok: true, data: result as MulmoScriptDispatchResult[K] };
   }
 
-  function onGenerationEvent(filePath: () => string, handler: (event: MulmoScriptGenerationEvent) => void): () => void {
+  function onGenerationEvent(filePath: () => string, root: () => string | undefined, handler: (event: MulmoScriptGenerationEvent) => void): () => void {
     return runtime.pubsub.subscribe(GENERATION_EVENT, (payload: unknown) => {
       const event = parseGenerationEvent(payload);
       if (!event) return;
       const current = filePath();
-      if (!current || event.filePath !== current) return;
+      // The PAIR, not the path: `stories/deck.json` exists in every root, so
+      // filtering on the path alone puts another repository's spinners on this
+      // View (Codex P1 on #3015). `root` is a required parameter rather than an
+      // optional one because a forgotten optional is exactly how the server
+      // side of this shipped broken twice.
+      if (!current || event.filePath !== current || (event.root ?? "") !== (root() ?? "")) return;
       handler(event);
     });
   }
@@ -86,11 +94,11 @@ export function useMulmoScriptTransport(): MulmoScriptTransport {
    * on them would rebuild the element the caret is in on every keystroke, so they are dropped
    * here. A write from the agent carries no origin and always reaches the handler.
    */
-  function onScriptChanged(filePath: () => string, ownOrigin: string, handler: () => void): () => void {
+  function onScriptChanged(filePath: () => string, root: () => string | undefined, ownOrigin: string, handler: () => void): () => void {
     return runtime.pubsub.subscribe(SCRIPT_CHANGED_EVENT, (payload: unknown) => {
       const event = parseScriptChangedEvent(payload);
       if (!event) return;
-      if (!shouldReloadForScriptChange(event, filePath(), ownOrigin)) return;
+      if (!shouldReloadForScriptChange(event, filePath(), ownOrigin, root())) return;
       handler();
     });
   }

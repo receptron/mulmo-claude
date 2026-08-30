@@ -1257,6 +1257,10 @@ watch(() => props.selectedResult, initializeScript);
 // after a remount, on finish we reload the relevant asset off disk.
 const unsubscribeGenerationEvents = api.onGenerationEvent(
   () => filePath.value,
+  // The View is opened from the host's default root today; step 2 gives it a
+  // root of its own. Written out rather than left to a default so the pair
+  // filter is visible at the call site (#3014).
+  () => undefined,
   (event) => {
     if (!event.done) {
       reflectGenerationStart(event);
