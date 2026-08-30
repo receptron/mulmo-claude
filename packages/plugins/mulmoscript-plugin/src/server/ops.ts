@@ -219,7 +219,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     // person who has to widen their session key, and they see this at boot
     // rather than discovering it from a stuck spinner.
     log.warn(
-      "extra stories roots registered — the host's per-session generation key must include the root, or two roots running the same generation in one session will collapse to one entry (#3014 step 2)",
+      "extra stories roots registered — generation and writes are REFUSED in them until the host's per-session generation key includes the root (`generationKey` in @mulmobridge/protocol); reads work today (#3014 step 2)",
       { roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT) },
     );
   }
@@ -381,6 +381,27 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    *
    * Step 2 replaces this with a per-root FileOps rather than removing it.
    */
+  /**
+   * Whether a GENERATION may run in this root.
+   *
+   * The pair identity is complete inside this package but stops at the host
+   * boundary: a host's per-session store keys pending work by
+   * `(kind, filePath, key)` — `generationKey` in `@mulmobridge/protocol`,
+   * which bridges also consume. Two roots running the same generation in one
+   * session would collapse to one entry, and either completion would clear the
+   * other root's indicator (Codex P1 on #3015).
+   *
+   * Widening that key is a protocol change with its own consumers, so it is not
+   * this package's to make. Refusing the generation is: a named root that
+   * cannot be tracked correctly must not start, rather than start and corrupt
+   * the other root's state. Same fail-closed shape as `guardStoryWriteRoot`,
+   * and step 2 replaces both once the protocol carries the root.
+   */
+  function guardStoryGenerationRoot(root: string | undefined): OpFailure | null {
+    if (normalizeRoot(root) === DEFAULT_ROOT) return null;
+    return opBadRequest("generating in a non-default stories root is not supported yet");
+  }
+
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
     return opBadRequest("writing to a non-default stories root is not supported yet");
@@ -654,6 +675,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
 
   async function renderBeatOp(args: GenerateOpArgsWith<"filePath" | "beatIndex">): Promise<OpResult<{ image: string }>> {
     const { filePath, beatIndex, force, chatSessionId, root } = args;
+    const rootGuard = guardStoryGenerationRoot(root);
+    if (rootGuard) return rootGuard;
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
 
@@ -682,6 +705,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
 
   async function generateBeatAudioOp(args: GenerateOpArgsWith<"filePath" | "beatIndex">): Promise<OpResult<{ audio: string }>> {
     const { filePath, beatIndex, force, chatSessionId, root } = args;
+    const rootGuard = guardStoryGenerationRoot(root);
+    if (rootGuard) return rootGuard;
     const mapKey = String(beatIndex);
     publishGeneration(chatSessionId, "beatAudio", filePath, mapKey, false, { root });
     let genError: string | undefined;
@@ -723,6 +748,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
 
   async function renderCharacterOp(args: GenerateOpArgsWith<"filePath" | "key">): Promise<OpResult<{ image: string }>> {
     const { filePath, key, force, chatSessionId, root } = args;
+    const rootGuard = guardStoryGenerationRoot(root);
+    if (rootGuard) return rootGuard;
     publishGeneration(chatSessionId, "characterImage", filePath, key, false, { root });
     let genError: string | undefined;
     try {
@@ -840,6 +867,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * as they land — the successor of the SSE per-beat events.
    */
   async function generateMovieOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ moviePath: string }>> {
+    const rootGuard = guardStoryGenerationRoot(root);
+    if (rootGuard) return rootGuard;
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
     const resolved = resolveStory(filePath, root);
@@ -980,6 +1009,8 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   /** Long-held foreground PDF generation (the package View's `generatePdf`
    *  dispatch) — the PDF sibling of `generateMovieOp`. */
   async function generatePdfOp(filePath: string, chatSessionId: string | undefined, root?: string): Promise<OpResult<{ pdfPath: string }>> {
+    const rootGuard = guardStoryGenerationRoot(root);
+    if (rootGuard) return rootGuard;
     const ffmpeg = ffmpegGuard();
     if (ffmpeg) return ffmpeg;
     const resolved = resolveStory(filePath, root);
@@ -1024,6 +1055,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     resolveStory,
     guardStoryWirePath,
     guardStoryWriteRoot,
+    guardStoryGenerationRoot,
     ffmpegGuard,
     runStoryOp,
     publishGeneration,

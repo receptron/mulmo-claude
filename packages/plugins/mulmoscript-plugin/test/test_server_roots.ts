@@ -50,7 +50,7 @@ describe("root registry", () => {
     assert.equal(result.ok === false && result.code, "bad_request");
   });
 
-  it("warns at boot that the host's session key must be widened", () => {
+  it("warns at boot that named roots are read-only until the protocol carries the root", () => {
     // The pair identity stops at the host boundary: `generationKey` in
     // `@mulmobridge/protocol` keys on `(kind, filePath, key)`. Widening it is a
     // protocol change with its own consumers, so this package cannot make it —
@@ -65,7 +65,7 @@ describe("root registry", () => {
       log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
     });
     assert.equal(warnings.length, 1);
-    assert.match(warnings[0]!, /session generation key must include the root|generation key must include the root/);
+    assert.match(warnings[0]!, /generation and writes are REFUSED in them/);
   });
 
   it("says nothing at boot when only the default root is registered", () => {
@@ -219,6 +219,48 @@ describe("every read resolves in the root it was asked for", () => {
     const result = await ops.generatePdfOp("stories/deck.json", undefined, unregistered);
     assert.equal(result.ok, false);
     assert.equal(result.ok === false && result.code, "bad_request");
+  });
+});
+
+describe("generations stay in the default root until step 2", () => {
+  // The host's per-session store keys pending work by `(kind, filePath, key)`
+  // — `generationKey` in `@mulmobridge/protocol`. Two roots running the same
+  // generation in one session would collapse to one entry, and either
+  // completion would clear the other root's indicator. Widening that key is a
+  // protocol change with its own consumers, so the generation is refused
+  // instead: a run that cannot be tracked correctly must not start
+  // (Codex P1 on #3015).
+  const namedRoot = "repoA";
+
+  it("refuses every generation kind in a named root", async () => {
+    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const results = [
+      await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot),
+      await ops.generatePdfOp("stories/deck.json", "session-1", namedRoot),
+      await ops.renderBeatOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "session-1", root: namedRoot }),
+      await ops.generateBeatAudioOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "session-1", root: namedRoot }),
+      await ops.renderCharacterOp({ filePath: "stories/deck.json", key: "alice", chatSessionId: "session-1", root: namedRoot }),
+    ];
+    for (const result of results) {
+      assert.equal(result.ok, false);
+      assert.equal(result.ok === false && result.code, "bad_request");
+    }
+  });
+
+  it("publishes nothing for a refused generation", () => {
+    // The refusal must come BEFORE the start event: a start with no matching
+    // finish is the stuck-spinner this guard exists to prevent.
+    const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+    void ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
+    assert.equal(generations.length, 0);
+  });
+
+  it("still allows generation that names no root", async () => {
+    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const result = await ops.generateMovieOp("stories/deck.json", "session-1");
+    // It fails for an unrelated reason (no such script), but NOT with the
+    // root refusal — the default root is still generatable.
+    assert.ok(result.ok === false && result.error !== "generating in a non-default stories root is not supported yet");
   });
 });
 
