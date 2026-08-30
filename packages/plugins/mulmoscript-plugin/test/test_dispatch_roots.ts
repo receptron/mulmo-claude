@@ -152,3 +152,44 @@ describe("swept over generated arguments, a named root never gets a mutation thr
     assert.doesNotMatch(result.error, INVALID_ARGS, "and its arguments were fine");
   });
 });
+
+describe("an unregistered root is refused by every kind that takes one", () => {
+  // The rule was enforced by whichever ops happened to call `resolveStory`,
+  // which needs a file to exist. `pendingGenerations` needs none — it filters
+  // an in-memory map — so `root: "nope"` answered `{ ok: true, pending: [] }`,
+  // and a host typo or a stale card was indistinguishable from "no work is
+  // running" (Codex P2 on #3015).
+  //
+  // That is the eleventh finding on this PR of one rule holding at the sites
+  // that happened to reach it, so the check is over the SURFACE rather than
+  // over a list: every kind the handler routes, called with a root nobody
+  // registered, must fail. A new kind that forgets is red here.
+  const READ_KINDS: ReadonlyArray<[string, Record<string, unknown>]> = [
+    ["beatImage", { filePath: "stories/deck.json", beatIndex: 0 }],
+    ["beatAudio", { filePath: "stories/deck.json", beatIndex: 0 }],
+    ["beatMovie", { filePath: "stories/deck.json", beatIndex: 0 }],
+    ["characterImage", { filePath: "stories/deck.json", key: "alice" }],
+    ["movieStatus", { filePath: "stories/deck.json" }],
+    ["pdfStatus", { filePath: "stories/deck.json" }],
+    ["pendingGenerations", { filePath: "stories/deck.json" }],
+  ];
+
+  for (const [kind, args] of [...READ_KINDS, ...MUTATING_KINDS]) {
+    it(`${kind} refuses root "nope"`, async () => {
+      const result = await makeDispatch()({ kind, ...args, root: "nope" });
+      assert.ok(isFailure(result), `${kind} must never answer successfully for a root nobody registered`);
+      assert.equal(result.code, "bad_request", `${kind} must refuse an unknown root with bad_request`);
+    });
+  }
+
+  it("the same kinds answer when the root IS registered", async () => {
+    // Otherwise the sweep above passes by refusing everything unconditionally.
+    const registered = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root: NAMED_ROOT });
+    assert.equal(isFailure(registered), false, "a registered root must get its (empty) snapshot");
+  });
+
+  it("and answer when no root is named at all", async () => {
+    const bare = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json" });
+    assert.equal(isFailure(bare), false);
+  });
+});

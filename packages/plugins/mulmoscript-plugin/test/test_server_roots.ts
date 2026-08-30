@@ -279,6 +279,7 @@ describe("the whole ops surface is classified for named roots", () => {
     "toStoryRef",
     "resolveStory",
     "guardStoryWirePath",
+    "guardStoryRootRegistered",
     "guardStoryWriteRoot",
     "guardStoryGenerationRoot",
     "runStoryOp",

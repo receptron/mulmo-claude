@@ -374,6 +374,20 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * validation (including the script-vs-filePath mode check) belongs to
    * the core.
    */
+  /**
+   * Whether this root is one the host registered.
+   *
+   * Every other root-aware op learns this from `resolveStory`, which needs a
+   * file. `pendingGenerations` needs none — it only filters an in-memory map —
+   * so an unregistered root produced `{ ok: true, pending: [] }`, and a host
+   * typo or a stale card read back as "no work is running" (Codex P2 on
+   * #3015). An unknown root is a question this package cannot answer, and the
+   * answer it must not give is a confident empty one.
+   */
+  function guardStoryRootRegistered(root: string | undefined): OpFailure | null {
+    return rootDir(root) === null ? opBadRequest(`unknown stories root "${normalizeRoot(root)}"`) : null;
+  }
+
   function guardStoryWirePath(filePath: unknown, root?: string): OpFailure | null {
     if (typeof filePath !== "string" || filePath === "") return null;
     const resolved = resolveStory(filePath, root);
@@ -1078,6 +1092,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     toStoryRef,
     resolveStory,
     guardStoryWirePath,
+    guardStoryRootRegistered,
     guardStoryWriteRoot,
     guardStoryGenerationRoot,
     ffmpegGuard,

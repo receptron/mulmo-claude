@@ -190,7 +190,12 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (kind === "pendingGenerations") {
       const filePath = str(args.filePath);
       if (!filePath) return invalidArgs(kind);
-      return { ok: true, pending: ops.pendingGenerations(filePath, str(args.root)) };
+      const root = str(args.root);
+      // An empty snapshot for an unknown root is indistinguishable from "no
+      // work is running" — see `guardStoryRootRegistered`.
+      const rootGuard = ops.guardStoryRootRegistered(root);
+      if (rootGuard) return fromOpFailure(rootGuard);
+      return { ok: true, pending: ops.pendingGenerations(filePath, root) };
     }
     return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
   };
