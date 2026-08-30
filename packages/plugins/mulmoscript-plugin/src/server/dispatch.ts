@@ -88,6 +88,12 @@ export type MulmoScriptDispatchHandler = (args: Record<string, unknown>) => Prom
  * FileOps, guarded by the instance's realpath containment
  * (`guardStoryWirePath`) — the core's own guard is lexical.
  */
+/** `undefined` when `root` is absent or a string; a failure envelope otherwise. */
+function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: string } | undefined {
+  if (root === undefined || typeof root === "string") return undefined;
+  return { ok: false, code: "bad_request", error: `mulmoScript root must be a string, got ${typeof root}` };
+}
+
 export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): MulmoScriptDispatchHandler {
   const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
 
@@ -182,6 +188,15 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
   return async (args: Record<string, unknown>): Promise<unknown> => {
     const kind = str(args.kind);
     if (!kind) return invalidArgs("<missing>");
+    // Once, at the only entry, so no per-kind reader can forget it. `str()`
+    // answers `undefined` for a number, `null`, an object — indistinguishable
+    // from a root that was never supplied, which every reader below then takes
+    // as the DEFAULT root. A host that serialises a root wrongly would have
+    // written to, and read from, the default root's identically-named script
+    // while believing it named another (Codex P2 on #3015). Absent stays
+    // default; present must be a string.
+    const malformedRoot = guardSuppliedRoot(args.root);
+    if (malformedRoot) return malformedRoot;
     if (kind === "save") return saveKind(args);
     if (kind === "updateBeat" || kind === "updateScript") return updateKind(kind, args);
     if (PROBE_KINDS.has(kind)) return probeKind(kind, args);

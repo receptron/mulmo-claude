@@ -182,6 +182,30 @@ describe("an unregistered root is refused by every kind that takes one", () => {
     });
   }
 
+  // A root that is PRESENT but not a string. `str()` flattens all of these to
+  // `undefined`, which every reader below took as "no root named" — the
+  // default root. A host serialising a root wrongly would then read and write
+  // the default root's identically-named script while believing it named
+  // another (Codex P2 on #3015).
+  const MALFORMED_ROOTS: ReadonlyArray<[string, unknown]> = [
+    ["null", null],
+    ["number", 1],
+    ["object", {}],
+    ["array", ["repoA"]],
+    ["boolean", true],
+  ];
+
+  for (const [label, root] of MALFORMED_ROOTS) {
+    it(`every kind refuses a ${label} root`, async () => {
+      for (const [kind, args] of [...READ_KINDS, ...MUTATING_KINDS]) {
+        const result = await makeDispatch()({ kind, ...args, root });
+        assert.ok(isFailure(result), `${kind} must refuse a ${label} root`);
+        assert.equal(result.code, "bad_request", `${kind} must refuse a ${label} root with bad_request`);
+        assert.match(result.error, /root must be a string/, `${kind} must say WHY — a ${label} root is not a missing one`);
+      }
+    });
+  }
+
   it("the same kinds answer when the root IS registered", async () => {
     // Otherwise the sweep above passes by refusing everything unconditionally.
     const registered = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root: NAMED_ROOT });
