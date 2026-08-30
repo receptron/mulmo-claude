@@ -174,10 +174,15 @@ async function withBeatProgress<T>(beats: MulmoBeat[], onBeat: (sessionType: str
 /** Map identity for the in-flight tracker. JSON array keeps the three
  *  fields unambiguous (a human-visible delimiter could collide). */
 function generationMapKey(kind: GenerationKind, filePath: string, key: string, root?: string): string {
+  // Normalised HERE rather than by the caller. A start keyed `" repoA "` and a
+  // finish keyed `"repoA"` never match, and the tracker entry then leaks for
+  // the life of the process — so the one place that builds the key is the one
+  // place that must not be able to get the spelling wrong (Codex on #3015).
+  const normalized = normalizeRoot(root);
   // `root` is the LAST element so a call site that omits it produces exactly
   // the pre-#3014 key — the default root's entries keep their identity across
   // an upgrade, and a running generation is not orphaned by one.
-  return root === undefined || root === "" ? JSON.stringify([kind, filePath, key]) : JSON.stringify([kind, filePath, key, root]);
+  return normalized === DEFAULT_ROOT ? JSON.stringify([kind, filePath, key]) : JSON.stringify([kind, filePath, key, normalized]);
 }
 
 /**
@@ -265,13 +270,19 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // instance creation because the directory may not exist yet (it's
   // created on demand by the save route). The cache is invalidated
   // never — once the dir exists, its realpath is stable.
+  //
+  // Keyed by the resolved DIRECTORY rather than the root id, so there is no
+  // normalisation left to forget: `rootDir` already collapses every spelling of
+  // a root to one absolute path, and two ids pointing at the same directory
+  // share one entry instead of allocating a second. Keying on the raw id let
+  // `" repoA "` and `"repoA"` both resolve and then cache separately, in a map
+  // that is never evicted (Codex P2 on #3015).
   const storiesRealCache = new Map<string, string>();
   function ensureStoriesReal(root?: string): string | null {
-    const key = root ?? DEFAULT_ROOT;
-    const cached = storiesRealCache.get(key);
-    if (cached) return cached;
     const dir = rootDir(root);
     if (dir === null) return null;
+    const cached = storiesRealCache.get(dir);
+    if (cached) return cached;
     try {
       // Only the DEFAULT root is created on demand. An extra root is a
       // directory the user already owns — often a git worktree — and creating
@@ -280,7 +291,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       // responsible for it existing (#3015 review F3).
       if (normalizeRoot(root) === DEFAULT_ROOT) mkdirSync(dir, { recursive: true });
       const real = realpathSync(dir);
-      storiesRealCache.set(key, real);
+      storiesRealCache.set(dir, real);
       return real;
     } catch {
       return null;
@@ -491,7 +502,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     // emitted event both normalize, so keying on the raw text made a start
     // written `" repoA "` and its finish written `"repoA"` two entries: the
     // finish deleted nothing and the start leaked (Codex P2 on #3015).
-    const mapKey = generationMapKey(kind, wirePath, key, normalizeRoot(root));
+    const mapKey = generationMapKey(kind, wirePath, key, root);
     const existing = inFlightGenerations.get(mapKey);
     if (finished) {
       if (existing && existing.count > 1) {

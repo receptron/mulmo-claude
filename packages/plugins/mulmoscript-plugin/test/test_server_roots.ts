@@ -6,9 +6,9 @@
 // field existed and the collisions it was meant to end were all still there.
 // Type-checking cannot catch that: `root` is optional, so a forgotten forward
 // is a legal call. Only a test that asserts on the OUTPUT can.
-import { describe, it } from "node:test";
+import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
@@ -435,5 +435,86 @@ describe("script-changed events carry their root", () => {
     const { ops, changes } = makeOps();
     ops.publishScriptChanged("stories/deck.json", "view-1");
     assert.ok(!("root" in changes[0]!));
+  });
+});
+
+describe("one root, one cache entry, whatever the spelling", () => {
+  // `ensureStoriesReal` memoises the realpath forever — the directory's real
+  // path is stable once it exists, so nothing evicts it. Keyed by the raw root
+  // id, `" repoA "` and `"repoA"` both resolved (the LOOKUP normalises) and
+  // then cached separately, so a never-evicted map grew one entry per spelling
+  // (Codex P2 on #3015). It is keyed by the resolved DIRECTORY now, which
+  // leaves no normalisation for a caller to forget.
+  const workspaces: string[] = [];
+  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  function makeRootedOps() {
+    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-rootcache-"));
+    workspaces.push(workspace);
+    const extra = path.join(workspace, "repoA", "artifacts", "stories");
+    mkdirSync(extra, { recursive: true });
+    writeFileSync(path.join(extra, "foo.json"), "{}");
+    const ops = createMulmoScriptServerOps({
+      storiesDir: path.join(workspace, "default", "artifacts", "stories"),
+      extraRoots: { repoA: extra },
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return { ops, extra };
+  }
+
+  it("resolves every spelling of one root to the same file", () => {
+    const { ops } = makeRootedOps();
+    const canonical = ops.resolveStory("stories/foo.json", "repoA");
+    assert.ok(canonical.ok);
+    for (const spelling of [" repoA ", "repoA  ", "  repoA"]) {
+      const resolved = ops.resolveStory("stories/foo.json", spelling);
+      assert.ok(resolved.ok, `expected ${JSON.stringify(spelling)} to resolve`);
+      assert.equal(resolved.absolutePath, canonical.absolutePath);
+    }
+  });
+
+  it("shares the memoised realpath across spellings", () => {
+    // The only externally visible difference between one cache entry and two:
+    // once the directory is gone, a SHARED entry still answers from memory,
+    // while a second spelling with its own key would re-realpath a missing
+    // directory and fail. Deleting the directory is what makes the cache
+    // observable at all.
+    const { ops, extra } = makeRootedOps();
+    // Resolved while the directory still exists — on macOS the temp dir is
+    // reached through a `/var` → `/private/var` symlink, so the configured
+    // path and its realpath differ and only the realpath relativizes cleanly.
+    const realExtra = realpathSync(extra);
+    assert.ok(ops.resolveStory("stories/foo.json", "repoA").ok, "warm the cache under one spelling");
+    rmSync(path.dirname(path.dirname(extra)), { recursive: true, force: true });
+    assert.equal(ops.toStoryRef(path.join(realExtra, "foo.json"), " repoA "), "stories/foo.json", "a second spelling must hit the entry the first one filled");
+  });
+});
+
+describe("the cache-sharing test can tell the two cases apart", () => {
+  // Its assertion means nothing unless a COLD cache actually fails it. With
+  // the directory gone and nothing memoised, `ensureStoriesReal` returns null,
+  // the base falls back to the unresolved configured path, and the ref comes
+  // out traversal-shaped — so it is rejected. That is the state the shared
+  // entry rescues.
+  const workspaces: string[] = [];
+  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  it("returns null for a cold cache once the directory is gone", () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-coldcache-"));
+    workspaces.push(workspace);
+    const extra = path.join(workspace, "repoA", "artifacts", "stories");
+    mkdirSync(extra, { recursive: true });
+    const realExtra = realpathSync(extra);
+    const ops = createMulmoScriptServerOps({
+      storiesDir: path.join(workspace, "default", "artifacts", "stories"),
+      extraRoots: { repoA: extra },
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    rmSync(path.dirname(path.dirname(extra)), { recursive: true, force: true });
+    assert.equal(ops.toStoryRef(path.join(realExtra, "foo.json"), "repoA"), null);
   });
 });
