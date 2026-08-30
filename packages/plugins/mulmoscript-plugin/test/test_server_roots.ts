@@ -8,7 +8,7 @@
 // is a legal call. Only a test that asserts on the OUTPUT can.
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
@@ -445,31 +445,47 @@ describe("one root, one cache entry, whatever the spelling", () => {
   // then cached separately, so a never-evicted map grew one entry per spelling
   // (Codex P2 on #3015). It is keyed by the resolved DIRECTORY now, which
   // leaves no normalisation for a caller to forget.
+  //
+  // The root is registered THROUGH A SYMLINK so its configured path and its
+  // realpath differ on every platform. A first version leaned on macOS
+  // resolving the temp dir through `/var` → `/private/var`, which made the
+  // discrimination real there and vacuous on Linux — where the two are the
+  // same string, a cold cache and a warm one produce identical output and the
+  // test passed while proving nothing. It failed on ubuntu in CI.
   const workspaces: string[] = [];
   after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
-  function makeRootedOps() {
+  /** Non-null unless this platform refuses to create the symlink. */
+  function makeSymlinkedRoot(): { ops: ReturnType<typeof createMulmoScriptServerOps>; realStories: string; realTree: string } | null {
     const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-rootcache-"));
     workspaces.push(workspace);
-    const extra = path.join(workspace, "repoA", "artifacts", "stories");
-    mkdirSync(extra, { recursive: true });
-    writeFileSync(path.join(extra, "foo.json"), "{}");
+    const realTree = path.join(workspace, "real");
+    const realStoriesDir = path.join(realTree, "artifacts", "stories");
+    mkdirSync(realStoriesDir, { recursive: true });
+    writeFileSync(path.join(realStoriesDir, "foo.json"), "{}");
+    const link = path.join(workspace, "link");
+    try {
+      symlinkSync(realTree, link, "junction");
+    } catch {
+      return null;
+    }
     const ops = createMulmoScriptServerOps({
       storiesDir: path.join(workspace, "default", "artifacts", "stories"),
-      extraRoots: { repoA: extra },
+      extraRoots: { repoA: path.join(link, "artifacts", "stories") },
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: () => {}, error: () => {} },
     });
-    return { ops, extra };
+    return { ops, realStories: realpathSync(realStoriesDir), realTree };
   }
 
   it("resolves every spelling of one root to the same file", () => {
-    const { ops } = makeRootedOps();
-    const canonical = ops.resolveStory("stories/foo.json", "repoA");
+    const fixture = makeSymlinkedRoot();
+    if (!fixture) return;
+    const canonical = fixture.ops.resolveStory("stories/foo.json", "repoA");
     assert.ok(canonical.ok);
     for (const spelling of [" repoA ", "repoA  ", "  repoA"]) {
-      const resolved = ops.resolveStory("stories/foo.json", spelling);
+      const resolved = fixture.ops.resolveStory("stories/foo.json", spelling);
       assert.ok(resolved.ok, `expected ${JSON.stringify(spelling)} to resolve`);
       assert.equal(resolved.absolutePath, canonical.absolutePath);
     }
@@ -479,42 +495,26 @@ describe("one root, one cache entry, whatever the spelling", () => {
     // The only externally visible difference between one cache entry and two:
     // once the directory is gone, a SHARED entry still answers from memory,
     // while a second spelling with its own key would re-realpath a missing
-    // directory and fail. Deleting the directory is what makes the cache
-    // observable at all.
-    const { ops, extra } = makeRootedOps();
-    // Resolved while the directory still exists — on macOS the temp dir is
-    // reached through a `/var` → `/private/var` symlink, so the configured
-    // path and its realpath differ and only the realpath relativizes cleanly.
-    const realExtra = realpathSync(extra);
-    assert.ok(ops.resolveStory("stories/foo.json", "repoA").ok, "warm the cache under one spelling");
-    rmSync(path.dirname(path.dirname(extra)), { recursive: true, force: true });
-    assert.equal(ops.toStoryRef(path.join(realExtra, "foo.json"), " repoA "), "stories/foo.json", "a second spelling must hit the entry the first one filled");
+    // directory and fall back to the SYMLINK path, which the real file is not
+    // under. Deleting the directory is what makes the cache observable.
+    const fixture = makeSymlinkedRoot();
+    if (!fixture) return;
+    assert.ok(fixture.ops.resolveStory("stories/foo.json", "repoA").ok, "warm the cache under one spelling");
+    rmSync(fixture.realTree, { recursive: true, force: true });
+    assert.equal(
+      fixture.ops.toStoryRef(path.join(fixture.realStories, "foo.json"), " repoA "),
+      "stories/foo.json",
+      "a second spelling must hit the entry the first one filled",
+    );
   });
-});
-
-describe("the cache-sharing test can tell the two cases apart", () => {
-  // Its assertion means nothing unless a COLD cache actually fails it. With
-  // the directory gone and nothing memoised, `ensureStoriesReal` returns null,
-  // the base falls back to the unresolved configured path, and the ref comes
-  // out traversal-shaped — so it is rejected. That is the state the shared
-  // entry rescues.
-  const workspaces: string[] = [];
-  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
   it("returns null for a cold cache once the directory is gone", () => {
-    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-coldcache-"));
-    workspaces.push(workspace);
-    const extra = path.join(workspace, "repoA", "artifacts", "stories");
-    mkdirSync(extra, { recursive: true });
-    const realExtra = realpathSync(extra);
-    const ops = createMulmoScriptServerOps({
-      storiesDir: path.join(workspace, "default", "artifacts", "stories"),
-      extraRoots: { repoA: extra },
-      artifacts: stubFileOps,
-      writeFileAtomic: async () => {},
-      log: { info: () => {}, warn: () => {}, error: () => {} },
-    });
-    rmSync(path.dirname(path.dirname(extra)), { recursive: true, force: true });
-    assert.equal(ops.toStoryRef(path.join(realExtra, "foo.json"), "repoA"), null);
+    // Without this the test above means nothing: it has to be possible to
+    // fail. Nothing memoised, the directory gone, so the base falls back to
+    // the symlink path and the ref comes out traversal-shaped.
+    const fixture = makeSymlinkedRoot();
+    if (!fixture) return;
+    rmSync(fixture.realTree, { recursive: true, force: true });
+    assert.equal(fixture.ops.toStoryRef(path.join(fixture.realStories, "foo.json"), "repoA"), null);
   });
 });
