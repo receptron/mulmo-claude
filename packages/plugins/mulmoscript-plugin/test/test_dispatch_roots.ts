@@ -117,10 +117,9 @@ describe("swept over generated arguments, a named root never gets a mutation thr
   const KEYS = [undefined, "", "alice"];
   const INVALID_ARGS = /invalid arguments|unknown mulmoScript dispatch kind/;
 
-  it("answers every generated named-root mutation with a refusal", async () => {
-    const dispatch = makeDispatch();
-    let refusedForRoot = 0;
-    let rejectedForArgs = 0;
+  /** Every mutating call the generator can build with a named root. */
+  function namedRootMutations(): Record<string, unknown>[] {
+    const calls: Record<string, unknown>[] = [];
     for (const [kind] of MUTATING_KINDS)
       for (const root of NAMED_ROOTS)
         for (const filePath of FILE_PATHS)
@@ -130,17 +129,26 @@ describe("swept over generated arguments, a named root never gets a mutation thr
               if (filePath !== undefined) args.filePath = filePath;
               if (beatIndex !== undefined) args.beatIndex = beatIndex;
               if (key !== undefined) args.key = key;
-              const result = await dispatch(args);
-              const where = JSON.stringify(args);
-              assert.ok(isFailure(result), `${where} must not succeed`);
-              if (REFUSAL.test(result.error)) refusedForRoot += 1;
-              else if (INVALID_ARGS.test(result.error)) rejectedForArgs += 1;
-              else assert.fail(`${where} failed for neither the root nor its arguments: ${result.error}`);
+              calls.push(args);
             }
+    return calls;
+  }
+
+  it("answers every generated named-root mutation with a refusal", async () => {
+    const dispatch = makeDispatch();
+    const reasons = { root: 0, args: 0 };
+    for (const args of namedRootMutations()) {
+      const result = await dispatch(args);
+      const where = JSON.stringify(args);
+      assert.ok(isFailure(result), `${where} must not succeed`);
+      if (REFUSAL.test(result.error)) reasons.root += 1;
+      else if (INVALID_ARGS.test(result.error)) reasons.args += 1;
+      else assert.fail(`${where} failed for neither the root nor its arguments: ${result.error}`);
+    }
     // Neither branch may be vacuous: all-args-rejected would pass while the
     // root guard did nothing at all.
-    assert.ok(refusedForRoot > 100, `the sweep must exercise the root refusal, saw ${refusedForRoot}`);
-    assert.ok(rejectedForArgs > 100, `the sweep must exercise argument rejection, saw ${rejectedForArgs}`);
+    assert.ok(reasons.root > 100, `the sweep must exercise the root refusal, saw ${reasons.root}`);
+    assert.ok(reasons.args > 100, `the sweep must exercise argument rejection, saw ${reasons.args}`);
   });
 
   it("lets the same generated calls through when no root is named", async () => {

@@ -19,38 +19,49 @@ const ORIGINS: (string | undefined)[] = [undefined, "", "view-1", "view-2"];
 const ABSENT_ROOTS: (string | undefined)[] = [undefined, ""];
 
 describe("shouldReloadForScriptChange — the pre-roots world is unchanged", () => {
-  it("matches the pre-#3014 rule for every call that names no root", () => {
-    // The rule as it stood before roots: path equality plus the echo guard.
-    const before = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string) =>
-      watching !== "" && event.filePath === watching && event.origin !== ownOrigin;
+  /** The rule as it stood before roots: path equality plus the echo guard. */
+  const beforeRoots = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string): boolean =>
+    watching !== "" && event.filePath === watching && event.origin !== ownOrigin;
 
-    let compared = 0;
-    for (const filePath of PATHS) {
-      for (const watching of PATHS) {
-        for (const origin of ORIGINS) {
-          for (const ownOrigin of ORIGINS) {
-            for (const eventRoot of ABSENT_ROOTS) {
+  interface NoRootCase {
+    event: MulmoScriptChangedEvent;
+    watching: string;
+    ownOrigin: string;
+    watchingRoot: string | undefined;
+  }
+
+  /** Every combination in which neither side names a root. */
+  function noRootCases(): NoRootCase[] {
+    const cases: NoRootCase[] = [];
+    for (const filePath of PATHS)
+      for (const watching of PATHS)
+        for (const origin of ORIGINS)
+          for (const ownOrigin of ORIGINS)
+            for (const eventRoot of ABSENT_ROOTS)
               for (const watchingRoot of ABSENT_ROOTS) {
-                // `exactOptionalPropertyTypes` is on: an optional field is either
-                // present with a value or absent, never explicitly `undefined`.
+                // `exactOptionalPropertyTypes` is on: an optional field is
+                // either present with a value or absent, never explicitly
+                // `undefined`.
                 const event: MulmoScriptChangedEvent = {
                   filePath,
                   ...(origin === undefined ? {} : { origin }),
                   ...(eventRoot === undefined ? {} : { root: eventRoot }),
                 };
-                assert.equal(
-                  shouldReloadForScriptChange(event, watching, ownOrigin ?? "", watchingRoot),
-                  before(event, watching, ownOrigin ?? ""),
-                  `diverged for ${JSON.stringify({ filePath, watching, origin, ownOrigin, eventRoot, watchingRoot })}`,
-                );
-                compared += 1;
+                cases.push({ event, watching, ownOrigin: ownOrigin ?? "", watchingRoot });
               }
-            }
-          }
-        }
-      }
+    return cases;
+  }
+
+  it("matches the pre-#3014 rule for every call that names no root", () => {
+    const cases = noRootCases();
+    for (const { event, watching, ownOrigin, watchingRoot } of cases) {
+      assert.equal(
+        shouldReloadForScriptChange(event, watching, ownOrigin, watchingRoot),
+        beforeRoots(event, watching, ownOrigin),
+        `diverged for ${JSON.stringify({ event, watching, ownOrigin, watchingRoot })}`,
+      );
     }
-    assert.ok(compared >= 1000, `expected a real sweep, compared ${compared}`);
+    assert.ok(cases.length >= 1000, `expected a real sweep, compared ${cases.length}`);
   });
 
   it("treats an absent root and an empty root as the same root", () => {
