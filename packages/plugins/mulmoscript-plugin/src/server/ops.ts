@@ -205,6 +205,24 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     }
     rootDirs.set(trimmed, path.resolve(dir));
   }
+  if (rootDirs.size > 1) {
+    // The pair identity is complete INSIDE this package, and stops at the host
+    // boundary. A host's per-session generation store keys on
+    // `(kind, filePath, key)` — `generationKey` in `@mulmobridge/protocol`,
+    // which bridges also consume — so two roots running the same generation in
+    // one session collapse to one entry and either finish clears the other's
+    // pending state (Codex P1 on #3015).
+    //
+    // Widening that key is a protocol change with its own consumers, so it is
+    // not this package's to make. Unreachable until a host registers a root,
+    // which is exactly the moment this fires: whoever first does it is the
+    // person who has to widen their session key, and they see this at boot
+    // rather than discovering it from a stuck spinner.
+    log.warn(
+      "extra stories roots registered — the host's per-session generation key must include the root, or two roots running the same generation in one session will collapse to one entry (#3014 step 2)",
+      { roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT) },
+    );
+  }
 
   /** The registered directory for a wire `root`, or null when the host never
    *  registered it. Null is a REJECTION, not a fallback to the default: an

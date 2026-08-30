@@ -50,6 +50,35 @@ describe("root registry", () => {
     assert.equal(result.ok === false && result.code, "bad_request");
   });
 
+  it("warns at boot that the host's session key must be widened", () => {
+    // The pair identity stops at the host boundary: `generationKey` in
+    // `@mulmobridge/protocol` keys on `(kind, filePath, key)`. Widening it is a
+    // protocol change with its own consumers, so this package cannot make it —
+    // but it can make sure the first host to register a root is told, at boot,
+    // instead of finding out from a stuck spinner (Codex P1 on #3015).
+    const warnings: string[] = [];
+    createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      extraRoots: { repoA: "/tmp/a" },
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+    });
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!, /session generation key must include the root|generation key must include the root/);
+  });
+
+  it("says nothing at boot when only the default root is registered", () => {
+    const warnings: string[] = [];
+    createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+    });
+    assert.equal(warnings.length, 0, "the single-root world must stay silent");
+  });
+
   it("normalizes a root id by trimming, matching readCommandScope", () => {
     // Two parallel "which project root" identifiers must agree on what one
     // root is, or the same string names different roots in different layers.
