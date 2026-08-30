@@ -69,6 +69,38 @@ describe("root registry", () => {
     assert.match(warnings[0]!, /generation and writes are REFUSED in them/);
   });
 
+  it("refuses two extraRoots ids that trim to the same key", () => {
+    // `set` would keep the LAST directory, so every read for `repoA` would
+    // answer from a directory the card never named — with the host given no
+    // signal at all (CodeRabbit on #3015). A misconfiguration is cheapest to
+    // fail on at boot, and silently resolving the wrong directory is exactly
+    // what this package refuses everywhere else.
+    assert.throws(
+      () =>
+        createMulmoScriptServerOps({
+          storiesDir: "/nonexistent/for-tests/artifacts/stories",
+          extraRoots: { repoA: "/tmp/a", " repoA ": "/tmp/b" },
+          artifacts: stubFileOps,
+          writeFileAtomic: async () => {},
+          log: { info: () => {}, warn: () => {}, error: () => {} },
+        }),
+      /registered twice/,
+    );
+  });
+
+  it("still accepts two distinct roots pointing at different directories", () => {
+    // The throw must be about the KEY, not about having more than one root.
+    assert.doesNotThrow(() =>
+      createMulmoScriptServerOps({
+        storiesDir: "/nonexistent/for-tests/artifacts/stories",
+        extraRoots: { repoA: "/tmp/a", repoB: "/tmp/b" },
+        artifacts: stubFileOps,
+        writeFileAtomic: async () => {},
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+      }),
+    );
+  });
+
   it("says nothing at boot when only the default root is registered", () => {
     const warnings: string[] = [];
     createMulmoScriptServerOps({
@@ -485,9 +517,11 @@ describe("one root, one cache entry, whatever the spelling", () => {
     return { ops, realStories: realpathSync(realStoriesDir), realTree };
   }
 
-  it("resolves every spelling of one root to the same file", () => {
+  it("resolves every spelling of one root to the same file", (t) => {
     const fixture = makeSymlinkedRoot();
-    if (!fixture) return;
+    // Reported rather than returned: a silent early return is a green test
+    // that exercised nothing, which is the shape this file argues against.
+    if (!fixture) return t.skip("this platform refuses to create the symlink");
     const canonical = fixture.ops.resolveStory("stories/foo.json", "repoA");
     assert.ok(canonical.ok);
     for (const spelling of [" repoA ", "repoA  ", "  repoA"]) {
@@ -497,14 +531,16 @@ describe("one root, one cache entry, whatever the spelling", () => {
     }
   });
 
-  it("shares the memoised realpath across spellings", () => {
+  it("shares the memoised realpath across spellings", (t) => {
     // The only externally visible difference between one cache entry and two:
     // once the directory is gone, a SHARED entry still answers from memory,
     // while a second spelling with its own key would re-realpath a missing
     // directory and fall back to the SYMLINK path, which the real file is not
     // under. Deleting the directory is what makes the cache observable.
     const fixture = makeSymlinkedRoot();
-    if (!fixture) return;
+    // Reported rather than returned: a silent early return is a green test
+    // that exercised nothing, which is the shape this file argues against.
+    if (!fixture) return t.skip("this platform refuses to create the symlink");
     assert.ok(fixture.ops.resolveStory("stories/foo.json", "repoA").ok, "warm the cache under one spelling");
     rmSync(fixture.realTree, { recursive: true, force: true });
     assert.equal(
@@ -514,12 +550,14 @@ describe("one root, one cache entry, whatever the spelling", () => {
     );
   });
 
-  it("returns null for a cold cache once the directory is gone", () => {
+  it("returns null for a cold cache once the directory is gone", (t) => {
     // Without this the test above means nothing: it has to be possible to
     // fail. Nothing memoised, the directory gone, so the base falls back to
     // the symlink path and the ref comes out traversal-shaped.
     const fixture = makeSymlinkedRoot();
-    if (!fixture) return;
+    // Reported rather than returned: a silent early return is a green test
+    // that exercised nothing, which is the shape this file argues against.
+    if (!fixture) return t.skip("this platform refuses to create the symlink");
     rmSync(fixture.realTree, { recursive: true, force: true });
     assert.equal(fixture.ops.toStoryRef(path.join(fixture.realStories, "foo.json"), "repoA"), null);
   });

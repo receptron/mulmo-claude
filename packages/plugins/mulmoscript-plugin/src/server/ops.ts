@@ -208,6 +208,15 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     if (trimmed === DEFAULT_ROOT) {
       throw new Error("mulmoScript: extraRoots key must not be empty — the empty id is reserved for the default stories root");
     }
+    // Two ids that trim to one key: `set` would silently keep the LAST
+    // directory, so every read for `repoA` would answer from a directory the
+    // card never named, with the host given no signal (CodeRabbit on #3015).
+    // Same reasoning as the empty id above — a misconfiguration is cheapest to
+    // fail on at boot, and silently resolving the wrong directory is the
+    // failure this package refuses everywhere else.
+    if (rootDirs.has(trimmed)) {
+      throw new Error(`mulmoScript: extraRoots keys must be distinct after trimming — "${trimmed}" is registered twice`);
+    }
     rootDirs.set(trimmed, path.resolve(dir));
   }
   if (rootDirs.size > 1) {
