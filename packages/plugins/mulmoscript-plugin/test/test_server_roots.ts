@@ -50,6 +50,18 @@ describe("root registry", () => {
     assert.equal(result.ok === false && result.code, "bad_request");
   });
 
+  it("normalizes a root id by trimming, matching readCommandScope", () => {
+    // Two parallel "which project root" identifiers must agree on what one
+    // root is, or the same string names different roots in different layers.
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    assert.equal(ops.guardStoryWriteRoot("  "), null, "whitespace is the default root, not a named one");
+    assert.equal(ops.toStoryRef("/tmp/a/x.json", " repoA "), ops.toStoryRef("/tmp/a/x.json", "repoA"));
+  });
+
+  it("refuses a whitespace-only extraRoots id at construction", () => {
+    assert.throws(() => makeOps({ "   ": "/somewhere" }), /must not be empty/);
+  });
+
   it("refuses an empty extraRoots id at construction", () => {
     // The empty id is the default root's own key; accepting it would re-point
     // every pre-roots caller. Boot is the cheap place to fail.
@@ -79,7 +91,7 @@ describe("root registry", () => {
 describe("generation events carry their root", () => {
   it("puts the root on the published event", () => {
     const { ops, generations } = makeOps({ repoA: "/tmp/a" });
-    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, undefined, "repoA");
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
     assert.equal(generations.length, 1);
     assert.equal(generations[0]?.root, "repoA");
   });
@@ -92,10 +104,38 @@ describe("generation events carry their root", () => {
   });
 });
 
+describe("a start event carries its root and no error", () => {
+  // The shape of `publishGeneration` used to end in two adjacent optional
+  // strings, `error` then `root`. Appending `root` to the call sites that pass
+  // no error put it in `error`'s slot: the start event announced
+  // `error: "repoA"`, the root was dropped, the tracker entry was filed under
+  // the default root, and — because the matching finish passed both — its key
+  // differed and the entry was never deleted. One leaked row per generation,
+  // for the life of the process (#3015 review).
+  it("does not report an error when a generation starts in a named root", () => {
+    const { ops, generations } = makeOps({ repoA: "/tmp/a" });
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
+    const started = generations[0]!;
+    assert.equal(started.done, false);
+    assert.equal(started.root, "repoA");
+    assert.ok(!("error" in started), `a start must carry no error, got ${JSON.stringify(started)}`);
+  });
+
+  it("clears the tracker when the matching finish arrives", () => {
+    // Start and finish must produce the SAME key. When they did not, the
+    // snapshot kept reporting a finished run forever.
+    const { ops } = makeOps({ repoA: "/tmp/a" });
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
+    assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", true, { root: "repoA" });
+    assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 0, "the finish must delete the entry it started");
+  });
+});
+
 describe("pendingGenerations is scoped by the pair", () => {
   it("does not hand one root's in-flight run to another root's View", () => {
     const { ops } = makeOps({ repoA: "/tmp/a", repoB: "/tmp/b" });
-    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, undefined, "repoA");
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
 
     assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
     assert.equal(ops.pendingGenerations("stories/deck.json", "repoB").length, 0, "repoB must not see repoA's run");
@@ -112,8 +152,8 @@ describe("pendingGenerations is scoped by the pair", () => {
 
   it("dedups per root — the same deck in two roots is two runs", () => {
     const { ops, generations } = makeOps({ repoA: "/tmp/a", repoB: "/tmp/b" });
-    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, undefined, "repoA");
-    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, undefined, "repoB");
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
+    ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoB" });
     // Two starts, not one start plus a suppressed duplicate.
     assert.equal(generations.filter((e) => !e.done).length, 2);
   });
