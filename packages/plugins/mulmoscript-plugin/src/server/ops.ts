@@ -372,18 +372,6 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   /**
-   * Realpath containment pre-guard for wire paths handed to the phase-1
-   * core's save/reopen/update executes. The core's own path guard is
-   * lexical (it runs against the generic FileOps, whose read/write follows
-   * symlinks), so hosts re-assert the realpath boundary here before
-   * invoking it — a symlink planted below the stories dir can't read or
-   * write outside the tree (Codex P1 on MulmoClaude#2133).
-   *
-   * Returns null when `filePath` isn't a non-empty string — shape
-   * validation (including the script-vs-filePath mode check) belongs to
-   * the core.
-   */
-  /**
    * Whether this root is one the host registered.
    *
    * Every other root-aware op learns this from `resolveStory`, which needs a
@@ -397,24 +385,24 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     return rootDir(root) === null ? opBadRequest(`unknown stories root "${normalizeRoot(root)}"`) : null;
   }
 
+  /**
+   * Realpath containment pre-guard for wire paths handed to the phase-1
+   * core's save/reopen/update executes. The core's own path guard is
+   * lexical (it runs against the generic FileOps, whose read/write follows
+   * symlinks), so hosts re-assert the realpath boundary here before
+   * invoking it — a symlink planted below the stories dir can't read or
+   * write outside the tree (Codex P1 on MulmoClaude#2133).
+   *
+   * Returns null when `filePath` isn't a non-empty string — shape
+   * validation (including the script-vs-filePath mode check) belongs to
+   * the core.
+   */
   function guardStoryWirePath(filePath: unknown, root?: string): OpFailure | null {
     if (typeof filePath !== "string" || filePath === "") return null;
     const resolved = resolveStory(filePath, root);
     return resolved.ok ? null : resolved;
   }
 
-  /**
-   * Whether a WRITE may target this root.
-   *
-   * Reads are root-aware; writes are not. `executeMulmoScriptSave` and the
-   * update executors run against one `FileOps`, bound by the host to the
-   * default root, so a write naming another root would rewrite the DEFAULT
-   * root's identically-named file and then announce the other one as changed
-   * (#3015 review G1). Closing it here is fail-closed: "readable but not yet
-   * writable" beats "wrote somewhere else and said so".
-   *
-   * Step 2 replaces this with a per-root FileOps rather than removing it.
-   */
   /**
    * Whether a GENERATION may run in this root.
    *
@@ -447,6 +435,18 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * through the package executors, not through these ops — so
    * `test_server_roots.ts` walks the whole ops surface and fails on any op
    * that is neither in the read-only allowlist nor refusing.
+   */
+  /**
+   * Whether a WRITE may target this root.
+   *
+   * Reads are root-aware; writes are not. `executeMulmoScriptSave` and the
+   * update executors run against one `FileOps`, bound by the host to the
+   * default root, so a write naming another root would rewrite the DEFAULT
+   * root's identically-named file and then announce the other one as changed
+   * (#3015 review G1). Closing it here is fail-closed: "readable but not yet
+   * writable" beats "wrote somewhere else and said so".
+   *
+   * Step 2 replaces this with a per-root FileOps rather than removing it.
    */
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;

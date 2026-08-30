@@ -66,3 +66,42 @@ describe("onScriptChanged accepts both call forms", () => {
     assert.equal(subscription.ownOrigin, "");
   });
 });
+
+describe("the object form is checked at the subscribe call, not at delivery", () => {
+  // This package is published, so a JavaScript consumer reaches these
+  // functions with no call-site checking. An object missing `root` passed
+  // straight through, and the failure surfaced later as
+  // `sub.root is not a function` — thrown inside a pubsub delivery, where
+  // there is no caller left to catch it and the only symptom is a View that
+  // silently stops updating (CodeRabbit on #3015).
+  const filePath = (): string => "stories/deck.json";
+  const handler = (): void => {};
+
+  it("treats an object with no root as the default root", () => {
+    // The one field with a safe answer: a caller who did not think about
+    // roots meant the default one.
+    const subscription = normalizeGenerationSubscription({ filePath, handler } as never);
+    assert.equal(typeof subscription.root, "function");
+    assert.equal(subscription.root(), undefined);
+  });
+
+  it("treats a script-changed object with no root the same way", () => {
+    const subscription = normalizeScriptChangedSubscription({ filePath, ownOrigin: "view-1", handler } as never);
+    assert.equal(subscription.root(), undefined);
+    assert.equal(subscription.ownOrigin, "view-1");
+  });
+
+  it("throws at the subscribe call for a non-function root", () => {
+    assert.throws(() => normalizeGenerationSubscription({ filePath, root: "repoA", handler } as never), /root must be a function/);
+  });
+
+  it("throws at the subscribe call for a missing filePath or handler", () => {
+    assert.throws(() => normalizeGenerationSubscription({ handler } as never), /filePath and handler/);
+    assert.throws(() => normalizeGenerationSubscription({ filePath } as never), /filePath and handler/);
+    assert.throws(() => normalizeScriptChangedSubscription({ ownOrigin: "view-1", handler } as never), /filePath and handler/);
+  });
+
+  it("throws for a script-changed object with no ownOrigin", () => {
+    assert.throws(() => normalizeScriptChangedSubscription({ filePath, handler } as never), /ownOrigin must be a string/);
+  });
+});
