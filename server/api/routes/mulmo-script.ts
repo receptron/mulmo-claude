@@ -291,7 +291,7 @@ bindRoute(router, API_ROUTES.mulmoScript.generateMovie, async (req: Request<obje
     send({ type: "error", message: genError });
   } finally {
     mulmoScriptOps.inFlightMovies.delete(absoluteFilePath);
-    mulmoScriptOps.publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", true, genError);
+    mulmoScriptOps.publishGeneration(chatSessionId, GENERATION_KINDS.movie, filePath, "", true, { error: genError });
     res.end();
   }
 });
@@ -457,7 +457,7 @@ async function handleGeneratePdf(req: Request<object, object, { filePath: string
     send({ type: "error", message: genError });
   } finally {
     mulmoScriptOps.inFlightPdfs.delete(absoluteFilePath);
-    mulmoScriptOps.publishGeneration(chatSessionId, GENERATION_KINDS.pdf, filePath, "", true, genError);
+    mulmoScriptOps.publishGeneration(chatSessionId, GENERATION_KINDS.pdf, filePath, "", true, { error: genError });
     res.end();
   }
 }
