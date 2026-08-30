@@ -8,7 +8,7 @@
 // is a legal call. Only a test that asserts on the OUTPUT can.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
@@ -235,26 +235,58 @@ describe("the whole ops surface is classified for named roots", () => {
   // added without classifying it fails `every op is classified`, and one
   // classified as mutating must actually refuse.
   const namedRoot = "repoA";
-  const NOT_AN_OP = new Set([
-    "backend",
+  /**
+   * Which members must be classified, read off the source rather than listed.
+   *
+   * The first version of this test had a hand-written "not an op" exclusion
+   * set, and `triggerAutoBackgroundMovie` sat in it — a member that takes a
+   * `root` and starts a full generation, exempted by the very list meant to
+   * catch it (Codex P1 on #3015). A hand-maintained exemption list is the same
+   * failure as a hand-maintained guard list, one level up.
+   *
+   * So the rule is derived: a member whose declaration accepts a `root` is a
+   * root-aware entry point and must be classified. Adding one and forgetting
+   * turns this red without anyone editing an exemption.
+   */
+  function rootAwareMembers(): string[] {
+    const source = readFileSync(new URL("../src/server/ops.ts", import.meta.url), "utf8");
+    const returned = /\n {2}return \{\n([\s\S]*?)\n {2}\};/.exec(source);
+    assert.ok(returned, "could not find the ops object literal in ops.ts");
+    const keys = returned[1]!
+      .split("\n")
+      .map((line) => line.trim().replace(/,$/, ""))
+      .filter((key) => /^[A-Za-z][A-Za-z0-9]*$/.test(key));
+    assert.ok(keys.length > 10, "the ops object literal parsed to too few keys — the regex has drifted");
+    return keys.filter((key) => {
+      const decl = new RegExp(`function ${key}\\(([^)]*)\\)`).exec(source);
+      // `root?: string` directly, or an args object that carries one
+      // (`GenerateOpArgsWith<…>`) — the second form is how `renderBeatOp` and
+      // its siblings take theirs, and a check that saw only the first would
+      // exempt every generation op it exists to police.
+      return decl !== null && /\broot\??:|GenerateOpArgs|StoryOpOptions/.test(decl[1]!);
+    });
+  }
+
+  /** Ops that only read. A named root is legal for them — that is the feature. */
+  const READ_ONLY = ["beatImageOp", "beatAudioOp", "beatMovieOp", "characterImageOp", "movieStatusOp", "pdfStatusOp"] as const;
+  /**
+   * Root-aware members that are not `OpResult` ops, so the generic invoker
+   * below cannot drive them — each has its own test in this file instead.
+   * They still have to be named, because being unnamed is what let
+   * `triggerAutoBackgroundMovie` through.
+   */
+  const GUARDED_ELSEWHERE = [
     "toStoryRef",
     "resolveStory",
     "guardStoryWirePath",
     "guardStoryWriteRoot",
     "guardStoryGenerationRoot",
-    "ffmpegGuard",
     "runStoryOp",
     "publishGeneration",
     "publishScriptChanged",
     "pendingGenerations",
-    "inFlightMovies",
-    "inFlightPdfs",
-    "runMovieGeneration",
-    "runPdfGeneration",
     "triggerAutoBackgroundMovie",
-  ]);
-  /** Ops that only read. A named root is legal for them — that is the feature. */
-  const READ_ONLY = ["beatImageOp", "beatAudioOp", "beatMovieOp", "characterImageOp", "movieStatusOp", "pdfStatusOp"] as const;
+  ] as const;
   /** Ops that write or generate. A named root must be refused, fail-closed. */
   const REFUSAL = /^(writing to|generating in) a non-default stories root is not supported yet$/;
   const MUTATING: ReadonlyArray<[string, (ops: ReturnType<typeof makeOps>["ops"]) => Promise<OpResult<unknown>>]> = [
@@ -267,11 +299,29 @@ describe("the whole ops surface is classified for named roots", () => {
     ["generatePdfOp", (ops) => ops.generatePdfOp("stories/d.json", undefined, namedRoot)],
   ];
 
-  it("every op is classified as read-only or mutating", () => {
-    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
-    const classified = new Set<string>([...READ_ONLY, ...MUTATING.map(([name]) => name)]);
-    const unclassified = Object.keys(ops).filter((key) => !NOT_AN_OP.has(key) && !classified.has(key));
+  it("the derivation actually finds the root-aware members", () => {
+    // Without this the classification test passes vacuously the moment the
+    // regex stops matching — a silent green is the failure mode of every
+    // check that reads source.
+    const found = rootAwareMembers();
+    assert.ok(found.length >= 19, `expected the ops surface to expose many root-aware members, found ${found.length}`);
+    for (const expected of ["triggerAutoBackgroundMovie", "renderBeatOp", "uploadBeatImageOp", "beatImageOp"]) {
+      assert.ok(found.includes(expected), `${expected} takes a root but the derivation missed it`);
+    }
+  });
+
+  it("every root-aware member is classified as read-only or mutating", () => {
+    const classified = new Set<string>([...READ_ONLY, ...MUTATING.map(([name]) => name), ...GUARDED_ELSEWHERE]);
+    const unclassified = rootAwareMembers().filter((key) => !classified.has(key));
     assert.deepEqual(unclassified, [], `classify these in test_server_roots.ts: ${unclassified.join(", ")}`);
+  });
+
+  it("the classification names members that actually exist", () => {
+    // The derivation reads source; this pins it to the real object, so a
+    // renamed op cannot leave a classification pointing at nothing.
+    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const missing = [...READ_ONLY, ...MUTATING.map(([name]) => name), ...GUARDED_ELSEWHERE].filter((name) => !(name in ops));
+    assert.deepEqual(missing, []);
   });
 
   for (const [name, invoke] of MUTATING) {
@@ -290,6 +340,26 @@ describe("the whole ops surface is classified for named roots", () => {
       assert.equal(generations.length, 0, `${name} must not publish anything when refused`);
     });
   }
+});
+
+describe("the detached background movie is refused in a named root too", () => {
+  // It returns `void`, so it can carry no `OpResult` — and that is exactly why
+  // it was the one generation the guard missed. A detached run corrupting the
+  // other root's pending state has no caller to see the failure.
+  const namedRoot = "repoA";
+
+  it("starts nothing and publishes nothing for a named root", () => {
+    const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+    ops.triggerAutoBackgroundMovie("/tmp/a/stories/d.json", "stories/d.json", "session-1", namedRoot);
+    assert.equal(generations.length, 0, "a refused background movie must announce nothing");
+    assert.equal(ops.inFlightMovies.has("/tmp/a/stories/d.json"), false, "a refused background movie must not be marked in flight");
+  });
+
+  it("still starts for the default root", () => {
+    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    ops.triggerAutoBackgroundMovie("/tmp/x/stories/d.json", "stories/d.json", "session-1");
+    assert.equal(ops.inFlightMovies.has("/tmp/x/stories/d.json"), true, "the default root must still generate");
+  });
 });
 
 describe("generations stay in the default root until step 2", () => {

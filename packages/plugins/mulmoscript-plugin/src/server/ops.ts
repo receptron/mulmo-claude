@@ -907,6 +907,16 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   function triggerAutoBackgroundMovie(absoluteFilePath: string, wireFilePath: string, chatSessionId: string | undefined, root?: string): void {
+    // The same refusal as the foreground generation ops, reached the only way
+    // a `void` entry point can reach it. This one takes a `root` but never
+    // returned an `OpResult`, so the guard that covers every other generation
+    // did not cover the one generation nobody is waiting on — which is the
+    // worse half: a detached run corrupting the other root's pending state
+    // has no caller to see the failure (Codex P1 on #3015).
+    if (guardStoryGenerationRoot(root)) {
+      log.warn("refused an auto background movie in a non-default stories root", { filePath: wireFilePath, root });
+      return;
+    }
     if (inFlightMovies.has(absoluteFilePath)) return;
     inFlightMovies.add(absoluteFilePath);
     void runBackgroundMovieGeneration(absoluteFilePath, wireFilePath, chatSessionId, root);
