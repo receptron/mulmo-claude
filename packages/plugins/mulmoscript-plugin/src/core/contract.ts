@@ -19,6 +19,10 @@ export interface MulmoScriptGenerationEvent {
   kind: "beatImage" | "beatAudio" | "characterImage" | "movie" | "pdf";
   /** Wire `stories/…` path of the script the generation belongs to. */
   filePath: string;
+  /** Which stories root `filePath` is relative to (#3014). Absent = the
+   *  host's default root, which is every event this package emitted before
+   *  roots existed. */
+  root?: string;
   /** beatIndex (as string) for beat*, character key for characterImage, "" for movie/pdf. */
   key: string;
   /** false = started, true = finished (reload the asset off disk). */
@@ -44,6 +48,8 @@ export const SCRIPT_CHANGED_EVENT = "scriptChanged";
  */
 export interface MulmoScriptChangedEvent {
   filePath: string;
+  /** Which stories root `filePath` is relative to (#3014). Absent = default. */
+  root?: string;
   origin?: string;
 }
 
@@ -54,8 +60,20 @@ export interface MulmoScriptChangedEvent {
  * the one that is invisible when it is wrong: a View acting on the echo of its own write
  * rebuilds the element the caret is in, on every keystroke.
  */
-export const shouldReloadForScriptChange = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string): boolean =>
-  watching !== "" && event.filePath === watching && event.origin !== ownOrigin;
+export const shouldReloadForScriptChange = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string, watchingRoot?: string): boolean =>
+  watching !== "" && event.filePath === watching && sameRoot(event.root, watchingRoot) && event.origin !== ownOrigin;
+
+/**
+ * Two roots are the same when they name the same one, with absent meaning the
+ * host's default (#3014).
+ *
+ * The identity of a script is the PAIR, not the path: `stories/deck.json` in
+ * two repositories is two files, and comparing paths alone would reload the
+ * View watching one because the other was saved. Absent normalises to the
+ * default so a pre-`root` event and a default-root watcher still match — that
+ * equivalence is what keeps every existing card working untouched.
+ */
+const sameRoot = (a: string | undefined, b: string | undefined): boolean => (a ?? "") === (b ?? "");
 
 interface BeatRef {
   filePath: string;

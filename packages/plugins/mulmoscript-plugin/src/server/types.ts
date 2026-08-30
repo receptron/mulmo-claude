@@ -49,9 +49,29 @@ export type MulmoScriptServerLog = MinimalLogger;
  * containment, and generation-state tracking are all in-package.
  */
 export interface MulmoScriptServerBackend {
-  /** Absolute path of the stories directory (`<workspace>/artifacts/stories`).
-   *  May not exist yet — the ops lazily create + realpath it. */
+  /** Absolute path of the DEFAULT stories directory
+   *  (`<workspace>/artifacts/stories`). May not exist yet — the ops lazily
+   *  create + realpath it. A wire path with no `root` resolves here, which
+   *  is what makes every pre-`root` caller keep its exact behaviour. */
   storiesDir: string;
+  /**
+   * Additional stories roots, keyed by the id the wire `root` names
+   * (#3014). Absent or empty = the single-root world this package shipped
+   * with, byte for byte.
+   *
+   * The KEY IS OPAQUE TO THIS PACKAGE. It is looked up here and never
+   * parsed, so the host owns what a root id means — a declared name, a
+   * hash of the directory, an assigned handle. That decision is persisted
+   * in the host's cards, so it belongs to whoever has to keep it stable,
+   * and pinning it here would freeze it for every host at once.
+   *
+   * Registration is the containment boundary. `filePath` is a field the
+   * MODEL fills (`core/definition.ts`), so the agent must never be able to
+   * name a root: it may only address what the host already registered. The
+   * tool definition is unchanged for exactly this reason — a host adds a
+   * root, an agent cannot.
+   */
+  extraRoots?: Record<string, string>;
   /** Shared artifacts FileOps (rooted at `<workspace>/artifacts`) for the
    *  save / reopen / update dispatch kinds (phase-1 core executes). */
   artifacts: FileOps;

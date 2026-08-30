@@ -102,12 +102,15 @@ export async function buildContext(absoluteFilePath: string, force = false): Pro
 export type StoryContext = NonNullable<Awaited<ReturnType<typeof buildContext>>>;
 
 export interface RunStoryOpDeps {
-  resolveStory?: (filePath: string) => { ok: true; absolutePath: string } | OpFailure;
+  resolveStory?: (filePath: string, root?: string) => { ok: true; absolutePath: string } | OpFailure;
   buildContext?: (absoluteFilePath: string, force?: boolean) => Promise<StoryContext | undefined>;
 }
 
 export interface RunStoryOpOptions<T> {
   force?: boolean | undefined;
+  /** Which registered stories root `filePath` is relative to (#3014).
+   *  Absent = the host's default root, i.e. exactly the pre-roots path. */
+  root?: string | undefined;
   /**
    * Op-specific tag included in the failure log so dashboards can
    * distinguish which op is failing (e.g. `"generate-beat-audio"`).
@@ -169,8 +172,11 @@ async function withBeatProgress<T>(beats: MulmoBeat[], onBeat: (sessionType: str
 
 /** Map identity for the in-flight tracker. JSON array keeps the three
  *  fields unambiguous (a human-visible delimiter could collide). */
-function generationMapKey(kind: GenerationKind, filePath: string, key: string): string {
-  return JSON.stringify([kind, filePath, key]);
+function generationMapKey(kind: GenerationKind, filePath: string, key: string, root?: string): string {
+  // `root` is the LAST element so a call site that omits it produces exactly
+  // the pre-#3014 key — the default root's entries keep their identity across
+  // an upgrade, and a running generation is not orphaned by one.
+  return root === undefined || root === "" ? JSON.stringify([kind, filePath, key]) : JSON.stringify([kind, filePath, key, root]);
 }
 
 /**
@@ -181,7 +187,24 @@ function generationMapKey(kind: GenerationKind, filePath: string, key: string): 
 export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   const log = backend.log ?? NOOP_LOG;
   setMulmoErrorCaptureLogger(log);
-  const storiesDir = path.resolve(backend.storiesDir);
+  // Root registry: the default (pre-#3014, wire `root` absent) plus whatever
+  // the host registered. Resolved once — the host owns the ids, this package
+  // only ever looks them up.
+  const DEFAULT_ROOT = "";
+  const rootDirs = new Map<string, string>([[DEFAULT_ROOT, path.resolve(backend.storiesDir)]]);
+  for (const [id, dir] of Object.entries(backend.extraRoots ?? {})) {
+    // An empty id would shadow the default root and silently re-point every
+    // pre-roots caller at someone else's directory.
+    if (id !== DEFAULT_ROOT) rootDirs.set(id, path.resolve(dir));
+  }
+
+  /** The registered directory for a wire `root`, or null when the host never
+   *  registered it. Null is a REJECTION, not a fallback to the default: an
+   *  unknown root must not quietly read the workspace's file of the same
+   *  name. */
+  function rootDir(root: string | undefined): string | null {
+    return rootDirs.get(root ?? DEFAULT_ROOT) ?? null;
+  }
 
   // ── Story path infrastructure ─────────────────────────────────
 
@@ -192,9 +215,10 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // paths under the link's target, and relativizing against the link
   // itself would produce a traversal-like "stories/../../…" ref that
   // resolveStory then rejects (CodeRabbit on #2137).
-  function toStoryRef(absolutePath: string): string {
-    const root = ensureStoriesReal() ?? storiesDir;
-    const rel = path.relative(root, absolutePath).split(path.sep).join("/");
+  function toStoryRef(absolutePath: string, root?: string): string {
+    const dir = rootDir(root);
+    const base = (dir === null ? null : ensureStoriesReal(root)) ?? dir ?? rootDirs.get(DEFAULT_ROOT)!;
+    const rel = path.relative(base, absolutePath).split(path.sep).join("/");
     return rel ? `stories/${rel}` : "stories";
   }
 
@@ -202,13 +226,18 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // instance creation because the directory may not exist yet (it's
   // created on demand by the save route). The cache is invalidated
   // never — once the dir exists, its realpath is stable.
-  let storiesRealCache: string | null = null;
-  function ensureStoriesReal(): string | null {
-    if (storiesRealCache) return storiesRealCache;
+  const storiesRealCache = new Map<string, string>();
+  function ensureStoriesReal(root?: string): string | null {
+    const key = root ?? DEFAULT_ROOT;
+    const cached = storiesRealCache.get(key);
+    if (cached) return cached;
+    const dir = rootDir(root);
+    if (dir === null) return null;
     try {
-      mkdirSync(storiesDir, { recursive: true });
-      storiesRealCache = realpathSync(storiesDir);
-      return storiesRealCache;
+      mkdirSync(dir, { recursive: true });
+      const real = realpathSync(dir);
+      storiesRealCache.set(key, real);
+      return real;
     } catch {
       return null;
     }
@@ -225,8 +254,14 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * stories/ is a regular directory or a legitimate symlink to another
    * location. ENOENT and traversal are distinguished (404 vs 400).
    */
-  function resolveStory(filePath: string): { ok: true; absolutePath: string } | OpFailure {
-    const storiesReal = ensureStoriesReal();
+  function resolveStory(filePath: string, root?: string): { ok: true; absolutePath: string } | OpFailure {
+    // An unregistered root is a bad request, not a fall back to the default:
+    // resolving it against the workspace would hand the caller a DIFFERENT
+    // file that happens to share the name.
+    if (rootDir(root) === null) {
+      return opBadRequest("Unknown stories root");
+    }
+    const storiesReal = ensureStoriesReal(root);
     if (!storiesReal) {
       return opServerError("stories directory not available");
     }
@@ -327,9 +362,17 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     return normalizeStoryPath(filePath) ?? filePath;
   }
 
-  function publishGeneration(chatSessionId: string | undefined, kind: GenerationKind, filePath: string, key: string, finished: boolean, error?: string): void {
+  function publishGeneration(
+    chatSessionId: string | undefined,
+    kind: GenerationKind,
+    filePath: string,
+    key: string,
+    finished: boolean,
+    error?: string,
+    root?: string,
+  ): void {
     const wirePath = canonicalWirePath(filePath);
-    const mapKey = generationMapKey(kind, wirePath, key);
+    const mapKey = generationMapKey(kind, wirePath, key, root);
     const existing = inFlightGenerations.get(mapKey);
     if (finished) {
       if (existing && existing.count > 1) {
@@ -384,7 +427,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   ): Promise<OpResult<T>> {
     const resolver = deps.resolveStory ?? resolveStory;
     const build = deps.buildContext ?? buildContext;
-    const resolved = resolver(filePath);
+    const resolved = resolver(filePath, options.root);
     if (!resolved.ok) return resolved;
     try {
       const context = await build(resolved.absolutePath, options.force ?? false);

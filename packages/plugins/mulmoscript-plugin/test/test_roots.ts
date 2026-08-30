@@ -1,0 +1,85 @@
+// The identity of a script is the PAIR (root, filePath) — #3014.
+//
+// The generator and the property here are what survived the differential
+// harness that proved the widening was behaviour-preserving: the harness
+// itself could not, because half of it was the pre-#3014 code this replaced.
+//
+// What the harness established, and what these keep true:
+//   - every call that names no root behaves exactly as it did before roots
+//   - two roots holding the same wire path are two different scripts
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { shouldReloadForScriptChange, type MulmoScriptChangedEvent } from "../src/core/contract.js";
+
+// The inputs that mattered in the differential run: the wire spellings the
+// module accepts, both "no root" spellings (absent and empty — they must be
+// the same root), and the origin cases that drive the echo rule.
+const PATHS = ["", "stories/a.json", "stories/b.json", "stories/x/y.json", "artifacts/stories/a.json"];
+const ORIGINS: (string | undefined)[] = [undefined, "", "view-1", "view-2"];
+const ABSENT_ROOTS: (string | undefined)[] = [undefined, ""];
+
+describe("shouldReloadForScriptChange — the pre-roots world is unchanged", () => {
+  it("matches the pre-#3014 rule for every call that names no root", () => {
+    // The rule as it stood before roots: path equality plus the echo guard.
+    const before = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string) =>
+      watching !== "" && event.filePath === watching && event.origin !== ownOrigin;
+
+    let compared = 0;
+    for (const filePath of PATHS) {
+      for (const watching of PATHS) {
+        for (const origin of ORIGINS) {
+          for (const ownOrigin of ORIGINS) {
+            for (const eventRoot of ABSENT_ROOTS) {
+              for (const watchingRoot of ABSENT_ROOTS) {
+                // `exactOptionalPropertyTypes` is on: an optional field is either
+                // present with a value or absent, never explicitly `undefined`.
+                const event: MulmoScriptChangedEvent = {
+                  filePath,
+                  ...(origin === undefined ? {} : { origin }),
+                  ...(eventRoot === undefined ? {} : { root: eventRoot }),
+                };
+                assert.equal(
+                  shouldReloadForScriptChange(event, watching, ownOrigin ?? "", watchingRoot),
+                  before(event, watching, ownOrigin ?? ""),
+                  `diverged for ${JSON.stringify({ filePath, watching, origin, ownOrigin, eventRoot, watchingRoot })}`,
+                );
+                compared += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+    assert.ok(compared >= 1000, `expected a real sweep, compared ${compared}`);
+  });
+
+  it("treats an absent root and an empty root as the same root", () => {
+    const watching = "stories/deck.json";
+    assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "" }, watching, "me", undefined), true);
+    assert.equal(shouldReloadForScriptChange({ filePath: watching }, watching, "me", ""), true);
+  });
+});
+
+describe("shouldReloadForScriptChange — two roots are two scripts", () => {
+  const watching = "stories/deck.json";
+
+  it("does not reload a View watching another root's identically-named script", () => {
+    assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "repoA" }, watching, "me", "repoB"), false);
+  });
+
+  it("still reloads the View watching the root that changed", () => {
+    assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "repoA" }, watching, "me", "repoA"), true);
+  });
+
+  it("does not reload the default-root View when a named root changed", () => {
+    // The case that makes the pair load-bearing: before #3014 this was a
+    // path match, so a repository save redrew the workspace's canvas.
+    assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "repoA" }, watching, "me", undefined), false);
+  });
+
+  it("keeps the echo guard independent of the root", () => {
+    // A View ignores its own write whatever root it is watching — otherwise a
+    // keystroke rebuilds the element the caret is in.
+    assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "repoA", origin: "me" }, watching, "me", "repoA"), false);
+  });
+});
