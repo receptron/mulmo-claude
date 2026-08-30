@@ -185,6 +185,20 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     return envelope(await ops.uploadBeatImageOp(parsed.filePath, parsed.beatIndex, imageData, str(args.root)));
   }
 
+  async function pendingKind(kind: string, args: Record<string, unknown>): Promise<unknown> {
+    const filePath = str(args.filePath);
+    if (!filePath) return invalidArgs(kind);
+    const root = str(args.root);
+    // An empty snapshot for an unknown root is indistinguishable from "no
+    // work is running" — see `guardStoryRootRegistered`.
+    const rootGuard = ops.guardStoryRootRegistered(root);
+    if (rootGuard) return fromOpFailure(rootGuard);
+    return { ok: true, pending: ops.pendingGenerations(filePath, root) };
+  }
+
+  // Nothing but routing below: every kind resolves to one named handler, so
+  // reading it answers "where does this kind go" without also having to read
+  // what any of them do.
   return async (args: Record<string, unknown>): Promise<unknown> => {
     const kind = str(args.kind);
     if (!kind) return invalidArgs("<missing>");
@@ -202,16 +216,7 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (PROBE_KINDS.has(kind)) return probeKind(kind, args);
     if (GENERATE_KINDS.has(kind)) return generateKind(kind, args);
     if (UPLOAD_KINDS.has(kind)) return uploadKind(kind, args);
-    if (kind === "pendingGenerations") {
-      const filePath = str(args.filePath);
-      if (!filePath) return invalidArgs(kind);
-      const root = str(args.root);
-      // An empty snapshot for an unknown root is indistinguishable from "no
-      // work is running" — see `guardStoryRootRegistered`.
-      const rootGuard = ops.guardStoryRootRegistered(root);
-      if (rootGuard) return fromOpFailure(rootGuard);
-      return { ok: true, pending: ops.pendingGenerations(filePath, root) };
-    }
+    if (kind === "pendingGenerations") return pendingKind(kind, args);
     return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
   };
 }

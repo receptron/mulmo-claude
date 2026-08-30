@@ -494,7 +494,15 @@ describe("one root, one cache entry, whatever the spelling", () => {
   after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
   /** Non-null unless this platform refuses to create the symlink. */
-  function makeSymlinkedRoot(): { ops: ReturnType<typeof createMulmoScriptServerOps>; realStories: string; realTree: string } | null {
+  interface SymlinkedTree {
+    realTree: string;
+    realStoriesDir: string;
+    linkedStoriesDir: string;
+    defaultStoriesDir: string;
+  }
+
+  /** `null` when the platform refuses the symlink; the caller reports a skip. */
+  function makeSymlinkedTree(): SymlinkedTree | null {
     const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-rootcache-"));
     workspaces.push(workspace);
     const realTree = path.join(workspace, "real");
@@ -507,14 +515,25 @@ describe("one root, one cache entry, whatever the spelling", () => {
     } catch {
       return null;
     }
+    return {
+      realTree,
+      realStoriesDir,
+      linkedStoriesDir: path.join(link, "artifacts", "stories"),
+      defaultStoriesDir: path.join(workspace, "default", "artifacts", "stories"),
+    };
+  }
+
+  function makeSymlinkedRoot(): { ops: ReturnType<typeof createMulmoScriptServerOps>; realStories: string; realTree: string } | null {
+    const tree = makeSymlinkedTree();
+    if (!tree) return null;
     const ops = createMulmoScriptServerOps({
-      storiesDir: path.join(workspace, "default", "artifacts", "stories"),
-      extraRoots: { repoA: path.join(link, "artifacts", "stories") },
+      storiesDir: tree.defaultStoriesDir,
+      extraRoots: { repoA: tree.linkedStoriesDir },
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: () => {}, error: () => {} },
     });
-    return { ops, realStories: realpathSync(realStoriesDir), realTree };
+    return { ops, realStories: realpathSync(tree.realStoriesDir), realTree: tree.realTree };
   }
 
   it("resolves every spelling of one root to the same file", (t) => {
