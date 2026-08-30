@@ -21,16 +21,25 @@ type ArgsFor<K extends MulmoScriptDispatchArgs["kind"]> = Omit<Extract<MulmoScri
 
 const GENERATION_EVENT_KINDS: ReadonlySet<string> = new Set(["beatImage", "beatAudio", "characterImage", "movie", "pdf"]);
 
-function parseScriptChangedEvent(payload: unknown): MulmoScriptChangedEvent | null {
+// These parsers are the boundary the pair identity has to survive. Rebuilding
+// the event field by field means a field nobody listed is silently dropped —
+// which is how `(root, filePath)` checks were added downstream and compared
+// `undefined` against every named root, filtering out the very events they
+// were written to route (Codex P1 on #3015).
+export function parseScriptChangedEvent(payload: unknown): MulmoScriptChangedEvent | null {
   if (!isRecord(payload)) return null;
-  const { filePath, origin } = payload;
+  const { filePath, origin, root } = payload;
   if (typeof filePath !== "string") return null;
-  return { filePath, ...(typeof origin === "string" ? { origin } : {}) };
+  return {
+    filePath,
+    ...(typeof origin === "string" ? { origin } : {}),
+    ...(typeof root === "string" ? { root } : {}),
+  };
 }
 
-function parseGenerationEvent(payload: unknown): MulmoScriptGenerationEvent | null {
+export function parseGenerationEvent(payload: unknown): MulmoScriptGenerationEvent | null {
   if (!isRecord(payload)) return null;
-  const { kind, filePath, key, done, error } = payload;
+  const { kind, filePath, key, done, error, root } = payload;
   if (typeof kind !== "string" || !GENERATION_EVENT_KINDS.has(kind)) return null;
   if (typeof filePath !== "string" || typeof key !== "string" || typeof done !== "boolean") return null;
   return {
@@ -39,6 +48,7 @@ function parseGenerationEvent(payload: unknown): MulmoScriptGenerationEvent | nu
     key,
     done,
     ...(typeof error === "string" ? { error } : {}),
+    ...(typeof root === "string" ? { root } : {}),
   };
 }
 
