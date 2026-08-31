@@ -54,6 +54,17 @@ const MUTATING_KINDS: ReadonlyArray<[string, Record<string, unknown>]> = [
   ["renderCharacter", { filePath: "stories/deck.json", key: "alice" }],
 ];
 
+/** Every kind that only reads — a named root is legal for these (#3014). */
+const READ_KINDS: ReadonlyArray<[string, Record<string, unknown>]> = [
+  ["beatImage", { filePath: "stories/deck.json", beatIndex: 0 }],
+  ["beatAudio", { filePath: "stories/deck.json", beatIndex: 0 }],
+  ["beatMovie", { filePath: "stories/deck.json", beatIndex: 0 }],
+  ["characterImage", { filePath: "stories/deck.json", key: "alice" }],
+  ["movieStatus", { filePath: "stories/deck.json" }],
+  ["pdfStatus", { filePath: "stories/deck.json" }],
+  ["pendingGenerations", { filePath: "stories/deck.json" }],
+];
+
 describe("dispatch refuses every mutating kind in a named root", () => {
   for (const [kind, args] of MUTATING_KINDS) {
     it(`${kind} is refused BECAUSE of the root`, async () => {
@@ -172,15 +183,6 @@ describe("an unregistered root is refused by every kind that takes one", () => {
   // that happened to reach it, so the check is over the SURFACE rather than
   // over a list: every kind the handler routes, called with a root nobody
   // registered, must fail. A new kind that forgets is red here.
-  const READ_KINDS: ReadonlyArray<[string, Record<string, unknown>]> = [
-    ["beatImage", { filePath: "stories/deck.json", beatIndex: 0 }],
-    ["beatAudio", { filePath: "stories/deck.json", beatIndex: 0 }],
-    ["beatMovie", { filePath: "stories/deck.json", beatIndex: 0 }],
-    ["characterImage", { filePath: "stories/deck.json", key: "alice" }],
-    ["movieStatus", { filePath: "stories/deck.json" }],
-    ["pdfStatus", { filePath: "stories/deck.json" }],
-    ["pendingGenerations", { filePath: "stories/deck.json" }],
-  ];
 
   for (const [kind, args] of [...READ_KINDS, ...MUTATING_KINDS]) {
     it(`${kind} refuses root "nope"`, async () => {
@@ -223,5 +225,63 @@ describe("an unregistered root is refused by every kind that takes one", () => {
   it("and answer when no root is named at all", async () => {
     const bare = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json" });
     assert.equal(isFailure(bare), false);
+  });
+});
+
+describe("a result carries the root it acted in", () => {
+  // A host builds its cards from these results, and a card's identity is the
+  // PAIR `(root, filePath)` — `stories/deck.json` exists in every registered
+  // root. #3015 threaded `root` through the ARGS and the EVENTS and not
+  // through the results, so a host could not tell two repositories' decks
+  // apart no matter what it did on its side (#3019).
+  const isOk = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === true;
+
+  it("stamps a named root on every kind that succeeds", async () => {
+    // Swept rather than listed: the tag is applied once at the router, and
+    // this is what says so. A kind that somehow bypassed it shows up here.
+    const dispatch = makeDispatch();
+    let stamped = 0;
+    for (const [kind, args] of [...READ_KINDS, ...MUTATING_KINDS]) {
+      const result = await dispatch({ kind, ...args, root: NAMED_ROOT });
+      if (!isOk(result)) continue;
+      assert.equal(result.root, NAMED_ROOT, `${kind} succeeded without naming its root`);
+      stamped += 1;
+    }
+    assert.ok(stamped > 0, "the sweep must actually reach a succeeding kind");
+  });
+
+  it("leaves a default-root result byte-identical to the pre-roots one", async () => {
+    // The compatibility claim: a call that names no root must return exactly
+    // what this package returned before roots existed, with no `root` key at
+    // all — an explicit `root: undefined` is a different object on the wire.
+    const result = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json" });
+    assert.deepEqual(result, { ok: true, pending: [] });
+    assert.ok(isOk(result) && !("root" in result));
+  });
+
+  it("treats an empty or whitespace root as the default one", async () => {
+    for (const root of ["", "   "]) {
+      const result = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root });
+      assert.deepEqual(result, { ok: true, pending: [] }, `root ${JSON.stringify(root)}`);
+    }
+  });
+
+  it("normalises the root it stamps", async () => {
+    // The stamped value is what the host persists in a card, so it must be
+    // the same string the next call has to name — not the caller's spelling.
+    const result = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root: `  ${NAMED_ROOT}  ` });
+    assert.ok(isOk(result));
+    assert.equal(result.root, NAMED_ROOT);
+  });
+
+  it("never stamps a root on a failure", async () => {
+    // A failure means the call did not happen. Tagging it would invite a
+    // reader to treat the pair as addressable when it is not.
+    const refused = await makeDispatch()({ kind: "save", filename: "d.json", script: {}, root: NAMED_ROOT });
+    assert.ok(isFailure(refused));
+    assert.ok(!("root" in (refused as Record<string, unknown>)));
+    const unknownRoot = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root: "nope" });
+    assert.ok(isFailure(unknownRoot));
+    assert.ok(!("root" in (unknownRoot as Record<string, unknown>)));
   });
 });
