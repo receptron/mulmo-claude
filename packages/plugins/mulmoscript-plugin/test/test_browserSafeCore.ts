@@ -7,47 +7,64 @@
 // bundler does, or worse, ships a broken chunk. So the rule is checked rather
 // than remembered: `core/` takes its platform pieces as arguments.
 //
-// The list of builtins comes from NODE, not from this file. The first version
-// matched `node:*` only, and `import path from "path"` — equally valid, and
-// what most of this repo actually writes — would have put the dependency
-// straight back with the guard green (Codex on #3017). A rule enforced by a
-// list someone maintains is the failure this whole line of work keeps hitting.
+// **Parsed, not pattern-matched.** Four rounds of review went into a regex
+// that kept being almost right: it missed bare `import path from "path"`, then
+// side-effect `import "path"`, then multiline `import {\n…\n} from "node:fs"`,
+// while also flagging `export const label = "node:fs"` — a string that is not
+// an import at all. Every fix enumerated one more form, and the forms are
+// open-ended. TypeScript already knows what a module specifier is, so it is
+// asked (Codex + CodeRabbit on #3017).
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { builtinModules } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const CORE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "core");
 const BUILTINS = new Set(builtinModules);
 
 /**
- * Every module specifier the line imports, however it spells it.
+ * Every module specifier the source imports — from the parser, not a pattern.
  *
- * Two rules rather than a list of syntactic forms. The first version listed
- * `from` / `require(` / `import(`, and `import "path";` — which has none of
- * them — walked straight past it, twice (Codex + CodeRabbit on #3017). The
- * forms are open-ended; what is closed is WHERE a specifier can appear.
- *
- * 1. On an `import` / `export` statement, every string literal is a specifier.
- *    That covers the side-effect form for free, because there is nothing else
- *    a quoted string can be there.
- * 2. Anywhere at all, the argument of `require(…)` or a dynamic `import(…)`.
+ * `forEachChild` walks the real tree, so a specifier is found wherever the
+ * grammar allows one and nowhere else: static and side-effect imports,
+ * `export … from`, `import type`, `require()` and dynamic `import()`, however
+ * they are spread across lines. A quoted builtin name that is NOT a specifier
+ * (`const which = "path"`) is not a node this visitor stops on.
  */
-function importedSpecifiers(line: string): string[] {
+export function importedSpecifiers(source: string): string[] {
+  const file = ts.createSourceFile("probe.ts", source, ts.ScriptTarget.Latest, true);
   const specifiers: string[] = [];
-  if (/^\s*(?:import|export)\b/.test(line)) {
-    for (const match of line.matchAll(/["']([^"']+)["']/g)) specifiers.push(match[1]!);
-  }
-  for (const match of line.matchAll(/(?:require|import)\(\s*["']([^"']+)["']/g)) {
-    specifiers.push(match[1]!);
-  }
+  const visit = (node: ts.Node): void => {
+    const specifier = moduleSpecifierOf(node);
+    if (specifier !== undefined) specifiers.push(specifier);
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
   return specifiers;
 }
 
+function moduleSpecifierOf(node: ts.Node): string | undefined {
+  if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+    return node.moduleSpecifier.text;
+  }
+  if (ts.isCallExpression(node) && isModuleLoadCall(node.expression)) {
+    const [first] = node.arguments;
+    if (first && ts.isStringLiteral(first)) return first.text;
+  }
+  return undefined;
+}
+
+/** `require(…)` or a dynamic `import(…)` — the identifier itself, so
+ *  `myrequire("path")` is not one of them. */
+function isModuleLoadCall(expression: ts.Expression): boolean {
+  return expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(expression) && expression.text === "require");
+}
+
 /** A Node builtin, whether written `node:path` or bare `path`. */
-function isNodeBuiltin(specifier: string): boolean {
+export function isNodeBuiltin(specifier: string): boolean {
   const bare = specifier.startsWith("node:") ? specifier.slice("node:".length) : specifier;
   return BUILTINS.has(bare) || BUILTINS.has(`node:${bare}`);
 }
@@ -56,9 +73,8 @@ function coreModules(): string[] {
   return readdirSync(CORE_DIR).filter((name) => name.endsWith(".ts"));
 }
 
-function findBuiltinImport(name: string): string | undefined {
-  const source = readFileSync(path.join(CORE_DIR, name), "utf8");
-  return source.split("\n").find((line) => importedSpecifiers(line).some(isNodeBuiltin));
+function builtinImportsIn(name: string): string[] {
+  return importedSpecifiers(readFileSync(path.join(CORE_DIR, name), "utf8")).filter(isNodeBuiltin);
 }
 
 describe("the browser-facing core imports no Node builtin", () => {
@@ -71,55 +87,61 @@ describe("the browser-facing core imports no Node builtin", () => {
 
   for (const name of coreModules()) {
     it(`${name} imports no Node builtin`, () => {
-      const offender = findBuiltinImport(name);
-      assert.equal(offender, undefined, `${name} reaches the browser bundle — take the platform piece as an argument instead of importing it`);
+      const offenders = builtinImportsIn(name);
+      assert.deepEqual(offenders, [], `${name} reaches the browser bundle — take the platform piece as an argument instead of importing it`);
     });
   }
 });
 
-describe("the guard recognises every spelling of a builtin import", () => {
-  // The detection IS the test, so it is pinned directly — including the bare
-  // form the first version missed.
-  const CAUGHT = [
-    'import nodePath from "node:path";',
-    'import path from "path";',
-    'import { readFileSync } from "node:fs";',
-    'import { readFileSync } from "fs";',
-    // Side-effect imports: no `from`, no call — the form that slipped past two
-    // versions of this guard.
-    'import "path";',
-    'import "node:path";',
-    '  import "node:crypto";',
-    'const p = require("path");',
-    'const p = require("node:path");',
-    'export { sep } from "path";',
-    'export * from "node:path";',
-    'const mod = await import("node:os");',
-    'import type { Stats } from "node:fs";',
-  ];
-  const ALLOWED = [
-    " * The slice of `node:path` this rule needs.",
-    'import { ARTIFACTS_ROOT } from "@mulmoclaude/core/artifacts";',
-    'import { normalizeStoryPath } from "./paths";',
-    'import type { MulmoBeat } from "@mulmocast/types";',
-    // A package whose name merely CONTAINS a builtin's name is not one.
-    'import { join } from "path-browserify";',
-    'import x from "node-fetch";',
-    'import "./styles.css";',
-    // A quoted builtin name OUTSIDE an import statement is not an import.
-    'const which = "path";',
-    'log.info("fs", "wrote the file");',
+describe("the guard finds a specifier wherever the grammar allows one", () => {
+  // The detection IS the test, so it is pinned directly — every form that
+  // walked past an earlier version of it included.
+  const CAUGHT: ReadonlyArray<[string, string]> = [
+    ["default import", 'import nodePath from "node:path";'],
+    ["bare default import", 'import path from "path";'],
+    ["named import", 'import { readFileSync } from "node:fs";'],
+    ["bare named import", 'import { readFileSync } from "fs";'],
+    ["side-effect import", 'import "path";'],
+    ["side-effect import, prefixed", 'import "node:path";'],
+    ["multiline import", 'import {\n  readFileSync,\n  writeFileSync,\n} from "node:fs";'],
+    ["multiline default import", 'import\n  nodePath\nfrom "path";'],
+    ["type-only import", 'import type { Stats } from "node:fs";'],
+    ["namespace import", 'import * as os from "node:os";'],
+    ["re-export", 'export { sep } from "path";'],
+    ["star re-export", 'export * from "node:path";'],
+    ["require", 'const p = require("path");'],
+    ["dynamic import", 'const mod = await import("node:os");'],
   ];
 
-  for (const line of CAUGHT) {
-    it(`catches ${line}`, () => {
-      assert.ok(importedSpecifiers(line).some(isNodeBuiltin), line);
+  for (const [label, source] of CAUGHT) {
+    it(`catches a ${label}`, () => {
+      assert.ok(importedSpecifiers(source).some(isNodeBuiltin), `${label} must be recognised: ${JSON.stringify(source)}`);
     });
   }
+});
 
-  for (const line of ALLOWED) {
-    it(`allows ${line.trim().slice(0, 48)}`, () => {
-      assert.ok(!importedSpecifiers(line).some(isNodeBuiltin), line);
+describe("the guard does not flag things that only look like imports", () => {
+  const ALLOWED: ReadonlyArray<[string, string]> = [
+    ["a comment", "/** The slice of `node:path` this rule needs. */"],
+    ["a workspace import", 'import { ARTIFACTS_ROOT } from "@mulmoclaude/core/artifacts";'],
+    ["a relative import", 'import { normalizeStoryPath } from "./paths";'],
+    ["a stylesheet", 'import "./styles.css";'],
+    // Packages whose NAME contains a builtin's name.
+    ["path-browserify", 'import { join } from "path-browserify";'],
+    ["node-fetch", 'import x from "node-fetch";'],
+    // Strings that are not specifiers — the false positives a line-based
+    // regex produced.
+    ["an exported constant", 'export const label = "node:fs";'],
+    ["a local constant", 'const which = "path";'],
+    ["a log argument", 'log.info("fs", "wrote the file");'],
+    ["require-looking text inside a string", "const sample = 'require(\"node:fs\")';"],
+    ["an identifier ending in require", 'myrequire("path");'],
+  ];
+
+  for (const [label, source] of ALLOWED) {
+    it(`allows ${label}`, () => {
+      const found = importedSpecifiers(source).filter(isNodeBuiltin);
+      assert.deepEqual(found, [], `${label} must not be flagged: ${JSON.stringify(source)}`);
     });
   }
 
