@@ -45,8 +45,6 @@ const MUTATING_KINDS: ReadonlyArray<[string, Record<string, unknown>]> = [
   ["save", { filename: "deck.json", script: {} }],
   ["updateBeat", { filePath: "stories/deck.json", beatIndex: 0, beat: {} }],
   ["updateScript", { filePath: "stories/deck.json", script: {} }],
-  ["uploadBeatImage", { filePath: "stories/deck.json", beatIndex: 0, imageData: "data:image/png;base64,AA==" }],
-  ["uploadCharacterImage", { filePath: "stories/deck.json", key: "alice", imageData: "data:image/png;base64,AA==" }],
   ["generateMovie", { filePath: "stories/deck.json" }],
   ["generatePdf", { filePath: "stories/deck.json" }],
   ["renderBeat", { filePath: "stories/deck.json", beatIndex: 0 }],

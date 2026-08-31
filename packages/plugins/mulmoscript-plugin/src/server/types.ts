@@ -75,6 +75,27 @@ export interface MulmoScriptServerBackend {
    * root, an agent cannot.
    */
   extraRoots?: Record<string, string>;
+  /**
+   * Whether this host can keep pending generations apart by root.
+   *
+   * Generation in a named root was refused outright (#3015) because
+   * MulmoClaude's session store keys pending work by `(kind, filePath, key)` —
+   * `generationKey` in `@mulmobridge/protocol` — so two roots generating the
+   * same beat in one session collapse to one entry and either completion
+   * clears the other root's indicator.
+   *
+   * That hazard is the HOST's, not this package's, and not every host has it:
+   * MulmoTerminal ignores `chatSessionId` and publishes straight to a pubsub
+   * channel the View filters by the pair, so it was being refused for a
+   * collision it cannot have (#3019). The question was never "is this root the
+   * default" but "can this host tell two roots' generations apart".
+   *
+   * Default `false` — absent means the refusal stays exactly as it shipped, so
+   * a host that has not thought about this is not quietly opened up. A host
+   * sets it only once its own pending-generation state carries the root (or it
+   * keeps none at all).
+   */
+  rootScopedGenerationState?: boolean;
   /** Shared artifacts FileOps (rooted at `<workspace>/artifacts`) for the
    *  save / reopen / update dispatch kinds (phase-1 core executes). */
   artifacts: FileOps;

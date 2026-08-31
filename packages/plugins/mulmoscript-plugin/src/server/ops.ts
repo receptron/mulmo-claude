@@ -233,7 +233,9 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     // person who has to widen their session key, and they see this at boot
     // rather than discovering it from a stuck spinner.
     log.warn(
-      "extra stories roots registered — generation and writes are REFUSED in them until the host's per-session generation key includes the root (`generationKey` in @mulmobridge/protocol); reads work today (#3014 step 2)",
+      backend.rootScopedGenerationState === true
+        ? "extra stories roots registered — reads, uploads and generation work; save/update still land in the DEFAULT root until this host passes `artifactsFor` (#3019)"
+        : "extra stories roots registered — reads and uploads work, but GENERATION is refused until this host declares `rootScopedGenerationState` (its pending-generation state must carry the root, or it must keep none), and save/update land in the DEFAULT root until it passes `artifactsFor` (#3019)",
       { roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT) },
     );
   }
@@ -408,14 +410,17 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * session would collapse to one entry, and either completion would clear the
    * other root's indicator (Codex P1 on #3015).
    *
-   * Widening that key is a protocol change with its own consumers, so it is not
-   * this package's to make. Refusing the generation is: a named root that
-   * cannot be tracked correctly must not start, rather than start and corrupt
-   * the other root's state. Same fail-closed shape as `guardStoryWriteRoot`,
-   * and step 2 replaces both once the protocol carries the root.
+   * Whose hazard it is decides who answers: a host declares
+   * `rootScopedGenerationState` when its own pending state carries the root —
+   * or when it keeps none, which is MulmoTerminal's case. It was refused for a
+   * collision it cannot have (#3019).
+   *
+   * Absent still refuses, so a host that has not thought about this keeps the
+   * shipped behaviour rather than being quietly opened up.
    */
   function guardStoryGenerationRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
+    if (backend.rootScopedGenerationState === true) return null;
     return opBadRequest("generating in a non-default stories root is not supported yet");
   }
 
@@ -816,8 +821,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // ── Upload ops ────────────────────────────────────────────────
 
   async function uploadBeatImageOp(filePath: string, beatIndex: number, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
-    const rootGuard = guardStoryWriteRoot(root);
-    if (rootGuard) return rootGuard;
+    // No root guard: the write is already in the right root. `runStoryOp`
+    // resolves through `resolveStory` — realpath containment, per root — and
+    // hands the executor an ABSOLUTE path, from which `buildContext` derives
+    // its `basedir`. The guard here was added defensively during #3015's
+    // review and refused a write that was never wrong (#3019).
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-beat-image", root }, async ({ context }) => {
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       // writeFileAtomic creates parent dirs and prevents a half-
@@ -829,8 +837,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   async function uploadCharacterImageOp(filePath: string, key: string, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
-    const rootGuard = guardStoryWriteRoot(root);
-    if (rootGuard) return rootGuard;
+    // No root guard: the write is already in the right root. `runStoryOp`
+    // resolves through `resolveStory` — realpath containment, per root — and
+    // hands the executor an ABSOLUTE path, from which `buildContext` derives
+    // its `basedir`. The guard here was added defensively during #3015's
+    // review and refused a write that was never wrong (#3019).
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-character-image", root }, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
       const base64 = stripDataUri(imageData);

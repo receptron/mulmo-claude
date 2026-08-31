@@ -52,7 +52,7 @@ describe("root registry", () => {
     assert.equal(result.ok === false && result.code, "bad_request");
   });
 
-  it("warns at boot that named roots are read-only until the protocol carries the root", () => {
+  it("tells a host that registers a root exactly what does not work yet", () => {
     // The pair identity stops at the host boundary: `generationKey` in
     // `@mulmobridge/protocol` keys on `(kind, filePath, key)`. Widening it is a
     // protocol change with its own consumers, so this package cannot make it —
@@ -67,7 +67,7 @@ describe("root registry", () => {
       log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
     });
     assert.equal(warnings.length, 1);
-    assert.match(warnings[0]!, /generation and writes are REFUSED in them/);
+    assert.match(warnings[0]!, /GENERATION is refused until this host declares `rootScopedGenerationState`/);
   });
 
   it("refuses two extraRoots ids that trim to the same key", () => {
@@ -309,6 +309,11 @@ describe("the whole ops surface is classified for named roots", () => {
    * `triggerAutoBackgroundMovie` through.
    */
   const GUARDED_ELSEWHERE = [
+    // Uploads write through `resolveStory`'s per-root containment and take the
+    // absolute path it returns, so a named root is already the RIGHT place to
+    // write — they have their own coverage below rather than a refusal (#3019).
+    "uploadBeatImageOp",
+    "uploadCharacterImageOp",
     "toStoryRef",
     "resolveStory",
     "guardStoryWirePath",
@@ -327,8 +332,6 @@ describe("the whole ops surface is classified for named roots", () => {
     ["renderBeatOp", (ops) => ops.renderBeatOp({ filePath: "stories/d.json", beatIndex: 0, root: namedRoot })],
     ["generateBeatAudioOp", (ops) => ops.generateBeatAudioOp({ filePath: "stories/d.json", beatIndex: 0, root: namedRoot })],
     ["renderCharacterOp", (ops) => ops.renderCharacterOp({ filePath: "stories/d.json", key: "alice", root: namedRoot })],
-    ["uploadBeatImageOp", (ops) => ops.uploadBeatImageOp("stories/d.json", 0, "data:image/png;base64,AA==", namedRoot)],
-    ["uploadCharacterImageOp", (ops) => ops.uploadCharacterImageOp("stories/d.json", "alice", "data:image/png;base64,AA==", namedRoot)],
     ["generateMovieOp", (ops) => ops.generateMovieOp("stories/d.json", undefined, namedRoot)],
     ["generatePdfOp", (ops) => ops.generatePdfOp("stories/d.json", undefined, namedRoot)],
   ];
@@ -660,5 +663,189 @@ describe("storyRefWithin — the Windows case, driven from any platform", () => 
     assert.equal(storyRefWithin(root, "/workspace/artifacts/stories/deck.json", path.posix), "stories/deck.json");
     assert.equal(storyRefWithin(root, "/elsewhere/deck.json", path.posix), null);
     assert.equal(storyRefWithin(root, root, path.posix), "stories");
+  });
+});
+
+describe("an upload writes into the root it names — and nowhere else", () => {
+  // The guard that refused these was defensive, not necessary: `runStoryOp`
+  // resolves through `resolveStory` (realpath containment, per root) and hands
+  // the executor an ABSOLUTE path. Removing a guard is only safe if what it
+  // was standing in front of is actually sound, so this drives the real
+  // filesystem rather than asserting the guard is gone (#3019).
+  //
+  // Containment rests on `resolveStory` ALONE here: both hosts inject a
+  // `writeFileAtomic` that trusts the absolute path it is handed
+  // (MulmoTerminal `server/backends/mulmoscript.ts:66` mkdir -p's and renames).
+  // That is the invariant these cases exist to hold.
+  const workspaces: string[] = [];
+  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+  const PNG = "data:image/png;base64,iVBORw0KGgo=";
+
+  function makeTwoRoots() {
+    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-upload-"));
+    workspaces.push(base);
+    const written: string[] = [];
+    const roots = { repoA: path.join(base, "a"), repoB: path.join(base, "b") };
+    const defaultStories = path.join(base, "ws", "artifacts", "stories");
+    for (const dir of [roots.repoA, roots.repoB, defaultStories]) mkdirSync(dir, { recursive: true });
+    // The same wire path exists in all three — the case the pair identity is
+    // for. A REAL script, because the upload path builds a mulmocast context
+    // from the file before it derives the image path: a `{}` stub fails long
+    // before the write, and the assertion below would pass on a run that never
+    // wrote anything.
+    const deck = JSON.stringify({
+      $mulmocast: { version: "1.1" },
+      title: "Deck",
+      lang: "en",
+      beats: [{ speaker: "Narrator", text: "Beat one.", image: { type: "textSlide", slide: { title: "S", bullets: ["b"] } } }],
+      imageParams: {},
+    });
+    for (const dir of [roots.repoA, roots.repoB, defaultStories]) writeFileSync(path.join(dir, "deck.json"), deck);
+    const ops = createMulmoScriptServerOps({
+      storiesDir: defaultStories,
+      extraRoots: roots,
+      artifacts: stubFileOps,
+      writeFileAtomic: async (absolutePath) => {
+        written.push(absolutePath);
+      },
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return { ops, written, roots, defaultStories };
+  }
+
+  it("writes under the named root, not the default one", async () => {
+    const { ops, written, roots, defaultStories } = makeTwoRoots();
+    await ops.uploadBeatImageOp("stories/deck.json", 0, PNG, "repoA");
+    assert.equal(written.length, 1, "exactly one write");
+    const target = written[0]!;
+    assert.ok(target.startsWith(realpathSync(roots.repoA)), `wrote outside repoA: ${target}`);
+    assert.ok(!target.startsWith(realpathSync(defaultStories)), `wrote into the DEFAULT root: ${target}`);
+  });
+
+  it("keeps two roots' identically-named decks apart", async () => {
+    // The failure this replaces the guard's protection with: writing to
+    // `repoB` must not touch `repoA`, though both hold `stories/deck.json`.
+    const { ops, written, roots } = makeTwoRoots();
+    await ops.uploadBeatImageOp("stories/deck.json", 0, PNG, "repoB");
+    assert.equal(written.length, 1);
+    assert.ok(written[0]!.startsWith(realpathSync(roots.repoB)));
+    assert.ok(!written[0]!.startsWith(realpathSync(roots.repoA)));
+  });
+
+  it("still refuses an unregistered root — the containment did not move", async () => {
+    const { ops, written } = makeTwoRoots();
+    const result = await ops.uploadBeatImageOp("stories/deck.json", 0, PNG, "nope");
+    assert.equal(result.ok, false);
+    assert.equal(written.length, 0, "a refused upload must write nothing");
+  });
+
+  it("still refuses a traversal path — the containment did not move", async () => {
+    const { ops, written } = makeTwoRoots();
+    const result = await ops.uploadBeatImageOp("stories/../../escape.png", 0, PNG, "repoA");
+    assert.equal(result.ok, false);
+    assert.equal(written.length, 0, "a refused upload must write nothing");
+  });
+
+  it("the default root still works, unchanged", async () => {
+    const { ops, written, defaultStories } = makeTwoRoots();
+    await ops.uploadBeatImageOp("stories/deck.json", 0, PNG);
+    assert.equal(written.length, 1);
+    assert.ok(written[0]!.startsWith(realpathSync(defaultStories)));
+  });
+});
+
+describe("who may generate in a named root is the HOST's answer", () => {
+  // Generation was refused outright (#3015) because MulmoClaude's session store
+  // keys pending work by `(kind, filePath, key)`, so two roots generating the
+  // same beat in one session collapse to one entry. That hazard belongs to the
+  // host, and MulmoTerminal does not have it — it ignores `chatSessionId` and
+  // publishes to a pubsub channel the View filters by the pair. It was being
+  // refused for a collision it cannot have (#3019).
+  const namedRoot = "repoA";
+  const REFUSAL = /generating in a non-default stories root is not supported yet/;
+
+  function makeOpsWith(declared: boolean | undefined) {
+    const generations: MulmoScriptGenerationEvent[] = [];
+    const ops = createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      extraRoots: { [namedRoot]: "/tmp/a" },
+      ...(declared === undefined ? {} : { rootScopedGenerationState: declared }),
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      onGenerationEvent: (_session, event) => generations.push(event),
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return { ops, generations };
+  }
+
+  it("refuses when the host says nothing — the shipped behaviour is the default", async () => {
+    // An absent declaration must not quietly open a host that never thought
+    // about this. That is the whole reason the flag defaults to off.
+    const { ops } = makeOpsWith(undefined);
+    const result = await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
+    assert.equal(result.ok, false);
+    assert.match(result.ok === false ? result.error : "", REFUSAL);
+  });
+
+  it("refuses when the host declares it cannot keep roots apart", async () => {
+    const { ops } = makeOpsWith(false);
+    const result = await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
+    assert.equal(result.ok, false);
+    assert.match(result.ok === false ? result.error : "", REFUSAL);
+  });
+
+  it("lets the generation start when the host declares it can", async () => {
+    // It still fails — there is no such script on disk — but NOT for the root,
+    // which is the difference between "refused" and "ran and did not find it".
+    const { ops } = makeOpsWith(true);
+    const result = await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
+    assert.equal(result.ok, false);
+    assert.doesNotMatch(result.ok === false ? result.error : "", REFUSAL, "the root must no longer be the reason");
+  });
+
+  it("applies the declaration to every generation kind", async () => {
+    // Swept, because the guard sits at five entry points and a kind that kept
+    // the old blanket refusal would be invisible in a single-kind test.
+    const { ops } = makeOpsWith(true);
+    const results = [
+      await ops.generateMovieOp("stories/deck.json", "s", namedRoot),
+      await ops.generatePdfOp("stories/deck.json", "s", namedRoot),
+      await ops.renderBeatOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "s", root: namedRoot }),
+      await ops.generateBeatAudioOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "s", root: namedRoot }),
+      await ops.renderCharacterOp({ filePath: "stories/deck.json", key: "alice", chatSessionId: "s", root: namedRoot }),
+    ];
+    for (const result of results) {
+      assert.doesNotMatch(result.ok === false ? result.error : "", REFUSAL);
+    }
+  });
+
+  it("never opens the DEFAULT root's behaviour either way", async () => {
+    // The declaration is about named roots. A call naming no root was always
+    // allowed and must stay exactly as it was.
+    for (const declared of [undefined, false, true]) {
+      const { ops } = makeOpsWith(declared);
+      const result = await ops.generateMovieOp("stories/deck.json", "session-1");
+      assert.doesNotMatch(result.ok === false ? result.error : "", REFUSAL, `declared=${declared}`);
+    }
+  });
+});
+
+describe("the boot warning says what is actually true for THIS host", () => {
+  // The warning is the only thing a host integrator reads before discovering a
+  // limit from a stuck spinner, so it must track the limits rather than repeat
+  // the ones that applied when it was written (#3019).
+  it("stops mentioning generation once the host declares it can scope it", () => {
+    const warnings: string[] = [];
+    createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      extraRoots: { repoA: "/tmp/a" },
+      rootScopedGenerationState: true,
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+    });
+    assert.equal(warnings.length, 1);
+    assert.doesNotMatch(warnings[0]!, /GENERATION is refused/);
+    assert.match(warnings[0]!, /save\/update still land in the DEFAULT root/);
   });
 });
