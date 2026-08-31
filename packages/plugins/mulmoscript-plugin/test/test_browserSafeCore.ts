@@ -22,10 +22,25 @@ import { fileURLToPath } from "node:url";
 const CORE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "core");
 const BUILTINS = new Set(builtinModules);
 
-/** Every module specifier the line imports from, however it spells it. */
+/**
+ * Every module specifier the line imports, however it spells it.
+ *
+ * Two rules rather than a list of syntactic forms. The first version listed
+ * `from` / `require(` / `import(`, and `import "path";` — which has none of
+ * them — walked straight past it, twice (Codex + CodeRabbit on #3017). The
+ * forms are open-ended; what is closed is WHERE a specifier can appear.
+ *
+ * 1. On an `import` / `export` statement, every string literal is a specifier.
+ *    That covers the side-effect form for free, because there is nothing else
+ *    a quoted string can be there.
+ * 2. Anywhere at all, the argument of `require(…)` or a dynamic `import(…)`.
+ */
 function importedSpecifiers(line: string): string[] {
   const specifiers: string[] = [];
-  for (const match of line.matchAll(/(?:from\s*|require\(\s*|import\(\s*)["']([^"']+)["']/g)) {
+  if (/^\s*(?:import|export)\b/.test(line)) {
+    for (const match of line.matchAll(/["']([^"']+)["']/g)) specifiers.push(match[1]!);
+  }
+  for (const match of line.matchAll(/(?:require|import)\(\s*["']([^"']+)["']/g)) {
     specifiers.push(match[1]!);
   }
   return specifiers;
@@ -70,10 +85,17 @@ describe("the guard recognises every spelling of a builtin import", () => {
     'import path from "path";',
     'import { readFileSync } from "node:fs";',
     'import { readFileSync } from "fs";',
+    // Side-effect imports: no `from`, no call — the form that slipped past two
+    // versions of this guard.
+    'import "path";',
+    'import "node:path";',
+    '  import "node:crypto";',
     'const p = require("path");',
     'const p = require("node:path");',
     'export { sep } from "path";',
+    'export * from "node:path";',
     'const mod = await import("node:os");',
+    'import type { Stats } from "node:fs";',
   ];
   const ALLOWED = [
     " * The slice of `node:path` this rule needs.",
@@ -83,6 +105,10 @@ describe("the guard recognises every spelling of a builtin import", () => {
     // A package whose name merely CONTAINS a builtin's name is not one.
     'import { join } from "path-browserify";',
     'import x from "node-fetch";',
+    'import "./styles.css";',
+    // A quoted builtin name OUTSIDE an import statement is not an import.
+    'const which = "path";',
+    'log.info("fs", "wrote the file");',
   ];
 
   for (const line of CAUGHT) {
