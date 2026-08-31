@@ -126,3 +126,30 @@ describe("one spelling of a root, shared by both sides", () => {
     assert.equal(shouldReloadForScriptChange({ filePath: watching, root: "repoA" }, watching, "me", " repoA "), true);
   });
 });
+
+describe("a non-string root never throws out of a pubsub callback", () => {
+  // The type forbids it, but this package is published and its callers include
+  // untyped JavaScript. A subscription whose `root()` returns `42` reached
+  // `.trim()` and threw from INSIDE the pubsub callback — nothing catches it
+  // there, and the only symptom is a View that stops updating
+  // (Codex P2 on #3015).
+  const MALFORMED = [42, null, {}, ["repoA"], true];
+
+  it("reads a non-string root as the default root", () => {
+    for (const root of MALFORMED) {
+      assert.equal(normalizeRoot(root as never), "", `normalizeRoot(${JSON.stringify(root)})`);
+    }
+  });
+
+  it("matches a malformed root against the default root, not against a named one", () => {
+    for (const root of MALFORMED) {
+      assert.equal(sameRoot(root as never, undefined), true, `${JSON.stringify(root)} vs default`);
+      assert.equal(sameRoot(root as never, "repoA"), false, `${JSON.stringify(root)} vs repoA`);
+    }
+  });
+
+  it("does not throw from the reload rule either", () => {
+    const watching = "stories/deck.json";
+    assert.doesNotThrow(() => shouldReloadForScriptChange({ filePath: watching, root: 42 as never }, watching, "me", "repoA"));
+  });
+});

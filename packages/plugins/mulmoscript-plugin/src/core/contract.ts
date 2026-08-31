@@ -79,8 +79,16 @@ export const DEFAULT_ROOT = "";
  * `readCommandScope` in `@mulmoclaude/core/remote-host` — trims its value and
  * shares the "absent = the host's own root" convention. Without this,
  * `" repoA "` is one root there and a different one here.
+ *
+ * A non-string reads as the default root rather than throwing. The type says
+ * that cannot happen, but this package is published and its callers include
+ * untyped JavaScript: a subscription whose `root()` returns `42` reached
+ * `.trim()` and threw from INSIDE a pubsub callback, where nothing catches it
+ * and the View simply stops updating (Codex P2 on #3015). The guard belongs
+ * here rather than at the three call sites, because a rule enforced by
+ * enumerating its callers is what this PR got wrong repeatedly.
  */
-export const normalizeRoot = (root: string | undefined): string => root?.trim() ?? DEFAULT_ROOT;
+export const normalizeRoot = (root: string | undefined): string => (typeof root === "string" ? root.trim() : DEFAULT_ROOT);
 
 /**
  * Two roots are the same when they name the same one, with absent meaning the

@@ -8,6 +8,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeGenerationSubscription, normalizeScriptChangedSubscription } from "../src/vue/subscription";
+import { sameRoot } from "../src/core/contract";
 import type { MulmoScriptGenerationEvent } from "../src/core/contract";
 
 const filePath = (): string => "stories/deck.json";
@@ -103,5 +104,33 @@ describe("the object form is checked at the subscribe call, not at delivery", ()
 
   it("throws for a script-changed object with no ownOrigin", () => {
     assert.throws(() => normalizeScriptChangedSubscription({ filePath, handler } as never), /ownOrigin must be a string/);
+  });
+});
+
+describe("a root getter that returns a non-string cannot break delivery", () => {
+  // The exact path Codex named (P2 on #3015): the object form only checks that
+  // `root` is CALLABLE, so an untyped caller can pass `{ root: () => 42 }`.
+  // The subscriber then evaluates it during pubsub delivery and hands the
+  // result to `sameRoot` — which used to throw from inside the callback, where
+  // nothing catches it and the View just stops updating.
+  //
+  // Evaluating the getter at subscribe time would not help: it is a getter
+  // precisely because its answer changes. So the value is made safe where it
+  // is USED, and this test drives that boundary the way the subscriber does.
+  const filePath = (): string => "stories/deck.json";
+  const handler = (): void => {};
+
+  it("accepts the subscription and never throws when the getter is evaluated", () => {
+    const subscription = normalizeGenerationSubscription({ filePath, root: () => 42, handler } as never);
+    assert.doesNotThrow(() => sameRoot("repoA", subscription.root()));
+    assert.doesNotThrow(() => sameRoot(undefined, subscription.root()));
+  });
+
+  it("treats the malformed answer as the default root", () => {
+    // Not as a match for every named root, which is the failure that would
+    // route another repository's events to this View.
+    const subscription = normalizeGenerationSubscription({ filePath, root: () => 42, handler } as never);
+    assert.equal(sameRoot("repoA", subscription.root()), false);
+    assert.equal(sameRoot(undefined, subscription.root()), true);
   });
 });
