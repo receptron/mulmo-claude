@@ -267,7 +267,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     // The relativizing rule is a pure function in `core/paths.ts` so it can be
     // driven with `path.win32` from a POSIX machine — the case it guards
     // (no relative route across drives) is unreachable here.
-    return storyRefWithin(base, absolutePath);
+    return storyRefWithin(base, absolutePath, path);
   }
 
   // Lazily realpath the stories dir on first use. We can't realpath at

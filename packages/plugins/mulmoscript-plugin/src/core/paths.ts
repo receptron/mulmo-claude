@@ -9,11 +9,16 @@
 // (which every mulmoScript endpoint keys on) are the SAME string. Stories are
 // NOT `YYYY/MM`-partitioned, so `storyFilePath` opts out of partitioning.
 
-import nodePath from "node:path";
 import { ARTIFACTS_ROOT, buildArtifactRelPath, hasUnsafePathSegment, slugifyArtifact } from "@mulmoclaude/core/artifacts";
 
-/** The slice of `node:path` this module needs — injected so the win32 rules
- *  can be driven from a POSIX machine (`path.win32`). */
+/**
+ * The slice of `node:path` this rule needs.
+ *
+ * Injected with no default, and this module imports no `node:*` builtin: it is
+ * reached from the browser entry through `core/plugin`, so a `node:path`
+ * import here lands in the Vue bundle (Codex on #3017). The server passes its
+ * own `path`; tests pass `path.win32` to reach the case below.
+ */
 export interface PathRules {
   relative: (from: string, to: string) => string;
   isAbsolute: (p: string) => boolean;
@@ -34,7 +39,7 @@ export interface PathRules {
  * is the substitution this function exists to refuse. Only Windows CI caught
  * it; here there is one root and always a relative route (#3015 post-merge).
  */
-export function storyRefWithin(base: string, absolutePath: string, rules: PathRules = nodePath): string | null {
+export function storyRefWithin(base: string, absolutePath: string, rules: PathRules): string | null {
   const relative = rules.relative(base, absolutePath);
   if (rules.isAbsolute(relative)) return null;
   const rel = relative.split(rules.sep).join("/");
