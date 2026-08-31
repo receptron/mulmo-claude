@@ -9,7 +9,7 @@
 
 「起動 path 1 個を root として登録した世界」を作って実行:
 
-```
+```text
 stories/myrepo/decks/talk.json -> OK  <launch>/myrepo/decks/talk.json
 stories/other/notes/deck.json  -> OK  <launch>/other/notes/deck.json
 stories/../../etc/passwd       -> 拒否 bad_request
@@ -75,6 +75,43 @@ MulmoTerminal 側の `createFileOps(rootFor: () => string, label: string)` は r
 一度は「MulmoTerminal のディレクトリ一覧は実行中に変わるから thunk が要る」と
 考えたが、root がサブツリーなら **起動 path 1 個**で足り、それは boot で確定する。
 実行時登録は要らない。
+
+### 5. 名前付き root の FileOps は `stories/` を剥いでから渡す（レビューで判明）
+
+読みと書きが**1 セグメントだけ食い違い、しかも静かだった**。
+
+| | 経路 | `stories/deck.json` の着地 |
+|---|---|---|
+| 読み | `resolveStory` が `stories/` を剥いで rootDir 配下で解決 | `<rootDir>/deck.json` |
+| 書き | executor が wire パスのまま FileOps へ渡す | `<FileOpsRoot>/stories/deck.json` |
+
+一致するのは `FileOpsRoot/stories === rootDir` のときだけで、その制約はどこにも
+書かれていなかった。消費側ホスト（MulmoTerminal）が「登録したディレクトリに
+FileOps を張る」という**自然な書き方**をすると外れる。
+
+実測した症状:
+
+```text
+save の結果  : {"ok":true, "filePath":"stories/talk-….json", "root":"launch"}   ← 成功を返す
+実際に生えた : <launch>/stories/talk-….json
+読み戻し先   : NG not_found                                    ← 読みは <launch>/talk-….json
+```
+
+**`save` は成功を報告し、読み戻せない wire パスを返す。** ホストが作るカードが
+何も指さない。
+
+名前付き root の FileOps を薄いアダプタで包み、`stories/` を剥いでから渡す。
+これで「**登録したディレクトリ = FileOps の root**」が正しくなり、ホストが自然に
+書く形と一致する。既定 root は無改変（その FileOps は `<workspace>/artifacts` に
+根を張り、他プラグインと共有しているので再ルートできない）。
+
+wire パスでないものは通さず throw する。ここに来るものはすべて
+`normalizeStoryPath` か `storyFilePath` を通っているので、そうでないものはバグで、
+通せば「誰も読めない場所に書く」——このアダプタが終わらせようとしている失敗そのもの。
+
+**テストの形も変えた。** 元のテストは相対キーの `Map` を見ていたので、
+**バイトがどの絶対パスに落ちたかを見ていなかった**。実 FileOps + 実ディレクトリで
+書き、`resolveStory` が返す絶対パスから読み戻す **round trip** にした。
 
 ## 不可侵点
 

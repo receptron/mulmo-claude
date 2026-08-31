@@ -6,7 +6,7 @@
 // field existed and the collisions it was meant to end were all still there.
 // Type-checking cannot catch that: `root` is optional, so a forgotten forward
 // is a legal call. Only a test that asserts on the OUTPUT can.
-import { describe, it, after } from "node:test";
+import { describe, it, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -806,6 +806,28 @@ describe("who may generate in a named root is the HOST's answer", () => {
     assert.doesNotMatch(result.ok === false ? result.error : "", REFUSAL, "the root must no longer be the reason");
   });
 
+  it("emits NOTHING for an unregistered root, even with the declaration on", async () => {
+    // The flag says "this host can tell two roots apart", not "any id is
+    // addressable". The generation ops publish their start event before
+    // `runStoryOp` reaches `resolveStory`, so an unregistered root emitted a
+    // start/finish pair for work that never existed and the host briefly
+    // recorded it (Codex + CodeRabbit on #3020).
+    const { ops, generations } = makeOpsWith(true);
+    const result = await ops.renderBeatOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "s", root: "never-registered" });
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.code, "bad_request");
+    assert.deepEqual(generations, [], "an unregistered root must announce nothing at all");
+  });
+
+  it("emits nothing for an unregistered root in every generation kind", async () => {
+    const { ops, generations } = makeOpsWith(true);
+    await ops.generateMovieOp("stories/deck.json", "s", "never-registered");
+    await ops.generatePdfOp("stories/deck.json", "s", "never-registered");
+    await ops.generateBeatAudioOp({ filePath: "stories/deck.json", beatIndex: 0, chatSessionId: "s", root: "never-registered" });
+    await ops.renderCharacterOp({ filePath: "stories/deck.json", key: "alice", chatSessionId: "s", root: "never-registered" });
+    assert.deepEqual(generations, []);
+  });
+
   it("applies the declaration to every generation kind", async () => {
     // Swept, because the guard sits at five entry points and a kind that kept
     // the old blanket refusal would be invisible in a single-kind test.
@@ -862,10 +884,17 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
   // would reject an unregistered root a moment later anyway, so a dispatch
   // test passes whether or not this check exists. It did — removing the
   // registration line left the suite green until this case was added (#3019).
+  /** Every path the host's FileOps was actually handed. */
+  const seen: string[] = [];
+  beforeEach(() => {
+    seen.length = 0;
+  });
   const served: FileOps = {
     read: async () => "{}",
     readBytes: async () => new Uint8Array(),
-    write: async () => {},
+    write: async (p) => {
+      seen.push(p);
+    },
     readDir: async () => [],
     stat: async () => ({ mtimeMs: 0, size: 0 }),
     exists: async () => true,
@@ -897,16 +926,35 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
     assert.match(guard.error, /unknown stories root/);
   });
 
-  it("serves the FileOps for a root that WAS registered", () => {
-    // Otherwise the check above passes by refusing everything.
+  it("serves a FileOps for a root that WAS registered", async () => {
+    // Otherwise the check above passes by refusing everything. Identity is not
+    // the test — a named root's ops is WRAPPED, so it is a different object by
+    // design (#3020 H1). What must hold is that the host's ops is reached, and
+    // reached with the `stories/` prefix taken off.
     const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
-    assert.equal(ops.artifactsForRoot("repoA"), served);
+    const scoped = ops.artifactsForRoot("repoA");
+    assert.ok(scoped !== null);
+    await scoped.write("stories/sub/deck.json", "{}");
+    assert.deepEqual(seen, ["sub/deck.json"], "the host must receive the path relative to the directory it registered");
     assert.equal(ops.guardStoryWriteRoot("repoA"), null);
   });
 
-  it("keeps the default root on its own FileOps, never the resolver's", () => {
-    // The default root's writes must not start flowing through a host
-    // resolver that answers for everything.
+  it("refuses a path that is not a stories wire path rather than writing it somewhere", async () => {
+    // Everything reaching a named root's ops has been through
+    // `normalizeStoryPath` or `storyFilePath`, so one that has not is a bug —
+    // and passing it through would write it where nobody reads.
+    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const scoped = ops.artifactsForRoot("repoA");
+    assert.ok(scoped !== null);
+    await assert.rejects(() => scoped.write("../escape.json", "{}"), /not a stories path/);
+    assert.deepEqual(seen, [], "nothing may reach the host for a path it cannot place");
+  });
+
+  it("keeps the default root on its own FileOps, unwrapped", () => {
+    // The default root's FileOps is rooted one level up, at
+    // `<workspace>/artifacts`, and is shared with other plugins — so the wire
+    // path IS its path, nothing is stripped, and the host resolver is not
+    // consulted at all.
     const ops = opsAnsweringEverything();
     assert.equal(ops.artifactsForRoot(undefined), ops.backend.artifacts);
     assert.notEqual(ops.artifactsForRoot(undefined), served);

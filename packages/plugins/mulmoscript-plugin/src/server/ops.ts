@@ -44,7 +44,7 @@ import {
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
 import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
-import { normalizeStoryPath, storyRefWithin } from "../core/paths";
+import { normalizeStoryPath, storyRefWithin, storiesRelativePath } from "../core/paths";
 import { errorMessage } from "@mulmoclaude/common";
 import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { fileToDataUri, stripDataUri } from "./support";
@@ -421,6 +421,13 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    */
   function guardStoryGenerationRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
+    // Registration BEFORE the host's opt-in. The flag says "this host can tell
+    // two roots apart", not "any id is addressable" — and the generation ops
+    // publish their start event before `runStoryOp` reaches `resolveStory`, so
+    // an unregistered root emitted a start/finish pair for work that never
+    // existed (Codex + CodeRabbit on #3020).
+    const registered = guardStoryRootRegistered(root);
+    if (registered) return registered;
     if (backend.rootScopedGenerationState === true) return null;
     return opBadRequest("generating in a non-default stories root is not supported yet");
   }
@@ -470,7 +477,50 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     const normalized = normalizeRoot(root);
     if (normalized === DEFAULT_ROOT) return backend.artifacts;
     if (rootDir(normalized) === null) return null;
-    return backend.artifactsFor?.(normalized) ?? null;
+    const hostOps = backend.artifactsFor?.(normalized);
+    return hostOps === undefined || hostOps === null ? null : storiesScoped(hostOps);
+  }
+
+  /**
+   * Address a named root's FileOps the way the READ side addresses it.
+   *
+   * The two sides disagreed about one path segment, and the disagreement was
+   * silent. A read strips `stories/` and resolves under the registered
+   * directory (`<root>/<rel>`); a write handed the executors' wire path
+   * straight to the host's FileOps, which is rooted at that same registered
+   * directory, so the bytes landed in `<root>/stories/<rel>`. `save` then
+   * REPORTED SUCCESS and returned a wire path that could not be read back —
+   * a card pointing at nothing (#3020 review H1, from the consuming host).
+   *
+   * Stripping here makes "the directory you registered is the directory your
+   * FileOps is rooted at" true, which is what a host writes without being
+   * told. The default root is untouched: its FileOps is rooted one level up,
+   * at `<workspace>/artifacts`, and is shared with other plugins.
+   *
+   * A path that is not a stories wire path throws rather than passing
+   * through. Everything reaching here has been through `normalizeStoryPath`
+   * or `storyFilePath`, so one that has not is a bug — and letting it through
+   * would write it somewhere nobody can read, which is the failure this whole
+   * wrapper exists to end.
+   */
+  function storiesScoped(inner: FileOps): FileOps {
+    const within = (wirePath: string): string => {
+      const relative = storiesRelativePath(wirePath);
+      if (relative === null) throw new Error(`mulmoScript: "${wirePath}" is not a stories path — a named root's FileOps takes stories paths only`);
+      return relative;
+    };
+    // Every member is `async` so the refusal arrives as a REJECTED PROMISE,
+    // the way every other FileOps failure does. Throwing synchronously out of
+    // a method the caller only ever awaits would skip its `try`.
+    return {
+      read: async (wirePath) => inner.read(within(wirePath)),
+      readBytes: async (wirePath) => inner.readBytes(within(wirePath)),
+      write: async (wirePath, data) => inner.write(within(wirePath), data),
+      readDir: async (wirePath) => inner.readDir(within(wirePath)),
+      stat: async (wirePath) => inner.stat(within(wirePath)),
+      exists: async (wirePath) => inner.exists(within(wirePath)),
+      unlink: async (wirePath) => inner.unlink(within(wirePath)),
+    };
   }
 
   // mulmocast shells out to ffmpeg for movie / beat rendering. When the
