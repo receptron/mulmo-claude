@@ -17,6 +17,19 @@ import { storyRefWithin } from "../src/core/paths";
 import type { OpResult } from "../src/server/types";
 import type { MulmoScriptGenerationEvent, MulmoScriptChangedEvent } from "../src/core/contract";
 
+/**
+ * Directories for tests that never touch the filesystem.
+ *
+ * NOT `/tmp/a`: that path may EXIST on the machine running this, and if it
+ * holds `stories/deck.json` then `resolveStory` succeeds and a generation test
+ * runs the real mulmocast pipeline — shelling out to ffmpeg. The assertions
+ * would still pass, on a test that silently depends on host filesystem
+ * contents (CodeRabbit on #3020). These live under a directory nothing
+ * creates, so the resolution they need to fail always fails.
+ */
+const NAMED_ROOT_DIR_A = "/nonexistent/for-tests/roots/a";
+const NAMED_ROOT_DIR_B = "/nonexistent/for-tests/roots/b";
+
 const stubFileOps: FileOps = {
   read: async () => {
     throw new Error("unused");
@@ -61,7 +74,7 @@ describe("root registry", () => {
     const warnings: string[] = [];
     createMulmoScriptServerOps({
       storiesDir: "/nonexistent/for-tests/artifacts/stories",
-      extraRoots: { repoA: "/tmp/a" },
+      extraRoots: { repoA: NAMED_ROOT_DIR_A },
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
@@ -80,7 +93,7 @@ describe("root registry", () => {
       () =>
         createMulmoScriptServerOps({
           storiesDir: "/nonexistent/for-tests/artifacts/stories",
-          extraRoots: { repoA: "/tmp/a", " repoA ": "/tmp/b" },
+          extraRoots: { repoA: NAMED_ROOT_DIR_A, " repoA ": NAMED_ROOT_DIR_B },
           artifacts: stubFileOps,
           writeFileAtomic: async () => {},
           log: { info: () => {}, warn: () => {}, error: () => {} },
@@ -94,7 +107,7 @@ describe("root registry", () => {
     assert.doesNotThrow(() =>
       createMulmoScriptServerOps({
         storiesDir: "/nonexistent/for-tests/artifacts/stories",
-        extraRoots: { repoA: "/tmp/a", repoB: "/tmp/b" },
+        extraRoots: { repoA: NAMED_ROOT_DIR_A, repoB: NAMED_ROOT_DIR_B },
         artifacts: stubFileOps,
         writeFileAtomic: async () => {},
         log: { info: () => {}, warn: () => {}, error: () => {} },
@@ -116,7 +129,7 @@ describe("root registry", () => {
   it("normalizes a root id by trimming, matching readCommandScope", () => {
     // Two parallel "which project root" identifiers must agree on what one
     // root is, or the same string names different roots in different layers.
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     assert.equal(ops.guardStoryWriteRoot("  "), null, "whitespace is the default root, not a named one");
     assert.equal(ops.toStoryRef("/tmp/a/x.json", " repoA "), ops.toStoryRef("/tmp/a/x.json", "repoA"));
   });
@@ -153,7 +166,7 @@ describe("root registry", () => {
 
 describe("generation events carry their root", () => {
   it("puts the root on the published event", () => {
-    const { ops, generations } = makeOps({ repoA: "/tmp/a" });
+    const { ops, generations } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
     assert.equal(generations.length, 1);
     assert.equal(generations[0]?.root, "repoA");
@@ -176,7 +189,7 @@ describe("a start event carries its root and no error", () => {
   // differed and the entry was never deleted. One leaked row per generation,
   // for the life of the process (#3015 review).
   it("does not report an error when a generation starts in a named root", () => {
-    const { ops, generations } = makeOps({ repoA: "/tmp/a" });
+    const { ops, generations } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
     const started = generations[0]!;
     assert.equal(started.done, false);
@@ -188,7 +201,7 @@ describe("a start event carries its root and no error", () => {
     // The tracker value and the event normalize; the KEY did not, so
     // `" repoA "` started an entry that `"repoA"` could never delete
     // (Codex P2 on #3015).
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: " repoA " });
     assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", true, { root: "repoA" });
@@ -198,7 +211,7 @@ describe("a start event carries its root and no error", () => {
   it("clears the tracker when the matching finish arrives", () => {
     // Start and finish must produce the SAME key. When they did not, the
     // snapshot kept reporting a finished run forever.
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
     assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", true, { root: "repoA" });
@@ -208,7 +221,7 @@ describe("a start event carries its root and no error", () => {
 
 describe("pendingGenerations is scoped by the pair", () => {
   it("does not hand one root's in-flight run to another root's View", () => {
-    const { ops } = makeOps({ repoA: "/tmp/a", repoB: "/tmp/b" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A, repoB: NAMED_ROOT_DIR_B });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
 
     assert.equal(ops.pendingGenerations("stories/deck.json", "repoA").length, 1);
@@ -225,7 +238,7 @@ describe("pendingGenerations is scoped by the pair", () => {
   });
 
   it("dedups per root — the same deck in two roots is two runs", () => {
-    const { ops, generations } = makeOps({ repoA: "/tmp/a", repoB: "/tmp/b" });
+    const { ops, generations } = makeOps({ repoA: NAMED_ROOT_DIR_A, repoB: NAMED_ROOT_DIR_B });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoA" });
     ops.publishGeneration(undefined, "movie", "stories/deck.json", "", false, { root: "repoB" });
     // Two starts, not one start plus a suppressed duplicate.
@@ -242,14 +255,14 @@ describe("every read resolves in the root it was asked for", () => {
   const unregistered = "nope";
 
   it("fails generateMovie for an unregistered root instead of using the default", async () => {
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     const result = await ops.generateMovieOp("stories/deck.json", undefined, unregistered);
     assert.equal(result.ok, false);
     assert.equal(result.ok === false && result.code, "bad_request");
   });
 
   it("fails generatePdf for an unregistered root instead of using the default", async () => {
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     const result = await ops.generatePdfOp("stories/deck.json", undefined, unregistered);
     assert.equal(result.ok, false);
     assert.equal(result.ok === false && result.code, "bad_request");
@@ -359,14 +372,14 @@ describe("the whole ops surface is classified for named roots", () => {
   it("the classification names members that actually exist", () => {
     // The derivation reads source; this pins it to the real object, so a
     // renamed op cannot leave a classification pointing at nothing.
-    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     const missing = [...READ_ONLY, ...MUTATING.map(([name]) => name), ...GUARDED_ELSEWHERE].filter((name) => !(name in ops));
     assert.deepEqual(missing, []);
   });
 
   for (const [name, invoke] of MUTATING) {
     it(`${name} refuses a named root`, async () => {
-      const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+      const { ops, generations } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
       const result = await invoke(ops);
       // The REASON, not just `ok === false`. Every one of these also fails for
       // an unrelated reason in this fixture (no such script on disk), so
@@ -389,14 +402,14 @@ describe("the detached background movie is refused in a named root too", () => {
   const namedRoot = "repoA";
 
   it("starts nothing and publishes nothing for a named root", () => {
-    const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops, generations } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     ops.triggerAutoBackgroundMovie("/tmp/a/stories/d.json", "stories/d.json", "session-1", namedRoot);
     assert.equal(generations.length, 0, "a refused background movie must announce nothing");
     assert.equal(ops.inFlightMovies.has("/tmp/a/stories/d.json"), false, "a refused background movie must not be marked in flight");
   });
 
   it("still starts for the default root", () => {
-    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     ops.triggerAutoBackgroundMovie("/tmp/x/stories/d.json", "stories/d.json", "session-1");
     assert.equal(ops.inFlightMovies.has("/tmp/x/stories/d.json"), true, "the default root must still generate");
   });
@@ -413,7 +426,7 @@ describe("generations stay in the default root until step 2", () => {
   const namedRoot = "repoA";
 
   it("refuses every generation kind in a named root", async () => {
-    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     const results = [
       await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot),
       await ops.generatePdfOp("stories/deck.json", "session-1", namedRoot),
@@ -435,13 +448,13 @@ describe("generations stay in the default root until step 2", () => {
     // empty whether the guard ran or the op merely had not reached its
     // publish yet, so the un-awaited version stayed green for the wrong
     // reason (CodeRabbit on #3015).
-    const { ops, generations } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops, generations } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     await ops.generateMovieOp("stories/deck.json", "session-1", namedRoot);
     assert.equal(generations.length, 0);
   });
 
   it("still allows generation that names no root", async () => {
-    const { ops } = makeOps({ [namedRoot]: "/tmp/a" });
+    const { ops } = makeOps({ [namedRoot]: NAMED_ROOT_DIR_A });
     const result = await ops.generateMovieOp("stories/deck.json", "session-1");
     // It fails for an unrelated reason (no such script), but NOT with the
     // root refusal — the default root is still generatable.
@@ -456,14 +469,14 @@ describe("writes stay in the default root until step 2", () => {
   // identically-named file and then announce the other one as changed
   // (#3015 review G1). Fail closed until step 2 supplies a per-root FileOps.
   it("refuses a write that names a non-default root", () => {
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     const guard = ops.guardStoryWriteRoot("repoA");
     assert.ok(guard, "a named root must not be writable yet");
     assert.equal(guard?.code, "bad_request");
   });
 
   it("still allows every write that names no root", () => {
-    const { ops } = makeOps({ repoA: "/tmp/a" });
+    const { ops } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     assert.equal(ops.guardStoryWriteRoot(undefined), null);
     assert.equal(ops.guardStoryWriteRoot(""), null, "the empty spelling is the default root");
   });
@@ -471,7 +484,7 @@ describe("writes stay in the default root until step 2", () => {
 
 describe("script-changed events carry their root", () => {
   it("names the root a write happened in", () => {
-    const { ops, changes } = makeOps({ repoA: "/tmp/a" });
+    const { ops, changes } = makeOps({ repoA: NAMED_ROOT_DIR_A });
     ops.publishScriptChanged("stories/deck.json", "view-1", "repoA");
     assert.equal(changes[0]?.root, "repoA");
   });
@@ -725,6 +738,19 @@ describe("an upload writes into the root it names — and nowhere else", () => {
     assert.ok(!target.startsWith(realpathSync(defaultStories)), `wrote into the DEFAULT root: ${target}`);
   });
 
+  it("a character upload writes under the named root too", async () => {
+    // Both upload ops lost their refusal, so both need a positive case: the
+    // sweep no longer requires them to refuse, and only `uploadBeatImageOp`
+    // had a filesystem test. They share `runStoryOp`, but "shares the code
+    // path" is an argument, and this file's whole point is that the write
+    // location is checked rather than argued (CodeRabbit on #3020).
+    const { ops, written, roots, defaultStories } = makeTwoRoots();
+    await ops.uploadCharacterImageOp("stories/deck.json", "alice", PNG, "repoA");
+    assert.equal(written.length, 1, "exactly one write");
+    assert.ok(written[0]!.startsWith(realpathSync(roots.repoA)), `wrote outside repoA: ${written[0]}`);
+    assert.ok(!written[0]!.startsWith(realpathSync(defaultStories)), `wrote into the DEFAULT root: ${written[0]}`);
+  });
+
   it("keeps two roots' identically-named decks apart", async () => {
     // The failure this replaces the guard's protection with: writing to
     // `repoB` must not touch `repoA`, though both hold `stories/deck.json`.
@@ -767,11 +793,21 @@ describe("who may generate in a named root is the HOST's answer", () => {
   const namedRoot = "repoA";
   const REFUSAL = /generating in a non-default stories root is not supported yet/;
 
+  const generationRoots: string[] = [];
+  after(() => generationRoots.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
   function makeOpsWith(declared: boolean | undefined) {
     const generations: MulmoScriptGenerationEvent[] = [];
+    // A fresh temp directory, not a shared path: `/tmp/a` may EXIST on the
+    // machine running this, and if it holds `stories/deck.json` then
+    // `resolveStory` succeeds and `generateMovieOp` runs the real mulmocast
+    // pipeline — shelling out to ffmpeg. The assertions would still pass, on a
+    // test that depends on host filesystem contents (CodeRabbit on #3020).
+    const namedDir = mkdtempSync(path.join(tmpdir(), "mulmoscript-gen-"));
+    generationRoots.push(namedDir);
     const ops = createMulmoScriptServerOps({
       storiesDir: "/nonexistent/for-tests/artifacts/stories",
-      extraRoots: { [namedRoot]: "/tmp/a" },
+      extraRoots: { [namedRoot]: namedDir },
       ...(declared === undefined ? {} : { rootScopedGenerationState: declared }),
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
@@ -863,7 +899,7 @@ describe("the boot warning says what is actually true for THIS host", () => {
     const warnings: string[] = [];
     createMulmoScriptServerOps({
       storiesDir: "/nonexistent/for-tests/artifacts/stories",
-      extraRoots: { repoA: "/tmp/a" },
+      extraRoots: { repoA: NAMED_ROOT_DIR_A },
       rootScopedGenerationState: true,
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
@@ -915,12 +951,12 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
   }
 
   it("serves no FileOps for a root that was never registered", () => {
-    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const ops = opsAnsweringEverything({ repoA: NAMED_ROOT_DIR_A });
     assert.equal(ops.artifactsForRoot("never-registered"), null, "an unregistered id must not reach the host's resolver");
   });
 
   it("refuses the write for that root", () => {
-    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const ops = opsAnsweringEverything({ repoA: NAMED_ROOT_DIR_A });
     const guard = ops.guardStoryWriteRoot("never-registered");
     assert.ok(guard !== null);
     assert.match(guard.error, /unknown stories root/);
@@ -931,7 +967,7 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
     // the test — a named root's ops is WRAPPED, so it is a different object by
     // design (#3020 H1). What must hold is that the host's ops is reached, and
     // reached with the `stories/` prefix taken off.
-    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const ops = opsAnsweringEverything({ repoA: NAMED_ROOT_DIR_A });
     const scoped = ops.artifactsForRoot("repoA");
     assert.ok(scoped !== null);
     await scoped.write("stories/sub/deck.json", "{}");
@@ -943,7 +979,7 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
     // Everything reaching a named root's ops has been through
     // `normalizeStoryPath` or `storyFilePath`, so one that has not is a bug —
     // and passing it through would write it where nobody reads.
-    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const ops = opsAnsweringEverything({ repoA: NAMED_ROOT_DIR_A });
     const scoped = ops.artifactsForRoot("repoA");
     assert.ok(scoped !== null);
     await assert.rejects(() => scoped.write("../escape.json", "{}"), /not a stories path/);

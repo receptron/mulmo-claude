@@ -14,6 +14,18 @@ import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
 import { createMulmoScriptDispatchHandler } from "../src/server/dispatch";
 
+/**
+ * Directories for tests that never touch the filesystem.
+ *
+ * NOT `/tmp/a`: that path may EXIST on the machine running this, and if it
+ * holds `stories/deck.json` then `resolveStory` succeeds and a generation test
+ * runs the real mulmocast pipeline — shelling out to ffmpeg. The assertions
+ * would still pass, on a test that silently depends on host filesystem
+ * contents (CodeRabbit on #3020). These live under a directory nothing
+ * creates, so the resolution they need to fail always fails.
+ */
+const NAMED_ROOT_DIR_A = "/nonexistent/for-tests/roots/a";
+
 const stubFileOps: FileOps = {
   read: async () => {
     throw new Error("unused");
@@ -36,7 +48,7 @@ const REFUSAL = /^((writing to|generating in) a non-default stories root is not 
 function makeDispatch() {
   const ops = createMulmoScriptServerOps({
     storiesDir: "/nonexistent/for-tests/artifacts/stories",
-    extraRoots: { [NAMED_ROOT]: "/tmp/a" },
+    extraRoots: { [NAMED_ROOT]: NAMED_ROOT_DIR_A },
     artifacts: stubFileOps,
     writeFileAtomic: async () => {},
     log: { info: () => {}, warn: () => {}, error: () => {} },
