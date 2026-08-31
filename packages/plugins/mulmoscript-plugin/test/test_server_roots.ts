@@ -13,6 +13,7 @@ import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
+import { storyRefWithin } from "../src/core/paths";
 import type { OpResult } from "../src/server/types";
 import type { MulmoScriptGenerationEvent, MulmoScriptChangedEvent } from "../src/core/contract";
 
@@ -579,5 +580,85 @@ describe("one root, one cache entry, whatever the spelling", () => {
     if (!fixture) return t.skip("this platform refuses to create the symlink");
     rmSync(fixture.realTree, { recursive: true, force: true });
     assert.equal(fixture.ops.toStoryRef(path.join(fixture.realStories, "foo.json"), "repoA"), null);
+  });
+});
+
+describe("a path that has no relative route to the root gets no wire ref", () => {
+  // Windows-only in the wild, but pinned so every platform runs it.
+  //
+  // `path.relative` says "not under the base" in two ways, and only one looks
+  // like an escape. `../…` is the familiar one. Across DRIVES there is no
+  // relative path at all, so `path.relative("C:\\base", "D:\\x")` answers
+  // `"D:\\x"` — absolute, with no `..` for the escape check to catch. It
+  // minted `stories/D:/anything`: a wire ref that reads back as a different
+  // file, which is the exact substitution `toStoryRef` exists to refuse. Only
+  // Windows CI caught it; macOS and Linux have one root and always find a
+  // relative route (#3015 post-merge).
+  const workspaces: string[] = [];
+  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  it("refuses a target with no relative route, whatever the platform calls it", () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-noroute-"));
+    workspaces.push(workspace);
+    const storiesDir = path.join(workspace, "artifacts", "stories");
+    mkdirSync(storiesDir, { recursive: true });
+    const { ops } = { ops: createMulmoScriptServerOps({ storiesDir, artifacts: stubFileOps, writeFileAtomic: async () => {} }) };
+
+    // On Windows the second drive has no relative route; on POSIX the same
+    // string is an ordinary escape. Either way the answer must be null, and
+    // the ref must never carry the target verbatim.
+    for (const outside of ["D:\\anything", "/anything", path.join(workspace, "..", "elsewhere", "deck.json")]) {
+      const ref = ops.toStoryRef(outside, undefined);
+      assert.ok(ref === null || !ref.includes(".."), `${outside} must not mint a traversal ref, got ${ref}`);
+      assert.ok(ref === null || !path.isAbsolute(ref.replace(/^stories\//, "")), `${outside} must not mint an absolute ref, got ${ref}`);
+    }
+  });
+
+  it("still names a file that IS under the root", () => {
+    // Without this the test above passes by refusing everything.
+    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-noroute-ok-"));
+    workspaces.push(workspace);
+    const storiesDir = path.join(workspace, "artifacts", "stories");
+    mkdirSync(storiesDir, { recursive: true });
+    const ops = createMulmoScriptServerOps({ storiesDir, artifacts: stubFileOps, writeFileAtomic: async () => {} });
+    assert.equal(ops.toStoryRef(path.join(realpathSync(storiesDir), "deck.json"), undefined), "stories/deck.json");
+  });
+});
+
+describe("storyRefWithin — the Windows case, driven from any platform", () => {
+  // The bug: `path.relative` says "not under the base" in TWO ways, and only
+  // one looks like an escape. `../…` is familiar. Across Windows DRIVES there
+  // is no relative path at all, so `relative("C:\\base", "D:\\x")` answers
+  // `"D:\\x"` — absolute, no `..` for the escape check to catch. That minted
+  // `stories/D:/anything`: a wire ref reading back as a DIFFERENT file, the
+  // exact substitution this rule exists to refuse. Only Windows CI caught it.
+  //
+  // The rule takes its path module as an argument precisely so the case is
+  // reachable here — on macOS and Linux there is one root and always a
+  // relative route, so a test using the real `path` proves nothing.
+  const WIN_ROOT = "C:\\workspace\\artifacts\\stories";
+
+  it("refuses a target on another drive", () => {
+    assert.equal(storyRefWithin(WIN_ROOT, "D:\\anything", path.win32), null);
+    assert.equal(storyRefWithin(WIN_ROOT, "D:\\repo\\artifacts\\stories\\deck.json", path.win32), null);
+  });
+
+  it("refuses an ordinary escape on the same drive", () => {
+    assert.equal(storyRefWithin(WIN_ROOT, "C:\\elsewhere\\deck.json", path.win32), null);
+  });
+
+  it("still names a file inside the root, with forward slashes on the wire", () => {
+    // The other half: the drive check must not reject legitimate refs, and the
+    // wire form stays POSIX whatever the host separator is.
+    assert.equal(storyRefWithin(WIN_ROOT, "C:\\workspace\\artifacts\\stories\\deck.json", path.win32), "stories/deck.json");
+    assert.equal(storyRefWithin(WIN_ROOT, "C:\\workspace\\artifacts\\stories\\sub\\deck.json", path.win32), "stories/sub/deck.json");
+    assert.equal(storyRefWithin(WIN_ROOT, WIN_ROOT, path.win32), "stories");
+  });
+
+  it("keeps the POSIX rules intact", () => {
+    const root = "/workspace/artifacts/stories";
+    assert.equal(storyRefWithin(root, "/workspace/artifacts/stories/deck.json", path.posix), "stories/deck.json");
+    assert.equal(storyRefWithin(root, "/elsewhere/deck.json", path.posix), null);
+    assert.equal(storyRefWithin(root, root, path.posix), "stories");
   });
 });

@@ -9,7 +9,38 @@
 // (which every mulmoScript endpoint keys on) are the SAME string. Stories are
 // NOT `YYYY/MM`-partitioned, so `storyFilePath` opts out of partitioning.
 
+import nodePath from "node:path";
 import { ARTIFACTS_ROOT, buildArtifactRelPath, hasUnsafePathSegment, slugifyArtifact } from "@mulmoclaude/core/artifacts";
+
+/** The slice of `node:path` this module needs — injected so the win32 rules
+ *  can be driven from a POSIX machine (`path.win32`). */
+export interface PathRules {
+  relative: (from: string, to: string) => string;
+  isAbsolute: (p: string) => boolean;
+  sep: string;
+}
+
+/**
+ * The wire ref for an absolute path inside a stories root, or `null` when it
+ * is not inside one.
+ *
+ * Pure, and taking its path rules as an argument, because the case that
+ * matters is unreachable on the machine this is written on. `path.relative`
+ * says "not under the base" in TWO ways and only one looks like an escape:
+ * `../…` is the familiar one, and across Windows DRIVES there is no relative
+ * path at all, so `relative("C:\\base", "D:\\x")` answers `"D:\\x"` —
+ * absolute, with no `..` for the escape check to catch. That minted
+ * `stories/D:/anything`, a wire ref that reads back as a DIFFERENT file, which
+ * is the substitution this function exists to refuse. Only Windows CI caught
+ * it; here there is one root and always a relative route (#3015 post-merge).
+ */
+export function storyRefWithin(base: string, absolutePath: string, rules: PathRules = nodePath): string | null {
+  const relative = rules.relative(base, absolutePath);
+  if (rules.isAbsolute(relative)) return null;
+  const rel = relative.split(rules.sep).join("/");
+  if (rel === ".." || rel.startsWith("../")) return null;
+  return rel ? `${STORIES_DIR}/${rel}` : STORIES_DIR;
+}
 
 const STORIES_DIR = "stories";
 const STORY_FALLBACK_SLUG = "story";

@@ -43,7 +43,7 @@ import {
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
 import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
-import { normalizeStoryPath } from "../core/paths";
+import { normalizeStoryPath, storyRefWithin } from "../core/paths";
 import { errorMessage } from "@mulmoclaude/common";
 import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { fileToDataUri, stripDataUri } from "./support";
@@ -264,15 +264,10 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     const dir = rootDir(root);
     if (dir === null) return null;
     const base = ensureStoriesReal(root) ?? dir;
-    const rel = path.relative(base, absolutePath).split(path.sep).join("/");
-    // A path outside the base relativizes to `../…`, which would be handed
-    // out as the traversal-shaped ref `stories/../../…` that `resolveStory`
-    // then rejects — a wire path that cannot be read back. It happens for
-    // real: a root whose directory does not exist yet has no realpath, so the
-    // base falls back to the unresolved directory and every absolute path
-    // looks outside it.
-    if (rel === ".." || rel.startsWith("../")) return null;
-    return rel ? `stories/${rel}` : "stories";
+    // The relativizing rule is a pure function in `core/paths.ts` so it can be
+    // driven with `path.win32` from a POSIX machine — the case it guards
+    // (no relative route across drives) is unreachable here.
+    return storyRefWithin(base, absolutePath);
   }
 
   // Lazily realpath the stories dir on first use. We can't realpath at
