@@ -697,26 +697,37 @@ describe("an upload writes into the root it names — and nowhere else", () => {
   after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
   const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
-  function makeTwoRoots() {
+  /**
+   * A REAL script, not a `{}` stub: the upload path builds a mulmocast context
+   * from the file before it derives the image path, so a stub fails long
+   * before the write and the assertions would pass on a run that never wrote
+   * anything.
+   */
+  const DECK = JSON.stringify({
+    $mulmocast: { version: "1.1" },
+    title: "Deck",
+    lang: "en",
+    beats: [{ speaker: "Narrator", text: "Beat one.", image: { type: "textSlide", slide: { title: "S", bullets: ["b"] } } }],
+    imageParams: {},
+  });
+
+  /** Two named roots and the default one, each holding the SAME wire path —
+   *  the case the pair identity exists for. */
+  function makeUploadDirs() {
     const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-upload-"));
     workspaces.push(base);
-    const written: string[] = [];
     const roots = { repoA: path.join(base, "a"), repoB: path.join(base, "b") };
     const defaultStories = path.join(base, "ws", "artifacts", "stories");
-    for (const dir of [roots.repoA, roots.repoB, defaultStories]) mkdirSync(dir, { recursive: true });
-    // The same wire path exists in all three — the case the pair identity is
-    // for. A REAL script, because the upload path builds a mulmocast context
-    // from the file before it derives the image path: a `{}` stub fails long
-    // before the write, and the assertion below would pass on a run that never
-    // wrote anything.
-    const deck = JSON.stringify({
-      $mulmocast: { version: "1.1" },
-      title: "Deck",
-      lang: "en",
-      beats: [{ speaker: "Narrator", text: "Beat one.", image: { type: "textSlide", slide: { title: "S", bullets: ["b"] } } }],
-      imageParams: {},
-    });
-    for (const dir of [roots.repoA, roots.repoB, defaultStories]) writeFileSync(path.join(dir, "deck.json"), deck);
+    for (const dir of [roots.repoA, roots.repoB, defaultStories]) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "deck.json"), DECK);
+    }
+    return { roots, defaultStories };
+  }
+
+  function makeTwoRoots() {
+    const { roots, defaultStories } = makeUploadDirs();
+    const written: string[] = [];
     const ops = createMulmoScriptServerOps({
       storiesDir: defaultStories,
       extraRoots: roots,
