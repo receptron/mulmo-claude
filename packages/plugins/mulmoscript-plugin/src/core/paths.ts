@@ -11,6 +11,42 @@
 
 import { ARTIFACTS_ROOT, buildArtifactRelPath, hasUnsafePathSegment, slugifyArtifact } from "@mulmoclaude/core/artifacts";
 
+/**
+ * The slice of `node:path` this rule needs.
+ *
+ * Injected with no default, and this module imports no `node:*` builtin: it is
+ * reached from the browser entry through `core/plugin`, so a `node:path`
+ * import here lands in the Vue bundle (Codex on #3017). The server passes its
+ * own `path`; tests pass `path.win32` to reach the case below.
+ */
+export interface PathRules {
+  relative: (from: string, to: string) => string;
+  isAbsolute: (p: string) => boolean;
+  sep: string;
+}
+
+/**
+ * The wire ref for an absolute path inside a stories root, or `null` when it
+ * is not inside one.
+ *
+ * Pure, and taking its path rules as an argument, because the case that
+ * matters is unreachable on the machine this is written on. `path.relative`
+ * says "not under the base" in TWO ways and only one looks like an escape:
+ * `../…` is the familiar one, and across Windows DRIVES there is no relative
+ * path at all, so `relative("C:\\base", "D:\\x")` answers `"D:\\x"` —
+ * absolute, with no `..` for the escape check to catch. That minted
+ * `stories/D:/anything`, a wire ref that reads back as a DIFFERENT file, which
+ * is the substitution this function exists to refuse. Only Windows CI caught
+ * it; here there is one root and always a relative route (#3015 post-merge).
+ */
+export function storyRefWithin(base: string, absolutePath: string, rules: PathRules): string | null {
+  const relative = rules.relative(base, absolutePath);
+  if (rules.isAbsolute(relative)) return null;
+  const rel = relative.split(rules.sep).join("/");
+  if (rel === ".." || rel.startsWith("../")) return null;
+  return rel ? `${STORIES_DIR}/${rel}` : STORIES_DIR;
+}
+
 const STORIES_DIR = "stories";
 const STORY_FALLBACK_SLUG = "story";
 
