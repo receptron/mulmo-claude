@@ -54,6 +54,13 @@ function moduleSpecifierOf(node: ts.Node): string | undefined {
     const [first] = node.arguments;
     if (first) return staticSpecifierText(first);
   }
+  // `import fs = require("node:fs")` — TypeScript's own import form. It keeps
+  // its specifier in an `ExternalModuleReference`, not in a call expression,
+  // so a visitor looking only for calls walks straight past it (CodeRabbit on
+  // #3017).
+  if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+    return staticSpecifierText(node.moduleReference.expression);
+  }
   return undefined;
 }
 
@@ -129,6 +136,8 @@ describe("the guard finds a specifier wherever the grammar allows one", () => {
     // `isStringLiteral`.
     ["dynamic import with a template literal", "const mod = await import(`node:path`);"],
     ["require with a template literal", "const p = require(`path`);"],
+    ["import-equals", 'import fs = require("node:fs");'],
+    ["bare import-equals", 'import fs = require("fs");'],
   ];
 
   for (const [label, source] of CAUGHT) {
