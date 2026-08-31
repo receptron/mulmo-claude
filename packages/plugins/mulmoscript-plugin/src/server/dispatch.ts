@@ -88,11 +88,21 @@ export type MulmoScriptDispatchHandler = (args: Record<string, unknown>) => Prom
  * FileOps, guarded by the instance's realpath containment
  * (`guardStoryWirePath`) — the core's own guard is lexical.
  */
+/** `undefined` when `root` is absent or a string; a failure envelope otherwise. */
+function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: string } | undefined {
+  if (root === undefined || typeof root === "string") return undefined;
+  return { ok: false, code: "bad_request", error: `mulmoScript root must be a string, got ${typeof root}` };
+}
+
 export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): MulmoScriptDispatchHandler {
   const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {
-    const guard = ops.guardStoryWirePath(args.filePath);
+    // Writes stay in the default root until step 2 gives the executors a
+    // per-root FileOps — see `guardStoryWriteRoot` (#3015 review G1).
+    const rootGuard = ops.guardStoryWriteRoot(str(args.root));
+    if (rootGuard) return fromOpFailure(rootGuard);
+    const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
     const outcome = await executeMulmoScriptSave(executeContext, {
       script: args.script,
@@ -104,13 +114,15 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
   }
 
   async function updateKind(kind: "updateBeat" | "updateScript", args: Record<string, unknown>): Promise<unknown> {
-    const guard = ops.guardStoryWirePath(args.filePath);
+    const rootGuard = ops.guardStoryWriteRoot(str(args.root));
+    if (rootGuard) return fromOpFailure(rootGuard);
+    const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
     const outcome = kind === "updateBeat" ? await executeUpdateBeat(executeContext, args) : await executeUpdateScript(executeContext, args);
     if (!outcome.ok) return fromPackageFailure(outcome);
     // After the write landed, never before: a View that reloads on a failed write would
     // discard the user's edit and show the old file back.
-    ops.publishScriptChanged(str(args.filePath) ?? "", str(args.origin));
+    ops.publishScriptChanged(str(args.filePath) ?? "", str(args.origin), str(args.root));
     return { ok: true };
   }
 
@@ -121,34 +133,43 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     const statusOp = STATUS_OPS[kind as keyof typeof STATUS_OPS];
     if (statusOp) {
       const filePath = str(args.filePath);
-      return filePath ? envelope(await statusOp(filePath)) : invalidArgs(kind);
+      return filePath ? envelope(await statusOp(filePath, str(args.root))) : invalidArgs(kind);
     }
     if (kind === "characterImage") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.characterImageOp(parsed.filePath, parsed.key)) : invalidArgs(kind);
+      return parsed ? envelope(await ops.characterImageOp(parsed.filePath, parsed.key, str(args.root))) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
-    return envelope(await BEAT_PROBE_OPS[kind as keyof typeof BEAT_PROBE_OPS](parsed.filePath, parsed.beatIndex));
+    return envelope(await BEAT_PROBE_OPS[kind as keyof typeof BEAT_PROBE_OPS](parsed.filePath, parsed.beatIndex, str(args.root)));
+  }
+
+  /** Movie and PDF take the whole script; the other generate kinds take a beat
+   *  or a character within it. */
+  async function wholeScriptGenerationKind(kind: "generateMovie" | "generatePdf", args: Record<string, unknown>): Promise<unknown> {
+    const filePath = str(args.filePath);
+    if (!filePath) return invalidArgs(kind);
+    const chatSessionId = str(args.chatSessionId);
+    const root = str(args.root);
+    const result = kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId, root) : await ops.generatePdfOp(filePath, chatSessionId, root);
+    return envelope(result);
   }
 
   async function generateKind(kind: string, args: Record<string, unknown>): Promise<unknown> {
+    if (kind === "generateMovie" || kind === "generatePdf") return wholeScriptGenerationKind(kind, args);
     const chatSessionId = str(args.chatSessionId);
+    const root = str(args.root);
     const force = args.force === true;
-    if (kind === "generateMovie" || kind === "generatePdf") {
-      const filePath = str(args.filePath);
-      if (!filePath) return invalidArgs(kind);
-      const result = kind === "generateMovie" ? await ops.generateMovieOp(filePath, chatSessionId) : await ops.generatePdfOp(filePath, chatSessionId);
-      return envelope(result);
-    }
     if (kind === "renderCharacter") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.renderCharacterOp({ ...parsed, force, chatSessionId })) : invalidArgs(kind);
+      return parsed ? envelope(await ops.renderCharacterOp({ ...parsed, force, chatSessionId, root })) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
     const result =
-      kind === "renderBeat" ? await ops.renderBeatOp({ ...parsed, force, chatSessionId }) : await ops.generateBeatAudioOp({ ...parsed, force, chatSessionId });
+      kind === "renderBeat"
+        ? await ops.renderBeatOp({ ...parsed, force, chatSessionId, root })
+        : await ops.generateBeatAudioOp({ ...parsed, force, chatSessionId, root });
     return envelope(result);
   }
 
@@ -157,26 +178,45 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (!imageData) return invalidArgs(kind);
     if (kind === "uploadCharacterImage") {
       const parsed = keyArgs(args);
-      return parsed ? envelope(await ops.uploadCharacterImageOp(parsed.filePath, parsed.key, imageData)) : invalidArgs(kind);
+      return parsed ? envelope(await ops.uploadCharacterImageOp(parsed.filePath, parsed.key, imageData, str(args.root))) : invalidArgs(kind);
     }
     const parsed = beatArgs(args);
     if (!parsed) return invalidArgs(kind);
-    return envelope(await ops.uploadBeatImageOp(parsed.filePath, parsed.beatIndex, imageData));
+    return envelope(await ops.uploadBeatImageOp(parsed.filePath, parsed.beatIndex, imageData, str(args.root)));
   }
 
+  async function pendingKind(kind: string, args: Record<string, unknown>): Promise<unknown> {
+    const filePath = str(args.filePath);
+    if (!filePath) return invalidArgs(kind);
+    const root = str(args.root);
+    // An empty snapshot for an unknown root is indistinguishable from "no
+    // work is running" — see `guardStoryRootRegistered`.
+    const rootGuard = ops.guardStoryRootRegistered(root);
+    if (rootGuard) return fromOpFailure(rootGuard);
+    return { ok: true, pending: ops.pendingGenerations(filePath, root) };
+  }
+
+  // Nothing but routing below: every kind resolves to one named handler, so
+  // reading it answers "where does this kind go" without also having to read
+  // what any of them do.
   return async (args: Record<string, unknown>): Promise<unknown> => {
     const kind = str(args.kind);
     if (!kind) return invalidArgs("<missing>");
+    // Once, at the only entry, so no per-kind reader can forget it. `str()`
+    // answers `undefined` for a number, `null`, an object — indistinguishable
+    // from a root that was never supplied, which every reader below then takes
+    // as the DEFAULT root. A host that serialises a root wrongly would have
+    // written to, and read from, the default root's identically-named script
+    // while believing it named another (Codex P2 on #3015). Absent stays
+    // default; present must be a string.
+    const malformedRoot = guardSuppliedRoot(args.root);
+    if (malformedRoot) return malformedRoot;
     if (kind === "save") return saveKind(args);
     if (kind === "updateBeat" || kind === "updateScript") return updateKind(kind, args);
     if (PROBE_KINDS.has(kind)) return probeKind(kind, args);
     if (GENERATE_KINDS.has(kind)) return generateKind(kind, args);
     if (UPLOAD_KINDS.has(kind)) return uploadKind(kind, args);
-    if (kind === "pendingGenerations") {
-      const filePath = str(args.filePath);
-      if (!filePath) return invalidArgs(kind);
-      return { ok: true, pending: ops.pendingGenerations(filePath) };
-    }
+    if (kind === "pendingGenerations") return pendingKind(kind, args);
     return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
   };
 }

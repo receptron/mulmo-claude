@@ -23,7 +23,13 @@ export type { MulmoScriptDispatchArgs, MulmoScriptDispatchResult, MulmoScriptGen
 export { GENERATION_EVENT, SCRIPT_CHANGED_EVENT } from "../core/contract";
 export { TOOL_NAME, TOOL_DEFINITION } from "../core/definition";
 export { MULMOSCRIPT_HOST_ADAPTER_KEY, useHostAdapter, type MulmoScriptHostAdapter } from "./hostAdapter";
-export { useMulmoScriptTransport, type MulmoScriptTransport, type TransportResult } from "./transport";
+export {
+  useMulmoScriptTransport,
+  type MulmoScriptTransport,
+  type TransportResult,
+  type GenerationSubscription,
+  type ScriptChangedSubscription,
+} from "./transport";
 export { View, Preview };
 
 export default { plugin };

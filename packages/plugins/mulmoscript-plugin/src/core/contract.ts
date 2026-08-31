@@ -19,6 +19,10 @@ export interface MulmoScriptGenerationEvent {
   kind: "beatImage" | "beatAudio" | "characterImage" | "movie" | "pdf";
   /** Wire `stories/…` path of the script the generation belongs to. */
   filePath: string;
+  /** Which stories root `filePath` is relative to (#3014). Absent = the
+   *  host's default root, which is every event this package emitted before
+   *  roots existed. */
+  root?: string;
   /** beatIndex (as string) for beat*, character key for characterImage, "" for movie/pdf. */
   key: string;
   /** false = started, true = finished (reload the asset off disk). */
@@ -44,6 +48,8 @@ export const SCRIPT_CHANGED_EVENT = "scriptChanged";
  */
 export interface MulmoScriptChangedEvent {
   filePath: string;
+  /** Which stories root `filePath` is relative to (#3014). Absent = default. */
+  root?: string;
   origin?: string;
 }
 
@@ -54,8 +60,47 @@ export interface MulmoScriptChangedEvent {
  * the one that is invisible when it is wrong: a View acting on the echo of its own write
  * rebuilds the element the caret is in, on every keystroke.
  */
-export const shouldReloadForScriptChange = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string): boolean =>
-  watching !== "" && event.filePath === watching && event.origin !== ownOrigin;
+export const shouldReloadForScriptChange = (event: MulmoScriptChangedEvent, watching: string, ownOrigin: string, watchingRoot?: string): boolean =>
+  watching !== "" && event.filePath === watching && sameRoot(event.root, watchingRoot) && event.origin !== ownOrigin;
+
+/** The default root: what a caller that names no root is asking for. */
+export const DEFAULT_ROOT = "";
+
+/**
+ * The one spelling of a root that every comparison and every key must use.
+ *
+ * It lives HERE, in the module both the server and the View import, because
+ * the server had its own copy and the browser side compared raw strings — so
+ * `publishGeneration` emitted `"repoA"` while a View watching `" repoA "`
+ * dropped every event of its own generation (CodeRabbit on #3015). A rule
+ * that two sides must agree on cannot live on one of the two sides.
+ *
+ * Trimmed, because the codebase's other opaque "which project root" reader —
+ * `readCommandScope` in `@mulmoclaude/core/remote-host` — trims its value and
+ * shares the "absent = the host's own root" convention. Without this,
+ * `" repoA "` is one root there and a different one here.
+ *
+ * A non-string reads as the default root rather than throwing. The type says
+ * that cannot happen, but this package is published and its callers include
+ * untyped JavaScript: a subscription whose `root()` returns `42` reached
+ * `.trim()` and threw from INSIDE a pubsub callback, where nothing catches it
+ * and the View simply stops updating (Codex P2 on #3015). The guard belongs
+ * here rather than at the three call sites, because a rule enforced by
+ * enumerating its callers is what this PR got wrong repeatedly.
+ */
+export const normalizeRoot = (root: string | undefined): string => (typeof root === "string" ? root.trim() : DEFAULT_ROOT);
+
+/**
+ * Two roots are the same when they name the same one, with absent meaning the
+ * host's default (#3014).
+ *
+ * The identity of a script is the PAIR, not the path: `stories/deck.json` in
+ * two repositories is two files, and comparing paths alone would reload the
+ * View watching one because the other was saved. Absent normalises to the
+ * default so a pre-`root` event and a default-root watcher still match — that
+ * equivalence is what keeps every existing card working untouched.
+ */
+export const sameRoot = (a: string | undefined, b: string | undefined): boolean => normalizeRoot(a) === normalizeRoot(b);
 
 interface BeatRef {
   filePath: string;
@@ -74,24 +119,38 @@ interface SessionTag {
   chatSessionId?: string | undefined;
 }
 
-export type MulmoScriptDispatchArgs =
-  | ({ kind: "save" } & { filePath?: string; script?: unknown; filename?: string })
-  | { kind: "updateBeat"; filePath: string; beatIndex: number; beat: unknown; origin?: string }
-  | { kind: "updateScript"; filePath: string; script: unknown; origin?: string }
-  | ({ kind: "beatImage" } & BeatRef)
-  | ({ kind: "beatAudio" } & BeatRef)
-  | ({ kind: "beatMovie" } & BeatRef)
-  | ({ kind: "renderBeat" } & BeatRef & SessionTag & { force?: boolean })
-  | ({ kind: "generateBeatAudio" } & BeatRef & SessionTag & { force?: boolean })
-  | ({ kind: "uploadBeatImage" } & BeatRef & { imageData: string })
-  | ({ kind: "characterImage" } & CharacterRef)
-  | ({ kind: "renderCharacter" } & CharacterRef & SessionTag & { force?: boolean })
-  | ({ kind: "uploadCharacterImage" } & CharacterRef & { imageData: string })
-  | ({ kind: "movieStatus" } & { filePath: string })
-  | ({ kind: "pdfStatus" } & { filePath: string })
-  | ({ kind: "generateMovie" } & { filePath: string } & SessionTag)
-  | ({ kind: "generatePdf" } & { filePath: string } & SessionTag)
-  | { kind: "pendingGenerations"; filePath: string };
+/**
+ * Which registered stories root the named script lives in (#3014).
+ *
+ * Intersected into the whole union below, so every dispatch that names a
+ * `filePath` can name its root — a union member that could not would make
+ * root-aware calls untypeable while the handler happily read `args.root`
+ * off an untyped record (Codex P1 on #3015).
+ */
+interface RootTag {
+  root?: string | undefined;
+}
+
+export type MulmoScriptDispatchArgs = RootTag &
+  (
+    | ({ kind: "save" } & { filePath?: string; script?: unknown; filename?: string })
+    | { kind: "updateBeat"; filePath: string; beatIndex: number; beat: unknown; origin?: string }
+    | { kind: "updateScript"; filePath: string; script: unknown; origin?: string }
+    | ({ kind: "beatImage" } & BeatRef)
+    | ({ kind: "beatAudio" } & BeatRef)
+    | ({ kind: "beatMovie" } & BeatRef)
+    | ({ kind: "renderBeat" } & BeatRef & SessionTag & { force?: boolean })
+    | ({ kind: "generateBeatAudio" } & BeatRef & SessionTag & { force?: boolean })
+    | ({ kind: "uploadBeatImage" } & BeatRef & { imageData: string })
+    | ({ kind: "characterImage" } & CharacterRef)
+    | ({ kind: "renderCharacter" } & CharacterRef & SessionTag & { force?: boolean })
+    | ({ kind: "uploadCharacterImage" } & CharacterRef & { imageData: string })
+    | ({ kind: "movieStatus" } & { filePath: string })
+    | ({ kind: "pdfStatus" } & { filePath: string })
+    | ({ kind: "generateMovie" } & { filePath: string } & SessionTag)
+    | ({ kind: "generatePdf" } & { filePath: string } & SessionTag)
+    | { kind: "pendingGenerations"; filePath: string }
+  );
 
 export type MulmoScriptDispatchKind = MulmoScriptDispatchArgs["kind"];
 
