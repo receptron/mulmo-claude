@@ -52,8 +52,22 @@ function moduleSpecifierOf(node: ts.Node): string | undefined {
   }
   if (ts.isCallExpression(node) && isModuleLoadCall(node.expression)) {
     const [first] = node.arguments;
-    if (first && ts.isStringLiteral(first)) return first.text;
+    if (first) return staticSpecifierText(first);
   }
+  return undefined;
+}
+
+/**
+ * The text of a specifier argument, when it is knowable without running.
+ *
+ * Unlike the syntactic forms above, this set is CLOSED: a call's specifier can
+ * be a string literal or a no-substitution template (`` import(`node:path`) ``
+ * — legal, and missed by a check that asked only `isStringLiteral`; Codex on
+ * #3017). A template WITH substitutions has no static text at all, so there is
+ * nothing for any checker to read and nothing this guard can promise about it.
+ */
+function staticSpecifierText(argument: ts.Expression): string | undefined {
+  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) return argument.text;
   return undefined;
 }
 
@@ -111,6 +125,10 @@ describe("the guard finds a specifier wherever the grammar allows one", () => {
     ["star re-export", 'export * from "node:path";'],
     ["require", 'const p = require("path");'],
     ["dynamic import", 'const mod = await import("node:os");'],
+    // Backtick specifiers: legal, and missed by a check that asks only
+    // `isStringLiteral`.
+    ["dynamic import with a template literal", "const mod = await import(`node:path`);"],
+    ["require with a template literal", "const p = require(`path`);"],
   ];
 
   for (const [label, source] of CAUGHT) {
@@ -144,6 +162,15 @@ describe("the guard does not flag things that only look like imports", () => {
       assert.deepEqual(found, [], `${label} must not be flagged: ${JSON.stringify(source)}`);
     });
   }
+
+  it("says nothing about a computed specifier, because nothing can", () => {
+    // `import(`node:${name}`)` has no static text — there is no answer to read
+    // without running the code. Pinned so the silence is a decision rather
+    // than an oversight: a core module doing this would not be caught here,
+    // and the reviewer of such a line is the check.
+    const found = importedSpecifiers("const mod = await import(`node:${name}`);").filter(isNodeBuiltin);
+    assert.deepEqual(found, [], "a computed specifier has no static text to judge");
+  });
 
   it("takes its builtin list from Node itself", () => {
     // Not from a list in this file — that is the shape the first version got
