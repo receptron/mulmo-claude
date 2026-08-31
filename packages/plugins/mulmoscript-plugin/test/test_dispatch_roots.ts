@@ -333,28 +333,54 @@ describe("a write lands in the root it names — and can be read back", () => {
     imageParams: {},
   };
 
-  function makeHost(opts: { serveNamed: boolean }) {
-    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-write-"));
+  /**
+   * The directory shape a host writes: the registered directory IS the FileOps
+   * root for a named root, while the default root's FileOps sits one level up
+   * at `<workspace>/artifacts` because it is shared with other plugins.
+   */
+  function makeDirs(prefix: string) {
+    const base = mkdtempSync(path.join(tmpdir(), prefix));
     workspaces.push(base);
-    // The shape a host writes: the registered directory IS the FileOps root
-    // for a named root. The default root's FileOps sits one level up, at
-    // `<workspace>/artifacts`, because it is shared with other plugins.
-    const namedDir = path.join(base, "repoA");
     const artifactsDir = path.join(base, "ws", "artifacts");
-    const defaultDir = path.join(artifactsDir, "stories");
-    for (const dir of [namedDir, defaultDir]) {
+    const dirs = { base, artifactsDir, namedDir: path.join(base, "repoA"), defaultDir: path.join(artifactsDir, "stories") };
+    for (const dir of [dirs.namedDir, dirs.defaultDir]) {
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, "deck.json"), JSON.stringify(DECK));
     }
+    return dirs;
+  }
+
+  function makeHost(opts: { serveNamed: boolean }) {
+    const dirs = makeDirs("mulmoscript-write-");
     const ops = createMulmoScriptServerOps({
-      storiesDir: defaultDir,
-      extraRoots: { [NAMED]: namedDir },
-      artifacts: realFileOps(artifactsDir),
-      ...(opts.serveNamed ? { artifactsFor: (root: string) => (root === NAMED ? realFileOps(namedDir) : null) } : {}),
+      storiesDir: dirs.defaultDir,
+      extraRoots: { [NAMED]: dirs.namedDir },
+      artifacts: realFileOps(dirs.artifactsDir),
+      ...(opts.serveNamed ? { artifactsFor: (root: string) => (root === NAMED ? realFileOps(dirs.namedDir) : null) } : {}),
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: () => {}, error: () => {} },
     });
-    return { ops, dispatch: createMulmoScriptDispatchHandler(ops), namedDir, defaultDir };
+    return { ops, dispatch: createMulmoScriptDispatchHandler(ops), ...dirs };
+  }
+
+  /** A host that hands back a FileOps for ANY id, including ones it never
+   *  registered — the misconfiguration `extraRoots` has to survive. */
+  function hostAnsweringEverything() {
+    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-unreg-"));
+    workspaces.push(base);
+    const artifactsDir = path.join(base, "ws", "artifacts");
+    const defaultDir = path.join(artifactsDir, "stories");
+    const elsewhere = path.join(base, "elsewhere");
+    for (const dir of [defaultDir, elsewhere]) mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(defaultDir, "deck.json"), JSON.stringify(DECK));
+    const ops = createMulmoScriptServerOps({
+      storiesDir: defaultDir,
+      artifacts: realFileOps(artifactsDir),
+      artifactsFor: () => realFileOps(elsewhere),
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return { dispatch: createMulmoScriptDispatchHandler(ops), elsewhere };
   }
 
   /** The title at the wire path, read through the resolver a READER uses. */
@@ -409,26 +435,9 @@ describe("a write lands in the root it names — and can be read back", () => {
   it("refuses a root the host resolves but never registered", async () => {
     // `extraRoots` stays the containment boundary: a host cannot widen the
     // addressable set by answering `artifactsFor` for an id it never declared.
-    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-unreg-"));
-    workspaces.push(base);
-    const artifactsDir = path.join(base, "ws", "artifacts");
-    const defaultDir = path.join(artifactsDir, "stories");
-    const elsewhere = path.join(base, "elsewhere");
-    for (const dir of [defaultDir, elsewhere]) mkdirSync(dir, { recursive: true });
-    writeFileSync(path.join(defaultDir, "deck.json"), JSON.stringify(DECK));
-    const ops = createMulmoScriptServerOps({
-      storiesDir: defaultDir,
-      artifacts: realFileOps(artifactsDir),
-      artifactsFor: () => realFileOps(elsewhere),
-      writeFileAtomic: async () => {},
-      log: { info: () => {}, warn: () => {}, error: () => {} },
-    });
-    const result = await createMulmoScriptDispatchHandler(ops)({
-      kind: "updateScript",
-      filePath: "stories/deck.json",
-      script: DECK,
-      root: "never-registered",
-    });
+    const { dispatch, elsewhere } = hostAnsweringEverything();
+    const result = await dispatch({ kind: "updateScript", filePath: "stories/deck.json", script: DECK, root: "never-registered" });
+
     assert.ok(isFailure(result));
     assert.match(result.error, /unknown stories root/);
     assert.deepEqual(readdirSync(elsewhere), [], "nothing may be written into an unregistered root");
