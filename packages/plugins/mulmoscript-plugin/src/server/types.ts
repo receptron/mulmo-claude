@@ -99,6 +99,24 @@ export interface MulmoScriptServerBackend {
   /** Shared artifacts FileOps (rooted at `<workspace>/artifacts`) for the
    *  save / reopen / update dispatch kinds (phase-1 core executes). */
   artifacts: FileOps;
+  /**
+   * The FileOps for a named root's artifacts area, or null when the host does
+   * not serve that root.
+   *
+   * `artifacts` above is ONE FileOps bound to the default root, and the
+   * save / update executors run against it. So a write naming another root
+   * rewrote the DEFAULT root's identically-named script and then announced the
+   * other one as changed — which is why those kinds were refused outright
+   * (#3015 review G1). Reads and uploads never had the problem: they go
+   * through `resolveStory` and take the absolute path it returns.
+   *
+   * A resolver rather than a map, because the host already has one: it knows
+   * which directory an opaque root id names, and building a FileOps for it is
+   * a closure per root (MulmoTerminal's `createFileOps(rootFor, label)` takes
+   * a root getter for exactly this). Absent means named-root writes stay
+   * refused, so a host that has not wired it keeps the shipped behaviour.
+   */
+  artifactsFor?: (root: string) => FileOps | null;
   /** Atomic file write (tmp alongside destination + rename; parent dirs
    *  created). Hosts inject their hardened implementation. */
   writeFileAtomic: (absolutePath: string, data: string | Uint8Array) => Promise<void>;

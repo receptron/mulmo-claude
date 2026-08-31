@@ -5,8 +5,11 @@
 // That gap is why `uploadKind` could forward a root past `guardStoryWriteRoot`
 // while `saveKind` and `updateKind` were guarded: nothing drove the kinds
 // through the handler that routes them.
-import { describe, it } from "node:test";
+import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
 import { createMulmoScriptDispatchHandler } from "../src/server/dispatch";
@@ -24,7 +27,11 @@ const stubFileOps: FileOps = {
 };
 
 const NAMED_ROOT = "repoA";
-const REFUSAL = /^(writing to|generating in) a non-default stories root is not supported yet$/;
+/** Every way a call can be refused BECAUSE of the root it named. `unknown
+ *  stories root` joined the set when the write guard started checking
+ *  registration first, which is the more accurate reason for a root nobody
+ *  registered (#3019). */
+const REFUSAL = /^((writing to|generating in) a non-default stories root is not supported yet|unknown stories root ".*")$/;
 
 function makeDispatch() {
   const ops = createMulmoScriptServerOps({
@@ -281,5 +288,143 @@ describe("a result carries the root it acted in", () => {
     const unknownRoot = await makeDispatch()({ kind: "pendingGenerations", filePath: "stories/deck.json", root: "nope" });
     assert.ok(isFailure(unknownRoot));
     assert.ok(!("root" in (unknownRoot as Record<string, unknown>)));
+  });
+});
+
+describe("a write lands in the root it names, once the host supplies its FileOps", () => {
+  // The one thing that was genuinely blocked (#3015 review G1): the executors
+  // ran against ONE FileOps bound to the default root, so a write naming
+  // another root rewrote the DEFAULT root's identically-named script and then
+  // announced the other one as changed. Opening it is only correct if the
+  // write actually MOVES, so these drive two in-memory roots holding the same
+  // wire path and assert which store received the bytes (#3019).
+  const NAMED = "repoA";
+
+  /** A FileOps over a plain map, so a test can see exactly what was written. */
+  function memoryFileOps(store: Map<string, string>): FileOps {
+    return {
+      read: async (p: string) => {
+        const value = store.get(p);
+        if (value === undefined) throw new Error(`ENOENT ${p}`);
+        return value;
+      },
+      readBytes: async () => new Uint8Array(),
+      write: async (p: string, data: string | Uint8Array) => {
+        store.set(p, typeof data === "string" ? data : Buffer.from(data).toString());
+      },
+      readDir: async () => [],
+      stat: async () => ({ mtimeMs: 0, size: 0 }),
+      exists: async (p: string) => store.has(p),
+      unlink: async (p: string) => {
+        store.delete(p);
+      },
+    };
+  }
+
+  const DECK = JSON.stringify({
+    $mulmocast: { version: "1.1" },
+    title: "Deck",
+    lang: "en",
+    beats: [{ speaker: "Narrator", text: "Beat one.", image: { type: "textSlide", slide: { title: "S", bullets: ["b"] } } }],
+    imageParams: {},
+  });
+
+  // Real directories AND memory stores, because the write path uses both: the
+  // realpath containment (`guardStoryWirePath` → `resolveStory`) reads the
+  // actual filesystem, while the executor writes through the injected FileOps.
+  const workspaces: string[] = [];
+  after(() => workspaces.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  function makeHost(opts: { serveNamed: boolean }) {
+    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-write-"));
+    workspaces.push(base);
+    const defaultDir = path.join(base, "ws", "artifacts", "stories");
+    const namedDir = path.join(base, "repoA");
+    for (const dir of [defaultDir, namedDir]) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "deck.json"), DECK);
+    }
+    const defaultStore = new Map<string, string>([["stories/deck.json", DECK]]);
+    const namedStore = new Map<string, string>([["stories/deck.json", DECK]]);
+    const ops = createMulmoScriptServerOps({
+      storiesDir: defaultDir,
+      extraRoots: { [NAMED]: namedDir },
+      artifacts: memoryFileOps(defaultStore),
+      ...(opts.serveNamed ? { artifactsFor: (root: string) => (root === NAMED ? memoryFileOps(namedStore) : null) } : {}),
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return { dispatch: createMulmoScriptDispatchHandler(ops), defaultStore, namedStore };
+  }
+
+  it("updateScript writes into the named store, leaving the default one untouched", async () => {
+    const { dispatch, defaultStore, namedStore } = makeHost({ serveNamed: true });
+    const rewritten = JSON.parse(DECK) as Record<string, unknown>;
+    rewritten.title = "Rewritten in repoA";
+    const result = await dispatch({ kind: "updateScript", filePath: "stories/deck.json", script: rewritten, root: NAMED });
+
+    assert.deepEqual(result, { ok: true, root: NAMED });
+    assert.match(namedStore.get("stories/deck.json")!, /Rewritten in repoA/, "the named root must have the new bytes");
+    assert.equal(defaultStore.get("stories/deck.json"), DECK, "the DEFAULT root must be untouched — this is the bug being fixed");
+  });
+
+  it("still writes the default root when no root is named", async () => {
+    const { dispatch, defaultStore, namedStore } = makeHost({ serveNamed: true });
+    const rewritten = JSON.parse(DECK) as Record<string, unknown>;
+    rewritten.title = "Rewritten in the workspace";
+    const result = await dispatch({ kind: "updateScript", filePath: "stories/deck.json", script: rewritten });
+
+    assert.deepEqual(result, { ok: true }, "a default-root result stays byte-identical to the pre-roots one");
+    assert.match(defaultStore.get("stories/deck.json")!, /Rewritten in the workspace/);
+    assert.equal(namedStore.get("stories/deck.json"), DECK, "a named root must not receive a workspace write");
+  });
+
+  it("refuses when the host serves no FileOps for that root", async () => {
+    // A host that has not wired `artifactsFor` keeps the shipped refusal
+    // rather than being quietly opened up.
+    const { dispatch, defaultStore, namedStore } = makeHost({ serveNamed: false });
+    const result = await dispatch({ kind: "updateScript", filePath: "stories/deck.json", script: JSON.parse(DECK), root: NAMED });
+
+    assert.ok(isFailure(result));
+    assert.equal(result.code, "bad_request");
+    assert.equal(defaultStore.get("stories/deck.json"), DECK, "a refused write must touch nothing");
+    assert.equal(namedStore.get("stories/deck.json"), DECK);
+  });
+
+  it("refuses a root the host resolves but never registered", async () => {
+    // `extraRoots` stays the containment boundary: a host cannot widen the
+    // addressable set by answering `artifactsFor` for an id it never declared.
+    const base = mkdtempSync(path.join(tmpdir(), "mulmoscript-unreg-"));
+    workspaces.push(base);
+    const defaultDir = path.join(base, "ws", "artifacts", "stories");
+    mkdirSync(defaultDir, { recursive: true });
+    writeFileSync(path.join(defaultDir, "deck.json"), DECK);
+    const store = new Map<string, string>([["stories/deck.json", DECK]]);
+    const ops = createMulmoScriptServerOps({
+      storiesDir: defaultDir,
+      artifacts: memoryFileOps(new Map([["stories/deck.json", DECK]])),
+      artifactsFor: () => memoryFileOps(store),
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const result = await createMulmoScriptDispatchHandler(ops)({
+      kind: "updateScript",
+      filePath: "stories/deck.json",
+      script: JSON.parse(DECK),
+      root: "never-registered",
+    });
+    assert.ok(isFailure(result));
+    assert.match(result.error, /unknown stories root/);
+    assert.equal(store.get("stories/deck.json"), DECK, "nothing may be written into an unregistered root");
+  });
+
+  it("save also lands in the named root", async () => {
+    const { dispatch, defaultStore, namedStore } = makeHost({ serveNamed: true });
+    const result = await dispatch({ kind: "save", filename: "fresh.json", script: JSON.parse(DECK), root: NAMED });
+
+    assert.ok(!isFailure(result), `save must succeed: ${JSON.stringify(result)}`);
+    const created = [...namedStore.keys()].filter((k) => k !== "stories/deck.json");
+    assert.equal(created.length, 1, `expected one new file in the named root, got ${created.join(", ")}`);
+    assert.equal([...defaultStore.keys()].length, 1, "the default root must gain nothing");
   });
 });

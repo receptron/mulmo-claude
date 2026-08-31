@@ -319,6 +319,9 @@ describe("the whole ops surface is classified for named roots", () => {
     "guardStoryWirePath",
     "guardStoryRootRegistered",
     "guardStoryWriteRoot",
+    // Not an op: the resolver the write guard and dispatch consult. Covered by
+    // the per-root write cases below.
+    "artifactsForRoot",
     "guardStoryGenerationRoot",
     "runStoryOp",
     "publishGeneration",
@@ -847,5 +850,65 @@ describe("the boot warning says what is actually true for THIS host", () => {
     assert.equal(warnings.length, 1);
     assert.doesNotMatch(warnings[0]!, /GENERATION is refused/);
     assert.match(warnings[0]!, /save\/update still land in the DEFAULT root/);
+  });
+});
+
+describe("`extraRoots` stays the containment boundary for writes", () => {
+  // `artifactsForRoot` asks the host for a FileOps, and a host could answer for
+  // an id it never declared. Registration is checked FIRST so that cannot
+  // widen the addressable set — the same rule `resolveStory` holds for reads.
+  //
+  // Driven directly rather than through dispatch: there, `guardStoryWirePath`
+  // would reject an unregistered root a moment later anyway, so a dispatch
+  // test passes whether or not this check exists. It did — removing the
+  // registration line left the suite green until this case was added (#3019).
+  const served: FileOps = {
+    read: async () => "{}",
+    readBytes: async () => new Uint8Array(),
+    write: async () => {},
+    readDir: async () => [],
+    stat: async () => ({ mtimeMs: 0, size: 0 }),
+    exists: async () => true,
+    unlink: async () => {},
+  };
+
+  function opsAnsweringEverything(extraRoots?: Record<string, string>) {
+    return createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      ...(extraRoots ? { extraRoots } : {}),
+      artifacts: stubFileOps,
+      // A host that hands back a FileOps for ANY id — the misconfiguration
+      // this check exists to survive.
+      artifactsFor: () => served,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+  }
+
+  it("serves no FileOps for a root that was never registered", () => {
+    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    assert.equal(ops.artifactsForRoot("never-registered"), null, "an unregistered id must not reach the host's resolver");
+  });
+
+  it("refuses the write for that root", () => {
+    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    const guard = ops.guardStoryWriteRoot("never-registered");
+    assert.ok(guard !== null);
+    assert.match(guard.error, /unknown stories root/);
+  });
+
+  it("serves the FileOps for a root that WAS registered", () => {
+    // Otherwise the check above passes by refusing everything.
+    const ops = opsAnsweringEverything({ repoA: "/tmp/a" });
+    assert.equal(ops.artifactsForRoot("repoA"), served);
+    assert.equal(ops.guardStoryWriteRoot("repoA"), null);
+  });
+
+  it("keeps the default root on its own FileOps, never the resolver's", () => {
+    // The default root's writes must not start flowing through a host
+    // resolver that answers for everything.
+    const ops = opsAnsweringEverything();
+    assert.equal(ops.artifactsForRoot(undefined), ops.backend.artifacts);
+    assert.notEqual(ops.artifactsForRoot(undefined), served);
   });
 });

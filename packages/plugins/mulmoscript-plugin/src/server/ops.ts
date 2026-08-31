@@ -19,6 +19,7 @@
 
 import { existsSync, mkdirSync, realpathSync, statSync, unlinkSync } from "fs";
 import path from "path";
+import type { FileOps } from "gui-chat-protocol";
 import {
   getFileObject,
   initializeContextFromFiles,
@@ -443,14 +444,33 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * update executors run against one `FileOps`, bound by the host to the
    * default root, so a write naming another root would rewrite the DEFAULT
    * root's identically-named file and then announce the other one as changed
-   * (#3015 review G1). Closing it here is fail-closed: "readable but not yet
+   * (#3015 review G1). Closing it was fail-closed: "readable but not yet
    * writable" beats "wrote somewhere else and said so".
    *
-   * Step 2 replaces this with a per-root FileOps rather than removing it.
+   * It opens per root, not globally: the host answers `artifactsFor` for the
+   * roots it can serve, and a root it cannot is still refused. A host that
+   * wires nothing keeps the shipped refusal (#3019).
    */
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
-    return opBadRequest("writing to a non-default stories root is not supported yet");
+    const registered = guardStoryRootRegistered(root);
+    if (registered) return registered;
+    return artifactsForRoot(root) === null ? opBadRequest("writing to a non-default stories root is not supported yet") : null;
+  }
+
+  /**
+   * The FileOps a write to this root must go through.
+   *
+   * The default root keeps the single `artifacts` it always had, byte for
+   * byte. A named root is served only when the host both REGISTERED it
+   * (`extraRoots` — the containment boundary, so a host cannot widen the
+   * addressable set through this back door) and can supply a FileOps for it.
+   */
+  function artifactsForRoot(root: string | undefined): FileOps | null {
+    const normalized = normalizeRoot(root);
+    if (normalized === DEFAULT_ROOT) return backend.artifacts;
+    if (rootDir(normalized) === null) return null;
+    return backend.artifactsFor?.(normalized) ?? null;
   }
 
   // mulmocast shells out to ffmpeg for movie / beat rendering. When the
@@ -1109,6 +1129,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     guardStoryWirePath,
     guardStoryRootRegistered,
     guardStoryWriteRoot,
+    artifactsForRoot,
     guardStoryGenerationRoot,
     ffmpegGuard,
     runStoryOp,

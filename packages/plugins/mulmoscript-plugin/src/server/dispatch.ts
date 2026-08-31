@@ -113,16 +113,31 @@ function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: str
 }
 
 export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): MulmoScriptDispatchHandler {
-  const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
+  /**
+   * The executor context for a write, bound to the root it names.
+   *
+   * One `FileOps` was held for the whole handler, so the executors — which
+   * take a WIRE path (`stories/…`) and resolve it against whatever FileOps
+   * they are given — wrote a named root's script into the DEFAULT root's
+   * identically-named file. Choosing here keeps `MulmoScriptExecuteContext`
+   * and every executor unchanged: the root never reaches them, only the right
+   * FileOps does (#3019).
+   */
+  function executeContextFor(root: string | undefined): MulmoScriptExecuteContext | null {
+    const artifacts = ops.artifactsForRoot(root);
+    return artifacts === null ? null : { files: { artifacts } };
+  }
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {
-    // Writes stay in the default root until step 2 gives the executors a
-    // per-root FileOps — see `guardStoryWriteRoot` (#3015 review G1).
+    // Which root this write lands in — see `guardStoryWriteRoot` and
+    // `executeContextFor`.
     const rootGuard = ops.guardStoryWriteRoot(str(args.root));
     if (rootGuard) return fromOpFailure(rootGuard);
     const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
-    const outcome = await executeMulmoScriptSave(executeContext, {
+    const context = executeContextFor(str(args.root));
+    if (context === null) return invalidArgs("save");
+    const outcome = await executeMulmoScriptSave(context, {
       script: args.script,
       filename: str(args.filename),
       filePath: str(args.filePath),
@@ -136,7 +151,9 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (rootGuard) return fromOpFailure(rootGuard);
     const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
-    const outcome = kind === "updateBeat" ? await executeUpdateBeat(executeContext, args) : await executeUpdateScript(executeContext, args);
+    const context = executeContextFor(str(args.root));
+    if (context === null) return invalidArgs(kind);
+    const outcome = kind === "updateBeat" ? await executeUpdateBeat(context, args) : await executeUpdateScript(context, args);
     if (!outcome.ok) return fromPackageFailure(outcome);
     // After the write landed, never before: a View that reloads on a failed write would
     // discard the user's edit and show the old file back.
