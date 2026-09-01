@@ -904,21 +904,73 @@ describe("who may generate in a named root is the HOST's answer", () => {
 
 describe("the boot warning says what is actually true for THIS host", () => {
   // The warning is the only thing a host integrator reads before discovering a
-  // limit from a stuck spinner, so it must track the limits rather than repeat
-  // the ones that applied when it was written (#3019).
-  it("stops mentioning generation once the host declares it can scope it", () => {
+  // limit from a stuck spinner, so it must track what THIS host is missing.
+  //
+  // It used to key on the root COUNT alone, so a host that HAD passed
+  // `artifactsFor` was told at every boot that its writes land in the default
+  // root — the opposite of what the code then did, read by the hosts that got
+  // the wiring right (#3022, reported by the consuming host).
+  const CAPABILITIES = {
+    none: {},
+    generationOnly: { rootScopedGenerationState: true },
+    writesOnly: { artifactsFor: () => stubFileOps },
+    both: { rootScopedGenerationState: true, artifactsFor: () => stubFileOps },
+  } as const;
+
+  function warningsFor(capabilities: Record<string, unknown>): string[] {
     const warnings: string[] = [];
     createMulmoScriptServerOps({
       storiesDir: "/nonexistent/for-tests/artifacts/stories",
       extraRoots: { repoA: NAMED_ROOT_DIR_A },
-      rootScopedGenerationState: true,
+      ...capabilities,
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
     });
-    assert.equal(warnings.length, 1);
-    assert.doesNotMatch(warnings[0]!, /GENERATION is refused/);
-    assert.match(warnings[0]!, /save\/update still land in the DEFAULT root/);
+    return warnings;
+  }
+
+  it("says nothing at all when the host wired everything", () => {
+    // The bug this replaces: a correctly-wired host was told, every boot, that
+    // a feature it had enabled did not work.
+    assert.deepEqual(warningsFor(CAPABILITIES.both), []);
+  });
+
+  it("names only the missing generation capability", () => {
+    const [warning] = warningsFor(CAPABILITIES.writesOnly);
+    assert.ok(warning);
+    assert.match(warning, /rootScopedGenerationState/);
+    assert.doesNotMatch(warning, /artifactsFor/, "a host that passed it must not be told it did not");
+  });
+
+  it("names only the missing write capability", () => {
+    const [warning] = warningsFor(CAPABILITIES.generationOnly);
+    assert.ok(warning);
+    assert.match(warning, /artifactsFor/);
+    assert.doesNotMatch(warning, /rootScopedGenerationState/, "a host that declared it must not be told it did not");
+  });
+
+  it("names both when the host wired neither", () => {
+    const [warning] = warningsFor(CAPABILITIES.none);
+    assert.ok(warning);
+    assert.match(warning, /rootScopedGenerationState/);
+    assert.match(warning, /artifactsFor/);
+  });
+
+  it("still says nothing when only the default root exists, whatever the host wired", () => {
+    // The warning is about named roots. A single-root host must stay silent
+    // even if it passes nothing.
+    for (const capabilities of Object.values(CAPABILITIES)) {
+      const warnings: string[] = [];
+      createMulmoScriptServerOps({
+        storiesDir: "/nonexistent/for-tests/artifacts/stories",
+        ...capabilities,
+        artifacts: stubFileOps,
+        writeFileAtomic: async () => {},
+        log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+      });
+      assert.deepEqual(warnings, [], JSON.stringify(Object.keys(capabilities)));
+    }
   });
 });
 
