@@ -44,6 +44,17 @@
       </div>
 
       <footer class="px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
+        <!-- Host controls for the chat that is about to start. Empty in every host that passes
+             nothing, and the wrapper is then zero-width — `mr-auto` absorbs the free space the
+             footer's `justify-end` was absorbing anyway, so the buttons do not move.
+
+             The plugin knows nothing about what a host puts here. MulmoTerminal starts these
+             chats as one of several agents and needs to say which; MulmoClaude has one and does
+             not. Whether the slot is filled at all is the parent's call — see CollectionView,
+             which withholds it on the embedded path where no new chat is started. -->
+        <div class="mr-auto flex items-center gap-2">
+          <slot name="options" />
+        </div>
         <button
           type="button"
           class="h-8 px-2.5 rounded text-xs font-bold text-slate-500 hover:bg-slate-200/50 transition-colors"
