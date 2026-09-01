@@ -10,8 +10,10 @@
 // so user-facing messages stay free of transport prefixes.
 
 import { executeMulmoScriptSave, executeUpdateBeat, executeUpdateScript, type MulmoScriptFailure } from "../core/plugin";
+import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptExecuteContext } from "../core/types";
 import type { MulmoScriptServerOps } from "./ops";
+import { isRecord } from "./support";
 import type { OpFailure } from "./types";
 
 interface DispatchFailure {
@@ -88,6 +90,22 @@ export type MulmoScriptDispatchHandler = (args: Record<string, unknown>) => Prom
  * FileOps, guarded by the instance's realpath containment
  * (`guardStoryWirePath`) — the core's own guard is lexical.
  */
+/**
+ * Stamp the root a successful result acted in.
+ *
+ * Only on success: a failure carries `code` and `error`, and adding a root to
+ * it would invite a reader to treat the pair as addressable when the call did
+ * not happen. Only when NON-default, so a result for a call that named no root
+ * stays byte-identical to what this package returned before roots existed —
+ * which is what keeps every existing card working untouched.
+ */
+function withRoot(result: unknown, root: string | undefined): unknown {
+  const normalized = normalizeRoot(root);
+  if (normalized === DEFAULT_ROOT) return result;
+  if (!isRecord(result) || result.ok !== true) return result;
+  return { ...result, root: normalized };
+}
+
 /** `undefined` when `root` is absent or a string; a failure envelope otherwise. */
 function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: string } | undefined {
   if (root === undefined || typeof root === "string") return undefined;
@@ -95,16 +113,31 @@ function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: str
 }
 
 export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): MulmoScriptDispatchHandler {
-  const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
+  /**
+   * The executor context for a write, bound to the root it names.
+   *
+   * One `FileOps` was held for the whole handler, so the executors — which
+   * take a WIRE path (`stories/…`) and resolve it against whatever FileOps
+   * they are given — wrote a named root's script into the DEFAULT root's
+   * identically-named file. Choosing here keeps `MulmoScriptExecuteContext`
+   * and every executor unchanged: the root never reaches them, only the right
+   * FileOps does (#3019).
+   */
+  function executeContextFor(root: string | undefined): MulmoScriptExecuteContext | null {
+    const artifacts = ops.artifactsForRoot(root);
+    return artifacts === null ? null : { files: { artifacts } };
+  }
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {
-    // Writes stay in the default root until step 2 gives the executors a
-    // per-root FileOps — see `guardStoryWriteRoot` (#3015 review G1).
+    // Which root this write lands in — see `guardStoryWriteRoot` and
+    // `executeContextFor`.
     const rootGuard = ops.guardStoryWriteRoot(str(args.root));
     if (rootGuard) return fromOpFailure(rootGuard);
     const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
-    const outcome = await executeMulmoScriptSave(executeContext, {
+    const context = executeContextFor(str(args.root));
+    if (context === null) return invalidArgs("save");
+    const outcome = await executeMulmoScriptSave(context, {
       script: args.script,
       filename: str(args.filename),
       filePath: str(args.filePath),
@@ -118,7 +151,9 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     if (rootGuard) return fromOpFailure(rootGuard);
     const guard = ops.guardStoryWirePath(args.filePath, str(args.root));
     if (guard) return fromOpFailure(guard);
-    const outcome = kind === "updateBeat" ? await executeUpdateBeat(executeContext, args) : await executeUpdateScript(executeContext, args);
+    const context = executeContextFor(str(args.root));
+    if (context === null) return invalidArgs(kind);
+    const outcome = kind === "updateBeat" ? await executeUpdateBeat(context, args) : await executeUpdateScript(context, args);
     if (!outcome.ok) return fromPackageFailure(outcome);
     // After the write landed, never before: a View that reloads on a failed write would
     // discard the user's edit and show the old file back.
@@ -199,6 +234,17 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
   // Nothing but routing below: every kind resolves to one named handler, so
   // reading it answers "where does this kind go" without also having to read
   // what any of them do.
+  /** Which handler serves this kind. Routing only — the caller tags the answer. */
+  async function route(kind: string, args: Record<string, unknown>): Promise<unknown> {
+    if (kind === "save") return saveKind(args);
+    if (kind === "updateBeat" || kind === "updateScript") return updateKind(kind, args);
+    if (PROBE_KINDS.has(kind)) return probeKind(kind, args);
+    if (GENERATE_KINDS.has(kind)) return generateKind(kind, args);
+    if (UPLOAD_KINDS.has(kind)) return uploadKind(kind, args);
+    if (kind === "pendingGenerations") return pendingKind(kind, args);
+    return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
+  }
+
   return async (args: Record<string, unknown>): Promise<unknown> => {
     const kind = str(args.kind);
     if (!kind) return invalidArgs("<missing>");
@@ -211,12 +257,11 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
     // default; present must be a string.
     const malformedRoot = guardSuppliedRoot(args.root);
     if (malformedRoot) return malformedRoot;
-    if (kind === "save") return saveKind(args);
-    if (kind === "updateBeat" || kind === "updateScript") return updateKind(kind, args);
-    if (PROBE_KINDS.has(kind)) return probeKind(kind, args);
-    if (GENERATE_KINDS.has(kind)) return generateKind(kind, args);
-    if (UPLOAD_KINDS.has(kind)) return uploadKind(kind, args);
-    if (kind === "pendingGenerations") return pendingKind(kind, args);
-    return { ok: false, code: "bad_request", error: `unknown mulmoScript dispatch kind "${kind}"` };
+    // Tagged HERE, once, rather than by each of the seventeen kinds. A host
+    // builds its cards from these results and a card's identity is the pair
+    // `(root, filePath)`, so a kind that forgot the tag would quietly collapse
+    // two repositories' identically-named decks onto one card. Threading it
+    // per-kind is exactly the shape #3015 got wrong over and over.
+    return withRoot(await route(kind, args), str(args.root));
   };
 }

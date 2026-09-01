@@ -165,9 +165,9 @@ export interface DispatchFailure {
 
 export type DispatchEnvelope<T> = ({ ok: true } & T) | DispatchFailure;
 
-/** Maps a dispatch `kind` to its success payload so the View's transport
- *  can call `dispatch` without casts at every site. */
-export interface MulmoScriptDispatchResult {
+/** The success payload of each dispatch `kind`, BEFORE the root tag below is
+ *  applied. Not exported: `MulmoScriptDispatchResult` is the type callers use. */
+interface DispatchResultPayloads {
   save: { script: Record<string, unknown>; filePath: string; message: string };
   updateBeat: Record<string, never>;
   updateScript: Record<string, never>;
@@ -186,3 +186,25 @@ export interface MulmoScriptDispatchResult {
   generatePdf: { pdfPath: string };
   pendingGenerations: { pending: MulmoScriptGenerationEvent[] };
 }
+
+/**
+ * Maps a dispatch `kind` to its success payload, every one of them carrying
+ * the root it acted in.
+ *
+ * A host builds its cards from these results, and a card's identity is the
+ * PAIR `(root, filePath)` — `stories/deck.json` exists in every registered
+ * root. Without the root here, two repositories' identically-named decks
+ * collapse onto one card, which is #3014's third collision point, and no
+ * amount of fixing the host's identity function helps because the value never
+ * arrives.
+ *
+ * `root` was threaded through the ARGS and the EVENTS in #3015 and not through
+ * the results — the same shape that PR got wrong repeatedly: the comparison
+ * widened while the path carrying the data to it did not. Applied as a mapped
+ * type rather than field by field so a kind added later cannot be forgotten.
+ *
+ * Absent means the default root, so every pre-`root` card is unchanged.
+ */
+export type MulmoScriptDispatchResult = {
+  [K in keyof DispatchResultPayloads]: DispatchResultPayloads[K] & RootTag;
+};

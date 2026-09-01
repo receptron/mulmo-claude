@@ -39,6 +39,24 @@ export interface PathRules {
  * is the substitution this function exists to refuse. Only Windows CI caught
  * it; here there is one root and always a relative route (#3015 post-merge).
  */
+/**
+ * The path INSIDE a stories root that a wire path names, or null when it does
+ * not name one.
+ *
+ * The default root's FileOps is rooted one level up, at `<workspace>/artifacts`,
+ * so there the wire path and the FileOps path are the SAME string and nothing
+ * is stripped. A named root's FileOps is rooted at the stories directory
+ * itself — which is what a host naturally writes, having registered exactly
+ * that directory in `extraRoots` — so the `stories/` prefix has to come off,
+ * or the write lands in `<root>/stories/<rel>` while the read looks in
+ * `<root>/<rel>` and the two are different files (#3020 review H1).
+ */
+export function storiesRelativePath(wirePath: string): string | null {
+  const normalized = normalizeStoryPath(wirePath);
+  if (normalized === null) return null;
+  return normalized.slice(`${STORIES_DIR}/`.length);
+}
+
 export function storyRefWithin(base: string, absolutePath: string, rules: PathRules): string | null {
   const relative = rules.relative(base, absolutePath);
   if (rules.isAbsolute(relative)) return null;

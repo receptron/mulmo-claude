@@ -75,9 +75,48 @@ export interface MulmoScriptServerBackend {
    * root, an agent cannot.
    */
   extraRoots?: Record<string, string>;
+  /**
+   * Whether this host can keep pending generations apart by root.
+   *
+   * Generation in a named root was refused outright (#3015) because
+   * MulmoClaude's session store keys pending work by `(kind, filePath, key)` —
+   * `generationKey` in `@mulmobridge/protocol` — so two roots generating the
+   * same beat in one session collapse to one entry and either completion
+   * clears the other root's indicator.
+   *
+   * That hazard is the HOST's, not this package's, and not every host has it:
+   * MulmoTerminal ignores `chatSessionId` and publishes straight to a pubsub
+   * channel the View filters by the pair, so it was being refused for a
+   * collision it cannot have (#3019). The question was never "is this root the
+   * default" but "can this host tell two roots' generations apart".
+   *
+   * Default `false` — absent means the refusal stays exactly as it shipped, so
+   * a host that has not thought about this is not quietly opened up. A host
+   * sets it only once its own pending-generation state carries the root (or it
+   * keeps none at all).
+   */
+  rootScopedGenerationState?: boolean;
   /** Shared artifacts FileOps (rooted at `<workspace>/artifacts`) for the
    *  save / reopen / update dispatch kinds (phase-1 core executes). */
   artifacts: FileOps;
+  /**
+   * The FileOps for a named root's artifacts area, or null when the host does
+   * not serve that root.
+   *
+   * `artifacts` above is ONE FileOps bound to the default root, and the
+   * save / update executors run against it. So a write naming another root
+   * rewrote the DEFAULT root's identically-named script and then announced the
+   * other one as changed — which is why those kinds were refused outright
+   * (#3015 review G1). Reads and uploads never had the problem: they go
+   * through `resolveStory` and take the absolute path it returns.
+   *
+   * A resolver rather than a map, because the host already has one: it knows
+   * which directory an opaque root id names, and building a FileOps for it is
+   * a closure per root (MulmoTerminal's `createFileOps(rootFor, label)` takes
+   * a root getter for exactly this). Absent means named-root writes stay
+   * refused, so a host that has not wired it keeps the shipped behaviour.
+   */
+  artifactsFor?: (root: string) => FileOps | null;
   /** Atomic file write (tmp alongside destination + rename; parent dirs
    *  created). Hosts inject their hardened implementation. */
   writeFileAtomic: (absolutePath: string, data: string | Uint8Array) => Promise<void>;
