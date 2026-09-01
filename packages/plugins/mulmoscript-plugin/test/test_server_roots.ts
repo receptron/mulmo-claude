@@ -14,6 +14,7 @@ import path from "path";
 import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
 import { storyRefWithin } from "../src/core/paths";
+import { missingRootCapabilities } from "../src/server/types";
 import type { OpResult } from "../src/server/types";
 import type { MulmoScriptGenerationEvent, MulmoScriptChangedEvent } from "../src/core/contract";
 
@@ -1057,5 +1058,41 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
     const ops = opsAnsweringEverything();
     assert.equal(ops.artifactsForRoot(undefined), ops.backend.artifacts);
     assert.notEqual(ops.artifactsForRoot(undefined), served);
+  });
+});
+
+describe("missingRootCapabilities — the rule, without building a server", () => {
+  // Extracted so it can be driven directly (CodeRabbit on #3023). The rule is
+  // what went wrong in #3022: the warning keyed on the root COUNT and never
+  // looked at `artifactsFor`, so a correctly-wired host was told at every boot
+  // that its writes land in the default root.
+  const someOps = (): FileOps => stubFileOps;
+
+  it("names nothing when both capabilities are wired", () => {
+    assert.deepEqual(missingRootCapabilities({ rootScopedGenerationState: true, artifactsFor: someOps }), []);
+  });
+
+  it("names only generation when only that is missing", () => {
+    const missing = missingRootCapabilities({ artifactsFor: someOps });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /rootScopedGenerationState/);
+  });
+
+  it("names only writes when only those are missing", () => {
+    const missing = missingRootCapabilities({ rootScopedGenerationState: true });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /artifactsFor/);
+  });
+
+  it("names both when neither is wired", () => {
+    assert.equal(missingRootCapabilities({}).length, 2);
+  });
+
+  it("treats an explicitly false declaration as unwired", () => {
+    // `false` is a host saying "I cannot scope generation state", which is the
+    // same answer as saying nothing — and must read that way here.
+    const missing = missingRootCapabilities({ rootScopedGenerationState: false, artifactsFor: someOps });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /rootScopedGenerationState/);
   });
 });

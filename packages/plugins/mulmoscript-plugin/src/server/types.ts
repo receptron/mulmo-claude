@@ -51,6 +51,36 @@ export type MulmoScriptServerLog = MinimalLogger;
  * host-specific transport lives here — the mulmocast orchestration, path
  * containment, and generation-state tracking are all in-package.
  */
+/**
+ * Which named-root capabilities a host has NOT wired.
+ *
+ * Pure and exported so the rule can be tested without building a server: the
+ * condition used to key on the root COUNT alone, so a host that HAD passed
+ * `artifactsFor` was told at every boot that its writes land in the default
+ * root — the opposite of what the code then did (#3022).
+ *
+ * Reads and uploads need nothing from the host, so they never appear here.
+ */
+export function missingRootCapabilities(backend: Pick<MulmoScriptServerBackend, "rootScopedGenerationState" | "artifactsFor">): string[] {
+  const missing: string[] = [];
+  // The pair identity is complete INSIDE this package and stops at the host
+  // boundary: a host's per-session store keys pending work on
+  // `(kind, filePath, key)` — `generationKey` in `@mulmobridge/protocol` — so
+  // two roots generating the same beat in one session collapse to one entry
+  // (Codex P1 on #3015). A host that keeps no such store declares it.
+  if (backend.rootScopedGenerationState !== true) {
+    missing.push(
+      "GENERATION is refused until this host declares `rootScopedGenerationState` (its pending-generation state must carry the root, or it must keep none)",
+    );
+  }
+  // The save/update executors run against one FileOps; without a per-root one
+  // they would rewrite the DEFAULT root's identically-named script.
+  if (backend.artifactsFor === undefined) {
+    missing.push("save/update land in the DEFAULT root until this host passes `artifactsFor`");
+  }
+  return missing;
+}
+
 export interface MulmoScriptServerBackend {
   /** Absolute path of the DEFAULT stories directory
    *  (`<workspace>/artifacts/stories`). May not exist yet — the ops lazily
