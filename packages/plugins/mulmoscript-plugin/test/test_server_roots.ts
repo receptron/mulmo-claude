@@ -14,6 +14,7 @@ import path from "path";
 import type { FileOps } from "gui-chat-protocol";
 import { createMulmoScriptServerOps } from "../src/server/ops";
 import { storyRefWithin } from "../src/core/paths";
+import { missingRootCapabilities } from "../src/server/types";
 import type { OpResult } from "../src/server/types";
 import type { MulmoScriptGenerationEvent, MulmoScriptChangedEvent } from "../src/core/contract";
 
@@ -904,21 +905,73 @@ describe("who may generate in a named root is the HOST's answer", () => {
 
 describe("the boot warning says what is actually true for THIS host", () => {
   // The warning is the only thing a host integrator reads before discovering a
-  // limit from a stuck spinner, so it must track the limits rather than repeat
-  // the ones that applied when it was written (#3019).
-  it("stops mentioning generation once the host declares it can scope it", () => {
+  // limit from a stuck spinner, so it must track what THIS host is missing.
+  //
+  // It used to key on the root COUNT alone, so a host that HAD passed
+  // `artifactsFor` was told at every boot that its writes land in the default
+  // root — the opposite of what the code then did, read by the hosts that got
+  // the wiring right (#3022, reported by the consuming host).
+  const CAPABILITIES = {
+    none: {},
+    generationOnly: { rootScopedGenerationState: true },
+    writesOnly: { artifactsFor: () => stubFileOps },
+    both: { rootScopedGenerationState: true, artifactsFor: () => stubFileOps },
+  } as const;
+
+  function warningsFor(capabilities: Record<string, unknown>): string[] {
     const warnings: string[] = [];
     createMulmoScriptServerOps({
       storiesDir: "/nonexistent/for-tests/artifacts/stories",
       extraRoots: { repoA: NAMED_ROOT_DIR_A },
-      rootScopedGenerationState: true,
+      ...capabilities,
       artifacts: stubFileOps,
       writeFileAtomic: async () => {},
       log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
     });
-    assert.equal(warnings.length, 1);
-    assert.doesNotMatch(warnings[0]!, /GENERATION is refused/);
-    assert.match(warnings[0]!, /save\/update still land in the DEFAULT root/);
+    return warnings;
+  }
+
+  it("says nothing at all when the host wired everything", () => {
+    // The bug this replaces: a correctly-wired host was told, every boot, that
+    // a feature it had enabled did not work.
+    assert.deepEqual(warningsFor(CAPABILITIES.both), []);
+  });
+
+  it("names only the missing generation capability", () => {
+    const [warning] = warningsFor(CAPABILITIES.writesOnly);
+    assert.ok(warning);
+    assert.match(warning, /rootScopedGenerationState/);
+    assert.doesNotMatch(warning, /artifactsFor/, "a host that passed it must not be told it did not");
+  });
+
+  it("names only the missing write capability", () => {
+    const [warning] = warningsFor(CAPABILITIES.generationOnly);
+    assert.ok(warning);
+    assert.match(warning, /artifactsFor/);
+    assert.doesNotMatch(warning, /rootScopedGenerationState/, "a host that declared it must not be told it did not");
+  });
+
+  it("names both when the host wired neither", () => {
+    const [warning] = warningsFor(CAPABILITIES.none);
+    assert.ok(warning);
+    assert.match(warning, /rootScopedGenerationState/);
+    assert.match(warning, /artifactsFor/);
+  });
+
+  it("still says nothing when only the default root exists, whatever the host wired", () => {
+    // The warning is about named roots. A single-root host must stay silent
+    // even if it passes nothing.
+    for (const capabilities of Object.values(CAPABILITIES)) {
+      const warnings: string[] = [];
+      createMulmoScriptServerOps({
+        storiesDir: "/nonexistent/for-tests/artifacts/stories",
+        ...capabilities,
+        artifacts: stubFileOps,
+        writeFileAtomic: async () => {},
+        log: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+      });
+      assert.deepEqual(warnings, [], JSON.stringify(Object.keys(capabilities)));
+    }
   });
 });
 
@@ -1005,5 +1058,41 @@ describe("`extraRoots` stays the containment boundary for writes", () => {
     const ops = opsAnsweringEverything();
     assert.equal(ops.artifactsForRoot(undefined), ops.backend.artifacts);
     assert.notEqual(ops.artifactsForRoot(undefined), served);
+  });
+});
+
+describe("missingRootCapabilities — the rule, without building a server", () => {
+  // Extracted so it can be driven directly (CodeRabbit on #3023). The rule is
+  // what went wrong in #3022: the warning keyed on the root COUNT and never
+  // looked at `artifactsFor`, so a correctly-wired host was told at every boot
+  // that its writes land in the default root.
+  const someOps = (): FileOps => stubFileOps;
+
+  it("names nothing when both capabilities are wired", () => {
+    assert.deepEqual(missingRootCapabilities({ rootScopedGenerationState: true, artifactsFor: someOps }), []);
+  });
+
+  it("names only generation when only that is missing", () => {
+    const missing = missingRootCapabilities({ artifactsFor: someOps });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /rootScopedGenerationState/);
+  });
+
+  it("names only writes when only those are missing", () => {
+    const missing = missingRootCapabilities({ rootScopedGenerationState: true });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /artifactsFor/);
+  });
+
+  it("names both when neither is wired", () => {
+    assert.equal(missingRootCapabilities({}).length, 2);
+  });
+
+  it("treats an explicitly false declaration as unwired", () => {
+    // `false` is a host saying "I cannot scope generation state", which is the
+    // same answer as saying nothing — and must read that way here.
+    const missing = missingRootCapabilities({ rootScopedGenerationState: false, artifactsFor: someOps });
+    assert.equal(missing.length, 1);
+    assert.match(missing[0]!, /rootScopedGenerationState/);
   });
 });

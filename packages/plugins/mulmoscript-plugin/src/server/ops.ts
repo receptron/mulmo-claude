@@ -48,6 +48,7 @@ import { normalizeStoryPath, storyRefWithin, storiesRelativePath } from "../core
 import { errorMessage } from "@mulmoclaude/common";
 import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { fileToDataUri, stripDataUri } from "./support";
+import { missingRootCapabilities } from "./types";
 import { enableGraphAIErrorCapture, setMulmoErrorCaptureLogger, withMulmoErrorCapture } from "./mulmoErrorCapture";
 import type {
   GenerateOpArgsWith,
@@ -220,25 +221,31 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     }
     rootDirs.set(trimmed, path.resolve(dir));
   }
-  if (rootDirs.size > 1) {
-    // The pair identity is complete INSIDE this package, and stops at the host
-    // boundary. A host's per-session generation store keys on
-    // `(kind, filePath, key)` — `generationKey` in `@mulmobridge/protocol`,
-    // which bridges also consume — so two roots running the same generation in
-    // one session collapse to one entry and either finish clears the other's
-    // pending state (Codex P1 on #3015).
-    //
-    // Widening that key is a protocol change with its own consumers, so it is
-    // not this package's to make. Unreachable until a host registers a root,
-    // which is exactly the moment this fires: whoever first does it is the
-    // person who has to widen their session key, and they see this at boot
-    // rather than discovering it from a stuck spinner.
-    log.warn(
-      backend.rootScopedGenerationState === true
-        ? "extra stories roots registered — reads, uploads and generation work; save/update still land in the DEFAULT root until this host passes `artifactsFor` (#3019)"
-        : "extra stories roots registered — reads and uploads work, but GENERATION is refused until this host declares `rootScopedGenerationState` (its pending-generation state must carry the root, or it must keep none), and save/update land in the DEFAULT root until it passes `artifactsFor` (#3019)",
-      { roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT) },
-    );
+  warnAboutUnwiredRoots();
+
+  /**
+   * Tell a host which named-root capabilities it has not wired — and nothing
+   * when it has wired them all.
+   *
+   * The condition used to be the root COUNT alone, so a host that had passed
+   * `artifactsFor` was still told, at every boot, that its writes land in the
+   * default root. That is not a stale wording: it is the opposite of what the
+   * code then does, read by the hosts that got the wiring RIGHT (#3022, from
+   * the consuming host).
+   *
+   * Silence when nothing is missing, because a warning that always fires is
+   * one people learn to skip — and then the host that really did forget
+   * `artifactsFor` cannot tell either. Each clause is emitted only when that
+   * capability is actually absent, so the message says what is true for THIS
+   * host rather than what was true when it was written.
+   */
+  function warnAboutUnwiredRoots(): void {
+    if (rootDirs.size <= 1) return;
+    const missing = missingRootCapabilities(backend);
+    if (missing.length === 0) return;
+    log.warn(`extra stories roots registered — reads and uploads work, but ${missing.join(", and ")} (#3019)`, {
+      roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT),
+    });
   }
 
   /** The registered directory for a wire `root`, or null when the host never
