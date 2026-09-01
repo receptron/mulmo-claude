@@ -23,7 +23,7 @@ plugin はホストが何を置くかを知らない。エージェントの語�
 
 ### 2. `CollectionView.vue` — `chat-modal-options` を、標準経路でだけ転送
 
-```
+```vue
 <template v-if="!sendTextMessage" #options><slot name="chat-modal-options" /></template>
 ```
 
