@@ -2,6 +2,18 @@
 
 Newest first. Each entry corresponds to a tagged release. Written in English.
 
+## @mulmoclaude/collection-plugin@4.6.0 — 2026-09-02
+
+Opens an `options` slot in the chat modal's footer, so a host can put its own control beside "Start chat" (#3026, PR #3027).
+
+`CollectionChatModal` covers the whole page — `fixed inset-0` plus `backdrop-blur-sm` — so anything a host draws elsewhere to say *what this chat will start as* is blurred out at exactly the moment the button is pressed. MulmoTerminal starts these chats as one of five agents chosen by a single persisted global, and a user reported a collection chat coming up as Meta Muse with nothing on screen to explain it (receptron/mulmoterminal#1938).
+
+- `CollectionChatModal.vue` renders `<slot name="options" />` at the left of the footer, wrapped in a `mr-auto` div. Empty in every host that passes nothing, and the wrapper is then zero-width: `mr-auto` absorbs the free space the footer's `justify-end` was absorbing anyway, so Cancel and Start do not move. The plugin learns nothing about what a host puts there — no agent vocabulary crosses the boundary.
+- `CollectionView.vue` forwards its own `chat-modal-options` slot into it, **and only on the standalone path**. With `sendTextMessage` set the modal is inside a chat card and `submitChat` sends into the session already running (`useCollectionChat`'s `dispatchSeed`), so no new chat is started and a control over "which chat gets started" would change nothing. An option that does not apply is worse than none.
+- MulmoClaude fills the slot nowhere, so its own UI is unchanged. `e2e/tests/collection-chat-button.spec.ts` pins that the footer still holds exactly two buttons, and `test/components/test_collection_chat_modal_slot.ts` pins the slot, the forwarding, and the gate on the same template element.
+
+📦 **npm**: [`@mulmoclaude/collection-plugin@4.6.0`](https://www.npmjs.com/package/@mulmoclaude/collection-plugin/v/4.6.0)
+
 ## @mulmoclaude/collection-plugin@4.5.0 — 2026-08-30
 
 Routes every icon in the plugin through core's new `IconGlyph` (#2986, #3003), and requires `@mulmoclaude/core@4.5.0` to do it — the component did not exist before that release.
