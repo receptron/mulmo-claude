@@ -7,7 +7,7 @@
 // `skillsStagingDir`, which is what lets the storage layer be reasoned about
 // (and eventually packaged) without dragging the skill layout along.
 
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceRoot, stagingSkillDir } from "./host";
 import { toPosixRelPath } from "../../files/relPath.js";
@@ -57,8 +57,8 @@ export async function readCustomViewHtml(collection: SourceAwareReadTarget, view
  *
  *  The evidence is the slug's own `schema.json`, because that is what the
  *  authoring layout actually produces — `putSchema` writes it, and the delete
- *  path below has always keyed on it. `isRegularFile` (lstat) rather than a
- *  plain `stat`, so a symlink standing in for the schema is not evidence.
+ *  path below has always keyed on it. It must be a REGULAR FILE — `lstat`, not
+ *  `stat` — so a symlink standing in for the schema is not evidence.
  *
  *  Exported so the DELETE path uses this exact function rather than a second
  *  copy of the expression: "reads and deletes agree" is a claim `views.ts` has
@@ -67,7 +67,48 @@ export async function readCustomViewHtml(collection: SourceAwareReadTarget, view
 export async function stagedSkillDir(workspaceRoot: string, safeSlug: string): Promise<string | null> {
   const staging = stagingSkillDir(workspaceRoot, safeSlug);
   if (staging === null) return null;
-  return (await isRegularFile(path.join(staging, SCHEMA_FILE))) ? staging : null;
+  return (await isStagedSchema(path.join(staging, SCHEMA_FILE))) ? staging : null;
+}
+
+/** Is the staged `schema.json` there, as a regular file?
+ *
+ *  NOT `isRegularFile` from `io.ts`, which answers `false` for every `lstat`
+ *  failure. Here "no schema" and "the schema could not be inspected" must not
+ *  collapse into one answer: the second would quietly downgrade a staged slug
+ *  to unstaged and serve the OTHER base's copy — the same masking the read loop
+ *  below refuses, and for the same reason (Sourcery review on #3032). Only the
+ *  missing-here codes mean "not staged"; anything else propagates. */
+async function isStagedSchema(target: string): Promise<boolean> {
+  try {
+    return (await lstat(target)).isFile();
+  } catch (err) {
+    if (!isMissingHere(err)) throw err;
+    return false;
+  }
+}
+
+/** The two codes that mean "not at this path" rather than "this path failed".
+ *  A permission denial / disk error must propagate — silently treating it as
+ *  absent masks a real failure as a stale-from-another-base success or a
+ *  misleading 404 (CodeRabbit review on #1836). */
+function isMissingHere(err: unknown): boolean {
+  return isErrorWithCode(err) && (err.code === "ENOENT" || err.code === "ENOTDIR");
+}
+
+/** Read `relPath` from the first base that holds it, or null when none does.
+ *  Bases are tried in order and each is containment-checked on its own, so the
+ *  fallback never widens what a single base would have allowed. */
+async function readFromBases(bases: readonly string[], relPath: string): Promise<string | null> {
+  for (const base of bases) {
+    const resolved = resolveTemplatePath(base, relPath);
+    if (resolved === null) continue;
+    try {
+      return await readFile(resolved, "utf-8");
+    } catch (err) {
+      if (!isMissingHere(err)) throw err;
+    }
+  }
+  return null;
 }
 
 /** Internal helper: read a file using the same source-aware base fallback as
@@ -85,22 +126,7 @@ async function readSourceAwareFile(collection: SourceAwareReadTarget, relPath: s
   // not per root — a staged workspace also carries imported and directly
   // committed collections, and they must read their own copy (#3031).
   const staging = collection.source === "project" ? await stagedSkillDir(workspaceRoot, safeSlug) : null;
-  const bases = staging === null ? [collection.skillDir] : [staging, collection.skillDir];
-  for (const base of bases) {
-    const resolved = resolveTemplatePath(base, relPath);
-    if (resolved === null) continue;
-    try {
-      return await readFile(resolved, "utf-8");
-    } catch (err) {
-      // Only the "file missing here" codes should trigger the fallback. A
-      // permission denial / disk error must propagate — silently falling back
-      // would mask a real failure as a stale-from-other-base success or a
-      // misleading 404 (CodeRabbit review on #1836).
-      if (!isErrorWithCode(err)) throw err;
-      if (err.code !== "ENOENT" && err.code !== "ENOTDIR") throw err;
-    }
-  }
-  return null;
+  return readFromBases(staging === null ? [collection.skillDir] : [staging, collection.skillDir], relPath);
 }
 
 export interface CustomViewI18nResult {

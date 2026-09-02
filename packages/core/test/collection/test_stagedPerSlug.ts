@@ -15,7 +15,7 @@
 // predicate to guarantee.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { configureCollectionHost, loadCollection, readCustomViewHtml, deleteCustomView } from "../../src/collection/server/index.ts";
@@ -127,4 +127,27 @@ test("delete removes the copy the read serves — unstaged slug leaves the stale
   // The stale tree is not this collection's staging dir, so the delete does not
   // reach into it — same reasoning as the null-staging root's delete.
   assert.equal(existsSync(path.join(root, "data", "skills", "committed", "views", "board.html")), true);
+});
+
+// "no staged schema" and "the staged schema could not be inspected" must not
+// collapse into one answer. Treating a permission failure as "unstaged" would
+// quietly serve the OTHER base's copy — the same masking the read loop refuses
+// for the view file itself, and the reason the evidence check rethrows anything
+// that is not ENOENT/ENOTDIR (Sourcery review on #3032).
+test("an unreadable staging tree propagates rather than reading as unstaged", async (testCtx) => {
+  if (process.platform === "win32" || process.getuid?.() === 0) {
+    testCtx.skip("requires POSIX permissions and a non-root user");
+    return;
+  }
+  const root = makeMixedRoot("sps-eacces-");
+  const collection = await loadCollection("authored", { workspaceRoot: root });
+  assert.ok(collection);
+
+  const stagingDir = path.join(root, "data", "skills", "authored");
+  chmodSync(stagingDir, 0o000);
+  try {
+    await assert.rejects(() => readCustomViewHtml(collection, "views/board.html", { workspaceRoot: root }), /EACCES|EPERM/);
+  } finally {
+    chmodSync(stagingDir, 0o755);
+  }
 });
