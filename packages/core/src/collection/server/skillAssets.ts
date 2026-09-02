@@ -12,7 +12,7 @@ import path from "node:path";
 import { getWorkspaceRoot, stagingSkillDir } from "./host";
 import { toPosixRelPath } from "../../files/relPath.js";
 import { isRegularFile, type IoOptions } from "./io";
-import { resolveTemplatePath, safeSlugName } from "./paths";
+import { resolveTemplatePath, safeSlugName, SCHEMA_FILE } from "./paths";
 import type { CollectionItem, CollectionSchema } from "../core/schema";
 import type { LoadedCollection } from "./discoveredCollection";
 import { isErrorWithCode, isRecord } from "@mulmoclaude/common";
@@ -45,6 +45,31 @@ export async function readCustomViewHtml(collection: SourceAwareReadTarget, view
   return readSourceAwareFile(collection, viewFile, opts);
 }
 
+/** `<staging>/<slug>` when THAT slug is actually staged there, else null.
+ *
+ *  `stagingSkillDir` only says whether the ROOT has a staging tree, and then
+ *  joins the slug — so on its own it claims every collection in a staged
+ *  workspace is staged. That is wrong for the two layouts that coexist there:
+ *  a collection IMPORTED via the discover panel, and one committed directly
+ *  under `.claude/skills/`, neither of which has a staging copy. A stale
+ *  `data/skills/<slug>/views/x.html` left beside them then SHADOWED the real
+ *  view on every read (#3031).
+ *
+ *  The evidence is the slug's own `schema.json`, because that is what the
+ *  authoring layout actually produces — `putSchema` writes it, and the delete
+ *  path below has always keyed on it. `isRegularFile` (lstat) rather than a
+ *  plain `stat`, so a symlink standing in for the schema is not evidence.
+ *
+ *  Exported so the DELETE path uses this exact function rather than a second
+ *  copy of the expression: "reads and deletes agree" is a claim `views.ts` has
+ *  made in its comments since #1836, and sharing the predicate is what makes
+ *  it structurally true instead of a convention two files have to remember. */
+export async function stagedSkillDir(workspaceRoot: string, safeSlug: string): Promise<string | null> {
+  const staging = stagingSkillDir(workspaceRoot, safeSlug);
+  if (staging === null) return null;
+  return (await isRegularFile(path.join(staging, SCHEMA_FILE))) ? staging : null;
+}
+
 /** Internal helper: read a file using the same source-aware base fallback as
  *  `readCustomViewHtml`. Used by both `readCustomViewHtml` and
  *  `readCustomViewI18n` so the two stay in lockstep. */
@@ -52,12 +77,14 @@ async function readSourceAwareFile(collection: SourceAwareReadTarget, relPath: s
   const safeSlug = safeSlugName(collection.slug);
   if (safeSlug === null) return null;
   const workspaceRoot = opts.workspaceRoot ?? getWorkspaceRoot();
-  // A root with NO staging tree (`stagingSkillDir` → null) reads the skill dir
-  // alone. Adding a synthetic staging base there is not merely redundant: a
+  // A slug with no staged `schema.json` (`stagedSkillDir` → null) reads the
+  // skill dir alone. Adding a staging base there is not merely redundant: a
   // stray `<root>/data/skills/<slug>/views/x.html` left behind by an agent that
   // followed the staged authoring instructions would SHADOW the committed
-  // `.claude/skills/<slug>/views/x.html` on every read.
-  const staging = collection.source === "project" ? stagingSkillDir(workspaceRoot, safeSlug) : null;
+  // `.claude/skills/<slug>/views/x.html` on every read. That holds per SLUG,
+  // not per root — a staged workspace also carries imported and directly
+  // committed collections, and they must read their own copy (#3031).
+  const staging = collection.source === "project" ? await stagedSkillDir(workspaceRoot, safeSlug) : null;
   const bases = staging === null ? [collection.skillDir] : [staging, collection.skillDir];
   for (const base of bases) {
     const resolved = resolveTemplatePath(base, relPath);
