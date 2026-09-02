@@ -1096,3 +1096,73 @@ describe("missingRootCapabilities — the rule, without building a server", () =
     assert.match(missing[0]!, /rootScopedGenerationState/);
   });
 });
+
+describe("a refused write says WHERE the problem is", () => {
+  // Two different failures used to share one message, and they are fixed in
+  // different places: no `artifactsFor` is a capability this host has not
+  // turned on; `artifactsFor` answering `null` for a REGISTERED root is a
+  // wiring mistake inside that host.
+  //
+  // The second is the quiet one — the boot warning stays silent (the resolver
+  // WAS passed) while every write is refused — so a message reading "the
+  // plugin cannot do this yet" sends the host looking in the wrong place
+  // (#3024, from the consuming host's review of #3023).
+  const NOT_SUPPORTED = /writing to a non-default stories root is not supported yet/;
+  const HOST_RESOLVER = /this host's `artifactsFor` returned no FileOps for the registered stories root "repoA"/;
+
+  function opsWith(artifactsFor?: (root: string) => FileOps | null) {
+    return createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      extraRoots: { repoA: NAMED_ROOT_DIR_A },
+      ...(artifactsFor ? { artifactsFor } : {}),
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+  }
+
+  it("says the capability is off when the host passed no resolver", () => {
+    const guard = opsWith().guardStoryWriteRoot("repoA");
+    assert.ok(guard !== null);
+    assert.match(guard.error, NOT_SUPPORTED);
+  });
+
+  it("names the host's own resolver when it answered null for a registered root", () => {
+    // The case the boot warning cannot catch: `artifactsFor` was passed, so it
+    // stays silent, and only this message can say why nothing writes.
+    const guard = opsWith((root) => (root === "SOMETHING-ELSE" ? stubFileOps : null))?.guardStoryWriteRoot("repoA");
+    assert.ok(guard !== null && guard !== undefined);
+    assert.match(guard.error, HOST_RESOLVER);
+    assert.doesNotMatch(guard.error, NOT_SUPPORTED, "a wiring mistake must not read as a missing feature");
+  });
+
+  it("names the root, so a host serving several knows which one", () => {
+    const ops = createMulmoScriptServerOps({
+      storiesDir: "/nonexistent/for-tests/artifacts/stories",
+      extraRoots: { repoA: NAMED_ROOT_DIR_A, repoB: NAMED_ROOT_DIR_B },
+      artifactsFor: (root) => (root === "repoA" ? stubFileOps : null),
+      artifacts: stubFileOps,
+      writeFileAtomic: async () => {},
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    assert.equal(ops.guardStoryWriteRoot("repoA"), null, "the root it serves must be allowed");
+    const guard = ops.guardStoryWriteRoot("repoB");
+    assert.ok(guard !== null);
+    assert.match(guard.error, /stories root "repoB"/, "the message must name the root that failed");
+  });
+
+  it("still allows a root the resolver serves, and the default one", () => {
+    // Otherwise the cases above pass by refusing everything.
+    const ops = opsWith(() => stubFileOps);
+    assert.equal(ops.guardStoryWriteRoot("repoA"), null);
+    assert.equal(ops.guardStoryWriteRoot(undefined), null);
+  });
+
+  it("still refuses an unregistered root for being unregistered", () => {
+    // Registration is checked first, so an unknown id must not be reported as
+    // a resolver problem — the host never claimed to serve it.
+    const guard = opsWith(() => stubFileOps).guardStoryWriteRoot("never-registered");
+    assert.ok(guard !== null);
+    assert.match(guard.error, /unknown stories root/);
+  });
+});

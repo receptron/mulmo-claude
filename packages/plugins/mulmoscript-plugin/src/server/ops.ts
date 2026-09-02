@@ -464,12 +464,23 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * It opens per root, not globally: the host answers `artifactsFor` for the
    * roots it can serve, and a root it cannot is still refused. A host that
    * wires nothing keeps the shipped refusal (#3019).
+   *
+   * The two refusals say different things because they are fixed in different
+   * places. No `artifactsFor` at all is a capability this host has not turned
+   * on. `artifactsFor` present but answering `null` for a REGISTERED root is a
+   * wiring mistake inside that host — and it is the quiet one, because the
+   * boot warning stays silent (the resolver WAS passed) while every write is
+   * refused. One message for both read as "the plugin cannot do this yet",
+   * which sends the host looking in the wrong place (#3024).
    */
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
     const registered = guardStoryRootRegistered(root);
     if (registered) return registered;
-    return artifactsForRoot(root) === null ? opBadRequest("writing to a non-default stories root is not supported yet") : null;
+    if (artifactsForRoot(root) !== null) return null;
+    return backend.artifactsFor === undefined
+      ? opBadRequest("writing to a non-default stories root is not supported yet")
+      : opBadRequest(`this host's \`artifactsFor\` returned no FileOps for the registered stories root "${normalizeRoot(root)}"`);
   }
 
   /**
