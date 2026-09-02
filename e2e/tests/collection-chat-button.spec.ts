@@ -60,6 +60,11 @@ test.describe("collection + Chat button", () => {
     await expect(send).toBeDisabled();
     await page.getByTestId("collections-chat-input").fill("make a new entry");
     await expect(send).toBeEnabled();
+
+    // The footer's `options` slot is for HOSTS that need one (MulmoTerminal names the agent the
+    // chat will start as). MulmoClaude passes nothing, so the footer stays the two buttons it
+    // always was — that the slot is invisible here is the whole reason it could be added.
+    await expect(modal.locator("footer button")).toHaveCount(2);
   });
 
   test("submitting seeds a general-role chat with `/<slug> <message>`", async ({ page }) => {

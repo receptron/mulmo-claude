@@ -334,7 +334,13 @@
       @close="configOpen = false"
     />
 
-    <CollectionChatModal v-if="chatOpen && collection" :collection-title="collection.title" @close="closeChat" @submit="submitChat" />
+    <!-- `chat-modal-options` reaches the modal's footer, and ONLY on the standalone path. With
+         `sendTextMessage` set we are inside a chat card and `submitChat` sends into the session
+         already running (useCollectionChat's `dispatchSeed`), so a host control over "which chat
+         gets started" would change nothing — an option that does not apply is worse than none. -->
+    <CollectionChatModal v-if="chatOpen && collection" :collection-title="collection.title" @close="closeChat" @submit="submitChat">
+      <template v-if="!sendTextMessage" #options><slot name="chat-modal-options" /></template>
+    </CollectionChatModal>
   </div>
 </template>
 
