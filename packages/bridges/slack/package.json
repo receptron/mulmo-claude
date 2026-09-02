@@ -32,8 +32,8 @@
     "undici": "^7.29.0"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "tsx": "^4.23.12",
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   },
   "homepage": "https://github.com/receptron/mulmoclaude/tree/main/packages/bridges/slack#readme",

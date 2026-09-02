@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "vuedraggable": "^4.1.0",
-    "zod": "^4.5.2"
+    "zod": "^4.5.4"
   },
   "peerDependencies": {
     "@mulmoclaude/core": "^4.5.0",
@@ -50,7 +50,7 @@
   "devDependencies": {
     "@mulmoclaude/core": "^4.5.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "echarts": "^6.1.0",
     "gui-chat-protocol": "^2.0.0",
