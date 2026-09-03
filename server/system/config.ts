@@ -447,6 +447,17 @@ export interface McpHttpSpec {
   enabled?: boolean;
 }
 
+/** Legacy MCP HTTP+SSE transport. NOT accepted in user config
+ *  (`isMcpServerSpec` rejects it) — it exists only because the
+ *  host-exec shim's gateway speaks SSE, and the spec handed to the
+ *  CLI must name the transport the gateway actually serves (#3018). */
+export interface McpSseSpec {
+  type: "sse";
+  url: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+}
+
 export interface McpStdioSpec {
   type: "stdio";
   command: string;
@@ -464,6 +475,11 @@ export interface McpStdioSpec {
 }
 
 export type McpServerSpec = McpHttpSpec | McpStdioSpec;
+
+/** What `prepareUserServers` hands downstream. Wider than the
+ *  user-writable `McpServerSpec` because the host-exec shim turns an
+ *  opted-in stdio entry into an `sse` spec pointing at its gateway. */
+export type PreparedMcpServerSpec = McpServerSpec | McpSseSpec;
 
 // UI-friendly flat array form. Storage uses the record form; conversion
 // helpers below keep the two in sync.
