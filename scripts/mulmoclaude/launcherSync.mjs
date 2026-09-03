@@ -89,6 +89,7 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
         packageJsonPath: pkgPath,
         peerDependencies: pkg.peerDependencies ?? {},
         dependencies: pkg.dependencies ?? {},
+        devDependencies: pkg.devDependencies ?? {},
       });
     }
   }
@@ -143,6 +144,63 @@ export function satisfies(version, range) {
   return v[0] === lb[0] && v[1] === lb[1] && v[2] === lb[2];
 }
 
+// Every field a manifest can declare an internal dep in. A stale range
+// is equally wrong in all three: `dependencies` ships it, `peer` states
+// what the host must provide, and `dev` is what the package built and
+// tested against.
+const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies"];
+
+// Invariant 6 applies to every manifest EXCEPT the launcher's
+// `dependencies`, which invariant 4 already owns — reporting the same
+// drift twice would make one bad release look like two problems.
+function isOwnedByInvariant4(manifestPath, field, launcherPath) {
+  return manifestPath === launcherPath && field === "dependencies";
+}
+
+// One consumer edge: a manifest declaring a range on a workspace
+// package. The range's lower bound MUST equal that workspace's current
+// version, for the same reason invariant 4 exists — a caret does not
+// float a consumer forward, it pins it to the lower bound, so a stale
+// range withholds every release since from anyone installing it.
+function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion }) {
+  const lower = parseLowerBound(range);
+  if (!lower) {
+    return { kind: "skipped", message: `${relPath}: ${field}."${depName}"="${range}" unparseable — cannot verify vs workspace ${workspaceVersion}` };
+  }
+  if (lower.join(".") === workspaceVersion) return null;
+  return {
+    kind: "consumer-lockstep",
+    message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,
+  };
+}
+
+// Invariant 6: EVERY workspace manifest tracks its internal deps, not
+// just the launcher. `launcherSync` used to check the launcher alone, so
+// a release that bumped a package and swept only the launcher left every
+// plugin's peer/dev range silently stale — 14 such declarations went
+// unreported while the gate showed a single finding (#3037 / #3038).
+export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
+  const launcherPath = path.join(root, LAUNCHER_REL);
+  const manifests = [{ manifestPath: path.join(root, "package.json"), pkg: rootPkg }];
+  for (const ws of workspaces.values()) {
+    manifests.push({ manifestPath: ws.packageJsonPath, pkg: ws });
+  }
+  const findings = [];
+  for (const { manifestPath, pkg } of manifests) {
+    const relPath = path.relative(root, manifestPath) || "package.json";
+    for (const field of DEP_FIELDS) {
+      if (isOwnedByInvariant4(manifestPath, field, launcherPath)) continue;
+      for (const [depName, range] of Object.entries(pkg[field] ?? {})) {
+        const target = workspaces.get(depName);
+        if (!target || depName === pkg.name) continue;
+        const finding = checkConsumerEdge({ relPath, field, depName, range, workspaceVersion: target.version });
+        if (finding) findings.push(finding);
+      }
+    }
+  }
+  return findings;
+}
+
 // Emit findings; each finding = { kind, message } and the caller
 // decides fail vs warn. Kinds:
 //   root-launcher-mismatch  invariant 1 — root ↔ launcher common dep range identical
@@ -150,6 +208,7 @@ export function satisfies(version, range) {
 //   peer-dep-violation      invariant 3 (#1920) — plugin peer dep satisfied by launcher pin
 //   workspace-lockstep      invariant 4 — launcher range lower bound == workspace source (strict ratchet)
 //   peer-dep-lockstep       invariant 5 — plugin peer dep lower bound major.minor == launcher pin major.minor
+//   consumer-lockstep       invariant 6 — EVERY manifest's internal dep range lower bound == workspace source
 //   skipped                 range unparseable → surface for triage
 export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
   const rootPkg = await readJson(path.join(root, "package.json"));
@@ -255,6 +314,8 @@ export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
     }
   }
 
+  findings.push(...auditConsumerLockstep({ root, rootPkg, workspaces }));
+
   return findings;
 }
 
@@ -263,7 +324,7 @@ export async function main() {
   const failing = findings.filter((f) => f.kind !== "skipped");
   const skipped = findings.filter((f) => f.kind === "skipped");
   if (failing.length === 0 && skipped.length === 0) {
-    console.log("[mulmoclaude:launcher-sync] OK — root ↔ launcher deps in sync, no peer-dep violations.");
+    console.log("[mulmoclaude:launcher-sync] OK — root ↔ launcher ↔ every workspace in sync, no peer-dep violations.");
     return 0;
   }
   for (const finding of failing) {
@@ -279,8 +340,10 @@ export async function main() {
   }
   console.error("");
   console.error(`[mulmoclaude:launcher-sync] ${failing.length} failing finding(s).`);
-  console.error("Bring root package.json, packages/mulmoclaude/package.json, and workspace peerDependencies");
-  console.error("into sync before merging. See #1920 for the class of bug this gate catches.");
+  console.error("Bring root package.json, packages/mulmoclaude/package.json, and EVERY workspace's");
+  console.error("dependencies / devDependencies / peerDependencies into sync before merging.");
+  console.error("See #1920 for the original class of bug, and #3037 / #3038 for the releases that");
+  console.error("swept only the launcher and left 14 plugin declarations stale.");
   return 1;
 }
 

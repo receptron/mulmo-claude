@@ -17,6 +17,7 @@ interface FakePackage {
   version: string;
   peerDependencies?: Record<string, string>;
   dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 interface Fixture {
@@ -323,6 +324,120 @@ describe("auditLauncherSync — invariant 5: gui-chat-protocol peer dep lockstep
     try {
       const findings = await sync.auditLauncherSync({ root });
       assert.deepEqual(findings, []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("auditLauncherSync — invariant 6: every manifest tracks its internal deps", () => {
+  // The gap #3037 / #3038 were filed for. Three releases in a row bumped a
+  // workspace package and swept only the launcher; the gate reported ONE
+  // finding while 14 plugin peer/dev declarations stayed stale and unchecked.
+  const staleConsumer = () => ({
+    root: { name: "monorepo", dependencies: {} },
+    launcher: { name: "mulmoclaude", dependencies: { "@mulmoclaude/core": "^4.7.0" } },
+    workspaces: [
+      { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.7.0" } },
+      {
+        dir: "packages/plugins/foo-plugin",
+        pkg: {
+          name: "@mulmoclaude/foo-plugin",
+          version: "1.0.0",
+          peerDependencies: { "@mulmoclaude/core": "^4.6.0" },
+          devDependencies: { "@mulmoclaude/core": "^4.6.0" },
+        },
+      },
+    ],
+  });
+
+  it("catches a plugin's peer AND dev range left behind while the launcher is correct", async () => {
+    const root = makeFakeRepo(staleConsumer());
+    try {
+      const findings = await sync.auditLauncherSync({ root });
+      const consumer = findings.filter((finding) => finding.kind === "consumer-lockstep");
+      assert.equal(consumer.length, 2, "both the peer and the dev declaration are stale");
+      assert.ok(consumer.every((finding) => /foo-plugin.*4\.6\.0.*4\.7\.0/.test(finding.message)));
+      assert.ok(
+        consumer.some((finding) => finding.message.includes("peerDependencies")) && consumer.some((finding) => finding.message.includes("devDependencies")),
+        "names which field is stale, so the sweep is mechanical",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stays silent once the consumer is swept", async () => {
+    const fixture = staleConsumer();
+    const plugin = fixture.workspaces.find((entry) => entry.pkg.name === "@mulmoclaude/foo-plugin");
+    assert.ok(plugin, "fixture must contain the plugin whose ranges we are sweeping");
+    plugin.pkg.peerDependencies = { "@mulmoclaude/core": "^4.7.0" };
+    plugin.pkg.devDependencies = { "@mulmoclaude/core": "^4.7.0" };
+    const root = makeFakeRepo(fixture);
+    try {
+      assert.deepEqual(await sync.auditLauncherSync({ root }), []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports a stale launcher dep once, not twice", async () => {
+    // Invariant 4 already owns the launcher's `dependencies`. Reporting the
+    // same drift from both rules would make one bad release read as two.
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: { "@mulmoclaude/core": "^4.6.0" } },
+      workspaces: [{ dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.7.0" } }],
+    });
+    try {
+      const findings = await sync.auditLauncherSync({ root });
+      assert.equal(findings.filter((finding) => finding.kind === "workspace-lockstep").length, 1);
+      assert.equal(findings.filter((finding) => finding.kind === "consumer-lockstep").length, 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores external deps and a package's own name", async () => {
+    // Only workspace-internal edges are knowable from the tree; an external
+    // range is the author's call and a self-reference is not an edge at all.
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: {} },
+      workspaces: [
+        {
+          dir: "packages/plugins/foo-plugin",
+          pkg: {
+            name: "@mulmoclaude/foo-plugin",
+            version: "1.0.0",
+            dependencies: { vue: "^3.0.0", "@mulmoclaude/foo-plugin": "^0.0.1" },
+          },
+        },
+      ],
+    });
+    try {
+      assert.deepEqual(await sync.auditLauncherSync({ root }), []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("surfaces an unparseable consumer range as skipped, never as a failure", async () => {
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: {} },
+      workspaces: [
+        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.7.0" } },
+        {
+          dir: "packages/plugins/foo-plugin",
+          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", dependencies: { "@mulmoclaude/core": "workspace:*" } },
+        },
+      ],
+    });
+    try {
+      const findings = await sync.auditLauncherSync({ root });
+      assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0, "a range we cannot parse must not fail the gate");
+      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
