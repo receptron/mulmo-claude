@@ -8,6 +8,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Fixed
+
+#### `@mulmoclaude/core@4.6.0` — a custom view's staging base is decided per SLUG, not per root (#3031, PR #3032; mulmoterminal#1957, mulmoterminal#1955)
+
+Released 2026-09-03. `readSourceAwareFile` prepended the `data/skills/<slug>/` staging base for
+every project-scope collection whenever the ROOT had a staging tree, without checking that the
+slug itself was staged — `stagingSkillDir(root, slug)` only answers "does this root stage" and
+then joins the slug.
+
+A staged workspace does not hold only staged collections. It also holds ones imported through the
+discover panel and ones committed directly under `.claude/skills/`, and a leftover
+`data/skills/<slug>/views/*.html` beside one of those won on every read — silently, and against
+the copy the repository actually commits.
+
+The read and the custom-view delete path now share one predicate, the newly exported
+**`stagedSkillDir(workspaceRoot, safeSlug)`**, which returns `<staging>/<slug>` only when that
+slug's own `schema.json` is present. `views.ts` had always made this check in `canonicalBase` /
+`schemaWriteTargets`, and its JSDoc has claimed "Matches `readCustomViewHtml` so reads and deletes
+agree on both layouts" since #1836 — sharing the function is what makes that structurally true
+instead of a convention two files had to remember.
+
+**Unchanged**: properly staged collections (staging still wins), imported collections, roots with
+no staging tree (`skillsStagingDir` → `null`), and `user` / `feed` scope. The behaviour moves only
+for a slug that has a stale staging view but no staged schema of its own — there the committed
+copy now wins.
+
+The evidence check uses `lstat`, so a symlink standing in for `schema.json` is not evidence, and
+it **propagates** anything that is not `ENOENT` / `ENOTDIR`. Collapsing an unreadable staging tree
+into "unstaged" would quietly serve the other base's copy, which is the masking the read loop
+already refuses (Sourcery review on #3032). The delete path inherits the same `lstat` semantics —
+previously `stat`, which followed symlinks.
+
+Why this had to land in core: a host binding cannot express the decision. `skillsStagingDir` is
+`(workspaceRoot: string) => string | null` and never sees the slug, so MulmoTerminal could fix
+which ROOTS stage (mulmoterminal#1955) but not which SLUGS are staged. Fixing it here lands for
+both hosts at once.
+
+**No dependency ranges were swept.** Every consumer declares a `^4.x` caret, which floats across
+minors, so they resolve 4.6.0 on their own; nothing in this tree imports `stagedSkillDir` from the
+published package, so the sweep would be tidiness rather than delivery (the same reasoning as
+4.1.1 / 4.3.0). Also refreshed in this window: `zod` `^4.5.2` → `^4.5.4`, plus `@types/node` and
+`tsx` on the dev side (PR #3030).
+
 ---
 
 ## [1.15.0] - 2026-08-30
